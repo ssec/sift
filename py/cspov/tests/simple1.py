@@ -19,12 +19,16 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(label)
 
         toolbar = QToolBar("och")
+        toolbar.setIconSize(QSize(20,20))
         self.addToolBar(toolbar)
 
-        button_action = QAction("ochtuse", self)
+        button_action = QAction(QIcon("balance.png"), "ochtuse", self)
         button_action.setStatusTip("och, just do something")
         button_action.triggered.connect(self.onMyToolBarButtonClick)
+        button_action.setCheckable(True)
         toolbar.addAction(button_action)
+        toolbar.addWidget(QLabel("OCH"))
+        toolbar.addWidget(QCheckBox())
 
         self.setStatusBar(QStatusBar(self))
 
