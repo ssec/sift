@@ -26,12 +26,23 @@ class MainWindow(QMainWindow):
         button_action.setStatusTip("och, just do something")
         button_action.triggered.connect(self.onMyToolBarButtonClick)
         button_action.setCheckable(True)
+        # button_action.setShortcut(QKeySequence("Ctrl+p"))
+        # button_action.setShortcut(QKeySequence(Qt.CTRL + Qt.Key_P))
+        button_action.setShortcut(QKeySequence.Print)
         toolbar.addAction(button_action)
         toolbar.addWidget(QLabel("OCH"))
         toolbar.addWidget(QCheckBox())
 
         self.setStatusBar(QStatusBar(self))
 
+
+        menu = self.menuBar()
+
+        file_menu = menu.addMenu("&File")
+        file_menu.addAction(button_action)
+        file_menu.addSeparator()
+        file_menu.addMenu("Do not push")
+#        file_menu.addAction()
 
     def onMyToolBarButtonClick(self, s):
         print("click", s)
