@@ -26,6 +26,10 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(widget)
         self.significant.connect(self.on_my_signal)
 
+    def contextMenuEvent(self, e):
+        print("context menu")
+        super(MainWindow, self).contextMenuEvent(e)  # can also use e.accept() or e.ignore()
+
     def on_golden_pond(self, a):
         print(a)
 
