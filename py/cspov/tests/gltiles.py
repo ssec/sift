@@ -6,6 +6,23 @@ from PyQt4.QtCore import *
 # http://pyqt.sourceforge.net/Docs/PyQt4/modules.html
 #from PyQt4.QtWidgets import *
 
+class GLTile(object):
+    """
+    A lazy-loaded image which can be mapped to a texture buffer and drawn on a polygon
+    Represents a single x-y coordinate range at a single level of detail
+    """
+
+
+class GLTileArray(object):
+    """
+    A single level of detail with lazy loading of tiles
+    Tiles may or may not be available
+    Tiles follow a predictable lookup
+    """
+    def __init__(self, index, lod):
+        """
+        index is a mapping which { (0,0): GLTile(), ... }
+
 
 class MainWindow(QMainWindow):
 
