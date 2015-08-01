@@ -19,9 +19,56 @@ class GLTileArray(object):
     Tiles may or may not be available
     Tiles follow a predictable lookup
     """
+    _drawlist = None 
+
     def __init__(self, index, lod):
         """
         index is a mapping which { (0,0): GLTile(), ... }
+        """
+        pass
+
+    def get_drawlist(self):
+        return self._drawlist
+
+    def set_drawlist(self, number):
+        self._drawlist = number
+
+    gldrawlist = property(get_drawlist, set_drawlist)
+
+
+    def tileseq_in_area(self, index_bltr): 
+        """
+        yield the sequence of tiles in a given rectangular tileseq_in_area
+        """
+        pass
+
+    def tileseq_visible(self, data_bltr): 
+        """
+        given data coordinates, determine which tiles are on the canvas
+        """
+        pass
+
+    def glLoadTextures(self, tile_seq):
+        pass
+
+    def glDraw(self, tile_seq, to_drawlist=None):
+        """
+        send drawing commands for a sequence of tiles
+
+        """
+
+    def glRedraw(self, data_bltr):
+        """
+        if bltr is inside most recently drawn bltr, redraw with draw list
+        otherwise do a full draw 
+        """
+
+
+class LayerStack(object):
+    """
+    manage stack of layers including tiles, vectors, overlays etc
+    """
+
 
 
 class MainWindow(QMainWindow):
