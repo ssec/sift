@@ -41,21 +41,21 @@ from PyQt4.QtOpenGL import *
 import numpy as np
 
 
-DEFAULT_TILE_HEIGHT = 512   # 180°
-DEFAULT_TILE_WIDTH = 1024   # 360°
+DEFAULT_TILE_HEIGHT = 256   # 180°
+DEFAULT_TILE_WIDTH = 512   # 360°
 
 
 # mercator
 MAX_SCENE_Y = 39940660.0
 MAX_SCENE_X = 40075020.0
 
-box = namedtuple('box', ('bottom', 'left', 'top', 'right'))
+box = namedtuple('box', ('b', 'l', 't', 'r'))  # bottom, left, top, right
 rez = namedtuple('rez', ('dy', 'dx'))
 pnt = namedtuple('pnt', ('y', 'x'))
-geo = namedtuple('geo', ('lat', 'lon'))
+geo = namedtuple('geo', ('n', 'e'))  # lat N, lon E
 
 # eqm coordinates describing a view
-view_geometry = namedtuple('render_geometry', ('bottom', 'left', 'top', 'right', 'dy', 'dx'))
+view_geometry = namedtuple('view_geometry', ('b', 'l', 't', 'r', 'dy', 'dx'))
 
 
 class CoordSystem(object):
@@ -129,37 +129,136 @@ class MercatorTileCalc(object):
 
     name = None
     pixel_shape = None
-    extent_box = None
+    pixel_rez = None
     zero_point = None
     tile_shape = None
-    _pixel_rez = None
+    # derived
+    extents_box = None  # word coordinates that this image and its tiles corresponds to
+    tiles_avail = None  # (ny,nx) available tile count for this image
 
-    def __init__(self, name, pixel_shape, extent_box, zero_point, tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH)):
+    def __init__(self, name, pixel_shape, zero_point, pixel_rez, tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH)):
         """
         name: the 'name' of the tile, typically the path of the file it represents
-        pixel_shape: (h,w) in pixels
-        extent_box: eqm box the image represents
-        zero_point: the pixel (y,x) in the image that represents 0,0 eqm, even if outside the image
-        tile_shape: the pixel dimensions of the GPU tiling we want to use
+        pixel_shape: (h:int,w:int) in pixels
+        zero_point: (y:float,x:float) in pixels that represents world coords 0N,0E eqm, even if outside the image and even if fractional
+        pixel_rez: (dy:float,dx:float) in world coords per pixel ascending from corner [0,0]
+        tile_shape: the pixel dimensions (h:int, w:int) of the GPU tiling we want to use
+
+        Tiling is aligned to pixels, not world
+        World coordinates are eqm such that 0,0 matches 0°N 0°E, going north/south +-90° and west/east +-180°
+        Data coordinates are pixels with b l or b r corner being 0,0
         """
         self.name = name
         self.pixel_shape = pixel_shape
-        self.extent_box = extent_box
         self.zero_point = zero_point
+        self.pixel_rez = pixel_rez
         self.tile_shape = tile_shape
 
-        # epm per pixel
-        dy = (extent_box.top - extent_box.bottom)/pixel_shape[0]
-        dx = (extent_box.right - extent_box.left)/pixel_shape[1]
-        self._pixel_rez = rez(dy,dx)
+        assert(pixel_rez.dy > 0.0)        # FIXME: what if pixel_rez.dy < 0? can we handle this reliably?
+        assert(pixel_rez.dx > 0.0)
+
+        h,w = pixel_shape
+        zy,zx = zero_point
+        # below < 0, above >0
+        # h = above - below
+        # zy + above = h
+        # below = -zy
+        pxbelow = float(-zy)
+        pxabove = float(h) - float(zy)
+        # r > 0, l < 0
+        # w = r - l
+        # zx + r = w
+        # l = -zx
+        pxright = float(w) - float(zx)
+        pxleft = float(-zx)
+
+        self.extents_box = box(
+            b = pxbelow * pixel_rez.dy,
+            t = pxabove * pixel_rez.dy,
+            l = pxleft * pixel_rez.dx,
+            r = pxright * pixel_rez.dx
+        )
+
+        self.tiles_avail = (h/tile_shape[0], w/tile_shape[1])
+
+        # FIXME: for now, require image size to be a multiple of tile size, else we have to deal with partial tiles!
+        assert(h % tile_shape[0]==0)
+        assert(w % tile_shape[1]==0)
 
 
-    def visible_tiles(self, screen_geom, extra_box = box(0,0,0,0)):
+    def visible_tiles(self, visible_geom, extra_tiles_box = box(0,0,0,0)):
         """
-        given a visible screen geometry and sampling, return (sampling-state, [list-of-tiles-to-draw])
+        given a visible world geometry and sampling, return (sampling-state, [box-of-tiles-to-draw])
         sampling state is WELLSAMPLED/OVERSAMPLED/UNDERSAMPLED
+        tiles are specified as (iy,ix) integer pairs
         extra_box value says how many extra tiles to include around each edge
         """
+        V = visible_geom
+        X = extra_tiles_box  # FUTURE: extra_geom_box specifies in world coordinates instead of tile count
+        E = self.extents_box
+        Z = self.pixel_rez
+
+        # convert world coords to pixel coords
+        py0, px0 = self.extents_box.b, self.extents_box.l
+
+        # pixel view b
+        pv = box(
+            b = (V.b - E.b)/Z.dy,
+            l = (V.l - E.l)/Z.dx,
+            t = (V.t - E.b)/Z.dy,
+            r = (V.r - E.l)/Z.dx
+        )
+
+        # number of tiles wide and high we'll absolutely need
+        th,tw = self.tile_shape
+        nth = int(np.ceil((pv.t - pv.b) / th))
+        ntw = int(np.ceil((pv.r - pv.l) / tw))
+
+        # first tile we'll need is (tiy0,tix0)
+        tiy0 = int(np.floor(pv.b / th))
+        tix0 = int(np.floor(pv.l / tw))
+
+        # now add the extras
+        if X.b>0:
+            tiy0 -= int(X.b)
+            nth += int(X.b)
+        if X.l>0:
+            tix0 -= int(X.l)
+            ntw += int(X.l)
+        if X.t>0:
+            nth += int(X.t)
+        if X.r>0:
+            ntw += int(X.r)
+
+        # truncate to the available tiles
+        if tix0<0:
+            ntw += tix0
+            tix0 = 0
+        if tiy0<0:
+            nth += tiy0
+            tiy0 = 0
+
+        ath,atw = self.tiles_avail
+        xth = ath - (tiy0 + nth)
+        if xth < 0:  # then we're asking for tiles that don't exist
+            nth += xth  # trim it back
+        xtw = atw - (tix0 + ntw)
+        if xtw < 0:  # likewise with tiles wide
+            ntw += xtw
+
+        # FIXME: compare visible dx/dy versus tile dx/dy to determine over/undersampledness
+        overunder = self.WELLSAMPLED
+
+        tileset = box(
+            b = tiy0,
+            l = tix0,
+            t = tiy0 + nth,
+            r = tix0 + ntw
+        )
+
+        return overunder, tileset
+
+
 
 
 
@@ -186,7 +285,7 @@ class DataTilesFromFile(object):
         """
         map the file as read-only
         chop it into data tiles
-        tiles are set up such that tile (0,0) starts with zero_point and goes up and to the right
+        tiles are set up such that tile (0,0) starts with zero_point and goes up and to the r
 
         """
         self.data = np.memmap(path, element_dtype, 'r', shape=shape)
