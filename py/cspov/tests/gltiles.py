@@ -8,40 +8,30 @@ Scene coordinate are meters along the 0 parallel
 y range +/- 6356752.3142 * 2 * pi => 39,940,652.742
 x range +/- 6378137.0 * 2 * pi => 40,075,016.6856
 
+"eqm" = equator-meter, we're using mercator projection as a baseline with
+
 References
 https://bitbucket.org/rndblnch/opengl-programmable/raw/29d0c699c82a2ca961014e7eb5e6cd3a87fe5883/05-shader.py
 
 Layers
     can hold more than one level of detail (LayerRepresentation), only 1-2 of which are activated at any given time
-    can belong to multiple GLWidgets
-    render GLDrawLists and GLActiveTextures that draw a subset of the overall layer data, with a suitable level of detail
-
-GLDrawLists
-    cannot belong to multiple widgets
-
-GLTextures
-    later: have a key so they can be shared and properly reference-counted
-    can belong to multiple drawlists
+    can paint to multiple GLWidgets
+    render draw-lists and textures that draw a subset of the overall layer data, with a suitable level of detail
 
 
 Rendering loop
     For each layer
-        Is layer current rendering ideal, i.e. well suited for this set of extents?
-            No: put it on a dirty list to be re-rendered to a new drawlist
-        Is the layer current rendering valid, i.e. is it even worth drawing?
-            No: continue on to the next higher layer
-        Render the drawlist of this layer with GLDrawList.paintGL()
+        call Layer's paint, giving it information about the extents and sampling so it can pick best of the ready representations
+        note whether the layer returned False and is requesting a re-render when the dust has settled => add to dirty layer list
 
 Idle loop
     For each dirty layer
         Have layer render new draw list
-
-
-
-
+        If layer has problems rendering, call a purge on all layers and then re-render
 
 
 """
+
 import sys
 from collections import namedtuple
 from OpenGL.GL import *
@@ -64,6 +54,9 @@ rez = namedtuple('rez', ('dx', 'dy'))
 pnt = namedtuple('pnt', ('x', 'y'))
 geo = namedtuple('geo', ('lat', 'lon'))
 
+# eqm coordinates describing a view
+view_geometry = namedtuple('render_geometry', ('bottom', 'left', 'top', 'right', 'dy', 'dx'))
+
 
 class CoordSystem(object):
     """
@@ -84,34 +77,35 @@ class Layer(object):
     - typically will cache a "coarsest" single-tile representation for zoom-out events
     - can have probes attached which operate primarily on the science representation
     """
-    def paint(self, extent_box, sample_rez):
+    def paint(self, geom):
         """
         draw the most appropriate representation for this layer
         if a better representation could be rendered for later draws, return False and render() will be queued for later idle time
         """
         return True
 
-    def render(self, extent_box, sample_rez):
+    def render(self, geom, *more_geom):
         """
         cache a rendering (typically a draw-list with textures) that best handles the extents and sampling requested
+        if more than one view is active, more geometry may be provided for other views
         return False if resources were too limited and a purge is needed among the layer stack
         """
         return True
 
-    def purge(self):
+    def purge(self, geom, *more_geom):
         """
         release any cached representations that we haven't used lately, leaving at most 1
         return True if any GL resources were released
         """
         return False
 
-    def probe_point_merc(self, xy_point):
+    def probe_point_xy(self, x, y):
         """
         return a value array for the requested point as specified in mercator-meters
         """
         raise NotImplementedError()
 
-    def probe_point_geo(self, geo_point):
+    def probe_point_geo(self, lat, lon):
         """
         """
         raise NotImplementedError()
@@ -122,47 +116,6 @@ class Layer(object):
         """
         raise NotImplementedError()
 
-
-
-
-
-class GeoLayer(object):
-    """
-    A layer that has geospatial projection and follows the geospatial cursor
-    """
-    pass
-
-
-
-class LayerRep(object):
-    """
-    Layer Representation that can be immediately drawn in OpenGL.
-    Layers emit draw lists.
-    Draw lists are cache entities that may no longer be valid if their extents or detail level are exceeded.
-    When a DrawList is invalid, it gets phased out in favor of a new DrawList.
-    """
-    extents = (0.0, 0.0)  # view extents which we're able to render
-    textures = None  # set of textures we need in order to draw
-    layer = None   # layer we correspond to
-    list_number = 0  # our draw list number, allocated from OpenGL
-
-    # def __init__(self, number=0):
-
-
-    def is_ideal_and_valid(self, extents, stride):
-        """
-        return pair of bools, (ideal, valid)
-        ideal: are we able to fully represent this extent/stride?
-        valid: are we even relevant for this extent/stride?
-        typically, non-ideal will cause an assessment of whether another LOD should be brought in,
-          but we might continue to use it temporarily (e.g. during zooms) for responsiveness
-        non-valid will prevent the drawlist from being used
-        """
-
-    def draw(self, context):
-        """
-        given a prepared and scaled context, perform drawing
-        """
 
 
 
@@ -236,50 +189,69 @@ class DataTilesFromFile(object):
 
 
 
-
-
-
-class GLGeoLodTileArray(GeoLayer):
+class GLGeoTileArray(Layer):
     """
-    A single level of detail with lazy loading of tiles
-    Tiles may or may not be available
-    Tiles follow a predictable lookup
+    Mercator-projected geographic layer with one or more levels of detail
     """
 
-    def __init__(self, index, lod):
-        """
-        index is a mapping which { (0,0): GLTile(), ... }
-        """
-        pass
-
-
-    def render(self, glcontext, extents, replacing_drawlist=None):
-        """
-        we're being activated, optionally using another layer that we want to align to
-        for instance, if we're shifting LOD one will activate and the other will deactivate
-        obtain any needed GL resources and prefill
-        return a GLDrawList that draws us quickly while it's valid; come back
+    def __init__(self, tiles):
         """
 
-        # make sure we've got all the textures we need
-
-        # create a quad array that puts all the textures onto the screen
-
-        pass
-
-
-    def tileseq_in_area(self, index_bltr):
-        """
-        yield the sequence of tiles in a given rectangular tileseq_in_area
         """
         pass
 
-    def tileseq_visible(self, data_bltr): 
+    def paint(self, geom):
         """
-        given data coordinates, determine which tiles are on the canvas
+        draw the most appropriate representation for this layer
+        if a better representation could be rendered for later draws, return False and render() will be queued for later idle time
         """
-        pass
+        return True
 
+    def render(self, geom, *more_geom):
+        """
+        cache a rendering (typically a draw-list with textures) that best handles the extents and sampling requested
+        if more than one view is active, more geometry may be provided for other views
+        return False if resources were too limited and a purge is needed among the layer stack
+        """
+        return True
+
+    def purge(self, geom, *more_geom):
+        """
+        release any cached representations that we haven't used lately, leaving at most 1
+        return True if any GL resources were released
+        """
+        return False
+
+    def probe_point_xy(self, x, y):
+        """
+        return a value array for the requested point as specified in mercator-meters
+        """
+        raise NotImplementedError()
+
+    def probe_point_geo(self, lat, lon):
+        """
+        """
+        raise NotImplementedError()
+
+    def probe_shape(self, geo_shape):
+        """
+        given a shapely description of an area, return a masked array of data
+        """
+        raise NotImplementedError()
+
+
+    # def tileseq_in_area(self, index_bltr):
+    #     """
+    #     yield the sequence of tiles in a given rectangular tileseq_in_area
+    #     """
+    #     pass
+    #
+    # def tileseq_visible(self, data_bltr):
+    #     """
+    #     given data coordinates, determine which tiles are on the canvas
+    #     """
+    #     pass
+    #
 
 
 
