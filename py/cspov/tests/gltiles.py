@@ -21,8 +21,10 @@ from PyQt4.QtCore import *
 from PyQt4.QtOpenGL import *
 import numpy as np
 
-DEFAULT_TILE_HEIGHT = 1024
-DEFAULT_TILE_WIDTH = 1024
+
+DEFAULT_TILE_HEIGHT = 512   # 360°
+DEFAULT_TILE_WIDTH = 1024   # 180°
+
 
 MAX_SCENE_Y = 39940660
 MAX_SCENE_X = 40075020
@@ -205,7 +207,14 @@ class GLGeoLodTileArray(GeoLayer):
 
 
 class Layer(object):
-    pass
+    def paintGL(self):
+        glColor3f(0.0, 0.0, 1.0)
+        glRectf(-5, -5, 5, 5)
+        glColor3f(1.0, 0.0, 0.0)
+        glBegin(GL_LINES)
+        glVertex3f(0, 0, 0)
+        glVertex3f(20, 20, 0)
+
 
 
 class GeoTiledLayer(Layer):
@@ -217,24 +226,17 @@ class GeoTiledLayer(Layer):
     """
 
 
-class LayerStack(object):
-    """
-    manage stack of layers including tiles, vectors, overlays etc
-    """
-
-
 class CsGlWidget(QGLWidget):
+    layers = None
+
     def __init__(self, parent=None):
         super(CsGlWidget, self).__init__(parent)
+        self.layers = [Layer()]
 
     def paintGL(self):
         glClear(GL_COLOR_BUFFER_BIT)
-        glColor3f(0.0, 0.0, 1.0)
-        glRectf(-5, -5, 5, 5)
-        glColor3f(1.0, 0.0, 0.0)
-        glBegin(GL_LINES)
-        glVertex3f(0, 0, 0)
-        glVertex3f(20, 20, 0)
+        for layer in self.layers:
+            layer.paintGL()
         glEnd()
 
     def resizeGL(self, w, h):
