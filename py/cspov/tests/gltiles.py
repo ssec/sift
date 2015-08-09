@@ -50,8 +50,8 @@ MAX_SCENE_Y = 39940660.0
 MAX_SCENE_X = 40075020.0
 
 box = namedtuple('box', ('bottom', 'left', 'top', 'right'))
-rez = namedtuple('rez', ('dx', 'dy'))
-pnt = namedtuple('pnt', ('x', 'y'))
+rez = namedtuple('rez', ('dy', 'dx'))
+pnt = namedtuple('pnt', ('y', 'x'))
 geo = namedtuple('geo', ('lat', 'lon'))
 
 # eqm coordinates describing a view
@@ -118,6 +118,52 @@ class Layer(object):
 
 
 
+class MercatorTileCalc(object):
+    """
+    common calculations for mercator tile groups in an array or file
+    tiles are identified by (iy,ix) zero-based indicators
+    """
+    OVERSAMPLED=1
+    UNDERSAMPLED=-1
+    WELLSAMPLED=0
+
+    name = None
+    pixel_shape = None
+    extent_box = None
+    zero_point = None
+    tile_shape = None
+    _pixel_rez = None
+
+    def __init__(self, name, pixel_shape, extent_box, zero_point, tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH)):
+        """
+        name: the 'name' of the tile, typically the path of the file it represents
+        pixel_shape: (h,w) in pixels
+        extent_box: eqm box the image represents
+        zero_point: the pixel (y,x) in the image that represents 0,0 eqm, even if outside the image
+        tile_shape: the pixel dimensions of the GPU tiling we want to use
+        """
+        self.name = name
+        self.pixel_shape = pixel_shape
+        self.extent_box = extent_box
+        self.zero_point = zero_point
+        self.tile_shape = tile_shape
+
+        # epm per pixel
+        dy = (extent_box.top - extent_box.bottom)/pixel_shape[0]
+        dx = (extent_box.right - extent_box.left)/pixel_shape[1]
+        self._pixel_rez = rez(dy,dx)
+
+
+    def visible_tiles(self, screen_geom, extra_box = box(0,0,0,0)):
+        """
+        given a visible screen geometry and sampling, return (sampling-state, [list-of-tiles-to-draw])
+        sampling state is WELLSAMPLED/OVERSAMPLED/UNDERSAMPLED
+        extra_box value says how many extra tiles to include around each edge
+        """
+
+
+
+
 
 
 class DataTilesFromFile(object):
@@ -125,6 +171,11 @@ class DataTilesFromFile(object):
     A lazy-loaded image which can be mapped to a texture buffer and drawn on a polygon
     Represents a single x-y coordinate range at a single level of detail
     Will map data into GL texture memory for rendering
+
+    Tiles have
+    - extents in the mercator-meters space
+    - a texture map
+    - later: a shader which may be shared
     """
     data = None
     tile_shape = None
@@ -146,8 +197,10 @@ class DataTilesFromFile(object):
     def activate(self, tile_y, tile_x, transform_func=None):
         """
         load a texture map from this data
+        return ( box, texture-id )
         """
-        buffer_id = glGenBuffers(1)
+        # FUTURE: implement using glGenBuffers() and use a shader to render
+        texid = glGenTextures(1)
 
         # offset within the array
         th,tw = self.tile_shape
@@ -156,6 +209,12 @@ class DataTilesFromFile(object):
         ye = ys + th
         xe = xs + tw
         npslice = self.data[ys:ye, xs:xe]
+
+        # FIXME: temporarmily require that textures aren't odd sizes
+        assert(xe<=self.data.shape[1])
+        assert(ye<=self.data.shape[0])
+
+        glTexSubImage2D()
 
         # # start working with this buffer
         # glBindBuffer(GL_COPY_WRITE_BUFFER, buffer_id)
