@@ -11,6 +11,35 @@ x range +/- 6378137.0 * 2 * pi => 40,075,016.6856
 References
 https://bitbucket.org/rndblnch/opengl-programmable/raw/29d0c699c82a2ca961014e7eb5e6cd3a87fe5883/05-shader.py
 
+Layers
+    can hold more than one level of detail (LayerRepresentation), only 1-2 of which are activated at any given time
+    can belong to multiple GLWidgets
+    render GLDrawLists and GLActiveTextures that draw a subset of the overall layer data, with a suitable level of detail
+
+GLDrawLists
+    cannot belong to multiple widgets
+
+GLTextures
+    later: have a key so they can be shared and properly reference-counted
+    can belong to multiple drawlists
+
+
+Rendering loop
+    For each layer
+        Is layer current rendering ideal, i.e. well suited for this set of extents?
+            No: put it on a dirty list to be re-rendered to a new drawlist
+        Is the layer current rendering valid, i.e. is it even worth drawing?
+            No: continue on to the next higher layer
+        Render the drawlist of this layer with GLDrawList.paintGL()
+
+Idle loop
+    For each dirty layer
+        Have layer render new draw list
+
+
+
+
+
 
 """
 import sys
@@ -22,18 +51,18 @@ from PyQt4.QtOpenGL import *
 import numpy as np
 
 
-DEFAULT_TILE_HEIGHT = 512   # 360°
-DEFAULT_TILE_WIDTH = 1024   # 180°
+DEFAULT_TILE_HEIGHT = 512   # 180°
+DEFAULT_TILE_WIDTH = 1024   # 360°
 
 
-MAX_SCENE_Y = 39940660
-MAX_SCENE_X = 40075020
+# mercator
+MAX_SCENE_Y = 39940660.0
+MAX_SCENE_X = 40075020.0
 
-extent_t = namedtuple('extent_t', ('bottom', 'left', 'top', 'right'))
-
-
-# http://pyqt.sourceforge.net/Docs/PyQt4/modules.html
-#from PyQt4.QtWidgets import *
+box = namedtuple('box', ('bottom', 'left', 'top', 'right'))
+rez = namedtuple('rez', ('dx', 'dy'))
+pnt = namedtuple('pnt', ('x', 'y'))
+geo = namedtuple('geo', ('lat', 'lon'))
 
 
 class CoordSystem(object):
@@ -46,6 +75,55 @@ class CoordSystem(object):
     LATLON_DEGREES = 4  # lat/lon
 
 
+class Layer(object):
+    """
+    A Layer
+    - has one or more representations available to immediately draw
+    - may want to schedule the rendering of other representations during idle time, to get ideal view
+    - may have a backing science representation which is pure science data instead of pixel values or RGBA maps
+    - typically will cache a "coarsest" single-tile representation for zoom-out events
+    - can have probes attached which operate primarily on the science representation
+    """
+    def paint(self, extent_box, sample_rez):
+        """
+        draw the most appropriate representation for this layer
+        if a better representation could be rendered for later draws, return False and render() will be queued for later idle time
+        """
+        return True
+
+    def render(self, extent_box, sample_rez):
+        """
+        cache a rendering (typically a draw-list with textures) that best handles the extents and sampling requested
+        return False if resources were too limited and a purge is needed among the layer stack
+        """
+        return True
+
+    def purge(self):
+        """
+        release any cached representations that we haven't used lately, leaving at most 1
+        return True if any GL resources were released
+        """
+        return False
+
+    def probe_point_merc(self, xy_point):
+        """
+        return a value array for the requested point as specified in mercator-meters
+        """
+        raise NotImplementedError()
+
+    def probe_point_geo(self, geo_point):
+        """
+        """
+        raise NotImplementedError()
+
+    def probe_shape(self, geo_shape):
+        """
+        given a shapely description of an area, return a masked array of data
+        """
+        raise NotImplementedError()
+
+
+
 
 
 class GeoLayer(object):
@@ -56,10 +134,9 @@ class GeoLayer(object):
 
 
 
-
-
-class GLDrawList(object):
+class LayerRep(object):
     """
+    Layer Representation that can be immediately drawn in OpenGL.
     Layers emit draw lists.
     Draw lists are cache entities that may no longer be valid if their extents or detail level are exceeded.
     When a DrawList is invalid, it gets phased out in favor of a new DrawList.
@@ -217,6 +294,8 @@ class Layer(object):
 
 
 
+
+
 class GeoTiledLayer(Layer):
     """
     We have one or more levels of detail (LOD).
@@ -224,6 +303,14 @@ class GeoTiledLayer(Layer):
     When enough changes to extents/stride occur, switch LOD and update to a new GLDrawList.
     Manage a tile texture pool
     """
+
+class GeoTestPatternLayer(GeoTiledLayer):
+    """
+    a layer that shows a colored texture tile pattern
+    """
+
+
+
 
 
 class CsGlWidget(QGLWidget):
@@ -237,6 +324,7 @@ class CsGlWidget(QGLWidget):
         glClear(GL_COLOR_BUFFER_BIT)
         for layer in self.layers:
             layer.paintGL()
+
         glEnd()
 
     def resizeGL(self, w, h):
