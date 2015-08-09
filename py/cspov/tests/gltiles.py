@@ -255,8 +255,8 @@ class GLGeoTileArray(Layer):
 
 
 
-class Layer(object):
-    def paintGL(self):
+class TestLayer(Layer):
+    def paint(self, *args):
         glColor3f(0.0, 0.0, 1.0)
         glRectf(-5, -5, 5, 5)
         glColor3f(1.0, 0.0, 0.0)
@@ -268,34 +268,18 @@ class Layer(object):
 
 
 
-class GeoTiledLayer(Layer):
-    """
-    We have one or more levels of detail (LOD).
-    Provide GLDrawList entities to the main gl context draw loop.
-    When enough changes to extents/stride occur, switch LOD and update to a new GLDrawList.
-    Manage a tile texture pool
-    """
-
-class GeoTestPatternLayer(GeoTiledLayer):
-    """
-    a layer that shows a colored texture tile pattern
-    """
-
-
-
-
 
 class CsGlWidget(QGLWidget):
     layers = None
 
     def __init__(self, parent=None):
         super(CsGlWidget, self).__init__(parent)
-        self.layers = [Layer()]
+        self.layers = [TestLayer()]
 
     def paintGL(self):
         glClear(GL_COLOR_BUFFER_BIT)
         for layer in self.layers:
-            layer.paintGL()
+            layer.paint()
 
         glEnd()
 
