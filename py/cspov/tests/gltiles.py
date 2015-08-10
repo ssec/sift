@@ -74,13 +74,14 @@ class Layer(object):
     - has one or more representations available to immediately draw
     - may want to schedule the rendering of other representations during idle time, to get ideal view
     - may have a backing science representation which is pure science data instead of pixel values or RGBA maps
-    - typically will cache a "coarsest" single-tile representation for zoom-out events
+    - typically will cache a "coarsest" single-tile representation for zoom-out events (preferred for fast=True paint calls)
     - can have probes attached which operate primarily on the science representation
     """
-    def paint(self, geom):
+    def paint(self, geom, fast=False):
         """
         draw the most appropriate representation for this layer
         if a better representation could be rendered for later draws, return False and render() will be queued for later idle time
+        fast flag requests that low-cost rendering be used
         """
         return True
 
@@ -259,13 +260,22 @@ class MercatorTileCalc(object):
         return overunder, tileset
 
 
+    def tile_pixels(self, data, tiy, tix):
+        """
+        extract pixel data for a given tile
+        """
+        return data[
+               tiy*self.tile_shape[0]:(tiy+1)*self.tile_shape[0],
+               tix*self.tile_shape[1]:(tix+1)*self.tile_shape[1]
+               ]
 
 
 
 
 
 
-class DataTilesFromFile(object):
+
+class FlatFileTileSet(object):
     """
     A lazy-loaded image which can be mapped to a texture buffer and drawn on a polygon
     Represents a single x-y coordinate range at a single level of detail
@@ -277,11 +287,11 @@ class DataTilesFromFile(object):
     - later: a shader which may be shared
     """
     data = None
-    tile_shape = None
     path = None
     _active = None     # {(y,x): (buffer,texture), ...}
+    _calc = None  # calculator
 
-    def __init__(self, path, element_dtype, shape, zero_point, tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH)):
+    def __init__(self, path, element_dtype, shape, zero_point, pixel_rez, tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH)):
         """
         map the file as read-only
         chop it into data tiles
@@ -289,11 +299,19 @@ class DataTilesFromFile(object):
 
         """
         self.data = np.memmap(path, element_dtype, 'r', shape=shape)
-        self.tile_shape = tile_shape
+        self._calc = MercatorTileCalc(name=path, pixel_shape=shape, zero_point=zero_point, pixel_rez=pixel_rez, tile_shape=tile_shape)
         self.path = path
-        self.zero_point = zero_point
+        self._active = {}
 
-    def activate(self, tile_y, tile_x, transform_func=None):
+
+    def __getitem__(self, tileyx):
+        try:
+            return self._active[tuple(tileyx)]
+        except KeyError as unavailable:
+            return self.activate(tileyx)
+
+
+    def activate(self, tile_yx):
         """
         load a texture map from this data
         return ( box, texture-id )
@@ -302,9 +320,10 @@ class DataTilesFromFile(object):
         texid = glGenTextures(1)
 
         # offset within the array
-        th,tw = self.tile_shape
-        ys = (tile_y*th)*self.zero_point[0]
-        xs = (tile_x*tw)*self.zero_point[1]
+        tile_y, tile_x = tile_yx
+        th,tw = self._calc.tile_shape
+        ys = (tile_y*th)*self._calc.zero_point[0]
+        xs = (tile_x*tw)*self._calc.zero_point[1]
         ye = ys + th
         xe = xs + tw
         npslice = self.data[ys:ye, xs:xe]
@@ -313,7 +332,10 @@ class DataTilesFromFile(object):
         assert(xe<=self.data.shape[1])
         assert(ye<=self.data.shape[0])
 
+        glBindTexture(GL_TEXTURE_BUFFER, texid)
         glTexSubImage2D()
+
+        self._active[(tile_y, tile_x)] = texid
 
         # # start working with this buffer
         # glBindBuffer(GL_COPY_WRITE_BUFFER, buffer_id)
@@ -335,21 +357,28 @@ class DataTilesFromFile(object):
         #     # copy through transform function
         #
         # # let GL push it to the GPU
-        glUnmapBuffer(GL_COPY_WRITE_BUFFER)
+        #glUnmapBuffer(GL_COPY_WRITE_BUFFER)
 
 
     def deactivate(self, tile_y, tile_x):
         """
         release a given
         """
+        k = (tile_y, tile_x)
+        t = self._active[k]
+        del self._active[k]
+
+        glDeleteTextures([t])
 
 
 
 
 
-class GLGeoTileArray(Layer):
+class GLGeoTiles(Layer):
     """
-    Mercator-projected geographic layer with one or more levels of detail
+    Mercator-projected geographic layer with one or more levels of detail.
+    Coarsest level of detail (1° typically) is always expected to be available for fast zoom.
+
     """
 
     def __init__(self, tiles):
@@ -358,10 +387,11 @@ class GLGeoTileArray(Layer):
         """
         pass
 
-    def paint(self, geom):
+    def paint(self, geom, fast=False):
         """
         draw the most appropriate representation for this layer
         if a better representation could be rendered for later draws, return False and render() will be queued for later idle time
+        fast flag requests the fastest available rendering be painted, for instance during zoom-out
         """
         return True
 
