@@ -38,6 +38,7 @@ from OpenGL.GL import *
 from PyQt4.QtGui import *
 from PyQt4.QtCore import *
 from PyQt4.QtOpenGL import *
+from PIL import Image
 import numpy as np
 
 
@@ -118,7 +119,6 @@ class Layer(object):
         raise NotImplementedError()
 
 
-
 class MercatorTileCalc(object):
     """
     common calculations for mercator tile groups in an array or file
@@ -149,6 +149,7 @@ class MercatorTileCalc(object):
         World coordinates are eqm such that 0,0 matches 0°N 0°E, going north/south +-90° and west/east +-180°
         Data coordinates are pixels with b l or b r corner being 0,0
         """
+        super(MercatorTileCalc, self).__init__()
         self.name = name
         self.pixel_shape = pixel_shape
         self.zero_point = zero_point
@@ -298,6 +299,7 @@ class FlatFileTileSet(object):
         tiles are set up such that tile (0,0) starts with zero_point and goes up and to the r
 
         """
+        super(FlatFileTileSet, self).__init__()
         self.data = np.memmap(path, element_dtype, 'r', shape=shape)
         self._calc = MercatorTileCalc(name=path, pixel_shape=shape, zero_point=zero_point, pixel_rez=pixel_rez, tile_shape=tile_shape)
         self.path = path
@@ -371,60 +373,66 @@ class FlatFileTileSet(object):
         glDeleteTextures([t])
 
 
+class TextureTileLayer(Layer):
+    """
+    A layer represented as an array of quads with textures on them
+    """
+    pass
 
 
 
-class GLGeoTiles(Layer):
+
+
+class ColormapTiles(TextureTileLayer):
     """
     Mercator-projected geographic layer with one or more levels of detail.
     Coarsest level of detail (1° typically) is always expected to be available for fast zoom.
 
     """
+    _tileset = None
+    _image = None
+    _shape = None
 
-    def __init__(self, tiles):
+    def __init__(self, path, zero_point=None, pixel_rez=None):
         """
 
         """
-        pass
+        super(ColormapTiles, self).__init__()
+        if path.lower().endswith('.json'):
+            from json import load
+            with open(path, 'rt') as fp:
+                info = load(fp)
+                globals().update(info)  # FIXME: security
+        self._image = im = Image.open(path)
+        # image is top-left to bottom-right, remember this when loading textures
+        im.load()
+        l,t,r,b = im.getbbox()
+        w = r-l
+        h = b-t
+        self._shape = (h,w)
+
+
 
     def paint(self, geom, fast=False):
-        """
-        draw the most appropriate representation for this layer
-        if a better representation could be rendered for later draws, return False and render() will be queued for later idle time
-        fast flag requests the fastest available rendering be painted, for instance during zoom-out
-        """
         return True
 
     def render(self, geom, *more_geom):
         """
-        cache a rendering (typically a draw-list with textures) that best handles the extents and sampling requested
-        if more than one view is active, more geometry may be provided for other views
-        return False if resources were too limited and a purge is needed among the layer stack
+        in offline GL, make a drawlist that nicely handles the world geometry requested
         """
+
         return True
 
     def purge(self, geom, *more_geom):
-        """
-        release any cached representations that we haven't used lately, leaving at most 1
-        return True if any GL resources were released
-        """
         return False
 
     def probe_point_xy(self, x, y):
-        """
-        return a value array for the requested point as specified in mercator-meters
-        """
         raise NotImplementedError()
 
     def probe_point_geo(self, lat, lon):
-        """
-        """
         raise NotImplementedError()
 
     def probe_shape(self, geo_shape):
-        """
-        given a shapely description of an area, return a masked array of data
-        """
         raise NotImplementedError()
 
 
@@ -480,6 +488,8 @@ class CsGlWidget(QGLWidget):
     def initializeGL(self):
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
+        print(glGetString(GL_VERSION))
+        print("GLSL {}".format(glGetIntegerv(GL_SHADING_LANGUAGE_VERSION)))
 
 
 
@@ -521,6 +531,9 @@ class MainWindow(QMainWindow):
 
     def contextMenuEvent(self, e):
         print("context menu")
+        # maj,min = glGetIntegerv(GL_MAJOR_VERSION), glGetIntegerv(GL_MINOR_VERSION)
+        # print("OpenGL {}.{}".format(maj,min))
+
         super(MainWindow, self).contextMenuEvent(e)  # can also use e.accept() or e.ignore()
 
     def return_pressed(self):
