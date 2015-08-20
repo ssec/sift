@@ -339,6 +339,7 @@ class TestTileLayer(Layer):
                 color = TEST_COLORS[n%len(TEST_COLORS)]
                 quad = self._calc.tile_world_box(y,x)
                 boxes.append((quad, color))
+                n+=1
         glBegin(GL_QUADS)
         for quad,color in boxes:
             glColor3f(*color)
@@ -347,6 +348,7 @@ class TestTileLayer(Layer):
             glVertex3f(quad.r, quad.t, 0.)
             glVertex3f(quad.l, quad.t, 0.)
         glEnd()
+        print('drew {0!r:s}'.format(boxes))
 
 
     def render(self, geom, *more_geom):
@@ -632,6 +634,7 @@ class Animating(MapBehavior):
 class CsGlWidget(QGLWidget):
     layers = None
     activity = None  # Behavior object stack which we push/pop for primary activity
+    viewport = None
 
     # primary behaviors we connect
     _idling = None
@@ -644,6 +647,7 @@ class CsGlWidget(QGLWidget):
         # self.layers = [TestLayer()]
         self.layers = [TestTileLayer()]
         self.active = [Idling()]
+        self.viewport = box(l=-MAX_EXCURSION_X, b=-MAX_EXCURSION_Y, r=MAX_EXCURSION_X, t=MAX_EXCURSION_Y)
 
     def paintGL(self):
         glClear(GL_COLOR_BUFFER_BIT)
@@ -655,8 +659,9 @@ class CsGlWidget(QGLWidget):
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
         # glOrtho(-50, 50, -50, 50, -50.0, 50.0)
-        glOrtho(-MAX_EXCURSION_X, MAX_EXCURSION_X,
-                -MAX_EXCURSION_Y, MAX_EXCURSION_Y,
+        vp = self.viewport
+        glOrtho(vp.l, vp.r,
+                vp.b, vp.t,
                 -50, 50)
         glViewport(0, 0, w, h)
 
