@@ -301,6 +301,18 @@ class MercatorTileCalc(object):
                ]
 
 
+TEST_COLORS = [
+    (1.,1.,1.),
+    (0.1,0.1,0.1),
+    (0.,0.,1.),
+    (0.,1.,0.),
+    (0.,1.,1.),
+    (1.,0.,0.),
+    (1.,0.,1.),
+    (1.,1.,0.),
+]
+
+
 class TestTileLayer(Layer):
     """
     Test layer that renders tiles as flat colors
@@ -317,6 +329,24 @@ class TestTileLayer(Layer):
         zero_point = pnt(511.5, 2047.5)
         pixel_rez = rez(MAX_EXCURSION_Y*2.0/float(ph), MAX_EXCURSION_X*2.0/float(pw))
         self._calc = MercatorTileCalc(name, pixel_shape, zero_point, pixel_rez)
+
+    def paint(self, *args, **kwargs):
+        _,tiles = self._calc.visible_tiles(WORLD_EXTENT_BOX)
+        boxes = []
+        n = 0
+        for y in range(tiles.b, tiles.t+1):
+            for x in range(tiles.l, tiles.r+1):
+                color = TEST_COLORS[n%len(TEST_COLORS)]
+                quad = self._calc.tile_world_box(y,x)
+                boxes.append((quad, color))
+        glBegin(GL_QUADS)
+        for quad,color in boxes:
+            glColor3f(*color)
+            glVertex3f(quad.l, quad.b, 0.)
+            glVertex3f(quad.r, quad.b, 0.)
+            glVertex3f(quad.r, quad.t, 0.)
+            glVertex3f(quad.l, quad.t, 0.)
+        glEnd()
 
 
     def render(self, geom, *more_geom):
@@ -611,27 +641,31 @@ class CsGlWidget(QGLWidget):
 
     def __init__(self, parent=None):
         super(CsGlWidget, self).__init__(parent)
-        self.layers = [TestLayer()]
+        # self.layers = [TestLayer()]
+        self.layers = [TestTileLayer()]
         self.active = [Idling()]
 
     def paintGL(self):
         glClear(GL_COLOR_BUFFER_BIT)
+        glDisable(GL_CULL_FACE)
         for layer in self.layers:
             layer.paint()
-
-        glEnd()
 
     def resizeGL(self, w, h):
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
-        glOrtho(-50, 50, -50, 50, -50.0, 50.0)
+        # glOrtho(-50, 50, -50, 50, -50.0, 50.0)
+        glOrtho(-MAX_EXCURSION_X, MAX_EXCURSION_X,
+                -MAX_EXCURSION_Y, MAX_EXCURSION_Y,
+                -50, 50)
         glViewport(0, 0, w, h)
 
     def initializeGL(self):
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
-        print(glGetString(GL_VERSION))
-        print("GLSL {}".format(glGetIntegerv(GL_SHADING_LANGUAGE_VERSION)))
+
+        # print(glGetString(GL_VERSION))
+        # print("GLSL {}".format(glGetIntegerv(GL_SHADING_LANGUAGE_VERSION)))
 
 
 
