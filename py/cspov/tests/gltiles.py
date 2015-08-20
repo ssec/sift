@@ -42,21 +42,35 @@ from PIL import Image
 import numpy as np
 
 
-DEFAULT_TILE_HEIGHT = 256   # 180°
-DEFAULT_TILE_WIDTH = 512   # 360°
+DEFAULT_TILE_HEIGHT = 512
+DEFAULT_TILE_WIDTH = 512
 
 
-# mercator
-MAX_SCENE_Y = 39940660.0
-MAX_SCENE_X = 40075020.0
+# http://home.online.no/~sigurdhu/WGS84_Eng.html
+R_EQ = 6378137.0  # m
+R_POL = 6356752.3142  # m
 
+C_EQ = 40075017.0  # linear m
+C_POL = 40007863.0  # linear m
+
+# +/- extents
+MAX_EXCURSION_Y = C_POL/4.0
+MAX_EXCURSION_X = C_EQ/2.0
+
+
+
+# basic container tuples
 box = namedtuple('box', ('b', 'l', 't', 'r'))  # bottom, left, top, right
 rez = namedtuple('rez', ('dy', 'dx'))
 pnt = namedtuple('pnt', ('y', 'x'))
 geo = namedtuple('geo', ('n', 'e'))  # lat N, lon E
 
 # eqm coordinates describing a view
-view_geometry = namedtuple('view_geometry', ('b', 'l', 't', 'r', 'dy', 'dx'))
+vue = namedtuple('vue', ('b', 'l', 't', 'r', 'dy', 'dx'))
+
+
+# how big our mercator-based world coordinate system is
+WORLD_EXTENT_BOX = box(b=-MAX_EXCURSION_Y, l=-MAX_EXCURSION_X, t=MAX_EXCURSION_Y, r=MAX_EXCURSION_X)
 
 
 class CoordSystem(object):
@@ -78,7 +92,7 @@ class Layer(object):
     - typically will cache a "coarsest" single-tile representation for zoom-out events (preferred for fast=True paint calls)
     - can have probes attached which operate primarily on the science representation
     """
-    def paint(self, geom, fast=False):
+    def paint(self, geom, fast=False, **kwargs):
         """
         draw the most appropriate representation for this layer
         if a better representation could be rendered for later draws, return False and render() will be queued for later idle time
@@ -119,6 +133,7 @@ class Layer(object):
         raise NotImplementedError()
 
 
+
 class MercatorTileCalc(object):
     """
     common calculations for mercator tile groups in an array or file
@@ -142,7 +157,7 @@ class MercatorTileCalc(object):
         name: the 'name' of the tile, typically the path of the file it represents
         pixel_shape: (h:int,w:int) in pixels
         zero_point: (y:float,x:float) in pixels that represents world coords 0N,0E eqm, even if outside the image and even if fractional
-        pixel_rez: (dy:float,dx:float) in world coords per pixel ascending from corner [0,0]
+        pixel_rez: (dy:float,dx:float) in world coords per pixel ascending from corner [0,0], as measured near zero_point
         tile_shape: the pixel dimensions (h:int, w:int) of the GPU tiling we want to use
 
         Tiling is aligned to pixels, not world
@@ -260,6 +275,21 @@ class MercatorTileCalc(object):
 
         return overunder, tileset
 
+    def tile_world_box(self, tiy, tix, ny=1, nx=1):
+        """
+        return world coordinate box a given tile fills
+        """
+        eb,el = self.extents_box.b, self.extents_box.l
+        dy,dx = self.pixel_rez
+        th,tw = map(float, self.tile_shape)
+
+        b = eb + dy*(th*tiy)
+        t = eb + dy*(th*(tiy+ny))
+        l = el + dx*(tw*tix)
+        r = el + dx*(tw*(tix+nx))
+
+        return box(b=b,l=l,t=t,r=r)
+
 
     def tile_pixels(self, data, tiy, tix):
         """
@@ -269,6 +299,37 @@ class MercatorTileCalc(object):
                tiy*self.tile_shape[0]:(tiy+1)*self.tile_shape[0],
                tix*self.tile_shape[1]:(tix+1)*self.tile_shape[1]
                ]
+
+
+class TestTileLayer(Layer):
+    """
+    Test layer that renders tiles as flat colors
+    """
+    _drawlist = None
+    _drawlist_fast = None
+    _calc = None  # MercatorTileCalc
+
+    def __init__(self, tile_count=(8,32)):
+        super(TestTileLayer, self).__init__()
+        name = 'testlayer'
+        pixel_shape = (ph,pw) = (2048, 8192)
+        th,tw = tile_count
+        zero_point = pnt(511.5, 2047.5)
+        pixel_rez = rez(MAX_EXCURSION_Y*2.0/float(ph), MAX_EXCURSION_X*2.0/float(pw))
+        self._calc = MercatorTileCalc(name, pixel_shape, zero_point, pixel_rez)
+
+
+    def render(self, geom, *more_geom):
+        if more_geom:
+            raise NotImplementedError('not yet')
+
+        if self._drawlist_fast is None:
+            # render a single fast-draw list we can always fall back on for the full dataset
+            pass
+
+        if self._drawlist is not None:
+            glDeleteLists()
+
 
 
 
@@ -289,8 +350,8 @@ class FlatFileTileSet(object):
     """
     data = None
     path = None
-    _active = None     # {(y,x): (buffer,texture), ...}
-    _calc = None  # calculator
+    _active = None     # {(y,x): (texture-id, texture-box), ...}
+    _calc = None   # calculator
 
     def __init__(self, path, element_dtype, shape, zero_point, pixel_rez, tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH)):
         """
@@ -313,31 +374,44 @@ class FlatFileTileSet(object):
             return self.activate(tileyx)
 
 
-    def activate(self, tile_yx):
+    def activate(self, tile_yx, ufunc=None):
         """
-        load a texture map from this data
-        return ( box, texture-id )
+        load a texture map from this data, optionally filtering data with a numpy ufunc
+        return (texture-id, box)
         """
         # FUTURE: implement using glGenBuffers() and use a shader to render
+        # We want to push buffers of data into GL, and use GLSL to determine the color/transparency of the data.
+        # See VisPy for tools and techniques.
+        # For now, alpha test with plain old textures
+
         texid = glGenTextures(1)
 
         # offset within the array
-        tile_y, tile_x = tile_yx
         th,tw = self._calc.tile_shape
-        ys = (tile_y*th)*self._calc.zero_point[0]
-        xs = (tile_x*tw)*self._calc.zero_point[1]
-        ye = ys + th
-        xe = xs + tw
-        npslice = self.data[ys:ye, xs:xe]
+        # tile_y, tile_x = tile_yx
+        # ys = (tile_y*th)*self._calc.zero_point[0]
+        # xs = (tile_x*tw)*self._calc.zero_point[1]
+        # ye = ys + th
+        # xe = xs + tw
+        # assert(xe<=self.data.shape[1])
+        # assert(ye<=self.data.shape[0])
+        # tiledata = self.data[ys:ye, xs:xe]
+        # prepare a tile of data for OpenGL
+        tiledata = self._calc.tile_pixels(self.data, *tile_yx)
+        tile = np.require(tiledata, dtype=np.float32, requirements=['C_CONTIGUOUS', 'ALIGNED'])
+        del tiledata
 
-        # FIXME: temporarmily require that textures aren't odd sizes
-        assert(xe<=self.data.shape[1])
-        assert(ye<=self.data.shape[0])
+        # FIXME: temporarily require that textures aren't odd sizes
+        txbox = box(b=0, l=0, t=th, r=tw)
 
         glBindTexture(GL_TEXTURE_BUFFER, texid)
-        glTexSubImage2D()
+        LOD = 0
+        glTexSubImage2D(GL_TEXTURE_2D, LOD, 0,0, tw,th, GL_RED, GL_FLOAT, tile.data)
 
-        self._active[(tile_y, tile_x)] = texid
+        nfo = (texid, txbox)
+        self._active[tile_yx] = nfo
+        return nfo
+
 
         # # start working with this buffer
         # glBindBuffer(GL_COPY_WRITE_BUFFER, buffer_id)
@@ -360,6 +434,7 @@ class FlatFileTileSet(object):
         #
         # # let GL push it to the GPU
         #glUnmapBuffer(GL_COPY_WRITE_BUFFER)
+        # also see glTexBuffer()
 
 
     def deactivate(self, tile_y, tile_x):
@@ -462,15 +537,82 @@ class TestLayer(Layer):
 
 
 
+class MapBehavior(QObject):
+    """
+    Use cases represented as objects
+    The Map window has an activity which is the main behavior operating
+    Behaviors can request to be made the active behavior
+
+    """
+    def layer_paint_parms(self):
+        """
+        return additional keyword parameters to be sent to layers when they're painting
+        """
+        return {}
+
+
+class UserPanningMap(MapBehavior):
+    """
+    user mouses down
+    user drags map
+        click and drag OR
+        Mac: scroll surface option
+    user mouses up
+    """
+
+class UserZoomingMap(MapBehavior):
+    """
+    user starts zooming
+        scroll wheel OR
+        chording with keyboard and mouse
+    user zooms inward
+    user zooms outward
+    user ends zooming
+    """
+
+
+class UserZoomingRegion(MapBehavior):
+    """
+    user starts region selection
+        click and drag with tool OR
+        click and drag middle mouse button??
+    user continues selecting box region
+    user finishes selecting region
+    """
+    pass
+
+
+class Idling(MapBehavior):
+    """
+    This is the default behavior we do when nothing else is going on
+    :param Behavior:
+    :return:
+    """
+
+class Animating(MapBehavior):
+    """
+    When we're doing an animation cycle
+    :param Behavior:
+    :return:
+    """
+
 
 
 
 class CsGlWidget(QGLWidget):
     layers = None
+    activity = None  # Behavior object stack which we push/pop for primary activity
+
+    # primary behaviors we connect
+    _idling = None
+    _panning = None
+    _zooming = None
+    _animating = None
 
     def __init__(self, parent=None):
         super(CsGlWidget, self).__init__(parent)
         self.layers = [TestLayer()]
+        self.active = [Idling()]
 
     def paintGL(self):
         glClear(GL_COLOR_BUFFER_BIT)

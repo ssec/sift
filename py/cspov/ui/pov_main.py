@@ -14,7 +14,7 @@ REQUIRES
 
 
 :author: R.K.Garcia <rayg@ssec.wisc.edu>
-:copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
+:copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
 __author__ = 'rayg'
@@ -34,6 +34,7 @@ class Main(QtGui.QMainWindow):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+        # refer to objectName'd entities as self.ui.objectName
 
 
 
