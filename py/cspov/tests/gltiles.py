@@ -575,19 +575,29 @@ class TestLayer(Layer):
 
 class MapWidgetActivity(QObject):
     """
-    Use cases represented as objects
+    Major mouse activities represented as objects, to simplify main window control logic
+    Right now this is crude and we'll eventually run out of road and have to rethink it
+    For now it's a good leg up.
+    Eventually we want something more like a Behavior wired in at the Designer level??
+
     The Map window has an activity which is the main thing it's doing
     return None for "I remain status quo"
     return False for "dismiss me"
     return a new activity for "send to this guy"
     """
+    main = None   # main map widget we serve
+
+    def __init__(self, main):
+        super(MapWidgetActivity, self).__init__()
+        self.main = main
+
     def layer_paint_parms(self):
         """
         return additional keyword parameters to be sent to layers when they're painting
         """
         return {}
 
-    def mouseReleaseEvent(self, QMouseEvent):
+    def mouseReleaseEvent(self, event):
         return None
 
     def mouseMoveEvent(self, event):
@@ -596,7 +606,8 @@ class MapWidgetActivity(QObject):
     def mousePressEvent(self, event):
         return None
 
-
+    def wheelEvent(self, event):
+        return None
 
 class UserPanningMap(MapWidgetActivity):
     """
@@ -606,6 +617,38 @@ class UserPanningMap(MapWidgetActivity):
         Mac: scroll surface option
     user mouses up
     """
+    def mouseReleaseEvent(self, event):
+        """
+        user is done zooming
+        go back to idle
+        draw at higher resolution (not fast-draw)
+        """
+        print("done panning")
+        return False  # we're done, dismiss us
+
+    def mouseMoveEvent(self, event):
+        """
+        change the visible region
+        invalidate the view
+        """
+        x, y = event.x(), event.y()
+        pdx = x - self.lx
+        pdy = y - self.ly
+        self.main.pan_viewport(pdy=pdy, pdx=pdx)
+        self.main.update()  # repaint() is faster if we need it
+        self.lx, self.ly = x, y
+        print("pan dx={0} dy={1}".format(pdx,pdy))
+        return None
+
+    def mousePressEvent(self, event):
+        """
+        Idling probably sent this our way, use it to note where we're starting from
+          Also optionally change cursors
+        """
+        print("mouse down, starting pan")
+        self.lx, self.ly = event.x(), event.y()
+        return None
+
 
 class UserZoomingMap(MapWidgetActivity):
     """
@@ -616,6 +659,10 @@ class UserZoomingMap(MapWidgetActivity):
     user zooms outward
     user ends zooming
     """
+    def wheelEvent(self, event):
+        # FIXME
+
+        return None
 
 
 class UserZoomingRegion(MapWidgetActivity):
@@ -627,13 +674,18 @@ class UserZoomingRegion(MapWidgetActivity):
     user finishes selecting region
     """
     def mouseReleaseEvent(self, event):
-        return None
+        """
+        user is done zooming
+        go back to idle
+        draw at higher resolution (not fast-draw)
+        """
+        return False
 
     def mouseMoveEvent(self, event):
         return None
 
     def mousePressEvent(self, event):
-        return UserPanningMap()
+        return False  # we should never get this
 
 
 
@@ -643,14 +695,21 @@ class Idling(MapWidgetActivity):
     :param Behavior:
     :return:
     """
-    def mouseReleaseEvent(self, event):
-        return None
 
     def mouseMoveEvent(self, event):
+        # FIXME: send world coordinates to cursor coordinate content probe
         return None
 
     def mousePressEvent(self, event):
-        return UserPanningMap()
+        """
+        Drag with left mouse button to pan
+        Drag with right mouse button to zoom (to point?)
+        Drag with middle button for rectangle zoom? Or drag with modifier key to zoom?
+        """
+        return UserPanningMap(self.main)  # FIXME more routes to route
+
+    def wheelEvent(self, event):
+        return UserZoomingMap(self.main)
 
 
 class Animating(MapWidgetActivity):
@@ -659,35 +718,37 @@ class Animating(MapWidgetActivity):
     :param Behavior:
     :return:
     """
-    def mouseReleaseEvent(self, event):
-        return None
-
-    def mouseMoveEvent(self, event):
-        return None
-
-    def mousePressEvent(self, event):
-        return None
 
 
 
 
 class CsGlWidget(QGLWidget):
-    layers = None
     _activity_stack = None  # Behavior object stack which we push/pop for primary activity; activity[-1] is what we're currently doing
-    viewport = None
-
-    # primary behaviors we connect
-    _idling = None
+    layers = None  # layers we're currently displaying, last on top
+    viewport = None  # box with world coordinates of what we're showing
 
     @property
     def activity(self):
         return self._activity_stack[-1]
 
+    def pan_viewport(self, pdy=None, pdx=None, wdy=None, wdx=None):
+        """
+        displace view by pixel or world coordinates
+        does not queue screen update
+        :param pdy: displacement in pixels, y:int
+        :param pdx: displacement in pixels, x:int
+        :param wdy: displacement in world y:float
+        :param wdx: displacement in world x:float
+        :return: new world viewport
+        """
+        #FIXME
+        raise NotImplementedError()
+
     def __init__(self, parent=None):
         super(CsGlWidget, self).__init__(parent)
         # self.layers = [TestLayer()]
         self.layers = [TestTileLayer()]
-        self.active = [Idling()]
+        self.active = [Idling(self)]
         self.viewport = box(l=-MAX_EXCURSION_X, b=-MAX_EXCURSION_Y, r=MAX_EXCURSION_X, t=MAX_EXCURSION_Y)
 
     def paintGL(self):
@@ -737,6 +798,16 @@ class CsGlWidget(QGLWidget):
         newact = True
         while newact is not None:
             newact = self.activity.mousePressEvent(event)
+            if newact is False:
+                self._activity_stack.pop()
+                continue
+            assert(isinstance(newact, MapWidgetActivity))
+            self._activity_stack.append(newact)
+
+    def wheelEvent(self, event):
+        newact = True
+        while newact is not None:
+            newact = self.activity.wheelEvent(event)
             if newact is False:
                 self._activity_stack.pop()
                 continue
