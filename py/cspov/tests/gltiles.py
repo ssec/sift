@@ -202,6 +202,7 @@ class MercatorTileCalc(object):
 
         self.tiles_avail = (h/tile_shape[0], w/tile_shape[1])
 
+        # FIXME: deal with the AHI seeing the dateline and not the prime meridian!
         # FIXME: for now, require image size to be a multiple of tile size, else we have to deal with partial tiles!
         assert(h % tile_shape[0]==0)
         assert(w % tile_shape[1]==0)
@@ -572,12 +573,13 @@ class TestLayer(Layer):
 
 
 
-class MapBehavior(QObject):
+class MapWidgetActivity(QObject):
     """
     Use cases represented as objects
-    The Map window has an activity which is the main behavior operating
-    Behaviors can request to be made the active behavior
-
+    The Map window has an activity which is the main thing it's doing
+    return None for "I remain status quo"
+    return False for "dismiss me"
+    return a new activity for "send to this guy"
     """
     def layer_paint_parms(self):
         """
@@ -585,8 +587,18 @@ class MapBehavior(QObject):
         """
         return {}
 
+    def mouseReleaseEvent(self, QMouseEvent):
+        return None
 
-class UserPanningMap(MapBehavior):
+    def mouseMoveEvent(self, event):
+        return None
+
+    def mousePressEvent(self, event):
+        return None
+
+
+
+class UserPanningMap(MapWidgetActivity):
     """
     user mouses down
     user drags map
@@ -595,7 +607,7 @@ class UserPanningMap(MapBehavior):
     user mouses up
     """
 
-class UserZoomingMap(MapBehavior):
+class UserZoomingMap(MapWidgetActivity):
     """
     user starts zooming
         scroll wheel OR
@@ -606,7 +618,7 @@ class UserZoomingMap(MapBehavior):
     """
 
 
-class UserZoomingRegion(MapBehavior):
+class UserZoomingRegion(MapWidgetActivity):
     """
     user starts region selection
         click and drag with tool OR
@@ -614,36 +626,62 @@ class UserZoomingRegion(MapBehavior):
     user continues selecting box region
     user finishes selecting region
     """
-    pass
+    def mouseReleaseEvent(self, event):
+        return None
+
+    def mouseMoveEvent(self, event):
+        return None
+
+    def mousePressEvent(self, event):
+        return UserPanningMap()
 
 
-class Idling(MapBehavior):
+
+class Idling(MapWidgetActivity):
     """
     This is the default behavior we do when nothing else is going on
     :param Behavior:
     :return:
     """
+    def mouseReleaseEvent(self, event):
+        return None
 
-class Animating(MapBehavior):
+    def mouseMoveEvent(self, event):
+        return None
+
+    def mousePressEvent(self, event):
+        return UserPanningMap()
+
+
+class Animating(MapWidgetActivity):
     """
     When we're doing an animation cycle
     :param Behavior:
     :return:
     """
+    def mouseReleaseEvent(self, event):
+        return None
+
+    def mouseMoveEvent(self, event):
+        return None
+
+    def mousePressEvent(self, event):
+        return None
 
 
 
 
 class CsGlWidget(QGLWidget):
     layers = None
-    activity = None  # Behavior object stack which we push/pop for primary activity
+    _activity_stack = None  # Behavior object stack which we push/pop for primary activity; activity[-1] is what we're currently doing
     viewport = None
 
     # primary behaviors we connect
     _idling = None
-    _panning = None
-    _zooming = None
-    _animating = None
+
+    @property
+    def activity(self):
+        return self._activity_stack[-1]
 
     def __init__(self, parent=None):
         super(CsGlWidget, self).__init__(parent)
@@ -674,6 +712,39 @@ class CsGlWidget(QGLWidget):
 
         # print(glGetString(GL_VERSION))
         # print("GLSL {}".format(glGetIntegerv(GL_SHADING_LANGUAGE_VERSION)))
+
+    def mouseReleaseEvent(self, event):
+        newact = True
+        while newact is not None:
+            newact = self.activity.mouseReleaseEvent(event)
+            if newact is False:
+                self._activity_stack.pop()
+                continue
+            assert(isinstance(newact, MapWidgetActivity))
+            self._activity_stack.append(newact)
+
+    def mouseMoveEvent(self, event):
+        newact = True
+        while newact is not None:
+            newact = self.activity.mouseMoveEvent(event)
+            if newact is False:
+                self._activity_stack.pop()
+                continue
+            assert(isinstance(newact, MapWidgetActivity))
+            self._activity_stack.append(newact)
+
+    def mousePressEvent(self, event):
+        newact = True
+        while newact is not None:
+            newact = self.activity.mousePressEvent(event)
+            if newact is False:
+                self._activity_stack.pop()
+                continue
+            assert(isinstance(newact, MapWidgetActivity))
+            self._activity_stack.append(newact)
+
+
+
 
 
 
