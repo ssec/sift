@@ -34,12 +34,16 @@ Idle loop
 
 import sys
 from collections import namedtuple
-from OpenGL.GL import *
 from PyQt4.QtGui import *
 from PyQt4.QtCore import *
-from PyQt4.QtOpenGL import *
+from PyQt4.QtOpenGL import QGLWidget
+from OpenGL.GL import *
 from PIL import Image
 import numpy as np
+import vispy
+vispy.use(app='PyQt4') #, gl='gl+')
+
+import vispy.scene as vps
 
 
 DEFAULT_TILE_HEIGHT = 512
@@ -202,8 +206,7 @@ class MercatorTileCalc(object):
         assert(h % tile_shape[0]==0)
         assert(w % tile_shape[1]==0)
 
-
-    def visible_tiles(self, visible_geom, extra_tiles_box = box(0,0,0,0)):
+    def visible_tiles(self, visible_geom, extra_tiles_box=box(0,0,0,0)):
         """
         given a visible world geometry and sampling, return (sampling-state, [box-of-tiles-to-draw])
         sampling state is WELLSAMPLED/OVERSAMPLED/UNDERSAMPLED
@@ -348,7 +351,7 @@ class TestTileLayer(Layer):
             glVertex3f(quad.r, quad.t, 0.)
             glVertex3f(quad.l, quad.t, 0.)
         glEnd()
-        print('drew {0!r:s}'.format(boxes))
+        # print('drew {0!r:s}'.format(boxes))
 
 
     def render(self, geom, *more_geom):
@@ -685,6 +688,9 @@ class MainWindow(QMainWindow):
         # layout = QStackedLayout()
         widget = QTabWidget()
         # things = [QDateEdit, QLabel, QDial, QDoubleSpinBox, QSpinBox, QProgressBar, QSlider, QRadioButton, QTimeEdit, QFontComboBox, QLineEdit]
+        self.scenegraph = vps.SceneCanvas('vispy', app='PyQt4')
+        widget.addTab(self.scenegraph.native, 'vispy')
+
         things = [CsGlWidget, QTextEdit]
         for w in things: 
             if w is QLabel:
@@ -705,7 +711,10 @@ class MainWindow(QMainWindow):
             else:
                 wid = w()
             # layout.addWidget(wid)
-            widget.addTab(wid, str(w))
+
+            widget.addTab(wid, str(w.__name__))
+
+        widget.setCurrentIndex(1)
 
         self.setCentralWidget(widget)
         self.significant.connect(self.on_my_signal)
