@@ -722,7 +722,7 @@ class Animating(MapWidgetActivity):
 
 
 
-class CsGlWidget(QGLWidget):
+class CspovMainMapWidget(QGLWidget):
     _activity_stack = None  # Behavior object stack which we push/pop for primary activity; activity[-1] is what we're currently doing
     layers = None  # layers we're currently displaying, last on top
     viewport = None  # box with world coordinates of what we're showing
@@ -742,13 +742,14 @@ class CsGlWidget(QGLWidget):
         :return: new world viewport
         """
         #FIXME
-        raise NotImplementedError()
+        print("FIXME: viewport pan requested {0!r:s}".format((pdy,pdx,wdy,wdx)))
+        return self.viewport
 
     def __init__(self, parent=None):
-        super(CsGlWidget, self).__init__(parent)
+        super(CspovMainMapWidget, self).__init__(parent)
         # self.layers = [TestLayer()]
         self.layers = [TestTileLayer()]
-        self.active = [Idling(self)]
+        self._activity_stack = [Idling(self)]
         self.viewport = box(l=-MAX_EXCURSION_X, b=-MAX_EXCURSION_Y, r=MAX_EXCURSION_X, t=MAX_EXCURSION_Y)
 
     def paintGL(self):
@@ -778,6 +779,8 @@ class CsGlWidget(QGLWidget):
         newact = True
         while newact is not None:
             newact = self.activity.mouseReleaseEvent(event)
+            if newact is None:
+                break
             if newact is False:
                 self._activity_stack.pop()
                 continue
@@ -788,6 +791,8 @@ class CsGlWidget(QGLWidget):
         newact = True
         while newact is not None:
             newact = self.activity.mouseMoveEvent(event)
+            if newact is None:
+                return
             if newact is False:
                 self._activity_stack.pop()
                 continue
@@ -798,6 +803,8 @@ class CsGlWidget(QGLWidget):
         newact = True
         while newact is not None:
             newact = self.activity.mousePressEvent(event)
+            if newact is None:
+                return
             if newact is False:
                 self._activity_stack.pop()
                 continue
@@ -808,6 +815,8 @@ class CsGlWidget(QGLWidget):
         newact = True
         while newact is not None:
             newact = self.activity.wheelEvent(event)
+            if newact is None:
+                return
             if newact is False:
                 self._activity_stack.pop()
                 continue
@@ -833,7 +842,7 @@ class MainWindow(QMainWindow):
         self.scenegraph = vps.SceneCanvas('vispy', app='PyQt4')
         widget.addTab(self.scenegraph.native, 'vispy')
 
-        things = [CsGlWidget, QTextEdit]
+        things = [CspovMainMapWidget, QTextEdit]
         for w in things: 
             if w is QLabel:
                 wid = QLabel('hola')
