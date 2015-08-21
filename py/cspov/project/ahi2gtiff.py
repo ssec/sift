@@ -290,18 +290,22 @@ def main():
 
     # Calculate upper-left corner (origin) using center point as a reference
     shape = nc.variables["longitude"].shape
-    center_x_idx = shape[1] / 2
-    center_y_idx = shape[0] / 2
+    # center_x_idx = shape[1] / 2
+    # center_y_idx = shape[0] / 2
     pixel_size_x = AHI_NADIR_RES[shape[0]]
     pixel_size_y = -AHI_NADIR_RES[shape[1]]
-    center_lon = nc.variables["longitude"][center_x_idx, center_y_idx]
-    center_lat = nc.variables["latitude"][center_x_idx, center_y_idx]
-    p = Proj(input_proj_str)
-    center_x, center_y = p(center_lon, center_lat)
-    origin_x = center_x - pixel_size_x * center_x_idx
-    origin_y = center_y - pixel_size_y * center_y_idx
-    LOG.debug("Center Lon: %f\tCenter Lat: %f", center_lon, center_lat)
-    LOG.debug("Center X: %f\tCenter Y: %f", center_x, center_y)
+    # center_lon = nc.variables["longitude"][center_x_idx, center_y_idx]
+    # center_lat = nc.variables["latitude"][center_x_idx, center_y_idx]
+    # p = Proj(input_proj_str)
+    # center_x, center_y = p(center_lon, center_lat)
+    # origin_x = center_x - pixel_size_x * center_x_idx
+    # origin_y = center_y - pixel_size_y * center_y_idx
+    # LOG.debug("Center Lon: %f\tCenter Lat: %f", center_lon, center_lat)
+    # LOG.debug("Center X: %f\tCenter Y: %f", center_x, center_y)
+
+    # Assume that center pixel is at 0, 0 projection space
+    origin_x = -pixel_size_x * (shape[1] / 2.0)
+    origin_y = -pixel_size_y * (shape[0] / 2.0)
     LOG.debug("Origin X: %f\tOrigin Y: %f", origin_x, origin_y)
 
     # origin_x, cell_width, rotation_x, origin_y, rotation_y, cell_height
