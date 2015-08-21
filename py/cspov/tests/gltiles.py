@@ -632,10 +632,11 @@ class UserPanningMap(MapWidgetActivity):
         invalidate the view
         """
         x, y = event.x(), event.y()
-        pdx = x - self.lx
+        pdx = self.lx - x
+        # GL coordinates are reversed from screen coordinates
         pdy = y - self.ly
-        self.main.pan_viewport(pdy=pdy, pdx=pdx)
-        self.main.update()  # repaint() is faster if we need it
+        self.main.panViewport(pdy=pdy, pdx=pdx)
+        self.main.updateGL()  # repaint() is faster if we need it
         self.lx, self.ly = x, y
         print("pan dx={0} dy={1}".format(pdx,pdy))
         return None
@@ -723,6 +724,11 @@ class Animating(MapWidgetActivity):
 
 
 class CspovMainMapWidget(QGLWidget):
+
+    # signals
+    viewportDidChange = pyqtSignal(box)
+
+    # members
     _activity_stack = None  # Behavior object stack which we push/pop for primary activity; activity[-1] is what we're currently doing
     layers = None  # layers we're currently displaying, last on top
     viewport = None  # box with world coordinates of what we're showing
@@ -731,7 +737,7 @@ class CspovMainMapWidget(QGLWidget):
     def activity(self):
         return self._activity_stack[-1]
 
-    def pan_viewport(self, pdy=None, pdx=None, wdy=None, wdx=None):
+    def panViewport(self, pdy=None, pdx=None, wdy=None, wdx=None):
         """
         displace view by pixel or world coordinates
         does not queue screen update
@@ -741,8 +747,18 @@ class CspovMainMapWidget(QGLWidget):
         :param wdx: displacement in world x:float
         :return: new world viewport
         """
-        #FIXME
-        print("FIXME: viewport pan requested {0!r:s}".format((pdy,pdx,wdy,wdx)))
+        print(" viewport pan requested {0!r:s}".format((pdy,pdx,wdy,wdx)))
+        if (pdy, pdx) is not (None, None):
+            s = self.size()
+            ph, pw = float(s.height()), float(s.width())
+            wh, ww = self.viewport.t - self.viewport.b, self.viewport.r - self.viewport.l
+            wdy, wdx = float(pdy)/ph*wh, float(pdx)/pw*ww
+        elif (wdy, wdx) is (None, None):
+            return self.viewport
+        nvp = box(b=self.viewport.b+wdy, t=self.viewport.t+wdy, l=self.viewport.l+wdx, r=self.viewport.r+wdx)
+        print("pan viewport {0!r:s} => {1!r:s}".format(self.viewport, nvp))
+        self.viewport = nvp
+        self.viewportDidChange.emit(nvp)
         return self.viewport
 
     def __init__(self, parent=None):
@@ -756,7 +772,8 @@ class CspovMainMapWidget(QGLWidget):
         glClear(GL_COLOR_BUFFER_BIT)
         glDisable(GL_CULL_FACE)
         for layer in self.layers:
-            layer.paint()
+            needs_rerender = layer.paint()
+        # FIXME: schedule re-render for layers that are no longer optimal
 
     def resizeGL(self, w, h):
         glMatrixMode(GL_PROJECTION)
