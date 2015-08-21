@@ -24,8 +24,8 @@ import sys
 
 from PyQt4.QtGui import *
 from PyQt4.QtCore import *
-import vispy
-vispy.use(app='PyQt4') #, gl='gl+')
+# import vispy
+# vispy.use(app='PyQt4') #, gl='gl+')
 
 import vispy.scene as vps
 from cspov.view.MapWidget import CspovMainMapWidget
@@ -47,11 +47,12 @@ class Main(QMainWindow):
         self.ui.setupUi(self)
         # refer to objectName'd entities as self.ui.objectName
 
-        self.mainMap = CspovMainMapWidget()
+        self.mainMap = CspovMainMapWidget(self)
         self.ui.mainWidgets.addTab(self.mainMap, 'Mercator')
+        # self.mainMap.setVisible(True)
 
-        self.scenegraph = vps.SceneCanvas('vispy', app='PyQt4')
-        self.ui.mainWidgets.addTab(self.scenegraph.native, 'Tools')
+        # self.scenegraph = vps.SceneCanvas('vispy', app='PyQt4')
+        # self.ui.mainWidgets.addTab(self.scenegraph.native, 'Tools')
 
         self.ui.mainWidgets.removeTab(0)
         self.ui.mainWidgets.removeTab(0)

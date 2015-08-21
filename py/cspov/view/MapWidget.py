@@ -196,7 +196,7 @@ class CspovMainMapWidget(QGLWidget):
         # self.layers = [TestLayer()]
         self.layers = [TestTileLayer()]
         self._activity_stack = [Idling(self)]
-        self.viewport = box(l=-MAX_EXCURSION_X, b=-MAX_EXCURSION_Y, r=MAX_EXCURSION_X, t=MAX_EXCURSION_Y)
+        self.viewport = box(l=-MAX_EXCURSION_X/4, b=-MAX_EXCURSION_Y/1.5, r=MAX_EXCURSION_X/4, t=MAX_EXCURSION_Y/1.5)
         self.viewportDidChange.connect(self.updateGL)
         # assert(self.updatesEnabled())
         # self.setUpdatesEnabled(True)
