@@ -129,7 +129,7 @@ class UserPanningMap(MapWidgetActivity):
         # GL coordinates are reversed from screen coordinates
         pdy = y - self.ly
         self.main.panViewport(pdy=pdy, pdx=pdx)
-        self.main.updateGL()  # repaint() is faster if we need it
+        # self.main.updateGL()  # repaint() is faster if we need it
         self.lx, self.ly = x, y
         print("pan dx={0} dy={1}".format(pdx,pdy))
         return None
@@ -223,6 +223,14 @@ class CspovMainMapWidget(QGLWidget):
     layers = None  # layers we're currently displaying, last on top
     viewport = None  # box with world coordinates of what we're showing
 
+    def __init__(self, parent=None):
+        super(CspovMainMapWidget, self).__init__(parent)
+        # self.layers = [TestLayer()]
+        self.layers = [TestTileLayer()]
+        self._activity_stack = [Idling(self)]
+        self.viewport = box(l=-MAX_EXCURSION_X, b=-MAX_EXCURSION_Y, r=MAX_EXCURSION_X, t=MAX_EXCURSION_Y)
+        self.viewportDidChange.connect(self.updateGL)
+
     @property
     def activity(self):
         return self._activity_stack[-1]
@@ -250,13 +258,6 @@ class CspovMainMapWidget(QGLWidget):
         self.viewport = nvp
         self.viewportDidChange.emit(nvp)
         return self.viewport
-
-    def __init__(self, parent=None):
-        super(CspovMainMapWidget, self).__init__(parent)
-        # self.layers = [TestLayer()]
-        self.layers = [TestTileLayer()]
-        self._activity_stack = [Idling(self)]
-        self.viewport = box(l=-MAX_EXCURSION_X, b=-MAX_EXCURSION_Y, r=MAX_EXCURSION_X, t=MAX_EXCURSION_Y)
 
     def paintGL(self):
         glClear(GL_COLOR_BUFFER_BIT)
