@@ -32,39 +32,6 @@ import logging, unittest, argparse
 LOG = logging.getLogger(__name__)
 
 
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="PURPOSE",
-        epilog="",
-        fromfile_prefix_chars='@')
-    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG')
-    # http://docs.python.org/2.7/library/argparse.html#nargs
-    # parser.add_argument('--stuff', nargs='5', dest='my_stuff',
-    #                    help="one or more random things")
-    parser.add_argument('pos_args', nargs='*',
-                        help="positional arguments don't have the '-' prefix")
-    args = parser.parse_args()
-
-
-    levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
-    logging.basicConfig(level=levels[min(3, args.verbosity)])
-
-    if not args.pos_args:
-        unittest.main()
-        return 0
-
-    for pn in args.pos_args:
-        pass
-
-    return 0
-
-
-if __name__ == '__main__':
-    sys.exit(main())
-
-
 class MapWidgetActivity(QObject):
     """
     Major mouse activities represented as objects, to simplify main window control logic
@@ -191,6 +158,7 @@ class Idling(MapWidgetActivity):
 
     def mouseMoveEvent(self, event):
         # FIXME: send world coordinates to cursor coordinate content probe
+        # print("mousie") # yeah this works
         return None
 
     def mousePressEvent(self, event):
@@ -230,6 +198,11 @@ class CspovMainMapWidget(QGLWidget):
         self._activity_stack = [Idling(self)]
         self.viewport = box(l=-MAX_EXCURSION_X, b=-MAX_EXCURSION_Y, r=MAX_EXCURSION_X, t=MAX_EXCURSION_Y)
         self.viewportDidChange.connect(self.updateGL)
+        # assert(self.updatesEnabled())
+        # self.setUpdatesEnabled(True)
+        # self.setAutoBufferSwap(True)
+        self.setMouseTracking(True)  # gives us mouseMoveEvent calls in Idling
+        # assert(self.hasMouseTracking())
 
     @property
     def activity(self):
@@ -283,6 +256,10 @@ class CspovMainMapWidget(QGLWidget):
         # print(glGetString(GL_VERSION))
         # print("GLSL {}".format(glGetIntegerv(GL_SHADING_LANGUAGE_VERSION)))
 
+    def keyPressEvent(self, key):
+        print(repr(key))
+        self.updateGL()
+
     def mouseReleaseEvent(self, event):
         newact = True
         while newact is not None:
@@ -294,9 +271,11 @@ class CspovMainMapWidget(QGLWidget):
                 continue
             assert(isinstance(newact, MapWidgetActivity))
             self._activity_stack.append(newact)
+        self.updateGL()  # FIXME DEBUG
 
     def mouseMoveEvent(self, event):
         newact = True
+        self.updateGL()
         while newact is not None:
             newact = self.activity.mouseMoveEvent(event)
             if newact is None:
