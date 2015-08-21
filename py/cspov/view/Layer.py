@@ -113,6 +113,7 @@ class TestTileLayer(Layer):
         self._calc = MercatorTileCalc(name, pixel_shape, zero_point, pixel_rez)
 
     def paint(self, *args, **kwargs):
+        # print("paint")
         _,tiles = self._calc.visible_tiles(WORLD_EXTENT_BOX)
         boxes = []
         n = 0
@@ -143,6 +144,18 @@ class TestTileLayer(Layer):
 
         if self._drawlist is not None:
             glDeleteLists()
+
+
+class MercatorTiffTileLayer(Layer):
+    """
+    A layer with a Mercator TIFF image of world extent
+    """
+    def __init__(self, pathname, extent=WORLD_EXTENT_BOX):
+        self.pathname = pathname
+
+
+
+
 
 
 class FlatFileTileSet(object):

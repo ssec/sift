@@ -19,7 +19,7 @@ REQUIRES
 """
 from OpenGL.GL import *
 from PyQt4.QtCore import *
-from PyQt4.QtOpenGL import QGLWidget
+from PyQt4.QtOpenGL import QGLWidget, QGLFormat
 from cspov.view.Layer import TestTileLayer
 from cspov.common import MAX_EXCURSION_Y, MAX_EXCURSION_X, box
 
@@ -98,7 +98,7 @@ class UserPanningMap(MapWidgetActivity):
         self.main.panViewport(pdy=pdy, pdx=pdx)
         # self.main.updateGL()  # repaint() is faster if we need it
         self.lx, self.ly = x, y
-        print("pan dx={0} dy={1}".format(pdx,pdy))
+        # print("pan dx={0} dy={1}".format(pdx,pdy))
         return None
 
     def mousePressEvent(self, event):
@@ -190,18 +190,24 @@ class CspovMainMapWidget(QGLWidget):
     _activity_stack = None  # Behavior object stack which we push/pop for primary activity; activity[-1] is what we're currently doing
     layers = None  # layers we're currently displaying, last on top
     viewport = None  # box with world coordinates of what we're showing
+    _dirty_viewport = True
 
     def __init__(self, parent=None):
-        super(CspovMainMapWidget, self).__init__(parent)
+        # http://stackoverflow.com/questions/17167194/how-to-make-updategl-realtime-in-qt
+        #
+        fmt = QGLFormat.defaultFormat()
+        fmt.setSwapInterval(1)
+        super(CspovMainMapWidget, self).__init__(fmt, parent=parent)
         # self.layers = [TestLayer()]
         self.layers = [TestTileLayer()]
         self._activity_stack = [Idling(self)]
         self.viewport = box(l=-MAX_EXCURSION_X/4, b=-MAX_EXCURSION_Y/1.5, r=MAX_EXCURSION_X/4, t=MAX_EXCURSION_Y/1.5)
-        self.viewportDidChange.connect(self.updateGL)
+        # self.viewportDidChange.connect(self.updateGL)
         # assert(self.updatesEnabled())
         # self.setUpdatesEnabled(True)
         # self.setAutoBufferSwap(True)
         self.setMouseTracking(True)  # gives us mouseMoveEvent calls in Idling
+        # self.setAutoBufferSwap(True)
         # assert(self.hasMouseTracking())
 
     @property
@@ -218,7 +224,7 @@ class CspovMainMapWidget(QGLWidget):
         :param wdx: displacement in world x:float
         :return: new world viewport
         """
-        print(" viewport pan requested {0!r:s}".format((pdy,pdx,wdy,wdx)))
+        # print(" viewport pan requested {0!r:s}".format((pdy,pdx,wdy,wdx)))
         if (pdy, pdx) is not (None, None):
             s = self.size()
             ph, pw = float(s.height()), float(s.width())
@@ -227,19 +233,37 @@ class CspovMainMapWidget(QGLWidget):
         elif (wdy, wdx) is (None, None):
             return self.viewport
         nvp = box(b=self.viewport.b+wdy, t=self.viewport.t+wdy, l=self.viewport.l+wdx, r=self.viewport.r+wdx)
-        print("pan viewport {0!r:s} => {1!r:s}".format(self.viewport, nvp))
+        # print("pan viewport {0!r:s} => {1!r:s}".format(self.viewport, nvp))
         self.viewport = nvp
+        self_dirty_viewport = True
         self.viewportDidChange.emit(nvp)
+        self.updateGL()
         return self.viewport
 
+    def viewportGL(self):
+        # print("viewport")
+        glMatrixMode(GL_PROJECTION)
+        glLoadIdentity()
+        # glOrtho(-50, 50, -50, 50, -50.0, 50.0)
+        vp = self.viewport
+        glOrtho(vp.l, vp.r,
+                vp.b, vp.t,
+                -50, 50)
+        self._dirty_viewport = False
+
     def paintGL(self):
+        # if self._dirty_viewport:
+        self.viewportGL()
         glClear(GL_COLOR_BUFFER_BIT)
         glDisable(GL_CULL_FACE)
         for layer in self.layers:
             needs_rerender = layer.paint()
         # FIXME: schedule re-render for layers that are no longer optimal
 
-    def resizeGL(self, w, h):
+    def resizeGL(self, w=None, h=None):
+        # if (w,h) is (None,None):
+        #     s = self.size()
+        #     w,h = int(s.height()), int(s.width())
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
         # glOrtho(-50, 50, -50, 50, -50.0, 50.0)
@@ -258,7 +282,6 @@ class CspovMainMapWidget(QGLWidget):
 
     def keyPressEvent(self, key):
         print(repr(key))
-        self.updateGL()
 
     def mouseReleaseEvent(self, event):
         newact = True
@@ -271,11 +294,9 @@ class CspovMainMapWidget(QGLWidget):
                 continue
             assert(isinstance(newact, MapWidgetActivity))
             self._activity_stack.append(newact)
-        self.updateGL()  # FIXME DEBUG
 
     def mouseMoveEvent(self, event):
         newact = True
-        self.updateGL()
         while newact is not None:
             newact = self.activity.mouseMoveEvent(event)
             if newact is None:
