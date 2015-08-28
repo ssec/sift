@@ -121,9 +121,21 @@ class UserZoomingMap(MapWidgetActivity):
     user ends zooming
     """
     def wheelEvent(self, event):
-        # FIXME
-
+        event.accept()
+        pos = event.pos()
+        delta = event.delta()
+        self.main.zoomViewport(delta)
         return None
+
+    def mouseMoveEvent(self, event):
+        # FIXME: does it work to drop the zooming by way of a mouse move?
+        return False
+
+    def mousePressEvent(self, event):
+        return False
+
+    def mouseReleaseEvent(self, event):
+        return False
 
 
 class UserZoomingRegion(MapWidgetActivity):
@@ -213,6 +225,19 @@ class CspovMainMapWidget(QGLWidget):
     @property
     def activity(self):
         return self._activity_stack[-1]
+
+    def zoomViewport(self, pdz=None, wdz=None):
+        if pdz is not None:
+            s = self.size()
+            ph, pw = float(s.height()), float(s.width())
+            wh, ww = self.viewport.t - self.viewport.b, self.viewport.r - self.viewport.l
+            wdy, wdx = float(pdz)/ph*wh, float(pdz)/pw*ww
+        nvp = box(b=self.viewport.b+wdy, t=self.viewport.t-wdy, l=self.viewport.l+wdx, r=self.viewport.r-wdx)
+        # print("pan viewport {0!r:s} => {1!r:s}".format(self.viewport, nvp))
+        self.viewport = nvp
+        self_dirty_viewport = True
+        self.viewportDidChange.emit(nvp)
+        self.updateGL()
 
     def panViewport(self, pdy=None, pdx=None, wdy=None, wdx=None):
         """
