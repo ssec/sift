@@ -49,15 +49,15 @@ LOG = logging.getLogger(__name__)
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
 
-class Main(QMainWindow):
+class Main(QtGui.QMainWindow):
     def __init__(self):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
         # refer to objectName'd entities as self.ui.objectName
 
-        self.mainMap = CspovMainMapWidget(self)
-        self.ui.mainWidgets.addTab(self.mainMap, 'Mercator')
+        self.mainMap = CspovMainMapWidget(parent=self)
+        self.ui.mainWidgets.addTab(self.mainMap.native, 'Mercator')
         # self.mainMap.setVisible(True)
 
         # self.scenegraph = vps.SceneCanvas('vispy', app='PyQt4')
@@ -67,8 +67,11 @@ class Main(QMainWindow):
         self.ui.mainWidgets.removeTab(0)
 
 if __name__ == '__main__':
-    app = QApplication(sys.argv)
+    app.create()
+    # app = QApplication(sys.argv)
     window = Main()
     window.show()
-    sys.exit(app.exec_())
-
+    print("running")
+    app.run()
+    # sys.exit(app.exec_())
+#

@@ -21,8 +21,11 @@ from OpenGL.GL import *
 # from PyQt4.QtCore import *
 # from PyQt4.QtOpenGL import QGLWidget, QGLFormat
 from vispy import app, gloo
-from cspov.view.Layer import TestTileLayer
+import numpy as np
+from cspov.view.Layer import TestTileLayer, Layer
 from cspov.common import MAX_EXCURSION_Y, MAX_EXCURSION_X, box
+from vispy.util.transforms import perspective, translate, rotate, ortho
+from vispy.io import read_mesh, load_data_file, load_crate
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -33,7 +36,7 @@ import logging, unittest, argparse
 LOG = logging.getLogger(__name__)
 
 
-class MapWidgetActivity(QObject):
+class MapWidgetActivity(object):
     """
     Major mouse activities represented as objects, to simplify main window control logic
     Right now this is crude and we'll eventually run out of road and have to rethink it
@@ -193,34 +196,147 @@ class Animating(MapWidgetActivity):
     :return:
     """
 
+VERT_CODE = """
+uniform   mat4 u_model;
+uniform   mat4 u_view;
+uniform   mat4 u_projection;
+
+attribute vec3 a_position;
+attribute vec2 a_texcoord;
+
+varying vec2 v_texcoord;
+
+void main()
+{
+    v_texcoord = a_texcoord;
+    gl_Position = u_projection * u_view * u_model * vec4(a_position,1.0);
+    //gl_Position = vec4(a_position,1.0);
+}
+"""
+
+
+FRAG_CODE = """
+uniform sampler2D u_texture;
+varying vec2 v_texcoord;
+
+void main()
+{
+    float ty = v_texcoord.y;
+    float tx = sin(ty*50.0)*0.01 + v_texcoord.x;
+    gl_FragColor = texture2D(u_texture, vec2(tx, ty));
+}
+"""
+
+# from imshow_cuts.py
+image_vertex = """
+attribute vec2 position;
+attribute vec2 texcoord;
+
+varying vec2 v_texcoord;
+void main()
+{
+    gl_Position = vec4(position, 0.0, 1.0 );
+    v_texcoord = texcoord;
+}
+"""
+
+image_fragment = """
+uniform float vmin;
+uniform float vmax;
+uniform float cmap;
+uniform float n_colormaps;
+
+uniform sampler2D image;
+uniform sampler2D colormaps;
+
+varying vec2 v_texcoord;
+void main()
+{
+    float value = texture2D(image, v_texcoord).r;
+    float index = (cmap+0.5) / n_colormaps;
+
+    if( value < vmin ) {
+        gl_FragColor = texture2D(colormaps, vec2(0.0,index));
+    } else if( value > vmax ) {
+        gl_FragColor = texture2D(colormaps, vec2(1.0,index));
+    } else {
+        value = (value-vmin)/(vmax-vmin);
+        value = 1.0/512.0 + 510.0/512.0*value;
+        gl_FragColor = texture2D(colormaps, vec2(value,index));
+    }
+}
+"""
+
+# Read cube data
+# FIXME: remove
+positions, faces, normals, texcoords = \
+    read_mesh(load_data_file('orig/cube.obj'))
+colors = np.random.uniform(0, 1, positions.shape).astype('float32')
+
+faces_buffer = gloo.IndexBuffer(faces.astype(np.uint16))
+
+
+#
+# class TestSingleImageLayer(Layer):
+#
+#     def __init__(self, **kwargs):
+#         super(TestImageLayer, self).__init__(**kwargs)
+#         self.image = Program(image_vertex, image_fragment, 4)
+#         self.image['position'] = (-1, -1), (-1, +1), (+1, -1), (+1, +1)
+#         self.image['texcoord'] = (0, 0), (0, +1), (+1, 0), (+1, +1)
+#         self.image['vmin'] = +0.0
+#         self.image['vmax'] = +1.0
+#         self.image['cmap'] = 0  # Colormap index to use
+#         self.image['colormaps'] = colormaps
+#         self.image['n_colormaps'] = colormaps.shape[0]
+#         self.image['image'] = I.astype('float32')
+#         self.image['image'].interpolation = 'linear'
+#
 
 class CspovMainMapWidget(app.Canvas):
 
     # signals
-    viewportDidChange = pyqtSignal(box)
+    # viewportDidChange = pyqtSignal(box)
 
     # members
     _activity_stack = None  # Behavior object stack which we push/pop for primary activity; activity[-1] is what we're currently doing
     layers = None  # layers we're currently displaying, last on top
     viewport = None  # box with world coordinates of what we're showing
-    _dirty_viewport = True
 
-    def __init__(self, parent=None, **kwargs):
+    def __init__(self, **kwargs):
         # http://stackoverflow.com/questions/17167194/how-to-make-updategl-realtime-in-qt
         #
-        super(CspovMainMapWidget, self).__init__(parent=parent, **kwargs)
+        super(CspovMainMapWidget, self).__init__(**kwargs)
+
         # self.layers = [TestLayer()]
-        self.layers = [TestTileLayer()]
-        self.program = gloo.Program()
+        self.layers = [] # FIXME [TestTileLayer()]
         self._activity_stack = [Idling(self)]
         self.viewport = box(l=-MAX_EXCURSION_X/4, b=-MAX_EXCURSION_Y/1.5, r=MAX_EXCURSION_X/4, t=MAX_EXCURSION_Y/1.5)
         # self.viewportDidChange.connect(self.updateGL)
         # assert(self.updatesEnabled())
         # self.setUpdatesEnabled(True)
         # self.setAutoBufferSwap(True)
-        self.setMouseTracking(True)  # gives us mouseMoveEvent calls in Idling
+        # self.setMouseTracking(True)  # gives us mouseMoveEvent calls in Idling
         # self.setAutoBufferSwap(True)
         # assert(self.hasMouseTracking())
+
+        self.program = gloo.Program(VERT_CODE, FRAG_CODE)
+        # Set attributes
+        self.program['a_position'] = gloo.VertexBuffer(positions)
+        self.program['a_texcoord'] = gloo.VertexBuffer(texcoords)
+        self.program['u_texture'] = gloo.Texture2D(load_crate())
+
+        # Handle transformations
+        self.init_transforms()
+        self.apply_zoom()
+
+        gloo.set_clear_color((0, 0, 0, 1))
+        gloo.set_state(depth_test=True)
+
+        # self._timer = app.Timer('auto', connect=self.update_transforms)
+        # self._timer.start()
+
+        self.show()
 
     @property
     def activity(self):
@@ -235,9 +351,8 @@ class CspovMainMapWidget(app.Canvas):
         nvp = box(b=self.viewport.b+wdy, t=self.viewport.t-wdy, l=self.viewport.l+wdx, r=self.viewport.r-wdx)
         # print("pan viewport {0!r:s} => {1!r:s}".format(self.viewport, nvp))
         self.viewport = nvp
-        self_dirty_viewport = True
-        self.viewportDidChange.emit(nvp)
-        self.updateGL()
+        # self.viewportDidChange.emit(nvp)
+        self.update()
 
     def panViewport(self, pdy=None, pdx=None, wdy=None, wdx=None):
         """
@@ -260,55 +375,60 @@ class CspovMainMapWidget(app.Canvas):
         nvp = box(b=self.viewport.b+wdy, t=self.viewport.t+wdy, l=self.viewport.l+wdx, r=self.viewport.r+wdx)
         # print("pan viewport {0!r:s} => {1!r:s}".format(self.viewport, nvp))
         self.viewport = nvp
-        self_dirty_viewport = True
         self.viewportDidChange.emit(nvp)
-        self.updateGL()
+        self.update()
         return self.viewport
 
-    def viewportGL(self):
+    #
+    # GLOO
+    #
+
+    def init_transforms(self):
+        self.theta = 0
+        self.phi = 0
+        self.view = translate((0, 0, -5))
+        self.model = np.eye(4, dtype=np.float32)
+        self.projection = np.eye(4, dtype=np.float32)
+
+        self.program['u_model'] = self.model
+        self.program['u_view'] = self.view
+
+    def on_resize(self, event):
+        self.apply_zoom()
+
+    def apply_zoom(self, event=None):
+        if event is not None:
+            gloo.set_viewport(0, 0, *event.physical_size)
+        else:
+            gloo.set_viewport(0, 0, self.physical_size[0], self.physical_size[1])
         # print("viewport")
-        glMatrixMode(GL_PROJECTION)
-        glLoadIdentity()
         # glOrtho(-50, 50, -50, 50, -50.0, 50.0)
         vp = self.viewport
-        glOrtho(vp.l, vp.r,
+        self.projection = ortho(vp.l, vp.r,
                 vp.b, vp.t,
                 -50, 50)
-        self._dirty_viewport = False
+        self.program['u_projection'] = self.projection
 
-    def paintGL(self):
-        # if self._dirty_viewport:
-        self.viewportGL()
-        glClear(GL_COLOR_BUFFER_BIT)
-        glDisable(GL_CULL_FACE)
+    def on_draw(self, event):
+        gloo.clear()
         for layer in self.layers:
-            needs_rerender = layer.paint()
-        # FIXME: schedule re-render for layers that are no longer optimal
+            layer.on_draw(event)
+        self.program.draw('triangles', faces_buffer)
 
-    def resizeGL(self, w=None, h=None):
-        # if (w,h) is (None,None):
-        #     s = self.size()
-        #     w,h = int(s.height()), int(s.width())
-        glMatrixMode(GL_PROJECTION)
-        glLoadIdentity()
-        # glOrtho(-50, 50, -50, 50, -50.0, 50.0)
-        vp = self.viewport
-        glOrtho(vp.l, vp.r,
-                vp.b, vp.t,
-                -50, 50)
-        glViewport(0, 0, w, h)
+    # def on_compile(self):
+    #     vert_code = str(self.vertEdit.toPlainText())
+    #     frag_code = str(self.fragEdit.toPlainText())
+    #     self.canvas.program.set_shaders(vert_code, frag_code)
 
-    def initializeGL(self):
-        glClearColor(0.0, 0.0, 0.0, 1.0)
-        glClear(GL_COLOR_BUFFER_BIT)
 
-        # print(glGetString(GL_VERSION))
-        # print("GLSL {}".format(glGetIntegerv(GL_SHADING_LANGUAGE_VERSION)))
+    def key_press(self, key):
+        print('down', repr(key))
 
-    def keyPressEvent(self, key):
-        print(repr(key))
+    def key_release(self, key):
+        print('up', repr(key))
 
-    def mouseReleaseEvent(self, event):
+    def mouse_release(self, event):
+        event = event.native  # FIXME: stop using .native
         newact = True
         while newact is not None:
             newact = self.activity.mouseReleaseEvent(event)
@@ -320,7 +440,8 @@ class CspovMainMapWidget(app.Canvas):
             assert(isinstance(newact, MapWidgetActivity))
             self._activity_stack.append(newact)
 
-    def mouseMoveEvent(self, event):
+    def mouse_move(self, event):
+        event = event.native
         newact = True
         while newact is not None:
             newact = self.activity.mouseMoveEvent(event)
@@ -332,7 +453,8 @@ class CspovMainMapWidget(app.Canvas):
             assert(isinstance(newact, MapWidgetActivity))
             self._activity_stack.append(newact)
 
-    def mousePressEvent(self, event):
+    def mouse_press(self, event):
+        event = event.native
         newact = True
         while newact is not None:
             newact = self.activity.mousePressEvent(event)
@@ -344,7 +466,8 @@ class CspovMainMapWidget(app.Canvas):
             assert(isinstance(newact, MapWidgetActivity))
             self._activity_stack.append(newact)
 
-    def wheelEvent(self, event):
+    def mouse_wheel(self, event):
+        event = event.native
         newact = True
         while newact is not None:
             newact = self.activity.wheelEvent(event)
