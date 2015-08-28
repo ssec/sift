@@ -18,8 +18,9 @@ REQUIRES
 :license: GPLv3, see LICENSE for more details
 """
 from OpenGL.GL import *
-from PyQt4.QtCore import *
-from PyQt4.QtOpenGL import QGLWidget, QGLFormat
+# from PyQt4.QtCore import *
+# from PyQt4.QtOpenGL import QGLWidget, QGLFormat
+from vispy import app, gloo
 from cspov.view.Layer import TestTileLayer
 from cspov.common import MAX_EXCURSION_Y, MAX_EXCURSION_X, box
 
@@ -193,7 +194,7 @@ class Animating(MapWidgetActivity):
     """
 
 
-class CspovMainMapWidget(QGLWidget):
+class CspovMainMapWidget(app.Canvas):
 
     # signals
     viewportDidChange = pyqtSignal(box)
@@ -204,14 +205,13 @@ class CspovMainMapWidget(QGLWidget):
     viewport = None  # box with world coordinates of what we're showing
     _dirty_viewport = True
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, **kwargs):
         # http://stackoverflow.com/questions/17167194/how-to-make-updategl-realtime-in-qt
         #
-        fmt = QGLFormat.defaultFormat()
-        fmt.setSwapInterval(1)
-        super(CspovMainMapWidget, self).__init__(fmt, parent=parent)
+        super(CspovMainMapWidget, self).__init__(parent=parent, **kwargs)
         # self.layers = [TestLayer()]
         self.layers = [TestTileLayer()]
+        self.program = gloo.Program()
         self._activity_stack = [Idling(self)]
         self.viewport = box(l=-MAX_EXCURSION_X/4, b=-MAX_EXCURSION_Y/1.5, r=MAX_EXCURSION_X/4, t=MAX_EXCURSION_Y/1.5)
         # self.viewportDidChange.connect(self.updateGL)

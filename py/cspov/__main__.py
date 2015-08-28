@@ -22,10 +22,19 @@ __docformat__ = 'reStructuredText'
 
 import sys
 
-from PyQt4.QtGui import *
-from PyQt4.QtCore import *
+# from PyQt4.QtGui import *
+# from PyQt4.QtCore import *
+from vispy import app, gloo
 # import vispy
 # vispy.use(app='PyQt4') #, gl='gl+')
+
+try:
+    app_object = app.use_app('pyqt4')
+except Exception:
+    app_object = app.use_app('pyside')
+QtCore = app_object.backend_module.QtCore,
+QtGui = app_object.backend_module.QtGui
+
 
 import vispy.scene as vps
 from cspov.view.MapWidget import CspovMainMapWidget
