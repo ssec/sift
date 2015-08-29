@@ -333,8 +333,8 @@ class CspovMainMapWidget(app.Canvas):
         gloo.set_clear_color((0, 0, 0, 1))
         gloo.set_state(depth_test=True)
 
-        # self._timer = app.Timer('auto', connect=self.update_transforms)
-        # self._timer.start()
+        self._timer = app.Timer('auto', connect=self.update_transforms)
+        self._timer.start()
 
         self.show()
 
@@ -375,7 +375,7 @@ class CspovMainMapWidget(app.Canvas):
         nvp = box(b=self.viewport.b+wdy, t=self.viewport.t+wdy, l=self.viewport.l+wdx, r=self.viewport.r+wdx)
         # print("pan viewport {0!r:s} => {1!r:s}".format(self.viewport, nvp))
         self.viewport = nvp
-        self.viewportDidChange.emit(nvp)
+        # self.viewportDidChange.emit(nvp)
         self.update()
         return self.viewport
 
@@ -393,6 +393,14 @@ class CspovMainMapWidget(app.Canvas):
         self.program['u_model'] = self.model
         self.program['u_view'] = self.view
 
+    def update_transforms(self, event):
+        self.theta += .5
+        self.phi += .5
+        self.model = np.dot(rotate(self.theta, (0, 0, 1)),
+                            rotate(self.phi, (0, 1, 0)))
+        self.program['u_model'] = self.model
+        self.update()
+
     def on_resize(self, event):
         self.apply_zoom()
 
@@ -401,12 +409,14 @@ class CspovMainMapWidget(app.Canvas):
             gloo.set_viewport(0, 0, *event.physical_size)
         else:
             gloo.set_viewport(0, 0, self.physical_size[0], self.physical_size[1])
-        # print("viewport")
-        # glOrtho(-50, 50, -50, 50, -50.0, 50.0)
         vp = self.viewport
-        self.projection = ortho(vp.l, vp.r,
-                vp.b, vp.t,
-                -50, 50)
+        self.projection = perspective(45.0, self.size[0] /
+                                      float(self.size[1]), 2.0, 10.0)
+        # self.projection = ortho(
+        #     vp.l, vp.r,
+        #     vp.b, vp.t,
+        #     -50, 50
+        # )
         self.program['u_projection'] = self.projection
 
     def on_draw(self, event):

@@ -20,7 +20,6 @@ REQUIRES
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import sys
 
 # from PyQt4.QtGui import *
 # from PyQt4.QtCore import *
@@ -36,11 +35,9 @@ QtCore = app_object.backend_module.QtCore,
 QtGui = app_object.backend_module.QtGui
 
 
-import vispy.scene as vps
 from cspov.view.MapWidget import CspovMainMapWidget
 
 
-import os, sys
 import logging, unittest, argparse
 
 LOG = logging.getLogger(__name__)
