@@ -196,6 +196,7 @@ class Animating(MapWidgetActivity):
     :return:
     """
 
+# basic vertex shader for projection
 VERT_CODE = """
 uniform   mat4 u_model;
 uniform   mat4 u_view;
@@ -214,7 +215,7 @@ void main()
 }
 """
 
-
+# simple fragment shader for putting a slightly modified texture onto a set of polys
 FRAG_CODE = """
 uniform sampler2D u_texture;
 varying vec2 v_texcoord;
@@ -394,8 +395,8 @@ class CspovMainMapWidget(app.Canvas):
         self.program['u_view'] = self.view
 
     def update_transforms(self, event):
-        self.theta += .5
-        self.phi += .5
+        self.theta += .1
+        self.phi += .1
         self.model = np.dot(rotate(self.theta, (0, 0, 1)),
                             rotate(self.phi, (0, 1, 0)))
         self.program['u_model'] = self.model
@@ -410,8 +411,10 @@ class CspovMainMapWidget(app.Canvas):
         else:
             gloo.set_viewport(0, 0, self.physical_size[0], self.physical_size[1])
         vp = self.viewport
-        self.projection = perspective(45.0, self.size[0] /
-                                      float(self.size[1]), 2.0, 10.0)
+        # self.projection = perspective(45.0, self.size[0] /
+        #                               float(self.size[1]), 2.0, 10.0)
+        aspect = self.size[1] / float(self.size[0])
+        self.projection = ortho(-4, 4, -4*aspect, 4*aspect, -10, 10)
         # self.projection = ortho(
         #     vp.l, vp.r,
         #     vp.b, vp.t,
