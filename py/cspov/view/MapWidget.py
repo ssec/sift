@@ -26,6 +26,7 @@ from cspov.view.Layer import TestTileLayer, Layer
 from cspov.common import MAX_EXCURSION_Y, MAX_EXCURSION_X, box
 from vispy.util.transforms import perspective, translate, rotate, ortho
 from vispy.io import read_mesh, load_data_file, load_crate
+from vispy.geometry import create_plane
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -273,8 +274,13 @@ void main()
 positions, faces, normals, texcoords = \
     read_mesh(load_data_file('orig/cube.obj'))
 colors = np.random.uniform(0, 1, positions.shape).astype('float32')
+print("positions:", positions, len(positions))
+print("faces:", faces, len(faces))
+print("normals:", normals, len(normals))
+print("texcoords:", texcoords, len(texcoords))
 
 faces_buffer = gloo.IndexBuffer(faces.astype(np.uint16))
+
 
 
 #
@@ -292,7 +298,56 @@ faces_buffer = gloo.IndexBuffer(faces.astype(np.uint16))
 #         self.image['n_colormaps'] = colormaps.shape[0]
 #         self.image['image'] = I.astype('float32')
 #         self.image['image'].interpolation = 'linear'
-#
+
+class RGBATileProgram(object):
+    program = None
+
+    def __init__(self, world_box=box(l=-4.0, r=4.0, t=2.0, b=-2.0), image=None, image_box=None):
+        super(RGBATileProgram, self).__init__()
+        self.program = gloo.Program(VERT_CODE, FRAG_CODE)
+        if image is None:
+            self.image = image = load_crate()
+
+        # get the geometry queued
+        vtnc, faces, outline = plane = create_plane(width=world_box.r-world_box.l,
+                                             height=world_box.t-world_box.b,
+                                             direction='+z')
+
+        verts = np.array([q[0] for q in vtnc])
+        texcoords = np.array([q[1] for q in vtnc])
+        normals = np.array([q[2] for q in vtnc])
+        colors = np.array([q[3] for q in vtnc])
+        faces_buffer = gloo.IndexBuffer(faces.astype(np.uint16))
+        print("V:", verts, len(verts))
+        print("T:", texcoords, len(texcoords))
+        print("N:", normals, len(normals))
+        print("C:", colors, len(colors))
+        print("F:", faces, len(faces))
+        print("O:", outline, len(outline))
+        # print("T:", texcoords, len(texcoords))
+
+        self.program['a_position'] = gloo.VertexBuffer(verts)
+        self.program['a_texcoord'] = gloo.VertexBuffer(texcoords)
+        self.faces = faces_buffer
+
+        # get the texture queued
+        self.program['u_texture'] = self.texture = gloo.Texture2D(image)
+
+    def draw(self):
+        self.program.draw('triangles', self.faces)
+
+    def update_mvp(self, model=None, view=None, projection=None):
+        if model is not None:
+            self.program['u_model'] = model
+        if view is not None:
+            self.program['u_view'] = view
+        if projection is not None:
+            self.program['u_projection'] = projection
+
+
+
+
+
 
 class CspovMainMapWidget(app.Canvas):
 
@@ -303,6 +358,8 @@ class CspovMainMapWidget(app.Canvas):
     _activity_stack = None  # Behavior object stack which we push/pop for primary activity; activity[-1] is what we're currently doing
     layers = None  # layers we're currently displaying, last on top
     viewport = None  # box with world coordinates of what we're showing
+
+    _testtile = None
 
     def __init__(self, **kwargs):
         # http://stackoverflow.com/questions/17167194/how-to-make-updategl-realtime-in-qt
@@ -326,6 +383,8 @@ class CspovMainMapWidget(app.Canvas):
         self.program['a_position'] = gloo.VertexBuffer(positions)
         self.program['a_texcoord'] = gloo.VertexBuffer(texcoords)
         self.program['u_texture'] = gloo.Texture2D(load_crate())
+
+        self._testtile = RGBATileProgram()
 
         # Handle transformations
         self.init_transforms()
@@ -393,6 +452,7 @@ class CspovMainMapWidget(app.Canvas):
 
         self.program['u_model'] = self.model
         self.program['u_view'] = self.view
+        self._testtile.update_mvp(self.model, self.view, self.projection)
 
     def update_transforms(self, event):
         self.theta += .1
@@ -400,6 +460,7 @@ class CspovMainMapWidget(app.Canvas):
         self.model = np.dot(rotate(self.theta, (0, 0, 1)),
                             rotate(self.phi, (0, 1, 0)))
         self.program['u_model'] = self.model
+        self._testtile.update_mvp(self.model)
         self.update()
 
     def on_resize(self, event):
@@ -421,12 +482,15 @@ class CspovMainMapWidget(app.Canvas):
         #     -50, 50
         # )
         self.program['u_projection'] = self.projection
+        self._testtile.update_mvp(projection=self.projection)
 
     def on_draw(self, event):
         gloo.clear()
         for layer in self.layers:
             layer.on_draw(event)
         self.program.draw('triangles', faces_buffer)
+        if self._testtile:
+            self._testtile.draw()
 
     # def on_compile(self):
     #     vert_code = str(self.vertEdit.toPlainText())
