@@ -369,7 +369,12 @@ class CspovMainMapWidget(app.Canvas):
         # self.layers = [TestLayer()]
         self.layers = [] # FIXME [TestTileLayer()]
         self._activity_stack = [Idling(self)]
+
         self.viewport = box(l=-MAX_EXCURSION_X/4, b=-MAX_EXCURSION_Y/1.5, r=MAX_EXCURSION_X/4, t=MAX_EXCURSION_Y/1.5)
+
+        aspect = self.size[1] / float(self.size[0])
+        self.viewport = vp = box(l=-4, r=4, b=-4*aspect, t=4*aspect)
+
         # self.viewportDidChange.connect(self.updateGL)
         # assert(self.updatesEnabled())
         # self.setUpdatesEnabled(True)
@@ -388,7 +393,7 @@ class CspovMainMapWidget(app.Canvas):
 
         # Handle transformations
         self.init_transforms()
-        self.apply_zoom()
+        self.update_proj()
 
         gloo.set_clear_color((0, 0, 0, 1))
         gloo.set_state(depth_test=True)
@@ -426,15 +431,17 @@ class CspovMainMapWidget(app.Canvas):
         """
         # print(" viewport pan requested {0!r:s}".format((pdy,pdx,wdy,wdx)))
         if (pdy, pdx) is not (None, None):
-            s = self.size()
-            ph, pw = float(s.height()), float(s.width())
+            pw, ph = self.size
+            # ph, pw = float(s.height()), float(s.width())
             wh, ww = self.viewport.t - self.viewport.b, self.viewport.r - self.viewport.l
             wdy, wdx = float(pdy)/ph*wh, float(pdx)/pw*ww
         elif (wdy, wdx) is (None, None):
             return self.viewport
+        print("pan {}y {}x".format(pdy, pdx))
         nvp = box(b=self.viewport.b+wdy, t=self.viewport.t+wdy, l=self.viewport.l+wdx, r=self.viewport.r+wdx)
         # print("pan viewport {0!r:s} => {1!r:s}".format(self.viewport, nvp))
         self.viewport = nvp
+        self.update_proj()  # propagate projection matrix
         # self.viewportDidChange.emit(nvp)
         self.update()
         return self.viewport
@@ -464,9 +471,9 @@ class CspovMainMapWidget(app.Canvas):
         self.update()
 
     def on_resize(self, event):
-        self.apply_zoom()
+        self.update_proj()
 
-    def apply_zoom(self, event=None):
+    def update_proj(self, event=None):
         if event is not None:
             gloo.set_viewport(0, 0, *event.physical_size)
         else:
@@ -475,12 +482,12 @@ class CspovMainMapWidget(app.Canvas):
         # self.projection = perspective(45.0, self.size[0] /
         #                               float(self.size[1]), 2.0, 10.0)
         aspect = self.size[1] / float(self.size[0])
-        self.projection = ortho(-4, 4, -4*aspect, 4*aspect, -10, 10)
-        # self.projection = ortho(
-        #     vp.l, vp.r,
-        #     vp.b, vp.t,
-        #     -50, 50
-        # )
+        #self.projection = ortho(-4, 4, -4*aspect, 4*aspect, -10, 10)
+        self.projection = ortho(
+            vp.l, vp.r,
+            vp.b, vp.t,
+            -10, 10
+        )
         self.program['u_projection'] = self.projection
         self._testtile.update_mvp(projection=self.projection)
 
@@ -504,7 +511,7 @@ class CspovMainMapWidget(app.Canvas):
     def key_release(self, key):
         print('up', repr(key))
 
-    def mouse_release(self, event):
+    def on_mouse_release(self, event):
         event = event.native  # FIXME: stop using .native
         newact = True
         while newact is not None:
@@ -517,7 +524,8 @@ class CspovMainMapWidget(app.Canvas):
             assert(isinstance(newact, MapWidgetActivity))
             self._activity_stack.append(newact)
 
-    def mouse_move(self, event):
+    def on_mouse_move(self, event):
+        # print("mouse_move")
         event = event.native
         newact = True
         while newact is not None:
@@ -530,7 +538,7 @@ class CspovMainMapWidget(app.Canvas):
             assert(isinstance(newact, MapWidgetActivity))
             self._activity_stack.append(newact)
 
-    def mouse_press(self, event):
+    def on_mouse_press(self, event):
         event = event.native
         newact = True
         while newact is not None:
@@ -543,7 +551,7 @@ class CspovMainMapWidget(app.Canvas):
             assert(isinstance(newact, MapWidgetActivity))
             self._activity_stack.append(newact)
 
-    def mouse_wheel(self, event):
+    def on_mouse_wheel(self, event):
         event = event.native
         newact = True
         while newact is not None:
