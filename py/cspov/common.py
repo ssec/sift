@@ -34,10 +34,10 @@ LOG = logging.getLogger(__name__)
 DEFAULT_TILE_HEIGHT = 512
 DEFAULT_TILE_WIDTH = 512
 
-R_EQ = 6378137.0  # m
-R_POL = 6356752.3142  # m
-C_EQ = 40075017.0  # linear m
-C_POL = 40007863.0  # linear m
+R_EQ = 6378.1370  # km
+R_POL = 6356.7523142  # km
+C_EQ = 40075.0170  # linear km
+C_POL = 40007.8630  # linear km
 
 MAX_EXCURSION_Y = C_POL/4.0
 MAX_EXCURSION_X = C_EQ/2.0

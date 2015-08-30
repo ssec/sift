@@ -17,18 +17,20 @@ REQUIRES
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
+import os, sys
+import logging, unittest, argparse
 from OpenGL.GL import *
 from PIL import Image
 import numpy as np
 
+import scipy.misc as spm
 from cspov.common import pnt, rez, MAX_EXCURSION_Y, MAX_EXCURSION_X, MercatorTileCalc, WORLD_EXTENT_BOX, \
     DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH, box
+from cspov.view.Program import GlooRGBTile
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import os, sys
-import logging, unittest, argparse
 
 LOG = logging.getLogger(__name__)
 
@@ -43,9 +45,9 @@ class Layer(object):
     - typically will cache a "coarsest" single-tile representation for zoom-out events (preferred for fast=True paint calls)
     - can have probes attached which operate primarily on the science representation
     """
-    def paint(self, geom, fast=False, **kwargs):
+    def paint(self, geom, proj, fast=False, **kwargs):
         """
-        draw the most appropriate representation for this layer
+        draw the most appropriate representation for this layer, given world geometry represented and projection matrix
         if a better representation could be rendered for later draws, return False and render() will be queued for later idle time
         fast flag requests that low-cost rendering be used
         """
@@ -96,57 +98,6 @@ TEST_COLORS = [
 ]
 
 
-class TestTileLayer(Layer):
-    """
-    Test layer that renders tiles as flat colors
-    """
-    _drawlist = None
-    _drawlist_fast = None
-    _calc = None  # MercatorTileCalc
-
-    def __init__(self, tile_count=(8,32)):
-        super(TestTileLayer, self).__init__()
-        name = 'testlayer'
-        pixel_shape = (ph,pw) = (2048, 8192)
-        th,tw = tile_count
-        zero_point = pnt(511.5, 2047.5)
-        pixel_rez = rez(MAX_EXCURSION_Y *2.0/float(ph), MAX_EXCURSION_X *2.0/float(pw))
-        self._calc = MercatorTileCalc(name, pixel_shape, zero_point, pixel_rez)
-
-    def paint(self, *args, **kwargs):
-        # print("paint")
-        _,tiles = self._calc.visible_tiles(WORLD_EXTENT_BOX)
-        boxes = []
-        n = 0
-        for y in range(tiles.b, tiles.t+1):
-            for x in range(tiles.l, tiles.r+1):
-                color = TEST_COLORS[n%len(TEST_COLORS)]
-                quad = self._calc.tile_world_box(y,x)
-                boxes.append((quad, color))
-                n+=1
-        glBegin(GL_QUADS)
-        for quad,color in boxes:
-            glColor3f(*color)
-            glVertex3f(quad.l, quad.b, 0.)
-            glVertex3f(quad.r, quad.b, 0.)
-            glVertex3f(quad.r, quad.t, 0.)
-            glVertex3f(quad.l, quad.t, 0.)
-        glEnd()
-        # print('drew {0!r:s}'.format(boxes))
-
-
-    def render(self, geom, *more_geom):
-        if more_geom:
-            raise NotImplementedError('not yet')
-
-        if self._drawlist_fast is None:
-            # render a single fast-draw list we can always fall back on for the full dataset
-            pass
-
-        if self._drawlist is not None:
-            glDeleteLists()
-
-
 class MercatorTiffTileLayer(Layer):
     """
     A layer with a Mercator TIFF image of world extent
@@ -155,6 +106,43 @@ class MercatorTiffTileLayer(Layer):
         self.pathname = pathname
 
 
+class BackgroundRGBWorldTiles(Layer):
+    """
+    Tile an RGB image representing the full -180..180 longitude, -90..90 latitude
+    """
+    image = None
+    shape = None
+    calc = None
+    tiles = None  # dictionary of {(y,x): GlooRgbTile, ...}
+
+    def __init__(self, filename=None, world_box=None):
+        self.image = spm.imread(filename or 'cspov/data/shadedrelief.jpg')  # FIXME package resource
+        self.world_box = world_box or WORLD_EXTENT_BOX
+        self.shape = (h,w) = tuple(self.image.shape[:2])
+        zero_point = (float(h)/2, float(w)/2)
+        pixel_rez = 180.0/float(h), 360.0/float(w)
+        self.calc = MercatorTileCalc('bgns', self.shape, zero_point, pixel_rez)
+        self.tiles = {}
+        self._generate_tiles()
+
+    def paint(self, geom, proj, fast=False, **kwargs):
+        """
+        draw the most appropriate representation for this layer
+        if a better representation could be rendered for later draws, return False and render() will be queued for later idle time
+        fast flag requests that low-cost rendering be used
+        """
+        for tile in self.tiles.values():
+            tile.update_mvp(projection=proj)
+            tile.draw()
+        return True
+
+    def _generate_tiles(self):
+        h,w = self.image.shape[:2]
+        _, tileset = self.calc.visible_tiles(WORLD_EXTENT_BOX)
+        for tileid in tileset:
+            tilegeom = self.calc.tile_world_box(*tileid)
+            subim = self.calc.tile_pixels(self.image, *tilegeom)
+            self.tiles[tileid] = GlooRGBTile(tilegeom, subim)
 
 
 

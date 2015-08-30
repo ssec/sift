@@ -24,7 +24,7 @@ import numpy as np
 import scipy.misc as spm
 from vispy.util.transforms import translate, rotate, ortho
 
-from cspov.common import box
+from cspov.common import box, WORLD_EXTENT_BOX, MAX_EXCURSION_X, MAX_EXCURSION_Y
 from cspov.view.Program import GlooRGBTile
 
 __author__ = 'rayg'
@@ -284,8 +284,10 @@ class CspovMainMapWidget(app.Canvas):
         aspect = self.size[1] / float(self.size[0])
         self.viewport = vp = box(l=-4, r=4, b=-4*aspect, t=4*aspect)
         # FIXME: use this viewport
-        # self.viewport = box(l=-MAX_EXCURSION_X/4, b=-MAX_EXCURSION_Y/1.5, r=MAX_EXCURSION_X/4, t=MAX_EXCURSION_Y/1.5)
-
+        rad = MAX_EXCURSION_X/2
+        # self.viewport = vp = box(l=-rad, r=rad, b=-rad*aspect, t=rad*aspect)
+        self.viewport = box(l=-MAX_EXCURSION_X/4, b=-MAX_EXCURSION_Y/1.5, r=MAX_EXCURSION_X/4, t=MAX_EXCURSION_Y/1.5)
+        #
         # self.viewportDidChange.connect(self.updateGL)
         # assert(self.updatesEnabled())
         # self.setUpdatesEnabled(True)
@@ -294,9 +296,13 @@ class CspovMainMapWidget(app.Canvas):
         # self.setAutoBufferSwap(True)
         # assert(self.hasMouseTracking())
 
-        self._testtile = GlooRGBTile(world_box=box(l=-4.0, r=4.0, t=2.0, b=-2.0),
-                                         image=spm.imread('cspov/data/shadedrelief.jpg'),
-                                         image_box=box(b=3000, t=3512, l=3000, r=4024))
+        # self._testtile = GlooRGBTile(world_box=box(l=-4.0, r=4.0, t=2.0, b=-2.0),
+        #                                  image=spm.imread('cspov/data/shadedrelief.jpg'),
+        #                                  image_box=box(b=3000, t=3512, l=3000, r=4024))
+        self._testtile = GlooRGBTile(world_box=WORLD_EXTENT_BOX,
+                                     image=spm.imread('cspov/data/shadedrelief.jpg') )
+                                     # image_box=box(b=3000, t=3512, l=3000, r=4024))
+
 
         # Handle transformations
         self.init_transforms()
@@ -389,7 +395,7 @@ class CspovMainMapWidget(app.Canvas):
         self.projection = ortho(
             vp.l, vp.r,
             vp.b, vp.t,
-            -10, 10
+            -10000000, 10000000
         )
         self._testtile.set_mvp(projection=self.projection)
 
