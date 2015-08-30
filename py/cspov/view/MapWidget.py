@@ -289,45 +289,63 @@ void main()
 
 class RGBATileProgram(object):
     program = None
+    image = None
+    world_box = None
+    faces = None
 
-    def __init__(self, world_box=box(l=-4.0, r=4.0, t=2.0, b=-2.0), image=None, image_box=None):
+    def __init__(self, world_box=None, image=None, image_box=None):
         super(RGBATileProgram, self).__init__()
         self.program = gloo.Program(VERT_CODE, FRAG_CODE)
-        if image is None:
-            image = load_crate()
-        if image_box is not None:
-            self.image = image = image[image_box.b:image_box.t, image_box.l:image_box.r]
-            print("clipping")
-        else:
-            self.image = image
+        if image is not None:
+            self.set_texture(image, image_box)
+        if world_box is not None:
+            self.set_world(world_box)
 
+    def set_world(self, world_box):
         # get the geometry queued
         vtnc, faces, outline = plane = create_plane(width=world_box.r-world_box.l,
                                              height=world_box.t-world_box.b,
                                              direction='+z')
 
         verts = np.array([q[0] for q in vtnc])
+        # translate the vertices
+        verts[:,0] -= (world_box.l + world_box.r)/2.0
+        verts[:,1] -= (world_box.b + world_box.t)/2.0
         texcoords = np.array([q[1] for q in vtnc])
         normals = np.array([q[2] for q in vtnc])
         colors = np.array([q[3] for q in vtnc])
         faces_buffer = gloo.IndexBuffer(faces.astype(np.uint16))
-        print("V:", verts, len(verts))
-        print("T:", texcoords, len(texcoords))
-        print("N:", normals, len(normals))
-        print("C:", colors, len(colors))
-        print("F:", faces, len(faces))
-        print("O:", outline, len(outline))
+        # print("V:", verts, len(verts))
+        # print("T:", texcoords, len(texcoords))
+        # print("N:", normals, len(normals))
+        # print("C:", colors, len(colors))
+        # print("F:", faces, len(faces))
+        # print("O:", outline, len(outline))
         # print("T:", texcoords, len(texcoords))
 
         self.program['a_position'] = gloo.VertexBuffer(verts)
         self.program['a_texcoord'] = gloo.VertexBuffer(texcoords)
         self.faces = faces_buffer
+        self.world_box = world_box
 
+
+    def set_texture(self, image, image_box=None):
+        if isinstance(image, str) and image == 'crate':
+            image = load_crate()
+        if image_box is not None:
+            self.image = image = image[image_box.b:image_box.t, image_box.l:image_box.r]
+            print("clipping")
+        else:
+            self.image = image
         # get the texture queued
-        self.program['u_texture'] = self.texture = gloo.Texture2D(image)
+        self.program['u_texture'] = gloo.Texture2D(image)
+
 
     def draw(self):
+        assert(self.image is not None)
+        assert(self.world_box is not None)
         self.program.draw('triangles', self.faces)
+
 
     def update_mvp(self, model=None, view=None, projection=None):
         if model is not None:
@@ -376,7 +394,8 @@ class CspovMainMapWidget(app.Canvas):
         # self.setAutoBufferSwap(True)
         # assert(self.hasMouseTracking())
 
-        self._testtile = RGBATileProgram(image=spm.imread('cspov/data/shadedrelief.jpg'),
+        self._testtile = RGBATileProgram(world_box=box(l=-4.0, r=4.0, t=2.0, b=-2.0),
+                                         image=spm.imread('cspov/data/shadedrelief.jpg'),
                                          image_box=box(b=3000, t=3512, l=3000, r=4024))
 
         # Handle transformations
