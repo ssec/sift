@@ -20,18 +20,24 @@ REQUIRES
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import sys
 
-from PyQt4.QtGui import *
-from PyQt4.QtCore import *
+# from PyQt4.QtGui import *
+# from PyQt4.QtCore import *
+from vispy import app, gloo
 # import vispy
 # vispy.use(app='PyQt4') #, gl='gl+')
 
-import vispy.scene as vps
+try:
+    app_object = app.use_app('pyqt4')
+except Exception:
+    app_object = app.use_app('pyside')
+QtCore = app_object.backend_module.QtCore,
+QtGui = app_object.backend_module.QtGui
+
+
 from cspov.view.MapWidget import CspovMainMapWidget
 
 
-import os, sys
 import logging, unittest, argparse
 
 LOG = logging.getLogger(__name__)
@@ -40,15 +46,15 @@ LOG = logging.getLogger(__name__)
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
 
-class Main(QMainWindow):
+class Main(QtGui.QMainWindow):
     def __init__(self):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
         # refer to objectName'd entities as self.ui.objectName
 
-        self.mainMap = CspovMainMapWidget(self)
-        self.ui.mainWidgets.addTab(self.mainMap, 'Mercator')
+        self.mainMap = CspovMainMapWidget(parent=self)
+        self.ui.mainWidgets.addTab(self.mainMap.native, 'Mercator')
         # self.mainMap.setVisible(True)
 
         # self.scenegraph = vps.SceneCanvas('vispy', app='PyQt4')
@@ -58,8 +64,11 @@ class Main(QMainWindow):
         self.ui.mainWidgets.removeTab(0)
 
 if __name__ == '__main__':
-    app = QApplication(sys.argv)
+    app.create()
+    # app = QApplication(sys.argv)
     window = Main()
     window.show()
-    sys.exit(app.exec_())
-
+    print("running")
+    app.run()
+    # sys.exit(app.exec_())
+#
