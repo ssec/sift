@@ -126,8 +126,8 @@ class UserZoomingMap(MapWidgetActivity):
     user ends zooming
     """
     def wheelEvent(self, event):
-        event.accept()
-        pos = event.pos()
+        # event.accept()
+        # pos = event.pos()
         delta = event.delta()
         self.main.zoomViewport(delta)
         return None
@@ -409,13 +409,13 @@ class CspovMainMapWidget(app.Canvas):
 
     def zoomViewport(self, pdz=None, wdz=None):
         if pdz is not None:
-            s = self.size()
-            ph, pw = float(s.height()), float(s.width())
+            pw, ph = self.size
             wh, ww = self.viewport.t - self.viewport.b, self.viewport.r - self.viewport.l
             wdy, wdx = float(pdz)/ph*wh, float(pdz)/pw*ww
         nvp = box(b=self.viewport.b+wdy, t=self.viewport.t-wdy, l=self.viewport.l+wdx, r=self.viewport.r-wdx)
         # print("pan viewport {0!r:s} => {1!r:s}".format(self.viewport, nvp))
         self.viewport = nvp
+        self.update_proj()
         # self.viewportDidChange.emit(nvp)
         self.update()
 
@@ -437,7 +437,7 @@ class CspovMainMapWidget(app.Canvas):
             wdy, wdx = float(pdy)/ph*wh, float(pdx)/pw*ww
         elif (wdy, wdx) is (None, None):
             return self.viewport
-        print("pan {}y {}x".format(pdy, pdx))
+        # print("pan {}y {}x".format(pdy, pdx))
         nvp = box(b=self.viewport.b+wdy, t=self.viewport.t+wdy, l=self.viewport.l+wdx, r=self.viewport.r+wdx)
         # print("pan viewport {0!r:s} => {1!r:s}".format(self.viewport, nvp))
         self.viewport = nvp
