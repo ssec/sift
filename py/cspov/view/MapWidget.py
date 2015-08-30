@@ -269,19 +269,6 @@ void main()
 }
 """
 
-# Read cube data
-# FIXME: remove
-positions, faces, normals, texcoords = \
-    read_mesh(load_data_file('orig/cube.obj'))
-colors = np.random.uniform(0, 1, positions.shape).astype('float32')
-print("positions:", positions, len(positions))
-print("faces:", faces, len(faces))
-print("normals:", normals, len(normals))
-print("texcoords:", texcoords, len(texcoords))
-
-faces_buffer = gloo.IndexBuffer(faces.astype(np.uint16))
-
-
 
 #
 # class TestSingleImageLayer(Layer):
@@ -370,10 +357,10 @@ class CspovMainMapWidget(app.Canvas):
         self.layers = [] # FIXME [TestTileLayer()]
         self._activity_stack = [Idling(self)]
 
-        self.viewport = box(l=-MAX_EXCURSION_X/4, b=-MAX_EXCURSION_Y/1.5, r=MAX_EXCURSION_X/4, t=MAX_EXCURSION_Y/1.5)
-
         aspect = self.size[1] / float(self.size[0])
         self.viewport = vp = box(l=-4, r=4, b=-4*aspect, t=4*aspect)
+        # FIXME: use this viewport
+        # self.viewport = box(l=-MAX_EXCURSION_X/4, b=-MAX_EXCURSION_Y/1.5, r=MAX_EXCURSION_X/4, t=MAX_EXCURSION_Y/1.5)
 
         # self.viewportDidChange.connect(self.updateGL)
         # assert(self.updatesEnabled())
@@ -382,12 +369,6 @@ class CspovMainMapWidget(app.Canvas):
         # self.setMouseTracking(True)  # gives us mouseMoveEvent calls in Idling
         # self.setAutoBufferSwap(True)
         # assert(self.hasMouseTracking())
-
-        self.program = gloo.Program(VERT_CODE, FRAG_CODE)
-        # Set attributes
-        self.program['a_position'] = gloo.VertexBuffer(positions)
-        self.program['a_texcoord'] = gloo.VertexBuffer(texcoords)
-        self.program['u_texture'] = gloo.Texture2D(load_crate())
 
         self._testtile = RGBATileProgram()
 
@@ -456,9 +437,6 @@ class CspovMainMapWidget(app.Canvas):
         self.view = translate((0, 0, -5))
         self.model = np.eye(4, dtype=np.float32)
         self.projection = np.eye(4, dtype=np.float32)
-
-        self.program['u_model'] = self.model
-        self.program['u_view'] = self.view
         self._testtile.update_mvp(self.model, self.view, self.projection)
 
     def update_transforms(self, event):
@@ -466,7 +444,6 @@ class CspovMainMapWidget(app.Canvas):
         self.phi += .1
         self.model = np.dot(rotate(self.theta, (0, 0, 1)),
                             rotate(self.phi, (0, 1, 0)))
-        self.program['u_model'] = self.model
         self._testtile.update_mvp(self.model)
         self.update()
 
@@ -488,14 +465,12 @@ class CspovMainMapWidget(app.Canvas):
             vp.b, vp.t,
             -10, 10
         )
-        self.program['u_projection'] = self.projection
         self._testtile.update_mvp(projection=self.projection)
 
     def on_draw(self, event):
         gloo.clear()
         for layer in self.layers:
             layer.on_draw(event)
-        self.program.draw('triangles', faces_buffer)
         if self._testtile:
             self._testtile.draw()
 
