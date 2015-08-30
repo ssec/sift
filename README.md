@@ -18,3 +18,11 @@ for fn in *.nc; do time python ~/repos/git/CSPOV/py/cspov/project/ahi2gtiff.py -
 for fn in *R20.tif; do
     time gdalwarp -t_srs "+proj=merc +datum=WGS84 +ellps=WGS84" -ts 5120 5120 -te_srs "+proj=latlong +datum=WGS84 +ellps=WGS84" -te -180 -80 180 80 $fn ${fn/.tif/.merc.tif}
 done
+
+Reading Geotiffs with GDAL
+--------------------------
+
+    import gdal
+    g = gdal.Open("HS_H08_20150714_0330_B02_FLDK_R20.merc.tif")
+    # for single banded geotiffs:
+    data = g.GetRasterBand(1).ReadAsArray()

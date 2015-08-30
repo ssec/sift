@@ -22,6 +22,11 @@ GTIFF_DRIVER = gdal.GetDriverByName("GTIFF")
 DEFAULT_PROJ_STR = "+proj=merc +datum=WGS84 +ellps=WGS84 +no_defs"
 
 
+AHI_NADIR_RES = {
+    5500: 2000,
+}
+
+
 ### Scaling Functions Copied from Polar2Grid ###
 
 def linear_flexible_scale(img, min_out, max_out, min_in=None, max_in=None, flip=False, **kwargs):
@@ -261,12 +266,13 @@ def main():
         input_data = brightness_temperature_scale(input_data, 242.0, 163.0, 330.0, 0, 255)
     np.clip(input_data, 0, 255, out=input_data)
     input_data = input_data.astype(np.uint8)
+    # input_data = input_data.astype(np.float32)  # make sure everything is 32-bit floats
 
     projection_info = nc.variables["Projection"].__dict__.copy()
     projection_info["semi_major_axis"] *= 1000.0  # is in kilometers, need meters
     projection_info["perspective_point_height"] *= 1000.0  # is in kilometers, need meters
     projection_info["flattening"] = 1.0 / projection_info["inverse_flattening"]
-    projection_info["semi_minor_axis"] = projection_info["semi_major_axis"] * (1 - projection_info["flattening"])
+    # projection_info["semi_minor_axis"] = projection_info["semi_major_axis"] * (1 - projection_info["flattening"])
     # Shouldn't be needed: 6356752.29960574448
 
     # Notes on Sweep: https://trac.osgeo.org/proj/wiki/proj%3Dgeos
@@ -275,26 +281,31 @@ def main():
     input_proj_str += "+lon_0={longitude_of_projection_origin:0.3f} "
     input_proj_str += "+lat_0={latitude_of_projection_origin:0.3f} "
     input_proj_str += "+a={semi_major_axis:0.3f} "
-    # input_proj_str += "+f={flattening} "
-    input_proj_str += "+b={semi_minor_axis:0.3f} "
+    input_proj_str += "+f={flattening} "
+    # input_proj_str += "+b={semi_minor_axis:0.3f} "
     input_proj_str += "+h={perspective_point_height} "
-    input_proj_str += "+sweep=y"
+    input_proj_str += "+sweep={sweep_angle_axis}"
     input_proj_str = input_proj_str.format(**projection_info)
     LOG.debug("AHI Fixed Grid Projection String: %s", input_proj_str)
 
     # Calculate upper-left corner (origin) using center point as a reference
     shape = nc.variables["longitude"].shape
-    center_x_idx = shape[1] / 2
-    center_y_idx = shape[0] / 2
-    pixel_size_x, pixel_size_y = 2000.0, -2000.0
-    center_lon = nc.variables["longitude"][center_x_idx, center_y_idx]
-    center_lat = nc.variables["latitude"][center_x_idx, center_y_idx]
-    p = Proj(input_proj_str)
-    center_x, center_y = p(center_lon, center_lat)
-    origin_x = center_x - pixel_size_x * center_x_idx
-    origin_y = center_y - pixel_size_y * center_y_idx
-    LOG.debug("Center Lon: %f\tCenter Lat: %f", center_lon, center_lat)
-    LOG.debug("Center X: %f\tCenter Y: %f", center_x, center_y)
+    # center_x_idx = shape[1] / 2
+    # center_y_idx = shape[0] / 2
+    pixel_size_x = AHI_NADIR_RES[shape[0]]
+    pixel_size_y = -AHI_NADIR_RES[shape[1]]
+    # center_lon = nc.variables["longitude"][center_x_idx, center_y_idx]
+    # center_lat = nc.variables["latitude"][center_x_idx, center_y_idx]
+    # p = Proj(input_proj_str)
+    # center_x, center_y = p(center_lon, center_lat)
+    # origin_x = center_x - pixel_size_x * center_x_idx
+    # origin_y = center_y - pixel_size_y * center_y_idx
+    # LOG.debug("Center Lon: %f\tCenter Lat: %f", center_lon, center_lat)
+    # LOG.debug("Center X: %f\tCenter Y: %f", center_x, center_y)
+
+    # Assume that center pixel is at 0, 0 projection space
+    origin_x = -pixel_size_x * (shape[1] / 2.0)
+    origin_y = -pixel_size_y * (shape[0] / 2.0)
     LOG.debug("Origin X: %f\tOrigin Y: %f", origin_x, origin_y)
 
     # origin_x, cell_width, rotation_x, origin_y, rotation_y, cell_height
