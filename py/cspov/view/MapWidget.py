@@ -285,9 +285,9 @@ class CspovMainMapWidget(app.Canvas):
         self.viewport = vp = box(l=-4, r=4, b=-4*aspect, t=4*aspect)
         # FIXME: use this viewport
         rad = MAX_EXCURSION_X/2
-        # self.viewport = vp = box(l=-rad, r=rad, b=-rad*aspect, t=rad*aspect)
-        self.viewport = box(l=-MAX_EXCURSION_X/4, b=-MAX_EXCURSION_Y/1.5, r=MAX_EXCURSION_X/4, t=MAX_EXCURSION_Y/1.5)
-        #
+        self.viewport = vp = box(l=-rad, r=rad, b=-rad*aspect, t=rad*aspect)
+        # self.viewport = box(l=-MAX_EXCURSION_X/4, b=-MAX_EXCURSION_Y/1.5, r=MAX_EXCURSION_X/4, t=MAX_EXCURSION_Y/1.5)
+
         # self.viewportDidChange.connect(self.updateGL)
         # assert(self.updatesEnabled())
         # self.setUpdatesEnabled(True)
@@ -325,6 +325,8 @@ class CspovMainMapWidget(app.Canvas):
             pw, ph = self.size
             wh, ww = self.viewport.t - self.viewport.b, self.viewport.r - self.viewport.l
             wdy, wdx = float(pdz)/ph*wh, float(pdz)/pw*ww
+        aspect = self.size[1] / float(self.size[0])
+        wdx = wdy / aspect
         nvp = box(b=self.viewport.b+wdy, t=self.viewport.t-wdy, l=self.viewport.l+wdx, r=self.viewport.r-wdx)
         # print("pan viewport {0!r:s} => {1!r:s}".format(self.viewport, nvp))
         self.viewport = nvp
@@ -372,11 +374,11 @@ class CspovMainMapWidget(app.Canvas):
         self._testtile.set_mvp(self.model, self.view, self.projection)
 
     def update_transforms(self, event):
-        self.theta += .1
-        self.phi += .1
-        self.model = np.dot(rotate(self.theta, (0, 0, 1)),
-                            rotate(self.phi, (0, 1, 0)))
-        self._testtile.set_mvp(self.model)
+        # self.theta += .1
+        # self.phi += .1
+        # self.model = np.dot(rotate(self.theta, (0, 0, 1)),
+        #                     rotate(self.phi, (0, 1, 0)))
+        # self._testtile.set_mvp(self.model)
         self.update()
 
     def on_resize(self, event):

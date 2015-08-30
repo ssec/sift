@@ -84,6 +84,8 @@ class GlooRGBTile(object):
         verts[:,0] -= (world_box.l + world_box.r)/2.0
         verts[:,1] -= (world_box.b + world_box.t)/2.0
         texcoords = np.array([q[1] for q in vtnc])
+        # images are typically from top-left (0,0) and we're working bottom left (0,0)
+        texcoords[:,1] = 1.0 - texcoords[:,1]
         # normals = np.array([q[2] for q in vtnc])
         # colors = np.array([q[3] for q in vtnc])
         faces_buffer = gloo.IndexBuffer(faces.astype(np.uint16))
