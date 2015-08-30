@@ -22,6 +22,7 @@ from OpenGL.GL import *
 # from PyQt4.QtOpenGL import QGLWidget, QGLFormat
 from vispy import app, gloo
 import numpy as np
+import scipy.misc as spm
 from cspov.view.Layer import TestTileLayer, Layer
 from cspov.common import MAX_EXCURSION_Y, MAX_EXCURSION_X, box
 from vispy.util.transforms import perspective, translate, rotate, ortho
@@ -224,7 +225,7 @@ varying vec2 v_texcoord;
 void main()
 {
     float ty = v_texcoord.y;
-    float tx = sin(ty*50.0)*0.01 + v_texcoord.x;
+    float tx = v_texcoord.x;
     gl_FragColor = texture2D(u_texture, vec2(tx, ty));
 }
 """
@@ -293,7 +294,12 @@ class RGBATileProgram(object):
         super(RGBATileProgram, self).__init__()
         self.program = gloo.Program(VERT_CODE, FRAG_CODE)
         if image is None:
-            self.image = image = load_crate()
+            image = load_crate()
+        if image_box is not None:
+            self.image = image = image[image_box.b:image_box.t, image_box.l:image_box.r]
+            print("clipping")
+        else:
+            self.image = image
 
         # get the geometry queued
         vtnc, faces, outline = plane = create_plane(width=world_box.r-world_box.l,
@@ -370,7 +376,8 @@ class CspovMainMapWidget(app.Canvas):
         # self.setAutoBufferSwap(True)
         # assert(self.hasMouseTracking())
 
-        self._testtile = RGBATileProgram()
+        self._testtile = RGBATileProgram(image=spm.imread('cspov/data/shadedrelief.jpg'),
+                                         image_box=box(b=3000, t=3512, l=3000, r=4024))
 
         # Handle transformations
         self.init_transforms()
@@ -487,7 +494,7 @@ class CspovMainMapWidget(app.Canvas):
         print('up', repr(key))
 
     def on_mouse_release(self, event):
-        event = event.native  # FIXME: stop using .native
+        event = event.native  # FIXME: stop using .native, send the vispy event and refactor the Activities
         newact = True
         while newact is not None:
             newact = self.activity.mouseReleaseEvent(event)
