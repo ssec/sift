@@ -25,7 +25,7 @@ import scipy.misc as spm
 from vispy.util.transforms import translate, rotate, ortho
 
 from cspov.common import box
-from cspov.view.Program import RGBATileProgram
+from cspov.view.Program import GlooRGBTile
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -294,7 +294,7 @@ class CspovMainMapWidget(app.Canvas):
         # self.setAutoBufferSwap(True)
         # assert(self.hasMouseTracking())
 
-        self._testtile = RGBATileProgram(world_box=box(l=-4.0, r=4.0, t=2.0, b=-2.0),
+        self._testtile = GlooRGBTile(world_box=box(l=-4.0, r=4.0, t=2.0, b=-2.0),
                                          image=spm.imread('cspov/data/shadedrelief.jpg'),
                                          image_box=box(b=3000, t=3512, l=3000, r=4024))
 

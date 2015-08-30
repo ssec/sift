@@ -39,8 +39,8 @@ varying vec2 v_texcoord;
 void main()
 {
     v_texcoord = a_texcoord;
-    //gl_Position = u_projection * u_view * u_model * vec4(a_position,1.0);
     gl_Position = u_projection * u_view * u_model * vec4(a_position.xy,u_z,1.0);
+    //gl_Position = u_projection * u_view * u_model * vec4(a_position,1.0);
     //gl_Position = vec4(a_position,1.0);
 }
 """
@@ -58,7 +58,7 @@ void main()
 """
 
 
-class RGBATileProgram(object):
+class GlooRGBTile(object):
     program = None
     image = None
     world_box = None
@@ -66,7 +66,7 @@ class RGBATileProgram(object):
     z = 0.0
 
     def __init__(self, world_box=None, image=None, image_box=None):
-        super(RGBATileProgram, self).__init__()
+        super(GlooRGBTile, self).__init__()
         self.program = gloo.Program(VERT_CODE, FRAG_CODE)
         if image is not None:
             self.set_texture(image, image_box)
@@ -99,6 +99,7 @@ class RGBATileProgram(object):
         self.program['a_texcoord'] = gloo.VertexBuffer(texcoords)
         self.faces = faces_buffer
         self.world_box = world_box
+        self.program['u_z'] = self.z
 
     def set_texture(self, image, image_box=None):
         if isinstance(image, str) and image == 'crate':
@@ -110,6 +111,10 @@ class RGBATileProgram(object):
             self.image = image
         # get the texture queued
         self.program['u_texture'] = gloo.Texture2D(image)
+
+
+    def set_z(self, z):
+        self.program['u_z'] = self.z = z
 
 
     def set_mvp(self, model=None, view=None, projection=None):
@@ -124,5 +129,4 @@ class RGBATileProgram(object):
     def draw(self):
         assert(self.image is not None)
         assert(self.world_box is not None)
-        self.program['u_z'] = self.z
         self.program.draw('triangles', self.faces)
