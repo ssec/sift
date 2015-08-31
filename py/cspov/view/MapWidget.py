@@ -269,7 +269,7 @@ void main()
 class CspovMainMapWidget(app.Canvas):
 
     # signals
-    viewportDidChange = pyqtSignal(box)
+    # viewportDidChange = pyqtSignal(box)
 
     # members
     _activity_stack = None  # Behavior object stack which we push/pop for primary activity; activity[-1] is what we're currently doing

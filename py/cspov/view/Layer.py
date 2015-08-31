@@ -43,30 +43,38 @@ class Layer(QObject):
     - typically will cache a "coarsest" single-tile representation for zoom-out events (preferred for fast=True paint calls)
     - can have probes attached which operate primarily on the science representation
     """
+    propertyDidChange = pyqtSignal(dict)
+    _z = None
+    _alpha = None
+    _name = None
+
     def __init__(self):
         super(Layer, self).__init__()
-    
+
     def get_z(self):
-        pass
+        return self._z
 
     def set_z(self, new_z):
-        pass
+        self._z = new_z
+        self.propertyDidChange.emit({'z': new_z})
 
     z = property(get_z, set_z)
 
     def get_alpha(self):
-        pass
+        return self._alpha
 
     def set_alpha(self, new_alpha):
-        pass
+        self._alpha = new_alpha
+        self.propertyDidChange.emit({'alpha': new_alpha})
 
     alpha = property(get_alpha, set_alpha)
 
     def get_name(self):
-        pass
+        return self._name
 
-    def set_name(self, new_alpha):
-        pass
+    def set_name(self, new_name):
+        self._name = new_name
+        self.propertyDidChange.emit({'name': new_name})
 
     name = property(get_alpha, set_alpha)
 
@@ -161,6 +169,7 @@ class BackgroundRGBWorldTiles(Layer):
     tiles = None  # dictionary of {(y,x): GlooRgbTile, ...}
 
     def __init__(self, model, view, filename=None, world_box=None, tile_shape=None):
+        super(BackgroundRGBWorldTiles, self).__init__()
         self.image = spm.imread(filename or 'cspov/data/shadedrelief.jpg')  # FIXME package resource
         self.image = self.image[::-1]  # flip so 0,0 is bottom left instead of top left
         if filename is None:
