@@ -64,6 +64,11 @@ class Main(QtGui.QMainWindow):
         self.ui.mainWidgets.removeTab(0)
 
 if __name__ == '__main__':
+    import os
+    levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
+    verbosity = int(os.environ.get('VERBOSITY', 0))
+    logging.basicConfig(level=levels[min(3, verbosity)])
+
     app.create()
     # app = QApplication(sys.argv)
     window = Main()

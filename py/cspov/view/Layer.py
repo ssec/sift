@@ -115,14 +115,18 @@ class BackgroundRGBWorldTiles(Layer):
     calc = None
     tiles = None  # dictionary of {(y,x): GlooRgbTile, ...}
 
-    def __init__(self, filename=None, world_box=None):
+    def __init__(self, model, view, filename=None, world_box=None, tile_shape=None):
         self.image = spm.imread(filename or 'cspov/data/shadedrelief.jpg')  # FIXME package resource
+        if filename is None:
+            tile_shape = (1080,1080)  # FIXME make tile shape smarter
         self.world_box = world_box or WORLD_EXTENT_BOX
         self.shape = (h,w) = tuple(self.image.shape[:2])
-        zero_point = (float(h)/2, float(w)/2)
-        pixel_rez = 180.0/float(h), 360.0/float(w)
-        self.calc = MercatorTileCalc('bgns', self.shape, zero_point, pixel_rez)
+        zero_point = pnt(float(h)/2, float(w)/2)
+        pixel_rez = rez(180.0/float(h), 360.0/float(w))
+        self.calc = MercatorTileCalc('bgns', self.shape, zero_point, pixel_rez, tile_shape)
         self.tiles = {}
+        self.model = model
+        self.view = view
         self._generate_tiles()
 
     def paint(self, geom, proj, fast=False, **kwargs):
@@ -131,18 +135,27 @@ class BackgroundRGBWorldTiles(Layer):
         if a better representation could be rendered for later draws, return False and render() will be queued for later idle time
         fast flag requests that low-cost rendering be used
         """
-        for tile in self.tiles.values():
-            tile.update_mvp(projection=proj)
+        # tile = self.tiles[(2,2)]
+        # tile.set_mvp(projection=proj)
+        # tile.draw()
+        # return True
+
+        for tile in self.tiles.values():  # FIXME: draw only the tiles that are visible in the geom
+            # LOG.debug('draw tile {0!r:s}'.format(tile))
+            tile.set_mvp(projection=proj)
             tile.draw()
         return True
 
     def _generate_tiles(self):
         h,w = self.image.shape[:2]
-        _, tileset = self.calc.visible_tiles(WORLD_EXTENT_BOX)
-        for tileid in tileset:
-            tilegeom = self.calc.tile_world_box(*tileid)
-            subim = self.calc.tile_pixels(self.image, *tilegeom)
-            self.tiles[tileid] = GlooRGBTile(tilegeom, subim)
+        _, tilebox = self.calc.visible_tiles(WORLD_EXTENT_BOX)
+        LOG.info(tilebox)
+        for tiy in range(tilebox.b, tilebox.t):
+            for tix in range(tilebox.l, tilebox.r):
+                tilegeom = self.calc.tile_world_box(tiy,tix)
+                subim = self.calc.tile_pixels(self.image, tiy, tix)
+                self.tiles[(tiy,tix)] = t = GlooRGBTile(tilegeom, subim)
+                t.set_mvp(model=self.model, view=self.view)
 
 
 

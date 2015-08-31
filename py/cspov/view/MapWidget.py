@@ -26,6 +26,7 @@ from vispy.util.transforms import translate, rotate, ortho
 
 from cspov.common import box, WORLD_EXTENT_BOX, MAX_EXCURSION_X, MAX_EXCURSION_Y
 from cspov.view.Program import GlooRGBTile
+from cspov.view.Layer import BackgroundRGBWorldTiles
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -277,13 +278,10 @@ class CspovMainMapWidget(app.Canvas):
         #
         super(CspovMainMapWidget, self).__init__(**kwargs)
 
-        # self.layers = [TestLayer()]
-        self.layers = [] # FIXME [TestTileLayer()]
         self._activity_stack = [Idling(self)]
 
         aspect = self.size[1] / float(self.size[0])
         self.viewport = vp = box(l=-4, r=4, b=-4*aspect, t=4*aspect)
-        # FIXME: use this viewport
         rad = MAX_EXCURSION_X/2
         self.viewport = vp = box(l=-rad, r=rad, b=-rad*aspect, t=rad*aspect)
         # self.viewport = box(l=-MAX_EXCURSION_X/4, b=-MAX_EXCURSION_Y/1.5, r=MAX_EXCURSION_X/4, t=MAX_EXCURSION_Y/1.5)
@@ -296,23 +294,22 @@ class CspovMainMapWidget(app.Canvas):
         # self.setAutoBufferSwap(True)
         # assert(self.hasMouseTracking())
 
-        # self._testtile = GlooRGBTile(world_box=box(l=-4.0, r=4.0, t=2.0, b=-2.0),
-        #                                  image=spm.imread('cspov/data/shadedrelief.jpg'),
-        #                                  image_box=box(b=3000, t=3512, l=3000, r=4024))
-        self._testtile = GlooRGBTile(world_box=WORLD_EXTENT_BOX,
-                                     image=spm.imread('cspov/data/shadedrelief.jpg') )
-                                     # image_box=box(b=3000, t=3512, l=3000, r=4024))
+        # self._testtile = GlooRGBTile(world_box=WORLD_EXTENT_BOX,
+        #                              image=spm.imread('cspov/data/shadedrelief.jpg') )
+        #                              # image_box=box(b=3000, t=3512, l=3000, r=4024))
 
 
         # Handle transformations
         self.init_transforms()
         self.update_proj()
 
+        self.layers = [BackgroundRGBWorldTiles(self.model, self.view)] #
+
         gloo.set_clear_color((0, 0, 0, 1))
         gloo.set_state(depth_test=True)
 
-        self._timer = app.Timer('auto', connect=self.update_transforms)
-        self._timer.start()
+        # self._timer = app.Timer('auto', connect=self.update_transforms)
+        # self._timer.start()
 
         self.show()
 
@@ -356,7 +353,7 @@ class CspovMainMapWidget(app.Canvas):
         nvp = box(b=self.viewport.b+wdy, t=self.viewport.t+wdy, l=self.viewport.l+wdx, r=self.viewport.r+wdx)
         # print("pan viewport {0!r:s} => {1!r:s}".format(self.viewport, nvp))
         self.viewport = nvp
-        self.update_proj()  # propagate projection matrix
+        self.update_proj()  # recalculate projection matrix
         # self.viewportDidChange.emit(nvp)
         self.update()
         return self.viewport
@@ -371,7 +368,8 @@ class CspovMainMapWidget(app.Canvas):
         self.view = translate((0, 0, -5))
         self.model = np.eye(4, dtype=np.float32)
         self.projection = np.eye(4, dtype=np.float32)
-        self._testtile.set_mvp(self.model, self.view, self.projection)
+        if self._testtile:
+            self._testtile.set_mvp(self.model, self.view, self.projection)
 
     def update_transforms(self, event):
         # self.theta += .1
@@ -399,12 +397,13 @@ class CspovMainMapWidget(app.Canvas):
             vp.b, vp.t,
             -10000000, 10000000
         )
-        self._testtile.set_mvp(projection=self.projection)
+        if self._testtile:
+            self._testtile.set_mvp(projection=self.projection)
 
     def on_draw(self, event):
         gloo.clear()
         for layer in self.layers:
-            layer.on_draw(event)
+            layer.paint(self.viewport, self.projection)
         if self._testtile:
             self._testtile.draw()
 
