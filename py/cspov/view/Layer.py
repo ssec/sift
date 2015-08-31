@@ -117,6 +117,7 @@ class BackgroundRGBWorldTiles(Layer):
 
     def __init__(self, model, view, filename=None, world_box=None, tile_shape=None):
         self.image = spm.imread(filename or 'cspov/data/shadedrelief.jpg')  # FIXME package resource
+        self.image = self.image[::-1]  # flip so 0,0 is bottom left instead of top left
         if filename is None:
             tile_shape = (1080,1080)  # FIXME make tile shape smarter
         self.world_box = world_box or WORLD_EXTENT_BOX
@@ -157,6 +158,7 @@ class BackgroundRGBWorldTiles(Layer):
         for tiy in range(tilebox.b, tilebox.t):
             for tix in range(tilebox.l, tilebox.r):
                 tilegeom = self.calc.tile_world_box(tiy,tix)
+                # if (tilegeom.r+tilegeom.l) < 0 or (tilegeom.b+tilegeom.t) < 0: continue ## DEBUG
                 LOG.debug('y:{0} x:{1} geom:{2!r:s}'.format(tiy,tix,tilegeom))
                 subim = self.calc.tile_pixels(self.image, tiy, tix)
                 self.tiles[(tiy,tix)] = t = GlooRGBTile(tilegeom, subim)

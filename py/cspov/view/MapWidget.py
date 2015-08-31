@@ -88,6 +88,7 @@ class UserPanningMap(MapWidgetActivity):
         draw at higher resolution (not fast-draw)
         """
         print("done panning")
+        LOG.info("new viewport after pan: {0!r:s}".format(self.main.viewport))
         return False  # we're done, dismiss us
 
     def mouseMoveEvent(self, event):
@@ -133,12 +134,15 @@ class UserZoomingMap(MapWidgetActivity):
 
     def mouseMoveEvent(self, event):
         # FIXME: does it work to drop the zooming by way of a mouse move?
+        LOG.info("new viewport after zoom: {0!r:s}".format(self.main.viewport))
         return False
 
     def mousePressEvent(self, event):
+        LOG.info("new viewport after zoom: {0!r:s}".format(self.main.viewport))
         return False
 
     def mouseReleaseEvent(self, event):
+        LOG.info("new viewport after zoom: {0!r:s}".format(self.main.viewport))
         return False
 
 
@@ -279,7 +283,7 @@ class CspovMainMapWidget(app.Canvas):
         self._activity_stack = [Idling(self)]
 
         aspect = float(self.size[1]) / float(self.size[0])
-        self.viewport = vp = box(l=-4, r=4, b=-4*aspect, t=4*aspect)
+        # self.viewport = vp = box(l=-4, r=4, b=-4*aspect, t=4*aspect)
         rad = MAX_EXCURSION_X/2
         self.viewport = vp = box(l=-rad, r=rad, b=-rad*aspect, t=rad*aspect)
         # self.viewport = box(l=-MAX_EXCURSION_X/4, b=-MAX_EXCURSION_Y/1.5, r=MAX_EXCURSION_X/4, t=MAX_EXCURSION_Y/1.5)
@@ -326,6 +330,7 @@ class CspovMainMapWidget(app.Canvas):
         # print("pan viewport {0!r:s} => {1!r:s}".format(self.viewport, nvp))
         self.viewport = nvp
         self.update_proj()
+        # LOG.info("new viewport: {0!r:s}".format(nvp))
         # self.viewportDidChange.emit(nvp)
         self.update()
 
@@ -352,6 +357,7 @@ class CspovMainMapWidget(app.Canvas):
         # print("pan viewport {0!r:s} => {1!r:s}".format(self.viewport, nvp))
         self.viewport = nvp
         self.update_proj()  # recalculate projection matrix
+        # LOG.info("new viewport: {0!r:s}".format(nvp))
         # self.viewportDidChange.emit(nvp)
         self.update()
         return self.viewport
@@ -393,7 +399,7 @@ class CspovMainMapWidget(app.Canvas):
         self.projection = ortho(
             vp.l, vp.r,
             vp.b, vp.t,
-            -10000000, 10000000
+            10000000, -10000000
         )
         if self._testtile:
             self._testtile.set_mvp(projection=self.projection)

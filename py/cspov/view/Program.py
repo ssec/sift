@@ -39,9 +39,11 @@ varying vec2 v_texcoord;
 void main()
 {
     v_texcoord = a_texcoord;
-    gl_Position = u_projection * u_view * u_model * vec4(a_position.xy,u_z,1.0);
+    //gl_Position = u_projection * u_view * u_model * vec4(a_position.xy,u_z,1.0); // preferred
+    // debug: show where x is large by tapering
+    //gl_Position = u_projection * u_view * u_model * vec4(a_position.x, a_position.y+a_position.x*0.01,u_z,1.0); // debug
     //gl_Position = u_projection * u_view * u_model * vec4(a_position,1.0);
-    //gl_Position = vec4(a_position,1.0);
+    gl_Position = u_projection * vec4(a_position,1.0);
 }
 """
 
@@ -59,6 +61,11 @@ void main()
 
 
 class GlooRGBTile(object):
+    """
+    A GL program which plots a planar tile with a texture map
+    texture map is assumed oriented such that ascending pixel row is ascending coordinate from bottom left of screen
+    (typically requires inverting the Y direction)
+    """
     program = None
     image = None
     world_box = None
@@ -81,15 +88,13 @@ class GlooRGBTile(object):
 
         verts = np.array([q[0] for q in vtnc])
         # translate the vertices
-        verts[:,0] -= (world_box.l + world_box.r)/2.0
-        verts[:,1] -= (world_box.b + world_box.t)/2.0
+        verts[:,0] += (world_box.l + world_box.r)/2.0
+        verts[:,1] += (world_box.b + world_box.t)/2.0
         texcoords = np.array([q[1] for q in vtnc])
-        # images are typically from top-left (0,0) and we're working bottom left (0,0)
-        texcoords[:,1] = 1.0 - texcoords[:,1]
         # normals = np.array([q[2] for q in vtnc])
         # colors = np.array([q[3] for q in vtnc])
         faces_buffer = gloo.IndexBuffer(faces.astype(np.uint16))
-        # print("V:", verts, len(verts))
+        print("V:", verts, len(verts))
         # print("T:", texcoords, len(texcoords))
         # print("N:", normals, len(normals))
         # print("C:", colors, len(colors))
