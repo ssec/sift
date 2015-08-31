@@ -19,9 +19,17 @@ REQUIRES
 """
 
 import numpy as np
+import logging
 from vispy import gloo
 from vispy.geometry import create_plane
 from vispy.io import load_crate
+
+__author__ = 'rayg'
+__docformat__ = 'reStructuredText'
+
+
+LOG = logging.getLogger(__name__)
+
 
 # FIXME: use uniform float _z
 
@@ -49,13 +57,17 @@ void main()
 
 FRAG_CODE = """
 uniform sampler2D u_texture;
+uniform float u_alpha;
 varying vec2 v_texcoord;
 
 void main()
 {
     float ty = v_texcoord.y;
     float tx = v_texcoord.x;
-    gl_FragColor = texture2D(u_texture, vec2(tx, ty));
+    vec2 txcoord = vec2(tx, ty);
+    //gl_FragColor = texture2D(u_texture, txcoord);
+    gl_FragColor = vec4(texture2D(u_texture, txcoord).xyz, texture2D(u_texture, txcoord).w * u_alpha);
+    //gl_FragColor = vec4(texture2D(u_texture, txcoord).xyz, u_alpha); // DEBUG
 }
 """
 
@@ -70,7 +82,8 @@ class GlooRGBTile(object):
     image = None
     world_box = None
     faces = None
-    z = 0.0
+    _z = 0.0
+    _alpha = 1.0
 
     def __init__(self, world_box=None, image=None, image_box=None):
         super(GlooRGBTile, self).__init__()
@@ -106,7 +119,8 @@ class GlooRGBTile(object):
         self.program['a_texcoord'] = gloo.VertexBuffer(texcoords)
         self.faces = faces_buffer
         self.world_box = world_box
-        self.program['u_z'] = self.z
+        self.program['u_z'] = self._z
+        self.program['u_alpha'] = self._alpha
 
     def set_texture(self, image, image_box=None):
         if isinstance(image, str) and image == 'crate':
@@ -120,8 +134,23 @@ class GlooRGBTile(object):
         self.program['u_texture'] = gloo.Texture2D(image)
 
 
+    def get_z(self):
+        return self._z
+
     def set_z(self, z):
-        self.program['u_z'] = self.z = z
+        self.program['u_z'] = self._z = z
+        LOG.debug('z set to {}'.format(z))
+
+    z = property(get_z, set_z)
+
+    def get_alpha(self, alpha):
+        return self._alpha
+
+    def set_alpha(self, alpha):
+        self.program['u_alpha'] = self._alpha = alpha
+        LOG.debug('alpha set to {}'.format(alpha))
+
+    alpha = property(get_alpha, set_alpha)
 
 
     def set_mvp(self, model=None, view=None, projection=None):

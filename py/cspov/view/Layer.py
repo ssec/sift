@@ -168,6 +168,16 @@ class BackgroundRGBWorldTiles(Layer):
     calc = None
     tiles = None  # dictionary of {(y,x): GlooRgbTile, ...}
 
+    def set_z(self, z):
+        super(BackgroundRGBWorldTiles, self).set_z(z)
+        for tile in self.tiles.values():
+            tile.z = z
+
+    def set_alpha(self, alpha):
+        for tile in self.tiles.values():
+            tile.alpha = alpha
+        super(BackgroundRGBWorldTiles, self).set_alpha(alpha)
+
     def __init__(self, model, view, filename=None, world_box=None, tile_shape=None):
         super(BackgroundRGBWorldTiles, self).__init__()
         self.image = spm.imread(filename or 'cspov/data/shadedrelief.jpg')  # FIXME package resource

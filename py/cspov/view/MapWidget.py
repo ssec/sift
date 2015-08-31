@@ -294,12 +294,21 @@ class CspovMainMapWidget(app.Canvas):
         self.init_transforms()
         self.update_proj()
 
-        self.layers = LayerStack([BackgroundRGBWorldTiles(self.model, self.view, filename=os.environ.get('MERC',None))])
+        raw_layers = []  # front to back
+        fn = os.environ.get('MERC', None)
+        # if fn:
+        LOG.info('loading {}'.format(fn))
+        layer = BackgroundRGBWorldTiles(self.model, self.view, filename=fn)
+        layer.set_alpha(0.5)
+        raw_layers.append(layer)
+        # raw_layers.append(BackgroundRGBWorldTiles(self.model, self.view))
+
+        self.layers = LayerStack(raw_layers)
         # import os
         # fn = os.path.expanduser('~/Data/CSPOV/2015_07_14_195/0400/HS_H08_20150714_0400_B03_FLDK_R20.merc.tif')
         # self.layers = LayerStack([BackgroundRGBWorldTiles(self.model, self.view, fn)])
 
-        gloo.set_clear_color((0, 0, 0, 1))
+        gloo.set_clear_color((0.2, 0.2, 0.2, 1))
         gloo.set_state(depth_test=True)
 
         # self._timer = app.Timer('auto', connect=self.update_transforms)
