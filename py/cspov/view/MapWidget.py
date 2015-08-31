@@ -274,13 +274,11 @@ class CspovMainMapWidget(app.Canvas):
     _testtile = None
 
     def __init__(self, **kwargs):
-        # http://stackoverflow.com/questions/17167194/how-to-make-updategl-realtime-in-qt
-        #
         super(CspovMainMapWidget, self).__init__(**kwargs)
 
         self._activity_stack = [Idling(self)]
 
-        aspect = self.size[1] / float(self.size[0])
+        aspect = float(self.size[1]) / float(self.size[0])
         self.viewport = vp = box(l=-4, r=4, b=-4*aspect, t=4*aspect)
         rad = MAX_EXCURSION_X/2
         self.viewport = vp = box(l=-rad, r=rad, b=-rad*aspect, t=rad*aspect)
@@ -294,9 +292,9 @@ class CspovMainMapWidget(app.Canvas):
         # self.setAutoBufferSwap(True)
         # assert(self.hasMouseTracking())
 
-        # self._testtile = GlooRGBTile(world_box=WORLD_EXTENT_BOX,
-        #                              image=spm.imread('cspov/data/shadedrelief.jpg') )
-        #                              # image_box=box(b=3000, t=3512, l=3000, r=4024))
+        self._testtile = GlooRGBTile(world_box=WORLD_EXTENT_BOX,
+                                     image=spm.imread('cspov/data/shadedrelief.jpg') )
+                                     # image_box=box(b=3000, t=3512, l=3000, r=4024))
 
 
         # Handle transformations
@@ -390,7 +388,7 @@ class CspovMainMapWidget(app.Canvas):
         vp = self.viewport
         # self.projection = perspective(45.0, self.size[0] /
         #                               float(self.size[1]), 2.0, 10.0)
-        aspect = self.size[1] / float(self.size[0])
+        aspect = float(self.size[1]) / float(self.size[0])
         #self.projection = ortho(-4, 4, -4*aspect, 4*aspect, -10, 10)
         self.projection = ortho(
             vp.l, vp.r,
