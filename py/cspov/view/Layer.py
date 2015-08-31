@@ -45,7 +45,7 @@ class Layer(object):
     - typically will cache a "coarsest" single-tile representation for zoom-out events (preferred for fast=True paint calls)
     - can have probes attached which operate primarily on the science representation
     """
-    def paint(self, geom, proj, fast=False, **kwargs):
+    def paint(self, geom, mvp, fast=False, **kwargs):
         """
         draw the most appropriate representation for this layer, given world geometry represented and projection matrix
         if a better representation could be rendered for later draws, return False and render() will be queued for later idle time
@@ -129,7 +129,7 @@ class BackgroundRGBWorldTiles(Layer):
         self.view = view
         self._generate_tiles()
 
-    def paint(self, geom, proj, fast=False, **kwargs):
+    def paint(self, geom, mvp, fast=False, **kwargs):
         """
         draw the most appropriate representation for this layer
         if a better representation could be rendered for later draws, return False and render() will be queued for later idle time
@@ -142,7 +142,8 @@ class BackgroundRGBWorldTiles(Layer):
 
         for tile in self.tiles.values():  # FIXME: draw only the tiles that are visible in the geom
             # LOG.debug('draw tile {0!r:s}'.format(tile))
-            tile.set_mvp(projection=proj)
+            m,v,p = mvp
+            tile.set_mvp(m,v,p)
             tile.draw()
         return True
 

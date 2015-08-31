@@ -292,9 +292,9 @@ class CspovMainMapWidget(app.Canvas):
         # self.setAutoBufferSwap(True)
         # assert(self.hasMouseTracking())
 
-        self._testtile = GlooRGBTile(world_box=WORLD_EXTENT_BOX,
-                                     image=spm.imread('cspov/data/shadedrelief.jpg') )
-                                     # image_box=box(b=3000, t=3512, l=3000, r=4024))
+        # self._testtile = GlooRGBTile(world_box=WORLD_EXTENT_BOX,
+        #                              image=spm.imread('cspov/data/shadedrelief.jpg') )
+        #                              # image_box=box(b=3000, t=3512, l=3000, r=4024))
 
 
         # Handle transformations
@@ -400,8 +400,9 @@ class CspovMainMapWidget(app.Canvas):
 
     def on_draw(self, event):
         gloo.clear()
+        mvp = self.model, self.view, self.projection
         for layer in self.layers:
-            layer.paint(self.viewport, self.projection)
+            layer.paint(self.viewport, mvp)
         if self._testtile:
             self._testtile.draw()
 

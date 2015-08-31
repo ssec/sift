@@ -205,12 +205,19 @@ class MercatorTileCalc(object):
         LOG.debug('{}y, {}x'.format(tiy,tix))
         eb,el = self.extents_box.b, self.extents_box.l
         dy,dx = self.pixel_rez
+        if dy<0:
+            LOG.warning('unexpected dy={}'.format(dy))
+        if dx<0:
+            LOG.warning('unexpected dx={}'.format(dx))
         th,tw = map(float, self.tile_shape)
 
         b = eb + dy*(th*tiy)
         t = eb + dy*(th*(tiy+ny))
         l = el + dx*(tw*tix)
         r = el + dx*(tw*(tix+nx))
+
+        if l>=r:
+            LOG.warning('left > right')
 
         return box(b=b,l=l,t=t,r=r)
 
