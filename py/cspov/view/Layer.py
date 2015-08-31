@@ -122,7 +122,7 @@ class BackgroundRGBWorldTiles(Layer):
         self.world_box = world_box or WORLD_EXTENT_BOX
         self.shape = (h,w) = tuple(self.image.shape[:2])
         zero_point = pnt(float(h)/2, float(w)/2)
-        pixel_rez = rez(180.0/float(h), 360.0/float(w))
+        pixel_rez = rez(MAX_EXCURSION_Y*2/float(h), MAX_EXCURSION_X*2/float(w))
         self.calc = MercatorTileCalc('bgns', self.shape, zero_point, pixel_rez, tile_shape)
         self.tiles = {}
         self.model = model
@@ -157,6 +157,7 @@ class BackgroundRGBWorldTiles(Layer):
         for tiy in range(tilebox.b, tilebox.t):
             for tix in range(tilebox.l, tilebox.r):
                 tilegeom = self.calc.tile_world_box(tiy,tix)
+                LOG.debug('y:{0} x:{1} geom:{2!r:s}'.format(tiy,tix,tilegeom))
                 subim = self.calc.tile_pixels(self.image, tiy, tix)
                 self.tiles[(tiy,tix)] = t = GlooRGBTile(tilegeom, subim)
                 t.set_mvp(model=self.model, view=self.view)
