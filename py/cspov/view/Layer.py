@@ -45,6 +45,22 @@ class Layer(object):
     - typically will cache a "coarsest" single-tile representation for zoom-out events (preferred for fast=True paint calls)
     - can have probes attached which operate primarily on the science representation
     """
+    def get_z(self):
+        pass
+
+    def set_z(self, new_z):
+        pass
+
+    z = property(get_z, set_z)
+
+    def get_alpha(self):
+        pass
+
+    def set_alpha(self, new_alpha):
+        pass
+
+    alpha = property(get_alpha, set_alpha)
+
     def paint(self, geom, mvp, fast=False, **kwargs):
         """
         draw the most appropriate representation for this layer, given world geometry represented and projection matrix
@@ -84,6 +100,22 @@ class Layer(object):
         given a shapely description of an area, return a masked array of data
         """
         raise NotImplementedError()
+
+
+
+class LayerStack(object):
+    layers = None
+
+    def __init__(self, init_layers=None):
+        super(LayerStack, self).__init__()
+        self.layers = list(init_layers or [])
+
+    def __iter__(self):
+        for level,layer in enumerate(reversed(self.layers)):
+            layer.z = float(level)
+            yield layer
+
+
 
 
 TEST_COLORS = [

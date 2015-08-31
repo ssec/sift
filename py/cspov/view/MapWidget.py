@@ -18,6 +18,7 @@ REQUIRES
 :license: GPLv3, see LICENSE for more details
 """
 # from PyQt4.QtCore import *
+from PyQt4.QtCore import pyqtSignal
 # from PyQt4.QtOpenGL import QGLWidget, QGLFormat
 from vispy import app, gloo
 import numpy as np
@@ -26,7 +27,7 @@ from vispy.util.transforms import translate, rotate, ortho
 
 from cspov.common import box, WORLD_EXTENT_BOX, MAX_EXCURSION_X, MAX_EXCURSION_Y
 from cspov.view.Program import GlooRGBTile
-from cspov.view.Layer import BackgroundRGBWorldTiles
+from cspov.view.Layer import BackgroundRGBWorldTiles, LayerStack
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -268,7 +269,7 @@ void main()
 class CspovMainMapWidget(app.Canvas):
 
     # signals
-    # viewportDidChange = pyqtSignal(box)
+    viewportDidChange = pyqtSignal(box)
 
     # members
     _activity_stack = None  # Behavior object stack which we push/pop for primary activity; activity[-1] is what we're currently doing
@@ -305,7 +306,7 @@ class CspovMainMapWidget(app.Canvas):
         self.init_transforms()
         self.update_proj()
 
-        self.layers = [BackgroundRGBWorldTiles(self.model, self.view)] #
+        self.layers = LayerStack([BackgroundRGBWorldTiles(self.model, self.view)])
 
         gloo.set_clear_color((0, 0, 0, 1))
         gloo.set_state(depth_test=True)
