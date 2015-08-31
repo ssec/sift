@@ -31,12 +31,10 @@ try:
     app_object = app.use_app('pyqt4')
 except Exception:
     app_object = app.use_app('pyside')
-QtCore = app_object.backend_module.QtCore,
+QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
 
-
 from cspov.view.MapWidget import CspovMainMapWidget
-
 
 import logging, unittest, argparse
 

@@ -39,11 +39,11 @@ varying vec2 v_texcoord;
 void main()
 {
     v_texcoord = a_texcoord;
-    //gl_Position = u_projection * u_view * u_model * vec4(a_position.xy,u_z,1.0); // preferred
+    gl_Position = u_projection * u_view * u_model * vec4(a_position.xy,u_z,1.0); // preferred
     // debug: show where x is large by tapering
     //gl_Position = u_projection * u_view * u_model * vec4(a_position.x, a_position.y+a_position.x*0.01,u_z,1.0); // debug
     //gl_Position = u_projection * u_view * u_model * vec4(a_position,1.0);
-    gl_Position = u_projection * vec4(a_position,1.0);
+    //gl_Position = u_projection * vec4(a_position,1.0);
 }
 """
 
@@ -94,7 +94,7 @@ class GlooRGBTile(object):
         # normals = np.array([q[2] for q in vtnc])
         # colors = np.array([q[3] for q in vtnc])
         faces_buffer = gloo.IndexBuffer(faces.astype(np.uint16))
-        print("V:", verts, len(verts))
+        # print("V:", verts, len(verts))
         # print("T:", texcoords, len(texcoords))
         # print("N:", normals, len(normals))
         # print("C:", colors, len(colors))
