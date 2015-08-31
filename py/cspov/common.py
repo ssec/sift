@@ -25,6 +25,7 @@ __docformat__ = 'reStructuredText'
 
 import os, sys
 import logging, unittest, argparse
+from numba import autojit
 
 LOG = logging.getLogger(__name__)
 
@@ -122,6 +123,7 @@ class MercatorTileCalc(object):
         assert(h % tile_shape[0]==0)
         assert(w % tile_shape[1]==0)
 
+    @autojit
     def visible_tiles(self, visible_geom, extra_tiles_box=box(0,0,0,0)):
         """
         given a visible world geometry and sampling, return (sampling-state, [box-of-tiles-to-draw])
@@ -195,6 +197,7 @@ class MercatorTileCalc(object):
 
         return overunder, tilebox
 
+    @autojit
     def tile_world_box(self, tiy, tix, ny=1, nx=1):
         """
         return world coordinate box a given tile fills

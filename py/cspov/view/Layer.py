@@ -149,7 +149,10 @@ class BackgroundRGBWorldTiles(Layer):
     def _generate_tiles(self):
         h,w = self.image.shape[:2]
         _, tilebox = self.calc.visible_tiles(WORLD_EXTENT_BOX)
-        LOG.info(tilebox)
+        # LOG.info(tilebox)
+        # FIXME: high tiles are south of equator, leftward instead of up, rightward
+        # for tiy in range(int((tilebox.b+tilebox.t)/2), tilebox.t):  DEBUG
+        #     for tix in range(int((tilebox.l+tilebox.r)/2), tilebox.r):
         for tiy in range(tilebox.b, tilebox.t):
             for tix in range(tilebox.l, tilebox.r):
                 tilegeom = self.calc.tile_world_box(tiy,tix)
