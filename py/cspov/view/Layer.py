@@ -174,6 +174,10 @@ class BackgroundRGBWorldTiles(Layer):
         self.image = self.image[::-1]  # flip so 0,0 is bottom left instead of top left
         if filename is None:
             tile_shape = (1080,1080)  # FIXME make tile shape smarter
+            self.name = 'shadedrelief'
+        else:
+            self.name = os.path.split(filename)[-1]
+        tile_shape = tile_shape or (DEFAULT_TILE_HEIGHT,DEFAULT_TILE_WIDTH)
         self.world_box = world_box or WORLD_EXTENT_BOX
         self.shape = (h,w) = tuple(self.image.shape[:2])
         zero_point = pnt(float(h)/2, float(w)/2)

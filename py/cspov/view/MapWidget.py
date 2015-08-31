@@ -17,17 +17,15 @@ REQUIRES
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-# from PyQt4.QtCore import *
+import os,sys
 from PyQt4.QtCore import pyqtSignal
 # from PyQt4.QtOpenGL import QGLWidget, QGLFormat
 from vispy import app, gloo
 import numpy as np
-import scipy.misc as spm
 from vispy.util.transforms import translate, rotate, ortho
-
 from cspov.common import box, WORLD_EXTENT_BOX, MAX_EXCURSION_X, MAX_EXCURSION_Y
-from cspov.view.Program import GlooRGBTile
 from cspov.view.Layer import BackgroundRGBWorldTiles, LayerStack
+# from cspov.view.Program import GlooRGBTile
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -287,26 +285,19 @@ class CspovMainMapWidget(app.Canvas):
         # self.viewport = vp = box(l=-4, r=4, b=-4*aspect, t=4*aspect)
         rad = MAX_EXCURSION_X/2
         self.viewport = vp = box(l=-rad, r=rad, b=-rad*aspect, t=rad*aspect)
-        # self.viewport = box(l=-MAX_EXCURSION_X/4, b=-MAX_EXCURSION_Y/1.5, r=MAX_EXCURSION_X/4, t=MAX_EXCURSION_Y/1.5)
-
-        # self.viewportDidChange.connect(self.updateGL)
-        # assert(self.updatesEnabled())
-        # self.setUpdatesEnabled(True)
-        # self.setAutoBufferSwap(True)
-        # self.setMouseTracking(True)  # gives us mouseMoveEvent calls in Idling
-        # self.setAutoBufferSwap(True)
-        # assert(self.hasMouseTracking())
 
         # self._testtile = GlooRGBTile(world_box=WORLD_EXTENT_BOX,
         #                              image=spm.imread('cspov/data/shadedrelief.jpg') )
         #                              # image_box=box(b=3000, t=3512, l=3000, r=4024))
 
-
         # Handle transformations
         self.init_transforms()
         self.update_proj()
 
-        self.layers = LayerStack([BackgroundRGBWorldTiles(self.model, self.view)])
+        self.layers = LayerStack([BackgroundRGBWorldTiles(self.model, self.view, filename=os.environ.get('MERC',None))])
+        # import os
+        # fn = os.path.expanduser('~/Data/CSPOV/2015_07_14_195/0400/HS_H08_20150714_0400_B03_FLDK_R20.merc.tif')
+        # self.layers = LayerStack([BackgroundRGBWorldTiles(self.model, self.view, fn)])
 
         gloo.set_clear_color((0, 0, 0, 1))
         gloo.set_state(depth_test=True)
