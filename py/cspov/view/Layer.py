@@ -129,25 +129,55 @@ class LayerStack(QObject):
 
     _layerlist = None
 
+
     def __init__(self, init_layers=None):
         super(LayerStack, self).__init__()
         self._layerlist = list(init_layers or [])
+
 
     def __iter__(self):
         for level,layer in enumerate(reversed(self._layerlist)):
             layer.z = float(level)
             yield layer
 
+
     def __getitem__(self, item):
         return self._layerlist[item]
 
+
     def __len__(self):
         return len(self._layerlist)
+
+
+    def append(self, layer):
+        self._layerlist.append(layer)
+        self.layerStackDidChangeOrder.emit(tuple(range(len(self))))
+
+
+    def __delitem__(self, dex):
+        order = list(range(len(self)))
+        del self._layerlist[dex]
+        del order[dex]
+        self.layerStackDidChangeOrder(tuple(order))
+
+
+    def swap(self, adex, bdex):
+        order = list(range(len(self)))
+        order[bdex], order[adex] = adex, bdex
+        new_list = [self._layerlist[dex] for dex in order]
+        self._layerlist = new_list
+        self.layerStackDidChangeOrder.emit(tuple(order))
+
 
     @property
     def top(self):
         return self._layerlist[0] if self._layerlist else None
 
+
+    @property
+    def listing(self):
+        for layer in self._layerlist:
+            yield {'name': layer.name}
 
 
 
