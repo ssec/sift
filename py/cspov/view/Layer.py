@@ -29,9 +29,7 @@ from cspov.view.Program import GlooRGBTile
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-
 LOG = logging.getLogger(__name__)
-
 
 
 class Layer(QObject):
@@ -44,9 +42,9 @@ class Layer(QObject):
     - can have probes attached which operate primarily on the science representation
     """
     propertyDidChange = pyqtSignal(dict)
-    _z = None
-    _alpha = None
-    _name = None
+    _z = 0.0
+    _alpha = 1.0
+    _name = 'unnnamed'
 
     def __init__(self):
         super(Layer, self).__init__()
@@ -76,7 +74,7 @@ class Layer(QObject):
         self._name = new_name
         self.propertyDidChange.emit({'name': new_name})
 
-    name = property(get_alpha, set_alpha)
+    name = property(get_name, set_name)
 
     def paint(self, geom, mvp, fast=False, **kwargs):
         """
@@ -119,11 +117,33 @@ class Layer(QObject):
         raise NotImplementedError()
 
 
+class LayerStackAsListWidget(QObject):
+    """ behavior connecting list widget to layer stack (both ways)
+    """
+    widget = None
+    stack = None
+
+    def __init__(self, widget, stack):
+        super(LayerStackAsListWidget, self).__init__()
+        self.widget = widget
+        self.stack = stack
+        self.updateList()
+        stack.layerStackDidChangeOrder.connect(self.updateList)
+        # FIXME: connect and configure list widget signals
+
+    def updateList(self):
+        self.widget.clear()
+        for x in self.stack.listing:
+            self.widget.addItem(x['name'])
+
+
+
 
 class LayerStack(QObject):
     """
     The master layer stack used by MapWidget; contains signals and can be controlled by GUI or script
-
+    Allows re-ordering and other expected manipulations
+    Links to other controls in GUI
     """
     layerStackDidChangeOrder = pyqtSignal(tuple)  # new order as ordinals e.g. (0, 2, 1, 3)
 
@@ -169,15 +189,18 @@ class LayerStack(QObject):
         self.layerStackDidChangeOrder.emit(tuple(order))
 
 
-    @property
-    def top(self):
-        return self._layerlist[0] if self._layerlist else None
-
+    # @property
+    # def top(self):
+    #     return self._layerlist[0] if self._layerlist else None
+    #
 
     @property
     def listing(self):
+        """
+        return representation summary for layer list - name, icon, source, etc
+        """
         for layer in self._layerlist:
-            yield {'name': layer.name}
+            yield {'name': str(layer.name)}
 
 
 

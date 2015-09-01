@@ -294,6 +294,7 @@ class CspovMainMapWidget(app.Canvas):
         self.init_transforms()
         self.update_proj()
 
+        # FIXME: pass in the Layers object rather than building it right here
         raw_layers = []  # front to back
         fn = os.environ.get('MERC', None)
         # if fn:
@@ -302,7 +303,6 @@ class CspovMainMapWidget(app.Canvas):
         layer.set_alpha(0.5)
         raw_layers.append(layer)
         # raw_layers.append(BackgroundRGBWorldTiles(self.model, self.view))
-
         self.layers = LayerStack(raw_layers)
         # import os
         # fn = os.path.expanduser('~/Data/CSPOV/2015_07_14_195/0400/HS_H08_20150714_0400_B03_FLDK_R20.merc.tif')

@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created: Thu Aug 20 22:11:02 2015
+# Created: Mon Aug 31 22:48:58 2015
 #      by: PyQt4 UI code generator 4.11.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -26,7 +26,7 @@ except AttributeError:
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName(_fromUtf8("MainWindow"))
-        MainWindow.resize(1176, 797)
+        MainWindow.resize(1020, 723)
         self.centralwidget = QtGui.QWidget(MainWindow)
         self.centralwidget.setObjectName(_fromUtf8("centralwidget"))
         self.verticalLayout_2 = QtGui.QVBoxLayout(self.centralwidget)
@@ -74,35 +74,35 @@ class Ui_MainWindow(object):
         self.verticalLayout_2.addWidget(self.groupBox)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtGui.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1176, 22))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 1020, 22))
         self.menubar.setObjectName(_fromUtf8("menubar"))
         MainWindow.setMenuBar(self.menubar)
         self.statusbar = QtGui.QStatusBar(MainWindow)
         self.statusbar.setObjectName(_fromUtf8("statusbar"))
         MainWindow.setStatusBar(self.statusbar)
-        self.probeA = QtGui.QDockWidget(MainWindow)
-        self.probeA.setObjectName(_fromUtf8("probeA"))
+        self.probeAPane = QtGui.QDockWidget(MainWindow)
+        self.probeAPane.setObjectName(_fromUtf8("probeAPane"))
         self.dockWidgetContents_2 = QtGui.QWidget()
         self.dockWidgetContents_2.setObjectName(_fromUtf8("dockWidgetContents_2"))
-        self.probeA.setWidget(self.dockWidgetContents_2)
-        MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.probeA)
-        self.probeB = QtGui.QDockWidget(MainWindow)
-        self.probeB.setObjectName(_fromUtf8("probeB"))
+        self.probeAPane.setWidget(self.dockWidgetContents_2)
+        MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.probeAPane)
+        self.probeBPane = QtGui.QDockWidget(MainWindow)
+        self.probeBPane.setObjectName(_fromUtf8("probeBPane"))
         self.dockWidgetContents_4 = QtGui.QWidget()
         self.dockWidgetContents_4.setObjectName(_fromUtf8("dockWidgetContents_4"))
-        self.probeB.setWidget(self.dockWidgetContents_4)
-        MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.probeB)
-        self.layers = QtGui.QDockWidget(MainWindow)
-        self.layers.setObjectName(_fromUtf8("layers"))
+        self.probeBPane.setWidget(self.dockWidgetContents_4)
+        MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.probeBPane)
+        self.layersPane = QtGui.QDockWidget(MainWindow)
+        self.layersPane.setObjectName(_fromUtf8("layersPane"))
         self.dockWidgetContents_5 = QtGui.QWidget()
         self.dockWidgetContents_5.setObjectName(_fromUtf8("dockWidgetContents_5"))
         self.verticalLayout = QtGui.QVBoxLayout(self.dockWidgetContents_5)
         self.verticalLayout.setObjectName(_fromUtf8("verticalLayout"))
-        self.treeView = QtGui.QTreeView(self.dockWidgetContents_5)
-        self.treeView.setObjectName(_fromUtf8("treeView"))
-        self.verticalLayout.addWidget(self.treeView)
-        self.layers.setWidget(self.dockWidgetContents_5)
-        MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.layers)
+        self.layers = QtGui.QListWidget(self.dockWidgetContents_5)
+        self.layers.setObjectName(_fromUtf8("layers"))
+        self.verticalLayout.addWidget(self.layers)
+        self.layersPane.setWidget(self.dockWidgetContents_5)
+        MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.layersPane)
 
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
@@ -116,7 +116,7 @@ class Ui_MainWindow(object):
         self.toolButton_3.setText(_translate("MainWindow", "...", None))
         self.toolButton_4.setText(_translate("MainWindow", "...", None))
         self.toolButton.setText(_translate("MainWindow", "...", None))
-        self.probeA.setWindowTitle(_translate("MainWindow", "A Probe", None))
-        self.probeB.setWindowTitle(_translate("MainWindow", "B Probe", None))
-        self.layers.setWindowTitle(_translate("MainWindow", "Layers", None))
+        self.probeAPane.setWindowTitle(_translate("MainWindow", "A Probe", None))
+        self.probeBPane.setWindowTitle(_translate("MainWindow", "B Probe", None))
+        self.layersPane.setWindowTitle(_translate("MainWindow", "Layers", None))
 

@@ -35,6 +35,7 @@ QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
 
 from cspov.view.MapWidget import CspovMainMapWidget
+from cspov.view.Layer import LayerStackAsListWidget
 
 import logging, unittest, argparse
 
@@ -51,15 +52,19 @@ class Main(QtGui.QMainWindow):
         self.ui.setupUi(self)
         # refer to objectName'd entities as self.ui.objectName
 
-        self.mainMap = CspovMainMapWidget(parent=self)
+        self.mainMap = mainMap = CspovMainMapWidget(parent=self)
         self.ui.mainWidgets.addTab(self.mainMap.native, 'Mercator')
-        # self.mainMap.setVisible(True)
-
-        # self.scenegraph = vps.SceneCanvas('vispy', app='PyQt4')
-        # self.ui.mainWidgets.addTab(self.scenegraph.native, 'Tools')
 
         self.ui.mainWidgets.removeTab(0)
         self.ui.mainWidgets.removeTab(0)
+
+        # convey action between layer list
+        # FIXME: put a document model in here
+        self.behaviorLayersList = LayerStackAsListWidget(self.ui.layers, mainMap.layers)
+        # self.ui.layers
+
+    def updateLayerList(self):
+        self.ui.layers.add
 
 if __name__ == '__main__':
     import os
