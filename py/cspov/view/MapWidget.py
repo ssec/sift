@@ -200,45 +200,6 @@ class Animating(MapWidgetActivity):
     """
 
 
-# from imshow_cuts.py
-image_vertex = """
-attribute vec2 position;
-attribute vec2 texcoord;
-
-varying vec2 v_texcoord;
-void main()
-{
-    gl_Position = vec4(position, 0.0, 1.0 );
-    v_texcoord = texcoord;
-}
-"""
-
-image_fragment = """
-uniform float vmin;
-uniform float vmax;
-uniform float cmap;
-uniform float n_colormaps;
-
-uniform sampler2D image;
-uniform sampler2D colormaps;
-
-varying vec2 v_texcoord;
-void main()
-{
-    float value = texture2D(image, v_texcoord).r;
-    float index = (cmap+0.5) / n_colormaps;
-
-    if( value < vmin ) {
-        gl_FragColor = texture2D(colormaps, vec2(0.0,index));
-    } else if( value > vmax ) {
-        gl_FragColor = texture2D(colormaps, vec2(1.0,index));
-    } else {
-        value = (value-vmin)/(vmax-vmin);
-        value = 1.0/512.0 + 510.0/512.0*value;
-        gl_FragColor = texture2D(colormaps, vec2(value,index));
-    }
-}
-"""
 
 
 #

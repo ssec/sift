@@ -31,9 +31,7 @@ __docformat__ = 'reStructuredText'
 LOG = logging.getLogger(__name__)
 
 
-# FIXME: use uniform float _z
-
-VERT_CODE = """
+SIMPLE_VERT_SHADER = """
 uniform   mat4 u_model;
 uniform   mat4 u_view;
 uniform   mat4 u_projection;
@@ -55,7 +53,8 @@ void main()
 }
 """
 
-FRAG_CODE = """
+# a fragment shader for projecting simple loaded images, e.g. png/jpg/tiff
+RGB_FRAG_SHADER = """
 uniform sampler2D u_texture;
 uniform float u_alpha;
 varying vec2 v_texcoord;
@@ -177,7 +176,7 @@ class GlooRGBTile(GlooTile):
     _alpha = 1.0
 
     def __init__(self, world_box=None, image=None, image_box=None):
-        super(GlooRGBTile, self).__init__(VERT_CODE, FRAG_CODE)
+        super(GlooRGBTile, self).__init__(SIMPLE_VERT_SHADER, RGB_FRAG_SHADER)
         if image is not None:
             self.set_data(image, image_box)
         if world_box is not None:
@@ -199,5 +198,84 @@ class GlooRGBTile(GlooTile):
         self.program['u_texture'] = gloo.Texture2D(image)
 
 
+# from imshow_cuts.py
+COLORMAP_FRAG_SHADER = """
+uniform float vmin;
+uniform float vmax;
+uniform float cmap;
+uniform float n_colormaps;
+
+uniform sampler2D field;
+uniform sampler2D colormaps;
+
+varying vec2 v_texcoord;
+void main()
+{
+    float value = texture2D(image, v_texcoord).r;
+    float index = (cmap+0.5) / n_colormaps;
+
+    if( value < vmin ) {
+        gl_FragColor = texture2D(colormaps, vec2(0.0,index));
+    } else if( value > vmax ) {
+        gl_FragColor = texture2D(colormaps, vec2(1.0,index));
+    } else {
+        value = (value-vmin)/(vmax-vmin);
+        value = 1.0/512.0 + 510.0/512.0*value;
+        gl_FragColor = texture2D(colormaps, vec2(value,index));
+    }
+}
+"""
+
+
+class GlooFlatFieldTile(GlooTile):
+    """
+    A Tile program which uses a RGBA color map shader to render a mercator-projected float32 science data field
+    NaNs are automatically mapped to alpha=0
+    FUTURE: allow simple enhancement expressions to be embedded in the shader code, e.g. sqrt or log enhancement
+    """
+    program = None
+    field = None
+    _world_box = None
+    faces = None
+    _z = 0.0
+    _alpha = 1.0
+
+    def __init__(self, world_box=None, field=None, image_box=None, colormap=None):
+        super(GlooRGBTile, self).__init__(SIMPLE_VERT_SHADER, COLORMAP_FRAG_SHADER)
+        if field is not None:
+            self.set_data(field, image_box)
+        if world_box is not None:
+            self.set_world_box(world_box)
+        if colormap is not None:
+            self.set_colormap(colormap)
+
+    def get_data(self):
+        return self.field
+
+    def set_data(self, field, field_box=None):
+        assert(len(field.shape)==2)  # we only accept flat fields of intensity
+        if field is None:
+            # FIXME: load test pattern
+            pass
+        if field_box is not None:
+            self.field = field = field[field_box.b:field_box.t, field_box.l:field_box.r]
+            print("clipping")
+        else:
+            self.field = field
+        # get the texture queued
+        self.program['u_field'] = gloo.Texture2D(field)
+
+
+    def get_colormap(self):
+        raise NotImplementedError('not yet implemented')
+
+    def set_colormap(self):
+        """
+        Color map may be updated interactively and should be pushed to the GPU for impending redraw
+        :return:
+        """
+        raise NotImplementedError('not yet implemented')
+
+    colormap = property(get_colormap, set_colormap)
 
 
