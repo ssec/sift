@@ -25,6 +25,7 @@ import numpy as np
 from vispy.util.transforms import translate, rotate, ortho
 from cspov.common import box, WORLD_EXTENT_BOX, MAX_EXCURSION_X, MAX_EXCURSION_Y
 from cspov.view.Layer import BackgroundRGBWorldTiles, LayerStack
+from numba import jit
 # from cspov.view.Program import GlooRGBTile
 
 __author__ = 'rayg'
@@ -281,14 +282,26 @@ class CspovMainMapWidget(app.Canvas):
     def activity(self):
         return self._activity_stack[-1]
 
+    @jit
     def zoomViewport(self, pdz=None, wdz=None):
         if pdz is not None:
             pw, ph = self.size
             wh, ww = self.viewport.t - self.viewport.b, self.viewport.r - self.viewport.l
             wdy, wdx = float(pdz)/ph*wh, float(pdz)/pw*ww
-        aspect = self.size[1] / float(self.size[0])
-        wdx = wdy / aspect
-        nvp = box(b=self.viewport.b+wdy, t=self.viewport.t-wdy, l=self.viewport.l+wdx, r=self.viewport.r-wdx)
+        # aspect = float(self.size[0]) / float(self.size[1])  # x/y
+        # aspect = ww/wh  # x/y
+        b=self.viewport.b+wdy
+        t=self.viewport.t-wdy
+        # c = (self.viewport.r + self.viewport.l)/2.0
+        # xcursion = ww/wh * wdy
+        # l,r = c - xcursion, c + xcursion
+        wdx = ww/wh * wdy
+        l = self.viewport.l+wdx
+        r = self.viewport.r-wdx
+
+        # LOG.info('wdx={} aspect={}'.format(wdx, aspect))
+        # nvp = box(b=self.viewport.b+wdy, t=self.viewport.t-wdy, l=self.viewport.l+wdx, r=self.viewport.r-wdx)
+        nvp = box(b=b, t=t, l=l, r=r)
         # print("pan viewport {0!r:s} => {1!r:s}".format(self.viewport, nvp))
         self.viewport = nvp
         self.update_proj()
