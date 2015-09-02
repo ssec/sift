@@ -25,7 +25,7 @@ __docformat__ = 'reStructuredText'
 
 import os, sys
 import logging, unittest, argparse
-from numba import autojit
+from numba import jit
 
 LOG = logging.getLogger(__name__)
 
@@ -123,7 +123,7 @@ class MercatorTileCalc(object):
         assert(h % tile_shape[0]==0)
         assert(w % tile_shape[1]==0)
 
-    @autojit
+    @jit
     def visible_tiles(self, visible_geom, extra_tiles_box=box(0,0,0,0)):
         """
         given a visible world geometry and sampling, return (sampling-state, [box-of-tiles-to-draw])
@@ -185,8 +185,12 @@ class MercatorTileCalc(object):
         if xtw < 0:  # likewise with tiles wide
             ntw += xtw
 
-        # FIXME: compare visible dx/dy versus tile dx/dy to determine over/undersampledness
-        overunder = self.WELLSAMPLED
+        # FIXME: use vue() instead of box() to represent visible geometry,
+        #        so we can estimate sampledness and decide when to re-render
+        if not isinstance(visible_geom, vue):
+            overunder = None
+        else:  # use dy/dx to calculate texture pixels to screen pixels ratio
+            overunder = self.calc_sampling(visible_geom, Z)
 
         tilebox = box(
             b = int(tiy0),
@@ -197,7 +201,22 @@ class MercatorTileCalc(object):
 
         return overunder, tilebox
 
-    @autojit
+    @jit
+    def calc_sampling(self, visible, texture):
+        """
+        estimate whether we're oversampled, undersampled or well-sampled
+        visible.dy, .dx: d(world distance)/d(screen pixels)
+        texture.dy, .dx: d(world distance)/d(texture pixels)
+        texture pixels / screen pixels = visible / texture
+        1:1 is optimal, 2:1 is oversampled, 1:2 is undersampled
+        """
+        tsy = visible.dy / texture.dy
+        tsx = visible.dx / texture.dx
+        if min(tsy,tsx) <= 0.5: return self.UNDERSAMPLED
+        if max(tsy,tsx) >= 2.0: return self.OVERSAMPLED
+        return self.WELLSAMPLED
+
+    @jit
     def tile_world_box(self, tiy, tix, ny=1, nx=1):
         """
         return world coordinate box a given tile fills
