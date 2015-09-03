@@ -35,7 +35,7 @@ QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
 
 from cspov.view.MapWidget import CspovMainMapWidget
-from cspov.view.Layer import LayerStackAsListWidget
+from cspov.view.LayerDrawingPlan import LayerStackAsListWidget
 
 import logging, unittest, argparse
 

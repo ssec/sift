@@ -5,16 +5,17 @@
 ~~~
 
 PURPOSE
-
+Support calculations, namedtuples and constants used throughout the library and application.
 
 REFERENCES
 
 
 REQUIRES
-
+numpy
+numba
 
 :author: R.K.Garcia <rayg@ssec.wisc.edu>
-:copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
+:copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
 from collections import namedtuple
