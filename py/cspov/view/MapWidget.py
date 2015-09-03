@@ -24,7 +24,8 @@ from vispy import app, gloo
 import numpy as np
 from vispy.util.transforms import translate, rotate, ortho
 from cspov.common import box, WORLD_EXTENT_BOX, MAX_EXCURSION_X, MAX_EXCURSION_Y
-from cspov.view.Layer import BackgroundRGBWorldTiles, LayerStack
+from cspov.view.LayerRep import BackgroundRGBWorldTiles
+from cspov.view.LayerDrawingPlan import LayerDrawingPlan
 from numba import jit
 # from cspov.view.Program import GlooRGBTile
 
@@ -232,7 +233,7 @@ class CspovMainMapWidget(app.Canvas):
     # viewportDidChange = pyqtSignal(box)
 
     # members
-    _activity_stack = None  # Behavior object stack which we push/pop for primary activity; activity[-1] is what we're currently doing
+    _activity_stack = None  # Activity object stack which we push/pop for primary activity; activity[-1] is what we're currently doing
     layers = None  # layers we're currently displaying, last on top
     viewport = None  # box with world coordinates of what we're showing
 
@@ -265,7 +266,7 @@ class CspovMainMapWidget(app.Canvas):
         layer.set_alpha(0.5)
         raw_layers.append(layer)
         # raw_layers.append(BackgroundRGBWorldTiles(self.model, self.view))
-        self.layers = LayerStack(raw_layers)
+        self.layers = LayerDrawingPlan(raw_layers)
         # import os
         # fn = os.path.expanduser('~/Data/CSPOV/2015_07_14_195/0400/HS_H08_20150714_0400_B03_FLDK_R20.merc.tif')
         # self.layers = LayerStack([BackgroundRGBWorldTiles(self.model, self.view, fn)])

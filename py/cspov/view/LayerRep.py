@@ -1,11 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-.py
-~~~
+LayerRep.py
+~~~~~~~~~~~
 
 PURPOSE
+Layer representation - the "physical" realization of content to draw on the map.
+A layer representation can have multiple levels of detail
 
+A factory will convert URIs into LayerReps
+LayerReps are managed by document, and handed off to the MapWidget as part of a LayerDrawingPlan
 
 REFERENCES
 
@@ -17,13 +21,17 @@ REQUIRES
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-import os, sys
-import logging, unittest, argparse
-import numpy as np
+import os
+import sys
+import logging
+import unittest
+import argparse
+
 import scipy.misc as spm
 from PyQt4.QtCore import QObject, pyqtSignal
+
 from cspov.common import pnt, rez, MAX_EXCURSION_Y, MAX_EXCURSION_X, MercatorTileCalc, WORLD_EXTENT_BOX, \
-    DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH, box
+    DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH
 from cspov.view.Program import GlooRGBTile
 
 __author__ = 'rayg'
@@ -32,9 +40,9 @@ __docformat__ = 'reStructuredText'
 LOG = logging.getLogger(__name__)
 
 
-class Layer(QObject):
+class LayerRep(QObject):
     """
-    A Layer
+    A Layer Representation on the View side of the fence
     - has one or more representations available to immediately draw
     - may want to schedule the rendering of other representations during idle time, to get ideal view
     - may have a backing science representation which is pure science data instead of pixel values or RGBA maps
@@ -47,7 +55,7 @@ class Layer(QObject):
     _name = 'unnnamed'
 
     def __init__(self):
-        super(Layer, self).__init__()
+        super(LayerRep, self).__init__()
 
     def get_z(self):
         return self._z
@@ -117,94 +125,7 @@ class Layer(QObject):
         raise NotImplementedError()
 
 
-class LayerStackAsListWidget(QObject):
-    """ behavior connecting list widget to layer stack (both ways)
-    """
-    widget = None
-    stack = None
-
-    def __init__(self, widget, stack):
-        super(LayerStackAsListWidget, self).__init__()
-        self.widget = widget
-        self.stack = stack
-        self.updateList()
-        stack.layerStackDidChangeOrder.connect(self.updateList)
-        # FIXME: connect and configure list widget signals
-
-    def updateList(self):
-        self.widget.clear()
-        for x in self.stack.listing:
-            self.widget.addItem(x['name'])
-
-
-
-
-class LayerStack(QObject):
-    """
-    The master layer stack used by MapWidget; contains signals and can be controlled by GUI or script
-    Allows re-ordering and other expected manipulations
-    Links to other controls in GUI
-    """
-    layerStackDidChangeOrder = pyqtSignal(tuple)  # new order as ordinals e.g. (0, 2, 1, 3)
-
-    _layerlist = None
-
-
-    def __init__(self, init_layers=None):
-        super(LayerStack, self).__init__()
-        self._layerlist = list(init_layers or [])
-
-
-    def __iter__(self):
-        for level,layer in enumerate(reversed(self._layerlist)):
-            layer.z = float(level)
-            yield layer
-
-
-    def __getitem__(self, item):
-        return self._layerlist[item]
-
-
-    def __len__(self):
-        return len(self._layerlist)
-
-
-    def append(self, layer):
-        self._layerlist.append(layer)
-        self.layerStackDidChangeOrder.emit(tuple(range(len(self))))
-
-
-    def __delitem__(self, dex):
-        order = list(range(len(self)))
-        del self._layerlist[dex]
-        del order[dex]
-        self.layerStackDidChangeOrder(tuple(order))
-
-
-    def swap(self, adex, bdex):
-        order = list(range(len(self)))
-        order[bdex], order[adex] = adex, bdex
-        new_list = [self._layerlist[dex] for dex in order]
-        self._layerlist = new_list
-        self.layerStackDidChangeOrder.emit(tuple(order))
-
-
-    # @property
-    # def top(self):
-    #     return self._layerlist[0] if self._layerlist else None
-    #
-
-    @property
-    def listing(self):
-        """
-        return representation summary for layer list - name, icon, source, etc
-        """
-        for layer in self._layerlist:
-            yield {'name': str(layer.name)}
-
-
-
-class MercatorTiffTileLayer(Layer):
+class MercatorTiffTileLayer(LayerRep):
     """
     A layer with a Mercator TIFF image of world extent
     """
@@ -212,7 +133,7 @@ class MercatorTiffTileLayer(Layer):
         self.pathname = pathname
 
 
-class BackgroundRGBWorldTiles(Layer):
+class BackgroundRGBWorldTiles(LayerRep):
     """
     Tile an RGB image representing the full -180..180 longitude, -90..90 latitude
     """
