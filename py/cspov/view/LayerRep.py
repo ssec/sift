@@ -166,7 +166,7 @@ class BackgroundRGBWorldTiles(LayerRep):
         self.shape = (h,w) = tuple(self.image.shape[:2])
         zero_point = pnt(float(h)/2, float(w)/2)
         pixel_rez = rez(MAX_EXCURSION_Y*2/float(h), MAX_EXCURSION_X*2/float(w))
-        self.calc = MercatorTileCalc('bgns', self.shape, zero_point, pixel_rez, tile_shape)
+        self.calc = MercatorTileCalc('bgnd', self.shape, zero_point, pixel_rez, tile_shape)
         self.tiles = {}
         self.model = model
         self.view = view
