@@ -1,15 +1,33 @@
-from distutils.core import setup
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""Setuptools installation script for the CSPOV python package.
 
+To install from source run the following command::
 
-setup(name='cspov',
-      version='0.1',
-      description="Fluid high resolution satellite and meteorological imagery viewer",
-      author='Ray Garcia, SSEC',
-      author_email='ray.garcia@ssec.wisc.edu',
-      url='https://www.ssec.wisc.edu/',
-      zip_safe=False,
-      include_package_data=True,
-      install_requires=['scipy','vispy','numpy', 'OpenGL', 'PyQt4', 'netCDF4', 'h5py'],
-      packages=['distutils', 'distutils.command'],
-      entry_points = {'console_scripts' : ['cspov = cspov.main:main']}
-     )
+    python setup.py install
+
+To install for development replace 'install' with 'develop' in the above
+command.
+
+.. note::
+
+    PyQt4 is required for GUI operations, but must be install manually
+    since it is not 'pip' installable.
+
+"""
+
+from setuptools import setup, find_packages
+
+setup(
+    name='cspov',
+    version='0.1',
+    description="Fluid high resolution satellite and meteorological imagery viewer",
+    author='Ray Garcia, SSEC',
+    author_email='ray.garcia@ssec.wisc.edu',
+    url='https://www.ssec.wisc.edu/',
+    zip_safe=False,
+    include_package_data=True,
+    install_requires=['numpy', 'pillow', 'scipy', 'numba', 'vispy>0.4.0', 'numpy', 'PyOpenGL', 'netCDF4', 'h5py'],
+    packages=find_packages(),
+    entry_points={'console_scripts' : ['cspov = cspov.main:main']}
+)
