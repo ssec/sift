@@ -32,7 +32,7 @@ from PyQt4.QtCore import QObject, pyqtSignal
 
 from cspov.common import pnt, rez, MAX_EXCURSION_Y, MAX_EXCURSION_X, MercatorTileCalc, WORLD_EXTENT_BOX, \
     DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH, vue
-from cspov.view.Program import GlooRGBTile
+from cspov.view.Program import GlooRGBImageTile
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -134,9 +134,9 @@ class MercatorTiffTileLayer(LayerRep):
         self.pathname = pathname
 
 
-class BackgroundRGBWorldTiles(LayerRep):
+class TiledImageFile(LayerRep):
     """
-    Tile an RGB image representing the full -180..180 longitude, -90..90 latitude
+    Tile an RGB or float32 image representing the full -180..180 longitude, -90..90 latitude
     """
     image = None
     shape = None
@@ -145,17 +145,18 @@ class BackgroundRGBWorldTiles(LayerRep):
     _stride = 1
 
     def set_z(self, z):
-        super(BackgroundRGBWorldTiles, self).set_z(z)
+        super(TiledImageFile, self).set_z(z)
         for tile in self.tiles.values():
             tile.z = z
 
     def set_alpha(self, alpha):
         for tile in self.tiles.values():
             tile.alpha = alpha
-        super(BackgroundRGBWorldTiles, self).set_alpha(alpha)
+        super(TiledImageFile, self).set_alpha(alpha)
 
-    def __init__(self, model, view, filename=None, world_box=None, tile_shape=None):
-        super(BackgroundRGBWorldTiles, self).__init__()
+    def __init__(self, model, view, filename=None, world_box=None, tile_shape=None, tile_class=GlooRGBImageTile):
+        super(TiledImageFile, self).__init__()
+        self._tile_class = tile_class
         self.image = spm.imread(filename or 'cspov/data/shadedrelief.jpg')  # FIXME package resource
         self.image = self.image[::-1]  # flip so 0,0 is bottom left instead of top left
         if filename is None:
@@ -216,7 +217,7 @@ class BackgroundRGBWorldTiles(LayerRep):
                 # if (tilegeom.r+tilegeom.l) < 0 or (tilegeom.b+tilegeom.t) < 0: continue ## DEBUG
                 LOG.debug('y:{0} x:{1} geom:{2!r:s}'.format(tiy,tix,tilegeom))
                 subim = self.calc.tile_pixels(self.image, tiy, tix, self._stride)
-                self.tiles[(tiy,tix)] = t = GlooRGBTile(tilegeom, subim)
+                self.tiles[(tiy,tix)] = t = self._tile_class(tilegeom, subim)
                 t.set_mvp(model=self.model, view=self.view)
 
 

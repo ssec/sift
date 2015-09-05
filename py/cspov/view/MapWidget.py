@@ -23,7 +23,7 @@ from vispy import app, gloo
 import numpy as np
 from vispy.util.transforms import translate, rotate, ortho
 from cspov.common import box, WORLD_EXTENT_BOX, MAX_EXCURSION_X, MAX_EXCURSION_Y, vue
-from cspov.view.LayerRep import BackgroundRGBWorldTiles
+from cspov.view.LayerRep import TiledImageFile
 from cspov.view.LayerDrawingPlan import LayerDrawingPlan
 from numba import jit
 # from cspov.view.Program import GlooRGBTile
@@ -264,7 +264,7 @@ class CspovMainMapWidget(app.Canvas):
         fn = os.environ.get('MERC', None)
         # if fn:
         LOG.info('loading {}'.format(fn))
-        layer = BackgroundRGBWorldTiles(self.model, self.view, filename=fn)
+        layer = TiledImageFile(self.model, self.view, filename=fn)
         layer.set_alpha(0.5)
         raw_layers.append(layer)
         # raw_layers.append(BackgroundRGBWorldTiles(self.model, self.view))
