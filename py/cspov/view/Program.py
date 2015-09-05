@@ -147,6 +147,29 @@ class GlooTile(object):
 
     alpha = property(get_alpha, set_alpha)
 
+    def auto_range(self, field):
+        pass
+
+    def get_range(self):
+        return None
+
+    def set_range(self, min_value, max_value):
+        pass  # raise?
+
+    range = property(get_range, set_range)
+
+
+    def get_colormap(self):
+        return None
+
+    def set_colormap(self):
+        """
+        Color map may be updated interactively and should be pushed to the GPU for impending redraw
+        :return:
+        """
+        return None  # raise?
+
+    colormap = property(get_colormap, set_colormap)
 
     def set_mvp(self, model=None, view=None, projection=None):
         if model is not None:
@@ -162,7 +185,7 @@ class GlooTile(object):
 
 
 
-class GlooRGBTile(GlooTile):
+class GlooRGBImageTile(GlooTile):
     """
     A GL program which plots a planar tile with a texture map
     texture map is assumed oriented such that ascending pixel row is ascending coordinate from bottom left of screen
@@ -172,15 +195,15 @@ class GlooRGBTile(GlooTile):
     image = None
     _world_box = None
     faces = None
-    _z = 0.0
-    _alpha = 1.0
 
-    def __init__(self, world_box=None, image=None, image_box=None):
-        super(GlooRGBTile, self).__init__(SIMPLE_VERT_SHADER, RGB_FRAG_SHADER)
+    def __init__(self, world_box=None, image=None, image_box=None, **kwargs):
+        super(GlooRGBImageTile, self).__init__(SIMPLE_VERT_SHADER, RGB_FRAG_SHADER)
         if image is not None:
             self.set_data(image, image_box)
         if world_box is not None:
             self.set_world_box(world_box)
+        if kwargs:
+            LOG.info("ignoring additional arguments {0!r:s}".format(list(kwargs.keys())))
 
 
     def get_data(self):
@@ -191,29 +214,49 @@ class GlooRGBTile(GlooTile):
             image = load_crate()
         if image_box is not None:
             self.image = image = image[image_box.b:image_box.t, image_box.l:image_box.r]
-            print("clipping")
         else:
             self.image = image
         # get the texture queued
         self.program['u_texture'] = gloo.Texture2D(image)
 
 
-# from imshow_cuts.py
+
+####
+####  Colormapped float32 field tiles
+####
+
+
+
+# FIXME: u_z and u_alpha need to be present in all frag shaders for subclasses of GlooTile; is this good?
+# FIXME: allow color map to include alpha instead of just RGB
+# FIXME: auto_range right now only is taking into account the local tile, not the whole image
+# modified from imshow_cuts.py
 COLORMAP_FRAG_SHADER = """
 uniform float vmin;
 uniform float vmax;
 uniform float cmap;
 uniform float n_colormaps;
+uniform float u_z;
+uniform float u_alpha;
 
 uniform sampler2D field;
 uniform sampler2D colormaps;
 
 varying vec2 v_texcoord;
+
+// http://stackoverflow.com/questions/11810158/how-to-deal-with-nan-or-inf-in-opengl-es-2-0-shaders
+bool isNan(float val)
+{
+  return (val <= 0.0 || 0.0 <= val) ? false : true; // all comparisons on NaN return false
+}
+
 void main()
 {
-    float value = texture2D(image, v_texcoord).r;
+    float value = texture2D(field, v_texcoord).r;
     float index = (cmap+0.5) / n_colormaps;
-
+    //if (isNan(value)) {
+    //    gl_FragColor = vec4(0,0,0,0);
+    //} else
     if( value < vmin ) {
         gl_FragColor = texture2D(colormaps, vec2(0.0,index));
     } else if( value > vmax ) {
@@ -221,61 +264,116 @@ void main()
     } else {
         value = (value-vmin)/(vmax-vmin);
         value = 1.0/512.0 + 510.0/512.0*value;
-        gl_FragColor = texture2D(colormaps, vec2(value,index));
+        // gl_FragColor = texture2D(colormaps, vec2(value,index));
+        gl_FragColor = vec4(texture2D(colormaps, vec2(value,index)).xyz, u_alpha);
     }
 }
 """
 
+# FIXME: implement a colormap editing and storage subsystem as part of the document
 
-class GlooFlatFieldTile(GlooTile):
+# Colormaps
+COLORMAP_COUNT = 16
+COLORMAP_LEN = 512
+COLORMAPS = np.ones((COLORMAP_COUNT, COLORMAP_LEN, 4)).astype(np.float32)
+values = np.linspace(0, 1, COLORMAP_LEN)[1:-1]
+
+# Hot colormap
+DEFAULT_COLORMAP = COLORMAP_HOT = 0
+COLORMAPS[0, 0] = 0, 0, 1, 1  # Low values  (< vmin)
+COLORMAPS[0, -1] = 0, 1, 0, 1  # High values (> vmax)
+COLORMAPS[0, 1:-1, 0] = np.interp(values, [0.00, 0.33, 0.66, 1.00],
+                                          [0.00, 1.00, 1.00, 1.00])
+COLORMAPS[0, 1:-1, 1] = np.interp(values, [0.00, 0.33, 0.66, 1.00],
+                                          [0.00, 0.00, 1.00, 1.00])
+COLORMAPS[0, 1:-1, 2] = np.interp(values, [0.00, 0.33, 0.66, 1.00],
+                                          [0.00, 0.00, 0.00, 1.00])
+
+# Grey colormap
+COLORMAP_GREY = 1
+COLORMAPS[1, 0] = 0, 0, 1, 1  # Low values (< vmin)
+COLORMAPS[1, -1] = 0, 1, 0, 1  # High values (> vmax)
+COLORMAPS[1, 1:-1, 0] = np.interp(values, [0.00, 1.00],
+                                          [0.00, 1.00])
+COLORMAPS[1, 1:-1, 1] = np.interp(values, [0.00, 1.00],
+                                          [0.00, 1.00])
+COLORMAPS[1, 1:-1, 2] = np.interp(values, [0.00, 1.00],
+                                          [0.00, 1.00])
+# Jet colormap
+# ...
+del values
+
+
+class GlooColormapDataTile(GlooTile):
     """
     A Tile program which uses a RGBA color map shader to render a mercator-projected float32 science data field
     NaNs are automatically mapped to alpha=0
     FUTURE: allow simple enhancement expressions to be embedded in the shader code, e.g. sqrt or log enhancement
     """
     program = None
-    field = None
-    _world_box = None
+    image = None  # float32 2D array
+    _colormaps = None  # colormap data to push into GPU
     faces = None
-    _z = 0.0
-    _alpha = 1.0
+    _world_box = None
+    _range = None
 
-    def __init__(self, world_box=None, field=None, image_box=None, colormap=None):
-        super(GlooRGBTile, self).__init__(SIMPLE_VERT_SHADER, COLORMAP_FRAG_SHADER)
-        if field is not None:
-            self.set_data(field, image_box)
+    def __init__(self, world_box=None, image=None, image_box=None, colormap=None, range=None, **kwargs):
+        super(GlooColormapDataTile, self).__init__(SIMPLE_VERT_SHADER, COLORMAP_FRAG_SHADER)
+        if image is not None:
+            self.set_data(image, image_box)
         if world_box is not None:
             self.set_world_box(world_box)
-        if colormap is not None:
-            self.set_colormap(colormap)
+        self.set_colormap(colormap or COLORMAPS)
+        if range is not None:
+            self.set_range(*range)
+        else:
+            self.auto_range()
+        if kwargs:
+            LOG.info("ignoring additional arguments {0!r:s}".format(list(kwargs.keys())))
+        self.program['cmap'] = COLORMAP_GREY  # alternate COLORMAP_HOT
+        self.program['n_colormaps'] = COLORMAP_COUNT
+        # FIXME: deal with multiple colormaps being available, as well as loading/editing color maps
 
     def get_data(self):
-        return self.field
+        return self.image
 
-    def set_data(self, field, field_box=None):
-        assert(len(field.shape)==2)  # we only accept flat fields of intensity
-        if field is None:
-            # FIXME: load test pattern
-            pass
-        if field_box is not None:
-            self.field = field = field[field_box.b:field_box.t, field_box.l:field_box.r]
-            print("clipping")
+    def set_data(self, image, image_box=None):
+        assert(len(image.shape)==2)  # we only accept flat fields of intensity
+        image = np.require(image, dtype=np.float32)
+
+        if image_box is not None:
+            self.image = image = image[image_box.b:image_box.t, image_box.l:image_box.r]
         else:
-            self.field = field
+            self.image = image
         # get the texture queued
-        self.program['u_field'] = gloo.Texture2D(field)
+        self.program['field'] = gloo.Texture2D(image)  # FIXME: review if we need to send additional parameters
+
+
+    def auto_range(self, field=None):
+        field = field or self.image
+        range = np.nanmin(field), np.nanmax(field)
+        # print('>>>>>', repr(range))
+        # range = (0.0, 255.0)  # FIXME DEBUG
+        self.set_range(*range)
+
+    def get_range(self):
+        return self._range
+
+    def set_range(self, min_value, max_value):
+        self._range = (min_value, max_value)
+        self.program['vmin'] = min_value
+        self.program['vmax'] = max_value
 
 
     def get_colormap(self):
-        raise NotImplementedError('not yet implemented')
+        return self._colormaps
 
-    def set_colormap(self):
+    def set_colormap(self, colormap):
         """
         Color map may be updated interactively and should be pushed to the GPU for impending redraw
         :return:
         """
-        raise NotImplementedError('not yet implemented')
+        self.program['colormaps'] = self._colormaps = colormap
 
-    colormap = property(get_colormap, set_colormap)
 
 

@@ -23,7 +23,7 @@ from vispy import app, gloo
 import numpy as np
 from vispy.util.transforms import translate, rotate, ortho
 from cspov.common import box, WORLD_EXTENT_BOX, MAX_EXCURSION_X, MAX_EXCURSION_Y, vue
-from cspov.view.LayerRep import BackgroundRGBWorldTiles
+from cspov.view.LayerRep import TiledImageFile
 from cspov.view.LayerDrawingPlan import LayerDrawingPlan
 from numba import jit
 # from cspov.view.Program import GlooRGBTile
@@ -259,12 +259,15 @@ class CspovMainMapWidget(app.Canvas):
         self.init_transforms()
         self.update_proj()
 
-        # FIXME: pass in the Layers object rather than building it right here
+        # FIXME: pass in the Layers object rather than building it right here (test pattern style)
         raw_layers = []  # front to back
         fn = os.environ.get('MERC', None)
         # if fn:
         LOG.info('loading {}'.format(fn))
-        layer = BackgroundRGBWorldTiles(self.model, self.view, filename=fn)
+        from .Program import GlooRGBImageTile, GlooColormapDataTile
+        cls = GlooRGBImageTile if (fn is None or fn.endswith('.jpg') or fn.endswith('.png')) else GlooColormapDataTile
+        # cls = GlooColormapDataTile if (fn is not None and fn.endswith('.tif')) else GlooRGBImageTile
+        layer = TiledImageFile(self.model, self.view, filename=fn, tile_class=cls)
         layer.set_alpha(0.5)
         raw_layers.append(layer)
         # raw_layers.append(BackgroundRGBWorldTiles(self.model, self.view))
@@ -362,6 +365,7 @@ class CspovMainMapWidget(app.Canvas):
         self.update()
 
     def on_resize(self, event):
+        # FIXME: maintain aspect ratio
         self.update_proj()
 
     def update_proj(self, event=None):
