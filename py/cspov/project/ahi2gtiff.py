@@ -260,13 +260,13 @@ def main():
     if "albedo" in nc.variables:
         input_data = nc.variables["albedo"][:]
         # input_data = linear_flexible_scale(input_data, 0, 255)
-        input_data = sqrt_scale(input_data, 0, 255)
+        # input_data = sqrt_scale(input_data, 0, 255)
     else:
         input_data = nc.variables["brightness_temp"][:]
-        input_data = brightness_temperature_scale(input_data, 242.0, 163.0, 330.0, 0, 255)
-    np.clip(input_data, 0, 255, out=input_data)
-    input_data = input_data.astype(np.uint8)
-    # input_data = input_data.astype(np.float32)  # make sure everything is 32-bit floats
+        # input_data = brightness_temperature_scale(input_data, 242.0, 163.0, 330.0, 0, 255)
+    # np.clip(input_data, 0, 255, out=input_data)
+    # input_data = input_data.astype(np.uint8)
+    input_data = input_data.astype(np.float32)  # make sure everything is 32-bit floats
 
     projection_info = nc.variables["Projection"].__dict__.copy()
     projection_info["semi_major_axis"] *= 1000.0  # is in kilometers, need meters
@@ -312,7 +312,8 @@ def main():
     geotransform = (origin_x, pixel_size_x, 0, origin_y, 0, pixel_size_y)
     # gcps = [(center_lon, center_lat, center_x_idx, center_y_idx),]
 
-    create_geotiff(input_data, args.output_filename, input_proj_str, geotransform, etype=gdal.GDT_Byte)
+    etype = gdal.GDT_Byte if input_data.dtype == np.uint8 else gdal.GDT_Float32
+    create_geotiff(input_data, args.output_filename, input_proj_str, geotransform, etype=etype)
 
 if __name__ == "__main__":
     sys.exit(main())
