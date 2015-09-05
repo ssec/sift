@@ -36,6 +36,8 @@ LOG = logging.getLogger(__name__)
 DEFAULT_TILE_HEIGHT = 512
 DEFAULT_TILE_WIDTH = 512
 
+PREFERRED_SCREEN_TO_TEXTURE_RATIO = 0.5  # screenpx:texturepx that we want to keep, ideally, by striding
+
 R_EQ = 6378.1370  # km
 R_POL = 6356.7523142  # km
 C_EQ = 40075.0170  # linear km
@@ -234,8 +236,8 @@ class MercatorTileCalc(object):
         # world distance per pixel for our data
         # compute texture pixels per screen pixels
         texture = texture or self.pixel_rez
-        tsy = max(1, np.floor(visible.dy / texture.dy))
-        tsx = max(1, np.floor(visible.dx / texture.dx))
+        tsy = max(1, np.floor(visible.dy * PREFERRED_SCREEN_TO_TEXTURE_RATIO / texture.dy))
+        tsx = max(1, np.floor(visible.dx * PREFERRED_SCREEN_TO_TEXTURE_RATIO / texture.dx))
         ts = min(tsy,tsx)
         stride = int(ts)
         return stride

@@ -185,9 +185,12 @@ class BackgroundRGBWorldTiles(LayerRep):
             m,v,p = mvp
             tile.set_mvp(m,v,p)
             tile.draw()
-        sampling = self.calc.calc_sampling(visible_geom, self._stride)
-        # LOG.debug('sampling is {}'.format(sampling))
-        return False if (sampling is self.calc.WELLSAMPLED) else True
+        preferred_stride = self.calc.calc_stride(visible_geom)
+        return True if preferred_stride != self._stride else False
+
+        # sampling = self.calc.calc_sampling(visible_geom, self._stride)
+        # # LOG.debug('sampling is {}'.format(sampling))
+        # return False if (sampling is self.calc.WELLSAMPLED) else True
 
     def render(self, geom, *more_geom):
         "render at a suitable sampling for the screen geometry"
