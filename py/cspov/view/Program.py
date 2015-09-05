@@ -330,7 +330,7 @@ class GlooColormapDataTile(GlooTile):
             self.auto_range()
         if kwargs:
             LOG.info("ignoring additional arguments {0!r:s}".format(list(kwargs.keys())))
-        self.program['cmap'] = COLORMAP_HOT
+        self.program['cmap'] = COLORMAP_GREY  # alternate COLORMAP_HOT
         self.program['n_colormaps'] = COLORMAP_COUNT
         # FIXME: deal with multiple colormaps being available, as well as loading/editing color maps
 
