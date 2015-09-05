@@ -195,8 +195,6 @@ class GlooRGBImageTile(GlooTile):
     image = None
     _world_box = None
     faces = None
-    _z = 0.0
-    _alpha = 1.0
 
     def __init__(self, world_box=None, image=None, image_box=None, **kwargs):
         super(GlooRGBImageTile, self).__init__(SIMPLE_VERT_SHADER, RGB_FRAG_SHADER)
@@ -229,32 +227,45 @@ class GlooRGBImageTile(GlooTile):
 
 
 
-
+# FIXME: u_z and u_alpha need to be present in all frag shaders for subclasses of GlooTile; is this good?
+# FIXME: allow color map to include alpha instead of just RGB
+# FIXME: auto_range right now only is taking into account the local tile, not the whole image
 # modified from imshow_cuts.py
 COLORMAP_FRAG_SHADER = """
 uniform float vmin;
 uniform float vmax;
 uniform float cmap;
 uniform float n_colormaps;
+uniform float u_z;
+uniform float u_alpha;
 
 uniform sampler2D field;
 uniform sampler2D colormaps;
 
 varying vec2 v_texcoord;
+
+// http://stackoverflow.com/questions/11810158/how-to-deal-with-nan-or-inf-in-opengl-es-2-0-shaders
+bool isNan(float val)
+{
+  return (val <= 0.0 || 0.0 <= val) ? false : true; // all comparisons on NaN return false
+}
+
 void main()
 {
     float value = texture2D(field, v_texcoord).r;
     float index = (cmap+0.5) / n_colormaps;
-    if (isnan(value) || isinf(value)) {
-        discard;
-    } else if( value < vmin ) {
+    //if (isNan(value)) {
+    //    gl_FragColor = vec4(0,0,0,0);
+    //} else
+    if( value < vmin ) {
         gl_FragColor = texture2D(colormaps, vec2(0.0,index));
     } else if( value > vmax ) {
         gl_FragColor = texture2D(colormaps, vec2(1.0,index));
     } else {
         value = (value-vmin)/(vmax-vmin);
         value = 1.0/512.0 + 510.0/512.0*value;
-        gl_FragColor = texture2D(colormaps, vec2(value,index));
+        // gl_FragColor = texture2D(colormaps, vec2(value,index));
+        gl_FragColor = vec4(texture2D(colormaps, vec2(value,index)).xyz, u_alpha);
     }
 }
 """
@@ -306,15 +317,22 @@ class GlooColormapDataTile(GlooTile):
     _world_box = None
     _range = None
 
-    def __init__(self, world_box=None, image=None, image_box=None, colormap=None, **kwargs):
-        super(GlooRGBImageTile, self).__init__(SIMPLE_VERT_SHADER, COLORMAP_FRAG_SHADER)
+    def __init__(self, world_box=None, image=None, image_box=None, colormap=None, range=None, **kwargs):
+        super(GlooColormapDataTile, self).__init__(SIMPLE_VERT_SHADER, COLORMAP_FRAG_SHADER)
         if image is not None:
             self.set_data(image, image_box)
         if world_box is not None:
             self.set_world_box(world_box)
         self.set_colormap(colormap or COLORMAPS)
+        if range is not None:
+            self.set_range(*range)
+        else:
+            self.auto_range()
         if kwargs:
             LOG.info("ignoring additional arguments {0!r:s}".format(list(kwargs.keys())))
+        self.program['cmap'] = COLORMAP_HOT
+        self.program['n_colormaps'] = COLORMAP_COUNT
+        # FIXME: deal with multiple colormaps being available, as well as loading/editing color maps
 
     def get_data(self):
         return self.image
@@ -331,8 +349,11 @@ class GlooColormapDataTile(GlooTile):
         self.program['field'] = gloo.Texture2D(image)  # FIXME: review if we need to send additional parameters
 
 
-    def auto_range(self, field):
+    def auto_range(self, field=None):
+        field = field or self.image
         range = np.nanmin(field), np.nanmax(field)
+        # print('>>>>>', repr(range))
+        # range = (0.0, 255.0)  # FIXME DEBUG
         self.set_range(*range)
 
     def get_range(self):
@@ -347,12 +368,12 @@ class GlooColormapDataTile(GlooTile):
     def get_colormap(self):
         return self._colormaps
 
-    def set_colormap(self):
+    def set_colormap(self, colormap):
         """
         Color map may be updated interactively and should be pushed to the GPU for impending redraw
         :return:
         """
-        self.program['colormaps'] = self._colormaps
+        self.program['colormaps'] = self._colormaps = colormap
 
 
 

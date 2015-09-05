@@ -259,12 +259,15 @@ class CspovMainMapWidget(app.Canvas):
         self.init_transforms()
         self.update_proj()
 
-        # FIXME: pass in the Layers object rather than building it right here
+        # FIXME: pass in the Layers object rather than building it right here (test pattern style)
         raw_layers = []  # front to back
         fn = os.environ.get('MERC', None)
         # if fn:
         LOG.info('loading {}'.format(fn))
-        layer = TiledImageFile(self.model, self.view, filename=fn)
+        from .Program import GlooRGBImageTile, GlooColormapDataTile
+        cls = GlooRGBImageTile if (fn is None or fn.endswith('.jpg') or fn.endswith('.png')) else GlooColormapDataTile
+        # cls = GlooColormapDataTile if (fn is not None and fn.endswith('.tif')) else GlooRGBImageTile
+        layer = TiledImageFile(self.model, self.view, filename=fn, tile_class=cls)
         layer.set_alpha(0.5)
         raw_layers.append(layer)
         # raw_layers.append(BackgroundRGBWorldTiles(self.model, self.view))
