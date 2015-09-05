@@ -187,19 +187,21 @@ class BackgroundRGBWorldTiles(LayerRep):
             tile.draw()
         sampling = self.calc.calc_sampling(visible_geom, self._stride)
         # LOG.debug('sampling is {}'.format(sampling))
-        return True if sampling is self.calc.WELLSAMPLED else False
+        return False if (sampling is self.calc.WELLSAMPLED) else True
 
     def render(self, geom, *more_geom):
         "render at a suitable sampling for the screen geometry"
-        self._stride = self.calc.calc_stride(geom)
-        self._generate_tiles()
+        stride = self.calc.calc_stride(geom)
+        self._generate_tiles(stride)
 
-    def _generate_tiles(self):
+    def _generate_tiles(self, stride=None):
         h,w = self.image.shape[:2]
         _, tilebox = self.calc.visible_tiles(WORLD_EXTENT_BOX)
         # LOG.info(tilebox)
         # for tiy in range(int((tilebox.b+tilebox.t)/2), tilebox.t):  DEBUG
         #     for tix in range(int((tilebox.l+tilebox.r)/2), tilebox.r):
+        if stride is not None:
+            self._stride = stride
         for tiy in range(tilebox.b, tilebox.t):
             for tix in range(tilebox.l, tilebox.r):
                 tilegeom = self.calc.tile_world_box(tiy,tix)

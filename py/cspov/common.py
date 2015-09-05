@@ -214,9 +214,12 @@ class MercatorTileCalc(object):
         texture = texture or self.pixel_rez
         tsy = visible.dy / (texture.dy * float(stride))
         tsx = visible.dx / (texture.dx * float(stride))
-        LOG.debug('tsy,tsx = {0:.2f},{1:.2f}'.format(tsy,tsx))
-        if min(tsy,tsx) <= 0.5: return self.UNDERSAMPLED
-        if max(tsy,tsx) >= 2.0: return self.OVERSAMPLED
+        if min(tsy,tsx) <= 0.5:
+            LOG.debug('undersampled tsy,tsx = {0:.2f},{1:.2f}'.format(tsy,tsx))
+            return self.UNDERSAMPLED
+        if max(tsy,tsx) >= 2.0:
+            LOG.debug('oversampled tsy,tsx = {0:.2f},{1:.2f}'.format(tsy,tsx))
+            return self.OVERSAMPLED
         return self.WELLSAMPLED
 
     @jit
