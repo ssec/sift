@@ -362,6 +362,7 @@ class CspovMainMapWidget(app.Canvas):
         self.update()
 
     def on_resize(self, event):
+        # FIXME: maintain aspect ratio
         self.update_proj()
 
     def update_proj(self, event=None):

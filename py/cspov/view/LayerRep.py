@@ -31,7 +31,7 @@ import scipy.misc as spm
 from PyQt4.QtCore import QObject, pyqtSignal
 
 from cspov.common import pnt, rez, MAX_EXCURSION_Y, MAX_EXCURSION_X, MercatorTileCalc, WORLD_EXTENT_BOX, \
-    DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH
+    DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH, vue
 from cspov.view.Program import GlooRGBTile
 
 __author__ = 'rayg'
@@ -172,7 +172,12 @@ class BackgroundRGBWorldTiles(LayerRep):
         self.tiles = {}
         self.model = model
         self.view = view
-        self._generate_tiles()  # FIXME: don't render anything more than a coarse 1024x512, defer high-rez tiles
+        # start with a very coarse representation that fits in minimal tiles
+        tinyworld = vue(*WORLD_EXTENT_BOX,
+                        dy=MAX_EXCURSION_Y*2/DEFAULT_TILE_HEIGHT,
+                        dx=MAX_EXCURSION_X*2/DEFAULT_TILE_WIDTH)
+        self._generate_tiles(self.calc.calc_stride(tinyworld))
+        # self._generate_tiles()
 
     def paint(self, visible_geom, mvp, fast=False, **kwargs):
         """
