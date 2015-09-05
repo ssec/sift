@@ -18,8 +18,7 @@ REQUIRES
 :license: GPLv3, see LICENSE for more details
 """
 import os,sys
-from PyQt4.QtCore import pyqtSignal
-# from PyQt4.QtOpenGL import QGLWidget, QGLFormat
+from PyQt4.QtCore import pyqtSignal, QTimer
 from vispy import app, gloo
 import numpy as np
 from vispy.util.transforms import translate, rotate, ortho
@@ -238,11 +237,14 @@ class CspovMainMapWidget(app.Canvas):
     viewport = None  # box with world coordinates of what we're showing
 
     _testtile = None
+    _deferred_render_layers = None  # FIXME replace with a task queue
+    _deferred_render_timer = None
 
     def __init__(self, **kwargs):
         super(CspovMainMapWidget, self).__init__(**kwargs)
 
         self._activity_stack = [Idling(self)]
+        self._deferred_render_layers = []
 
         aspect = float(self.size[1]) / float(self.size[0])
         # self.viewport = vp = box(l=-4, r=4, b=-4*aspect, t=4*aspect)
@@ -380,19 +382,47 @@ class CspovMainMapWidget(app.Canvas):
         if self._testtile:
             self._testtile.set_mvp(projection=self.projection)
 
-    def on_draw(self, event):
-        gloo.clear()
-        mvp = self.model, self.view, self.projection
+    def render_layers(self, layers=None):
+        layers = layers or self._deferred_render_layers
+        LOG.info('re-rendering {} layers'.format(len(layers)))
+        if not layers:
+            return
+        vp = self._vueport()
+        for layer in layers:
+            layer.render(vp)
+        self._deferred_render_layers = []
+        self._deferred_render_timer = None
+        self.update()
+
+    @jit
+    def _vueport(self):
         w,h = self.size
         dx = (self.viewport.r - self.viewport.l)/float(w)
         dy = (self.viewport.t - self.viewport.b)/float(h)
-        visible_geom = vue(l=self.viewport.l, r=self.viewport.r, b=self.viewport.b, t=self.viewport.t, dx=dx, dy=dy)
+        return vue(l=self.viewport.l, r=self.viewport.r, b=self.viewport.b, t=self.viewport.t, dx=dx, dy=dy)
+
+    def on_draw(self, event):
+        gloo.clear()
+        mvp = self.model, self.view, self.projection
+        visible_geom = self._vueport()
         render_candidates = []
         for layer in self.layers:
             if layer.paint(visible_geom, mvp): # then we should re-render
                 render_candidates.append(layer)
         if render_candidates:
-            LOG.debug('{0:d} layers request to be re-rendered'.format(len(render_candidates)))
+            # def rerender(self=self, layers=render_candidates):
+            #     self.render_layers(layers)
+            # nqueued = len(self._deferred_render_layers)
+            for cand in render_candidates:
+                if cand not in self._deferred_render_layers:
+                    self._deferred_render_layers.append(cand)
+            # self._deferred_render_layers += render_candidates
+            if self._deferred_render_timer is not None:
+                self._deferred_render_timer.stop()
+            # if nqueued==0:
+            self._deferred_render_timer = QTimer.singleShot(250, self.render_layers)  # FIXME: defer this if we continue drawing
+            LOG.debug('{0:d} layers queued to be re-rendered'.format(len(render_candidates)))
+
         if self._testtile:
             self._testtile.draw()
 
