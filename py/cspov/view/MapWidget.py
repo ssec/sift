@@ -23,7 +23,7 @@ from PyQt4.QtCore import pyqtSignal
 from vispy import app, gloo
 import numpy as np
 from vispy.util.transforms import translate, rotate, ortho
-from cspov.common import box, WORLD_EXTENT_BOX, MAX_EXCURSION_X, MAX_EXCURSION_Y
+from cspov.common import box, WORLD_EXTENT_BOX, MAX_EXCURSION_X, MAX_EXCURSION_Y, vue
 from cspov.view.LayerRep import BackgroundRGBWorldTiles
 from cspov.view.LayerDrawingPlan import LayerDrawingPlan
 from numba import jit
@@ -383,8 +383,16 @@ class CspovMainMapWidget(app.Canvas):
     def on_draw(self, event):
         gloo.clear()
         mvp = self.model, self.view, self.projection
+        w,h = self.size
+        dx = (self.viewport.r - self.viewport.l)/float(w)
+        dy = (self.viewport.t - self.viewport.b)/float(h)
+        visible_geom = vue(l=self.viewport.l, r=self.viewport.r, b=self.viewport.b, t=self.viewport.t, dx=dx, dy=dy)
+        render_candidates = []
         for layer in self.layers:
-            layer.paint(self.viewport, mvp)
+            if layer.paint(visible_geom, mvp): # then we should re-render
+                render_candidates.append(layer)
+        if render_candidates:
+            LOG.debug('{0:d} layers request to be re-rendered'.format(len(render_candidates)))
         if self._testtile:
             self._testtile.draw()
 

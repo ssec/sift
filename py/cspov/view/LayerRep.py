@@ -172,31 +172,27 @@ class BackgroundRGBWorldTiles(LayerRep):
         self.tiles = {}
         self.model = model
         self.view = view
-        self._generate_tiles()
+        self._generate_tiles()  # FIXME: don't render anything more than a coarse 1024x512, defer high-rez tiles
 
-    def paint(self, geom, mvp, fast=False, **kwargs):
+    def paint(self, visible_geom, mvp, fast=False, **kwargs):
         """
         draw the most appropriate representation for this layer
         if a better representation could be rendered for later draws, return False and render() will be queued for later idle time
         fast flag requests that low-cost rendering be used
         """
-        # tile = self.tiles[(2,2)]
-        # tile.set_mvp(projection=proj)
-        # tile.draw()
-        # return True
-
         for tile in self.tiles.values():  # FIXME: draw only the tiles that are visible in the geom
             # LOG.debug('draw tile {0!r:s}'.format(tile))
             m,v,p = mvp
             tile.set_mvp(m,v,p)
             tile.draw()
-        return True
+        sampling = self.calc.calc_sampling(visible_geom, self._stride)
+        # LOG.debug('sampling is {}'.format(sampling))
+        return True if sampling is self.calc.WELLSAMPLED else False
 
     def render(self, geom, *more_geom):
         "render at a suitable sampling for the screen geometry"
-        stride = self.calc.calc_stride(geom)
-
-
+        self._stride = self.calc.calc_stride(geom)
+        self._generate_tiles()
 
     def _generate_tiles(self):
         h,w = self.image.shape[:2]
@@ -209,7 +205,7 @@ class BackgroundRGBWorldTiles(LayerRep):
                 tilegeom = self.calc.tile_world_box(tiy,tix)
                 # if (tilegeom.r+tilegeom.l) < 0 or (tilegeom.b+tilegeom.t) < 0: continue ## DEBUG
                 LOG.debug('y:{0} x:{1} geom:{2!r:s}'.format(tiy,tix,tilegeom))
-                subim = self.calc.tile_pixels(self.image, tiy, tix)
+                subim = self.calc.tile_pixels(self.image, tiy, tix, self._stride)
                 self.tiles[(tiy,tix)] = t = GlooRGBTile(tilegeom, subim)
                 t.set_mvp(model=self.model, view=self.view)
 

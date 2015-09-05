@@ -60,9 +60,9 @@ class MercatorTileCalc(object):
     common calculations for mercator tile groups in an array or file
     tiles are identified by (iy,ix) zero-based indicators
     """
-    OVERSAMPLED=1
-    UNDERSAMPLED=-1
-    WELLSAMPLED=0
+    OVERSAMPLED='oversampled'
+    UNDERSAMPLED='undersampled'
+    WELLSAMPLED='wellsampled'
 
     name = None
     pixel_shape = None
@@ -203,7 +203,7 @@ class MercatorTileCalc(object):
         return overunder, tilebox
 
     @jit
-    def calc_sampling(self, visible, texture=None):
+    def calc_sampling(self, visible, stride, texture=None):
         """
         estimate whether we're oversampled, undersampled or well-sampled
         visible.dy, .dx: d(world distance)/d(screen pixels)
@@ -212,8 +212,9 @@ class MercatorTileCalc(object):
         1:1 is optimal, 2:1 is oversampled, 1:2 is undersampled
         """
         texture = texture or self.pixel_rez
-        tsy = visible.dy / texture.dy
-        tsx = visible.dx / texture.dx
+        tsy = visible.dy / (texture.dy * float(stride))
+        tsx = visible.dx / (texture.dx * float(stride))
+        LOG.debug('tsy,tsx = {0:.2f},{1:.2f}'.format(tsy,tsx))
         if min(tsy,tsx) <= 0.5: return self.UNDERSAMPLED
         if max(tsy,tsx) >= 2.0: return self.OVERSAMPLED
         return self.WELLSAMPLED
@@ -261,13 +262,13 @@ class MercatorTileCalc(object):
         return box(b=b,l=l,t=t,r=r)
 
 
-    def tile_pixels(self, data, tiy, tix):
+    def tile_pixels(self, data, tiy, tix, stride):
         """
         extract pixel data for a given tile
         """
         return data[
-               tiy*self.tile_shape[0]:(tiy+1)*self.tile_shape[0],
-               tix*self.tile_shape[1]:(tix+1)*self.tile_shape[1]
+               tiy*self.tile_shape[0]:(tiy+1)*self.tile_shape[0]:stride,
+               tix*self.tile_shape[1]:(tix+1)*self.tile_shape[1]:stride
                ]
 
 
