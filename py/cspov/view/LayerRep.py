@@ -97,13 +97,14 @@ class LayerRep(QObject):
         cache a rendering (typically a draw-list with textures) that best handles the extents and sampling requested
         if more than one view is active, more geometry may be provided for other views
         return False if resources were too limited and a purge is needed among the layer stack
+        :param geom: screen geometry as a vue tuple, world coordinates with d(world)/d(pixel) dy and dx
         """
         return True
 
     def purge(self, geom, *more_geom):
         """
         release any cached representations that we haven't used lately, leaving at most 1
-        return True if any GL resources were released
+        :return: True if any GL resources were released
         """
         return False
 
@@ -141,6 +142,7 @@ class BackgroundRGBWorldTiles(LayerRep):
     shape = None
     calc = None
     tiles = None  # dictionary of {(y,x): GlooRgbTile, ...}
+    _stride = 1
 
     def set_z(self, z):
         super(BackgroundRGBWorldTiles, self).set_z(z)
@@ -190,11 +192,16 @@ class BackgroundRGBWorldTiles(LayerRep):
             tile.draw()
         return True
 
+    def render(self, geom, *more_geom):
+        "render at a suitable sampling for the screen geometry"
+        stride = self.calc.calc_stride(geom)
+
+
+
     def _generate_tiles(self):
         h,w = self.image.shape[:2]
         _, tilebox = self.calc.visible_tiles(WORLD_EXTENT_BOX)
         # LOG.info(tilebox)
-        # FIXME: high tiles are south of equator, leftward instead of up, rightward
         # for tiy in range(int((tilebox.b+tilebox.t)/2), tilebox.t):  DEBUG
         #     for tix in range(int((tilebox.l+tilebox.r)/2), tilebox.r):
         for tiy in range(tilebox.b, tilebox.t):

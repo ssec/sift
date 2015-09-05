@@ -203,7 +203,7 @@ class MercatorTileCalc(object):
         return overunder, tilebox
 
     @jit
-    def calc_sampling(self, visible, texture):
+    def calc_sampling(self, visible, texture=None):
         """
         estimate whether we're oversampled, undersampled or well-sampled
         visible.dy, .dx: d(world distance)/d(screen pixels)
@@ -211,11 +211,30 @@ class MercatorTileCalc(object):
         texture pixels / screen pixels = visible / texture
         1:1 is optimal, 2:1 is oversampled, 1:2 is undersampled
         """
+        texture = texture or self.pixel_rez
         tsy = visible.dy / texture.dy
         tsx = visible.dx / texture.dx
         if min(tsy,tsx) <= 0.5: return self.UNDERSAMPLED
         if max(tsy,tsx) >= 2.0: return self.OVERSAMPLED
         return self.WELLSAMPLED
+
+    @jit
+    def calc_stride(self, visible, texture=None):
+        """
+        given world geometry and sampling as a vue or rez tuple
+        calculate a conservative stride value for rendering a set of tiles
+        :param visible: vue or rez with world pixels per screen pixel
+        :param texture: vue or rez with texture resolution as world pixels per screen pixel
+        """
+        # screen dy,dx in world distance per pixel
+        # world distance per pixel for our data
+        # compute texture pixels per screen pixels
+        texture = texture or self.pixel_rez
+        tsy = max(1, np.floor(visible.dy / texture.dy))
+        tsx = max(1, np.floor(visible.dx / texture.dx))
+        ts = min(tsy,tsx)
+        stride = int(ts)
+        return stride
 
     @jit
     def tile_world_box(self, tiy, tix, ny=1, nx=1):
