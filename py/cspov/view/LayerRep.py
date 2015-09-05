@@ -97,13 +97,14 @@ class LayerRep(QObject):
         cache a rendering (typically a draw-list with textures) that best handles the extents and sampling requested
         if more than one view is active, more geometry may be provided for other views
         return False if resources were too limited and a purge is needed among the layer stack
+        :param geom: screen geometry as a vue tuple, world coordinates with d(world)/d(pixel) dy and dx
         """
         return True
 
     def purge(self, geom, *more_geom):
         """
         release any cached representations that we haven't used lately, leaving at most 1
-        return True if any GL resources were released
+        :return: True if any GL resources were released
         """
         return False
 
@@ -141,6 +142,7 @@ class BackgroundRGBWorldTiles(LayerRep):
     shape = None
     calc = None
     tiles = None  # dictionary of {(y,x): GlooRgbTile, ...}
+    _stride = 1
 
     def set_z(self, z):
         super(BackgroundRGBWorldTiles, self).set_z(z)
@@ -170,39 +172,45 @@ class BackgroundRGBWorldTiles(LayerRep):
         self.tiles = {}
         self.model = model
         self.view = view
-        self._generate_tiles()
+        self._generate_tiles()  # FIXME: don't render anything more than a coarse 1024x512, defer high-rez tiles
 
-    def paint(self, geom, mvp, fast=False, **kwargs):
+    def paint(self, visible_geom, mvp, fast=False, **kwargs):
         """
         draw the most appropriate representation for this layer
         if a better representation could be rendered for later draws, return False and render() will be queued for later idle time
         fast flag requests that low-cost rendering be used
         """
-        # tile = self.tiles[(2,2)]
-        # tile.set_mvp(projection=proj)
-        # tile.draw()
-        # return True
-
         for tile in self.tiles.values():  # FIXME: draw only the tiles that are visible in the geom
             # LOG.debug('draw tile {0!r:s}'.format(tile))
             m,v,p = mvp
             tile.set_mvp(m,v,p)
             tile.draw()
-        return True
+        preferred_stride = self.calc.calc_stride(visible_geom)
+        return True if preferred_stride != self._stride else False
 
-    def _generate_tiles(self):
+        # sampling = self.calc.calc_sampling(visible_geom, self._stride)
+        # # LOG.debug('sampling is {}'.format(sampling))
+        # return False if (sampling is self.calc.WELLSAMPLED) else True
+
+    def render(self, geom, *more_geom):
+        "render at a suitable sampling for the screen geometry"
+        stride = self.calc.calc_stride(geom)
+        self._generate_tiles(stride)
+
+    def _generate_tiles(self, stride=None):
         h,w = self.image.shape[:2]
         _, tilebox = self.calc.visible_tiles(WORLD_EXTENT_BOX)
         # LOG.info(tilebox)
-        # FIXME: high tiles are south of equator, leftward instead of up, rightward
         # for tiy in range(int((tilebox.b+tilebox.t)/2), tilebox.t):  DEBUG
         #     for tix in range(int((tilebox.l+tilebox.r)/2), tilebox.r):
+        if stride is not None:
+            self._stride = stride
         for tiy in range(tilebox.b, tilebox.t):
             for tix in range(tilebox.l, tilebox.r):
                 tilegeom = self.calc.tile_world_box(tiy,tix)
                 # if (tilegeom.r+tilegeom.l) < 0 or (tilegeom.b+tilegeom.t) < 0: continue ## DEBUG
                 LOG.debug('y:{0} x:{1} geom:{2!r:s}'.format(tiy,tix,tilegeom))
-                subim = self.calc.tile_pixels(self.image, tiy, tix)
+                subim = self.calc.tile_pixels(self.image, tiy, tix, self._stride)
                 self.tiles[(tiy,tix)] = t = GlooRGBTile(tilegeom, subim)
                 t.set_mvp(model=self.model, view=self.view)
 

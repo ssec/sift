@@ -36,6 +36,8 @@ LOG = logging.getLogger(__name__)
 DEFAULT_TILE_HEIGHT = 512
 DEFAULT_TILE_WIDTH = 512
 
+PREFERRED_SCREEN_TO_TEXTURE_RATIO = 0.5  # screenpx:texturepx that we want to keep, ideally, by striding
+
 R_EQ = 6378.1370  # km
 R_POL = 6356.7523142  # km
 C_EQ = 40075.0170  # linear km
@@ -60,9 +62,9 @@ class MercatorTileCalc(object):
     common calculations for mercator tile groups in an array or file
     tiles are identified by (iy,ix) zero-based indicators
     """
-    OVERSAMPLED=1
-    UNDERSAMPLED=-1
-    WELLSAMPLED=0
+    OVERSAMPLED='oversampled'
+    UNDERSAMPLED='undersampled'
+    WELLSAMPLED='wellsampled'
 
     name = None
     pixel_shape = None
@@ -203,7 +205,7 @@ class MercatorTileCalc(object):
         return overunder, tilebox
 
     @jit
-    def calc_sampling(self, visible, texture):
+    def calc_sampling(self, visible, stride, texture=None):
         """
         estimate whether we're oversampled, undersampled or well-sampled
         visible.dy, .dx: d(world distance)/d(screen pixels)
@@ -211,11 +213,34 @@ class MercatorTileCalc(object):
         texture pixels / screen pixels = visible / texture
         1:1 is optimal, 2:1 is oversampled, 1:2 is undersampled
         """
-        tsy = visible.dy / texture.dy
-        tsx = visible.dx / texture.dx
-        if min(tsy,tsx) <= 0.5: return self.UNDERSAMPLED
-        if max(tsy,tsx) >= 2.0: return self.OVERSAMPLED
+        texture = texture or self.pixel_rez
+        tsy = visible.dy / (texture.dy * float(stride))
+        tsx = visible.dx / (texture.dx * float(stride))
+        if min(tsy,tsx) <= 0.5:
+            LOG.debug('undersampled tsy,tsx = {0:.2f},{1:.2f}'.format(tsy,tsx))
+            return self.UNDERSAMPLED
+        if max(tsy,tsx) >= 2.0:
+            LOG.debug('oversampled tsy,tsx = {0:.2f},{1:.2f}'.format(tsy,tsx))
+            return self.OVERSAMPLED
         return self.WELLSAMPLED
+
+    @jit
+    def calc_stride(self, visible, texture=None):
+        """
+        given world geometry and sampling as a vue or rez tuple
+        calculate a conservative stride value for rendering a set of tiles
+        :param visible: vue or rez with world pixels per screen pixel
+        :param texture: vue or rez with texture resolution as world pixels per screen pixel
+        """
+        # screen dy,dx in world distance per pixel
+        # world distance per pixel for our data
+        # compute texture pixels per screen pixels
+        texture = texture or self.pixel_rez
+        tsy = max(1, np.floor(visible.dy * PREFERRED_SCREEN_TO_TEXTURE_RATIO / texture.dy))
+        tsx = max(1, np.floor(visible.dx * PREFERRED_SCREEN_TO_TEXTURE_RATIO / texture.dx))
+        ts = min(tsy,tsx)
+        stride = int(ts)
+        return stride
 
     @jit
     def tile_world_box(self, tiy, tix, ny=1, nx=1):
@@ -242,13 +267,13 @@ class MercatorTileCalc(object):
         return box(b=b,l=l,t=t,r=r)
 
 
-    def tile_pixels(self, data, tiy, tix):
+    def tile_pixels(self, data, tiy, tix, stride):
         """
         extract pixel data for a given tile
         """
         return data[
-               tiy*self.tile_shape[0]:(tiy+1)*self.tile_shape[0],
-               tix*self.tile_shape[1]:(tix+1)*self.tile_shape[1]
+               tiy*self.tile_shape[0]:(tiy+1)*self.tile_shape[0]:stride,
+               tix*self.tile_shape[1]:(tix+1)*self.tile_shape[1]:stride
                ]
 
 
