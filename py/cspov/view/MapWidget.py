@@ -211,7 +211,7 @@ def test_merc_layers(model, view, fn):
     layer = TiledImageFile(model, view, filename=fn, tile_class=cls)
     # layer.set_alpha(0.5)
     raw_layers.append(layer)
-    return raw_layers
+    return LayerDrawingPlan(raw_layers)
 
 
 def test_layers_from_directory(model, view, layer_tiff_glob):
@@ -228,7 +228,7 @@ def test_layers_from_directory(model, view, layer_tiff_glob):
     for tif in glob(layer_tiff_glob):
         layer = TiledImageFile(model, view, tif, tile_class=GlooColormapDataTile)
         layers.append(layer)
-    return layers
+    return LayerDrawingPlan(layers)
 
 def test_layers(model, view):
     if 'TIFF_GLOB' in os.environ:
@@ -245,6 +245,8 @@ class CspovMainMapWidget(app.Canvas):
 
     # members
     _activity_stack = None  # Activity object stack which we push/pop for primary activity; activity[-1] is what we're currently doing
+    _animation_timer = None  # animation cycling
+    _frame_number = 0
     layers = None  # layers we're currently displaying, last on top
     viewport = None  # box with world coordinates of what we're showing
 
@@ -270,14 +272,41 @@ class CspovMainMapWidget(app.Canvas):
         gloo.set_clear_color((0.2, 0.2, 0.2, 1))
         gloo.set_state(depth_test=True)
 
-        raw_layers = test_layers(self.model, self.view)
-        # raw_layers.append(BackgroundRGBWorldTiles(self.model, self.view))
-        self.layers = LayerDrawingPlan(raw_layers)
+        # FIXME: drawing plan will get moved outside the constructor;
+        # application will construct it and it will be managed either by the document or from the document
+        self.layers = test_layers(self.model, self.view)
 
-        # self._timer = app.Timer('auto', connect=self.update_transforms)
+        self._animation_timer = app.Timer(1.0/10.0, connect=self.next_frame)
         # self._timer.start()
 
         self.show()
+
+    def next_frame(self, event=None, frame_number=None):
+        """
+        skip to the frame (from 0) or increment one frame and update
+        typically this is run by self._animation_timer
+        :param frame_number: optional frame to go to, from 0
+        :return:
+        """
+        frame = frame_number if isinstance(frame_number, int) else self._frame_number + 1
+        # FIXME: two places to store frame - redundant?
+        self._frame_number = self.layers.frame_number = frame
+        self.update()
+
+    def set_animating(self, animating=True):
+        if animating:
+            if isinstance(self.activity, Animating):
+                return
+            self._activity_stack.append(Animating(self))
+            self.layers.frame_number = self._frame_number
+            self.layers.animating = True
+            self._animation_timer.start()
+        else:
+            if not isinstance(self.activity, Animating):
+                return
+            self._animation_timer.stop()
+            self.layers.animating = False
+            self._activity_stack.pop()
 
     @property
     def activity(self):
@@ -431,11 +460,13 @@ class CspovMainMapWidget(app.Canvas):
     #     self.canvas.program.set_shaders(vert_code, frag_code)
 
 
-    def key_press(self, key):
+    def on_key_press(self, key):
         print('down', repr(key))
 
-    def key_release(self, key):
+    def on_key_release(self, key):
         print('up', repr(key))
+        if key.text=='a':  # toggle whether to animate or not
+            self.set_animating(not isinstance(self.activity, Animating))
 
     def on_mouse_release(self, event):
         event = event.native  # FIXME: stop using .native, send the vispy event and refactor the Activities
