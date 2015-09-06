@@ -67,6 +67,8 @@ class LayerDrawingPlan(QObject):
 
     _layerlist = None
     _animationloop = None  # list of lists:
+    frame_number = 0  # animation frame we're drawing
+    animating = False  # whether we're animating or not
 
 
     def __init__(self, init_layers=None):
@@ -75,6 +77,12 @@ class LayerDrawingPlan(QObject):
 
 
     def __iter__(self):
+        # FIXME: this is an animation test pattern
+        if self.animating:
+            todraw = self._layerlist[self.frame_number % len(self._layerlist)]
+            todraw.z = 0
+            yield todraw
+            return
         for level,layer in enumerate(reversed(self._layerlist)):
             layer.z = float(level)
             yield layer
@@ -106,6 +114,7 @@ class LayerDrawingPlan(QObject):
         new_list = [self._layerlist[dex] for dex in order]
         self._layerlist = new_list
         self.layerStackDidChangeOrder.emit(tuple(order))
+
 
 
     # @property

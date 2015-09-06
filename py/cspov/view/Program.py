@@ -162,7 +162,7 @@ class GlooTile(object):
     def get_colormap(self):
         return None
 
-    def set_colormap(self):
+    def set_colormap(self, colormap):
         """
         Color map may be updated interactively and should be pushed to the GPU for impending redraw
         :return:
@@ -228,7 +228,7 @@ class GlooRGBImageTile(GlooTile):
 
 
 # FIXME: u_z and u_alpha need to be present in all frag shaders for subclasses of GlooTile; is this good?
-# FIXME: allow color map to include alpha instead of just RGB
+# FIXME: allow color map to include alpha instead of just RGB - and multiply through with u_alpha
 # FIXME: auto_range right now only is taking into account the local tile, not the whole image
 # modified from imshow_cuts.py
 COLORMAP_FRAG_SHADER = """

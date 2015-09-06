@@ -201,28 +201,40 @@ class Animating(MapWidgetActivity):
     """
 
 
+def test_merc_layers(model, view, fn):
+    # FIXME: pass in the Layers object rather than building it right here (test pattern style)
+    raw_layers = []  # front to back
+    LOG.info('loading {}'.format(fn))
+    from .Program import GlooRGBImageTile, GlooColormapDataTile
+    cls = GlooRGBImageTile if (fn is None or fn.endswith('.jpg') or fn.endswith('.png')) else GlooColormapDataTile
+    # cls = GlooColormapDataTile if (fn is not None and fn.endswith('.tif')) else GlooRGBImageTile
+    layer = TiledImageFile(model, view, filename=fn, tile_class=cls)
+    # layer.set_alpha(0.5)
+    raw_layers.append(layer)
+    return LayerDrawingPlan(raw_layers)
 
 
-#
-# class TestSingleImageLayer(Layer):
-#
-#     def __init__(self, **kwargs):
-#         super(TestImageLayer, self).__init__(**kwargs)
-#         self.image = Program(image_vertex, image_fragment, 4)
-#         self.image['position'] = (-1, -1), (-1, +1), (+1, -1), (+1, +1)
-#         self.image['texcoord'] = (0, 0), (0, +1), (+1, 0), (+1, +1)
-#         self.image['vmin'] = +0.0
-#         self.image['vmax'] = +1.0
-#         self.image['cmap'] = 0  # Colormap index to use
-#         self.image['colormaps'] = colormaps
-#         self.image['n_colormaps'] = colormaps.shape[0]
-#         self.image['image'] = I.astype('float32')
-#         self.image['image'].interpolation = 'linear'
+def test_layers_from_directory(model, view, layer_tiff_glob):
+    """
+    TIFF_GLOB='/Users/keoni/Data/CSPOV/2015_07_14_195/00?0/HS*_B03_*merc.tif' VERBOSITY=3 python -m cspov
+    :param model:
+    :param view:
+    :param layer_tiff_glob:
+    :return:
+    """
+    from glob import glob
+    from .Program import GlooRGBImageTile, GlooColormapDataTile
+    layers = []
+    for tif in glob(layer_tiff_glob):
+        layer = TiledImageFile(model, view, tif, tile_class=GlooColormapDataTile)
+        layers.append(layer)
+    return LayerDrawingPlan(layers)
 
-
-
-
-
+def test_layers(model, view):
+    if 'TIFF_GLOB' in os.environ:
+        return test_layers_from_directory(model, view, os.environ['TIFF_GLOB'])
+    elif 'MERC' in os.environ:
+        return test_merc_layers(model, view, os.environ.get('MERC', None))
 
 
 
@@ -233,6 +245,8 @@ class CspovMainMapWidget(app.Canvas):
 
     # members
     _activity_stack = None  # Activity object stack which we push/pop for primary activity; activity[-1] is what we're currently doing
+    _animation_timer = None  # animation cycling
+    _frame_number = 0
     layers = None  # layers we're currently displaying, last on top
     viewport = None  # box with world coordinates of what we're showing
 
@@ -251,38 +265,48 @@ class CspovMainMapWidget(app.Canvas):
         rad = MAX_EXCURSION_X/2
         self.viewport = vp = box(l=-rad, r=rad, b=-rad*aspect, t=rad*aspect)
 
-        # self._testtile = GlooRGBTile(world_box=WORLD_EXTENT_BOX,
-        #                              image=spm.imread('cspov/data/shadedrelief.jpg') )
-        #                              # image_box=box(b=3000, t=3512, l=3000, r=4024))
-
         # Handle transformations
         self.init_transforms()
         self.update_proj()
 
-        # FIXME: pass in the Layers object rather than building it right here (test pattern style)
-        raw_layers = []  # front to back
-        fn = os.environ.get('MERC', None)
-        # if fn:
-        LOG.info('loading {}'.format(fn))
-        from .Program import GlooRGBImageTile, GlooColormapDataTile
-        cls = GlooRGBImageTile if (fn is None or fn.endswith('.jpg') or fn.endswith('.png')) else GlooColormapDataTile
-        # cls = GlooColormapDataTile if (fn is not None and fn.endswith('.tif')) else GlooRGBImageTile
-        layer = TiledImageFile(self.model, self.view, filename=fn, tile_class=cls)
-        layer.set_alpha(0.5)
-        raw_layers.append(layer)
-        # raw_layers.append(BackgroundRGBWorldTiles(self.model, self.view))
-        self.layers = LayerDrawingPlan(raw_layers)
-        # import os
-        # fn = os.path.expanduser('~/Data/CSPOV/2015_07_14_195/0400/HS_H08_20150714_0400_B03_FLDK_R20.merc.tif')
-        # self.layers = LayerStack([BackgroundRGBWorldTiles(self.model, self.view, fn)])
-
         gloo.set_clear_color((0.2, 0.2, 0.2, 1))
         gloo.set_state(depth_test=True)
 
-        # self._timer = app.Timer('auto', connect=self.update_transforms)
+        # FIXME: drawing plan will get moved outside the constructor;
+        # application will construct it and it will be managed either by the document or from the document
+        self.layers = test_layers(self.model, self.view)
+
+        self._animation_timer = app.Timer(1.0/10.0, connect=self.next_frame)
         # self._timer.start()
 
         self.show()
+
+    def next_frame(self, event=None, frame_number=None):
+        """
+        skip to the frame (from 0) or increment one frame and update
+        typically this is run by self._animation_timer
+        :param frame_number: optional frame to go to, from 0
+        :return:
+        """
+        frame = frame_number if isinstance(frame_number, int) else self._frame_number + 1
+        # FIXME: two places to store frame - redundant?
+        self._frame_number = self.layers.frame_number = frame
+        self.update()
+
+    def set_animating(self, animating=True):
+        if animating:
+            if isinstance(self.activity, Animating):
+                return
+            self._activity_stack.append(Animating(self))
+            self.layers.frame_number = self._frame_number
+            self.layers.animating = True
+            self._animation_timer.start()
+        else:
+            if not isinstance(self.activity, Animating):
+                return
+            self._animation_timer.stop()
+            self.layers.animating = False
+            self._activity_stack.pop()
 
     @property
     def activity(self):
@@ -436,11 +460,13 @@ class CspovMainMapWidget(app.Canvas):
     #     self.canvas.program.set_shaders(vert_code, frag_code)
 
 
-    def key_press(self, key):
+    def on_key_press(self, key):
         print('down', repr(key))
 
-    def key_release(self, key):
+    def on_key_release(self, key):
         print('up', repr(key))
+        if key.text=='a':  # toggle whether to animate or not
+            self.set_animating(not isinstance(self.activity, Animating))
 
     def on_mouse_release(self, event):
         event = event.native  # FIXME: stop using .native, send the vispy event and refactor the Activities
