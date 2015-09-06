@@ -201,28 +201,40 @@ class Animating(MapWidgetActivity):
     """
 
 
+def test_merc_layers(model, view, fn):
+    # FIXME: pass in the Layers object rather than building it right here (test pattern style)
+    raw_layers = []  # front to back
+    LOG.info('loading {}'.format(fn))
+    from .Program import GlooRGBImageTile, GlooColormapDataTile
+    cls = GlooRGBImageTile if (fn is None or fn.endswith('.jpg') or fn.endswith('.png')) else GlooColormapDataTile
+    # cls = GlooColormapDataTile if (fn is not None and fn.endswith('.tif')) else GlooRGBImageTile
+    layer = TiledImageFile(model, view, filename=fn, tile_class=cls)
+    layer.set_alpha(0.5)
+    raw_layers.append(layer)
+    return raw_layers
 
 
-#
-# class TestSingleImageLayer(Layer):
-#
-#     def __init__(self, **kwargs):
-#         super(TestImageLayer, self).__init__(**kwargs)
-#         self.image = Program(image_vertex, image_fragment, 4)
-#         self.image['position'] = (-1, -1), (-1, +1), (+1, -1), (+1, +1)
-#         self.image['texcoord'] = (0, 0), (0, +1), (+1, 0), (+1, +1)
-#         self.image['vmin'] = +0.0
-#         self.image['vmax'] = +1.0
-#         self.image['cmap'] = 0  # Colormap index to use
-#         self.image['colormaps'] = colormaps
-#         self.image['n_colormaps'] = colormaps.shape[0]
-#         self.image['image'] = I.astype('float32')
-#         self.image['image'].interpolation = 'linear'
+def test_layers_from_directory(model, view, layer_tiff_glob):
+    """
+    TIFF_GLOB='/Users/keoni/Data/CSPOV/2015_07_14_195/00?0/HS*_B03_*merc.tif' VERBOSITY=3 python -m cspov
+    :param model:
+    :param view:
+    :param layer_tiff_glob:
+    :return:
+    """
+    from glob import glob
+    from .Program import GlooRGBImageTile, GlooColormapDataTile
+    layers = []
+    for tif in glob(layer_tiff_glob):
+        layer = TiledImageFile(model, view, tif, tile_class=GlooColormapDataTile)
+        layers.append(layer)
+    return layers
 
-
-
-
-
+def test_layers(model, view):
+    if 'TIFF_GLOB' in os.environ:
+        return test_layers_from_directory(model, view, os.environ['TIFF_GLOB'])
+    elif 'MERC' in os.environ:
+        return test_merc_layers(model, view, os.environ.get('MERC', None))
 
 
 
@@ -251,33 +263,16 @@ class CspovMainMapWidget(app.Canvas):
         rad = MAX_EXCURSION_X/2
         self.viewport = vp = box(l=-rad, r=rad, b=-rad*aspect, t=rad*aspect)
 
-        # self._testtile = GlooRGBTile(world_box=WORLD_EXTENT_BOX,
-        #                              image=spm.imread('cspov/data/shadedrelief.jpg') )
-        #                              # image_box=box(b=3000, t=3512, l=3000, r=4024))
-
         # Handle transformations
         self.init_transforms()
         self.update_proj()
 
-        # FIXME: pass in the Layers object rather than building it right here (test pattern style)
-        raw_layers = []  # front to back
-        fn = os.environ.get('MERC', None)
-        # if fn:
-        LOG.info('loading {}'.format(fn))
-        from .Program import GlooRGBImageTile, GlooColormapDataTile
-        cls = GlooRGBImageTile if (fn is None or fn.endswith('.jpg') or fn.endswith('.png')) else GlooColormapDataTile
-        # cls = GlooColormapDataTile if (fn is not None and fn.endswith('.tif')) else GlooRGBImageTile
-        layer = TiledImageFile(self.model, self.view, filename=fn, tile_class=cls)
-        layer.set_alpha(0.5)
-        raw_layers.append(layer)
-        # raw_layers.append(BackgroundRGBWorldTiles(self.model, self.view))
-        self.layers = LayerDrawingPlan(raw_layers)
-        # import os
-        # fn = os.path.expanduser('~/Data/CSPOV/2015_07_14_195/0400/HS_H08_20150714_0400_B03_FLDK_R20.merc.tif')
-        # self.layers = LayerStack([BackgroundRGBWorldTiles(self.model, self.view, fn)])
-
         gloo.set_clear_color((0.2, 0.2, 0.2, 1))
         gloo.set_state(depth_test=True)
+
+        raw_layers = test_layers(self.model, self.view)
+        # raw_layers.append(BackgroundRGBWorldTiles(self.model, self.view))
+        self.layers = LayerDrawingPlan(raw_layers)
 
         # self._timer = app.Timer('auto', connect=self.update_transforms)
         # self._timer.start()
