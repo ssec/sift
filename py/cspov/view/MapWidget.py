@@ -209,7 +209,7 @@ def test_merc_layers(model, view, fn):
     cls = GlooRGBImageTile if (fn is None or fn.endswith('.jpg') or fn.endswith('.png')) else GlooColormapDataTile
     # cls = GlooColormapDataTile if (fn is not None and fn.endswith('.tif')) else GlooRGBImageTile
     layer = TiledImageFile(model, view, filename=fn, tile_class=cls)
-    layer.set_alpha(0.5)
+    # layer.set_alpha(0.5)
     raw_layers.append(layer)
     return raw_layers
 

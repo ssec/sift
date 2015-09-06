@@ -141,7 +141,7 @@ class MercatorTileCalc(object):
         Z = self.pixel_rez
 
         # convert world coords to pixel coords
-        py0, px0 = self.extents_box.b, self.extents_box.l
+        # py0, px0 = self.extents_box.b, self.extents_box.l
 
         # pixel view b
         pv = box(
@@ -153,8 +153,8 @@ class MercatorTileCalc(object):
 
         # number of tiles wide and high we'll absolutely need
         th,tw = self.tile_shape
-        nth = int(np.ceil((pv.t - pv.b) / th))
-        ntw = int(np.ceil((pv.r - pv.l) / tw))
+        nth = int(np.ceil((pv.t - pv.b) / th)) + 1  # FIXME: is the +1 correct?
+        ntw = int(np.ceil((pv.r - pv.l) / tw)) + 1
 
         # first tile we'll need is (tiy0,tix0)
         tiy0 = int(np.floor(pv.b / th))
@@ -190,10 +190,11 @@ class MercatorTileCalc(object):
 
         # FIXME: use vue() instead of box() to represent visible geometry,
         #        so we can estimate sampledness and decide when to re-render
-        if not isinstance(visible_geom, vue):
-            overunder = None
-        else:  # use dy/dx to calculate texture pixels to screen pixels ratio
-            overunder = self.calc_sampling(visible_geom, Z)
+        overunder = None
+        # if not isinstance(visible_geom, vue):
+        #     overunder = None
+        # else:  # use dy/dx to calculate texture pixels to screen pixels ratio
+        #     overunder = self.calc_sampling(visible_geom, Z)
 
         tilebox = box(
             b = int(tiy0),

@@ -186,17 +186,18 @@ class TiledImageFile(LayerRep):
         if a better representation could be rendered for later draws, return False and render() will be queued for later idle time
         fast flag requests that low-cost rendering be used
         """
-        for tile in self.tiles.values():  # FIXME: draw only the tiles that are visible in the geom
-            # LOG.debug('draw tile {0!r:s}'.format(tile))
-            m,v,p = mvp
-            tile.set_mvp(m,v,p)
-            tile.draw()
+        _, tilebox = self.calc.visible_tiles(visible_geom)
+        # LOG.info(tilebox)
+        # print(repr(tilebox))
+        for iy in range(tilebox.b, tilebox.t):
+            for ix in range(tilebox.l, tilebox.r):
+                tile = self.tiles[(iy,ix)]
+                # LOG.debug('draw tile {0!r:s}'.format(tile))
+                # m,v,p = mvp
+                tile.set_mvp(*mvp)
+                tile.draw()
         preferred_stride = self.calc.calc_stride(visible_geom)
         return True if preferred_stride != self._stride else False
-
-        # sampling = self.calc.calc_sampling(visible_geom, self._stride)
-        # # LOG.debug('sampling is {}'.format(sampling))
-        # return False if (sampling is self.calc.WELLSAMPLED) else True
 
     def render(self, geom, *more_geom):
         "render at a suitable sampling for the screen geometry"
