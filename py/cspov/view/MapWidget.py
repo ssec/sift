@@ -214,7 +214,7 @@ def test_merc_layers(model, view, fn):
     return LayerDrawingPlan(raw_layers)
 
 
-def test_layers_from_directory(model, view, layer_tiff_glob):
+def test_layers_from_directory(model, view, layer_tiff_glob, range_txt=None):
     """
     TIFF_GLOB='/Users/keoni/Data/CSPOV/2015_07_14_195/00?0/HS*_B03_*merc.tif' VERBOSITY=3 python -m cspov
     :param model:
@@ -225,14 +225,19 @@ def test_layers_from_directory(model, view, layer_tiff_glob):
     from glob import glob
     from .Program import GlooRGBImageTile, GlooColormapDataTile
     layers = []
+    range = None
+    if range_txt:
+        import re
+        range = tuple(map(float, re.findall(r'[\.0-9]+', range_txt)))
+
     for tif in glob(layer_tiff_glob):
-        layer = TiledImageFile(model, view, tif, tile_class=GlooColormapDataTile)
+        layer = TiledImageFile(model, view, tif, tile_class=GlooColormapDataTile, range=range)
         layers.append(layer)
     return LayerDrawingPlan(layers)
 
 def test_layers(model, view):
     if 'TIFF_GLOB' in os.environ:
-        return test_layers_from_directory(model, view, os.environ['TIFF_GLOB'])
+        return test_layers_from_directory(model, view, os.environ['TIFF_GLOB'], os.environ.get('RANGE',None))
     elif 'MERC' in os.environ:
         return test_merc_layers(model, view, os.environ.get('MERC', None))
 
