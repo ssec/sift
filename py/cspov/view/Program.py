@@ -325,7 +325,7 @@ class GlooColormapDataTile(GlooTile):
             self.set_world_box(world_box)
         self.set_colormap(colormap or COLORMAPS)
         if range is not None:
-            self.set_range(*range)
+            self.set_range(range)
         else:
             self.auto_range()
         if kwargs:
@@ -352,17 +352,18 @@ class GlooColormapDataTile(GlooTile):
     def auto_range(self, field=None):
         field = field or self.image
         range = np.nanmin(field), np.nanmax(field)
-        # print('>>>>>', repr(range))
+        LOG.debug('autorange {}'.format(repr(range)))
         # range = (0.0, 255.0)  # FIXME DEBUG
         self.set_range(*range)
 
     def get_range(self):
         return self._range
 
-    def set_range(self, min_value, max_value):
-        self._range = (min_value, max_value)
-        self.program['vmin'] = min_value
-        self.program['vmax'] = max_value
+    def set_range(self, new_range):
+        LOG.debug('range {}'.format(repr(new_range)))
+        vmin, vmax = new_range
+        self.program['vmin'] = vmin
+        self.program['vmax'] = vmax
 
 
     def get_colormap(self):

@@ -143,6 +143,7 @@ class TiledImageFile(LayerRep):
     calc = None
     tiles = None  # dictionary of {(y,x): GlooRgbTile, ...}
     _stride = 1
+    _tile_kwargs = {}
 
     def set_z(self, z):
         super(TiledImageFile, self).set_z(z)
@@ -154,9 +155,10 @@ class TiledImageFile(LayerRep):
             tile.alpha = alpha
         super(TiledImageFile, self).set_alpha(alpha)
 
-    def __init__(self, model, view, filename=None, world_box=None, tile_shape=None, tile_class=GlooRGBImageTile):
+    def __init__(self, model, view, filename=None, world_box=None, tile_shape=None, tile_class=GlooRGBImageTile, **kwargs):
         super(TiledImageFile, self).__init__()
         self._tile_class = tile_class
+        self._tile_kwargs = dict(kwargs)  # FUTURE this is too cryptic, initially used to propagate range default
         self.image = spm.imread(filename or 'cspov/data/shadedrelief.jpg')  # FIXME package resource
         self.image = self.image[::-1]  # flip so 0,0 is bottom left instead of top left
         if filename is None:
@@ -218,7 +220,7 @@ class TiledImageFile(LayerRep):
                 # if (tilegeom.r+tilegeom.l) < 0 or (tilegeom.b+tilegeom.t) < 0: continue ## DEBUG
                 LOG.debug('y:{0} x:{1} geom:{2!r:s}'.format(tiy,tix,tilegeom))
                 subim = self.calc.tile_pixels(self.image, tiy, tix, self._stride)
-                self.tiles[(tiy,tix)] = t = self._tile_class(tilegeom, subim)
+                self.tiles[(tiy,tix)] = t = self._tile_class(tilegeom, subim, **self._tile_kwargs)
                 t.set_mvp(model=self.model, view=self.view)
 
 
