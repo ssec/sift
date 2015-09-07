@@ -356,7 +356,7 @@ class GlooColormapDataTile(GlooTile):
         range = np.nanmin(field), np.nanmax(field)
         LOG.debug('autorange {}'.format(repr(range)))
         # range = (0.0, 255.0)  # FIXME DEBUG
-        self.set_range(*range)
+        self.set_range(range)
 
     def get_range(self):
         return self._range

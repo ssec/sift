@@ -28,14 +28,14 @@ import logging, unittest, argparse
 LOG = logging.getLogger(__name__)
 
 
-class LayerStackAsListWidget(QObject):
+class ListWidgetChangesLayerStack(QObject):
     """ behavior connecting list widget to layer stack (both ways)
     """
     widget = None
     stack = None
 
     def __init__(self, widget, stack):
-        super(LayerStackAsListWidget, self).__init__()
+        super(ListWidgetChangesLayerStack, self).__init__()
         self.widget = widget
         self.stack = stack
         self.updateList()

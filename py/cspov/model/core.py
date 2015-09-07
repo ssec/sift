@@ -6,7 +6,7 @@ cspov.model.core
 
 PURPOSE
 Core (low-level) document model for CSPOV.
-The core is typically accessed via Facets, which are like database views for a specific group of use cases
+The core is sometimes accessed via Facets, which are like database views for a specific group of use cases
 
 The document model is a metadata representation which permits the workspace to be constructed and managed.
 
@@ -23,52 +23,85 @@ sqlalchemy
 :copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
+
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import os, sys
-import logging, unittest, argparse
+import sys
+import logging
+import unittest
+import argparse
+
+from PyQt4.QtCore import QObject, pyqtSignal
+from ..view.LayerDrawingPlan import LayerDrawingPlan
 
 LOG = logging.getLogger(__name__)
 
-class CoreDocument(object):
+class VizDoc(QObject):
     """
     low level queries
     event handling
     cross-process concurrency
     lazy updates
     """
+    docDidChangeLayer = pyqtSignal(str)  # add/remove
+    docDidChangeLayerOrder = pyqtSignal(str)
+    docDidChangeEnhancement = pyqtSignal(str)  # includes colormaps
+    docDidChangeShape = pyqtSignal(str)
+
+    _drawing_plan = None
+
+    @property
+    def asLayerDrawingPlan(self):
+        return self._drawing_plan
+
+
+    def __init__(self, **kwargs):
+        super(VizDoc, self).__init__(**kwargs)
+        self._drawing_plan = LayerDrawingPlan()
+
+
+
+
+class PrefsDoc(QObject):
+    """
+    Preferences doc. Holds many of the same resources, but not a layer stack.
+    """
     pass
 
 
-class Source(object):
+class DocElement(QObject):
+    pass
+
+
+class Source(DocElement):
     """
     is effectively a URI containing data we wish to convert to a Resource and visualize
     a helper/plugin is often used to render the source into the workspace
     """
 
-class Resource(object):
+class Dataset(DocElement):
     """
     is a Source rendered in such a way that the display engine can realize it rapidly.
     """
 
-class Layer(object):
+class Layer(DocElement):
     pass
 
 
-class LayerStack(object):
+class LayerStack(DocElement):
     pass
 
 
-class Shape(object):
+class Shape(DocElement):
     pass
 
 
-class Tool(object):
+class Tool(DocElement):
     pass
 
 
-class Transform(object):
+class Transform(DocElement):
     """
     Metadata describing a transform of multiple Resources to a virtual Resource
     """
@@ -108,3 +141,5 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
+

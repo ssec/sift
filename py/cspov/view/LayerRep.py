@@ -134,6 +134,7 @@ class MercatorTiffTileLayer(LayerRep):
         self.pathname = pathname
 
 
+# FIXME: replace this with a LayerRepFactory which tracks all the GPU resources that have been dedicated?
 class TiledImageFile(LayerRep):
     """
     Tile an RGB or float32 image representing the full -180..180 longitude, -90..90 latitude
@@ -155,7 +156,7 @@ class TiledImageFile(LayerRep):
             tile.alpha = alpha
         super(TiledImageFile, self).set_alpha(alpha)
 
-    def __init__(self, model, view, filename=None, world_box=None, tile_shape=None, tile_class=GlooRGBImageTile, **kwargs):
+    def __init__(self, filename=None, world_box=None, tile_shape=None, tile_class=GlooRGBImageTile, **kwargs):
         super(TiledImageFile, self).__init__()
         self._tile_class = tile_class
         self._tile_kwargs = dict(kwargs)  # FUTURE this is too cryptic, initially used to propagate range default
@@ -173,8 +174,6 @@ class TiledImageFile(LayerRep):
         pixel_rez = rez(MAX_EXCURSION_Y*2/float(h), MAX_EXCURSION_X*2/float(w))
         self.calc = MercatorTileCalc('bgnd', self.shape, zero_point, pixel_rez, tile_shape)
         self.tiles = {}
-        self.model = model
-        self.view = view
         # start with a very coarse representation that fits in minimal tiles
         tinyworld = vue(*WORLD_EXTENT_BOX,
                         dy=MAX_EXCURSION_Y*2/DEFAULT_TILE_HEIGHT,
@@ -221,7 +220,7 @@ class TiledImageFile(LayerRep):
                 LOG.debug('y:{0} x:{1} geom:{2!r:s}'.format(tiy,tix,tilegeom))
                 subim = self.calc.tile_pixels(self.image, tiy, tix, self._stride)
                 self.tiles[(tiy,tix)] = t = self._tile_class(tilegeom, subim, **self._tile_kwargs)
-                t.set_mvp(model=self.model, view=self.view)
+                # t.set_mvp(model=self.model, view=self.view)
 
 
 
