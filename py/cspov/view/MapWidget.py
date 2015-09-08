@@ -263,9 +263,12 @@ class CspovMainMapWidget(app.Canvas):
         if animating and not self._animating:
             self._animating = True
             self._animation_timer.start()
+            LOG.info("animation on")
         elif not animating and self._animating:
             self._animation_timer.stop()
             self._frame_number = 0
+            self._animating = False
+            LOG.info("animation off")
 
     @property
     def activity(self):
@@ -421,10 +424,11 @@ class CspovMainMapWidget(app.Canvas):
 
 
     def on_key_press(self, key):
-        print('down', repr(key))
+        # print('down', repr(key))
+        pass
 
     def on_key_release(self, key):
-        print('up', repr(key))
+        # print('up', repr(key))
         if key.text=='a':  # toggle whether to animate or not
             self.set_animating(None)  # toggle
 
