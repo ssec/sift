@@ -194,7 +194,7 @@ class Idling(MapWidgetActivity):
         return UserZoomingMap(self.main)
 
 
-class Animating(MapWidgetActivity):
+class Animating(Idling):
     """
     When we're doing an animation cycle
     :param Behavior:
@@ -210,6 +210,7 @@ class CspovMainMapWidget(app.Canvas):
     # members
     _activity_stack = None  # Activity object stack which we push/pop for primary activity; activity[-1] is what we're currently doing
     _animation_timer = None  # animation cycling
+    _animating = False
     _frame_number = 0
     drawing_plan = None  # LayerDrawingPlan we're currently displaying, last on top
     viewport = None  # box with world coordinates of what we're showing
@@ -253,24 +254,18 @@ class CspovMainMapWidget(app.Canvas):
         :return:
         """
         frame = frame_number if isinstance(frame_number, int) else self._frame_number + 1
-        # FIXME: two places to store frame - redundant?
-        self._frame_number = self.drawing_plan.frame_number = frame
+        self._frame_number = frame
         self.update()
 
     def set_animating(self, animating=True):
-        if animating:
-            if isinstance(self.activity, Animating):
-                return
-            self._activity_stack.append(Animating(self))
-            self.drawing_plan.frame_number = self._frame_number
-            self.drawing_plan.animating = True
+        if animating is None:
+            animating = not self._animating
+        if animating and not self._animating:
+            self._animating = True
             self._animation_timer.start()
-        else:
-            if not isinstance(self.activity, Animating):
-                return
+        elif not animating and self._animating:
             self._animation_timer.stop()
-            self.drawing_plan.animating = False
-            self._activity_stack.pop()
+            self._frame_number = 0
 
     @property
     def activity(self):
@@ -398,8 +393,8 @@ class CspovMainMapWidget(app.Canvas):
         mvp = self.model, self.view, self.projection
         visible_geom = self._vueport()
         render_candidates = []
-        LOG.info('drawing {} layers'.format(len(self.drawing_plan)))
-        for layer in self.drawing_plan:
+        # LOG.info('drawing {} layers'.format(len(self.drawing_plan)))
+        for layer in self.drawing_plan(self._frame_number if self._animating else None):
             if layer.paint(visible_geom, mvp): # then we should re-render
                 render_candidates.append(layer)
         if render_candidates:
@@ -431,7 +426,7 @@ class CspovMainMapWidget(app.Canvas):
     def on_key_release(self, key):
         print('up', repr(key))
         if key.text=='a':  # toggle whether to animate or not
-            self.set_animating(not isinstance(self.activity, Animating))
+            self.set_animating(None)  # toggle
 
     def on_mouse_release(self, event):
         event = event.native  # FIXME: stop using .native, send the vispy event and refactor the Activities

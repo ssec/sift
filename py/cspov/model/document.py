@@ -33,37 +33,74 @@ import unittest
 import argparse
 
 from PyQt4.QtCore import QObject, pyqtSignal
-from ..view.LayerDrawingPlan import LayerDrawingPlan
+
+# FIXME: move these out of the document and into a factory
+from ..view.LayerRep import TiledImageFile
+from ..view.Program import GlooColormapDataTile, GlooRGBImageTile
+
+from .probes import Probe, Shape
+
 
 LOG = logging.getLogger(__name__)
 
-class VizDoc(QObject):
+class Document(QObject):
     """
     low level queries
     event handling
     cross-process concurrency
     lazy updates
     """
-    docDidChangeLayer = pyqtSignal(str)  # add/remove
-    docDidChangeLayerOrder = pyqtSignal(str)
-    docDidChangeEnhancement = pyqtSignal(str)  # includes colormaps
-    docDidChangeShape = pyqtSignal(str)
+    docDidChangeLayer = pyqtSignal(dict)  # add/remove
+    docDidChangeLayerOrder = pyqtSignal(dict)
+    docDidChangeEnhancement = pyqtSignal(dict)  # includes colormaps
+    docDidChangeShape = pyqtSignal(dict)
 
-    _drawing_plan = None
-
-    @property
-    def asLayerDrawingPlan(self):
-        return self._drawing_plan
+    _layer_reps = None
 
 
     def __init__(self, **kwargs):
-        super(VizDoc, self).__init__(**kwargs)
-        self._drawing_plan = LayerDrawingPlan()
+        super(Document, self).__init__(**kwargs)
+        self._layer_reps = []  # LayerStack(self)
 
 
+    def asDrawingPlan(self, frame=None):
+        """
+        delegate callable yielding a sequence of LayerReps to draw
+        """
+        if frame is not None:
+            yield self._layer_reps[frame % len(self._layer_reps)]
+            return
+        for layer_rep in self._layer_reps:
+            yield layer_rep
 
 
-class PrefsDoc(QObject):
+    def asListing(self):
+        for q in self._layer_reps:
+            yield {'name': q.name}
+
+
+    def addRGBImageLayer(self, filename, range=None):
+        rep = TiledImageFile(filename, tile_class=GlooRGBImageTile)
+        self._layer_reps.append(rep)
+        self.docDidChangeLayer.emit({'filename': filename})
+
+
+    def addFullGlobMercatorColormappedFloatImageLayer(self, filename, range=None):
+        rep = TiledImageFile(filename, tile_class=GlooColormapDataTile, range=range)
+        self._layer_reps.append(rep)
+        self.docDidChangeLayer.emit({'filename': filename})
+
+#
+#     def swap(self, adex, bdex):
+#         order = list(range(len(self)))
+#         order[bdex], order[adex] = adex, bdex
+#         new_list = [self._layerlist[dex] for dex in order]
+#         self._layerlist = new_list
+#         # self.layerStackDidChangeOrder.emit(tuple(order))
+#
+
+
+class Preferences(QObject):
     """
     Preferences doc. Holds many of the same resources, but not a layer stack.
     """
@@ -86,10 +123,6 @@ class Dataset(DocElement):
     """
 
 class Layer(DocElement):
-    pass
-
-
-class LayerStack(DocElement):
     pass
 
 
