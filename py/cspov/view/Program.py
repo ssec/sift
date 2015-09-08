@@ -247,7 +247,9 @@ varying vec2 v_texcoord;
 // http://stackoverflow.com/questions/11810158/how-to-deal-with-nan-or-inf-in-opengl-es-2-0-shaders
 bool isNan(float val)
 {
-  return (val <= 0.0 || 0.0 <= val) ? false : true; // all comparisons on NaN return false
+  return (val <= 0.0 || 0.0 <= val) ? false : true;
+  // all comparisons on NaN return false. Note this may not work on sloppy non-IEEE754 GPUs! (Crap.)
+  // also note that isnan isn't part of GLSL standard in 2.0, but we get isnan and isinf later.
 }
 
 void main()
@@ -354,7 +356,7 @@ class GlooColormapDataTile(GlooTile):
         range = np.nanmin(field), np.nanmax(field)
         LOG.debug('autorange {}'.format(repr(range)))
         # range = (0.0, 255.0)  # FIXME DEBUG
-        self.set_range(*range)
+        self.set_range(range)
 
     def get_range(self):
         return self._range

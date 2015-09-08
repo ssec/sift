@@ -17,15 +17,16 @@ REQUIRES
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-import os,sys
-from PyQt4.QtCore import pyqtSignal, QTimer
+from PyQt4.QtCore import QTimer
 from vispy import app, gloo
 import numpy as np
-from vispy.util.transforms import translate, rotate, ortho
-from cspov.common import box, WORLD_EXTENT_BOX, MAX_EXCURSION_X, MAX_EXCURSION_Y, vue
-from cspov.view.LayerRep import TiledImageFile
-from cspov.view.LayerDrawingPlan import LayerDrawingPlan
+from vispy.util.transforms import translate, ortho
 from numba import jit
+
+from cspov.common import box, MAX_EXCURSION_X, vue
+
+
+
 # from cspov.view.Program import GlooRGBTile
 
 __author__ = 'rayg'
@@ -193,54 +194,12 @@ class Idling(MapWidgetActivity):
         return UserZoomingMap(self.main)
 
 
-class Animating(MapWidgetActivity):
+class Animating(Idling):
     """
     When we're doing an animation cycle
     :param Behavior:
     :return:
     """
-
-
-def test_merc_layers(model, view, fn):
-    # FIXME: pass in the Layers object rather than building it right here (test pattern style)
-    raw_layers = []  # front to back
-    LOG.info('loading {}'.format(fn))
-    from .Program import GlooRGBImageTile, GlooColormapDataTile
-    cls = GlooRGBImageTile if (fn is None or fn.endswith('.jpg') or fn.endswith('.png')) else GlooColormapDataTile
-    # cls = GlooColormapDataTile if (fn is not None and fn.endswith('.tif')) else GlooRGBImageTile
-    layer = TiledImageFile(model, view, filename=fn, tile_class=cls)
-    # layer.set_alpha(0.5)
-    raw_layers.append(layer)
-    return LayerDrawingPlan(raw_layers)
-
-
-def test_layers_from_directory(model, view, layer_tiff_glob, range_txt=None):
-    """
-    TIFF_GLOB='/Users/keoni/Data/CSPOV/2015_07_14_195/00?0/HS*_B03_*merc.tif' VERBOSITY=3 python -m cspov
-    :param model:
-    :param view:
-    :param layer_tiff_glob:
-    :return:
-    """
-    from glob import glob
-    from .Program import GlooRGBImageTile, GlooColormapDataTile
-    layers = []
-    range = None
-    if range_txt:
-        import re
-        range = tuple(map(float, re.findall(r'[\.0-9]+', range_txt)))
-
-    for tif in glob(layer_tiff_glob):
-        layer = TiledImageFile(model, view, tif, tile_class=GlooColormapDataTile, range=range)
-        layers.append(layer)
-    return LayerDrawingPlan(layers)
-
-def test_layers(model, view):
-    if 'TIFF_GLOB' in os.environ:
-        return test_layers_from_directory(model, view, os.environ['TIFF_GLOB'], os.environ.get('RANGE',None))
-    elif 'MERC' in os.environ:
-        return test_merc_layers(model, view, os.environ.get('MERC', None))
-
 
 
 class CspovMainMapWidget(app.Canvas):
@@ -251,8 +210,9 @@ class CspovMainMapWidget(app.Canvas):
     # members
     _activity_stack = None  # Activity object stack which we push/pop for primary activity; activity[-1] is what we're currently doing
     _animation_timer = None  # animation cycling
+    _animating = False
     _frame_number = 0
-    layers = None  # layers we're currently displaying, last on top
+    drawing_plan = None  # LayerDrawingPlan we're currently displaying, last on top
     viewport = None  # box with world coordinates of what we're showing
 
     _testtile = None
@@ -279,7 +239,7 @@ class CspovMainMapWidget(app.Canvas):
 
         # FIXME: drawing plan will get moved outside the constructor;
         # application will construct it and it will be managed either by the document or from the document
-        self.layers = test_layers(self.model, self.view)
+        # self.drawing_plan = test_layers(self.model, self.view)
 
         self._animation_timer = app.Timer(1.0/10.0, connect=self.next_frame)
         # self._timer.start()
@@ -294,24 +254,18 @@ class CspovMainMapWidget(app.Canvas):
         :return:
         """
         frame = frame_number if isinstance(frame_number, int) else self._frame_number + 1
-        # FIXME: two places to store frame - redundant?
-        self._frame_number = self.layers.frame_number = frame
+        self._frame_number = frame
         self.update()
 
     def set_animating(self, animating=True):
-        if animating:
-            if isinstance(self.activity, Animating):
-                return
-            self._activity_stack.append(Animating(self))
-            self.layers.frame_number = self._frame_number
-            self.layers.animating = True
+        if animating is None:
+            animating = not self._animating
+        if animating and not self._animating:
+            self._animating = True
             self._animation_timer.start()
-        else:
-            if not isinstance(self.activity, Animating):
-                return
+        elif not animating and self._animating:
             self._animation_timer.stop()
-            self.layers.animating = False
-            self._activity_stack.pop()
+            self._frame_number = 0
 
     @property
     def activity(self):
@@ -439,7 +393,8 @@ class CspovMainMapWidget(app.Canvas):
         mvp = self.model, self.view, self.projection
         visible_geom = self._vueport()
         render_candidates = []
-        for layer in self.layers:
+        # LOG.info('drawing {} layers'.format(len(self.drawing_plan)))
+        for layer in self.drawing_plan(self._frame_number if self._animating else None):
             if layer.paint(visible_geom, mvp): # then we should re-render
                 render_candidates.append(layer)
         if render_candidates:
@@ -471,7 +426,7 @@ class CspovMainMapWidget(app.Canvas):
     def on_key_release(self, key):
         print('up', repr(key))
         if key.text=='a':  # toggle whether to animate or not
-            self.set_animating(not isinstance(self.activity, Animating))
+            self.set_animating(None)  # toggle
 
     def on_mouse_release(self, event):
         event = event.native  # FIXME: stop using .native, send the vispy event and refactor the Activities
