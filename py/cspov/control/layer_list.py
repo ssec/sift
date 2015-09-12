@@ -4,9 +4,21 @@
 
 PURPOSE
 Behaviors involving layer list controls
+Layer list shows:
+- visibility status
+- animation order
+- active color bar
+- active enhancements or formulas, if any
+- indicator colors
+
+Layer stack actions:
+- rearrange layers
+- de/select one or more layers
+- rename layer
+- bring up context menu for layer
 
 REFERENCES
-
+http://pyqt.sourceforge.net/Docs/PyQt4/qabstractlistmodel.html
 
 REQUIRES
 
@@ -22,27 +34,59 @@ __docformat__ = 'reStructuredText'
 
 import os, sys
 import logging, unittest, argparse
+import weakref
+from PyQt4.QtCore import QAbstractListModel
+from PyQt4.QtGui import QAbstractItemDelegate
 
 LOG = logging.getLogger(__name__)
 
 
-class ListWidgetMatchesLayerStack(QObject):
+class LayerWidgetDelegate(QAbstractItemDelegate):
+    """
+    set for a specific column, controls the rendering and editing of items in that column or row of a list or table
+    see QAbstractItemView.setItemDelegateForRow/Column
+    """
+    pass
+
+
+class LayerStackListViewModel(QAbstractListModel):
     """ behavior connecting list widget to layer stack (both ways)
     """
     widget = None
     doc = None
 
     def __init__(self, widget, doc):
-        super(ListWidgetMatchesLayerStack, self).__init__()
-        self.widget = widget
-        self.doc = doc
-        self.updateList()
+        super(LayerStackListViewModel, self).__init__()
+        self.widget = weakref.ref(widget)
+        self.doc = weakref.ref(doc)
+        widget.clicked.connect(self.layer_clicked)
+        widget.indexesMoved.connect(self.layers_moved)
+        widget.customContextMenuRequested.connect(self.context_menu)
+        widget.entered.connect(self.layer_entered)
+        widget.pressed.connect(self.layer_pressed)
         doc.docDidChangeLayerOrder.connect(self.updateList)
         doc.docDidChangeLayer.connect(self.updateList)
-        # FIXME: connect and configure list widget signals
+        widget.setModel(self)
+        self.updateList()
+
+    def layer_clicked(self, qindex):
+        pass
+
+    def layers_moved(self, qindices):
+        pass
+
+    def layer_entered(self, qindex):
+        pass
+
+    def layer_pressed(self, qindex):
+        pass
+
+    def context_menu(self, qpoint):
+        pass
 
     def updateList(self):
-        self.widget.clear()
-        for x in self.doc.asListing():
-            self.widget.addItem(x['name'])
+        pass
+        # self.widget().clear()
+        # for x in self.doc.asListing():
+        #     self.widget().addItem(x['name'])
 

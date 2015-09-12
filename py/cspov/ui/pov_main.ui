@@ -129,7 +129,7 @@
    <widget class="QWidget" name="dockWidgetContents_5">
     <layout class="QVBoxLayout" name="verticalLayout">
      <item>
-      <widget class="QListWidget" name="layers"/>
+      <widget class="QListView" name="layers"/>
      </item>
     </layout>
    </widget>

@@ -47,10 +47,10 @@ MAX_EXCURSION_Y = C_POL/4.0
 MAX_EXCURSION_X = C_EQ/2.0
 
 box = namedtuple('box', ('b', 'l', 't', 'r'))  # bottom, left, top, right
-rez = namedtuple('rez', ('dy', 'dx'))
+rez = namedtuple('rez', ('dy', 'dx'))  # world km / pixel distance
 pnt = namedtuple('pnt', ('y', 'x'))
 geo = namedtuple('geo', ('n', 'e'))  # lat N, lon E
-vue = namedtuple('vue', ('b', 'l', 't', 'r', 'dy', 'dx'))
+vue = namedtuple('vue', ('b', 'l', 't', 'r', 'dy', 'dx'))  # combination of box + rez
 
 WORLD_EXTENT_BOX = box(b=-MAX_EXCURSION_Y, l=-MAX_EXCURSION_X, t=MAX_EXCURSION_Y, r=MAX_EXCURSION_X)
 

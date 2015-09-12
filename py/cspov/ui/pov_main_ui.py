@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created: Mon Aug 31 22:48:58 2015
+# Created: Fri Sep 11 15:01:27 2015
 #      by: PyQt4 UI code generator 4.11.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -98,7 +98,7 @@ class Ui_MainWindow(object):
         self.dockWidgetContents_5.setObjectName(_fromUtf8("dockWidgetContents_5"))
         self.verticalLayout = QtGui.QVBoxLayout(self.dockWidgetContents_5)
         self.verticalLayout.setObjectName(_fromUtf8("verticalLayout"))
-        self.layers = QtGui.QListWidget(self.dockWidgetContents_5)
+        self.layers = QtGui.QListView(self.dockWidgetContents_5)
         self.layers.setObjectName(_fromUtf8("layers"))
         self.verticalLayout.addWidget(self.layers)
         self.layersPane.setWidget(self.dockWidgetContents_5)

@@ -37,7 +37,7 @@ QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
 
 from cspov.view.MapWidget import CspovMainMapWidget, LOG
-from cspov.control.layer_list import ListWidgetMatchesLayerStack
+from cspov.control.layer_list import LayerStackListViewModel
 from cspov.model import Document
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
@@ -53,7 +53,6 @@ LOG = logging.getLogger(__name__)
 
 
 def test_merc_layers(doc, fn):
-    # FIXME: pass in the Layers object rather than building it right here (test pattern style)
     raw_layers = []  # front to back
     LOG.info('loading {}'.format(fn))
     doc.addRGBImageLayer(fn)
@@ -118,9 +117,8 @@ class Main(QtGui.QMainWindow):
         self.ui.mainWidgets.removeTab(0)
         self.ui.mainWidgets.removeTab(0)
 
-        # convey action between layer list
-        # FIXME: use the document for this, not the drawing plan
-        self.behaviorLayersList = ListWidgetMatchesLayerStack(self.ui.layers, doc)
+        # convey action between document and layer list view
+        self.behaviorLayersList = LayerStackListViewModel(self.ui.layers, doc)
         # self.ui.layers
 
     def updateLayerList(self):
