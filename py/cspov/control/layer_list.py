@@ -19,6 +19,7 @@ Layer stack actions:
 
 REFERENCES
 http://pyqt.sourceforge.net/Docs/PyQt4/qabstractlistmodel.html
+https://github.com/Werkov/PyQt4/blob/8cc9d541119226703668d34e06b430370fbfb482/examples/itemviews/simpledommodel.py
 
 REQUIRES
 
@@ -68,6 +69,27 @@ class LayerStackListViewModel(QAbstractListModel):
         doc.docDidChangeLayer.connect(self.updateList)
         widget.setModel(self)
         self.updateList()
+
+    def columnCount(self, *args, **kwargs):
+        return 1
+
+    def rowCount(self, QModelIndex_parent=None, *args, **kwargs):
+        return self.doc().
+
+    def data(self, QModelIndex, int_role=None):
+        return None
+
+    def flags(self, QModelIndex):
+        return None
+
+    def headerData(self, p_int, Qt_Orientation, int_role=None):
+        return None
+
+    def index(self, p_int, int_column=0, QModelIndex_parent=None, *args, **kwargs):
+        return None
+
+    def parent(self, child, *args, **kwargs):
+        return None
 
     def layer_clicked(self, qindex):
         pass
