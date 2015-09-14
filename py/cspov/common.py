@@ -27,6 +27,7 @@ __docformat__ = 'reStructuredText'
 import os, sys
 import logging, unittest, argparse
 from numba import jit
+from pyproj import Proj
 
 LOG = logging.getLogger(__name__)
 
@@ -37,14 +38,20 @@ DEFAULT_TILE_HEIGHT = 512
 DEFAULT_TILE_WIDTH = 512
 
 PREFERRED_SCREEN_TO_TEXTURE_RATIO = 0.5  # screenpx:texturepx that we want to keep, ideally, by striding
-
-R_EQ = 6378.1370  # km
-R_POL = 6356.7523142  # km
-C_EQ = 40075.0170  # linear km
-C_POL = 40007.8630  # linear km
-
-MAX_EXCURSION_Y = C_POL/4.0
+DEFAULT_PROJECTION = "+proj=merc +datum=WGS84 +ellps=WGS84"
+DEFAULT_PROJ_OBJ = p = Proj(DEFAULT_PROJECTION)
+C_EQ = p(180, 0)[0] - p(-180, 0)[0]
+C_POL = p(0, 89.9)[1] - p(0, -89.9)[1]
+MAX_EXCURSION_Y = C_POL/2.0
 MAX_EXCURSION_X = C_EQ/2.0
+
+#R_EQ = 6378.1370  # km
+#R_POL = 6356.7523142  # km
+#C_EQ = 40075.0170  # linear km
+#C_POL = 40007.8630  # linear km
+
+# MAX_EXCURSION_Y = C_POL/4.0
+# MAX_EXCURSION_X = C_EQ/2.0
 
 box = namedtuple('box', ('b', 'l', 't', 'r'))  # bottom, left, top, right
 rez = namedtuple('rez', ('dy', 'dx'))

@@ -336,7 +336,7 @@ class CspovMainMapWidget(app.Canvas):
     def init_transforms(self):
         self.theta = 0
         self.phi = 0
-        self.view = translate((0, 0, -5))
+        self.view = translate((0, 0, -5), dtype=np.float32)
         self.model = np.eye(4, dtype=np.float32)
         self.projection = np.eye(4, dtype=np.float32)
         if self._testtile:
@@ -364,10 +364,11 @@ class CspovMainMapWidget(app.Canvas):
         #                               float(self.size[1]), 2.0, 10.0)
         aspect = float(self.size[1]) / float(self.size[0])
         #self.projection = ortho(-4, 4, -4*aspect, 4*aspect, -10, 10)
+        # FIXME: Z is backwards from documentation based on results. Negative first, positive second makes Z positive towards the viewer
         self.projection = ortho(
             vp.l, vp.r,
             vp.b, vp.t,
-            10000000, -10000000
+            -10000000, 10000000
         )
         if self._testtile:
             self._testtile.set_mvp(projection=self.projection)

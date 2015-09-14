@@ -107,6 +107,7 @@ class Main(QtGui.QMainWindow):
         # callable which returns an iterable of LayerReps to draw
         mainMap.drawing_plan = doc.asDrawingPlan
 
+        doc.addShapeLayer("/Users/davidh/Downloads/ne_110m_admin_0_countries/ne_110m_admin_0_countries.shp")
         test_layers(doc)
         mainMap.update()
 
@@ -138,6 +139,8 @@ if __name__ == '__main__':
     window = Main()
     window.show()
     print("running")
+    # bring window to front
+    window.raise_()
     app.run()
     # sys.exit(app.exec_())
 #

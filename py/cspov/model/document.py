@@ -35,7 +35,7 @@ import argparse
 from PyQt4.QtCore import QObject, pyqtSignal
 
 # FIXME: move these out of the document and into a factory
-from ..view.LayerRep import TiledImageFile
+from ..view.LayerRep import TiledImageFile, ShapefileLayer
 from ..view.Program import GlooColormapDataTile, GlooRGBImageTile
 
 from .probes import Probe, Shape
@@ -87,6 +87,12 @@ class Document(QObject):
 
     def addFullGlobMercatorColormappedFloatImageLayer(self, filename, range=None):
         rep = TiledImageFile(filename, tile_class=GlooColormapDataTile, range=range)
+        self._layer_reps.append(rep)
+        self.docDidChangeLayer.emit({'filename': filename})
+
+    def addShapeLayer(self, filename, **kwargs):
+        # FIXME: Figure out what the required arguments and stuff are
+        rep = ShapefileLayer(filename)
         self._layer_reps.append(rep)
         self.docDidChangeLayer.emit({'filename': filename})
 

@@ -29,6 +29,7 @@ import argparse
 
 import scipy.misc as spm
 from PyQt4.QtCore import QObject, pyqtSignal
+import shapefile
 
 from cspov.common import pnt, rez, MAX_EXCURSION_Y, MAX_EXCURSION_X, MercatorTileCalc, WORLD_EXTENT_BOX, \
     DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH, vue
@@ -223,6 +224,66 @@ class TiledImageFile(LayerRep):
                 # t.set_mvp(model=self.model, view=self.view)
 
 
+from vispy.visuals.line import LineVisual
+import numpy as np
+from datetime import datetime
+class ShapefileLayer(LayerRep):
+    def __init__(self, filename):
+        super(ShapefileLayer, self).__init__()
+        self.sf = shapefile.Reader(filename)
+        self.polygons = []
+        print("Starting loop: ", datetime.utcnow().isoformat(" "))
+        for idx, one_shape in enumerate(self.sf.iterShapes()):
+            points = np.array(one_shape.points, dtype=np.float32)
+            for part_start, part_end in zip(one_shape.parts, list(one_shape.parts[1:]) + [-1]):
+                this_part = points[part_start: part_end] / 180.0
+                # if idx >= 25:
+                #     continue
+                line_vis = LineVisual(
+                    this_part,
+                    width=1,
+                    color=(0.0, 0.0, 1.0, 1.0),
+                )
+                self.polygons.append(line_vis)
+
+            # if idx == 50:
+            #     break
+        print("Done: ", datetime.utcnow().isoformat(" "))
+        # self.polygons = [
+        #     LineVisual(np.array([[0.0, 0.0, -0.5], [0.0, 0.5, 0.0], [0.5, 0.5, 0.5]]),
+        #                width=10,
+        #                color=(1.0, 0.5, 0.5, 0.5))]
+
+    def paint(self, *args, **kwargs):
+        for poly in self.polygons:
+            poly.draw()
+
+    def render(self, *args, **kwargs):
+        print("Render called #############################")
+
+    def get_lon_lats(self, idx):
+        return zip(*self.sf.shapes(idx).points)
+
+    def get_locations(self, idx):
+        from pyproj import Proj
+        lons, lats = self.get_lon_lats(idx)
+        p = Proj("+proj=merc +datum=WGS84 +ellps=WGS84")
+        x, y = p(lons, lats)
+        return x, y
+
+
+
+class NaturalEarthShapefileLayer(ShapefileLayer):
+    """Layer class for handling shapefiles from Natural Earth.
+
+    http://www.naturalearthdata.com/
+
+    There should be no difference in the format of the file, but some
+    assumptions can be made with data from Natural Earth about filenaming,
+    data resolution, fields and other record information that is normally
+    included in most Natural Earth files.
+    """
+    pass
 
 
 
