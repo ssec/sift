@@ -18,7 +18,7 @@ REQUIRES
 :license: GPLv3, see LICENSE for more details
 """
 from PyQt4.QtCore import QTimer
-from vispy import app, gloo
+from vispy import app, gloo, scene
 import numpy as np
 from vispy.util.transforms import translate, ortho
 from numba import jit
@@ -200,6 +200,10 @@ class Animating(Idling):
     :param Behavior:
     :return:
     """
+
+
+class CspovMainMapCanvas(scene.SceneCanvas):
+    pass
 
 
 class CspovMainMapWidget(app.Canvas):

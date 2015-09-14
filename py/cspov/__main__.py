@@ -17,17 +17,14 @@ REQUIRES
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-from cspov.view.LayerRep import TiledImageFile
-
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
 
-# from PyQt4.QtGui import *
-# from PyQt4.QtCore import *
-from vispy import app, gloo
-# import vispy
-# vispy.use(app='PyQt4') #, gl='gl+')
+import os
+import logging
+from vispy import app, scene, visuals
+from vispy.io import imread
 
 try:
     app_object = app.use_app('pyqt4')
@@ -36,17 +33,12 @@ except Exception:
 QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
 
-from cspov.view.MapWidget import CspovMainMapWidget, LOG
+from cspov.view.MapWidget import CspovMainMapWidget, CspovMainMapCanvas
 from cspov.control.layer_list import ListWidgetMatchesLayerStack
 from cspov.model import Document
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
-
-# behaviors
-from cspov.control.file_behaviors import UserAddsFileToDoc
-
-import logging, unittest, argparse
 
 LOG = logging.getLogger(__name__)
 
@@ -84,15 +76,118 @@ def test_layers(doc):
     return []
 
 
+class MainMap(scene.Node):
+    """Scene node for holding all of the information for the main map area
+    """
+    def __init__(self, *args, **kwargs):
+        super(MainMap, self).__init__(*args, **kwargs)
+        self.events.key_release.connect(self.on_key_release)
+
+    def on_key_release(self, key):
+        print("Key release")
+        print(key)
+        if key.text == "a":
+            print("Got 'a'")
+
+
+class LayerList(scene.Node):
+    def __init__(self, name=None, parent=None):
+        super(LayerList, self).__init__(name=name, parent=parent)
+        # children are usually added by specifying a LayerList as their parent Node
+
+
+class AnimatedLayerList(LayerList):
+    def __init__(self, *args, **kwargs):
+        super(AnimatedLayerList, self).__init__(*args, **kwargs)
+        self._animating = False
+        self._frame_number = 0
+        self._animation_timer = app.Timer(1.0/10.0, connect=self.next_frame)
+
+    @property
+    def animating(self):
+        return self._animating
+
+    @animating.setter
+    def animating(self, animate):
+        print("Running animating ", animate)
+        if self._animating and not animate:
+            # We are currently, but don't want to be
+            self._animating = False
+            self._animation_timer.stop()
+        elif not self._animating and animate:
+            # We are not currently, but want to be
+            self._animating = True
+            self._animation_timer.start()
+        # TODO: Add a proper AnimationEvent to self.events
+
+    def toggle_animation(self, *args):
+        self.animating = not self._animating
+
+    def _set_visible_child(self, frame_number):
+        for idx, child in enumerate(self._children):
+            # not sure if this is actually doing anything
+            with child.events.blocker():
+                if idx == frame_number:
+                    child.visible = True
+                else:
+                    child.visible = False
+
+    def next_frame(self, event=None, frame_number=None):
+        """
+        skip to the frame (from 0) or increment one frame and update
+        typically this is run by self._animation_timer
+        :param frame_number: optional frame to go to, from 0
+        :return:
+        """
+        frame = frame_number if isinstance(frame_number, int) else (self._frame_number + 1) % len(self.children)
+        self._set_visible_child(frame)
+        self._frame_number = frame
+        self.update()
+
+
+class ImageLayerVisual(visuals.ImageVisual):
+    """CSPOV Image Layer
+
+    Note: VisPy separates this with a ImageVisual and a dynamically created scene.visuals.Image.
+    """
+    def __init__(self, image_filepath, **kwargs):
+        img_data = imread(image_filepath)
+        super(ImageLayerVisual, self).__init__(img_data, **kwargs)
+
+# XXX: Doing the subclassing myself causes some inheritance problems for some reason
+ImageLayer = scene.visuals.create_visual_node(ImageLayerVisual)
+
+
+class DatasetInfo(dict):
+    pass
+
+
+class Workspace(object):
+    def __init__(self, base_dir):
+        if not os.path.isdir(base_dir):
+            raise IOError("Workspace '%s' does not exist" % (base_dir,))
+        self.base_dir = os.path.realpath(base_dir)
+
+    def get_dataset_info(self, item, time_step=None, resolution=None):
+        if resolution is not None:
+            raise NotImplementedError("Resolution can not be specified yet")
+
+        # FIXME: Workspace structure
+        # 'item_start_time' is a string representing the directory name for the string to get
+        fn_pat = "HS_H08_20150714_{}_{}_FLDK_R20.merc.tif"
+        item_path = os.path.join(self.base_dir, time_step, fn_pat.format(time_step, item))
+
+        dataset_info = DatasetInfo()
+        dataset_info["filepath"] = item_path
+        return dataset_info
 
 
 class Main(QtGui.QMainWindow):
-
     def _init_add_file_dialog(self):
         pass
         # self._b_adds_files = UserAddsFileToDoc(self, self.ui.)
 
-    def __init__(self):
+    def __init__(self, workspace_dir=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
@@ -100,47 +195,83 @@ class Main(QtGui.QMainWindow):
 
         # create document
         self.document = doc = Document()
+        self.workspace = Workspace(workspace_dir)
 
-        self.mainMap = mainMap = CspovMainMapWidget(parent=self)
-        self.ui.mainWidgets.addTab(self.mainMap.native, 'Mercator')
+        self.main_canvas = CspovMainMapCanvas(parent=self)
+        self.ui.mainWidgets.addTab(self.main_canvas.native, 'Mercator')
+        self.main_view = self.main_canvas.central_widget.add_view()
+        # Head node of the map graph
+        self.main_map = MainMap(name="MainMap", parent=self.main_view.scene)
+        # Head node of the image layer graph
+        self.image_list = AnimatedLayerList(parent=self.main_map)
 
-        # callable which returns an iterable of LayerReps to draw
-        mainMap.drawing_plan = doc.asDrawingPlan
+        # Create Layers
+        for time_step in ["0330", "0340"]:
+            ds_info = self.workspace.get_dataset_info("B02", time_step=time_step)
+            image = ImageLayer(ds_info["filepath"], interpolation='nearest', method='subdivide', parent=self.image_list)
 
-        doc.addShapeLayer("/Users/davidh/Downloads/ne_110m_admin_0_countries/ne_110m_admin_0_countries.shp")
-        test_layers(doc)
-        mainMap.update()
+        # doc.addShapeLayer("/Users/davidh/Downloads/ne_110m_admin_0_countries/ne_110m_admin_0_countries.shp")
+
+        # Interaction Setup
+        self.setup_key_releases()
+
+        # Camera Setup
+        self.main_view.camera = scene.PanZoomCamera(aspect=1)
+        self.main_view.camera.flip = (0, 0, 0)
+        # range limits are subject to zoom fraction
+        self.main_view.camera.set_range(x=(0, 81920), y=(0, 40960))
+        self.main_view.camera.zoom(0.1, (0, 0))
 
         # things to refresh the map window
-        doc.docDidChangeLayerOrder.connect(mainMap.update)
-        doc.docDidChangeEnhancement.connect(mainMap.update)
-        doc.docDidChangeLayer.connect(mainMap.update)
+        # doc.docDidChangeLayerOrder.connect(main_canvas.update)
+        # doc.docDidChangeEnhancement.connect(main_canvas.update)
+        # doc.docDidChangeLayer.connect(main_canvas.update)
 
         self.ui.mainWidgets.removeTab(0)
         self.ui.mainWidgets.removeTab(0)
 
         # convey action between layer list
         # FIXME: use the document for this, not the drawing plan
-        self.behaviorLayersList = ListWidgetMatchesLayerStack(self.ui.layers, doc)
+        # self.behaviorLayersList = ListWidgetMatchesLayerStack(self.ui.layers, doc)
         # self.ui.layers
+
+        print(self.main_view.describe_tree(with_transform=True))
+
+    def setup_key_releases(self):
+        def cb_factory(required_key, cb):
+            def tmp_cb(key, cb=cb):
+                if key.text == required_key:
+                    return cb()
+            return tmp_cb
+
+        self.main_canvas.events.key_release.connect(cb_factory("a", self.image_list.toggle_animation))
+        self.main_canvas.events.key_release.connect(cb_factory("n", self.image_list.next_frame))
 
     def updateLayerList(self):
         self.ui.layers.add
 
 
-if __name__ == '__main__':
-    import os
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Run CSPOV")
+    parser.add_argument("-w", "--workspace", default='.',
+                        help="Specify workspace base directory")
+    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
+                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG (default INFO)')
+    args = parser.parse_args()
+
     levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
-    verbosity = int(os.environ.get('VERBOSITY', 0))
-    logging.basicConfig(level=levels[min(3, verbosity)])
+    logging.basicConfig(level=levels[min(3, args.verbosity)])
 
     app.create()
     # app = QApplication(sys.argv)
-    window = Main()
+    window = Main(workspace_dir=args.workspace)
     window.show()
     print("running")
     # bring window to front
     window.raise_()
     app.run()
-    # sys.exit(app.exec_())
-#
+
+if __name__ == '__main__':
+    import sys
+    sys.exit(main())
