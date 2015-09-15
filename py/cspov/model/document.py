@@ -75,8 +75,7 @@ class Document(QObject):
 
 
     def asListing(self):
-        for q in self._layer_reps:
-            yield {'name': q.name}
+        return [{'name': q.name} for q in self._layer_reps]
 
 
     def addRGBImageLayer(self, filename, range=None):

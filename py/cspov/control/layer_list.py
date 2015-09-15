@@ -74,23 +74,28 @@ class LayerStackListViewModel(QAbstractListModel):
         return 1
 
     def rowCount(self, QModelIndex_parent=None, *args, **kwargs):
-        return self.doc().
+        el = self.doc().asListing()
+        LOG.info('{} layers'.format(len(el)))
+        return len(el)
 
-    def data(self, QModelIndex, int_role=None):
-        return None
+    def data(self, index, int_role=None):
+        el = self.doc().asListing()
+        row = index.row()
+        LOG.info('row {} is {}'.format(row, el[row]))
+        return el[row]['name']
 
-    def flags(self, QModelIndex):
-        return None
-
-    def headerData(self, p_int, Qt_Orientation, int_role=None):
-        return None
-
-    def index(self, p_int, int_column=0, QModelIndex_parent=None, *args, **kwargs):
-        return None
-
-    def parent(self, child, *args, **kwargs):
-        return None
-
+    # def flags(self, QModelIndex):
+    #     return None
+    #
+    # def headerData(self, p_int, Qt_Orientation, int_role=None):
+    #     return None
+    #
+    # def index(self, p_int, int_column=0, QModelIndex_parent=None, *args, **kwargs):
+    #     return None
+    #
+    # def parent(self, child, *args, **kwargs):
+    #     return None
+    #
     def layer_clicked(self, qindex):
         pass
 
