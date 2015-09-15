@@ -36,7 +36,7 @@ __docformat__ = 'reStructuredText'
 import os, sys
 import logging, unittest, argparse
 import weakref
-from PyQt4.QtCore import QAbstractListModel
+from PyQt4.QtCore import QAbstractListModel, QVariant
 from PyQt4.QtGui import QAbstractItemDelegate
 
 LOG = logging.getLogger(__name__)
@@ -70,8 +70,8 @@ class LayerStackListViewModel(QAbstractListModel):
         widget.setModel(self)
         self.updateList()
 
-    def columnCount(self, *args, **kwargs):
-        return 1
+    # def columnCount(self, *args, **kwargs):
+    #     return 1
 
     def rowCount(self, QModelIndex_parent=None, *args, **kwargs):
         el = self.doc().asListing()
@@ -82,7 +82,7 @@ class LayerStackListViewModel(QAbstractListModel):
         el = self.doc().asListing()
         row = index.row()
         LOG.info('row {} is {}'.format(row, el[row]))
-        return el[row]['name']
+        return el[row]['name'].encode('ascii')
 
     # def flags(self, QModelIndex):
     #     return None
