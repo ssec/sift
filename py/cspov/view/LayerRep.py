@@ -224,56 +224,40 @@ class TiledImageFile(LayerRep):
                 # t.set_mvp(model=self.model, view=self.view)
 
 
-from vispy.visuals.line import LineVisual
+from vispy.scene import Node, visuals
 import numpy as np
 from datetime import datetime
-class ShapefileLayer(LayerRep):
-    def __init__(self, filename):
-        super(ShapefileLayer, self).__init__()
-        self.sf = shapefile.Reader(filename)
+class ShapefileLayer(Node):
+    def __init__(self, filepath, **kwargs):
+        super(ShapefileLayer, self).__init__(**kwargs)
+
+        self.sf = shapefile.Reader(filepath)
         self.polygons = []
+
         print("Starting loop: ", datetime.utcnow().isoformat(" "))
+        # Prepare the arrays
+        total_points = 0
+        total_parts = 0
         for idx, one_shape in enumerate(self.sf.iterShapes()):
-            points = np.array(one_shape.points, dtype=np.float32)
-            for part_start, part_end in zip(one_shape.parts, list(one_shape.parts[1:]) + [-1]):
-                this_part = points[part_start: part_end] / 180.0
-                # if idx >= 25:
-                #     continue
-                line_vis = LineVisual(
-                    this_part,
-                    width=1,
-                    color=(0.0, 0.0, 1.0, 1.0),
-                )
-                self.polygons.append(line_vis)
+            total_points += len(one_shape.points)
+            total_parts += len(one_shape.parts)
+        vertex_buffer = np.empty((total_points * 2 - total_parts * 2, 2), dtype=np.float32)
+        prev_idx = 0
+        for idx, one_shape in enumerate(self.sf.iterShapes()):
+            # end_idx = prev_idx + len(one_shape.points) * 2 - len(one_shape.parts) * 2
+            # vertex_buffer[prev_idx:end_idx:2] = one_shape.points[:-1]
+            # for part_idx in one_shape.parts:
+            for part_start, part_end in zip(one_shape.parts, list(one_shape.parts[1:]) + [len(one_shape.points)]):
+                end_idx = prev_idx + (part_end - part_start) * 2 - 2
+                vertex_buffer[prev_idx:end_idx:2] = one_shape.points[part_start:part_end-1]
+                vertex_buffer[prev_idx + 1:end_idx:2] = one_shape.points[part_start+1:part_end]
+                prev_idx = end_idx
 
-            # if idx == 50:
-            #     break
+        self.polygons.append(visuals.Line(vertex_buffer, connect="segments", width=1, color=(0.0, 0.0, 1.0, 1.0), parent=self))
         print("Done: ", datetime.utcnow().isoformat(" "))
-        # self.polygons = [
-        #     LineVisual(np.array([[0.0, 0.0, -0.5], [0.0, 0.5, 0.0], [0.5, 0.5, 0.5]]),
-        #                width=10,
-        #                color=(1.0, 0.5, 0.5, 0.5))]
-
-    def paint(self, *args, **kwargs):
-        for poly in self.polygons:
-            poly.draw()
-
-    def render(self, *args, **kwargs):
-        print("Render called #############################")
-
-    def get_lon_lats(self, idx):
-        return zip(*self.sf.shapes(idx).points)
-
-    def get_locations(self, idx):
-        from pyproj import Proj
-        lons, lats = self.get_lon_lats(idx)
-        p = Proj("+proj=merc +datum=WGS84 +ellps=WGS84")
-        x, y = p(lons, lats)
-        return x, y
 
 
-
-class NaturalEarthShapefileLayer(ShapefileLayer):
+class NEShapefileLayer(ShapefileLayer):
     """Layer class for handling shapefiles from Natural Earth.
 
     http://www.naturalearthdata.com/
@@ -284,8 +268,6 @@ class NaturalEarthShapefileLayer(ShapefileLayer):
     included in most Natural Earth files.
     """
     pass
-
-
 
 def main():
     parser = argparse.ArgumentParser(

@@ -25,6 +25,7 @@ import os
 import logging
 from vispy import app, scene, visuals
 from vispy.io import imread
+from vispy.visuals.transforms.linear import MatrixTransform, STTransform
 
 try:
     app_object = app.use_app('pyqt4')
@@ -34,14 +35,13 @@ QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
 
 from cspov.view.MapWidget import CspovMainMapWidget, CspovMainMapCanvas
-from cspov.control.layer_list import ListWidgetMatchesLayerStack
+from cspov.view.LayerRep import NEShapefileLayer
 from cspov.model import Document
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
 
 LOG = logging.getLogger(__name__)
-
 
 
 def test_merc_layers(doc, fn):
@@ -202,15 +202,21 @@ class Main(QtGui.QMainWindow):
         self.main_view = self.main_canvas.central_widget.add_view()
         # Head node of the map graph
         self.main_map = MainMap(name="MainMap", parent=self.main_view.scene)
+        merc_ortho = MatrixTransform()
+        # FIXME: Make the projection transform apply to everything
+        merc_ortho.set_ortho(-180.0, 180.0, -90.0, 90.0, 100.0, -100.0)
+        self.main_map.transform *= merc_ortho
         # Head node of the image layer graph
         self.image_list = AnimatedLayerList(parent=self.main_map)
+        # The center of the image is not the lower left
+        # self.image_list.transform *= STTransform(translate=(-180.0, -90.0))
+
+        self.boundaries = NEShapefileLayer("/Users/davidh/Downloads/ne_110m_admin_0_countries/ne_110m_admin_0_countries.shp", parent=self.main_map)
 
         # Create Layers
         for time_step in ["0330", "0340"]:
             ds_info = self.workspace.get_dataset_info("B02", time_step=time_step)
             image = ImageLayer(ds_info["filepath"], interpolation='nearest', method='subdivide', parent=self.image_list)
-
-        # doc.addShapeLayer("/Users/davidh/Downloads/ne_110m_admin_0_countries/ne_110m_admin_0_countries.shp")
 
         # Interaction Setup
         self.setup_key_releases()
@@ -219,7 +225,7 @@ class Main(QtGui.QMainWindow):
         self.main_view.camera = scene.PanZoomCamera(aspect=1)
         self.main_view.camera.flip = (0, 0, 0)
         # range limits are subject to zoom fraction
-        self.main_view.camera.set_range(x=(0, 81920), y=(0, 40960))
+        self.main_view.camera.set_range(x=(-180.0, 180.0), y=(-90.0, 90.0))
         self.main_view.camera.zoom(0.1, (0, 0))
 
         # things to refresh the map window
