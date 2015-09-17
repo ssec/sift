@@ -50,6 +50,8 @@ from vispy.visuals.transforms.linear import MatrixTransform, STTransform
 import numpy as np
 
 LOG = logging.getLogger(__name__)
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+DEFAULT_SHAPE_FILE = os.path.join(SCRIPT_DIR, "data", "ne_110m_admin_0_countries", "ne_110m_admin_0_countries.shp")
 
 
 def test_merc_layers(doc, fn):
@@ -232,7 +234,7 @@ class Main(QtGui.QMainWindow):
         pass
         # self._b_adds_files = UserAddsFileToDoc(self, self.ui.)
 
-    def __init__(self, workspace_dir=None):
+    def __init__(self, workspace_dir=None, border_shapefile=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
@@ -260,7 +262,7 @@ class Main(QtGui.QMainWindow):
         # TODO: Make this part of whatever custom Image class we make
         self.image_list.transform *= STTransform(translate=(0, 0, -50.0))
 
-        self.boundaries = NEShapefileLayer("/Users/davidh/Downloads/ne_110m_admin_0_countries/ne_110m_admin_0_countries.shp", parent=self.main_map)
+        self.boundaries = NEShapefileLayer(border_shapefile, double=True, parent=self.main_map)
 
         # Create Layers
         for time_step in ["0330", "0340"]:
@@ -306,6 +308,8 @@ def main():
     parser = argparse.ArgumentParser(description="Run CSPOV")
     parser.add_argument("-w", "--workspace", default='.',
                         help="Specify workspace base directory")
+    parser.add_argument("--border-shapefile", default=DEFAULT_SHAPE_FILE,
+                        help="Specify alternative coastline/border shapefile")
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
                         help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG (default INFO)')
     args = parser.parse_args()
@@ -315,7 +319,7 @@ def main():
 
     app.create()
     # app = QApplication(sys.argv)
-    window = Main(workspace_dir=args.workspace)
+    window = Main(workspace_dir=args.workspace, border_shapefile=args.border_shapefile)
     window.show()
     print("running")
     # bring window to front

@@ -225,15 +225,15 @@ class TiledImageFile(LayerRep):
 
 
 from vispy.scene import Node, visuals
-from vispy.visuals.transforms import STTransform
 import numpy as np
 from datetime import datetime
-from cspov.common import DEFAULT_PROJECTION
+from cspov.common import DEFAULT_PROJECTION, C_EQ
 from pyproj import Proj
 class ShapefileLayer(Node):
-    def __init__(self, filepath, projection=DEFAULT_PROJECTION, **kwargs):
+    def __init__(self, filepath, projection=DEFAULT_PROJECTION, double=False, **kwargs):
         super(ShapefileLayer, self).__init__(**kwargs)
 
+        LOG.debug("Using border shapefile '%s'", filepath)
         self.sf = shapefile.Reader(filepath)
         self.polygons = []
         self.proj = Proj(projection)
@@ -260,6 +260,11 @@ class ShapefileLayer(Node):
         # Clip lats to +/- 89.9 otherwise PROJ.4 on mercator projection will fail
         np.clip(vertex_buffer[:, 1], -89.9, 89.9, out=vertex_buffer[:, 1])
         vertex_buffer[:, 0], vertex_buffer[:, 1] = self.proj(vertex_buffer[:, 0], vertex_buffer[:, 1])
+        if double:
+            LOG.debug("Adding 180 to 540 double of shapefile")
+            orig_points = vertex_buffer.shape[0]
+            vertex_buffer = np.concatenate((vertex_buffer, vertex_buffer), axis=0)
+            vertex_buffer[orig_points:, 0] += C_EQ
 
         self.polygons.append(visuals.Line(vertex_buffer, connect="segments", width=1, color=(0.0, 0.0, 1.0, 1.0), parent=self))
         print("Done loading boundaries: ", datetime.utcnow().isoformat(" "))
