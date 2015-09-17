@@ -37,6 +37,7 @@ from cspov.common import (DEFAULT_X_PIXEL_SIZE,
                           DEFAULT_ORIGIN_X,
                           DEFAULT_ORIGIN_Y,
                           WORLD_EXTENT_BOX,
+                          C_EQ,
                           )
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
@@ -160,8 +161,9 @@ class ImageLayerVisual(visuals.ImageVisual):
 
     Note: VisPy separates this with a ImageVisual and a dynamically created scene.visuals.Image.
     """
-    def __init__(self, image_filepath, **kwargs):
+    def __init__(self, image_filepath, double=False, **kwargs):
         img_data = imread(image_filepath)
+        self.double = double
         super(ImageLayerVisual, self).__init__(img_data, **kwargs)
 
     def _build_vertex_data(self):
@@ -198,6 +200,11 @@ class ImageLayerVisual(visuals.ImageVisual):
         vertices[:, 0] += DEFAULT_ORIGIN_X
         vertices[:, 1] *= DEFAULT_Y_PIXEL_SIZE
         vertices[:, 1] += DEFAULT_ORIGIN_Y
+        if self.double:
+            orig_points = vertices.shape[0]
+            vertices = np.concatenate((vertices, vertices), axis=0)
+            tex_coords = np.concatenate((tex_coords, tex_coords), axis=0)
+            vertices[orig_points:, 0] += C_EQ
         self._subdiv_position.set_data(vertices.astype('float32'))
         self._subdiv_texcoord.set_data(tex_coords.astype('float32'))
 
@@ -267,7 +274,7 @@ class Main(QtGui.QMainWindow):
         # Create Layers
         for time_step in ["0330", "0340"]:
             ds_info = self.workspace.get_dataset_info("B02", time_step=time_step)
-            image = ImageLayer(ds_info["filepath"], interpolation='nearest', method='subdivide', grid=(20, 20), parent=self.image_list)
+            image = ImageLayer(ds_info["filepath"], interpolation='nearest', method='subdivide', grid=(20, 20), double=True, parent=self.image_list)
 
         # Interaction Setup
         self.setup_key_releases()
