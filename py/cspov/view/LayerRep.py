@@ -225,16 +225,20 @@ class TiledImageFile(LayerRep):
 
 
 from vispy.scene import Node, visuals
+from vispy.visuals.transforms import STTransform
 import numpy as np
 from datetime import datetime
+from cspov.common import DEFAULT_PROJECTION
+from pyproj import Proj
 class ShapefileLayer(Node):
-    def __init__(self, filepath, **kwargs):
+    def __init__(self, filepath, projection=DEFAULT_PROJECTION, **kwargs):
         super(ShapefileLayer, self).__init__(**kwargs)
 
         self.sf = shapefile.Reader(filepath)
         self.polygons = []
+        self.proj = Proj(projection)
 
-        print("Starting loop: ", datetime.utcnow().isoformat(" "))
+        print("Loading boundaries: ", datetime.utcnow().isoformat(" "))
         # Prepare the arrays
         total_points = 0
         total_parts = 0
@@ -253,8 +257,12 @@ class ShapefileLayer(Node):
                 vertex_buffer[prev_idx + 1:end_idx:2] = one_shape.points[part_start+1:part_end]
                 prev_idx = end_idx
 
+        # Clip lats to +/- 89.9 otherwise PROJ.4 on mercator projection will fail
+        np.clip(vertex_buffer[:, 1], -89.9, 89.9, out=vertex_buffer[:, 1])
+        vertex_buffer[:, 0], vertex_buffer[:, 1] = self.proj(vertex_buffer[:, 0], vertex_buffer[:, 1])
+
         self.polygons.append(visuals.Line(vertex_buffer, connect="segments", width=1, color=(0.0, 0.0, 1.0, 1.0), parent=self))
-        print("Done: ", datetime.utcnow().isoformat(" "))
+        print("Done loading boundaries: ", datetime.utcnow().isoformat(" "))
 
 
 class NEShapefileLayer(ShapefileLayer):

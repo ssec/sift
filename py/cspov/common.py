@@ -36,6 +36,12 @@ LOG = logging.getLogger(__name__)
 
 DEFAULT_TILE_HEIGHT = 512
 DEFAULT_TILE_WIDTH = 512
+# The values below are taken from the test geotiffs that are projected to the `DEFAULT_PROJECTION` below.
+# These units are in meters in mercator projection space
+DEFAULT_X_PIXEL_SIZE = 4891.969810251281160
+DEFAULT_Y_PIXEL_SIZE = -7566.684931505724307
+DEFAULT_ORIGIN_X = -20037508.342789247632027
+DEFAULT_ORIGIN_Y = 15496570.739723727107048
 
 PREFERRED_SCREEN_TO_TEXTURE_RATIO = 0.5  # screenpx:texturepx that we want to keep, ideally, by striding
 DEFAULT_PROJECTION = "+proj=merc +datum=WGS84 +ellps=WGS84"

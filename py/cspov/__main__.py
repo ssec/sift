@@ -32,6 +32,12 @@ QtGui = app_object.backend_module.QtGui
 from cspov.view.MapWidget import CspovMainMapWidget, CspovMainMapCanvas
 from cspov.view.LayerRep import NEShapefileLayer
 from cspov.model import Document
+from cspov.common import (DEFAULT_X_PIXEL_SIZE,
+                          DEFAULT_Y_PIXEL_SIZE,
+                          DEFAULT_ORIGIN_X,
+                          DEFAULT_ORIGIN_Y,
+                          WORLD_EXTENT_BOX,
+                          )
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
@@ -41,6 +47,7 @@ import logging
 from vispy import scene, visuals
 from vispy.io import imread
 from vispy.visuals.transforms.linear import MatrixTransform, STTransform
+import numpy as np
 
 LOG = logging.getLogger(__name__)
 
@@ -155,6 +162,43 @@ class ImageLayerVisual(visuals.ImageVisual):
         img_data = imread(image_filepath)
         super(ImageLayerVisual, self).__init__(img_data, **kwargs)
 
+    def _build_vertex_data(self):
+        """Rebuild the vertex buffers used for rendering the image when using
+        the subdivide method.
+
+        CSPOV Note: Copied from 0.5.0dev original ImageVisual class
+        """
+        grid = self._grid
+        w = 1.0 / grid[1]
+        h = 1.0 / grid[0]
+
+        quad = np.array([[0, 0, 0], [w, 0, 0], [w, h, 0],
+                         [0, 0, 0], [w, h, 0], [0, h, 0]],
+                        dtype=np.float32)
+        quads = np.empty((grid[1], grid[0], 6, 3), dtype=np.float32)
+        quads[:] = quad
+
+        mgrid = np.mgrid[0.:grid[1], 0.:grid[0]].transpose(1, 2, 0)
+        mgrid = mgrid[:, :, np.newaxis, :]
+        mgrid[..., 0] *= w
+        mgrid[..., 1] *= h
+
+        quads[..., :2] += mgrid
+        tex_coords = quads.reshape(grid[1]*grid[0]*6, 3)
+        tex_coords = np.ascontiguousarray(tex_coords[:, :2])
+        vertices = tex_coords * self.size
+        # vertices = tex_coords
+
+        # TODO: Read the source to figure out how the vertices are actually used
+        # FIXME: temporary hack to get the image geolocation (should really be determined by the geo info in the image file or metadata
+        vertices = vertices.astype('float32')
+        vertices[:, 0] *= DEFAULT_X_PIXEL_SIZE
+        vertices[:, 0] += DEFAULT_ORIGIN_X
+        vertices[:, 1] *= DEFAULT_Y_PIXEL_SIZE
+        vertices[:, 1] += DEFAULT_ORIGIN_Y
+        self._subdiv_position.set_data(vertices.astype('float32'))
+        self._subdiv_texcoord.set_data(tex_coords.astype('float32'))
+
 # XXX: Doing the subclassing myself causes some inheritance problems for some reason
 ImageLayer = scene.visuals.create_visual_node(ImageLayerVisual)
 
@@ -206,21 +250,22 @@ class Main(QtGui.QMainWindow):
         merc_ortho = MatrixTransform()
         # near/far is backwards it seems:
         camera_z_scale = 1e-6
-        merc_ortho.set_ortho(-180.0, 180.0, -90.0, 90.0, -100.0 * camera_z_scale, 100.0 * camera_z_scale)
+        # merc_ortho.set_ortho(-180.0, 180.0, -90.0, 90.0, -100.0 * camera_z_scale, 100.0 * camera_z_scale)
+        l, r, b, t = [getattr(WORLD_EXTENT_BOX, x) for x in ['l', 'r', 'b', 't']]
+        merc_ortho.set_ortho(l, r, b, t, -100.0 * camera_z_scale, 100.0 * camera_z_scale)
         self.main_map.transform *= merc_ortho
         # Head node of the image layer graph
         self.image_list = AnimatedLayerList(parent=self.main_map)
-        # FIXME: Assumes that images represent (-180.0 to 180.0 and -80.0 to 80.0)
-        # This should be replaced by actual information in the geotiff or the associated metadata (taken from workspace)
-        self.image_list.transform *= STTransform(scale=(360.0/8096.0, 160.0/4096.0, 1.0), translate=(-180.0, -80.0, 1.0)) * \
-                          STTransform(scale=(1.0, 1.0, 200.0), translate=(0.0, 0.0, -100.0))
+        # Put all the images to the -50.0 Z level
+        # TODO: Make this part of whatever custom Image class we make
+        self.image_list.transform *= STTransform(translate=(0, 0, -50.0))
 
         self.boundaries = NEShapefileLayer("/Users/davidh/Downloads/ne_110m_admin_0_countries/ne_110m_admin_0_countries.shp", parent=self.main_map)
 
         # Create Layers
         for time_step in ["0330", "0340"]:
             ds_info = self.workspace.get_dataset_info("B02", time_step=time_step)
-            image = ImageLayer(ds_info["filepath"], interpolation='nearest', method='subdivide', parent=self.image_list)
+            image = ImageLayer(ds_info["filepath"], interpolation='nearest', method='subdivide', grid=(20, 20), parent=self.image_list)
 
         # Interaction Setup
         self.setup_key_releases()
@@ -229,7 +274,7 @@ class Main(QtGui.QMainWindow):
         self.main_view.camera = scene.PanZoomCamera(aspect=1)
         self.main_view.camera.flip = (0, 0, 0)
         # range limits are subject to zoom fraction (I think?)
-        self.main_view.camera.set_range(x=(-18.0, 18.0), y=(-9.0, 9.0), margin=0)
+        self.main_view.camera.set_range(x=(-10.0, 10.0), y=(-10.0, 10.0), margin=0)
         self.main_view.camera.zoom(0.1, (0, 0))
 
         # things to refresh the map window
@@ -240,12 +285,7 @@ class Main(QtGui.QMainWindow):
         self.ui.mainWidgets.removeTab(0)
         self.ui.mainWidgets.removeTab(0)
 
-        # convey action between layer list
-        # FIXME: use the document for this, not the drawing plan
-        # self.behaviorLayersList = ListWidgetMatchesLayerStack(self.ui.layers, doc)
-        # self.ui.layers
-
-        print(self.main_view.describe_tree(with_transform=True))
+        # print(self.main_view.describe_tree(with_transform=True))
 
     def setup_key_releases(self):
         def cb_factory(required_key, cb):
