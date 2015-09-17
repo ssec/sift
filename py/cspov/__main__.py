@@ -21,12 +21,7 @@ __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
 
-import os
-import logging
-from vispy import app, scene, visuals
-from vispy.io import imread
-from vispy.visuals.transforms.linear import MatrixTransform, STTransform
-
+from vispy import app
 try:
     app_object = app.use_app('pyqt4')
 except Exception:
@@ -40,6 +35,12 @@ from cspov.model import Document
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
+
+import os
+import logging
+from vispy import scene, visuals
+from vispy.io import imread
+from vispy.visuals.transforms.linear import MatrixTransform, STTransform
 
 LOG = logging.getLogger(__name__)
 
@@ -203,13 +204,16 @@ class Main(QtGui.QMainWindow):
         # Head node of the map graph
         self.main_map = MainMap(name="MainMap", parent=self.main_view.scene)
         merc_ortho = MatrixTransform()
-        # FIXME: Make the projection transform apply to everything
-        merc_ortho.set_ortho(-180.0, 180.0, -90.0, 90.0, 100.0, -100.0)
+        # near/far is backwards it seems:
+        camera_z_scale = 1e-6
+        merc_ortho.set_ortho(-180.0, 180.0, -90.0, 90.0, -100.0 * camera_z_scale, 100.0 * camera_z_scale)
         self.main_map.transform *= merc_ortho
         # Head node of the image layer graph
         self.image_list = AnimatedLayerList(parent=self.main_map)
-        # The center of the image is not the lower left
-        # self.image_list.transform *= STTransform(translate=(-180.0, -90.0))
+        # FIXME: Assumes that images represent (-180.0 to 180.0 and -80.0 to 80.0)
+        # This should be replaced by actual information in the geotiff or the associated metadata (taken from workspace)
+        self.image_list.transform *= STTransform(scale=(360.0/8096.0, 160.0/4096.0, 1.0), translate=(-180.0, -80.0, 1.0)) * \
+                          STTransform(scale=(1.0, 1.0, 200.0), translate=(0.0, 0.0, -100.0))
 
         self.boundaries = NEShapefileLayer("/Users/davidh/Downloads/ne_110m_admin_0_countries/ne_110m_admin_0_countries.shp", parent=self.main_map)
 
@@ -224,8 +228,8 @@ class Main(QtGui.QMainWindow):
         # Camera Setup
         self.main_view.camera = scene.PanZoomCamera(aspect=1)
         self.main_view.camera.flip = (0, 0, 0)
-        # range limits are subject to zoom fraction
-        self.main_view.camera.set_range(x=(-180.0, 180.0), y=(-90.0, 90.0))
+        # range limits are subject to zoom fraction (I think?)
+        self.main_view.camera.set_range(x=(-18.0, 18.0), y=(-9.0, 9.0), margin=0)
         self.main_view.camera.zoom(0.1, (0, 0))
 
         # things to refresh the map window
