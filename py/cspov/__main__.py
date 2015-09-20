@@ -20,7 +20,6 @@ REQUIRES
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-
 from vispy import app
 try:
     app_object = app.use_app('pyqt4')
@@ -29,26 +28,18 @@ except Exception:
 QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
 
-from cspov.view.MapWidget import CspovMainMapWidget, CspovMainMapCanvas
-from cspov.view.LayerRep import NEShapefileLayer
+from cspov.view.MapWidget import CspovMainMapCanvas
+from cspov.view.LayerRep import NEShapefileLines, GeolocatedImage
 from cspov.model import Document
-from cspov.common import (DEFAULT_X_PIXEL_SIZE,
-                          DEFAULT_Y_PIXEL_SIZE,
-                          DEFAULT_ORIGIN_X,
-                          DEFAULT_ORIGIN_Y,
-                          WORLD_EXTENT_BOX,
-                          C_EQ,
-                          )
+from cspov.common import WORLD_EXTENT_BOX
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
 
 import os
 import logging
-from vispy import scene, visuals
-from vispy.io import imread
+from vispy import scene
 from vispy.visuals.transforms.linear import MatrixTransform, STTransform
-import numpy as np
 
 LOG = logging.getLogger(__name__)
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -92,13 +83,6 @@ class MainMap(scene.Node):
     """
     def __init__(self, *args, **kwargs):
         super(MainMap, self).__init__(*args, **kwargs)
-        self.events.key_release.connect(self.on_key_release)
-
-    def on_key_release(self, key):
-        print("Key release")
-        print(key)
-        if key.text == "a":
-            print("Got 'a'")
 
 
 class LayerList(scene.Node):
@@ -154,62 +138,6 @@ class AnimatedLayerList(LayerList):
         self._set_visible_child(frame)
         self._frame_number = frame
         self.update()
-
-
-class ImageLayerVisual(visuals.ImageVisual):
-    """CSPOV Image Layer
-
-    Note: VisPy separates this with a ImageVisual and a dynamically created scene.visuals.Image.
-    """
-    def __init__(self, image_filepath, double=False, **kwargs):
-        img_data = imread(image_filepath)
-        self.double = double
-        super(ImageLayerVisual, self).__init__(img_data, **kwargs)
-
-    def _build_vertex_data(self):
-        """Rebuild the vertex buffers used for rendering the image when using
-        the subdivide method.
-
-        CSPOV Note: Copied from 0.5.0dev original ImageVisual class
-        """
-        grid = self._grid
-        w = 1.0 / grid[1]
-        h = 1.0 / grid[0]
-
-        quad = np.array([[0, 0, 0], [w, 0, 0], [w, h, 0],
-                         [0, 0, 0], [w, h, 0], [0, h, 0]],
-                        dtype=np.float32)
-        quads = np.empty((grid[1], grid[0], 6, 3), dtype=np.float32)
-        quads[:] = quad
-
-        mgrid = np.mgrid[0.:grid[1], 0.:grid[0]].transpose(1, 2, 0)
-        mgrid = mgrid[:, :, np.newaxis, :]
-        mgrid[..., 0] *= w
-        mgrid[..., 1] *= h
-
-        quads[..., :2] += mgrid
-        tex_coords = quads.reshape(grid[1]*grid[0]*6, 3)
-        tex_coords = np.ascontiguousarray(tex_coords[:, :2])
-        vertices = tex_coords * self.size
-        # vertices = tex_coords
-
-        # TODO: Read the source to figure out how the vertices are actually used
-        # FIXME: temporary hack to get the image geolocation (should really be determined by the geo info in the image file or metadata
-        vertices = vertices.astype('float32')
-        vertices[:, 0] *= DEFAULT_X_PIXEL_SIZE
-        vertices[:, 0] += DEFAULT_ORIGIN_X
-        vertices[:, 1] *= DEFAULT_Y_PIXEL_SIZE
-        vertices[:, 1] += DEFAULT_ORIGIN_Y
-        if self.double:
-            orig_points = vertices.shape[0]
-            vertices = np.concatenate((vertices, vertices), axis=0)
-            tex_coords = np.concatenate((tex_coords, tex_coords), axis=0)
-            vertices[orig_points:, 0] += C_EQ
-        self._subdiv_position.set_data(vertices.astype('float32'))
-        self._subdiv_texcoord.set_data(tex_coords.astype('float32'))
-
-# XXX: Doing the subclassing myself causes some inheritance problems for some reason
-ImageLayer = scene.visuals.create_visual_node(ImageLayerVisual)
 
 
 class DatasetInfo(dict):
@@ -269,12 +197,12 @@ class Main(QtGui.QMainWindow):
         # TODO: Make this part of whatever custom Image class we make
         self.image_list.transform *= STTransform(translate=(0, 0, -50.0))
 
-        self.boundaries = NEShapefileLayer(border_shapefile, double=True, parent=self.main_map)
+        self.boundaries = NEShapefileLines(border_shapefile, double=True, parent=self.main_map)
 
         # Create Layers
         for time_step in ["0330", "0340"]:
             ds_info = self.workspace.get_dataset_info("B02", time_step=time_step)
-            image = ImageLayer(ds_info["filepath"], interpolation='nearest', method='subdivide', grid=(20, 20), double=True, parent=self.image_list)
+            image = GeolocatedImage.from_geotiff(ds_info["filepath"], interpolation='nearest', method='subdivide', grid=(20, 20), double=True, parent=self.image_list)
 
         # Interaction Setup
         self.setup_key_releases()

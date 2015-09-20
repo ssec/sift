@@ -31,8 +31,22 @@ import scipy.misc as spm
 from PyQt4.QtCore import QObject, pyqtSignal
 import shapefile
 
-from cspov.common import pnt, rez, MAX_EXCURSION_Y, MAX_EXCURSION_X, MercatorTileCalc, WORLD_EXTENT_BOX, \
-    DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH, vue
+from vispy.scene.visuals import create_visual_node
+from vispy.visuals import LineVisual, ImageVisual, CompoundVisual
+import numpy as np
+from datetime import datetime
+from pyproj import Proj
+
+# from cspov.common import pnt, rez, MAX_EXCURSION_Y, MAX_EXCURSION_X, MercatorTileCalc, WORLD_EXTENT_BOX, \
+#     DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH, vue
+from cspov.common import (DEFAULT_X_PIXEL_SIZE,
+                          DEFAULT_Y_PIXEL_SIZE,
+                          DEFAULT_ORIGIN_X,
+                          DEFAULT_ORIGIN_Y,
+                          DEFAULT_PROJECTION,
+                          WORLD_EXTENT_BOX,
+                          C_EQ,
+                          )
 from cspov.view.Program import GlooRGBImageTile
 
 __author__ = 'rayg'
@@ -127,16 +141,86 @@ class LayerRep(QObject):
         raise NotImplementedError()
 
 
-class MercatorTiffTileLayer(LayerRep):
+class GeolocatedImageVisual(ImageVisual):
+    """Visual class for image data that is geolocated and should be referenced that way when displayed.
+
+    Note: VisPy separates the Visual from the Node used in the SceneGraph by dynamically creating
+    the `vispy.scene.visuals.Image` class. Use the GeolocatedImage class with scenes.
     """
-    A layer with a Mercator TIFF image of world extent
+    def __init__(self,
+                 origin_x=DEFAULT_ORIGIN_X, origin_y=DEFAULT_ORIGIN_Y,
+                 cell_width=DEFAULT_X_PIXEL_SIZE, cell_height=DEFAULT_Y_PIXEL_SIZE,
+                 double=False, **kwargs):
+        self.origin_x = origin_x
+        self.origin_y = origin_y
+        self.cell_width = cell_width
+        self.cell_height = cell_height
+        self.double = double
+        super(GeolocatedImageVisual, self).__init__(**kwargs)
+
+    @classmethod
+    def from_geotiff(cls, geotiff_filepath, **kwargs):
+        import gdal
+        gtiff = gdal.Open(geotiff_filepath)
+        ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
+        img_data = gtiff.GetRasterBand(1).ReadAsArray()
+        return cls(data=img_data, origin_x=ox, origin_y=oy, cell_width=cw, cell_height=ch, **kwargs)
+
+    def _build_vertex_data(self):
+        """Rebuild the vertex buffers used for rendering the image when using
+        the subdivide method.
+
+        CSPOV Note: Copied from 0.5.0dev original ImageVisual class
+        """
+        grid = self._grid
+        w = 1.0 / grid[1]
+        h = 1.0 / grid[0]
+
+        quad = np.array([[0, 0, 0], [w, 0, 0], [w, h, 0],
+                         [0, 0, 0], [w, h, 0], [0, h, 0]],
+                        dtype=np.float32)
+        quads = np.empty((grid[1], grid[0], 6, 3), dtype=np.float32)
+        quads[:] = quad
+
+        mgrid = np.mgrid[0.:grid[1], 0.:grid[0]].transpose(1, 2, 0)
+        mgrid = mgrid[:, :, np.newaxis, :]
+        mgrid[..., 0] *= w
+        mgrid[..., 1] *= h
+
+        quads[..., :2] += mgrid
+        tex_coords = quads.reshape(grid[1]*grid[0]*6, 3)
+        tex_coords = np.ascontiguousarray(tex_coords[:, :2])
+        vertices = tex_coords * self.size
+
+        # FUTURE: This should probably be done as a transform
+        vertices = vertices.astype('float32')
+        vertices[:, 0] *= self.cell_width
+        vertices[:, 0] += self.origin_x
+        vertices[:, 1] *= self.cell_height
+        vertices[:, 1] += self.origin_y
+        if self.double:
+            orig_points = vertices.shape[0]
+            vertices = np.concatenate((vertices, vertices), axis=0)
+            tex_coords = np.concatenate((tex_coords, tex_coords), axis=0)
+            vertices[orig_points:, 0] += C_EQ
+        self._subdiv_position.set_data(vertices.astype('float32'))
+        self._subdiv_texcoord.set_data(tex_coords.astype('float32'))
+
+
+GeolocatedImage = create_visual_node(GeolocatedImageVisual)
+
+
+class TiledGeolocatedImageVisual(GeolocatedImageVisual):
+    """Geolocated image that is specially tiled to save on GPU memory usage.
     """
-    def __init__(self, pathname, extent=WORLD_EXTENT_BOX):
-        self.pathname = pathname
+    pass
+
+
+TiledGeolocatedImage = create_visual_node(TiledGeolocatedImageVisual)
 
 
 # FIXME: replace this with a LayerRepFactory which tracks all the GPU resources that have been dedicated?
-class TiledImageFile(LayerRep):
+class OldTiledImageFile(LayerRep):
     """
     Tile an RGB or float32 image representing the full -180..180 longitude, -90..90 latitude
     """
@@ -224,18 +308,11 @@ class TiledImageFile(LayerRep):
                 # t.set_mvp(model=self.model, view=self.view)
 
 
-from vispy.scene import Node, visuals
-import numpy as np
-from datetime import datetime
-from cspov.common import DEFAULT_PROJECTION, C_EQ
-from pyproj import Proj
-class ShapefileLayer(Node):
+class ShapefileLinesVisual(CompoundVisual):
     def __init__(self, filepath, projection=DEFAULT_PROJECTION, double=False, **kwargs):
-        super(ShapefileLayer, self).__init__(**kwargs)
-
         LOG.debug("Using border shapefile '%s'", filepath)
         self.sf = shapefile.Reader(filepath)
-        self.polygons = []
+        # FUTURE: Proj stuff should be done in GLSL for better speeds and flexibility with swapping projection (may require something in addition to transform)
         self.proj = Proj(projection)
 
         print("Loading boundaries: ", datetime.utcnow().isoformat(" "))
@@ -266,11 +343,18 @@ class ShapefileLayer(Node):
             vertex_buffer = np.concatenate((vertex_buffer, vertex_buffer), axis=0)
             vertex_buffer[orig_points:, 0] += C_EQ
 
-        self.polygons.append(visuals.Line(vertex_buffer, connect="segments", width=1, color=(0.0, 0.0, 1.0, 1.0), parent=self))
+        kwargs.setdefault("color", (0.0, 0.0, 1.0, 1.0))
+        kwargs.setdefault("width", 1)
+        self._border_lines = LineVisual(vertex_buffer, connect="segments", **kwargs)
         print("Done loading boundaries: ", datetime.utcnow().isoformat(" "))
 
+        super(ShapefileLinesVisual, self).__init__((self._border_lines,))
 
-class NEShapefileLayer(ShapefileLayer):
+
+ShapefileLines = create_visual_node(ShapefileLinesVisual)
+
+
+class NEShapefileLinesVisual(ShapefileLinesVisual):
     """Layer class for handling shapefiles from Natural Earth.
 
     http://www.naturalearthdata.com/
@@ -281,6 +365,10 @@ class NEShapefileLayer(ShapefileLayer):
     included in most Natural Earth files.
     """
     pass
+
+
+NEShapefileLines = create_visual_node(NEShapefileLinesVisual)
+
 
 def main():
     parser = argparse.ArgumentParser(
