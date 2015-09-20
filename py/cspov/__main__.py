@@ -29,7 +29,7 @@ QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
 
 from cspov.view.MapWidget import CspovMainMapCanvas
-from cspov.view.LayerRep import NEShapefileLines, GeolocatedImage
+from cspov.view.LayerRep import NEShapefileLines, GeolocatedImage, TiledGeolocatedImage
 from cspov.model import Document
 from cspov.common import WORLD_EXTENT_BOX
 
@@ -44,38 +44,6 @@ from vispy.visuals.transforms.linear import MatrixTransform, STTransform
 LOG = logging.getLogger(__name__)
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 DEFAULT_SHAPE_FILE = os.path.join(SCRIPT_DIR, "data", "ne_110m_admin_0_countries", "ne_110m_admin_0_countries.shp")
-
-
-def test_merc_layers(doc, fn):
-    # FIXME: pass in the Layers object rather than building it right here (test pattern style)
-    raw_layers = []  # front to back
-    LOG.info('loading {}'.format(fn))
-    doc.addRGBImageLayer(fn)
-
-
-def test_layers_from_directory(doc, layer_tiff_glob, range_txt=None):
-    """
-    TIFF_GLOB='/Users/keoni/Data/CSPOV/2015_07_14_195/00?0/HS*_B03_*merc.tif' VERBOSITY=3 python -m cspov
-    :param model:
-    :param view:
-    :param layer_tiff_glob:
-    :return:
-    """
-    from glob import glob
-    range = None
-    if range_txt:
-        import re
-        range = tuple(map(float, re.findall(r'[\.0-9]+', range_txt)))
-    for tif in glob(layer_tiff_glob):
-        doc.addFullGlobMercatorColormappedFloatImageLayer(tif, range=range)
-
-
-def test_layers(doc):
-    if 'TIFF_GLOB' in os.environ:
-        return test_layers_from_directory(doc, os.environ['TIFF_GLOB'], os.environ.get('RANGE',None))
-    elif 'MERC' in os.environ:
-        return test_merc_layers(doc, os.environ.get('MERC', None))
-    return []
 
 
 class MainMap(scene.Node):
@@ -161,6 +129,7 @@ class Workspace(object):
 
         dataset_info = DatasetInfo()
         dataset_info["filepath"] = item_path
+        dataset_info["clim"] = (0.0, 1.0)
         return dataset_info
 
 
@@ -202,7 +171,7 @@ class Main(QtGui.QMainWindow):
         # Create Layers
         for time_step in ["0330", "0340"]:
             ds_info = self.workspace.get_dataset_info("B02", time_step=time_step)
-            image = GeolocatedImage.from_geotiff(ds_info["filepath"], interpolation='nearest', method='subdivide', grid=(20, 20), double=True, parent=self.image_list)
+            image = TiledGeolocatedImage.from_geotiff(ds_info["filepath"], interpolation='nearest', clim=ds_info["clim"], method='subdivide', double=True, parent=self.image_list)
 
         # Interaction Setup
         self.setup_key_releases()

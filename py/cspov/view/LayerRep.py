@@ -210,10 +210,55 @@ class GeolocatedImageVisual(ImageVisual):
 GeolocatedImage = create_visual_node(GeolocatedImageVisual)
 
 
-class TiledGeolocatedImageVisual(GeolocatedImageVisual):
+class TiledGeolocatedImageVisual(CompoundVisual):
     """Geolocated image that is specially tiled to save on GPU memory usage.
+
+    Currently this visual holds on to the original data on the CPU side forever. The
+    provided data is assumed to be a memory mapped file. In future iterations of this
+    class it will provide a method to set the data for the lower resolutions based on
+    events/signals.
+
+    Tile sizes (pixels) are based on the original full resolution of the data in meters
+    since this data is known to be geolocated. For example, input data for image 1
+    could be of size 10x10 at 1km resolution and image 2 could be at the same 1km
+    spatial/projected resolution but be 20x20 pixels.
+    At lower resolution display (Z greater than image Z) we would want to display the
+    same number of pixels for each image regardless of full resolution number of pixels.
     """
-    pass
+    def __init__(self, data, tile_width=10000000.0, tile_height=16000000.0, **kwargs):
+        # Note: tile_width=5000000.0, tile_height=8000000.0 give ~1000 pixels per tile for test images
+        # TODO: Put all logic about "what tile information should I use" in to a separate class
+        # FIXME: Hardcoded for now
+        self._subimages = []
+        # Make a logical assertion that a tile must be at least 10 pixels
+        assert(tile_width >= 10 * kwargs["cell_width"])
+        assert(tile_height >= 10 * kwargs["cell_height"])
+        tile_x_step = int(abs(tile_width // kwargs["cell_width"]) + 0.5)
+        tile_y_step = int(abs(tile_height // kwargs["cell_height"]) + 0.5)
+        y_offsets = range(0, data.shape[0], tile_x_step)
+        dy = y_offsets[1] - y_offsets[0]
+        x_offsets = range(0, data.shape[1], tile_y_step)
+        dx = x_offsets[1] - x_offsets[0]
+        print(list(x_offsets), list(y_offsets))
+        print(len(x_offsets), len(y_offsets))
+        for y_offset in y_offsets:
+            for x_offset in x_offsets:
+                kws = kwargs.copy()
+                kws["origin_x"] = kws["origin_x"] + x_offset * kws["cell_width"]
+                kws["origin_y"] = kws["origin_y"] + y_offset * kws["cell_height"]
+                image = GeolocatedImageVisual(data=data[y_offset: y_offset + dy, x_offset: x_offset + dx], **kws)
+                self._subimages.append(image)
+        super(TiledGeolocatedImageVisual, self).__init__(self._subimages)
+
+    def _generate_tiles(self):
+
+    @classmethod
+    def from_geotiff(cls, geotiff_filepath, **kwargs):
+        import gdal
+        gtiff = gdal.Open(geotiff_filepath)
+        ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
+        img_data = gtiff.GetRasterBand(1).ReadAsArray()
+        return cls(data=img_data, origin_x=ox, origin_y=oy, cell_width=cw, cell_height=ch, **kwargs)
 
 
 TiledGeolocatedImage = create_visual_node(TiledGeolocatedImageVisual)
