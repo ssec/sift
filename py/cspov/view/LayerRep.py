@@ -251,6 +251,7 @@ class TiledGeolocatedImageVisual(CompoundVisual):
         super(TiledGeolocatedImageVisual, self).__init__(self._subimages)
 
     def _generate_tiles(self):
+        pass
 
     @classmethod
     def from_geotiff(cls, geotiff_filepath, **kwargs):
