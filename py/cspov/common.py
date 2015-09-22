@@ -107,8 +107,8 @@ class MercatorTileCalc(object):
         self.pixel_rez = pixel_rez
         self.tile_shape = tile_shape
 
-        assert(pixel_rez.dy > 0.0)        # FIXME: what if pixel_rez.dy < 0? can we handle this reliably?
-        assert(pixel_rez.dx > 0.0)
+        # assert(pixel_rez.dy > 0.0)        # FIXME: what if pixel_rez.dy < 0? can we handle this reliably?
+        # assert(pixel_rez.dx > 0.0)
 
         h,w = pixel_shape
         zy,zx = zero_point
@@ -255,6 +255,15 @@ class MercatorTileCalc(object):
         ts = min(tsy,tsx)
         stride = int(ts)
         return stride
+
+    @jit
+    def overview_stride(self):
+        # FUTURE: Come up with a fancier way of doing overviews like averaging each strided section, if needed
+        tsy = max(1, np.floor(self.pixel_shape[0] / self.tile_shape[0]))
+        tsx = max(1, np.floor(self.pixel_shape[1] / self.tile_shape[1]))
+        y_slice = slice(0, self.pixel_shape[0], tsy)
+        x_slice = slice(0, self.pixel_shape[1], tsx)
+        return y_slice, x_slice
 
     @jit
     def tile_world_box(self, tiy, tix, ny=1, nx=1):

@@ -31,13 +31,14 @@ QtGui = app_object.backend_module.QtGui
 from cspov.view.MapWidget import CspovMainMapCanvas
 from cspov.view.LayerRep import NEShapefileLines, GeolocatedImage, TiledGeolocatedImage
 from cspov.model import Document
-from cspov.common import WORLD_EXTENT_BOX
+from cspov.common import WORLD_EXTENT_BOX, DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
 
 import os
 import logging
+import gdal
 from vispy import scene
 from vispy.visuals.transforms.linear import MatrixTransform, STTransform
 
@@ -65,6 +66,8 @@ class AnimatedLayerList(LayerList):
         self._animating = False
         self._frame_number = 0
         self._animation_timer = app.Timer(1.0/10.0, connect=self.next_frame)
+        # Make the newest child as the only visible node
+        self.events.children_change.connect(self._set_visible_node)
 
     @property
     def animating(self):
@@ -85,6 +88,16 @@ class AnimatedLayerList(LayerList):
 
     def toggle_animation(self, *args):
         self.animating = not self._animating
+
+    def _set_visible_node(self, node):
+        """Set all nodes to invisible except for the `event.added` node.
+        """
+        for child in self._children:
+            with child.events.blocker():
+                if child is node.added:
+                    child.visible = True
+                else:
+                    child.visible = False
 
     def _set_visible_child(self, frame_number):
         for idx, child in enumerate(self._children):
@@ -112,25 +125,72 @@ class DatasetInfo(dict):
     pass
 
 
+# FIXME: Workspace structure
 class Workspace(object):
-    def __init__(self, base_dir):
+    def __init__(self, base_dir, tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH)):
         if not os.path.isdir(base_dir):
             raise IOError("Workspace '%s' does not exist" % (base_dir,))
         self.base_dir = os.path.realpath(base_dir)
+        self.tile_shape = tile_shape
 
-    def get_dataset_info(self, item, time_step=None, resolution=None):
-        if resolution is not None:
-            raise NotImplementedError("Resolution can not be specified yet")
-
-        # FIXME: Workspace structure
-        # 'item_start_time' is a string representing the directory name for the string to get
+    def _dataset_filepath(self, item, time_step):
         fn_pat = "HS_H08_20150714_{}_{}_FLDK_R20.merc.tif"
-        item_path = os.path.join(self.base_dir, time_step, fn_pat.format(time_step, item))
+        # 'time_step' is a string representing the directory name for the string to get
+        return os.path.join(self.base_dir, time_step, fn_pat.format(time_step, item))
 
+    def _get_dataset_projection_info(self, fp):
+        d = {}
+        if fp.endswith(".tif"):
+            gtiff = gdal.Open(fp)
+            ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
+            d["origin_x"] = ox
+            d["origin_y"] = oy
+            d["cell_width"] = cw
+            d["cell_height"] = ch
+            # FUTURE: Should the Workspace normalize all input data or should the Image Layer handle any projection?
+            srs = gdal.osr.SpatialReference()
+            srs.ImportFromWkt(gtiff.GetProjection())
+            d["proj"] = srs.ExportToProj4()
+        else:
+            raise ValueError("Unknown workspace format detected: %s" % (fp,))
+
+        return d
+
+    def get_dataset_info(self, item, time_step, stride=None):
         dataset_info = DatasetInfo()
-        dataset_info["filepath"] = item_path
-        dataset_info["clim"] = (0.0, 1.0)
+        # FIXME: Make up a better name
+        dataset_info["name"] = item + "_" + time_step
+        dataset_info["filepath"] = self._dataset_filepath(item, time_step)
+
+        # Valid min and max for colormap use
+        if item in ["B01", "B02", "B03", "B04", "B05", "B06"]:
+            # Reflectance/visible data limits
+            # FIXME: Are these correct?
+            dataset_info["clim"] = (0.0, 1.0)
+        else:
+            # BT data limits
+            # FIXME: Are these correct?
+            dataset_info["clim"] = (200.0, 350.0)
+
+        # Full resolution shape
+        dataset_info["shape"] = self.get_dataset_data(item, time_step).shape
+
+        dataset_info.update(self._get_dataset_projection_info(dataset_info["filepath"]))
         return dataset_info
+
+    def get_dataset_data(self, item, time_step, row_slice=None, col_slice=None):
+        fp = self._dataset_filepath(item, time_step)
+
+        if fp.endswith(".tif"):
+            gtiff = gdal.Open(fp)
+            img_data = gtiff.GetRasterBand(1).ReadAsArray()
+        else:
+            raise ValueError("Unknown workspace format detected: %s" % (fp,))
+
+        if row_slice is None or col_slice is None:
+            return img_data
+        else:
+            return img_data[row_slice, col_slice]
 
 
 class Main(QtGui.QMainWindow):
@@ -150,7 +210,14 @@ class Main(QtGui.QMainWindow):
 
         self.main_canvas = CspovMainMapCanvas(parent=self)
         self.ui.mainWidgets.addTab(self.main_canvas.native, 'Mercator')
-        self.main_view = self.main_canvas.central_widget.add_view()
+
+        self.main_view = self.main_canvas.central_widget.add_view(scene.PanZoomCamera(aspect=1))
+        # Camera Setup
+        self.main_view.camera.flip = (0, 0, 0)
+        # FIXME: these ranges just happen to look ok, but I'm not really sure the 'best' way to set these
+        self.main_view.camera.set_range(x=(-10.0, 10.0), y=(-10.0, 10.0), margin=0)
+        self.main_view.camera.zoom(0.1, (0, 0))
+
         # Head node of the map graph
         self.main_map = MainMap(name="MainMap", parent=self.main_view.scene)
         merc_ortho = MatrixTransform()
@@ -160,6 +227,7 @@ class Main(QtGui.QMainWindow):
         l, r, b, t = [getattr(WORLD_EXTENT_BOX, x) for x in ['l', 'r', 'b', 't']]
         merc_ortho.set_ortho(l, r, b, t, -100.0 * camera_z_scale, 100.0 * camera_z_scale)
         self.main_map.transform *= merc_ortho
+
         # Head node of the image layer graph
         self.image_list = AnimatedLayerList(parent=self.main_map)
         # Put all the images to the -50.0 Z level
@@ -171,17 +239,16 @@ class Main(QtGui.QMainWindow):
         # Create Layers
         for time_step in ["0330", "0340"]:
             ds_info = self.workspace.get_dataset_info("B02", time_step=time_step)
-            image = TiledGeolocatedImage.from_geotiff(ds_info["filepath"], interpolation='nearest', clim=ds_info["clim"], method='subdivide', double=True, parent=self.image_list)
+            full_data = self.workspace.get_dataset_data("B02", time_step=time_step)
+            image = TiledGeolocatedImage(
+                ds_info.pop("name"),
+                data=full_data,
+                interpolation='nearest', method='subdivide', double=False, parent=self.image_list,
+                **ds_info
+            )
 
         # Interaction Setup
         self.setup_key_releases()
-
-        # Camera Setup
-        self.main_view.camera = scene.PanZoomCamera(aspect=1)
-        self.main_view.camera.flip = (0, 0, 0)
-        # range limits are subject to zoom fraction (I think?)
-        self.main_view.camera.set_range(x=(-10.0, 10.0), y=(-10.0, 10.0), margin=0)
-        self.main_view.camera.zoom(0.1, (0, 0))
 
         # things to refresh the map window
         # doc.docDidChangeLayerOrder.connect(main_canvas.update)

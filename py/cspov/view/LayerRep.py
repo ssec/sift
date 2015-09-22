@@ -46,6 +46,8 @@ from cspov.common import (DEFAULT_X_PIXEL_SIZE,
                           DEFAULT_PROJECTION,
                           WORLD_EXTENT_BOX,
                           C_EQ,
+                          box, pnt, rez, vue,
+                          MercatorTileCalc
                           )
 from cspov.view.Program import GlooRGBImageTile
 
@@ -212,54 +214,66 @@ GeolocatedImage = create_visual_node(GeolocatedImageVisual)
 
 class TiledGeolocatedImageVisual(CompoundVisual):
     """Geolocated image that is specially tiled to save on GPU memory usage.
-
-    Currently this visual holds on to the original data on the CPU side forever. The
-    provided data is assumed to be a memory mapped file. In future iterations of this
-    class it will provide a method to set the data for the lower resolutions based on
-    events/signals.
-
-    Tile sizes (pixels) are based on the original full resolution of the data in meters
-    since this data is known to be geolocated. For example, input data for image 1
-    could be of size 10x10 at 1km resolution and image 2 could be at the same 1km
-    spatial/projected resolution but be 20x20 pixels.
-    At lower resolution display (Z greater than image Z) we would want to display the
-    same number of pixels for each image regardless of full resolution number of pixels.
     """
-    def __init__(self, data, tile_width=10000000.0, tile_height=16000000.0, **kwargs):
-        # Note: tile_width=5000000.0, tile_height=8000000.0 give ~1000 pixels per tile for test images
-        # TODO: Put all logic about "what tile information should I use" in to a separate class
-        # FIXME: Hardcoded for now
-        self._subimages = []
-        # Make a logical assertion that a tile must be at least 10 pixels
-        assert(tile_width >= 10 * kwargs["cell_width"])
-        assert(tile_height >= 10 * kwargs["cell_height"])
-        tile_x_step = int(abs(tile_width // kwargs["cell_width"]) + 0.5)
-        tile_y_step = int(abs(tile_height // kwargs["cell_height"]) + 0.5)
-        y_offsets = range(0, data.shape[0], tile_x_step)
-        dy = y_offsets[1] - y_offsets[0]
-        x_offsets = range(0, data.shape[1], tile_y_step)
-        dx = x_offsets[1] - x_offsets[0]
-        print(list(x_offsets), list(y_offsets))
-        print(len(x_offsets), len(y_offsets))
-        for y_offset in y_offsets:
-            for x_offset in x_offsets:
-                kws = kwargs.copy()
-                kws["origin_x"] = kws["origin_x"] + x_offset * kws["cell_width"]
-                kws["origin_y"] = kws["origin_y"] + y_offset * kws["cell_height"]
-                image = GeolocatedImageVisual(data=data[y_offset: y_offset + dy, x_offset: x_offset + dx], **kws)
-                self._subimages.append(image)
-        super(TiledGeolocatedImageVisual, self).__init__(self._subimages)
+    def __init__(self, name, data=None, tile_shape=(512, 512), **kwargs):
+        self.name = name
+        self.tile_shape = tile_shape
+        self.cell_width = kwargs["cell_width"]
+        self.cell_height = kwargs["cell_height"]  # Note: cell_height is usually negative
 
-    def _generate_tiles(self):
+        assert ("shape" in kwargs or data is not None), "`data` or `shape` must be provided"
+        image_shape = kwargs.get("shape", data.shape)
+
+        # Where does this image lie in this lonely world
+        self.image_extents = vue(
+            kwargs["origin_y"] + image_shape[0] * self.cell_height,
+            kwargs["origin_x"],
+            kwargs["origin_y"],
+            kwargs["origin_x"] + image_shape[1] * self.cell_width,
+            abs(self.cell_height),
+            abs(self.cell_width),
+        )
+        # FIXME: Is zero_point needed?
+        zpnt = pnt(0.0, 0.0)
+        pixel_rez = rez(abs(self.cell_height), abs(self.cell_width))
+        self.calc = MercatorTileCalc(self.name, image_shape, zpnt, pixel_rez, tile_shape)
+
+        # Start by showing the overview, the actual draw cycle will do the proper requests for higher resolution data
+        # FIXME: Only making one large image for now
+        y_slice, x_slice = self.calc.overview_stride()
+        # overview_stride = (int(image_shape[0]/tile_shape[0]), int(image_shape[1]/tile_shape[1]))
+        self.overview_data = data[y_slice, x_slice]
+        # Update kwargs to reflect the new spatial resolution of the overview image
+        kwargs["data"] = self.overview_data
+        kwargs["cell_width"] *= x_slice.step
+        kwargs["cell_height"] *= y_slice.step
+        # FIXME: Reminder, origin x/y also need to be included in these updates for each tile
+        # Keep a pointer to the overview so we can remove it from our CompoundVisual list
+        self.overview_visual = GeolocatedImageVisual(**kwargs)
+
+        # Initialize and 'freeze' the Visual class, don't declare any child visuals yet
+        super(TiledGeolocatedImageVisual, self).__init__(tuple())
+
+        # Add the overview as the first image that gets displayed, this will get updated in the actual draw
+        # We don't update the tiles here in case transforms aren't completely set yet
+        self.add_subvisual(self.overview_visual)
+
+    def _generate_tiles(self, view_box):
         pass
 
-    @classmethod
-    def from_geotiff(cls, geotiff_filepath, **kwargs):
-        import gdal
-        gtiff = gdal.Open(geotiff_filepath)
-        ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
-        img_data = gtiff.GetRasterBand(1).ReadAsArray()
-        return cls(data=img_data, origin_x=ox, origin_y=oy, cell_width=cw, cell_height=ch, **kwargs)
+    def _prepare_draw(self, view):
+        ll_corner, ur_corner = self.transforms.get_transform().imap([(-1, -1, 1), (1, 1, 1)])
+        margin = 10000.0
+        # How many tiles should be contained in this view?
+        view_box = box(
+            max(ll_corner[1] - margin, WORLD_EXTENT_BOX.b),
+            max(ll_corner[0] - margin, WORLD_EXTENT_BOX.l),
+            min(ur_corner[1] + margin, WORLD_EXTENT_BOX.t),
+            min(ur_corner[0] + margin, WORLD_EXTENT_BOX.r)
+        )
+        view_box = vue(*view_box, dy=(view_box.t - view_box.b)/self.canvas.size[1], dx=(view_box.r - view_box.l)/self.canvas.size[0])
+        print(self.calc.calc_stride(view_box))
+        return super(TiledGeolocatedImageVisual, self)._prepare_draw(view)
 
 
 TiledGeolocatedImage = create_visual_node(TiledGeolocatedImageVisual)
