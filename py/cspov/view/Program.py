@@ -380,3 +380,52 @@ class GlooColormapDataTile(GlooTile):
 
 
 
+from vispy.gloo import Texture2D
+from cspov.common import DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH
+class TextureAtlas2D(Texture2D):
+    def __init__(self, num_tiles, tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH),
+                 format=None, resizable=True,
+                 interpolation=None, wrapping=None,
+                 internalformat=None, resizeable=None):
+        shape = (tile_shape[0], tile_shape[1] * num_tiles)
+        self.tile_shape = tile_shape
+        self.num_tiles = num_tiles
+        # shape = (tile_shape[0], tile_shape[1])
+        # shape = (4096, 8192)
+        # shape = None
+        # data = np.zeros((4096, 8192))
+        super(TextureAtlas2D, self).__init__(None, format, resizable, interpolation,
+                                             wrapping, shape, internalformat, resizeable)
+
+    def set_data(self, data, offset=None, copy=False):
+        # super(TextureAtlas2D, self).set_data(data, offset=(0, 0))
+        # super(TextureAtlas2D, self).set_data(data[:512, :self._shape[1]], offset=(0, 0))
+        tex_idx = 0
+        for y_idx in range(0, data.shape[0], 512):
+            for x_idx in range(0, data.shape[1], 512):
+                super(TextureAtlas2D, self).set_data(data[y_idx: y_idx+512, x_idx: x_idx+512], offset=(0, tex_idx*512))
+                tex_idx += 1
+                # FIXME: Don't go further than one row
+                if tex_idx * 512 >= self._shape[1]:
+                    break
+            if tex_idx * 512 >= self._shape[1]:
+                break
+
+    def get_texture_coordinates(self, tile_idx):
+        """Get texture coordinates for one tile as a quad.
+        """
+        # grid = (1, 1)
+        w = 1
+        h = 1
+
+        # start with basic quad describing the entire texture
+        quad = np.array([[0, 0, 0], [w, 0, 0], [w, h, 0],
+                         [0, 0, 0], [w, h, 0], [0, h, 0]],
+                        dtype=np.float32)
+        # Now scale and translate the coordinates so they only apply to one tile in the texture
+        one_tile_tex_width = 1.0 / self._shape[1] * self.tile_shape[1]
+        quad[:, 0] *= one_tile_tex_width
+        quad[:, 0] += one_tile_tex_width * tile_idx
+        quad = quad.reshape(6, 3)
+        quad = np.ascontiguousarray(quad[:, :2])
+        return quad

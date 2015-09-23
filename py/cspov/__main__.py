@@ -29,7 +29,7 @@ QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
 
 from cspov.view.MapWidget import CspovMainMapCanvas
-from cspov.view.LayerRep import NEShapefileLines, GeolocatedImage, TiledGeolocatedImage
+from cspov.view.LayerRep import NEShapefileLines, GeolocatedImage, OldTiledGeolocatedImage
 from cspov.model import Document
 from cspov.common import WORLD_EXTENT_BOX, DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH
 
@@ -127,11 +127,10 @@ class DatasetInfo(dict):
 
 # FIXME: Workspace structure
 class Workspace(object):
-    def __init__(self, base_dir, tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH)):
+    def __init__(self, base_dir):
         if not os.path.isdir(base_dir):
             raise IOError("Workspace '%s' does not exist" % (base_dir,))
         self.base_dir = os.path.realpath(base_dir)
-        self.tile_shape = tile_shape
 
     def _dataset_filepath(self, item, time_step):
         fn_pat = "HS_H08_20150714_{}_{}_FLDK_R20.merc.tif"
@@ -156,7 +155,7 @@ class Workspace(object):
 
         return d
 
-    def get_dataset_info(self, item, time_step, stride=None):
+    def get_dataset_info(self, item, time_step):
         dataset_info = DatasetInfo()
         # FIXME: Make up a better name
         dataset_info["name"] = item + "_" + time_step
@@ -240,7 +239,7 @@ class Main(QtGui.QMainWindow):
         for time_step in ["0330", "0340"]:
             ds_info = self.workspace.get_dataset_info("B02", time_step=time_step)
             full_data = self.workspace.get_dataset_data("B02", time_step=time_step)
-            image = TiledGeolocatedImage(
+            image = OldTiledGeolocatedImage(
                 ds_info.pop("name"),
                 data=full_data,
                 interpolation='nearest', method='subdivide', double=False, parent=self.image_list,

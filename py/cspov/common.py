@@ -88,11 +88,11 @@ class MercatorTileCalc(object):
     extents_box = None  # word coordinates that this image and its tiles corresponds to
     tiles_avail = None  # (ny,nx) available tile count for this image
 
-    def __init__(self, name, pixel_shape, zero_point, pixel_rez, tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH)):
+    def __init__(self, name, pixel_shape, ul_origin, pixel_rez, tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH)):
         """
         name: the 'name' of the tile, typically the path of the file it represents
         pixel_shape: (h:int,w:int) in pixels
-        zero_point: (y:float,x:float) in pixels that represents world coords 0N,0E eqm, even if outside the image and even if fractional
+        ul_origin: (y:float,x:float) in world coords specifies upper-left coordinate of the image
         pixel_rez: (dy:float,dx:float) in world coords per pixel ascending from corner [0,0], as measured near zero_point
         tile_shape: the pixel dimensions (h:int, w:int) of the GPU tiling we want to use
 
@@ -103,33 +103,17 @@ class MercatorTileCalc(object):
         super(MercatorTileCalc, self).__init__()
         self.name = name
         self.pixel_shape = pixel_shape
-        self.zero_point = zero_point
+        self.ul_origin = ul_origin
         self.pixel_rez = pixel_rez
         self.tile_shape = tile_shape
 
-        # assert(pixel_rez.dy > 0.0)        # FIXME: what if pixel_rez.dy < 0? can we handle this reliably?
-        # assert(pixel_rez.dx > 0.0)
-
         h,w = pixel_shape
-        zy,zx = zero_point
-        # below < 0, above >0
-        # h = above - below
-        # zy + above = h
-        # below = -zy
-        pxbelow = float(-zy)
-        pxabove = float(h) - float(zy)
-        # r > 0, l < 0
-        # w = r - l
-        # zx + r = w
-        # l = -zx
-        pxright = float(w) - float(zx)
-        pxleft = float(-zx)
-
+        oy,ox = ul_origin
         self.extents_box = box(
-            b = pxbelow * pixel_rez.dy,
-            t = pxabove * pixel_rez.dy,
-            l = pxleft * pixel_rez.dx,
-            r = pxright * pixel_rez.dx
+            b=oy - h * self.pixel_rez.dy,
+            t=oy,
+            l=ox,
+            r=ox + w * self.pixel_rez.dx,
         )
 
         self.tiles_avail = (h/tile_shape[0], w/tile_shape[1])
@@ -289,6 +273,10 @@ class MercatorTileCalc(object):
 
         return box(b=b,l=l,t=t,r=r)
 
+    def tile_slices(self, tiy, tix, stride):
+        y_slice = slice(tiy*self.tile_shape[0], (tiy+1)*self.tile_shape[0], stride)
+        x_slice = slice(tix*self.tile_shape[1], (tix+1)*self.tile_shape[1], stride)
+        return y_slice, x_slice
 
     def tile_pixels(self, data, tiy, tix, stride):
         """

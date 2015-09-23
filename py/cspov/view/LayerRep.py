@@ -36,6 +36,7 @@ from vispy.visuals import LineVisual, ImageVisual, CompoundVisual
 import numpy as np
 from datetime import datetime
 from pyproj import Proj
+from collections import defaultdict
 
 # from cspov.common import pnt, rez, MAX_EXCURSION_Y, MAX_EXCURSION_X, MercatorTileCalc, WORLD_EXTENT_BOX, \
 #     DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH, vue
@@ -212,7 +213,7 @@ class GeolocatedImageVisual(ImageVisual):
 GeolocatedImage = create_visual_node(GeolocatedImageVisual)
 
 
-class TiledGeolocatedImageVisual(CompoundVisual):
+class OldTiledGeolocatedImageVisual(CompoundVisual):
     """Geolocated image that is specially tiled to save on GPU memory usage.
     """
     def __init__(self, name, data=None, tile_shape=(512, 512), **kwargs):
@@ -220,23 +221,26 @@ class TiledGeolocatedImageVisual(CompoundVisual):
         self.tile_shape = tile_shape
         self.cell_width = kwargs["cell_width"]
         self.cell_height = kwargs["cell_height"]  # Note: cell_height is usually negative
+        self.origin_x = kwargs["origin_x"]
+        self.origin_y = kwargs["origin_y"]
+        self._stride = None  # Current stride is None when we are showing the overview
+        self._waiting_on_data = False
+        self._tiles = {}
 
         assert ("shape" in kwargs or data is not None), "`data` or `shape` must be provided"
         image_shape = kwargs.get("shape", data.shape)
 
         # Where does this image lie in this lonely world
-        self.image_extents = vue(
-            kwargs["origin_y"] + image_shape[0] * self.cell_height,
-            kwargs["origin_x"],
-            kwargs["origin_y"],
-            kwargs["origin_x"] + image_shape[1] * self.cell_width,
-            abs(self.cell_height),
-            abs(self.cell_width),
+        self.calc = MercatorTileCalc(
+            self.name,
+            image_shape,
+            pnt(x=self.origin_x, y=self.origin_y),
+            rez(dy=abs(self.cell_height), dx=abs(self.cell_width)),
+            tile_shape,
         )
-        # FIXME: Is zero_point needed?
-        zpnt = pnt(0.0, 0.0)
-        pixel_rez = rez(abs(self.cell_height), abs(self.cell_width))
-        self.calc = MercatorTileCalc(self.name, image_shape, zpnt, pixel_rez, tile_shape)
+
+        # FIXME: We should not be holding on to the entire dataset, this should come from the workspace
+        self.full_data = data
 
         # Start by showing the overview, the actual draw cycle will do the proper requests for higher resolution data
         # FIXME: Only making one large image for now
@@ -256,28 +260,260 @@ class TiledGeolocatedImageVisual(CompoundVisual):
 
         # Add the overview as the first image that gets displayed, this will get updated in the actual draw
         # We don't update the tiles here in case transforms aren't completely set yet
-        self.add_subvisual(self.overview_visual)
+        # self.add_subvisual(self.overview_visual)
 
     def _generate_tiles(self, view_box):
         pass
 
-    def _prepare_draw(self, view):
+    def _show_overview(self):
+        if self._stride is None and self.overview_visual.visible:
+            # we're already showing it
+            return
+        # TODO: Clear out old tiles, probably in another method
+        # TODO: Set Z level of overview to be one lower than the actual tiles so
+        # this way we can show the overview but keep the current tiles until new data is ready
+        self.add_subvisual(self.overview_visual)
+        self.overview_visual.visible = True
+        self._stride = None
+
+    def _hide_overview(self, new_stride):
+        if self._stride is not None or not self.overview_visual.visible:
+            # we aren't showing it
+            return
+        self.remove_subvisual(self.overview_visual)
+        self.overview_visual.visible = False
+        self._stride = new_stride
+
+    def set_data(self, new_data):
+        self._waiting_on_data = False
+
+    def get_new_data(self, y_slice, x_slice):
+        # FIXME: Remove this and replace with an actual request to the Workspace
+        return self.full_data[y_slice, x_slice]
+
+    def paint(self, view):
+        """Quickly and cheaply draw what we have.
+        """
+        return True
+
+    def _get_view_box(self):
         ll_corner, ur_corner = self.transforms.get_transform().imap([(-1, -1, 1), (1, 1, 1)])
-        margin = 10000.0
         # How many tiles should be contained in this view?
         view_box = box(
-            max(ll_corner[1] - margin, WORLD_EXTENT_BOX.b),
-            max(ll_corner[0] - margin, WORLD_EXTENT_BOX.l),
-            min(ur_corner[1] + margin, WORLD_EXTENT_BOX.t),
-            min(ur_corner[0] + margin, WORLD_EXTENT_BOX.r)
+            max(ll_corner[1], WORLD_EXTENT_BOX.b),
+            max(ll_corner[0], WORLD_EXTENT_BOX.l),
+            min(ur_corner[1], WORLD_EXTENT_BOX.t),
+            min(ur_corner[0], WORLD_EXTENT_BOX.r)
         )
         view_box = vue(*view_box, dy=(view_box.t - view_box.b)/self.canvas.size[1], dx=(view_box.r - view_box.l)/self.canvas.size[0])
-        print(self.calc.calc_stride(view_box))
+        return view_box
+
+    def assess(self, view):
+        """Determine if a retile is needed.
+
+        Tell workspace we will be needed
+        """
+        view_box = self._get_view_box()
+        preferred_stride = self.calc.calc_stride(view_box)
+        # XXX: Do we request new data here? How do the slices get moved around?
+        # self.request_new_data(y_slice, x_slice)
+        return preferred_stride != self._stride
+
+    def _generate_tiles(self, new_data):
+        # Remove tiles that aren't needed
+        # TODO: Stop removing all tiles
+        for tile_obj in self._tiles.values():
+            # FIXME: This redraws everytime by calling update
+            self.remove_subvisual(tile_obj)
+
+        # Add tiles that we need
+        y_tiles = int(np.ceil(new_data.shape[0] / self.tile_shape[0]))
+        x_tiles = int(np.ceil(new_data.shape[1] / self.tile_shape[1]))
+        for tiy in range(y_tiles):
+            for tix in range(x_tiles):
+                LOG.debug('y:{0} x:{1}'.format(tiy, tix))
+                # subim = self.calc.tile_pixels(tiy, tix, 1)
+                t = GeolocatedImageVisual(
+                    data=self.calc.tile_pixels(new_data, tiy, tix, 1),
+                    origin_x=self.origin_x + self.tile_shape[1] * self.cell_width,
+                    origin_y=self.origin_y + self.tile_shape[1] * self.cell_height,
+                    cell_width=self.cell_width / self.tile_shape[1],
+                    cell_height=self.cell_height / self.tile_shape[0],
+                )
+                self._tiles[(tiy, tix)] = t
+                self.add_subvisual(t)
+
+    def retile(self):
+        """Get data from workspace and retile/retexture as needed.
+        """
+        view_box = self._get_view_box()
+        preferred_stride = self.calc.calc_stride(view_box)
+        _, tile_box = self.calc.visible_tiles(view_box)
+
+        LOG.debug("Requesting new data from Workspace...")
+        # FIXME: Request just the part needed, not the whole strided image
+        # y_slice = slice(0, self.full_data.shape[0], preferred_stride)
+        # x_slice = slice(0, self.full_data.shape[1], preferred_stride)
+        top_idx = self.full_data.shape[0] - (self.tile_shape[0] * tile_box.t)
+        bot_idx = self.full_data.shape[0] - (self.tile_shape[0] * tile_box.b)
+        y_slice = slice(top_idx, bot_idx, preferred_stride)
+        x_slice = slice(tile_box.l * self.tile_shape[1], tile_box.r * self.tile_shape[1], preferred_stride)
+        new_data = self.get_new_data(y_slice, x_slice)
+        print(new_data.shape, tile_box)
+        self._generate_tiles(new_data)
+        self._stride = preferred_stride
+
+    def _prepare_draw(self, view):
+        self.paint(view)
+
+        if self.assess(view):
+            # We need a rerender/retile
+            self.retile()
         return super(TiledGeolocatedImageVisual, self)._prepare_draw(view)
 
 
-TiledGeolocatedImage = create_visual_node(TiledGeolocatedImageVisual)
+OldTiledGeolocatedImage = create_visual_node(OldTiledGeolocatedImageVisual)
 
+
+from cspov.view.Program import TextureAtlas2D, Texture2D
+from vispy.visuals.image import ImageVisual, load_spatial_filters, \
+    Function, _texture_lookup, VertexBuffer, _interpolation_template, \
+    NullTransform, VERT_SHADER, FRAG_SHADER
+from cspov.common import DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH
+class TiledGeolocatedImageVisual(ImageVisual):
+    def __init__(self, data, origin_x, origin_y, cell_width, cell_height,
+                 cmap='viridis', method='tiled', clim='auto', interpolation='nearest', **kwargs):
+        if method != 'tiled':
+            raise ValueError("Only 'tiled' method is currently supported")
+        method = 'subdivide'
+        grid = (1, 1)
+
+        self.origin_x = origin_x
+        self.origin_y = origin_y
+        self.cell_width = cell_width
+        self.cell_height = cell_height
+        num_tiles = 12
+        # num_tiles = 6
+        # num_tiles = 2
+        self.tile_shape = (DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH)
+        self.tile_info = {}
+        for i in range(num_tiles):
+            self.tile_info[(0, i)] = {
+                "origin_x": self.origin_x + self.cell_width * i * 512,
+                "origin_y": self.origin_y,
+                "cell_width": self.cell_width,
+                "cell_height": self.cell_height,
+            }
+
+        # Copied from original visual
+        self._data = None
+
+        # load 'float packed rgba8' interpolation kernel
+        # to load float interpolation kernel use
+        # `load_spatial_filters(packed=False)`
+        kernel, self._interpolation_names = load_spatial_filters()
+
+        self._kerneltex = Texture2D(kernel, interpolation='nearest')
+        # The unpacking can be debugged by changing "spatial-filters.frag"
+        # to have the "unpack" function just return the .r component. That
+        # combined with using the below as the _kerneltex allows debugging
+        # of the pipeline
+        # self._kerneltex = Texture2D(kernel, interpolation='linear',
+        #                             internalformat='r32f')
+
+        # create interpolation shader functions for available
+        # interpolations
+        fun = [Function(_interpolation_template % n)
+               for n in self._interpolation_names]
+        self._interpolation_names = [n.lower()
+                                     for n in self._interpolation_names]
+
+        self._interpolation_fun = dict(zip(self._interpolation_names, fun))
+        self._interpolation_names.sort()
+        self._interpolation_names = tuple(self._interpolation_names)
+
+        # overwrite "nearest" and "bilinear" spatial-filters
+        # with  "hardware" interpolation _data_lookup_fn
+        self._interpolation_fun['nearest'] = Function(_texture_lookup)
+        self._interpolation_fun['bilinear'] = Function(_texture_lookup)
+
+        if interpolation not in self._interpolation_names:
+            raise ValueError("interpolation must be one of %s" %
+                             ', '.join(self._interpolation_names))
+
+        self._interpolation = interpolation
+
+        # check texture interpolation
+        if self._interpolation == 'bilinear':
+            texture_interpolation = 'linear'
+        else:
+            texture_interpolation = 'nearest'
+
+        self._method = method
+        self._grid = grid
+        self._need_texture_upload = True
+        self._need_vertex_update = True
+        self._need_colortransform_update = True
+        self._need_interpolation_update = True
+        self._texture = TextureAtlas2D(num_tiles=num_tiles, tile_shape=self.tile_shape,
+                                       interpolation=texture_interpolation)
+        self._subdiv_position = VertexBuffer()
+        self._subdiv_texcoord = VertexBuffer()
+
+        # impostor quad covers entire viewport
+        vertices = np.array([[-1, -1], [1, -1], [1, 1],
+                             [-1, -1], [1, 1], [-1, 1]],
+                            dtype=np.float32)
+        self._impostor_coords = VertexBuffer(vertices)
+        self._null_tr = NullTransform()
+
+        self._init_view(self)
+        super(ImageVisual, self).__init__(vcode=VERT_SHADER, fcode=FRAG_SHADER)
+        self.set_gl_state('translucent', cull_face=False)
+        self._draw_mode = 'triangles'
+
+        # define _data_lookup_fn as None, will be setup in
+        # self._build_interpolation()
+        self._data_lookup_fn = None
+
+        self.clim = clim
+        self.cmap = cmap
+        if data is not None:
+            self.set_data(data)
+        self.freeze()
+
+    def _build_texture(self):
+        super(TiledGeolocatedImageVisual, self)._build_texture()
+        self._data = self._data[:512, :self._texture.shape[1]]
+
+    def _build_vertex_data(self):
+        """Rebuild the vertex buffers used for rendering the image when using
+        the subdivide method.
+
+        CSPOV Note: Copied from 0.5.0dev original ImageVisual class
+        """
+        # return self._old2_build_vertex_data()
+        tex_coords = [
+            self._texture.get_texture_coordinates(i) for i in range(self._texture.num_tiles)]
+        tex_coords = np.concatenate(tex_coords, axis=0)
+
+        vertices = np.zeros((6 * self._texture.num_tiles, 2), dtype=np.float32)
+        for i in range(self._texture.num_tiles):
+            tile_info = self.tile_info[(0, i)]
+            quad = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0],
+                             [0, 0, 0], [1, 1, 0], [0, 1, 0]],
+                            dtype=np.float32)
+            quad[:, 0] *= tile_info["cell_width"] * self.tile_shape[1]
+            quad[:, 0] += tile_info["origin_x"]
+            quad[:, 1] *= tile_info["cell_height"] * self.tile_shape[0]
+            quad[:, 1] += tile_info["origin_y"]
+            quad = quad.reshape(6, 3)
+            vertices[i*6: (i+1)*6, :] = quad[:, :2]
+
+        self._subdiv_position.set_data(vertices.astype('float32'))
+        self._subdiv_texcoord.set_data(tex_coords.astype('float32'))
+
+TiledGeolocatedImage = create_visual_node(TiledGeolocatedImageVisual)
 
 # FIXME: replace this with a LayerRepFactory which tracks all the GPU resources that have been dedicated?
 class OldTiledImageFile(LayerRep):
