@@ -156,6 +156,8 @@ class Workspace(object):
         return d
 
     def get_dataset_info(self, item, time_step):
+        # Extra little 'fluff' so that 0 in the texture can be used for fill values
+        fill_margin = 0.005
         dataset_info = DatasetInfo()
         # FIXME: Make up a better name
         dataset_info["name"] = item + "_" + time_step
@@ -165,11 +167,11 @@ class Workspace(object):
         if item in ["B01", "B02", "B03", "B04", "B05", "B06"]:
             # Reflectance/visible data limits
             # FIXME: Are these correct?
-            dataset_info["clim"] = (0.0, 1.0)
+            dataset_info["clim"] = (0.0 - fill_margin, 1.0)
         else:
             # BT data limits
             # FIXME: Are these correct?
-            dataset_info["clim"] = (200.0, 350.0)
+            dataset_info["clim"] = (200.0 - fill_margin, 350.0)
 
         # Full resolution shape
         dataset_info["shape"] = self.get_dataset_data(item, time_step).shape

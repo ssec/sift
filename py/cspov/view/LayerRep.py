@@ -36,7 +36,6 @@ from vispy.visuals import LineVisual, ImageVisual, CompoundVisual
 import numpy as np
 from datetime import datetime
 from pyproj import Proj
-from collections import defaultdict
 
 # from cspov.common import pnt, rez, MAX_EXCURSION_Y, MAX_EXCURSION_X, MercatorTileCalc, WORLD_EXTENT_BOX, \
 #     DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH, vue
@@ -380,6 +379,94 @@ from vispy.visuals.image import ImageVisual, load_spatial_filters, \
     Function, _texture_lookup, VertexBuffer, _interpolation_template, \
     NullTransform, VERT_SHADER, FRAG_SHADER
 from cspov.common import DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH
+
+VERT_SHADER = """
+uniform int method;  // 0=subdivide, 1=impostor
+attribute vec2 a_position;
+attribute vec2 a_texcoord;
+varying vec2 v_texcoord;
+
+void main() {
+    v_texcoord = a_texcoord;
+    gl_Position = $transform(vec4(a_position, 0., 1.));
+}
+"""
+
+FRAG_SHADER = """
+uniform vec2 image_size;
+uniform int method;  // 0=subdivide, 1=impostor
+uniform sampler2D u_texture;
+varying vec2 v_texcoord;
+
+// http://stackoverflow.com/questions/11810158/how-to-deal-with-nan-or-inf-in-opengl-es-2-0-shaders
+bool isNan(float val)
+{
+  return (val <= 0.0 || 0.0 <= val) ? false : true;
+  // all comparisons on NaN return false. Note this may not work on sloppy non-IEEE754 GPUs! (Crap.)
+  // also note that isnan isn't part of GLSL standard in 2.0, but we get isnan and isinf later.
+}
+
+vec4 map_local_to_tex(vec4 x) {
+    // Cast ray from 3D viewport to surface of image
+    // (if $transform does not affect z values, then this
+    // can be optimized as simply $transform.map(x) )
+    vec4 p1 = $transform(x);
+    vec4 p2 = $transform(x + vec4(0, 0, 0.5, 0));
+    p1 /= p1.w;
+    p2 /= p2.w;
+    vec4 d = p2 - p1;
+    float f = p2.z / d.z;
+    vec4 p3 = p2 - d * f;
+
+    // finally map local to texture coords
+    return vec4(p3.xy / image_size, 0, 1);
+}
+
+
+void main()
+{
+    vec2 texcoord;
+    if( method == 0 ) {
+        texcoord = v_texcoord;
+    }
+    else {
+        // vertex shader ouptuts clip coordinates;
+        // fragment shader maps to texture coordinates
+        texcoord = map_local_to_tex(vec4(v_texcoord, 0, 1)).xy;
+    }
+
+    gl_FragColor = $color_transform($get_data(texcoord));
+}
+"""  # noqa
+
+_null_color_transform = 'vec4 pass(vec4 color) { return color; }'
+_c2l = 'float cmap(vec4 color) { return (color.r + color.g + color.b) / 3.; }'
+
+_interpolation_template = """
+    #include "misc/spatial-filters.frag"
+    vec4 texture_lookup_filtered(vec2 texcoord) {
+        if(texcoord.x < 0.0 || texcoord.x > 1.0 ||
+        texcoord.y < 0.0 || texcoord.y > 1.0) {
+            discard;
+        }
+        return %s($texture, $shape, texcoord);
+    }"""
+
+_texture_lookup = """
+    vec4 texture_lookup(vec2 texcoord) {
+        if(texcoord.x < 0.0 || texcoord.x > 1.0 ||
+        texcoord.y < 0.0 || texcoord.y > 1.0) {
+            discard;
+        }
+        vec4 val = texture2D($texture, texcoord);
+        // NaN is not properly translated in the texture so use 0 as the fill value
+        if (val.r == 0.0) {
+            discard;
+        }
+        return val;
+    }"""
+
+
 class TiledGeolocatedImageVisual(ImageVisual):
     def __init__(self, data, origin_x, origin_y, cell_width, cell_height,
                  cmap='viridis', method='tiled', clim='auto', interpolation='nearest', **kwargs):
@@ -498,7 +585,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         tex_coords = np.concatenate(tex_coords, axis=0)
 
         vertices = np.zeros((6 * self._texture.num_tiles, 2), dtype=np.float32)
-        for i in range(self._texture.num_tiles):
+        for i in self._texture.iter_tile_index():
             tile_info = self.tile_info[(0, i)]
             quad = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0],
                              [0, 0, 0], [1, 1, 0], [0, 1, 0]],

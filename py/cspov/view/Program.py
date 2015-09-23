@@ -390,6 +390,7 @@ class TextureAtlas2D(Texture2D):
         shape = (tile_shape[0], tile_shape[1] * num_tiles)
         self.tile_shape = tile_shape
         self.num_tiles = num_tiles
+        self.tile_dirty = np.ones((self.num_tiles,), dtype=np.bool)
         # shape = (tile_shape[0], tile_shape[1])
         # shape = (4096, 8192)
         # shape = None
@@ -397,18 +398,40 @@ class TextureAtlas2D(Texture2D):
         super(TextureAtlas2D, self).__init__(None, format, resizable, interpolation,
                                              wrapping, shape, internalformat, resizeable)
 
+    def iter_tile_index(self):
+        return (idx for idx, dirty in enumerate(self.tile_dirty) if not dirty)
+
+    def _tex_offset(self, idx):
+        """Return the X, Y texture index offset for the 1D tile index.
+
+        This class presents a 1D indexing scheme, but internally can hold multiple tiles in both X and Y direction.
+        """
+        return 0, idx * self.tile_shape[1]
+
     def set_data(self, data, offset=None, copy=False):
         # super(TextureAtlas2D, self).set_data(data, offset=(0, 0))
         # super(TextureAtlas2D, self).set_data(data[:512, :self._shape[1]], offset=(0, 0))
-        tex_idx = 0
-        for y_idx in range(0, data.shape[0], 512):
-            for x_idx in range(0, data.shape[1], 512):
-                super(TextureAtlas2D, self).set_data(data[y_idx: y_idx+512, x_idx: x_idx+512], offset=(0, tex_idx*512))
-                tex_idx += 1
+        tile_idx = 0
+        tmp_tile = np.empty(self.tile_shape, data.dtype)
+        for y_idx in [0]:# range(0, data.shape[0], self.tile_shape[0]):
+            for x_idx in range(0, data.shape[1], self.tile_shape[1]):
+                offset = self._tex_offset(tile_idx)
+                # data_slice = (slice(y_idx, y_idx + self.tile_shape[0]), slice(x_idx, x_idx + self.tile_shape[1]))
+                tile_offset = (min(y_idx + self.tile_shape[0], data.shape[0]) - y_idx,
+                               min(x_idx + self.tile_shape[1], data.shape[1]) - x_idx)
+                if tile_offset[0] < self.tile_shape[0] or tile_offset[1] < self.tile_shape[1]:
+                    # FIXME: This should be handled by the caller to expand the array to be NaN filled and aligned
+                    # NaN fill the tile when it isn't filled with data
+                    # tmp_tile[:] = np.nan
+                    tmp_tile[:] = 0.0
+                tmp_tile[:tile_offset[0], :tile_offset[1]] = data[y_idx: y_idx + tile_offset[0], x_idx: x_idx + tile_offset[1]]
+                super(TextureAtlas2D, self).set_data(tmp_tile, offset=offset, copy=True)
+                self.tile_dirty[tile_idx] = False
+                tile_idx += 1
                 # FIXME: Don't go further than one row
-                if tex_idx * 512 >= self._shape[1]:
+                if tile_idx * self.tile_shape[1] >= self._shape[1]:
                     break
-            if tex_idx * 512 >= self._shape[1]:
+            if tile_idx * self.tile_shape[1] >= self._shape[1]:
                 break
 
     def get_texture_coordinates(self, tile_idx):
