@@ -26,6 +26,8 @@ __docformat__ = 'reStructuredText'
 # from PyQt4.QtGui import *
 # from PyQt4.QtCore import *
 from vispy import app, gloo
+from .queue import TaskQueue, test_task, TASK_PROGRESS, TASK_DOING
+
 # import vispy
 # vispy.use(app='PyQt4') #, gl='gl+')
 
@@ -83,7 +85,7 @@ def test_layers(doc):
     return []
 
 
-
+PROGRESS_BAR_MAX = 1000
 
 class Main(QtGui.QMainWindow):
 
@@ -91,11 +93,23 @@ class Main(QtGui.QMainWindow):
         pass
         # self._b_adds_files = UserAddsFileToDoc(self, self.ui.)
 
+    def update_progress_bar(self, status_info, *args, **kwargs):  # FIXME no workie
+        active = status_info[0]
+        LOG.warning('{0!r:s}'.format(status_info))
+        val = active[TASK_PROGRESS]
+        self.ui.progressBar.setValue(int(val*PROGRESS_BAR_MAX))
+        LOG.warning('progress bar updated to {}'.format(val))
+
+
     def __init__(self):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
         # refer to objectName'd entities as self.ui.objectName
+
+        self.queue = TaskQueue()
+        self.ui.progressBar.setRange(0, PROGRESS_BAR_MAX)
+        self.queue.didMakeProgress.connect(self.update_progress_bar)
 
         # create document
         self.document = doc = Document()
@@ -119,10 +133,13 @@ class Main(QtGui.QMainWindow):
 
         # convey action between document and layer list view
         self.behaviorLayersList = LayerStackListViewModel(self.ui.layers, doc)
+
+        self.queue.add('test', test_task(), 'test000')
         # self.ui.layers
 
     def updateLayerList(self):
-        self.ui.layers.add
+        # self.ui.layers.add
+        pass
 
 
 if __name__ == '__main__':
