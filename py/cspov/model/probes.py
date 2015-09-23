@@ -41,25 +41,50 @@ class Probe(QObject):
     """
     kind = None  # preferred output type
 
-    didChangeAreaSelection = pyqtSignal(str)  # WKT representation of new shape
+    didChangeAreaSelection = pyqtSignal()  # probably WKB or WKT representation of new shape? or shapely object?
+    didChangeLayerSelection = pyqtSignal()
+    didUpdateCalculatedContent = pyqtSignal()  #
 
-    # kinds that will be supported
+    # kinds of delegates that will be supported
     HTML = 'html'
     MATPLOTLIB = 'matplotlib'
     VISPY = 'vispy'
     QT = 'qt'
 
-    def update(self, *args, **kwargs):
+    def recalculate(self, *args, **kwargs):
         """
-        Slot used to recalculate and propagate update to the view
+        Slot used to recalculate content that delegates provide to the view
         :return:
         """
         return None
 
-
     def asViewDelegate(self, kind, **kwargs):
+        """
+        Delegate is
+        :param kind:
+        :param kwargs:
+        :return: delegate object which a matched view will use to update its contents
+        """
         assert(kind==self.kind)
         return None
+
+
+class HtmlProbeViewDelegate(object):
+
+    def set_widget(self, html_widget):
+        raise NotImplementedError()
+
+    def get_widget(self):
+        return None
+
+    widget = property(get_widget, set_widget)  # WebKit widget we'll be setting up and updating
+
+    def update(self):
+        """
+        interact with WebKit widget to update or initialize content
+        :return:
+        """
+
 
 
 

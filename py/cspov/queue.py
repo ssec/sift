@@ -22,7 +22,7 @@ __docformat__ = 'reStructuredText'
 
 import os, sys
 import logging, unittest, argparse
-from PyQt4.QtCore import QObject
+from PyQt4.QtCore import QObject, pyqtSignal
 
 LOG = logging.getLogger(__name__)
 
@@ -38,13 +38,16 @@ class TaskQueue(QObject):
     Includes state updates and GUI links.
     Eventually will include thread pools and multiprocess pools.
     """
-    pool = None  # process pool for background activity
+    process_pool = None  # process pool for background activity
+    thread_pool = None  # thread pool for background activity
+
+    didMakeProgress = pyqtSignal(tuple)  # update information to be propagated to on-screen status
 
     def __init__(self, pool=None):
         super(TaskQueue, self).__init__()
         self.pool = pool
 
-    def __setitem__(self, key, value):
+    def add(self, key, task_iterable, description, use_process_pool=False, use_thread_pool=False):
         """
         Add an iterable task which will yield progress information dictionaries.
 
