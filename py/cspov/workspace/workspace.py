@@ -23,15 +23,16 @@ REQUIRES
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import os, sys
+import os, sys, re
 import logging, unittest, argparse
 from PyQt4.QtCore import QObject, pyqtSignal
+import gdal
 from collections import namedtuple
 
 
 LOG = logging.getLogger(__name__)
 
-import_progress = namedtuple('import_progress', ['stages', 'current_stage', 'completion', 'stage_desc', 'dataset_info', 'data'])
+import_progress = namedtuple('import_progress', ['uuid', 'stages', 'current_stage', 'completion', 'stage_desc', 'dataset_info', 'data'])
 # stages:int, number of stages this import requires
 # current_stage:int, 0..stages-1 , which stage we're on
 # completion:float, 0..1 how far we are along on this stage
@@ -56,7 +57,7 @@ class WorkspaceImporter(object):
         """
         Yield a series of import_status tuples updating status of the import.
         :param dest_cwd: destination directory to place flat files into
-        :param dest_uuid: uuid key to use in reference to this dataset - may or may not be used in file naming, but should be included in datasetinfo
+        :param dest_uuid: uuid key to use in reference to this dataset at all LODs - may or may not be used in file naming, but should be included in datasetinfo
         :param source_uri: uri to load from
         :param source_path: path to load from (alternative to source_uri)
         :return: sequence of import_progress, the first and last of which must include data,
@@ -72,8 +73,61 @@ class GeoTiffImporter(WorkspaceImporter):
     def __init__(self, **kwargs):
         super(GeoTiffImporter, self).__init__()
 
+    def test_uri(self, uri):
+        return True if (uri.lower().endswith('.tif') or uri.lower().endswith('.tiff')) else False
+
     def __call__(self, dest_cwd, dest_uuid, source_uri=None, source_path=None, process_pool=None, **kwargs):
-        raise NotImplementedError('must transfer code from another branch')
+        # yield successive levels of detail as we load
+        if source_uri is not None:
+            raise NotImplementedError("GeoTiffImporter cannot read from URIs yet")
+        d = {}
+        gtiff = gdal.Open(source_path)
+        ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
+        d["origin_x"] = ox
+        d["origin_y"] = oy
+        d["cell_width"] = cw
+        d["cell_height"] = ch
+        # FUTURE: Should the Workspace normalize all input data or should the Image Layer handle any projection?
+        srs = gdal.osr.SpatialReference()
+        srs.ImportFromWkt(gtiff.GetProjection())
+        d["proj"] = srs.ExportToProj4()
+
+        d["name"] = os.path.split(source_path)[-1]
+        d["filepath"] = source_path
+        item = re.findall(r'_(B\d\d)_', source_path)[-1]  # FIXME: this should be a guidebook
+        # Valid min and max for colormap use
+        if item in ["B01", "B02", "B03", "B04", "B05", "B06"]:
+            # Reflectance/visible data limits
+            # FIXME: Are these correct?
+            d["clim"] = (0.0, 1.0)
+        else:
+            # BT data limits
+            # FIXME: Are these correct?
+            d["clim"] = (200.0, 350.0)
+
+        img_data = gtiff.GetRasterBand(1).ReadAsArray()
+
+        # Full resolution shape
+        # d["shape"] = self.get_dataset_data(item, time_step).shape
+        d['shape'] = img_data.shape
+
+        # normally we would place a numpy.memmap in the workspace with the content of the geotiff raster band/s here
+
+        # single stage import with all the data for this simple case
+        zult = import_progress(uuid=dest_uuid,
+                               stages=1,
+                               current_stage=0,
+                               completion=1.0,
+                               stage_desc="loading geotiff",
+                               dataset_info=d,
+                               data=img_data)
+        yield zult
+        # further yields would logically add levels of detail with their own sampling values
+        # FIXME: provide example of multiple LOD loading and how datasetinfo dictionary/dictionaries look in that case
+
+
+
+
 
 
 class Workspace(QObject):
@@ -91,6 +145,7 @@ class Workspace(QObject):
     cwd = None  # directory we work in
     _own_cwd = None  # whether or not we created the cwd - which is also whether or not we're allowed to destroy it
     _pool = None  # process pool that importers can use for background activities, if any
+    _importers = None  # list of importers to consult when asked to start an import
 
     # signals
     didStartImport = pyqtSignal(dict)  # a dataset started importing; generated after overview level of detail is available
@@ -98,6 +153,8 @@ class Workspace(QObject):
     didImportLevelOfDetail = pyqtSignal(dict)  # partial completion of a dataset import
     didFinishImport = pyqtSignal(dict)  # all loading activities for a dataset have completed
     didDiscoverExternalDataset = pyqtSignal(dict)  # a new dataset was added to the workspace from an external agent
+
+    IMPORT_CLASSES = [ GeoTiffImporter ]
 
 
     def __init__(self, directory_path=None, process_pool=None):
@@ -137,6 +194,8 @@ class Workspace(QObject):
         :param pathname:
         :return:
         """
+        for imp in self._importers:
+            if imp.test_uri
         return self.attach_uri('file://' + pathname)
 
     def remove(self, dsi):
