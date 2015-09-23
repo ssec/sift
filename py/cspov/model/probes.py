@@ -23,7 +23,7 @@ __docformat__ = 'reStructuredText'
 
 import os, sys
 import logging, unittest, argparse
-from PyQt4.QtCore import QObject
+from PyQt4.QtCore import QObject, pyqtSignal
 
 LOG = logging.getLogger(__name__)
 
@@ -31,8 +31,36 @@ LOG = logging.getLogger(__name__)
 class Shape(QObject):
     pass
 
+
+
 class Probe(QObject):
-    pass
+    """
+    A Probe transforms a Shape into a visualization widget aka ProbeView.
+    Typically is attached to one or more layers - this is so that we can update when animation is taking place.
+    It offers a delegate to the view that it's driving.
+    """
+    kind = None  # preferred output type
+
+    didChangeAreaSelection = pyqtSignal(str)  # WKT representation of new shape
+
+    # kinds that will be supported
+    HTML = 'html'
+    MATPLOTLIB = 'matplotlib'
+    VISPY = 'vispy'
+    QT = 'qt'
+
+    def update(self, *args, **kwargs):
+        """
+        Slot used to recalculate and propagate update to the view
+        :return:
+        """
+        return None
+
+
+    def asViewDelegate(self, kind, **kwargs):
+        assert(kind==self.kind)
+        return None
+
 
 
 

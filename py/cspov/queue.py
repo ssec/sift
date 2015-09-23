@@ -38,8 +38,11 @@ class TaskQueue(QObject):
     Includes state updates and GUI links.
     Eventually will include thread pools and multiprocess pools.
     """
-    def __init__(self):
+    pool = None  # process pool for background activity
+
+    def __init__(self, pool=None):
         super(TaskQueue, self).__init__()
+        self.pool = pool
 
     def __setitem__(self, key, value):
         """

@@ -90,6 +90,12 @@ class Document(QObject):
         self.docDidChangeLayer.emit({'filename': filename})
 
 #
+    def asProbeGuidance(self, **kwargs):
+        """
+        Retrieve delegate to be used by Probe objects to access and update the data selection (lasso et cetera)
+        """
+        return None
+
 #     def swap(self, adex, bdex):
 #         order = list(range(len(self)))
 #         order[bdex], order[adex] = adex, bdex

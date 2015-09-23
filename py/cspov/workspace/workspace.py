@@ -26,9 +26,55 @@ __docformat__ = 'reStructuredText'
 import os, sys
 import logging, unittest, argparse
 from PyQt4.QtCore import QObject, pyqtSignal
+from collections import namedtuple
 
 
 LOG = logging.getLogger(__name__)
+
+import_progress = namedtuple('import_progress', ['stages', 'current_stage', 'completion', 'stage_desc', 'dataset_info', 'data'])
+# stages:int, number of stages this import requires
+# current_stage:int, 0..stages-1 , which stage we're on
+# completion:float, 0..1 how far we are along on this stage
+# stage_desc:tuple(str), brief description of each of the stages we'll be doing
+
+
+class WorkspaceImporter(object):
+    """
+    Instances of this class are typically singletons owned by Workspace.
+    They're used to perform background activity for importing large input files.
+    """
+    def __init__(self, **kwargs):
+        super(WorkspaceImporter, self).__init__()
+    
+    def test_uri(self, uri):
+        """
+        return True if this importer is capable of reading this URI.
+        """
+        return False
+
+    def __call__(self, dest_cwd, dest_uuid, source_uri=None, source_path=None, process_pool=None, **kwargs):
+        """
+        Yield a series of import_status tuples updating status of the import.
+        :param dest_cwd: destination directory to place flat files into
+        :param dest_uuid: uuid key to use in reference to this dataset - may or may not be used in file naming, but should be included in datasetinfo
+        :param source_uri: uri to load from
+        :param source_path: path to load from (alternative to source_uri)
+        :return: sequence of import_progress, the first and last of which must include data,
+                 inbetween updates typically will release data when stages complete and have None for dataset_info and data fields
+        """
+        raise NotImplementedError('subclass must implement')
+
+
+class GeoTiffImporter(WorkspaceImporter):
+    """
+    GeoTIFF data importer
+    """
+    def __init__(self, **kwargs):
+        super(GeoTiffImporter, self).__init__()
+
+    def __call__(self, dest_cwd, dest_uuid, source_uri=None, source_path=None, process_pool=None, **kwargs):
+        raise NotImplementedError('must transfer code from another branch')
+
 
 class Workspace(QObject):
     """
@@ -44,18 +90,21 @@ class Workspace(QObject):
     """
     cwd = None  # directory we work in
     _own_cwd = None  # whether or not we created the cwd - which is also whether or not we're allowed to destroy it
+    _pool = None  # process pool that importers can use for background activities, if any
 
     # signals
     didStartImport = pyqtSignal(dict)  # a dataset started importing; generated after overview level of detail is available
+    didMakeImportProgress = pyqtSignal(dict)
     didImportLevelOfDetail = pyqtSignal(dict)  # partial completion of a dataset import
     didFinishImport = pyqtSignal(dict)  # all loading activities for a dataset have completed
     didDiscoverExternalDataset = pyqtSignal(dict)  # a new dataset was added to the workspace from an external agent
 
 
-    def __init__(self, directory_path=None):
+    def __init__(self, directory_path=None, process_pool=None):
         """
         Initialize a new or attach an existing workspace, creating any necessary bookkeeping.
         """
+        super(Workspace, self).__init__()
         self.cwd = directory_path = os.path.abspath(directory_path)
         if not os.path.isdir(directory_path):
             os.makedirs(directory_path)
@@ -90,7 +139,7 @@ class Workspace(QObject):
         """
         return self.attach_uri('file://' + pathname)
 
-    def expel(self, dsi):
+    def remove(self, dsi):
         """
         Formally detach a dataset, removing its content from the workspace fully by the time that idle() has nothing more to do.
         :param dsi: datasetinfo dictionary
@@ -103,7 +152,15 @@ class Workspace(QObject):
         :param datasetinfo: metadata on the dataset
         :return: sliceable object returning numpy arrays
         """
+        pass
 
+
+    def asProbeDataSource(self, **kwargs):
+        """
+        Delegate used to match masks to data content.
+        :param kwargs:
+        :return: delegate object used by probe objects to access workspace content
+        """
 
 
 def main():
