@@ -47,7 +47,7 @@ class WorkspaceImporter(object):
     def __init__(self, **kwargs):
         super(WorkspaceImporter, self).__init__()
     
-    def test_uri(self, uri):
+    def is_relevant(self, source_uri=None, source_path=None):
         """
         return True if this importer is capable of reading this URI.
         """
@@ -73,7 +73,7 @@ class GeoTiffImporter(WorkspaceImporter):
     def __init__(self, **kwargs):
         super(GeoTiffImporter, self).__init__()
 
-    def test_uri(self, uri):
+    def is_relevant(self, uri):
         return True if (uri.lower().endswith('.tif') or uri.lower().endswith('.tiff')) else False
 
     def __call__(self, dest_cwd, dest_uuid, source_uri=None, source_path=None, process_pool=None, **kwargs):
@@ -82,6 +82,9 @@ class GeoTiffImporter(WorkspaceImporter):
             raise NotImplementedError("GeoTiffImporter cannot read from URIs yet")
         d = {}
         gtiff = gdal.Open(source_path)
+
+        # FIXME: consider yielding status at this point so our progress bar starts moving
+
         ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
         d["origin_x"] = ox
         d["origin_y"] = oy
@@ -124,6 +127,7 @@ class GeoTiffImporter(WorkspaceImporter):
         yield zult
         # further yields would logically add levels of detail with their own sampling values
         # FIXME: provide example of multiple LOD loading and how datasetinfo dictionary/dictionaries look in that case
+        # note that once the coarse data is yielded, we may be operating in another thread - think about that for now?
 
 
 
@@ -146,6 +150,8 @@ class Workspace(QObject):
     _own_cwd = None  # whether or not we created the cwd - which is also whether or not we're allowed to destroy it
     _pool = None  # process pool that importers can use for background activities, if any
     _importers = None  # list of importers to consult when asked to start an import
+    _info = None
+    _data = None
 
     # signals
     didStartImport = pyqtSignal(dict)  # a dataset started importing; generated after overview level of detail is available
@@ -168,6 +174,8 @@ class Workspace(QObject):
             self._own_cwd = True
         else:
             self._own_cwd = False
+        self._data = {}
+        self._info = {}
 
 
     def idle(self):
@@ -194,9 +202,26 @@ class Workspace(QObject):
         :param pathname:
         :return:
         """
+        gen = None
+        uuid = pathname  # FIXME
         for imp in self._importers:
-            if imp.test_uri
-        return self.attach_uri('file://' + pathname)
+            if imp.is_relevant(source_path=pathname):
+                gen = imp(self.cwd, uuid, source_path=pathname)  # FIXME: use a real unique id to track this dataset
+                break
+        if gen is None:
+            raise IOError("unable to import {}".format(pathname))
+
+        # FIXME: for now, just iterate the incremental load. later we want to add this to TheQueue and update the UI as we get more data loaded
+        for update in gen:
+            if update.data is not None:
+                info = self._info[uuid] = update.dataset_info
+                data = self._data[uuid] = update.data
+                LOG.debug(repr(update))
+        return info, data
+
+
+
+
 
     def remove(self, dsi):
         """
