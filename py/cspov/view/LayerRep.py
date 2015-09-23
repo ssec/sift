@@ -579,13 +579,11 @@ class TiledGeolocatedImageVisual(ImageVisual):
 
         CSPOV Note: Copied from 0.5.0dev original ImageVisual class
         """
-        # return self._old2_build_vertex_data()
-        tex_coords = [
-            self._texture.get_texture_coordinates(i) for i in range(self._texture.num_tiles)]
-        tex_coords = np.concatenate(tex_coords, axis=0)
+        tex_coords = np.empty((6 * self._texture.num_tiles, 2), dtype=np.float32)
+        vertices = np.empty((6 * self._texture.num_tiles, 2), dtype=np.float32)
 
-        vertices = np.zeros((6 * self._texture.num_tiles, 2), dtype=np.float32)
         for i in self._texture.iter_tile_index():
+            tex_coords[i*6: (i+1)*6] = self._texture.get_texture_coordinates(i)
             tile_info = self.tile_info[(0, i)]
             quad = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0],
                              [0, 0, 0], [1, 1, 0], [0, 1, 0]],
