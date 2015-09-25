@@ -29,7 +29,7 @@ QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
 
 from cspov.view.MapWidget import CspovMainMapCanvas
-from cspov.view.LayerRep import NEShapefileLines, GeolocatedImage, OldTiledGeolocatedImage
+from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.model import Document
 from cspov.common import WORLD_EXTENT_BOX, DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH
 
@@ -238,14 +238,24 @@ class Main(QtGui.QMainWindow):
         self.boundaries = NEShapefileLines(border_shapefile, double=True, parent=self.main_map)
 
         # Create Layers
+        tex_tiles_per_image = 32
+        # tex_tiles_per_image = 16 * 8
         for time_step in ["0330", "0340"]:
             ds_info = self.workspace.get_dataset_info("B02", time_step=time_step)
             full_data = self.workspace.get_dataset_data("B02", time_step=time_step)
-            image = OldTiledGeolocatedImage(
-                ds_info.pop("name"),
-                data=full_data,
-                interpolation='nearest', method='subdivide', double=False, parent=self.image_list,
-                **ds_info
+            image = TiledGeolocatedImage(
+                full_data,
+                ds_info["origin_x"],
+                ds_info["origin_y"],
+                ds_info["cell_width"],
+                ds_info["cell_height"],
+                name=ds_info["name"],
+                clim=ds_info["clim"],
+                interpolation='nearest',
+                method='tiled',
+                double=False,
+                num_tiles=tex_tiles_per_image,
+                parent=self.image_list,
             )
 
         # Interaction Setup

@@ -432,22 +432,22 @@ class TextureAtlas2D(Texture2D):
         super(TextureAtlas2D, self).set_data(data, offset=offset, copy=copy)
         self.tile_dirty[tile_idx] = False
 
-    def set_data(self, data, offset=None, copy=False):
-        tile_idx = 0
-        # for y_idx in [0]:# range(0, data.shape[0], self.tile_shape[0]):
-        for y_idx in range(0, data.shape[0], self.tile_shape[0]):
-            for x_idx in range(0, data.shape[1], self.tile_shape[1]):
-                self.set_tile_data(tile_idx,
-                                   data[y_idx: y_idx + self.tile_shape[0], x_idx: x_idx + self.tile_shape[1]],
-                                   copy=copy)
-                tile_idx += 1
-
-                if tile_idx >= self.num_tiles:
-                    break
-                    raise ValueError("Too much data to fit in texture atlas with shape %r" % (data.shape,))
-                # FIXME: Don't go further than the data we have
-            if tile_idx >= self.num_tiles:
-                break
+    # def set_data(self, data, offset=None, copy=False):
+    #     tile_idx = 0
+    #     # for y_idx in [0]:# range(0, data.shape[0], self.tile_shape[0]):
+    #     for y_idx in range(0, data.shape[0], self.tile_shape[0]):
+    #         for x_idx in range(0, data.shape[1], self.tile_shape[1]):
+    #             self.set_tile_data(tile_idx,
+    #                                data[y_idx: y_idx + self.tile_shape[0], x_idx: x_idx + self.tile_shape[1]],
+    #                                copy=copy)
+    #             tile_idx += 1
+    #
+    #             if tile_idx >= self.num_tiles:
+    #                 break
+    #                 raise ValueError("Too much data to fit in texture atlas with shape %r" % (data.shape,))
+    #             # FIXME: Don't go further than the data we have
+    #         if tile_idx >= self.num_tiles:
+    #             break
 
     def get_texture_coordinates(self, tile_idx):
         """Get texture coordinates for one tile as a quad.

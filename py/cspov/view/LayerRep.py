@@ -574,7 +574,8 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self.tile_info = {}
         self.lod = 5
         self.tile_shape = tile_shape
-        self._stride = None  # Current stride is None when we are showing the overview
+        self._stride = 0 # Current stride is None when we are showing the overview
+        self._latest_tile_box = None
         self._waiting_on_data = False
         self._tiles = {}
 
@@ -691,15 +692,11 @@ class TiledGeolocatedImageVisual(ImageVisual):
                 data[:] = 1 if data[0, 0] != 0 else 0
             self._clim = np.array(clim)
 
-        # FIXME: Right now this adds all the tiles for all of the data/image
-        # self._texture.set_data(data)
         view_box = self._get_view_box()
         preferred_stride = self.calc.calc_stride(view_box)
         _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride)
-        print(tile_box)
-        # preferred_stride = 1
-        # for tiy in range(8):
-        #     for tix in range(16):
+        LOG.debug("Uploading texture data for %d tiles (%r)", (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l), tile_box)
+
         # Tiles start at upper-left so go from top to bottom
         for tiy in range(tile_box.t, tile_box.b):
             for tix in range(tile_box.l, tile_box.r):
@@ -710,7 +707,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
                     # FIXME: we should make a list/set of the tiles we need to add before this
                     continue
 
-                LOG.debug("Adding image tile (y: {:d}, x: {:d}) to texture tile {:d}".format(tiy, tix, tex_tile_idx))
+                LOG.debug("Adding image tile (stride: {:d}, y: {:d}, x: {:d}) to texture tile {:d}".format(preferred_stride, tiy, tix, tex_tile_idx))
                 y_slice, x_slice = self.calc.tile_slices(tiy, tix, preferred_stride)
                 self._texture.set_tile_data(
                     tex_tile_idx,
@@ -732,26 +729,40 @@ class TiledGeolocatedImageVisual(ImageVisual):
         tex_coords = np.empty((6 * total_num_tiles, 2), dtype=np.float32)
         vertices = np.empty((6 * total_num_tiles, 2), dtype=np.float32)
 
+        if total_num_tiles > self.num_tiles:
+            LOG.warning("Current view sees more tiles than can be held in the GPU")
+            # We continue on because there should be an overview image for any tiles that can't be drawn
+
         # preferred_stride = 1
+        LOG.debug("Building vertex data for %d tiles (%r)", total_num_tiles, tile_box)
         # What tile are we currently describing out of all the tiles being viewed
-        used_tile_idx = 0
+        used_tile_idx = -1
         # Tiles start at upper-left so go from top to bottom
         for tiy in range(tile_box.t, tile_box.b):
             for tix in range(tile_box.l, tile_box.r):
+                # Update the index here because we have multiple exit/continuation points
+                used_tile_idx += 1
+
+                # Check if the tile we want to draw is actually in the GPU, if not (atlas too small?) fill with zeros and keep going
                 if (preferred_stride, tiy, tix) not in self.texture_state:
-                    # THIS SHOULD NEVER HAPPEN IF TEXTURE BUILDING IS DONE CORRECTLY
-                    raise RuntimeError("Tried to build coordinates for tile that isn't in the GPU")
+                    # THIS SHOULD NEVER HAPPEN IF TEXTURE BUILDING IS DONE CORRECTLY AND THE ATLAS IS BIG ENOUGH
+                    tex_coords[used_tile_idx*6: (used_tile_idx+1)*6, :] = 0
+                    vertices[used_tile_idx*6: (used_tile_idx+1)*6, :] = 0
+                    continue
+
                 # we should have already loaded the texture data in to the GPU so get the index of that texture
                 tex_tile_idx = self.texture_state[(preferred_stride, tiy, tix)]
                 # print(tex_tile_idx, preferred_stride, tiy, tix)
                 tex_coords[used_tile_idx*6: (used_tile_idx+1)*6, :] = self._texture.get_texture_coordinates(tex_tile_idx)
                 vertices[used_tile_idx*6: (used_tile_idx+1)*6, :] = self.calc.calc_vertex_coordinates(tiy, tix, preferred_stride)
-                used_tile_idx += 1
 
-        # print(self.texture_state.itile_age)
         self._subdiv_position.set_data(vertices.astype('float32'))
         self._subdiv_texcoord.set_data(tex_coords.astype('float32'))
+        # We don't need to recreate the vertex data unless the texture changes
         self._need_vertex_update = False
+        # Store the most recent level of detail that we've done
+        self._stride = preferred_stride
+        self._latest_tile_box = tile_box
 
     def paint_old(self, view):
         """Quickly and cheaply draw what we have.
@@ -777,9 +788,11 @@ class TiledGeolocatedImageVisual(ImageVisual):
         """
         view_box = self._get_view_box()
         preferred_stride = self.calc.calc_stride(view_box)
-        # XXX: Do we request new data here? How do the slices get moved around?
-        # self.request_new_data(y_slice, x_slice)
-        return preferred_stride != self._stride
+        _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride)
+        LOG.debug("Assessment: Prefer '%s' have '%s', was looking at %r, now looking at %r",
+                  preferred_stride, self._stride, self._latest_tile_box, tile_box)
+        # If we zoomed out or we panned
+        return preferred_stride != self._stride or self._latest_tile_box != tile_box
 
     def retile(self):
         """Get data from workspace and retile/retexture as needed.
@@ -808,6 +821,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         if self.assess(view):
             # We need a rerender/retile
             # self.retile()
+            print("Reassessment needed!!!")
             self._need_texture_upload = True
             self._need_vertex_update = True
         return super(TiledGeolocatedImageVisual, self)._prepare_draw(view)
