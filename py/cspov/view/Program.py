@@ -418,14 +418,17 @@ class TextureAtlas2D(Texture2D):
         """Write a single tile of data into the texture.
         """
         offset = self._tex_offset(tile_idx)
+        # FIXME: Doesn't this always return the shape of the input data?
         tile_offset = (min(self.tile_shape[0], data.shape[0]),
                        min(self.tile_shape[1], data.shape[1]))
         if tile_offset[0] < self.tile_shape[0] or tile_offset[1] < self.tile_shape[1]:
             # FIXME: This should be handled by the caller to expand the array to be NaN filled and aligned
             # Assign a fill value, make sure to copy the data so that we don't overwrite the original
-            data = data.copy()
-            data[:] = 0.0
-            data[:tile_offset[0], :tile_offset[1]] = data[:tile_offset[0], :tile_offset[1]]
+            data_orig = data
+            data = np.zeros(self.tile_shape, dtype=data.dtype)
+            # data = data.copy()
+            # data[:] = 0.0
+            data[:tile_offset[0], :tile_offset[1]] = data_orig[:tile_offset[0], :tile_offset[1]]
         super(TextureAtlas2D, self).set_data(data, offset=offset, copy=copy)
         self.tile_dirty[tile_idx] = False
 

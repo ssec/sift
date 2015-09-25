@@ -142,10 +142,10 @@ class MercatorTileCalc(object):
 
         # pixel view b
         pv = box(
-            b = (V.b - E.t)/-Z.dy,
-            l = (V.l - E.l)/Z.dx,
-            t = (V.t - E.t)/-Z.dy,
-            r = (V.r - E.l)/Z.dx
+            b = (V.b - E.t)/-(Z.dy * stride),
+            l = (V.l - E.l)/(Z.dx * stride),
+            t = (V.t - E.t)/-(Z.dy * stride),
+            r = (V.r - E.l)/(Z.dx * stride)
         )
 
         # number of tiles wide and high we'll absolutely need
@@ -177,7 +177,9 @@ class MercatorTileCalc(object):
             nth += tiy0
             tiy0 = 0
 
-        ath,atw = self.tiles_avail
+        # Total number of tiles in this image at this stride
+        ath = np.ceil((self.pixel_shape[0] / float(stride)) / th)
+        atw = np.ceil((self.pixel_shape[1] / float(stride)) / tw)
         xth = ath - (tiy0 + nth)
         if xth < 0:  # then we're asking for tiles that don't exist
             nth += xth  # trim it back

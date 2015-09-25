@@ -695,28 +695,29 @@ class TiledGeolocatedImageVisual(ImageVisual):
         # self._texture.set_data(data)
         view_box = self._get_view_box()
         preferred_stride = self.calc.calc_stride(view_box)
-        _, tile_box = self.calc.visible_tiles(view_box)
+        _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride)
         print(tile_box)
-        preferred_stride = 1
+        # preferred_stride = 1
         # for tiy in range(8):
         #     for tix in range(16):
         # Tiles start at upper-left so go from top to bottom
         for tiy in range(tile_box.t, tile_box.b):
             for tix in range(tile_box.l, tile_box.r):
-                if (preferred_stride, tiy, tix) in self.texture_state:
+                already_in = (preferred_stride, tiy, tix) in self.texture_state
+                # Update the age if already in there
+                tex_tile_idx = self.texture_state.add_tile((preferred_stride, tiy, tix))
+                if already_in:
                     # FIXME: we should make a list/set of the tiles we need to add before this
                     continue
 
-                tex_tile_idx = self.texture_state.add_tile((preferred_stride, tiy, tix))
                 LOG.debug("Adding image tile (y: {:d}, x: {:d}) to texture tile {:d}".format(tiy, tix, tex_tile_idx))
                 y_slice, x_slice = self.calc.tile_slices(tiy, tix, preferred_stride)
                 self._texture.set_tile_data(
                     tex_tile_idx,
                     data[y_slice, x_slice]
                 )
-            if tex_tile_idx is None:
-                break
         self._need_texture_upload = False
+        self._need_vertex_update = True
 
     def _build_vertex_data(self):
         """Rebuild the vertex buffers used for rendering the image when using
@@ -726,12 +727,12 @@ class TiledGeolocatedImageVisual(ImageVisual):
         """
         view_box = self._get_view_box()
         preferred_stride = self.calc.calc_stride(view_box)
-        _, tile_box = self.calc.visible_tiles(view_box)
+        _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride)
         total_num_tiles = (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l)
         tex_coords = np.empty((6 * total_num_tiles, 2), dtype=np.float32)
         vertices = np.empty((6 * total_num_tiles, 2), dtype=np.float32)
 
-        preferred_stride = 1
+        # preferred_stride = 1
         # What tile are we currently describing out of all the tiles being viewed
         used_tile_idx = 0
         # Tiles start at upper-left so go from top to bottom
@@ -742,26 +743,17 @@ class TiledGeolocatedImageVisual(ImageVisual):
                     raise RuntimeError("Tried to build coordinates for tile that isn't in the GPU")
                 # we should have already loaded the texture data in to the GPU so get the index of that texture
                 tex_tile_idx = self.texture_state[(preferred_stride, tiy, tix)]
-                print(tex_tile_idx, tiy, tix)
+                # print(tex_tile_idx, preferred_stride, tiy, tix)
                 tex_coords[used_tile_idx*6: (used_tile_idx+1)*6, :] = self._texture.get_texture_coordinates(tex_tile_idx)
                 vertices[used_tile_idx*6: (used_tile_idx+1)*6, :] = self.calc.calc_vertex_coordinates(tiy, tix, preferred_stride)
-                # tile_info = self.tile_info[(0, i)]
-                # quad = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0],
-                #                  [0, 0, 0], [1, 1, 0], [0, 1, 0]],
-                #                 dtype=np.float32)
-                # quad[:, 0] *= tile_info["cell_width"] * self.tile_shape[1]
-                # quad[:, 0] += tile_info["origin_x"]
-                # quad[:, 1] *= tile_info["cell_height"] * self.tile_shape[0]
-                # quad[:, 1] += tile_info["origin_y"]
-                # quad = quad.reshape(6, 3)
-                # vertices[i*6: (i+1)*6, :] = quad[:, :2]
                 used_tile_idx += 1
 
         # print(self.texture_state.itile_age)
         self._subdiv_position.set_data(vertices.astype('float32'))
         self._subdiv_texcoord.set_data(tex_coords.astype('float32'))
+        self._need_vertex_update = False
 
-    def paint(self, view):
+    def paint_old(self, view):
         """Quickly and cheaply draw what we have.
         """
         return True
@@ -810,12 +802,15 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self._stride = preferred_stride
 
     def _prepare_draw(self, view):
-        return super(TiledGeolocatedImageVisual, self)._prepare_draw(view)
+        # TODO: Update the texture if things have changed
         # self.paint(view)
-        #
-        # if self.assess(view):
-        #     # We need a rerender/retile
-        #     self.retile()
+
+        if self.assess(view):
+            # We need a rerender/retile
+            # self.retile()
+            self._need_texture_upload = True
+            self._need_vertex_update = True
+        return super(TiledGeolocatedImageVisual, self)._prepare_draw(view)
 
 TiledGeolocatedImage = create_visual_node(TiledGeolocatedImageVisual)
 
