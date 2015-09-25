@@ -392,7 +392,8 @@ class TextureAtlas2D(Texture2D):
                  format=None, resizable=True,
                  interpolation=None, wrapping=None,
                  internalformat=None, resizeable=None):
-        self._atlas_shape = (int(num_tiles/5)+1, 5)
+        width = 16
+        self._atlas_shape = (int(num_tiles/width)+1, width)
         shape = (self._atlas_shape[0] * tile_shape[0], self._atlas_shape[1] * tile_shape[1])
         self.tile_shape = tile_shape
         self.num_tiles = num_tiles

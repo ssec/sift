@@ -273,9 +273,10 @@ class MercatorTileCalc(object):
 
         return box(b=b,l=l,t=t,r=r)
 
+    @jit
     def tile_slices(self, tiy, tix, stride):
-        y_slice = slice(tiy*self.tile_shape[0], (tiy+1)*self.tile_shape[0], stride)
-        x_slice = slice(tix*self.tile_shape[1], (tix+1)*self.tile_shape[1], stride)
+        y_slice = slice(tiy*self.tile_shape[0]*stride, (tiy+1)*self.tile_shape[0]*stride, stride)
+        x_slice = slice(tix*self.tile_shape[1]*stride, (tix+1)*self.tile_shape[1]*stride, stride)
         return y_slice, x_slice
 
     def tile_pixels(self, data, tiy, tix, stride):
@@ -286,6 +287,20 @@ class MercatorTileCalc(object):
                tiy*self.tile_shape[0]:(tiy+1)*self.tile_shape[0]:stride,
                tix*self.tile_shape[1]:(tix+1)*self.tile_shape[1]:stride
                ]
+
+    @jit
+    def calc_vertex_coordinates(self, tiy, tix, stride):
+        quad = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0],
+                         [0, 0, 0], [1, 1, 0], [0, 1, 0]],
+                        dtype=np.float32)
+        tile_width = self.pixel_rez.dx * self.tile_shape[1] * stride
+        tile_height = self.pixel_rez.dy * self.tile_shape[0] * stride
+        quad[:, 0] *= tile_width
+        quad[:, 0] += self.ul_origin.x + tile_width * tix
+        quad[:, 1] *= -tile_height  # Origin is upper-left so image goes down
+        quad[:, 1] += self.ul_origin.y - tile_height * tiy
+        quad = quad.reshape(6, 3)
+        return quad[:, :2]
 
 
 def main():
