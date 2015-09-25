@@ -484,9 +484,9 @@ class TextureTileState(object):
         self.num_tiles = num_tiles
         self.itile_cache = {}
         self._rev_cache = {}
-        self._lod = 5
         # True if the data doesn't matter, False if data matters
         self.tile_free = [True] * num_tiles
+        self.itile_age = []
 
     def __getitem__(self, item):
         """Get the texture index associated with this image tile index.
@@ -498,44 +498,58 @@ class TextureTileState(object):
         """
         return item in self.itile_cache
 
-    @property
-    def lod(self):
-        return self._lod
-
-    @lod.setter
-    def lod(self, lod):
-        self._lod = lod
-        self.reset_state()
-
-    def reset_state(self):
+    def reset(self):
         self.itile_cache = {}
         self._rev_cache = {}
         self.tile_tree[:] = True
+        self.itile_age = []
 
     def next_available_tile(self):
         for idx, tile_free in enumerate(self.tile_free):
             if tile_free:
                 return idx
-        return None
+
+        # We don't have any free tiles, remove the oldest one
+        LOG.debug("Expiring image tile from texture atlas: %r", self.itile_age[0])
+        ttile_idx = self.remove_tile(self.itile_age[0])
+        return ttile_idx
+
+    def refresh_age(self, itile_idx):
+        """Update the age of an image tile so it is less likely to expire.
+        """
+        try:
+            # Remove it from wherever it is
+            self.itile_age.remove(itile_idx)
+        except ValueError:
+            # we haven't heard about this tile, that's ok, we'll add it to the list
+            pass
+
+        # Put it to the end as the "youngest" tile
+        self.itile_age.append(itile_idx)
 
     def add_tile(self, itile_idx):
+        """Get texture index for new tile. If tile is already known return its current location.
+
+        Note, this should be called even when the caller knows the tile exists to refresh the "age".
+        """
         # Have we already added this tile, get the tile index
         if itile_idx in self:
+            self.refresh_age(itile_idx)
             return self[itile_idx]
 
         ttile_idx = self.next_available_tile()
-        if ttile_idx is None:
-            return None
 
         self.itile_cache[itile_idx] = ttile_idx
         self._rev_cache[ttile_idx] = itile_idx
         self.tile_free[ttile_idx] = False
+        self.refresh_age(itile_idx)
         return ttile_idx
 
     def remove_tile(self, itile_idx):
         ttile_idx = self.itile_cache.pop(itile_idx)
         self._rev_cache.pop(ttile_idx)
         self.tile_free[ttile_idx] = True
+        self.itile_age.remove(itile_idx)
         return ttile_idx
 
 
@@ -687,11 +701,11 @@ class TiledGeolocatedImageVisual(ImageVisual):
         #     for tix in range(tile_box.l, tile_box.r):
         for tiy in range(8):
             for tix in range(16):
-                if (tiy, tix) in self.texture_state:
+                if (preferred_stride, tiy, tix) in self.texture_state:
                     # FIXME: we should make a list/set of the tiles we need to add before this
                     continue
 
-                tex_tile_idx = self.texture_state.add_tile((tiy, tix))
+                tex_tile_idx = self.texture_state.add_tile((preferred_stride, tiy, tix))
                 if tex_tile_idx is None:
                     # FIXME: We shouldn't be adding all of the tiles. We should know what tiles we need to add
                     break
@@ -729,11 +743,11 @@ class TiledGeolocatedImageVisual(ImageVisual):
         #     for tix in range(tile_box.l, tile_box.r):
         for tiy in range(8):
             for tix in range(16):
-                if (tiy, tix) not in self.texture_state:
+                if (preferred_stride, tiy, tix) not in self.texture_state:
                     # FIXME: Normally we would know what exact tiles we need, for now if its not in there then we haven't loaded the data
                     continue
                 # we should have already loaded the texture data in to the GPU so get the index of that texture
-                tex_tile_idx = self.texture_state[(tiy, tix)]
+                tex_tile_idx = self.texture_state[(preferred_stride, tiy, tix)]
                 print(tex_tile_idx, tiy, tix)
                 tex_coords[tex_tile_idx*6: (tex_tile_idx+1)*6] = self._texture.get_texture_coordinates(tex_tile_idx)
                 vertices[tex_tile_idx*6: (tex_tile_idx+1)*6] = self.calc.calc_vertex_coordinates(tiy, tix, preferred_stride)
@@ -748,9 +762,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
                 # quad = quad.reshape(6, 3)
                 # vertices[i*6: (i+1)*6, :] = quad[:, :2]
 
-        if vertices[:, 0].min() < self.origin_x - 1000 or vertices[:, 1].max() > self.origin_y + 1000:
-            print(vertices[:, 0].min(), vertices[:, 1].max())
-            pass
+        print(self.texture_state.itile_age)
         self._subdiv_position.set_data(vertices.astype('float32'))
         self._subdiv_texcoord.set_data(tex_coords.astype('float32'))
 
