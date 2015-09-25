@@ -124,7 +124,7 @@ class MercatorTileCalc(object):
         assert(w % tile_shape[1]==0)
 
     @jit
-    def visible_tiles(self, visible_geom, extra_tiles_box=box(0,0,0,0)):
+    def visible_tiles(self, visible_geom, stride=1, extra_tiles_box=box(0,0,0,0)):
         """
         given a visible world geometry and sampling, return (sampling-state, [box-of-tiles-to-draw])
         sampling state is WELLSAMPLED/OVERSAMPLED/UNDERSAMPLED
@@ -142,19 +142,19 @@ class MercatorTileCalc(object):
 
         # pixel view b
         pv = box(
-            b = (V.b - E.b)/Z.dy,
+            b = (V.b - E.t)/-Z.dy,
             l = (V.l - E.l)/Z.dx,
-            t = (V.t - E.b)/Z.dy,
+            t = (V.t - E.t)/-Z.dy,
             r = (V.r - E.l)/Z.dx
         )
 
         # number of tiles wide and high we'll absolutely need
         th,tw = self.tile_shape
-        nth = int(np.ceil((pv.t - pv.b) / th)) + 1  # FIXME: is the +1 correct?
+        nth = int(np.ceil((pv.b - pv.t) / th)) + 1  # FIXME: is the +1 correct?
         ntw = int(np.ceil((pv.r - pv.l) / tw)) + 1
 
         # first tile we'll need is (tiy0,tix0)
-        tiy0 = int(np.floor(pv.b / th))
+        tiy0 = int(np.floor(pv.t / th))
         tix0 = int(np.floor(pv.l / tw))
 
         # now add the extras
@@ -194,9 +194,9 @@ class MercatorTileCalc(object):
         #     overunder = self.calc_sampling(visible_geom, Z)
 
         tilebox = box(
-            b = int(tiy0),
+            b = int(tiy0 + nth),
             l = int(tix0),
-            t = int(tiy0 + nth),
+            t = int(tiy0),
             r = int(tix0 + ntw)
         )
 

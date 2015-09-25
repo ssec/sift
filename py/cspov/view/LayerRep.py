@@ -696,19 +696,18 @@ class TiledGeolocatedImageVisual(ImageVisual):
         view_box = self._get_view_box()
         preferred_stride = self.calc.calc_stride(view_box)
         _, tile_box = self.calc.visible_tiles(view_box)
+        print(tile_box)
         preferred_stride = 1
-        # for tiy in range(tile_box.b, tile_box.t):
-        #     for tix in range(tile_box.l, tile_box.r):
-        for tiy in range(8):
-            for tix in range(16):
+        # for tiy in range(8):
+        #     for tix in range(16):
+        # Tiles start at upper-left so go from top to bottom
+        for tiy in range(tile_box.t, tile_box.b):
+            for tix in range(tile_box.l, tile_box.r):
                 if (preferred_stride, tiy, tix) in self.texture_state:
                     # FIXME: we should make a list/set of the tiles we need to add before this
                     continue
 
                 tex_tile_idx = self.texture_state.add_tile((preferred_stride, tiy, tix))
-                if tex_tile_idx is None:
-                    # FIXME: We shouldn't be adding all of the tiles. We should know what tiles we need to add
-                    break
                 LOG.debug("Adding image tile (y: {:d}, x: {:d}) to texture tile {:d}".format(tiy, tix, tex_tile_idx))
                 y_slice, x_slice = self.calc.tile_slices(tiy, tix, preferred_stride)
                 self._texture.set_tile_data(
@@ -727,30 +726,25 @@ class TiledGeolocatedImageVisual(ImageVisual):
         """
         view_box = self._get_view_box()
         preferred_stride = self.calc.calc_stride(view_box)
-        # _, tile_box = self.calc.visible_tiles(view_box)
-        # total_num_tiles = (tile_box.t - tile_box.b) * (tile_box.r - tile_box.l)
-        total_num_tiles = 16 * 8
-        # tex_coords = np.zeros((6 * total_num_tiles, 2), dtype=np.float32)
-        # vertices = np.zeros((6 * total_num_tiles, 2), dtype=np.float32)
+        _, tile_box = self.calc.visible_tiles(view_box)
+        total_num_tiles = (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l)
         tex_coords = np.empty((6 * total_num_tiles, 2), dtype=np.float32)
         vertices = np.empty((6 * total_num_tiles, 2), dtype=np.float32)
-        # tex_coords = np.empty((6 * self._texture.num_tiles, 2), dtype=np.float32)
-        # vertices = np.empty((6 * self._texture.num_tiles, 2), dtype=np.float32)
 
-        # for i in self._texture.iter_tile_index():
         preferred_stride = 1
-        # for tiy in range(tile_box.b, tile_box.t):
-        #     for tix in range(tile_box.l, tile_box.r):
-        for tiy in range(8):
-            for tix in range(16):
+        # What tile are we currently describing out of all the tiles being viewed
+        used_tile_idx = 0
+        # Tiles start at upper-left so go from top to bottom
+        for tiy in range(tile_box.t, tile_box.b):
+            for tix in range(tile_box.l, tile_box.r):
                 if (preferred_stride, tiy, tix) not in self.texture_state:
-                    # FIXME: Normally we would know what exact tiles we need, for now if its not in there then we haven't loaded the data
-                    continue
+                    # THIS SHOULD NEVER HAPPEN IF TEXTURE BUILDING IS DONE CORRECTLY
+                    raise RuntimeError("Tried to build coordinates for tile that isn't in the GPU")
                 # we should have already loaded the texture data in to the GPU so get the index of that texture
                 tex_tile_idx = self.texture_state[(preferred_stride, tiy, tix)]
                 print(tex_tile_idx, tiy, tix)
-                tex_coords[tex_tile_idx*6: (tex_tile_idx+1)*6] = self._texture.get_texture_coordinates(tex_tile_idx)
-                vertices[tex_tile_idx*6: (tex_tile_idx+1)*6] = self.calc.calc_vertex_coordinates(tiy, tix, preferred_stride)
+                tex_coords[used_tile_idx*6: (used_tile_idx+1)*6, :] = self._texture.get_texture_coordinates(tex_tile_idx)
+                vertices[used_tile_idx*6: (used_tile_idx+1)*6, :] = self.calc.calc_vertex_coordinates(tiy, tix, preferred_stride)
                 # tile_info = self.tile_info[(0, i)]
                 # quad = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0],
                 #                  [0, 0, 0], [1, 1, 0], [0, 1, 0]],
@@ -761,8 +755,9 @@ class TiledGeolocatedImageVisual(ImageVisual):
                 # quad[:, 1] += tile_info["origin_y"]
                 # quad = quad.reshape(6, 3)
                 # vertices[i*6: (i+1)*6, :] = quad[:, :2]
+                used_tile_idx += 1
 
-        print(self.texture_state.itile_age)
+        # print(self.texture_state.itile_age)
         self._subdiv_position.set_data(vertices.astype('float32'))
         self._subdiv_texcoord.set_data(tex_coords.astype('float32'))
 
@@ -775,10 +770,10 @@ class TiledGeolocatedImageVisual(ImageVisual):
         ll_corner, ur_corner = self.transforms.get_transform().imap([(-1, -1, 1), (1, 1, 1)])
         # How many tiles should be contained in this view?
         view_box = box(
-            max(ll_corner[1], WORLD_EXTENT_BOX.b),
-            max(ll_corner[0], WORLD_EXTENT_BOX.l),
-            min(ur_corner[1], WORLD_EXTENT_BOX.t),
-            min(ur_corner[0], WORLD_EXTENT_BOX.r)
+            b=ll_corner[1],
+            l=ll_corner[0],
+            t=ur_corner[1],
+            r=ur_corner[0]
         )
         view_box = vue(*view_box, dy=(view_box.t - view_box.b)/self.canvas.size[1], dx=(view_box.r - view_box.l)/self.canvas.size[0])
         return view_box
