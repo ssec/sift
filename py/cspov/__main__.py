@@ -242,12 +242,12 @@ class Main(QtGui.QMainWindow):
         pass
         # self._b_adds_files = UserAddsFileToDoc(self, self.ui.)
 
-    def update_progress_bar(self, status_info, *args, **kwargs):  # FIXME no workie
+    def update_progress_bar(self, status_info, *args, **kwargs):
         active = status_info[0]
         LOG.warning('{0!r:s}'.format(status_info))
         val = active[TASK_PROGRESS]
         self.ui.progressBar.setValue(int(val*PROGRESS_BAR_MAX))
-        LOG.warning('progress bar updated to {}'.format(val))
+        #LOG.warning('progress bar updated to {}'.format(val))
 
 
     def __init__(self, workspace_dir=None, border_shapefile=None):
