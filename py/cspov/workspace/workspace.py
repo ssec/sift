@@ -25,10 +25,11 @@ __docformat__ = 'reStructuredText'
 
 import os, sys, re
 import logging, unittest, argparse
-from PyQt4.QtCore import QObject, pyqtSignal
 import gdal
-from uuid import UUID, uuid1 as uuidgen
+import numpy as np
 from collections import namedtuple
+from uuid import UUID, uuid1 as uuidgen
+from PyQt4.QtCore import QObject, pyqtSignal
 
 
 LOG = logging.getLogger(__name__)
@@ -62,8 +63,8 @@ class WorkspaceImporter(object):
         """
         Yield a series of import_status tuples updating status of the import.
         Typically this is going to run on TheQueue when possible.
-        :param dest_cwd: destination directory to place flat files into
-        :param dest_uuid: uuid key to use in reference to this dataset at all LODs - may or may not be used in file naming, but should be included in datasetinfo
+        :param dest_cwd: destination directory to place flat files into, may be anywhere inside workspace.cwd
+        :param dest_uuid: uuid key to use in reference to this dataset at all LODs - may/not be used in file naming, but should be included in datasetinfo
         :param source_uri: uri to load from
         :param source_path: path to load from (alternative to source_uri)
         :return: sequence of import_progress, the first and last of which must include data,
@@ -107,11 +108,11 @@ class GeoTiffImporter(WorkspaceImporter):
         d["filepath"] = source_path
         item = re.findall(r'_(B\d\d)_', source_path)[-1]  # FIXME: this should be a guidebook
         # Valid min and max for colormap use
-        MARGIN=0.005
+        margin = 0.005
         if item in ["B01", "B02", "B03", "B04", "B05", "B06"]:
             # Reflectance/visible data limits
             # FIXME: Are these correct?
-            d["clim"] = (0.0, 1.0-MARGIN)
+            d["clim"] = (0.0, 1.0-margin)
         else:
             # BT data limits
             # FIXME: Are these correct?
@@ -119,6 +120,7 @@ class GeoTiffImporter(WorkspaceImporter):
 
         # FIXME: read this into a numpy.memmap backed by disk in the workspace
         img_data = gtiff.GetRasterBand(1).ReadAsArray()
+        img_data = np.require(img_data, dtype=np.float32, requirements=['C'])  # FIXME: is this necessary/correct?
 
         # Full resolution shape
         # d["shape"] = self.get_dataset_data(item, time_step).shape
