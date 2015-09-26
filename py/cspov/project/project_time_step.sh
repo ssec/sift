@@ -15,13 +15,17 @@ oops() {
     exit 1
 }
 
+abspath() {
+    python -c "import os; print(os.path.realpath(\"$1\"))"
+}
+
 if [ ! -d $input_dir ]; then
     echo "Input directory does not exist: $input_dir"
     exit 1
 fi
 
 # Get full path
-input_dir=`readlink -f $input_dir`
+input_dir=`abspath $input_dir`
 
 if [ ! -d $output_dir ]; then
     echo "Output directory does not exist: $output_dir"
