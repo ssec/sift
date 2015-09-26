@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-.py
-~~~
+workspace.py
+~~~~~~~~~~~~
 
 PURPOSE
 Implement Workspace, a singleton object which manages large amounts of data
@@ -27,6 +27,7 @@ import os, sys, re
 import logging, unittest, argparse
 from PyQt4.QtCore import QObject, pyqtSignal
 import gdal
+from uuid import UUID, uuid1 as uuidgen
 from collections import namedtuple
 
 
@@ -37,6 +38,10 @@ import_progress = namedtuple('import_progress', ['uuid', 'stages', 'current_stag
 # current_stage:int, 0..stages-1 , which stage we're on
 # completion:float, 0..1 how far we are along on this stage
 # stage_desc:tuple(str), brief description of each of the stages we'll be doing
+
+
+# first instance is main singleton instance; don't preclude the possibility of importing from another workspace later on
+TheWorkspace = None
 
 
 class WorkspaceImporter(object):
@@ -53,9 +58,10 @@ class WorkspaceImporter(object):
         """
         return False
 
-    def __call__(self, dest_cwd, dest_uuid, source_uri=None, source_path=None, process_pool=None, **kwargs):
+    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_uri=None, source_path=None, **kwargs):
         """
         Yield a series of import_status tuples updating status of the import.
+        Typically this is going to run on TheQueue when possible.
         :param dest_cwd: destination directory to place flat files into
         :param dest_uuid: uuid key to use in reference to this dataset at all LODs - may or may not be used in file naming, but should be included in datasetinfo
         :param source_uri: uri to load from
@@ -76,7 +82,7 @@ class GeoTiffImporter(WorkspaceImporter):
     def is_relevant(self, uri):
         return True if (uri.lower().endswith('.tif') or uri.lower().endswith('.tiff')) else False
 
-    def __call__(self, dest_cwd, dest_uuid, source_uri=None, source_path=None, process_pool=None, **kwargs):
+    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_uri=None, source_path=None, **kwargs):
         # yield successive levels of detail as we load
         if source_uri is not None:
             raise NotImplementedError("GeoTiffImporter cannot read from URIs yet")
@@ -108,6 +114,7 @@ class GeoTiffImporter(WorkspaceImporter):
             # FIXME: Are these correct?
             d["clim"] = (200.0, 350.0)
 
+        # FIXME: read this into a numpy.memmap backed by disk in the workspace
         img_data = gtiff.GetRasterBand(1).ReadAsArray()
 
         # Full resolution shape
@@ -132,13 +139,12 @@ class GeoTiffImporter(WorkspaceImporter):
 
 
 
-
-
 class Workspace(QObject):
     """
     Workspace is a singleton object which works with Datasets shall:
     - own a working directory full of recently used datasets
     - provide DatasetInfo dictionaries for shorthand use between application subsystems
+    - identify datasets primarily with a UUID object which tracks the dataset and its various representations through the system
     - unpack data in "packing crate" formats like NetCDF into memory-compatible flat files
     - efficiently create on-demand subsections and strides of raster data as numpy arrays
     - incrementally cache often-used subsections and strides ("image pyramid") using appropriate tools like gdal
@@ -162,7 +168,6 @@ class Workspace(QObject):
 
     IMPORT_CLASSES = [ GeoTiffImporter ]
 
-
     def __init__(self, directory_path=None, process_pool=None):
         """
         Initialize a new or attach an existing workspace, creating any necessary bookkeeping.
@@ -172,11 +177,23 @@ class Workspace(QObject):
         if not os.path.isdir(directory_path):
             os.makedirs(directory_path)
             self._own_cwd = True
+            self._init_create_workspace()
         else:
             self._own_cwd = False
+            self._init_inventory_existing_datasets()
         self._data = {}
         self._info = {}
+        self._importers = [x() for x in self.IMPORT_CLASSES]
+        if TheWorkspace is None:
+            global TheWorkspace  # singleton
+            TheWorkspace = self
 
+    def _init_inventory_existing_datasets(self):
+        """
+        Do an inventory of an pre-existing workspace
+        :return:
+        """
+        pass
 
     def idle(self):
         """
@@ -194,6 +211,7 @@ class Workspace(QObject):
         :param uri:
         :return:
         """
+        raise NotImplementedError('Workspace.import_uri not implemented')
 
     def import_file(self, pathname):
         """
@@ -203,10 +221,11 @@ class Workspace(QObject):
         :return:
         """
         gen = None
-        uuid = pathname  # FIXME
+        # FIXME: check if the data is already in the workspace
+        uuid = uuidgen()
         for imp in self._importers:
             if imp.is_relevant(source_path=pathname):
-                gen = imp(self.cwd, uuid, source_path=pathname)  # FIXME: use a real unique id to track this dataset
+                gen = imp(self, self.cwd, uuid, source_path=pathname)
                 break
         if gen is None:
             raise IOError("unable to import {}".format(pathname))
@@ -217,10 +236,7 @@ class Workspace(QObject):
                 info = self._info[uuid] = update.dataset_info
                 data = self._data[uuid] = update.data
                 LOG.debug(repr(update))
-        return info, data
-
-
-
+        return uuid, info, data
 
 
     def remove(self, dsi):
@@ -230,21 +246,29 @@ class Workspace(QObject):
         :return: None
         """
 
-    def __getitem__(self, datasetinfo):
+    def __getitem__(self, datasetinfo_or_uuid):
         """
         return a dataset or dataset proxy capable of generating a numpy array when sliced
-        :param datasetinfo: metadata on the dataset
+        :param datasetinfo_or_uuid: metadata or key for the dataset
         :return: sliceable object returning numpy arrays
         """
         pass
 
-
     def asProbeDataSource(self, **kwargs):
         """
-        Delegate used to match masks to data content.
+        Produce delegate used to match masks to data content.
         :param kwargs:
         :return: delegate object used by probe objects to access workspace content
         """
+        return self  # FUTURE: revise this once we have more of an interface specification
+
+    def asLayerDataSource(self, uuid=None, **kwargs):
+        """
+        produce layer data source delegate to be handed to a LayerRep
+        :param kwargs:
+        :return:
+        """
+        return self  # FUTURE: revise this once we have more of an interface specification
 
 
 def main():
