@@ -6,6 +6,8 @@ queue.py
 
 PURPOSE
 Global background task queue for loading, rendering, et cetera.
+Use TheQueue.add() to create background behavior.
+Note that Qt4 facilities other than signals should not be used on the task queue!
 
 REFERENCES
 
@@ -22,7 +24,7 @@ __docformat__ = 'reStructuredText'
 
 import os, sys
 import logging, unittest, argparse
-from PyQt4.QtCore import QObject
+from PyQt4.QtCore import QObject, pyqtSignal, QThread
 
 LOG = logging.getLogger(__name__)
 
@@ -31,17 +33,35 @@ TASK_DOING = ("activity", str)
 TASK_PROGRESS = ("progress", float) # 0.0 - 1.0 progress
 
 
+# singleton instance used by clients
+TheQueue = None
 
-class TaskQueue(QObject):
+
+class TaskQueue(QThread):
     """
     Global background task queue for loading, rendering, et cetera.
     Includes state updates and GUI links.
     Eventually will include thread pools and multiprocess pools.
     """
-    def __init__(self):
-        super(TaskQueue, self).__init__()
+    process_pool = None  # process pool for background activity
+    thread_pool = None  # thread pool for background activity
+    queue = None
 
-    def __setitem__(self, key, value):
+    didMakeProgress = pyqtSignal(list)  # sequence of dictionaries listing update information to be propagated to view
+    # started : inherited
+    # finished : inherited
+    # terminated : inherited
+
+    def __init__(self, process_pool=None, thread_pool=None):
+        super(TaskQueue, self).__init__()
+        self.process_pool = process_pool
+        self.thread_pool = thread_pool
+        self.queue = []
+        assert(TheQueue is None)
+        global TheQueue
+        TheQueue = self
+
+    def add(self, key, task_iterable, description, use_process_pool=False, use_thread_pool=False):
         """
         Add an iterable task which will yield progress information dictionaries.
 
@@ -55,6 +75,33 @@ class TaskQueue(QObject):
         :param value: iterable task object
         :return:
         """
+        self.queue.append(task_iterable)
+        self.start()  # safe if already running
+
+    def _did_progress(self, task_status):
+        """
+        Summarize the task queue, including progress, and send it out as a signal
+        :param task_status:
+        :return:
+        """
+        # FIXME: this should have entries for the upcoming stuff as well so we can have an Activity panel
+        info = [task_status]
+        self.didMakeProgress.emit(info)
+
+    def run(self):
+        while len(self.queue)>0:
+            task = self.queue.pop(0)
+            for status in task:
+                self._did_progress(status)
+
+
+def test_task():
+    for dex in range(10):
+        yield {TASK_DOING: 'test task', TASK_PROGRESS: float(dex)/10.0}
+        TheQueue.sleep(1)
+    yield {TASK_DOING: 'test task', TASK_PROGRESS: 1.0}
+
+
 
 
 def main():
