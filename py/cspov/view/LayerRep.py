@@ -192,11 +192,11 @@ class GeolocatedImageVisual(ImageVisual):
 
         quads[..., :2] += mgrid
         tex_coords = quads.reshape(grid[1]*grid[0]*6, 3)
-        tex_coords = np.ascontiguousarray(tex_coords[:, :2])
+        tex_coords = tex_coords[:, :2]
         vertices = tex_coords * self.size
 
         # FUTURE: This should probably be done as a transform
-        vertices = vertices.astype('float32')
+        # vertices = vertices.astype('float32')
         vertices[:, 0] *= self.cell_width
         vertices[:, 0] += self.origin_x
         vertices[:, 1] *= self.cell_height
@@ -206,8 +206,8 @@ class GeolocatedImageVisual(ImageVisual):
             vertices = np.concatenate((vertices, vertices), axis=0)
             tex_coords = np.concatenate((tex_coords, tex_coords), axis=0)
             vertices[orig_points:, 0] += C_EQ
-        self._subdiv_position.set_data(vertices.astype('float32'))
-        self._subdiv_texcoord.set_data(tex_coords.astype('float32'))
+        self._subdiv_position.set_data(np.require(vertices, dtype=np.float32, requirements=['C']))
+        self._subdiv_texcoord.set_data(np.require(tex_coords, dtype=np.float32, requirements=['C']))
 
 
 GeolocatedImage = create_visual_node(GeolocatedImageVisual)
