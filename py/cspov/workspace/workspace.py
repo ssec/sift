@@ -52,13 +52,13 @@ class WorkspaceImporter(object):
     def __init__(self, **kwargs):
         super(WorkspaceImporter, self).__init__()
     
-    def is_relevant(self, source_uri=None, source_path=None):
+    def is_relevant(self, source_path=None, source_uri=None):
         """
         return True if this importer is capable of reading this URI.
         """
         return False
 
-    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_uri=None, source_path=None, **kwargs):
+    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, **kwargs):
         """
         Yield a series of import_status tuples updating status of the import.
         Typically this is going to run on TheQueue when possible.
@@ -79,10 +79,11 @@ class GeoTiffImporter(WorkspaceImporter):
     def __init__(self, **kwargs):
         super(GeoTiffImporter, self).__init__()
 
-    def is_relevant(self, uri):
-        return True if (uri.lower().endswith('.tif') or uri.lower().endswith('.tiff')) else False
+    def is_relevant(self, source_path=None, source_uri=None):
+        source = source_path or source_uri
+        return True if (source.lower().endswith('.tif') or source.lower().endswith('.tiff')) else False
 
-    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_uri=None, source_path=None, **kwargs):
+    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, **kwargs):
         # yield successive levels of detail as we load
         if source_uri is not None:
             raise NotImplementedError("GeoTiffImporter cannot read from URIs yet")
@@ -92,6 +93,7 @@ class GeoTiffImporter(WorkspaceImporter):
         # FIXME: consider yielding status at this point so our progress bar starts moving
 
         ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
+        d["uuid"] = dest_uuid
         d["origin_x"] = ox
         d["origin_y"] = oy
         d["cell_width"] = cw
@@ -105,10 +107,11 @@ class GeoTiffImporter(WorkspaceImporter):
         d["filepath"] = source_path
         item = re.findall(r'_(B\d\d)_', source_path)[-1]  # FIXME: this should be a guidebook
         # Valid min and max for colormap use
+        MARGIN=0.005
         if item in ["B01", "B02", "B03", "B04", "B05", "B06"]:
             # Reflectance/visible data limits
             # FIXME: Are these correct?
-            d["clim"] = (0.0, 1.0)
+            d["clim"] = (0.0, 1.0-MARGIN)
         else:
             # BT data limits
             # FIXME: Are these correct?
@@ -203,32 +206,26 @@ class Workspace(QObject):
         """
         return False
 
-    def import_uri(self, uri):
-        """
-        Start loading URI data into the workspace asynchronously.
-        When enough of the data is available to produce and overview,
-        return a DatasetInfo dictionary which can be used by client as a token to grab data.
-        :param uri:
-        :return:
-        """
-        raise NotImplementedError('Workspace.import_uri not implemented')
 
-    def import_file(self, pathname):
+    def import_image(self, source_path=None, source_uri=None):
         """
         Start loading URI data into the workspace asynchronously.
 
-        :param pathname:
+        :param source_path:
         :return:
         """
+        if source_uri is not None and source_path is None:
+            raise NotImplementedError('URI load not yet supported')
+
         gen = None
         # FIXME: check if the data is already in the workspace
         uuid = uuidgen()
         for imp in self._importers:
-            if imp.is_relevant(source_path=pathname):
-                gen = imp(self, self.cwd, uuid, source_path=pathname)
+            if imp.is_relevant(source_path=source_path):
+                gen = imp(self, self.cwd, uuid, source_path=source_path)
                 break
         if gen is None:
-            raise IOError("unable to import {}".format(pathname))
+            raise IOError("unable to import {}".format(source_path))
 
         # FIXME: for now, just iterate the incremental load. later we want to add this to TheQueue and update the UI as we get more data loaded
         for update in gen:

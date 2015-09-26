@@ -23,6 +23,7 @@ __docformat__ = 'reStructuredText'
 
 from vispy import app
 from .queue import TaskQueue, test_task, TASK_PROGRESS, TASK_DOING
+from .workspace import Workspace
 
 try:
     app_object = app.use_app('pyqt4')
@@ -44,8 +45,8 @@ import os
 import logging
 import gdal
 from vispy import scene
-from vispy.visuals.transforms.linear import STTransform
-from vispy.util.transforms import translate, ortho
+from vispy.visuals.transforms.linear import STTransform, MatrixTransform
+# from vispy.util.transforms import translate, ortho
 
 LOG = logging.getLogger(__name__)
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -53,13 +54,14 @@ DEFAULT_SHAPE_FILE = os.path.join(SCRIPT_DIR, "data", "ne_110m_admin_0_countries
 
 
 
-def test_merc_layers(doc, fn):
-    raw_layers = []  # front to back
-    LOG.info('loading {}'.format(fn))
-    doc.addRGBImageLayer(fn)
+def test_merc_layers(ws, doc, fn):
+    raise NotImplementedError('deprecated')
+    # raw_layers = []  # front to back
+    # LOG.info('loading {}'.format(fn))
+    # doc.addRGBImageLayer(fn)
 
 
-def test_layers_from_directory(doc, layer_tiff_glob, range_txt=None):
+def test_layers_from_directory(ws, doc, layer_tiff_glob, range_txt=None):
     """
     TIFF_GLOB='/Users/keoni/Data/CSPOV/2015_07_14_195/00?0/HS*_B03_*merc.tif' VERBOSITY=3 python -m cspov
     :param model:
@@ -73,14 +75,16 @@ def test_layers_from_directory(doc, layer_tiff_glob, range_txt=None):
         import re
         range = tuple(map(float, re.findall(r'[\.0-9]+', range_txt)))
     for tif in glob(layer_tiff_glob):
-        doc.addFullGlobMercatorColormappedFloatImageLayer(tif, range=range)
+        # doc.addFullGlobMercatorColormappedFloatImageLayer(tif, range=range)
+        uuid, info, overview_data = ws.import_image(tif)
+        yield uuid, info, overview_data
 
 
-def test_layers(doc):
+def test_layers(ws, doc):
     if 'TIFF_GLOB' in os.environ:
-        return test_layers_from_directory(doc, os.environ['TIFF_GLOB'], os.environ.get('RANGE',None))
+        return test_layers_from_directory(ws, doc, os.environ['TIFF_GLOB'], os.environ.get('RANGE',None))
     elif 'MERC' in os.environ:
-        return test_merc_layers(doc, os.environ.get('MERC', None))
+        return test_merc_layers(ws, doc, os.environ.get('MERC', None))
     return []
 
 
@@ -163,74 +167,74 @@ class AnimatedLayerList(LayerList):
 class DatasetInfo(dict):
     pass
 
-
-# FIXME: Workspace structure
-class Workspace(object):
-    def __init__(self, base_dir):
-        if not os.path.isdir(base_dir):
-            raise IOError("Workspace '%s' does not exist" % (base_dir,))
-        self.base_dir = os.path.realpath(base_dir)
-
-    def _dataset_filepath(self, item, time_step):
-        fn_pat = "HS_H08_20150714_{}_{}_FLDK_R20.merc.tif"
-        # 'time_step' is a string representing the directory name for the string to get
-        return os.path.join(self.base_dir, time_step, fn_pat.format(time_step, item))
-
-    def _get_dataset_projection_info(self, fp):
-        d = {}
-        if fp.endswith(".tif"):
-            gtiff = gdal.Open(fp)
-            ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
-            d["origin_x"] = ox
-            d["origin_y"] = oy
-            d["cell_width"] = cw
-            d["cell_height"] = ch
-            # FUTURE: Should the Workspace normalize all input data or should the Image Layer handle any projection?
-            srs = gdal.osr.SpatialReference()
-            srs.ImportFromWkt(gtiff.GetProjection())
-            d["proj"] = srs.ExportToProj4()
-        else:
-            raise ValueError("Unknown workspace format detected: %s" % (fp,))
-
-        return d
-
-    def get_dataset_info(self, item, time_step):
-        # Extra little 'fluff' so that 0 in the texture can be used for fill values
-        fill_margin = 0.005
-        dataset_info = DatasetInfo()
-        # FIXME: Make up a better name
-        dataset_info["name"] = item + "_" + time_step
-        dataset_info["filepath"] = self._dataset_filepath(item, time_step)
-
-        # Valid min and max for colormap use
-        if item in ["B01", "B02", "B03", "B04", "B05", "B06"]:
-            # Reflectance/visible data limits
-            # FIXME: Are these correct?
-            dataset_info["clim"] = (0.0 - fill_margin, 1.0)
-        else:
-            # BT data limits
-            # FIXME: Are these correct?
-            dataset_info["clim"] = (200.0 - fill_margin, 350.0)
-
-        # Full resolution shape
-        dataset_info["shape"] = self.get_dataset_data(item, time_step).shape
-
-        dataset_info.update(self._get_dataset_projection_info(dataset_info["filepath"]))
-        return dataset_info
-
-    def get_dataset_data(self, item, time_step, row_slice=None, col_slice=None):
-        fp = self._dataset_filepath(item, time_step)
-
-        if fp.endswith(".tif"):
-            gtiff = gdal.Open(fp)
-            img_data = gtiff.GetRasterBand(1).ReadAsArray()
-        else:
-            raise ValueError("Unknown workspace format detected: %s" % (fp,))
-
-        if row_slice is None or col_slice is None:
-            return img_data
-        else:
-            return img_data[row_slice, col_slice]
+#
+# # FIXME: Workspace structure
+# class Workspace(object):
+#     def __init__(self, base_dir):
+#         if not os.path.isdir(base_dir):
+#             raise IOError("Workspace '%s' does not exist" % (base_dir,))
+#         self.base_dir = os.path.realpath(base_dir)
+#
+#     def _dataset_filepath(self, item, time_step):
+#         fn_pat = "HS_H08_20150714_{}_{}_FLDK_R20.merc.tif"
+#         # 'time_step' is a string representing the directory name for the string to get
+#         return os.path.join(self.base_dir, time_step, fn_pat.format(time_step, item))
+#
+#     def _get_dataset_projection_info(self, fp):
+#         d = {}
+#         if fp.endswith(".tif"):
+#             gtiff = gdal.Open(fp)
+#             ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
+#             d["origin_x"] = ox
+#             d["origin_y"] = oy
+#             d["cell_width"] = cw
+#             d["cell_height"] = ch
+#             # FUTURE: Should the Workspace normalize all input data or should the Image Layer handle any projection?
+#             srs = gdal.osr.SpatialReference()
+#             srs.ImportFromWkt(gtiff.GetProjection())
+#             d["proj"] = srs.ExportToProj4()
+#         else:
+#             raise ValueError("Unknown workspace format detected: %s" % (fp,))
+#
+#         return d
+#
+#     def get_dataset_info(self, item, time_step):
+#         # Extra little 'fluff' so that 0 in the texture can be used for fill values
+#         fill_margin = 0.005
+#         dataset_info = DatasetInfo()
+#         # FIXME: Make up a better name
+#         dataset_info["name"] = item + "_" + time_step
+#         dataset_info["filepath"] = self._dataset_filepath(item, time_step)
+#
+#         # Valid min and max for colormap use
+#         if item in ["B01", "B02", "B03", "B04", "B05", "B06"]:
+#             # Reflectance/visible data limits
+#             # FIXME: Are these correct?
+#             dataset_info["clim"] = (0.0 - fill_margin, 1.0)
+#         else:
+#             # BT data limits
+#             # FIXME: Are these correct?
+#             dataset_info["clim"] = (200.0 - fill_margin, 350.0)
+#
+#         # Full resolution shape
+#         dataset_info["shape"] = self.get_dataset_data(item, time_step).shape
+#
+#         dataset_info.update(self._get_dataset_projection_info(dataset_info["filepath"]))
+#         return dataset_info
+#
+#     def get_dataset_data(self, item, time_step, row_slice=None, col_slice=None):
+#         fp = self._dataset_filepath(item, time_step)
+#
+#         if fp.endswith(".tif"):
+#             gtiff = gdal.Open(fp)
+#             img_data = gtiff.GetRasterBand(1).ReadAsArray()
+#         else:
+#             raise ValueError("Unknown workspace format detected: %s" % (fp,))
+#
+#         if row_slice is None or col_slice is None:
+#             return img_data
+#         else:
+#             return img_data[row_slice, col_slice]
 
 
 class Main(QtGui.QMainWindow):
@@ -272,15 +276,16 @@ class Main(QtGui.QMainWindow):
 
         # Head node of the map graph
         self.main_map = MainMap(name="MainMap", parent=self.main_view.scene)
-        # merc_ortho = MatrixTransform()
+        merc_ortho = MatrixTransform()
         # near/far is backwards it seems:
         camera_z_scale = 1e-6
         # merc_ortho.set_ortho(-180.0, 180.0, -90.0, 90.0, -100.0 * camera_z_scale, 100.0 * camera_z_scale)
         l, r, b, t = [getattr(WORLD_EXTENT_BOX, x) for x in ['l', 'r', 'b', 't']]
-        # merc_ortho.set_ortho(l, r, b, t, -100.0 * camera_z_scale, 100.0 * camera_z_scale)
-        self.main_map.transform *= ortho(l, r, b, t, -100.0 * camera_z_scale, 100.0 * camera_z_scale)
+        merc_ortho.set_ortho(l, r, b, t, -100.0 * camera_z_scale, 100.0 * camera_z_scale)
+        self.main_map.transform *= merc_ortho # ortho(l, r, b, t, -100.0 * camera_z_scale, 100.0 * camera_z_scale)
 
         # Head node of the image layer graph
+        # FIXME: merge to the document delegate
         self.image_list = AnimatedLayerList(parent=self.main_map)
         # Put all the images to the -50.0 Z level
         # TODO: Make this part of whatever custom Image class we make
@@ -291,9 +296,8 @@ class Main(QtGui.QMainWindow):
         # Create Layers
         tex_tiles_per_image = 32
         # tex_tiles_per_image = 16 * 8
-        for time_step in ["0330", "0340"]:
-            ds_info = self.workspace.get_dataset_info("B02", time_step=time_step)
-            full_data = self.workspace.get_dataset_data("B02", time_step=time_step)
+        for uuid, ds_info, full_data in test_layers(self.workspace, self.document):
+            # add visuals to scene
             image = TiledGeolocatedImage(
                 full_data,
                 ds_info["origin_x"],
@@ -306,7 +310,7 @@ class Main(QtGui.QMainWindow):
                 method='tiled',
                 double=False,
                 num_tiles=tex_tiles_per_image,
-                parent=self.image_list,
+                parent=self.image_list,  # FIXME move into document tilestack
             )
 
         # Interaction Setup
