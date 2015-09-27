@@ -358,7 +358,9 @@ def main():
     args = parser.parse_args()
 
     levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
-    logging.basicConfig(level=levels[min(3, args.verbosity)])
+    level=levels[min(3, args.verbosity)]
+    logging.basicConfig(level=level)
+    logging.getLogger('vispy').setLevel(level)
 
     app.create()
     # app = QApplication(sys.argv)
