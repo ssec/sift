@@ -25,7 +25,7 @@ __docformat__ = 'reStructuredText'
 
 import os, sys, re
 import logging, unittest, argparse
-import gdal
+import gdal, osr
 import numpy as np
 from collections import namedtuple
 from uuid import UUID, uuid1 as uuidgen
@@ -100,7 +100,7 @@ class GeoTiffImporter(WorkspaceImporter):
         d["cell_width"] = cw
         d["cell_height"] = ch
         # FUTURE: Should the Workspace normalize all input data or should the Image Layer handle any projection?
-        srs = gdal.osr.SpatialReference()
+        srs = osr.SpatialReference()
         srs.ImportFromWkt(gtiff.GetProjection())
         d["proj"] = srs.ExportToProj4()
 
