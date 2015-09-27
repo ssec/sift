@@ -308,6 +308,7 @@ class Main(QtGui.QMainWindow):
                 clim=ds_info["clim"],
                 interpolation='nearest',
                 method='tiled',
+                cmap='grays',
                 double=False,
                 num_tiles=tex_tiles_per_image,
                 parent=self.image_list,  # FIXME move into document tilestack
