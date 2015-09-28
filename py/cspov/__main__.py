@@ -36,29 +36,20 @@ from cspov.control.layer_list import LayerStackListViewModel
 from cspov.view.MapWidget import CspovMainMapCanvas
 from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.model import Document
-from cspov.common import WORLD_EXTENT_BOX, DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH
+from cspov.common import WORLD_EXTENT_BOX
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
 
 import os
 import logging
-import gdal
 from vispy import scene
 from vispy.visuals.transforms.linear import STTransform, MatrixTransform
-# from vispy.util.transforms import translate, ortho
 
 LOG = logging.getLogger(__name__)
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 DEFAULT_SHAPE_FILE = os.path.join(SCRIPT_DIR, "data", "ne_110m_admin_0_countries", "ne_110m_admin_0_countries.shp")
-
-
-
-def test_merc_layers(ws, doc, fn):
-    raise NotImplementedError('deprecated')
-    # raw_layers = []  # front to back
-    # LOG.info('loading {}'.format(fn))
-    # doc.addRGBImageLayer(fn)
+PROGRESS_BAR_MAX = 1000
 
 
 def test_layers_from_directory(ws, doc, layer_tiff_glob, range_txt=None):
@@ -80,15 +71,12 @@ def test_layers_from_directory(ws, doc, layer_tiff_glob, range_txt=None):
         yield uuid, info, overview_data
 
 
-def test_layers(ws, doc):
-    if 'TIFF_GLOB' in os.environ:
-        return test_layers_from_directory(ws, doc, os.environ['TIFF_GLOB'], os.environ.get('RANGE',None))
-    elif 'MERC' in os.environ:
-        return test_merc_layers(ws, doc, os.environ.get('MERC', None))
+def test_layers(ws, doc, glob_pattern=None):
+    if glob_pattern:
+        return test_layers_from_directory(ws, doc, glob_pattern, os.environ.get('RANGE', None))
+    LOG.warning("No image glob pattern provided")
     return []
 
-
-PROGRESS_BAR_MAX = 1000
 
 class MainMap(scene.Node):
     """Scene node for holding all of the information for the main map area
@@ -164,79 +152,6 @@ class AnimatedLayerList(LayerList):
         self.update()
 
 
-class DatasetInfo(dict):
-    pass
-
-#
-# # FIXME: Workspace structure
-# class Workspace(object):
-#     def __init__(self, base_dir):
-#         if not os.path.isdir(base_dir):
-#             raise IOError("Workspace '%s' does not exist" % (base_dir,))
-#         self.base_dir = os.path.realpath(base_dir)
-#
-#     def _dataset_filepath(self, item, time_step):
-#         fn_pat = "HS_H08_20150714_{}_{}_FLDK_R20.merc.tif"
-#         # 'time_step' is a string representing the directory name for the string to get
-#         return os.path.join(self.base_dir, time_step, fn_pat.format(time_step, item))
-#
-#     def _get_dataset_projection_info(self, fp):
-#         d = {}
-#         if fp.endswith(".tif"):
-#             gtiff = gdal.Open(fp)
-#             ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
-#             d["origin_x"] = ox
-#             d["origin_y"] = oy
-#             d["cell_width"] = cw
-#             d["cell_height"] = ch
-#             # FUTURE: Should the Workspace normalize all input data or should the Image Layer handle any projection?
-#             srs = gdal.osr.SpatialReference()
-#             srs.ImportFromWkt(gtiff.GetProjection())
-#             d["proj"] = srs.ExportToProj4()
-#         else:
-#             raise ValueError("Unknown workspace format detected: %s" % (fp,))
-#
-#         return d
-#
-#     def get_dataset_info(self, item, time_step):
-#         # Extra little 'fluff' so that 0 in the texture can be used for fill values
-#         fill_margin = 0.005
-#         dataset_info = DatasetInfo()
-#         # FIXME: Make up a better name
-#         dataset_info["name"] = item + "_" + time_step
-#         dataset_info["filepath"] = self._dataset_filepath(item, time_step)
-#
-#         # Valid min and max for colormap use
-#         if item in ["B01", "B02", "B03", "B04", "B05", "B06"]:
-#             # Reflectance/visible data limits
-#             # FIXME: Are these correct?
-#             dataset_info["clim"] = (0.0 - fill_margin, 1.0)
-#         else:
-#             # BT data limits
-#             # FIXME: Are these correct?
-#             dataset_info["clim"] = (200.0 - fill_margin, 350.0)
-#
-#         # Full resolution shape
-#         dataset_info["shape"] = self.get_dataset_data(item, time_step).shape
-#
-#         dataset_info.update(self._get_dataset_projection_info(dataset_info["filepath"]))
-#         return dataset_info
-#
-#     def get_dataset_data(self, item, time_step, row_slice=None, col_slice=None):
-#         fp = self._dataset_filepath(item, time_step)
-#
-#         if fp.endswith(".tif"):
-#             gtiff = gdal.Open(fp)
-#             img_data = gtiff.GetRasterBand(1).ReadAsArray()
-#         else:
-#             raise ValueError("Unknown workspace format detected: %s" % (fp,))
-#
-#         if row_slice is None or col_slice is None:
-#             return img_data
-#         else:
-#             return img_data[row_slice, col_slice]
-
-
 class Main(QtGui.QMainWindow):
     def _init_add_file_dialog(self):
         pass
@@ -249,8 +164,7 @@ class Main(QtGui.QMainWindow):
         self.ui.progressBar.setValue(int(val*PROGRESS_BAR_MAX))
         #LOG.warning('progress bar updated to {}'.format(val))
 
-
-    def __init__(self, workspace_dir=None, border_shapefile=None):
+    def __init__(self, workspace_dir=None, glob_pattern=None, border_shapefile=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
@@ -296,7 +210,7 @@ class Main(QtGui.QMainWindow):
         # Create Layers
         tex_tiles_per_image = 32
         # tex_tiles_per_image = 16 * 8
-        for uuid, ds_info, full_data in test_layers(self.workspace, self.document):
+        for uuid, ds_info, full_data in test_layers(self.workspace, self.document, glob_pattern=glob_pattern):
             # add visuals to scene
             image = TiledGeolocatedImage(
                 full_data,
@@ -354,6 +268,8 @@ def main():
                         help="Specify workspace base directory")
     parser.add_argument("--border-shapefile", default=DEFAULT_SHAPE_FILE,
                         help="Specify alternative coastline/border shapefile")
+    parser.add_argument("--glob-pattern", default=os.environ.get("TIFF_GLOB", None),
+                        help="Specify glob pattern for input images")
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
                         help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG (default INFO)')
     args = parser.parse_args()
@@ -365,7 +281,11 @@ def main():
 
     app.create()
     # app = QApplication(sys.argv)
-    window = Main(workspace_dir=args.workspace, border_shapefile=args.border_shapefile)
+    window = Main(
+        workspace_dir=args.workspace,
+        glob_pattern=args.glob_pattern,
+        border_shapefile=args.border_shapefile
+    )
     window.show()
     print("running")
     # bring window to front
