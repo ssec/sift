@@ -688,7 +688,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         nfo["texture_coordinates"] = self._texture.get_texture_coordinates(0)
         nfo["vertex_coordinates"] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step)
 
-    def _build_texture(self):
+    def _build_texture(self, view_box=None):
         data = self._data
         if data.dtype == np.float64:
             data = data.astype(np.float32)
@@ -707,7 +707,8 @@ class TiledGeolocatedImageVisual(ImageVisual):
                 data[:] = 1 if data[0, 0] != 0 else 0
             self._clim = np.array(clim)
 
-        view_box = self._get_view_box()
+        if view_box is None:
+            view_box = self.get_view_box()
         preferred_stride = self.calc.calc_stride(view_box)
         _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride)
         LOG.debug("Uploading texture data for %d tiles (%r)", (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l), tile_box)
@@ -731,13 +732,14 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self._need_texture_upload = False
         self._need_vertex_update = True
 
-    def _build_vertex_data(self):
+    def _build_vertex_data(self, view_box=None):
         """Rebuild the vertex buffers used for rendering the image when using
         the subdivide method.
 
         CSPOV Note: Copied from 0.5.0dev original ImageVisual class
         """
-        view_box = self._get_view_box()
+        if view_box is None:
+            view_box = self.get_view_box()
         preferred_stride = self.calc.calc_stride(view_box)
         _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride)
         total_num_tiles = (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l)
@@ -753,7 +755,6 @@ class TiledGeolocatedImageVisual(ImageVisual):
             # we aren't looking at this image
             # FIXME: What's the correct way to stop drawing here
             return
-
 
         tex_coords = np.empty((6 * total_num_tiles, 2), dtype=np.float32)
         vertices = np.empty((6 * total_num_tiles, 2), dtype=np.float32)
@@ -795,7 +796,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self._stride = preferred_stride
         self._latest_tile_box = tile_box
 
-    def _get_view_box(self):
+    def get_view_box(self):
         ll_corner, ur_corner = self.transforms.get_transform().imap([(-1, -1, 1), (1, 1, 1)])
         # How many tiles should be contained in this view?
         view_box = box(
@@ -807,12 +808,11 @@ class TiledGeolocatedImageVisual(ImageVisual):
         view_box = vue(*view_box, dy=(view_box.t - view_box.b)/self.canvas.size[1], dx=(view_box.r - view_box.l)/self.canvas.size[0])
         return view_box
 
-    def assess(self, view):
+    def assess(self, workspace, view_box):
         """Determine if a retile is needed.
 
         Tell workspace we will be needed
         """
-        view_box = self._get_view_box()
         preferred_stride = self.calc.calc_stride(view_box)
         _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride)
         LOG.debug("Assessment: Prefer '%s' have '%s', was looking at %r, now looking at %r",
@@ -820,38 +820,49 @@ class TiledGeolocatedImageVisual(ImageVisual):
         # If we zoomed out or we panned
         return preferred_stride != self._stride or self._latest_tile_box != tile_box
 
-    def retile(self):
+    def retile(self, workspace, view_box):
         """Get data from workspace and retile/retexture as needed.
         """
-        view_box = self._get_view_box()
         preferred_stride = self.calc.calc_stride(view_box)
-        _, tile_box = self.calc.visible_tiles(view_box)
-
+        # Ask workspace for the right resolution of data
         LOG.debug("Requesting new data from Workspace...")
-        # FIXME: Request just the part needed, not the whole strided image
-        # y_slice = slice(0, self.full_data.shape[0], preferred_stride)
-        # x_slice = slice(0, self.full_data.shape[1], preferred_stride)
-        top_idx = self.full_data.shape[0] - (self.tile_shape[0] * tile_box.t)
-        bot_idx = self.full_data.shape[0] - (self.tile_shape[0] * tile_box.b)
-        y_slice = slice(top_idx, bot_idx, preferred_stride)
-        x_slice = slice(tile_box.l * self.tile_shape[1], tile_box.r * self.tile_shape[1], preferred_stride)
-        new_data = self.get_new_data(y_slice, x_slice)
-        print(new_data.shape, tile_box)
-        self._generate_tiles(new_data)
-        self._stride = preferred_stride
+        # workspace.get_dataset_data(self.name, preferred_stride)
+        self._build_texture(view_box)
+        self._build_vertex_data(view_box)
+        # don't update here, the caller will do that
+
+    def set_data(self, image):
+        """Set the data
+
+        Parameters
+        ----------
+        image : array-like
+            The image data.
+        """
+        data = np.asarray(image)
+        if self._data is None or self._data.shape != data.shape:
+            self._need_vertex_update = True
+        self._data = data
+        self._need_texture_upload = True
 
     def _prepare_draw(self, view):
-        # TODO: Update the texture if things have changed
-        # self.paint(view)
+        if self._data is None:
+            return False
 
-        if self.assess(view):
-            # We need a rerender/retile
-            # self.retile()
-            print("Reassessment needed!!!")
-            self._need_texture_upload = True
-            self._need_vertex_update = True
-        return super(TiledGeolocatedImageVisual, self)._prepare_draw(view)
+        if self._need_interpolation_update:
+            self._build_interpolation()
 
+        if self._need_texture_upload:
+            self._build_texture()
+
+        if self._need_colortransform_update:
+            self._build_color_transform()
+
+        if self._need_vertex_update:
+            self._build_vertex_data()
+
+        if view._need_method_update:
+            self._update_method(view)
 
 TiledGeolocatedImage = create_visual_node(TiledGeolocatedImageVisual)
 

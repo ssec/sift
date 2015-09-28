@@ -29,5 +29,5 @@ setup(
     include_package_data=True,
     install_requires=['numpy', 'pillow', 'scipy', 'numba', 'vispy>0.4.0', 'numpy', 'PyOpenGL', 'netCDF4', 'h5py', 'pyproj', 'pyshp'],
     packages=find_packages(),
-    entry_points={'console_scripts' : ['cspov = cspov.main:main']}
+    entry_points={'console_scripts': ['cspov = cspov.__main__:main']}
 )
