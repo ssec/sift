@@ -36,21 +36,20 @@ from cspov.control.layer_list import LayerStackListViewModel
 from cspov.view.MapWidget import CspovMainMapCanvas
 from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.model import Document
-from cspov.common import WORLD_EXTENT_BOX, DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH
+from cspov.common import WORLD_EXTENT_BOX
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
 
 import os
 import logging
-import gdal
 from vispy import scene
 from vispy.visuals.transforms.linear import STTransform, MatrixTransform
-# from vispy.util.transforms import translate, ortho
 
 LOG = logging.getLogger(__name__)
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 DEFAULT_SHAPE_FILE = os.path.join(SCRIPT_DIR, "data", "ne_110m_admin_0_countries", "ne_110m_admin_0_countries.shp")
+PROGRESS_BAR_MAX = 1000
 
 
 def test_layers_from_directory(ws, doc, layer_tiff_glob, range_txt=None):
@@ -77,9 +76,6 @@ def test_layers(ws, doc, glob_pattern=None):
         return test_layers_from_directory(ws, doc, glob_pattern, os.environ.get('RANGE', None))
     LOG.warning("No image glob pattern provided")
     return []
-
-
-PROGRESS_BAR_MAX = 1000
 
 
 class MainMap(scene.Node):
@@ -154,79 +150,6 @@ class AnimatedLayerList(LayerList):
         self._set_visible_child(frame)
         self._frame_number = frame
         self.update()
-
-
-class DatasetInfo(dict):
-    pass
-
-#
-# # FIXME: Workspace structure
-# class Workspace(object):
-#     def __init__(self, base_dir):
-#         if not os.path.isdir(base_dir):
-#             raise IOError("Workspace '%s' does not exist" % (base_dir,))
-#         self.base_dir = os.path.realpath(base_dir)
-#
-#     def _dataset_filepath(self, item, time_step):
-#         fn_pat = "HS_H08_20150714_{}_{}_FLDK_R20.merc.tif"
-#         # 'time_step' is a string representing the directory name for the string to get
-#         return os.path.join(self.base_dir, time_step, fn_pat.format(time_step, item))
-#
-#     def _get_dataset_projection_info(self, fp):
-#         d = {}
-#         if fp.endswith(".tif"):
-#             gtiff = gdal.Open(fp)
-#             ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
-#             d["origin_x"] = ox
-#             d["origin_y"] = oy
-#             d["cell_width"] = cw
-#             d["cell_height"] = ch
-#             # FUTURE: Should the Workspace normalize all input data or should the Image Layer handle any projection?
-#             srs = gdal.osr.SpatialReference()
-#             srs.ImportFromWkt(gtiff.GetProjection())
-#             d["proj"] = srs.ExportToProj4()
-#         else:
-#             raise ValueError("Unknown workspace format detected: %s" % (fp,))
-#
-#         return d
-#
-#     def get_dataset_info(self, item, time_step):
-#         # Extra little 'fluff' so that 0 in the texture can be used for fill values
-#         fill_margin = 0.005
-#         dataset_info = DatasetInfo()
-#         # FIXME: Make up a better name
-#         dataset_info["name"] = item + "_" + time_step
-#         dataset_info["filepath"] = self._dataset_filepath(item, time_step)
-#
-#         # Valid min and max for colormap use
-#         if item in ["B01", "B02", "B03", "B04", "B05", "B06"]:
-#             # Reflectance/visible data limits
-#             # FIXME: Are these correct?
-#             dataset_info["clim"] = (0.0 - fill_margin, 1.0)
-#         else:
-#             # BT data limits
-#             # FIXME: Are these correct?
-#             dataset_info["clim"] = (200.0 - fill_margin, 350.0)
-#
-#         # Full resolution shape
-#         dataset_info["shape"] = self.get_dataset_data(item, time_step).shape
-#
-#         dataset_info.update(self._get_dataset_projection_info(dataset_info["filepath"]))
-#         return dataset_info
-#
-#     def get_dataset_data(self, item, time_step, row_slice=None, col_slice=None):
-#         fp = self._dataset_filepath(item, time_step)
-#
-#         if fp.endswith(".tif"):
-#             gtiff = gdal.Open(fp)
-#             img_data = gtiff.GetRasterBand(1).ReadAsArray()
-#         else:
-#             raise ValueError("Unknown workspace format detected: %s" % (fp,))
-#
-#         if row_slice is None or col_slice is None:
-#             return img_data
-#         else:
-#             return img_data[row_slice, col_slice]
 
 
 class Main(QtGui.QMainWindow):
