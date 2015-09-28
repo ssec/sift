@@ -53,14 +53,6 @@ SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 DEFAULT_SHAPE_FILE = os.path.join(SCRIPT_DIR, "data", "ne_110m_admin_0_countries", "ne_110m_admin_0_countries.shp")
 
 
-
-def test_merc_layers(ws, doc, fn):
-    raise NotImplementedError('deprecated')
-    # raw_layers = []  # front to back
-    # LOG.info('loading {}'.format(fn))
-    # doc.addRGBImageLayer(fn)
-
-
 def test_layers_from_directory(ws, doc, layer_tiff_glob, range_txt=None):
     """
     TIFF_GLOB='/Users/keoni/Data/CSPOV/2015_07_14_195/00?0/HS*_B03_*merc.tif' VERBOSITY=3 python -m cspov
@@ -80,15 +72,15 @@ def test_layers_from_directory(ws, doc, layer_tiff_glob, range_txt=None):
         yield uuid, info, overview_data
 
 
-def test_layers(ws, doc):
-    if 'TIFF_GLOB' in os.environ:
-        return test_layers_from_directory(ws, doc, os.environ['TIFF_GLOB'], os.environ.get('RANGE',None))
-    elif 'MERC' in os.environ:
-        return test_merc_layers(ws, doc, os.environ.get('MERC', None))
+def test_layers(ws, doc, glob_pattern=None):
+    if glob_pattern:
+        return test_layers_from_directory(ws, doc, glob_pattern, os.environ.get('RANGE', None))
+    LOG.warning("No image glob pattern provided")
     return []
 
 
 PROGRESS_BAR_MAX = 1000
+
 
 class MainMap(scene.Node):
     """Scene node for holding all of the information for the main map area
@@ -249,8 +241,7 @@ class Main(QtGui.QMainWindow):
         self.ui.progressBar.setValue(int(val*PROGRESS_BAR_MAX))
         #LOG.warning('progress bar updated to {}'.format(val))
 
-
-    def __init__(self, workspace_dir=None, border_shapefile=None):
+    def __init__(self, workspace_dir=None, glob_pattern=None, border_shapefile=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
@@ -296,7 +287,7 @@ class Main(QtGui.QMainWindow):
         # Create Layers
         tex_tiles_per_image = 32
         # tex_tiles_per_image = 16 * 8
-        for uuid, ds_info, full_data in test_layers(self.workspace, self.document):
+        for uuid, ds_info, full_data in test_layers(self.workspace, self.document, glob_pattern=glob_pattern):
             # add visuals to scene
             image = TiledGeolocatedImage(
                 full_data,
@@ -354,6 +345,8 @@ def main():
                         help="Specify workspace base directory")
     parser.add_argument("--border-shapefile", default=DEFAULT_SHAPE_FILE,
                         help="Specify alternative coastline/border shapefile")
+    parser.add_argument("--glob-pattern", default=os.environ.get("TIFF_GLOB", None),
+                        help="Specify glob pattern for input images")
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
                         help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG (default INFO)')
     args = parser.parse_args()
@@ -365,7 +358,11 @@ def main():
 
     app.create()
     # app = QApplication(sys.argv)
-    window = Main(workspace_dir=args.workspace, border_shapefile=args.border_shapefile)
+    window = Main(
+        workspace_dir=args.workspace,
+        glob_pattern=args.glob_pattern,
+        border_shapefile=args.border_shapefile
+    )
     window.show()
     print("running")
     # bring window to front
