@@ -399,14 +399,6 @@ uniform int method;  // 0=subdivide, 1=impostor
 uniform sampler2D u_texture;
 varying vec2 v_texcoord;
 
-// http://stackoverflow.com/questions/11810158/how-to-deal-with-nan-or-inf-in-opengl-es-2-0-shaders
-bool isNan(float val)
-{
-  return (val <= 0.0 || 0.0 <= val) ? false : true;
-  // all comparisons on NaN return false. Note this may not work on sloppy non-IEEE754 GPUs! (Crap.)
-  // also note that isnan isn't part of GLSL standard in 2.0, but we get isnan and isinf later.
-}
-
 vec4 map_local_to_tex(vec4 x) {
     // Cast ray from 3D viewport to surface of image
     // (if $transform does not affect z values, then this
@@ -527,14 +519,15 @@ class TextureTileState(object):
         # Put it to the end as the "youngest" tile
         self.itile_age.append(itile_idx)
 
-    def add_tile(self, itile_idx):
+    def add_tile(self, itile_idx, expires=True):
         """Get texture index for new tile. If tile is already known return its current location.
 
         Note, this should be called even when the caller knows the tile exists to refresh the "age".
         """
         # Have we already added this tile, get the tile index
         if itile_idx in self:
-            self.refresh_age(itile_idx)
+            if expires:
+                self.refresh_age(itile_idx)
             return self[itile_idx]
 
         ttile_idx = self.next_available_tile()
@@ -542,7 +535,8 @@ class TextureTileState(object):
         self.itile_cache[itile_idx] = ttile_idx
         self._rev_cache[ttile_idx] = itile_idx
         self.tile_free[ttile_idx] = False
-        self.refresh_age(itile_idx)
+        if expires:
+            self.refresh_age(itile_idx)
         return ttile_idx
 
     def remove_tile(self, itile_idx):
@@ -666,13 +660,34 @@ class TiledGeolocatedImageVisual(ImageVisual):
 
         self.clim = clim
         self.cmap = cmap
+
+        self.overview_info = None
         if data is not None:
             self.set_data(data)
+            self._init_overview()
+
         self.freeze()
 
-    # def _build_texture(self):
-    #     super(TiledGeolocatedImageVisual, self)._build_texture()
-    #     self._data = self._data[:512, :self._texture.shape[1]]
+    def _init_overview(self):
+        """Create and add a low resolution version of the data that is always
+        shown behind the higher resolution image tiles.
+        """
+        if self._data is None:
+            return
+
+        self.overview_info = nfo = {}
+        y_slice, x_slice = self.calc.overview_stride()
+        # overview_stride = (int(image_shape[0]/tile_shape[0]), int(image_shape[1]/tile_shape[1]))
+        nfo["data"] = self._data[y_slice, x_slice]
+        # Update kwargs to reflect the new spatial resolution of the overview image
+        nfo["cell_width"] = self.cell_width * x_slice.step
+        nfo["cell_height"] = self.cell_height * y_slice.step
+        # Tell the texture state that we are adding a tile that should never expire and should always exist
+        nfo["texture_tile_index"] = ttile_idx = self.texture_state.add_tile((0, 0, 0), expires=False)
+        self._texture.set_tile_data(ttile_idx, nfo["data"])
+        nfo["texture_coordinates"] = self._texture.get_texture_coordinates(0)
+        nfo["vertex_coordinates"] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step)
+
     def _build_texture(self):
         data = self._data
         if data.dtype == np.float64:
@@ -726,17 +741,33 @@ class TiledGeolocatedImageVisual(ImageVisual):
         preferred_stride = self.calc.calc_stride(view_box)
         _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride)
         total_num_tiles = (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l)
-        tex_coords = np.empty((6 * total_num_tiles, 2), dtype=np.float32)
-        vertices = np.empty((6 * total_num_tiles, 2), dtype=np.float32)
+
+        if self.overview_info is not None:
+            # we should be providing an overview image
+            total_num_tiles += 1
 
         if total_num_tiles > self.num_tiles:
             LOG.warning("Current view sees more tiles than can be held in the GPU")
             # We continue on because there should be an overview image for any tiles that can't be drawn
+        elif total_num_tiles <= 0:
+            # we aren't looking at this image
+            # FIXME: What's the correct way to stop drawing here
+            return
+
+
+        tex_coords = np.empty((6 * total_num_tiles, 2), dtype=np.float32)
+        vertices = np.empty((6 * total_num_tiles, 2), dtype=np.float32)
+
+        # What tile are we currently describing out of all the tiles being viewed
+        used_tile_idx = -1
+        # Set up the overview tile
+        if self.overview_info is not None:
+            # XXX: This completely depends on drawing order, putting it at the end seems to work
+            tex_coords[-6:, :] = self.overview_info["texture_coordinates"]
+            vertices[-6:, :] = self.overview_info["vertex_coordinates"]
 
         # preferred_stride = 1
         LOG.debug("Building vertex data for %d tiles (%r)", total_num_tiles, tile_box)
-        # What tile are we currently describing out of all the tiles being viewed
-        used_tile_idx = -1
         # Tiles start at upper-left so go from top to bottom
         for tiy in range(tile_box.t, tile_box.b):
             for tix in range(tile_box.l, tile_box.r):
@@ -754,7 +785,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
                 tex_tile_idx = self.texture_state[(preferred_stride, tiy, tix)]
                 # print(tex_tile_idx, preferred_stride, tiy, tix)
                 tex_coords[used_tile_idx*6: (used_tile_idx+1)*6, :] = self._texture.get_texture_coordinates(tex_tile_idx)
-                vertices[used_tile_idx*6: (used_tile_idx+1)*6, :] = self.calc.calc_vertex_coordinates(tiy, tix, preferred_stride)
+                vertices[used_tile_idx*6: (used_tile_idx+1)*6, :] = self.calc.calc_vertex_coordinates(tiy, tix, preferred_stride, preferred_stride)
 
         self._subdiv_position.set_data(vertices.astype('float32'))
         self._subdiv_texcoord.set_data(tex_coords.astype('float32'))
@@ -763,11 +794,6 @@ class TiledGeolocatedImageVisual(ImageVisual):
         # Store the most recent level of detail that we've done
         self._stride = preferred_stride
         self._latest_tile_box = tile_box
-
-    def paint_old(self, view):
-        """Quickly and cheaply draw what we have.
-        """
-        return True
 
     def _get_view_box(self):
         ll_corner, ur_corner = self.transforms.get_transform().imap([(-1, -1, 1), (1, 1, 1)])
@@ -825,6 +851,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
             self._need_texture_upload = True
             self._need_vertex_update = True
         return super(TiledGeolocatedImageVisual, self)._prepare_draw(view)
+
 
 TiledGeolocatedImage = create_visual_node(TiledGeolocatedImageVisual)
 

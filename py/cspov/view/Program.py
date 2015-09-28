@@ -23,6 +23,9 @@ import logging
 from vispy import gloo
 from vispy.geometry import create_plane
 from vispy.io import load_crate
+from vispy.gloo import Texture2D
+
+from cspov.common import DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -379,9 +382,6 @@ class GlooColormapDataTile(GlooTile):
         self.program['colormaps'] = self._colormaps = colormap
 
 
-
-from vispy.gloo import Texture2D
-from cspov.common import DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH
 class TextureAtlas2D(Texture2D):
     """A 2D Texture Array structure implemented as a 2D Texture Atlas.
 
@@ -397,12 +397,8 @@ class TextureAtlas2D(Texture2D):
         shape = (self._atlas_shape[0] * tile_shape[0], self._atlas_shape[1] * tile_shape[1])
         self.tile_shape = tile_shape
         self.num_tiles = num_tiles
-        self.tile_dirty = np.ones((self.num_tiles,), dtype=np.bool)
         super(TextureAtlas2D, self).__init__(None, format, resizable, interpolation,
                                              wrapping, shape, internalformat, resizeable)
-
-    def iter_tile_index(self):
-        return (idx for idx, dirty in enumerate(self.tile_dirty) if not dirty)
 
     def _tex_offset(self, idx):
         """Return the X, Y texture index offset for the 1D tile index.
@@ -411,7 +407,6 @@ class TextureAtlas2D(Texture2D):
         """
         row = int(idx / self._atlas_shape[1])
         col = idx % self._atlas_shape[1]
-        print(row, col)
         return row * self.tile_shape[0], col * self.tile_shape[1]
 
     def set_tile_data(self, tile_idx, data, copy=False):
@@ -430,24 +425,6 @@ class TextureAtlas2D(Texture2D):
             # data[:] = 0.0
             data[:tile_offset[0], :tile_offset[1]] = data_orig[:tile_offset[0], :tile_offset[1]]
         super(TextureAtlas2D, self).set_data(data, offset=offset, copy=copy)
-        self.tile_dirty[tile_idx] = False
-
-    # def set_data(self, data, offset=None, copy=False):
-    #     tile_idx = 0
-    #     # for y_idx in [0]:# range(0, data.shape[0], self.tile_shape[0]):
-    #     for y_idx in range(0, data.shape[0], self.tile_shape[0]):
-    #         for x_idx in range(0, data.shape[1], self.tile_shape[1]):
-    #             self.set_tile_data(tile_idx,
-    #                                data[y_idx: y_idx + self.tile_shape[0], x_idx: x_idx + self.tile_shape[1]],
-    #                                copy=copy)
-    #             tile_idx += 1
-    #
-    #             if tile_idx >= self.num_tiles:
-    #                 break
-    #                 raise ValueError("Too much data to fit in texture atlas with shape %r" % (data.shape,))
-    #             # FIXME: Don't go further than the data we have
-    #         if tile_idx >= self.num_tiles:
-    #             break
 
     def get_texture_coordinates(self, tile_idx):
         """Get texture coordinates for one tile as a quad.

@@ -291,12 +291,12 @@ class MercatorTileCalc(object):
                ]
 
     @jit
-    def calc_vertex_coordinates(self, tiy, tix, stride):
+    def calc_vertex_coordinates(self, tiy, tix, stridey, stridex):
         quad = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0],
                          [0, 0, 0], [1, 1, 0], [0, 1, 0]],
                         dtype=np.float32)
-        tile_width = self.pixel_rez.dx * self.tile_shape[1] * stride
-        tile_height = self.pixel_rez.dy * self.tile_shape[0] * stride
+        tile_width = self.pixel_rez.dx * self.tile_shape[1] * stridex
+        tile_height = self.pixel_rez.dy * self.tile_shape[0] * stridey
         quad[:, 0] *= tile_width
         quad[:, 0] += self.ul_origin.x + tile_width * tix
         quad[:, 1] *= -tile_height  # Origin is upper-left so image goes down
