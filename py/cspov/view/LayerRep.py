@@ -38,18 +38,27 @@ import numpy as np
 from datetime import datetime
 from pyproj import Proj
 
-# from cspov.common import pnt, rez, MAX_EXCURSION_Y, MAX_EXCURSION_X, MercatorTileCalc, WORLD_EXTENT_BOX, \
-#     DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH, vue
 from cspov.common import (DEFAULT_X_PIXEL_SIZE,
                           DEFAULT_Y_PIXEL_SIZE,
                           DEFAULT_ORIGIN_X,
                           DEFAULT_ORIGIN_Y,
                           DEFAULT_PROJECTION,
+                          DEFAULT_TILE_HEIGHT,
+                          DEFAULT_TILE_WIDTH,
+                          DEFAULT_TEXTURE_HEIGHT,
+                          DEFAULT_TEXTURE_WIDTH,
                           WORLD_EXTENT_BOX,
                           C_EQ,
                           box, pnt, rez, vue,
                           MercatorTileCalc
                           )
+from cspov.view.Program import TextureAtlas2D, Texture2D
+# The below imports are needed because we subclassed the ImageVisual
+from vispy.visuals.shaders import Function
+from vispy.visuals.transforms import NullTransform
+from vispy.gloo import VertexBuffer
+from vispy.io.datasets import load_spatial_filters
+
 from cspov.view.Program import GlooRGBImageTile
 
 __author__ = 'rayg'
@@ -375,12 +384,6 @@ class OldTiledGeolocatedImageVisual(CompoundVisual):
 OldTiledGeolocatedImage = create_visual_node(OldTiledGeolocatedImageVisual)
 
 
-from cspov.view.Program import TextureAtlas2D, Texture2D
-from vispy.visuals.image import ImageVisual, load_spatial_filters, \
-    Function, _texture_lookup, VertexBuffer, _interpolation_template, \
-    NullTransform, VERT_SHADER, FRAG_SHADER
-from cspov.common import DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH
-
 VERT_SHADER = """
 uniform int method;  // 0=subdivide, 1=impostor
 attribute vec2 a_position;
@@ -549,7 +552,9 @@ class TextureTileState(object):
 
 class TiledGeolocatedImageVisual(ImageVisual):
     def __init__(self, data, origin_x, origin_y, cell_width, cell_height,
-                 tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH), num_tiles=32,
+                 shape=None,
+                 tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH),
+                 texture_shape=(DEFAULT_TEXTURE_HEIGHT, DEFAULT_TEXTURE_WIDTH),
                  cmap='viridis', method='tiled', clim='auto', interpolation='nearest', **kwargs):
         if method != 'tiled':
             raise ValueError("Only 'tiled' method is currently supported")
@@ -563,31 +568,28 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self.origin_y = origin_y
         self.cell_width = cell_width
         self.cell_height = cell_height  # Note: cell_height is usually negative
-        self.num_tiles = num_tiles
-        self.tile_shape = (DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH)
-        self.tile_info = {}
-        self.lod = 5
+        self.texture_shape = texture_shape
         self.tile_shape = tile_shape
-        self._stride = 0 # Current stride is None when we are showing the overview
+        self.num_tiles = self.texture_shape[0] * self.texture_shape[1]
+        self._stride = 0  # Current stride is None when we are showing the overview
         self._latest_tile_box = None
         self._waiting_on_data = False
         self._tiles = {}
-
-        assert ("shape" in kwargs or data is not None), "`data` or `shape` must be provided"
-        image_shape = kwargs.get("shape", data.shape)
+        assert (shape or data is not None), "`data` or `shape` must be provided"
+        self.shape = shape or data.shape
 
         # Where does this image lie in this lonely world
         self.calc = MercatorTileCalc(
             self.name,
-            image_shape,
+            self.shape,
             pnt(x=self.origin_x, y=self.origin_y),
             rez(dy=abs(self.cell_height), dx=abs(self.cell_width)),
-            tile_shape,
+            self.tile_shape,
+            self.texture_shape,
         )
         # What tiles have we used and can we use
         self.texture_state = TextureTileState(self.num_tiles)
 
-        # Copied from original visual
         self._data = None
 
         # load 'float packed rgba8' interpolation kernel
@@ -637,7 +639,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self._need_vertex_update = True
         self._need_colortransform_update = True
         self._need_interpolation_update = True
-        self._texture = TextureAtlas2D(num_tiles=num_tiles, tile_shape=self.tile_shape,
+        self._texture = TextureAtlas2D(self.texture_shape, tile_shape=self.tile_shape,
                                        interpolation=texture_interpolation)
         self._subdiv_position = VertexBuffer()
         self._subdiv_texcoord = VertexBuffer()
@@ -662,9 +664,8 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self.cmap = cmap
 
         self.overview_info = None
-        if data is not None:
-            self.set_data(data)
-            self._init_overview()
+        self._data = data
+        self._init_overview()
 
         self.freeze()
 
@@ -685,11 +686,12 @@ class TiledGeolocatedImageVisual(ImageVisual):
         # Tell the texture state that we are adding a tile that should never expire and should always exist
         nfo["texture_tile_index"] = ttile_idx = self.texture_state.add_tile((0, 0, 0), expires=False)
         self._texture.set_tile_data(ttile_idx, nfo["data"])
-        nfo["texture_coordinates"] = self._texture.get_texture_coordinates(0)
+        nfo["texture_coordinates"] = self.calc.calc_texture_coordinates(ttile_idx)
         nfo["vertex_coordinates"] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step)
 
-    def _build_texture(self, view_box=None):
-        data = self._data
+    def _build_texture_tiles(self, data, view_box, stride, tile_box):
+        """Prepare and organize strided data in to individual tiles with associated information.
+        """
         if data.dtype == np.float64:
             data = data.astype(np.float32)
 
@@ -709,30 +711,35 @@ class TiledGeolocatedImageVisual(ImageVisual):
 
         if view_box is None:
             view_box = self.get_view_box()
-        preferred_stride = self.calc.calc_stride(view_box)
-        _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride)
+        if stride is None:
+            stride = self.calc.calc_stride(view_box)
+        if tile_box is None:
+            _, tile_box = self.calc.visible_tiles(view_box, stride=stride)
         LOG.debug("Uploading texture data for %d tiles (%r)", (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l), tile_box)
 
         # Tiles start at upper-left so go from top to bottom
+        tiles_info = []
         for tiy in range(tile_box.t, tile_box.b):
             for tix in range(tile_box.l, tile_box.r):
-                already_in = (preferred_stride, tiy, tix) in self.texture_state
+                already_in = (stride, tiy, tix) in self.texture_state
                 # Update the age if already in there
-                tex_tile_idx = self.texture_state.add_tile((preferred_stride, tiy, tix))
+                # Assume that texture_state does not change from the main thread if this is run in another
+                tex_tile_idx = self.texture_state.add_tile((stride, tiy, tix))
                 if already_in:
                     # FIXME: we should make a list/set of the tiles we need to add before this
                     continue
 
-                LOG.debug("Adding image tile (stride: {:d}, y: {:d}, x: {:d}) to texture tile {:d}".format(preferred_stride, tiy, tix, tex_tile_idx))
-                y_slice, x_slice = self.calc.tile_slices(tiy, tix, preferred_stride)
-                self._texture.set_tile_data(
-                    tex_tile_idx,
-                    data[y_slice, x_slice]
-                )
-        self._need_texture_upload = False
-        self._need_vertex_update = True
+                # Assume we were given a total image worth of this stride
+                tiles_info.append((stride, tiy, tix, tex_tile_idx, data[tiy*self.tile_shape[0]:(tiy+1)*self.tile_shape[0], tix*self.tile_shape[1]:(tix+1)*self.tile_shape[1]]))
 
-    def _build_vertex_data(self, view_box=None):
+        return tiles_info
+
+    def _set_texture_tiles(self, tiles_info):
+        for tile_info in tiles_info:
+            stride, tiy, tix, tex_tile_idx, data = tile_info
+            self._texture.set_tile_data(tex_tile_idx, data)
+
+    def _build_vertex_tiles(self, view_box=None, preferred_stride=None, tile_box=None):
         """Rebuild the vertex buffers used for rendering the image when using
         the subdivide method.
 
@@ -740,8 +747,10 @@ class TiledGeolocatedImageVisual(ImageVisual):
         """
         if view_box is None:
             view_box = self.get_view_box()
-        preferred_stride = self.calc.calc_stride(view_box)
-        _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride)
+        if preferred_stride is None:
+            preferred_stride = self.calc.calc_stride(view_box)
+        if tile_box is None:
+            _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride)
         total_num_tiles = (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l)
 
         if self.overview_info is not None:
@@ -785,16 +794,14 @@ class TiledGeolocatedImageVisual(ImageVisual):
                 # we should have already loaded the texture data in to the GPU so get the index of that texture
                 tex_tile_idx = self.texture_state[(preferred_stride, tiy, tix)]
                 # print(tex_tile_idx, preferred_stride, tiy, tix)
-                tex_coords[used_tile_idx*6: (used_tile_idx+1)*6, :] = self._texture.get_texture_coordinates(tex_tile_idx)
+                tex_coords[used_tile_idx*6: (used_tile_idx+1)*6, :] = self.calc.calc_texture_coordinates(tex_tile_idx)
                 vertices[used_tile_idx*6: (used_tile_idx+1)*6, :] = self.calc.calc_vertex_coordinates(tiy, tix, preferred_stride, preferred_stride)
 
+        return vertices, tex_coords
+
+    def _set_vertex_tiles(self, vertices, tex_coords):
         self._subdiv_position.set_data(vertices.astype('float32'))
         self._subdiv_texcoord.set_data(tex_coords.astype('float32'))
-        # We don't need to recreate the vertex data unless the texture changes
-        self._need_vertex_update = False
-        # Store the most recent level of detail that we've done
-        self._stride = preferred_stride
-        self._latest_tile_box = tile_box
 
     def get_view_box(self):
         ll_corner, ur_corner = self.transforms.get_transform().imap([(-1, -1, 1), (1, 1, 1)])
@@ -808,28 +815,39 @@ class TiledGeolocatedImageVisual(ImageVisual):
         view_box = vue(*view_box, dy=(view_box.t - view_box.b)/self.canvas.size[1], dx=(view_box.r - view_box.l)/self.canvas.size[0])
         return view_box
 
-    def assess(self, workspace, view_box):
+    def assess(self, workspace):
         """Determine if a retile is needed.
 
         Tell workspace we will be needed
         """
+        view_box = self.get_view_box()
         preferred_stride = self.calc.calc_stride(view_box)
         _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride)
         LOG.debug("Assessment: Prefer '%s' have '%s', was looking at %r, now looking at %r",
                   preferred_stride, self._stride, self._latest_tile_box, tile_box)
         # If we zoomed out or we panned
-        return preferred_stride != self._stride or self._latest_tile_box != tile_box
+        need_retile = preferred_stride != self._stride or self._latest_tile_box != tile_box
+        return need_retile, view_box, preferred_stride, tile_box
 
-    def retile(self, workspace, view_box):
+    def retile(self, workspace, view_box, preferred_stride, tile_box):
         """Get data from workspace and retile/retexture as needed.
         """
-        preferred_stride = self.calc.calc_stride(view_box)
         # Ask workspace for the right resolution of data
         LOG.debug("Requesting new data from Workspace...")
+        # FIXME: This is temporary until we are getting the proper strided data from the workspace
+        data = self._data[::preferred_stride, ::preferred_stride]
         # workspace.get_dataset_data(self.name, preferred_stride)
-        self._build_texture(view_box)
-        self._build_vertex_data(view_box)
+
+        tiles_info = self._build_texture_tiles(data, view_box, preferred_stride, tile_box)
+        self._set_texture_tiles(tiles_info)
+
+        vertices, tex_coords = self._build_vertex_tiles(view_box, preferred_stride, tile_box)
+        self._set_vertex_tiles(vertices, tex_coords)
+
         # don't update here, the caller will do that
+        # Store the most recent level of detail that we've done
+        self._stride = preferred_stride
+        self._latest_tile_box = tile_box
 
     def set_data(self, image):
         """Set the data
@@ -839,11 +857,13 @@ class TiledGeolocatedImageVisual(ImageVisual):
         image : array-like
             The image data.
         """
-        data = np.asarray(image)
-        if self._data is None or self._data.shape != data.shape:
-            self._need_vertex_update = True
-        self._data = data
-        self._need_texture_upload = True
+        raise NotImplementedError("This image subclass does not support the 'set_data' method")
+
+    def _build_texture(self):
+        raise NotImplementedError("_build_texture is not implemented in this subclass, use the 2-step process of '_build_texture_tiles' and '_set_texture_tiles'")
+
+    def _build_vertex_data(self, transforms):
+        raise NotImplementedError("_build_vertex_data is not implemented in this subclass, use the 2-step process of '_build_vertex_tiles' and '_set_vertex_tiles'")
 
     def _prepare_draw(self, view):
         if self._data is None:
@@ -852,14 +872,14 @@ class TiledGeolocatedImageVisual(ImageVisual):
         if self._need_interpolation_update:
             self._build_interpolation()
 
-        if self._need_texture_upload:
-            self._build_texture()
+        # if self._need_texture_upload:
+        #     self._build_texture()
 
         if self._need_colortransform_update:
             self._build_color_transform()
 
-        if self._need_vertex_update:
-            self._build_vertex_data()
+        # if self._need_vertex_update:
+        #     self._build_vertex_data()
 
         if view._need_method_update:
             self._update_method(view)

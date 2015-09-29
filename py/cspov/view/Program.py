@@ -384,19 +384,20 @@ class GlooColormapDataTile(GlooTile):
 
 class TextureAtlas2D(Texture2D):
     """A 2D Texture Array structure implemented as a 2D Texture Atlas.
-
-    External tile indexes are 1 to `num_tiles` while internal structure may
-    be 2 dimensional.
     """
-    def __init__(self, num_tiles, tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH),
+    def __init__(self, texture_shape, tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH),
                  format=None, resizable=True,
                  interpolation=None, wrapping=None,
                  internalformat=None, resizeable=None):
-        width = 16
-        self._atlas_shape = (int(num_tiles/width)+1, width)
-        shape = (self._atlas_shape[0] * tile_shape[0], self._atlas_shape[1] * tile_shape[1])
+        assert len(texture_shape) == 2
+        # Number of tiles in each direction (y, x)
+        self.texture_shape = texture_shape
+        # Number of rows and columns for each tile
         self.tile_shape = tile_shape
-        self.num_tiles = num_tiles
+        # Number of rows and columns to hold all of these tiles in one texture
+        shape = (self.texture_shape[0] * self.tile_shape[0], self.texture_shape[1] * self.tile_shape[1])
+        self.texture_size = shape
+        # will add self.shape:
         super(TextureAtlas2D, self).__init__(None, format, resizable, interpolation,
                                              wrapping, shape, internalformat, resizeable)
 
@@ -405,8 +406,8 @@ class TextureAtlas2D(Texture2D):
 
         This class presents a 1D indexing scheme, but internally can hold multiple tiles in both X and Y direction.
         """
-        row = int(idx / self._atlas_shape[1])
-        col = idx % self._atlas_shape[1]
+        row = int(idx / self.texture_shape[1])
+        col = idx % self.texture_shape[1]
         return row * self.tile_shape[0], col * self.tile_shape[1]
 
     def set_tile_data(self, tile_idx, data, copy=False):
@@ -426,26 +427,3 @@ class TextureAtlas2D(Texture2D):
             data[:tile_offset[0], :tile_offset[1]] = data_orig[:tile_offset[0], :tile_offset[1]]
         super(TextureAtlas2D, self).set_data(data, offset=offset, copy=copy)
 
-    def get_texture_coordinates(self, tile_idx):
-        """Get texture coordinates for one tile as a quad.
-        """
-        # grid = (1, 1)
-        w = 1
-        h = 1
-        row = int(tile_idx / self._atlas_shape[1])
-        col = tile_idx % self._atlas_shape[1]
-
-        # start with basic quad describing the entire texture
-        quad = np.array([[0, 0, 0], [w, 0, 0], [w, h, 0],
-                         [0, 0, 0], [w, h, 0], [0, h, 0]],
-                        dtype=np.float32)
-        # Now scale and translate the coordinates so they only apply to one tile in the texture
-        one_tile_tex_width = 1.0 / self._shape[1] * self.tile_shape[1]
-        one_tile_tex_height = 1.0 / self._shape[0] * self.tile_shape[0]
-        quad[:, 0] *= one_tile_tex_width
-        quad[:, 0] += one_tile_tex_width * col
-        quad[:, 1] *= one_tile_tex_height
-        quad[:, 1] += one_tile_tex_height * row
-        quad = quad.reshape(6, 3)
-        quad = np.ascontiguousarray(quad[:, :2])
-        return quad

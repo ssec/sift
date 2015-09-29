@@ -36,6 +36,8 @@ LOG = logging.getLogger(__name__)
 
 DEFAULT_TILE_HEIGHT = 512
 DEFAULT_TILE_WIDTH = 512
+DEFAULT_TEXTURE_HEIGHT=2
+DEFAULT_TEXTURE_WIDTH=16
 # The values below are taken from the test geotiffs that are projected to the `DEFAULT_PROJECTION` below.
 # These units are in meters in mercator projection space
 DEFAULT_X_PIXEL_SIZE = 4891.969810251281160
@@ -88,13 +90,16 @@ class MercatorTileCalc(object):
     extents_box = None  # word coordinates that this image and its tiles corresponds to
     tiles_avail = None  # (ny,nx) available tile count for this image
 
-    def __init__(self, name, pixel_shape, ul_origin, pixel_rez, tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH)):
+    def __init__(self, name, pixel_shape, ul_origin, pixel_rez,
+                 tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH),
+                 texture_shape=(DEFAULT_TEXTURE_HEIGHT, DEFAULT_TEXTURE_WIDTH)):
         """
         name: the 'name' of the tile, typically the path of the file it represents
         pixel_shape: (h:int,w:int) in pixels
         ul_origin: (y:float,x:float) in world coords specifies upper-left coordinate of the image
         pixel_rez: (dy:float,dx:float) in world coords per pixel ascending from corner [0,0], as measured near zero_point
         tile_shape: the pixel dimensions (h:int, w:int) of the GPU tiling we want to use
+        texture_shape: the size of the texture being used (h:int, w:int) in number of tiles
 
         Tiling is aligned to pixels, not world
         World coordinates are eqm such that 0,0 matches 0°N 0°E, going north/south +-90° and west/east +-180°
@@ -106,6 +111,10 @@ class MercatorTileCalc(object):
         self.ul_origin = ul_origin
         self.pixel_rez = pixel_rez
         self.tile_shape = tile_shape
+        # in units of tiles:
+        self.texture_shape = texture_shape
+        # in units of data elements (float32):
+        self.texture_size = (self.texture_shape[0] * self.tile_shape[0], self.texture_shape[1] * self.tile_shape[1])
 
         h,w = pixel_shape
         oy,ox = ul_origin
@@ -118,7 +127,6 @@ class MercatorTileCalc(object):
 
         self.tiles_avail = (h/tile_shape[0], w/tile_shape[1])
 
-        # FIXME: deal with the AHI seeing the dateline and not the prime meridian!
         # FIXME: for now, require image size to be a multiple of tile size, else we have to deal with partial tiles!
         assert(h % tile_shape[0]==0)
         assert(w % tile_shape[1]==0)
@@ -303,6 +311,29 @@ class MercatorTileCalc(object):
         quad[:, 1] += self.ul_origin.y - tile_height * tiy
         quad = quad.reshape(6, 3)
         return quad[:, :2]
+
+    @jit
+    def calc_texture_coordinates(self, ttile_idx):
+        """Get texture coordinates for one tile as a quad.
+
+        :param ttile_idx: int, texture 1D index that maps to some internal texture tile location
+        """
+        tiy = int(ttile_idx / self.texture_shape[1])
+        tix = ttile_idx % self.texture_shape[1]
+        # start with basic quad describing the entire texture
+        quad = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0],
+                         [0, 0, 0], [1, 1, 0], [0, 1, 0]],
+                        dtype=np.float32)
+        # Now scale and translate the coordinates so they only apply to one tile in the texture
+        one_tile_tex_width = 1.0 / self.texture_size[1] * self.tile_shape[1]
+        one_tile_tex_height = 1.0 / self.texture_size[0] * self.tile_shape[0]
+        quad[:, 0] *= one_tile_tex_width
+        quad[:, 0] += one_tile_tex_width * tix
+        quad[:, 1] *= one_tile_tex_height
+        quad[:, 1] += one_tile_tex_height * tiy
+        quad = quad.reshape(6, 3)
+        quad = np.ascontiguousarray(quad[:, :2])
+        return quad
 
 
 def main():

@@ -105,13 +105,14 @@ class LayerList(scene.Node):
         # Keep track of any children being updated
         update = False
         for child in self.children:
-            view_box = child.get_view_box()
-            if child.assess(ws, view_box):
+            need_retile, view_box, preferred_stride, tile_box = child.assess(ws)
+            if need_retile:
                 update = True
                 LOG.debug("Retiling child '%s'", child.name)
-                child.retile(ws, view_box)
+                child.retile(ws, view_box, preferred_stride, tile_box)
 
         if update:
+            # XXX: Should we update after every child?
             # draw any changes that were made
             self.update()
 
@@ -233,7 +234,7 @@ class Main(QtGui.QMainWindow):
         self.boundaries = NEShapefileLines(border_shapefile, double=True, parent=self.main_map)
 
         # Create Layers
-        tex_tiles_per_image = 32
+        texture_shape = (2, 16)
         # tex_tiles_per_image = 16 * 8
         for uuid, ds_info, full_data in test_layers(self.workspace, self.document, glob_pattern=glob_pattern):
             # add visuals to scene
@@ -249,14 +250,14 @@ class Main(QtGui.QMainWindow):
                 method='tiled',
                 cmap='grays',
                 double=False,
-                num_tiles=tex_tiles_per_image,
+                texture_shape=texture_shape,
                 parent=self.image_list,  # FIXME move into document tilestack
             )
 
         # Interaction Setup
         self.setup_key_releases()
         self.scheduler = QtCore.QTimer(parent=self)
-        self.scheduler.setInterval(1000.0)
+        self.scheduler.setInterval(250.0)
         self.scheduler.timeout.connect(partial(self.image_list._timeout_slot, self.scheduler))
         def start_wrapper(timer, event):
             """Simple wrapper around a timers start method so we can accept but ignore the event provided
