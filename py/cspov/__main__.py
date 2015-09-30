@@ -251,13 +251,14 @@ class Main(QtGui.QMainWindow):
                 cmap='grays',
                 double=False,
                 texture_shape=texture_shape,
+                wrap_lon=True,
                 parent=self.image_list,  # FIXME move into document tilestack
             )
 
         # Interaction Setup
         self.setup_key_releases()
         self.scheduler = QtCore.QTimer(parent=self)
-        self.scheduler.setInterval(250.0)
+        self.scheduler.setInterval(500.0)
         self.scheduler.timeout.connect(partial(self.image_list._timeout_slot, self.scheduler))
         def start_wrapper(timer, event):
             """Simple wrapper around a timers start method so we can accept but ignore the event provided
