@@ -134,7 +134,7 @@ class MercatorTileCalc(object):
         assert(self.image_shape[0] % tile_shape[0] == 0)
         assert(self.image_shape[1] % tile_shape[1] == 0)
 
-    # @jit
+    @jit
     def visible_tiles(self, visible_geom, stride=1, extra_tiles_box=box(0,0,0,0)):
         """
         given a visible world geometry and sampling, return (sampling-state, [box-of-tiles-to-draw])
@@ -149,6 +149,7 @@ class MercatorTileCalc(object):
         Z = self.pixel_rez
 
         if self.wrap_lon:
+            # FIXME: Technically this doesn't handle reusing the tiles properly, this assumes that the tiles align perfectly
             # make the image look like it covers twice as much of the earth
             # XXX: this only works for global images (not subimages)
             E = box(b=E.b, l=E.l, t=E.t, r=E.r + self.image_shape[1] * self.pixel_rez.dx)  # copy the original instance variable
@@ -194,9 +195,7 @@ class MercatorTileCalc(object):
             tiy0 = 0
 
         # Total number of tiles in this image at this stride
-        w = self.image_shape[1] * 2 if self.wrap_lon else self.image_shape[1]
-        ath = np.ceil((self.image_shape[0] / float(stride)) / th)
-        atw = np.ceil((w / float(stride)) / tw)
+        ath, atw = self.max_tiles_available(stride, self.wrap_lon)
         xth = ath - (tiy0 + nth)
         if xth < 0:  # then we're asking for tiles that don't exist
             nth += xth  # trim it back
@@ -220,6 +219,14 @@ class MercatorTileCalc(object):
         )
 
         return overunder, tilebox
+
+    @jit
+    def max_tiles_available(self, stride, wrap_lon=False):
+        ath = np.ceil((self.image_shape[0] / float(stride)) / self.tile_shape[0])
+        atw = np.ceil((self.image_shape[1] / float(stride)) / self.tile_shape[1])
+        if wrap_lon:
+            atw *= 2
+        return ath, atw
 
     @jit
     def calc_sampling(self, visible, stride, texture=None):
@@ -308,14 +315,29 @@ class MercatorTileCalc(object):
                ]
 
     @jit
+    def fractional_wrapped_tile(self, stride):
+        """The amount of tile that overlaps at the antimeridian and should be removed from the wrapped tiles.
+        """
+        # Index of the first
+        tix = self.max_tiles_available(stride)[1]
+        tile_start_idx = tix * self.tile_shape[1]
+        return (tile_start_idx - int(self.image_shape[1] / stride)) / self.tile_shape[1]
+
+    @jit
     def calc_vertex_coordinates(self, tiy, tix, stridey, stridex):
         quad = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0],
                          [0, 0, 0], [1, 1, 0], [0, 1, 0]],
                         dtype=np.float32)
         tile_width = self.pixel_rez.dx * self.tile_shape[1] * stridex
         tile_height = self.pixel_rez.dy * self.tile_shape[0] * stridey
+        max_tiles = self.max_tiles_available(stridex)
+        virt_tix = tix % max_tiles[1]
+        # which image of the repeating/wrapping images are we in
+        image_idx = int(tix / max_tiles[1])
+        # one whole image in the X direction is this many meters:
+        image_origin_x = self.ul_origin.x + self.pixel_rez.dx * self.image_shape[1] * image_idx
         quad[:, 0] *= tile_width
-        quad[:, 0] += self.ul_origin.x + tile_width * tix
+        quad[:, 0] += image_origin_x + (tile_width * virt_tix)
         quad[:, 1] *= -tile_height  # Origin is upper-left so image goes down
         quad[:, 1] += self.ul_origin.y - tile_height * tiy
         quad = quad.reshape(6, 3)

@@ -234,7 +234,7 @@ class Main(QtGui.QMainWindow):
         self.boundaries = NEShapefileLines(border_shapefile, double=True, parent=self.main_map)
 
         # Create Layers
-        texture_shape = (2, 16)
+        texture_shape = (4, 16)
         # tex_tiles_per_image = 16 * 8
         for uuid, ds_info, full_data in test_layers(self.workspace, self.document, glob_pattern=glob_pattern):
             # add visuals to scene
