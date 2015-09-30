@@ -36,11 +36,12 @@ __docformat__ = 'reStructuredText'
 import os, sys
 import logging, unittest, argparse
 import weakref
-from PyQt4.QtCore import QAbstractListModel, QVariant
+from PyQt4.QtCore import QAbstractListModel, QVariant, Qt
 from PyQt4.QtGui import QAbstractItemDelegate
 
 LOG = logging.getLogger(__name__)
 
+COLUMNS=('Visibility', 'Name', 'Animation')
 
 class LayerWidgetDelegate(QAbstractItemDelegate):
     """
@@ -52,37 +53,72 @@ class LayerWidgetDelegate(QAbstractItemDelegate):
 
 class LayerStackListViewModel(QAbstractListModel):
     """ behavior connecting list widget to layer stack (both ways)
+        Each table view represents a different configured document layer stack "set" - user can select from at least four.
+        Convey layer set information to/from the document to the respective table, including selection.
     """
     widget = None
     doc = None
 
-    def __init__(self, widget, doc):
+    def __init__(self, widgets, doc):
+        """
+        Connect one or more table views to the document via this model.
+        :param widgets: list of TableViews to wire up
+        :param doc: document to communicate with
+        :return:
+        """
         super(LayerStackListViewModel, self).__init__()
-        self.widget = weakref.ref(widget)
-        self.doc = weakref.ref(doc)
-        widget.clicked.connect(self.layer_clicked)
-        widget.indexesMoved.connect(self.layers_moved)
-        widget.customContextMenuRequested.connect(self.context_menu)
-        widget.entered.connect(self.layer_entered)
-        widget.pressed.connect(self.layer_pressed)
+        self.widgets = list(widgets) # [weakref.ref(widget) for widget in widgets]
+        self.doc = doc
+        self.column = [self._visibilityData, self._nameData, self._animationData]
+
         doc.docDidChangeLayerOrder.connect(self.updateList)
         doc.docDidChangeLayer.connect(self.updateList)
-        widget.setModel(self)
+
+        for widget in widgets:
+            widget.clicked.connect(self.layer_clicked)
+            widget.indexesMoved.connect(self.layers_moved)
+            widget.customContextMenuRequested.connect(self.context_menu)
+            widget.entered.connect(self.layer_entered)
+            widget.pressed.connect(self.layer_pressed)
+            widget.setModel(self)
+
         self.updateList()
 
     # def columnCount(self, *args, **kwargs):
     #     return 1
 
     def rowCount(self, QModelIndex_parent=None, *args, **kwargs):
-        el = self.doc().asListing()
+        el = self.listing
         LOG.info('{} layers'.format(len(el)))
         return len(el)
 
+    def columnCount(self, QModelIndex_parent=None, *args, **kwargs):
+        return len(COLUMNS)
+
+    @property
+    def listing(self):
+        return self.doc.asListing()
+
+    def _visibilityData(self, row, listing):
+        return True  # FIXME
+
+    def _nameData(self, row, listing):
+        return listing[row]['name']
+
+    def _animationData(self, row, listing):
+        return row+1  # FIXME
+
     def data(self, index, int_role=None):
-        el = self.doc().asListing()
+        if not index.isValid():
+            return None
+        if int_role!=Qt.DisplayRole:
+            return None
+        el = self.listing
+
         row = index.row()
-        LOG.info('row {} is {}'.format(row, el[row]))
-        return el[row]['name'].encode('ascii')
+        col = index.column()
+        LOG.debug('row,col {},{} is {}'.format(row, col, el[row]))
+        return self.column[col](row, el)
 
     # def flags(self, QModelIndex):
     #     return None

@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1366</width>
-    <height>998</height>
+    <width>1321</width>
+    <height>807</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -45,7 +45,7 @@
           </size>
          </property>
          <property name="toolTip">
-          <string>Background Activity</string>
+          <string>Activity Progress</string>
          </property>
          <property name="value">
           <number>24</number>
@@ -54,6 +54,12 @@
        </item>
        <item>
         <widget class="QToolButton" name="queueButton">
+         <property name="toolTip">
+          <string>Show Activity</string>
+         </property>
+         <property name="statusTip">
+          <string>Show activities in progress</string>
+         </property>
          <property name="text">
           <string>...</string>
          </property>
@@ -81,8 +87,11 @@
          <property name="toolTip">
           <string notr="true"/>
          </property>
+         <property name="statusTip">
+          <string>Step backward</string>
+         </property>
          <property name="text">
-          <string>|◀◀</string>
+          <string>|◀</string>
          </property>
         </widget>
        </item>
@@ -95,6 +104,9 @@
            <italic>false</italic>
           </font>
          </property>
+         <property name="statusTip">
+          <string>Start or stop animation</string>
+         </property>
          <property name="text">
           <string>▶</string>
          </property>
@@ -102,8 +114,11 @@
        </item>
        <item>
         <widget class="QToolButton" name="animForward">
+         <property name="statusTip">
+          <string>Step forward</string>
+         </property>
          <property name="text">
-          <string>▶▶|</string>
+          <string>▶|</string>
          </property>
         </widget>
        </item>
@@ -201,6 +216,9 @@
          <property name="toolTip">
           <string>Value under cursor</string>
          </property>
+         <property name="statusTip">
+          <string>Selected layer value under cursor</string>
+         </property>
          <property name="text">
           <string>Cursor Value</string>
          </property>
@@ -216,7 +234,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1366</width>
+     <width>1321</width>
      <height>22</height>
     </rect>
    </property>
@@ -251,6 +269,12 @@
     <layout class="QVBoxLayout" name="verticalLayout">
      <item>
       <widget class="QTabWidget" name="layerSetTabs">
+       <property name="toolTip">
+        <string>Alternate layer sets</string>
+       </property>
+       <property name="statusTip">
+        <string>Select alternate layer set</string>
+       </property>
        <property name="currentIndex">
         <number>0</number>
        </property>
@@ -261,16 +285,15 @@
         <attribute name="toolTip">
          <string>Layer Set 1</string>
         </attribute>
-        <widget class="QTableView" name="layerSet1Table">
-         <property name="geometry">
-          <rect>
-           <x>0</x>
-           <y>0</y>
-           <width>285</width>
-           <height>450</height>
-          </rect>
-         </property>
-        </widget>
+        <layout class="QVBoxLayout" name="verticalLayout_4">
+         <item>
+          <widget class="QListView" name="layerSet1Table">
+           <property name="statusTip">
+            <string>Current layers</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </widget>
        <widget class="QWidget" name="layerSet2Tab">
         <attribute name="title">
@@ -279,16 +302,11 @@
         <attribute name="toolTip">
          <string>Layer Set 2</string>
         </attribute>
-        <widget class="QTableView" name="layerSet2Table">
-         <property name="geometry">
-          <rect>
-           <x>0</x>
-           <y>0</y>
-           <width>285</width>
-           <height>450</height>
-          </rect>
-         </property>
-        </widget>
+        <layout class="QVBoxLayout" name="verticalLayout_5">
+         <item>
+          <widget class="QListView" name="layerSet2Table"/>
+         </item>
+        </layout>
        </widget>
        <widget class="QWidget" name="layerSet3Tab">
         <attribute name="title">
@@ -297,16 +315,11 @@
         <attribute name="toolTip">
          <string>Layer Set 3</string>
         </attribute>
-        <widget class="QTableView" name="layerSet3Table">
-         <property name="geometry">
-          <rect>
-           <x>0</x>
-           <y>0</y>
-           <width>285</width>
-           <height>450</height>
-          </rect>
-         </property>
-        </widget>
+        <layout class="QVBoxLayout" name="verticalLayout_6">
+         <item>
+          <widget class="QListView" name="layerSet3Table"/>
+         </item>
+        </layout>
        </widget>
        <widget class="QWidget" name="layerSet4Tab">
         <attribute name="title">
@@ -315,16 +328,11 @@
         <attribute name="toolTip">
          <string>Layer Set 4</string>
         </attribute>
-        <widget class="QTableView" name="layerSet4Table">
-         <property name="geometry">
-          <rect>
-           <x>0</x>
-           <y>0</y>
-           <width>285</width>
-           <height>450</height>
-          </rect>
-         </property>
-        </widget>
+        <layout class="QVBoxLayout" name="verticalLayout_7">
+         <item>
+          <widget class="QListView" name="layerSet4Table"/>
+         </item>
+        </layout>
        </widget>
       </widget>
      </item>
@@ -332,6 +340,15 @@
    </widget>
   </widget>
   <widget class="QDockWidget" name="layerConfigPane">
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
+   <property name="statusTip">
+    <string>Selected layer information</string>
+   </property>
    <property name="windowTitle">
     <string>Layer Details</string>
    </property>
@@ -339,38 +356,38 @@
     <number>2</number>
    </attribute>
    <widget class="QWidget" name="dockWidgetContents">
-    <widget class="QWidget" name="verticalLayoutWidget">
-     <property name="geometry">
-      <rect>
-       <x>-1</x>
-       <y>-1</y>
-       <width>311</width>
-       <height>171</height>
-      </rect>
-     </property>
-     <layout class="QGridLayout" name="gridLayout">
-      <item row="0" column="0">
-       <widget class="QLineEdit" name="layerNameEdit">
-        <property name="text">
-         <string>Layer Name</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="0">
-       <widget class="QPushButton" name="colorBarButton">
-        <property name="minimumSize">
-         <size>
-          <width>0</width>
-          <height>32</height>
-         </size>
-        </property>
-        <property name="text">
-         <string>ColorBar</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
+    <property name="sizePolicy">
+     <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+      <horstretch>0</horstretch>
+      <verstretch>0</verstretch>
+     </sizepolicy>
+    </property>
+    <layout class="QVBoxLayout" name="verticalLayout_9">
+     <item>
+      <layout class="QVBoxLayout" name="verticalLayout_8">
+       <item>
+        <widget class="QLineEdit" name="layerNameEdit">
+         <property name="text">
+          <string>Layer Name</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="colorBarButton">
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>32</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>ColorBar</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+    </layout>
    </widget>
   </widget>
  </widget>

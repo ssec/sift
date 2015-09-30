@@ -240,7 +240,7 @@ class Main(QtGui.QMainWindow):
         self.ui.mainWidgets.removeTab(0)
 
         # convey action between document and layer list view
-        # self.behaviorLayersList = LayerStackListViewModel(self.ui.layers, doc)
+        self.behaviorLayersList = LayerStackListViewModel([self.ui.layerSet1Table, self.ui.layerSet2Table, self.ui.layerSet3Table, self.ui.layerSet4Table], doc)
 
         self.queue.add('test', test_task(), 'test000')
         # self.ui.layers
