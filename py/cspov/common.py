@@ -82,7 +82,7 @@ class MercatorTileCalc(object):
     WELLSAMPLED='wellsampled'
 
     name = None
-    pixel_shape = None
+    image_shape = None
     pixel_rez = None
     zero_point = None
     tile_shape = None
@@ -90,12 +90,13 @@ class MercatorTileCalc(object):
     extents_box = None  # word coordinates that this image and its tiles corresponds to
     tiles_avail = None  # (ny,nx) available tile count for this image
 
-    def __init__(self, name, pixel_shape, ul_origin, pixel_rez,
+    def __init__(self, name, image_shape, ul_origin, pixel_rez,
                  tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH),
-                 texture_shape=(DEFAULT_TEXTURE_HEIGHT, DEFAULT_TEXTURE_WIDTH)):
+                 texture_shape=(DEFAULT_TEXTURE_HEIGHT, DEFAULT_TEXTURE_WIDTH),
+                 wrap_lon=False):
         """
         name: the 'name' of the tile, typically the path of the file it represents
-        pixel_shape: (h:int,w:int) in pixels
+        image_shape: (h:int,w:int) in pixels
         ul_origin: (y:float,x:float) in world coords specifies upper-left coordinate of the image
         pixel_rez: (dy:float,dx:float) in world coords per pixel ascending from corner [0,0], as measured near zero_point
         tile_shape: the pixel dimensions (h:int, w:int) of the GPU tiling we want to use
@@ -107,7 +108,7 @@ class MercatorTileCalc(object):
         """
         super(MercatorTileCalc, self).__init__()
         self.name = name
-        self.pixel_shape = pixel_shape
+        self.image_shape = image_shape
         self.ul_origin = ul_origin
         self.pixel_rez = pixel_rez
         self.tile_shape = tile_shape
@@ -115,23 +116,25 @@ class MercatorTileCalc(object):
         self.texture_shape = texture_shape
         # in units of data elements (float32):
         self.texture_size = (self.texture_shape[0] * self.tile_shape[0], self.texture_shape[1] * self.tile_shape[1])
+        self.image_tiles_avail = (self.image_shape[0] / self.tile_shape[0], self.image_shape[1] / self.tile_shape[1])
 
-        h,w = pixel_shape
-        oy,ox = ul_origin
+        self.wrap_lon = wrap_lon
+        # if self.wrap_lon:
+        #     # FIXME: Temporary until we can automatically know that tile (Y, X) is tile (Y, X-tiles_avail[1])
+        #     self.image_shape = (self.image_shape[0], self.image_shape[1] * 2)
+
         self.extents_box = box(
-            b=oy - h * self.pixel_rez.dy,
-            t=oy,
-            l=ox,
-            r=ox + w * self.pixel_rez.dx,
+            b=self.ul_origin[0] - self.image_shape[0] * self.pixel_rez.dy,
+            t=self.ul_origin[0],
+            l=self.ul_origin[1],
+            r=self.ul_origin[1] + self.image_shape[1] * self.pixel_rez.dx,
         )
 
-        self.tiles_avail = (h/tile_shape[0], w/tile_shape[1])
-
         # FIXME: for now, require image size to be a multiple of tile size, else we have to deal with partial tiles!
-        assert(h % tile_shape[0]==0)
-        assert(w % tile_shape[1]==0)
+        assert(self.image_shape[0] % tile_shape[0] == 0)
+        assert(self.image_shape[1] % tile_shape[1] == 0)
 
-    @jit
+    # @jit
     def visible_tiles(self, visible_geom, stride=1, extra_tiles_box=box(0,0,0,0)):
         """
         given a visible world geometry and sampling, return (sampling-state, [box-of-tiles-to-draw])
@@ -144,6 +147,11 @@ class MercatorTileCalc(object):
         X = extra_tiles_box  # FUTURE: extra_geom_box specifies in world coordinates instead of tile count
         E = self.extents_box
         Z = self.pixel_rez
+
+        if self.wrap_lon:
+            # make the image look like it covers twice as much of the earth
+            # XXX: this only works for global images (not subimages)
+            E = box(b=E.b, l=E.l, t=E.t, r=E.r + self.image_shape[1] * self.pixel_rez.dx)  # copy the original instance variable
 
         # convert world coords to pixel coords
         # py0, px0 = self.extents_box.b, self.extents_box.l
@@ -186,8 +194,9 @@ class MercatorTileCalc(object):
             tiy0 = 0
 
         # Total number of tiles in this image at this stride
-        ath = np.ceil((self.pixel_shape[0] / float(stride)) / th)
-        atw = np.ceil((self.pixel_shape[1] / float(stride)) / tw)
+        w = self.image_shape[1] * 2 if self.wrap_lon else self.image_shape[1]
+        ath = np.ceil((self.image_shape[0] / float(stride)) / th)
+        atw = np.ceil((w / float(stride)) / tw)
         xth = ath - (tiy0 + nth)
         if xth < 0:  # then we're asking for tiles that don't exist
             nth += xth  # trim it back
@@ -253,10 +262,10 @@ class MercatorTileCalc(object):
     @jit
     def overview_stride(self):
         # FUTURE: Come up with a fancier way of doing overviews like averaging each strided section, if needed
-        tsy = max(1, np.floor(self.pixel_shape[0] / self.tile_shape[0]))
-        tsx = max(1, np.floor(self.pixel_shape[1] / self.tile_shape[1]))
-        y_slice = slice(0, self.pixel_shape[0], tsy)
-        x_slice = slice(0, self.pixel_shape[1], tsx)
+        tsy = max(1, np.floor(self.image_shape[0] / self.tile_shape[0]))
+        tsx = max(1, np.floor(self.image_shape[1] / self.tile_shape[1]))
+        y_slice = slice(0, self.image_shape[0], tsy)
+        x_slice = slice(0, self.image_shape[1], tsx)
         return y_slice, x_slice
 
     @jit

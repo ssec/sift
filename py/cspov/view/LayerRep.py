@@ -571,7 +571,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self.cell_height = cell_height  # Note: cell_height is usually negative
         self.texture_shape = texture_shape
         self.tile_shape = tile_shape
-        self.num_tiles = self.texture_shape[0] * self.texture_shape[1]
+        self.num_tex_tiles = self.texture_shape[0] * self.texture_shape[1]
         self._stride = 0  # Current stride is None when we are showing the overview
         self._latest_tile_box = None
         self.wrap_lon = wrap_lon
@@ -587,9 +587,10 @@ class TiledGeolocatedImageVisual(ImageVisual):
             rez(dy=abs(self.cell_height), dx=abs(self.cell_width)),
             self.tile_shape,
             self.texture_shape,
+            wrap_lon=self.wrap_lon
         )
         # What tiles have we used and can we use
-        self.texture_state = TextureTileState(self.num_tiles)
+        self.texture_state = TextureTileState(self.num_tex_tiles)
 
         self._data = None
 
@@ -742,7 +743,24 @@ class TiledGeolocatedImageVisual(ImageVisual):
                     continue
 
                 # Assume we were given a total image worth of this stride
-                tiles_info.append((stride, tiy, tix, tex_tile_idx, data[tiy*self.tile_shape[0]:(tiy+1)*self.tile_shape[0], tix*self.tile_shape[1]:(tix+1)*self.tile_shape[1]]))
+                y_start = tiy * self.tile_shape[0]
+                y_end = y_start + self.tile_shape[0]
+                x_start = tix * self.tile_shape[1]
+                x_end = x_start + self.tile_shape[1]
+                if x_start > self.shape[1]:
+                    x_start = x_start % self.shape[1]
+                if x_end > self.shape[1]:
+                    x_end = x_end % self.shape[1]
+                if x_end < x_start:
+                    # the tile spans the antimeridian
+                    tile_data = np.empty(self.tile_shape, dtype=data.dtype)
+                    tile_start2 = self.shape[1] - x_start
+                    tile_data[:, :tile_start2] = data[y_start:y_end, x_start:]
+                    tile_data[:, tile_start2:] = data[y_start:y_end, :x_end]
+                else:
+                    tile_data = data[y_start: y_end, x_start: x_end]
+
+                tiles_info.append((stride, tiy, tix, tex_tile_idx, tile_data))
 
         return tiles_info
 
@@ -771,7 +789,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
             total_overview_tiles = int(self.overview_info["vertex_coordinates"].shape[0] / 6)
             total_num_tiles += total_overview_tiles
 
-        if total_num_tiles > self.num_tiles:
+        if total_num_tiles > self.num_tex_tiles:
             LOG.warning("Current view sees more tiles than can be held in the GPU")
             # We continue on because there should be an overview image for any tiles that can't be drawn
         elif total_num_tiles <= 0:
@@ -797,6 +815,9 @@ class TiledGeolocatedImageVisual(ImageVisual):
             for tix in range(tile_box.l, tile_box.r):
                 # Update the index here because we have multiple exit/continuation points
                 used_tile_idx += 1
+
+                # if self.wrap_lon:
+                #     tix = tix % self.calc.image_tiles_avail[1]
 
                 # Check if the tile we want to draw is actually in the GPU, if not (atlas too small?) fill with zeros and keep going
                 if (preferred_stride, tiy, tix) not in self.texture_state:
