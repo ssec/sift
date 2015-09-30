@@ -22,8 +22,8 @@ __docformat__ = 'reStructuredText'
 
 
 from vispy import app
-from .queue import TaskQueue, test_task, TASK_PROGRESS, TASK_DOING
-from .workspace import Workspace
+from cspov.queue import TaskQueue, test_task, TASK_PROGRESS, TASK_DOING
+from cspov.workspace import Workspace
 
 try:
     app_object = app.use_app('pyqt4')
@@ -37,6 +37,7 @@ from cspov.view.MapWidget import CspovMainMapCanvas
 from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.model import Document
 from cspov.common import WORLD_EXTENT_BOX
+from functools import partial
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
@@ -45,6 +46,7 @@ import os
 import logging
 from vispy import scene
 from vispy.visuals.transforms.linear import STTransform, MatrixTransform
+from vispy.util.event import Event
 
 LOG = logging.getLogger(__name__)
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -85,10 +87,34 @@ class MainMap(scene.Node):
         super(MainMap, self).__init__(*args, **kwargs)
 
 
+class RetileEvent(Event):
+    pass
+
+
 class LayerList(scene.Node):
+    """SceneGraph container for multiple image layers.
+    """
     def __init__(self, name=None, parent=None):
         super(LayerList, self).__init__(name=name, parent=parent)
-        # children are usually added by specifying a LayerList as their parent Node
+
+    def _timeout_slot(self, scheduler, ws=None):
+        """Simple event handler for when we need to reassess.
+        """
+        # Stop the timer so it doesn't continously call this slot
+        scheduler.stop()
+        # Keep track of any children being updated
+        update = False
+        for child in self.children:
+            need_retile, view_box, preferred_stride, tile_box = child.assess(ws)
+            if need_retile:
+                update = True
+                LOG.debug("Retiling child '%s'", child.name)
+                child.retile(ws, view_box, preferred_stride, tile_box)
+
+        if update:
+            # XXX: Should we update after every child?
+            # draw any changes that were made
+            self.update()
 
 
 class AnimatedLayerList(LayerList):
@@ -208,7 +234,7 @@ class Main(QtGui.QMainWindow):
         self.boundaries = NEShapefileLines(border_shapefile, double=True, parent=self.main_map)
 
         # Create Layers
-        tex_tiles_per_image = 32
+        texture_shape = (4, 16)
         # tex_tiles_per_image = 16 * 8
         for uuid, ds_info, full_data in test_layers(self.workspace, self.document, glob_pattern=glob_pattern):
             # add visuals to scene
@@ -224,12 +250,22 @@ class Main(QtGui.QMainWindow):
                 method='tiled',
                 cmap='grays',
                 double=False,
-                num_tiles=tex_tiles_per_image,
+                texture_shape=texture_shape,
+                wrap_lon=True,
                 parent=self.image_list,  # FIXME move into document tilestack
             )
 
         # Interaction Setup
         self.setup_key_releases()
+        self.scheduler = QtCore.QTimer(parent=self)
+        self.scheduler.setInterval(500.0)
+        self.scheduler.timeout.connect(partial(self.image_list._timeout_slot, self.scheduler))
+        def start_wrapper(timer, event):
+            """Simple wrapper around a timers start method so we can accept but ignore the event provided
+            """
+            timer.start()
+        self.main_canvas.events.draw.connect(partial(start_wrapper, self.scheduler))
+
 
         # things to refresh the map window
         # doc.docDidChangeLayerOrder.connect(main_canvas.update)
@@ -270,14 +306,14 @@ def main():
                         help="Specify alternative coastline/border shapefile")
     parser.add_argument("--glob-pattern", default=os.environ.get("TIFF_GLOB", None),
                         help="Specify glob pattern for input images")
-    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
+    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=int(os.environ.get("VERBOSITY", 2)),
                         help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG (default INFO)')
     args = parser.parse_args()
 
     levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
     level=levels[min(3, args.verbosity)]
     logging.basicConfig(level=level)
-    logging.getLogger('vispy').setLevel(level)
+    # logging.getLogger('vispy').setLevel(level)
 
     app.create()
     # app = QApplication(sys.argv)
