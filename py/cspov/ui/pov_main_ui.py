@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created: Wed Sep 30 09:40:33 2015
+# Created: Wed Sep 30 10:00:58 2015
 #      by: PyQt4 UI code generator 4.11.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -64,9 +64,15 @@ class Ui_MainWindow(object):
         self.animationSlider.setObjectName(_fromUtf8("animationSlider"))
         self.horizontalLayout.addWidget(self.animationSlider)
         self.animBack = QtGui.QToolButton(self.groupBox)
+        self.animBack.setToolTip(_fromUtf8(""))
         self.animBack.setObjectName(_fromUtf8("animBack"))
         self.horizontalLayout.addWidget(self.animBack)
         self.animPlayPause = QtGui.QToolButton(self.groupBox)
+        font = QtGui.QFont()
+        font.setFamily(_fromUtf8("Andale Mono"))
+        font.setPointSize(18)
+        font.setItalic(False)
+        self.animPlayPause.setFont(font)
         self.animPlayPause.setObjectName(_fromUtf8("animPlayPause"))
         self.horizontalLayout.addWidget(self.animPlayPause)
         self.animForward = QtGui.QToolButton(self.groupBox)
@@ -78,8 +84,28 @@ class Ui_MainWindow(object):
         self.line_2.setObjectName(_fromUtf8("line_2"))
         self.horizontalLayout.addWidget(self.line_2)
         self.cursorProbeText = QtGui.QLabel(self.groupBox)
-        self.cursorProbeText.setMinimumSize(QtCore.QSize(128, 0))
+        self.cursorProbeText.setMinimumSize(QtCore.QSize(240, 0))
         self.cursorProbeText.setMaximumSize(QtCore.QSize(256, 16777215))
+        palette = QtGui.QPalette()
+        brush = QtGui.QBrush(QtGui.QColor(17, 71, 5))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.WindowText, brush)
+        brush = QtGui.QBrush(QtGui.QColor(17, 71, 5))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.Text, brush)
+        brush = QtGui.QBrush(QtGui.QColor(17, 71, 5))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.WindowText, brush)
+        brush = QtGui.QBrush(QtGui.QColor(17, 71, 5))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.Text, brush)
+        brush = QtGui.QBrush(QtGui.QColor(69, 69, 69))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.WindowText, brush)
+        brush = QtGui.QBrush(QtGui.QColor(69, 69, 69))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.Text, brush)
+        self.cursorProbeText.setPalette(palette)
         font = QtGui.QFont()
         font.setFamily(_fromUtf8("Andale Mono"))
         font.setPointSize(14)
@@ -163,7 +189,7 @@ class Ui_MainWindow(object):
         MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.layerConfigPane)
 
         self.retranslateUi(MainWindow)
-        self.layerSetTabs.setCurrentIndex(3)
+        self.layerSetTabs.setCurrentIndex(0)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
@@ -174,11 +200,11 @@ class Ui_MainWindow(object):
         self.progressBar.setToolTip(_translate("MainWindow", "Background Activity", None))
         self.queueButton.setText(_translate("MainWindow", "...", None))
         self.animationSlider.setToolTip(_translate("MainWindow", "Animation", None))
-        self.animBack.setText(_translate("MainWindow", "...", None))
-        self.animPlayPause.setText(_translate("MainWindow", "...", None))
-        self.animForward.setText(_translate("MainWindow", "...", None))
+        self.animBack.setText(_translate("MainWindow", "|◀◀", None))
+        self.animPlayPause.setText(_translate("MainWindow", "▶", None))
+        self.animForward.setText(_translate("MainWindow", "▶▶|", None))
         self.cursorProbeText.setToolTip(_translate("MainWindow", "Value under cursor", None))
-        self.cursorProbeText.setText(_translate("MainWindow", "TextLabel", None))
+        self.cursorProbeText.setText(_translate("MainWindow", "Cursor Value", None))
         self.probeAPane.setWindowTitle(_translate("MainWindow", "A Probe", None))
         self.probeBPane.setWindowTitle(_translate("MainWindow", "B Probe", None))
         self.layersPane.setWindowTitle(_translate("MainWindow", "Layers", None))
