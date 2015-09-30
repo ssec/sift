@@ -555,6 +555,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
                  shape=None,
                  tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH),
                  texture_shape=(DEFAULT_TEXTURE_HEIGHT, DEFAULT_TEXTURE_WIDTH),
+                 wrap_lon=False,
                  cmap='viridis', method='tiled', clim='auto', interpolation='nearest', **kwargs):
         if method != 'tiled':
             raise ValueError("Only 'tiled' method is currently supported")
@@ -573,7 +574,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self.num_tiles = self.texture_shape[0] * self.texture_shape[1]
         self._stride = 0  # Current stride is None when we are showing the overview
         self._latest_tile_box = None
-        self._waiting_on_data = False
+        self.wrap_lon = wrap_lon
         self._tiles = {}
         assert (shape or data is not None), "`data` or `shape` must be provided"
         self.shape = shape or data.shape
@@ -686,8 +687,19 @@ class TiledGeolocatedImageVisual(ImageVisual):
         # Tell the texture state that we are adding a tile that should never expire and should always exist
         nfo["texture_tile_index"] = ttile_idx = self.texture_state.add_tile((0, 0, 0), expires=False)
         self._texture.set_tile_data(ttile_idx, nfo["data"])
-        nfo["texture_coordinates"] = self.calc.calc_texture_coordinates(ttile_idx)
-        nfo["vertex_coordinates"] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step)
+
+        # Handle wrapping around the anti-meridian so there is a -180/180 continuous image
+        num_tiles = 1 if not self.wrap_lon else 2
+        nfo["texture_coordinates"] = np.empty((6 * num_tiles, 2), dtype=np.float32)
+        nfo["vertex_coordinates"] = np.empty((6 * num_tiles, 2), dtype=np.float32)
+        nfo["texture_coordinates"][:6, :2] = self.calc.calc_texture_coordinates(ttile_idx)
+        nfo["vertex_coordinates"][:6, :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step)
+        if self.wrap_lon:
+            nfo["texture_coordinates"][6:12, :2] = nfo["texture_coordinates"][:6, :2]
+            nfo["vertex_coordinates"][6:12, :2] = nfo["vertex_coordinates"][:6, :2]
+            # increase the second set of X coordinates by the circumference of the earth
+            nfo["vertex_coordinates"][6:12, 0] += nfo["cell_width"] * nfo["data"].shape[1]
+        self._set_vertex_tiles(nfo["vertex_coordinates"], nfo["texture_coordinates"])
 
     def _build_texture_tiles(self, data, view_box, stride, tile_box):
         """Prepare and organize strided data in to individual tiles with associated information.
@@ -753,9 +765,11 @@ class TiledGeolocatedImageVisual(ImageVisual):
             _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride)
         total_num_tiles = (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l)
 
+        total_overview_tiles = 0
         if self.overview_info is not None:
             # we should be providing an overview image
-            total_num_tiles += 1
+            total_overview_tiles = int(self.overview_info["vertex_coordinates"].shape[0] / 6)
+            total_num_tiles += total_overview_tiles
 
         if total_num_tiles > self.num_tiles:
             LOG.warning("Current view sees more tiles than can be held in the GPU")
@@ -773,8 +787,8 @@ class TiledGeolocatedImageVisual(ImageVisual):
         # Set up the overview tile
         if self.overview_info is not None:
             # XXX: This completely depends on drawing order, putting it at the end seems to work
-            tex_coords[-6:, :] = self.overview_info["texture_coordinates"]
-            vertices[-6:, :] = self.overview_info["vertex_coordinates"]
+            tex_coords[-6 * total_overview_tiles:, :] = self.overview_info["texture_coordinates"]
+            vertices[-6 * total_overview_tiles:, :] = self.overview_info["vertex_coordinates"]
 
         # preferred_stride = 1
         LOG.debug("Building vertex data for %d tiles (%r)", total_num_tiles, tile_box)
