@@ -31,7 +31,6 @@ from collections import namedtuple
 from uuid import UUID, uuid1 as uuidgen
 from PyQt4.QtCore import QObject, pyqtSignal
 
-
 LOG = logging.getLogger(__name__)
 
 import_progress = namedtuple('import_progress', ['uuid', 'stages', 'current_stage', 'completion', 'stage_desc', 'dataset_info', 'data'])
