@@ -82,8 +82,6 @@ class LayerStackListViewModel(QAbstractListModel):
             widget.pressed.connect(self.layer_pressed)
             widget.setModel(self)
 
-        self.updateList()
-
     # def columnCount(self, *args, **kwargs):
     #     return 1
 

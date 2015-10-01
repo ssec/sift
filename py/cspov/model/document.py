@@ -31,6 +31,7 @@ import sys
 import logging
 import unittest
 import argparse
+from collections import namedtuple
 
 from PyQt4.QtCore import QObject, pyqtSignal
 
@@ -43,35 +44,147 @@ from .probes import Probe, Shape
 
 LOG = logging.getLogger(__name__)
 
+DEFAULT_LAYER_SET_COUNT = 4  # this should match the ui configuration!
+
+# presentation information for a layer
+prez = namedtuple('prez', [
+    'uuid',     # UUID: dataset in the document/workspace
+    'visible',  # bool: whether it's visible or not
+    'order',    # int: animation order, 1..N or None/False/0 if non-animating
+    'enhancement',  # weakref: to enhancement it's observed through
+    'siblings'  # set(UUID): of other datasets contributing to the enhancement (e.g. RGB/RGBA enhancements)
+])
+
+
+# class LayerSet(object):
+#     """
+#     LayerSet is a visual configuration of a stack of layers
+#     """
+#     def __init__(self, prior=None):
+#         """
+#         initialize, optionally by copying a prior LayerSet
+#         """
+#
+#     def __getitem__(self, uuid):
+#         """ retrieve layer information by uuid
+#         """
+#         # FIXME
+#
+#     @property
+#     def animation_order
+
+
 class Document(QObject):
     """
-    low level queries
-    event handling
-    cross-process concurrency
-    lazy updates
+    Document has one or more LayerSets choosable by the user (one at a time) as currentLayerSet
+    LayerSets configure animation order, visibility, enhancements and linear combinations
+    LayerSets can be cloned from the prior active LayerSet when unconfigured
+    Document has Probes, which operate on the currentLayerSet
+    Probes have spatial areas (point probes, shaped areas)
+    Probe areas are translated into localized data masks against the workspace raw data content
+
     """
+    workspace = None
+    layer_set = None  # list(list(prez) or None)
+    current_set_index = 0
+    available = None  # set(uuid)
+
+    # signals
     docDidChangeLayer = pyqtSignal(dict)  # add/remove
-    docDidChangeLayerOrder = pyqtSignal(dict)
+    docDidChangeLayerOrder = pyqtSignal(list)
     docDidChangeEnhancement = pyqtSignal(dict)  # includes colormaps
     docDidChangeShape = pyqtSignal(dict)
 
-    _layer_reps = None
-
-
-    def __init__(self, **kwargs):
+    def __init__(self, workspace, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
         super(Document, self).__init__(**kwargs)
-        self._layer_reps = []  # LayerStack(self)
+        self.workspace = workspace
+        self.layer_set = [list()] + [None] * (layer_set_count-1)
+        self.available = set()
+
+    def _default_enhancement(self, datasetinfo):
+        """
+        consult guidebook and user preferences for which enhancement should be used for a given datasetinfo
+        :param datasetinfo: dictionary of metadata about dataset
+        :return: enhancement info and siblings participating in the enhancement
+        """
+        return None, None
+
+    @property
+    def current_layer_set(self):
+        return self.layer_set[self.current_set_index]
+
+    def open_file(self, path):
+        """
+        open an arbitrary file and make it the new top layer.
+        emits docDidChangeLayer followed by docDidChangeLayerOrder
+        :param path: file to open and add
+        :return: overview (uuid:UUID, datasetinfo:dict, overviewdata:numpy.ndarray)
+        """
+        uuid, info, content = self.workspace.import_image(source_path=path)
+
+        # add as visible to the front of the current set, and invisible to the rest of the available sets
+        enhancement, siblings = self._default_enhancement(info)
+        p = prez(uuid=uuid,
+                 visible=True,
+                 order=None,
+                 enhancement=enhancement,
+                 siblings=siblings)
+        q = prez(uuid=uuid,
+                 visible=False,
+                 order=None,
+                 enhancement=enhancement,
+                 siblings=siblings)
+        old_layer_count = len(self.layer_set[self.current_set_index])
+        for dex,lset in enumerate(self.layer_set):
+            if lset is not None:  # uninitialized layer sets will be None
+                lset.insert(0, p if dex==self.current_set_index else q)
+
+        # signal updates from the document
+        self.docDidChangeLayer.emit({
+            'uuid': uuid,
+            'info': info,
+            'content': content,
+            'order': 0
+        })
+        # express new layer order using old layer order indices
+        reordered_indices = [None] + list(range(old_layer_count))
+        self.docDidChangeLayerOrder.emit(reordered_indices)
+
+        return uuid, info, content
+
+    def _clone_layer_set(self, existing_layer_set):
+        return existing_layer_set.deepcopy()
+
+    def select_layer_set(self, layer_set_index):
+        """
+        """
+        assert(layer_set_index<len(self.layer_set) and layer_set_index>=0)
+        if self.layer_set[layer_set_index] is None:
+            self.layer_set[layer_set_index] = self._clone_layer_set(self.layer_set[self.current_set_index])
+        self.current_set_index = layer_set_index
+        self.docDidChangeLayerOrder.emit([])  # indicate that pretty much everything has changed
+
+    def change_layer_order(self, old_index, new_index):
+        L = self.current_layer_set
+        order = list(range(len(L)))
+        p = L[old_index]
+        d = order[old_index]
+        del L[old_index]
+        del order[old_index]
+        L.insert(new_index, p)
+        L.insert(new_index, d)
+        self.docDidChangeLayerOrder.emit(order)
 
 
-    def asDrawingPlan(self, frame=None):
-        """
-        delegate callable yielding a sequence of LayerReps to draw
-        """
-        if frame is not None:
-            yield self._layer_reps[frame % len(self._layer_reps)]
-            return
-        for layer_rep in self._layer_reps:
-            yield layer_rep
+    # def asDrawingPlan(self, frame=None):
+    #     """
+    #     delegate callable yielding a sequence of LayerReps to draw
+    #     """
+    #     if frame is not None:
+    #         yield self._layer_reps[frame % len(self._layer_reps)]
+    #         return
+    #     for layer_rep in self._layer_reps:
+    #         yield layer_rep
 
 
     def asListing(self):
@@ -82,6 +195,7 @@ class Document(QObject):
         rep = TiledGeolocatedImage(filename, tile_class=GlooRGBImageTile)
         self._layer_reps.append(rep)
         self.docDidChangeLayer.emit({'filename': filename})
+
 
 
     def addFullGlobMercatorColormappedFloatImageLayer(self, filename, range=None):

@@ -201,8 +201,8 @@ class Main(QtGui.QMainWindow):
         self.queue.didMakeProgress.connect(self.update_progress_bar)
 
         # create document
-        self.document = doc = Document()
         self.workspace = Workspace(workspace_dir)
+        self.document = doc = Document(self.workspace)
 
         self.main_canvas = CspovMainMapCanvas(parent=self)
         self.ui.mainWidgets.addTab(self.main_canvas.native, 'Mercator')
