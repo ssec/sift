@@ -36,6 +36,8 @@ LOG = logging.getLogger(__name__)
 
 DEFAULT_TILE_HEIGHT = 512
 DEFAULT_TILE_WIDTH = 512
+DEFAULT_TEXTURE_HEIGHT=2
+DEFAULT_TEXTURE_WIDTH=16
 # The values below are taken from the test geotiffs that are projected to the `DEFAULT_PROJECTION` below.
 # These units are in meters in mercator projection space
 DEFAULT_X_PIXEL_SIZE = 4891.969810251281160
@@ -80,7 +82,7 @@ class MercatorTileCalc(object):
     WELLSAMPLED='wellsampled'
 
     name = None
-    pixel_shape = None
+    image_shape = None
     pixel_rez = None
     zero_point = None
     tile_shape = None
@@ -88,13 +90,17 @@ class MercatorTileCalc(object):
     extents_box = None  # word coordinates that this image and its tiles corresponds to
     tiles_avail = None  # (ny,nx) available tile count for this image
 
-    def __init__(self, name, pixel_shape, ul_origin, pixel_rez, tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH)):
+    def __init__(self, name, image_shape, ul_origin, pixel_rez,
+                 tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH),
+                 texture_shape=(DEFAULT_TEXTURE_HEIGHT, DEFAULT_TEXTURE_WIDTH),
+                 wrap_lon=False):
         """
         name: the 'name' of the tile, typically the path of the file it represents
-        pixel_shape: (h:int,w:int) in pixels
+        image_shape: (h:int,w:int) in pixels
         ul_origin: (y:float,x:float) in world coords specifies upper-left coordinate of the image
         pixel_rez: (dy:float,dx:float) in world coords per pixel ascending from corner [0,0], as measured near zero_point
         tile_shape: the pixel dimensions (h:int, w:int) of the GPU tiling we want to use
+        texture_shape: the size of the texture being used (h:int, w:int) in number of tiles
 
         Tiling is aligned to pixels, not world
         World coordinates are eqm such that 0,0 matches 0°N 0°E, going north/south +-90° and west/east +-180°
@@ -102,26 +108,31 @@ class MercatorTileCalc(object):
         """
         super(MercatorTileCalc, self).__init__()
         self.name = name
-        self.pixel_shape = pixel_shape
+        self.image_shape = image_shape
         self.ul_origin = ul_origin
         self.pixel_rez = pixel_rez
         self.tile_shape = tile_shape
+        # in units of tiles:
+        self.texture_shape = texture_shape
+        # in units of data elements (float32):
+        self.texture_size = (self.texture_shape[0] * self.tile_shape[0], self.texture_shape[1] * self.tile_shape[1])
+        self.image_tiles_avail = (self.image_shape[0] / self.tile_shape[0], self.image_shape[1] / self.tile_shape[1])
 
-        h,w = pixel_shape
-        oy,ox = ul_origin
+        self.wrap_lon = wrap_lon
+        # if self.wrap_lon:
+        #     # FIXME: Temporary until we can automatically know that tile (Y, X) is tile (Y, X-tiles_avail[1])
+        #     self.image_shape = (self.image_shape[0], self.image_shape[1] * 2)
+
         self.extents_box = box(
-            b=oy - h * self.pixel_rez.dy,
-            t=oy,
-            l=ox,
-            r=ox + w * self.pixel_rez.dx,
+            b=self.ul_origin[0] - self.image_shape[0] * self.pixel_rez.dy,
+            t=self.ul_origin[0],
+            l=self.ul_origin[1],
+            r=self.ul_origin[1] + self.image_shape[1] * self.pixel_rez.dx,
         )
 
-        self.tiles_avail = (h/tile_shape[0], w/tile_shape[1])
-
-        # FIXME: deal with the AHI seeing the dateline and not the prime meridian!
         # FIXME: for now, require image size to be a multiple of tile size, else we have to deal with partial tiles!
-        assert(h % tile_shape[0]==0)
-        assert(w % tile_shape[1]==0)
+        assert(self.image_shape[0] % tile_shape[0] == 0)
+        assert(self.image_shape[1] % tile_shape[1] == 0)
 
     @jit
     def visible_tiles(self, visible_geom, stride=1, extra_tiles_box=box(0,0,0,0)):
@@ -136,6 +147,12 @@ class MercatorTileCalc(object):
         X = extra_tiles_box  # FUTURE: extra_geom_box specifies in world coordinates instead of tile count
         E = self.extents_box
         Z = self.pixel_rez
+
+        if self.wrap_lon:
+            # FIXME: Technically this doesn't handle reusing the tiles properly, this assumes that the tiles align perfectly
+            # make the image look like it covers twice as much of the earth
+            # XXX: this only works for global images (not subimages)
+            E = box(b=E.b, l=E.l, t=E.t, r=E.r + self.image_shape[1] * self.pixel_rez.dx)  # copy the original instance variable
 
         # convert world coords to pixel coords
         # py0, px0 = self.extents_box.b, self.extents_box.l
@@ -178,8 +195,7 @@ class MercatorTileCalc(object):
             tiy0 = 0
 
         # Total number of tiles in this image at this stride
-        ath = np.ceil((self.pixel_shape[0] / float(stride)) / th)
-        atw = np.ceil((self.pixel_shape[1] / float(stride)) / tw)
+        ath, atw = self.max_tiles_available(stride, self.wrap_lon)
         xth = ath - (tiy0 + nth)
         if xth < 0:  # then we're asking for tiles that don't exist
             nth += xth  # trim it back
@@ -203,6 +219,14 @@ class MercatorTileCalc(object):
         )
 
         return overunder, tilebox
+
+    @jit
+    def max_tiles_available(self, stride, wrap_lon=False):
+        ath = np.ceil((self.image_shape[0] / float(stride)) / self.tile_shape[0])
+        atw = np.ceil((self.image_shape[1] / float(stride)) / self.tile_shape[1])
+        if wrap_lon:
+            atw *= 2
+        return ath, atw
 
     @jit
     def calc_sampling(self, visible, stride, texture=None):
@@ -245,10 +269,10 @@ class MercatorTileCalc(object):
     @jit
     def overview_stride(self):
         # FUTURE: Come up with a fancier way of doing overviews like averaging each strided section, if needed
-        tsy = max(1, np.floor(self.pixel_shape[0] / self.tile_shape[0]))
-        tsx = max(1, np.floor(self.pixel_shape[1] / self.tile_shape[1]))
-        y_slice = slice(0, self.pixel_shape[0], tsy)
-        x_slice = slice(0, self.pixel_shape[1], tsx)
+        tsy = max(1, np.floor(self.image_shape[0] / self.tile_shape[0]))
+        tsx = max(1, np.floor(self.image_shape[1] / self.tile_shape[1]))
+        y_slice = slice(0, self.image_shape[0], tsy)
+        x_slice = slice(0, self.image_shape[1], tsx)
         return y_slice, x_slice
 
     @jit
@@ -291,18 +315,56 @@ class MercatorTileCalc(object):
                ]
 
     @jit
-    def calc_vertex_coordinates(self, tiy, tix, stride):
+    def fractional_wrapped_tile(self, stride):
+        """The amount of tile that overlaps at the antimeridian and should be removed from the wrapped tiles.
+        """
+        # Index of the first
+        tix = self.max_tiles_available(stride)[1]
+        tile_start_idx = tix * self.tile_shape[1]
+        return (tile_start_idx - int(self.image_shape[1] / stride)) / self.tile_shape[1]
+
+    @jit
+    def calc_vertex_coordinates(self, tiy, tix, stridey, stridex):
         quad = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0],
                          [0, 0, 0], [1, 1, 0], [0, 1, 0]],
                         dtype=np.float32)
-        tile_width = self.pixel_rez.dx * self.tile_shape[1] * stride
-        tile_height = self.pixel_rez.dy * self.tile_shape[0] * stride
+        tile_width = self.pixel_rez.dx * self.tile_shape[1] * stridex
+        tile_height = self.pixel_rez.dy * self.tile_shape[0] * stridey
+        max_tiles = self.max_tiles_available(stridex)
+        virt_tix = tix % max_tiles[1]
+        # which image of the repeating/wrapping images are we in
+        image_idx = int(tix / max_tiles[1])
+        # one whole image in the X direction is this many meters:
+        image_origin_x = self.ul_origin.x + self.pixel_rez.dx * self.image_shape[1] * image_idx
         quad[:, 0] *= tile_width
-        quad[:, 0] += self.ul_origin.x + tile_width * tix
+        quad[:, 0] += image_origin_x + (tile_width * virt_tix)
         quad[:, 1] *= -tile_height  # Origin is upper-left so image goes down
         quad[:, 1] += self.ul_origin.y - tile_height * tiy
         quad = quad.reshape(6, 3)
         return quad[:, :2]
+
+    @jit
+    def calc_texture_coordinates(self, ttile_idx):
+        """Get texture coordinates for one tile as a quad.
+
+        :param ttile_idx: int, texture 1D index that maps to some internal texture tile location
+        """
+        tiy = int(ttile_idx / self.texture_shape[1])
+        tix = ttile_idx % self.texture_shape[1]
+        # start with basic quad describing the entire texture
+        quad = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0],
+                         [0, 0, 0], [1, 1, 0], [0, 1, 0]],
+                        dtype=np.float32)
+        # Now scale and translate the coordinates so they only apply to one tile in the texture
+        one_tile_tex_width = 1.0 / self.texture_size[1] * self.tile_shape[1]
+        one_tile_tex_height = 1.0 / self.texture_size[0] * self.tile_shape[0]
+        quad[:, 0] *= one_tile_tex_width
+        quad[:, 0] += one_tile_tex_width * tix
+        quad[:, 1] *= one_tile_tex_height
+        quad[:, 1] += one_tile_tex_height * tiy
+        quad = quad.reshape(6, 3)
+        quad = np.ascontiguousarray(quad[:, :2])
+        return quad
 
 
 def main():
