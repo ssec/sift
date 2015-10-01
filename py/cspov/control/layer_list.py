@@ -92,8 +92,8 @@ class LayerStackListViewModel(QAbstractListModel):
         LOG.info('{} layers'.format(len(el)))
         return len(el)
 
-    def columnCount(self, QModelIndex_parent=None, *args, **kwargs):
-        return len(COLUMNS)
+    # def columnCount(self, QModelIndex_parent=None, *args, **kwargs):
+    #     return len(COLUMNS)
 
     @property
     def listing(self):
@@ -113,10 +113,12 @@ class LayerStackListViewModel(QAbstractListModel):
             return None
         if int_role!=Qt.DisplayRole:
             return None
+        return "test"  # FIXME debug
         el = self.listing
 
         row = index.row()
-        col = index.column()
+        # col = index.column()
+        col = 1
         LOG.debug('row,col {},{} is {}'.format(row, col, el[row]))
         return self.column[col](row, el)
 
