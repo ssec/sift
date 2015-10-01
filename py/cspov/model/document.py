@@ -84,22 +84,23 @@ class Document(QObject):
     Probe areas are translated into localized data masks against the workspace raw data content
 
     """
-    workspace = None
-    layer_set = None  # list(list(prez) or None)
     current_set_index = 0
-    available = None  # set(uuid)
+    _workspace = None
+    _layer_sets = None  # list(list(prez) or None)
+    _available = None  # dict(uuid:datasetinfo)
 
     # signals
     docDidChangeLayer = pyqtSignal(dict)  # add/remove
-    docDidChangeLayerOrder = pyqtSignal(list)
+    docDidChangeLayerOrder = pyqtSignal(list)  # list of original indices in their new order
     docDidChangeEnhancement = pyqtSignal(dict)  # includes colormaps
     docDidChangeShape = pyqtSignal(dict)
 
     def __init__(self, workspace, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
         super(Document, self).__init__(**kwargs)
-        self.workspace = workspace
-        self.layer_set = [list()] + [None] * (layer_set_count-1)
-        self.available = set()
+        self._workspace = workspace
+        self._layer_sets = [list()] + [None] * (layer_set_count-1)
+        self._available = set()
+        # TODO: connect signals from workspace to slots including update_dataset_info
 
     def _default_enhancement(self, datasetinfo):
         """
@@ -111,7 +112,7 @@ class Document(QObject):
 
     @property
     def current_layer_set(self):
-        return self.layer_set[self.current_set_index]
+        return self._layer_sets[self.current_set_index]
 
     def open_file(self, path):
         """
@@ -120,7 +121,9 @@ class Document(QObject):
         :param path: file to open and add
         :return: overview (uuid:UUID, datasetinfo:dict, overviewdata:numpy.ndarray)
         """
-        uuid, info, content = self.workspace.import_image(source_path=path)
+        uuid, info, content = self._workspace.import_image(source_path=path)
+
+        self._available[uuid] = info
 
         # add as visible to the front of the current set, and invisible to the rest of the available sets
         enhancement, siblings = self._default_enhancement(info)
@@ -134,13 +137,14 @@ class Document(QObject):
                  order=None,
                  enhancement=enhancement,
                  siblings=siblings)
-        old_layer_count = len(self.layer_set[self.current_set_index])
-        for dex,lset in enumerate(self.layer_set):
+        old_layer_count = len(self._layer_sets[self.current_set_index])
+        for dex,lset in enumerate(self._layer_sets):
             if lset is not None:  # uninitialized layer sets will be None
                 lset.insert(0, p if dex==self.current_set_index else q)
 
         # signal updates from the document
         self.docDidChangeLayer.emit({
+            'change': 'addition',
             'uuid': uuid,
             'info': info,
             'content': content,
@@ -149,20 +153,38 @@ class Document(QObject):
         # express new layer order using old layer order indices
         reordered_indices = [None] + list(range(old_layer_count))
         self.docDidChangeLayerOrder.emit(reordered_indices)
-
         return uuid, info, content
+
+    def update_dataset_info(self, new_info):
+        """
+        slot which updates document on new information workspace has provided us about a dataset
+        :param new_info: information dictionary including projection, levels of detail, etc
+        :return: None
+        """
+        uuid = new_info['uuid']
+        if uuid not in self._available:
+            LOG.warning('new information on uuid {0!r:s} is not for a known dataset'.format(new_info))
+        self._available[new_info['uuid']] = new_info
+        # TODO: see if this affects any presentation information; view will handle redrawing on its own
 
     def _clone_layer_set(self, existing_layer_set):
         return existing_layer_set.deepcopy()
 
     def select_layer_set(self, layer_set_index):
         """
+        change the selected layer set, 0..N (typically 0..3), cloning the old set if needed
+        emits docDidChangeLayerOrder with an empty list implying complete reassessment,
+          if cloning of layer set didn't occur
+        :param layer_set_index: which layer set to switch to
         """
-        assert(layer_set_index<len(self.layer_set) and layer_set_index>=0)
-        if self.layer_set[layer_set_index] is None:
-            self.layer_set[layer_set_index] = self._clone_layer_set(self.layer_set[self.current_set_index])
+        assert(layer_set_index<len(self._layer_sets) and layer_set_index>=0)
+        did_clone = False
+        if self._layer_sets[layer_set_index] is None:
+            self._layer_sets[layer_set_index] = self._clone_layer_set(self._layer_sets[self.current_set_index])
+            did_clone = True
         self.current_set_index = layer_set_index
-        self.docDidChangeLayerOrder.emit([])  # indicate that pretty much everything has changed
+        if not did_clone:
+            self.docDidChangeLayerOrder.emit([])  # indicate that pretty much everything has changed
 
     def change_layer_order(self, old_index, new_index):
         L = self.current_layer_set
@@ -175,6 +197,44 @@ class Document(QObject):
         L.insert(new_index, d)
         self.docDidChangeLayerOrder.emit(order)
 
+    def swap_layer_order(self, first_index, second_index):
+        L = self.current_layer_set
+        order = list(range(len(L)))
+        L[first_index], L[second_index] = L[second_index], L[first_index]
+        order[first_index], order[second_index] = order[second_index], order[first_index]
+        self.docDidChangeLayerOrder.emit(order)
+
+    def toggle_layer_visibility(self, dex, visible=None):
+        """
+        change the visibility of a layer
+        :param dex: layer index
+        :param visible: True, False, or None (toggle)
+        """
+        L = self.current_layer_set
+        old = L[dex]
+        visible = ~old.visible if visible is None else visible
+        nu = prez(
+            uuid=old.uuid,
+            visible=visible,
+            order=old.order,
+            enhancement=old.enhancement,
+            siblings=old.siblings
+        )
+        L[dex] = nu
+        self.docDidChangeLayer.emit({
+            'change': 'visible',
+            'uuid': nu.uuid,
+            'order': dex
+        })
+
+    def __len__(self):
+        return len(self.current_layer_set)
+
+    def __getitem__(self, dex):
+        """
+        return prez for a given layer index
+        """
+        return self.current_layer_set[dex]
 
     # def asDrawingPlan(self, frame=None):
     #     """
@@ -190,24 +250,24 @@ class Document(QObject):
     def asListing(self):
         return [{'name': q.name} for q in self._layer_reps]
 
+    #
+    # def addRGBImageLayer(self, filename, range=None):
+    #     rep = TiledGeolocatedImage(filename, tile_class=GlooRGBImageTile)
+    #     self._layer_reps.append(rep)
+    #     self.docDidChangeLayer.emit({'filename': filename})
 
-    def addRGBImageLayer(self, filename, range=None):
-        rep = TiledGeolocatedImage(filename, tile_class=GlooRGBImageTile)
-        self._layer_reps.append(rep)
-        self.docDidChangeLayer.emit({'filename': filename})
 
 
+    # def addFullGlobMercatorColormappedFloatImageLayer(self, filename, range=None):
+    #     rep = TiledGeolocatedImage(filename, tile_class=GlooColormapDataTile, range=range)
+    #     self._layer_reps.append(rep)
+    #     self.docDidChangeLayer.emit({'filename': filename})
 
-    def addFullGlobMercatorColormappedFloatImageLayer(self, filename, range=None):
-        rep = TiledGeolocatedImage(filename, tile_class=GlooColormapDataTile, range=range)
-        self._layer_reps.append(rep)
-        self.docDidChangeLayer.emit({'filename': filename})
-
-    def addShapeLayer(self, filename, **kwargs):
-        # FIXME: Figure out what the required arguments and stuff are
-        rep = NEShapefileLines(filename)
-        self._layer_reps.append(rep)
-        self.docDidChangeLayer.emit({'filename': filename})
+    # def addShapeLayer(self, filename, **kwargs):
+    #     # FIXME: Figure out what the required arguments and stuff are
+    #     rep = NEShapefileLines(filename)
+    #     self._layer_reps.append(rep)
+    #     self.docDidChangeLayer.emit({'filename': filename})
 
 #
     def asProbeGuidance(self, **kwargs):
