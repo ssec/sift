@@ -85,6 +85,10 @@ class LayerStackListViewModel(QAbstractListModel):
     # def columnCount(self, *args, **kwargs):
     #     return 1
 
+    @property
+    def listing(self):
+        return self.doc.asListing()
+
     def rowCount(self, QModelIndex_parent=None, *args, **kwargs):
         el = self.listing
         LOG.info('{} layers'.format(len(el)))
@@ -92,10 +96,6 @@ class LayerStackListViewModel(QAbstractListModel):
 
     # def columnCount(self, QModelIndex_parent=None, *args, **kwargs):
     #     return len(COLUMNS)
-
-    @property
-    def listing(self):
-        return self.doc.asListing()
 
     def _visibilityData(self, row, listing):
         return True  # FIXME

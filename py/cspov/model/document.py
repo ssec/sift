@@ -90,8 +90,8 @@ class Document(QObject):
     _available = None  # dict(uuid:datasetinfo)
 
     # signals
-    docDidChangeLayer = pyqtSignal(dict)  # add/remove
-    docDidChangeLayerOrder = pyqtSignal(list)  # list of original indices in their new order
+    docDidChangeLayer = pyqtSignal(dict)  # add/remove/alter
+    docDidChangeLayerOrder = pyqtSignal(list)  # list of original indices in their new order, None for new layers
     docDidChangeEnhancement = pyqtSignal(dict)  # includes colormaps
     docDidChangeShape = pyqtSignal(dict)
 
@@ -99,7 +99,7 @@ class Document(QObject):
         super(Document, self).__init__(**kwargs)
         self._workspace = workspace
         self._layer_sets = [list()] + [None] * (layer_set_count-1)
-        self._available = set()
+        self._available = {}
         # TODO: connect signals from workspace to slots including update_dataset_info
 
     def _default_enhancement(self, datasetinfo):
@@ -144,7 +144,7 @@ class Document(QObject):
 
         # signal updates from the document
         self.docDidChangeLayer.emit({
-            'change': 'addition',
+            'change': 'add',
             'uuid': uuid,
             'info': info,
             'content': content,
