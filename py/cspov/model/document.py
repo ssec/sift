@@ -234,7 +234,9 @@ class Document(QObject):
         """
         return prez for a given layer index
         """
-        return self.current_layer_set[dex]
+        uuid = self.current_layer_set[dex].uuid
+        nfo = self._available[uuid]
+        return nfo
 
     # def asDrawingPlan(self, frame=None):
     #     """
@@ -247,8 +249,8 @@ class Document(QObject):
     #         yield layer_rep
 
 
-    def asListing(self):
-        return [{'name': q.name} for q in self._layer_reps]
+    # def asListing(self):
+    #     return [{'name': q.name} for q in self._layer_reps]
 
     #
     # def addRGBImageLayer(self, filename, range=None):
