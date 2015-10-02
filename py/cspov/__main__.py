@@ -51,6 +51,7 @@ from vispy.util.event import Event
 LOG = logging.getLogger(__name__)
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 DEFAULT_SHAPE_FILE = os.path.join(SCRIPT_DIR, "data", "ne_110m_admin_0_countries", "ne_110m_admin_0_countries.shp")
+DEFAULT_TEXTURE_SHAPE = (4, 16)
 PROGRESS_BAR_MAX = 1000
 
 
@@ -69,7 +70,9 @@ def test_layers_from_directory(ws, doc, layer_tiff_glob, range_txt=None):
         range = tuple(map(float, re.findall(r'[\.0-9]+', range_txt)))
     for tif in glob(layer_tiff_glob):
         # doc.addFullGlobMercatorColormappedFloatImageLayer(tif, range=range)
-        uuid, info, overview_data = ws.import_image(tif)
+        # uuid, info, overview_data = ws.import_image(tif)
+        uuid, info, overview_data = doc.open_file(tif)
+        LOG.info('loaded uuid {} from {}'.format(uuid, tif))
         yield uuid, info, overview_data
 
 
@@ -125,6 +128,53 @@ class AnimatedLayerList(LayerList):
         self._animation_timer = app.Timer(1.0/10.0, connect=self.next_frame)
         # Make the newest child as the only visible node
         self.events.children_change.connect(self._set_visible_node)
+
+    def set_document(self, document):
+        document.docDidChangeLayerOrder.connect(self.rebuild_new_order)
+        document.docDidChangeLayer.connect(self.rebuild_layer_changed)
+
+    def rebuild_new_order(self, new_layer_index_order, *args, **kwargs):
+        """
+        layer order has changed; shift layers around
+        :param change:
+        :return:
+        """
+        pass
+
+    def rebuild_layer_changed(self, change_dict, *args, **kwargs):
+        """
+        document layer changed, update that layer
+        :param change_dict: dictionary of change information
+        :return:
+        """
+        if change_dict['change']=='add':  # a layer was added
+            # add visuals to scene
+            ds_info = change_dict['info']
+            overview_content = change_dict['content']
+
+            # create a new layer in the imagelist
+            image = TiledGeolocatedImage(
+                overview_content,
+                ds_info["origin_x"],
+                ds_info["origin_y"],
+                ds_info["cell_width"],
+                ds_info["cell_height"],
+                name=ds_info["name"],
+                clim=ds_info["clim"],
+                interpolation='nearest',
+                method='tiled',
+                cmap='grays',
+                double=False,
+                texture_shape=DEFAULT_TEXTURE_SHAPE,
+                wrap_lon=True,
+                parent=self,
+            )
+        else:
+            pass  # FIXME: other events? remove?
+
+
+    def rebuild_all(self, *args, **kwargs):
+        pass
 
     @property
     def animating(self):
@@ -201,8 +251,8 @@ class Main(QtGui.QMainWindow):
         self.queue.didMakeProgress.connect(self.update_progress_bar)
 
         # create document
-        self.document = doc = Document()
         self.workspace = Workspace(workspace_dir)
+        self.document = doc = Document(self.workspace)
 
         self.main_canvas = CspovMainMapCanvas(parent=self)
         self.ui.mainWidgets.addTab(self.main_canvas.native, 'Mercator')
@@ -227,6 +277,7 @@ class Main(QtGui.QMainWindow):
         # Head node of the image layer graph
         # FIXME: merge to the document delegate
         self.image_list = AnimatedLayerList(parent=self.main_map)
+        self.image_list.set_document(doc)
         # Put all the images to the -50.0 Z level
         # TODO: Make this part of whatever custom Image class we make
         self.image_list.transform *= STTransform(translate=(0, 0, -50.0))
@@ -234,26 +285,28 @@ class Main(QtGui.QMainWindow):
         self.boundaries = NEShapefileLines(border_shapefile, double=True, parent=self.main_map)
 
         # Create Layers
-        texture_shape = (4, 16)
+        texture_shape = DEFAULT_TEXTURE_SHAPE
         # tex_tiles_per_image = 16 * 8
         for uuid, ds_info, full_data in test_layers(self.workspace, self.document, glob_pattern=glob_pattern):
+            # this now fires off a document modification cascade resulting in a new layer going up
+            pass
             # add visuals to scene
-            image = TiledGeolocatedImage(
-                full_data,
-                ds_info["origin_x"],
-                ds_info["origin_y"],
-                ds_info["cell_width"],
-                ds_info["cell_height"],
-                name=ds_info["name"],
-                clim=ds_info["clim"],
-                interpolation='nearest',
-                method='tiled',
-                cmap='grays',
-                double=False,
-                texture_shape=texture_shape,
-                wrap_lon=True,
-                parent=self.image_list,  # FIXME move into document tilestack
-            )
+            # image = TiledGeolocatedImage(
+            #     full_data,
+            #     ds_info["origin_x"],
+            #     ds_info["origin_y"],
+            #     ds_info["cell_width"],
+            #     ds_info["cell_height"],
+            #     name=ds_info["name"],
+            #     clim=ds_info["clim"],
+            #     interpolation='nearest',
+            #     method='tiled',
+            #     cmap='grays',
+            #     double=False,
+            #     texture_shape=texture_shape,
+            #     wrap_lon=True,
+            #     parent=self.image_list,  # FIXME move into document tilestack
+            # )
 
         # Interaction Setup
         self.setup_key_releases()
@@ -276,7 +329,7 @@ class Main(QtGui.QMainWindow):
         self.ui.mainWidgets.removeTab(0)
 
         # convey action between document and layer list view
-        # self.behaviorLayersList = LayerStackListViewModel(self.ui.layers, doc)
+        self.behaviorLayersList = LayerStackListViewModel([self.ui.layerSet1Table, self.ui.layerSet2Table, self.ui.layerSet3Table, self.ui.layerSet4Table], doc)
 
         self.queue.add('test', test_task(), 'test000')
         # self.ui.layers

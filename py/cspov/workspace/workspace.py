@@ -31,7 +31,6 @@ from collections import namedtuple
 from uuid import UUID, uuid1 as uuidgen
 from PyQt4.QtCore import QObject, pyqtSignal
 
-
 LOG = logging.getLogger(__name__)
 
 import_progress = namedtuple('import_progress', ['uuid', 'stages', 'current_stage', 'completion', 'stage_desc', 'dataset_info', 'data'])
@@ -149,6 +148,7 @@ class Workspace(QObject):
     Workspace is a singleton object which works with Datasets shall:
     - own a working directory full of recently used datasets
     - provide DatasetInfo dictionaries for shorthand use between application subsystems
+    -- datasetinfo dictionaries are ordinary python dictionaries containing ['uuid'], projection metadata, LOD info
     - identify datasets primarily with a UUID object which tracks the dataset and its various representations through the system
     - unpack data in "packing crate" formats like NetCDF into memory-compatible flat files
     - efficiently create on-demand subsections and strides of raster data as numpy arrays
@@ -167,7 +167,7 @@ class Workspace(QObject):
     # signals
     didStartImport = pyqtSignal(dict)  # a dataset started importing; generated after overview level of detail is available
     didMakeImportProgress = pyqtSignal(dict)
-    didImportLevelOfDetail = pyqtSignal(dict)  # partial completion of a dataset import
+    didUpdateDataset = pyqtSignal(dict)  # partial completion of a dataset import, new datasetinfo dict is released
     didFinishImport = pyqtSignal(dict)  # all loading activities for a dataset have completed
     didDiscoverExternalDataset = pyqtSignal(dict)  # a new dataset was added to the workspace from an external agent
 
@@ -208,7 +208,6 @@ class Workspace(QObject):
         """
         return False
 
-
     def import_image(self, source_path=None, source_uri=None):
         """
         Start loading URI data into the workspace asynchronously.
@@ -237,7 +236,6 @@ class Workspace(QObject):
                 LOG.debug(repr(update))
         return uuid, info, data
 
-
     def remove(self, dsi):
         """
         Formally detach a dataset, removing its content from the workspace fully by the time that idle() has nothing more to do.
@@ -245,9 +243,17 @@ class Workspace(QObject):
         :return: None
         """
 
+    def get_info(self, dsi_or_uuid, lod=None):
+        """
+        :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
+        :param lod: desired level of detail to focus
+        :return:
+        """
+        pass
+
     def __getitem__(self, datasetinfo_or_uuid):
         """
-        return a dataset or dataset proxy capable of generating a numpy array when sliced
+        return science content proxy capable of generating a numpy array when sliced
         :param datasetinfo_or_uuid: metadata or key for the dataset
         :return: sliceable object returning numpy arrays
         """
