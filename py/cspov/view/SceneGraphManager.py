@@ -32,6 +32,7 @@ from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY
 from cspov.control.layer_list import LayerStackListViewModel
 from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.view.MapWidget import CspovMainMapCanvas
+from cspov.queue import TASK_DOING, TASK_PROGRESS
 
 from PyQt4.QtCore import QObject, pyqtSignal
 
@@ -272,7 +273,7 @@ class SceneGraphManager(QObject):
 
     def start_retiling_task(self, uuid, preferred_stride, tile_box):
         LOG.debug("Scheduling retile for child with UUID: %s", uuid)
-        self._retile_child(uuid, preferred_stride, tile_box)
+        self.queue.add(str(uuid) + "_retile", self._retile_child(uuid, preferred_stride, tile_box), 'Retile calculations for image layer ' + str(uuid))
 
     def _retile_child(self, uuid, preferred_stride, tile_box):
         LOG.debug("Retiling child with UUID: '%s'", uuid)
@@ -281,6 +282,7 @@ class SceneGraphManager(QObject):
         # XXX: ThreadSafe Data Storage needed?
         data = self._image_data[uuid][::preferred_stride, ::preferred_stride]
         tiles_info, vertices, tex_coords = child.retile(data, preferred_stride, tile_box)
+        yield {TASK_DOING: 'image_retile', TASK_PROGRESS: 1.0}
         self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)
 
     def _set_retiled(self, uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords):
