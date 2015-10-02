@@ -48,10 +48,73 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     set for a specific column, controls the rendering and editing of items in that column or row of a list or table
     see QAbstractItemView.setItemDelegateForRow/Column
     """
-    # def paint(self, painter, QStyleOptionViewItem, QModelIndex):
+    def paint(self, painter, style, index):
+        """
+        Draw the item in the model
+        :param painter:
+        :param style:
+        :param index:
+        :return:
+        """
+        super(LayerWidgetDelegate, self).paint(painter, style, index)
 
     def sizeHint(self, QStyleOptionViewItem, QModelIndex):
         return QSize(100,36)
+
+    # def paint(self, painter, option, index):
+    #     '''
+    #     Paint a checkbox without the label.
+    #     from http://stackoverflow.com/questions/17748546/pyqt-column-of-checkboxes-in-a-qtableview
+    #     '''
+    #     checked = index.model().data(index, QtCore.Qt.DisplayRole) == 'True'
+    #     check_box_style_option = QtGui.QStyleOptionButton()
+    #
+    #     if (index.flags() & QtCore.Qt.ItemIsEditable) > 0:
+    #         check_box_style_option.state |= QtGui.QStyle.State_Enabled
+    #     else:
+    #         check_box_style_option.state |= QtGui.QStyle.State_ReadOnly
+    #
+    #     if checked:
+    #         check_box_style_option.state |= QtGui.QStyle.State_On
+    #     else:
+    #         check_box_style_option.state |= QtGui.QStyle.State_Off
+    #
+    #     check_box_style_option.rect = self.getCheckBoxRect(option)
+    #
+    #     # this will not run - hasFlag does not exist
+    #     #if not index.model().hasFlag(index, QtCore.Qt.ItemIsEditable):
+    #         #check_box_style_option.state |= QtGui.QStyle.State_ReadOnly
+    #
+    #     check_box_style_option.state |= QtGui.QStyle.State_Enabled
+    #
+    #     QtGui.QApplication.style().drawControl(QtGui.QStyle.CE_CheckBox, check_box_style_option, painter)
+    #
+    # def editorEvent(self, event, model, option, index):
+    #     '''
+    #     Change the data in the model and the state of the checkbox
+    #     if the user presses the left mousebutton or presses
+    #     Key_Space or Key_Select and this cell is editable. Otherwise do nothing.
+    #     '''
+    #     print 'Check Box editor Event detected : '
+    #     if not (index.flags() & QtCore.Qt.ItemIsEditable) > 0:
+    #         return False
+    #
+    #     print 'Check Box edior Event detected : passed first check'
+    #     # Do not change the checkbox-state
+    #     if event.type() == QtCore.QEvent.MouseButtonRelease or event.type() == QtCore.QEvent.MouseButtonDblClick:
+    #         if event.button() != QtCore.Qt.LeftButton or not self.getCheckBoxRect(option).contains(event.pos()):
+    #             return False
+    #         if event.type() == QtCore.QEvent.MouseButtonDblClick:
+    #             return True
+    #     elif event.type() == QtCore.QEvent.KeyPress:
+    #         if event.key() != QtCore.Qt.Key_Space and event.key() != QtCore.Qt.Key_Select:
+    #             return False
+    #         else:
+    #             return False
+    #
+    #     # Change the checkbox-state
+    #     self.setModelData(None, model, index)
+    #     return True
 
 
 class LayerStackListViewModel(QAbstractListModel):
@@ -115,7 +178,9 @@ class LayerStackListViewModel(QAbstractListModel):
     def data(self, index, int_role=None):
         if not index.isValid():
             return None
-        if int_role!=Qt.DisplayRole:
+        if int_role==Qt.ItemDataRole:
+            return self.doc[index.row()] if index.row()<len(self.doc) else None
+        elif int_role!=Qt.DisplayRole:
             return None
         # return "test"
         el = self.listing
@@ -125,6 +190,7 @@ class LayerStackListViewModel(QAbstractListModel):
         col = 1
         LOG.debug('row,col {},{} is {}'.format(row, col, el[row]))
         return self.column[col](row, el)
+
 
     # def flags(self, QModelIndex):
     #     return None
