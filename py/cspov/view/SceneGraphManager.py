@@ -33,6 +33,8 @@ from cspov.control.layer_list import LayerStackListViewModel
 from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.view.MapWidget import CspovMainMapCanvas
 
+from PyQt4.QtCore import QObject, pyqtSignal
+
 import os
 import logging
 
@@ -156,12 +158,17 @@ class LayerSet(object):
         self.parent.update()
 
 
-class SceneGraphManager(object):
-    def __init__(self, doc, workspace, border_shapefile=None, glob_pattern=None, parent=None, texture_shape=(4, 16)):
+class SceneGraphManager(QObject):
+    didRetilingCalcs = pyqtSignal(object, object, object, object, object, object)
+
+    def __init__(self, doc, workspace, queue, border_shapefile=None, glob_pattern=None, parent=None, texture_shape=(4, 16)):
+        super(SceneGraphManager, self).__init__(parent)
+        self.didRetilingCalcs.connect(self._set_retiled)
+
         # Parent should be the Qt widget that this GLCanvas belongs to
-        self.parent = parent
         self.document = doc
         self.workspace = workspace
+        self.queue = queue
         self.border_shapefile = border_shapefile or DEFAULT_SHAPE_FILE
         self.glob_pattern = glob_pattern
         self.texture_shape = texture_shape
@@ -173,10 +180,11 @@ class SceneGraphManager(object):
         self.layer_set = LayerSet(self)
 
         self.set_document(self.document)
+
         self.setup_initial_canvas()
 
     def setup_initial_canvas(self):
-        self.main_canvas = CspovMainMapCanvas(parent=self.parent)
+        self.main_canvas = CspovMainMapCanvas(parent=self.parent())
         self.main_view = self.main_canvas.central_widget.add_view(scene.PanZoomCamera(aspect=1))
         # Camera Setup
         self.main_view.camera.flip = (0, 0, 0)
@@ -193,15 +201,6 @@ class SceneGraphManager(object):
         l, r, b, t = [getattr(WORLD_EXTENT_BOX, x) for x in ['l', 'r', 'b', 't']]
         merc_ortho.set_ortho(l, r, b, t, -100.0 * camera_z_scale, 100.0 * camera_z_scale)
         self.main_map.transform *= merc_ortho # ortho(l, r, b, t, -100.0 * camera_z_scale, 100.0 * camera_z_scale)
-
-        # Head node of the image layer graph
-        # FIXME: merge to the document delegate
-        # self.image_list = AnimatedLayerList(parent=self.main_map)
-        # self.image_list.set_document(self.document)
-        # Put all the images to the -50.0 Z level
-        # TODO: Make this part of whatever custom Image class we make
-        # self.image_list.transform *= STTransform(translate=(0, 0, -50.0))
-        # FIXME: merge to the document delegate
 
         self.boundaries = NEShapefileLines(self.border_shapefile, double=True, parent=self.main_map)
 
@@ -266,21 +265,30 @@ class SceneGraphManager(object):
         # Stop the timer so it doesn't continuously call this slot
         scheduler.stop()
 
-        update = False
         for uuid, child in self.image_layers.items():
-            need_retile, view_box, preferred_stride, tile_box = child.assess()
+            need_retile, preferred_stride, tile_box = child.assess()
             if need_retile:
-                # Check if the workspace has this stride
-                # FIXME: Schedule a background job to tile the data and then emit a signal that updates the GPU
-                # XXX: ThreadSafe Data Storage needed?
-                update = True
-                LOG.debug("Retiling child '%s'", child.name)
-                data = self._image_data[uuid][::preferred_stride, ::preferred_stride]
-                tiles_info, vertices, tex_coords = child.retile(data, view_box, preferred_stride, tile_box)
-                child.set_retiled(preferred_stride, tile_box, tiles_info, vertices, tex_coords)
+                self.start_retiling_task(uuid, preferred_stride, tile_box)
 
-        if update:
-            self.update()
+    def start_retiling_task(self, uuid, preferred_stride, tile_box):
+        LOG.debug("Scheduling retile for child with UUID: %s", uuid)
+        self._retile_child(uuid, preferred_stride, tile_box)
+
+    def _retile_child(self, uuid, preferred_stride, tile_box):
+        LOG.debug("Retiling child with UUID: '%s'", uuid)
+        child = self.image_layers[uuid]
+        # FIXME: Get data from workspace
+        # XXX: ThreadSafe Data Storage needed?
+        data = self._image_data[uuid][::preferred_stride, ::preferred_stride]
+        tiles_info, vertices, tex_coords = child.retile(data, preferred_stride, tile_box)
+        self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)
+
+    def _set_retiled(self, uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords):
+        """Slot to take data from background thread and apply it to the layer living in the image layer.
+        """
+        child = self.image_layers[uuid]
+        child.set_retiled(preferred_stride, tile_box, tiles_info, vertices, tex_coords)
+        child.update()
 
     def on_layer_visible_toggle(self, visible):
         pass

@@ -100,7 +100,7 @@ class Main(QtGui.QMainWindow):
         # create document
         self.workspace = Workspace(workspace_dir)
         self.document = doc = Document(self.workspace)
-        self.scene_manager = SceneGraphManager(doc, self.workspace, glob_pattern=glob_pattern, parent=self)
+        self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue, glob_pattern=glob_pattern, parent=self)
         self.ui.mainWidgets.addTab(self.scene_manager.main_canvas.native, 'Mercator')
 
         for uuid, ds_info, full_data in test_layers(self.workspace, self.document, glob_pattern=glob_pattern):
