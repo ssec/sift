@@ -28,7 +28,7 @@ from vispy import app
 from vispy import scene
 from vispy.util.event import Event
 from vispy.visuals.transforms import STTransform, MatrixTransform
-from cspov.common import WORLD_EXTENT_BOX
+from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY
 from cspov.control.layer_list import LayerStackListViewModel
 from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.view.MapWidget import CspovMainMapCanvas
@@ -49,90 +49,59 @@ class MainMap(scene.Node):
         super(MainMap, self).__init__(*args, **kwargs)
 
 
-class RetileEvent(Event):
-    pass
+class LayerSet(object):
+    """Basic bookkeeping object for each layer set (A, B, C, D) from the UI.
 
-
-class LayerList(scene.Node):
-    """SceneGraph container for multiple image layers.
+    Each LayerSet has its own:
+     - Per layer visiblity
+     - Animation loop and frame order
+     - Layer Order
     """
-    def __init__(self, name=None, parent=None):
-        super(LayerList, self).__init__(name=name, parent=parent)
+    def __init__(self, parent, layers=None, layer_order=None, frame_order=None):
+        if layers is None and (layer_order is not None or frame_order is not None):
+            raise ValueError("'layers' required when 'layer_order' or 'frame_order' is specified")
 
-    def _timeout_slot(self, scheduler, ws=None):
-        """Simple event handler for when we need to reassess.
-        """
-        # Stop the timer so it doesn't continously call this slot
-        scheduler.stop()
-        # Keep track of any children being updated
-        update = False
-        for child in self.children:
-            need_retile, view_box, preferred_stride, tile_box = child.assess(ws)
-            if need_retile:
-                update = True
-                LOG.debug("Retiling child '%s'", child.name)
-                child.retile(ws, view_box, preferred_stride, tile_box)
-
-        if update:
-            # XXX: Should we update after every child?
-            # draw any changes that were made
-            self.update()
-
-    def set_document(self, document):
-        document.docDidChangeLayerOrder.connect(self.rebuild_new_order)
-        document.docDidChangeLayer.connect(self.rebuild_layer_changed)
-
-    def rebuild_new_order(self, new_layer_index_order, *args, **kwargs):
-        """
-        layer order has changed; shift layers around
-        :param change:
-        :return:
-        """
-        pass
-
-    def rebuild_layer_changed(self, change_dict, *args, **kwargs):
-        """
-        document layer changed, update that layer
-        :param change_dict: dictionary of change information
-        :return:
-        """
-        if change_dict['change']=='add':  # a layer was added
-            # add visuals to scene
-            ds_info = change_dict['info']
-            overview_content = change_dict['content']
-
-            # create a new layer in the imagelist
-            image = TiledGeolocatedImage(
-                overview_content,
-                ds_info["origin_x"],
-                ds_info["origin_y"],
-                ds_info["cell_width"],
-                ds_info["cell_height"],
-                name=ds_info["name"],
-                clim=ds_info["clim"],
-                interpolation='nearest',
-                method='tiled',
-                cmap='grays',
-                double=False,
-                texture_shape=DEFAULT_TEXTURE_SHAPE,
-                wrap_lon=True,
-                parent=self,
-            )
-        else:
-            pass  # FIXME: other events? remove?
-
-    def rebuild_all(self, *args, **kwargs):
-        pass
-
-
-class AnimatedLayerList(LayerList):
-    def __init__(self, *args, **kwargs):
-        super(AnimatedLayerList, self).__init__(*args, **kwargs)
+        self.parent = parent
+        self._layers = {}
+        self._layer_order = []
+        self._frame_order = []
         self._animating = False
         self._frame_number = 0
-        self._animation_timer = app.Timer(1.0/10.0, connect=self.next_frame)
-        # Make the newest child as the only visible node
-        self.events.children_change.connect(self._set_visible_node)
+        self._animation_timer = app.Timer(DEFAULT_ANIMATION_DELAY, connect=self.next_frame)
+
+        if layers is not None:
+            self.set_layers(layers)
+
+            if layer_order is None:
+                layer_order = [x.name for x in layers.keys()]
+            self.set_layer_order(layer_order)
+
+            if frame_order is None:
+                frame_order = [x.name for x in layers.keys()]
+            self.set_frame_order(frame_order)
+
+    def set_layers(self, layers):
+        for layer in layers:
+            self.add_layer(layer)
+
+    def add_layer(self, layer):
+        uuid = layer.name
+        self._layers[uuid] = layer
+        self._layer_order.append(uuid)
+        # FIXME: For now automatically add new layers to the animation loop
+        self._frame_order.append(uuid)
+
+    def set_layer_order(self, layer_order):
+        for o in layer_order:
+            # Layer names are UUIDs
+            assert o in self._layers
+        self._layer_order = layer_order
+
+    def set_frame_order(self, frame_order):
+        for o in frame_order:
+            assert o in self._layers
+        self._frame_order = frame_order
+        self._frame_number = 0
 
     @property
     def animating(self):
@@ -165,7 +134,8 @@ class AnimatedLayerList(LayerList):
                     child.visible = False
 
     def _set_visible_child(self, frame_number):
-        for idx, child in enumerate(self._children):
+        for idx, uuid in enumerate(self._frame_order):
+            child = self._layers[uuid]
             # not sure if this is actually doing anything
             with child.events.blocker():
                 if idx == frame_number:
@@ -180,10 +150,10 @@ class AnimatedLayerList(LayerList):
         :param frame_number: optional frame to go to, from 0
         :return:
         """
-        frame = frame_number if isinstance(frame_number, int) else (self._frame_number + 1) % len(self.children)
+        frame = frame_number if isinstance(frame_number, int) else (self._frame_number + 1) % len(self._frame_order)
         self._set_visible_child(frame)
         self._frame_number = frame
-        self.update()
+        self.parent.update()
 
 
 class SceneGraphManager(object):
@@ -198,9 +168,11 @@ class SceneGraphManager(object):
 
         self.image_layers = {}
         self.datasets = {}
-        # FIXME:
+        # FIXME: I shouldn't need to hold on to data
         self._image_data = {}
+        self.layer_set = LayerSet(self)
 
+        self.set_document(self.document)
         self.setup_initial_canvas()
 
     def setup_initial_canvas(self):
@@ -224,11 +196,11 @@ class SceneGraphManager(object):
 
         # Head node of the image layer graph
         # FIXME: merge to the document delegate
-        self.image_list = AnimatedLayerList(parent=self.main_map)
-        self.image_list.set_document(self.document)
+        # self.image_list = AnimatedLayerList(parent=self.main_map)
+        # self.image_list.set_document(self.document)
         # Put all the images to the -50.0 Z level
         # TODO: Make this part of whatever custom Image class we make
-        self.image_list.transform *= STTransform(translate=(0, 0, -50.0))
+        # self.image_list.transform *= STTransform(translate=(0, 0, -50.0))
         # FIXME: merge to the document delegate
 
         self.boundaries = NEShapefileLines(self.border_shapefile, double=True, parent=self.main_map)
@@ -236,34 +208,62 @@ class SceneGraphManager(object):
     def update(self):
         return self.main_canvas.update()
 
-    # def on_layer_add(self, ds_info, full_data):
-    #     uuid = ds_info["uuid"]
-    #     image = TiledGeolocatedImage(
-    #         full_data,
-    #         ds_info["origin_x"],
-    #         ds_info["origin_y"],
-    #         ds_info["cell_width"],
-    #         ds_info["cell_height"],
-    #         name=ds_info["name"],
-    #         clim=ds_info["clim"],
-    #         interpolation='nearest',
-    #         method='tiled',
-    #         cmap='grays',
-    #         texture_shape=self.texture_shape,
-    #         wrap_lon=True,
-    #         parent=self.image_list,  # FIXME move into document tilestack
-    #     )
-    #     # FIXME: Have the Z level configurable
-    #     image.transform *= STTransform(translate=(0, 0, -50.0))
-    #
-    #     self.image_layers[uuid] = image
-    #     self.datasets[uuid] = ds_info
-    #     self._image_data[uuid] = full_data
+    def rebuild_layer_changed(self, change_dict, *args, **kwargs):
+        """
+        document layer changed, update that layer
+        :param change_dict: dictionary of change information
+        :return:
+        """
+        if change_dict['change']=='add':  # a layer was added
+            # add visuals to scene
+            ds_info = change_dict['info']
+            overview_content = change_dict['content']
+            uuid = ds_info["uuid"]
+
+            # create a new layer in the imagelist
+            image = TiledGeolocatedImage(
+                overview_content,
+                ds_info["origin_x"],
+                ds_info["origin_y"],
+                ds_info["cell_width"],
+                ds_info["cell_height"],
+                name=str(uuid),
+                clim=ds_info["clim"],
+                interpolation='nearest',
+                method='tiled',
+                cmap='grays',
+                double=False,
+                texture_shape=DEFAULT_TEXTURE_SHAPE,
+                wrap_lon=True,
+                parent=self.main_map,
+            )
+            image.transform *= STTransform(translate=(0, 0, -50.0))
+            self.image_layers[uuid] = image
+            self.datasets[uuid] = ds_info
+            self._image_data[uuid] = overview_content
+            self.layer_set.add_layer(image)
+        else:
+            pass  # FIXME: other events? remove?
+
+    def set_document(self, document):
+        document.docDidChangeLayerOrder.connect(self.rebuild_new_order)
+        document.docDidChangeLayer.connect(self.rebuild_layer_changed)
+
+    def rebuild_new_order(self, new_layer_index_order, *args, **kwargs):
+        """
+        layer order has changed; shift layers around
+        :param change:
+        :return:
+        """
+        print("New layer order: ", new_layer_index_order)
+
+    def rebuild_all(self, *args, **kwargs):
+        pass
 
     def on_view_change(self, scheduler, ws=None):
         """Simple event handler for when we need to reassess image layers.
         """
-        # Stop the timer so it doesn't continously call this slot
+        # Stop the timer so it doesn't continuously call this slot
         scheduler.stop()
 
         update = False
@@ -271,6 +271,8 @@ class SceneGraphManager(object):
             need_retile, view_box, preferred_stride, tile_box = child.assess(ws)
             if need_retile:
                 # Check if the workspace has this stride
+                # FIXME: Schedule a background job to tile the data and then emit a signal that updates the GPU
+                # XXX: ThreadSafe Data Storage needed?
                 update = True
                 LOG.debug("Retiling child '%s'", child.name)
                 child.retile(ws, view_box, preferred_stride, tile_box)
