@@ -287,7 +287,7 @@
         </attribute>
         <layout class="QVBoxLayout" name="verticalLayout_4">
          <item>
-          <widget class="QListView" name="layerSet1Table">
+          <widget class="QTableView" name="layerSet1Table">
            <property name="statusTip">
             <string>Current layers</string>
            </property>
@@ -304,7 +304,7 @@
         </attribute>
         <layout class="QVBoxLayout" name="verticalLayout_5">
          <item>
-          <widget class="QListView" name="layerSet2Table"/>
+          <widget class="QTableView" name="layerSet2Table"/>
          </item>
         </layout>
        </widget>
@@ -317,7 +317,7 @@
         </attribute>
         <layout class="QVBoxLayout" name="verticalLayout_6">
          <item>
-          <widget class="QListView" name="layerSet3Table"/>
+          <widget class="QTableView" name="layerSet3Table"/>
          </item>
         </layout>
        </widget>
@@ -330,7 +330,7 @@
         </attribute>
         <layout class="QVBoxLayout" name="verticalLayout_7">
          <item>
-          <widget class="QListView" name="layerSet4Table"/>
+          <widget class="QTableView" name="layerSet4Table"/>
          </item>
         </layout>
        </widget>

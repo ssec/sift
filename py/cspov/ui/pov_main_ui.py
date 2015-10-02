@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created: Wed Sep 30 12:47:33 2015
+# Created: Fri Oct  2 08:31:36 2015
 #      by: PyQt4 UI code generator 4.11.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -145,7 +145,7 @@ class Ui_MainWindow(object):
         self.layerSet1Tab.setObjectName(_fromUtf8("layerSet1Tab"))
         self.verticalLayout_4 = QtGui.QVBoxLayout(self.layerSet1Tab)
         self.verticalLayout_4.setObjectName(_fromUtf8("verticalLayout_4"))
-        self.layerSet1Table = QtGui.QListView(self.layerSet1Tab)
+        self.layerSet1Table = QtGui.QTableView(self.layerSet1Tab)
         self.layerSet1Table.setObjectName(_fromUtf8("layerSet1Table"))
         self.verticalLayout_4.addWidget(self.layerSet1Table)
         self.layerSetTabs.addTab(self.layerSet1Tab, _fromUtf8(""))
@@ -153,7 +153,7 @@ class Ui_MainWindow(object):
         self.layerSet2Tab.setObjectName(_fromUtf8("layerSet2Tab"))
         self.verticalLayout_5 = QtGui.QVBoxLayout(self.layerSet2Tab)
         self.verticalLayout_5.setObjectName(_fromUtf8("verticalLayout_5"))
-        self.layerSet2Table = QtGui.QListView(self.layerSet2Tab)
+        self.layerSet2Table = QtGui.QTableView(self.layerSet2Tab)
         self.layerSet2Table.setObjectName(_fromUtf8("layerSet2Table"))
         self.verticalLayout_5.addWidget(self.layerSet2Table)
         self.layerSetTabs.addTab(self.layerSet2Tab, _fromUtf8(""))
@@ -161,7 +161,7 @@ class Ui_MainWindow(object):
         self.layerSet3Tab.setObjectName(_fromUtf8("layerSet3Tab"))
         self.verticalLayout_6 = QtGui.QVBoxLayout(self.layerSet3Tab)
         self.verticalLayout_6.setObjectName(_fromUtf8("verticalLayout_6"))
-        self.layerSet3Table = QtGui.QListView(self.layerSet3Tab)
+        self.layerSet3Table = QtGui.QTableView(self.layerSet3Tab)
         self.layerSet3Table.setObjectName(_fromUtf8("layerSet3Table"))
         self.verticalLayout_6.addWidget(self.layerSet3Table)
         self.layerSetTabs.addTab(self.layerSet3Tab, _fromUtf8(""))
@@ -169,7 +169,7 @@ class Ui_MainWindow(object):
         self.layerSet4Tab.setObjectName(_fromUtf8("layerSet4Tab"))
         self.verticalLayout_7 = QtGui.QVBoxLayout(self.layerSet4Tab)
         self.verticalLayout_7.setObjectName(_fromUtf8("verticalLayout_7"))
-        self.layerSet4Table = QtGui.QListView(self.layerSet4Tab)
+        self.layerSet4Table = QtGui.QTableView(self.layerSet4Tab)
         self.layerSet4Table.setObjectName(_fromUtf8("layerSet4Table"))
         self.verticalLayout_7.addWidget(self.layerSet4Table)
         self.layerSetTabs.addTab(self.layerSet4Tab, _fromUtf8(""))
@@ -206,7 +206,7 @@ class Ui_MainWindow(object):
         MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.layerConfigPane)
 
         self.retranslateUi(MainWindow)
-        self.layerSetTabs.setCurrentIndex(0)
+        self.layerSetTabs.setCurrentIndex(3)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):

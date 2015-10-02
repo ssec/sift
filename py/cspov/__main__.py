@@ -32,7 +32,7 @@ except Exception:
 QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
 
-from cspov.control.layer_list import LayerStackListViewModel
+from cspov.control.layer_list import LayerStackTableModel
 from cspov.view.MapWidget import CspovMainMapCanvas
 from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.model import Document
@@ -329,7 +329,7 @@ class Main(QtGui.QMainWindow):
         self.ui.mainWidgets.removeTab(0)
 
         # convey action between document and layer list view
-        self.behaviorLayersList = LayerStackListViewModel([self.ui.layerSet1Table, self.ui.layerSet2Table, self.ui.layerSet3Table, self.ui.layerSet4Table], doc)
+        self.behaviorLayersList = LayerStackTableModel([self.ui.layerSet1Table, self.ui.layerSet2Table, self.ui.layerSet3Table, self.ui.layerSet4Table], doc)
 
         self.queue.add('test', test_task(), 'test000')
         # self.ui.layers
