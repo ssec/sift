@@ -267,15 +267,17 @@ class SceneGraphManager(object):
         scheduler.stop()
 
         update = False
-        for child in self.image_layers.values():
-            need_retile, view_box, preferred_stride, tile_box = child.assess(ws)
+        for uuid, child in self.image_layers.items():
+            need_retile, view_box, preferred_stride, tile_box = child.assess()
             if need_retile:
                 # Check if the workspace has this stride
                 # FIXME: Schedule a background job to tile the data and then emit a signal that updates the GPU
                 # XXX: ThreadSafe Data Storage needed?
                 update = True
                 LOG.debug("Retiling child '%s'", child.name)
-                child.retile(ws, view_box, preferred_stride, tile_box)
+                data = self._image_data[uuid][::preferred_stride, ::preferred_stride]
+                tiles_info, vertices, tex_coords = child.retile(data, view_box, preferred_stride, tile_box)
+                child.set_retiled(preferred_stride, tile_box, tiles_info, vertices, tex_coords)
 
         if update:
             self.update()

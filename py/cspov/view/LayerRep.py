@@ -844,7 +844,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         view_box = vue(*view_box, dy=(view_box.t - view_box.b)/self.canvas.size[1], dx=(view_box.r - view_box.l)/self.canvas.size[0])
         return view_box
 
-    def assess(self, workspace):
+    def assess(self):
         """Determine if a retile is needed.
 
         Tell workspace we will be needed
@@ -858,19 +858,15 @@ class TiledGeolocatedImageVisual(ImageVisual):
         need_retile = preferred_stride != self._stride or self._latest_tile_box != tile_box
         return need_retile, view_box, preferred_stride, tile_box
 
-    def retile(self, workspace, view_box, preferred_stride, tile_box):
+    def retile(self, data, view_box, preferred_stride, tile_box):
         """Get data from workspace and retile/retexture as needed.
         """
-        # Ask workspace for the right resolution of data
-        LOG.debug("Requesting new data from Workspace...")
-        # FIXME: This is temporary until we are getting the proper strided data from the workspace
-        data = self._data[::preferred_stride, ::preferred_stride]
-        # workspace.get_dataset_data(self.name, preferred_stride)
-
         tiles_info = self._build_texture_tiles(data, view_box, preferred_stride, tile_box)
-        self._set_texture_tiles(tiles_info)
-
         vertices, tex_coords = self._build_vertex_tiles(view_box, preferred_stride, tile_box)
+        return tiles_info, vertices, tex_coords
+
+    def set_retiled(self, preferred_stride, tile_box, tiles_info, vertices, tex_coords):
+        self._set_texture_tiles(tiles_info)
         self._set_vertex_tiles(vertices, tex_coords)
 
         # don't update here, the caller will do that
