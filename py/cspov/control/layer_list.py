@@ -36,19 +36,22 @@ __docformat__ = 'reStructuredText'
 import os, sys
 import logging, unittest, argparse
 import weakref
-from PyQt4.QtCore import QAbstractListModel, QVariant, Qt
-from PyQt4.QtGui import QAbstractItemDelegate
+from PyQt4.QtCore import QAbstractListModel, QVariant, Qt, QSize
+from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate
 
 LOG = logging.getLogger(__name__)
 
 COLUMNS=('Visibility', 'Name', 'Animation')
 
-class LayerWidgetDelegate(QAbstractItemDelegate):
+class LayerWidgetDelegate(QStyledItemDelegate):
     """
     set for a specific column, controls the rendering and editing of items in that column or row of a list or table
     see QAbstractItemView.setItemDelegateForRow/Column
     """
-    pass
+    # def paint(self, painter, QStyleOptionViewItem, QModelIndex):
+
+    def sizeHint(self, QStyleOptionViewItem, QModelIndex):
+        return QSize(100,36)
 
 
 class LayerStackListViewModel(QAbstractListModel):
@@ -58,6 +61,7 @@ class LayerStackListViewModel(QAbstractListModel):
     """
     widget = None
     doc = None
+    item_delegate = None
 
     def __init__(self, widgets, doc):
         """
@@ -70,6 +74,7 @@ class LayerStackListViewModel(QAbstractListModel):
         self.widgets = list(widgets) # [weakref.ref(widget) for widget in widgets]
         self.doc = doc
         self.column = [self._visibilityData, self._nameData, self._animationData]
+        self.item_delegate = LayerWidgetDelegate()
 
         doc.docDidChangeLayerOrder.connect(self.updateList)
         doc.docDidChangeLayer.connect(self.updateList)
@@ -81,6 +86,8 @@ class LayerStackListViewModel(QAbstractListModel):
             widget.entered.connect(self.layer_entered)
             widget.pressed.connect(self.layer_pressed)
             widget.setModel(self)
+            widget.setItemDelegate(self.item_delegate)
+
 
     # def columnCount(self, *args, **kwargs):
     #     return 1
