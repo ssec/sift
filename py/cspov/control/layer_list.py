@@ -151,6 +151,21 @@ class LayerStackListViewModel(QAbstractListModel):
             widget.setModel(self)
             widget.setItemDelegate(self.item_delegate)
 
+#         table.setModel(self.model)
+#         table.setSortingEnabled(True)
+#         table.setDropIndicatorShown(True)
+#         table.setAcceptDrops(True)
+#         table.setDragDropMode(QtGui.QAbstractItemView.InternalMove)
+#         table.setDragEnabled(True)
+#         table.setSelectionMode(QtGui.QTableView.SingleSelection)
+#         table.setSelectionBehavior(QtGui.QTableView.SelectRows)
+#         table.horizontalHeader().setMovable(True)
+#         table.horizontalHeader().setDragEnabled(True)
+#         table.horizontalHeader().setDragDropMode(QtGui.QAbstractItemView.InternalMove)
+#         table.verticalHeader().setMovable(True)
+#         table.verticalHeader().setDragEnabled(True)
+#         table.verticalHeader().setDragDropMode(QtGui.QAbstractItemView.InternalMove)
+
 
     # def columnCount(self, *args, **kwargs):
     #     return 1
