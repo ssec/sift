@@ -230,6 +230,9 @@ class Document(QObject):
     def is_layer_visible(self, dex):
         return self.current_layer_set[dex].visible
 
+    def layer_animation_order(self, dex):
+        return self.current_layer_set[dex].order
+
     def __len__(self):
         return len(self.current_layer_set)
 

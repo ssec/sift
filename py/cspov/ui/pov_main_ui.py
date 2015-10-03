@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created: Fri Oct  2 08:31:36 2015
+# Created: Fri Oct  2 13:38:18 2015
 #      by: PyQt4 UI code generator 4.11.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -206,7 +206,7 @@ class Ui_MainWindow(object):
         MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.layerConfigPane)
 
         self.retranslateUi(MainWindow)
-        self.layerSetTabs.setCurrentIndex(3)
+        self.layerSetTabs.setCurrentIndex(0)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):

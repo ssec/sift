@@ -41,7 +41,7 @@ from PyQt4.QtGui import QAbstractItemDelegate, QTableView, QStyledItemDelegate, 
 
 LOG = logging.getLogger(__name__)
 
-COLUMNS=('Visibility', 'Name', 'Animation')
+COLUMNS=('Visibility', 'Name', 'Enhancement')
 
 class LayerWidgetDelegate(QStyledItemDelegate):
     """
@@ -158,7 +158,7 @@ class LayerStackTableModel(QAbstractTableModel):
         super(LayerStackTableModel, self).__init__()
         self.widgets = list(widgets) # [weakref.ref(widget) for widget in widgets]
         self.doc = doc
-        self._column = [self._visibilityData, self._nameData, self._animationData]
+        self._column = [self._visibilityData, self._nameData]
         self.item_delegate = LayerWidgetDelegate()
 
         doc.docDidChangeLayerOrder.connect(self.updateList)
@@ -184,25 +184,26 @@ class LayerStackTableModel(QAbstractTableModel):
             return super(LayerStackTableModel, self).flags(index)
 
     def rowCount(self, QModelIndex_parent=None, *args, **kwargs):
-        LOG.info('{} layers'.format(len(self.doc)))
+        LOG.debug('{} layers'.format(len(self.doc)))
         return len(self.doc)
 
     # def columnCount(self, QModelIndex_parent=None, *args, **kwargs):
     #     return len(COLUMNS)
 
     def _visibilityData(self, row, listing, role):
+        "return column 0, animation order (integer) and visibility data (checkbox)"
         if role==Qt.CheckStateRole:
-            return Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
-            # return bool(listing[row]['visible'])
-        return ' '
+            check =  Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
+            return check
+        elif role==Qt.DisplayRole:
+            lao = self.doc.layer_animation_order(row)
+            return '-' if lao==0 else str(lao)
+        return None
 
     def _nameData(self, row, listing, role):
         if role==Qt.DisplayRole:
             return listing[row]['name']
         return None
-
-    def _animationData(self, row, listing, role):
-        return row+1  # FIXME
 
     def data(self, index, int_role=None):
         if not index.isValid():
