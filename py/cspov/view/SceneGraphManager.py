@@ -176,8 +176,6 @@ class SceneGraphManager(QObject):
 
         self.image_layers = {}
         self.datasets = {}
-        # FIXME: I shouldn't need to hold on to data
-        self._image_data = {}
         self.layer_set = LayerSet(self)
 
         self.set_document(self.document)
@@ -240,7 +238,6 @@ class SceneGraphManager(QObject):
             image.transform *= STTransform(translate=(0, 0, -50.0))
             self.image_layers[uuid] = image
             self.datasets[uuid] = ds_info
-            self._image_data[uuid] = overview_content
             self.layer_set.add_layer(image)
         else:
             pass  # FIXME: other events? remove?
@@ -278,9 +275,9 @@ class SceneGraphManager(QObject):
     def _retile_child(self, uuid, preferred_stride, tile_box):
         LOG.debug("Retiling child with UUID: '%s'", uuid)
         child = self.image_layers[uuid]
-        # FIXME: Get data from workspace
-        # XXX: ThreadSafe Data Storage needed?
-        data = self._image_data[uuid][::preferred_stride, ::preferred_stride]
+        data = self.workspace.get_content(uuid, lod=preferred_stride)
+        # FIXME: Use LOD instead of stride and provide the lod to the workspace
+        data = data[::preferred_stride, ::preferred_stride]
         tiles_info, vertices, tex_coords = child.retile(data, preferred_stride, tile_box)
         yield {TASK_DOING: 'image_retile', TASK_PROGRESS: 1.0}
         self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)

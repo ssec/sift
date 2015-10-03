@@ -249,7 +249,15 @@ class Workspace(QObject):
         :param lod: desired level of detail to focus
         :return:
         """
-        pass
+        return self._info[dsi_or_uuid]
+
+    def get_content(self, dsi_or_uuid, lod=None):
+        """
+        :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
+        :param lod: desired level of detail to focus
+        :return:
+        """
+        return self._data[dsi_or_uuid]
 
     def __getitem__(self, datasetinfo_or_uuid):
         """
