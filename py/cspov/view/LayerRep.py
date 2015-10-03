@@ -702,7 +702,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
             nfo["vertex_coordinates"][6:12, 0] += nfo["cell_width"] * nfo["data"].shape[1]
         self._set_vertex_tiles(nfo["vertex_coordinates"], nfo["texture_coordinates"])
 
-    def _build_texture_tiles(self, data, view_box, stride, tile_box):
+    def _build_texture_tiles(self, data, stride, tile_box):
         """Prepare and organize strided data in to individual tiles with associated information.
         """
         if data.dtype == np.float64:
@@ -722,12 +722,6 @@ class TiledGeolocatedImageVisual(ImageVisual):
                 data[:] = 1 if data[0, 0] != 0 else 0
             self._clim = np.array(clim)
 
-        if view_box is None:
-            view_box = self.get_view_box()
-        if stride is None:
-            stride = self.calc.calc_stride(view_box)
-        if tile_box is None:
-            _, tile_box = self.calc.visible_tiles(view_box, stride=stride)
         LOG.debug("Uploading texture data for %d tiles (%r)", (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l), tile_box)
         max_tiles = self.calc.max_tiles_available(stride)
 
@@ -762,18 +756,12 @@ class TiledGeolocatedImageVisual(ImageVisual):
             stride, tiy, tix, tex_tile_idx, data = tile_info
             self._texture.set_tile_data(tex_tile_idx, data)
 
-    def _build_vertex_tiles(self, view_box=None, preferred_stride=None, tile_box=None):
+    def _build_vertex_tiles(self, preferred_stride, tile_box):
         """Rebuild the vertex buffers used for rendering the image when using
         the subdivide method.
 
         CSPOV Note: Copied from 0.5.0dev original ImageVisual class
         """
-        if view_box is None:
-            view_box = self.get_view_box()
-        if preferred_stride is None:
-            preferred_stride = self.calc.calc_stride(view_box)
-        if tile_box is None:
-            _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride)
         max_tiles = self.calc.max_tiles_available(preferred_stride)
         total_num_tiles = (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l)
 
@@ -844,7 +832,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         view_box = vue(*view_box, dy=(view_box.t - view_box.b)/self.canvas.size[1], dx=(view_box.r - view_box.l)/self.canvas.size[0])
         return view_box
 
-    def assess(self, workspace):
+    def assess(self):
         """Determine if a retile is needed.
 
         Tell workspace we will be needed
@@ -856,21 +844,17 @@ class TiledGeolocatedImageVisual(ImageVisual):
                   preferred_stride, self._stride, self._latest_tile_box, tile_box)
         # If we zoomed out or we panned
         need_retile = preferred_stride != self._stride or self._latest_tile_box != tile_box
-        return need_retile, view_box, preferred_stride, tile_box
+        return need_retile, preferred_stride, tile_box
 
-    def retile(self, workspace, view_box, preferred_stride, tile_box):
+    def retile(self, data, preferred_stride, tile_box):
         """Get data from workspace and retile/retexture as needed.
         """
-        # Ask workspace for the right resolution of data
-        LOG.debug("Requesting new data from Workspace...")
-        # FIXME: This is temporary until we are getting the proper strided data from the workspace
-        data = self._data[::preferred_stride, ::preferred_stride]
-        # workspace.get_dataset_data(self.name, preferred_stride)
+        tiles_info = self._build_texture_tiles(data, preferred_stride, tile_box)
+        vertices, tex_coords = self._build_vertex_tiles(preferred_stride, tile_box)
+        return tiles_info, vertices, tex_coords
 
-        tiles_info = self._build_texture_tiles(data, view_box, preferred_stride, tile_box)
+    def set_retiled(self, preferred_stride, tile_box, tiles_info, vertices, tex_coords):
         self._set_texture_tiles(tiles_info)
-
-        vertices, tex_coords = self._build_vertex_tiles(view_box, preferred_stride, tile_box)
         self._set_vertex_tiles(vertices, tex_coords)
 
         # don't update here, the caller will do that
