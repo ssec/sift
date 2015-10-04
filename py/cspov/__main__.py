@@ -119,6 +119,11 @@ class Main(QtGui.QMainWindow):
             timer.start()
         self.scene_manager.main_canvas.events.draw.connect(partial(start_wrapper, self.scheduler))
 
+        def update_probe_point(uuid, xy_pos):
+            data_point = self.workspace.get_content_point(uuid, xy_pos)
+            self.ui.cursorProbeText.setText("Point Probe: {:.03f}".format(data_point))
+        self.scene_manager.newProbePoint.connect(update_probe_point)
+
         self.ui.mainWidgets.removeTab(0)
         self.ui.mainWidgets.removeTab(0)
 
@@ -127,7 +132,7 @@ class Main(QtGui.QMainWindow):
 
         self.queue.add('test', test_task(), 'test000')
         # self.ui.layers
-        # print(self.main_view.describe_tree(with_transform=True))
+        print(self.scene_manager.main_view.describe_tree(with_transform=True))
 
     def setup_key_releases(self):
         def cb_factory(required_key, cb):
@@ -138,6 +143,7 @@ class Main(QtGui.QMainWindow):
 
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("a", self.scene_manager.layer_set.toggle_animation))
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("n", self.scene_manager.layer_set.next_frame))
+        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("c", self.scene_manager.next_camera))
 
     def updateLayerList(self):
         # self.ui.layers.add

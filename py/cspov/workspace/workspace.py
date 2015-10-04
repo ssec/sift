@@ -249,6 +249,8 @@ class Workspace(QObject):
         :param lod: desired level of detail to focus
         :return:
         """
+        if isinstance(dsi_or_uuid, str):
+            dsi_or_uuid = UUID(dsi_or_uuid)
         return self._info[dsi_or_uuid]
 
     def get_content(self, dsi_or_uuid, lod=None):
@@ -257,7 +259,24 @@ class Workspace(QObject):
         :param lod: desired level of detail to focus
         :return:
         """
+        if isinstance(dsi_or_uuid, str):
+            dsi_or_uuid = UUID(dsi_or_uuid)
         return self._data[dsi_or_uuid]
+
+    def _position_to_index(self, dsi_or_uuid, xy_pos):
+        info = self.get_info(dsi_or_uuid)
+        x = xy_pos[0]
+        y = xy_pos[1]
+        col = (x - info["origin_x"]) / info["cell_width"]
+        row = (y - info["origin_y"]) / info["cell_height"]
+        return np.round(row), np.round(col)
+
+    def get_content_point(self, dsi_or_uuid, xy_pos):
+        row, col = self._position_to_index(dsi_or_uuid, xy_pos)
+        data = self.get_content(dsi_or_uuid)
+        if not ((0 <= col < data.shape[1]) and (0 <= row < data.shape[0])):
+            raise ValueError("X/Y position is outside of image with UUID: %s", dsi_or_uuid)
+        return data[row, col]
 
     def __getitem__(self, datasetinfo_or_uuid):
         """
