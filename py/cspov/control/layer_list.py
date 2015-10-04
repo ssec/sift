@@ -37,7 +37,7 @@ import os, sys
 import logging, unittest, argparse
 import weakref
 from PyQt4.QtCore import QAbstractListModel, QAbstractTableModel, QVariant, Qt, QSize
-from PyQt4.QtGui import QAbstractItemDelegate, QTableView, QStyledItemDelegate, QAbstractItemView
+from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView
 
 LOG = logging.getLogger(__name__)
 
@@ -117,7 +117,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     #     return True
 
 
-class LayerStackTableModel(QAbstractTableModel):
+class LayerStackListViewModel(QAbstractListModel):
     """ behavior connecting list widget to layer stack (both ways)
         Each table view represents a different configured document layer stack "set" - user can select from at least four.
         Convey layer set information to/from the document to the respective table, including selection.
@@ -126,20 +126,21 @@ class LayerStackTableModel(QAbstractTableModel):
     doc = None
     item_delegate = None
 
-    def _init_widget(self, table:QTableView):
-        table.clicked.connect(self.layer_clicked)
+    def _init_widget(self, listbox:QListView):
+        listbox.clicked.connect(self.layer_clicked)
         # widget.indexesMoved.connect(self.layers_moved)
-        table.customContextMenuRequested.connect(self.context_menu)
-        table.entered.connect(self.layer_entered)
-        table.pressed.connect(self.layer_pressed)
-        table.setModel(self)
-        table.setSortingEnabled(True)
-        table.setDropIndicatorShown(True)
-        table.setAcceptDrops(True)
-        table.setDragDropMode(QAbstractItemView.InternalMove)
-        table.setDragEnabled(True)
-        table.setSelectionMode(QTableView.MultiSelection)  # alternate SingleSelection
-        table.setSelectionBehavior(QTableView.SelectRows)
+        listbox.setItemDelegate(self.item_delegate)
+        listbox.customContextMenuRequested.connect(self.context_menu)
+        listbox.entered.connect(self.layer_entered)
+        listbox.pressed.connect(self.layer_pressed)
+        listbox.setModel(self)
+        # listbox.setSortingEnabled(True)
+        listbox.setDropIndicatorShown(True)
+        listbox.setAcceptDrops(True)
+        listbox.setDragDropMode(QAbstractItemView.InternalMove)
+        listbox.setDragEnabled(True)
+        listbox.setSelectionMode(QListView.MultiSelection)  # alternate SingleSelection
+        # listbox.setSelectionBehavior(QTableView.SelectRows)
 #         table.horizontalHeader().setMovable(True)
 #         table.horizontalHeader().setDragEnabled(True)
 #         table.horizontalHeader().setDragDropMode(QtGui.QAbstractItemView.InternalMove)
@@ -155,10 +156,10 @@ class LayerStackTableModel(QAbstractTableModel):
         :param doc: document to communicate with
         :return:
         """
-        super(LayerStackTableModel, self).__init__()
+        super(LayerStackListViewModel, self).__init__()
         self.widgets = list(widgets) # [weakref.ref(widget) for widget in widgets]
         self.doc = doc
-        self._column = [self._visibilityData, self._nameData]
+        # self._column = [self._visibilityData, self._nameData]
         self.item_delegate = LayerWidgetDelegate()
 
         doc.docDidChangeLayerOrder.connect(self.updateList)
@@ -169,19 +170,18 @@ class LayerStackTableModel(QAbstractTableModel):
         for widget in widgets:
             self._init_widget(widget)
 
-
-    def columnCount(self, *args, **kwargs):
-        return len(self._column)
+    # def columnCount(self, *args, **kwargs):
+    #     return len(self._column)
 
     @property
     def listing(self):
         return [self.doc[dex] for dex in range(len(self.doc))]
 
     def flags(self, index):
-        if index.column()==0:
-            return Qt.ItemIsEnabled | Qt.ItemIsUserCheckable | Qt.ItemIsEditable
-        else:
-            return super(LayerStackTableModel, self).flags(index)
+        return Qt.ItemIsEnabled | Qt.ItemIsUserCheckable | Qt.ItemIsEditable
+        # if index.column()==0:
+        # else:
+        #     return super(LayerStackListViewModel, self).flags(index)
 
     def rowCount(self, QModelIndex_parent=None, *args, **kwargs):
         LOG.debug('{} layers'.format(len(self.doc)))
@@ -190,35 +190,44 @@ class LayerStackTableModel(QAbstractTableModel):
     # def columnCount(self, QModelIndex_parent=None, *args, **kwargs):
     #     return len(COLUMNS)
 
-    def _visibilityData(self, row, listing, role):
-        "return column 0, animation order (integer) and visibility data (checkbox)"
-        if role==Qt.CheckStateRole:
-            check =  Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
-            return check
-        elif role==Qt.DisplayRole:
-            lao = self.doc.layer_animation_order(row)
-            return '-' if lao==0 else str(lao)
-        return None
+    # def _visibilityData(self, row, listing, role):
+    #     "return column 0, animation order (integer) and visibility data (checkbox)"
+    #     if role==Qt.CheckStateRole:
+    #         check =  Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
+    #         return check
+    #     elif role==Qt.DisplayRole:
+    #         lao = self.doc.layer_animation_order(row)
+    #         return '-' if lao==0 else str(lao)
+    #     return None
 
-    def _nameData(self, row, listing, role):
-        if role==Qt.DisplayRole:
-            return listing[row]['name']
-        return None
+    # def _nameData(self, row, listing, role):
+    #     if role==Qt.CheckStateRole:
+    #         check =  Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
+    #         return check
+    #     elif role==Qt.DisplayRole:
+    #         lao = self.doc.layer_animation_order(row)
+    #         return listing[row]['name'] + ('' if lao==0 else '[{}]'.format(lao))
+    #     return None
 
     def data(self, index, int_role=None):
         if not index.isValid():
             return None
         row = index.row()
-        col = index.column()
+        # col = index.column()
         if int_role==Qt.ItemDataRole:
             return self.doc[index.row()] if index.row()<len(self.doc) else None
         elif int_role!=Qt.DisplayRole:
             return None
         # return "test"
         el = self.listing
-        # col = 1
-        LOG.debug('row,col {},{} is {}'.format(row, col, el[row]))
-        return self._column[col](row, el, int_role)
+        LOG.debug('row {} is {}'.format(row, el[row]))
+        if int_role==Qt.CheckStateRole:
+            check =  Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
+            return check
+        elif int_role==Qt.DisplayRole:
+            lao = self.doc.layer_animation_order(row)
+            return el[row]['name'] + ('' if lao==0 else '[{}]'.format(lao))
+        return None
 
 
     # def flags(self, QModelIndex):

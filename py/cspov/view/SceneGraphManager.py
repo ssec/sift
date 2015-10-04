@@ -29,7 +29,7 @@ from vispy import scene
 from vispy.util.event import Event
 from vispy.visuals.transforms import STTransform, MatrixTransform
 from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY
-from cspov.control.layer_list import LayerStackListViewModel
+# from cspov.control.layer_list import LayerStackListViewModel
 from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.view.MapWidget import CspovMainMapCanvas
 from cspov.queue import TASK_DOING, TASK_PROGRESS
