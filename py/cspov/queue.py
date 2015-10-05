@@ -93,6 +93,7 @@ class TaskQueue(QThread):
             task = self.queue.pop(0)
             for status in task:
                 self._did_progress(status)
+        self._did_progress({TASK_DOING:'', TASK_PROGRESS:0.0})
 
 
 def test_task():
