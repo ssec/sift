@@ -89,6 +89,14 @@ class Main(QtGui.QMainWindow):
         self.ui.progressBar.setValue(int(val*PROGRESS_BAR_MAX))
         #LOG.warning('progress bar updated to {}'.format(val))
 
+    def update_frame_slider(self, frame_info):
+        frame_index, frame_count, animating = frame_info[:3]
+        self.ui.animationSlider.setRange(0, frame_count-1)
+        self.ui.animationSlider.setValue(frame_index or 0)
+        LOG.debug('did update animation slider {} {}'.format(frame_index, frame_count))
+        self.ui.animPlayPause.setDown(animating)
+        self.ui.animationSlider.update()
+
     def __init__(self, workspace_dir=None, glob_pattern=None, border_shapefile=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
@@ -104,6 +112,11 @@ class Main(QtGui.QMainWindow):
         self.document = doc = Document(self.workspace)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue, glob_pattern=glob_pattern, parent=self)
         self.ui.mainWidgets.addTab(self.scene_manager.main_canvas.native, 'Mercator')
+
+        self.scene_manager.didChangeFrame.connect(self.update_frame_slider)
+        self.ui.animPlayPause.clicked.connect(self.scene_manager.layer_set.toggle_animation)
+        # TODO: connect animation slider to frame number
+        # TODO: connect step forward and step back buttons to frame number (.next_frame)
 
         for uuid, ds_info, full_data in test_layers(self.workspace, self.document, glob_pattern=glob_pattern):
             # this now fires off a document modification cascade resulting in a new layer going up
