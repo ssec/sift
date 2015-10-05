@@ -112,6 +112,7 @@ class LayerStackListViewModel(QAbstractListModel):
     """ behavior connecting list widget to layer stack (both ways)
         Each table view represents a different configured document layer stack "set" - user can select from at least four.
         Convey layer set information to/from the document to the respective table, including selection.
+        ref: http://duganchen.ca/a-pythonic-qt-list-model-implementation/
     """
     widget = None
     doc = None
@@ -161,10 +162,12 @@ class LayerStackListViewModel(QAbstractListModel):
         return [self.doc[dex] for dex in range(len(self.doc))]
 
     def flags(self, index):
-        return Qt.ItemIsEnabled | Qt.ItemIsUserCheckable | Qt.ItemIsEditable
-        # if index.column()==0:
-        # else:
-        #     return super(LayerStackListViewModel, self).flags(index)
+        flags = super(LayerStackListViewModel, self).flags(index)
+        if index.isValid():
+            flags |= Qt.ItemIsDragEnabled | Qt.ItemIsDropEnabled | Qt.ItemIsUserCheckable
+        else:
+            flags = Qt.ItemIsDropEnabled
+        return flags
 
     def rowCount(self, QModelIndex_parent=None, *args, **kwargs):
         LOG.debug('{} layers'.format(len(self.doc)))
@@ -190,16 +193,24 @@ class LayerStackListViewModel(QAbstractListModel):
             return el[row]['name'] + ('[-]' if lao==0 else '[{}]'.format(lao))
         return None
 
+    # def supportedDragActions(self):
+    #     return Qt.MoveAction
 
-    # def headerData(self, p_int, Qt_Orientation, int_role=None):
-    #     return None
-    #
-    # def index(self, p_int, int_column=0, QModelIndex_parent=None, *args, **kwargs):
-    #     return None
-    #
-    # def parent(self, child, *args, **kwargs):
-    #     return None
-    #
+    def supportedDropActions(self):
+        return Qt.MoveAction
+
+    def insertRows(self, row, count, parent=QModelIndex()):
+        self.beginInsertRows(QModelIndex(), row, row+count)
+        # TODO: insert 'count' rows into document
+        self.endInsertRows()
+        return True
+
+    def removeRows(self, row, count, QModelIndex_parent=None, *args, **kwargs):
+        self.beginRemoveRows(QModelIndex(), row, row+count)
+        # TODO: remove layers from document
+        self.endRemoveRows()
+        return True
+
     def layer_clicked(self, qindex):
         pass
 
