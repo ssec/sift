@@ -30,12 +30,11 @@ QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
 
 from cspov.control.layer_list import LayerStackListViewModel
-from cspov.view.MapWidget import CspovMainMapCanvas
-from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.model import Document
 from cspov.view.SceneGraphManager import SceneGraphManager
 from cspov.queue import TaskQueue, test_task, TASK_PROGRESS, TASK_DOING
 from cspov.workspace import Workspace
+from vispy.color.colormap import Colormap
 
 from functools import partial
 
@@ -108,6 +107,12 @@ class Main(QtGui.QMainWindow):
         self.ui.animPlayPause.setDown(animating)
         self.ui.animationSlider.update()
 
+    def change_layer_colormap(self, nfo):
+        uuid = nfo['uuid']
+        mapname = nfo['colormap']
+        LOG.info('changing {} to colormap {}'.format(uuid, mapname))
+        self.scene_manager.set_colormap(mapname, uuid=uuid)
+
     def __init__(self, workspace_dir=None, glob_pattern=None, border_shapefile=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
@@ -162,12 +167,20 @@ class Main(QtGui.QMainWindow):
         self.ui.mainWidgets.removeTab(0)
         self.ui.mainWidgets.removeTab(0)
 
+        # Set up builtin colormaps
+        # FIXME: Move stuff like this to document probably
+        self.scene_manager.add_colormap("test", Colormap([
+            (0.00, 0.00, 0.00, 1.00),
+            (0.00, 0.00, 1.00, 1.00),
+        ]))
+
         # convey action between document and layer list view
         self.behaviorLayersList = LayerStackListViewModel([self.ui.layerSet1Table, self.ui.layerSet2Table, self.ui.layerSet3Table, self.ui.layerSet4Table], doc)
 
         # self.queue.add('test', test_task(), 'test000')
         # self.ui.layers
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
+        self.document.docDidChangeEnhancement.connect(self.change_layer_colormap)
 
         self.ui.panZoomToolButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.pz_camera.name))
         self.ui.pointSelectButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.point_probe_camera.name))
@@ -184,6 +197,20 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("a", self.scene_manager.layer_set.toggle_animation))
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("n", self.scene_manager.layer_set.next_frame))
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("c", self.scene_manager.next_camera))
+
+        class ColormapSlot(object):
+            def __init__(self, sgm, key='e'):
+                self.index = 0
+                self.key = key
+                self.sgm = sgm
+                self.colormaps = ["grays", "autumn", "fire", "hot", "winter", "test"]
+
+            def __call__(self, key):
+                if key.text == self.key:
+                    self.sgm.set_colormap(self.colormaps[self.index])
+                    self.index = (self.index + 1) % len(self.colormaps)
+
+        self.scene_manager.main_canvas.events.key_release.connect(ColormapSlot(self.scene_manager))
 
     def updateLayerList(self):
         # self.ui.layers.add

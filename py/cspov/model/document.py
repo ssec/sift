@@ -233,15 +233,37 @@ class Document(QObject):
     def layer_animation_order(self, dex):
         return self.current_layer_set[dex].order
 
+    def change_colormap_for_layers(self, name, uuids=None):
+        # FIXME: actually record the colormap change in the document
+        if uuids is not None:
+            # LOG.error('layer selection not implemented in change_colormap_for_layers')
+            for uuid in uuids:
+                if uuid in self._available: # only data layers
+                    nfo = {'uuid': uuid, 'colormap': name}
+                    self.docDidChangeEnhancement.emit(nfo)
+                else:
+                    LOG.warning('skipping colormap change for {}'.format(uuid))
+        else:  # all data layers
+            for dex in range(len(self.current_layer_set)):
+                uuid = self.current_layer_set[dex].uuid
+                if uuid in self._available:  # data layer?
+                    nfo = {'uuid': uuid, 'colormap': name}
+                    self.docDidChangeEnhancement.emit(nfo)
+                else:
+                    LOG.warning('skipping colormap change for {}'.format(uuid))
+
     def __len__(self):
         return len(self.current_layer_set)
+
+    def uuid_for_layer(self, dex):
+        uuid = self.current_layer_set[dex].uuid
 
     def __getitem__(self, dex):
         """
         return prez for a given layer index
         """
         uuid = self.current_layer_set[dex].uuid
-        nfo = self._available[uuid]
+        nfo = self._available[uuid]  # FIXME: won't work when we add non-data layers (boundary vectors, region selections)
         return nfo
 
     # def asDrawingPlan(self, frame=None):
