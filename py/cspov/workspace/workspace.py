@@ -278,6 +278,24 @@ class Workspace(QObject):
             raise ValueError("X/Y position is outside of image with UUID: %s", dsi_or_uuid)
         return data[row, col]
 
+    def get_content_polygon(self, dsi_or_uuid, points):
+        data = self.get_content(dsi_or_uuid)
+        xmin = data.shape[1]
+        xmax = 0
+        ymin = data.shape[0]
+        ymax = 0
+        for point in points:
+            row, col = self._position_to_index(dsi_or_uuid, point)
+            if row < ymin:
+                ymin = row
+            elif row > ymax:
+                ymax = row
+            if col < xmin:
+                xmin = col
+            elif col > xmax:
+                xmax = col
+        return data[ymin:ymax, xmin:xmax]
+
     def __getitem__(self, datasetinfo_or_uuid):
         """
         return science content proxy capable of generating a numpy array when sliced
