@@ -112,7 +112,7 @@ class Main(QtGui.QMainWindow):
         # Interaction Setup
         self.setup_key_releases()
         self.scheduler = QtCore.QTimer(parent=self)
-        self.scheduler.setInterval(500.0)
+        self.scheduler.setInterval(200.0)
         # self.scheduler.timeout.connect(partial(self.scene_manager.image_list._timeout_slot, self.scheduler))
         self.scheduler.timeout.connect(partial(self.scene_manager.on_view_change, self.scheduler))
         def start_wrapper(timer, event):

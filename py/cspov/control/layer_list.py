@@ -36,7 +36,7 @@ __docformat__ = 'reStructuredText'
 import os, sys
 import logging, unittest, argparse
 import weakref
-from PyQt4.QtCore import QAbstractListModel, QAbstractTableModel, QVariant, Qt, QSize
+from PyQt4.QtCore import QAbstractListModel, QAbstractTableModel, QVariant, Qt, QSize, QModelIndex
 from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView
 
 LOG = logging.getLogger(__name__)
@@ -170,24 +170,24 @@ class LayerStackListViewModel(QAbstractListModel):
         LOG.debug('{} layers'.format(len(self.doc)))
         return len(self.doc)
 
-    def data(self, index, int_role=None):
+    def data(self, index:QModelIndex, role:int=None):
         if not index.isValid():
             return None
         row = index.row()
         # col = index.column()
-        if int_role==Qt.ItemDataRole:
+        if role==Qt.ItemDataRole:
             return self.doc[index.row()] if index.row()<len(self.doc) else None
-        elif int_role!=Qt.DisplayRole:
+        elif role!=Qt.DisplayRole:
             return None
         # return "test"
         el = self.listing
         LOG.debug('row {} is {}'.format(row, el[row]))
-        if int_role==Qt.CheckStateRole:
+        if role==Qt.CheckStateRole:
             check =  Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
             return check
-        elif int_role==Qt.DisplayRole:
+        elif role==Qt.DisplayRole:
             lao = self.doc.layer_animation_order(row)
-            return el[row]['name'] + ('' if lao==0 else '[{}]'.format(lao))
+            return el[row]['name'] + ('[-]' if lao==0 else '[{}]'.format(lao))
         return None
 
 
