@@ -108,6 +108,11 @@ class Main(QtGui.QMainWindow):
         self.ui.animPlayPause.setDown(animating)
         self.ui.animationSlider.update()
 
+    def change_layer_colormap(self, nfo):
+        uuid = nfo['uuid']
+        mapname = nfo['colormap']
+        self.scene_manager.set_colormap(mapname, uuid=uuid)
+
     def __init__(self, workspace_dir=None, glob_pattern=None, border_shapefile=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
@@ -168,6 +173,7 @@ class Main(QtGui.QMainWindow):
         # self.queue.add('test', test_task(), 'test000')
         # self.ui.layers
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
+        self.document.docDidChangeEnhancement.connect(self.change_layer_colormap)
 
         self.ui.panZoomToolButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.pz_camera.name))
         self.ui.pointSelectButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.point_probe_camera.name))

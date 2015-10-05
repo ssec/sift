@@ -37,9 +37,11 @@ import os, sys
 import logging, unittest, argparse
 import weakref
 from PyQt4.QtCore import QAbstractListModel, QAbstractTableModel, QVariant, Qt, QSize, QModelIndex
-from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView
+from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView, QMenu
 
 LOG = logging.getLogger(__name__)
+
+COLOR_MAP_LIST=["grays", "autumn", "fire", "hot", "winter", "test"]  # FIXME: DRY violation
 
 COLUMNS=('Visibility', 'Name', 'Enhancement')
 
@@ -131,7 +133,8 @@ class LayerStackListViewModel(QAbstractListModel):
         listbox.setDragDropMode(QAbstractItemView.InternalMove)
         listbox.setDragEnabled(True)
         listbox.setSelectionMode(QListView.MultiSelection)  # alternate SingleSelection
-
+        listbox.setContextMenuPolicy(Qt.CustomContextMenu)
+        listbox.customContextMenuRequested.connect(self.menu)
 
     def __init__(self, widgets, doc):
         """
@@ -156,6 +159,18 @@ class LayerStackListViewModel(QAbstractListModel):
 
     # def columnCount(self, *args, **kwargs):
     #     return len(self._column)
+
+    def menu(self, pos, *args):
+        menu = QMenu()
+        actions = {}
+        for colormap in COLOR_MAP_LIST:
+            actions[menu.addAction(colormap)] = colormap
+        sel = menu.exec_(self.mapToGlobal(pos))
+        new_cmap = actions.get(sel, None)
+        selected_uuids = None
+        # TODO: figure out which list box this came from (the currently visible one almost certainly) and get selected uuid list
+        if new_cmap is not None:
+            self.doc.change_colormap_for_layers(name=new_cmap, uuids=selected_uuids)
 
     @property
     def listing(self):
