@@ -36,27 +36,18 @@ __docformat__ = 'reStructuredText'
 import os, sys
 import logging, unittest, argparse
 import weakref
-from PyQt4.QtCore import QAbstractListModel, QVariant, Qt, QSize
-from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate
+from PyQt4.QtCore import QAbstractListModel, QAbstractTableModel, QVariant, Qt, QSize, QModelIndex
+from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView
 
 LOG = logging.getLogger(__name__)
 
-COLUMNS=('Visibility', 'Name', 'Animation')
+COLUMNS=('Visibility', 'Name', 'Enhancement')
 
 class LayerWidgetDelegate(QStyledItemDelegate):
     """
     set for a specific column, controls the rendering and editing of items in that column or row of a list or table
     see QAbstractItemView.setItemDelegateForRow/Column
     """
-    def paint(self, painter, style, index):
-        """
-        Draw the item in the model
-        :param painter:
-        :param style:
-        :param index:
-        :return:
-        """
-        super(LayerWidgetDelegate, self).paint(painter, style, index)
 
     def sizeHint(self, QStyleOptionViewItem, QModelIndex):
         return QSize(100,36)
@@ -126,6 +117,21 @@ class LayerStackListViewModel(QAbstractListModel):
     doc = None
     item_delegate = None
 
+    def _init_widget(self, listbox:QListView):
+        listbox.clicked.connect(self.layer_clicked)
+        # widget.indexesMoved.connect(self.layers_moved)
+        listbox.setItemDelegate(self.item_delegate)
+        listbox.customContextMenuRequested.connect(self.context_menu)
+        listbox.entered.connect(self.layer_entered)
+        listbox.pressed.connect(self.layer_pressed)
+        listbox.setModel(self)
+        listbox.setDropIndicatorShown(True)
+        listbox.setAcceptDrops(True)
+        listbox.setDragDropMode(QAbstractItemView.InternalMove)
+        listbox.setDragEnabled(True)
+        listbox.setSelectionMode(QListView.MultiSelection)  # alternate SingleSelection
+
+
     def __init__(self, widgets, doc):
         """
         Connect one or more table views to the document via this model.
@@ -136,80 +142,55 @@ class LayerStackListViewModel(QAbstractListModel):
         super(LayerStackListViewModel, self).__init__()
         self.widgets = list(widgets) # [weakref.ref(widget) for widget in widgets]
         self.doc = doc
-        self.column = [self._visibilityData, self._nameData, self._animationData]
+        # self._column = [self._visibilityData, self._nameData]
         self.item_delegate = LayerWidgetDelegate()
 
         doc.docDidChangeLayerOrder.connect(self.updateList)
         doc.docDidChangeLayer.connect(self.updateList)
+        # q = QTableView()
+        # q.setItemDelegateForColumn(0, )
 
         for widget in widgets:
-            widget.clicked.connect(self.layer_clicked)
-            widget.indexesMoved.connect(self.layers_moved)
-            widget.customContextMenuRequested.connect(self.context_menu)
-            widget.entered.connect(self.layer_entered)
-            widget.pressed.connect(self.layer_pressed)
-            widget.setModel(self)
-            widget.setItemDelegate(self.item_delegate)
-
-#         table.setModel(self.model)
-#         table.setSortingEnabled(True)
-#         table.setDropIndicatorShown(True)
-#         table.setAcceptDrops(True)
-#         table.setDragDropMode(QtGui.QAbstractItemView.InternalMove)
-#         table.setDragEnabled(True)
-#         table.setSelectionMode(QtGui.QTableView.SingleSelection)
-#         table.setSelectionBehavior(QtGui.QTableView.SelectRows)
-#         table.horizontalHeader().setMovable(True)
-#         table.horizontalHeader().setDragEnabled(True)
-#         table.horizontalHeader().setDragDropMode(QtGui.QAbstractItemView.InternalMove)
-#         table.verticalHeader().setMovable(True)
-#         table.verticalHeader().setDragEnabled(True)
-#         table.verticalHeader().setDragDropMode(QtGui.QAbstractItemView.InternalMove)
-
+            self._init_widget(widget)
 
     # def columnCount(self, *args, **kwargs):
-    #     return 1
+    #     return len(self._column)
 
     @property
     def listing(self):
         return [self.doc[dex] for dex in range(len(self.doc))]
 
+    def flags(self, index):
+        return Qt.ItemIsEnabled | Qt.ItemIsUserCheckable | Qt.ItemIsEditable
+        # if index.column()==0:
+        # else:
+        #     return super(LayerStackListViewModel, self).flags(index)
+
     def rowCount(self, QModelIndex_parent=None, *args, **kwargs):
-        LOG.info('{} layers'.format(len(self.doc)))
+        LOG.debug('{} layers'.format(len(self.doc)))
         return len(self.doc)
 
-    # def columnCount(self, QModelIndex_parent=None, *args, **kwargs):
-    #     return len(COLUMNS)
-
-    def _visibilityData(self, row, listing):
-        return True  # FIXME
-
-    def _nameData(self, row, listing):
-        return listing[row]['name']
-
-    def _animationData(self, row, listing):
-        return row+1  # FIXME
-
-    def data(self, index, int_role=None):
+    def data(self, index:QModelIndex, role:int=None):
         if not index.isValid():
             return None
-        if int_role==Qt.ItemDataRole:
+        row = index.row()
+        # col = index.column()
+        if role==Qt.ItemDataRole:
             return self.doc[index.row()] if index.row()<len(self.doc) else None
-        elif int_role!=Qt.DisplayRole:
+        elif role!=Qt.DisplayRole:
             return None
         # return "test"
         el = self.listing
+        LOG.debug('row {} is {}'.format(row, el[row]))
+        if role==Qt.CheckStateRole:
+            check =  Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
+            return check
+        elif role==Qt.DisplayRole:
+            lao = self.doc.layer_animation_order(row)
+            return el[row]['name'] + ('[-]' if lao==0 else '[{}]'.format(lao))
+        return None
 
-        row = index.row()
-        # col = index.column()
-        col = 1
-        LOG.debug('row,col {},{} is {}'.format(row, col, el[row]))
-        return self.column[col](row, el)
 
-
-    # def flags(self, QModelIndex):
-    #     return None
-    #
     # def headerData(self, p_int, Qt_Orientation, int_role=None):
     #     return None
     #

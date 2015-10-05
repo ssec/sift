@@ -30,6 +30,8 @@ QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
 
 from cspov.control.layer_list import LayerStackListViewModel
+from cspov.view.MapWidget import CspovMainMapCanvas
+from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.model import Document
 from cspov.view.SceneGraphManager import SceneGraphManager
 from cspov.queue import TaskQueue, test_task, TASK_PROGRESS, TASK_DOING
@@ -87,6 +89,14 @@ class Main(QtGui.QMainWindow):
         self.ui.progressBar.setValue(int(val*PROGRESS_BAR_MAX))
         #LOG.warning('progress bar updated to {}'.format(val))
 
+    def update_frame_slider(self, frame_info):
+        frame_index, frame_count, animating = frame_info[:3]
+        self.ui.animationSlider.setRange(0, frame_count-1)
+        self.ui.animationSlider.setValue(frame_index or 0)
+        LOG.debug('did update animation slider {} {}'.format(frame_index, frame_count))
+        self.ui.animPlayPause.setDown(animating)
+        self.ui.animationSlider.update()
+
     def __init__(self, workspace_dir=None, glob_pattern=None, border_shapefile=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
@@ -103,6 +113,11 @@ class Main(QtGui.QMainWindow):
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue, glob_pattern=glob_pattern, parent=self)
         self.ui.mainWidgets.addTab(self.scene_manager.main_canvas.native, 'Mercator')
 
+        self.scene_manager.didChangeFrame.connect(self.update_frame_slider)
+        self.ui.animPlayPause.clicked.connect(self.scene_manager.layer_set.toggle_animation)
+        # TODO: connect animation slider to frame number
+        # TODO: connect step forward and step back buttons to frame number (.next_frame)
+
         for uuid, ds_info, full_data in test_layers(self.workspace, self.document, glob_pattern=glob_pattern):
             # this now fires off a document modification cascade resulting in a new layer going up
             pass
@@ -110,7 +125,7 @@ class Main(QtGui.QMainWindow):
         # Interaction Setup
         self.setup_key_releases()
         self.scheduler = QtCore.QTimer(parent=self)
-        self.scheduler.setInterval(500.0)
+        self.scheduler.setInterval(200.0)
         # self.scheduler.timeout.connect(partial(self.scene_manager.image_list._timeout_slot, self.scheduler))
         self.scheduler.timeout.connect(partial(self.scene_manager.on_view_change, self.scheduler))
         def start_wrapper(timer, event):
@@ -136,7 +151,7 @@ class Main(QtGui.QMainWindow):
         # convey action between document and layer list view
         self.behaviorLayersList = LayerStackListViewModel([self.ui.layerSet1Table, self.ui.layerSet2Table, self.ui.layerSet3Table, self.ui.layerSet4Table], doc)
 
-        self.queue.add('test', test_task(), 'test000')
+        # self.queue.add('test', test_task(), 'test000')
         # self.ui.layers
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
 

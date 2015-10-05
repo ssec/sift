@@ -31,7 +31,7 @@ from vispy.visuals.transforms import STTransform, MatrixTransform
 from vispy.visuals import MarkersVisual, marker_types
 from vispy.scene.visuals import Markers, Polygon
 from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY
-from cspov.control.layer_list import LayerStackListViewModel
+# from cspov.control.layer_list import LayerStackListViewModel
 from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.view.MapWidget import CspovMainMapCanvas
 from cspov.view.Cameras import ProbeCamera
@@ -99,7 +99,7 @@ class LayerSet(object):
      - Animation loop and frame order
      - Layer Order
     """
-    def __init__(self, parent, layers=None, layer_order=None, frame_order=None):
+    def __init__(self, parent, layers=None, layer_order=None, frame_order=None, frame_change_cb=None):
         if layers is None and (layer_order is not None or frame_order is not None):
             raise ValueError("'layers' required when 'layer_order' or 'frame_order' is specified")
 
@@ -109,6 +109,7 @@ class LayerSet(object):
         self._frame_order = []
         self._animating = False
         self._frame_number = 0
+        self._frame_change_cb = frame_change_cb
         self._animation_timer = app.Timer(DEFAULT_ANIMATION_DELAY, connect=self.next_frame)
 
         if layers is not None:
@@ -144,6 +145,8 @@ class LayerSet(object):
             assert o in self._layers
         self._frame_order = frame_order
         self._frame_number = 0
+        if self._frame_change_cb is not None:
+            self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating))
 
     def top_layer_uuid(self):
         for layer_uuid in self._layer_order:
@@ -171,6 +174,8 @@ class LayerSet(object):
 
     def toggle_animation(self, *args):
         self.animating = not self._animating
+        if self._frame_change_cb is not None:
+            self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating))
 
     def _set_visible_node(self, node):
         """Set all nodes to invisible except for the `event.added` node.
@@ -199,14 +204,18 @@ class LayerSet(object):
         :param frame_number: optional frame to go to, from 0
         :return:
         """
-        frame = frame_number if isinstance(frame_number, int) else (self._frame_number + 1) % len(self._frame_order)
+        lfo = len(self._frame_order)
+        frame = frame_number if isinstance(frame_number, int) else (self._frame_number + 1) % lfo
         self._set_visible_child(frame)
         self._frame_number = frame
         self.parent.update()
+        if self._frame_change_cb is not None:
+            self._frame_change_cb((frame_number, lfo, self._animating))
 
 
 class SceneGraphManager(QObject):
     didRetilingCalcs = pyqtSignal(object, object, object, object, object, object)
+    didChangeFrame = pyqtSignal(tuple)
     newProbePoint = pyqtSignal(object, object)
     newProbePolygon = pyqtSignal(object, object)
 
@@ -225,12 +234,21 @@ class SceneGraphManager(QObject):
 
         self.image_layers = {}
         self.datasets = {}
-        self.layer_set = LayerSet(self)
+        self.layer_set = LayerSet(self, frame_change_cb=self.frame_changed)
 
         self.set_document(self.document)
 
         self.setup_initial_canvas()
         self.pending_polygon = PendingPolygon(self.main_map)
+
+    def frame_changed(self, frame_info):
+        """
+        callback which emits information on current animation frame as a signal
+        (see LayerSet.next_frame)
+        :param frame_info: tuple to be relayed in the signal, typically (frame_index:int, total_frames:int, animating:bool)
+        """
+        # LOG.debug('emitting didChangeFrame')
+        self.didChangeFrame.emit(frame_info)
 
     def setup_initial_canvas(self):
         self.main_canvas = CspovMainMapCanvas(parent=self.parent())
