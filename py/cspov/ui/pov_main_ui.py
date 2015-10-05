@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created: Mon Oct  5 10:39:42 2015
+# Created: Mon Oct  5 10:40:46 2015
 #      by: PyQt4 UI code generator 4.11.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -234,7 +234,7 @@ class Ui_MainWindow(object):
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
-        MainWindow.setWindowTitle(_translate("MainWindow", "CSPOV", None))
+        MainWindow.setWindowTitle(_translate("MainWindow", "CSPOV Alpha Test", None))
         self.panZoomToolButton.setText(_translate("MainWindow", "Pan/Zoom", None))
         self.pointSelectButton.setText(_translate("MainWindow", "Point", None))
         self.regionSelectButton.setText(_translate("MainWindow", "Region", None))
