@@ -773,7 +773,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         if total_num_tiles <= 0:
             # we aren't looking at this image
             # FIXME: What's the correct way to stop drawing here
-            return
+            raise RuntimeError("View calculations determined a negative number of tiles are visible")
         elif total_num_tiles > self.num_tex_tiles - total_overview_tiles:
             LOG.warning("Current view sees more tiles than can be held in the GPU")
             # We continue on because there should be an overview image for any tiles that can't be drawn

@@ -28,13 +28,17 @@ from vispy import app
 from vispy import scene
 from vispy.util.event import Event
 from vispy.visuals.transforms import STTransform, MatrixTransform
+from vispy.visuals import MarkersVisual, marker_types
+from vispy.scene.visuals import Markers, Polygon
 from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY
 # from cspov.control.layer_list import LayerStackListViewModel
 from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.view.MapWidget import CspovMainMapCanvas
+from cspov.view.Cameras import ProbeCamera
 from cspov.queue import TASK_DOING, TASK_PROGRESS
 
 from PyQt4.QtCore import QObject, pyqtSignal
+import numpy as np
 
 import os
 import logging
@@ -50,6 +54,41 @@ class MainMap(scene.Node):
     """
     def __init__(self, *args, **kwargs):
         super(MainMap, self).__init__(*args, **kwargs)
+
+
+class PendingPolygon(object):
+    """Temporary information holder for Probe Polygons.
+    """
+    def __init__(self, point_parent):
+        self.parent = point_parent
+        self.markers = []
+        self.canvas_points = []
+        self.points = []
+        self.radius = 10.0
+
+    def is_complete(self, canvas_pos):
+        # XXX: Can't get "visuals_at" method of the SceneCanvas to work to find if the point is ready
+        if len(self.points) < 3:
+            return False
+        p1 = self.canvas_points[0]
+        r = self.radius
+        if (p1[0] - r <= canvas_pos[0] <= p1[0] + r) and (p1[1] - r <= canvas_pos[1] <= p1[1] + r):
+            return True
+
+    def add_point(self, canvas_pos, xy_pos):
+        if self.is_complete(canvas_pos):
+            # Are you finishing the polygon by adding this point (same point as the first point...or near it)
+            return True
+        self.canvas_points.append(canvas_pos)
+        self.points.append(xy_pos)
+        point_visual = Markers(parent=self.parent, symbol="disc", pos=np.array([xy_pos[:2]]))
+        self.markers.append(point_visual)
+        return False
+
+    def reset(self):
+        self.markers = []
+        self.canvas_points = []
+        self.points = []
 
 
 class LayerSet(object):
@@ -109,6 +148,13 @@ class LayerSet(object):
         if self._frame_change_cb is not None:
             self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating))
 
+    def top_layer_uuid(self):
+        for layer_uuid in self._layer_order:
+            if self._layers[layer_uuid].visible:
+                return layer_uuid
+        # None of the image layers are visible
+        return None
+
     @property
     def animating(self):
         return self._animating
@@ -134,7 +180,7 @@ class LayerSet(object):
     def _set_visible_node(self, node):
         """Set all nodes to invisible except for the `event.added` node.
         """
-        for child in self._children:
+        for child in self._layers.values():
             with child.events.blocker():
                 if child is node.added:
                     child.visible = True
@@ -170,6 +216,8 @@ class LayerSet(object):
 class SceneGraphManager(QObject):
     didRetilingCalcs = pyqtSignal(object, object, object, object, object, object)
     didChangeFrame = pyqtSignal(tuple)
+    newProbePoint = pyqtSignal(object, object)
+    newProbePolygon = pyqtSignal(object, object)
 
     def __init__(self, doc, workspace, queue, border_shapefile=None, glob_pattern=None, parent=None, texture_shape=(4, 16)):
         super(SceneGraphManager, self).__init__(parent)
@@ -182,6 +230,7 @@ class SceneGraphManager(QObject):
         self.border_shapefile = border_shapefile or DEFAULT_SHAPE_FILE
         self.glob_pattern = glob_pattern
         self.texture_shape = texture_shape
+        self.polygons = []
 
         self.image_layers = {}
         self.datasets = {}
@@ -190,6 +239,7 @@ class SceneGraphManager(QObject):
         self.set_document(self.document)
 
         self.setup_initial_canvas()
+        self.pending_polygon = PendingPolygon(self.main_map)
 
     def frame_changed(self, frame_info):
         """
@@ -202,27 +252,90 @@ class SceneGraphManager(QObject):
 
     def setup_initial_canvas(self):
         self.main_canvas = CspovMainMapCanvas(parent=self.parent())
-        self.main_view = self.main_canvas.central_widget.add_view(scene.PanZoomCamera(aspect=1))
+        self.main_view = self.main_canvas.central_widget.add_view()
+
         # Camera Setup
-        self.main_view.camera.flip = (0, 0, 0)
+        self.pz_camera = scene.PanZoomCamera(name="pz_camera", aspect=1)
+        self.main_view.camera = self.pz_camera
+
+        self.main_view.camera.flip = (False, False, False)
         # FIXME: these ranges just happen to look ok, but I'm not really sure the 'best' way to set these
         self.main_view.camera.set_range(x=(-10.0, 10.0), y=(-10.0, 10.0), margin=0)
         self.main_view.camera.zoom(0.1, (0, 0))
+
+        # Point Probe Mode/Camera
+        self.point_probe_camera = ProbeCamera(name="point_probe_camera", aspect=1)
+        self.main_view.camera.link(self.point_probe_camera)
+
+        # Polygon Probe Mode/Camera
+        self.polygon_probe_camera = ProbeCamera(name="polygon_probe_camera", aspect=1)
+        self.main_view.camera.link(self.polygon_probe_camera)
+
+        self._cameras = dict((c.name, c) for c in [self.main_view.camera, self.point_probe_camera, self.polygon_probe_camera])
+        # FIXME: Add the polygon probe camera
+        self._camera_names = [self.pz_camera.name, self.point_probe_camera.name, self.polygon_probe_camera.name]
+
+        self.main_view.events.mouse_press.connect(self.on_mouse_press, after=list(self.main_view.events.mouse_press.callbacks))
 
         # Head node of the map graph
         self.main_map = MainMap(name="MainMap", parent=self.main_view.scene)
         merc_ortho = MatrixTransform()
         # near/far is backwards it seems:
         camera_z_scale = 1e-6
-        # merc_ortho.set_ortho(-180.0, 180.0, -90.0, 90.0, -100.0 * camera_z_scale, 100.0 * camera_z_scale)
         l, r, b, t = [getattr(WORLD_EXTENT_BOX, x) for x in ['l', 'r', 'b', 't']]
         merc_ortho.set_ortho(l, r, b, t, -100.0 * camera_z_scale, 100.0 * camera_z_scale)
-        self.main_map.transform *= merc_ortho # ortho(l, r, b, t, -100.0 * camera_z_scale, 100.0 * camera_z_scale)
+        # self.main_map.transforms.visual_transform = merc_ortho
+        self.main_map.transform = merc_ortho
 
         self.boundaries = NEShapefileLines(self.border_shapefile, double=True, parent=self.main_map)
 
+    def on_mouse_press(self, event):
+        if event.handled:
+            return
+        # What does this mouse press mean?
+        if self.main_view.camera is self.point_probe_camera:
+            buffer_pos = event.sources[0].transforms.get_transform().map(event.pos)
+            # FIXME: We should be able to use the main_map object to do the transform...but it doesn't work (waiting on vispy developers)
+            # map_pos = self.main_map.transforms.get_transform().imap(buffer_pos)
+            map_pos = list(self.image_layers.values())[0].transforms.get_transform().imap(buffer_pos)
+            # point_marker = Markers(parent=self.main_map, symbol="disc", pos=np.array([map_pos[:2]]))
+            # self.points.append(point_marker)
+            self.newProbePoint.emit(self.layer_set.top_layer_uuid(), map_pos[:2])
+        elif self.main_view.camera is self.polygon_probe_camera:
+            buffer_pos = event.sources[0].transforms.get_transform().map(event.pos)
+            map_pos = list(self.image_layers.values())[0].transforms.get_transform().imap(buffer_pos)
+            if self.pending_polygon.add_point(event.pos, map_pos):
+                points = self.pending_polygon.points + [self.pending_polygon.points[0]]
+                for marker in self.pending_polygon.markers:
+                    # Remove the marker from the scene graph
+                    marker.parent = None
+                # Reset the pending polygon object
+                self.pending_polygon.reset()
+                self.newProbePolygon.emit(self.layer_set.top_layer_uuid(), points)
+        else:
+            print("I don't know how to handle this camera for a mouse press")
+
+    def on_new_polygon(self, points, **kwargs):
+        kwargs.setdefault("color", (1.0, 0.0, 1.0, 0.5))
+        poly = Polygon(parent=self.main_map, pos=points, **kwargs)
+        self.polygons.append(poly)
+
     def update(self):
         return self.main_canvas.update()
+
+    def change_camera(self, idx_or_name):
+        if isinstance(idx_or_name, str):
+            camera = self._cameras[idx_or_name]
+        else:
+            camera = self._cameras[self._camera_names[idx_or_name]]
+
+        print("Changing camera to ", camera)
+        self.main_view.camera = camera
+
+    def next_camera(self):
+        idx = self._camera_names.index(self.main_view.camera.name)
+        idx = (idx + 1) % len(self._camera_names)
+        self.change_camera(idx)
 
     def rebuild_layer_changed(self, change_dict, *args, **kwargs):
         """
