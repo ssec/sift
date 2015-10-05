@@ -245,6 +245,7 @@ class SceneGraphManager(QObject):
 
         self.image_layers = {}
         self.datasets = {}
+        self.colormaps = {}
         self.layer_set = LayerSet(self, frame_change_cb=self.frame_changed)
 
         self.set_document(self.document)
@@ -283,7 +284,6 @@ class SceneGraphManager(QObject):
         self.main_view.camera.link(self.polygon_probe_camera)
 
         self._cameras = dict((c.name, c) for c in [self.main_view.camera, self.point_probe_camera, self.polygon_probe_camera])
-        # FIXME: Add the polygon probe camera
         self._camera_names = [self.pz_camera.name, self.point_probe_camera.name, self.polygon_probe_camera.name]
 
         self.main_view.events.mouse_press.connect(self.on_mouse_press, after=list(self.main_view.events.mouse_press.callbacks))
@@ -347,6 +347,22 @@ class SceneGraphManager(QObject):
         idx = self._camera_names.index(self.main_view.camera.name)
         idx = (idx + 1) % len(self._camera_names)
         self.change_camera(idx)
+
+    def set_colormap(self, colormap, uuid=None):
+        if isinstance(colormap, str) and colormap in self.colormaps:
+            colormap = self.colormaps[colormap]
+
+        uuids = uuid
+        if uuid is None:
+            uuids = self.image_layers.keys()
+        elif not isinstance(uuid, (list, tuple)):
+            uuids = [uuid]
+
+        for uuid in uuids:
+            self.image_layers[uuid].cmap = colormap
+
+    def add_colormap(self, name, colormap):
+        self.colormaps[name] = colormap
 
     def rebuild_layer_changed(self, change_dict, *args, **kwargs):
         """
