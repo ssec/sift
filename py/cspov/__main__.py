@@ -30,12 +30,11 @@ QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
 
 from cspov.control.layer_list import LayerStackListViewModel
-from cspov.view.MapWidget import CspovMainMapCanvas
-from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.model import Document
 from cspov.view.SceneGraphManager import SceneGraphManager
 from cspov.queue import TaskQueue, test_task, TASK_PROGRESS, TASK_DOING
 from cspov.workspace import Workspace
+from vispy.color.colormap import Colormap
 
 from functools import partial
 
@@ -162,6 +161,13 @@ class Main(QtGui.QMainWindow):
         self.ui.mainWidgets.removeTab(0)
         self.ui.mainWidgets.removeTab(0)
 
+        # Set up builtin colormaps
+        # FIXME: Move stuff like this to document probably
+        self.scene_manager.add_colormap("test", Colormap([
+            (0.00, 0.00, 0.00, 1.00),
+            (0.00, 0.00, 1.00, 1.00),
+        ]))
+
         # convey action between document and layer list view
         self.behaviorLayersList = LayerStackListViewModel([self.ui.layerSet1Table, self.ui.layerSet2Table, self.ui.layerSet3Table, self.ui.layerSet4Table], doc)
 
@@ -184,6 +190,20 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("a", self.scene_manager.layer_set.toggle_animation))
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("n", self.scene_manager.layer_set.next_frame))
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("c", self.scene_manager.next_camera))
+
+        class ColormapSlot(object):
+            def __init__(self, sgm, key='e'):
+                self.index = 0
+                self.key = key
+                self.sgm = sgm
+                self.colormaps = ["grays", "autumn", "fire", "hot", "winter", "test"]
+
+            def __call__(self, key):
+                if key.text == self.key:
+                    self.sgm.set_colormap(self.colormaps[self.index])
+                    self.index = (self.index + 1) % len(self.colormaps)
+
+        self.scene_manager.main_canvas.events.key_release.connect(ColormapSlot(self.scene_manager))
 
     def updateLayerList(self):
         # self.ui.layers.add
