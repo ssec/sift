@@ -36,7 +36,7 @@ __docformat__ = 'reStructuredText'
 import os, sys
 import logging, unittest, argparse
 import weakref
-from PyQt4.QtCore import QAbstractListModel, QAbstractTableModel, QVariant, Qt, QSize, QModelIndex
+from PyQt4.QtCore import QAbstractListModel, QAbstractTableModel, QVariant, Qt, QSize, QModelIndex, QPoint
 from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView, QMenu
 
 LOG = logging.getLogger(__name__)
@@ -116,9 +116,10 @@ class LayerStackListViewModel(QAbstractListModel):
         Convey layer set information to/from the document to the respective table, including selection.
         ref: http://duganchen.ca/a-pythonic-qt-list-model-implementation/
     """
-    widget = None
+    widgets = None
     doc = None
     item_delegate = None
+
 
     def _init_widget(self, listbox:QListView):
         listbox.clicked.connect(self.layer_clicked)
@@ -135,6 +136,19 @@ class LayerStackListViewModel(QAbstractListModel):
         listbox.setSelectionMode(QListView.MultiSelection)  # alternate SingleSelection
         listbox.setContextMenuPolicy(Qt.CustomContextMenu)
         listbox.customContextMenuRequested.connect(self.menu)
+        self.widgets.append(listbox)
+
+    @property
+    def current_set_listbox(self):
+        """
+        We can have several list boxes, one for each layer_set in the document.
+        Return whichever one is currently active.
+        :return:
+        """
+        # FIXME this is fugly
+        for widget in self.widgets:
+            if widget.isVisible():
+                return widget
 
     def __init__(self, widgets, doc):
         """
@@ -160,17 +174,25 @@ class LayerStackListViewModel(QAbstractListModel):
     # def columnCount(self, *args, **kwargs):
     #     return len(self._column)
 
-    def menu(self, pos, *args):
+    def current_selected_uuids(self, lbox:QListView=None):
+        # FIXME: this is just plain crufty, also doesn't work!
+        lbox = self.current_set_listbox if lbox is None else lbox
+        for q in lbox.selectedIndexes():
+            yield self.doc.uuid_for_layer(q.row())
+
+    def menu(self, pos:QPoint, *args):
+        LOG.info('menu requested for layer list')
         menu = QMenu()
         actions = {}
+        lbox = self.current_set_listbox
         for colormap in COLOR_MAP_LIST:
             actions[menu.addAction(colormap)] = colormap
-        sel = menu.exec_(self.mapToGlobal(pos))
+        sel = menu.exec_(lbox.mapToGlobal(pos))
         new_cmap = actions.get(sel, None)
-        selected_uuids = None
-        # TODO: figure out which list box this came from (the currently visible one almost certainly) and get selected uuid list
+        selected_uuids = list(self.current_selected_uuids(lbox))
         if new_cmap is not None:
-            self.doc.change_colormap_for_layers(name=new_cmap, uuids=selected_uuids)
+            LOG.info("changing to colormap {0} for ids {1!r:s}".format(new_cmap, selected_uuids))
+            self.doc.change_colormap_for_layers(name=new_cmap) # FIXME, uuids=selected_uuids)
 
     @property
     def listing(self):
@@ -185,7 +207,7 @@ class LayerStackListViewModel(QAbstractListModel):
         return flags
 
     def rowCount(self, QModelIndex_parent=None, *args, **kwargs):
-        LOG.debug('{} layers'.format(len(self.doc)))
+        # LOG.debug('{} layers'.format(len(self.doc)))
         return len(self.doc)
 
     def data(self, index:QModelIndex, role:int=None):

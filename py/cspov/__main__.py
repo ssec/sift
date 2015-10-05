@@ -110,6 +110,7 @@ class Main(QtGui.QMainWindow):
     def change_layer_colormap(self, nfo):
         uuid = nfo['uuid']
         mapname = nfo['colormap']
+        LOG.info('changing {} to colormap {}'.format(uuid, mapname))
         self.scene_manager.set_colormap(mapname, uuid=uuid)
 
     def __init__(self, workspace_dir=None, glob_pattern=None, border_shapefile=None):
