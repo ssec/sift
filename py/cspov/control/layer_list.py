@@ -48,15 +48,6 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     set for a specific column, controls the rendering and editing of items in that column or row of a list or table
     see QAbstractItemView.setItemDelegateForRow/Column
     """
-    def paint(self, painter, style, index):
-        """
-        Draw the item in the model
-        :param painter:
-        :param style:
-        :param index:
-        :return:
-        """
-        super(LayerWidgetDelegate, self).paint(painter, style, index)
 
     def sizeHint(self, QStyleOptionViewItem, QModelIndex):
         return QSize(100,36)
@@ -134,19 +125,11 @@ class LayerStackListViewModel(QAbstractListModel):
         listbox.entered.connect(self.layer_entered)
         listbox.pressed.connect(self.layer_pressed)
         listbox.setModel(self)
-        # listbox.setSortingEnabled(True)
         listbox.setDropIndicatorShown(True)
         listbox.setAcceptDrops(True)
         listbox.setDragDropMode(QAbstractItemView.InternalMove)
         listbox.setDragEnabled(True)
         listbox.setSelectionMode(QListView.MultiSelection)  # alternate SingleSelection
-        # listbox.setSelectionBehavior(QTableView.SelectRows)
-#         table.horizontalHeader().setMovable(True)
-#         table.horizontalHeader().setDragEnabled(True)
-#         table.horizontalHeader().setDragDropMode(QtGui.QAbstractItemView.InternalMove)
-#         table.verticalHeader().setMovable(True)
-#         table.verticalHeader().setDragEnabled(True)
-#         table.verticalHeader().setDragDropMode(QtGui.QAbstractItemView.InternalMove)
 
 
     def __init__(self, widgets, doc):
@@ -187,28 +170,6 @@ class LayerStackListViewModel(QAbstractListModel):
         LOG.debug('{} layers'.format(len(self.doc)))
         return len(self.doc)
 
-    # def columnCount(self, QModelIndex_parent=None, *args, **kwargs):
-    #     return len(COLUMNS)
-
-    # def _visibilityData(self, row, listing, role):
-    #     "return column 0, animation order (integer) and visibility data (checkbox)"
-    #     if role==Qt.CheckStateRole:
-    #         check =  Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
-    #         return check
-    #     elif role==Qt.DisplayRole:
-    #         lao = self.doc.layer_animation_order(row)
-    #         return '-' if lao==0 else str(lao)
-    #     return None
-
-    # def _nameData(self, row, listing, role):
-    #     if role==Qt.CheckStateRole:
-    #         check =  Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
-    #         return check
-    #     elif role==Qt.DisplayRole:
-    #         lao = self.doc.layer_animation_order(row)
-    #         return listing[row]['name'] + ('' if lao==0 else '[{}]'.format(lao))
-    #     return None
-
     def data(self, index, int_role=None):
         if not index.isValid():
             return None
@@ -230,9 +191,6 @@ class LayerStackListViewModel(QAbstractListModel):
         return None
 
 
-    # def flags(self, QModelIndex):
-    #     return None
-    #
     # def headerData(self, p_int, Qt_Orientation, int_role=None):
     #     return None
     #
