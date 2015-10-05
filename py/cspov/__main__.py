@@ -86,7 +86,9 @@ class Main(QtGui.QMainWindow):
         active = status_info[0]
         LOG.warning('{0!r:s}'.format(status_info))
         val = active[TASK_PROGRESS]
+        txt = active[TASK_DOING]
         self.ui.progressBar.setValue(int(val*PROGRESS_BAR_MAX))
+        self.ui.progressText.setText(txt)
         #LOG.warning('progress bar updated to {}'.format(val))
 
     def update_frame_slider(self, frame_info):

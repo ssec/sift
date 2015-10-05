@@ -416,12 +416,14 @@ class SceneGraphManager(QObject):
 
     def _retile_child(self, uuid, preferred_stride, tile_box):
         LOG.debug("Retiling child with UUID: '%s'", uuid)
+        yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.0}
         child = self.image_layers[uuid]
         data = self.workspace.get_content(uuid, lod=preferred_stride)
+        yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.5}
         # FIXME: Use LOD instead of stride and provide the lod to the workspace
         data = data[::preferred_stride, ::preferred_stride]
         tiles_info, vertices, tex_coords = child.retile(data, preferred_stride, tile_box)
-        yield {TASK_DOING: 'image_retile', TASK_PROGRESS: 1.0}
+        yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 1.0}
         self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)
 
     def _set_retiled(self, uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords):
