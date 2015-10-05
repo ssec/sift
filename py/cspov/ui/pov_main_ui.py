@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created: Mon Oct  5 10:08:18 2015
+# Created: Mon Oct  5 10:20:52 2015
 #      by: PyQt4 UI code generator 4.11.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -33,12 +33,15 @@ class Ui_MainWindow(object):
         self.verticalLayout_2.setObjectName(_fromUtf8("verticalLayout_2"))
         self.horizontalLayout_2 = QtGui.QHBoxLayout()
         self.horizontalLayout_2.setObjectName(_fromUtf8("horizontalLayout_2"))
-        self.toolButton_2 = QtGui.QToolButton(self.centralwidget)
-        self.toolButton_2.setObjectName(_fromUtf8("toolButton_2"))
-        self.horizontalLayout_2.addWidget(self.toolButton_2)
-        self.toolButton = QtGui.QToolButton(self.centralwidget)
-        self.toolButton.setObjectName(_fromUtf8("toolButton"))
-        self.horizontalLayout_2.addWidget(self.toolButton)
+        self.panZoomToolButton = QtGui.QToolButton(self.centralwidget)
+        self.panZoomToolButton.setObjectName(_fromUtf8("panZoomToolButton"))
+        self.horizontalLayout_2.addWidget(self.panZoomToolButton)
+        self.pointSelectButton = QtGui.QToolButton(self.centralwidget)
+        self.pointSelectButton.setObjectName(_fromUtf8("pointSelectButton"))
+        self.horizontalLayout_2.addWidget(self.pointSelectButton)
+        self.regionSelectButton = QtGui.QToolButton(self.centralwidget)
+        self.regionSelectButton.setObjectName(_fromUtf8("regionSelectButton"))
+        self.horizontalLayout_2.addWidget(self.regionSelectButton)
         spacerItem = QtGui.QSpacerItem(40, 20, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
         self.horizontalLayout_2.addItem(spacerItem)
         self.cursorProbeText = QtGui.QLabel(self.centralwidget)
@@ -232,8 +235,9 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow", None))
-        self.toolButton_2.setText(_translate("MainWindow", "Pan/Zoom", None))
-        self.toolButton.setText(_translate("MainWindow", "Select", None))
+        self.panZoomToolButton.setText(_translate("MainWindow", "Pan/Zoom", None))
+        self.pointSelectButton.setText(_translate("MainWindow", "Point", None))
+        self.regionSelectButton.setText(_translate("MainWindow", "Region", None))
         self.cursorProbeText.setToolTip(_translate("MainWindow", "Value under cursor", None))
         self.cursorProbeText.setStatusTip(_translate("MainWindow", "Selected layer value under cursor", None))
         self.cursorProbeText.setText(_translate("MainWindow", "Cursor Value", None))

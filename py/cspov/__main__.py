@@ -82,6 +82,15 @@ class Main(QtGui.QMainWindow):
         pass
         # self._b_adds_files = UserAddsFileToDoc(self, self.ui.)
 
+    def change_tool(self, name="pz_camera"):
+        buttons = [self.ui.panZoomToolButton, self.ui.pointSelectButton, self.ui.regionSelectButton]
+        names = [self.scene_manager.pz_camera.name, self.scene_manager.point_probe_camera.name, self.scene_manager.polygon_probe_camera.name]
+        names = dict((name,value) for (value,name) in enumerate(names))
+        dex = names[name]
+        for q,b in enumerate(buttons):
+            b.setDown(dex==q)
+        self.scene_manager.change_camera(dex)
+
     def update_progress_bar(self, status_info, *args, **kwargs):
         active = status_info[0]
         LOG.warning('{0!r:s}'.format(status_info))
@@ -159,6 +168,11 @@ class Main(QtGui.QMainWindow):
         # self.queue.add('test', test_task(), 'test000')
         # self.ui.layers
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
+
+        self.ui.panZoomToolButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.pz_camera.name))
+        self.ui.pointSelectButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.point_probe_camera.name))
+        self.ui.regionSelectButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.polygon_probe_camera.name))
+        self.change_tool()
 
     def setup_key_releases(self):
         def cb_factory(required_key, cb):

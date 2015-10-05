@@ -18,16 +18,23 @@
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout_2">
       <item>
-       <widget class="QToolButton" name="toolButton_2">
+       <widget class="QToolButton" name="panZoomToolButton">
         <property name="text">
          <string>Pan/Zoom</string>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QToolButton" name="toolButton">
+       <widget class="QToolButton" name="pointSelectButton">
         <property name="text">
-         <string>Select</string>
+         <string>Point</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="regionSelectButton">
+        <property name="text">
+         <string>Region</string>
         </property>
        </widget>
       </item>
