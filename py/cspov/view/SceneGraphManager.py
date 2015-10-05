@@ -205,7 +205,18 @@ class LayerSet(object):
         :return:
         """
         lfo = len(self._frame_order)
-        frame = frame_number if isinstance(frame_number, int) else (self._frame_number + 1) % lfo
+        frame = self._frame_number
+        if frame_number is None:
+            frame = self._frame_number + 1
+        elif isinstance(frame_number, int):
+            if frame_number==-1:
+                frame = self._frame_number + (lfo - 1)
+            else:
+                frame = frame_number
+        if lfo>0:
+            frame %= lfo
+        else:
+            frame = 0
         self._set_visible_child(frame)
         self._frame_number = frame
         self.parent.update()
