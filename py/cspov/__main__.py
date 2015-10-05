@@ -115,6 +115,9 @@ class Main(QtGui.QMainWindow):
 
         self.scene_manager.didChangeFrame.connect(self.update_frame_slider)
         self.ui.animPlayPause.clicked.connect(self.scene_manager.layer_set.toggle_animation)
+        self.ui.animForward.clicked.connect(self.scene_manager.layer_set.next_frame)
+        last_frame = partial(self.scene_manager.layer_set.next_frame, frame_number=-1)
+        self.ui.animBack.clicked.connect(last_frame)
         # TODO: connect animation slider to frame number
         # TODO: connect step forward and step back buttons to frame number (.next_frame)
 
