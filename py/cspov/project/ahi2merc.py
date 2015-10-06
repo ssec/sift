@@ -61,7 +61,7 @@ def main():
         opath = os.path.dirname(geos_file)
         if not os.path.exists(opath):
             LOG.info("Creating output directory: %s", opath)
-            os.makedirs(opath)
+            os.makedirs(opath, exist_ok=True)
         ahi2gtiff(nc_file, geos_file)
 
         # Get information about the geotiff
@@ -82,7 +82,7 @@ def main():
         # Run gdalwarp
         LOG.info("Running gdalwarp on '%s' to create '%s'", geos_file, merc_file)
         gdalwarp_args = args.gdalwarp_args + [
-            "-multi",
+            #"-multi",
             "-t_srs", DEFAULT_PROJ_STR,
             "-tr", str(cw), str(ch),
             "-te_srs", "+proj=latlong +datum=WGS84 +ellps=WGS84",
