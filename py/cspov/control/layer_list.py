@@ -37,7 +37,7 @@ import os, sys
 import logging, unittest, argparse
 import weakref
 from PyQt4.QtCore import QAbstractListModel, QAbstractTableModel, QVariant, Qt, QSize, QModelIndex, QPoint
-from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView, QMenu
+from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyleOptionViewItem
 
 LOG = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     see QAbstractItemView.setItemDelegateForRow/Column
     """
 
-    def sizeHint(self, QStyleOptionViewItem, QModelIndex):
+    def sizeHint(self, option:QStyleOptionViewItem, index:QModelIndex):
         return QSize(100,36)
 
     # def paint(self, painter, option, index):

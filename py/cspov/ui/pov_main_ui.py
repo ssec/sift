@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created: Mon Oct  5 10:40:46 2015
+# Created: Mon Oct  5 14:45:41 2015
 #      by: PyQt4 UI code generator 4.11.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -140,6 +140,8 @@ class Ui_MainWindow(object):
         self.menubar = QtGui.QMenuBar(MainWindow)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 1321, 22))
         self.menubar.setObjectName(_fromUtf8("menubar"))
+        self.menu_File = QtGui.QMenu(self.menubar)
+        self.menu_File.setObjectName(_fromUtf8("menu_File"))
         MainWindow.setMenuBar(self.menubar)
         self.statusbar = QtGui.QStatusBar(MainWindow)
         self.statusbar.setObjectName(_fromUtf8("statusbar"))
@@ -227,6 +229,10 @@ class Ui_MainWindow(object):
         self.verticalLayout_9.addLayout(self.verticalLayout_8)
         self.layerConfigPane.setWidget(self.dockWidgetContents)
         MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.layerConfigPane)
+        self.action_Open = QtGui.QAction(MainWindow)
+        self.action_Open.setObjectName(_fromUtf8("action_Open"))
+        self.menu_File.addAction(self.action_Open)
+        self.menubar.addAction(self.menu_File.menuAction())
 
         self.retranslateUi(MainWindow)
         self.mainWidgets.setCurrentIndex(0)
@@ -256,6 +262,7 @@ class Ui_MainWindow(object):
         self.animPlayPause.setText(_translate("MainWindow", "▶", None))
         self.animForward.setStatusTip(_translate("MainWindow", "Step forward", None))
         self.animForward.setText(_translate("MainWindow", "▶|", None))
+        self.menu_File.setTitle(_translate("MainWindow", "&File", None))
         self.probeAPane.setWindowTitle(_translate("MainWindow", "A Probe", None))
         self.probeBPane.setWindowTitle(_translate("MainWindow", "B Probe", None))
         self.layersPane.setWindowTitle(_translate("MainWindow", "Layers", None))
@@ -274,4 +281,5 @@ class Ui_MainWindow(object):
         self.layerConfigPane.setWindowTitle(_translate("MainWindow", "Layer Details", None))
         self.layerNameEdit.setText(_translate("MainWindow", "Layer Name", None))
         self.colorBarButton.setText(_translate("MainWindow", "ColorBar", None))
+        self.action_Open.setText(_translate("MainWindow", "&Open", None))
 
