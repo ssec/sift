@@ -19,125 +19,13 @@ import numpy as np
 
 LOG = logging.getLogger(__name__)
 GTIFF_DRIVER = gdal.GetDriverByName("GTIFF")
-DEFAULT_PROJ_STR = "+proj=merc +datum=WGS84 +ellps=WGS84 +no_defs"
 
 
 AHI_NADIR_RES = {
     5500: 2000,
+    11000: 1000,
+    22000: 500,
 }
-
-
-### Scaling Functions Copied from Polar2Grid ###
-
-def linear_flexible_scale(img, min_out, max_out, min_in=None, max_in=None, flip=False, **kwargs):
-    """Flexible linear scaling by specifying what you want output, not the parameters of the linear equation.
-
-    This scaling function stops humans from doing math...let the computers do it.
-
-    - If you aren't sure what the valid limits of your data are, only specify
-        the min and max output values. The input minimum and maximum will be
-        computed. Note that this could add a considerable amount of time to
-        the calculation.
-    - If you know the limits, specify the output and input ranges.
-    - If the data needs to be clipped to the output range, specify 1 or 0 for
-        the "clip" keyword. Note that most backends will do this to fit the
-        data type of the output format.
-    """
-    LOG.debug("Running 'linear_flexible_scale' with (min_out: %f, max_out: %f)..." % (min_out, max_out))
-
-    # Assume masked arrays for ahi2gtiff.py:
-    min_in = img.min() if min_in is None else min_in
-    max_in = img.max() if max_in is None else max_in
-    if min_in == max_in:
-        # Data doesn't differ...at all
-        LOG.warning("Data does not differ (min/max are the same), can not scale properly")
-        max_in = min_in + 1.0
-    LOG.debug("Input minimum: %f, Input maximum: %f" % (min_in, max_in))
-
-    if flip:
-        m = (min_out - max_out) / (max_in - min_in)
-        b = max_out - m * min_in
-    else:
-        m = (max_out - min_out) / (max_in - min_in)
-        b = min_out - m * min_in
-    LOG.debug("Linear parameters: m=%f, b=%f", m, b)
-
-    if m != 1:
-        np.multiply(img, m, img)
-    if b != 0:
-        np.add(img, b, img)
-
-    return img
-
-
-def sqrt_scale(img, min_out, max_out, inner_mult=None, outer_mult=None, min_in=0.0, max_in=1.0, **kwargs):
-    """Square root enhancement
-
-    Note that any values below zero are clipped to zero before calculations.
-
-    Default behavior (for regular 8-bit scaling):
-        new_data = sqrt(data * 100.0) * 25.5
-    """
-    LOG.debug("Running 'sqrt_scale'...")
-    if min_out != 0 and min_in != 0:
-        raise RuntimeError("'sqrt_scale' does not support a `min_out` or `min_in` not equal to 0")
-    inner_mult = inner_mult if inner_mult is not None else (100.0 / max_in)
-    outer_mult = outer_mult if outer_mult is not None else max_out / np.sqrt(inner_mult * max_in)
-    LOG.debug("Sqrt scaling using 'inner_mult'=%f and 'outer_mult'=%f", inner_mult, outer_mult)
-    img[img < 0] = 0  # because < 0 cant be sqrted
-
-    if inner_mult != 1:
-        np.multiply(img, inner_mult, img)
-
-    np.sqrt(img, out=img)
-
-    if outer_mult != 1:
-        np.multiply(img, outer_mult, img)
-
-    np.round(img, out=img)
-
-    return img
-
-def brightness_temperature_scale(img, threshold, min_in, max_in, min_out, max_out,
-                                 threshold_out=None, units="kelvin", **kwargs):
-    """Brightness temperature scaling is a piecewise function with two linear sub-functions.
-
-    Temperatures less than `threshold` are scaled linearly from `threshold_out` to `max_out`. Temperatures greater than
-    or equal to `threshold` are scaled linearly from `min_out` to `threshold_out`.
-
-    In previous versions, this function took the now calculated linear parameters, ``m`` and ``b`` for
-    each sub-function. For historical documentation here is how these were converted to the current method:
-
-        equation 1: middle_file_value = low_max - (low_mult * threshold)
-        equation 2: max_out = low_max - (low_mult * min_temp)
-        equation #1 - #2: threshold_out - max_out = low_mult * threshold + low_mult * min_temp = low_mult (threshold + min_temp) => low_mult = (threshold_out - max_out) / (min_temp - threshold)
-        equation 3: middle_file_value = high_max - (high_mult * threshold)
-        equation 4: min_out = high_max - (high_mult * max_temp)
-        equation #3 - #4: (middle_file_value - min_out) = high_mult * (max_in - threshold)
-
-    :param units: If 'celsius', convert 'in' parameters from kelvin to degrees celsius before performing calculations.
-
-    """
-    LOG.debug("Running 'bt_scale'...")
-    if units == "celsius":
-        min_in -= 273.15
-        max_in -= 273.15
-        threshold -= 273.15
-    threshold_out = threshold_out if threshold_out is not None else (176 / 255.0) * max_out
-    low_factor = (threshold_out - max_out) / (min_in - threshold)
-    low_offset = max_out + (low_factor * min_in)
-    high_factor = (threshold_out - min_out) / (max_in - threshold)
-    high_offset = min_out + (high_factor * max_in)
-    LOG.debug("BT scale: threshold_out=%f; low_factor=%f; low_offset=%f; high_factor=%f; high_offset=%f",
-              threshold_out, low_factor, low_offset, high_factor, high_offset)
-
-    high_idx = img >= threshold
-    low_idx = img < threshold
-    img[high_idx] = high_offset - (high_factor * img[high_idx])
-    img[low_idx] = low_offset - (low_factor * img[low_idx])
-    return img
-
-### End of Scaling Copy ###
 
 
 def _proj4_to_srs(proj4_str):
@@ -235,27 +123,9 @@ def create_geotiff(data, output_filename, proj4_str, geotransform, etype=gdal.GD
 
         # Garbage collection/destructor should close the file properly
 
-
-def main():
-    from argparse import ArgumentParser
-    parser = ArgumentParser(description="Convert AHI NetCDF files to Geotiff images")
-    parser.add_argument("input_filename",
-                        help="Input AHI NetCDF file")
-    parser.add_argument("-o", "--output", dest="output_filename", default=None,
-                        help="Output geotiff filename")
-    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG (default INFO)')
-    args = parser.parse_args()
-
-    levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
-    logging.basicConfig(level=levels[min(3, args.verbosity)])
-
-    if args.output_filename is None:
-        stem = os.path.splitext(args.input_filename)[0]
-        args.output_filename = stem + ".tif"
-
-    LOG.debug("Opening input netcdf4 file: %s", args.input_filename)
-    nc = Dataset(args.input_filename, "r")
+def ahi2gtiff(input_filename, output_filename):
+    LOG.debug("Opening input netcdf4 file: %s", input_filename)
+    nc = Dataset(input_filename, "r")
 
     if "albedo" in nc.variables:
         input_data = nc.variables["albedo"][:]
@@ -313,7 +183,28 @@ def main():
     # gcps = [(center_lon, center_lat, center_x_idx, center_y_idx),]
 
     etype = gdal.GDT_Byte if input_data.dtype == np.uint8 else gdal.GDT_Float32
-    create_geotiff(input_data, args.output_filename, input_proj_str, geotransform, etype=etype)
+    create_geotiff(input_data, output_filename, input_proj_str, geotransform, etype=etype)
+
+
+def main():
+    from argparse import ArgumentParser
+    parser = ArgumentParser(description="Convert AHI NetCDF files to Geotiff images")
+    parser.add_argument("input_filename",
+                        help="Input AHI NetCDF file")
+    parser.add_argument("-o", "--output", dest="output_filename", default=None,
+                        help="Output geotiff filename")
+    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
+                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG (default INFO)')
+    args = parser.parse_args()
+
+    levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
+    logging.basicConfig(level=levels[min(3, args.verbosity)])
+
+    if args.output_filename is None:
+        stem = os.path.splitext(args.input_filename)[0]
+        args.output_filename = stem + ".tif"
+
+    ahi2gtiff(args.input_filename, args.output_filename)
 
 if __name__ == "__main__":
     sys.exit(main())
