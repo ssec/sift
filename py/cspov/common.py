@@ -20,6 +20,7 @@ numba
 """
 from collections import namedtuple
 import numpy as np
+from enum import Enum
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -70,6 +71,15 @@ vue = namedtuple('vue', ('b', 'l', 't', 'r', 'dy', 'dx'))  # combination of box 
 
 WORLD_EXTENT_BOX = box(b=-MAX_EXCURSION_Y, l=-MAX_EXCURSION_X, t=MAX_EXCURSION_Y, r=MAX_EXCURSION_X)
 
+
+class kind(Enum):
+    """kind of entities we're working with
+    """
+    UNKNOWN = 0
+    IMAGE = 1
+    OUTLINE = 2
+    SHAPE = 3
+    COMBINATION = 4
 
 
 

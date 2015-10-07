@@ -401,12 +401,13 @@ class SceneGraphManager(QObject):
             pass  # FIXME: other events? remove?
 
     def set_document(self, document):
-        document.docDidChangeLayerOrder.connect(self.rebuild_new_order)
-        document.docDidChangeLayer.connect(self.rebuild_layer_changed)
+        document.didChangeLayerOrder.connect(self.rebuild_new_order)
+        document.didChangeLayer.connect(self.rebuild_layer_changed)
 
     def rebuild_new_order(self, new_layer_index_order, *args, **kwargs):
         """
-        layer order has changed; shift layers around
+        layer order has changed; shift layers around.
+        an empty list is sent if the whole layer order has been changed
         :param change:
         :return:
         """

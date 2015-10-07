@@ -183,7 +183,7 @@ class Main(QtGui.QMainWindow):
         # self.queue.add('test', test_task(), 'test000')
         # self.ui.layers
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
-        self.document.docDidChangeEnhancement.connect(self.change_layer_colormap)
+        self.document.didChangeColormap.connect(self.change_layer_colormap)
 
         self.ui.action_Open.triggered.connect(self.openAction)
 

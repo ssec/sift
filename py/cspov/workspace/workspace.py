@@ -29,6 +29,7 @@ import gdal, osr
 import numpy as np
 from collections import namedtuple
 from uuid import UUID, uuid1 as uuidgen
+from cspov.common import kind
 from PyQt4.QtCore import QObject, pyqtSignal
 
 LOG = logging.getLogger(__name__)
@@ -94,6 +95,7 @@ class GeoTiffImporter(WorkspaceImporter):
 
         ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
         d["uuid"] = dest_uuid
+        d["kind"] = kind.IMAGE
         d["origin_x"] = ox
         d["origin_y"] = oy
         d["cell_width"] = cw
