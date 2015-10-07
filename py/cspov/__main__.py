@@ -155,12 +155,12 @@ class Main(QtGui.QMainWindow):
 
         def update_probe_point(uuid, xy_pos):
             data_point = self.workspace.get_content_point(uuid, xy_pos)
-            self.ui.cursorProbeText.setText("Point Probe: {:.03f}".format(data_point))
+            self.ui.cursorProbeText.setText("Point Probe: {:.03f}".format(float(data_point)))
         self.scene_manager.newProbePoint.connect(update_probe_point)
         def update_probe_polygon(uuid, points):
             data_polygon = self.workspace.get_content_polygon(uuid, points)
             avg = data_polygon.mean()
-            self.ui.cursorProbeText.setText("Polygon Probe: {:.03f}".format(avg))
+            self.ui.cursorProbeText.setText("Polygon Probe: {:.03f}".format(float(avg)))
             self.scene_manager.on_new_polygon(points)
         self.scene_manager.newProbePolygon.connect(update_probe_polygon)
 
