@@ -128,11 +128,14 @@ class Document(QObject):
     _layer_with_uuid = None  # dict(uuid:datasetinfo)
 
     # signals
-    didChangeLayer = pyqtSignal(dict)  # add/remove/alter
+    didChangeLayer = pyqtSignal(dict)  # 'change' key is add/remove/visible
     didChangeLayerOrder = pyqtSignal(list)  # list of original indices in their new order, None for new layers
+    didChangeLayerVisibility = pyqtSignal(list)  # list of (uuid,visible) tuples in layer order
+
+    didSwitchLayerSet = pyqtSignal(int)  # new layerset number, typically 0..3
+
     didChangeColormap = pyqtSignal(dict)  # includes colormaps
     # didChangeShapeLayer = pyqtSignal(dict)
-    didSwitchLayerSet = pyqtSignal(int)  # new layerset order information
 
     def __init__(self, workspace, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
         super(Document, self).__init__(**kwargs)
@@ -255,9 +258,12 @@ class Document(QObject):
         L[dex] = nu
         self.didChangeLayer.emit({
             'change': 'visible',
+            'visible': visible,
             'uuid': nu.uuid,
             'order': dex
         })
+        lvl = [(x.uuid, x.visibility) for x in self.current_layer_set]
+        self.didChangeLayerVisibility.emit(lvl)
 
     def is_layer_visible(self, dex):
         return self.current_layer_set[dex].visible
@@ -270,13 +276,13 @@ class Document(QObject):
         if uuids is not None:
             # LOG.error('layer selection not implemented in change_colormap_for_layers')
             for uuid in uuids:
-                nfo = {'uuid': uuid, 'colormap': name}
+                nfo = {'uuid': uuid, 'colormap': name, 'change': 'colormap'}
                 self.didChangeColormap.emit(nfo)
         else:  # all data layers
             uuids = []
             for dex in range(len(self.current_layer_set)):
                 uuid = self.current_layer_set[dex].uuid
-                nfo = {'uuid': uuid, 'colormap': name}
+                nfo = {'uuid': uuid, 'colormap': name, 'change': 'colormap'}
                 uuids.append(uuid)
                 self.didChangeColormap.emit(nfo)
         for uuid in uuids:
