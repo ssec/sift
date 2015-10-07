@@ -10,8 +10,41 @@ The core is sometimes accessed via Facets, which are like database views for a s
 
 The document model is a metadata representation which permits the workspace to be constructed and managed.
 
+Document is primarily a composition of layers.
+Layers come in several flavors:
+- Image : a float32 field shown as tiles containing strides and/or alternate LODs, having a colormap
+- Outline : typically a geographic political map
+- Region : a highlighted region selected by the user: point, line (great circle), polygon
+- Combination : calculated from two or more image layers, e.g. RGBA combination of images
+                combinations may be limited to areas specified by region layers.
+=== advanced stuff for later ===
+- Volume : a 3D dataset, potentially sparse
+-- DenseVolume
+-- SparseVolume : (x,y,z) point cloud
 
-REFERENCES
+Layers are represented in 1 or more LayerSets, which are alternate configurations of the display.
+Users may wish to display the same data in several different ways for illustration purposes.
+Only one LayerSet is used on a given Map window at a time.
+
+Layers have traits that vary with LayerSet:
+- z_order: bottom to top in the map display
+- visible: whether or not it's being drawn on the map
+- a_order: animation order, when the animation button is hit
+- colormap: how the data is converted to pixels
+
+Document has zero or more Probes.
+Layers also come in multiple flavors that may be be attached to plugins or helper applications.
+- Scatter: (layerA, layerB, region) -> xy plot
+- Slice: (volume, line) -> curtain plot
+- Profile: (volume, point) -> profile plot
+
+The document does not own data (content). It only owns metadata (info).
+At most, document holds coarse overview data content for preview purposes.
+
+Layers have a UUID that is their identity throughout their lifecycle, and is often used as shorthand
+between subsystems. Document rarely deals directly with content.
+
+
 
 
 REQUIRES
