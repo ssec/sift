@@ -262,7 +262,7 @@ class Document(QObject):
             'uuid': nu.uuid,
             'order': dex
         })
-        lvl = [(x.uuid, x.visibility) for x in self.current_layer_set]
+        lvl = [(x.uuid, x.visible) for x in self.current_layer_set]
         self.didChangeLayerVisibility.emit(lvl)
 
     def is_layer_visible(self, dex):

@@ -301,6 +301,11 @@ class LayerStackListViewModel(QAbstractListModel):
                 return True
             else:
                 LOG.debug("data type is {0!r:s}".format(type(data)))
+        elif role == Qt.CheckStateRole:
+            newvalue = True if data==Qt.Checked else False
+            LOG.debug('toggle layer visibility for row {} to {}'.format(index.row(), newvalue))
+            self.doc.toggle_layer_visibility(index.row(), newvalue)
+            return True
         elif role==Qt.ItemDataRole:
             LOG.warning('attempting to change layer')
             # self.doc.replace_layer()
