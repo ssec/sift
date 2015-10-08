@@ -313,6 +313,27 @@ class Document(QObject):
         # nfo = self._layer_with_uuid[uuid]
         # return nfo
 
+    def insert_layer_prez(self, row, layer_prez_seq):
+        cls = self.current_layer_set
+        clo = list(range(len(cls)))
+        lps = list(layer_prez_seq)
+        lps.reverse()
+        if not lps:
+            LOG.warning('attempt to drop empty content')
+            return
+        for p in lps:
+            if not isinstance(p, prez):
+                LOG.error('attempt to drop a new layer with the wrong type: {0!r:s}'.format(p))
+                continue
+            cls.insert(row, p)
+            clo.insert(row, None)
+        self.didChangeLayerOrder.emit(clo)
+
+    def remove_layer_prez(self, row, count=1):
+        clo = list(range(len(self.current_layer_set)))
+        del clo[row:row+count]
+        del self.current_layer_set[row:row+count]
+        self.didChangeLayerOrder.emit(clo)
 
 
 

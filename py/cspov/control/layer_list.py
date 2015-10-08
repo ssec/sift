@@ -36,7 +36,9 @@ __docformat__ = 'reStructuredText'
 import os, sys
 import logging, unittest, argparse
 import weakref
-from PyQt4.QtCore import QAbstractListModel, QAbstractTableModel, QVariant, Qt, QSize, QModelIndex, QPoint
+import pickle as pkl
+import base64
+from PyQt4.QtCore import QAbstractListModel, QAbstractTableModel, QVariant, Qt, QSize, QModelIndex, QPoint, QMimeData
 from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyleOptionViewItem
 
 LOG = logging.getLogger(__name__)
@@ -162,9 +164,10 @@ class LayerStackListViewModel(QAbstractListModel):
         listbox.setDropIndicatorShown(True)
         listbox.setDragDropOverwriteMode(False)
         listbox.setAcceptDrops(True)
-        listbox.setDragDropMode(QAbstractItemView.InternalMove)
+        # listbox.setDragDropMode(QAbstractItemView.DragDrop)
+        listbox.setDragDropMode(QAbstractItemView.InternalMove)  # later: accept mimedata
         listbox.setDragEnabled(True)
-        listbox.setSelectionMode(QListView.MultiSelection)  # alternate SingleSelection
+        listbox.setSelectionMode(QListView.SingleSelection)  # alternate MultiSelection
         listbox.setContextMenuPolicy(Qt.CustomContextMenu)
         listbox.customContextMenuRequested.connect(self.menu)
         self.widgets.append(listbox)
@@ -229,10 +232,33 @@ class LayerStackListViewModel(QAbstractListModel):
     def listing(self):
         return [self.doc.get_info(dex) for dex in range(len(self.doc))]
 
-    # def mimeData(self, list_of_QModelIndex):
-    #     l = []
-    #     for index in list_of_QModelIndex:
-    #         l.append(self.doc.uuid_for_layer(index.row()))
+    def dropMimeData(self, mime:QMimeData, action, row:int, column:int, parent:QModelIndex):
+        LOG.debug('dropMimeData at row {}'.format(row))
+        if action == Qt.IgnoreAction:
+            return True
+        if mime.hasText():
+            # unpickle the presentation information and re-insert it
+            b = base64.decodebytes(mime.text())
+            l = pkl.loads(b)
+            LOG.debug('dropped: {0!r:s}'.format(l))
+            count = len(l)
+            if row == -1:
+                row = len(self.doc)  # append
+            self.beginInsertRows(parent, row, row+count-1)
+            self.doc.insert_layer_prez(row, *l)
+            self.endInsertRows()
+        return True
+
+    def mimeData(self, list_of_QModelIndex):
+        l = []
+        for index in list_of_QModelIndex:
+            l.append(self.doc[index.row()])
+        p = pkl.dumps(l, pkl.HIGHEST_PROTOCOL)
+        mime = QMimeData()
+        t = base64.encodebytes(p).decode('ascii')
+        LOG.debug('mimetext for drag is "{}"'.format(t))
+        mime.setText(t)
+        return mime
 
     def flags(self, index):
         flags = super(LayerStackListViewModel, self).flags(index)
@@ -269,18 +295,50 @@ class LayerStackListViewModel(QAbstractListModel):
         return Qt.MoveAction
 
     def insertRows(self, row, count, parent=QModelIndex()):
-        self.beginInsertRows(QModelIndex(), row, row+count)
+        self.beginInsertRows(QModelIndex(), row, row+count-1)
         LOG.debug(">>>> INSERT {} rows".format(count))
         # TODO: insert 'count' rows into document
         self.endInsertRows()
         return True
 
     def removeRows(self, row, count, QModelIndex_parent=None, *args, **kwargs):
-        self.beginRemoveRows(QModelIndex(), row, row+count)
+        self.beginRemoveRows(QModelIndex(), row, row+count-1)
         # TODO: remove layers from document
         LOG.debug(">>>> REMOVE {} rows".format(count))
+        self.doc.remove_layer_prez(row, count)
         self.endRemoveRows()
         return True
+
+    # def dragEnterEvent(self, event):
+    #     if event.mimeData().hasUrls:
+    #         event.accept()
+    #
+    #     else:
+    #         event.ignore()
+    #
+    # def dragMoveEvent(self, event):
+    #     if event.mimeData().hasUrls:
+    #         event.setDropAction(QtCore.Qt.CopyAction)
+    #         event.accept()
+    #
+    #     else:
+    #         event.ignore()
+    #
+    # def dropEvent(self, event):
+    #     if event.mimeData().hasUrls:
+    #         event.setDropAction(QtCore.Qt.CopyAction)
+    #         event.accept()
+    #
+    #         filePaths = [
+    #             str(url.toLocalFile())
+    #             for url in event.mimeData().urls()
+    #         ]
+    #
+    #         self.dropped.emit(filePaths)
+    #
+    #     else:
+    #         event.ignore()
+
 
     def layer_clicked(self, qindex):
         pass
