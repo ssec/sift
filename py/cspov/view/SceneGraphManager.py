@@ -96,7 +96,7 @@ class PendingPolygon(object):
             return True
         self.canvas_points.append(canvas_pos)
         self.points.append(xy_pos)
-        point_visual = FakeMarker(parent=self.parent, symbol="disc", pos=np.array([xy_pos[:2]]))
+        point_visual = FakeMarker(parent=self.parent, symbol="disc", pos=np.array([xy_pos[:2]]), color=np.array([0., 0.5, 0.5, 1.]))
         self.markers.append(point_visual)
         return False
 
