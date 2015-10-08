@@ -55,6 +55,35 @@ class LayerWidgetDelegate(QStyledItemDelegate):
         return QSize(100,36)
 
     # def paint(self, painter, option, index):
+    #
+    #     painter.save()
+    #
+    #     painter.setPen(QtGui.QPen(QtCore.Qt.NoPen))
+    #
+    #     if option.state & QtGui.QStyle.State_Selected:
+    #         brush = QtGui.QBrush(QtGui.QColor("#66ff71"))
+    #         painter.setBrush(brush)
+    #
+    #     else:
+    #         brush = QtGui.QBrush(QtCore.Qt.white)
+    #         painter.setBrush(brush)
+    #
+    #     painter.drawRect(option.rect)
+    #
+    #     painter.setPen(QtGui.QPen(QtCore.Qt.blue))
+    #     value = index.data(QtCore.Qt.DisplayRole)
+    #
+    #     if value.isValid():
+    #
+    #         text = value.toString()
+    #         align = QtCore.Qt.AlignCenter
+    #         painter.drawText(option.rect, align, text)
+    #
+    #     #QtGui.QStyledItemDelegate.paint(self, painter, option, index)
+    #     painter.restore()
+
+
+    # def paint(self, painter, option, index):
     #     '''
     #     Paint a checkbox without the label.
     #     from http://stackoverflow.com/questions/17748546/pyqt-column-of-checkboxes-in-a-qtableview
@@ -215,17 +244,13 @@ class LayerStackListViewModel(QAbstractListModel):
             return None
         row = index.row()
         # col = index.column()
-        if role==Qt.ItemDataRole:
-            return self.doc[index.row()] if index.row()<len(self.doc) else None
-        elif role!=Qt.DisplayRole:
-            return None
-        # return "test"
         el = self.listing
-        LOG.debug('row {} is {}'.format(row, el[row]))
-        if role==Qt.CheckStateRole:
-            check =  Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
+        if role == Qt.ItemDataRole:
+            return self.doc[index.row()] if index.row()<len(self.doc) else None
+        elif role == Qt.CheckStateRole:
+            check = Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
             return check
-        elif role==Qt.DisplayRole:
+        elif role == Qt.DisplayRole:
             lao = self.doc.layer_animation_order(row)
             return el[row]['name'] + ('[-]' if lao==0 else '[{}]'.format(lao))
         return None
