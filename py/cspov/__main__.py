@@ -145,22 +145,21 @@ class Main(QtGui.QMainWindow):
         self.setup_key_releases()
         self.scheduler = QtCore.QTimer(parent=self)
         self.scheduler.setInterval(200.0)
-        # self.scheduler.timeout.connect(partial(self.scene_manager.image_list._timeout_slot, self.scheduler))
         self.scheduler.timeout.connect(partial(self.scene_manager.on_view_change, self.scheduler))
         def start_wrapper(timer, event):
             """Simple wrapper around a timers start method so we can accept but ignore the event provided
             """
             timer.start()
-        self.scene_manager.main_canvas.events.draw.connect(partial(start_wrapper, self.scheduler))
+        self.scene_manager.main_canvas.transforms.changed.connect(partial(start_wrapper, self.scheduler))
 
         def update_probe_point(uuid, xy_pos):
             data_point = self.workspace.get_content_point(uuid, xy_pos)
-            self.ui.cursorProbeText.setText("Point Probe: {:.03f}".format(data_point))
+            self.ui.cursorProbeText.setText("Point Probe: {:.03f}".format(float(data_point)))
         self.scene_manager.newProbePoint.connect(update_probe_point)
         def update_probe_polygon(uuid, points):
             data_polygon = self.workspace.get_content_polygon(uuid, points)
             avg = data_polygon.mean()
-            self.ui.cursorProbeText.setText("Polygon Probe: {:.03f}".format(avg))
+            self.ui.cursorProbeText.setText("Polygon Probe: {:.03f}".format(float(avg)))
             self.scene_manager.on_new_polygon(points)
         self.scene_manager.newProbePolygon.connect(update_probe_polygon)
 
