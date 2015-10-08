@@ -259,6 +259,7 @@ class Document(QObject):
         self.didChangeLayer.emit({
             'change': 'visible',
             'visible': visible,
+            'info': self._layer_with_uuid[nu.uuid],
             'uuid': nu.uuid,
             'order': dex
         })

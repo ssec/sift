@@ -397,12 +397,20 @@ class SceneGraphManager(QObject):
             self.image_layers[uuid] = image
             self.datasets[uuid] = ds_info
             self.layer_set.add_layer(image)
-        else:
-            pass  # FIXME: other events? remove?
+
+        elif change_dict['change']=='visible':
+            ds_info = change_dict['info']
+            uuid = ds_info['uuid']
+            new_state = change_dict['visible']
+            self.set_layer_visible(uuid, new_state)
 
     def set_document(self, document):
         document.didChangeLayerOrder.connect(self.rebuild_new_order)
         document.didChangeLayer.connect(self.rebuild_layer_changed)
+
+    def set_layer_visible(self, uuid, visible=None):
+        image = self.image_layers[uuid]
+        image.visible = not image.visible if visible is None else visible
 
     def rebuild_new_order(self, new_layer_index_order, *args, **kwargs):
         """
