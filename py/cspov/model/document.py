@@ -271,6 +271,19 @@ class Document(QObject):
     def layer_animation_order(self, dex):
         return self.current_layer_set[dex].a_order
 
+    def change_layer_name(self, row, new_name):
+        uuid = self.current_layer_set[row].uuid
+        info = self.get_info(row)
+        assert(uuid==info['uuid'])
+        info['name'] = new_name
+        nfo = {
+            'change': 'name',
+            'uuid': uuid,
+            'info': info,
+            'row': row
+        }
+        self.didChangeLayer.emit(nfo)
+
     def change_colormap_for_layers(self, name, uuids=None):
         L = self.current_layer_set
         if uuids is not None:
