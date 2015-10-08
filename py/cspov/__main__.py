@@ -145,13 +145,12 @@ class Main(QtGui.QMainWindow):
         self.setup_key_releases()
         self.scheduler = QtCore.QTimer(parent=self)
         self.scheduler.setInterval(200.0)
-        # self.scheduler.timeout.connect(partial(self.scene_manager.image_list._timeout_slot, self.scheduler))
         self.scheduler.timeout.connect(partial(self.scene_manager.on_view_change, self.scheduler))
         def start_wrapper(timer, event):
             """Simple wrapper around a timers start method so we can accept but ignore the event provided
             """
             timer.start()
-        self.scene_manager.main_canvas.events.draw.connect(partial(start_wrapper, self.scheduler))
+        self.scene_manager.main_canvas.transforms.changed.connect(partial(start_wrapper, self.scheduler))
 
         def update_probe_point(uuid, xy_pos):
             data_point = self.workspace.get_content_point(uuid, xy_pos)
