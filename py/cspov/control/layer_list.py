@@ -144,6 +144,7 @@ class LayerStackListViewModel(QAbstractListModel):
         Each table view represents a different configured document layer stack "set" - user can select from at least four.
         Convey layer set information to/from the document to the respective table, including selection.
         ref: http://duganchen.ca/a-pythonic-qt-list-model-implementation/
+        http://doc.qt.io/qt-5/qabstractitemmodel.html#beginMoveRows
     """
     widgets = None
     doc = None
@@ -159,6 +160,7 @@ class LayerStackListViewModel(QAbstractListModel):
         listbox.pressed.connect(self.layer_pressed)
         listbox.setModel(self)
         listbox.setDropIndicatorShown(True)
+        listbox.setDragDropOverwriteMode(False)
         listbox.setAcceptDrops(True)
         listbox.setDragDropMode(QAbstractItemView.InternalMove)
         listbox.setDragEnabled(True)
@@ -225,7 +227,12 @@ class LayerStackListViewModel(QAbstractListModel):
 
     @property
     def listing(self):
-        return [self.doc[dex] for dex in range(len(self.doc))]
+        return [self.doc.get_info(dex) for dex in range(len(self.doc))]
+
+    # def mimeData(self, list_of_QModelIndex):
+    #     l = []
+    #     for index in list_of_QModelIndex:
+    #         l.append(self.doc.uuid_for_layer(index.row()))
 
     def flags(self, index):
         flags = super(LayerStackListViewModel, self).flags(index)
@@ -246,7 +253,7 @@ class LayerStackListViewModel(QAbstractListModel):
         # col = index.column()
         el = self.listing
         if role == Qt.ItemDataRole:
-            return self.doc[index.row()] if index.row()<len(self.doc) else None
+            return self.doc.get_info(index.row()) if index.row()<len(self.doc) else None
         elif role == Qt.CheckStateRole:
             check = Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
             return check
@@ -255,14 +262,15 @@ class LayerStackListViewModel(QAbstractListModel):
             return el[row]['name'] + ('[-]' if lao==0 else '[{}]'.format(lao))
         return None
 
-    # def supportedDragActions(self):
-    #     return Qt.MoveAction
+    def supportedDragActions(self):
+        return Qt.MoveAction
 
     def supportedDropActions(self):
         return Qt.MoveAction
 
     def insertRows(self, row, count, parent=QModelIndex()):
         self.beginInsertRows(QModelIndex(), row, row+count)
+        LOG.debug(">>>> INSERT {} rows".format(count))
         # TODO: insert 'count' rows into document
         self.endInsertRows()
         return True
@@ -270,6 +278,7 @@ class LayerStackListViewModel(QAbstractListModel):
     def removeRows(self, row, count, QModelIndex_parent=None, *args, **kwargs):
         self.beginRemoveRows(QModelIndex(), row, row+count)
         # TODO: remove layers from document
+        LOG.debug(">>>> REMOVE {} rows".format(count))
         self.endRemoveRows()
         return True
 

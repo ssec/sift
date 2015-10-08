@@ -297,13 +297,21 @@ class Document(QObject):
         uuid = self.current_layer_set[dex].uuid
         return uuid
 
+    def get_info(self, dex=None):
+        if dex is not None:
+            uuid = self.current_layer_set[dex].uuid
+            nfo = self._layer_with_uuid[uuid]
+            return nfo
+        return None
+
     def __getitem__(self, dex):
         """
-        return prez for a given layer index
+        return info for a given layer index
         """
-        uuid = self.current_layer_set[dex].uuid
-        nfo = self._layer_with_uuid[uuid]
-        return nfo
+        return self.current_layer_set[dex]
+        # uuid = self.current_layer_set[dex].uuid
+        # nfo = self._layer_with_uuid[uuid]
+        # return nfo
 
 
 
