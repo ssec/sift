@@ -20,6 +20,7 @@ numba
 """
 from collections import namedtuple
 import numpy as np
+from enum import Enum
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -70,6 +71,15 @@ vue = namedtuple('vue', ('b', 'l', 't', 'r', 'dy', 'dx'))  # combination of box 
 
 WORLD_EXTENT_BOX = box(b=-MAX_EXCURSION_Y, l=-MAX_EXCURSION_X, t=MAX_EXCURSION_Y, r=MAX_EXCURSION_X)
 
+
+class kind(Enum):
+    """kind of entities we're working with
+    """
+    UNKNOWN = 0
+    IMAGE = 1
+    OUTLINE = 2
+    SHAPE = 3
+    COMBINATION = 4
 
 
 
@@ -130,10 +140,6 @@ class MercatorTileCalc(object):
             l=self.ul_origin[1],
             r=self.ul_origin[1] + self.image_shape[1] * self.pixel_rez.dx,
         )
-
-        # FIXME: for now, require image size to be a multiple of tile size, else we have to deal with partial tiles!
-        assert(self.image_shape[0] % tile_shape[0] == 0)
-        assert(self.image_shape[1] % tile_shape[1] == 0)
 
     @jit
     def visible_tiles(self, visible_geom, stride=1, extra_tiles_box=box(0,0,0,0)):

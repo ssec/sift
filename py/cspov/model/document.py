@@ -10,13 +10,42 @@ The core is sometimes accessed via Facets, which are like database views for a s
 
 The document model is a metadata representation which permits the workspace to be constructed and managed.
 
+Document is primarily a composition of layers.
+Layers come in several flavors:
+- Image : a float32 field shown as tiles containing strides and/or alternate LODs, having a colormap
+- Outline : typically a geographic political map
+- Shape : a highlighted region selected by the user: point, line (great circle), polygon
+- Combination : calculated from two or more image layers, e.g. RGBA combination of images
+                combinations may be limited to areas specified by region layers.
+=== advanced stuff for later ===
+- Volume : a 3D dataset, potentially sparse
+-- DenseVolume
+-- SparseVolume : (x,y,z) point cloud
 
-REFERENCES
+Layers are represented in 1 or more LayerSets, which are alternate configurations of the display.
+Users may wish to display the same data in several different ways for illustration purposes.
+Only one LayerSet is used on a given Map window at a time.
 
+Layers have presentation settings that vary with LayerSet:
+- z_order: bottom to top in the map display
+- visible: whether or not it's being drawn on the map
+- a_order: animation order, when the animation button is hit
+- colormap: how the data is converted to pixels
+- mixing: mixing mode when drawing (normal, additive)
 
-REQUIRES
-sqlite
-sqlalchemy
+Document has zero or more Probes.
+Layers also come in multiple flavors that may be be attached to plugins or helper applications.
+- Scatter: (layerA, layerB, region) -> xy plot
+- Slice: (volume, line) -> curtain plot
+- Profile: (volume, point) -> profile plot
+
+Document has zero or more Colormaps, determining how they're presented
+
+The document does not own data (content). It only owns metadata (info).
+At most, document holds coarse overview data content for preview purposes.
+
+All entities in the Document have a UUID that is their identity throughout their lifecycle, and is often used as shorthand
+between subsystems. Document rarely deals directly with content.
 
 
 :author: R.K.Garcia <rayg@ssec.wisc.edu>
@@ -32,6 +61,8 @@ import logging
 import unittest
 import argparse
 from collections import namedtuple
+from enum import Enum
+from cspov.common import kind
 
 from PyQt4.QtCore import QObject, pyqtSignal
 
@@ -46,14 +77,21 @@ LOG = logging.getLogger(__name__)
 
 DEFAULT_LAYER_SET_COUNT = 4  # this should match the ui configuration!
 
-# presentation information for a layer
+# presentation information for a layer; z_order comes from the layerset
 prez = namedtuple('prez', [
     'uuid',     # UUID: dataset in the document/workspace
+    'kind',     # what kind of layer it is
     'visible',  # bool: whether it's visible or not
-    'order',    # int: animation order, 1..N or None/False/0 if non-animating
-    'enhancement',  # weakref: to enhancement it's observed through
-    'siblings'  # set(UUID): of other datasets contributing to the enhancement (e.g. RGB/RGBA enhancements)
+    'a_order',  # int: None for non-animating, 0..n-1 what order to draw in during animation
+    'colormap', # name or uuid: color map to use; name for default, uuid for user-specified
+    'mixing'    # mixing mode constant
 ])
+
+class mixing(Enum):
+    UNKNOWN = 0
+    NORMAL = 1
+    ADD = 2
+    SUBTRACT = 3
 
 
 # class LayerSet(object):
@@ -87,34 +125,38 @@ class Document(QObject):
     current_set_index = 0
     _workspace = None
     _layer_sets = None  # list(list(prez) or None)
-    _available = None  # dict(uuid:datasetinfo)
+    _layer_with_uuid = None  # dict(uuid:datasetinfo)
 
     # signals
-    docDidChangeLayer = pyqtSignal(dict)  # add/remove/alter
-    docDidChangeLayerOrder = pyqtSignal(list)  # list of original indices in their new order, None for new layers
-    docDidChangeEnhancement = pyqtSignal(dict)  # includes colormaps
-    docDidChangeShape = pyqtSignal(dict)
+    didChangeLayer = pyqtSignal(dict)  # 'change' key is add/remove/visible
+    didChangeLayerOrder = pyqtSignal(list)  # list of original indices in their new order, None for new layers
+    didChangeLayerVisibility = pyqtSignal(list)  # list of (uuid,visible) tuples in layer order
+
+    didSwitchLayerSet = pyqtSignal(int)  # new layerset number, typically 0..3
+
+    didChangeColormap = pyqtSignal(dict)  # includes colormaps
+    # didChangeShapeLayer = pyqtSignal(dict)
 
     def __init__(self, workspace, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
         super(Document, self).__init__(**kwargs)
         self._workspace = workspace
         self._layer_sets = [list()] + [None] * (layer_set_count-1)
-        self._available = {}
+        self._layer_with_uuid = {}
         # TODO: connect signals from workspace to slots including update_dataset_info
 
-    def _default_enhancement(self, datasetinfo):
+    def _default_colormap(self, datasetinfo):
         """
         consult guidebook and user preferences for which enhancement should be used for a given datasetinfo
         :param datasetinfo: dictionary of metadata about dataset
         :return: enhancement info and siblings participating in the enhancement
         """
-        return None, None
+        return None
 
     @property
     def current_layer_set(self):
         return self._layer_sets[self.current_set_index]
 
-    def open_file(self, path):
+    def open_file(self, path, insert_before=0):
         """
         open an arbitrary file and make it the new top layer.
         emits docDidChangeLayer followed by docDidChangeLayerOrder
@@ -123,27 +165,24 @@ class Document(QObject):
         """
         uuid, info, content = self._workspace.import_image(source_path=path)
 
-        self._available[uuid] = info
+        self._layer_with_uuid[uuid] = info
 
         # add as visible to the front of the current set, and invisible to the rest of the available sets
-        enhancement, siblings = self._default_enhancement(info)
+        colormap = self._default_colormap(info)
         p = prez(uuid=uuid,
+                 kind=info["kind"],
                  visible=True,
-                 order=None,
-                 enhancement=enhancement,
-                 siblings=siblings)
-        q = prez(uuid=uuid,
-                 visible=False,
-                 order=None,
-                 enhancement=enhancement,
-                 siblings=siblings)
+                 a_order=None,
+                 colormap=colormap,
+                 mixing=mixing.NORMAL)
+        q = p._replace(visible=False)
         old_layer_count = len(self._layer_sets[self.current_set_index])
         for dex,lset in enumerate(self._layer_sets):
             if lset is not None:  # uninitialized layer sets will be None
-                lset.insert(0, p if dex==self.current_set_index else q)
+                lset.insert(insert_before, p if dex==self.current_set_index else q)
 
         # signal updates from the document
-        self.docDidChangeLayer.emit({
+        self.didChangeLayer.emit({
             'change': 'add',
             'uuid': uuid,
             'info': info,
@@ -152,19 +191,20 @@ class Document(QObject):
         })
         # express new layer order using old layer order indices
         reordered_indices = [None] + list(range(old_layer_count))
-        self.docDidChangeLayerOrder.emit(reordered_indices)
+        self.didChangeLayerOrder.emit(reordered_indices)
         return uuid, info, content
 
     def update_dataset_info(self, new_info):
         """
         slot which updates document on new information workspace has provided us about a dataset
+        typically signaled by importer operating in the workspace
         :param new_info: information dictionary including projection, levels of detail, etc
         :return: None
         """
         uuid = new_info['uuid']
-        if uuid not in self._available:
+        if uuid not in self._layer_with_uuid:
             LOG.warning('new information on uuid {0!r:s} is not for a known dataset'.format(new_info))
-        self._available[new_info['uuid']] = new_info
+        self._layer_with_uuid[new_info['uuid']] = new_info
         # TODO: see if this affects any presentation information; view will handle redrawing on its own
 
     def _clone_layer_set(self, existing_layer_set):
@@ -183,8 +223,9 @@ class Document(QObject):
             self._layer_sets[layer_set_index] = self._clone_layer_set(self._layer_sets[self.current_set_index])
             did_clone = True
         self.current_set_index = layer_set_index
+        self.didSwitchLayerSet.emit(layer_set_index)
         if not did_clone:
-            self.docDidChangeLayerOrder.emit([])  # indicate that pretty much everything has changed
+            self.didChangeLayerOrder.emit([])  # indicate that pretty much everything has changed
 
     def change_layer_order(self, old_index, new_index):
         L = self.current_layer_set
@@ -195,14 +236,14 @@ class Document(QObject):
         del order[old_index]
         L.insert(new_index, p)
         L.insert(new_index, d)
-        self.docDidChangeLayerOrder.emit(order)
+        self.didChangeLayerOrder.emit(order)
 
     def swap_layer_order(self, first_index, second_index):
         L = self.current_layer_set
         order = list(range(len(L)))
         L[first_index], L[second_index] = L[second_index], L[first_index]
         order[first_index], order[second_index] = order[second_index], order[first_index]
-        self.docDidChangeLayerOrder.emit(order)
+        self.didChangeLayerOrder.emit(order)
 
     def toggle_layer_visibility(self, dex, visible=None):
         """
@@ -213,149 +254,56 @@ class Document(QObject):
         L = self.current_layer_set
         old = L[dex]
         visible = ~old.visible if visible is None else visible
-        nu = prez(
-            uuid=old.uuid,
-            visible=visible,
-            order=old.order,
-            enhancement=old.enhancement,
-            siblings=old.siblings
-        )
+        nu = old._replace(visible=visible)
         L[dex] = nu
-        self.docDidChangeLayer.emit({
+        self.didChangeLayer.emit({
             'change': 'visible',
+            'visible': visible,
             'uuid': nu.uuid,
             'order': dex
         })
+        lvl = [(x.uuid, x.visibility) for x in self.current_layer_set]
+        self.didChangeLayerVisibility.emit(lvl)
 
     def is_layer_visible(self, dex):
         return self.current_layer_set[dex].visible
 
     def layer_animation_order(self, dex):
-        return self.current_layer_set[dex].order
+        return self.current_layer_set[dex].a_order
 
     def change_colormap_for_layers(self, name, uuids=None):
-        # FIXME: actually record the colormap change in the document
+        L = self.current_layer_set
         if uuids is not None:
             # LOG.error('layer selection not implemented in change_colormap_for_layers')
             for uuid in uuids:
-                if uuid in self._available: # only data layers
-                    nfo = {'uuid': uuid, 'colormap': name}
-                    self.docDidChangeEnhancement.emit(nfo)
-                else:
-                    LOG.warning('skipping colormap change for {}'.format(uuid))
+                nfo = {'uuid': uuid, 'colormap': name, 'change': 'colormap'}
+                self.didChangeColormap.emit(nfo)
         else:  # all data layers
+            uuids = []
             for dex in range(len(self.current_layer_set)):
                 uuid = self.current_layer_set[dex].uuid
-                if uuid in self._available:  # data layer?
-                    nfo = {'uuid': uuid, 'colormap': name}
-                    self.docDidChangeEnhancement.emit(nfo)
-                else:
-                    LOG.warning('skipping colormap change for {}'.format(uuid))
+                nfo = {'uuid': uuid, 'colormap': name, 'change': 'colormap'}
+                uuids.append(uuid)
+                self.didChangeColormap.emit(nfo)
+        for uuid in uuids:
+            for dex,pinfo in enumerate(L):
+                if pinfo.uuid==uuid:
+                    L[dex] = pinfo._replace(colormap=name)
 
     def __len__(self):
         return len(self.current_layer_set)
 
     def uuid_for_layer(self, dex):
         uuid = self.current_layer_set[dex].uuid
+        return uuid
 
     def __getitem__(self, dex):
         """
         return prez for a given layer index
         """
         uuid = self.current_layer_set[dex].uuid
-        nfo = self._available[uuid]  # FIXME: won't work when we add non-data layers (boundary vectors, region selections)
+        nfo = self._layer_with_uuid[uuid]
         return nfo
-
-    # def asDrawingPlan(self, frame=None):
-    #     """
-    #     delegate callable yielding a sequence of LayerReps to draw
-    #     """
-    #     if frame is not None:
-    #         yield self._layer_reps[frame % len(self._layer_reps)]
-    #         return
-    #     for layer_rep in self._layer_reps:
-    #         yield layer_rep
-
-
-    # def asListing(self):
-    #     return [{'name': q.name} for q in self._layer_reps]
-
-    #
-    # def addRGBImageLayer(self, filename, range=None):
-    #     rep = TiledGeolocatedImage(filename, tile_class=GlooRGBImageTile)
-    #     self._layer_reps.append(rep)
-    #     self.docDidChangeLayer.emit({'filename': filename})
-
-
-
-    # def addFullGlobMercatorColormappedFloatImageLayer(self, filename, range=None):
-    #     rep = TiledGeolocatedImage(filename, tile_class=GlooColormapDataTile, range=range)
-    #     self._layer_reps.append(rep)
-    #     self.docDidChangeLayer.emit({'filename': filename})
-
-    # def addShapeLayer(self, filename, **kwargs):
-    #     # FIXME: Figure out what the required arguments and stuff are
-    #     rep = NEShapefileLines(filename)
-    #     self._layer_reps.append(rep)
-    #     self.docDidChangeLayer.emit({'filename': filename})
-
-#
-    def asProbeGuidance(self, **kwargs):
-        """
-        Retrieve delegate to be used by Probe objects to access and update the data selection (lasso et cetera)
-        """
-        return None
-
-#     def swap(self, adex, bdex):
-#         order = list(range(len(self)))
-#         order[bdex], order[adex] = adex, bdex
-#         new_list = [self._layerlist[dex] for dex in order]
-#         self._layerlist = new_list
-#         # self.layerStackDidChangeOrder.emit(tuple(order))
-#
-
-
-class Preferences(QObject):
-    """
-    Preferences doc. Holds many of the same resources, but not a layer stack.
-    """
-    pass
-
-
-class DocElement(QObject):
-    pass
-
-
-class Source(DocElement):
-    """
-    is effectively a URI containing data we wish to convert to a Resource and visualize
-    a helper/plugin is often used to render the source into the workspace
-    """
-
-class Dataset(DocElement):
-    """
-    is a Source rendered in such a way that the display engine can realize it rapidly.
-    """
-
-class Layer(DocElement):
-    pass
-
-
-class Shape(DocElement):
-    pass
-
-
-class Tool(DocElement):
-    pass
-
-
-class Transform(DocElement):
-    """
-    Metadata describing a transform of multiple Resources to a virtual Resource
-    """
-
-class ColorMap(Transform):
-    pass
 
 
 

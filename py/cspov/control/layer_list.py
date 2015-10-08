@@ -163,8 +163,8 @@ class LayerStackListViewModel(QAbstractListModel):
         # self._column = [self._visibilityData, self._nameData]
         self.item_delegate = LayerWidgetDelegate()
 
-        doc.docDidChangeLayerOrder.connect(self.updateList)
-        doc.docDidChangeLayer.connect(self.updateList)
+        doc.didChangeLayerOrder.connect(self.updateList)
+        doc.didChangeLayer.connect(self.updateList)
         # q = QTableView()
         # q.setItemDelegateForColumn(0, )
 

@@ -58,6 +58,7 @@ from vispy.visuals.shaders import Function
 from vispy.visuals.transforms import NullTransform
 from vispy.gloo import VertexBuffer
 from vispy.io.datasets import load_spatial_filters
+from vispy.visuals.shaders import FunctionChain
 
 from cspov.view.Program import GlooRGBImageTile
 
@@ -578,6 +579,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self._tiles = {}
         assert (shape or data is not None), "`data` or `shape` must be provided"
         self.shape = shape or data.shape
+        self.ndim = len(self.shape) or data.ndim
 
         # Where does this image lie in this lonely world
         self.calc = MercatorTileCalc(
@@ -591,8 +593,6 @@ class TiledGeolocatedImageVisual(ImageVisual):
         )
         # What tiles have we used and can we use
         self.texture_state = TextureTileState(self.num_tex_tiles)
-
-        self._data = None
 
         # load 'float packed rgba8' interpolation kernel
         # to load float interpolation kernel use
@@ -666,22 +666,23 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self.cmap = cmap
 
         self.overview_info = None
-        self._data = data
-        self._init_overview()
+        self._init_overview(data)
 
         self.freeze()
 
-    def _init_overview(self):
+    @property
+    def size(self):
+        # Added to shader program, but not used by subdivide/tiled method
+        return self.shape[:2][::-1]
+
+    def _init_overview(self, data):
         """Create and add a low resolution version of the data that is always
         shown behind the higher resolution image tiles.
         """
-        if self._data is None:
-            return
-
         self.overview_info = nfo = {}
         y_slice, x_slice = self.calc.overview_stride()
         # overview_stride = (int(image_shape[0]/tile_shape[0]), int(image_shape[1]/tile_shape[1]))
-        nfo["data"] = self._data[y_slice, x_slice]
+        nfo["data"] = data[y_slice, x_slice]
         # Update kwargs to reflect the new spatial resolution of the overview image
         nfo["cell_width"] = self.cell_width * x_slice.step
         nfo["cell_height"] = self.cell_height * y_slice.step
@@ -878,10 +879,16 @@ class TiledGeolocatedImageVisual(ImageVisual):
     def _build_vertex_data(self, transforms):
         raise NotImplementedError("_build_vertex_data is not implemented in this subclass, use the 2-step process of '_build_vertex_tiles' and '_set_vertex_tiles'")
 
-    def _prepare_draw(self, view):
-        if self._data is None:
-            return False
+    def _build_color_transform(self):
+        if self.ndim == 2 or self.shape[2] == 1:
+            fun = FunctionChain(None, [Function(_c2l),
+                                       Function(self._cmap.glsl_map)])
+        else:
+            fun = Function(_null_color_transform)
+        self.shared_program.frag['color_transform'] = fun
+        self._need_colortransform_update = False
 
+    def _prepare_draw(self, view):
         if self._need_interpolation_update:
             self._build_interpolation()
 
