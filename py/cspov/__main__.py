@@ -197,6 +197,11 @@ class Main(QtGui.QMainWindow):
         # TODO: connect animation slider to frame number
         # TODO: connect step forward and step back buttons to frame number (.next_frame)
 
+        # disable close button on panes
+        for pane in [self.ui.probeAPane, self.ui.probeBPane, self.ui.layersPane]:
+            pane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable |
+                             QtGui.QDockWidget.DockWidgetMovable)
+
         for uuid, ds_info, full_data in test_layers(self.workspace, self.document, glob_pattern=glob_pattern):
             # this now fires off a document modification cascade resulting in a new layer going up
             pass
@@ -236,11 +241,13 @@ class Main(QtGui.QMainWindow):
                 data2 = self.workspace.get_content_polygon(selected_uuids[1], points)
                 name2 = self.workspace.get_info(selected_uuids[1])['name']
                 self.figureA.clf()
-                plt.scatter(data1.flatten(), data2.flatten())
+                plt.scatter(data1.flatten(), data2.flatten(), s=1, alpha=0.5)
                 plt.xlabel(name1)
                 plt.ylabel(name2)
                 self.canvasA.draw()
                 data_polygon = data1
+            else:
+                data_polygon = self.workspace.get_content_polygon(selected_uuids[0], points)
             avg = data_polygon.mean()
             self.ui.cursorProbeText.setText("Polygon Probe: {:.03f}".format(float(avg)))
             self.scene_manager.on_new_polygon(points)
