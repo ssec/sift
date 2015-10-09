@@ -121,7 +121,7 @@ class Main(QtGui.QMainWindow):
         frame_index, frame_count, animating = frame_info[:3]
         self.ui.animationSlider.setRange(0, frame_count-1)
         self.ui.animationSlider.setValue(frame_index or 0)
-        LOG.debug('did update animation slider {} {}'.format(frame_index, frame_count))
+        # LOG.debug('did update animation slider {} {}'.format(frame_index, frame_count))
         self.ui.animPlayPause.setDown(animating)
         self.ui.animationSlider.repaint()
 
