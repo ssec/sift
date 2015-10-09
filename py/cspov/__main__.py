@@ -44,6 +44,12 @@ from cspov.ui.pov_main_ui import Ui_MainWindow
 import os
 import logging
 
+# http://stackoverflow.com/questions/12459811/how-to-embed-matplotib-in-pyqt-for-dummies
+from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
+import matplotlib.pyplot as plt
+
+
 LOG = logging.getLogger(__name__)
 PROGRESS_BAR_MAX = 1000
 
@@ -77,6 +83,33 @@ def test_layers(ws, doc, glob_pattern=None):
 
 
 class Main(QtGui.QMainWindow):
+
+    def make_mpl_pane(self, parent):
+        """place a matplotlib figure inside a probe pane
+        """
+        # a figure instance to plot on
+        figure = plt.figure()
+
+        # this is the Canvas Widget that displays the `figure`
+        # it takes the `figure` instance as a parameter to __init__
+        canvas = FigureCanvas(figure)
+
+        # this is the Navigation widget
+        # it takes the Canvas widget and a parent
+        toolbar = None # NavigationToolbar(canvas, self)
+
+        # Just some button connected to `plot` method
+        # self.button = QtGui.QPushButton('Plot')
+        # self.button.clicked.connect(self.plot)
+
+        # set the layout
+        layout = QtGui.QVBoxLayout()
+        # layout.addWidget(toolbar)
+        layout.addWidget(canvas)
+        # layout.addWidget(button)
+        parent.setLayout(layout)
+        return figure, canvas, toolbar
+
 
     def open_files(self):
         files = QtGui.QFileDialog.getOpenFileNames(self,
@@ -185,6 +218,13 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.newProbePoint.connect(update_probe_point)
         def update_probe_polygon(uuid, points):
             data_polygon = self.workspace.get_content_polygon(uuid, points)
+
+            self.figureA.clf()
+            plt.hist(data_polygon.flatten())
+            # ax = self.figureA.add_subplot(111)
+            # plt.hist()
+            self.canvasA.draw()
+
             avg = data_polygon.mean()
             self.ui.cursorProbeText.setText("Polygon Probe: {:.03f}".format(float(avg)))
             self.scene_manager.on_new_polygon(points)
@@ -214,6 +254,11 @@ class Main(QtGui.QMainWindow):
         self.change_tool()
 
         self.setup_menu()
+        self.setup_probe_panes()
+
+    def setup_probe_panes(self):
+        self.figureA, self.canvasA, self.toolbarA = self.make_mpl_pane(self.ui.probeAWidget)
+
 
     def setup_menu(self):
         open_action = QtGui.QAction("&Open", self)
