@@ -77,9 +77,27 @@ def test_layers(ws, doc, glob_pattern=None):
 
 
 class Main(QtGui.QMainWindow):
-    def _init_add_file_dialog(self):
-        pass
-        # self._b_adds_files = UserAddsFileToDoc(self, self.ui.)
+
+    def open_files(self):
+        files = QtGui.QFileDialog.getOpenFileNames(self,
+                                                   "Select one or more files to open",
+                                                   os.getenv("HOME"),
+                                                   'Mercator GeoTIFF (*.tiff *.tif)')
+        for filename in files:
+            self.document.open_file(filename)
+
+    def dropEvent(self, event):
+        LOG.debug('drop event on mainwindow')
+        mime = event.mimeData()
+        if mime.hasUrls:
+            event.setDropAction(QtCore.Qt.CopyAction)
+            event.accept()
+            for url in mime.urls():
+                path = str(url.toLocalFile())
+                LOG.info('about to open {}'.format(path))
+                self.document.open_file(path)
+        else:
+            event.ignore()
 
     def change_tool(self, name="pz_camera"):
         buttons = [self.ui.panZoomToolButton, self.ui.pointSelectButton, self.ui.regionSelectButton]
@@ -113,14 +131,12 @@ class Main(QtGui.QMainWindow):
         LOG.info('changing {} to colormap {}'.format(uuid, mapname))
         self.scene_manager.set_colormap(mapname, uuid=uuid)
 
-    def openAction(self, *args, **kwargs):
-        LOG.info('let us open a file!')
-
     def __init__(self, workspace_dir=None, glob_pattern=None, border_shapefile=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
         # refer to objectName'd entities as self.ui.objectName
+        self.setAcceptDrops(True)
 
         self.queue = TaskQueue()
         self.ui.progressBar.setRange(0, PROGRESS_BAR_MAX)
@@ -184,12 +200,26 @@ class Main(QtGui.QMainWindow):
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
         self.document.didChangeColormap.connect(self.change_layer_colormap)
 
-        self.ui.action_Open.triggered.connect(self.openAction)
-
         self.ui.panZoomToolButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.pz_camera.name))
         self.ui.pointSelectButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.point_probe_camera.name))
         self.ui.regionSelectButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.polygon_probe_camera.name))
         self.change_tool()
+
+        self.setup_menu()
+
+    def setup_menu(self):
+        open_action = QtGui.QAction("&Open", self)
+        open_action.setShortcut("Ctrl+O")
+        open_action.triggered.connect(self.open_files)
+
+        exit_action = QtGui.QAction("&Exit", self)
+        exit_action.setShortcut("Ctrl+Q")
+        exit_action.triggered.connect(QtGui.qApp.quit)
+
+        menubar = self.ui.menubar
+        file_menu = menubar.addMenu('&File')
+        file_menu.addAction(open_action)
+        file_menu.addAction(exit_action)
 
     def setup_key_releases(self):
         def cb_factory(required_key, cb):
