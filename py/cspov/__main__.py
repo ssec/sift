@@ -145,7 +145,10 @@ class Main(QtGui.QMainWindow):
         # create document
         self.workspace = Workspace(workspace_dir)
         self.document = doc = Document(self.workspace)
-        self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue, glob_pattern=glob_pattern, parent=self)
+        self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
+                                               glob_pattern=glob_pattern,
+                                               border_shapefile=border_shapefile,
+                                               parent=self)
         self.ui.mainWidgets.addTab(self.scene_manager.main_canvas.native, 'Mercator')
 
         self.scene_manager.didChangeFrame.connect(self.update_frame_slider)
