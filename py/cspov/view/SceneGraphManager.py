@@ -45,7 +45,7 @@ import logging
 
 LOG = logging.getLogger(__name__)
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
-DEFAULT_SHAPE_FILE = os.path.join(SCRIPT_DIR, "..", "data", "ne_110m_admin_0_countries", "ne_110m_admin_0_countries.shp")
+DEFAULT_SHAPE_FILE = os.path.join(SCRIPT_DIR, "..", "data", "ne_50m_admin_0_countries", "ne_50m_admin_0_countries.shp")
 DEFAULT_TEXTURE_SHAPE = (4, 16)
 
 
@@ -397,16 +397,25 @@ class SceneGraphManager(QObject):
             self.image_layers[uuid] = image
             self.datasets[uuid] = ds_info
             self.layer_set.add_layer(image)
-        else:
-            pass  # FIXME: other events? remove?
+
+        elif change_dict['change']=='visible':
+            ds_info = change_dict['info']
+            uuid = ds_info['uuid']
+            new_state = change_dict['visible']
+            self.set_layer_visible(uuid, new_state)
 
     def set_document(self, document):
-        document.docDidChangeLayerOrder.connect(self.rebuild_new_order)
-        document.docDidChangeLayer.connect(self.rebuild_layer_changed)
+        document.didChangeLayerOrder.connect(self.rebuild_new_order)
+        document.didChangeLayer.connect(self.rebuild_layer_changed)
+
+    def set_layer_visible(self, uuid, visible=None):
+        image = self.image_layers[uuid]
+        image.visible = not image.visible if visible is None else visible
 
     def rebuild_new_order(self, new_layer_index_order, *args, **kwargs):
         """
-        layer order has changed; shift layers around
+        layer order has changed; shift layers around.
+        an empty list is sent if the whole layer order has been changed
         :param change:
         :return:
         """

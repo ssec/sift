@@ -92,7 +92,7 @@ class Main(QtGui.QMainWindow):
 
     def update_progress_bar(self, status_info, *args, **kwargs):
         active = status_info[0]
-        LOG.warning('{0!r:s}'.format(status_info))
+        LOG.debug('{0!r:s}'.format(status_info))
         val = active[TASK_PROGRESS]
         txt = active[TASK_DOING]
         self.ui.progressBar.setValue(int(val*PROGRESS_BAR_MAX))
@@ -113,6 +113,9 @@ class Main(QtGui.QMainWindow):
         LOG.info('changing {} to colormap {}'.format(uuid, mapname))
         self.scene_manager.set_colormap(mapname, uuid=uuid)
 
+    def openAction(self, *args, **kwargs):
+        LOG.info('let us open a file!')
+
     def __init__(self, workspace_dir=None, glob_pattern=None, border_shapefile=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
@@ -126,7 +129,10 @@ class Main(QtGui.QMainWindow):
         # create document
         self.workspace = Workspace(workspace_dir)
         self.document = doc = Document(self.workspace)
-        self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue, glob_pattern=glob_pattern, parent=self)
+        self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
+                                               glob_pattern=glob_pattern,
+                                               border_shapefile=border_shapefile,
+                                               parent=self)
         self.ui.mainWidgets.addTab(self.scene_manager.main_canvas.native, 'Mercator')
 
         self.scene_manager.didChangeFrame.connect(self.update_frame_slider)
@@ -145,22 +151,21 @@ class Main(QtGui.QMainWindow):
         self.setup_key_releases()
         self.scheduler = QtCore.QTimer(parent=self)
         self.scheduler.setInterval(200.0)
-        # self.scheduler.timeout.connect(partial(self.scene_manager.image_list._timeout_slot, self.scheduler))
         self.scheduler.timeout.connect(partial(self.scene_manager.on_view_change, self.scheduler))
         def start_wrapper(timer, event):
             """Simple wrapper around a timers start method so we can accept but ignore the event provided
             """
             timer.start()
-        self.scene_manager.main_canvas.events.draw.connect(partial(start_wrapper, self.scheduler))
+        self.scene_manager.main_canvas.transforms.changed.connect(partial(start_wrapper, self.scheduler))
 
         def update_probe_point(uuid, xy_pos):
             data_point = self.workspace.get_content_point(uuid, xy_pos)
-            self.ui.cursorProbeText.setText("Point Probe: {:.03f}".format(data_point))
+            self.ui.cursorProbeText.setText("Point Probe: {:.03f}".format(float(data_point)))
         self.scene_manager.newProbePoint.connect(update_probe_point)
         def update_probe_polygon(uuid, points):
             data_polygon = self.workspace.get_content_polygon(uuid, points)
             avg = data_polygon.mean()
-            self.ui.cursorProbeText.setText("Polygon Probe: {:.03f}".format(avg))
+            self.ui.cursorProbeText.setText("Polygon Probe: {:.03f}".format(float(avg)))
             self.scene_manager.on_new_polygon(points)
         self.scene_manager.newProbePolygon.connect(update_probe_polygon)
 
@@ -180,7 +185,9 @@ class Main(QtGui.QMainWindow):
         # self.queue.add('test', test_task(), 'test000')
         # self.ui.layers
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
-        self.document.docDidChangeEnhancement.connect(self.change_layer_colormap)
+        self.document.didChangeColormap.connect(self.change_layer_colormap)
+
+        self.ui.action_Open.triggered.connect(self.openAction)
 
         self.ui.panZoomToolButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.pz_camera.name))
         self.ui.pointSelectButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.point_probe_camera.name))

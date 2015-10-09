@@ -36,8 +36,10 @@ __docformat__ = 'reStructuredText'
 import os, sys
 import logging, unittest, argparse
 import weakref
-from PyQt4.QtCore import QAbstractListModel, QAbstractTableModel, QVariant, Qt, QSize, QModelIndex, QPoint
-from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView, QMenu
+import pickle as pkl
+import base64
+from PyQt4.QtCore import QAbstractListModel, QAbstractTableModel, QVariant, Qt, QSize, QModelIndex, QPoint, QMimeData
+from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyleOptionViewItem
 
 LOG = logging.getLogger(__name__)
 
@@ -51,8 +53,37 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     see QAbstractItemView.setItemDelegateForRow/Column
     """
 
-    def sizeHint(self, QStyleOptionViewItem, QModelIndex):
+    def sizeHint(self, option:QStyleOptionViewItem, index:QModelIndex):
         return QSize(100,36)
+
+    # def paint(self, painter, option, index):
+    #
+    #     painter.save()
+    #
+    #     painter.setPen(QtGui.QPen(QtCore.Qt.NoPen))
+    #
+    #     if option.state & QtGui.QStyle.State_Selected:
+    #         brush = QtGui.QBrush(QtGui.QColor("#66ff71"))
+    #         painter.setBrush(brush)
+    #
+    #     else:
+    #         brush = QtGui.QBrush(QtCore.Qt.white)
+    #         painter.setBrush(brush)
+    #
+    #     painter.drawRect(option.rect)
+    #
+    #     painter.setPen(QtGui.QPen(QtCore.Qt.blue))
+    #     value = index.data(QtCore.Qt.DisplayRole)
+    #
+    #     if value.isValid():
+    #
+    #         text = value.toString()
+    #         align = QtCore.Qt.AlignCenter
+    #         painter.drawText(option.rect, align, text)
+    #
+    #     #QtGui.QStyledItemDelegate.paint(self, painter, option, index)
+    #     painter.restore()
+
 
     # def paint(self, painter, option, index):
     #     '''
@@ -115,6 +146,7 @@ class LayerStackListViewModel(QAbstractListModel):
         Each table view represents a different configured document layer stack "set" - user can select from at least four.
         Convey layer set information to/from the document to the respective table, including selection.
         ref: http://duganchen.ca/a-pythonic-qt-list-model-implementation/
+        http://doc.qt.io/qt-5/qabstractitemmodel.html#beginMoveRows
     """
     widgets = None
     doc = None
@@ -130,12 +162,15 @@ class LayerStackListViewModel(QAbstractListModel):
         listbox.pressed.connect(self.layer_pressed)
         listbox.setModel(self)
         listbox.setDropIndicatorShown(True)
+        listbox.setDragDropOverwriteMode(False)
         listbox.setAcceptDrops(True)
-        listbox.setDragDropMode(QAbstractItemView.InternalMove)
+        # listbox.setDragDropMode(QAbstractItemView.DragDrop)
+        listbox.setDragDropMode(QAbstractItemView.InternalMove)  # later: accept mimedata
         listbox.setDragEnabled(True)
-        listbox.setSelectionMode(QListView.MultiSelection)  # alternate SingleSelection
+        listbox.setSelectionMode(QListView.SingleSelection)  # alternate MultiSelection
         listbox.setContextMenuPolicy(Qt.CustomContextMenu)
         listbox.customContextMenuRequested.connect(self.menu)
+        # selmo = listbox.selectionModel()
         self.widgets.append(listbox)
 
     @property
@@ -163,16 +198,12 @@ class LayerStackListViewModel(QAbstractListModel):
         # self._column = [self._visibilityData, self._nameData]
         self.item_delegate = LayerWidgetDelegate()
 
-        doc.docDidChangeLayerOrder.connect(self.updateList)
-        doc.docDidChangeLayer.connect(self.updateList)
-        # q = QTableView()
-        # q.setItemDelegateForColumn(0, )
+        doc.didChangeLayerOrder.connect(self.updateList)
+        doc.didChangeLayer.connect(self.updateList)
+        self.setSupportedDragActions(Qt.CopyAction | Qt.MoveAction)
 
         for widget in widgets:
             self._init_widget(widget)
-
-    # def columnCount(self, *args, **kwargs):
-    #     return len(self._column)
 
     def current_selected_uuids(self, lbox:QListView=None):
         # FIXME: this is just plain crufty, also doesn't work!
@@ -196,12 +227,44 @@ class LayerStackListViewModel(QAbstractListModel):
 
     @property
     def listing(self):
-        return [self.doc[dex] for dex in range(len(self.doc))]
+        return [self.doc.get_info(dex) for dex in range(len(self.doc))]
+
+    def dropMimeData(self, mime:QMimeData, action, row:int, column:int, parent:QModelIndex):
+        LOG.debug('dropMimeData at row {}'.format(row))
+        if action == Qt.IgnoreAction:
+            return True
+        if mime.hasFormat('application/layer-presentation-list'):
+            # unpickle the presentation information and re-insert it
+            # b = base64.decodebytes(mime.text())
+            b = mime.data()
+            l = pkl.loads(b)
+            LOG.debug('dropped: {0!r:s}'.format(l))
+            count = len(l)
+            if row == -1:
+                row = len(self.doc)  # append
+            self.beginInsertRows(parent, row, row+count-1)
+            self.doc.insert_layer_prez(row, *l)
+            self.endInsertRows()
+            return True
+        return super(LayerStackListViewModel, self).dropMimeData(mime, action, row, column, parent)
+
+    def mimeData(self, list_of_QModelIndex):
+        l = []
+        for index in list_of_QModelIndex:
+            # create a list of prez tuples showing how layers are presented
+            if index.isValid():
+                l.append(self.doc[index.row()])
+        p = pkl.dumps(l, pkl.HIGHEST_PROTOCOL)
+        mime = QMimeData()
+        # t = base64.encodebytes(p).decode('ascii')
+        # LOG.debug('mimetext for drag is "{}"'.format(t))
+        mime.setData('application/layer-presentation-list', p)
+        return mime
 
     def flags(self, index):
         flags = super(LayerStackListViewModel, self).flags(index)
         if index.isValid():
-            flags |= Qt.ItemIsDragEnabled | Qt.ItemIsDropEnabled | Qt.ItemIsUserCheckable
+            flags |= Qt.ItemIsDragEnabled | Qt.ItemIsDropEnabled | Qt.ItemIsUserCheckable | Qt.ItemIsEditable
         else:
             flags = Qt.ItemIsDropEnabled
         return flags
@@ -215,38 +278,96 @@ class LayerStackListViewModel(QAbstractListModel):
             return None
         row = index.row()
         # col = index.column()
-        if role==Qt.ItemDataRole:
-            return self.doc[index.row()] if index.row()<len(self.doc) else None
-        elif role!=Qt.DisplayRole:
-            return None
-        # return "test"
         el = self.listing
-        LOG.debug('row {} is {}'.format(row, el[row]))
-        if role==Qt.CheckStateRole:
-            check =  Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
+        if role == Qt.ItemDataRole:
+            return self.doc[index.row()] if index.row()<len(self.doc) else None
+        elif role == Qt.CheckStateRole:
+            check = Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
             return check
-        elif role==Qt.DisplayRole:
+        elif role == Qt.DisplayRole:
             lao = self.doc.layer_animation_order(row)
-            return el[row]['name'] + ('[-]' if lao==0 else '[{}]'.format(lao))
+            # return  ('[-]  ' if lao is None else '[{}]'.format(lao+1)) + el[row]['name']
+            return el[row]['name']
         return None
 
-    # def supportedDragActions(self):
-    #     return Qt.MoveAction
+    def setData(self, index:QModelIndex, data, role:int=None):
+        LOG.debug('setData {0!r:s}'.format(data))
+        if not index.isValid():
+            return False
+        if role==Qt.EditRole:
+            if isinstance(data, str):
+                LOG.debug("changing row {0:d} name to {1!r:s}".format(index.row(), data))
+                self.doc.change_layer_name(index.row(), data)
+                return True
+            else:
+                LOG.debug("data type is {0!r:s}".format(type(data)))
+        elif role == Qt.CheckStateRole:
+            newvalue = True if data==Qt.Checked else False
+            LOG.debug('toggle layer visibility for row {} to {}'.format(index.row(), newvalue))
+            self.doc.toggle_layer_visibility(index.row(), newvalue)
+            return True
+        elif role==Qt.ItemDataRole:
+            LOG.warning('attempting to change layer')
+            # self.doc.replace_layer()
+            return False
+        elif role==Qt.DisplayRole:
+            if index.isValid():
+                LOG.debug("changing row {} name to {0!r:s}".format(index.row(), data))
+                self.doc.change_layer_name(index.row(), data)
+                return True
+        return False
 
-    def supportedDropActions(self):
+    def supportedDragActions(self):
         return Qt.MoveAction
 
+    def supportedDropActions(self):
+        return Qt.MoveAction | Qt.CopyAction
+
     def insertRows(self, row, count, parent=QModelIndex()):
-        self.beginInsertRows(QModelIndex(), row, row+count)
+        self.beginInsertRows(QModelIndex(), row, row+count-1)
+        LOG.debug(">>>> INSERT {} rows".format(count))
         # TODO: insert 'count' rows into document
         self.endInsertRows()
         return True
 
     def removeRows(self, row, count, QModelIndex_parent=None, *args, **kwargs):
-        self.beginRemoveRows(QModelIndex(), row, row+count)
+        self.beginRemoveRows(QModelIndex(), row, row+count-1)
         # TODO: remove layers from document
+        LOG.debug(">>>> REMOVE {} rows".format(count))
+        self.doc.remove_layer_prez(row, count)
         self.endRemoveRows()
         return True
+
+    # def dragEnterEvent(self, event):
+    #     if event.mimeData().hasUrls:
+    #         event.accept()
+    #
+    #     else:
+    #         event.ignore()
+    #
+    # def dragMoveEvent(self, event):
+    #     if event.mimeData().hasUrls:
+    #         event.setDropAction(QtCore.Qt.CopyAction)
+    #         event.accept()
+    #
+    #     else:
+    #         event.ignore()
+    #
+    # def dropEvent(self, event):
+    #     if event.mimeData().hasUrls:
+    #         event.setDropAction(QtCore.Qt.CopyAction)
+    #         event.accept()
+    #
+    #         filePaths = [
+    #             str(url.toLocalFile())
+    #             for url in event.mimeData().urls()
+    #         ]
+    #
+    #         self.dropped.emit(filePaths)
+    #
+    #     else:
+    #         event.ignore()
+
 
     def layer_clicked(self, qindex):
         pass

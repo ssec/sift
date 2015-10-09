@@ -29,6 +29,7 @@ import gdal, osr
 import numpy as np
 from collections import namedtuple
 from uuid import UUID, uuid1 as uuidgen
+from cspov.common import kind
 from PyQt4.QtCore import QObject, pyqtSignal
 
 LOG = logging.getLogger(__name__)
@@ -94,6 +95,7 @@ class GeoTiffImporter(WorkspaceImporter):
 
         ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
         d["uuid"] = dest_uuid
+        d["kind"] = kind.IMAGE
         d["origin_x"] = ox
         d["origin_y"] = oy
         d["cell_width"] = cw
@@ -234,7 +236,18 @@ class Workspace(QObject):
                 info = self._info[uuid] = update.dataset_info
                 data = self._data[uuid] = update.data
                 LOG.debug(repr(update))
+        # copy the data into an anonymous memmap
+        self._data[uuid] = self._convert_to_memmap(data)
         return uuid, info, data
+
+    def _convert_to_memmap(self, data:np.ndarray):
+        if isinstance(data, np.memmap):
+            return data
+        from tempfile import TemporaryFile
+        fp = TemporaryFile()
+        mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
+        mm[:] = data[:]
+        return mm
 
     def remove(self, dsi):
         """
