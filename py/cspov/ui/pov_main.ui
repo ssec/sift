@@ -320,7 +320,7 @@
    <attribute name="dockWidgetArea">
     <number>2</number>
    </attribute>
-   <widget class="QWidget" name="dockWidgetContents_2"/>
+   <widget class="QWidget" name="probeAWidget"/>
   </widget>
   <widget class="QDockWidget" name="probeBPane">
    <property name="windowTitle">
@@ -329,7 +329,7 @@
    <attribute name="dockWidgetArea">
     <number>2</number>
    </attribute>
-   <widget class="QWidget" name="dockWidgetContents_4"/>
+   <widget class="QWidget" name="probeBWidget"/>
   </widget>
   <widget class="QDockWidget" name="layersPane">
    <property name="windowTitle">

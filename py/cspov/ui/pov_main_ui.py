@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created: Thu Oct  8 20:21:31 2015
+# Created: Thu Oct  8 22:21:36 2015
 #      by: PyQt4 UI code generator 4.11.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -147,15 +147,15 @@ class Ui_MainWindow(object):
         MainWindow.setStatusBar(self.statusbar)
         self.probeAPane = QtGui.QDockWidget(MainWindow)
         self.probeAPane.setObjectName(_fromUtf8("probeAPane"))
-        self.dockWidgetContents_2 = QtGui.QWidget()
-        self.dockWidgetContents_2.setObjectName(_fromUtf8("dockWidgetContents_2"))
-        self.probeAPane.setWidget(self.dockWidgetContents_2)
+        self.probeAWidget = QtGui.QWidget()
+        self.probeAWidget.setObjectName(_fromUtf8("probeAWidget"))
+        self.probeAPane.setWidget(self.probeAWidget)
         MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.probeAPane)
         self.probeBPane = QtGui.QDockWidget(MainWindow)
         self.probeBPane.setObjectName(_fromUtf8("probeBPane"))
-        self.dockWidgetContents_4 = QtGui.QWidget()
-        self.dockWidgetContents_4.setObjectName(_fromUtf8("dockWidgetContents_4"))
-        self.probeBPane.setWidget(self.dockWidgetContents_4)
+        self.probeBWidget = QtGui.QWidget()
+        self.probeBWidget.setObjectName(_fromUtf8("probeBWidget"))
+        self.probeBPane.setWidget(self.probeBWidget)
         MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.probeBPane)
         self.layersPane = QtGui.QDockWidget(MainWindow)
         self.layersPane.setObjectName(_fromUtf8("layersPane"))

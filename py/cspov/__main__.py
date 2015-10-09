@@ -44,6 +44,12 @@ from cspov.ui.pov_main_ui import Ui_MainWindow
 import os
 import logging
 
+# http://stackoverflow.com/questions/12459811/how-to-embed-matplotib-in-pyqt-for-dummies
+from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
+import matplotlib.pyplot as plt
+
+
 LOG = logging.getLogger(__name__)
 PROGRESS_BAR_MAX = 1000
 
@@ -77,6 +83,33 @@ def test_layers(ws, doc, glob_pattern=None):
 
 
 class Main(QtGui.QMainWindow):
+
+    def make_mpl_pane(self, parent):
+        """place a matplotlib figure inside a probe pane
+        """
+        # a figure instance to plot on
+        figure = plt.figure(figsize=(3,3), dpi=72)
+
+        # this is the Canvas Widget that displays the `figure`
+        # it takes the `figure` instance as a parameter to __init__
+        canvas = FigureCanvas(figure, )
+
+        # this is the Navigation widget
+        # it takes the Canvas widget and a parent
+        toolbar = None # NavigationToolbar(canvas, self)
+
+        # Just some button connected to `plot` method
+        # self.button = QtGui.QPushButton('Plot')
+        # self.button.clicked.connect(self.plot)
+
+        # set the layout
+        layout = QtGui.QVBoxLayout()
+        # layout.addWidget(toolbar)
+        layout.addWidget(canvas)
+        # layout.addWidget(button)
+        parent.setLayout(layout)
+        return figure, canvas, toolbar
+
 
     def open_files(self):
         files = QtGui.QFileDialog.getOpenFileNames(self,
@@ -164,6 +197,11 @@ class Main(QtGui.QMainWindow):
         # TODO: connect animation slider to frame number
         # TODO: connect step forward and step back buttons to frame number (.next_frame)
 
+        # disable close button on panes
+        for pane in [self.ui.probeAPane, self.ui.probeBPane, self.ui.layersPane]:
+            pane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable |
+                             QtGui.QDockWidget.DockWidgetMovable)
+
         for uuid, ds_info, full_data in test_layers(self.workspace, self.document, glob_pattern=glob_pattern):
             # this now fires off a document modification cascade resulting in a new layer going up
             pass
@@ -179,12 +217,37 @@ class Main(QtGui.QMainWindow):
             timer.start()
         self.scene_manager.main_canvas.transforms.changed.connect(partial(start_wrapper, self.scheduler))
 
+        # convey action between document and layer list view
+        self.behaviorLayersList = LayerStackListViewModel([self.ui.layerSet1Table, self.ui.layerSet2Table, self.ui.layerSet3Table, self.ui.layerSet4Table], doc)
+
         def update_probe_point(uuid, xy_pos):
             data_point = self.workspace.get_content_point(uuid, xy_pos)
             self.ui.cursorProbeText.setText("Point Probe: {:.03f}".format(float(data_point)))
         self.scene_manager.newProbePoint.connect(update_probe_point)
-        def update_probe_polygon(uuid, points):
-            data_polygon = self.workspace.get_content_polygon(uuid, points)
+
+        def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
+            selected_uuids = list(layerlist.current_selected_uuids())
+            LOG.debug("selected UUID set is {0!r:s}".format(selected_uuids))
+            if len(selected_uuids)==0:
+                selected_uuids = [uuid]
+            if (len(selected_uuids)==1):
+                data_polygon = self.workspace.get_content_polygon(selected_uuids[0], points)
+                self.figureA.clf()
+                plt.hist(data_polygon.flatten(), bins=100)
+                self.canvasA.draw()
+            elif len(selected_uuids)==2:
+                data1 = self.workspace.get_content_polygon(selected_uuids[0], points)
+                name1 = self.workspace.get_info(selected_uuids[0])['name']
+                data2 = self.workspace.get_content_polygon(selected_uuids[1], points)
+                name2 = self.workspace.get_info(selected_uuids[1])['name']
+                self.figureA.clf()
+                plt.scatter(data1.flatten(), data2.flatten(), s=1, alpha=0.5)
+                plt.xlabel(name1)
+                plt.ylabel(name2)
+                self.canvasA.draw()
+                data_polygon = data1
+            else:
+                data_polygon = self.workspace.get_content_polygon(selected_uuids[0], points)
             avg = data_polygon.mean()
             self.ui.cursorProbeText.setText("Polygon Probe: {:.03f}".format(float(avg)))
             self.scene_manager.on_new_polygon(points)
@@ -200,9 +263,6 @@ class Main(QtGui.QMainWindow):
             (0.00, 0.00, 1.00, 1.00),
         ]))
 
-        # convey action between document and layer list view
-        self.behaviorLayersList = LayerStackListViewModel([self.ui.layerSet1Table, self.ui.layerSet2Table, self.ui.layerSet3Table, self.ui.layerSet4Table], doc)
-
         # self.queue.add('test', test_task(), 'test000')
         # self.ui.layers
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
@@ -214,6 +274,11 @@ class Main(QtGui.QMainWindow):
         self.change_tool()
 
         self.setup_menu()
+        self.setup_probe_panes()
+
+    def setup_probe_panes(self):
+        self.figureA, self.canvasA, self.toolbarA = self.make_mpl_pane(self.ui.probeAWidget)
+
 
     def setup_menu(self):
         open_action = QtGui.QAction("&Open", self)
