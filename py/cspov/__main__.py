@@ -123,13 +123,17 @@ class Main(QtGui.QMainWindow):
         self.ui.animationSlider.setValue(frame_index or 0)
         LOG.debug('did update animation slider {} {}'.format(frame_index, frame_count))
         self.ui.animPlayPause.setDown(animating)
-        self.ui.animationSlider.update()
+        self.ui.animationSlider.repaint()
 
     def change_layer_colormap(self, nfo):
         uuid = nfo['uuid']
         mapname = nfo['colormap']
         LOG.info('changing {} to colormap {}'.format(uuid, mapname))
         self.scene_manager.set_colormap(mapname, uuid=uuid)
+
+    def animation_slider_jump_frame(self, event, *args, **kwargs):
+        frame = self.ui.animationSlider.value()
+        self.scene_manager.set_frame_number(frame)
 
     def __init__(self, workspace_dir=None, glob_pattern=None, border_shapefile=None):
         super(Main, self).__init__()
@@ -156,6 +160,7 @@ class Main(QtGui.QMainWindow):
         self.ui.animForward.clicked.connect(self.scene_manager.layer_set.next_frame)
         last_frame = partial(self.scene_manager.layer_set.next_frame, frame_number=-1)
         self.ui.animBack.clicked.connect(last_frame)
+        self.ui.animationSlider.valueChanged.connect(self.animation_slider_jump_frame)
         # TODO: connect animation slider to frame number
         # TODO: connect step forward and step back buttons to frame number (.next_frame)
 

@@ -236,7 +236,7 @@ class LayerSet(object):
         self._frame_number = frame
         self.parent.update()
         if self._frame_change_cb is not None:
-            self._frame_change_cb((frame_number, lfo, self._animating))
+            self._frame_change_cb((self._frame_number, lfo, self._animating))
 
 
 class SceneGraphManager(QObject):
@@ -422,6 +422,9 @@ class SceneGraphManager(QObject):
     def set_document(self, document):
         document.didChangeLayerOrder.connect(self.rebuild_new_order)
         document.didChangeLayer.connect(self.rebuild_layer_changed)
+
+    def set_frame_number(self, frame_number=None):
+        self.layer_set.next_frame(None, frame_number)
 
     def set_layer_visible(self, uuid, visible=None):
         image = self.image_layers[uuid]
