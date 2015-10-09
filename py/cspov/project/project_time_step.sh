@@ -15,13 +15,17 @@ oops() {
     exit 1
 }
 
+abspath() {
+    python -c "import os; print(os.path.realpath(\"$1\"))"
+}
+
 if [ ! -d $input_dir ]; then
     echo "Input directory does not exist: $input_dir"
     exit 1
 fi
 
 # Get full path
-input_dir=`readlink -f $input_dir`
+input_dir=`abspath $input_dir`
 
 if [ ! -d $output_dir ]; then
     echo "Output directory does not exist: $output_dir"
@@ -31,13 +35,10 @@ fi
 
 cd $output_dir
 
-# 5 Levels
-#OUTPUT_SIZE=16384
-# 4 Levels
-OUTPUT_SIZE_X=8192
-OUTPUT_SIZE_Y=4096
-# Original
-#OUTPUT_SIZE=5120
+#OUTPUT_SIZE_X=8192
+#OUTPUT_SIZE_Y=4096
+OUTPUT_RES_X=2000
+OUTPUT_RES_Y=2000
 
 for nc_file in `find $input_dir/ -name "*.nc"`; do
     echo "Processing $nc_file..."
@@ -53,7 +54,7 @@ for nc_file in `find $input_dir/ -name "*.nc"`; do
     fi
 
     echo "Creating mercator geotiff file..."
-    time gdalwarp -multi -t_srs "+proj=merc +datum=WGS84 +ellps=WGS84" -ts $OUTPUT_SIZE_X $OUTPUT_SIZE_Y -te_srs "+proj=latlong +datum=WGS84 +ellps=WGS84" -te -180 -80 180 80 $geos_gtiff_fn $merc_gtiff_fn
+    time gdalwarp -multi -t_srs "+proj=merc +datum=WGS84 +ellps=WGS84" -tr $OUTPUT_RES_X $OUTPUT_RES_Y -te_srs "+proj=latlong +datum=WGS84 +ellps=WGS84" -te -180 -80 180 80 $geos_gtiff_fn $merc_gtiff_fn
     if [ $? -ne 0 ]; then
         echo "ERROR: Failed to create mercator geotiff"
         continue

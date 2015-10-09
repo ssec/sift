@@ -22,7 +22,6 @@ __docformat__ = 'reStructuredText'
 
 import os, sys
 import logging, unittest, argparse
-from QtCore import QObject
 
 LOG = logging.getLogger(__name__)
 
