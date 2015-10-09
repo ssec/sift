@@ -212,19 +212,35 @@ class Main(QtGui.QMainWindow):
             timer.start()
         self.scene_manager.main_canvas.transforms.changed.connect(partial(start_wrapper, self.scheduler))
 
+        # convey action between document and layer list view
+        self.behaviorLayersList = LayerStackListViewModel([self.ui.layerSet1Table, self.ui.layerSet2Table, self.ui.layerSet3Table, self.ui.layerSet4Table], doc)
+
         def update_probe_point(uuid, xy_pos):
             data_point = self.workspace.get_content_point(uuid, xy_pos)
             self.ui.cursorProbeText.setText("Point Probe: {:.03f}".format(float(data_point)))
         self.scene_manager.newProbePoint.connect(update_probe_point)
-        def update_probe_polygon(uuid, points):
-            data_polygon = self.workspace.get_content_polygon(uuid, points)
 
-            self.figureA.clf()
-            plt.hist(data_polygon.flatten(), bins=100)
-            # ax = self.figureA.add_subplot(111)
-            # plt.hist()
-            self.canvasA.draw()
-
+        def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
+            selected_uuids = list(layerlist.current_selected_uuids())
+            LOG.debug("selected UUID set is {0!r:s}".format(selected_uuids))
+            if len(selected_uuids)==0:
+                selected_uuids = [uuid]
+            if (len(selected_uuids)==1):
+                data_polygon = self.workspace.get_content_polygon(selected_uuids[0], points)
+                self.figureA.clf()
+                plt.hist(data_polygon.flatten(), bins=100)
+                self.canvasA.draw()
+            elif len(selected_uuids)==2:
+                data1 = self.workspace.get_content_polygon(selected_uuids[0], points)
+                name1 = self.workspace.get_info(selected_uuids[0])['name']
+                data2 = self.workspace.get_content_polygon(selected_uuids[1], points)
+                name2 = self.workspace.get_info(selected_uuids[1])['name']
+                self.figureA.clf()
+                plt.scatter(data1.flatten(), data2.flatten())
+                plt.xlabel(name1)
+                plt.ylabel(name2)
+                self.canvasA.draw()
+                data_polygon = data1
             avg = data_polygon.mean()
             self.ui.cursorProbeText.setText("Polygon Probe: {:.03f}".format(float(avg)))
             self.scene_manager.on_new_polygon(points)
@@ -239,9 +255,6 @@ class Main(QtGui.QMainWindow):
             (0.00, 0.00, 0.00, 1.00),
             (0.00, 0.00, 1.00, 1.00),
         ]))
-
-        # convey action between document and layer list view
-        self.behaviorLayersList = LayerStackListViewModel([self.ui.layerSet1Table, self.ui.layerSet2Table, self.ui.layerSet3Table, self.ui.layerSet4Table], doc)
 
         # self.queue.add('test', test_task(), 'test000')
         # self.ui.layers
