@@ -28,8 +28,8 @@ from vispy import app
 from vispy import scene
 from vispy.util.event import Event
 from vispy.visuals.transforms import STTransform, MatrixTransform
-from vispy.visuals import MarkersVisual, marker_types
-from vispy.scene.visuals import Markers, Polygon
+from vispy.visuals import MarkersVisual, marker_types, LineVisual
+from vispy.scene.visuals import Markers, Polygon, Compound
 from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY
 # from cspov.control.layer_list import LayerStackListViewModel
 from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
@@ -47,6 +47,21 @@ LOG = logging.getLogger(__name__)
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 DEFAULT_SHAPE_FILE = os.path.join(SCRIPT_DIR, "..", "data", "ne_50m_admin_0_countries", "ne_50m_admin_0_countries.shp")
 DEFAULT_TEXTURE_SHAPE = (4, 16)
+
+
+class FakeMarker(Compound):
+    # FIXME: Temporary workaround because markers don't work on the target Windows laptops
+    def __init__(self, pos=None, parent=None, symbol=None, **kwargs):
+        kwargs["connect"] = "segments"
+        margin = 50000
+        width = 5
+        point = pos[0]
+        pos1 = np.array([[point[0] - margin, point[1]], [point[0] + margin, point[1]]])
+        pos2 = np.array([[point[0], point[1] - margin * 2], [point[0], point[1] + margin * 2]])
+        print("Creating FakeMarker: ", pos1, pos2)
+        self.line_one = LineVisual(pos=pos1, width=width, **kwargs)
+        self.line_two = LineVisual(pos=pos2, width=width, **kwargs)
+        super().__init__((self.line_one, self.line_two), parent=parent)
 
 
 class MainMap(scene.Node):
@@ -81,7 +96,7 @@ class PendingPolygon(object):
             return True
         self.canvas_points.append(canvas_pos)
         self.points.append(xy_pos)
-        point_visual = Markers(parent=self.parent, symbol="disc", pos=np.array([xy_pos[:2]]))
+        point_visual = FakeMarker(parent=self.parent, symbol="disc", pos=np.array([xy_pos[:2]]), color=np.array([0., 0.5, 0.5, 1.]))
         self.markers.append(point_visual)
         return False
 
