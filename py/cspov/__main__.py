@@ -88,11 +88,11 @@ class Main(QtGui.QMainWindow):
         """place a matplotlib figure inside a probe pane
         """
         # a figure instance to plot on
-        figure = plt.figure()
+        figure = plt.figure(figsize=(3,3), dpi=72)
 
         # this is the Canvas Widget that displays the `figure`
         # it takes the `figure` instance as a parameter to __init__
-        canvas = FigureCanvas(figure)
+        canvas = FigureCanvas(figure, )
 
         # this is the Navigation widget
         # it takes the Canvas widget and a parent
@@ -220,7 +220,7 @@ class Main(QtGui.QMainWindow):
             data_polygon = self.workspace.get_content_polygon(uuid, points)
 
             self.figureA.clf()
-            plt.hist(data_polygon.flatten())
+            plt.hist(data_polygon.flatten(), bins=100)
             # ax = self.figureA.add_subplot(111)
             # plt.hist()
             self.canvasA.draw()
