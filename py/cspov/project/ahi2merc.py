@@ -57,11 +57,19 @@ def main():
             LOG.error("Not a file '%s'" % (nc_file,))
             continue
 
+        # Come up with an intermediate geotiff name
         geos_file = nc_file.replace(idir, odir).replace(".nc", ".tif")
         opath = os.path.dirname(geos_file)
         if not os.path.exists(opath):
             LOG.info("Creating output directory: %s", opath)
             os.makedirs(opath, exist_ok=True)
+
+        # Come up with an output mercator filename
+        merc_file = geos_file.replace(".tif", args.merc_ext)
+        if os.path.isfile(merc_file):
+            LOG.warning("Output file already exists: %s" % (merc_file,))
+            continue
+
         ahi2gtiff(nc_file, geos_file)
 
         # Get information about the geotiff
@@ -72,12 +80,6 @@ def main():
         if "+proj=geos" not in proj:
             LOG.warning("Tried to process non-geos geotiff: %s" % (geos_file,))
         ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
-
-        # Come up with an output filename
-        merc_file = geos_file.replace(".tif", args.merc_ext)
-        if os.path.isfile(merc_file):
-            LOG.warning("Output file already exists: %s" % (merc_file,))
-            continue
 
         # Run gdalwarp
         LOG.info("Running gdalwarp on '%s' to create '%s'", geos_file, merc_file)
