@@ -72,7 +72,7 @@ vue = namedtuple('vue', ('b', 'l', 't', 'r', 'dy', 'dx'))  # combination of box 
 WORLD_EXTENT_BOX = box(b=-MAX_EXCURSION_Y, l=-MAX_EXCURSION_X, t=MAX_EXCURSION_Y, r=MAX_EXCURSION_X)
 
 
-class kind(Enum):
+class KIND(Enum):
     """kind of entities we're working with
     """
     UNKNOWN = 0
@@ -81,6 +81,27 @@ class kind(Enum):
     SHAPE = 3
     COMBINATION = 4
 
+class INFO(Enum):
+    """
+    Standard keys for info dictionaries
+    """
+
+    PATHNAME = 'pathname'  # full path to the data file
+    NAME = 'name'  # logical name of the file (possibly human assigned)
+    KIND = 'kind'  # KIND enumeration on what kind of layer this makes
+    UUID = 'uuid'  # UUID assigned on import, which follows the layer around the system
+    ORIGIN_X = 'origin_x'
+    ORIGIN_Y = 'origin_y'
+    CELL_WIDTH = 'cell_width'
+    CELL_HEIGHT = 'cell_height'
+    PROJ = 'proj4_string'
+    CLIM = 'clim'  # (min,max) color map limits
+    SHAPE = 'shape' # (rows, columns) or (rows, columns, levels) data shape
+    COLORMAP = 'colormap'  # name or UUID of a color map
+
+
+
+INFO
 
 
 class MercatorTileCalc(object):

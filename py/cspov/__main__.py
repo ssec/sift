@@ -40,6 +40,7 @@ from functools import partial
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
+from cspov.common import INFO
 
 import os
 import logging
@@ -159,8 +160,8 @@ class Main(QtGui.QMainWindow):
         self.ui.animationSlider.repaint()
 
     def change_layer_colormap(self, nfo):
-        uuid = nfo['uuid']
-        mapname = nfo['colormap']
+        uuid = nfo[INFO.UUID]
+        mapname = nfo[INFO.COLORMAP]
         LOG.info('changing {} to colormap {}'.format(uuid, mapname))
         self.scene_manager.set_colormap(mapname, uuid=uuid)
 

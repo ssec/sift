@@ -30,7 +30,7 @@ from vispy.util.event import Event
 from vispy.visuals.transforms import STTransform, MatrixTransform
 from vispy.visuals import MarkersVisual, marker_types, LineVisual
 from vispy.scene.visuals import Markers, Polygon, Compound
-from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY
+from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND
 # from cspov.control.layer_list import LayerStackListViewModel
 from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.view.MapWidget import CspovMainMapCanvas
@@ -40,6 +40,7 @@ from cspov.queue import TASK_DOING, TASK_PROGRESS
 from PyQt4.QtCore import QObject, pyqtSignal
 import numpy as np
 from uuid import UUID
+
 
 import os
 import logging
@@ -385,16 +386,16 @@ class SceneGraphManager(QObject):
             self.set_colormap(cmapid, uuid)
 
     def add_layer(self, new_order:list, ds_info:dict, overview_content:np.ndarray):
-        uuid = ds_info['uuid']
+        uuid = ds_info[INFO.UUID]
         # create a new layer in the imagelist
         image = TiledGeolocatedImage(
             overview_content,
-            ds_info["origin_x"],
-            ds_info["origin_y"],
-            ds_info["cell_width"],
-            ds_info["cell_height"],
+            ds_info[INFO.ORIGIN_X],
+            ds_info[INFO.ORIGIN_Y],
+            ds_info[INFO.CELL_WIDTH],
+            ds_info[INFO.CELL_HEIGHT],
             name=str(uuid),
-            clim=ds_info["clim"],
+            clim=ds_info[INFO.CLIM],
             interpolation='nearest',
             method='tiled',
             cmap='grays',
@@ -412,7 +413,7 @@ class SceneGraphManager(QObject):
         self.set_layer_visible(uuid_removed, False)
         raise NotImplementedError("layer removal from scenegraph not implemented")  # FIXME
 
-    def change_layer_visibility(self, layers_changed:dict):
+    def change_layers_visibility(self, layers_changed:dict):
         for uuid,visible in layers_changed.items():
             self.set_layer_visible(uuid, visible)
 
@@ -427,7 +428,7 @@ class SceneGraphManager(QObject):
         document.didRemoveLayer.connect(self.remove_layer)
         document.didSwitchLayerSet.connect(self.rebuild_new_layer_set)
         document.didChangeColormap.connect(self.change_layers_colormap)
-        document.didChangeLayerVisibility.connect(self.set_layer_visible)
+        document.didChangeLayerVisibility.connect(self.change_layers_visibility)
 
 
     def set_frame_number(self, frame_number=None):

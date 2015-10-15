@@ -41,6 +41,7 @@ import base64
 from PyQt4.QtCore import QAbstractListModel, QAbstractTableModel, QVariant, Qt, QSize, QModelIndex, QPoint, QMimeData
 from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyleOptionViewItem
 from cspov.model.document import Document
+from cspov.common import INFO, KIND
 
 LOG = logging.getLogger(__name__)
 
@@ -306,7 +307,7 @@ class LayerStackListViewModel(QAbstractListModel):
         elif role == Qt.DisplayRole:
             lao = self.doc.layer_animation_order(row)
             # return  ('[-]  ' if lao is None else '[{}]'.format(lao+1)) + el[row]['name']
-            return el[row]['name']
+            return el[row][INFO.NAME]
         return None
 
     def setData(self, index:QModelIndex, data, role:int=None):

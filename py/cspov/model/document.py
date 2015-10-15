@@ -64,7 +64,7 @@ from collections import namedtuple
 from enum import Enum
 from uuid import UUID
 import numpy as np
-from cspov.common import kind
+from cspov.common import KIND, INFO
 
 from PyQt4.QtCore import QObject, pyqtSignal
 
@@ -173,7 +173,7 @@ class Document(QObject):
         # add as visible to the front of the current set, and invisible to the rest of the available sets
         colormap = self._default_colormap(info)
         p = prez(uuid=uuid,
-                 kind=info["kind"],
+                 kind=info[INFO.KIND],
                  visible=True,
                  a_order=None,
                  colormap=colormap,
@@ -197,10 +197,10 @@ class Document(QObject):
         :param new_info: information dictionary including projection, levels of detail, etc
         :return: None
         """
-        uuid = new_info['uuid']
+        uuid = new_info[INFO.UUID]
         if uuid not in self._layer_with_uuid:
             LOG.warning('new information on uuid {0!r:s} is not for a known dataset'.format(new_info))
-        self._layer_with_uuid[new_info['uuid']] = new_info
+        self._layer_with_uuid[new_info[INFO.UUID]] = new_info
         # TODO: see if this affects any presentation information; view will handle redrawing on its own
 
     def _clone_layer_set(self, existing_layer_set):
@@ -273,8 +273,8 @@ class Document(QObject):
     def change_layer_name(self, row, new_name):
         uuid = self.current_layer_set[row].uuid
         info = self.get_info(row)
-        assert(uuid==info['uuid'])
-        info['name'] = new_name
+        assert(uuid==info[INFO.UUID])
+        info[INFO.NAME] = new_name
         self.didChangeLayerName.emit(uuid, new_name)
 
     def change_colormap_for_layers(self, name, uuids=None):

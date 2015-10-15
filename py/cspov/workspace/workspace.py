@@ -29,7 +29,7 @@ import gdal, osr
 import numpy as np
 from collections import namedtuple
 from uuid import UUID, uuid1 as uuidgen
-from cspov.common import kind
+from cspov.common import KIND, INFO
 from PyQt4.QtCore import QObject, pyqtSignal
 
 LOG = logging.getLogger(__name__)
@@ -94,30 +94,30 @@ class GeoTiffImporter(WorkspaceImporter):
         # FIXME: consider yielding status at this point so our progress bar starts moving
 
         ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
-        d["uuid"] = dest_uuid
-        d["kind"] = kind.IMAGE
-        d["origin_x"] = ox
-        d["origin_y"] = oy
-        d["cell_width"] = cw
-        d["cell_height"] = ch
+        d[INFO.UUID] = dest_uuid
+        d[INFO.KIND] = KIND.IMAGE
+        d[INFO.ORIGIN_X] = ox
+        d[INFO.ORIGIN_Y] = oy
+        d[INFO.CELL_WIDTH] = cw
+        d[INFO.CELL_HEIGHT] = ch
         # FUTURE: Should the Workspace normalize all input data or should the Image Layer handle any projection?
         srs = osr.SpatialReference()
         srs.ImportFromWkt(gtiff.GetProjection())
-        d["proj"] = srs.ExportToProj4()
+        d[INFO.PROJ] = srs.ExportToProj4()
 
-        d["name"] = os.path.split(source_path)[-1]
-        d["filepath"] = source_path
+        d[INFO.NAME] = os.path.split(source_path)[-1]
+        d[INFO.PATHNAME] = source_path
         item = re.findall(r'_(B\d\d)_', source_path)[-1]  # FIXME: this should be a guidebook
         # Valid min and max for colormap use
         margin = 0.005
         if item in ["B01", "B02", "B03", "B04", "B05", "B06"]:
             # Reflectance/visible data limits
             # FIXME: Are these correct?
-            d["clim"] = (0.0, 1.0-margin)
+            d[INFO.CLIM] = (0.0, 1.0-margin)
         else:
             # BT data limits
             # FIXME: Are these correct?
-            d["clim"] = (200.0, 350.0)
+            d[INFO.CLIM] = (200.0, 350.0)
 
         # FIXME: read this into a numpy.memmap backed by disk in the workspace
         img_data = gtiff.GetRasterBand(1).ReadAsArray()
@@ -125,7 +125,7 @@ class GeoTiffImporter(WorkspaceImporter):
 
         # Full resolution shape
         # d["shape"] = self.get_dataset_data(item, time_step).shape
-        d['shape'] = img_data.shape
+        d[INFO.SHAPE] = img_data.shape
 
         # normally we would place a numpy.memmap in the workspace with the content of the geotiff raster band/s here
 
@@ -150,7 +150,7 @@ class Workspace(QObject):
     Workspace is a singleton object which works with Datasets shall:
     - own a working directory full of recently used datasets
     - provide DatasetInfo dictionaries for shorthand use between application subsystems
-    -- datasetinfo dictionaries are ordinary python dictionaries containing ['uuid'], projection metadata, LOD info
+    -- datasetinfo dictionaries are ordinary python dictionaries containing [INFO.UUID], projection metadata, LOD info
     - identify datasets primarily with a UUID object which tracks the dataset and its various representations through the system
     - unpack data in "packing crate" formats like NetCDF into memory-compatible flat files
     - efficiently create on-demand subsections and strides of raster data as numpy arrays
@@ -280,8 +280,8 @@ class Workspace(QObject):
         info = self.get_info(dsi_or_uuid)
         x = xy_pos[0]
         y = xy_pos[1]
-        col = (x - info["origin_x"]) / info["cell_width"]
-        row = (y - info["origin_y"]) / info["cell_height"]
+        col = (x - info[INFO.ORIGIN_X]) / info[INFO.CELL_WIDTH]
+        row = (y - info[INFO.ORIGIN_Y]) / info[INFO.CELL_HEIGHT]
         return np.round(row), np.round(col)
 
     def get_content_point(self, dsi_or_uuid, xy_pos):
