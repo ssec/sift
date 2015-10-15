@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created: Mon Oct  5 14:45:41 2015
+# Created: Thu Oct  8 22:21:36 2015
 #      by: PyQt4 UI code generator 4.11.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -27,6 +27,7 @@ class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName(_fromUtf8("MainWindow"))
         MainWindow.resize(1321, 807)
+        MainWindow.setAcceptDrops(True)
         self.centralwidget = QtGui.QWidget(MainWindow)
         self.centralwidget.setObjectName(_fromUtf8("centralwidget"))
         self.verticalLayout_2 = QtGui.QVBoxLayout(self.centralwidget)
@@ -140,23 +141,21 @@ class Ui_MainWindow(object):
         self.menubar = QtGui.QMenuBar(MainWindow)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 1321, 22))
         self.menubar.setObjectName(_fromUtf8("menubar"))
-        self.menu_File = QtGui.QMenu(self.menubar)
-        self.menu_File.setObjectName(_fromUtf8("menu_File"))
         MainWindow.setMenuBar(self.menubar)
         self.statusbar = QtGui.QStatusBar(MainWindow)
         self.statusbar.setObjectName(_fromUtf8("statusbar"))
         MainWindow.setStatusBar(self.statusbar)
         self.probeAPane = QtGui.QDockWidget(MainWindow)
         self.probeAPane.setObjectName(_fromUtf8("probeAPane"))
-        self.dockWidgetContents_2 = QtGui.QWidget()
-        self.dockWidgetContents_2.setObjectName(_fromUtf8("dockWidgetContents_2"))
-        self.probeAPane.setWidget(self.dockWidgetContents_2)
+        self.probeAWidget = QtGui.QWidget()
+        self.probeAWidget.setObjectName(_fromUtf8("probeAWidget"))
+        self.probeAPane.setWidget(self.probeAWidget)
         MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.probeAPane)
         self.probeBPane = QtGui.QDockWidget(MainWindow)
         self.probeBPane.setObjectName(_fromUtf8("probeBPane"))
-        self.dockWidgetContents_4 = QtGui.QWidget()
-        self.dockWidgetContents_4.setObjectName(_fromUtf8("dockWidgetContents_4"))
-        self.probeBPane.setWidget(self.dockWidgetContents_4)
+        self.probeBWidget = QtGui.QWidget()
+        self.probeBWidget.setObjectName(_fromUtf8("probeBWidget"))
+        self.probeBPane.setWidget(self.probeBWidget)
         MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.probeBPane)
         self.layersPane = QtGui.QDockWidget(MainWindow)
         self.layersPane.setObjectName(_fromUtf8("layersPane"))
@@ -229,10 +228,6 @@ class Ui_MainWindow(object):
         self.verticalLayout_9.addLayout(self.verticalLayout_8)
         self.layerConfigPane.setWidget(self.dockWidgetContents)
         MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.layerConfigPane)
-        self.action_Open = QtGui.QAction(MainWindow)
-        self.action_Open.setObjectName(_fromUtf8("action_Open"))
-        self.menu_File.addAction(self.action_Open)
-        self.menubar.addAction(self.menu_File.menuAction())
 
         self.retranslateUi(MainWindow)
         self.mainWidgets.setCurrentIndex(0)
@@ -240,7 +235,7 @@ class Ui_MainWindow(object):
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
-        MainWindow.setWindowTitle(_translate("MainWindow", "CSPOV Alpha Test", None))
+        MainWindow.setWindowTitle(_translate("MainWindow", "AFUSION Alpha Test", None))
         self.panZoomToolButton.setText(_translate("MainWindow", "Pan/Zoom", None))
         self.pointSelectButton.setText(_translate("MainWindow", "Point", None))
         self.regionSelectButton.setText(_translate("MainWindow", "Region", None))
@@ -262,7 +257,6 @@ class Ui_MainWindow(object):
         self.animPlayPause.setText(_translate("MainWindow", "▶", None))
         self.animForward.setStatusTip(_translate("MainWindow", "Step forward", None))
         self.animForward.setText(_translate("MainWindow", "▶|", None))
-        self.menu_File.setTitle(_translate("MainWindow", "&File", None))
         self.probeAPane.setWindowTitle(_translate("MainWindow", "A Probe", None))
         self.probeBPane.setWindowTitle(_translate("MainWindow", "B Probe", None))
         self.layersPane.setWindowTitle(_translate("MainWindow", "Layers", None))
@@ -281,5 +275,4 @@ class Ui_MainWindow(object):
         self.layerConfigPane.setWindowTitle(_translate("MainWindow", "Layer Details", None))
         self.layerNameEdit.setText(_translate("MainWindow", "Layer Name", None))
         self.colorBarButton.setText(_translate("MainWindow", "ColorBar", None))
-        self.action_Open.setText(_translate("MainWindow", "&Open", None))
 

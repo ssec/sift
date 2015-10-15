@@ -167,7 +167,7 @@ class LayerStackListViewModel(QAbstractListModel):
         # listbox.setDragDropMode(QAbstractItemView.DragDrop)
         listbox.setDragDropMode(QAbstractItemView.InternalMove)  # later: accept mimedata
         listbox.setDragEnabled(True)
-        listbox.setSelectionMode(QListView.SingleSelection)  # alternate MultiSelection
+        listbox.setSelectionMode(QListView.MultiSelection)  # alternate SingleSelection
         listbox.setContextMenuPolicy(Qt.CustomContextMenu)
         listbox.customContextMenuRequested.connect(self.menu)
         # selmo = listbox.selectionModel()
@@ -208,6 +208,9 @@ class LayerStackListViewModel(QAbstractListModel):
     def current_selected_uuids(self, lbox:QListView=None):
         # FIXME: this is just plain crufty, also doesn't work!
         lbox = self.current_set_listbox if lbox is None else lbox
+        if lbox is None:
+            LOG.error('not sure which list box is active! oh pooh.')
+            return
         for q in lbox.selectedIndexes():
             yield self.doc.uuid_for_layer(q.row())
 
@@ -221,6 +224,7 @@ class LayerStackListViewModel(QAbstractListModel):
         sel = menu.exec_(lbox.mapToGlobal(pos))
         new_cmap = actions.get(sel, None)
         selected_uuids = list(self.current_selected_uuids(lbox))
+        LOG.debug("selected UUID set is {0!r:s}".format(selected_uuids))
         if new_cmap is not None:
             LOG.info("changing to colormap {0} for ids {1!r:s}".format(new_cmap, selected_uuids))
             self.doc.change_colormap_for_layers(name=new_cmap) # FIXME, uuids=selected_uuids)
@@ -297,7 +301,10 @@ class LayerStackListViewModel(QAbstractListModel):
         if role==Qt.EditRole:
             if isinstance(data, str):
                 LOG.debug("changing row {0:d} name to {1!r:s}".format(index.row(), data))
-                self.doc.change_layer_name(index.row(), data)
+                if not data:
+                    LOG.warning("skipping rename to nothing")
+                else:
+                    self.doc.change_layer_name(index.row(), data)
                 return True
             else:
                 LOG.debug("data type is {0!r:s}".format(type(data)))

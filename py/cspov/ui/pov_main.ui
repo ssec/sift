@@ -10,8 +10,11 @@
     <height>807</height>
    </rect>
   </property>
+  <property name="acceptDrops">
+   <bool>true</bool>
+  </property>
   <property name="windowTitle">
-   <string>CSPOV Alpha Test</string>
+   <string>AFUSION Alpha Test</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -308,13 +311,6 @@
      <height>22</height>
     </rect>
    </property>
-   <widget class="QMenu" name="menu_File">
-    <property name="title">
-     <string>&amp;File</string>
-    </property>
-    <addaction name="action_Open"/>
-   </widget>
-   <addaction name="menu_File"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QDockWidget" name="probeAPane">
@@ -324,7 +320,7 @@
    <attribute name="dockWidgetArea">
     <number>2</number>
    </attribute>
-   <widget class="QWidget" name="dockWidgetContents_2"/>
+   <widget class="QWidget" name="probeAWidget"/>
   </widget>
   <widget class="QDockWidget" name="probeBPane">
    <property name="windowTitle">
@@ -333,7 +329,7 @@
    <attribute name="dockWidgetArea">
     <number>2</number>
    </attribute>
-   <widget class="QWidget" name="dockWidgetContents_4"/>
+   <widget class="QWidget" name="probeBWidget"/>
   </widget>
   <widget class="QDockWidget" name="layersPane">
    <property name="windowTitle">
@@ -467,11 +463,6 @@
     </layout>
    </widget>
   </widget>
-  <action name="action_Open">
-   <property name="text">
-    <string>&amp;Open</string>
-   </property>
-  </action>
  </widget>
  <resources/>
  <connections/>

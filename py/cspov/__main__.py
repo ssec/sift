@@ -44,6 +44,12 @@ from cspov.ui.pov_main_ui import Ui_MainWindow
 import os
 import logging
 
+# http://stackoverflow.com/questions/12459811/how-to-embed-matplotib-in-pyqt-for-dummies
+from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
+import matplotlib.pyplot as plt
+
+
 LOG = logging.getLogger(__name__)
 PROGRESS_BAR_MAX = 1000
 
@@ -77,9 +83,54 @@ def test_layers(ws, doc, glob_pattern=None):
 
 
 class Main(QtGui.QMainWindow):
-    def _init_add_file_dialog(self):
-        pass
-        # self._b_adds_files = UserAddsFileToDoc(self, self.ui.)
+
+    def make_mpl_pane(self, parent):
+        """place a matplotlib figure inside a probe pane
+        """
+        # a figure instance to plot on
+        figure = plt.figure(figsize=(3,3), dpi=72)
+
+        # this is the Canvas Widget that displays the `figure`
+        # it takes the `figure` instance as a parameter to __init__
+        canvas = FigureCanvas(figure, )
+
+        # this is the Navigation widget
+        # it takes the Canvas widget and a parent
+        toolbar = None # NavigationToolbar(canvas, self)
+
+        # Just some button connected to `plot` method
+        # self.button = QtGui.QPushButton('Plot')
+        # self.button.clicked.connect(self.plot)
+
+        # set the layout
+        layout = QtGui.QVBoxLayout()
+        # layout.addWidget(toolbar)
+        layout.addWidget(canvas)
+        # layout.addWidget(button)
+        parent.setLayout(layout)
+        return figure, canvas, toolbar
+
+
+    def open_files(self):
+        files = QtGui.QFileDialog.getOpenFileNames(self,
+                                                   "Select one or more files to open",
+                                                   os.getenv("HOME"),
+                                                   'Mercator GeoTIFF (*.tiff *.tif)')
+        for filename in files:
+            self.document.open_file(filename)
+
+    def dropEvent(self, event):
+        LOG.debug('drop event on mainwindow')
+        mime = event.mimeData()
+        if mime.hasUrls:
+            event.setDropAction(QtCore.Qt.CopyAction)
+            event.accept()
+            for url in mime.urls():
+                path = str(url.toLocalFile())
+                LOG.info('about to open {}'.format(path))
+                self.document.open_file(path)
+        else:
+            event.ignore()
 
     def change_tool(self, name="pz_camera"):
         buttons = [self.ui.panZoomToolButton, self.ui.pointSelectButton, self.ui.regionSelectButton]
@@ -103,9 +154,9 @@ class Main(QtGui.QMainWindow):
         frame_index, frame_count, animating = frame_info[:3]
         self.ui.animationSlider.setRange(0, frame_count-1)
         self.ui.animationSlider.setValue(frame_index or 0)
-        LOG.debug('did update animation slider {} {}'.format(frame_index, frame_count))
+        # LOG.debug('did update animation slider {} {}'.format(frame_index, frame_count))
         self.ui.animPlayPause.setDown(animating)
-        self.ui.animationSlider.update()
+        self.ui.animationSlider.repaint()
 
     def change_layer_colormap(self, nfo):
         uuid = nfo['uuid']
@@ -113,14 +164,16 @@ class Main(QtGui.QMainWindow):
         LOG.info('changing {} to colormap {}'.format(uuid, mapname))
         self.scene_manager.set_colormap(mapname, uuid=uuid)
 
-    def openAction(self, *args, **kwargs):
-        LOG.info('let us open a file!')
+    def animation_slider_jump_frame(self, event, *args, **kwargs):
+        frame = self.ui.animationSlider.value()
+        self.scene_manager.set_frame_number(frame)
 
     def __init__(self, workspace_dir=None, glob_pattern=None, border_shapefile=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
         # refer to objectName'd entities as self.ui.objectName
+        self.setAcceptDrops(True)
 
         self.queue = TaskQueue()
         self.ui.progressBar.setRange(0, PROGRESS_BAR_MAX)
@@ -129,7 +182,10 @@ class Main(QtGui.QMainWindow):
         # create document
         self.workspace = Workspace(workspace_dir)
         self.document = doc = Document(self.workspace)
-        self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue, glob_pattern=glob_pattern, parent=self)
+        self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
+                                               glob_pattern=glob_pattern,
+                                               border_shapefile=border_shapefile,
+                                               parent=self)
         self.ui.mainWidgets.addTab(self.scene_manager.main_canvas.native, 'Mercator')
 
         self.scene_manager.didChangeFrame.connect(self.update_frame_slider)
@@ -137,8 +193,14 @@ class Main(QtGui.QMainWindow):
         self.ui.animForward.clicked.connect(self.scene_manager.layer_set.next_frame)
         last_frame = partial(self.scene_manager.layer_set.next_frame, frame_number=-1)
         self.ui.animBack.clicked.connect(last_frame)
+        self.ui.animationSlider.valueChanged.connect(self.animation_slider_jump_frame)
         # TODO: connect animation slider to frame number
         # TODO: connect step forward and step back buttons to frame number (.next_frame)
+
+        # disable close button on panes
+        for pane in [self.ui.probeAPane, self.ui.probeBPane, self.ui.layersPane]:
+            pane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable |
+                             QtGui.QDockWidget.DockWidgetMovable)
 
         for uuid, ds_info, full_data in test_layers(self.workspace, self.document, glob_pattern=glob_pattern):
             # this now fires off a document modification cascade resulting in a new layer going up
@@ -155,12 +217,37 @@ class Main(QtGui.QMainWindow):
             timer.start()
         self.scene_manager.main_canvas.transforms.changed.connect(partial(start_wrapper, self.scheduler))
 
+        # convey action between document and layer list view
+        self.behaviorLayersList = LayerStackListViewModel([self.ui.layerSet1Table, self.ui.layerSet2Table, self.ui.layerSet3Table, self.ui.layerSet4Table], doc)
+
         def update_probe_point(uuid, xy_pos):
             data_point = self.workspace.get_content_point(uuid, xy_pos)
             self.ui.cursorProbeText.setText("Point Probe: {:.03f}".format(float(data_point)))
         self.scene_manager.newProbePoint.connect(update_probe_point)
-        def update_probe_polygon(uuid, points):
-            data_polygon = self.workspace.get_content_polygon(uuid, points)
+
+        def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
+            selected_uuids = list(layerlist.current_selected_uuids())
+            LOG.debug("selected UUID set is {0!r:s}".format(selected_uuids))
+            if len(selected_uuids)==0:
+                selected_uuids = [uuid]
+            if (len(selected_uuids)==1):
+                data_polygon = self.workspace.get_content_polygon(selected_uuids[0], points)
+                self.figureA.clf()
+                plt.hist(data_polygon.flatten(), bins=100)
+                self.canvasA.draw()
+            elif len(selected_uuids)==2:
+                data1 = self.workspace.get_content_polygon(selected_uuids[0], points)
+                name1 = self.workspace.get_info(selected_uuids[0])['name']
+                data2 = self.workspace.get_content_polygon(selected_uuids[1], points)
+                name2 = self.workspace.get_info(selected_uuids[1])['name']
+                self.figureA.clf()
+                plt.scatter(data1.flatten(), data2.flatten(), s=1, alpha=0.5)
+                plt.xlabel(name1)
+                plt.ylabel(name2)
+                self.canvasA.draw()
+                data_polygon = data1
+            else:
+                data_polygon = self.workspace.get_content_polygon(selected_uuids[0], points)
             avg = data_polygon.mean()
             self.ui.cursorProbeText.setText("Polygon Probe: {:.03f}".format(float(avg)))
             self.scene_manager.on_new_polygon(points)
@@ -176,20 +263,36 @@ class Main(QtGui.QMainWindow):
             (0.00, 0.00, 1.00, 1.00),
         ]))
 
-        # convey action between document and layer list view
-        self.behaviorLayersList = LayerStackListViewModel([self.ui.layerSet1Table, self.ui.layerSet2Table, self.ui.layerSet3Table, self.ui.layerSet4Table], doc)
-
         # self.queue.add('test', test_task(), 'test000')
         # self.ui.layers
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
         self.document.didChangeColormap.connect(self.change_layer_colormap)
 
-        self.ui.action_Open.triggered.connect(self.openAction)
-
         self.ui.panZoomToolButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.pz_camera.name))
         self.ui.pointSelectButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.point_probe_camera.name))
         self.ui.regionSelectButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.polygon_probe_camera.name))
         self.change_tool()
+
+        self.setup_menu()
+        self.setup_probe_panes()
+
+    def setup_probe_panes(self):
+        self.figureA, self.canvasA, self.toolbarA = self.make_mpl_pane(self.ui.probeAWidget)
+
+
+    def setup_menu(self):
+        open_action = QtGui.QAction("&Open", self)
+        open_action.setShortcut("Ctrl+O")
+        open_action.triggered.connect(self.open_files)
+
+        exit_action = QtGui.QAction("&Exit", self)
+        exit_action.setShortcut("Ctrl+Q")
+        exit_action.triggered.connect(QtGui.qApp.quit)
+
+        menubar = self.ui.menubar
+        file_menu = menubar.addMenu('&File')
+        file_menu.addAction(open_action)
+        file_menu.addAction(exit_action)
 
     def setup_key_releases(self):
         def cb_factory(required_key, cb):
