@@ -39,6 +39,7 @@ from cspov.queue import TASK_DOING, TASK_PROGRESS
 
 from PyQt4.QtCore import QObject, pyqtSignal
 import numpy as np
+from uuid import UUID
 
 import os
 import logging
@@ -376,52 +377,58 @@ class SceneGraphManager(QObject):
         for uuid in uuids:
             self.image_layers[uuid].cmap = colormap
 
-    def add_colormap(self, name, colormap):
+    def add_colormap(self, name:str, colormap):
         self.colormaps[name] = colormap
 
-    def rebuild_layer_changed(self, change_dict, *args, **kwargs):
-        """
-        document layer changed, update that layer
-        :param change_dict: dictionary of change information
-        :return:
-        """
-        if change_dict['change']=='add':  # a layer was added
-            # add visuals to scene
-            ds_info = change_dict['info']
-            overview_content = change_dict['content']
-            uuid = ds_info["uuid"]
+    def change_layers_colormap(self, change_dict):
+        for uuid,cmapid in change_dict.items():
+            self.set_colormap(cmapid, uuid)
 
-            # create a new layer in the imagelist
-            image = TiledGeolocatedImage(
-                overview_content,
-                ds_info["origin_x"],
-                ds_info["origin_y"],
-                ds_info["cell_width"],
-                ds_info["cell_height"],
-                name=str(uuid),
-                clim=ds_info["clim"],
-                interpolation='nearest',
-                method='tiled',
-                cmap='grays',
-                double=False,
-                texture_shape=DEFAULT_TEXTURE_SHAPE,
-                wrap_lon=True,
-                parent=self.main_map,
-            )
-            image.transform *= STTransform(translate=(0, 0, -50.0))
-            self.image_layers[uuid] = image
-            self.datasets[uuid] = ds_info
-            self.layer_set.add_layer(image)
+    def add_layer(self, new_order:list, ds_info:dict, overview_content:np.ndarray):
+        uuid = ds_info['uuid']
+        # create a new layer in the imagelist
+        image = TiledGeolocatedImage(
+            overview_content,
+            ds_info["origin_x"],
+            ds_info["origin_y"],
+            ds_info["cell_width"],
+            ds_info["cell_height"],
+            name=str(uuid),
+            clim=ds_info["clim"],
+            interpolation='nearest',
+            method='tiled',
+            cmap='grays',
+            double=False,
+            texture_shape=DEFAULT_TEXTURE_SHAPE,
+            wrap_lon=True,
+            parent=self.main_map,
+        )
+        image.transform *= STTransform(translate=(0, 0, -50.0))
+        self.image_layers[uuid] = image
+        self.datasets[uuid] = ds_info
+        self.layer_set.add_layer(image)
 
-        elif change_dict['change']=='visible':
-            ds_info = change_dict['info']
-            uuid = ds_info['uuid']
-            new_state = change_dict['visible']
-            self.set_layer_visible(uuid, new_state)
+    def remove_layer(self, new_order:list, uuid_removed:UUID):
+        self.set_layer_visible(uuid_removed, False)
+        raise NotImplementedError("layer removal from scenegraph not implemented")  # FIXME
+
+    def change_layer_visibility(self, layers_changed:dict):
+        for uuid,visible in layers_changed.items():
+            self.set_layer_visible(uuid, visible)
+
+    def rebuild_new_layer_set(self, new_set_number:int, new_prez_order:list, new_anim_order:list):
+        raise NotImplementedError("layer set change not implemented in SceneGraphManager")
+
+
 
     def set_document(self, document):
-        document.didChangeLayerOrder.connect(self.rebuild_new_order)
-        document.didChangeLayer.connect(self.rebuild_layer_changed)
+        document.didReorderLayers.connect(self.rebuild_new_order)
+        document.didAddLayer.connect(self.add_layer)
+        document.didRemoveLayer.connect(self.remove_layer)
+        document.didSwitchLayerSet.connect(self.rebuild_new_layer_set)
+        document.didChangeColormap.connect(self.change_layers_colormap)
+        document.didChangeLayerVisibility.connect(self.set_layer_visible)
+
 
     def set_frame_number(self, frame_number=None):
         self.layer_set.next_frame(None, frame_number)
@@ -437,6 +444,8 @@ class SceneGraphManager(QObject):
         :param change:
         :return:
         """
+        # FIXME
+        raise NotImplementedError("layer order change not implemented in scenegraphmanager")
         print("New layer order: ", new_layer_index_order)
 
     def rebuild_all(self, *args, **kwargs):
