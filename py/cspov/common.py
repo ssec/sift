@@ -119,12 +119,13 @@ class MercatorTileCalc(object):
     zero_point = None
     tile_shape = None
     # derived
-    extents_box = None  # word coordinates that this image and its tiles corresponds to
+    image_extents_box = None  # word coordinates that this image and its tiles corresponds to
     tiles_avail = None  # (ny,nx) available tile count for this image
 
     def __init__(self, name, image_shape, ul_origin, pixel_rez,
                  tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH),
                  texture_shape=(DEFAULT_TEXTURE_HEIGHT, DEFAULT_TEXTURE_WIDTH),
+                 projection=DEFAULT_PROJECTION,
                  wrap_lon=False):
         """
         name: the 'name' of the tile, typically the path of the file it represents
@@ -149,13 +150,17 @@ class MercatorTileCalc(object):
         # in units of data elements (float32):
         self.texture_size = (self.texture_shape[0] * self.tile_shape[0], self.texture_shape[1] * self.tile_shape[1])
         self.image_tiles_avail = (self.image_shape[0] / self.tile_shape[0], self.image_shape[1] / self.tile_shape[1])
-
         self.wrap_lon = wrap_lon
-        # if self.wrap_lon:
-        #     # FIXME: Temporary until we can automatically know that tile (Y, X) is tile (Y, X-tiles_avail[1])
-        #     self.image_shape = (self.image_shape[0], self.image_shape[1] * 2)
 
-        self.extents_box = box(
+        p = Proj(projection)
+        # Note: this logic probably only works for mercator or other cylindrical projections
+        self.world_extents_box = box(
+            b=p(0, -89.9)[1],
+            t=p(0, 89.9)[1],
+            l=p(-180, 0)[0],
+            r=p(180, 0)[0],
+        )
+        self.image_extents_box = box(
             b=self.ul_origin[0] - self.image_shape[0] * self.pixel_rez.dy,
             t=self.ul_origin[0],
             l=self.ul_origin[1],
@@ -173,14 +178,14 @@ class MercatorTileCalc(object):
         """
         V = visible_geom
         X = extra_tiles_box  # FUTURE: extra_geom_box specifies in world coordinates instead of tile count
-        E = self.extents_box
+        E = self.image_extents_box
         Z = self.pixel_rez
 
         if self.wrap_lon:
             # FIXME: Technically this doesn't handle reusing the tiles properly, this assumes that the tiles align perfectly
             # make the image look like it covers twice as much of the earth
             # XXX: this only works for global images (not subimages)
-            E = box(b=E.b, l=E.l, t=E.t, r=E.r + self.image_shape[1] * self.pixel_rez.dx)  # copy the original instance variable
+            E = box(b=E.b, l=E.l, t=E.t, r=E.r + (E.r - E.l))  # copy the original instance variable
 
         # convert world coords to pixel coords
         # py0, px0 = self.extents_box.b, self.extents_box.l
@@ -309,7 +314,7 @@ class MercatorTileCalc(object):
         return world coordinate box a given tile fills
         """
         LOG.debug('{}y, {}x'.format(tiy,tix))
-        eb,el = self.extents_box.b, self.extents_box.l
+        eb,el = self.image_extents_box.b, self.image_extents_box.l
         dy,dx = self.pixel_rez
         if dy<0:
             LOG.warning('unexpected dy={}'.format(dy))
