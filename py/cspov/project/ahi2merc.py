@@ -11,13 +11,14 @@ __author__ = 'davidh'
 import os
 import sys
 import logging
-
-from glob import glob
-from osgeo import gdal
-import osr
 import subprocess
 
-from cspov.project.ahi2gtiff import ahi2gtiff
+import osr
+from glob import glob
+from osgeo import gdal
+from pyproj import Proj
+
+from cspov.project.ahi2gtiff import create_ahi_geotiff, ahi_image_info, ahi_image_data
 
 LOG = logging.getLogger(__name__)
 GTIFF_DRIVER = gdal.GetDriverByName("GTIFF")
@@ -25,7 +26,9 @@ DEFAULT_PROJ_STR = "+proj=merc +datum=WGS84 +ellps=WGS84 +no_defs"
 
 
 def run_gdalwarp(input_file, output_file, *args):
-    subprocess.call(["gdalwarp"] + list(args) + [input_file, output_file])
+    args = list(args) + [input_file, output_file]
+    LOG.info("Running gdalwarp with: gdalwarp %s", " ".join(args))
+    subprocess.call(["gdalwarp"] + args)
 
 
 def main():
@@ -70,7 +73,14 @@ def main():
             LOG.warning("Output file already exists: %s" % (merc_file,))
             continue
 
-        ahi2gtiff(nc_file, geos_file)
+        try:
+            src_info = ahi_image_info(nc_file)
+            src_data = ahi_image_data(nc_file)
+            create_ahi_geotiff(src_info, src_data, geos_file)
+            lon_west, lon_east = src_info["lon_extents"]
+        except RuntimeError:
+            LOG.error("Could not create geotiff for '%s'" % (nc_file,))
+            continue
 
         # Get information about the geotiff
         gtiff = gdal.Open(geos_file)
@@ -83,12 +93,22 @@ def main():
 
         # Run gdalwarp
         LOG.info("Running gdalwarp on '%s' to create '%s'", geos_file, merc_file)
+        proj = DEFAULT_PROJ_STR
+        proj = proj + " +over" if lon_east >= 180 else proj
+        # Include the '+over' parameter so longitudes are wrapper around the antimeridian
+        src_proj = Proj(proj)
+        x_extent = (src_proj(lon_west, 0)[0], src_proj(lon_east, 0)[0])
+        y_extent = (src_proj(0, -80)[1], src_proj(0, 80)[1])
+        # import ipdb; ipdb.set_trace()
         gdalwarp_args = args.gdalwarp_args + [
             #"-multi",
-            "-t_srs", DEFAULT_PROJ_STR,
+            "-t_srs", proj,
             "-tr", str(cw), str(ch),
-            "-te_srs", "+proj=latlong +datum=WGS84 +ellps=WGS84",
-            "-te", "-180", "-80", "180", "80",
+            "-te",
+            "{:0.03f}".format(x_extent[0]),
+            "{:0.03f}".format(y_extent[0]),
+            "{:0.03f}".format(x_extent[1]),
+            "{:0.03f}".format(y_extent[1]),
         ]
         run_gdalwarp(geos_file, merc_file, *gdalwarp_args)
 

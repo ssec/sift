@@ -169,8 +169,17 @@ def ahi_image_info(input_filename):
     origin_y = -pixel_size_y * (shape[0] / 2.0)
     LOG.debug("Origin X: %f\tOrigin Y: %f", origin_x, origin_y)
 
+    # AHI NetCDF files have "proper" 0-360 longitude so lon_min is west, lon_max is east
     lon_min = lon.min()
     lon_max = lon.max()
+    if lon_max >= 180 or (lon_max - lon_min) < 180:
+        # If longitudes are 0-360 then coordinates are as expected
+        lon_west = lon_min
+        lon_east = lon_max
+    else:
+        # If we are wrapping around the antimeridian
+        lon_west = lon_max
+        lon_east = lon_min
 
     info = {
         "proj": input_proj_str,
@@ -180,8 +189,7 @@ def ahi_image_info(input_filename):
         "cell_height": pixel_size_y,
         "width": shape[1],
         "height": shape[0],
-        "lon_min": lon_min,
-        "lon_max": lon_max,
+        "lon_extents": (lon_west, lon_east),
     }
     return info
 
@@ -190,11 +198,13 @@ def ahi2gtiff(input_filename, output_filename):
     LOG.debug("Opening input netcdf4 file: %s", input_filename)
     data = ahi_image_data(input_filename)
     info = ahi_image_info(input_filename)
+    return ahi2gtiff(info, data, output_filename)
 
+
+def create_ahi_geotiff(info, data, output_filename):
     etype = gdal.GDT_Byte if data.dtype == np.uint8 else gdal.GDT_Float32
     # origin_x, cell_width, rotation_x, origin_y, rotation_y, cell_height
     geotransform = (info["origin_x"], info["cell_width"], 0, info["origin_y"], 0, info["cell_height"])
-
     create_geotiff(data, output_filename, info["proj"], geotransform, etype=etype)
 
 
