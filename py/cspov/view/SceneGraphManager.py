@@ -420,8 +420,6 @@ class SceneGraphManager(QObject):
     def rebuild_new_layer_set(self, new_set_number:int, new_prez_order:list, new_anim_order:list):
         raise NotImplementedError("layer set change not implemented in SceneGraphManager")
 
-
-
     def set_document(self, document):
         document.didReorderLayers.connect(self.rebuild_new_order)
         document.didAddLayer.connect(self.add_layer)
