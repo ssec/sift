@@ -131,7 +131,7 @@ class Document(QObject):
 
     # signals
     didAddLayer = pyqtSignal(list, dict, np.ndarray)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
-    didRemoveLayer = pyqtSignal(list, UUID)  # new order list, UUID of the layer being removed
+    willPurgeLayer = pyqtSignal(list, UUID)  # new order list, UUID of the layer being removed
     didReorderLayers = pyqtSignal(list)  # list of original indices in their new order, None for new layers
     didChangeLayerVisibility = pyqtSignal(dict)  # {UUID: new-visibility, ...} for changed layers
     didReorderAnimation = pyqtSignal(list)  # list of UUIDs representing new animation order
@@ -350,10 +350,24 @@ class Document(QObject):
             clo.insert(row, None)
         self.didReorderLayers.emit(clo)
 
+    def is_using(self, uuid):
+        "return true if this dataset is still in use in one of the layer sets"
+        return True  # FIXME
+
     def remove_layer_prez(self, row, count=1):
+        self.toggle_layer_visibility(list(range(row,row+count)), False)
         clo = list(range(len(self.current_layer_set)))
         del clo[row:row+count]
+        uuids = [x.uuid for x in self.current_layer_set[row:row+count]]
         del self.current_layer_set[row:row+count]
+        for uuid in uuids:
+            # FIXME: let the scenegraph know to hide
+            if not self.is_using(uuid):
+                self.willPurgeLayer.emit(uuid)
+                # remove from our bookkeeping
+                del self._layer_with_uuid[uuid]
+                # remove from workspace
+                self._workspace.remove(uuid)
         self.didReorderLayers.emit(clo)
 
 

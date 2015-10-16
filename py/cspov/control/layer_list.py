@@ -206,7 +206,7 @@ class LayerStackListViewModel(QAbstractListModel):
         doc.didChangeLayerVisibility.connect(self.refresh)
         doc.didChangeLayerName.connect(self.refresh)
         doc.didAddLayer.connect(self.refresh)
-        doc.didRemoveLayer.connect(self.refresh)
+        doc.willPurgeLayer.connect(self.refresh)
         doc.didSwitchLayerSet.connect(self.refresh)
         doc.didReorderAnimation.connect(self.refresh)
 
