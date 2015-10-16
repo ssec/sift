@@ -62,7 +62,9 @@ import unittest
 import argparse
 from collections import namedtuple
 from enum import Enum
-from cspov.common import kind
+from uuid import UUID
+import numpy as np
+from cspov.common import KIND, INFO
 
 from PyQt4.QtCore import QObject, pyqtSignal
 
@@ -128,13 +130,14 @@ class Document(QObject):
     _layer_with_uuid = None  # dict(uuid:datasetinfo)
 
     # signals
-    didChangeLayer = pyqtSignal(dict)  # 'change' key is add/remove/visible
-    didChangeLayerOrder = pyqtSignal(list)  # list of original indices in their new order, None for new layers
-    didChangeLayerVisibility = pyqtSignal(list)  # list of (uuid,visible) tuples in layer order
-
-    didSwitchLayerSet = pyqtSignal(int)  # new layerset number, typically 0..3
-
-    didChangeColormap = pyqtSignal(dict)  # includes colormaps
+    didAddLayer = pyqtSignal(list, dict, np.ndarray)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
+    didRemoveLayer = pyqtSignal(list, UUID)  # new order list, UUID of the layer being removed
+    didReorderLayers = pyqtSignal(list)  # list of original indices in their new order, None for new layers
+    didChangeLayerVisibility = pyqtSignal(dict)  # {UUID: new-visibility, ...} for changed layers
+    didReorderAnimation = pyqtSignal(list)  # list of UUIDs representing new animation order
+    didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
+    didSwitchLayerSet = pyqtSignal(int, list, list)  # new layerset number typically 0..3, list of prez tuples representing new display order, new animation order
+    didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     # didChangeShapeLayer = pyqtSignal(dict)
 
     def __init__(self, workspace, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
@@ -170,7 +173,7 @@ class Document(QObject):
         # add as visible to the front of the current set, and invisible to the rest of the available sets
         colormap = self._default_colormap(info)
         p = prez(uuid=uuid,
-                 kind=info["kind"],
+                 kind=info[INFO.KIND],
                  visible=True,
                  a_order=None,
                  colormap=colormap,
@@ -181,17 +184,10 @@ class Document(QObject):
             if lset is not None:  # uninitialized layer sets will be None
                 lset.insert(insert_before, p if dex==self.current_set_index else q)
 
-        # signal updates from the document
-        self.didChangeLayer.emit({
-            'change': 'add',
-            'uuid': uuid,
-            'info': info,
-            'content': content,
-            'order': 0
-        })
-        # express new layer order using old layer order indices
         reordered_indices = [None] + list(range(old_layer_count))
-        self.didChangeLayerOrder.emit(reordered_indices)
+        # signal updates from the document
+        self.didAddLayer.emit(reordered_indices, info, content)
+
         return uuid, info, content
 
     def update_dataset_info(self, new_info):
@@ -201,14 +197,24 @@ class Document(QObject):
         :param new_info: information dictionary including projection, levels of detail, etc
         :return: None
         """
-        uuid = new_info['uuid']
+        uuid = new_info[INFO.UUID]
         if uuid not in self._layer_with_uuid:
             LOG.warning('new information on uuid {0!r:s} is not for a known dataset'.format(new_info))
-        self._layer_with_uuid[new_info['uuid']] = new_info
+        self._layer_with_uuid[new_info[INFO.UUID]] = new_info
         # TODO: see if this affects any presentation information; view will handle redrawing on its own
 
     def _clone_layer_set(self, existing_layer_set):
         return existing_layer_set.deepcopy()
+
+    @property
+    def current_animation_order(self):
+        """
+        return list of UUIDs representing the animation order in the currently selected layer set
+        :return: list of UUIDs
+        """
+        q = [(x.a_order, x.uuid) for x in self.current_layer_set if x.a_order is not None]
+        q.sort()
+        return q
 
     def select_layer_set(self, layer_set_index):
         """
@@ -223,9 +229,9 @@ class Document(QObject):
             self._layer_sets[layer_set_index] = self._clone_layer_set(self._layer_sets[self.current_set_index])
             did_clone = True
         self.current_set_index = layer_set_index
-        self.didSwitchLayerSet.emit(layer_set_index)
+        self.didSwitchLayerSet.emit(layer_set_index, self.current_layer_set, self.current_animation_order)
         if not did_clone:
-            self.didChangeLayerOrder.emit([])  # indicate that pretty much everything has changed
+            self.didReorderLayers.emit([])  # indicate that pretty much everything has changed
 
     def change_layer_order(self, old_index, new_index):
         L = self.current_layer_set
@@ -236,14 +242,14 @@ class Document(QObject):
         del order[old_index]
         L.insert(new_index, p)
         L.insert(new_index, d)
-        self.didChangeLayerOrder.emit(order)
+        self.didReorderLayers.emit(order)
 
     def swap_layer_order(self, first_index, second_index):
         L = self.current_layer_set
         order = list(range(len(L)))
         L[first_index], L[second_index] = L[second_index], L[first_index]
         order[first_index], order[second_index] = order[second_index], order[first_index]
-        self.didChangeLayerOrder.emit(order)
+        self.didReorderLayers.emit(order)
 
     def toggle_layer_visibility(self, dex, visible=None):
         """
@@ -256,15 +262,7 @@ class Document(QObject):
         visible = ~old.visible if visible is None else visible
         nu = old._replace(visible=visible)
         L[dex] = nu
-        self.didChangeLayer.emit({
-            'change': 'visible',
-            'visible': visible,
-            'info': self._layer_with_uuid[nu.uuid],
-            'uuid': nu.uuid,
-            'order': dex
-        })
-        lvl = [(x.uuid, x.visible) for x in self.current_layer_set]
-        self.didChangeLayerVisibility.emit(lvl)
+        self.didChangeLayerVisibility.emit({nu.uuid: nu.visible})
 
     def is_layer_visible(self, dex):
         return self.current_layer_set[dex].visible
@@ -275,34 +273,27 @@ class Document(QObject):
     def change_layer_name(self, row, new_name):
         uuid = self.current_layer_set[row].uuid
         info = self.get_info(row)
-        assert(uuid==info['uuid'])
-        info['name'] = new_name
-        nfo = {
-            'change': 'name',
-            'uuid': uuid,
-            'info': info,
-            'row': row
-        }
-        self.didChangeLayer.emit(nfo)
+        assert(uuid==info[INFO.UUID])
+        info[INFO.NAME] = new_name
+        self.didChangeLayerName.emit(uuid, new_name)
 
     def change_colormap_for_layers(self, name, uuids=None):
         L = self.current_layer_set
         if uuids is not None:
             # LOG.error('layer selection not implemented in change_colormap_for_layers')
-            for uuid in uuids:
-                nfo = {'uuid': uuid, 'colormap': name, 'change': 'colormap'}
-                self.didChangeColormap.emit(nfo)
+            nfo = dict((uuid, name) for uuid in uuids)
         else:  # all data layers
             uuids = []
+            nfo = {}
             for dex in range(len(self.current_layer_set)):
                 uuid = self.current_layer_set[dex].uuid
-                nfo = {'uuid': uuid, 'colormap': name, 'change': 'colormap'}
+                nfo[uuid] = name
                 uuids.append(uuid)
-                self.didChangeColormap.emit(nfo)
         for uuid in uuids:
             for dex,pinfo in enumerate(L):
                 if pinfo.uuid==uuid:
                     L[dex] = pinfo._replace(colormap=name)
+        self.didChangeColormap.emit(nfo)
 
     def __len__(self):
         return len(self.current_layer_set)
@@ -341,13 +332,13 @@ class Document(QObject):
                 continue
             cls.insert(row, p)
             clo.insert(row, None)
-        self.didChangeLayerOrder.emit(clo)
+        self.didReorderLayers.emit(clo)
 
     def remove_layer_prez(self, row, count=1):
         clo = list(range(len(self.current_layer_set)))
         del clo[row:row+count]
         del self.current_layer_set[row:row+count]
-        self.didChangeLayerOrder.emit(clo)
+        self.didReorderLayers.emit(clo)
 
 
 

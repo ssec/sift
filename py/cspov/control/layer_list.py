@@ -40,6 +40,8 @@ import pickle as pkl
 import base64
 from PyQt4.QtCore import QAbstractListModel, QAbstractTableModel, QVariant, Qt, QSize, QModelIndex, QPoint, QMimeData
 from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyleOptionViewItem
+from cspov.model.document import Document
+from cspov.common import INFO, KIND
 
 LOG = logging.getLogger(__name__)
 
@@ -185,7 +187,7 @@ class LayerStackListViewModel(QAbstractListModel):
             if widget.isVisible():
                 return widget
 
-    def __init__(self, widgets, doc):
+    def __init__(self, widgets:list, doc:Document):
         """
         Connect one or more table views to the document via this model.
         :param widgets: list of TableViews to wire up
@@ -198,12 +200,26 @@ class LayerStackListViewModel(QAbstractListModel):
         # self._column = [self._visibilityData, self._nameData]
         self.item_delegate = LayerWidgetDelegate()
 
-        doc.didChangeLayerOrder.connect(self.updateList)
-        doc.didChangeLayer.connect(self.updateList)
+        # for now, a copout by just having a refresh to the content when document changes
+        doc.didReorderLayers.connect(self.refresh)
+        doc.didChangeColormap.connect(self.refresh)
+        doc.didChangeLayerVisibility.connect(self.refresh)
+        doc.didChangeLayerName.connect(self.refresh)
+        doc.didAddLayer.connect(self.refresh)
+        doc.didRemoveLayer.connect(self.refresh)
+        doc.didSwitchLayerSet.connect(self.refresh)
+        doc.didReorderAnimation.connect(self.refresh)
+
         self.setSupportedDragActions(Qt.CopyAction | Qt.MoveAction)
 
         for widget in widgets:
             self._init_widget(widget)
+
+    def refresh(self):
+        for widget in self.widgets:
+            if widget.isVisible():
+                widget.update()
+
 
     def current_selected_uuids(self, lbox:QListView=None):
         # FIXME: this is just plain crufty, also doesn't work!
@@ -291,7 +307,7 @@ class LayerStackListViewModel(QAbstractListModel):
         elif role == Qt.DisplayRole:
             lao = self.doc.layer_animation_order(row)
             # return  ('[-]  ' if lao is None else '[{}]'.format(lao+1)) + el[row]['name']
-            return el[row]['name']
+            return el[row][INFO.NAME]
         return None
 
     def setData(self, index:QModelIndex, data, role:int=None):
@@ -391,8 +407,6 @@ class LayerStackListViewModel(QAbstractListModel):
     def context_menu(self, qpoint):
         pass
 
-    def updateList(self):
-        pass
         # self.widget().clear()
         # for x in self.doc.asListing():
         #     self.widget().addItem(x['name'])

@@ -40,6 +40,7 @@ from functools import partial
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
+from cspov.common import INFO
 
 import os
 import logging
@@ -159,8 +160,8 @@ class Main(QtGui.QMainWindow):
         self.ui.animationSlider.repaint()
 
     def change_layer_colormap(self, nfo):
-        uuid = nfo['uuid']
-        mapname = nfo['colormap']
+        uuid = nfo[INFO.UUID]
+        mapname = nfo[INFO.COLORMAP]
         LOG.info('changing {} to colormap {}'.format(uuid, mapname))
         self.scene_manager.set_colormap(mapname, uuid=uuid)
 
@@ -237,9 +238,9 @@ class Main(QtGui.QMainWindow):
                 self.canvasA.draw()
             elif len(selected_uuids)==2:
                 data1 = self.workspace.get_content_polygon(selected_uuids[0], points)
-                name1 = self.workspace.get_info(selected_uuids[0])['name']
+                name1 = self.workspace.get_info(selected_uuids[0])[INFO.NAME]
                 data2 = self.workspace.get_content_polygon(selected_uuids[1], points)
-                name2 = self.workspace.get_info(selected_uuids[1])['name']
+                name2 = self.workspace.get_info(selected_uuids[1])[INFO.NAME]
                 self.figureA.clf()
                 plt.scatter(data1.flatten(), data2.flatten(), s=1, alpha=0.5)
                 plt.xlabel(name1)

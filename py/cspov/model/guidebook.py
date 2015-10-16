@@ -16,10 +16,46 @@ This module is the "scientific expert knowledge" that is consulted.
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import os, sys
+import os, sys, re
 import logging, unittest, argparse
+from enum import Enum
+from cspov.common import INFO, KIND
 
 LOG = logging.getLogger(__name__)
+
+class INSTRUMENT(Enum):
+    UNKNOWN = 0
+    AHI = 1
+    ABI = 2
+    AMI = 3
+
+GUIDEBOOKS = {}
+
+
+class Guidebook(object):
+    """
+    guidebook which knows about AHI, ABI, AMI bands, timing, file naming conventions
+    """
+    @staticmethod
+    def is_relevant(pathname):
+        return False
+
+    @staticmethod
+    def for_info(info=None, path=None):
+        """
+        given an info dictionary, figure out which
+        :param info:
+        :return:
+        """
+        if info and not path:
+            path = info[INFO.PATHNAME]
+
+
+class AHI_HSF_Guidebook(Guidebook):
+    @staticmethod
+    def is_relevant(pathname):
+        return True if re.match(r'HS_H\d\d_\d{8}_\d{4}_B\d\d.*', os.path.split(pathname)[1]) else False
+
 
 
 

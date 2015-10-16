@@ -1,0 +1,113 @@
+package:
+  name: vispy
+  version: "0.5.0dev"
+
+source:
+  git_url: https://github.com/vispy/vispy.git
+  git_rev: 65edc3245aaf1e2e55d60d9c3c4abb68564b5972
+#  patches:
+   # List any patch files here
+   # - fix.patch
+
+# build:
+  # noarch_python: True
+  # preserve_egg_dir: True
+  # entry_points:
+    # Put any entry points (scripts to be generated automatically) here. The
+    # syntax is module:function.  For example
+    #
+    # - vispy = vispy:main
+    #
+    # Would create an entry point called vispy that calls vispy.main()
+
+
+  # If this is a new build for the same version, increment the build
+  # number. If you do not include this key, it defaults to 0.
+  # number: 1
+
+requirements:
+  build:
+    - python
+    - setuptools
+    - numpy
+
+  run:
+    - python
+    - numpy
+
+#test:
+#  # Python imports
+#  imports:
+#    - vispy
+#    - vispy.app
+#    - vispy.app.backends
+#    - vispy.app.backends.ipython
+#    - vispy.app.backends.tests
+#    - vispy.app.tests
+#    - vispy.color
+#    - vispy.color.tests
+#    - vispy.ext
+#    - vispy.geometry
+#    - vispy.geometry.tests
+#    - vispy.gloo
+#    - vispy.gloo.gl
+#    - vispy.gloo.gl.tests
+#    - vispy.gloo.tests
+#    - vispy.glsl
+#    - vispy.glsl.antialias
+#    - vispy.glsl.arrows
+#    - vispy.glsl.collections
+#    - vispy.glsl.colormaps
+#    - vispy.glsl.markers
+#    - vispy.glsl.math
+#    - vispy.glsl.misc
+#    - vispy.glsl.transforms
+#    - vispy.io
+#    - vispy.io.tests
+#    - vispy.mpl_plot
+#    - vispy.mpl_plot.tests
+#    - vispy.plot
+#    - vispy.plot.tests
+#    - vispy.scene
+#    - vispy.scene.cameras
+#    - vispy.scene.tests
+#    - vispy.scene.widgets
+#    - vispy.testing
+#    - vispy.testing.tests
+#    - vispy.util
+#    - vispy.util.dpi
+#    - vispy.util.dpi.tests
+#    - vispy.util.fonts
+#    - vispy.util.fonts.tests
+#    - vispy.util.svg
+#    - vispy.util.tests
+#    - vispy.visuals
+#    - vispy.visuals.collections
+#    - vispy.visuals.components
+#    - vispy.visuals.glsl
+#    - vispy.visuals.line
+#    - vispy.visuals.shaders
+#    - vispy.visuals.shaders.tests
+#    - vispy.visuals.text
+#    - vispy.visuals.transforms
+
+  # commands:
+    # You can put test commands to be run here.  Use this to test that the
+    # entry points work.
+
+
+  # You can also put a file called run_test.py in the recipe that will be run
+  # at test time.
+
+  # requires:
+    # Put any additional test requirements here.  For example
+    # - nose
+
+about:
+  home: http://vispy.org
+  license: BSD License
+  summary: 'Interactive visualization in Python'
+
+# See
+# http://docs.continuum.io/conda/build.html for
+# more information about meta.yaml

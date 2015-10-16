@@ -1,0 +1,86 @@
+package:
+  name: cspov
+  version: "0.1"
+
+source:
+  path: ../../py
+#  patches:
+   # List any patch files here
+   # - fix.patch
+
+build:
+  script: python setup.py install
+  # noarch_python: True
+  # preserve_egg_dir: True
+  # entry_points:
+    # Put any entry points (scripts to be generated automatically) here. The
+    # syntax is module:function.  For example
+    #
+    # - pyresample = pyresample:main
+    #
+    # Would create an entry point called pyresample that calls pyresample.main()
+
+
+  # If this is a new build for the same version, increment the build
+  # number. If you do not include this key, it defaults to 0.
+  number: 3
+
+requirements:
+  build:
+    - python
+    - setuptools
+    - numpy ==1.9.3
+    - matplotlib
+    - scipy
+    - numba
+    - pyproj ==1.9.4
+    - vispy ==0.5.0dev
+    - pyopengl ==3.1.1a1
+    - netcdf4 ==1.1.9
+    - h5py ==2.5.0
+    - gdal ==1.11.2
+#    - gdal ==2.0.0
+    - pillow
+    - pyshp ==1.2.1
+    - cython >=0.17 # [win]
+
+  run:
+    - python
+    - numpy ==1.9.3
+    - matplotlib
+    - scipy
+    - numba
+    - pyproj ==1.9.4
+    - vispy ==0.5.0dev
+    - pyopengl ==3.1.1a1
+    - netcdf4 ==1.1.9
+    - h5py ==2.5.0
+    - gdal ==1.11.2
+#    - gdal ==2.0.0
+    - pillow
+    - pyshp ==1.2.1
+
+# test:
+  # Python imports
+  # imports:
+
+  # commands:
+    # You can put test commands to be run here.  Use this to test that the
+    # entry points work.
+
+
+  # You can also put a file called run_test.py in the recipe that will be run
+  # at test time.
+
+  # requires:
+    # Put any additional test requirements here.  For example
+    # - nose
+
+about:
+  #home: The package home page
+  license: GNU Lesser General Public License v3 or later (LGPLv3+)
+  summary: 'Visualization Tool for Geostationary satellite imagery data'
+
+# See
+# http://docs.continuum.io/conda/build.html for
+# more information about meta.yaml
