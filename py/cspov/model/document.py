@@ -212,9 +212,20 @@ class Document(QObject):
         return list of UUIDs representing the animation order in the currently selected layer set
         :return: list of UUIDs
         """
-        q = [(x.a_order, x.uuid) for x in self.current_layer_set if x.a_order is not None]
-        q.sort()
-        return q
+        return list(reversed(self.current_layer_order))
+        # FIXME DEBUG - use this code once we have animation order setting commands
+        # q = [(x.a_order, x.uuid) for x in self.current_layer_set if x.a_order is not None]
+        # q.sort()
+        # return [u for _,u in q]
+
+    @property
+    def current_layer_order(self):
+        """
+        list of UUIDs (top to bottom) currently being displayed, independent of visibility
+        :return:
+        """
+        return [x.uuid for x in self.current_layer_set]
+
 
     def select_layer_set(self, layer_set_index):
         """
