@@ -262,18 +262,23 @@ class Document(QObject):
         order[first_index], order[second_index] = order[second_index], order[first_index]
         self.didReorderLayers.emit(order)
 
-    def toggle_layer_visibility(self, dex, visible=None):
+    def toggle_layer_visibility(self, dexes, visible=None):
         """
-        change the visibility of a layer
-        :param dex: layer index
+        change the visibility of a layer or layers
+        :param dexes: layer index or index list, 0..n-1
         :param visible: True, False, or None (toggle)
         """
         L = self.current_layer_set
-        old = L[dex]
-        visible = ~old.visible if visible is None else visible
-        nu = old._replace(visible=visible)
-        L[dex] = nu
-        self.didChangeLayerVisibility.emit({nu.uuid: nu.visible})
+        zult = {}
+        if isinstance(dexes, int):
+            dexes = [dexes]
+        for dex in dexes:
+            old = L[dex]
+            visible = ~old.visible if visible is None else visible
+            nu = old._replace(visible=visible)
+            L[dex] = nu
+            zult[nu.uuid] = nu.visible
+        self.didChangeLayerVisibility.emit(zult)
 
     def is_layer_visible(self, dex):
         return self.current_layer_set[dex].visible

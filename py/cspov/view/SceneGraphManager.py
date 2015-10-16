@@ -147,7 +147,7 @@ class LayerSet(object):
 
     def add_layer(self, layer):
         LOG.debug('add layer {}'.format(layer))
-        uuid = UUID(layer.name)
+        uuid = UUID(layer.name)  # we backitty-forth this because
         self._layers[uuid] = layer
         self._layer_order.insert(0, uuid)
         self.update_layers_z()
