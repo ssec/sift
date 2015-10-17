@@ -198,14 +198,14 @@ def ahi2gtiff(input_filename, output_filename):
     LOG.debug("Opening input netcdf4 file: %s", input_filename)
     data = ahi_image_data(input_filename)
     info = ahi_image_info(input_filename)
-    return ahi2gtiff(info, data, output_filename)
+    return create_ahi_geotiff(info, data, output_filename)
 
 
-def create_ahi_geotiff(info, data, output_filename):
+def create_ahi_geotiff(info, data, output_filename, **kwargs):
     etype = gdal.GDT_Byte if data.dtype == np.uint8 else gdal.GDT_Float32
     # origin_x, cell_width, rotation_x, origin_y, rotation_y, cell_height
     geotransform = (info["origin_x"], info["cell_width"], 0, info["origin_y"], 0, info["cell_height"])
-    create_geotiff(data, output_filename, info["proj"], geotransform, etype=etype)
+    create_geotiff(data, output_filename, info["proj"], geotransform, etype=etype, **kwargs)
 
 
 def main():

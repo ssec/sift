@@ -40,6 +40,8 @@ def main():
                         help="Input pattern used search for NetCDF files in 'input_dir'")
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
                         help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG (default INFO)')
+    parser.add_argument('--compress', default=None,
+                        help="Type of compression for geotiffs (passed to GDAL GeoTIFF Driver)")
     parser.add_argument("input_dir",
                         help="Input directory to search for the 'input_pattern' specified")
     parser.add_argument("output_dir",
@@ -70,15 +72,19 @@ def main():
         # Come up with an output mercator filename
         merc_file = geos_file.replace(".tif", args.merc_ext)
         if os.path.isfile(merc_file):
-            LOG.warning("Output file already exists: %s" % (merc_file,))
-            continue
+            LOG.warning("Output file already exists, will delete to start over: %s" % (merc_file,))
+            try:
+                os.remove(merc_file)
+            except Exception:
+                LOG.error("Could not remove previous file: %s" % (merc_file,))
+                continue
 
         try:
             src_info = ahi_image_info(nc_file)
             if not os.path.exists(geos_file):
                 src_data = ahi_image_data(nc_file)
                 # print("### Source Data: Min (%f) | Max (%f)" % (src_data.min(), src_data.max()))
-                create_ahi_geotiff(src_info, src_data, geos_file)
+                create_ahi_geotiff(src_info, src_data, geos_file, compress=args.compress)
             else:
                 LOG.debug("GEOS Projection GeoTIFF already exists, won't recreate...")
             lon_west, lon_east = src_info["lon_extents"]
@@ -114,6 +120,8 @@ def main():
             "{:0.03f}".format(x_extent[1]),
             "{:0.03f}".format(y_extent[1]),
         ]
+        if args.compress is not None:
+            gdalwarp_args.extend(["-to", "COMPRESS=%s" % (args.compress,)])
         run_gdalwarp(geos_file, merc_file, *gdalwarp_args)
 
 if __name__ == "__main__":
