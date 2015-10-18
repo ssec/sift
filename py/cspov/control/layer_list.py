@@ -185,7 +185,7 @@ class LayerStackListViewModel(QAbstractListModel):
 
     def _init_widget(self, listbox:QListView):
         listbox.setModel(self)
-        # listbox.setItemDelegate(self.item_delegate) FIXME
+        listbox.setItemDelegate(self.item_delegate)
         listbox.setContextMenuPolicy(Qt.CustomContextMenu)
         # listbox.customContextMenuRequested.connect(self.context_menu)
         listbox.customContextMenuRequested.connect(self.menu)
