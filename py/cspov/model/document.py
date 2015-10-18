@@ -65,6 +65,7 @@ from enum import Enum
 from uuid import UUID
 import numpy as np
 from cspov.common import KIND, INFO
+from cspov.model.guidebook import AHI_HSF_Guidebook
 
 from PyQt4.QtCore import QObject, pyqtSignal
 
@@ -128,6 +129,7 @@ class Document(QObject):
     _workspace = None
     _layer_sets = None  # list(list(prez) or None)
     _layer_with_uuid = None  # dict(uuid:datasetinfo)
+    _guidebook = None  # FUTURE: this is currently an AHI_HSF_Guidebook, make it a general guidebook
 
     # signals
     didAddLayer = pyqtSignal(list, dict, np.ndarray)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
@@ -143,6 +145,7 @@ class Document(QObject):
 
     def __init__(self, workspace, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
         super(Document, self).__init__(**kwargs)
+        self._guidebook = AHI_HSF_Guidebook()
         self._workspace = workspace
         self._layer_sets = [list()] + [None] * (layer_set_count-1)
         self._layer_with_uuid = {}
@@ -263,23 +266,65 @@ class Document(QObject):
         order[row1], order[row2] = order[row2], order[row1]
         self.didReorderLayers.emit(order)
 
+    def row_for_uuid(self, uuid, *uuids):
+        d = dict((q.uuid,i) for i,q in enumerate(self.current_layer_set))
+        if len(uuids):
+            yield d[uuid]
+            for uuid in uuids:
+                yield d[uuid]
+        else:
+            return d[uuid]
+
     def toggle_layer_visibility(self, rows, visible=None):
         """
         change the visibility of a layer or layers
-        :param rows: layer index or index list, 0..n-1
+        :param rows: layer index or index list, 0..n-1, alternately UUIDs of layers
         :param visible: True, False, or None (toggle)
         """
         L = self.current_layer_set
         zult = {}
-        if isinstance(rows, int):
+        r2u = dict((q.uuid,i) for i,q in enumerate(self.current_layer_set))
+        if isinstance(rows, int) or isinstance(rows, UUID):
             rows = [rows]
         for dex in rows:
+            if isinstance(dex, UUID):
+                dex = r2u[dex]
             old = L[dex]
             visible = ~old.visible if visible is None else visible
             nu = old._replace(visible=visible)
             L[dex] = nu
             zult[nu.uuid] = nu.visible
         self.didChangeLayerVisibility.emit(zult)
+
+    def next_last_step(self, uuid, delta=0, bandwise=False):
+        """
+        given a selected layer uuid,
+        use the data guidebook to
+        find the next or last time/bandstep (default: the layer itself) in the document
+        make all layers in the sibling group invisible save that timestep
+        :param uuid: layer we're focusing on as reference
+        :param delta: -1 => last step, 0 for focus step, +1 for next step
+        :param bandwise: True if we want to change by band instead of time
+        :return: UUID of new focus layer
+        """
+        # get list of UUIDs in time order, plus index where the focus uuid is
+        if bandwise:  # next or last band
+            consult_guide = self._guidebook.channel_siblings
+        else:
+            consult_guide = self._guidebook.time_siblings
+        sibs, dex = consult_guide(uuid, self._layer_with_uuid.values())
+        LOG.debug('layer {0} family is +{1} of {2!r:s}'.format(uuid, dex, sibs))
+        if not sibs:
+            LOG.info('nothing to do in next_last_timestep')
+            return uuid
+        dex += delta + len(sibs)
+        dex %= len(sibs)
+        new_focus = sibs[dex]
+        del sibs[dex]
+        if sibs:
+            self.toggle_layer_visibility(sibs, False)
+        self.toggle_layer_visibility(new_focus, True) # FUTURE: do these two commands in one step
+        return new_focus
 
     def is_layer_visible(self, row):
         return self.current_layer_set[row].visible
