@@ -40,7 +40,7 @@ from functools import partial
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
-from cspov.common import INFO
+from cspov.common import INFO, KIND
 
 import os
 import logging
@@ -172,16 +172,35 @@ class Main(QtGui.QMainWindow):
     def next_last_time(self, direction=0, *args, **kwargs):
         LOG.info('time incr {}'.format(direction))
         uuids = self.behaviorLayersList.current_selected_uuids()
+        if not uuids:
+            pass # FIXME: notify user
         for uuid in uuids:
             new_focus = self.document.next_last_step(uuid, direction, bandwise=False)
         self.behaviorLayersList.select([new_focus])
+        self.document.animate_using_layer(new_focus)
 
     def next_last_band(self, direction=0, *args, **kwargs):
         LOG.info('band incr {}'.format(direction))
         uuids = self.behaviorLayersList.current_selected_uuids()
+        if not uuids:
+            pass # FIXME: notify user
         for uuid in uuids:
             new_focus = self.document.next_last_step(uuid, direction, bandwise=True)
         self.behaviorLayersList.select([new_focus])
+
+    def change_animation_to_current_selection_siblings(self, *args, **kwargs):
+        uuids = self.behaviorLayersList.current_selected_uuids()
+        if len(uuids)!=1:
+            return # FIXME: notify user
+        # calculate the new animation sequence by consulting the guidebook
+        self.document.animate_using_layer(uuids[0])
+        LOG.info('using siblings of {} for animation loop'.format(uuids[0]))
+
+    def animate_based_on_new_layer(self, new_order, info, overview_content):
+        if info[INFO.KIND] == KIND.IMAGE:
+            LOG.info("rebuilding animation based on newly loaded image layer")
+            self.document.animate_using_layer(info[INFO.UUID])
+
 
     def __init__(self, workspace_dir=None, glob_pattern=None, border_shapefile=None):
         super(Main, self).__init__()
@@ -282,6 +301,8 @@ class Main(QtGui.QMainWindow):
         # self.ui.layers
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
         self.document.didChangeColormap.connect(self.change_layer_colormap)
+
+        self.document.didAddLayer.connect(self.animate_based_on_new_layer)
 
         self.ui.panZoomToolButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.pz_camera.name))
         self.ui.pointSelectButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.point_probe_camera.name))

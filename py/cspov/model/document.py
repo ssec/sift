@@ -216,7 +216,12 @@ class Document(QObject):
         return list of UUIDs representing the animation order in the currently selected layer set
         :return: list of UUIDs
         """
-        return list(reversed(self.current_layer_order))
+        cls = self.current_layer_set
+        aouu = [(x.a_order, x.uuid) for x in cls if (x.a_order is not None)]
+        aouu.sort()
+        ao = [u for a,u in aouu]
+        LOG.debug('animation order is {0!r:s}'.format(ao))
+        # return list(reversed(self.current_layer_order))
         # FIXME DEBUG - use this code once we have animation order setting commands
         # q = [(x.a_order, x.uuid) for x in self.current_layer_set if x.a_order is not None]
         # q.sort()
@@ -329,12 +334,12 @@ class Document(QObject):
     def is_layer_visible(self, row):
         return self.current_layer_set[row].visible
 
-    def layer_animation_order(self, layer_set_number):
-        return self.current_layer_set[layer_set_number].a_order
+    def layer_animation_order(self, layer_number):
+        return self.current_layer_set[layer_number].a_order
 
     def change_layer_name(self, row, new_name):
-        uuid = self.current_layer_set[row].uuid
-        info = self.get_info(row)
+        uuid = self.current_layer_set[row].uuid if not isinstance(row, UUID) else row
+        info = self._layer_with_uuid[uuid]
         assert(uuid==info[INFO.UUID])
         info[INFO.NAME] = new_name
         self.didChangeLayerName.emit(uuid, new_name)
@@ -363,6 +368,31 @@ class Document(QObject):
     def uuid_for_layer(self, row):
         uuid = self.current_layer_set[row].uuid
         return uuid
+
+    def clear_animation_order(self):
+        cls = self.current_layer_set
+        for i,q in enumerate(cls):
+            cls[i] = q._replace(a_order=None)
+
+    def animate_using_layer(self, row_or_uuid):
+        uuid = self.current_layer_set[row_or_uuid].uuid if not isinstance(row_or_uuid, UUID) else row_or_uuid
+        new_anim_uuids, _ = self._guidebook.time_siblings(uuid, self._layer_with_uuid.values())
+        LOG.debug('new animation order will be {0!r:s}'.format(new_anim_uuids))
+        cls = self.current_layer_set
+        u2r = dict((x.uuid, i) for i,x in enumerate(cls))
+        if not new_anim_uuids:
+            return
+        self.clear_animation_order()
+        for dex,u in enumerate(new_anim_uuids):
+            LOG.debug(u)
+            row = u2r.get(u, None)
+            if row is None:
+                LOG.error('unable to find row for uuid {} in current layer set'.format(u))
+                continue
+            old = cls[row]
+            new = old._replace(a_order=dex)
+            cls[row] = new
+        self.didReorderAnimation.emit(new_anim_uuids)
 
     def get_info(self, row=None):
         if row is not None:

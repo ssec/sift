@@ -163,6 +163,8 @@ class LayerSet(object):
         self.update_layers_z()
 
     def set_frame_order(self, frame_order):
+        if frame_order is None:
+            frame_order = []
         for o in frame_order:
             if o not in self._layers:
                 LOG.error('set_frame_order cannot deal with unknown layer {}'.format(o))
@@ -436,14 +438,17 @@ class SceneGraphManager(QObject):
         self.image_layers[uuid] = image
         self.datasets[uuid] = ds_info
         self.layer_set.add_layer(image)
-        cao = self.document.current_animation_order
+        cao = self.document.current_animation_order or []
         self.layer_set.set_frame_order(cao)
         print('animation order has {} frames'.format(len(cao)))
+        # FIXME FIXME debug this on initial add changing animation order in doc
 
     def remove_layer(self, new_order:list, uuid_removed:UUID):
         self.set_layer_visible(uuid_removed, False)
-        # FIXME: remove layer from scenegraph but retain it in SGM as it may be used in other layer sets
-        LOG.error("layer removal from scenegraph not implemented")
+        image_layer = self.image_layers[uuid_removed]
+        image_layer.parent = None
+        del self.image_layers[uuid_removed]
+        LOG.error("layer removal from scenegraph complete")
 
     def purge_layer(self, uuid_removed:UUID):
         """
@@ -453,7 +458,7 @@ class SceneGraphManager(QObject):
         """
         self.set_layer_visible(uuid_removed, False)
         # FIXME remove layer from layer_set and scenegraph, then:
-        # del self.datasets[uuid_removed]
+        del self.datasets[uuid_removed]
         # del self.image_layers[uuid_removed]
         LOG.error("layer purge from scenegraphmanager not implemented")
 
