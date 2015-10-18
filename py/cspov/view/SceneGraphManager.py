@@ -442,10 +442,23 @@ class SceneGraphManager(QObject):
 
     def remove_layer(self, new_order:list, uuid_removed:UUID):
         self.set_layer_visible(uuid_removed, False)
-        raise NotImplementedError("layer removal from scenegraph not implemented")  # FIXME
+        # FIXME: remove layer from scenegraph but retain it in SGM as it may be used in other layer sets
+        LOG.error("layer removal from scenegraph not implemented")
+
+    def purge_layer(self, uuid_removed:UUID):
+        """
+        Layer has been purged from document (no longer used anywhere) - flush it all out
+        :param uuid_removed: UUID of the layer that is to be removed
+        :return:
+        """
+        self.set_layer_visible(uuid_removed, False)
+        # FIXME remove layer from layer_set and scenegraph, then:
+        # del self.datasets[uuid_removed]
+        # del self.image_layers[uuid_removed]
+        LOG.error("layer purge from scenegraphmanager not implemented")
 
     def change_layers_visibility(self, layers_changed:dict):
-        for uuid,visible in layers_changed.items():
+        for uuid, visible in layers_changed.items():
             self.set_layer_visible(uuid, visible)
 
     def rebuild_new_layer_set(self, new_set_number:int, new_prez_order:list, new_anim_order:list):
@@ -453,9 +466,10 @@ class SceneGraphManager(QObject):
         # raise NotImplementedError("layer set change not implemented in SceneGraphManager")
 
     def set_document(self, document):
-        document.didReorderLayers.connect(self.rebuild_new_order)
-        document.didAddLayer.connect(self.add_layer)
-        document.didRemoveLayer.connect(self.remove_layer)
+        document.didReorderLayers.connect(self.rebuild_new_order)  # current layer set changed z/anim order
+        document.didAddLayer.connect(self.add_layer)  # layer added to one or more layer sets
+        document.didRemoveLayer.connect(self.remove_layer)  # layer removed from current layer set
+        document.willPurgeLayer.connect(self.purge_layer)  # layer removed from document
         document.didSwitchLayerSet.connect(self.rebuild_new_layer_set)
         document.didChangeColormap.connect(self.change_layers_colormap)
         document.didChangeLayerVisibility.connect(self.change_layers_visibility)

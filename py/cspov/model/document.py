@@ -131,7 +131,8 @@ class Document(QObject):
 
     # signals
     didAddLayer = pyqtSignal(list, dict, np.ndarray)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
-    willPurgeLayer = pyqtSignal(list, UUID)  # new order list, UUID of the layer being removed
+    didRemoveLayer = pyqtSignal(list, UUID)  # new order, UUID that was removed from current layer set
+    willPurgeLayer = pyqtSignal(UUID)  # UUID of the layer being removed
     didReorderLayers = pyqtSignal(list)  # list of original indices in their new order, None for new layers
     didChangeLayerVisibility = pyqtSignal(dict)  # {UUID: new-visibility, ...} for changed layers
     didReorderAnimation = pyqtSignal(list)  # list of UUIDs representing new animation order
@@ -255,24 +256,24 @@ class Document(QObject):
         L.insert(new_index, d)
         self.didReorderLayers.emit(order)
 
-    def swap_layer_order(self, first_index, second_index):
+    def swap_layer_order(self, row1, row2):
         L = self.current_layer_set
         order = list(range(len(L)))
-        L[first_index], L[second_index] = L[second_index], L[first_index]
-        order[first_index], order[second_index] = order[second_index], order[first_index]
+        L[row1], L[row2] = L[row2], L[row1]
+        order[row1], order[row2] = order[row2], order[row1]
         self.didReorderLayers.emit(order)
 
-    def toggle_layer_visibility(self, dexes, visible=None):
+    def toggle_layer_visibility(self, rows, visible=None):
         """
         change the visibility of a layer or layers
-        :param dexes: layer index or index list, 0..n-1
+        :param rows: layer index or index list, 0..n-1
         :param visible: True, False, or None (toggle)
         """
         L = self.current_layer_set
         zult = {}
-        if isinstance(dexes, int):
-            dexes = [dexes]
-        for dex in dexes:
+        if isinstance(rows, int):
+            rows = [rows]
+        for dex in rows:
             old = L[dex]
             visible = ~old.visible if visible is None else visible
             nu = old._replace(visible=visible)
@@ -280,11 +281,11 @@ class Document(QObject):
             zult[nu.uuid] = nu.visible
         self.didChangeLayerVisibility.emit(zult)
 
-    def is_layer_visible(self, dex):
-        return self.current_layer_set[dex].visible
+    def is_layer_visible(self, row):
+        return self.current_layer_set[row].visible
 
-    def layer_animation_order(self, dex):
-        return self.current_layer_set[dex].a_order
+    def layer_animation_order(self, layer_set_number):
+        return self.current_layer_set[layer_set_number].a_order
 
     def change_layer_name(self, row, new_name):
         uuid = self.current_layer_set[row].uuid
@@ -314,27 +315,27 @@ class Document(QObject):
     def __len__(self):
         return len(self.current_layer_set)
 
-    def uuid_for_layer(self, dex):
-        uuid = self.current_layer_set[dex].uuid
+    def uuid_for_layer(self, row):
+        uuid = self.current_layer_set[row].uuid
         return uuid
 
-    def get_info(self, dex=None):
-        if dex is not None:
-            uuid = self.current_layer_set[dex].uuid
+    def get_info(self, row=None):
+        if row is not None:
+            uuid = self.current_layer_set[row].uuid
             nfo = self._layer_with_uuid[uuid]
             return nfo
         return None
 
-    def __getitem__(self, dex):
+    def __getitem__(self, row:int):
         """
         return info for a given layer index
         """
-        return self.current_layer_set[dex]
+        return self.current_layer_set[row]
         # uuid = self.current_layer_set[dex].uuid
         # nfo = self._layer_with_uuid[uuid]
         # return nfo
 
-    def insert_layer_prez(self, row, layer_prez_seq):
+    def insert_layer_prez(self, row:int, layer_prez_seq):
         cls = self.current_layer_set
         clo = list(range(len(cls)))
         lps = list(layer_prez_seq)
@@ -350,26 +351,39 @@ class Document(QObject):
             clo.insert(row, None)
         self.didReorderLayers.emit(clo)
 
-    def is_using(self, uuid):
+    def is_using(self, uuid:UUID, layer_set:int=None):
         "return true if this dataset is still in use in one of the layer sets"
-        return True  # FIXME
+        if layer_set is not None:
+            lss = [self._layer_sets[layer_set]]
+        else:
+            lss = [q for q in self._layer_sets if q is not None]
+        for ls in lss:
+            for p in ls:
+                if p.uuid==uuid:
+                    return True
+        return False
 
-    def remove_layer_prez(self, row, count=1):
+    def remove_layer_prez(self, row:int, count:int=1):
+        """
+        remove the presentation of a given layer/s in the current set
+        :param row: which current layer set row to remove
+        :param count: how many rows to remove
+        :return:
+        """
         self.toggle_layer_visibility(list(range(row,row+count)), False)
         clo = list(range(len(self.current_layer_set)))
         del clo[row:row+count]
         uuids = [x.uuid for x in self.current_layer_set[row:row+count]]
         del self.current_layer_set[row:row+count]
         for uuid in uuids:
-            # FIXME: let the scenegraph know to hide
+            self.didRemoveLayer.emit(clo, uuid)
             if not self.is_using(uuid):
+                LOG.info('purging layer {}, no longer in use'.format(uuid))
                 self.willPurgeLayer.emit(uuid)
                 # remove from our bookkeeping
                 del self._layer_with_uuid[uuid]
                 # remove from workspace
                 self._workspace.remove(uuid)
-        self.didReorderLayers.emit(clo)
-
 
 
 def main():
