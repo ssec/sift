@@ -153,6 +153,7 @@ class LayerStackListViewModel(QAbstractListModel):
     widgets = None
     doc = None
     item_delegate = None
+    _mimetype = 'application/vnd.row.list'
 
     def __init__(self, widgets:list, doc:Document):
         """
@@ -176,32 +177,38 @@ class LayerStackListViewModel(QAbstractListModel):
         doc.willPurgeLayer.connect(self.refresh)
         doc.didSwitchLayerSet.connect(self.refresh)
         doc.didReorderAnimation.connect(self.refresh)
-        self.setSupportedDragActions(Qt.CopyAction | Qt.MoveAction)
+
+        # self.setSupportedDragActions(Qt.MoveAction)
 
         for widget in widgets:
             self._init_widget(widget)
 
     def _init_widget(self, listbox:QListView):
-        listbox.clicked.connect(self.layer_clicked)
-        # widget.indexesMoved.connect(self.layers_moved)
-        listbox.setItemDelegate(self.item_delegate)
-        listbox.customContextMenuRequested.connect(self.context_menu)
-        listbox.entered.connect(self.layer_entered)
-        listbox.pressed.connect(self.layer_pressed)
         listbox.setModel(self)
-        listbox.setMovement(QListView.Snap)
-        listbox.setDragDropMode(QListView.InternalMove)
-        # listbox.setDragDropMode(QAbstractItemView.DragDrop)
-        listbox.setDefaultDropAction(Qt.MoveAction)
-        listbox.setDropIndicatorShown(True)
-        listbox.setDragDropOverwriteMode(False)
-        listbox.setAcceptDrops(True)
-        listbox.setDragEnabled(True)
-        listbox.setSelectionMode(QListView.MultiSelection)  # alternate SingleSelection
+        # listbox.setItemDelegate(self.item_delegate) FIXME
         listbox.setContextMenuPolicy(Qt.CustomContextMenu)
+        # listbox.customContextMenuRequested.connect(self.context_menu)
         listbox.customContextMenuRequested.connect(self.menu)
-        # selmo = listbox.selectionModel()
+        listbox.setDragEnabled(True)
+        listbox.setAcceptDrops(True)
+        listbox.setDropIndicatorShown(True)
+        listbox.setSelectionMode(listbox.ExtendedSelection)
+        # listbox.indexesMoved.connect(FIXME)
+        # listbox.setMovement(QListView.Snap)
+        # listbox.setDragDropMode(QListView.InternalMove)
+        # listbox.setDragDropMode(QAbstractItemView.DragDrop)
+        # listbox.setDefaultDropAction(Qt.MoveAction)
+        # listbox.setDragDropOverwriteMode(False)
+        # listbox.clicked.connect(self.layer_clicked)
+        # listbox.entered.connect(self.layer_entered)
+        # listbox.pressed.connect(self.layer_pressed)
         self.widgets.append(listbox)
+
+    # def supportedDragActions(self):
+    #     return Qt.MoveAction
+    #
+    def supportedDropActions(self):
+        return Qt.MoveAction # | Qt.CopyAction
 
     @property
     def current_set_listbox(self):
@@ -219,7 +226,6 @@ class LayerStackListViewModel(QAbstractListModel):
         for widget in self.widgets:
             if widget.isVisible():
                 widget.update()
-
 
     def current_selected_uuids(self, lbox:QListView=None):
         # FIXME: this is just plain crufty, also doesn't work!
@@ -253,20 +259,25 @@ class LayerStackListViewModel(QAbstractListModel):
         LOG.debug('dropMimeData at row {}'.format(row))
         if action == Qt.IgnoreAction:
             return True
-        if mime.hasFormat('application/layer-presentation-list'):
+
+        if mime.hasFormat(self._mimetype):
             # unpickle the presentation information and re-insert it
             # b = base64.decodebytes(mime.text())
-            b = mime.data()
+            b = mime.data(self._mimetype)
             l = pkl.loads(b)
             LOG.debug('dropped: {0!r:s}'.format(l))
             count = len(l)
             if row == -1:
                 row = len(self.doc)  # append
+            # self.insertRows(row, count)
+            # for i, presentation in enumerate(l):
+            #     self.setData(self.index(row+i, 0), presentation)
             self.beginInsertRows(parent, row, row+count-1)
-            self.doc.insert_layer_prez(row, *l)
+            self.doc.insert_layer_prez(row, l)
             self.endInsertRows()
             return True
-        return super(LayerStackListViewModel, self).dropMimeData(mime, action, row, column, parent)
+        return False
+        # return super(LayerStackListViewModel, self).dropMimeData(mime, action, row, column, parent)
 
     def mimeData(self, list_of_QModelIndex):
         l = []
@@ -278,8 +289,12 @@ class LayerStackListViewModel(QAbstractListModel):
         mime = QMimeData()
         # t = base64.encodebytes(p).decode('ascii')
         # LOG.debug('mimetext for drag is "{}"'.format(t))
-        mime.setData('application/layer-presentation-list', p)
+        mime.setData(self._mimetype, p)
+        LOG.debug('presenting mime data for {0!r:s}'.format(l))
         return mime
+
+    def mimeTypes(self):
+        return [self._mimetype]  # TODO, allow geotiff and other file types to be dropped in
 
     def flags(self, index):
         # flags = super(LayerStackListViewModel, self).flags(index)
@@ -303,7 +318,7 @@ class LayerStackListViewModel(QAbstractListModel):
         row = index.row()
         # col = index.column()
         el = self.listing
-        if role == Qt.ItemDataRole:
+        if role == Qt.ItemDataRole or role == Qt.EditRole:
             return self.doc[index.row()] if index.row()<len(self.doc) else None
         elif role == Qt.CheckStateRole:
             check = Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
@@ -319,13 +334,14 @@ class LayerStackListViewModel(QAbstractListModel):
         LOG.debug('setData {0!r:s}'.format(data))
         if not index.isValid():
             return False
-        if role==Qt.EditRole:
+        if role == Qt.EditRole:
             if isinstance(data, str):
                 LOG.debug("changing row {0:d} name to {1!r:s}".format(index.row(), data))
                 if not data:
                     LOG.warning("skipping rename to nothing")
                 else:
                     self.doc.change_layer_name(index.row(), data)
+                    self.dataChanged.emit(index, index)
                 return True
             else:
                 LOG.debug("data type is {0!r:s}".format(type(data)))
@@ -333,11 +349,14 @@ class LayerStackListViewModel(QAbstractListModel):
             newvalue = True if data==Qt.Checked else False
             LOG.debug('toggle layer visibility for row {} to {}'.format(index.row(), newvalue))
             self.doc.toggle_layer_visibility(index.row(), newvalue)
+            self.dataChanged.emit(index, index)
             return True
         elif role==Qt.ItemDataRole:
             LOG.warning('attempting to change layer')
             # self.doc.replace_layer()
-            return False
+            # FIXME implement this
+            self.dataChanged.emit(index, index)
+            return True
         elif role==Qt.DisplayRole:
             if index.isValid():
                 LOG.debug("changing row {} name to {0!r:s}".format(index.row(), data))
@@ -345,16 +364,10 @@ class LayerStackListViewModel(QAbstractListModel):
                 return True
         return False
 
-    def supportedDragActions(self):
-        return Qt.MoveAction
-
-    def supportedDropActions(self):
-        return Qt.MoveAction # | Qt.CopyAction
-
     def insertRows(self, row, count, parent=QModelIndex()):
         self.beginInsertRows(QModelIndex(), row, row+count-1)
         LOG.debug(">>>> INSERT {} rows".format(count))
-        # TODO: insert 'count' rows into document
+        # TODO: insert 'count' empty rows into document
         self.endInsertRows()
         return True
 
