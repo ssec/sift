@@ -169,6 +169,20 @@ class Main(QtGui.QMainWindow):
         frame = self.ui.animationSlider.value()
         self.scene_manager.set_frame_number(frame)
 
+    def next_last_time(self, direction=0, *args, **kwargs):
+        LOG.info('time incr {}'.format(direction))
+        uuids = self.behaviorLayersList.current_selected_uuids()
+        for uuid in uuids:
+            new_focus = self.document.next_last_step(uuid, direction, bandwise=False)
+        self.behaviorLayersList.select([new_focus])
+
+    def next_last_band(self, direction=0, *args, **kwargs):
+        LOG.info('band incr {}'.format(direction))
+        uuids = self.behaviorLayersList.current_selected_uuids()
+        for uuid in uuids:
+            new_focus = self.document.next_last_step(uuid, direction, bandwise=True)
+        self.behaviorLayersList.select([new_focus])
+
     def __init__(self, workspace_dir=None, glob_pattern=None, border_shapefile=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
@@ -294,6 +308,29 @@ class Main(QtGui.QMainWindow):
         file_menu = menubar.addMenu('&File')
         file_menu.addAction(open_action)
         file_menu.addAction(exit_action)
+
+        next_time = QtGui.QAction("Next Time", self)
+        next_time.setShortcut(QtCore.Qt.Key_Right)
+        next_time.triggered.connect(partial(self.next_last_time, direction=1))
+
+        prev_time = QtGui.QAction("Previous Time", self)
+        prev_time.setShortcut(QtCore.Qt.Key_Left)
+        prev_time.triggered.connect(partial(self.next_last_time, direction=-1))
+
+        next_band = QtGui.QAction("Next Band", self)
+        next_band.setShortcut(QtCore.Qt.Key_Up)
+        next_band.triggered.connect(partial(self.next_last_band, direction=1))
+
+        prev_band = QtGui.QAction("Previous Band", self)
+        prev_band.setShortcut(QtCore.Qt.Key_Down)
+        prev_band.triggered.connect(partial(self.next_last_band, direction=-1))
+
+        view_menu = menubar.addMenu('&View')
+        view_menu.addAction(prev_time)
+        view_menu.addAction(next_time)
+        view_menu.addAction(prev_band)
+        view_menu.addAction(next_band)
+
 
     def setup_key_releases(self):
         def cb_factory(required_key, cb):

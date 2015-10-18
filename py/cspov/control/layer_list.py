@@ -236,6 +236,19 @@ class LayerStackListViewModel(QAbstractListModel):
         for q in lbox.selectedIndexes():
             yield self.doc.uuid_for_layer(q.row())
 
+    def select(self, uuids, lbox:QListView=None):
+        lbox = self.current_set_listbox if lbox is None else lbox
+        lbox.clearSelection()
+        if not uuids:
+            return
+        # FUTURE: this is quick and dirty
+        rowdict = dict((u,i) for i,u in enumerate(self.doc.current_layer_order))
+        for uuid in uuids:
+            row = rowdict[uuid]
+            q = self.createIndex(row, 0)
+            lbox.setCurrentIndex(q)
+            # FIXME: more than one uuids can be selected at a time
+
     def menu(self, pos:QPoint, *args):
         LOG.info('menu requested for layer list')
         menu = QMenu()
