@@ -154,39 +154,6 @@ class LayerStackListViewModel(QAbstractListModel):
     doc = None
     item_delegate = None
 
-
-    def _init_widget(self, listbox:QListView):
-        listbox.clicked.connect(self.layer_clicked)
-        # widget.indexesMoved.connect(self.layers_moved)
-        listbox.setItemDelegate(self.item_delegate)
-        listbox.customContextMenuRequested.connect(self.context_menu)
-        listbox.entered.connect(self.layer_entered)
-        listbox.pressed.connect(self.layer_pressed)
-        listbox.setModel(self)
-        listbox.setDropIndicatorShown(True)
-        listbox.setDragDropOverwriteMode(False)
-        listbox.setAcceptDrops(True)
-        # listbox.setDragDropMode(QAbstractItemView.DragDrop)
-        listbox.setDragDropMode(QAbstractItemView.InternalMove)  # later: accept mimedata
-        listbox.setDragEnabled(True)
-        listbox.setSelectionMode(QListView.MultiSelection)  # alternate SingleSelection
-        listbox.setContextMenuPolicy(Qt.CustomContextMenu)
-        listbox.customContextMenuRequested.connect(self.menu)
-        # selmo = listbox.selectionModel()
-        self.widgets.append(listbox)
-
-    @property
-    def current_set_listbox(self):
-        """
-        We can have several list boxes, one for each layer_set in the document.
-        Return whichever one is currently active.
-        :return:
-        """
-        # FIXME this is fugly
-        for widget in self.widgets:
-            if widget.isVisible():
-                return widget
-
     def __init__(self, widgets:list, doc:Document):
         """
         Connect one or more table views to the document via this model.
@@ -209,11 +176,44 @@ class LayerStackListViewModel(QAbstractListModel):
         doc.willPurgeLayer.connect(self.refresh)
         doc.didSwitchLayerSet.connect(self.refresh)
         doc.didReorderAnimation.connect(self.refresh)
-
         self.setSupportedDragActions(Qt.CopyAction | Qt.MoveAction)
 
         for widget in widgets:
             self._init_widget(widget)
+
+    def _init_widget(self, listbox:QListView):
+        listbox.clicked.connect(self.layer_clicked)
+        # widget.indexesMoved.connect(self.layers_moved)
+        listbox.setItemDelegate(self.item_delegate)
+        listbox.customContextMenuRequested.connect(self.context_menu)
+        listbox.entered.connect(self.layer_entered)
+        listbox.pressed.connect(self.layer_pressed)
+        listbox.setModel(self)
+        listbox.setMovement(QListView.Snap)
+        listbox.setDragDropMode(QListView.InternalMove)
+        # listbox.setDragDropMode(QAbstractItemView.DragDrop)
+        listbox.setDefaultDropAction(Qt.MoveAction)
+        listbox.setDropIndicatorShown(True)
+        listbox.setDragDropOverwriteMode(False)
+        listbox.setAcceptDrops(True)
+        listbox.setDragEnabled(True)
+        listbox.setSelectionMode(QListView.MultiSelection)  # alternate SingleSelection
+        listbox.setContextMenuPolicy(Qt.CustomContextMenu)
+        listbox.customContextMenuRequested.connect(self.menu)
+        # selmo = listbox.selectionModel()
+        self.widgets.append(listbox)
+
+    @property
+    def current_set_listbox(self):
+        """
+        We can have several list boxes, one for each layer_set in the document.
+        Return whichever one is currently active.
+        :return:
+        """
+        # FIXME this is fugly
+        for widget in self.widgets:
+            if widget.isVisible():
+                return widget
 
     def refresh(self):
         for widget in self.widgets:
@@ -282,9 +282,13 @@ class LayerStackListViewModel(QAbstractListModel):
         return mime
 
     def flags(self, index):
-        flags = super(LayerStackListViewModel, self).flags(index)
+        # flags = super(LayerStackListViewModel, self).flags(index)
         if index.isValid():
-            flags |= Qt.ItemIsDragEnabled | Qt.ItemIsDropEnabled | Qt.ItemIsUserCheckable | Qt.ItemIsEditable
+            flags = (Qt.ItemIsEnabled |
+                     Qt.ItemIsSelectable |
+                     Qt.ItemIsDragEnabled |
+                     Qt.ItemIsUserCheckable |
+                     Qt.ItemIsEditable)
         else:
             flags = Qt.ItemIsDropEnabled
         return flags
@@ -306,8 +310,9 @@ class LayerStackListViewModel(QAbstractListModel):
             return check
         elif role == Qt.DisplayRole:
             lao = self.doc.layer_animation_order(row)
+            name = el[row][INFO.NAME]
             # return  ('[-]  ' if lao is None else '[{}]'.format(lao+1)) + el[row]['name']
-            return el[row][INFO.NAME]
+            return name
         return None
 
     def setData(self, index:QModelIndex, data, role:int=None):
@@ -344,7 +349,7 @@ class LayerStackListViewModel(QAbstractListModel):
         return Qt.MoveAction
 
     def supportedDropActions(self):
-        return Qt.MoveAction | Qt.CopyAction
+        return Qt.MoveAction # | Qt.CopyAction
 
     def insertRows(self, row, count, parent=QModelIndex()):
         self.beginInsertRows(QModelIndex(), row, row+count-1)
@@ -355,7 +360,6 @@ class LayerStackListViewModel(QAbstractListModel):
 
     def removeRows(self, row, count, QModelIndex_parent=None, *args, **kwargs):
         self.beginRemoveRows(QModelIndex(), row, row+count-1)
-        # TODO: remove layers from document
         LOG.debug(">>>> REMOVE {} rows".format(count))
         self.doc.remove_layer_prez(row, count)
         self.endRemoveRows()
