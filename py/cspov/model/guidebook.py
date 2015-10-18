@@ -25,10 +25,10 @@ from cspov.common import INFO, KIND
 LOG = logging.getLogger(__name__)
 
 class INSTRUMENT(Enum):
-    UNKNOWN = 0
-    AHI = 1
-    ABI = 2
-    AMI = 3
+    UNKNOWN = '???'
+    AHI = 'AHI'
+    ABI = 'ABI'
+    AMI = 'AMI'
 
 GUIDEBOOKS = {}
 
@@ -60,16 +60,27 @@ class Guidebook(object):
         """
         return None, None
 
+    def time_siblings(self, uuid, infos):
+        """
+        determine the time siblings of a given dataset
+        :param uuid: uuid of the dataset we're interested in
+        :param infos: datasetinfo_dict sequence, available datasets
+        :return: (list,offset:int): list of [uuid,uuid,uuid] for siblings in order; offset of where the input is found in list
+        """
+        return None, None
+
 
 class GUIDE(Enum):
+    """
+    standard dictionary keys for guidebook metadata
+    """
     UUID = 'uuid'  # dataset UUID, if available
-    SPACECRAFT = 'spacecraft' # name of spacecraft
+    SPACECRAFT = 'spacecraft' # full standard name of spacecraft
     SCHED_TIME = 'timeline'  # scheduled time for observation
     OBS_TIME = 'obstime'  # actual time for observation
-    BAND = 'band'  # band number
-    SCENE = 'scene'  # scene identifier string, e.g. FLDK
-    INSTRUMENT = 'instrument'  # full instrument name
-
+    BAND = 'band'  # band number (multispectral instruments)
+    SCENE = 'scene'  # standard scene identifier string for instrument, e.g. FLDK
+    INSTRUMENT = 'instrument'  # INSTRUMENT enumeration, or string with full standard name
 
 
 class AHI_HSF_Guidebook(Guidebook):
@@ -171,32 +182,6 @@ class AHI_HSF_Guidebook(Guidebook):
         return [x[1] for x in sibs], offset[0]
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="PURPOSE",
-        epilog="",
-        fromfile_prefix_chars='@')
-    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG')
-    # http://docs.python.org/2.7/library/argparse.html#nargs
-    # parser.add_argument('--stuff', nargs='5', dest='my_stuff',
-    #                    help="one or more random things")
-    parser.add_argument('pos_args', nargs='*',
-                        help="positional arguments don't have the '-' prefix")
-    args = parser.parse_args()
 
-    levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
-    logging.basicConfig(level=levels[min(3, args.verbosity)])
-
-    if not args.pos_args:
-        unittest.main()
-        return 0
-
-    for pn in args.pos_args:
-        pass
-
-    return 0
-
-
-if __name__ == '__main__':
-    sys.exit(main())
+# if __name__ == '__main__':
+#     sys.exit(main())
