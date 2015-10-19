@@ -163,14 +163,13 @@ class LayerSet(object):
         self.update_layers_z()
 
     def set_frame_order(self, frame_order):
-        if frame_order is None:
-            frame_order = []
         for o in frame_order:
             if o not in self._layers:
                 LOG.error('set_frame_order cannot deal with unknown layer {}'.format(o))
                 return
         self._frame_order = frame_order
         self._frame_number = 0
+        LOG.debug('accepted new frame order of length {}'.format(len(frame_order)))
         if self._frame_change_cb is not None:
             self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating))
 
@@ -438,9 +437,9 @@ class SceneGraphManager(QObject):
         self.image_layers[uuid] = image
         self.datasets[uuid] = ds_info
         self.layer_set.add_layer(image)
-        cao = self.document.current_animation_order or []
-        self.layer_set.set_frame_order(cao)
-        print('animation order has {} frames'.format(len(cao)))
+        # cao = self.document.current_animation_order or []
+        # self.layer_set.set_frame_order(cao)
+        # print('animation order has {} frames'.format(len(cao)))
         # FIXME FIXME debug this on initial add changing animation order in doc
 
     def remove_layer(self, new_order:list, uuid_removed:UUID):
@@ -471,13 +470,14 @@ class SceneGraphManager(QObject):
         # raise NotImplementedError("layer set change not implemented in SceneGraphManager")
 
     def set_document(self, document):
-        document.didReorderLayers.connect(self.rebuild_new_order)  # current layer set changed z/anim order
+        document.didReorderLayers.connect(self.rebuild_layer_order)  # current layer set changed z/anim order
         document.didAddLayer.connect(self.add_layer)  # layer added to one or more layer sets
         document.didRemoveLayer.connect(self.remove_layer)  # layer removed from current layer set
         document.willPurgeLayer.connect(self.purge_layer)  # layer removed from document
         document.didSwitchLayerSet.connect(self.rebuild_new_layer_set)
         document.didChangeColormap.connect(self.change_layers_colormap)
         document.didChangeLayerVisibility.connect(self.change_layers_visibility)
+        document.didReorderAnimation.connect(self.rebuild_frame_order)
 
     def set_frame_number(self, frame_number=None):
         self.layer_set.next_frame(None, frame_number)
@@ -486,7 +486,7 @@ class SceneGraphManager(QObject):
         image = self.image_layers[uuid]
         image.visible = not image.visible if visible is None else visible
 
-    def rebuild_new_order(self, new_layer_index_order, *args, **kwargs):
+    def rebuild_layer_order(self, new_layer_index_order, *args, **kwargs):
         """
         layer order has changed; shift layers around.
         an empty list is sent if the whole layer order has been changed
@@ -496,6 +496,11 @@ class SceneGraphManager(QObject):
         # TODO this is the lazy implementation, eventually just change z order on affected layers
         self.layer_set.set_layer_order(self.document.current_layer_order)
         print("New layer order: ", new_layer_index_order)
+        self.update()
+
+    def rebuild_frame_order(self, uuid_list:list, *args, **kwargs):
+        LOG.debug('setting SGM new frame order to {0!r:s}'.format(uuid_list))
+        self.layer_set.set_frame_order(uuid_list)
         self.update()
 
     def rebuild_all(self, *args, **kwargs):

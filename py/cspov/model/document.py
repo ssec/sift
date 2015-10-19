@@ -191,6 +191,8 @@ class Document(QObject):
         reordered_indices = [None] + list(range(old_layer_count))
         # signal updates from the document
         self.didAddLayer.emit(reordered_indices, info, content)
+        if info[INFO.KIND]==KIND.IMAGE:  # TODO: decide if this is correct and useful behavior
+            self.animate_siblings_of_layer(uuid)
 
         return uuid, info, content
 
@@ -374,7 +376,7 @@ class Document(QObject):
         for i,q in enumerate(cls):
             cls[i] = q._replace(a_order=None)
 
-    def animate_using_layer(self, row_or_uuid):
+    def animate_siblings_of_layer(self, row_or_uuid):
         uuid = self.current_layer_set[row_or_uuid].uuid if not isinstance(row_or_uuid, UUID) else row_or_uuid
         new_anim_uuids, _ = self._guidebook.time_siblings(uuid, self._layer_with_uuid.values())
         LOG.debug('new animation order will be {0!r:s}'.format(new_anim_uuids))

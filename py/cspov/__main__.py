@@ -177,7 +177,7 @@ class Main(QtGui.QMainWindow):
         for uuid in uuids:
             new_focus = self.document.next_last_step(uuid, direction, bandwise=False)
         self.behaviorLayersList.select([new_focus])
-        self.document.animate_using_layer(new_focus)
+        self.document.animate_siblings_of_layer(new_focus)
 
     def next_last_band(self, direction=0, *args, **kwargs):
         LOG.info('band incr {}'.format(direction))
@@ -193,13 +193,16 @@ class Main(QtGui.QMainWindow):
         if len(uuids)!=1:
             return # FIXME: notify user
         # calculate the new animation sequence by consulting the guidebook
-        self.document.animate_using_layer(uuids[0])
+        self.document.animate_siblings_of_layer(uuids[0])
         LOG.info('using siblings of {} for animation loop'.format(uuids[0]))
 
-    def animate_based_on_new_layer(self, new_order, info, overview_content):
-        if info[INFO.KIND] == KIND.IMAGE:
-            LOG.info("rebuilding animation based on newly loaded image layer")
-            self.document.animate_using_layer(info[INFO.UUID])
+    # def accept_new_layer(self, new_order, info, overview_content):
+    #     LOG.debug('accepting new layer order {0!r:s}'.format(new_order))
+    #     if info[INFO.KIND] == KIND.IMAGE:
+    #         LOG.info("rebuilding animation based on newly loaded image layer")
+    #         self.document.animate_using_layer(info[INFO.UUID])
+    #         self.animation_slider_jump_frame(None)
+    #         self.behaviorLayersList.select([info[INFO.UUID]])
 
 
     def __init__(self, workspace_dir=None, glob_pattern=None, border_shapefile=None):
@@ -254,6 +257,9 @@ class Main(QtGui.QMainWindow):
         # convey action between document and layer list view
         self.behaviorLayersList = LayerStackListViewModel([self.ui.layerSet1Table, self.ui.layerSet2Table, self.ui.layerSet3Table, self.ui.layerSet4Table], doc)
 
+        # coordinate what gets done when a layer is added by document
+        # self.document.didAddLayer.connect(self.accept_new_layer)
+
         def update_probe_point(uuid, xy_pos):
             data_point = self.workspace.get_content_point(uuid, xy_pos)
             self.ui.cursorProbeText.setText("Point Probe: {:.03f}".format(float(data_point)))
@@ -302,8 +308,6 @@ class Main(QtGui.QMainWindow):
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
         self.document.didChangeColormap.connect(self.change_layer_colormap)
 
-        self.document.didAddLayer.connect(self.animate_based_on_new_layer)
-
         self.ui.panZoomToolButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.pz_camera.name))
         self.ui.pointSelectButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.point_probe_camera.name))
         self.ui.regionSelectButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.polygon_probe_camera.name))
@@ -351,6 +355,8 @@ class Main(QtGui.QMainWindow):
         view_menu.addAction(next_time)
         view_menu.addAction(prev_band)
         view_menu.addAction(next_band)
+
+        menubar.setEnabled(True)
 
 
     def setup_key_releases(self):
