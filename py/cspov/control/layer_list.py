@@ -173,7 +173,7 @@ class LayerStackListViewModel(QAbstractListModel):
         doc.didChangeColormap.connect(self.refresh)
         doc.didChangeLayerVisibility.connect(self.refresh)
         doc.didChangeLayerName.connect(self.refresh)
-        doc.didAddLayer.connect(self.refresh)
+        doc.didAddLayer.connect(self.doc_added_layer)
         doc.willPurgeLayer.connect(self.refresh)
         doc.didSwitchLayerSet.connect(self.refresh)
         doc.didReorderAnimation.connect(self.refresh)
@@ -222,10 +222,18 @@ class LayerStackListViewModel(QAbstractListModel):
             if widget.isVisible():
                 return widget
 
+    def doc_added_layer(self, new_order, info, content):
+        dexes = [i for i,q in enumerate(new_order) if q==None]
+        for dex in dexes:
+            self.beginInsertRows(QModelIndex(), dex, dex)
+            self.endInsertRows()
+        self.refresh()
+
     def refresh(self):
         for widget in self.widgets:
             if widget.isVisible():
                 widget.update()
+            # FIXME refresh content, or make sure we're signaling layer insertion and removal to the list box
 
     def current_selected_uuids(self, lbox:QListView=None):
         # FIXME: this is just plain crufty, also doesn't work!
