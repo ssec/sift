@@ -223,6 +223,7 @@ class Document(QObject):
         aouu.sort()
         ao = [u for a,u in aouu]
         LOG.debug('animation order is {0!r:s}'.format(ao))
+        return ao
         # return list(reversed(self.current_layer_order))
         # FIXME DEBUG - use this code once we have animation order setting commands
         # q = [(x.a_order, x.uuid) for x in self.current_layer_set if x.a_order is not None]

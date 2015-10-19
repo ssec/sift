@@ -448,6 +448,7 @@ class SceneGraphManager(QObject):
         :return:
         """
         self.set_layer_visible(uuid_removed, False)
+        self.rebuild_all()
         # LOG.error("layer removal from scenegraph complete")
 
     def purge_layer(self, uuid_removed:UUID):
