@@ -431,7 +431,7 @@ class SceneGraphManager(QObject):
             cmap='grays',
             double=False,
             texture_shape=DEFAULT_TEXTURE_SHAPE,
-            wrap_lon=True,
+            wrap_lon=False,
             parent=self.main_map,
         )
         image.transform *= STTransform(translate=(0, 0, -50.0))
