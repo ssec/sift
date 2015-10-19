@@ -252,9 +252,18 @@ class Workspace(QObject):
     def remove(self, dsi):
         """
         Formally detach a dataset, removing its content from the workspace fully by the time that idle() has nothing more to do.
-        :param dsi: datasetinfo dictionary
-        :return: None
+        :param dsi: datasetinfo dictionary or UUID of a dataset
+        :return: True if successfully deleted, False if not found
         """
+        uuid = dsi if isinstance(dsi, UUID) else dsi[INFO.UUID]
+        zult = False
+        if uuid in self._info:
+            del self._info[uuid]
+            zult = True
+        if uuid in self._data:
+            del self._data[uuid]
+            zult = True
+        return zult
 
     def get_info(self, dsi_or_uuid, lod=None):
         """

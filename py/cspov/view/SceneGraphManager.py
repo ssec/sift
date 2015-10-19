@@ -122,8 +122,8 @@ class LayerSet(object):
 
         self.parent = parent
         self._layers = {}
-        self._layer_order = []
-        self._frame_order = []
+        self._layer_order = []  # display (z) order, top to bottom
+        self._frame_order = []  # animation order, first to last
         self._animating = False
         self._frame_number = 0
         self._frame_change_cb = frame_change_cb
@@ -141,29 +141,58 @@ class LayerSet(object):
             self.set_frame_order(frame_order)
 
     def set_layers(self, layers):
+        # FIXME clear the existing layers
         for layer in layers:
             self.add_layer(layer)
 
     def add_layer(self, layer):
-        uuid = layer.name
+        LOG.debug('add layer {}'.format(layer))
+        uuid = UUID(layer.name)  # we backitty-forth this because
         self._layers[uuid] = layer
-        self._layer_order.append(uuid)
-        # FIXME: For now automatically add new layers to the animation loop
-        self._frame_order.append(uuid)
+        self._layer_order.insert(0, uuid)
+        self.update_layers_z()
+        # self._frame_order.append(uuid)
 
     def set_layer_order(self, layer_order):
         for o in layer_order:
             # Layer names are UUIDs
-            assert o in self._layers
+            if o not in self._layers:
+                LOG.error('set_layer_order cannot deal with unknown layer {}'.format(o))
+                return
         self._layer_order = layer_order
+        self.update_layers_z()
 
     def set_frame_order(self, frame_order):
         for o in frame_order:
-            assert o in self._layers
+            if o not in self._layers:
+                LOG.error('set_frame_order cannot deal with unknown layer {}'.format(o))
+                return
         self._frame_order = frame_order
         self._frame_number = 0
+        LOG.debug('accepted new frame order of length {}'.format(len(frame_order)))
         if self._frame_change_cb is not None:
             self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating))
+
+    def update_layers_z(self):
+        for z_level, uuid in enumerate(self._layer_order):
+            self._layers[uuid].transform = STTransform(translate=(0, 0, 0-int(z_level)))
+
+    # def set_layer_z(self, uuid, z_level):
+    #     """
+    #     :param uuid: layer to change
+    #     :param z_level: -100..100, 100 being closest to the camera
+    #     :return:
+    #     """
+    #     self._layers[uuid].transform = STTransform(translate=(0, 0, int(z_level)))
+    #
+    # def set_layers_z(self, layer_levels):
+    #     """
+    #     z_levels are -100..100, 100 being closest to the camera
+    #     :param layer_levels: {uuid:level}
+    #     :return:
+    #     """
+    #     for uuid, z_level in layer_levels.items():
+    #         self._layers[uuid].transform = STTransform(translate=(0, 0, int(z_level)))
 
     def top_layer_uuid(self):
         for layer_uuid in self._layer_order:
@@ -178,7 +207,7 @@ class LayerSet(object):
 
     @animating.setter
     def animating(self, animate):
-        print("Running animating ", animate)
+        print("Running animating {} with {} frames".format(animate, len(self._frame_order)))
         if self._animating and not animate:
             # We are currently, but don't want to be
             self._animating = False
@@ -193,6 +222,7 @@ class LayerSet(object):
         self.animating = not self._animating
         if self._frame_change_cb is not None:
             self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating))
+        return self.animating
 
     def _set_visible_node(self, node):
         """Set all nodes to invisible except for the `event.added` node.
@@ -410,24 +440,48 @@ class SceneGraphManager(QObject):
         self.layer_set.add_layer(image)
 
     def remove_layer(self, new_order:list, uuid_removed:UUID):
+        """
+        remove (disable) a layer, though this may be temporary due to a move.
+        wait for purge to truly flush out this puppy
+        :param new_order:
+        :param uuid_removed:
+        :return:
+        """
         self.set_layer_visible(uuid_removed, False)
-        raise NotImplementedError("layer removal from scenegraph not implemented")  # FIXME
+        self.rebuild_all()
+        # LOG.error("layer removal from scenegraph complete")
+
+    def purge_layer(self, uuid_removed:UUID):
+        """
+        Layer has been purged from document (no longer used anywhere) - flush it all out
+        :param uuid_removed: UUID of the layer that is to be removed
+        :return:
+        """
+        self.set_layer_visible(uuid_removed, False)
+        image_layer = self.image_layers[uuid_removed]
+        image_layer.parent = None
+        del self.image_layers[uuid_removed]
+        del self.datasets[uuid_removed]
+        # del self.image_layers[uuid_removed]
+        LOG.info("layer {} purge from scenegraphmanager".format(uuid_removed))
 
     def change_layers_visibility(self, layers_changed:dict):
-        for uuid,visible in layers_changed.items():
+        for uuid, visible in layers_changed.items():
             self.set_layer_visible(uuid, visible)
 
     def rebuild_new_layer_set(self, new_set_number:int, new_prez_order:list, new_anim_order:list):
-        raise NotImplementedError("layer set change not implemented in SceneGraphManager")
+        self.rebuild_all()
+        # raise NotImplementedError("layer set change not implemented in SceneGraphManager")
 
     def set_document(self, document):
-        document.didReorderLayers.connect(self.rebuild_new_order)
-        document.didAddLayer.connect(self.add_layer)
-        document.didRemoveLayer.connect(self.remove_layer)
+        document.didReorderLayers.connect(self.rebuild_layer_order)  # current layer set changed z/anim order
+        document.didAddLayer.connect(self.add_layer)  # layer added to one or more layer sets
+        document.didRemoveLayer.connect(self.remove_layer)  # layer removed from current layer set
+        document.willPurgeLayer.connect(self.purge_layer)  # layer removed from document
         document.didSwitchLayerSet.connect(self.rebuild_new_layer_set)
         document.didChangeColormap.connect(self.change_layers_colormap)
         document.didChangeLayerVisibility.connect(self.change_layers_visibility)
-
+        document.didReorderAnimation.connect(self.rebuild_frame_order)
 
     def set_frame_number(self, frame_number=None):
         self.layer_set.next_frame(None, frame_number)
@@ -436,19 +490,27 @@ class SceneGraphManager(QObject):
         image = self.image_layers[uuid]
         image.visible = not image.visible if visible is None else visible
 
-    def rebuild_new_order(self, new_layer_index_order, *args, **kwargs):
+    def rebuild_layer_order(self, new_layer_index_order, *args, **kwargs):
         """
         layer order has changed; shift layers around.
         an empty list is sent if the whole layer order has been changed
         :param change:
         :return:
         """
-        # FIXME
-        raise NotImplementedError("layer order change not implemented in scenegraphmanager")
+        # TODO this is the lazy implementation, eventually just change z order on affected layers
+        self.layer_set.set_layer_order(self.document.current_layer_order)
         print("New layer order: ", new_layer_index_order)
+        self.update()
+
+    def rebuild_frame_order(self, uuid_list:list, *args, **kwargs):
+        LOG.debug('setting SGM new frame order to {0!r:s}'.format(uuid_list))
+        self.layer_set.set_frame_order(uuid_list)
+        self.update()
 
     def rebuild_all(self, *args, **kwargs):
-        pass
+        self.layer_set.set_layer_order(self.document.current_layer_order)
+        self.layer_set.set_frame_order(self.document.current_animation_order)
+        self.update()
 
     def on_view_change(self, scheduler, ws=None):
         """Simple event handler for when we need to reassess image layers.
