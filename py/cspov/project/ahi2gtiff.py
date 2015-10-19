@@ -50,7 +50,9 @@ def _proj4_to_srs(proj4_str):
     return srs
 
 
-def create_geotiff(data, output_filename, proj4_str, geotransform, etype=gdal.GDT_UInt16, compress=None,
+def create_geotiff(data, output_filename, proj4_str, geotransform, etype=gdal.GDT_UInt16,
+                   compress=None, predictor=None, tile=False,
+                   blockxsize=None, blockysize=None,
                    quicklook=False, gcps=None, **kwargs):
     """Function that creates a geotiff from the information provided.
     """
@@ -81,6 +83,14 @@ def create_geotiff(data, output_filename, proj4_str, geotransform, etype=gdal.GD
 
     if compress is not None and compress != "NONE":
         options.append("COMPRESS=%s" % (compress,))
+        if predictor is not None:
+            options.append("PREDICTOR=%d" % (predictor,))
+    if tile:
+        options.append("TILED=YES")
+    if blockxsize is not None:
+        options.append("BLOCKXSIZE=%d" % (blockxsize,))
+    if blockysize is not None:
+        options.append("BLOCKYSIZE=%d" % (blockysize,))
 
     # Creating the file will truncate any pre-existing file
     LOG.debug("Creation Geotiff with options %r", options)
@@ -123,20 +133,20 @@ def create_geotiff(data, output_filename, proj4_str, geotransform, etype=gdal.GD
 
         # Garbage collection/destructor should close the file properly
 
-def ahi2gtiff(input_filename, output_filename):
-    LOG.debug("Opening input netcdf4 file: %s", input_filename)
+
+def ahi_image_data(input_filename):
     nc = Dataset(input_filename, "r")
 
     if "albedo" in nc.variables:
         input_data = nc.variables["albedo"][:]
-        # input_data = linear_flexible_scale(input_data, 0, 255)
-        # input_data = sqrt_scale(input_data, 0, 255)
     else:
         input_data = nc.variables["brightness_temp"][:]
-        # input_data = brightness_temperature_scale(input_data, 242.0, 163.0, 330.0, 0, 255)
-    # np.clip(input_data, 0, 255, out=input_data)
-    # input_data = input_data.astype(np.uint8)
     input_data = input_data.astype(np.float32)  # make sure everything is 32-bit floats
+    return input_data
+
+
+def ahi_image_info(input_filename):
+    nc = Dataset(input_filename, "r")
 
     projection_info = nc.variables["Projection"].__dict__.copy()
     projection_info["semi_major_axis"] *= 1000.0  # is in kilometers, need meters
@@ -159,31 +169,53 @@ def ahi2gtiff(input_filename, output_filename):
     LOG.debug("AHI Fixed Grid Projection String: %s", input_proj_str)
 
     # Calculate upper-left corner (origin) using center point as a reference
-    shape = nc.variables["longitude"].shape
-    # center_x_idx = shape[1] / 2
-    # center_y_idx = shape[0] / 2
+    lon = nc.variables["longitude"][:]
+    shape = lon.shape
     pixel_size_x = AHI_NADIR_RES[shape[0]]
     pixel_size_y = -AHI_NADIR_RES[shape[1]]
-    # center_lon = nc.variables["longitude"][center_x_idx, center_y_idx]
-    # center_lat = nc.variables["latitude"][center_x_idx, center_y_idx]
-    # p = Proj(input_proj_str)
-    # center_x, center_y = p(center_lon, center_lat)
-    # origin_x = center_x - pixel_size_x * center_x_idx
-    # origin_y = center_y - pixel_size_y * center_y_idx
-    # LOG.debug("Center Lon: %f\tCenter Lat: %f", center_lon, center_lat)
-    # LOG.debug("Center X: %f\tCenter Y: %f", center_x, center_y)
 
     # Assume that center pixel is at 0, 0 projection space
     origin_x = -pixel_size_x * (shape[1] / 2.0)
     origin_y = -pixel_size_y * (shape[0] / 2.0)
     LOG.debug("Origin X: %f\tOrigin Y: %f", origin_x, origin_y)
 
-    # origin_x, cell_width, rotation_x, origin_y, rotation_y, cell_height
-    geotransform = (origin_x, pixel_size_x, 0, origin_y, 0, pixel_size_y)
-    # gcps = [(center_lon, center_lat, center_x_idx, center_y_idx),]
+    # AHI NetCDF files have "proper" 0-360 longitude so lon_min is west, lon_max is east
+    lon_min = lon.min()
+    lon_max = lon.max()
+    if lon_max >= 180 or (lon_max - lon_min) < 180:
+        # If longitudes are 0-360 then coordinates are as expected
+        lon_west = lon_min
+        lon_east = lon_max
+    else:
+        # If we are wrapping around the antimeridian
+        lon_west = lon_max
+        lon_east = lon_min
 
-    etype = gdal.GDT_Byte if input_data.dtype == np.uint8 else gdal.GDT_Float32
-    create_geotiff(input_data, output_filename, input_proj_str, geotransform, etype=etype)
+    info = {
+        "proj": input_proj_str,
+        "origin_x": origin_x,
+        "origin_y": origin_y,
+        "cell_width": pixel_size_x,
+        "cell_height": pixel_size_y,
+        "width": shape[1],
+        "height": shape[0],
+        "lon_extents": (lon_west, lon_east),
+    }
+    return info
+
+
+def ahi2gtiff(input_filename, output_filename):
+    LOG.debug("Opening input netcdf4 file: %s", input_filename)
+    data = ahi_image_data(input_filename)
+    info = ahi_image_info(input_filename)
+    return create_ahi_geotiff(info, data, output_filename)
+
+
+def create_ahi_geotiff(info, data, output_filename, **kwargs):
+    etype = gdal.GDT_Byte if data.dtype == np.uint8 else gdal.GDT_Float32
+    # origin_x, cell_width, rotation_x, origin_y, rotation_y, cell_height
+    geotransform = (info["origin_x"], info["cell_width"], 0, info["origin_y"], 0, info["cell_height"])
+    create_geotiff(data, output_filename, info["proj"], geotransform, etype=etype, **kwargs)
 
 
 def main():

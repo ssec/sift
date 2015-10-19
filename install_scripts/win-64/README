@@ -1,0 +1,43 @@
+Windows 64-bit Production Environment Installation
+==================================================
+
+These files provide a way to install the SIFT visualization tool on a Windows 64-bit system.
+The following files and directories should be placed in the root directory of a USB drive
+for installation to work properly:
+
+ - Install SIFT.bat
+ - create_shortcuts.py
+ - rsync_sift_ahi.bat
+
+In addition to the above the drive should contain the following in the root directory:
+
+ - Anaconda 3.4 installer for Windows 64-bit machines
+     - https://www.continuum.io/downloads
+     - Tested with the installer named `Anaconda3-2.3.0-Windows-x86_64.exe` on Windows 7 laptops.
+ - cwRsync
+     - Version 5.4.1 x86: https://www.itefix.net/cwrsync
+     - Extract zip file and rename directory to "cwrsync"
+
+What It Does
+------------
+
+The installation script will do the following:
+
+1. Install Anaconda3 to the C:\Anaconda3 directory and create a "sift" sub-environment.
+2. Create C:\data and sets it for compression for data downloads.
+3. Create C:\Users\<username>\sift_workspace and sets it for compression. This is used by the SIFT GUI.
+4. Create 3 shortcuts:
+
+    - Updated SIFT.lnk: Update the Conda package for SIFT
+    - Run SIFT.lnk: Run the SIFT GUI
+    - Sync AHI Data.lnk: Rsync AHI data from SSEC servers to the local computer.
+
+How to Install
+--------------
+
+1. Run "Install SIFT.bat" from a properly configured USB drive by double clicking the icon.
+2. Follow the Anaconda graphical installation using the defaults (requires admin privileges).
+3. After installation has completed, press any key to close the window.
+4. Run the Sync shortcut that is created on the Desktop. This will download ~250GB to
+   your computer and must be run from inside the SSEC.
+5. Run SIFT by double clicking the "Run SIFT.lnk" icon on the Desktop.

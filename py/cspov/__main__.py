@@ -40,6 +40,7 @@ from functools import partial
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
+from cspov.common import INFO, KIND
 
 import os
 import logging
@@ -159,14 +160,58 @@ class Main(QtGui.QMainWindow):
         self.ui.animationSlider.repaint()
 
     def change_layer_colormap(self, nfo):
-        uuid = nfo['uuid']
-        mapname = nfo['colormap']
+        uuid = nfo[INFO.UUID]
+        mapname = nfo[INFO.COLORMAP]
         LOG.info('changing {} to colormap {}'.format(uuid, mapname))
         self.scene_manager.set_colormap(mapname, uuid=uuid)
+
+    def remove_layer(self, *args, **kwargs):
+        uuids = self.behaviorLayersList.current_selected_uuids()
+        for uuid in uuids:
+            LOG.debug('removing layer {}'.format(uuid))
+            self.document.remove_layer_prez(uuid)
 
     def animation_slider_jump_frame(self, event, *args, **kwargs):
         frame = self.ui.animationSlider.value()
         self.scene_manager.set_frame_number(frame)
+
+    def next_last_time(self, direction=0, *args, **kwargs):
+        LOG.info('time incr {}'.format(direction))
+        uuids = self.behaviorLayersList.current_selected_uuids()
+        if not uuids:
+            pass # FIXME: notify user
+        for uuid in uuids:
+            new_focus = self.document.next_last_step(uuid, direction, bandwise=False)
+        self.behaviorLayersList.select([new_focus])
+        # self.document.animate_siblings_of_layer(new_focus)
+
+    def next_last_band(self, direction=0, *args, **kwargs):
+        LOG.info('band incr {}'.format(direction))
+        uuids = self.behaviorLayersList.current_selected_uuids()
+        if not uuids:
+            pass # FIXME: notify user
+        for uuid in uuids:
+            new_focus = self.document.next_last_step(uuid, direction, bandwise=True)
+        self.behaviorLayersList.select([new_focus])
+
+    def change_animation_to_current_selection_siblings(self, *args, **kwargs):
+        uuids = list(self.behaviorLayersList.current_selected_uuids())
+        if len(uuids)!=1:
+            self.ui.cursorProbeText.setText("No selected layer?")
+            return # FIXME: notify user
+        # calculate the new animation sequence by consulting the guidebook
+        self.document.animate_siblings_of_layer(uuids[0])
+        self.ui.cursorProbeText.setText("Frame order updated")
+        LOG.info('using siblings of {} for animation loop'.format(uuids[0]))
+
+    # def accept_new_layer(self, new_order, info, overview_content):
+    #     LOG.debug('accepting new layer order {0!r:s}'.format(new_order))
+    #     if info[INFO.KIND] == KIND.IMAGE:
+    #         LOG.info("rebuilding animation based on newly loaded image layer")
+    #         self.document.animate_using_layer(info[INFO.UUID])
+    #         self.animation_slider_jump_frame(None)
+    #         self.behaviorLayersList.select([info[INFO.UUID]])
+
 
     def __init__(self, workspace_dir=None, glob_pattern=None, border_shapefile=None):
         super(Main, self).__init__()
@@ -220,6 +265,9 @@ class Main(QtGui.QMainWindow):
         # convey action between document and layer list view
         self.behaviorLayersList = LayerStackListViewModel([self.ui.layerSet1Table, self.ui.layerSet2Table, self.ui.layerSet3Table, self.ui.layerSet4Table], doc)
 
+        # coordinate what gets done when a layer is added by document
+        # self.document.didAddLayer.connect(self.accept_new_layer)
+
         def update_probe_point(uuid, xy_pos):
             data_point = self.workspace.get_content_point(uuid, xy_pos)
             self.ui.cursorProbeText.setText("Point Probe: {:.03f}".format(float(data_point)))
@@ -237,9 +285,9 @@ class Main(QtGui.QMainWindow):
                 self.canvasA.draw()
             elif len(selected_uuids)==2:
                 data1 = self.workspace.get_content_polygon(selected_uuids[0], points)
-                name1 = self.workspace.get_info(selected_uuids[0])['name']
+                name1 = self.workspace.get_info(selected_uuids[0])[INFO.NAME]
                 data2 = self.workspace.get_content_polygon(selected_uuids[1], points)
-                name2 = self.workspace.get_info(selected_uuids[1])['name']
+                name2 = self.workspace.get_info(selected_uuids[1])[INFO.NAME]
                 self.figureA.clf()
                 plt.scatter(data1.flatten(), data2.flatten(), s=1, alpha=0.5)
                 plt.xlabel(name1)
@@ -279,6 +327,9 @@ class Main(QtGui.QMainWindow):
     def setup_probe_panes(self):
         self.figureA, self.canvasA, self.toolbarA = self.make_mpl_pane(self.ui.probeAWidget)
 
+    def toggle_animation(self, action:QtGui.QAction=None, *args):
+        new_state = self.scene_manager.layer_set.toggle_animation()
+        action.setChecked(new_state)
 
     def setup_menu(self):
         open_action = QtGui.QAction("&Open", self)
@@ -294,6 +345,48 @@ class Main(QtGui.QMainWindow):
         file_menu.addAction(open_action)
         file_menu.addAction(exit_action)
 
+        next_time = QtGui.QAction("Next Time", self)
+        next_time.setShortcut(QtCore.Qt.Key_Right)
+        next_time.triggered.connect(partial(self.next_last_time, direction=1))
+
+        prev_time = QtGui.QAction("Previous Time", self)
+        prev_time.setShortcut(QtCore.Qt.Key_Left)
+        prev_time.triggered.connect(partial(self.next_last_time, direction=-1))
+
+        next_band = QtGui.QAction("Next Band", self)
+        next_band.setShortcut(QtCore.Qt.Key_Up)
+        next_band.triggered.connect(partial(self.next_last_band, direction=1))
+
+        prev_band = QtGui.QAction("Previous Band", self)
+        prev_band.setShortcut(QtCore.Qt.Key_Down)
+        prev_band.triggered.connect(partial(self.next_last_band, direction=-1))
+
+        animate = QtGui.QAction("Animate", self)
+        animate.setShortcut('A')
+        animate.triggered.connect(partial(self.toggle_animation, action=animate))
+
+        change_order = QtGui.QAction("Set Animation &Order", self)
+        change_order.setShortcut('O')
+        change_order.triggered.connect(self.change_animation_to_current_selection_siblings)
+
+        view_menu = menubar.addMenu('&View')
+        view_menu.addAction(animate)
+        view_menu.addAction(prev_time)
+        view_menu.addAction(next_time)
+        view_menu.addAction(prev_band)
+        view_menu.addAction(next_band)
+        view_menu.addAction(change_order)
+
+        remove = QtGui.QAction("Remove Layer", self)
+        remove.setShortcut(QtCore.Qt.Key_Delete)
+        remove.triggered.connect(self.remove_layer)
+
+        edit_menu = menubar.addMenu('&Edit')
+        edit_menu.addAction(remove)
+
+        menubar.setEnabled(True)
+
+
     def setup_key_releases(self):
         def cb_factory(required_key, cb):
             def tmp_cb(key, cb=cb):
@@ -301,8 +394,8 @@ class Main(QtGui.QMainWindow):
                     return cb()
             return tmp_cb
 
-        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("a", self.scene_manager.layer_set.toggle_animation))
-        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("n", self.scene_manager.layer_set.next_frame))
+        # self.scene_manager.main_canvas.events.key_release.connect(cb_factory("a", self.scene_manager.layer_set.toggle_animation))
+        # self.scene_manager.main_canvas.events.key_release.connect(cb_factory("n", self.scene_manager.layer_set.next_frame))
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("c", self.scene_manager.next_camera))
 
         class ColormapSlot(object):
