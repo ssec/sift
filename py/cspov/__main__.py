@@ -165,6 +165,12 @@ class Main(QtGui.QMainWindow):
         LOG.info('changing {} to colormap {}'.format(uuid, mapname))
         self.scene_manager.set_colormap(mapname, uuid=uuid)
 
+    def remove_layer(self, *args, **kwargs):
+        uuids = self.behaviorLayersList.current_selected_uuids()
+        for uuid in uuids:
+            LOG.debug('removing layer {}'.format(uuid))
+            self.document.remove_layer_prez(uuid)
+
     def animation_slider_jump_frame(self, event, *args, **kwargs):
         frame = self.ui.animationSlider.value()
         self.scene_manager.set_frame_number(frame)
@@ -370,6 +376,13 @@ class Main(QtGui.QMainWindow):
         view_menu.addAction(prev_band)
         view_menu.addAction(next_band)
         view_menu.addAction(change_order)
+
+        remove = QtGui.QAction("Remove Layer", self)
+        remove.setShortcut(QtCore.Qt.Key_Delete)
+        remove.triggered.connect(self.remove_layer)
+
+        edit_menu = menubar.addMenu('&Edit')
+        edit_menu.addAction(remove)
 
         menubar.setEnabled(True)
 

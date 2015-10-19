@@ -273,14 +273,12 @@ class Document(QObject):
         order[row1], order[row2] = order[row2], order[row1]
         self.didReorderLayers.emit(order)
 
-    def row_for_uuid(self, uuid, *uuids):
+    def row_for_uuid(self, *uuids):
         d = dict((q.uuid,i) for i,q in enumerate(self.current_layer_set))
-        if len(uuids):
-            yield d[uuid]
-            for uuid in uuids:
-                yield d[uuid]
+        if len(uuids)==1:
+            return d[uuids[0]]
         else:
-            return d[uuid]
+            return [d[x] for x in uuids]
 
     def toggle_layer_visibility(self, rows, visible=None):
         """
@@ -440,17 +438,22 @@ class Document(QObject):
                     return True
         return False
 
-    def remove_layer_prez(self, row:int, count:int=1):
+    def remove_layer_prez(self, row_or_uuid, count:int=1):
         """
         remove the presentation of a given layer/s in the current set
         :param row: which current layer set row to remove
         :param count: how many rows to remove
         :return:
         """
-        self.toggle_layer_visibility(list(range(row,row+count)), False)
+        if isinstance(row_or_uuid, UUID) and count==1:
+            row = self.row_for_uuid(row_or_uuid)
+            uuids = [row_or_uuid]
+        else:
+            row = row_or_uuid
+            uuids = [x.uuid for x in self.current_layer_set[row:row+count]]
+        self.toggle_layer_visibility(list(range(row, row+count)), False)
         clo = list(range(len(self.current_layer_set)))
         del clo[row:row+count]
-        uuids = [x.uuid for x in self.current_layer_set[row:row+count]]
         del self.current_layer_set[row:row+count]
         for uuid in uuids:
             self.didRemoveLayer.emit(clo, uuid)
