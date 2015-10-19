@@ -106,6 +106,7 @@ def main():
             lon_west, lon_east = src_info["lon_extents"]
         except RuntimeError:
             LOG.error("Could not create geotiff for '%s'" % (nc_file,))
+            LOG.debug("Exception Information: ", exc_info=True)
             continue
 
         # Get information about the geotiff
