@@ -177,7 +177,7 @@ class Main(QtGui.QMainWindow):
         for uuid in uuids:
             new_focus = self.document.next_last_step(uuid, direction, bandwise=False)
         self.behaviorLayersList.select([new_focus])
-        self.document.animate_siblings_of_layer(new_focus)
+        # self.document.animate_siblings_of_layer(new_focus)
 
     def next_last_band(self, direction=0, *args, **kwargs):
         LOG.info('band incr {}'.format(direction))
@@ -189,11 +189,13 @@ class Main(QtGui.QMainWindow):
         self.behaviorLayersList.select([new_focus])
 
     def change_animation_to_current_selection_siblings(self, *args, **kwargs):
-        uuids = self.behaviorLayersList.current_selected_uuids()
+        uuids = list(self.behaviorLayersList.current_selected_uuids())
         if len(uuids)!=1:
+            self.ui.cursorProbeText.setText("No selected layer?")
             return # FIXME: notify user
         # calculate the new animation sequence by consulting the guidebook
         self.document.animate_siblings_of_layer(uuids[0])
+        self.ui.cursorProbeText.setText("Frame order updated")
         LOG.info('using siblings of {} for animation loop'.format(uuids[0]))
 
     # def accept_new_layer(self, new_order, info, overview_content):
@@ -319,6 +321,9 @@ class Main(QtGui.QMainWindow):
     def setup_probe_panes(self):
         self.figureA, self.canvasA, self.toolbarA = self.make_mpl_pane(self.ui.probeAWidget)
 
+    def toggle_animation(self, action:QtGui.QAction=None, *args):
+        new_state = self.scene_manager.layer_set.toggle_animation()
+        action.setChecked(new_state)
 
     def setup_menu(self):
         open_action = QtGui.QAction("&Open", self)
@@ -350,11 +355,21 @@ class Main(QtGui.QMainWindow):
         prev_band.setShortcut(QtCore.Qt.Key_Down)
         prev_band.triggered.connect(partial(self.next_last_band, direction=-1))
 
+        animate = QtGui.QAction("Animate", self)
+        animate.setShortcut('A')
+        animate.triggered.connect(partial(self.toggle_animation, action=animate))
+
+        change_order = QtGui.QAction("Set Animation &Order", self)
+        change_order.setShortcut('O')
+        change_order.triggered.connect(self.change_animation_to_current_selection_siblings)
+
         view_menu = menubar.addMenu('&View')
+        view_menu.addAction(animate)
         view_menu.addAction(prev_time)
         view_menu.addAction(next_time)
         view_menu.addAction(prev_band)
         view_menu.addAction(next_band)
+        view_menu.addAction(change_order)
 
         menubar.setEnabled(True)
 
@@ -366,8 +381,8 @@ class Main(QtGui.QMainWindow):
                     return cb()
             return tmp_cb
 
-        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("a", self.scene_manager.layer_set.toggle_animation))
-        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("n", self.scene_manager.layer_set.next_frame))
+        # self.scene_manager.main_canvas.events.key_release.connect(cb_factory("a", self.scene_manager.layer_set.toggle_animation))
+        # self.scene_manager.main_canvas.events.key_release.connect(cb_factory("n", self.scene_manager.layer_set.next_frame))
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("c", self.scene_manager.next_camera))
 
         class ColormapSlot(object):

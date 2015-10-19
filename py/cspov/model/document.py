@@ -320,7 +320,7 @@ class Document(QObject):
         else:
             consult_guide = self._guidebook.time_siblings
         sibs, dex = consult_guide(uuid, self._layer_with_uuid.values())
-        LOG.debug('layer {0} family is +{1} of {2!r:s}'.format(uuid, dex, sibs))
+        # LOG.debug('layer {0} family is +{1} of {2!r:s}'.format(uuid, dex, sibs))
         if not sibs:
             LOG.info('nothing to do in next_last_timestep')
             return uuid

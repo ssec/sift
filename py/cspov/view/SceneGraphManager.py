@@ -222,6 +222,7 @@ class LayerSet(object):
         self.animating = not self._animating
         if self._frame_change_cb is not None:
             self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating))
+        return self.animating
 
     def _set_visible_node(self, node):
         """Set all nodes to invisible except for the `event.added` node.
@@ -437,17 +438,17 @@ class SceneGraphManager(QObject):
         self.image_layers[uuid] = image
         self.datasets[uuid] = ds_info
         self.layer_set.add_layer(image)
-        # cao = self.document.current_animation_order or []
-        # self.layer_set.set_frame_order(cao)
-        # print('animation order has {} frames'.format(len(cao)))
-        # FIXME FIXME debug this on initial add changing animation order in doc
 
     def remove_layer(self, new_order:list, uuid_removed:UUID):
+        """
+        remove (disable) a layer, though this may be temporary due to a move.
+        wait for purge to truly flush out this puppy
+        :param new_order:
+        :param uuid_removed:
+        :return:
+        """
         self.set_layer_visible(uuid_removed, False)
-        image_layer = self.image_layers[uuid_removed]
-        image_layer.parent = None
-        del self.image_layers[uuid_removed]
-        LOG.error("layer removal from scenegraph complete")
+        # LOG.error("layer removal from scenegraph complete")
 
     def purge_layer(self, uuid_removed:UUID):
         """
@@ -456,10 +457,12 @@ class SceneGraphManager(QObject):
         :return:
         """
         self.set_layer_visible(uuid_removed, False)
-        # FIXME remove layer from layer_set and scenegraph, then:
+        image_layer = self.image_layers[uuid_removed]
+        image_layer.parent = None
+        del self.image_layers[uuid_removed]
         del self.datasets[uuid_removed]
         # del self.image_layers[uuid_removed]
-        LOG.error("layer purge from scenegraphmanager not implemented")
+        LOG.info("layer {} purge from scenegraphmanager".format(uuid_removed))
 
     def change_layers_visibility(self, layers_changed:dict):
         for uuid, visible in layers_changed.items():
