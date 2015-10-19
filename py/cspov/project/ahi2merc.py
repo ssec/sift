@@ -52,6 +52,8 @@ def main():
                         help="Set tile block X size")
     parser.add_argument('--blockysize', default=None, type=int,
                         help="Set tile block Y size")
+    parser.add_argument('--extents', default=None, nargs=4, type=float,
+                        help="Set mercator bounds in lat/lon space (lon_min lat_min lon_max lat_max)")
 
     parser.add_argument("input_dir",
                         help="Input directory to search for the 'input_pattern' specified")
@@ -124,9 +126,19 @@ def main():
         proj = proj + " +over" if lon_east >= 180 else proj
         # Include the '+over' parameter so longitudes are wrapper around the antimeridian
         src_proj = Proj(proj)
-        x_extent = (src_proj(lon_west, 0)[0], src_proj(lon_east, 0)[0])
-        y_extent = (src_proj(0, -80)[1], src_proj(0, 80)[1])
-        # import ipdb; ipdb.set_trace()
+
+        if args.extents is not None:
+            # user told us what they want
+            x_min, y_min = src_proj(args.extents[0], args.extents[1])
+            x_max, y_max = src_proj(args.extents[2], args.extents[3])
+            x_extent = (x_min, x_max)
+            y_extent = (y_min, y_max)
+        else:
+            # use image bounds
+            x_extent = (src_proj(lon_west, 0)[0], src_proj(lon_east, 0)[0])
+            y_extent = (src_proj(0, -80)[1], src_proj(0, 80)[1])
+        LOG.debug("Using extents (%f : %f : %f : %f)", x_extent[0], y_extent[0], x_extent[1], y_extent[1])
+
         gdalwarp_args = args.gdalwarp_args + [
             #"-multi",
             "-t_srs", proj,
