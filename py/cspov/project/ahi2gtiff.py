@@ -157,7 +157,8 @@ def ahi_image_info(input_filename):
 
     # Notes on Sweep: https://trac.osgeo.org/proj/wiki/proj%3Dgeos
     # If AHI behaves like GOES then sweep should be Y
-    input_proj_str = "+proj=geos "
+    # +over is needed so that we do 0-360 lon/lats and x/y
+    input_proj_str = "+proj=geos +over "
     input_proj_str += "+lon_0={longitude_of_projection_origin:0.3f} "
     input_proj_str += "+lat_0={latitude_of_projection_origin:0.3f} "
     input_proj_str += "+a={semi_major_axis:0.3f} "
@@ -169,8 +170,7 @@ def ahi_image_info(input_filename):
     LOG.debug("AHI Fixed Grid Projection String: %s", input_proj_str)
 
     # Calculate upper-left corner (origin) using center point as a reference
-    lon = nc.variables["longitude"][:]
-    shape = lon.shape
+    shape = (len(nc.dimensions["y"]), len(nc.dimensions["x"]))
     pixel_size_x = AHI_NADIR_RES[shape[0]]
     pixel_size_y = -AHI_NADIR_RES[shape[1]]
 
@@ -180,8 +180,21 @@ def ahi_image_info(input_filename):
     LOG.debug("Origin X: %f\tOrigin Y: %f", origin_x, origin_y)
 
     # AHI NetCDF files have "proper" 0-360 longitude so lon_min is west, lon_max is east
-    lon_min = lon.min()
-    lon_max = lon.max()
+    # Find the left side of the image and the right side of the image
+    p = Proj(input_proj_str)
+    x = np.empty(shape, dtype=np.float32)
+    x[:] = origin_x + (pixel_size_x * np.arange(shape[1], dtype=np.float32))
+    y = np.empty(shape, dtype=np.float32)
+    y[:] = origin_y + (pixel_size_y * np.arange(shape[0], dtype=np.float32)[:, None])
+    lon, lat = p(x, y, inverse=True)
+    lon[lon == 1e30] = np.nan
+    lat[lat == 1e30] = np.nan
+    lon_min = np.nanmin(lon)
+    lon_max = np.nanmax(lon)
+    lat_south = np.nanmin(lat)
+    lat_north = np.nanmax(lat)
+    LOG.info("Longitude Minimum: %f; Maximum: %f" % (lon_min, lon_max))
+    LOG.info("Latitude Minimum: %f; Maximum: %f" % (lat_south, lat_north))
     if lon_max >= 180 or (lon_max - lon_min) < 180:
         # If longitudes are 0-360 then coordinates are as expected
         lon_west = lon_min
@@ -200,6 +213,7 @@ def ahi_image_info(input_filename):
         "width": shape[1],
         "height": shape[0],
         "lon_extents": (lon_west, lon_east),
+        "lat_extents": (lat_south, lat_north),
     }
     return info
 
