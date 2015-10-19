@@ -40,6 +40,19 @@ def main():
                         help="Input pattern used search for NetCDF files in 'input_dir'")
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
                         help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG (default INFO)')
+
+    # http://www.gdal.org/frmt_gtiff.html
+    parser.add_argument('--compress', default=None,
+                        help="Type of compression for geotiffs (passed to GDAL GeoTIFF Driver)")
+    parser.add_argument('--predictor', default=None, type=int,
+                        help="Set predictor for geotiff compression (LZW or DEFLATE)")
+    parser.add_argument('--tiled', action='store_true',
+                        help="Create tiled geotiffs")
+    parser.add_argument('--blockxsize', default=None, type=int,
+                        help="Set tile block X size")
+    parser.add_argument('--blockysize', default=None, type=int,
+                        help="Set tile block Y size")
+
     parser.add_argument("input_dir",
                         help="Input directory to search for the 'input_pattern' specified")
     parser.add_argument("output_dir",
@@ -61,7 +74,7 @@ def main():
             continue
 
         # Come up with an intermediate geotiff name
-        geos_file = nc_file.replace(idir, odir).replace(".nc", ".tif")
+        geos_file = nc_file.replace(idir, odir, 1).replace(".nc", ".tif")
         opath = os.path.dirname(geos_file)
         if not os.path.exists(opath):
             LOG.info("Creating output directory: %s", opath)
@@ -70,20 +83,30 @@ def main():
         # Come up with an output mercator filename
         merc_file = geos_file.replace(".tif", args.merc_ext)
         if os.path.isfile(merc_file):
-            LOG.warning("Output file already exists: %s" % (merc_file,))
-            continue
+            LOG.warning("Output file already exists, will delete to start over: %s" % (merc_file,))
+            try:
+                os.remove(merc_file)
+            except Exception:
+                LOG.error("Could not remove previous file: %s" % (merc_file,))
+                continue
 
         try:
             src_info = ahi_image_info(nc_file)
             if not os.path.exists(geos_file):
                 src_data = ahi_image_data(nc_file)
                 # print("### Source Data: Min (%f) | Max (%f)" % (src_data.min(), src_data.max()))
-                create_ahi_geotiff(src_info, src_data, geos_file)
+                create_ahi_geotiff(src_info, src_data, geos_file,
+                                   compress=args.compress,
+                                   predictor=args.predictor,
+                                   tiled=args.tiled,
+                                   blockxsize=args.blockxsize,
+                                   blockysize=args.blockysize)
             else:
                 LOG.debug("GEOS Projection GeoTIFF already exists, won't recreate...")
             lon_west, lon_east = src_info["lon_extents"]
         except RuntimeError:
             LOG.error("Could not create geotiff for '%s'" % (nc_file,))
+            LOG.debug("Exception Information: ", exc_info=True)
             continue
 
         # Get information about the geotiff
@@ -114,6 +137,16 @@ def main():
             "{:0.03f}".format(x_extent[1]),
             "{:0.03f}".format(y_extent[1]),
         ]
+        if args.compress is not None:
+            gdalwarp_args.extend(["-co", "COMPRESS=%s" % (args.compress,)])
+            if args.predictor is not None:
+                gdalwarp_args.extend(["-co", "PREDICTOR=%d" % (args.predictor,)])
+        if args.tiled:
+            gdalwarp_args.extend(["-co", "TILED=YES"])
+        if args.blockxsize is not None:
+            gdalwarp_args.extend(["-co", "BLOCKXSIZE=%d" % (args.blockxsize,)])
+        if args.blockysize is not None:
+            gdalwarp_args.extend(["-co", "BLOCKYSIZE=%d" % (args.blockysize,)])
         run_gdalwarp(geos_file, merc_file, *gdalwarp_args)
 
 if __name__ == "__main__":
