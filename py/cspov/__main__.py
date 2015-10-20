@@ -200,8 +200,9 @@ class Main(QtGui.QMainWindow):
             self.ui.cursorProbeText.setText("No selected layer?")
             return # FIXME: notify user
         # calculate the new animation sequence by consulting the guidebook
-        self.document.animate_siblings_of_layer(uuids[0])
+        uuids = self.document.animate_siblings_of_layer(uuids[0])
         self.ui.cursorProbeText.setText("Frame order updated")
+        self.behaviorLayersList.select(uuids)
         LOG.info('using siblings of {} for animation loop'.format(uuids[0]))
 
     # def accept_new_layer(self, new_order, info, overview_content):

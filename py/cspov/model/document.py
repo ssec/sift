@@ -382,7 +382,7 @@ class Document(QObject):
         cls = self.current_layer_set
         u2r = dict((x.uuid, i) for i,x in enumerate(cls))
         if not new_anim_uuids:
-            return
+            return []
         self.clear_animation_order()
         for dex,u in enumerate(new_anim_uuids):
             LOG.debug(u)
@@ -394,6 +394,7 @@ class Document(QObject):
             new = old._replace(a_order=dex)
             cls[row] = new
         self.didReorderAnimation.emit(new_anim_uuids)
+        return new_anim_uuids
 
     def get_info(self, row=None):
         if row is not None:

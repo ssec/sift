@@ -39,7 +39,7 @@ import weakref
 import pickle as pkl
 import base64
 from PyQt4.QtCore import QAbstractListModel, QAbstractTableModel, QVariant, Qt, QSize, QModelIndex, QPoint, QMimeData
-from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyleOptionViewItem
+from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyleOptionViewItem, QItemSelection, QItemSelectionModel
 from cspov.model.document import Document
 from cspov.common import INFO, KIND
 
@@ -251,11 +251,13 @@ class LayerStackListViewModel(QAbstractListModel):
             return
         # FUTURE: this is quick and dirty
         rowdict = dict((u,i) for i,u in enumerate(self.doc.current_layer_order))
+        items = QItemSelection()
         for uuid in uuids:
             row = rowdict[uuid]
             q = self.createIndex(row, 0)
-            lbox.setCurrentIndex(q)
-            # FIXME: more than one uuids can be selected at a time
+            items.select(q, q)
+            lbox.selectionModel().select(items, QItemSelectionModel.Select)
+            # lbox.setCurrentIndex(q)
 
     def menu(self, pos:QPoint, *args):
         LOG.info('menu requested for layer list')
