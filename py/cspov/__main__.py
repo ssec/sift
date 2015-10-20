@@ -84,6 +84,7 @@ def test_layers(ws, doc, glob_pattern=None):
 
 
 class Main(QtGui.QMainWindow):
+    _last_open_dir = None  # directory to open files in
 
     def make_mpl_pane(self, parent):
         """place a matplotlib figure inside a probe pane
@@ -115,10 +116,11 @@ class Main(QtGui.QMainWindow):
     def open_files(self):
         files = QtGui.QFileDialog.getOpenFileNames(self,
                                                    "Select one or more files to open",
-                                                   os.getenv("HOME"),
+                                                   self._last_open_dir or os.getenv("HOME"),
                                                    'Mercator GeoTIFF (*.tiff *.tif)')
-        for filename in files:
-            self.document.open_file(filename)
+        for pathname in files:
+            self.document.open_file(pathname)
+            self._last_open_dir = os.path.split(pathname)[0]
 
     def dropEvent(self, event):
         LOG.debug('drop event on mainwindow')
