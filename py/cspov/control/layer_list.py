@@ -196,7 +196,7 @@ class LayerStackListViewModel(QAbstractListModel):
         # listbox.indexesMoved.connect(FIXME)
         # listbox.setMovement(QListView.Snap)
         # listbox.setDragDropMode(QListView.InternalMove)
-        # listbox.setDragDropMode(QAbstractItemView.DragDrop)
+        listbox.setDragDropMode(QAbstractItemView.DragDrop)
         # listbox.setDefaultDropAction(Qt.MoveAction)
         # listbox.setDragDropOverwriteMode(False)
         # listbox.clicked.connect(self.layer_clicked)
@@ -283,7 +283,16 @@ class LayerStackListViewModel(QAbstractListModel):
         if action == Qt.IgnoreAction:
             return True
 
-        if mime.hasFormat(self._mimetype):
+        if mime.hasFormat('text/uri-list'):
+            if mime.hasUrls():
+                LOG.debug('found urls in drop!')
+                for qurl in mime.urls():
+                    LOG.debug(qurl.path())
+                    if qurl.isLocalFile():
+                        path = qurl.path()
+                        self.doc.open_file(path)
+                return True
+        elif mime.hasFormat(self._mimetype):
             # unpickle the presentation information and re-insert it
             # b = base64.decodebytes(mime.text())
             b = mime.data(self._mimetype)
@@ -317,7 +326,7 @@ class LayerStackListViewModel(QAbstractListModel):
         return mime
 
     def mimeTypes(self):
-        return [self._mimetype]  # TODO, allow geotiff and other file types to be dropped in
+        return ['text/uri-list', self._mimetype]  # ref https://github.com/shotgunsoftware/pyqt-uploader/blob/master/uploader.py
 
     def flags(self, index):
         # flags = super(LayerStackListViewModel, self).flags(index)

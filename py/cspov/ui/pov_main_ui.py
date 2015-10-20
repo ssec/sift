@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created: Thu Oct  8 22:21:36 2015
+# Created: Mon Oct 19 21:59:38 2015
 #      by: PyQt4 UI code generator 4.11.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -92,6 +92,7 @@ class Ui_MainWindow(object):
         self.mainWidgets.addTab(self.tab_2, _fromUtf8(""))
         self.verticalLayout_2.addWidget(self.mainWidgets)
         self.groupBox = QtGui.QGroupBox(self.centralwidget)
+        self.groupBox.setTitle(_fromUtf8(""))
         self.groupBox.setObjectName(_fromUtf8("groupBox"))
         self.horizontalLayout = QtGui.QHBoxLayout(self.groupBox)
         self.horizontalLayout.setObjectName(_fromUtf8("horizontalLayout"))
@@ -104,6 +105,7 @@ class Ui_MainWindow(object):
         self.progressText = QtGui.QLabel(self.groupBox)
         self.progressText.setMinimumSize(QtCore.QSize(240, 0))
         self.progressText.setMaximumSize(QtCore.QSize(256, 16777215))
+        self.progressText.setAlignment(QtCore.Qt.AlignCenter)
         self.progressText.setObjectName(_fromUtf8("progressText"))
         self.verticalLayout_10.addWidget(self.progressText)
         self.progressBar = QtGui.QProgressBar(self.groupBox)
@@ -112,15 +114,21 @@ class Ui_MainWindow(object):
         self.progressBar.setObjectName(_fromUtf8("progressBar"))
         self.verticalLayout_10.addWidget(self.progressBar)
         self.horizontalLayout.addLayout(self.verticalLayout_10)
-        self.line = QtGui.QFrame(self.groupBox)
-        self.line.setFrameShape(QtGui.QFrame.VLine)
-        self.line.setFrameShadow(QtGui.QFrame.Sunken)
-        self.line.setObjectName(_fromUtf8("line"))
-        self.horizontalLayout.addWidget(self.line)
+        self.verticalLayout_11 = QtGui.QVBoxLayout()
+        self.verticalLayout_11.setObjectName(_fromUtf8("verticalLayout_11"))
+        self.animationLabel = QtGui.QLabel(self.groupBox)
+        font = QtGui.QFont()
+        font.setFamily(_fromUtf8("Andale Mono"))
+        font.setPointSize(14)
+        self.animationLabel.setFont(font)
+        self.animationLabel.setAlignment(QtCore.Qt.AlignCenter)
+        self.animationLabel.setObjectName(_fromUtf8("animationLabel"))
+        self.verticalLayout_11.addWidget(self.animationLabel)
         self.animationSlider = QtGui.QSlider(self.groupBox)
         self.animationSlider.setOrientation(QtCore.Qt.Horizontal)
         self.animationSlider.setObjectName(_fromUtf8("animationSlider"))
-        self.horizontalLayout.addWidget(self.animationSlider)
+        self.verticalLayout_11.addWidget(self.animationSlider)
+        self.horizontalLayout.addLayout(self.verticalLayout_11)
         self.animBack = QtGui.QToolButton(self.groupBox)
         self.animBack.setToolTip(_fromUtf8(""))
         self.animBack.setObjectName(_fromUtf8("animBack"))
@@ -235,7 +243,7 @@ class Ui_MainWindow(object):
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
-        MainWindow.setWindowTitle(_translate("MainWindow", "AFUSION Alpha Test", None))
+        MainWindow.setWindowTitle(_translate("MainWindow", "SIFT Beta Test", None))
         self.panZoomToolButton.setText(_translate("MainWindow", "Pan/Zoom", None))
         self.pointSelectButton.setText(_translate("MainWindow", "Point", None))
         self.regionSelectButton.setText(_translate("MainWindow", "Region", None))
@@ -244,13 +252,12 @@ class Ui_MainWindow(object):
         self.cursorProbeText.setText(_translate("MainWindow", "Cursor Value", None))
         self.mainWidgets.setTabText(self.mainWidgets.indexOf(self.tab), _translate("MainWindow", "Tab 1", None))
         self.mainWidgets.setTabText(self.mainWidgets.indexOf(self.tab_2), _translate("MainWindow", "Tab 2", None))
-        self.groupBox.setTitle(_translate("MainWindow", "GroupBox", None))
         self.queueButton.setToolTip(_translate("MainWindow", "Show Activity", None))
         self.queueButton.setStatusTip(_translate("MainWindow", "Show activities in progress", None))
         self.queueButton.setText(_translate("MainWindow", "Queue...", None))
         self.progressText.setText(_translate("MainWindow", "idle", None))
         self.progressBar.setToolTip(_translate("MainWindow", "Activity Progress", None))
-        self.animationSlider.setToolTip(_translate("MainWindow", "Animation", None))
+        self.animationLabel.setText(_translate("MainWindow", "HH:MM", None))
         self.animBack.setStatusTip(_translate("MainWindow", "Step backward", None))
         self.animBack.setText(_translate("MainWindow", "|◀", None))
         self.animPlayPause.setStatusTip(_translate("MainWindow", "Start or stop animation", None))
