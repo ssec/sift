@@ -65,10 +65,18 @@ def main():
         if m is None:
             LOG.warning("Filename '%s' does not match regular expression", tif_file)
             continue
-        link_path = os.path.join(m["band"], m["time"], tif_fn)
+        nfo = m.groupdict()
+        link_path = os.path.join(nfo["band"], tif_fn)
         if os.path.exists(link_path) and not args.overwrite:
             LOG.debug("Link '%s' already exists, skipping...", link_path)
             continue
+        link_dir = os.path.dirname(link_path)
+        if not os.path.isdir(link_dir):
+            LOG.info("Creating directory for link: %s", link_dir)
+            os.makedirs(link_dir)
         LOG.info("Creating hardlink '%s' -> '%s'", link_path, tif_file)
         os.link(tif_file, link_path)
     LOG.info("Done mirroring files")
+
+if __name__ == "__main__":
+    sys.exit(main())
