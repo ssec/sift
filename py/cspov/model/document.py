@@ -281,23 +281,24 @@ class Document(QObject):
         else:
             return [d[x] for x in uuids]
 
-    def toggle_layer_visibility(self, rows, visible=None):
+    def toggle_layer_visibility(self, rows_or_uuids, visible=None):
         """
         change the visibility of a layer or layers
-        :param rows: layer index or index list, 0..n-1, alternately UUIDs of layers
+        :param rows_or_uuids: layer index or index list, 0..n-1, alternately UUIDs of layers
         :param visible: True, False, or None (toggle)
         """
         L = self.current_layer_set
         zult = {}
         r2u = dict((q.uuid,i) for i,q in enumerate(self.current_layer_set))
-        if isinstance(rows, int) or isinstance(rows, UUID):
-            rows = [rows]
-        for dex in rows:
+        if isinstance(rows_or_uuids, int) or isinstance(rows_or_uuids, UUID):
+            rows_or_uuids = [rows_or_uuids]
+        for dex in rows_or_uuids:
             if isinstance(dex, UUID):
                 dex = r2u[dex]
             old = L[dex]
-            visible = ~old.visible if visible is None else visible
-            nu = old._replace(visible=visible)
+            vis = (not old.visible) if visible is None else visible
+            print(vis)
+            nu = old._replace(visible=vis)
             L[dex] = nu
             zult[nu.uuid] = nu.visible
         self.didChangeLayerVisibility.emit(zult)
