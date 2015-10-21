@@ -412,13 +412,14 @@ class Main(QtGui.QMainWindow):
         # self.scene_manager.main_canvas.events.key_release.connect(cb_factory("a", self.scene_manager.layer_set.toggle_animation))
         # self.scene_manager.main_canvas.events.key_release.connect(cb_factory("n", self.scene_manager.layer_set.next_frame))
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("c", self.scene_manager.next_camera))
+        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("/", self.scene_manager.swap_clims))
 
         class ColormapSlot(object):
             def __init__(self, sgm, key='e'):
                 self.index = 0
                 self.key = key
                 self.sgm = sgm
-                self.colormaps = ["grays", "autumn", "fire", "hot", "winter"]
+                self.colormaps = ["grays", "autumn", "fire", "hot", "winter", "rain_rate", "cloud_amount_default", "cloud_top_height", "low_cloud_base"]
 
             def __call__(self, key):
                 if key.text == self.key:

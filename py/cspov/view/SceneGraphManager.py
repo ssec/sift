@@ -407,6 +407,18 @@ class SceneGraphManager(QObject):
         idx = (idx + 1) % len(self._camera_names)
         self.change_camera(idx)
 
+    def swap_clims(self, uuid=None):
+        """Swap the Color limits of a layer so that the color map is flipped.
+        """
+        uuids = uuid
+        if uuid is None:
+            uuids = self.image_layers.keys()
+        elif not isinstance(uuid, (list, tuple)):
+            uuids = [uuid]
+
+        for uuid in uuids:
+            self.image_layers[uuid].clim = self.image_layers[uuid].clim[::-1]
+
     def set_colormap(self, colormap, uuid=None):
         if isinstance(colormap, str) and colormap in self.colormaps:
             colormap = self.colormaps[colormap]

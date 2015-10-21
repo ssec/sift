@@ -42,12 +42,12 @@ from PyQt4.QtCore import QAbstractListModel, QAbstractTableModel, QVariant, Qt, 
 from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyleOptionViewItem, QItemSelection, QItemSelectionModel
 from cspov.model.document import Document
 from cspov.common import INFO, KIND
+from cspov.view.Colormap import all_colormaps
 
 LOG = logging.getLogger(__name__)
 
 # FIXME: DRY violation
-COLOR_MAP_LIST = ["grays", "autumn", "fire", "hot", "winter", "rain_rate",
-                  "cloud_amount_default", "cloud_top_height", "low_cloud_base"]
+COLOR_MAP_LIST = ["grays", "autumn", "fire", "hot", "winter"] + list(all_colormaps.keys())
 
 COLUMNS=('Visibility', 'Name', 'Enhancement')
 
