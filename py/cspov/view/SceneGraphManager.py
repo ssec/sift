@@ -140,7 +140,7 @@ class LayerSet(object):
 
             if frame_order is None:
                 frame_order = [x.name for x in layers.keys()]
-            self.set_frame_order(frame_order)
+            self.frame_order = frame_order
 
     def set_layers(self, layers):
         # FIXME clear the existing layers
@@ -164,7 +164,12 @@ class LayerSet(object):
         self._layer_order = layer_order
         self.update_layers_z()
 
-    def set_frame_order(self, frame_order):
+    @property
+    def frame_order(self):
+        return self._frame_order
+
+    @frame_order.setter
+    def frame_order(self, frame_order):
         for o in frame_order:
             if o not in self._layers:
                 LOG.error('set_frame_order cannot deal with unknown layer {}'.format(o))
@@ -215,17 +220,17 @@ class LayerSet(object):
             # We are currently, but don't want to be
             self._animating = False
             self._animation_timer.stop()
-        elif not self._animating and animate:
+        elif not self._animating and animate and self._frame_order:
             # We are not currently, but want to be
             self._animating = True
             self._animation_timer.start()
             # TODO: Add a proper AnimationEvent to self.events
+        if self._frame_change_cb is not None and self._frame_order:
+            uuid = self._frame_order[self._frame_number]
+            self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating, uuid))
 
     def toggle_animation(self, *args):
         self.animating = not self._animating
-        if self._frame_change_cb is not None:
-            uuid = self._frame_order[self._frame_number]
-            self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating, uuid))
         return self.animating
 
     def _set_visible_node(self, node):
@@ -279,6 +284,7 @@ class LayerSet(object):
 class SceneGraphManager(QObject):
     didRetilingCalcs = pyqtSignal(object, object, object, object, object, object)
     didChangeFrame = pyqtSignal(tuple)
+    didChangeLayerVisibility = pyqtSignal(dict)  # similar to document didChangeLayerVisibility
     newProbePoint = pyqtSignal(object, object)
     newProbePolygon = pyqtSignal(object, object)
 
@@ -309,10 +315,23 @@ class SceneGraphManager(QObject):
         """
         callback which emits information on current animation frame as a signal
         (see LayerSet.next_frame)
-        :param frame_info: tuple to be relayed in the signal, typically (frame_index:int, total_frames:int, animating:bool)
+        :param frame_info: tuple to be relayed in the signal, typically (frame_index:int, total_frames:int, animating:bool, frame_id:UUID)
         """
         # LOG.debug('emitting didChangeFrame')
         self.didChangeFrame.emit(frame_info)
+        is_animating = frame_info[2]
+        if not is_animating:
+            # emit a signal equivalent to document's didChangeLayerVisibility,
+            # except that visibility is being changed by animation interactions
+            # only do this when we're not animating, however
+            # watch out for signal loops!
+            uuid = frame_info[3]
+            uuids = self.layer_set.frame_order
+            tfu = lambda u: True if uuid==u else False
+            # note that all the layers in the layer_order but the current one are now invisible
+            vis = dict((u,tfu(u)) for u in uuids)
+            self.didChangeLayerVisibility.emit(vis)
+
 
     def setup_initial_canvas(self):
         self.main_canvas = CspovMainMapCanvas(parent=self.parent())
@@ -517,12 +536,12 @@ class SceneGraphManager(QObject):
 
     def rebuild_frame_order(self, uuid_list:list, *args, **kwargs):
         LOG.debug('setting SGM new frame order to {0!r:s}'.format(uuid_list))
-        self.layer_set.set_frame_order(uuid_list)
+        self.layer_set.frame_order = uuid_list
         self.update()
 
     def rebuild_all(self, *args, **kwargs):
         self.layer_set.set_layer_order(self.document.current_layer_order)
-        self.layer_set.set_frame_order(self.document.current_animation_order)
+        self.layer_set.frame_order = self.document.current_animation_order
         self.update()
 
     def on_view_change(self, scheduler, ws=None):
