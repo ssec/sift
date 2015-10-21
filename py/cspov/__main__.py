@@ -155,12 +155,20 @@ class Main(QtGui.QMainWindow):
         #LOG.warning('progress bar updated to {}'.format(val))
 
     def update_frame_slider(self, frame_info):
-        frame_index, frame_count, animating = frame_info[:3]
+        """
+        animation is in progress or completed
+        update the animation slider and label to show what's going on
+        :param frame_info: tuple, ultimately from scenegraphmanager.layer_set callback into sgm
+        :return:
+        """
+        frame_index, frame_count, animating, uuid = frame_info[:4]
         self.ui.animationSlider.setRange(0, frame_count-1)
         self.ui.animationSlider.setValue(frame_index or 0)
         # LOG.debug('did update animation slider {} {}'.format(frame_index, frame_count))
         self.ui.animPlayPause.setDown(animating)
         self.ui.animationSlider.repaint()
+        self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
+
 
     def change_layer_colormap(self, nfo):
         # uuid = nfo[INFO.UUID]
@@ -176,6 +184,7 @@ class Main(QtGui.QMainWindow):
             self.document.remove_layer_prez(uuid)
 
     def animation_slider_jump_frame(self, event, *args, **kwargs):
+        "user has moved frame slider, update the display"
         frame = self.ui.animationSlider.value()
         self.scene_manager.set_frame_number(frame)
         # TODO: update layer list to reflect what layers are visible/hidden?
@@ -187,13 +196,28 @@ class Main(QtGui.QMainWindow):
         if not uuids:
             self.ui.cursorProbeText.setText('No layer selected?')
             pass # FIXME: notify user
+        new_focus = None
         for uuid in uuids:
             new_focus = self.document.next_last_step(uuid, direction, bandwise=False)
         return new_focus
 
+    def update_slider_if_frame_is_in_animation(self, uuid):
+        # FUTURE: this could be a cheaper operation but it's probably fine since it's input-driven
+        cao = self.document.current_animation_order
+        try:
+            dex = cao.index(uuid)
+        except ValueError as not_present:
+            return
+        frame_change_tuple = (dex, len(cao), False, uuid)
+        self.update_frame_slider(frame_change_tuple)
+
     def next_last_time(self, direction=0, *args, **kwargs):
+        self.scene_manager.layer_set.animating = False
         new_focus = self._next_last_time_visibility(direction=direction)
         self.behaviorLayersList.select([new_focus])
+        # if this part of the animation cycle, update the animation slider and displayed time as well
+        self.update_slider_if_frame_is_in_animation(new_focus)
+        # FIXME: force animation off
         return new_focus
         # self.document.animate_siblings_of_layer(new_focus)
 
@@ -210,10 +234,12 @@ class Main(QtGui.QMainWindow):
         uuid = self._next_last_time_visibility(direction=0)
         # calculate the new animation sequence by consulting the guidebook
         uuids = self.document.animate_siblings_of_layer(uuid)
-        self.ui.cursorProbeText.setText("Frame order updated")
-        self.behaviorLayersList.select(uuids)
+        if uuids:
+            self.ui.cursorProbeText.setText("Frame order updated")
+            self.behaviorLayersList.select(uuids)
+        else:
+            self.ui.cursorProbeText.setText("Layer with time steps needed")
         LOG.info('using siblings of {} for animation loop'.format(uuids[0]))
-        # TODO: decide if animation controls should be updated as well
 
     def toggle_visibility_on_selected_layers(self, *args, **kwargs):
         uuids = self.behaviorLayersList.current_selected_uuids()
@@ -253,11 +279,12 @@ class Main(QtGui.QMainWindow):
         self.ui.animForward.clicked.connect(self.scene_manager.layer_set.next_frame)
         last_frame = partial(self.scene_manager.layer_set.next_frame, frame_number=-1)
         self.ui.animBack.clicked.connect(last_frame)
+
+        # allow animation slider to set animation frame being displayed:
         self.ui.animationSlider.valueChanged.connect(self.animation_slider_jump_frame)
-        # TODO: connect animation slider to frame number
-        # TODO: connect step forward and step back buttons to frame number (.next_frame)
-        # TODO: when animation stops, show the frames with their proper visibility again?
-        # TODO: otherwise, make sure the visibility on the layer list reflects what animation is doing
+
+        # allow animation, once stopped, to propagate visibility to the document and layerlist:
+        self.scene_manager.didChangeLayerVisibility.connect(self.document.animation_changed_visibility)
 
         # disable close button on panes
         for pane in [self.ui.probeAPane, self.ui.probeBPane, self.ui.layersPane]:
@@ -359,6 +386,10 @@ class Main(QtGui.QMainWindow):
         next_time.setShortcut(QtCore.Qt.Key_Right)
         next_time.triggered.connect(partial(self.next_last_time, direction=1))
 
+        focus_current = QtGui.QAction("Focus Current Timestep", self)
+        focus_current.setShortcut('.')
+        focus_current.triggered.connect(partial(self.next_last_band, direction=0))
+
         prev_time = QtGui.QAction("Previous Time", self)
         prev_time.setShortcut(QtCore.Qt.Key_Left)
         prev_time.triggered.connect(partial(self.next_last_time, direction=-1))
@@ -375,6 +406,7 @@ class Main(QtGui.QMainWindow):
         toggle_vis.setShortcut('V')
         toggle_vis.triggered.connect(self.toggle_visibility_on_selected_layers)
 
+
         animate = QtGui.QAction("Animate", self)
         animate.setShortcut('A')
         animate.triggered.connect(partial(self.toggle_animation, action=animate))
@@ -383,21 +415,23 @@ class Main(QtGui.QMainWindow):
         change_order.setShortcut('O')
         change_order.triggered.connect(self.change_animation_to_current_selection_siblings)
 
-        view_menu = menubar.addMenu('&View')
-        view_menu.addAction(animate)
-        view_menu.addAction(prev_time)
-        view_menu.addAction(next_time)
-        view_menu.addAction(prev_band)
-        view_menu.addAction(next_band)
-        view_menu.addAction(change_order)
-        view_menu.addAction(toggle_vis)
-
         remove = QtGui.QAction("Remove Layer", self)
         remove.setShortcut(QtCore.Qt.Key_Delete)
         remove.triggered.connect(self.remove_layer)
 
         edit_menu = menubar.addMenu('&Edit')
         edit_menu.addAction(remove)
+
+        view_menu = menubar.addMenu('&View')
+        view_menu.addAction(animate)
+        view_menu.addAction(prev_time)
+        view_menu.addAction(focus_current)
+        view_menu.addAction(next_time)
+        view_menu.addAction(prev_band)
+        view_menu.addAction(next_band)
+        view_menu.addAction(change_order)
+        view_menu.addAction(toggle_vis)
+
 
         menubar.setEnabled(True)
 

@@ -163,6 +163,17 @@ class Document(QObject):
     def current_layer_set(self):
         return self._layer_sets[self.current_set_index]
 
+    # def _additional_guidebook_information(self, info):
+    #     """
+    #     when adding a file, return any additional information we want from the guidebook
+    #     :param info: existing datasetinfo
+    #     :return: dictionary of information not immediately available from the file itself
+    #     """
+    #     md =
+    #     return {
+    #         INFO.DISPLAY_TIME: self._guidebook.display_time(info)
+    #     }
+
     def open_file(self, path, insert_before=0):
         """
         open an arbitrary file and make it the new top layer.
@@ -171,7 +182,7 @@ class Document(QObject):
         :return: overview (uuid:UUID, datasetinfo:dict, overviewdata:numpy.ndarray)
         """
         uuid, info, content = self._workspace.import_image(source_path=path)
-
+        # info.update(self._additional_guidebook_information(info))
         self._layer_with_uuid[uuid] = info
 
         # add as visible to the front of the current set, and invisible to the rest of the available sets
@@ -195,6 +206,12 @@ class Document(QObject):
             self.animate_siblings_of_layer(uuid)
 
         return uuid, info, content
+
+    def time_label_for_uuid(self, uuid):
+        """used to update animation display when a new frame is shown
+        """
+        info = self._layer_with_uuid[uuid]
+        return self._guidebook.display_time(info)
 
     def update_dataset_info(self, new_info):
         """
@@ -297,11 +314,27 @@ class Document(QObject):
                 dex = r2u[dex]
             old = L[dex]
             vis = (not old.visible) if visible is None else visible
-            print(vis)
+            # print(vis)
             nu = old._replace(visible=vis)
             L[dex] = nu
             zult[nu.uuid] = nu.visible
         self.didChangeLayerVisibility.emit(zult)
+
+    def animation_changed_visibility(self, changes):
+        """
+        this is triggered by animation being stopped,
+        via signal scenegraphmanager.didChangeLayerVisibility
+        in turn we generate our own didChangeLayerVisibility to ensure document views are up to date
+        :param changes: dictionary of {uuid:bool} with new visibility state
+        :return:
+        """
+        r2u = dict((q.uuid,i) for i,q in enumerate(self.current_layer_set))
+        L = self.current_layer_set
+        for uuid,visible in changes.items():
+            dex = r2u[uuid]
+            old = L[dex]
+            L[dex] = old._replace(visible=visible)
+        self.didChangeLayerVisibility.emit(changes)
 
     def next_last_step(self, uuid, delta=0, bandwise=False):
         """
@@ -382,7 +415,7 @@ class Document(QObject):
         LOG.debug('new animation order will be {0!r:s}'.format(new_anim_uuids))
         cls = self.current_layer_set
         u2r = dict((x.uuid, i) for i,x in enumerate(cls))
-        if not new_anim_uuids:
+        if not new_anim_uuids or len(new_anim_uuids)==1:
             return []
         self.clear_animation_order()
         for dex,u in enumerate(new_anim_uuids):
