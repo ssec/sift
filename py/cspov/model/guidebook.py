@@ -81,6 +81,7 @@ class GUIDE(Enum):
     BAND = 'band'  # band number (multispectral instruments)
     SCENE = 'scene'  # standard scene identifier string for instrument, e.g. FLDK
     INSTRUMENT = 'instrument'  # INSTRUMENT enumeration, or string with full standard name
+    DISPLAY_TIME = 'display_time' # time to show on animation control
 
 
 class AHI_HSF_Guidebook(Guidebook):
@@ -103,10 +104,12 @@ class AHI_HSF_Guidebook(Guidebook):
         when = datetime.strptime(yyyymmdd + hhmm, '%Y%m%d%H%M')
         sat = 'Himawari-{}'.format(int(sat))
         band = int(bb)
+        dtime = when.strftime('%Y-%m-%d %H:%M')
         return {
             GUIDE.SPACECRAFT: sat,
             GUIDE.BAND: band,
             GUIDE.SCHED_TIME: when,
+            GUIDE.DISPLAY_TIME: dtime,
             GUIDE.SCENE: scene
         }
 
@@ -129,6 +132,11 @@ class AHI_HSF_Guidebook(Guidebook):
                 md[GUIDE.INSTRUMENT] = INSTRUMENT.AHI
                 self._cache[each[INFO.UUID]] = md
                 yield each[INFO.UUID], md
+
+    def display_time(self, dsi):
+        nfo, = self._collect_info([dsi])
+        uuid, md = nfo
+        return nfo[GUIDE.DISPLAY_TIME]
 
     def flush(self):
         self._cache = {}
