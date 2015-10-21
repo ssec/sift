@@ -1,6 +1,6 @@
 package:
   name: cspov
-  version: "0.2"
+  version: "0.2.1"
 
 source:
   path: ../../py
