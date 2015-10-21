@@ -162,10 +162,11 @@ class Main(QtGui.QMainWindow):
         self.ui.animationSlider.repaint()
 
     def change_layer_colormap(self, nfo):
-        uuid = nfo[INFO.UUID]
-        mapname = nfo[INFO.COLORMAP]
-        LOG.info('changing {} to colormap {}'.format(uuid, mapname))
-        self.scene_manager.set_colormap(mapname, uuid=uuid)
+        # uuid = nfo[INFO.UUID]
+        # mapname = nfo[INFO.COLORMAP]
+        for uuid, mapname in nfo.items():
+            LOG.info('changing {} to colormap {}'.format(uuid, mapname))
+            self.scene_manager.set_colormap(mapname, uuid=uuid)
 
     def remove_layer(self, *args, **kwargs):
         uuids = self.behaviorLayersList.current_selected_uuids()
