@@ -688,7 +688,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         nfo["cell_height"] = self.cell_height * y_slice.step
         # Tell the texture state that we are adding a tile that should never expire and should always exist
         nfo["texture_tile_index"] = ttile_idx = self.texture_state.add_tile((0, 0, 0), expires=False)
-        self._texture.set_tile_data(ttile_idx, nfo["data"])
+        self._texture.set_tile_data(ttile_idx, self._normalize_data_with_clim(nfo["data"]))
 
         # Handle wrapping around the anti-meridian so there is a -180/180 continuous image
         num_tiles = 1 if not self.wrap_lon else 2
@@ -703,9 +703,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
             nfo["vertex_coordinates"][6:12, 0] += nfo["cell_width"] * nfo["data"].shape[1]
         self._set_vertex_tiles(nfo["vertex_coordinates"], nfo["texture_coordinates"])
 
-    def _build_texture_tiles(self, data, stride, tile_box):
-        """Prepare and organize strided data in to individual tiles with associated information.
-        """
+    def _normalize_data_with_clim(self, data):
         if data.dtype == np.float64:
             data = data.astype(np.float32)
 
@@ -722,6 +720,13 @@ class TiledGeolocatedImageVisual(ImageVisual):
             else:
                 data[:] = 1 if data[0, 0] != 0 else 0
             self._clim = np.array(clim)
+
+        return data
+
+    def _build_texture_tiles(self, data, stride, tile_box):
+        """Prepare and organize strided data in to individual tiles with associated information.
+        """
+        data = self._normalize_data_with_clim(data)
 
         LOG.debug("Uploading texture data for %d tiles (%r)", (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l), tile_box)
         max_tiles = self.calc.max_tiles_available(stride)
