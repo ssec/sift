@@ -321,13 +321,6 @@ class Main(QtGui.QMainWindow):
         self.ui.mainWidgets.removeTab(0)
         self.ui.mainWidgets.removeTab(0)
 
-        # Set up builtin colormaps
-        # FIXME: Move stuff like this to document probably
-        self.scene_manager.add_colormap("rain_rate", cspov.view.Colormap.rain_rate)
-        self.scene_manager.add_colormap("cloud_amount_default", cspov.view.Colormap.cloud_amount_default)
-        self.scene_manager.add_colormap("cloud_top_height", cspov.view.Colormap.cloud_top_height)
-        self.scene_manager.add_colormap("low_cloud_base", cspov.view.Colormap.low_cloud_base)
-
         # self.queue.add('test', test_task(), 'test000')
         # self.ui.layers
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
@@ -425,8 +418,7 @@ class Main(QtGui.QMainWindow):
                 self.index = 0
                 self.key = key
                 self.sgm = sgm
-                self.colormaps = ["grays", "autumn", "fire", "hot", "winter", "rain_rate",
-                "cloud_amount_default", "cloud_top_height", "low_cloud_base"]
+                self.colormaps = ["grays", "autumn", "fire", "hot", "winter"]
 
             def __call__(self, key):
                 if key.text == self.key:

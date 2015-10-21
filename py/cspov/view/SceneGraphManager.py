@@ -35,6 +35,7 @@ from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND
 from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.view.MapWidget import CspovMainMapCanvas
 from cspov.view.Cameras import PanZoomProbeCamera
+from cspov.view.Colormap import all_colormaps
 from cspov.queue import TASK_DOING, TASK_PROGRESS
 
 from PyQt4.QtCore import QObject, pyqtSignal
@@ -295,6 +296,7 @@ class SceneGraphManager(QObject):
         self.image_layers = {}
         self.datasets = {}
         self.colormaps = {}
+        self.colormaps.update(all_colormaps)
         self.layer_set = LayerSet(self, frame_change_cb=self.frame_changed)
 
         self.set_document(self.document)

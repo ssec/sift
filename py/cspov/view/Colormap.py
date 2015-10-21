@@ -160,3 +160,30 @@ gray_scale_water_vapor = Colormap(colors=_gray_scale_water_vapor_colors, control
 nssl_vas_wv_alternate = Colormap(colors=_nssl_vas_wv_alternate_colors, controls=_nssl_vas_wv_alternate_control_points)
 ramsdis_wv = Colormap(colors=_ramsdis_wv_colors, controls=_ramsdis_wv_control_points)
 slc_wv = Colormap(colors=_slc_wv_colors, controls=_slc_wv_control_points)
+
+
+all_colormaps = {
+    'cloud_amount_default':cloud_amount_default,
+    'cloud_top_height':cloud_top_height,
+    'low_cloud_base':low_cloud_base,
+    'rain_rate':rain_rate,
+    'circa_ir_default': cira_ir_default,
+    'fog':fog,
+    'ir_wv':ir_wv,
+    'lifted_index__new_cimss_table':lifted_index__new_cimss_table,
+    'lifted_index_default':lifted_index_default,
+    'blended_total_precip_water':blended_total_precip_water,
+    'percent_of_normal_tpw':percent_of_normal_tpw,
+    'precip_water__new_cimss_table':precip_water__new_cimss_table,
+    'precip_water__polar':precip_water__polar,
+    'precip_water_default':precip_water_default,
+    'skin_temp__new_cimss_table':skin_temp__new_cimss_table,
+    'skin_temp_default':skin_temp_default,
+    'ca_low_light_vis':ca_low_light_vis,
+    'linear':linear,
+    'za_vis_default':za_vis_default,
+    'gray_scale_water_vapor':gray_scale_water_vapor,
+    'nssl_vas_wv_alternate':nssl_vas_wv_alternate,
+    'ramsdis_wv':ramsdis_wv,
+    'slc_wv':slc_wv
+}
