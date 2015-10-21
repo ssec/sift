@@ -21,5 +21,5 @@ SET CWOLDPATH=%PATH%
 SET PATH=%CWRSYNCHOME%;%PATH%
 
 SET DATA_BASE=/cygdrive/c/data
-rsync -auv --progress rsync://dreadnaught:5873/sift_data/ahi "%DATA_BASE%/"
+rsync -auvH --progress rsync://dreadnaught:5873/sift_data/ahi "%DATA_BASE%/"
 pause
