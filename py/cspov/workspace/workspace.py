@@ -113,11 +113,11 @@ class GeoTiffImporter(WorkspaceImporter):
         if item in ["B01", "B02", "B03", "B04", "B05", "B06"]:
             # Reflectance/visible data limits
             # FIXME: Are these correct?
-            d[INFO.CLIM] = (0.0, 1.0-margin)
+            d[INFO.CLIM] = (0.0 - margin, 1.0)
         else:
             # BT data limits
             # FIXME: Are these correct?
-            d[INFO.CLIM] = (200.0, 350.0)
+            d[INFO.CLIM] = (-109.0 + 273.15 - margin, 55 + 273.15)
 
         # FIXME: read this into a numpy.memmap backed by disk in the workspace
         img_data = gtiff.GetRasterBand(1).ReadAsArray()
