@@ -84,8 +84,9 @@ def test_layers(ws, doc, glob_pattern=None):
 
 class GraphDisplay (object) :
 
-    figure = None
-    canvas = None
+    figure  = None
+    canvas  = None
+    toolbar = None
 
     def __init__(self, qt_parent):
         """build the graph tab controls
@@ -99,8 +100,12 @@ class GraphDisplay (object) :
         # it takes the `figure` instance as a parameter to __init__
         self.canvas = FigureCanvas(self.figure, )
 
+        # make a matplotlib toolbar to attach to the graph
+        self.toolbar = NavigationToolbar(self.canvas, qt_parent)
+
         # set the layout
         layout = QtGui.QVBoxLayout()
+        layout.addWidget(self.toolbar)
         layout.addWidget(self.canvas)
         qt_parent.setLayout(layout)
 
