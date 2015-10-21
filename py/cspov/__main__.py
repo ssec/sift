@@ -313,7 +313,7 @@ class Main(QtGui.QMainWindow):
                 data_polygon = self.workspace.get_content_polygon(selected_uuids[0], points)
             avg = data_polygon.mean()
             self.ui.cursorProbeText.setText("Polygon Probe: {:.03f}".format(float(avg)))
-            self.scene_manager.on_new_polygon(points)
+            self.scene_manager.on_new_polygon("default_name", points)
         self.scene_manager.newProbePolygon.connect(update_probe_polygon)
 
         self.ui.mainWidgets.removeTab(0)

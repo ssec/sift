@@ -54,16 +54,38 @@ DEFAULT_TEXTURE_SHAPE = (4, 16)
 class FakeMarker(Compound):
     # FIXME: Temporary workaround because markers don't work on the target Windows laptops
     def __init__(self, pos=None, parent=None, symbol=None, **kwargs):
-        kwargs["connect"] = "segments"
-        margin = 50000
-        width = 5
+        self.line_one = None
+        self.line_two = None
+        self.symbol = symbol
         point = pos[0]
-        pos1 = np.array([[point[0] - margin, point[1], point[2]], [point[0] + margin, point[1], point[2]]])
-        pos2 = np.array([[point[0], point[1] - margin * 2, point[2]], [point[0], point[1] + margin * 2, point[2]]])
-        print("Creating FakeMarker: ", pos1, pos2)
-        self.line_one = LineVisual(pos=pos1, width=width, **kwargs)
-        self.line_two = LineVisual(pos=pos2, width=width, **kwargs)
+
+        kwargs["connect"] = "segments"
+        width = 5
+        pos1, pos2 = self._get_positions(point)
+        if self.line_one is None:
+            self.line_one = LineVisual(pos=pos1, width=width, **kwargs)
+            self.line_two = LineVisual(pos=pos2, width=width, **kwargs)
+
+        # For some reason we can't add the subvisuals later, so we'll live with redundant logic
         super().__init__((self.line_one, self.line_two), parent=parent)
+
+        # self.set_point(point, **kwargs)
+
+    def _get_positions(self, point):
+        margin = 50000
+        if self.symbol == 'x':
+            pos1 = np.array([[point[0] - margin, point[1] - margin * 2, point[2]], [point[0] + margin, point[1] + margin * 2, point[2]]])
+            pos2 = np.array([[point[0] - margin, point[1] + margin * 2, point[2]], [point[0] + margin, point[1] - margin * 2, point[2]]])
+        else:
+            pos1 = np.array([[point[0] - margin, point[1], point[2]], [point[0] + margin, point[1], point[2]]])
+            pos2 = np.array([[point[0], point[1] - margin * 2, point[2]], [point[0], point[1] + margin * 2, point[2]]])
+        return pos1, pos2
+
+    def set_point(self, point, **kwargs):
+        kwargs["connect"] = "segments"
+        pos1, pos2 = self._get_positions(point)
+        self.line_one.set_data(pos=pos1)
+        self.line_two.set_data(pos=pos2)
 
 
 class MainMap(scene.Node):
@@ -290,7 +312,8 @@ class SceneGraphManager(QObject):
         self.border_shapefile = border_shapefile or DEFAULT_SHAPE_FILE
         self.glob_pattern = glob_pattern
         self.texture_shape = texture_shape
-        self.polygons = []
+        self.polygon_probes = {}
+        self.point_probes = {}
 
         self.image_layers = {}
         self.datasets = {}
@@ -365,6 +388,8 @@ class SceneGraphManager(QObject):
             # point_marker = Markers(parent=self.main_map, symbol="disc", pos=np.array([map_pos[:2]]))
             # self.points.append(point_marker)
             self.newProbePoint.emit(self.layer_set.top_layer_uuid(), map_pos[:2])
+            # FIXME: Move to Document (can include Z if you want, but default is fine)
+            self.on_point_probe_set("default_probe_name", map_pos[:2])
         elif event.button == 2 and modifiers == (SHIFT,):
             buffer_pos = event.sources[0].transforms.get_transform().map(event.pos)
             map_pos = self.boundaries.transforms.get_transform().imap(buffer_pos)
@@ -380,13 +405,25 @@ class SceneGraphManager(QObject):
             print("I don't know how to handle this camera for a mouse press")
             print(event.buttons, modifiers)
 
-    def on_new_polygon(self, points, **kwargs):
+    def on_point_probe_set(self, probe_name, xy_pos, **kwargs):
+        z = float(kwargs.get("z", 60))
+        if len(xy_pos) == 2:
+            xy_pos = [xy_pos[0], xy_pos[1], z]
+
+        if probe_name not in self.point_probes:
+            color = kwargs.get("color", np.array([0.5, 0., 0., 1.]))
+            point_visual = FakeMarker(parent=self.main_map, symbol="x", pos=np.array([xy_pos]), color=color)
+            self.point_probes[probe_name] = point_visual
+        else:
+            self.point_probes[probe_name].set_point(xy_pos)
+
+    def on_new_polygon(self, probe_name, points, **kwargs):
         kwargs.setdefault("color", (1.0, 0.0, 1.0, 0.5))
         # marker default is 60, polygon default is 50 so markers can be put on top of polygons
         z = float(kwargs.get("z", 50))
         poly = Polygon(parent=self.main_map, pos=points, **kwargs)
         poly.transform = STTransform(translate=(0, 0, z))
-        self.polygons.append(poly)
+        self.polygon_probes[probe_name] = poly
 
     def update(self):
         return self.main_canvas.update()
