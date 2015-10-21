@@ -40,6 +40,7 @@ from functools import partial
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
+import cspov.view.Colormap
 from cspov.common import INFO, KIND
 
 import os
@@ -162,10 +163,11 @@ class Main(QtGui.QMainWindow):
         self.ui.animationSlider.repaint()
 
     def change_layer_colormap(self, nfo):
-        uuid = nfo[INFO.UUID]
-        mapname = nfo[INFO.COLORMAP]
-        LOG.info('changing {} to colormap {}'.format(uuid, mapname))
-        self.scene_manager.set_colormap(mapname, uuid=uuid)
+        # uuid = nfo[INFO.UUID]
+        # mapname = nfo[INFO.COLORMAP]
+        for uuid, mapname in nfo.items():
+            LOG.info('changing {} to colormap {}'.format(uuid, mapname))
+            self.scene_manager.set_colormap(mapname, uuid=uuid)
 
     def remove_layer(self, *args, **kwargs):
         uuids = self.behaviorLayersList.current_selected_uuids()
@@ -319,13 +321,6 @@ class Main(QtGui.QMainWindow):
         self.ui.mainWidgets.removeTab(0)
         self.ui.mainWidgets.removeTab(0)
 
-        # Set up builtin colormaps
-        # FIXME: Move stuff like this to document probably
-        self.scene_manager.add_colormap("test", Colormap([
-            (0.00, 0.00, 0.00, 1.00),
-            (0.00, 0.00, 1.00, 1.00),
-        ]))
-
         # self.queue.add('test', test_task(), 'test000')
         # self.ui.layers
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
@@ -417,13 +412,14 @@ class Main(QtGui.QMainWindow):
         # self.scene_manager.main_canvas.events.key_release.connect(cb_factory("a", self.scene_manager.layer_set.toggle_animation))
         # self.scene_manager.main_canvas.events.key_release.connect(cb_factory("n", self.scene_manager.layer_set.next_frame))
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("c", self.scene_manager.next_camera))
+        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("/", self.scene_manager.swap_clims))
 
         class ColormapSlot(object):
             def __init__(self, sgm, key='e'):
                 self.index = 0
                 self.key = key
                 self.sgm = sgm
-                self.colormaps = ["grays", "autumn", "fire", "hot", "winter", "test"]
+                self.colormaps = ["grays", "autumn", "fire", "hot", "winter", "rain_rate", "cloud_amount_default", "cloud_top_height", "low_cloud_base"]
 
             def __call__(self, key):
                 if key.text == self.key:

@@ -35,6 +35,7 @@ from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND
 from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.view.MapWidget import CspovMainMapCanvas
 from cspov.view.Cameras import PanZoomProbeCamera
+from cspov.view.Colormap import all_colormaps
 from cspov.queue import TASK_DOING, TASK_PROGRESS
 
 from PyQt4.QtCore import QObject, pyqtSignal
@@ -318,6 +319,7 @@ class SceneGraphManager(QObject):
         self.image_layers = {}
         self.datasets = {}
         self.colormaps = {}
+        self.colormaps.update(all_colormaps)
         self.layer_set = LayerSet(self, frame_change_cb=self.frame_changed)
 
         self.set_document(self.document)
@@ -441,6 +443,18 @@ class SceneGraphManager(QObject):
         idx = self._camera_names.index(self.main_view.camera.name)
         idx = (idx + 1) % len(self._camera_names)
         self.change_camera(idx)
+
+    def swap_clims(self, uuid=None):
+        """Swap the Color limits of a layer so that the color map is flipped.
+        """
+        uuids = uuid
+        if uuid is None:
+            uuids = self.image_layers.keys()
+        elif not isinstance(uuid, (list, tuple)):
+            uuids = [uuid]
+
+        for uuid in uuids:
+            self.image_layers[uuid].clim = self.image_layers[uuid].clim[::-1]
 
     def set_colormap(self, colormap, uuid=None):
         if isinstance(colormap, str) and colormap in self.colormaps:
