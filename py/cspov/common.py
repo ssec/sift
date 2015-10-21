@@ -98,11 +98,7 @@ class INFO(Enum):
     CLIM = 'clim'  # (min,max) color map limits
     SHAPE = 'shape' # (rows, columns) or (rows, columns, levels) data shape
     COLORMAP = 'colormap'  # name or UUID of a color map
-
-
-
-INFO
-
+    DISPLAY_TIME = 'display_time'  # typically from guidebook, used for labeling animation frame
 
 class MercatorTileCalc(object):
     """

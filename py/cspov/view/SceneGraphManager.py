@@ -173,7 +173,8 @@ class LayerSet(object):
         self._frame_number = 0
         LOG.debug('accepted new frame order of length {}'.format(len(frame_order)))
         if self._frame_change_cb is not None:
-            self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating))
+            uuid = self._frame_order[self._frame_number]
+            self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating, uuid))
 
     def update_layers_z(self):
         for z_level, uuid in enumerate(self._layer_order):
@@ -223,7 +224,8 @@ class LayerSet(object):
     def toggle_animation(self, *args):
         self.animating = not self._animating
         if self._frame_change_cb is not None:
-            self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating))
+            uuid = self._frame_order[self._frame_number]
+            self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating, uuid))
         return self.animating
 
     def _set_visible_node(self, node):
@@ -270,7 +272,8 @@ class LayerSet(object):
         self._frame_number = frame
         self.parent.update()
         if self._frame_change_cb is not None:
-            self._frame_change_cb((self._frame_number, lfo, self._animating))
+            uuid = self._frame_order[self._frame_number]
+            self._frame_change_cb((self._frame_number, lfo, self._animating, uuid))
 
 
 class SceneGraphManager(QObject):

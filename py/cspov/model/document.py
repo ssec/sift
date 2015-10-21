@@ -163,6 +163,17 @@ class Document(QObject):
     def current_layer_set(self):
         return self._layer_sets[self.current_set_index]
 
+    # def _additional_guidebook_information(self, info):
+    #     """
+    #     when adding a file, return any additional information we want from the guidebook
+    #     :param info: existing datasetinfo
+    #     :return: dictionary of information not immediately available from the file itself
+    #     """
+    #     md =
+    #     return {
+    #         INFO.DISPLAY_TIME: self._guidebook.display_time(info)
+    #     }
+
     def open_file(self, path, insert_before=0):
         """
         open an arbitrary file and make it the new top layer.
@@ -171,7 +182,7 @@ class Document(QObject):
         :return: overview (uuid:UUID, datasetinfo:dict, overviewdata:numpy.ndarray)
         """
         uuid, info, content = self._workspace.import_image(source_path=path)
-
+        # info.update(self._additional_guidebook_information(info))
         self._layer_with_uuid[uuid] = info
 
         # add as visible to the front of the current set, and invisible to the rest of the available sets
@@ -195,6 +206,12 @@ class Document(QObject):
             self.animate_siblings_of_layer(uuid)
 
         return uuid, info, content
+
+    def time_label_for_uuid(self, uuid):
+        """used to update animation display when a new frame is shown
+        """
+        info = self._layer_with_uuid[uuid]
+        return self._guidebook.display_time(info)
 
     def update_dataset_info(self, new_info):
         """

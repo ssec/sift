@@ -96,7 +96,7 @@ class AHI_HSF_Guidebook(Guidebook):
         return True if re.match(r'HS_H\d\d_\d{8}_\d{4}_B\d\d.*', os.path.split(pathname)[1]) else False
 
     @staticmethod
-    def metadata_for_path(pathname):
+    def _metadata_for_path(pathname):
         m = re.match(r'HS_H(\d\d)_(\d{8})_(\d{4})_B(\d\d)_([A-Za-z0-9]+).*', os.path.split(pathname)[1])
         if not m:
             return {}
@@ -127,16 +127,16 @@ class AHI_HSF_Guidebook(Guidebook):
             if md is not None:
                 yield each[INFO.UUID], md
             else:
-                md = self.metadata_for_path(each[INFO.PATHNAME])
+                md = self._metadata_for_path(each[INFO.PATHNAME])
                 md[GUIDE.UUID] = each[INFO.UUID]
                 md[GUIDE.INSTRUMENT] = INSTRUMENT.AHI
                 self._cache[each[INFO.UUID]] = md
                 yield each[INFO.UUID], md
 
     def display_time(self, dsi):
-        nfo, = self._collect_info([dsi])
+        nfo, = list(self._collect_info([dsi]))
         uuid, md = nfo
-        return nfo[GUIDE.DISPLAY_TIME]
+        return md.get(GUIDE.DISPLAY_TIME, '--:--')
 
     def flush(self):
         self._cache = {}

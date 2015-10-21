@@ -154,12 +154,13 @@ class Main(QtGui.QMainWindow):
         #LOG.warning('progress bar updated to {}'.format(val))
 
     def update_frame_slider(self, frame_info):
-        frame_index, frame_count, animating = frame_info[:3]
+        frame_index, frame_count, animating, uuid = frame_info[:4]
         self.ui.animationSlider.setRange(0, frame_count-1)
         self.ui.animationSlider.setValue(frame_index or 0)
         # LOG.debug('did update animation slider {} {}'.format(frame_index, frame_count))
         self.ui.animPlayPause.setDown(animating)
         self.ui.animationSlider.repaint()
+        self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
 
     def change_layer_colormap(self, nfo):
         uuid = nfo[INFO.UUID]
