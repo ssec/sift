@@ -45,7 +45,9 @@ from cspov.common import INFO, KIND
 
 LOG = logging.getLogger(__name__)
 
-COLOR_MAP_LIST=["grays", "autumn", "fire", "hot", "winter", "test"]  # FIXME: DRY violation
+# FIXME: DRY violation
+COLOR_MAP_LIST = ["grays", "autumn", "fire", "hot", "winter", "rain_rate",
+                  "cloud_amount_default", "cloud_top_height", "low_cloud_base"]
 
 COLUMNS=('Visibility', 'Name', 'Enhancement')
 

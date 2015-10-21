@@ -40,6 +40,7 @@ from functools import partial
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
+import cspov.view.Colormap
 from cspov.common import INFO, KIND
 
 import os
@@ -322,10 +323,10 @@ class Main(QtGui.QMainWindow):
 
         # Set up builtin colormaps
         # FIXME: Move stuff like this to document probably
-        self.scene_manager.add_colormap("test", Colormap([
-            (0.00, 0.00, 0.00, 1.00),
-            (0.00, 0.00, 1.00, 1.00),
-        ]))
+        self.scene_manager.add_colormap("rain_rate", cspov.view.Colormap.rain_rate)
+        self.scene_manager.add_colormap("cloud_amount_default", cspov.view.Colormap.cloud_amount_default)
+        self.scene_manager.add_colormap("cloud_top_height", cspov.view.Colormap.cloud_top_height)
+        self.scene_manager.add_colormap("low_cloud_base", cspov.view.Colormap.low_cloud_base)
 
         # self.queue.add('test', test_task(), 'test000')
         # self.ui.layers
@@ -424,7 +425,8 @@ class Main(QtGui.QMainWindow):
                 self.index = 0
                 self.key = key
                 self.sgm = sgm
-                self.colormaps = ["grays", "autumn", "fire", "hot", "winter", "test"]
+                self.colormaps = ["grays", "autumn", "fire", "hot", "winter", "rain_rate",
+                "cloud_amount_default", "cloud_top_height", "low_cloud_base"]
 
             def __call__(self, key):
                 if key.text == self.key:
