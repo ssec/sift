@@ -46,10 +46,10 @@ import os
 import logging
 
 # http://stackoverflow.com/questions/12459811/how-to-embed-matplotib-in-pyqt-for-dummies
+# see also: http://matplotlib.org/users/navigation_toolbar.html
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
 import matplotlib.pyplot as plt
-
 
 LOG = logging.getLogger(__name__)
 PROGRESS_BAR_MAX = 1000
@@ -82,6 +82,68 @@ def test_layers(ws, doc, glob_pattern=None):
     LOG.warning("No image glob pattern provided")
     return []
 
+class GraphDisplay (object) :
+
+    figure = None
+    canvas = None
+
+    def __init__(self, qt_parent):
+        """build the graph tab controls
+        :return:
+        """
+
+        # a figure instance to plot on
+        self.figure = plt.figure(figsize=(3,3), dpi=72)
+
+        # this is the Canvas Widget that displays the `figure`
+        # it takes the `figure` instance as a parameter to __init__
+        self.canvas = FigureCanvas(self.figure, )
+
+        # set the layout
+        layout = QtGui.QVBoxLayout()
+        layout.addWidget(self.canvas)
+        qt_parent.setLayout(layout)
+
+    def plotHistogram (self, data, title, numBins=100) :
+        """Make a histogram using the given data and label it with the given title
+        """
+        self.figure.clf()
+        plt.hist(data, bins=100)
+        self.figure.axes[0].set_title(title)
+        self.canvas.draw()
+
+    def plotScatterplot (self, dataX, nameX, dataY, nameY) :
+        """Make a scatter plot of the x and y data
+        """
+
+        self.figure.clf()
+        plt.scatter(dataX.flatten(), dataY.flatten(), s=1, alpha=0.5)
+        plt.xlabel(nameX)
+        plt.ylabel(nameY)
+        self.figure.axes[0].set_title(nameX + " vs " + nameY)
+        self._draw_xy_line()
+
+        self.canvas.draw()
+
+    def _draw_xy_line (self) :
+
+        axes = self.figure.axes[0]
+
+        # get the bounds for our calculations and so we can reset the viewing window later
+        x_bounds = axes.get_xbound()
+        y_bounds = axes.get_ybound()
+
+        # figure out the size of the ranges
+        xrange = x_bounds[1] - x_bounds[0]
+        yrange = y_bounds[1] - y_bounds[0]
+
+        # draw the x=y line
+        perfect = [max(x_bounds[0], y_bounds[0]), min(x_bounds[1], y_bounds[1])]
+        axes.plot(perfect, perfect, '--', color='k', label='X = Y')
+
+        # reset the bounds
+        axes.set_xbound(x_bounds)
+        axes.set_ybound(y_bounds)
 
 class Main(QtGui.QMainWindow):
     _last_open_dir = None  # directory to open files in
@@ -89,29 +151,9 @@ class Main(QtGui.QMainWindow):
     def make_mpl_pane(self, parent):
         """place a matplotlib figure inside a probe pane
         """
-        # a figure instance to plot on
-        figure = plt.figure(figsize=(3,3), dpi=72)
+        graphTemp = GraphDisplay(parent)
 
-        # this is the Canvas Widget that displays the `figure`
-        # it takes the `figure` instance as a parameter to __init__
-        canvas = FigureCanvas(figure, )
-
-        # this is the Navigation widget
-        # it takes the Canvas widget and a parent
-        toolbar = None # NavigationToolbar(canvas, self)
-
-        # Just some button connected to `plot` method
-        # self.button = QtGui.QPushButton('Plot')
-        # self.button.clicked.connect(self.plot)
-
-        # set the layout
-        layout = QtGui.QVBoxLayout()
-        # layout.addWidget(toolbar)
-        layout.addWidget(canvas)
-        # layout.addWidget(button)
-        parent.setLayout(layout)
-        return figure, canvas, toolbar
-
+        return graphTemp
 
     def open_files(self):
         files = QtGui.QFileDialog.getOpenFileNames(self,
@@ -258,7 +300,7 @@ class Main(QtGui.QMainWindow):
         # TODO: otherwise, make sure the visibility on the layer list reflects what animation is doing
 
         # disable close button on panes
-        for pane in [self.ui.probeAPane, self.ui.probeBPane, self.ui.layersPane]:
+        for pane in [self.ui.areaProbePane, self.ui.layersPane]:
             pane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable |
                              QtGui.QDockWidget.DockWidgetMovable)
 
@@ -289,26 +331,41 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.newProbePoint.connect(update_probe_point)
 
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
+
+            print("In update probe polygon")
+
+            # TODO, this needs to use the current tab instead of always the A tab
+            graphObjTemp = self.graphObjects[0]
+
             selected_uuids = list(layerlist.current_selected_uuids())
             LOG.debug("selected UUID set is {0!r:s}".format(selected_uuids))
             if len(selected_uuids)==0:
+
                 selected_uuids = [uuid]
+
             if (len(selected_uuids)==1):
+
+                # get the data and info we need for this plot
                 data_polygon = self.workspace.get_content_polygon(selected_uuids[0], points)
-                self.figureA.clf()
-                plt.hist(data_polygon.flatten(), bins=100)
-                self.canvasA.draw()
+                title = self.workspace.get_info(selected_uuids[0])[INFO.NAME]
+
+                # plot a histogram
+                graphObjTemp.plotHistogram (data_polygon.flatten(), title)
+
             elif len(selected_uuids)==2:
+
+                # get the data and info we need for this plot
                 data1 = self.workspace.get_content_polygon(selected_uuids[0], points)
                 name1 = self.workspace.get_info(selected_uuids[0])[INFO.NAME]
                 data2 = self.workspace.get_content_polygon(selected_uuids[1], points)
                 name2 = self.workspace.get_info(selected_uuids[1])[INFO.NAME]
-                self.figureA.clf()
-                plt.scatter(data1.flatten(), data2.flatten(), s=1, alpha=0.5)
-                plt.xlabel(name1)
-                plt.ylabel(name2)
-                self.canvasA.draw()
+
+                # plot a scatter plot
+                graphObjTemp.plotScatterplot (data1.flatten(), name1, data2.flatten(), name2)
+
+                # set the data polygon to be the first data set so we can calculate the avg later
                 data_polygon = data1
+
             else:
                 data_polygon = self.workspace.get_content_polygon(selected_uuids[0], points)
             avg = data_polygon.mean()
@@ -340,7 +397,10 @@ class Main(QtGui.QMainWindow):
         self.setup_probe_panes()
 
     def setup_probe_panes(self):
-        self.figureA, self.canvasA, self.toolbarA = self.make_mpl_pane(self.ui.probeAWidget)
+        self.graphObjects = [ ];
+        self.currGraphIndex = 0;
+        graphTemp = self.make_mpl_pane(self.ui.tab_A)
+        self.graphObjects.append(graphTemp)
 
     def toggle_animation(self, action:QtGui.QAction=None, *args):
         new_state = self.scene_manager.layer_set.toggle_animation()
