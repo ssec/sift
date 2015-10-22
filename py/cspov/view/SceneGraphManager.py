@@ -521,6 +521,7 @@ class SceneGraphManager(QObject):
         self.image_layers[uuid] = image
         self.datasets[uuid] = ds_info
         self.layer_set.add_layer(image)
+        self.on_view_change(None)
 
     def remove_layer(self, new_order:list, uuid_removed:UUID):
         """
@@ -595,11 +596,12 @@ class SceneGraphManager(QObject):
         self.layer_set.frame_order = self.document.current_animation_order
         self.update()
 
-    def on_view_change(self, scheduler, ws=None):
+    def on_view_change(self, scheduler):
         """Simple event handler for when we need to reassess image layers.
         """
         # Stop the timer so it doesn't continuously call this slot
-        scheduler.stop()
+        if scheduler:
+            scheduler.stop()
 
         for uuid, child in self.image_layers.items():
             need_retile, preferred_stride, tile_box = child.assess()
