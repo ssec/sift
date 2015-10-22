@@ -50,7 +50,7 @@ import logging
 # see also: http://matplotlib.org/users/navigation_toolbar.html
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
-import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 
 LOG = logging.getLogger(__name__)
 PROGRESS_BAR_MAX = 1000
@@ -84,15 +84,73 @@ def test_layers(ws, doc, glob_pattern=None):
     return []
 
 class ProbeGraphManager (object) :
-    """
-    The ProbeGraphManager manages the many tabs of the Area Probe Graphs.
+    """The ProbeGraphManager manages the many tabs of the Area Probe Graphs.
     """
 
-    # TODO
+    graphs = None
+    selected_graph_index = -1
+    workspace = None
+    tab_widget_object = None
+    max_tab_letter = None
+
+    def __init__(self, tab_widget, workspace) :
+        """Setup our tab widget with an appropriate graph object in the first tab.
+
+        FUTURE, once we are saving our graph configurations, load those instead of setting up this default.
+        """
+
+        # hang on to the workspace
+        self.workspace = workspace
+
+        # hang on to the tab widget
+        self.tab_widget_object = tab_widget
+        tempCount = self.tab_widget_object.count()
+        if tempCount != 2 :
+            LOG.info("Unexpected number of tabs in the QTabWidget used for the Area Probe Graphs.")
+
+        # set up the first tab
+        self.graphs = [ ]
+        self.selected_graph_index = 0
+        temp_widget = self.tab_widget_object.widget(self.selected_graph_index)
+        self.graphs.append(ProbeGraphDisplay(temp_widget, self.workspace))
+        self.tab_widget_object.setCurrentIndex(self.selected_graph_index)
+        self.max_tab_letter = 'A'
+
+        # hook things up so we know when the tab changes
+        self.tab_widget_object.connect(self.tab_widget_object,
+                                       QtCore.SIGNAL('currentChanged(int)'),
+                                       self.handle_tab_change)
+
+    def currentPolygonChanged (self, selected_uuids, polygonPoints) :
+        """Update the current polygon in the selected graph and rebuild it's plot
+
+        FUTURE, once the polygon is a layer, this signal will be unnecessary
+        """
+
+        self.graphs[self.selected_graph_index].rebuildPlot (selected_uuids, polygonPoints=polygonPoints)
+
+    def handle_tab_change (self, ) :
+        """deal with the fact that the tab changed in the tab widget
+        """
+
+        newTabIndex = self.tab_widget_object.currentIndex()
+
+        # if this is the last tab, make a new tab and switch to that
+        if newTabIndex == (self.tab_widget_object.count() - 1) :
+            LOG.info ("Creating new area probe graph tab.")
+            self.max_tab_letter = chr(ord(self.max_tab_letter) + 1) # this will get strange after Z!
+            self.tab_widget_object.insertTab(newTabIndex, QtGui.QWidget(), self.max_tab_letter)
+            temp_widget = self.tab_widget_object.widget(newTabIndex)
+            self.graphs.append(ProbeGraphDisplay(temp_widget, self.workspace))
+            self.tab_widget_object.setCurrentIndex(newTabIndex)
+
+        # otherwise, just update our current index
+        else :
+            self.selected_graph_index = newTabIndex
 
 class ProbeGraphDisplay (object) :
-    """
-    The ProbeGraphDisplay controls one tab of the Area Probe Graphs. It handles generating a displaying a single graph.
+    """The ProbeGraphDisplay controls one tab of the Area Probe Graphs.
+    The ProbeGraphDisplay handles generating a displaying a single graph.
     """
 
     figure  = None
@@ -110,11 +168,12 @@ class ProbeGraphDisplay (object) :
         self.workspace = workspace
 
         # a figure instance to plot on
-        self.figure = plt.figure(figsize=(3,3), dpi=72)
-
+        self.figure = Figure(figsize=(3,3), dpi=72)
         # this is the Canvas Widget that displays the `figure`
         # it takes the `figure` instance as a parameter to __init__
         self.canvas = FigureCanvas(self.figure, )
+        # make sure our figure is clear
+        self.clearPlot()
 
         # make a matplotlib toolbar to attach to the graph
         self.toolbar = NavigationToolbar(self.canvas, qt_parent)
@@ -188,8 +247,9 @@ class ProbeGraphDisplay (object) :
         """Make a histogram using the given data and label it with the given title
         """
         self.figure.clf()
-        plt.hist(data, bins=100)
-        self.figure.axes[0].set_title(title)
+        axes = self.figure.add_subplot(111)
+        axes.hist(data, bins=100)
+        axes.set_title(title)
         self.canvas.draw()
 
     def plotScatterplot (self, dataX, nameX, dataY, nameY) :
@@ -197,11 +257,12 @@ class ProbeGraphDisplay (object) :
         """
 
         self.figure.clf()
-        plt.scatter(dataX.flatten(), dataY.flatten(), s=1, alpha=0.5)
-        plt.xlabel(nameX)
-        plt.ylabel(nameY)
-        self.figure.axes[0].set_title(nameX + " vs " + nameY)
-        self._draw_xy_line()
+        axes = self.figure.add_subplot(111)
+        axes.scatter(dataX.flatten(), dataY.flatten(), s=1, alpha=0.5)
+        axes.xlabel(nameX)
+        axes.ylabel(nameY)
+        axes.set_title(nameX + " vs " + nameY)
+        self._draw_xy_line(axes)
 
         self.canvas.draw()
 
@@ -212,9 +273,7 @@ class ProbeGraphDisplay (object) :
         self.figure.clf()
         self.canvas.draw()
 
-    def _draw_xy_line (self) :
-
-        axes = self.figure.axes[0]
+    def _draw_xy_line (self, axes) :
 
         # get the bounds for our calculations and so we can reset the viewing window later
         x_bounds = axes.get_xbound()
@@ -234,13 +293,6 @@ class ProbeGraphDisplay (object) :
 
 class Main(QtGui.QMainWindow):
     _last_open_dir = None  # directory to open files in
-
-    def make_mpl_pane(self, parent, workspace):
-        """place a matplotlib figure inside a probe pane
-        """
-        graphTemp = ProbeGraphDisplay(parent, workspace)
-
-        return graphTemp
 
     def open_files(self):
         files = QtGui.QFileDialog.getOpenFileNames(self,
@@ -460,10 +512,10 @@ class Main(QtGui.QMainWindow):
 
             # now we must have 1 or 2 UUIDs in our list
 
-            # TODO, this needs to use the current tab instead of always the A tab
+            # TODO, when the plots manage their own layer selection, change this call
             # FUTURE, once the polygon is a layer, this will need to change
-            # refresh our plot
-            self.graphObjects[0].rebuildPlot (selected_uuids, polygonPoints=points)
+            # update our current plot with the new polygon
+            self.graphManager.currentPolygonChanged (selected_uuids, polygonPoints=points)
 
             # do whatever other updates the scene manager needs
             self.scene_manager.on_new_polygon("default_name", points)
@@ -484,13 +536,7 @@ class Main(QtGui.QMainWindow):
         self.change_tool()
 
         self.setup_menu()
-        self.setup_probe_panes()
-
-    def setup_probe_panes(self):
-        self.graphObjects = [ ];
-        self.currGraphIndex = 0;
-        graphTemp = self.make_mpl_pane(self.ui.tab_A, self.workspace)
-        self.graphObjects.append(graphTemp)
+        self.graphManager = ProbeGraphManager(self.ui.probeTabWidget, self.workspace)
 
     def toggle_animation(self, action:QtGui.QAction=None, *args):
         new_state = self.scene_manager.layer_set.toggle_animation()
