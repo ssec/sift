@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created: Wed Oct 21 15:57:47 2015
+# Created: Thu Oct 22 16:35:08 2015
 #      by: PyQt4 UI code generator 4.11.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -167,9 +167,6 @@ class Ui_MainWindow(object):
         self.probeTabWidget = QtGui.QTabWidget(self.probeWidget)
         self.probeTabWidget.setMaximumSize(QtCore.QSize(16777215, 16777215))
         self.probeTabWidget.setObjectName(_fromUtf8("probeTabWidget"))
-        self.tab_A = QtGui.QWidget()
-        self.tab_A.setObjectName(_fromUtf8("tab_A"))
-        self.probeTabWidget.addTab(self.tab_A, _fromUtf8(""))
         self.tab_plus = QtGui.QWidget()
         self.tab_plus.setObjectName(_fromUtf8("tab_plus"))
         self.probeTabWidget.addTab(self.tab_plus, _fromUtf8(""))
@@ -277,7 +274,6 @@ class Ui_MainWindow(object):
         self.animForward.setStatusTip(_translate("MainWindow", "Step forward", None))
         self.animForward.setText(_translate("MainWindow", "▶|", None))
         self.areaProbePane.setWindowTitle(_translate("MainWindow", "Area Probe Graphs", None))
-        self.probeTabWidget.setTabText(self.probeTabWidget.indexOf(self.tab_A), _translate("MainWindow", "A", None))
         self.probeTabWidget.setTabText(self.probeTabWidget.indexOf(self.tab_plus), _translate("MainWindow", "+", None))
         self.layersPane.setWindowTitle(_translate("MainWindow", "Layers", None))
         self.layerSetTabs.setToolTip(_translate("MainWindow", "Alternate layer sets", None))

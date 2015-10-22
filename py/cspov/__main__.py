@@ -90,36 +90,58 @@ class ProbeGraphManager (object) :
     graphs = None
     selected_graph_index = -1
     workspace = None
+    document = None
     tab_widget_object = None
     max_tab_letter = None
 
-    def __init__(self, tab_widget, workspace) :
+    def __init__(self, tab_widget, workspace, document) :
         """Setup our tab widget with an appropriate graph object in the first tab.
 
         FUTURE, once we are saving our graph configurations, load those instead of setting up this default.
         """
 
-        # hang on to the workspace
+        # hang on to the workspace and document
         self.workspace = workspace
+        self.document  = document
 
         # hang on to the tab widget
         self.tab_widget_object = tab_widget
         tempCount = self.tab_widget_object.count()
-        if tempCount != 2 :
+        if tempCount != 1 :
             LOG.info("Unexpected number of tabs in the QTabWidget used for the Area Probe Graphs.")
 
         # set up the first tab
         self.graphs = [ ]
         self.selected_graph_index = 0
-        temp_widget = self.tab_widget_object.widget(self.selected_graph_index)
-        self.graphs.append(ProbeGraphDisplay(temp_widget, self.workspace))
-        self.tab_widget_object.setCurrentIndex(self.selected_graph_index)
         self.max_tab_letter = 'A'
+        self.set_up_tab(self.selected_graph_index, do_increment_tab_letter=False)
 
-        # hook things up so we know when the tab changes
+        # hook things up so we know when the selected tab changes
         self.tab_widget_object.connect(self.tab_widget_object,
                                        QtCore.SIGNAL('currentChanged(int)'),
                                        self.handle_tab_change)
+
+    def set_up_tab (self, tab_index, do_increment_tab_letter=True) :
+        """Create a new tab at tab_index and add it to the list of graphs
+        """
+
+        # increment our tab label letter if desired
+        if do_increment_tab_letter :
+            self.max_tab_letter = chr(ord(self.max_tab_letter) + 1) # this will get strange after Z!
+
+        # create our tab
+        temp_widget = QtGui.QWidget()
+        self.tab_widget_object.insertTab(tab_index, temp_widget, self.max_tab_letter)
+
+        # create the associated graph display object
+        self.graphs.append(ProbeGraphDisplay(temp_widget, self.workspace)) # FUTURE, check that the index means we added the tab at the end?
+
+        # go to the tab we just created
+        self.tab_widget_object.setCurrentIndex(tab_index)
+
+        # TODO, this should be hooked up to a signal properly
+        uuid_list = self.document.current_layer_order
+        self.graphs[tab_index].set_possible_layers(uuid_list)
 
     def currentPolygonChanged (self, selected_uuids, polygonPoints) :
         """Update the current polygon in the selected graph and rebuild it's plot
@@ -127,7 +149,7 @@ class ProbeGraphManager (object) :
         FUTURE, once the polygon is a layer, this signal will be unnecessary
         """
 
-        self.graphs[self.selected_graph_index].rebuildPlot (selected_uuids, polygonPoints=polygonPoints)
+        self.graphs[self.selected_graph_index].setPolygon (polygonPoints)
 
     def handle_tab_change (self, ) :
         """deal with the fact that the tab changed in the tab widget
@@ -138,11 +160,8 @@ class ProbeGraphManager (object) :
         # if this is the last tab, make a new tab and switch to that
         if newTabIndex == (self.tab_widget_object.count() - 1) :
             LOG.info ("Creating new area probe graph tab.")
-            self.max_tab_letter = chr(ord(self.max_tab_letter) + 1) # this will get strange after Z!
-            self.tab_widget_object.insertTab(newTabIndex, QtGui.QWidget(), self.max_tab_letter)
-            temp_widget = self.tab_widget_object.widget(newTabIndex)
-            self.graphs.append(ProbeGraphDisplay(temp_widget, self.workspace))
-            self.tab_widget_object.setCurrentIndex(newTabIndex)
+
+            self.set_up_tab(newTabIndex)
 
         # otherwise, just update our current index
         else :
@@ -153,11 +172,21 @@ class ProbeGraphDisplay (object) :
     The ProbeGraphDisplay handles generating a displaying a single graph.
     """
 
-    figure  = None
-    canvas  = None
-    toolbar = None
-    polygon = None
-    workspace = None
+    # plotting related controls
+    figure          = None
+    canvas          = None
+    toolbar         = None
+    yCheckBox       = None
+    xDropDown       = None
+    yDropDown       = None
+
+    # internal objects to reference for info and data
+    polygon         = None
+    workspace       = None
+
+    # internal values that control the behavior of plotting and controls
+    xSelectedUUID   = None
+    ySelectedUUID   = None
 
     def __init__(self, qt_parent, workspace):
         """build the graph tab controls
@@ -179,17 +208,102 @@ class ProbeGraphDisplay (object) :
         self.toolbar = NavigationToolbar(self.canvas, qt_parent)
 
         # create our selection controls
-        #tempDropDownX = QtGui.QComboBox(qt_parent)
-        #tempDropDownY = QtGui.QComboBox(qt_parent)
-        #tempDropDownY.addItem("Test Entry")
+
+        # the label for the x selection
+        xLabel= QtGui.QLabel("X layer:")
+
+        # the check box that turns on and off comparing to a y layer
+        self.yCheckBox = QtGui.QCheckBox("vs Y layer:")
+        self.yCheckBox.setToolTip("Plot X layer data vs Y layer when this is checked.")
+        self.yCheckBox.stateChanged.connect(self.vsChecked)
+
+        # the drop down for selecting the x layer
+        self.xDropDown = QtGui.QComboBox(qt_parent)
+        self.xDropDown.setToolTip("The X layer data to use for plotting.")
+        self.xDropDown.activated.connect(self.xSelected)
+
+        # the drop down for selecting the y layer
+        self.yDropDown = QtGui.QComboBox(qt_parent)
+        self.yDropDown.setDisabled(True)
+        self.yDropDown.setToolTip("The Y layer data to use for plotting.")
+        self.yDropDown.activated.connect(self.ySelected)
 
         # set the layout
-        layout = QtGui.QVBoxLayout()
-        layout.addWidget(self.toolbar)
-        layout.addWidget(self.canvas)
-        #layout.addWidget(tempDropDownX)
-        #layout.addWidget(tempDropDownY)
+        # Note: add in a grid is (widget, row#, col#) or (widget, row#, col#, row_span, col_span)
+        layout = QtGui.QGridLayout()
+        layout.addWidget(self.toolbar,   1, 1, 1, 3)
+        layout.addWidget(self.canvas,    2, 1, 1, 3)
+        layout.addWidget(xLabel,         3, 1)
+        layout.addWidget(self.xDropDown, 3, 2, 1, 2)
+        layout.addWidget(self.yCheckBox, 4, 1)
+        layout.addWidget(self.yDropDown, 4, 2, 1, 2)
         qt_parent.setLayout(layout)
+
+    def set_possible_layers (self, uuid_list) :
+        """Given a list of layer UUIDs, set the names and UUIDs in the drop downs
+        """
+
+        # clear out the current lists
+        self.xDropDown.clear()
+        self.yDropDown.clear()
+
+        # fill up our lists of layers
+        for uuid in uuid_list :
+
+            layer_name = self.workspace.get_info(uuid)[INFO.NAME]
+            self.xDropDown.addItem(layer_name, uuid)
+            self.yDropDown.addItem(layer_name, uuid)
+
+        # if possible, set the selections back to the way they were
+        xIndex = self.xDropDown.findData(self.xSelectedUUID)
+        if xIndex >= 0 :
+            self.xDropDown.setCurrentIndex(xIndex)
+        else :
+            self.xSelectedUUID = self.xDropDown.itemData(0)
+            self.xDropDown.setCurrentIndex(0)
+        yIndex = self.yDropDown.findData(self.ySelectedUUID)
+        if yIndex >= 0 :
+            self.yDropDown.setCurrentIndex(yIndex)
+        else :
+            self.ySelectedUUID = self.yDropDown.itemData(0)
+            self.yDropDown.setCurrentIndex(0)
+
+    def xSelected (self) :
+        """The user selected something in the X layer list.
+        """
+
+        oldX = self.xSelectedUUID
+        self.xSelectedUUID = self.xDropDown.itemData(self.xDropDown.currentIndex())
+
+        #print("X UUID selected: " + str(self.xSelectedUUID))
+
+        # regenerate the plot
+        if oldX != self.xSelectedUUID :
+            self.rebuildPlot()
+
+    def ySelected (self) :
+        """The user selected something in the Y layer list.
+        """
+
+        oldY = self.ySelectedUUID
+        self.ySelectedUUID = self.yDropDown.itemData(self.yDropDown.currentIndex())
+
+        #print("Y UUID selected: " + str(self.ySelectedUUID))
+
+        # regenerate the plot
+        if (oldY != self.ySelectedUUID) and self.yCheckBox.isChecked() :
+            self.rebuildPlot()
+
+    def vsChecked (self) :
+        """The vs check box was checked!
+        """
+
+        # look at the state of the vs box and enable/disable the y drop down accordingly
+        doPlotVS = self.yCheckBox.isChecked()
+        self.yDropDown.setDisabled(not doPlotVS)
+
+        # regenerate the plot
+        self.rebuildPlot()
 
     def setPolygon (self, polygonPoints) :
         """Set the polygon selection for this graph
@@ -198,36 +312,35 @@ class ProbeGraphDisplay (object) :
         self.polygon = polygonPoints
 
         # regenerate the plot
-        # TODO, once I'm managing the UUIDs internally call rebuildPlot here
+        self.rebuildPlot()
 
-    def rebuildPlot (self, selected_uuids, polygonPoints=None) : # TODO, manage UUIDs with my own controls
+    def rebuildPlot (self, ) :
         """Given what we currently know about the selection area and selected bands, rebuild our plot
 
         Note: This should be called only when the selections change in some way.
         """
 
-        # for simplicity, set the polygon if they sent us one
-        if polygonPoints is not None :
-            self.setPolygon(polygonPoints)
+        # should be be plotting vs Y?
+        doPlotVS = self.yCheckBox.isChecked()
 
-        # if the user has one band selected, make a histogram plot
-        if (len(selected_uuids) == 1):
+        # if we are plotting only x and we have a selected x and a polygon
+        if not doPlotVS and self.xSelectedUUID is not None and self.polygon is not None :
 
             # get the data and info we need for this plot
-            data_polygon = self.workspace.get_content_polygon(selected_uuids[0], self.polygon)
-            title = self.workspace.get_info(selected_uuids[0])[INFO.NAME]
+            data_polygon = self.workspace.get_content_polygon(self.xSelectedUUID, self.polygon)
+            title = self.workspace.get_info(self.xSelectedUUID)[INFO.NAME]
 
             # plot a histogram
             self.plotHistogram (data_polygon.flatten(), title)
 
-        # if the user has two bands selected make a scatter plot
-        elif len(selected_uuids) == 2:
+        # if we are plotting x vs y and have x, y, and a polygon
+        elif doPlotVS and self.xSelectedUUID is not None and self.ySelectedUUID is not None and self.polygon is not None :
 
             # get the data and info we need for this plot
-            data1 = self.workspace.get_content_polygon(selected_uuids[0], self.polygon)
-            name1 = self.workspace.get_info(selected_uuids[0])[INFO.NAME]
-            data2 = self.workspace.get_content_polygon(selected_uuids[1], self.polygon)
-            name2 = self.workspace.get_info(selected_uuids[1])[INFO.NAME]
+            data1 = self.workspace.get_content_polygon(self.xSelectedUUID, self.polygon)
+            name1 = self.workspace.get_info(self.xSelectedUUID)[INFO.NAME]
+            data2 = self.workspace.get_content_polygon(self.ySelectedUUID, self.polygon)
+            name2 = self.workspace.get_info(self.ySelectedUUID)[INFO.NAME]
 
             # we can only scatter plot if both data sets have the same resolution
             if data1.size != data2.size :
@@ -237,7 +350,7 @@ class ProbeGraphDisplay (object) :
                 # plot a scatter plot
                 self.plotScatterplot (data1.flatten(), name1, data2.flatten(), name2)
 
-        # if we have some number of layers selected that we don't understand, clear the figure
+        # if we have some combination of selections we don't understand, clear the figure
         else :
 
             self.clearPlot()
@@ -258,9 +371,9 @@ class ProbeGraphDisplay (object) :
 
         self.figure.clf()
         axes = self.figure.add_subplot(111)
-        axes.scatter(dataX.flatten(), dataY.flatten(), s=1, alpha=0.5)
-        axes.xlabel(nameX)
-        axes.ylabel(nameY)
+        axes.scatter(dataX.flatten(), dataY.flatten(), color='b', s=1, alpha=0.5)
+        axes.set_xlabel(nameX)
+        axes.set_ylabel(nameY)
         axes.set_title(nameX + " vs " + nameY)
         self._draw_xy_line(axes)
 
@@ -536,7 +649,7 @@ class Main(QtGui.QMainWindow):
         self.change_tool()
 
         self.setup_menu()
-        self.graphManager = ProbeGraphManager(self.ui.probeTabWidget, self.workspace)
+        self.graphManager = ProbeGraphManager(self.ui.probeTabWidget, self.workspace, self.document)
 
     def toggle_animation(self, action:QtGui.QAction=None, *args):
         new_state = self.scene_manager.layer_set.toggle_animation()

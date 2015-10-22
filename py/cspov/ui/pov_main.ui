@@ -352,11 +352,6 @@
        <property name="currentIndex">
         <number>0</number>
        </property>
-       <widget class="QWidget" name="tab_A">
-        <attribute name="title">
-         <string>A</string>
-        </attribute>
-       </widget>
        <widget class="QWidget" name="tab_plus">
         <attribute name="title">
          <string>+</string>
