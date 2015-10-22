@@ -187,6 +187,7 @@ class Document(QObject):
 
         # add as visible to the front of the current set, and invisible to the rest of the available sets
         colormap = self._default_colormap(info)
+        info[INFO.CLIM] = self._guidebook.climits(info)
         p = prez(uuid=uuid,
                  kind=info[INFO.KIND],
                  visible=True,
