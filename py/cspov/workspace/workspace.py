@@ -27,7 +27,9 @@ import os, sys, re
 import logging, unittest, argparse
 import gdal, osr
 import numpy as np
+import shutil
 from collections import namedtuple
+from pickle import dump, load, HIGHEST_PROTOCOL
 from uuid import UUID, uuid1 as uuidgen
 from cspov.common import KIND, INFO
 from PyQt4.QtCore import QObject, pyqtSignal
@@ -165,6 +167,8 @@ class Workspace(QObject):
     _importers = None  # list of importers to consult when asked to start an import
     _info = None
     _data = None
+    _inventory = None  # dictionary of data
+    _inventory_path = None  # filename to store and load inventory information (simple cache)
 
     # signals
     didStartImport = pyqtSignal(dict)  # a dataset started importing; generated after overview level of detail is available
@@ -181,6 +185,7 @@ class Workspace(QObject):
         """
         super(Workspace, self).__init__()
         self.cwd = directory_path = os.path.abspath(directory_path)
+        self._inventory_path = os.path.join(self.cwd, 'inventory.pkl')
         if not os.path.isdir(directory_path):
             os.makedirs(directory_path)
             self._own_cwd = True
@@ -195,12 +200,50 @@ class Workspace(QObject):
             global TheWorkspace  # singleton
             TheWorkspace = self
 
+    def _init_create_workspace(self):
+        """
+        initialize a previously empty workspace
+        :return:
+        """
+        self._inventory = {}
+        self._store_inventory()
+
     def _init_inventory_existing_datasets(self):
         """
         Do an inventory of an pre-existing workspace
         :return:
         """
-        pass
+        if os.path.exists(self._inventory_path):
+            with open(self._inventory_path, 'rb') as fob:
+                self._inventory = load(fob)
+        else:
+            self._inventory = {}
+            self._store_inventory()
+
+    @staticmethod
+    def _key_for_path(self, path):
+        if not os.path.exists(path):
+            return None
+        s = os.stat(path)
+        return (os.path.realpath(path), s.st_mtime, s.st_size)
+
+    def _store_inventory(self):
+        """
+        write inventory dictionary to an inventory.pkl file in the cwd
+        :return:
+        """
+        atomic = self._inventory_path + '-tmp'
+        with open(atomic, 'wb') as fob:
+            dump(self._inventory, fob, HIGHEST_PROTOCOL)
+        shutil.move(atomic, self._inventory_path)
+
+    def import_from_cache(self, path):
+        """
+
+        :param path: return uuid, info, overview_content if the data is already available without import
+        :return:
+        """
+
 
     def idle(self):
         """
