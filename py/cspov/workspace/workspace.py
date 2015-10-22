@@ -200,6 +200,9 @@ class Workspace(QObject):
             global TheWorkspace  # singleton
             TheWorkspace = self
 
+    def __del__(self):
+        self._clean_cache()
+
     def _init_create_workspace(self):
         """
         initialize a previously empty workspace
@@ -217,11 +220,10 @@ class Workspace(QObject):
             with open(self._inventory_path, 'rb') as fob:
                 self._inventory = load(fob)
         else:
-            self._inventory = {}
-            self._store_inventory()
+            self._init_create_workspace()
 
     @staticmethod
-    def _key_for_path(self, path):
+    def _key_for_path(path):
         if not os.path.exists(path):
             return None
         s = os.stat(path)
@@ -247,7 +249,8 @@ class Workspace(QObject):
         if nfo is None:
             return None
         uuid, info, data_info = nfo
-        dpath, dtype, shape = data_info
+        dfilename, dtype, shape = data_info
+        dpath = os.path.join(self.cwd, dfilename)
         if not os.path.exists(dpath):
             del self._inventory[key]
             self._store_inventory()
@@ -265,10 +268,19 @@ class Workspace(QObject):
         :return:
         """
         key = self._key_for_path(path)
-        data_info = (path, data.dtype, data.shape)
+        data_info = (os.path.split(data.filename)[1], data.dtype, data.shape)
         nfo = (uuid, info, data_info)
         self._inventory[key] = nfo
         self._store_inventory()
+
+    def _clean_cache(self):
+        """
+        find stale content in the cache and get rid of it
+        possibly include a workspace setting for max workspace size in bytes?
+        :return:
+        """
+        # FIXME
+        return
 
     def idle(self):
         """
@@ -288,9 +300,13 @@ class Workspace(QObject):
         if source_uri is not None and source_path is None:
             raise NotImplementedError('URI load not yet supported')
 
+        nfo = None
         if allow_cache and source_path is not None:
             nfo = self._check_cache(source_path)
             if nfo is not None:
+                uuid, info, data = nfo
+                self._info[uuid] = info
+                self._data[uuid] = data
                 return nfo
 
         gen = None
@@ -309,16 +325,18 @@ class Workspace(QObject):
                 data = self._data[uuid] = update.data
                 LOG.debug(repr(update))
         # copy the data into an anonymous memmap
-        self._data[uuid] = data = self._convert_to_memmap(data)
+        self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
         if allow_cache:
-            self._update_cache(source_path, (uuid, info, data))
+            self._update_cache(source_path, uuid, info, data)
         return uuid, info, data
 
-    def _convert_to_memmap(self, data:np.ndarray):
+    def _convert_to_memmap(self, filename, data:np.ndarray):
         if isinstance(data, np.memmap):
             return data
-        from tempfile import TemporaryFile
-        fp = TemporaryFile()
+        # from tempfile import TemporaryFile
+        # fp = TemporaryFile()
+        pathname = os.path.join(self.cwd, filename)
+        fp = open(pathname, 'wb+')
         mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
         mm[:] = data[:]
         return mm
