@@ -153,6 +153,8 @@ def main():
             "{:0.03f}".format(y_extent[0]),
             "{:0.03f}".format(x_extent[1]),
             "{:0.03f}".format(y_extent[1]),
+            "-srcnodata", "nan",
+            "-dstnodata", "nan",
         ]
         if args.compress is not None:
             gdalwarp_args.extend(["-co", "COMPRESS=%s" % (args.compress,)])
