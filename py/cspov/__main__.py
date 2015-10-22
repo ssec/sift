@@ -254,7 +254,7 @@ class Main(QtGui.QMainWindow):
     #         self.behaviorLayersList.select([info[INFO.UUID]])
 
 
-    def __init__(self, workspace_dir=None, glob_pattern=None, border_shapefile=None):
+    def __init__(self, workspace_dir=None, workspace_size=None, glob_pattern=None, border_shapefile=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
@@ -266,7 +266,7 @@ class Main(QtGui.QMainWindow):
         self.queue.didMakeProgress.connect(self.update_progress_bar)
 
         # create document
-        self.workspace = Workspace(workspace_dir)
+        self.workspace = Workspace(workspace_dir, max_size_gb=workspace_size)
         self.document = doc = Document(self.workspace)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
                                                glob_pattern=glob_pattern,
@@ -360,6 +360,10 @@ class Main(QtGui.QMainWindow):
 
         self.setup_menu()
         self.setup_probe_panes()
+
+    def closeEvent(self, event, *args, **kwargs):
+        LOG.debug('main window closing')
+        self.workspace.close()
 
     def setup_probe_panes(self):
         self.figureA, self.canvasA, self.toolbarA = self.make_mpl_pane(self.ui.probeAWidget)
@@ -472,6 +476,8 @@ def main():
     parser = argparse.ArgumentParser(description="Run CSPOV")
     parser.add_argument("-w", "--workspace", default='.',
                         help="Specify workspace base directory")
+    parser.add_argument("-s", "--space", default=256, type=int,
+                        help="Specify max amount of data to hold in workspace in Gigabytes")
     parser.add_argument("--border-shapefile", default=None,
                         help="Specify alternative coastline/border shapefile")
     parser.add_argument("--glob-pattern", default=os.environ.get("TIFF_GLOB", None),
@@ -489,6 +495,7 @@ def main():
     # app = QApplication(sys.argv)
     window = Main(
         workspace_dir=args.workspace,
+        workspace_size=args.space,
         glob_pattern=args.glob_pattern,
         border_shapefile=args.border_shapefile
     )
