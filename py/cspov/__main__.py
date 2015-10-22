@@ -82,16 +82,31 @@ def test_layers(ws, doc, glob_pattern=None):
     LOG.warning("No image glob pattern provided")
     return []
 
-class GraphDisplay (object) :
+class ProbeGraphManager (object) :
+    """
+    The ProbeGraphManager manages the many tabs of the Area Probe Graphs.
+    """
+
+    # TODO
+
+class ProbeGraphDisplay (object) :
+    """
+    The ProbeGraphDisplay controls one tab of the Area Probe Graphs. It handles generating a displaying a single graph.
+    """
 
     figure  = None
     canvas  = None
     toolbar = None
+    polygon = None
+    workspace = None
 
-    def __init__(self, qt_parent):
+    def __init__(self, qt_parent, workspace):
         """build the graph tab controls
         :return:
         """
+
+        # save the workspace for use later
+        self.workspace = workspace
 
         # a figure instance to plot on
         self.figure = plt.figure(figsize=(3,3), dpi=72)
@@ -103,11 +118,70 @@ class GraphDisplay (object) :
         # make a matplotlib toolbar to attach to the graph
         self.toolbar = NavigationToolbar(self.canvas, qt_parent)
 
+        # create our selection controls
+        #tempDropDownX = QtGui.QComboBox(qt_parent)
+        #tempDropDownY = QtGui.QComboBox(qt_parent)
+        #tempDropDownY.addItem("Test Entry")
+
         # set the layout
         layout = QtGui.QVBoxLayout()
         layout.addWidget(self.toolbar)
         layout.addWidget(self.canvas)
+        #layout.addWidget(tempDropDownX)
+        #layout.addWidget(tempDropDownY)
         qt_parent.setLayout(layout)
+
+    def setPolygon (self, polygonPoints) :
+        """Set the polygon selection for this graph
+        """
+
+        self.polygon = polygonPoints
+
+        # regenerate the plot
+        # TODO, once I'm managing the UUIDs internally call rebuildPlot here
+
+    def rebuildPlot (self, selected_uuids, polygonPoints=None) : # TODO, manage UUIDs with my own controls
+        """Given what we currently know about the selection area and selected bands, rebuild our plot
+
+        Note: This should be called only when the selections change in some way.
+        """
+
+        # for simplicity, set the polygon if they sent us one
+        if polygonPoints is not None :
+            self.setPolygon(polygonPoints)
+
+        # if the user has one band selected, make a histogram plot
+        if (len(selected_uuids) == 1):
+
+            # get the data and info we need for this plot
+            data_polygon = self.workspace.get_content_polygon(selected_uuids[0], self.polygon)
+            title = self.workspace.get_info(selected_uuids[0])[INFO.NAME]
+
+            # plot a histogram
+            self.plotHistogram (data_polygon.flatten(), title)
+
+        # if the user has two bands selected make a scatter plot
+        elif len(selected_uuids) == 2:
+
+            # get the data and info we need for this plot
+            data1 = self.workspace.get_content_polygon(selected_uuids[0], self.polygon)
+            name1 = self.workspace.get_info(selected_uuids[0])[INFO.NAME]
+            data2 = self.workspace.get_content_polygon(selected_uuids[1], self.polygon)
+            name2 = self.workspace.get_info(selected_uuids[1])[INFO.NAME]
+
+            # we can only scatter plot if both data sets have the same resolution
+            if data1.size != data2.size :
+                LOG.info("Unable to plot bands of different resolutions in the Area Probe Graph.")
+                self.clearPlot()
+            else:
+                # plot a scatter plot
+                self.plotScatterplot (data1.flatten(), name1, data2.flatten(), name2)
+
+        # if we have some number of layers selected that we don't understand, clear the figure
+        else :
+
+            self.clearPlot()
+
 
     def plotHistogram (self, data, title, numBins=100) :
         """Make a histogram using the given data and label it with the given title
@@ -128,6 +202,13 @@ class GraphDisplay (object) :
         self.figure.axes[0].set_title(nameX + " vs " + nameY)
         self._draw_xy_line()
 
+        self.canvas.draw()
+
+    def clearPlot (self) :
+        """Clear our plot 
+        """
+
+        self.figure.clf()
         self.canvas.draw()
 
     def _draw_xy_line (self) :
@@ -153,10 +234,10 @@ class GraphDisplay (object) :
 class Main(QtGui.QMainWindow):
     _last_open_dir = None  # directory to open files in
 
-    def make_mpl_pane(self, parent):
+    def make_mpl_pane(self, parent, workspace):
         """place a matplotlib figure inside a probe pane
         """
-        graphTemp = GraphDisplay(parent)
+        graphTemp = ProbeGraphDisplay(parent, workspace)
 
         return graphTemp
 
@@ -337,45 +418,26 @@ class Main(QtGui.QMainWindow):
 
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
 
-            print("In update probe polygon")
-
-            # TODO, this needs to use the current tab instead of always the A tab
-            graphObjTemp = self.graphObjects[0]
-
             selected_uuids = list(layerlist.current_selected_uuids())
             LOG.debug("selected UUID set is {0!r:s}".format(selected_uuids))
-            if len(selected_uuids)==0:
 
+            # if the layer list doesn't have any selected UUIDs, use the one passed in
+            if len(selected_uuids) <= 0:
                 selected_uuids = [uuid]
+            # if we have more than two uuids, just plot the very first one
+            elif len(selected_uuids) > 2 :
+                selected_uuids = selected_uuids[0:1]
 
-            if (len(selected_uuids)==1):
+            # now we must have 1 or 2 UUIDs in our list
 
-                # get the data and info we need for this plot
-                data_polygon = self.workspace.get_content_polygon(selected_uuids[0], points)
-                title = self.workspace.get_info(selected_uuids[0])[INFO.NAME]
+            # TODO, this needs to use the current tab instead of always the A tab
+            # FUTURE, once the polygon is a layer, this will need to change
+            # refresh our plot
+            self.graphObjects[0].rebuildPlot (selected_uuids, polygonPoints=points)
 
-                # plot a histogram
-                graphObjTemp.plotHistogram (data_polygon.flatten(), title)
-
-            elif len(selected_uuids)==2:
-
-                # get the data and info we need for this plot
-                data1 = self.workspace.get_content_polygon(selected_uuids[0], points)
-                name1 = self.workspace.get_info(selected_uuids[0])[INFO.NAME]
-                data2 = self.workspace.get_content_polygon(selected_uuids[1], points)
-                name2 = self.workspace.get_info(selected_uuids[1])[INFO.NAME]
-
-                # plot a scatter plot
-                graphObjTemp.plotScatterplot (data1.flatten(), name1, data2.flatten(), name2)
-
-                # set the data polygon to be the first data set so we can calculate the avg later
-                data_polygon = data1
-
-            else:
-                data_polygon = self.workspace.get_content_polygon(selected_uuids[0], points)
-            avg = data_polygon.mean()
-            self.ui.cursorProbeText.setText("Polygon Probe: {:.03f}".format(float(avg)))
+            # do whatever other updates the scene manager needs
             self.scene_manager.on_new_polygon(points)
+
         self.scene_manager.newProbePolygon.connect(update_probe_polygon)
 
         self.ui.mainWidgets.removeTab(0)
@@ -404,7 +466,7 @@ class Main(QtGui.QMainWindow):
     def setup_probe_panes(self):
         self.graphObjects = [ ];
         self.currGraphIndex = 0;
-        graphTemp = self.make_mpl_pane(self.ui.tab_A)
+        graphTemp = self.make_mpl_pane(self.ui.tab_A, self.workspace)
         self.graphObjects.append(graphTemp)
 
     def toggle_animation(self, action:QtGui.QAction=None, *args):
