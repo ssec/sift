@@ -456,10 +456,18 @@ _texture_lookup = """
             discard;
         }
         vec4 val = texture2D($texture, texcoord);
-        // NaN is not properly translated in the texture so use 0 as the fill value
-        if (val.r == 0.0) {
+        // http://stackoverflow.com/questions/11810158/how-to-deal-with-nan-or-inf-in-opengl-es-2-0-shaders
+        if (!(val.r <= 0.0 || 0.0 <= val.r)) {
             discard;
         }
+
+        if ($vmin < $vmax) {
+            val.r = clamp(val.r, $vmin, $vmax);
+        } else {
+            val.r = clamp(val.r, $vmax, $vmin);
+        }
+        val.r = (val.r-$vmin)/($vmax-$vmin);
+
         return val;
     }"""
 
@@ -640,9 +648,12 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self._need_texture_upload = True
         self._need_vertex_update = True
         self._need_colortransform_update = True
+        self._need_clim_update = True
         self._need_interpolation_update = True
         self._texture = TextureAtlas2D(self.texture_shape, tile_shape=self.tile_shape,
-                                       interpolation=texture_interpolation)
+                                       interpolation=texture_interpolation,
+                                       format="LUMINANCE", internalformat="R32F",
+                                       )
         self._subdiv_position = VertexBuffer()
         self._subdiv_texcoord = VertexBuffer()
 
@@ -662,13 +673,32 @@ class TiledGeolocatedImageVisual(ImageVisual):
         # self._build_interpolation()
         self._data_lookup_fn = None
 
-        self.clim = clim
+        self.clim = clim if clim != 'auto' else (np.nanmin(data), np.nanmax(data))
         self.cmap = cmap
 
         self.overview_info = None
         self._init_overview(data)
 
         self.freeze()
+
+    @property
+    def clim(self):
+        return (self._clim if isinstance(self._clim, string_types) else
+                tuple(self._clim))
+
+    @clim.setter
+    def clim(self, clim):
+        if isinstance(clim, string_types):
+            if clim != 'auto':
+                raise ValueError('clim must be "auto" if a string')
+        else:
+            clim = np.array(clim, float)
+            if clim.shape != (2,):
+                raise ValueError('clim must have two elements')
+        self._clim = clim
+        self._data_lookup_fn
+        self._need_clim_update = True
+        self.update()
 
     @property
     def size(self):
@@ -688,7 +718,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         nfo["cell_height"] = self.cell_height * y_slice.step
         # Tell the texture state that we are adding a tile that should never expire and should always exist
         nfo["texture_tile_index"] = ttile_idx = self.texture_state.add_tile((0, 0, 0), expires=False)
-        self._texture.set_tile_data(ttile_idx, nfo["data"])
+        self._texture.set_tile_data(ttile_idx, self._normalize_data(nfo["data"]))
 
         # Handle wrapping around the anti-meridian so there is a -180/180 continuous image
         num_tiles = 1 if not self.wrap_lon else 2
@@ -703,25 +733,16 @@ class TiledGeolocatedImageVisual(ImageVisual):
             nfo["vertex_coordinates"][6:12, 0] += nfo["cell_width"] * nfo["data"].shape[1]
         self._set_vertex_tiles(nfo["vertex_coordinates"], nfo["texture_coordinates"])
 
-    def _build_texture_tiles(self, data, stride, tile_box):
-        """Prepare and organize strided data in to individual tiles with associated information.
-        """
+    def _normalize_data(self, data):
         if data.dtype == np.float64:
             data = data.astype(np.float32)
 
-        if data.ndim == 2 or data.shape[2] == 1:
-            # deal with clim on CPU b/c of texture depth limits :(
-            # can eventually do this by simulating 32-bit float... maybe
-            clim = self._clim
-            if isinstance(clim, string_types) and clim == 'auto':
-                clim = np.min(data), np.max(data)
-            clim = np.asarray(clim, dtype=np.float32)
-            data = data - clim[0]  # not inplace so we don't modify orig data
-            if clim[1] - clim[0] > 0:
-                data /= clim[1] - clim[0]
-            else:
-                data[:] = 1 if data[0, 0] != 0 else 0
-            self._clim = np.array(clim)
+        return data
+
+    def _build_texture_tiles(self, data, stride, tile_box):
+        """Prepare and organize strided data in to individual tiles with associated information.
+        """
+        data = self._normalize_data(data)
 
         LOG.debug("Uploading texture data for %d tiles (%r)", (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l), tile_box)
         max_tiles = self.calc.max_tiles_available(stride)
@@ -840,11 +861,12 @@ class TiledGeolocatedImageVisual(ImageVisual):
         """
         view_box = self.get_view_box()
         preferred_stride = self.calc.calc_stride(view_box)
-        _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride)
+        _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride, extra_tiles_box=box(1, 1, 1, 1))
+        num_tiles = (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l)
         LOG.debug("Assessment: Prefer '%s' have '%s', was looking at %r, now looking at %r",
                   preferred_stride, self._stride, self._latest_tile_box, tile_box)
         # If we zoomed out or we panned
-        need_retile = preferred_stride != self._stride or self._latest_tile_box != tile_box
+        need_retile = (num_tiles > 0) and (preferred_stride != self._stride or self._latest_tile_box != tile_box)
         return need_retile, preferred_stride, tile_box
 
     def retile(self, data, preferred_stride, tile_box):
@@ -888,12 +910,20 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self.shared_program.frag['color_transform'] = fun
         self._need_colortransform_update = False
 
+    def _set_clim_vars(self):
+        self._data_lookup_fn["vmin"] = self._clim[0]
+        self._data_lookup_fn["vmax"] = self._clim[1]
+        self._need_clim_update = False
+
     def _prepare_draw(self, view):
         if self._need_interpolation_update:
             self._build_interpolation()
 
         # if self._need_texture_upload:
         #     self._build_texture()
+
+        if self._need_clim_update:
+            self._set_clim_vars()
 
         if self._need_colortransform_update:
             self._build_color_transform()

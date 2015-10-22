@@ -98,11 +98,7 @@ class INFO(Enum):
     CLIM = 'clim'  # (min,max) color map limits
     SHAPE = 'shape' # (rows, columns) or (rows, columns, levels) data shape
     COLORMAP = 'colormap'  # name or UUID of a color map
-
-
-
-INFO
-
+    DISPLAY_TIME = 'display_time'  # typically from guidebook, used for labeling animation frame
 
 class MercatorTileCalc(object):
     """
@@ -293,8 +289,8 @@ class MercatorTileCalc(object):
         # world distance per pixel for our data
         # compute texture pixels per screen pixels
         texture = texture or self.pixel_rez
-        tsy = max(1, np.floor(visible.dy * PREFERRED_SCREEN_TO_TEXTURE_RATIO / texture.dy))
-        tsx = max(1, np.floor(visible.dx * PREFERRED_SCREEN_TO_TEXTURE_RATIO / texture.dx))
+        tsy = max(1, np.ceil(visible.dy * PREFERRED_SCREEN_TO_TEXTURE_RATIO / texture.dy))
+        tsx = max(1, np.ceil(visible.dx * PREFERRED_SCREEN_TO_TEXTURE_RATIO / texture.dx))
         ts = min(tsy,tsx)
         stride = int(ts)
         return stride
