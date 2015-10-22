@@ -133,6 +133,17 @@ class AHI_HSF_Guidebook(Guidebook):
                 self._cache[each[INFO.UUID]] = md
                 yield each[INFO.UUID], md
 
+    def climits(self, dsi):
+        # Valid min and max for colormap use
+        nfo, = list(self._collect_info([dsi]))
+        uuid, md = nfo
+        if md[GUIDE.BAND] in [1, 2, 3, 4, 5, 6]:
+            # Reflectance/visible data limits
+            return -0.012, 1.192
+        else:
+            # BT data limits
+            return -109.0 + 273.15, 55 + 273.15
+
     def display_time(self, dsi):
         nfo, = list(self._collect_info([dsi]))
         uuid, md = nfo
