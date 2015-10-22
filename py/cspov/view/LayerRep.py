@@ -861,11 +861,12 @@ class TiledGeolocatedImageVisual(ImageVisual):
         """
         view_box = self.get_view_box()
         preferred_stride = self.calc.calc_stride(view_box)
-        _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride)
+        _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride, extra_tiles_box=box(1, 1, 1, 1))
+        num_tiles = (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l)
         LOG.debug("Assessment: Prefer '%s' have '%s', was looking at %r, now looking at %r",
                   preferred_stride, self._stride, self._latest_tile_box, tile_box)
         # If we zoomed out or we panned
-        need_retile = preferred_stride != self._stride or self._latest_tile_box != tile_box
+        need_retile = (num_tiles > 0) and (preferred_stride != self._stride or self._latest_tile_box != tile_box)
         return need_retile, preferred_stride, tile_box
 
     def retile(self, data, preferred_stride, tile_box):
