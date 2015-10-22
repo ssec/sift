@@ -247,13 +247,17 @@ class Workspace(QObject):
         if nfo is None:
             return None
         uuid, info, data_info = nfo
-        path, dtype, shape = data_info
-        FIXME FINISH THIS
-
+        dpath, dtype, shape = data_info
+        if not os.path.exists(dpath):
+            del self._inventory[key]
+            self._store_inventory()
+            return None
+        data = np.memmap(dpath, dtype=dtype, mode='c', shape=shape)
+        return uuid, info, data
 
     def _update_cache(self, path, uuid, info, data):
         """
-        add or update the cache
+        add or update the cache and put it to disk
         :param path: path to get key from
         :param uuid: uuid the data's been assigned
         :param info: dataset info dictionary
@@ -261,8 +265,10 @@ class Workspace(QObject):
         :return:
         """
         key = self._key_for_path(path)
-        FIXME FINISH THIS
-
+        data_info = (path, data.dtype, data.shape)
+        nfo = (uuid, info, data_info)
+        self._inventory[key] = nfo
+        self._store_inventory()
 
     def idle(self):
         """
