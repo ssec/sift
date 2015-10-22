@@ -112,17 +112,6 @@ class GeoTiffImporter(WorkspaceImporter):
 
         d[INFO.NAME] = os.path.split(source_path)[-1]
         d[INFO.PATHNAME] = source_path
-        item = re.findall(r'_(B\d\d)_', source_path)[-1]  # FIXME: this should be a guidebook
-        # Valid min and max for colormap use
-        margin = 0.005
-        if item in ["B01", "B02", "B03", "B04", "B05", "B06"]:
-            # Reflectance/visible data limits
-            # FIXME: Are these correct?
-            d[INFO.CLIM] = (0.0 - margin, 1.0)
-        else:
-            # BT data limits
-            # FIXME: Are these correct?
-            d[INFO.CLIM] = (-109.0 + 273.15 - margin, 55 + 273.15)
 
         # FIXME: read this into a numpy.memmap backed by disk in the workspace
         img_data = gtiff.GetRasterBand(1).ReadAsArray()
