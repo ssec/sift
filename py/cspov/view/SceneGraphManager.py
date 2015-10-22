@@ -200,7 +200,7 @@ class LayerSet(object):
         self._frame_order = frame_order
         self._frame_number = 0
         LOG.debug('accepted new frame order of length {}'.format(len(frame_order)))
-        if self._frame_change_cb is not None:
+        if self._frame_change_cb is not None and self._frame_order:
             uuid = self._frame_order[self._frame_number]
             self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating, uuid))
 
@@ -299,7 +299,7 @@ class LayerSet(object):
         self._set_visible_child(frame)
         self._frame_number = frame
         self.parent.update()
-        if self._frame_change_cb is not None:
+        if self._frame_change_cb is not None and lfo:
             uuid = self._frame_order[self._frame_number]
             self._frame_change_cb((self._frame_number, lfo, self._animating, uuid))
 
