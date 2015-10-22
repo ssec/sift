@@ -237,12 +237,31 @@ class Workspace(QObject):
             dump(self._inventory, fob, HIGHEST_PROTOCOL)
         shutil.move(atomic, self._inventory_path)
 
-    def import_from_cache(self, path):
+    def _check_cache(self, path):
         """
+        :param path: file we're checking
+        :return: uuid, info, overview_content if the data is already available without import
+        """
+        key = self._key_for_path(path)
+        nfo = self._inventory.get(key, None)
+        if nfo is None:
+            return None
+        uuid, info, data_info = nfo
+        path, dtype, shape = data_info
+        FIXME FINISH THIS
 
-        :param path: return uuid, info, overview_content if the data is already available without import
+
+    def _update_cache(self, path, uuid, info, data):
+        """
+        add or update the cache
+        :param path: path to get key from
+        :param uuid: uuid the data's been assigned
+        :param info: dataset info dictionary
+        :param data: numpy.memmap backed by a file in the workspace
         :return:
         """
+        key = self._key_for_path(path)
+        FIXME FINISH THIS
 
 
     def idle(self):
@@ -253,7 +272,7 @@ class Workspace(QObject):
         """
         return False
 
-    def import_image(self, source_path=None, source_uri=None):
+    def import_image(self, source_path=None, source_uri=None, allow_cache=True):
         """
         Start loading URI data into the workspace asynchronously.
 
@@ -263,8 +282,12 @@ class Workspace(QObject):
         if source_uri is not None and source_path is None:
             raise NotImplementedError('URI load not yet supported')
 
+        if allow_cache and source_path is not None:
+            nfo = self._check_cache(source_path)
+            if nfo is not None:
+                return nfo
+
         gen = None
-        # FIXME: check if the data is already in the workspace
         uuid = uuidgen()
         for imp in self._importers:
             if imp.is_relevant(source_path=source_path):
@@ -280,7 +303,9 @@ class Workspace(QObject):
                 data = self._data[uuid] = update.data
                 LOG.debug(repr(update))
         # copy the data into an anonymous memmap
-        self._data[uuid] = self._convert_to_memmap(data)
+        self._data[uuid] = data = self._convert_to_memmap(data)
+        if allow_cache:
+            self._update_cache(source_path, (uuid, info, data))
         return uuid, info, data
 
     def _convert_to_memmap(self, data:np.ndarray):
