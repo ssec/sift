@@ -161,7 +161,7 @@ class ProbeGraphManager (object) :
             doRebuild = graphObj is self.graphs[self.selected_graph_index]
             graphObj.set_possible_layers(uuid_list, do_rebuild_plot=doRebuild)
 
-    def currentPolygonChanged (self, selected_uuids, polygonPoints) :
+    def currentPolygonChanged (self, polygonPoints) :
         """Update the current polygon in the selected graph and rebuild it's plot
 
         FUTURE, once the polygon is a layer, this signal will be unnecessary
@@ -717,7 +717,7 @@ class Main(QtGui.QMainWindow):
             # TODO, when the plots manage their own layer selection, change this call
             # FUTURE, once the polygon is a layer, this will need to change
             # update our current plot with the new polygon
-            self.graphManager.currentPolygonChanged (selected_uuids, polygonPoints=points)
+            self.graphManager.currentPolygonChanged (polygonPoints=points)
 
             # do whatever other updates the scene manager needs
             self.scene_manager.on_new_polygon("default_name", points)
