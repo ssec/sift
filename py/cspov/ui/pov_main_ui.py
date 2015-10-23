@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created: Mon Oct 19 21:59:38 2015
+# Created: Thu Oct 22 16:35:08 2015
 #      by: PyQt4 UI code generator 4.11.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -26,7 +26,7 @@ except AttributeError:
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName(_fromUtf8("MainWindow"))
-        MainWindow.resize(1321, 807)
+        MainWindow.resize(1309, 807)
         MainWindow.setAcceptDrops(True)
         self.centralwidget = QtGui.QWidget(MainWindow)
         self.centralwidget.setObjectName(_fromUtf8("centralwidget"))
@@ -147,24 +147,32 @@ class Ui_MainWindow(object):
         self.verticalLayout_2.addWidget(self.groupBox)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtGui.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1321, 22))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 1309, 22))
         self.menubar.setObjectName(_fromUtf8("menubar"))
         MainWindow.setMenuBar(self.menubar)
         self.statusbar = QtGui.QStatusBar(MainWindow)
         self.statusbar.setObjectName(_fromUtf8("statusbar"))
         MainWindow.setStatusBar(self.statusbar)
-        self.probeAPane = QtGui.QDockWidget(MainWindow)
-        self.probeAPane.setObjectName(_fromUtf8("probeAPane"))
-        self.probeAWidget = QtGui.QWidget()
-        self.probeAWidget.setObjectName(_fromUtf8("probeAWidget"))
-        self.probeAPane.setWidget(self.probeAWidget)
-        MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.probeAPane)
-        self.probeBPane = QtGui.QDockWidget(MainWindow)
-        self.probeBPane.setObjectName(_fromUtf8("probeBPane"))
-        self.probeBWidget = QtGui.QWidget()
-        self.probeBWidget.setObjectName(_fromUtf8("probeBWidget"))
-        self.probeBPane.setWidget(self.probeBWidget)
-        MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.probeBPane)
+        self.areaProbePane = QtGui.QDockWidget(MainWindow)
+        self.areaProbePane.setObjectName(_fromUtf8("areaProbePane"))
+        self.probeWidget = QtGui.QWidget()
+        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.probeWidget.sizePolicy().hasHeightForWidth())
+        self.probeWidget.setSizePolicy(sizePolicy)
+        self.probeWidget.setObjectName(_fromUtf8("probeWidget"))
+        self.verticalLayout_12 = QtGui.QVBoxLayout(self.probeWidget)
+        self.verticalLayout_12.setObjectName(_fromUtf8("verticalLayout_12"))
+        self.probeTabWidget = QtGui.QTabWidget(self.probeWidget)
+        self.probeTabWidget.setMaximumSize(QtCore.QSize(16777215, 16777215))
+        self.probeTabWidget.setObjectName(_fromUtf8("probeTabWidget"))
+        self.tab_plus = QtGui.QWidget()
+        self.tab_plus.setObjectName(_fromUtf8("tab_plus"))
+        self.probeTabWidget.addTab(self.tab_plus, _fromUtf8(""))
+        self.verticalLayout_12.addWidget(self.probeTabWidget)
+        self.areaProbePane.setWidget(self.probeWidget)
+        MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.areaProbePane)
         self.layersPane = QtGui.QDockWidget(MainWindow)
         self.layersPane.setObjectName(_fromUtf8("layersPane"))
         self.dockWidgetContents_5 = QtGui.QWidget()
@@ -239,6 +247,7 @@ class Ui_MainWindow(object):
 
         self.retranslateUi(MainWindow)
         self.mainWidgets.setCurrentIndex(0)
+        self.probeTabWidget.setCurrentIndex(0)
         self.layerSetTabs.setCurrentIndex(0)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
@@ -264,8 +273,8 @@ class Ui_MainWindow(object):
         self.animPlayPause.setText(_translate("MainWindow", "▶", None))
         self.animForward.setStatusTip(_translate("MainWindow", "Step forward", None))
         self.animForward.setText(_translate("MainWindow", "▶|", None))
-        self.probeAPane.setWindowTitle(_translate("MainWindow", "A Probe", None))
-        self.probeBPane.setWindowTitle(_translate("MainWindow", "B Probe", None))
+        self.areaProbePane.setWindowTitle(_translate("MainWindow", "Area Probe Graphs", None))
+        self.probeTabWidget.setTabText(self.probeTabWidget.indexOf(self.tab_plus), _translate("MainWindow", "+", None))
         self.layersPane.setWindowTitle(_translate("MainWindow", "Layers", None))
         self.layerSetTabs.setToolTip(_translate("MainWindow", "Alternate layer sets", None))
         self.layerSetTabs.setStatusTip(_translate("MainWindow", "Select alternate layer set", None))
