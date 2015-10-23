@@ -45,12 +45,14 @@ from cspov.common import INFO, KIND
 
 import os
 import logging
+import numpy
 
 # http://stackoverflow.com/questions/12459811/how-to-embed-matplotib-in-pyqt-for-dummies
 # see also: http://matplotlib.org/users/navigation_toolbar.html
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
 from matplotlib.figure import Figure
+from matplotlib.colors import LogNorm
 
 LOG = logging.getLogger(__name__)
 PROGRESS_BAR_MAX = 1000
@@ -147,7 +149,7 @@ class ProbeGraphManager (object) :
 
         # load up the layers for this new tab
         uuid_list = self.document.current_layer_order
-        self.graphs[tab_index].set_possible_layers(uuid_list)
+        self.graphs[tab_index].set_possible_layers(uuid_list, do_rebuild_plot=True)
 
     def handleLayersChanged (self) :
         """Used when the document signals that something about the layers has changed
@@ -156,9 +158,10 @@ class ProbeGraphManager (object) :
         # reload the layer list for the existing graphs
         uuid_list = self.document.current_layer_order
         for graphObj in self.graphs :
-            graphObj.set_possible_layers(uuid_list)
+            doRebuild = graphObj is self.graphs[self.selected_graph_index]
+            graphObj.set_possible_layers(uuid_list, do_rebuild_plot=doRebuild)
 
-    def currentPolygonChanged (self, selected_uuids, polygonPoints) :
+    def currentPolygonChanged (self, polygonPoints) :
         """Update the current polygon in the selected graph and rebuild it's plot
 
         FUTURE, once the polygon is a layer, this signal will be unnecessary
@@ -178,14 +181,22 @@ class ProbeGraphManager (object) :
 
             self.set_up_tab(newTabIndex)
 
-        # otherwise, just update our current index
+        # otherwise, just update our current index and make sure the graph is fresh
         else :
             self.selected_graph_index = newTabIndex
+            self.graphs[self.selected_graph_index].rebuildPlot()
 
 class ProbeGraphDisplay (object) :
     """The ProbeGraphDisplay controls one tab of the Area Probe Graphs.
     The ProbeGraphDisplay handles generating a displaying a single graph.
     """
+
+    # the most data we are willing to plot in a scatter plot
+    # this limit was determined experimentally on Eva's laptop for glance, may need to revisit this
+    MAX_SCATTER_PLOT_DATA = 1e7
+
+    # the default number of bins for the histogram and density scatter plot
+    DEFAULT_NUM_BINS = 100
 
     # plotting related controls
     figure          = None
@@ -202,6 +213,7 @@ class ProbeGraphDisplay (object) :
     # internal values that control the behavior of plotting and controls
     xSelectedUUID   = None
     ySelectedUUID   = None
+    uuidMap         = None  # this is needed because the drop downs can't properly handle objects as ids
 
     def __init__(self, qt_parent, workspace):
         """build the graph tab controls
@@ -254,12 +266,12 @@ class ProbeGraphDisplay (object) :
         layout.addWidget(self.yDropDown, 4, 2, 1, 2)
         qt_parent.setLayout(layout)
 
-    def set_possible_layers (self, uuid_list) :
+    def set_possible_layers (self, uuid_list, do_rebuild_plot=False) :
         """Given a list of layer UUIDs, set the names and UUIDs in the drop downs
         """
 
         # make a uuid map because the mapping in a combo box doesn't work with objects
-        uuid_map = { }
+        self.uuidMap = { }
 
         # clear out the current lists
         self.xDropDown.clear()
@@ -273,49 +285,52 @@ class ProbeGraphDisplay (object) :
             self.xDropDown.addItem(layer_name, uuid_string)
             self.yDropDown.addItem(layer_name, uuid_string)
 
-            uuid_map[uuid_string] = uuid
+            self.uuidMap[uuid_string] = uuid
 
         # if possible, set the selections back to the way they were
         xIndex = self.xDropDown.findData(str(self.xSelectedUUID))
         if xIndex >= 0 :
             self.xDropDown.setCurrentIndex(xIndex)
-        else :
-            self.xSelectedUUID = uuid_map[self.xDropDown.itemData(0)]
+        elif self.xDropDown.count() > 0 :
+            self.xSelectedUUID = self.uuidMap[self.xDropDown.itemData(0)]
             self.xDropDown.setCurrentIndex(0)
+        else :
+            self.xSelectedUUID = None
         yIndex = self.yDropDown.findData(str(self.ySelectedUUID))
         if yIndex >= 0 :
             self.yDropDown.setCurrentIndex(yIndex)
-        else :
-            self.ySelectedUUID = uuid_map[self.yDropDown.itemData(0)]
+        elif self.yDropDown.count() > 0 :
+            self.ySelectedUUID = self.uuidMap[self.yDropDown.itemData(0)]
             self.yDropDown.setCurrentIndex(0)
+        else :
+            self.ySelectedUUID = None
 
-        # just in case, refresh the plot
-        self.rebuildPlot()
+        # refresh the plot
+        if do_rebuild_plot :
+            self.rebuildPlot()
 
     def xSelected (self) :
         """The user selected something in the X layer list.
         """
 
-        oldX = self.xSelectedUUID
-        self.xSelectedUUID = self.xDropDown.itemData(self.xDropDown.currentIndex())
-
-        #print("X UUID selected: " + str(self.xSelectedUUID))
+        oldXStr = str(self.xSelectedUUID)
+        newXStr = self.xDropDown.itemData(self.xDropDown.currentIndex())
+        self.xSelectedUUID = self.uuidMap[newXStr]
 
         # regenerate the plot
-        if oldX != self.xSelectedUUID :
+        if oldXStr != newXStr :
             self.rebuildPlot()
 
     def ySelected (self) :
         """The user selected something in the Y layer list.
         """
 
-        oldY = self.ySelectedUUID
-        self.ySelectedUUID = self.yDropDown.itemData(self.yDropDown.currentIndex())
-
-        #print("Y UUID selected: " + str(self.ySelectedUUID))
+        oldYStr = str(self.ySelectedUUID)
+        newYStr = self.yDropDown.itemData(self.yDropDown.currentIndex())
+        self.ySelectedUUID = self.uuidMap[newYStr]
 
         # regenerate the plot
-        if (oldY != self.ySelectedUUID) and self.yCheckBox.isChecked() :
+        if (oldYStr != newYStr) and self.yCheckBox.isChecked() :
             self.rebuildPlot()
 
     def vsChecked (self) :
@@ -385,7 +400,7 @@ class ProbeGraphDisplay (object) :
         """
         self.figure.clf()
         axes = self.figure.add_subplot(111)
-        axes.hist(data, bins=100)
+        axes.hist(data, bins=self.DEFAULT_NUM_BINS)
         axes.set_title(title)
         self.canvas.draw()
 
@@ -393,15 +408,64 @@ class ProbeGraphDisplay (object) :
         """Make a scatter plot of the x and y data
         """
 
+        # we should have the same size data here
+        assert(dataX.size == dataY.size)
+
+        if dataX.size > self.MAX_SCATTER_PLOT_DATA :
+            LOG.info("Too much data in selected region to generate scatter plot.")
+            self.clearPlot()
+            #self.plotDensityScatterplot(dataX, nameX, dataY, nameY)
+
+        else :
+            self.figure.clf()
+            axes = self.figure.add_subplot(111)
+            axes.scatter(dataX.flatten(), dataY.flatten(), color='b', s=1, alpha=0.5)
+            axes.set_xlabel(nameX)
+            axes.set_ylabel(nameY)
+            axes.set_title(nameX + " vs " + nameY)
+            self._draw_xy_line(axes)
+
+            self.canvas.draw()
+
+    # TODO, come back to this when we are properly backgrounding our plots
+    def plotDensityScatterplot (self, dataX, nameX, dataY, nameY) :
+        """Make a density scatter plot for the given data
+        """
+
+        # flatten our data
+        dataX = dataX.flatten()
+        dataY = dataY.flatten()
+
+        # clear the figure and make a new subplot
         self.figure.clf()
         axes = self.figure.add_subplot(111)
-        axes.scatter(dataX.flatten(), dataY.flatten(), color='b', s=1, alpha=0.5)
+
+        # figure out the range of the data
+        min_value = min(numpy.min(dataX), numpy.min(dataY))
+        max_value = max(numpy.max(dataX), numpy.max(dataY))
+        # bounds should be defined in the form [[xmin, xmax], [ymin, ymax]]
+        bounds = [[min_value, max_value], [min_value, max_value]]
+
+        # make the binned density map for this data set
+        density_map, _, _ = numpy.histogram2d(dataX, dataY, bins=self.DEFAULT_NUM_BINS, range=bounds)
+        # mask out zero counts; flip because y goes the opposite direction in an imshow graph
+        density_map = numpy.flipud(numpy.transpose(numpy.ma.masked_array(density_map, mask=density_map == 0)))
+
+        # display the density map data
+        axes.imshow(density_map, extent=[min_value, max_value, min_value, max_value],
+                    interpolation='nearest', norm=LogNorm())
+
+        # TODO make a colorbar
+        #colorbar = self.figure.colorbar()
+        #colorbar.set_label('log(count of data points)')
+
+        # set the various text labels
         axes.set_xlabel(nameX)
         axes.set_ylabel(nameY)
         axes.set_title(nameX + " vs " + nameY)
-        self._draw_xy_line(axes)
 
-        self.canvas.draw()
+        # draw the x vs y line
+        self._draw_xy_line(axes)
 
     def clearPlot (self) :
         """Clear our plot 
@@ -465,8 +529,9 @@ class Main(QtGui.QMainWindow):
     def update_progress_bar(self, status_info, *args, **kwargs):
         active = status_info[0]
         LOG.debug('{0!r:s}'.format(status_info))
-        val = active[TASK_PROGRESS]
+        # val = active[TASK_PROGRESS]
         txt = active[TASK_DOING]
+        val = self.queue.progress_ratio()
         self.ui.progressBar.setValue(int(val*PROGRESS_BAR_MAX))
         self.ui.progressText.setText(txt)
         #LOG.warning('progress bar updated to {}'.format(val))
@@ -571,7 +636,7 @@ class Main(QtGui.QMainWindow):
     #         self.behaviorLayersList.select([info[INFO.UUID]])
 
 
-    def __init__(self, workspace_dir=None, glob_pattern=None, border_shapefile=None):
+    def __init__(self, workspace_dir=None, workspace_size=None, glob_pattern=None, border_shapefile=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
@@ -583,7 +648,7 @@ class Main(QtGui.QMainWindow):
         self.queue.didMakeProgress.connect(self.update_progress_bar)
 
         # create document
-        self.workspace = Workspace(workspace_dir)
+        self.workspace = Workspace(workspace_dir, max_size_gb=workspace_size)
         self.document = doc = Document(self.workspace)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
                                                glob_pattern=glob_pattern,
@@ -652,7 +717,7 @@ class Main(QtGui.QMainWindow):
             # TODO, when the plots manage their own layer selection, change this call
             # FUTURE, once the polygon is a layer, this will need to change
             # update our current plot with the new polygon
-            self.graphManager.currentPolygonChanged (selected_uuids, polygonPoints=points)
+            self.graphManager.currentPolygonChanged (polygonPoints=points)
 
             # do whatever other updates the scene manager needs
             self.scene_manager.on_new_polygon("default_name", points)
@@ -674,6 +739,10 @@ class Main(QtGui.QMainWindow):
 
         self.setup_menu()
         self.graphManager = ProbeGraphManager(self.ui.probeTabWidget, self.workspace, self.document)
+
+    def closeEvent(self, event, *args, **kwargs):
+        LOG.debug('main window closing')
+        self.workspace.close()
 
     def toggle_animation(self, action:QtGui.QAction=None, *args):
         new_state = self.scene_manager.layer_set.toggle_animation()
@@ -783,6 +852,8 @@ def main():
     parser = argparse.ArgumentParser(description="Run CSPOV")
     parser.add_argument("-w", "--workspace", default='.',
                         help="Specify workspace base directory")
+    parser.add_argument("-s", "--space", default=256, type=int,
+                        help="Specify max amount of data to hold in workspace in Gigabytes")
     parser.add_argument("--border-shapefile", default=None,
                         help="Specify alternative coastline/border shapefile")
     parser.add_argument("--glob-pattern", default=os.environ.get("TIFF_GLOB", None),
@@ -800,6 +871,7 @@ def main():
     # app = QApplication(sys.argv)
     window = Main(
         workspace_dir=args.workspace,
+        workspace_size=args.space,
         glob_pattern=args.glob_pattern,
         border_shapefile=args.border_shapefile
     )
