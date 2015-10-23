@@ -121,6 +121,12 @@ class ProbeGraphManager (object) :
                                        QtCore.SIGNAL('currentChanged(int)'),
                                        self.handle_tab_change)
 
+        # hook up the various document signals that would mean we need to reload things
+        self.document.didReorderLayers.connect(self.handleLayersChanged)
+        self.document.didChangeLayerName.connect(self.handleLayersChanged)
+        self.document.didAddLayer.connect(self.handleLayersChanged)
+        self.document.willPurgeLayer.connect(self.handleLayersChanged)
+
     def set_up_tab (self, tab_index, do_increment_tab_letter=True) :
         """Create a new tab at tab_index and add it to the list of graphs
         """
@@ -139,9 +145,18 @@ class ProbeGraphManager (object) :
         # go to the tab we just created
         self.tab_widget_object.setCurrentIndex(tab_index)
 
-        # TODO, this should be hooked up to a signal properly
+        # load up the layers for this new tab
         uuid_list = self.document.current_layer_order
         self.graphs[tab_index].set_possible_layers(uuid_list)
+
+    def handleLayersChanged (self) :
+        """Used when the document signals that something about the layers has changed
+        """
+
+        # reload the layer list for the existing graphs
+        uuid_list = self.document.current_layer_order
+        for graphObj in self.graphs :
+            graphObj.set_possible_layers(uuid_list)
 
     def currentPolygonChanged (self, selected_uuids, polygonPoints) :
         """Update the current polygon in the selected graph and rebuild it's plot
@@ -243,6 +258,9 @@ class ProbeGraphDisplay (object) :
         """Given a list of layer UUIDs, set the names and UUIDs in the drop downs
         """
 
+        # make a uuid map because the mapping in a combo box doesn't work with objects
+        uuid_map = { }
+
         # clear out the current lists
         self.xDropDown.clear()
         self.yDropDown.clear()
@@ -251,22 +269,28 @@ class ProbeGraphDisplay (object) :
         for uuid in uuid_list :
 
             layer_name = self.workspace.get_info(uuid)[INFO.NAME]
-            self.xDropDown.addItem(layer_name, uuid)
-            self.yDropDown.addItem(layer_name, uuid)
+            uuid_string = str(uuid)
+            self.xDropDown.addItem(layer_name, uuid_string)
+            self.yDropDown.addItem(layer_name, uuid_string)
+
+            uuid_map[uuid_string] = uuid
 
         # if possible, set the selections back to the way they were
-        xIndex = self.xDropDown.findData(self.xSelectedUUID)
+        xIndex = self.xDropDown.findData(str(self.xSelectedUUID))
         if xIndex >= 0 :
             self.xDropDown.setCurrentIndex(xIndex)
         else :
-            self.xSelectedUUID = self.xDropDown.itemData(0)
+            self.xSelectedUUID = uuid_map[self.xDropDown.itemData(0)]
             self.xDropDown.setCurrentIndex(0)
-        yIndex = self.yDropDown.findData(self.ySelectedUUID)
+        yIndex = self.yDropDown.findData(str(self.ySelectedUUID))
         if yIndex >= 0 :
             self.yDropDown.setCurrentIndex(yIndex)
         else :
-            self.ySelectedUUID = self.yDropDown.itemData(0)
+            self.ySelectedUUID = uuid_map[self.yDropDown.itemData(0)]
             self.yDropDown.setCurrentIndex(0)
+
+        # just in case, refresh the plot
+        self.rebuildPlot()
 
     def xSelected (self) :
         """The user selected something in the X layer list.
