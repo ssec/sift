@@ -157,7 +157,7 @@ class Document(QObject):
         :param datasetinfo: dictionary of metadata about dataset
         :return: enhancement info and siblings participating in the enhancement
         """
-        return None
+        return self._guidebook.default_colormap(datasetinfo)
 
     @property
     def current_layer_set(self):

@@ -144,6 +144,14 @@ class AHI_HSF_Guidebook(Guidebook):
             # BT data limits
             return -109.0 + 273.15, 55 + 273.15
 
+    def default_colormap(self, dsi):
+        nfo, = list(self._collect_info([dsi]))
+        uuid, md = nfo
+        if md[GUIDE.BAND] in [1, 2, 3, 4, 5, 6]:
+            return "za_vis_default"
+        else:
+            return "circa_ir_default"
+
     def display_time(self, dsi):
         nfo, = list(self._collect_info([dsi]))
         uuid, md = nfo
