@@ -246,7 +246,7 @@ class LayerStackListViewModel(QAbstractListModel):
         for q in lbox.selectedIndexes():
             yield self.doc.uuid_for_layer(q.row())
 
-    def select(self, uuids, lbox:QListView=None):
+    def select(self, uuids, lbox:QListView=None, scroll_to_show_single=True):
         lbox = self.current_set_listbox if lbox is None else lbox
         lbox.clearSelection()
         if not uuids:
@@ -260,6 +260,8 @@ class LayerStackListViewModel(QAbstractListModel):
             items.select(q, q)
             lbox.selectionModel().select(items, QItemSelectionModel.Select)
             # lbox.setCurrentIndex(q)
+        if scroll_to_show_single and len(uuids)==1:
+            lbox.scrollTo(q)
 
     def menu(self, pos:QPoint, *args):
         LOG.info('menu requested for layer list')
