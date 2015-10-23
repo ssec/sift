@@ -37,7 +37,7 @@ from PyQt4.QtCore import QObject, pyqtSignal
 LOG = logging.getLogger(__name__)
 
 DEFAULT_WORKSPACE_SIZE = 256
-MIN_WORKSPACE_SIZE = 32
+MIN_WORKSPACE_SIZE = 8
 
 import_progress = namedtuple('import_progress', ['uuid', 'stages', 'current_stage', 'completion', 'stage_desc', 'dataset_info', 'data'])
 # stages:int, number of stages this import requires
