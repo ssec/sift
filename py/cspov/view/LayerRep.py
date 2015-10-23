@@ -467,6 +467,8 @@ _texture_lookup = """
             val.r = clamp(val.r, $vmax, $vmin);
         }
         val.r = (val.r-$vmin)/($vmax-$vmin);
+        val.g = val.r;
+        val.b = val.r;
 
         return val;
     }"""

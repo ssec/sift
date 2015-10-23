@@ -132,7 +132,7 @@ class Document(QObject):
     _guidebook = None  # FUTURE: this is currently an AHI_HSF_Guidebook, make it a general guidebook
 
     # signals
-    didAddLayer = pyqtSignal(list, dict, np.ndarray)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
+    didAddLayer = pyqtSignal(list, dict, prez, np.ndarray)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
     didRemoveLayer = pyqtSignal(list, UUID)  # new order, UUID that was removed from current layer set
     willPurgeLayer = pyqtSignal(UUID)  # UUID of the layer being removed
     didReorderLayers = pyqtSignal(list)  # list of original indices in their new order, None for new layers
@@ -157,7 +157,7 @@ class Document(QObject):
         :param datasetinfo: dictionary of metadata about dataset
         :return: enhancement info and siblings participating in the enhancement
         """
-        return None
+        return self._guidebook.default_colormap(datasetinfo)
 
     @property
     def current_layer_set(self):
@@ -186,13 +186,13 @@ class Document(QObject):
         self._layer_with_uuid[uuid] = info
 
         # add as visible to the front of the current set, and invisible to the rest of the available sets
-        colormap = self._default_colormap(info)
+        cmap = self._default_colormap(info)
         info[INFO.CLIM] = self._guidebook.climits(info)
         p = prez(uuid=uuid,
                  kind=info[INFO.KIND],
                  visible=True,
                  a_order=None,
-                 colormap=colormap,
+                 colormap=cmap,
                  mixing=mixing.NORMAL)
         q = p._replace(visible=False)
         old_layer_count = len(self._layer_sets[self.current_set_index])
@@ -202,7 +202,7 @@ class Document(QObject):
 
         reordered_indices = [None] + list(range(old_layer_count))
         # signal updates from the document
-        self.didAddLayer.emit(reordered_indices, info, content)
+        self.didAddLayer.emit(reordered_indices, info, p, content)
         if info[INFO.KIND]==KIND.IMAGE:  # TODO: decide if this is correct and useful behavior
             self.animate_siblings_of_layer(uuid)
 

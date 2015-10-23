@@ -35,7 +35,8 @@ from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND
 from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.view.MapWidget import CspovMainMapCanvas
 from cspov.view.Cameras import PanZoomProbeCamera
-from cspov.view.Colormap import all_colormaps
+from cspov.view.Colormap import ALL_COLORMAPS
+from cspov.model.document import prez
 from cspov.queue import TASK_DOING, TASK_PROGRESS
 
 from PyQt4.QtCore import QObject, pyqtSignal
@@ -328,7 +329,7 @@ class SceneGraphManager(QObject):
         self.image_layers = {}
         self.datasets = {}
         self.colormaps = {}
-        self.colormaps.update(all_colormaps)
+        self.colormaps.update(ALL_COLORMAPS)
         self.layer_set = LayerSet(self, frame_change_cb=self.frame_changed)
 
         self.set_document(self.document)
@@ -478,9 +479,13 @@ class SceneGraphManager(QObject):
         for uuid in uuids:
             self.image_layers[uuid].clim = self.image_layers[uuid].clim[::-1]
 
-    def set_colormap(self, colormap, uuid=None):
+    def _find_colormap(self, colormap):
         if isinstance(colormap, str) and colormap in self.colormaps:
             colormap = self.colormaps[colormap]
+        return colormap
+
+    def set_colormap(self, colormap, uuid=None):
+        colormap = self._find_colormap(colormap)
 
         uuids = uuid
         if uuid is None:
@@ -498,7 +503,7 @@ class SceneGraphManager(QObject):
         for uuid,cmapid in change_dict.items():
             self.set_colormap(cmapid, uuid)
 
-    def add_layer(self, new_order:list, ds_info:dict, overview_content:np.ndarray):
+    def add_layer(self, new_order:list, ds_info:dict, p:prez, overview_content:np.ndarray):
         uuid = ds_info[INFO.UUID]
         # create a new layer in the imagelist
         image = TiledGeolocatedImage(
@@ -511,7 +516,7 @@ class SceneGraphManager(QObject):
             clim=ds_info[INFO.CLIM],
             interpolation='nearest',
             method='tiled',
-            cmap='grays',
+            cmap=self._find_colormap(p.colormap),
             double=False,
             texture_shape=DEFAULT_TEXTURE_SHAPE,
             wrap_lon=False,

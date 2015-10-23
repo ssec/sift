@@ -42,12 +42,12 @@ from PyQt4.QtCore import QAbstractListModel, QAbstractTableModel, QVariant, Qt, 
 from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyleOptionViewItem, QItemSelection, QItemSelectionModel
 from cspov.model.document import Document
 from cspov.common import INFO, KIND
-from cspov.view.Colormap import all_colormaps
+from cspov.view.Colormap import ALL_COLORMAPS, CATEGORIZED_COLORMAPS
 
 LOG = logging.getLogger(__name__)
 
 # FIXME: DRY violation
-COLOR_MAP_LIST = ["grays", "autumn", "fire", "hot", "winter"] + list(all_colormaps.keys())
+COLOR_MAP_LIST = ["grays", "autumn", "fire", "hot", "winter"] + list(ALL_COLORMAPS.keys())
 
 COLUMNS=('Visibility', 'Name', 'Enhancement')
 
@@ -268,15 +268,18 @@ class LayerStackListViewModel(QAbstractListModel):
         menu = QMenu()
         actions = {}
         lbox = self.current_set_listbox
-        for colormap in COLOR_MAP_LIST:
-            actions[menu.addAction(colormap)] = colormap
+        for cat, cat_colormaps in CATEGORIZED_COLORMAPS.items():
+            submenu = QMenu(cat, parent=menu)
+            for colormap in cat_colormaps.keys():
+                actions[submenu.addAction(colormap)] = colormap
+            menu.addMenu(submenu)
         sel = menu.exec_(lbox.mapToGlobal(pos))
         new_cmap = actions.get(sel, None)
         selected_uuids = list(self.current_selected_uuids(lbox))
         LOG.debug("selected UUID set is {0!r:s}".format(selected_uuids))
         if new_cmap is not None:
             LOG.info("changing to colormap {0} for ids {1!r:s}".format(new_cmap, selected_uuids))
-            self.doc.change_colormap_for_layers(name=new_cmap) # FIXME, uuids=selected_uuids)
+            self.doc.change_colormap_for_layers(name=new_cmap, uuids=selected_uuids)
 
     @property
     def listing(self):
