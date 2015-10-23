@@ -46,6 +46,7 @@ class TaskQueue(QThread):
     process_pool = None  # process pool for background activity
     thread_pool = None  # thread pool for background activity
     queue = None
+    depth = 0
 
     didMakeProgress = pyqtSignal(list)  # sequence of dictionaries listing update information to be propagated to view
     # started : inherited
@@ -76,6 +77,7 @@ class TaskQueue(QThread):
         :return:
         """
         self.queue.append(task_iterable)
+        self.depth += 1
         self.start()  # safe if already running
 
     def _did_progress(self, task_status):
@@ -87,6 +89,14 @@ class TaskQueue(QThread):
         # FIXME: this should have entries for the upcoming stuff as well so we can have an Activity panel
         info = [task_status]
         self.didMakeProgress.emit(info)
+
+    def progress_ratio(self):
+        lq = len(self.queue)
+        if lq==0:
+            self.depth = 0
+            return 0.0
+        else:
+            return float(self.depth - lq) / self.depth
 
     def run(self):
         while len(self.queue)>0:

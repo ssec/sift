@@ -148,8 +148,9 @@ class Main(QtGui.QMainWindow):
     def update_progress_bar(self, status_info, *args, **kwargs):
         active = status_info[0]
         LOG.debug('{0!r:s}'.format(status_info))
-        val = active[TASK_PROGRESS]
+        # val = active[TASK_PROGRESS]
         txt = active[TASK_DOING]
+        val = self.queue.progress_ratio()
         self.ui.progressBar.setValue(int(val*PROGRESS_BAR_MAX))
         self.ui.progressText.setText(txt)
         #LOG.warning('progress bar updated to {}'.format(val))
