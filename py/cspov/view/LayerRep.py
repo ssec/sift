@@ -767,8 +767,10 @@ class TiledGeolocatedImageVisual(ImageVisual):
                 y_end = y_start + self.tile_shape[0]
                 x_start = virt_tix * self.tile_shape[1]
                 x_end = x_start + self.tile_shape[1]
-                tile_data = data[y_start: y_end, x_start: x_end]
-
+                # force a copy of the data from the content array (provided by the workspace) to a vispy-compatible contiguous float array
+                # this can be a potentially time-expensive operation since content array is often huge and always memory-mapped, so paging may occur
+                # we don't want this paging deferred until we're back in the GUI thread pushing data to OpenGL!
+                tile_data = np.array(data[y_start: y_end, x_start: x_end], dtype=np.float32)
                 tiles_info.append((stride, tiy, tix, tex_tile_idx, tile_data))
 
         return tiles_info
