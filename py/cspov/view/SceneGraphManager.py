@@ -448,7 +448,14 @@ class SceneGraphManager(QObject):
         z = float(kwargs.get("z", 50))
         poly = Polygon(parent=self.main_map, pos=points, **kwargs)
         poly.transform = STTransform(translate=(0, 0, z))
+        if probe_name in self.polygon_probes :
+            self.polygon_probes[probe_name].parent = None
         self.polygon_probes[probe_name] = poly
+
+    def show_only_polygons(self, list_of_polygon_names_to_show) :
+        temp_set = set(list_of_polygon_names_to_show)
+        for polygon_name in self.polygon_probes.keys() :
+            self.polygon_probes[polygon_name].visible = polygon_name in temp_set
 
     def update(self):
         return self.main_canvas.update()
