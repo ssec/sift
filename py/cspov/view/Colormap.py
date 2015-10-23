@@ -163,10 +163,15 @@ ramsdis_wv = Colormap(colors=_ramsdis_wv_colors, controls=_ramsdis_wv_control_po
 slc_wv = Colormap(colors=_slc_wv_colors, controls=_slc_wv_control_points)
 
 
+_sqroot12_control_points = (0.0, 0.0009765625, 0.00390625, 0.0087890625, 0.015625, 0.0244140625, 0.03515625, 0.0478515625, 0.0625, 0.0791015625, 0.09765625, 0.1181640625, 0.140625, 0.1650390625, 0.19140625, 0.2197265625, 0.25, 0.2822265625, 0.31640625, 0.3525390625, 0.390625, 0.4306640625, 0.47265625, 0.5166015625, 0.5625, 0.6103515625, 0.66015625, 0.7119140625, 0.765625, 0.8212890625, 0.87890625, 0.9384765625, 1.0)
+_sqroot12_colors = ('#000000', '#070707', '#0f0f0f', '#171717', '#1f1f1f', '#272727', '#2f2f2f', '#373737', '#3f3f3f', '#474747', '#4f4f4f', '#575757', '#5f5f5f', '#676767', '#6f6f6f', '#777777', '#7f7f7f', '#878787', '#8f8f8f', '#979797', '#9f9f9f', '#a7a7a7', '#afafaf', '#b7b7b7', '#bfbfbf', '#c7c7c7', '#cfcfcf', '#d7d7d7', '#dfdfdf', '#e7e7e7', '#efefef', '#f7f7f7', '#ffffff')
+sqroot12 = Colormap(colors=_sqroot12_colors, controls=_sqroot12_control_points)
+
 VIS_COLORMAPS = OrderedDict([
     ('CA (Low Light Vis)', ca_low_light_vis),
     ('Linear', linear),
     ('ZA (Vis Default)', za_vis_default),
+    ('Square Root', sqroot12),
 ])
 
 IR_COLORMAPS = OrderedDict([
