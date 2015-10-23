@@ -162,28 +162,68 @@ ramsdis_wv = Colormap(colors=_ramsdis_wv_colors, controls=_ramsdis_wv_control_po
 slc_wv = Colormap(colors=_slc_wv_colors, controls=_slc_wv_control_points)
 
 
-all_colormaps = {
-    'cloud_amount_default':cloud_amount_default,
-    'cloud_top_height':cloud_top_height,
-    'low_cloud_base':low_cloud_base,
-    'rain_rate':rain_rate,
-    'circa_ir_default': cira_ir_default,
-    'fog':fog,
-    'ir_wv':ir_wv,
-    'lifted_index__new_cimss_table':lifted_index__new_cimss_table,
-    'lifted_index_default':lifted_index_default,
-    'blended_total_precip_water':blended_total_precip_water,
-    'percent_of_normal_tpw':percent_of_normal_tpw,
-    'precip_water__new_cimss_table':precip_water__new_cimss_table,
-    'precip_water__polar':precip_water__polar,
-    'precip_water_default':precip_water_default,
-    'skin_temp__new_cimss_table':skin_temp__new_cimss_table,
-    'skin_temp_default':skin_temp_default,
-    'ca_low_light_vis':ca_low_light_vis,
-    'linear':linear,
-    'za_vis_default':za_vis_default,
-    'gray_scale_water_vapor':gray_scale_water_vapor,
-    'nssl_vas_wv_alternate':nssl_vas_wv_alternate,
-    'ramsdis_wv':ramsdis_wv,
-    'slc_wv':slc_wv
+VIS_COLORMAPS = {
+    'CA (Low Light Vis)': ca_low_light_vis,
+    'Linear': linear,
+    'ZA (Vis Default)': za_vis_default,
 }
+
+IR_COLORMAPS = {
+    'CIRCA IR (IR Default)': cira_ir_default,
+    'Fog': fog,
+    'IR WV': ir_wv,
+}
+
+LIFTED_INDEX_COLORMAPS = {
+    'Lifted Index (New CIMSS)': lifted_index__new_cimss_table,
+    'Lifted Index': lifted_index_default,
+}
+
+PRECIP_COLORMAPS = {
+    'Blended TPW': blended_total_precip_water,
+    'Percent of Normal TPW': percent_of_normal_tpw,
+    'Precipitable Water (New CIMSS)': precip_water__new_cimss_table,
+    'Precipitable Water (Polar)': precip_water__polar,
+    'Precipitable Water': precip_water_default,
+}
+
+SKIN_TEMP_COLORMAPS = {
+    'Skin Temp (New CIMSS)': skin_temp__new_cimss_table,
+    'Skin Temp': skin_temp_default,
+}
+
+WV_COLORMAPS = {
+    'Gray Scale Water Vapor': gray_scale_water_vapor,
+    'NSSL VAS (WV Alternate)': nssl_vas_wv_alternate,
+    'RAMSDIS WV': ramsdis_wv,
+    'SLC WV': slc_wv,
+}
+
+OTHER_COLORMAPS = {
+    'Rain Rate': rain_rate,
+    'Low Cloud Base': low_cloud_base,
+    'Cloud Amount': cloud_amount_default,
+    'Cloud Top Height': cloud_top_height,
+}
+
+ALL_COLORMAPS = {}
+ALL_COLORMAPS.update(VIS_COLORMAPS)
+ALL_COLORMAPS.update(IR_COLORMAPS)
+ALL_COLORMAPS.update(LIFTED_INDEX_COLORMAPS)
+ALL_COLORMAPS.update(PRECIP_COLORMAPS)
+ALL_COLORMAPS.update(SKIN_TEMP_COLORMAPS)
+ALL_COLORMAPS.update(WV_COLORMAPS)
+ALL_COLORMAPS.update(OTHER_COLORMAPS)
+
+COLORMAPS_CATEGORIZED = {
+    "Visible": VIS_COLORMAPS,
+    "IR": IR_COLORMAPS,
+    "Lifted Index": LIFTED_INDEX_COLORMAPS,
+    "Precipitable Water": PRECIP_COLORMAPS,
+    "Skin Temperature": SKIN_TEMP_COLORMAPS,
+    "Water Vapor": WV_COLORMAPS,
+    "Other": OTHER_COLORMAPS,
+}
+
+DEFAULT_VIS = "ZA (Vis Default)"
+DEFAULT_IR = "CIRCA IR (IR Default)"

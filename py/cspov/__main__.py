@@ -34,7 +34,7 @@ from cspov.model import Document
 from cspov.view.SceneGraphManager import SceneGraphManager
 from cspov.queue import TaskQueue, test_task, TASK_PROGRESS, TASK_DOING
 from cspov.workspace import Workspace
-from vispy.color.colormap import Colormap
+from cspov.view.Colormap import ALL_COLORMAPS
 
 from functools import partial
 
@@ -450,7 +450,7 @@ class Main(QtGui.QMainWindow):
                 self.index = 0
                 self.key = key
                 self.sgm = sgm
-                self.colormaps = ["grays", "autumn", "fire", "hot", "winter", "rain_rate", "cloud_amount_default", "cloud_top_height", "low_cloud_base"]
+                self.colormaps = ALL_COLORMAPS.keys()
 
             def __call__(self, key):
                 if key.text == self.key:
