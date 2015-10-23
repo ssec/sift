@@ -28,6 +28,7 @@ except Exception:
     app_object = app.use_app('pyside')
 QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
+from PyQt4.QtCore import QObject, pyqtSignal
 
 from cspov.control.layer_list import LayerStackListViewModel
 from cspov.model import Document
@@ -85,9 +86,12 @@ def test_layers(ws, doc, glob_pattern=None):
     LOG.warning("No image glob pattern provided")
     return []
 
-class ProbeGraphManager (object) :
+class ProbeGraphManager (QObject) :
     """The ProbeGraphManager manages the many tabs of the Area Probe Graphs.
     """
+
+    # signals
+    didChangeTab = pyqtSignal(list,)  # list of probe areas to show
 
     graphs = None
     selected_graph_index = -1
@@ -101,6 +105,8 @@ class ProbeGraphManager (object) :
 
         FUTURE, once we are saving our graph configurations, load those instead of setting up this default.
         """
+
+        super(ProbeGraphManager, self).__init__(tab_widget)
 
         # hang on to the workspace and document
         self.workspace = workspace
@@ -142,7 +148,7 @@ class ProbeGraphManager (object) :
         self.tab_widget_object.insertTab(tab_index, temp_widget, self.max_tab_letter)
 
         # create the associated graph display object
-        self.graphs.append(ProbeGraphDisplay(temp_widget, self.workspace)) # FUTURE, check that the index means we added the tab at the end?
+        self.graphs.append(ProbeGraphDisplay(temp_widget, self.workspace, self.max_tab_letter))
 
         # go to the tab we just created
         self.tab_widget_object.setCurrentIndex(tab_index)
@@ -167,7 +173,7 @@ class ProbeGraphManager (object) :
         FUTURE, once the polygon is a layer, this signal will be unnecessary
         """
 
-        self.graphs[self.selected_graph_index].setPolygon (polygonPoints)
+        return self.graphs[self.selected_graph_index].setPolygon (polygonPoints)
 
     def handle_tab_change (self, ) :
         """deal with the fact that the tab changed in the tab widget
@@ -186,6 +192,9 @@ class ProbeGraphManager (object) :
             self.selected_graph_index = newTabIndex
             self.graphs[self.selected_graph_index].rebuildPlot()
 
+        currentName = self.graphs[self.selected_graph_index].getName()
+        self.didChangeTab.emit([currentName])
+
 class ProbeGraphDisplay (object) :
     """The ProbeGraphDisplay controls one tab of the Area Probe Graphs.
     The ProbeGraphDisplay handles generating a displaying a single graph.
@@ -197,6 +206,9 @@ class ProbeGraphDisplay (object) :
 
     # the default number of bins for the histogram and density scatter plot
     DEFAULT_NUM_BINS = 100
+
+    # the display name of the probe, should be unique across all probes
+    myName          = None
 
     # plotting related controls
     figure          = None
@@ -215,10 +227,13 @@ class ProbeGraphDisplay (object) :
     ySelectedUUID   = None
     uuidMap         = None  # this is needed because the drop downs can't properly handle objects as ids
 
-    def __init__(self, qt_parent, workspace):
+    def __init__(self, qt_parent, workspace, name_str):
         """build the graph tab controls
         :return:
         """
+
+        # hang on to our name
+        self.myName = name_str
 
         # save the workspace for use later
         self.workspace = workspace
@@ -352,6 +367,14 @@ class ProbeGraphDisplay (object) :
 
         # regenerate the plot
         self.rebuildPlot()
+
+        # return our name to be used for the polygon name
+        return self.myName
+
+    def getName (self) :
+        """Accessor method for the graph's name
+        """
+        return self.myName
 
     def rebuildPlot (self, ) :
         """Given what we currently know about the selection area and selected bands, rebuild our plot
@@ -717,10 +740,10 @@ class Main(QtGui.QMainWindow):
             # TODO, when the plots manage their own layer selection, change this call
             # FUTURE, once the polygon is a layer, this will need to change
             # update our current plot with the new polygon
-            self.graphManager.currentPolygonChanged (polygonPoints=points)
+            polygon_name = self.graphManager.currentPolygonChanged (polygonPoints=points)
 
             # do whatever other updates the scene manager needs
-            self.scene_manager.on_new_polygon("default_name", points)
+            self.scene_manager.on_new_polygon(polygon_name, points)
 
         self.scene_manager.newProbePolygon.connect(update_probe_polygon)
 
@@ -739,6 +762,7 @@ class Main(QtGui.QMainWindow):
 
         self.setup_menu()
         self.graphManager = ProbeGraphManager(self.ui.probeTabWidget, self.workspace, self.document)
+        self.graphManager.didChangeTab.connect(self.scene_manager.show_only_polygons)
 
     def closeEvent(self, event, *args, **kwargs):
         LOG.debug('main window closing')
