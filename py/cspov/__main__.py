@@ -465,8 +465,9 @@ class Main(QtGui.QMainWindow):
     def update_progress_bar(self, status_info, *args, **kwargs):
         active = status_info[0]
         LOG.debug('{0!r:s}'.format(status_info))
-        val = active[TASK_PROGRESS]
+        # val = active[TASK_PROGRESS]
         txt = active[TASK_DOING]
+        val = self.queue.progress_ratio()
         self.ui.progressBar.setValue(int(val*PROGRESS_BAR_MAX))
         self.ui.progressText.setText(txt)
         #LOG.warning('progress bar updated to {}'.format(val))
@@ -571,7 +572,7 @@ class Main(QtGui.QMainWindow):
     #         self.behaviorLayersList.select([info[INFO.UUID]])
 
 
-    def __init__(self, workspace_dir=None, glob_pattern=None, border_shapefile=None):
+    def __init__(self, workspace_dir=None, workspace_size=None, glob_pattern=None, border_shapefile=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
@@ -583,7 +584,7 @@ class Main(QtGui.QMainWindow):
         self.queue.didMakeProgress.connect(self.update_progress_bar)
 
         # create document
-        self.workspace = Workspace(workspace_dir)
+        self.workspace = Workspace(workspace_dir, max_size_gb=workspace_size)
         self.document = doc = Document(self.workspace)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
                                                glob_pattern=glob_pattern,
@@ -674,6 +675,10 @@ class Main(QtGui.QMainWindow):
 
         self.setup_menu()
         self.graphManager = ProbeGraphManager(self.ui.probeTabWidget, self.workspace, self.document)
+
+    def closeEvent(self, event, *args, **kwargs):
+        LOG.debug('main window closing')
+        self.workspace.close()
 
     def toggle_animation(self, action:QtGui.QAction=None, *args):
         new_state = self.scene_manager.layer_set.toggle_animation()
@@ -783,6 +788,8 @@ def main():
     parser = argparse.ArgumentParser(description="Run CSPOV")
     parser.add_argument("-w", "--workspace", default='.',
                         help="Specify workspace base directory")
+    parser.add_argument("-s", "--space", default=256, type=int,
+                        help="Specify max amount of data to hold in workspace in Gigabytes")
     parser.add_argument("--border-shapefile", default=None,
                         help="Specify alternative coastline/border shapefile")
     parser.add_argument("--glob-pattern", default=os.environ.get("TIFF_GLOB", None),
@@ -800,6 +807,7 @@ def main():
     # app = QApplication(sys.argv)
     window = Main(
         workspace_dir=args.workspace,
+        workspace_size=args.space,
         glob_pattern=args.glob_pattern,
         border_shapefile=args.border_shapefile
     )
