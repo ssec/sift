@@ -274,7 +274,7 @@ class LayerStackListViewModel(QAbstractListModel):
         LOG.debug("selected UUID set is {0!r:s}".format(selected_uuids))
         if new_cmap is not None:
             LOG.info("changing to colormap {0} for ids {1!r:s}".format(new_cmap, selected_uuids))
-            self.doc.change_colormap_for_layers(name=new_cmap) # FIXME, uuids=selected_uuids)
+            self.doc.change_colormap_for_layers(name=new_cmap, uuids=selected_uuids)
 
     @property
     def listing(self):
