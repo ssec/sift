@@ -42,7 +42,7 @@ from PyQt4.QtCore import QAbstractListModel, QAbstractTableModel, QVariant, Qt, 
 from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyleOptionViewItem, QItemSelection, QItemSelectionModel
 from cspov.model.document import Document
 from cspov.common import INFO, KIND
-from cspov.view.Colormap import ALL_COLORMAPS
+from cspov.view.Colormap import ALL_COLORMAPS, CATEGORIZED_COLORMAPS
 
 LOG = logging.getLogger(__name__)
 
@@ -266,8 +266,11 @@ class LayerStackListViewModel(QAbstractListModel):
         menu = QMenu()
         actions = {}
         lbox = self.current_set_listbox
-        for colormap in COLOR_MAP_LIST:
-            actions[menu.addAction(colormap)] = colormap
+        for cat, cat_colormaps in CATEGORIZED_COLORMAPS.items():
+            submenu = QMenu(cat, parent=menu)
+            for colormap in cat_colormaps.keys():
+                actions[submenu.addAction(colormap)] = colormap
+            menu.addMenu(submenu)
         sel = menu.exec_(lbox.mapToGlobal(pos))
         new_cmap = actions.get(sel, None)
         selected_uuids = list(self.current_selected_uuids(lbox))

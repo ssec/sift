@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
+# -*- coding, utf-8 -*-
 """
 .py
 ~~~
@@ -13,14 +13,15 @@ REFERENCES
 REQUIRES
 
 
-:author: R.K.Garcia <rayg@ssec.wisc.edu>
-:copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
-:license: GPLv3, see LICENSE for more details
+,author: R.K.Garcia <rayg@ssec.wisc.edu>
+,copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
+,license: GPLv3, see LICENSE for more details
 """
 __docformat__ = 'reStructuredText'
 __author__ = 'cphillips'
 
 from vispy.color import Colormap
+from collections import OrderedDict
 
 _cloud_amount_default_control_points = (
     0.0,
@@ -162,49 +163,49 @@ ramsdis_wv = Colormap(colors=_ramsdis_wv_colors, controls=_ramsdis_wv_control_po
 slc_wv = Colormap(colors=_slc_wv_colors, controls=_slc_wv_control_points)
 
 
-VIS_COLORMAPS = {
-    'CA (Low Light Vis)': ca_low_light_vis,
-    'Linear': linear,
-    'ZA (Vis Default)': za_vis_default,
-}
+VIS_COLORMAPS = OrderedDict([
+    ('CA (Low Light Vis)', ca_low_light_vis),
+    ('Linear', linear),
+    ('ZA (Vis Default)', za_vis_default),
+])
 
-IR_COLORMAPS = {
-    'CIRCA IR (IR Default)': cira_ir_default,
-    'Fog': fog,
-    'IR WV': ir_wv,
-}
+IR_COLORMAPS = OrderedDict([
+    ('CIRCA IR (IR Default)', cira_ir_default),
+    ('Fog', fog),
+    ('IR WV', ir_wv),
+])
 
-LIFTED_INDEX_COLORMAPS = {
-    'Lifted Index (New CIMSS)': lifted_index__new_cimss_table,
-    'Lifted Index': lifted_index_default,
-}
+LIFTED_INDEX_COLORMAPS = OrderedDict([
+    ('Lifted Index (New CIMSS)', lifted_index__new_cimss_table),
+    ('Lifted Index', lifted_index_default),
+])
 
-PRECIP_COLORMAPS = {
-    'Blended TPW': blended_total_precip_water,
-    'Percent of Normal TPW': percent_of_normal_tpw,
-    'Precipitable Water (New CIMSS)': precip_water__new_cimss_table,
-    'Precipitable Water (Polar)': precip_water__polar,
-    'Precipitable Water': precip_water_default,
-}
+PRECIP_COLORMAPS = OrderedDict([
+    ('Blended TPW', blended_total_precip_water),
+    ('Percent of Normal TPW', percent_of_normal_tpw),
+    ('Precipitable Water (New CIMSS)', precip_water__new_cimss_table),
+    ('Precipitable Water (Polar)', precip_water__polar),
+    ('Precipitable Water', precip_water_default),
+])
 
-SKIN_TEMP_COLORMAPS = {
-    'Skin Temp (New CIMSS)': skin_temp__new_cimss_table,
-    'Skin Temp': skin_temp_default,
-}
+SKIN_TEMP_COLORMAPS = OrderedDict([
+    ('Skin Temp (New CIMSS)', skin_temp__new_cimss_table),
+    ('Skin Temp', skin_temp_default),
+])
 
-WV_COLORMAPS = {
-    'Gray Scale Water Vapor': gray_scale_water_vapor,
-    'NSSL VAS (WV Alternate)': nssl_vas_wv_alternate,
-    'RAMSDIS WV': ramsdis_wv,
-    'SLC WV': slc_wv,
-}
+WV_COLORMAPS = OrderedDict([
+    ('Gray Scale Water Vapor', gray_scale_water_vapor),
+    ('NSSL VAS (WV Alternate)', nssl_vas_wv_alternate),
+    ('RAMSDIS WV', ramsdis_wv),
+    ('SLC WV', slc_wv),
+])
 
-OTHER_COLORMAPS = {
-    'Rain Rate': rain_rate,
-    'Low Cloud Base': low_cloud_base,
-    'Cloud Amount': cloud_amount_default,
-    'Cloud Top Height': cloud_top_height,
-}
+OTHER_COLORMAPS = OrderedDict([
+    ('Rain Rate', rain_rate),
+    ('Low Cloud Base', low_cloud_base),
+    ('Cloud Amount', cloud_amount_default),
+    ('Cloud Top Height', cloud_top_height),
+])
 
 ALL_COLORMAPS = {}
 ALL_COLORMAPS.update(VIS_COLORMAPS)
@@ -215,15 +216,15 @@ ALL_COLORMAPS.update(SKIN_TEMP_COLORMAPS)
 ALL_COLORMAPS.update(WV_COLORMAPS)
 ALL_COLORMAPS.update(OTHER_COLORMAPS)
 
-COLORMAPS_CATEGORIZED = {
-    "Visible": VIS_COLORMAPS,
-    "IR": IR_COLORMAPS,
-    "Lifted Index": LIFTED_INDEX_COLORMAPS,
-    "Precipitable Water": PRECIP_COLORMAPS,
-    "Skin Temperature": SKIN_TEMP_COLORMAPS,
-    "Water Vapor": WV_COLORMAPS,
-    "Other": OTHER_COLORMAPS,
-}
+CATEGORIZED_COLORMAPS = OrderedDict([
+    ("Visible", VIS_COLORMAPS),
+    ("IR", IR_COLORMAPS),
+    ("Lifted Index", LIFTED_INDEX_COLORMAPS),
+    ("Precipitable Water", PRECIP_COLORMAPS),
+    ("Skin Temperature", SKIN_TEMP_COLORMAPS),
+    ("Water Vapor", WV_COLORMAPS),
+    ("Other", OTHER_COLORMAPS),
+])
 
 DEFAULT_VIS = "ZA (Vis Default)"
 DEFAULT_IR = "CIRCA IR (IR Default)"
