@@ -209,6 +209,17 @@ class AHI_HSF_Guidebook(Guidebook):
         offset = [i for i,x in enumerate(sibs) if x[1]==uuid]
         return [x[1] for x in sibs], offset[0]
 
+    def time_siblings_uuids(self, uuids, infos):
+        """
+        return generator uuids for datasets which have the same band as the uuids provided
+        :param uuids: iterable of uuids
+        :param infos: list of dataset infos available, some of which may not be relevant
+        :return: generate sorted list of sibling uuids in time order and in provided uuid order
+        """
+        for requested_uuid in uuids:
+            for sibling_uuid in self.time_siblings(requested_uuid, infos)[0]:
+                yield sibling_uuid
+
 
 
 # if __name__ == '__main__':

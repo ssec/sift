@@ -46,9 +46,6 @@ from cspov.view.Colormap import ALL_COLORMAPS, CATEGORIZED_COLORMAPS
 
 LOG = logging.getLogger(__name__)
 
-# FIXME: DRY violation
-COLOR_MAP_LIST = ["grays", "autumn", "fire", "hot", "winter"] + list(ALL_COLORMAPS.keys())
-
 COLUMNS=('Visibility', 'Name', 'Enhancement')
 
 class LayerWidgetDelegate(QStyledItemDelegate):
@@ -268,18 +265,33 @@ class LayerStackListViewModel(QAbstractListModel):
         menu = QMenu()
         actions = {}
         lbox = self.current_set_listbox
+        # XXX: Normally we would create the menu and actions before hand but since we are checking the actions based
+        # on selection we can't. Then we would use an ActionGroup and make it exclusive
+        selected_uuids = list(self.current_selected_uuids(lbox))
+        LOG.debug("selected UUID set is {0!r:s}".format(selected_uuids))
+        current_colormaps = set(self.doc.colormap_for_uuids(selected_uuids))
         for cat, cat_colormaps in CATEGORIZED_COLORMAPS.items():
             submenu = QMenu(cat, parent=menu)
             for colormap in cat_colormaps.keys():
-                actions[submenu.addAction(colormap)] = colormap
+                action = submenu.addAction(colormap)
+                actions[action] = colormap
+                action.setCheckable(True)
+                action.setChecked(colormap in current_colormaps)
             menu.addMenu(submenu)
+        menu.addSeparator()
+        flip_action = menu.addAction("Flip Color Limits")
+        flip_action.setCheckable(True)
+        flip_action.setChecked(any(self.doc.flipped_for_uuids(selected_uuids)))
+        menu.addAction(flip_action)
         sel = menu.exec_(lbox.mapToGlobal(pos))
-        new_cmap = actions.get(sel, None)
-        selected_uuids = list(self.current_selected_uuids(lbox))
-        LOG.debug("selected UUID set is {0!r:s}".format(selected_uuids))
-        if new_cmap is not None:
-            LOG.info("changing to colormap {0} for ids {1!r:s}".format(new_cmap, selected_uuids))
-            self.doc.change_colormap_for_layers(name=new_cmap, uuids=selected_uuids)
+        if sel is flip_action:
+            LOG.info("flipping color limits for sibling ids {0!r:s}".format(selected_uuids))
+            self.doc.flip_climits_for_layers(uuids=selected_uuids)
+        else:
+            new_cmap = actions.get(sel, None)
+            if new_cmap is not None:
+                LOG.info("changing to colormap {0} for ids {1!r:s}".format(new_cmap, selected_uuids))
+                self.doc.change_colormap_for_layers(name=new_cmap, uuids=selected_uuids)
 
     @property
     def listing(self):

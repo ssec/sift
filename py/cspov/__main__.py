@@ -574,11 +574,6 @@ class Main(QtGui.QMainWindow):
         self.ui.animationSlider.repaint()
         self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
 
-    def change_layer_colormap(self, nfo):
-        for uuid, mapname in nfo.items():
-            LOG.info('changing {} to colormap {}'.format(uuid, mapname))
-            self.scene_manager.set_colormap(mapname, uuid=uuid)
-
     def remove_layer(self, *args, **kwargs):
         uuids = self.behaviorLayersList.current_selected_uuids()
         for uuid in uuids:
@@ -750,7 +745,8 @@ class Main(QtGui.QMainWindow):
         # self.queue.add('test', test_task(), 'test000')
         # self.ui.layers
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
-        self.document.didChangeColormap.connect(self.change_layer_colormap)
+        self.document.didChangeColormap.connect(self.scene_manager.change_layers_colormap)
+        self.document.didChangeColorLimits.connect(self.scene_manager.change_layers_color_limits)
 
         self.ui.panZoomToolButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.pz_camera.name))
         self.ui.pointSelectButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.point_probe_camera.name))
@@ -847,7 +843,17 @@ class Main(QtGui.QMainWindow):
         # self.scene_manager.main_canvas.events.key_release.connect(cb_factory("a", self.scene_manager.layer_set.toggle_animation))
         # self.scene_manager.main_canvas.events.key_release.connect(cb_factory("n", self.scene_manager.layer_set.next_frame))
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("c", self.scene_manager.next_camera))
-        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("/", self.scene_manager.swap_clims))
+
+        def flip_selected_layers():
+            uuid = self.document.current_visible_layer
+            if uuid is None:
+                return
+                # XXX: Do we want to use the selection instead?
+                # uuids = list(self.behaviorLayersList.current_selected_uuids())
+            else:
+                uuids = [uuid]
+            self.document.flip_climits_for_layers(uuids)
+        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("/", flip_selected_layers))
 
         class ColormapSlot(object):
             def __init__(self, sgm, key='e'):

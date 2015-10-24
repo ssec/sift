@@ -20,8 +20,78 @@ REQUIRES
 __docformat__ = 'reStructuredText'
 __author__ = 'cphillips'
 
-from vispy.color import Colormap
+from vispy.color.colormap import Colormap, BaseColormap, _mix_simple
 from collections import OrderedDict
+import numpy as np
+
+
+class SquareRootColormap(BaseColormap):
+    colors = [(0.0, 0.0, 0.0, 1.0),
+              (1.0, 1.0, 1.0, 1.0)]
+
+    glsl_map = """
+    vec4 sqrt_cmap(float t) {
+        return mix($color_0, $color_1, sqrt(t));
+    }
+    """
+
+    def map(self, t):
+        a, b = self.colors.rgba
+        return _mix_simple(a, b, np.sqrt(t))
+
+
+class FlippedColormap(Colormap):
+    """Simple wrapper to flip the provide colors and colormaps.
+    """
+    def __init__(self, colors, controls, **kwargs):
+        colors = colors[::-1]
+        controls = [1-x for x in controls][::-1]
+        super().__init__(colors, controls=controls, **kwargs)
+
+
+# Hand made colormap for the CIRA IR Default colormap
+# The XML file from AWIPS doesn't separate things very well or in a way that can be easily automated
+# we have to include every break point
+cira_ir_colors = [(0.0, 0.0, 0.0, 1.0), # Black
+          (0.980392156862745, 0.980392156862745, 0.980392156862745, 1.0), # White
+          (0.972549019607843, 0.949019607843137, 0, 1.0), # Bright Yellow
+          (0.372549019607843, 0.372549019607843, 0.0, 1.0), # Dark Yellow
+          (0.564705882352941, 0.0, 0.0, 1.0), # Dark Red
+          (0.929411764705882, 0.0, 0.0, 1.0), # Bright Red
+          (0.949019607843137, 0.0, 0.972549019607843, 1.0), # Bright magenta
+          (0.549019607843137, 0.0, 0.552941176470588, 1.0), # Dark magenta
+          (0.0, 0.372549019607843, 0.564705882352941, 1.0), # Dark Cyan
+          (0.0, 0.780392156862745, 0.815686274509804, 1.0), # Bright Cyan
+          (0.0470588235294118, 0.972549019607843, 0.0, 1.0), # Bright Green
+          (0.0, 0.435294117647059, 0.0, 1.0), # Dark Green
+          (0.0235294117647059, 0.0, 0.0, 1.0), # Black
+          (0.847058823529412, 0.847058823529412, 0.847058823529412, 1.0), # white-ish
+          (0.00392156862745098, 0.0, 0.972549019607843, 1.0), # Bright Blue
+          (0.0, 0.0, 0.4, 1.0), # Dark Blue
+          (0.972549019607843, 0.0, 0.466666666666667, 1.0), # Bright Red
+          (0.0980392156862745, 0.0, 0.0392156862745098, 1.0), # Dark Red
+          (1.0, 1.0, 1.0, 1.0),
+          (1.0, 1.0, 1.0, 1.0),
+          ]
+
+cira_ir_segment_indexes = [
+    55,
+    -30,
+    -40,
+    -50,
+    -60,
+    -70,
+    -80,
+    -90,
+    -100,
+    -108,
+    -109,
+]
+cira_ir_controls = [(y - 55)/(-109 - 55) for x in cira_ir_segment_indexes for y in [x, x]][1:-1]
+
+cira_ir_default = FlippedColormap(cira_ir_colors, controls=cira_ir_controls)
+
+
 
 # Modified cloud_amount_default with 1.0 bounds value
 _cloud_amount_default_control_points = (0.0, 0.03137254901960784, 0.2196078431372549, 0.23137254901960785, 0.2627450980392157, 0.29411764705882354, 0.2980392156862745, 0.996078431372549, 1.0)
@@ -37,19 +107,19 @@ low_cloud_base = Colormap(colors=_low_cloud_base_colors, controls=_low_cloud_bas
 _rain_rate_control_points = (0.0, 0.5215686274509804, 0.6, 0.6470588235294118, 0.6980392156862745, 0.7490196078431373, 0.8, 0.8392156862745098, 0.8431372549019608, 0.8941176470588236, 1.0)
 _rain_rate_colors = ('#000000', '#c7c7c7', '#00ffff', '#0000ff', '#00ff00', '#ffff00', '#ff9500', '#e20000', '#f00000', '#ff00ff', '#ffffff')
 rain_rate = Colormap(colors=_rain_rate_colors, controls=_rain_rate_control_points)
-_sqroot12_control_points = (0.0, 0.99853515625, 0.998779296875, 0.9990234375, 0.999267578125, 0.99951171875, 1.0)
-_sqroot12_colors = ('#000000', '#fefefe', '#fefefe', '#fefefe', '#fefefe', '#fefefe', '#ffffff')
-sqroot12 = Colormap(colors=_sqroot12_colors, controls=_sqroot12_control_points)
 
-_cira_ir_default_control_points = (0.0, 0.6627450980392157, 0.7215686274509804, 0.7254901960784313, 0.7607843137254902, 0.8, 0.803921568627451, 0.8470588235294118, 0.8901960784313725, 0.9215686274509803, 0.9568627450980393, 0.9921568627450981, 1.0)
-_cira_ir_default_colors = ('#000000', '#f9f9f9', '#686600', '#5e5a00', '#e20000', '#97009b', '#8b008c', '#00c6d0', '#006f00', '#d8d8d8', '#000077', '#360017', '#ffffff')
-cira_ir_default = Colormap(colors=_cira_ir_default_colors, controls=_cira_ir_default_control_points)
+_color11new_control_points = (0.0, 0.0019540791402051783, 0.1265266243282853, 0.2510991695163654, 0.37567171470444555, 0.43820224719101125, 0.5007327796775769, 0.625305324865657, 0.6878358573522227, 0.7503663898387885, 1.0)
+_color11new_colors = ('#7e0000', '#190000', '#fe0000', '#fffe00', '#00ff00', '#00807e', '#00fefe', '#0000ff', '#7e0080', '#fe00fe', '#000000')
+color11new = Colormap(colors=_color11new_colors, controls=_color11new_control_points)
+# _cira_ir_default_control_points = (0.0, 0.6627450980392157, 0.7215686274509804, 0.7254901960784313, 0.7607843137254902, 0.8, 0.803921568627451, 0.8470588235294118, 0.8901960784313725, 0.9215686274509803, 0.9568627450980393, 0.9921568627450981, 1.0)
+# _cira_ir_default_colors = ('#000000', '#f9f9f9', '#686600', '#5e5a00', '#e20000', '#97009b', '#8b008c', '#00c6d0', '#006f00', '#d8d8d8', '#000077', '#360017', '#ffffff')
+# cira_ir_default = Colormap(colors=_cira_ir_default_colors, controls=_cira_ir_default_control_points)
 _fog_control_points = (0.0, 0.027450980392156862, 0.17647058823529413, 0.24313725490196078, 0.3254901960784314, 0.3764705882352941, 1.0)
 _fog_colors = ('#000000', '#0c0c0c', '#4e4e4e', '#6d6d6d', '#919191', '#a9a9a9', '#ffffff')
 fog = Colormap(colors=_fog_colors, controls=_fog_control_points)
 _ir_wv_control_points = (0.0, 0.6431372549019608, 0.7607843137254902, 0.8, 0.803921568627451, 0.8470588235294118, 0.8901960784313725, 0.9215686274509803, 0.9568627450980393, 0.9921568627450981, 1.0)
 _ir_wv_colors = ('#000000', '#f5f5f5', '#df0000', '#94009a', '#8a008a', '#00c4ce', '#006d00', '#d5d5d5', '#000076', '#350016', '#ffffff')
-ir_wv = Colormap(colors=_ir_wv_colors, controls=_ir_wv_control_points)
+ir_wv = FlippedColormap(colors=_ir_wv_colors, controls=_ir_wv_control_points)
 _lifted_index__new_cimss_table_control_points = (0.0, 0.4823529411764706, 0.5607843137254902, 0.5647058823529412, 0.6392156862745098, 0.6431372549019608, 0.7176470588235294, 0.7215686274509804, 0.7843137254901961, 0.9921568627450981, 1.0)
 _lifted_index__new_cimss_table_colors = ('#000000', '#412a0e', '#7876cf', '#7b79d4', '#767502', '#706f02', '#ea0000', '#f10000', '#f575c7', '#c6c6c5', '#ffffff')
 lifted_index__new_cimss_table = Colormap(colors=_lifted_index__new_cimss_table_colors, controls=_lifted_index__new_cimss_table_control_points)
@@ -91,26 +161,32 @@ _za_vis_default_colors = ('#000000', '#0b0b0b', '#181818', '#4c4c4c', '#848484',
 za_vis_default = Colormap(colors=_za_vis_default_colors, controls=_za_vis_default_control_points)
 _gray_scale_water_vapor_control_points = (0.0, 0.6274509803921569, 0.7176470588235294, 0.7803921568627451, 0.9803921568627451, 0.9921568627450981, 1.0)
 _gray_scale_water_vapor_colors = ('#000000', '#2e2e2e', '#606060', '#838383', '#f0f0f0', '#f6f6f6', '#ffffff')
-gray_scale_water_vapor = Colormap(colors=_gray_scale_water_vapor_colors, controls=_gray_scale_water_vapor_control_points)
+gray_scale_water_vapor = FlippedColormap(colors=_gray_scale_water_vapor_colors, controls=_gray_scale_water_vapor_control_points)
 _nssl_vas_wv_alternate_control_points = (0.0, 0.42745098039215684, 0.47058823529411764, 0.5490196078431373, 0.6274509803921569, 0.6588235294117647, 0.6745098039215687, 0.6901960784313725, 0.7058823529411765, 0.7843137254901961, 0.9098039215686274, 1.0)
 _nssl_vas_wv_alternate_colors = ('#000000', '#9e0000', '#7f0000', '#9e3f00', '#9e7f00', '#529e00', '#2bad00', '#00be45', '#009e6a', '#006a9e', '#a6a6a6', '#ffffff')
-nssl_vas_wv_alternate = Colormap(colors=_nssl_vas_wv_alternate_colors, controls=_nssl_vas_wv_alternate_control_points)
+nssl_vas_wv_alternate = FlippedColormap(colors=_nssl_vas_wv_alternate_colors, controls=_nssl_vas_wv_alternate_control_points)
 _ramsdis_wv_control_points = (0.0, 0.7450980392156863, 0.8, 0.8392156862745098, 0.8745098039215686, 0.9019607843137255, 0.9098039215686274, 0.9137254901960784, 0.9568627450980393, 1.0)
 _ramsdis_wv_colors = ('#000000', '#e5e5e5', '#0200ee', '#02ee02', '#df0000', '#ac4801', '#ffffff', '#626148', '#606060', '#ffffff')
-ramsdis_wv = Colormap(colors=_ramsdis_wv_colors, controls=_ramsdis_wv_control_points)
+ramsdis_wv = FlippedColormap(colors=_ramsdis_wv_colors, controls=_ramsdis_wv_control_points)
 _slc_wv_control_points = (0.0, 0.5529411764705883, 0.6431372549019608, 0.7686274509803922, 0.8196078431372549, 0.8235294117647058, 0.8274509803921568, 0.8627450980392157, 0.8862745098039215, 0.8901960784313725, 0.9137254901960784, 0.9254901960784314, 1.0)
 _slc_wv_colors = ('#000000', '#995c35', '#3a3835', '#759285', '#166f4c', '#076a44', '#036842', '#008484', '#00b0b0', '#00b6b6', '#009300', '#006c00', '#ffffff')
-slc_wv = Colormap(colors=_slc_wv_colors, controls=_slc_wv_control_points)
+slc_wv = FlippedColormap(colors=_slc_wv_colors, controls=_slc_wv_control_points)
+
+white_trans = Colormap(colors=np.array([[0., 0., 0., 0.], [1., 1., 1., 1.]]))
+red_trans = Colormap(colors=np.array([[0., 0., 0., 0.], [1., 0., 0., 1.]]))
+green_trans = Colormap(colors=np.array([[0., 0., 0., 0.], [0., 1., 0., 1.]]))
+blue_trans = Colormap(colors=np.array([[0., 0., 0., 0.], [0., 0., 1., 1.]]))
 
 VIS_COLORMAPS = OrderedDict([
     ('CA (Low Light Vis)', ca_low_light_vis),
     ('Linear', linear),
-    ('ZA (Vis Default)', za_vis_default),
-    ('Square Root', sqroot12),
+    ('ZA', za_vis_default),
+    ('Square Root (Vis Default)', SquareRootColormap()),
 ])
 
 IR_COLORMAPS = OrderedDict([
-    ('CIRCA IR (IR Default)', cira_ir_default),
+    ('Rainbow (IR Default)', color11new),
+    ('CIRA IR', cira_ir_default),
     ('Fog', fog),
     ('IR WV', ir_wv),
 ])
@@ -145,6 +221,10 @@ OTHER_COLORMAPS = OrderedDict([
     ('Low Cloud Base', low_cloud_base),
     ('Cloud Amount', cloud_amount_default),
     ('Cloud Top Height', cloud_top_height),
+    ('White Transparency', white_trans),
+    ('Red Transparency', red_trans),
+    ('Green Transparency', green_trans),
+    ('Blue Transparency', blue_trans),
 ])
 
 ALL_COLORMAPS = {}
@@ -166,5 +246,5 @@ CATEGORIZED_COLORMAPS = OrderedDict([
     ("Other", OTHER_COLORMAPS),
 ])
 
-DEFAULT_VIS = "ZA (Vis Default)"
-DEFAULT_IR = "CIRCA IR (IR Default)"
+DEFAULT_VIS = "Square Root (Vis Default)"
+DEFAULT_IR = "Rainbow (IR Default)"
