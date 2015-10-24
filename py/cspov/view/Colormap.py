@@ -172,6 +172,11 @@ _slc_wv_control_points = (0.0, 0.5529411764705883, 0.6431372549019608, 0.7686274
 _slc_wv_colors = ('#000000', '#995c35', '#3a3835', '#759285', '#166f4c', '#076a44', '#036842', '#008484', '#00b0b0', '#00b6b6', '#009300', '#006c00', '#ffffff')
 slc_wv = FlippedColormap(colors=_slc_wv_colors, controls=_slc_wv_control_points)
 
+white_trans = Colormap(colors=np.array([[0., 0., 0., 0.], [1., 1., 1., 1.]]))
+red_trans = Colormap(colors=np.array([[0., 0., 0., 0.], [1., 0., 0., 1.]]))
+green_trans = Colormap(colors=np.array([[0., 0., 0., 0.], [0., 1., 0., 1.]]))
+blue_trans = Colormap(colors=np.array([[0., 0., 0., 0.], [0., 0., 1., 1.]]))
+
 VIS_COLORMAPS = OrderedDict([
     ('CA (Low Light Vis)', ca_low_light_vis),
     ('Linear', linear),
@@ -216,6 +221,10 @@ OTHER_COLORMAPS = OrderedDict([
     ('Low Cloud Base', low_cloud_base),
     ('Cloud Amount', cloud_amount_default),
     ('Cloud Top Height', cloud_top_height),
+    ('White Transparency', white_trans),
+    ('Red Transparency', red_trans),
+    ('Green Transparency', green_trans),
+    ('Blue Transparency', blue_trans),
 ])
 
 ALL_COLORMAPS = {}
