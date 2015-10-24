@@ -46,9 +46,6 @@ from cspov.view.Colormap import ALL_COLORMAPS, CATEGORIZED_COLORMAPS
 
 LOG = logging.getLogger(__name__)
 
-# FIXME: DRY violation
-COLOR_MAP_LIST = ["grays", "autumn", "fire", "hot", "winter"] + list(ALL_COLORMAPS.keys())
-
 COLUMNS=('Visibility', 'Name', 'Enhancement')
 
 class LayerWidgetDelegate(QStyledItemDelegate):
@@ -268,10 +265,17 @@ class LayerStackListViewModel(QAbstractListModel):
         menu = QMenu()
         actions = {}
         lbox = self.current_set_listbox
+        # XXX: Normally we would create the menu and actions before hand but since we are checking the actions based
+        # on selection we can't. Then we would use an ActionGroup and make it exclusive
+        selected_uuids = self.current_selected_uuids(lbox)
+        current_colormaps = set(self.doc.colormap_for_uuids(selected_uuids))
         for cat, cat_colormaps in CATEGORIZED_COLORMAPS.items():
             submenu = QMenu(cat, parent=menu)
             for colormap in cat_colormaps.keys():
-                actions[submenu.addAction(colormap)] = colormap
+                action = submenu.addAction(colormap)
+                actions[action] = colormap
+                action.setCheckable(True)
+                action.setChecked(colormap in current_colormaps)
             menu.addMenu(submenu)
         sel = menu.exec_(lbox.mapToGlobal(pos))
         new_cmap = actions.get(sel, None)

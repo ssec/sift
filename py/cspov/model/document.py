@@ -214,6 +214,17 @@ class Document(QObject):
         info = self._layer_with_uuid[uuid]
         return self._guidebook.display_time(info)
 
+    def prez_for_uuids(self, uuids, lset=None):
+        if lset is None:
+            lset = self.current_layer_set
+        for p in lset:
+            if p.uuid in uuids:
+                yield p
+
+    def colormap_for_uuids(self, uuids, lset=None):
+        for p in self.prez_for_uuids(uuids, lset=lset):
+            yield p.colormap
+
     def update_dataset_info(self, new_info):
         """
         slot which updates document on new information workspace has provided us about a dataset
