@@ -427,8 +427,7 @@ class SceneGraphManager(QObject):
                 self.pending_polygon.reset()
                 self.newProbePolygon.emit(self.layer_set.top_layer_uuid(), points)
         else:
-            print("I don't know how to handle this camera for a mouse press")
-            print(event.buttons, modifiers)
+            LOG.error("I don't know how to handle this camera for a mouse press")
 
     def on_point_probe_set(self, probe_name, xy_pos, **kwargs):
         z = float(kwargs.get("z", 60))
@@ -474,18 +473,6 @@ class SceneGraphManager(QObject):
         idx = (idx + 1) % len(self._camera_names)
         self.change_camera(idx)
 
-    def swap_clims(self, uuid=None):
-        """Swap the Color limits of a layer so that the color map is flipped.
-        """
-        uuids = uuid
-        if uuid is None:
-            uuids = self.image_layers.keys()
-        elif not isinstance(uuid, (list, tuple)):
-            uuids = [uuid]
-
-        for uuid in uuids:
-            self.image_layers[uuid].clim = self.image_layers[uuid].clim[::-1]
-
     def _find_colormap(self, colormap):
         if isinstance(colormap, str) and colormap in self.colormaps:
             colormap = self.colormaps[colormap]
@@ -506,9 +493,27 @@ class SceneGraphManager(QObject):
     def add_colormap(self, name:str, colormap):
         self.colormaps[name] = colormap
 
+    def set_color_limits(self, clims, uuid=None):
+        """Swap the Color limits of a layer so that the color map is flipped.
+        """
+        uuids = uuid
+        if uuid is None:
+            uuids = self.image_layers.keys()
+        elif not isinstance(uuid, (list, tuple)):
+            uuids = [uuid]
+
+        for uuid in uuids:
+            self.image_layers[uuid].clim = clims
+
     def change_layers_colormap(self, change_dict):
         for uuid,cmapid in change_dict.items():
+            LOG.info('changing {} to colormap {}'.format(uuid, cmapid))
             self.set_colormap(cmapid, uuid)
+
+    def change_layers_color_limits(self, change_dict):
+        for uuid, clims in change_dict.items():
+            LOG.info('changing {} to colormap {}'.format(uuid, clims))
+            self.set_color_limits(clims, uuid)
 
     def add_layer(self, new_order:list, ds_info:dict, p:prez, overview_content:np.ndarray):
         uuid = ds_info[INFO.UUID]
