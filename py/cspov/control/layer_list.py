@@ -268,7 +268,7 @@ class LayerStackListViewModel(QAbstractListModel):
         # XXX: Normally we would create the menu and actions before hand but since we are checking the actions based
         # on selection we can't. Then we would use an ActionGroup and make it exclusive
         selected_uuids = self.current_selected_uuids(lbox)
-        current_colormaps = set(self.doc.colormap_for_uuids(selected_uuids))
+        current_colormaps = set(self.doc.colormap_for_uuids(list(selected_uuids)))
         for cat, cat_colormaps in CATEGORIZED_COLORMAPS.items():
             submenu = QMenu(cat, parent=menu)
             for colormap in cat_colormaps.keys():

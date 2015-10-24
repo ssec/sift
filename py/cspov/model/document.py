@@ -394,19 +394,17 @@ class Document(QObject):
     def change_colormap_for_layers(self, name, uuids=None):
         L = self.current_layer_set
         if uuids is not None:
-            # LOG.error('layer selection not implemented in change_colormap_for_layers')
-            nfo = dict((uuid, name) for uuid in uuids)
+            # TODO: Get sibling in the same band
+            uuids = self._guidebook.time_siblings_uuids(uuids, self._layer_with_uuid.values())
         else:  # all data layers
-            uuids = []
-            nfo = {}
-            for dex in range(len(self.current_layer_set)):
-                uuid = self.current_layer_set[dex].uuid
-                nfo[uuid] = name
-                uuids.append(uuid)
+            uuids = [pinfo.uuid for pinfo in L]
+
+        nfo = {}
         for uuid in uuids:
             for dex,pinfo in enumerate(L):
                 if pinfo.uuid==uuid:
                     L[dex] = pinfo._replace(colormap=name)
+                    nfo[uuid] = name
         self.didChangeColormap.emit(nfo)
 
     def __len__(self):
