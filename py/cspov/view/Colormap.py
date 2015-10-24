@@ -40,6 +40,50 @@ class SquareRootColormap(BaseColormap):
         return _mix_simple(a, b, np.sqrt(t))
 
 
+# Hand made colormap for the CIRA IR Default colormap
+# The XML file from AWIPS doesn't separate things very well or in a way that can be easily automated
+# we have to include every break point
+cira_ir_colors = [(0.0, 0.0, 0.0, 1.0), # Black
+          (0.980392156862745, 0.980392156862745, 0.980392156862745, 1.0), # White
+          (0.972549019607843, 0.949019607843137, 0, 1.0), # Bright Yellow
+          (0.372549019607843, 0.372549019607843, 0.0, 1.0), # Dark Yellow
+          (0.564705882352941, 0.0, 0.0, 1.0), # Dark Red
+          (0.929411764705882, 0.0, 0.0, 1.0), # Bright Red
+          (0.949019607843137, 0.0, 0.972549019607843, 1.0), # Bright magenta
+          (0.549019607843137, 0.0, 0.552941176470588, 1.0), # Dark magenta
+          (0.0, 0.372549019607843, 0.564705882352941, 1.0), # Dark Cyan
+          (0.0, 0.780392156862745, 0.815686274509804, 1.0), # Bright Cyan
+          (0.0470588235294118, 0.972549019607843, 0.0, 1.0), # Bright Green
+          (0.0, 0.435294117647059, 0.0, 1.0), # Dark Green
+          (0.0235294117647059, 0.0, 0.0, 1.0), # Black
+          (0.847058823529412, 0.847058823529412, 0.847058823529412, 1.0), # white-ish
+          (0.00392156862745098, 0.0, 0.972549019607843, 1.0), # Bright Blue
+          (0.0, 0.0, 0.4, 1.0), # Dark Blue
+          (0.972549019607843, 0.0, 0.466666666666667, 1.0), # Bright Red
+          (0.0980392156862745, 0.0, 0.0392156862745098, 1.0), # Dark Red
+          (1.0, 1.0, 1.0, 1.0),
+          (1.0, 1.0, 1.0, 1.0),
+          ]
+
+cira_ir_segment_indexes = [
+    55,
+    -30,
+    -40,
+    -50,
+    -60,
+    -70,
+    -80,
+    -90,
+    -100,
+    -108,
+    -109,
+]
+cira_ir_controls = [(y - 55)/(-109 - 55) for x in cira_ir_segment_indexes for y in [x, x]][1:-1]
+
+cira_ir_default = Colormap(cira_ir_colors, controls=cira_ir_controls)
+
+
+
 # Modified cloud_amount_default with 1.0 bounds value
 _cloud_amount_default_control_points = (0.0, 0.03137254901960784, 0.2196078431372549, 0.23137254901960785, 0.2627450980392157, 0.29411764705882354, 0.2980392156862745, 0.996078431372549, 1.0)
 _cloud_amount_default_colors = ('#000000', '#181818', '#bababa', '#c4c4c4', '#e0e0e0', '#fbfbfb', '#ffa67d', '#ffff00', '#ffff00')
@@ -58,9 +102,9 @@ rain_rate = Colormap(colors=_rain_rate_colors, controls=_rain_rate_control_point
 _color11new_control_points = (0.0, 0.0019540791402051783, 0.1265266243282853, 0.2510991695163654, 0.37567171470444555, 0.43820224719101125, 0.5007327796775769, 0.625305324865657, 0.6878358573522227, 0.7503663898387885, 1.0)
 _color11new_colors = ('#7e0000', '#190000', '#fe0000', '#fffe00', '#00ff00', '#00807e', '#00fefe', '#0000ff', '#7e0080', '#fe00fe', '#000000')
 color11new = Colormap(colors=_color11new_colors, controls=_color11new_control_points)
-_cira_ir_default_control_points = (0.0, 0.6627450980392157, 0.7215686274509804, 0.7254901960784313, 0.7607843137254902, 0.8, 0.803921568627451, 0.8470588235294118, 0.8901960784313725, 0.9215686274509803, 0.9568627450980393, 0.9921568627450981, 1.0)
-_cira_ir_default_colors = ('#000000', '#f9f9f9', '#686600', '#5e5a00', '#e20000', '#97009b', '#8b008c', '#00c6d0', '#006f00', '#d8d8d8', '#000077', '#360017', '#ffffff')
-cira_ir_default = Colormap(colors=_cira_ir_default_colors, controls=_cira_ir_default_control_points)
+# _cira_ir_default_control_points = (0.0, 0.6627450980392157, 0.7215686274509804, 0.7254901960784313, 0.7607843137254902, 0.8, 0.803921568627451, 0.8470588235294118, 0.8901960784313725, 0.9215686274509803, 0.9568627450980393, 0.9921568627450981, 1.0)
+# _cira_ir_default_colors = ('#000000', '#f9f9f9', '#686600', '#5e5a00', '#e20000', '#97009b', '#8b008c', '#00c6d0', '#006f00', '#d8d8d8', '#000077', '#360017', '#ffffff')
+# cira_ir_default = Colormap(colors=_cira_ir_default_colors, controls=_cira_ir_default_control_points)
 _fog_control_points = (0.0, 0.027450980392156862, 0.17647058823529413, 0.24313725490196078, 0.3254901960784314, 0.3764705882352941, 1.0)
 _fog_colors = ('#000000', '#0c0c0c', '#4e4e4e', '#6d6d6d', '#919191', '#a9a9a9', '#ffffff')
 fog = Colormap(colors=_fog_colors, controls=_fog_control_points)
@@ -128,7 +172,7 @@ VIS_COLORMAPS = OrderedDict([
 
 IR_COLORMAPS = OrderedDict([
     ('Rainbow (IR Default)', color11new),
-    ('CIRCA IR', cira_ir_default),
+    ('CIRA IR', cira_ir_default),
     ('Fog', fog),
     ('IR WV', ir_wv),
 ])
