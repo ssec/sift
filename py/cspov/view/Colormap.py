@@ -20,8 +20,25 @@ REQUIRES
 __docformat__ = 'reStructuredText'
 __author__ = 'cphillips'
 
-from vispy.color import Colormap
+from vispy.color.colormap import Colormap, BaseColormap, _mix_simple
 from collections import OrderedDict
+import numpy as np
+
+
+class SquareRootColormap(BaseColormap):
+    colors = [(0.0, 0.0, 0.0, 1.0),
+              (1.0, 1.0, 1.0, 1.0)]
+
+    glsl_map = """
+    vec4 sqrt_cmap(float t) {
+        return mix($color_0, $color_1, sqrt(t));
+    }
+    """
+
+    def map(self, t):
+        a, b = self.colors.rgba
+        return _mix_simple(a, b, np.sqrt(t))
+
 
 # Modified cloud_amount_default with 1.0 bounds value
 _cloud_amount_default_control_points = (0.0, 0.03137254901960784, 0.2196078431372549, 0.23137254901960785, 0.2627450980392157, 0.29411764705882354, 0.2980392156862745, 0.996078431372549, 1.0)
@@ -37,9 +54,6 @@ low_cloud_base = Colormap(colors=_low_cloud_base_colors, controls=_low_cloud_bas
 _rain_rate_control_points = (0.0, 0.5215686274509804, 0.6, 0.6470588235294118, 0.6980392156862745, 0.7490196078431373, 0.8, 0.8392156862745098, 0.8431372549019608, 0.8941176470588236, 1.0)
 _rain_rate_colors = ('#000000', '#c7c7c7', '#00ffff', '#0000ff', '#00ff00', '#ffff00', '#ff9500', '#e20000', '#f00000', '#ff00ff', '#ffffff')
 rain_rate = Colormap(colors=_rain_rate_colors, controls=_rain_rate_control_points)
-_sqroot12_control_points = (0.0, 0.99853515625, 0.998779296875, 0.9990234375, 0.999267578125, 0.99951171875, 1.0)
-_sqroot12_colors = ('#000000', '#fefefe', '#fefefe', '#fefefe', '#fefefe', '#fefefe', '#ffffff')
-sqroot12 = Colormap(colors=_sqroot12_colors, controls=_sqroot12_control_points)
 
 _color11new_control_points = (0.0, 0.0019540791402051783, 0.1265266243282853, 0.2510991695163654, 0.37567171470444555, 0.43820224719101125, 0.5007327796775769, 0.625305324865657, 0.6878358573522227, 0.7503663898387885, 1.0)
 _color11new_colors = ('#7e0000', '#190000', '#fe0000', '#fffe00', '#00ff00', '#00807e', '#00fefe', '#0000ff', '#7e0080', '#fe00fe', '#000000')
@@ -109,7 +123,7 @@ VIS_COLORMAPS = OrderedDict([
     ('CA (Low Light Vis)', ca_low_light_vis),
     ('Linear', linear),
     ('ZA', za_vis_default),
-    ('Square Root (Vis Default)', sqroot12),
+    ('Square Root (Vis Default)', SquareRootColormap()),
 ])
 
 IR_COLORMAPS = OrderedDict([
