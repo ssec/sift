@@ -165,7 +165,7 @@ class LayerStackListViewModel(QAbstractListModel):
         :return:
         """
         super(LayerStackListViewModel, self).__init__()
-        self.widgets = list(widgets) # [weakref.ref(widget) for widget in widgets]
+        self.widgets = [ ] # list(widgets) # [weakref.ref(widget) for widget in widgets]
         self.doc = doc
         # self._column = [self._visibilityData, self._nameData]
         self.item_delegate = LayerWidgetDelegate()
@@ -182,8 +182,13 @@ class LayerStackListViewModel(QAbstractListModel):
 
         # self.setSupportedDragActions(Qt.MoveAction)
 
+        # set up each of the widgets
         for widget in widgets:
             self._init_widget(widget)
+
+    # TODO, this wrapper is probably not needed, possibly remove later
+    def add_widget(self, listbox:QListView):
+        self._init_widget(listbox)
 
     def _init_widget(self, listbox:QListView):
         listbox.setModel(self)
