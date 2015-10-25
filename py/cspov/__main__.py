@@ -816,6 +816,14 @@ class Main(QtGui.QMainWindow):
         remove.setShortcut(QtCore.Qt.Key_Delete)
         remove.triggered.connect(self.remove_layer)
 
+        cycle_borders = QtGui.QAction("Cycle &Borders", self)
+        cycle_borders.setShortcut('B')
+        cycle_borders.triggered.connect(self.scene_manager.cycle_borders_color)
+
+        cycle_grid = QtGui.QAction("Cycle &Lat/Lon Grid", self)
+        cycle_grid.setShortcut('L')
+        cycle_grid.triggered.connect(self.scene_manager.cycle_grid_color)
+
         edit_menu = menubar.addMenu('&Edit')
         edit_menu.addAction(remove)
 
@@ -828,6 +836,8 @@ class Main(QtGui.QMainWindow):
         view_menu.addAction(next_band)
         view_menu.addAction(change_order)
         view_menu.addAction(toggle_vis)
+        view_menu.addAction(cycle_borders)
+        view_menu.addAction(cycle_grid)
 
 
         menubar.setEnabled(True)

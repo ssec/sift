@@ -1064,7 +1064,7 @@ class ShapefileLinesVisual(CompoundVisual):
             vertex_buffer = np.concatenate((vertex_buffer, vertex_buffer), axis=0)
             vertex_buffer[orig_points:, 0] += C_EQ
 
-        kwargs.setdefault("color", (0.0, 0.0, 1.0, 1.0))
+        kwargs.setdefault("color", (1.0, 1.0, 1.0, 1.0))
         kwargs.setdefault("width", 1)
         self._border_lines = LineVisual(vertex_buffer, connect="segments", **kwargs)
         print("Done loading boundaries: ", datetime.utcnow().isoformat(" "))

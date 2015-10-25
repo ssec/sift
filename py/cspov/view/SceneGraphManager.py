@@ -29,8 +29,8 @@ from vispy import scene
 from vispy.util.keys import SHIFT
 from vispy.visuals.transforms import STTransform, MatrixTransform
 from vispy.visuals import MarkersVisual, marker_types, LineVisual
-from vispy.scene.visuals import Markers, Polygon, Compound
-from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND
+from vispy.scene.visuals import Markers, Polygon, Compound, Line
+from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND, DEFAULT_PROJECTION
 # from cspov.control.layer_list import LayerStackListViewModel
 from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.view.MapWidget import CspovMainMapCanvas
@@ -42,7 +42,7 @@ from cspov.queue import TASK_DOING, TASK_PROGRESS
 from PyQt4.QtCore import QObject, pyqtSignal
 import numpy as np
 from uuid import UUID
-
+from pyproj import Proj
 
 import os
 import logging
@@ -334,6 +334,14 @@ class SceneGraphManager(QObject):
 
         self.set_document(self.document)
 
+        # border and lat/lon grid color choices
+        self._color_choices = [
+            np.array([1., 1., 1., 1.], dtype=np.float32), # white
+            np.array([.5, .5, .5, 1.], dtype=np.float32), # gray
+            np.array([0., 0., 0., 1.], dtype=np.float32), # black
+            np.array([0., 0., 0., 0.], dtype=np.float32), # transparent
+        ]
+
         self.setup_initial_canvas()
         self.pending_polygon = PendingPolygon(self.main_map)
 
@@ -357,7 +365,6 @@ class SceneGraphManager(QObject):
             # note that all the layers in the layer_order but the current one are now invisible
             vis = dict((u,tfu(u)) for u in uuids)
             self.didChangeLayerVisibility.emit(vis)
-
 
     def setup_initial_canvas(self):
         self.main_canvas = CspovMainMapCanvas(parent=self.parent())
@@ -397,8 +404,56 @@ class SceneGraphManager(QObject):
         merc_ortho.set_ortho(l, r, b, t, -100.0 * camera_z_scale, 100.0 * camera_z_scale)
         self.main_map.transform = merc_ortho
 
-        self.boundaries = NEShapefileLines(self.border_shapefile, double=True, parent=self.main_map)
-        self.boundaries.transform = STTransform(translate=(0, 0, 40))
+        self._borders_color_idx = 0
+        self.borders = NEShapefileLines(self.border_shapefile, double=True, color=self._color_choices[self._borders_color_idx], parent=self.main_map)
+        self.borders.transform = STTransform(translate=(0, 0, 40))
+
+        self._latlon_grid_color_idx = 1
+        self.latlon_grid = self._init_latlon_grid_layer(color=self._color_choices[self._latlon_grid_color_idx])
+
+    def _init_latlon_grid_layer(self, color=None, resolution=5.):
+        """Create a series of line segments representing latitude and longitude lines.
+
+        :param resolution: number of degrees between lines
+        """
+        lons = np.arange(-180., 180. + resolution, resolution, dtype=np.float32)
+        lats = np.arange(-89.9, 89.9, resolution, dtype=np.float32)
+        p = Proj(DEFAULT_PROJECTION)
+
+        box_lons = np.empty(((lons.shape[0] + lats.shape[0]) * 2,), dtype=np.float32)
+        box_lons[0:lons.shape[0]] = lons
+        box_lons[lons.shape[0]:lons.shape[0] * 2] = lons
+        box_lons[lons.shape[0] * 2:lons.shape[0] * 2 + lats.shape[0]] = -180
+        box_lons[lons.shape[0] * 2 + lats.shape[0]:] = 180
+
+        box_lats = np.empty(((lons.shape[0] + lats.shape[0]) * 2,), dtype=np.float32)
+        box_lats[0:lons.shape[0]] = -89.9
+        box_lats[lons.shape[0]:lons.shape[0] * 2] = 89.9
+        box_lats[lons.shape[0] * 2: lons.shape[0] * 2 + lats.shape[0]] = lats
+        box_lats[lons.shape[0] * 2 + lats.shape[0]:] = lats
+
+        # Assume all of the longitude and latitudes map correctly
+        box_x, box_y = p(box_lons, box_lats)
+        points = np.empty((box_x.shape[0], 2), dtype=np.float32)
+        # Longitude lines
+        points[:lons.shape[0] * 2:2, 0] = box_x[:lons.shape[0]]
+        points[:lons.shape[0] * 2:2, 1] = box_y[:lons.shape[0]]
+        points[1:lons.shape[0] * 2:2, 0] = box_x[lons.shape[0]:lons.shape[0] * 2]
+        points[1:lons.shape[0] * 2:2, 1] = box_y[lons.shape[0]:lons.shape[0] * 2]
+        # Latitude lines
+        points[lons.shape[0] * 2::2, 0] = box_x[lons.shape[0] * 2:lons.shape[0] * 2 + lats.shape[0]]
+        points[lons.shape[0] * 2::2, 1] = box_y[lons.shape[0] * 2:lons.shape[0] * 2 + lats.shape[0]]
+        points[lons.shape[0] * 2 + 1::2, 0] = box_x[lons.shape[0] * 2 + lats.shape[0]:]
+        points[lons.shape[0] * 2 + 1::2, 1] = box_y[lons.shape[0] * 2 + lats.shape[0]:]
+
+        # Repeat for "second" size of the earth (180 to 540)
+        offset = box_x[lons.shape[0] - 1] - box_x[0]
+        points2 = np.empty((points.shape[0] * 2, 2), dtype=np.float32)
+        points2[:points.shape[0], :] = points
+        points2[points.shape[0]:, :] = points
+        points2[points.shape[0]:, 0] += offset
+
+        return Line(pos=points2, connect="segments", color=color, parent=self.main_map)
 
     def on_mouse_press(self, event):
         if event.handled:
@@ -409,7 +464,7 @@ class SceneGraphManager(QObject):
             buffer_pos = event.sources[0].transforms.get_transform().map(event.pos)
             # FIXME: We should be able to use the main_map object to do the transform...but it doesn't work (waiting on vispy developers)
             # map_pos = self.main_map.transforms.get_transform().imap(buffer_pos)
-            map_pos = self.boundaries.transforms.get_transform().imap(buffer_pos)
+            map_pos = self.borders.transforms.get_transform().imap(buffer_pos)
             # point_marker = Markers(parent=self.main_map, symbol="disc", pos=np.array([map_pos[:2]]))
             # self.points.append(point_marker)
             self.newProbePoint.emit(self.layer_set.top_layer_uuid(), map_pos[:2])
@@ -417,7 +472,7 @@ class SceneGraphManager(QObject):
             self.on_point_probe_set("default_probe_name", map_pos[:2])
         elif event.button == 2 and modifiers == (SHIFT,):
             buffer_pos = event.sources[0].transforms.get_transform().map(event.pos)
-            map_pos = self.boundaries.transforms.get_transform().imap(buffer_pos)
+            map_pos = self.borders.transforms.get_transform().imap(buffer_pos)
             if self.pending_polygon.add_point(event.pos[:2], map_pos[:2], 60):
                 points = self.pending_polygon.points + [self.pending_polygon.points[0]]
                 for marker in self.pending_polygon.markers:
@@ -458,6 +513,22 @@ class SceneGraphManager(QObject):
 
     def update(self):
         return self.main_canvas.update()
+
+    def cycle_borders_color(self):
+        self._borders_color_idx = (self._borders_color_idx + 1) % len(self._color_choices)
+        if self._borders_color_idx + 1 == len(self._color_choices):
+            self.borders.visible = False
+        else:
+            self.borders.set_data(color=self._color_choices[self._borders_color_idx])
+            self.borders.visible = False
+
+    def cycle_grid_color(self):
+        self._latlon_grid_color_idx = (self._latlon_grid_color_idx + 1) % len(self._color_choices)
+        if self._latlon_grid_color_idx + 1 == len(self._color_choices):
+            self.latlon_grid.visible = False
+        else:
+            self.latlon_grid.set_data(color=self._color_choices[self._latlon_grid_color_idx])
+            self.latlon_grid.visible = True
 
     def change_camera(self, idx_or_name):
         if isinstance(idx_or_name, str):
