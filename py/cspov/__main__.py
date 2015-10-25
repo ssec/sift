@@ -843,9 +843,6 @@ class Main(QtGui.QMainWindow):
         self.graphManager = ProbeGraphManager(self.ui.probeTabWidget, self.workspace, self.document)
         self.graphManager.didChangeTab.connect(self.scene_manager.show_only_polygons)
 
-
-
-
     def closeEvent(self, event, *args, **kwargs):
         LOG.debug('main window closing')
         self.workspace.close()
@@ -909,6 +906,14 @@ class Main(QtGui.QMainWindow):
         remove.setShortcut(QtCore.Qt.Key_Delete)
         remove.triggered.connect(self.remove_layer)
 
+        cycle_borders = QtGui.QAction("Cycle &Borders", self)
+        cycle_borders.setShortcut('B')
+        cycle_borders.triggered.connect(self.scene_manager.cycle_borders_color)
+
+        cycle_grid = QtGui.QAction("Cycle &Lat/Lon Grid", self)
+        cycle_grid.setShortcut('L')
+        cycle_grid.triggered.connect(self.scene_manager.cycle_grid_color)
+
         edit_menu = menubar.addMenu('&Edit')
         edit_menu.addAction(remove)
 
@@ -922,6 +927,8 @@ class Main(QtGui.QMainWindow):
         view_menu.addAction(change_order)
         view_menu.addAction(toggle_vis)
         view_menu.addAction(flip_colormap)
+        view_menu.addAction(cycle_borders)
+        view_menu.addAction(cycle_grid)
 
         menubar.setEnabled(True)
 
@@ -933,6 +940,17 @@ class Main(QtGui.QMainWindow):
             return tmp_cb
 
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("c", self.scene_manager.next_camera))
+
+        def flip_selected_layers():
+            uuid = self.document.current_visible_layer
+            if uuid is None:
+                return
+                # XXX: Do we want to use the selection instead?
+                # uuids = list(self.behaviorLayersList.current_selected_uuids())
+            else:
+                uuids = [uuid]
+            self.document.flip_climits_for_layers(uuids)
+        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("/", flip_selected_layers))
 
         class ColormapSlot(object):
             def __init__(self, sgm, key='e'):
