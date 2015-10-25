@@ -682,11 +682,13 @@ class Main(QtGui.QMainWindow):
     def next_last_band(self, direction=0, *args, **kwargs):
         LOG.info('band incr {}'.format(direction))
         uuids = self.behaviorLayersList.current_selected_uuids()
+        new_focus = None
         if not uuids:
             pass # FIXME: notify user
         for uuid in uuids:
             new_focus = self.document.next_last_step(uuid, direction, bandwise=True)
-        self.behaviorLayersList.select([new_focus])
+        if new_focus is not None:
+            self.behaviorLayersList.select([new_focus])
 
     def change_animation_to_current_selection_siblings(self, *args, **kwargs):
         uuid = self._next_last_time_visibility(direction=0)
