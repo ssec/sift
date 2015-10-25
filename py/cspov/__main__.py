@@ -515,8 +515,61 @@ class ProbeGraphDisplay (object) :
         axes.set_xbound(x_bounds)
         axes.set_ybound(y_bounds)
 
+
+class AnimationSpeedPopupWindow(QtGui.QWidget):
+    _slider = None
+
+    def __init__(self, slot, *args, **kwargs):
+        super(AnimationSpeedPopupWindow, self).__init__(*args, **kwargs)
+        from PyQt4.QtCore import Qt
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Popup)
+        self.setFocusPolicy(Qt.ClickFocus)
+        self._slider = QtGui.QSlider(parent=self)
+        # n, x = self._convert(10, reverse=True), self._convert(5000, reverse=True)
+        n, x = 2, 300  # frames per 10 seconds
+        self._slider.setRange(n, x) #
+        # self._slider.setSingleStep(1)
+        # self._slider.setInvertedAppearance(True)
+        self._slot = slot
+        self._slider.valueChanged.connect(self._changed)
+        self._layout = QtGui.QHBoxLayout()
+        self._layout.addWidget(self._slider)
+        self.setLayout(self._layout)
+
+    def _convert(self, val, reverse=False):
+        """
+        map 1..100 nonlinearly to 10ms .. 5000ms
+        :param val: ticks to convert to milliseconds
+        :param reverse: when true, reverse conversion
+        :return:
+        """
+        if reverse: # convert milliseconds to fp10s
+            fp10s = 10000.0 / float(val)
+            return int(fp10s)
+        else:
+            ms = 10000.0 / float(val)
+            return int(ms)
+
+    def _changed(self, value):
+        val = self._convert(value)
+        self._slot(val)
+
+    def show_at(self, pos, val):
+        from PyQt4.QtCore import QRect, QPoint, QSize
+        sz = QSize(40, 256)
+        pt = QPoint(pos.x() - 20, pos.y() - 100)
+        rect = QRect(pt, sz)
+        self.setGeometry(rect)
+        self._slider.setValue(self._convert(val, reverse=True))
+        self.show()
+
+    def focusOutEvent(self, *args, **kwargs):
+        self.hide()
+
+
 class Main(QtGui.QMainWindow):
     _last_open_dir = None  # directory to open files in
+    _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
 
     def open_files(self):
         files = QtGui.QFileDialog.getOpenFileNames(self,
@@ -638,9 +691,28 @@ class Main(QtGui.QMainWindow):
             self.ui.cursorProbeText.setText("Layer with time steps needed")
         LOG.info('using siblings of {} for animation loop'.format(uuids[0]))
 
+    def set_animation_speed(self, milliseconds):
+        LOG.info('animation speed set to {}ms'.format(milliseconds))
+        # FUTURE: propagate this into the document?
+        self.scene_manager.layer_set.animation_speed = milliseconds
+
+    def show_animation_speed_slider(self, pos:QtCore.QPoint, *args):
+        LOG.info('menu requested for animation control')
+        gpos = self.ui.animPlayPause.mapToGlobal(pos)
+
+        if self._animation_speed_popup is None:
+            self._animation_speed_popup = popup = AnimationSpeedPopupWindow(slot=self.set_animation_speed, parent=None)
+        else:
+            popup = self._animation_speed_popup
+        if not popup.isVisible():
+            popup.show_at(gpos, self.scene_manager.layer_set.animation_speed)
+
     def toggle_visibility_on_selected_layers(self, *args, **kwargs):
         uuids = self.behaviorLayersList.current_selected_uuids()
         self.document.toggle_layer_visibility(uuids)
+
+    def toggle_animation(self, event, *args, **kwargs):
+        self.scene_manager.layer_set.toggle_animation(*args, **kwargs)
 
     # def accept_new_layer(self, new_order, info, overview_content):
     #     LOG.debug('accepting new layer order {0!r:s}'.format(new_order))
@@ -649,7 +721,6 @@ class Main(QtGui.QMainWindow):
     #         self.document.animate_using_layer(info[INFO.UUID])
     #         self.animation_slider_jump_frame(None)
     #         self.behaviorLayersList.select([info[INFO.UUID]])
-
 
     def __init__(self, workspace_dir=None, workspace_size=None, glob_pattern=None, border_shapefile=None):
         super(Main, self).__init__()
@@ -672,7 +743,9 @@ class Main(QtGui.QMainWindow):
         self.ui.mainWidgets.addTab(self.scene_manager.main_canvas.native, 'Mercator')
 
         self.scene_manager.didChangeFrame.connect(self.update_frame_slider)
-        self.ui.animPlayPause.clicked.connect(self.scene_manager.layer_set.toggle_animation)
+        self.ui.animPlayPause.clicked.connect(self.toggle_animation)
+        self.ui.animPlayPause.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.ui.animPlayPause.customContextMenuRequested.connect(self.show_animation_speed_slider)
         self.ui.animForward.clicked.connect(self.scene_manager.layer_set.next_frame)
         last_frame = partial(self.scene_manager.layer_set.next_frame, frame_number=-1)
         self.ui.animBack.clicked.connect(last_frame)
@@ -757,13 +830,16 @@ class Main(QtGui.QMainWindow):
         self.graphManager = ProbeGraphManager(self.ui.probeTabWidget, self.workspace, self.document)
         self.graphManager.didChangeTab.connect(self.scene_manager.show_only_polygons)
 
+
+
+
     def closeEvent(self, event, *args, **kwargs):
         LOG.debug('main window closing')
         self.workspace.close()
 
     def toggle_animation(self, action:QtGui.QAction=None, *args):
         new_state = self.scene_manager.layer_set.toggle_animation()
-        action.setChecked(new_state)
+        self.ui.animPlayPause.setChecked(new_state)
 
     def setup_menu(self):
         open_action = QtGui.QAction("&Open", self)

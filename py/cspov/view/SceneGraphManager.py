@@ -153,7 +153,8 @@ class LayerSet(object):
         self._animating = False
         self._frame_number = 0
         self._frame_change_cb = frame_change_cb
-        self._animation_timer = app.Timer(DEFAULT_ANIMATION_DELAY, connect=self.next_frame)
+        self._animation_speed = DEFAULT_ANIMATION_DELAY
+        self._animation_timer = app.Timer(self._animation_speed, connect=self.next_frame)
 
         if layers is not None:
             self.set_layers(layers)
@@ -165,6 +166,24 @@ class LayerSet(object):
             if frame_order is None:
                 frame_order = [x.name for x in layers.keys()]
             self.frame_order = frame_order
+
+    @property
+    def animation_speed(self):
+        """speed in milliseconds
+        """
+        return self._animation_speed
+
+    @animation_speed.setter
+    def animation_speed(self, milliseconds):
+        if milliseconds <= 0:
+            return
+        self._animating = True
+        # if self._animation_timer.isActive():
+        #     self._animation_timer.stop()
+        self._animation_timer.start(milliseconds)
+        if self._frame_change_cb is not None and self._frame_order:
+            uuid = self._frame_order[self._frame_number]
+            self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating, uuid))
 
     def set_layers(self, layers):
         # FIXME clear the existing layers
