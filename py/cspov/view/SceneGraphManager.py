@@ -411,6 +411,7 @@ class SceneGraphManager(QObject):
 
         self._latlon_grid_color_idx = 1
         self.latlon_grid = self._init_latlon_grid_layer(color=self._color_choices[self._latlon_grid_color_idx])
+        self.latlon_grid.transform = STTransform(translate=(0, 0, 45))
 
     def _init_latlon_grid_layer(self, color=None, resolution=5.):
         """Create a series of line segments representing latitude and longitude lines.
