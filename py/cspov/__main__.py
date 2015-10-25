@@ -555,6 +555,8 @@ class AnimationSpeedPopupWindow(QtGui.QWidget):
     def _changed(self, value):
         if not self._active:
             return
+        fps = float(value) / 10.0
+        self.setToolTip('{0:.1f} fps'.format(fps))
         val = self._convert(value)
         self._slot(val)
 
