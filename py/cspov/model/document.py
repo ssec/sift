@@ -190,6 +190,7 @@ class Document(QObject):
         # add as visible to the front of the current set, and invisible to the rest of the available sets
         cmap = self._default_colormap(info)
         info[INFO.CLIM] = self._guidebook.climits(info)
+        info[INFO.NAME] = self._guidebook.display_name(info) or info[INFO.NAME]
         p = prez(uuid=uuid,
                  kind=info[INFO.KIND],
                  visible=True,
@@ -197,7 +198,7 @@ class Document(QObject):
                  colormap=cmap,
                  climits=info[INFO.CLIM],
                  mixing=mixing.NORMAL)
-        q = p._replace(visible=False)
+        q = p._replace(visible=False)  # make it available but not visible in other layer sets
         old_layer_count = len(self._layer_sets[self.current_set_index])
         for dex,lset in enumerate(self._layer_sets):
             if lset is not None:  # uninitialized layer sets will be None
@@ -210,6 +211,11 @@ class Document(QObject):
             self.animate_siblings_of_layer(uuid)
 
         return uuid, info, content
+
+    def open_files(self, paths, insert_before=0):
+        paths = list(self._guidebook.sort_paths(paths))
+        for path in reversed(paths):
+            self.open_file(path, insert_before)
 
     def time_label_for_uuid(self, uuid):
         """used to update animation display when a new frame is shown
