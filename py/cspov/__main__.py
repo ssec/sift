@@ -812,6 +812,10 @@ class Main(QtGui.QMainWindow):
         change_order.setShortcut('O')
         change_order.triggered.connect(self.change_animation_to_current_selection_siblings)
 
+        flip_colormap = QtGui.QAction("Flip Color Limits (Top Layer)", self)
+        flip_colormap.setShortcut("/")
+        flip_colormap.triggered.connect(lambda: self.document.flip_climits_for_layers([self.document.current_visible_layer]))
+
         remove = QtGui.QAction("Remove Layer", self)
         remove.setShortcut(QtCore.Qt.Key_Delete)
         remove.triggered.connect(self.remove_layer)
@@ -828,10 +832,9 @@ class Main(QtGui.QMainWindow):
         view_menu.addAction(next_band)
         view_menu.addAction(change_order)
         view_menu.addAction(toggle_vis)
-
+        view_menu.addAction(flip_colormap)
 
         menubar.setEnabled(True)
-
 
     def setup_key_releases(self):
         def cb_factory(required_key, cb):
@@ -840,20 +843,7 @@ class Main(QtGui.QMainWindow):
                     return cb()
             return tmp_cb
 
-        # self.scene_manager.main_canvas.events.key_release.connect(cb_factory("a", self.scene_manager.layer_set.toggle_animation))
-        # self.scene_manager.main_canvas.events.key_release.connect(cb_factory("n", self.scene_manager.layer_set.next_frame))
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("c", self.scene_manager.next_camera))
-
-        def flip_selected_layers():
-            uuid = self.document.current_visible_layer
-            if uuid is None:
-                return
-                # XXX: Do we want to use the selection instead?
-                # uuids = list(self.behaviorLayersList.current_selected_uuids())
-            else:
-                uuids = [uuid]
-            self.document.flip_climits_for_layers(uuids)
-        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("/", flip_selected_layers))
 
         class ColormapSlot(object):
             def __init__(self, sgm, key='e'):
