@@ -518,15 +518,17 @@ class ProbeGraphDisplay (object) :
 
 class AnimationSpeedPopupWindow(QtGui.QWidget):
     _slider = None
+    _active = False
 
     def __init__(self, slot, *args, **kwargs):
         super(AnimationSpeedPopupWindow, self).__init__(*args, **kwargs)
         from PyQt4.QtCore import Qt
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Popup)
         self.setFocusPolicy(Qt.ClickFocus)
+        self.setToolTip('Set animation speed')
         self._slider = QtGui.QSlider(parent=self)
         # n, x = self._convert(10, reverse=True), self._convert(5000, reverse=True)
-        n, x = 2, 300  # frames per 10 seconds
+        n, x = 2, 150  # frames per 10 seconds
         self._slider.setRange(n, x) #
         # self._slider.setSingleStep(1)
         # self._slider.setInvertedAppearance(True)
@@ -545,26 +547,30 @@ class AnimationSpeedPopupWindow(QtGui.QWidget):
         """
         if reverse: # convert milliseconds to fp10s
             fp10s = 10000.0 / float(val)
-            return int(fp10s)
+            return fp10s
         else:
             ms = 10000.0 / float(val)
-            return int(ms)
+            return ms
 
     def _changed(self, value):
+        if not self._active:
+            return
         val = self._convert(value)
         self._slot(val)
 
     def show_at(self, pos, val):
         from PyQt4.QtCore import QRect, QPoint, QSize
-        sz = QSize(40, 256)
-        pt = QPoint(pos.x() - 20, pos.y() - 100)
+        sz = QSize(40, 180)
+        pt = QPoint(pos.x() - 20, pos.y() - 160)
         rect = QRect(pt, sz)
         self.setGeometry(rect)
-        self._slider.setValue(self._convert(val, reverse=True))
         self.show()
+        self._slider.setValue(int(self._convert(val, reverse=True)))
+        self._active = True
 
     def focusOutEvent(self, *args, **kwargs):
         self.hide()
+        self._active = False
 
 
 class Main(QtGui.QMainWindow):
@@ -746,9 +752,14 @@ class Main(QtGui.QMainWindow):
         self.ui.animPlayPause.clicked.connect(self.toggle_animation)
         self.ui.animPlayPause.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.ui.animPlayPause.customContextMenuRequested.connect(self.show_animation_speed_slider)
-        self.ui.animForward.clicked.connect(self.scene_manager.layer_set.next_frame)
-        last_frame = partial(self.scene_manager.layer_set.next_frame, frame_number=-1)
-        self.ui.animBack.clicked.connect(last_frame)
+        def next_frame(*args, **kwargs):
+            self.scene_manager.animating = False
+            self.scene_manager.layer_set.next_frame()
+        self.ui.animForward.clicked.connect(next_frame)
+        def prev_frame(*args, **kwargs):
+            self.scene_manager.animating = False
+            self.scene_manager.layer_set.next_frame(frame_number=-1)
+        self.ui.animBack.clicked.connect(prev_frame)
 
         # allow animation slider to set animation frame being displayed:
         self.ui.animationSlider.valueChanged.connect(self.animation_slider_jump_frame)

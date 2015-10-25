@@ -153,8 +153,8 @@ class LayerSet(object):
         self._animating = False
         self._frame_number = 0
         self._frame_change_cb = frame_change_cb
-        self._animation_speed = DEFAULT_ANIMATION_DELAY
-        self._animation_timer = app.Timer(self._animation_speed, connect=self.next_frame)
+        self._animation_speed = DEFAULT_ANIMATION_DELAY  # milliseconds
+        self._animation_timer = app.Timer(self._animation_speed/1000.0, connect=self.next_frame)
 
         if layers is not None:
             self.set_layers(layers)
@@ -177,10 +177,12 @@ class LayerSet(object):
     def animation_speed(self, milliseconds):
         if milliseconds <= 0:
             return
-        self._animating = True
-        # if self._animation_timer.isActive():
-        #     self._animation_timer.stop()
-        self._animation_timer.start(milliseconds)
+        self._animation_timer.stop()
+        self._animation_speed = milliseconds
+        self._animation_timer.interval = milliseconds/1000.0
+        if self._frame_order:
+            self._animating = True
+            self._animation_timer.start()
         if self._frame_change_cb is not None and self._frame_order:
             uuid = self._frame_order[self._frame_number]
             self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating, uuid))
@@ -258,12 +260,12 @@ class LayerSet(object):
 
     @animating.setter
     def animating(self, animate):
-        print("Running animating {} with {} frames".format(animate, len(self._frame_order)))
         if self._animating and not animate:
             # We are currently, but don't want to be
             self._animating = False
             self._animation_timer.stop()
         elif not self._animating and animate and self._frame_order:
+            print("Running animating {} with {} frames".format(animate, len(self._frame_order)))
             # We are not currently, but want to be
             self._animating = True
             self._animation_timer.start()
