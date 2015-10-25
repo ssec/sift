@@ -520,7 +520,7 @@ class SceneGraphManager(QObject):
             self.borders.visible = False
         else:
             self.borders.set_data(color=self._color_choices[self._borders_color_idx])
-            self.borders.visible = False
+            self.borders.visible = True
 
     def cycle_grid_color(self):
         self._latlon_grid_color_idx = (self._latlon_grid_color_idx + 1) % len(self._color_choices)

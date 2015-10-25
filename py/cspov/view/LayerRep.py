@@ -1029,7 +1029,7 @@ class OldTiledImageFile(LayerRep):
                 # t.set_mvp(model=self.model, view=self.view)
 
 
-class ShapefileLinesVisual(CompoundVisual):
+class ShapefileLinesVisual(LineVisual):
     def __init__(self, filepath, projection=DEFAULT_PROJECTION, double=False, **kwargs):
         LOG.debug("Using border shapefile '%s'", filepath)
         self.sf = shapefile.Reader(filepath)
@@ -1066,10 +1066,9 @@ class ShapefileLinesVisual(CompoundVisual):
 
         kwargs.setdefault("color", (1.0, 1.0, 1.0, 1.0))
         kwargs.setdefault("width", 1)
-        self._border_lines = LineVisual(vertex_buffer, connect="segments", **kwargs)
+        super().__init__(pos=vertex_buffer, connect="segments", **kwargs)
         print("Done loading boundaries: ", datetime.utcnow().isoformat(" "))
 
-        super(ShapefileLinesVisual, self).__init__((self._border_lines,))
 
 
 ShapefileLines = create_visual_node(ShapefileLinesVisual)
