@@ -251,13 +251,17 @@ class LayerStackListViewModel(QAbstractListModel):
         # FUTURE: this is quick and dirty
         rowdict = dict((u,i) for i,u in enumerate(self.doc.current_layer_order))
         items = QItemSelection()
+        q = None
         for uuid in uuids:
-            row = rowdict[uuid]
+            row = rowdict.get(uuid, None)
+            if row is None:
+                LOG.error('UUID {} cannot be selected in list view'.format(uuid))
+                continue
             q = self.createIndex(row, 0)
             items.select(q, q)
             lbox.selectionModel().select(items, QItemSelectionModel.Select)
             # lbox.setCurrentIndex(q)
-        if scroll_to_show_single and len(uuids)==1:
+        if scroll_to_show_single and len(uuids)==1 and q is not None:
             lbox.scrollTo(q)
 
     def menu(self, pos:QPoint, *args):
