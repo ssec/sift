@@ -757,14 +757,14 @@ class Main(QtGui.QMainWindow):
         self.ui.animPlayPause.clicked.connect(self.toggle_animation)
         self.ui.animPlayPause.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.ui.animPlayPause.customContextMenuRequested.connect(self.show_animation_speed_slider)
-        def next_frame(*args, **kwargs):
-            self.scene_manager.animating = False
-            self.scene_manager.layer_set.next_frame()
-        self.ui.animForward.clicked.connect(next_frame)
-        def prev_frame(*args, **kwargs):
-            self.scene_manager.animating = False
-            self.scene_manager.layer_set.next_frame(frame_number=-1)
-        self.ui.animBack.clicked.connect(prev_frame)
+        # def next_frame(*args, **kwargs):
+        #     self.scene_manager.animating = False
+        #     self.scene_manager.layer_set.next_frame()
+        # self.ui.animForward.clicked.connect(next_frame)
+        # def prev_frame(*args, **kwargs):
+        #     self.scene_manager.animating = False
+        #     self.scene_manager.layer_set.next_frame(frame_number=-1)
+        # self.ui.animBack.clicked.connect(prev_frame)
 
         # allow animation slider to set animation frame being displayed:
         self.ui.animationSlider.valueChanged.connect(self.animation_slider_jump_frame)
@@ -870,7 +870,9 @@ class Main(QtGui.QMainWindow):
 
         next_time = QtGui.QAction("Next Time", self)
         next_time.setShortcut(QtCore.Qt.Key_Right)
-        next_time.triggered.connect(partial(self.next_last_time, direction=1))
+        next_slot = partial(self.next_last_time, direction=1)
+        next_time.triggered.connect(next_slot)
+        self.ui.animForward.clicked.connect(next_slot)
 
         focus_current = QtGui.QAction("Focus Current Timestep", self)
         focus_current.setShortcut('.')
@@ -878,7 +880,9 @@ class Main(QtGui.QMainWindow):
 
         prev_time = QtGui.QAction("Previous Time", self)
         prev_time.setShortcut(QtCore.Qt.Key_Left)
-        prev_time.triggered.connect(partial(self.next_last_time, direction=-1))
+        prev_slot = partial(self.next_last_time, direction=-1)
+        prev_time.triggered.connect(prev_slot)
+        self.ui.animBack.clicked.connect(prev_slot)
 
         next_band = QtGui.QAction("Next Band", self)
         next_band.setShortcut(QtCore.Qt.Key_Up)
