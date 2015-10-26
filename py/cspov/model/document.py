@@ -134,7 +134,7 @@ class Document(QObject):
 
     # signals
     didAddLayer = pyqtSignal(list, dict, prez, np.ndarray)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
-    didRemoveLayer = pyqtSignal(list, UUID)  # new order, UUID that was removed from current layer set
+    didRemoveLayers = pyqtSignal(list, list, int, int)  # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
     willPurgeLayer = pyqtSignal(UUID)  # UUID of the layer being removed
     didReorderLayers = pyqtSignal(list)  # list of original indices in their new order, None for new layers
     didChangeLayerVisibility = pyqtSignal(dict)  # {UUID: new-visibility, ...} for changed layers
@@ -490,6 +490,17 @@ class Document(QObject):
         # nfo = self._layer_with_uuid[uuid]
         # return nfo
 
+    def reorder_by_indices(self, new_order, layer_set_index=None):
+        """given a new layer order, replace the current layer set
+        emits signal to other subsystems
+        """
+        if layer_set_index is None:
+            layer_set_index = self.current_set_index
+        assert(len(new_order)==len(self._layer_sets[layer_set_index]))
+        new_layer_set = [self._layer_sets[layer_set_index][n] for n in new_order]
+        self._layer_sets[layer_set_index] = new_layer_set
+        self.didReorderLayers.emit(new_order)
+
     def insert_layer_prez(self, row:int, layer_prez_seq):
         cls = self.current_layer_set
         clo = list(range(len(cls)))
@@ -504,7 +515,6 @@ class Document(QObject):
                 continue
             cls.insert(row, p)
             clo.insert(row, None)
-        self.didReorderLayers.emit(clo)
 
     def is_using(self, uuid:UUID, layer_set:int=None):
         "return true if this dataset is still in use in one of the layer sets"
@@ -535,8 +545,8 @@ class Document(QObject):
         clo = list(range(len(self.current_layer_set)))
         del clo[row:row+count]
         del self.current_layer_set[row:row+count]
+        self.didRemoveLayers.emit(clo, uuids, row, count)
         for uuid in uuids:
-            self.didRemoveLayer.emit(clo, uuid)
             if not self.is_using(uuid):
                 LOG.info('purging layer {}, no longer in use'.format(uuid))
                 self.willPurgeLayer.emit(uuid)
