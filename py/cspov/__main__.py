@@ -944,17 +944,6 @@ class Main(QtGui.QMainWindow):
 
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("c", self.scene_manager.next_camera))
 
-        def flip_selected_layers():
-            uuid = self.document.current_visible_layer
-            if uuid is None:
-                return
-                # XXX: Do we want to use the selection instead?
-                # uuids = list(self.behaviorLayersList.current_selected_uuids())
-            else:
-                uuids = [uuid]
-            self.document.flip_climits_for_layers(uuids)
-        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("/", flip_selected_layers))
-
         class ColormapSlot(object):
             def __init__(self, sgm, key='e'):
                 self.index = 0
