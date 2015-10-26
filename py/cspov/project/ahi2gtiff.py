@@ -50,12 +50,18 @@ def _proj4_to_srs(proj4_str):
     return srs
 
 
-def create_geotiff(data, output_filename, proj4_str, geotransform, etype=gdal.GDT_UInt16, compress=None,
-                   quicklook=False, gcps=None, **kwargs):
+def create_geotiff(data, output_filename, proj4_str, geotransform, etype=gdal.GDT_Byte,
+                   compress=None, predictor=None, tile=False,
+                   blockxsize=None, blockysize=None,
+                   quicklook=False, gcps=None,
+                   nodata=np.nan, **kwargs):
     """Function that creates a geotiff from the information provided.
     """
     log_level = logging.getLogger('').handlers[0].level or 0
     LOG.info("Creating geotiff '%s'" % (output_filename,))
+
+    if etype != gdal.GDT_Float32 and np.isnan(nodata):
+        nodata = 0
 
     # Find the number of bands provided
     if isinstance(data, (list, tuple)):
@@ -81,6 +87,14 @@ def create_geotiff(data, output_filename, proj4_str, geotransform, etype=gdal.GD
 
     if compress is not None and compress != "NONE":
         options.append("COMPRESS=%s" % (compress,))
+        if predictor is not None:
+            options.append("PREDICTOR=%d" % (predictor,))
+    if tile:
+        options.append("TILED=YES")
+    if blockxsize is not None:
+        options.append("BLOCKXSIZE=%d" % (blockxsize,))
+    if blockysize is not None:
+        options.append("BLOCKYSIZE=%d" % (blockysize,))
 
     # Creating the file will truncate any pre-existing file
     LOG.debug("Creation Geotiff with options %r", options)
@@ -108,13 +122,16 @@ def create_geotiff(data, output_filename, proj4_str, geotransform, etype=gdal.GD
         else:
             band_data = data[idx]
 
-        if log_level <= logging.DEBUG:
-            LOG.debug("Data min: %f, max: %f" % (band_data.min(), band_data.max()))
+        # if log_level <= logging.DEBUG:
+        #     LOG.debug("Data min: %f, max: %f" % (band_data.min(), band_data.max()))
 
         # Write the data
         if gtiff_band.WriteArray(band_data) != 0:
             LOG.error("Could not write band 1 data to geotiff '%s'" % (output_filename,))
             raise ValueError("Could not write band 1 data to geotiff '%s'" % (output_filename,))
+
+        # Set No Data value
+        gtiff_band.SetNoDataValue(nodata)
 
     if quicklook:
         png_filename = output_filename.replace(os.path.splitext(output_filename)[1], ".png")
@@ -132,7 +149,7 @@ def ahi_image_data(input_filename):
     else:
         input_data = nc.variables["brightness_temp"][:]
     input_data = input_data.astype(np.float32)  # make sure everything is 32-bit floats
-    return input_data
+    return input_data.filled(np.nan)
 
 
 def ahi_image_info(input_filename):
@@ -147,7 +164,8 @@ def ahi_image_info(input_filename):
 
     # Notes on Sweep: https://trac.osgeo.org/proj/wiki/proj%3Dgeos
     # If AHI behaves like GOES then sweep should be Y
-    input_proj_str = "+proj=geos "
+    # +over is needed so that we do 0-360 lon/lats and x/y
+    input_proj_str = "+proj=geos +over "
     input_proj_str += "+lon_0={longitude_of_projection_origin:0.3f} "
     input_proj_str += "+lat_0={latitude_of_projection_origin:0.3f} "
     input_proj_str += "+a={semi_major_axis:0.3f} "
@@ -159,8 +177,7 @@ def ahi_image_info(input_filename):
     LOG.debug("AHI Fixed Grid Projection String: %s", input_proj_str)
 
     # Calculate upper-left corner (origin) using center point as a reference
-    lon = nc.variables["longitude"][:]
-    shape = lon.shape
+    shape = (len(nc.dimensions["y"]), len(nc.dimensions["x"]))
     pixel_size_x = AHI_NADIR_RES[shape[0]]
     pixel_size_y = -AHI_NADIR_RES[shape[1]]
 
@@ -170,8 +187,21 @@ def ahi_image_info(input_filename):
     LOG.debug("Origin X: %f\tOrigin Y: %f", origin_x, origin_y)
 
     # AHI NetCDF files have "proper" 0-360 longitude so lon_min is west, lon_max is east
-    lon_min = lon.min()
-    lon_max = lon.max()
+    # Find the left side of the image and the right side of the image
+    p = Proj(input_proj_str)
+    x = np.empty(shape, dtype=np.float32)
+    x[:] = origin_x + (pixel_size_x * np.arange(shape[1], dtype=np.float32))
+    y = np.empty(shape, dtype=np.float32)
+    y[:] = origin_y + (pixel_size_y * np.arange(shape[0], dtype=np.float32)[:, None])
+    lon, lat = p(x, y, inverse=True)
+    lon[lon == 1e30] = np.nan
+    lat[lat == 1e30] = np.nan
+    lon_min = np.nanmin(lon)
+    lon_max = np.nanmax(lon)
+    lat_south = np.nanmin(lat)
+    lat_north = np.nanmax(lat)
+    LOG.info("Longitude Minimum: %f; Maximum: %f" % (lon_min, lon_max))
+    LOG.info("Latitude Minimum: %f; Maximum: %f" % (lat_south, lat_north))
     if lon_max >= 180 or (lon_max - lon_min) < 180:
         # If longitudes are 0-360 then coordinates are as expected
         lon_west = lon_min
@@ -190,6 +220,7 @@ def ahi_image_info(input_filename):
         "width": shape[1],
         "height": shape[0],
         "lon_extents": (lon_west, lon_east),
+        "lat_extents": (lat_south, lat_north),
     }
     return info
 
@@ -198,14 +229,14 @@ def ahi2gtiff(input_filename, output_filename):
     LOG.debug("Opening input netcdf4 file: %s", input_filename)
     data = ahi_image_data(input_filename)
     info = ahi_image_info(input_filename)
-    return ahi2gtiff(info, data, output_filename)
+    return create_ahi_geotiff(info, data, output_filename)
 
 
-def create_ahi_geotiff(info, data, output_filename):
+def create_ahi_geotiff(info, data, output_filename, **kwargs):
     etype = gdal.GDT_Byte if data.dtype == np.uint8 else gdal.GDT_Float32
     # origin_x, cell_width, rotation_x, origin_y, rotation_y, cell_height
     geotransform = (info["origin_x"], info["cell_width"], 0, info["origin_y"], 0, info["cell_height"])
-    create_geotiff(data, output_filename, info["proj"], geotransform, etype=etype)
+    create_geotiff(data, output_filename, info["proj"], geotransform, etype=etype, **kwargs)
 
 
 def main():

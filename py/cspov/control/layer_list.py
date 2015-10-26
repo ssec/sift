@@ -39,13 +39,12 @@ import weakref
 import pickle as pkl
 import base64
 from PyQt4.QtCore import QAbstractListModel, QAbstractTableModel, QVariant, Qt, QSize, QModelIndex, QPoint, QMimeData
-from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyleOptionViewItem
+from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyleOptionViewItem, QItemSelection, QItemSelectionModel
 from cspov.model.document import Document
 from cspov.common import INFO, KIND
+from cspov.view.Colormap import ALL_COLORMAPS, CATEGORIZED_COLORMAPS
 
 LOG = logging.getLogger(__name__)
-
-COLOR_MAP_LIST=["grays", "autumn", "fire", "hot", "winter", "test"]  # FIXME: DRY violation
 
 COLUMNS=('Visibility', 'Name', 'Enhancement')
 
@@ -173,7 +172,7 @@ class LayerStackListViewModel(QAbstractListModel):
         doc.didChangeColormap.connect(self.refresh)
         doc.didChangeLayerVisibility.connect(self.refresh)
         doc.didChangeLayerName.connect(self.refresh)
-        doc.didAddLayer.connect(self.refresh)
+        doc.didAddLayer.connect(self.doc_added_layer)
         doc.willPurgeLayer.connect(self.refresh)
         doc.didSwitchLayerSet.connect(self.refresh)
         doc.didReorderAnimation.connect(self.refresh)
@@ -185,7 +184,7 @@ class LayerStackListViewModel(QAbstractListModel):
 
     def _init_widget(self, listbox:QListView):
         listbox.setModel(self)
-        # listbox.setItemDelegate(self.item_delegate) FIXME
+        listbox.setItemDelegate(self.item_delegate)
         listbox.setContextMenuPolicy(Qt.CustomContextMenu)
         # listbox.customContextMenuRequested.connect(self.context_menu)
         listbox.customContextMenuRequested.connect(self.menu)
@@ -196,7 +195,7 @@ class LayerStackListViewModel(QAbstractListModel):
         # listbox.indexesMoved.connect(FIXME)
         # listbox.setMovement(QListView.Snap)
         # listbox.setDragDropMode(QListView.InternalMove)
-        # listbox.setDragDropMode(QAbstractItemView.DragDrop)
+        listbox.setDragDropMode(QAbstractItemView.DragDrop)
         # listbox.setDefaultDropAction(Qt.MoveAction)
         # listbox.setDragDropOverwriteMode(False)
         # listbox.clicked.connect(self.layer_clicked)
@@ -222,10 +221,18 @@ class LayerStackListViewModel(QAbstractListModel):
             if widget.isVisible():
                 return widget
 
+    def doc_added_layer(self, new_order, info, content):
+        dexes = [i for i,q in enumerate(new_order) if q==None]
+        for dex in dexes:
+            self.beginInsertRows(QModelIndex(), dex, dex)
+            self.endInsertRows()
+        self.refresh()
+
     def refresh(self):
         for widget in self.widgets:
             if widget.isVisible():
                 widget.update()
+            # FIXME refresh content, or make sure we're signaling layer insertion and removal to the list box
 
     def current_selected_uuids(self, lbox:QListView=None):
         # FIXME: this is just plain crufty, also doesn't work!
@@ -236,20 +243,59 @@ class LayerStackListViewModel(QAbstractListModel):
         for q in lbox.selectedIndexes():
             yield self.doc.uuid_for_layer(q.row())
 
+    def select(self, uuids, lbox:QListView=None, scroll_to_show_single=True):
+        lbox = self.current_set_listbox if lbox is None else lbox
+        lbox.clearSelection()
+        if not uuids:
+            return
+        # FUTURE: this is quick and dirty
+        rowdict = dict((u,i) for i,u in enumerate(self.doc.current_layer_order))
+        items = QItemSelection()
+        q = None
+        for uuid in uuids:
+            row = rowdict.get(uuid, None)
+            if row is None:
+                LOG.error('UUID {} cannot be selected in list view'.format(uuid))
+                continue
+            q = self.createIndex(row, 0)
+            items.select(q, q)
+            lbox.selectionModel().select(items, QItemSelectionModel.Select)
+            # lbox.setCurrentIndex(q)
+        if scroll_to_show_single and len(uuids)==1 and q is not None:
+            lbox.scrollTo(q)
+
     def menu(self, pos:QPoint, *args):
         LOG.info('menu requested for layer list')
         menu = QMenu()
         actions = {}
         lbox = self.current_set_listbox
-        for colormap in COLOR_MAP_LIST:
-            actions[menu.addAction(colormap)] = colormap
-        sel = menu.exec_(lbox.mapToGlobal(pos))
-        new_cmap = actions.get(sel, None)
+        # XXX: Normally we would create the menu and actions before hand but since we are checking the actions based
+        # on selection we can't. Then we would use an ActionGroup and make it exclusive
         selected_uuids = list(self.current_selected_uuids(lbox))
         LOG.debug("selected UUID set is {0!r:s}".format(selected_uuids))
-        if new_cmap is not None:
-            LOG.info("changing to colormap {0} for ids {1!r:s}".format(new_cmap, selected_uuids))
-            self.doc.change_colormap_for_layers(name=new_cmap) # FIXME, uuids=selected_uuids)
+        current_colormaps = set(self.doc.colormap_for_uuids(selected_uuids))
+        for cat, cat_colormaps in CATEGORIZED_COLORMAPS.items():
+            submenu = QMenu(cat, parent=menu)
+            for colormap in cat_colormaps.keys():
+                action = submenu.addAction(colormap)
+                actions[action] = colormap
+                action.setCheckable(True)
+                action.setChecked(colormap in current_colormaps)
+            menu.addMenu(submenu)
+        menu.addSeparator()
+        flip_action = menu.addAction("Flip Color Limits")
+        flip_action.setCheckable(True)
+        flip_action.setChecked(any(self.doc.flipped_for_uuids(selected_uuids)))
+        menu.addAction(flip_action)
+        sel = menu.exec_(lbox.mapToGlobal(pos))
+        if sel is flip_action:
+            LOG.info("flipping color limits for sibling ids {0!r:s}".format(selected_uuids))
+            self.doc.flip_climits_for_layers(uuids=selected_uuids)
+        else:
+            new_cmap = actions.get(sel, None)
+            if new_cmap is not None:
+                LOG.info("changing to colormap {0} for ids {1!r:s}".format(new_cmap, selected_uuids))
+                self.doc.change_colormap_for_layers(name=new_cmap, uuids=selected_uuids)
 
     @property
     def listing(self):
@@ -260,7 +306,16 @@ class LayerStackListViewModel(QAbstractListModel):
         if action == Qt.IgnoreAction:
             return True
 
-        if mime.hasFormat(self._mimetype):
+        if mime.hasFormat('text/uri-list'):
+            if mime.hasUrls():
+                LOG.debug('found urls in drop!')
+                for qurl in mime.urls():
+                    LOG.debug(qurl.path())
+                    if qurl.isLocalFile():
+                        path = qurl.path()
+                        self.doc.open_file(path)
+                return True
+        elif mime.hasFormat(self._mimetype):
             # unpickle the presentation information and re-insert it
             # b = base64.decodebytes(mime.text())
             b = mime.data(self._mimetype)
@@ -294,7 +349,7 @@ class LayerStackListViewModel(QAbstractListModel):
         return mime
 
     def mimeTypes(self):
-        return [self._mimetype]  # TODO, allow geotiff and other file types to be dropped in
+        return ['text/uri-list', self._mimetype]  # ref https://github.com/shotgunsoftware/pyqt-uploader/blob/master/uploader.py
 
     def flags(self, index):
         # flags = super(LayerStackListViewModel, self).flags(index)

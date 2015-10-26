@@ -27,12 +27,17 @@ import os, sys, re
 import logging, unittest, argparse
 import gdal, osr
 import numpy as np
+import shutil
 from collections import namedtuple
+from pickle import dump, load, HIGHEST_PROTOCOL
 from uuid import UUID, uuid1 as uuidgen
 from cspov.common import KIND, INFO
 from PyQt4.QtCore import QObject, pyqtSignal
 
 LOG = logging.getLogger(__name__)
+
+DEFAULT_WORKSPACE_SIZE = 256
+MIN_WORKSPACE_SIZE = 8
 
 import_progress = namedtuple('import_progress', ['uuid', 'stages', 'current_stage', 'completion', 'stage_desc', 'dataset_info', 'data'])
 # stages:int, number of stages this import requires
@@ -107,17 +112,6 @@ class GeoTiffImporter(WorkspaceImporter):
 
         d[INFO.NAME] = os.path.split(source_path)[-1]
         d[INFO.PATHNAME] = source_path
-        item = re.findall(r'_(B\d\d)_', source_path)[-1]  # FIXME: this should be a guidebook
-        # Valid min and max for colormap use
-        margin = 0.005
-        if item in ["B01", "B02", "B03", "B04", "B05", "B06"]:
-            # Reflectance/visible data limits
-            # FIXME: Are these correct?
-            d[INFO.CLIM] = (0.0, 1.0-margin)
-        else:
-            # BT data limits
-            # FIXME: Are these correct?
-            d[INFO.CLIM] = (200.0, 350.0)
 
         # FIXME: read this into a numpy.memmap backed by disk in the workspace
         img_data = gtiff.GetRasterBand(1).ReadAsArray()
@@ -165,6 +159,10 @@ class Workspace(QObject):
     _importers = None  # list of importers to consult when asked to start an import
     _info = None
     _data = None
+    _inventory = None  # dictionary of data
+    _inventory_path = None  # filename to store and load inventory information (simple cache)
+    _tempdir = None  # TemporaryDirectory, if it's needed (i.e. a directory name was not given)
+    _max_size_gb = None  # maximum size in gigabytes of flat files we cache in the workspace
 
     # signals
     didStartImport = pyqtSignal(dict)  # a dataset started importing; generated after overview level of detail is available
@@ -175,12 +173,22 @@ class Workspace(QObject):
 
     IMPORT_CLASSES = [ GeoTiffImporter ]
 
-    def __init__(self, directory_path=None, process_pool=None):
+    def __init__(self, directory_path=None, process_pool=None, max_size_gb=None):
         """
         Initialize a new or attach an existing workspace, creating any necessary bookkeeping.
         """
         super(Workspace, self).__init__()
+
+        self._max_size_gb = max_size_gb if max_size_gb is not None else DEFAULT_WORKSPACE_SIZE
+        if self._max_size_gb < MIN_WORKSPACE_SIZE:
+            self._max_size_gb = MIN_WORKSPACE_SIZE
+        if directory_path is None:
+            import tempfile
+            self._tempdir = tempfile.TemporaryDirectory()
+            directory_path = str(self._tempdir)
+            LOG.info('using temporary directory {}'.format(directory_path))
         self.cwd = directory_path = os.path.abspath(directory_path)
+        self._inventory_path = os.path.join(self.cwd, 'inventory.pkl')
         if not os.path.isdir(directory_path):
             os.makedirs(directory_path)
             self._own_cwd = True
@@ -195,12 +203,123 @@ class Workspace(QObject):
             global TheWorkspace  # singleton
             TheWorkspace = self
 
+    def _init_create_workspace(self):
+        """
+        initialize a previously empty workspace
+        :return:
+        """
+        self._inventory = {}
+        self._store_inventory()
+
     def _init_inventory_existing_datasets(self):
         """
         Do an inventory of an pre-existing workspace
         :return:
         """
-        pass
+        if os.path.exists(self._inventory_path):
+            with open(self._inventory_path, 'rb') as fob:
+                self._inventory = load(fob)
+        else:
+            self._init_create_workspace()
+
+    @staticmethod
+    def _key_for_path(path):
+        if not os.path.exists(path):
+            return None
+        s = os.stat(path)
+        return (os.path.realpath(path), s.st_mtime, s.st_size)
+
+    def _store_inventory(self):
+        """
+        write inventory dictionary to an inventory.pkl file in the cwd
+        :return:
+        """
+        atomic = self._inventory_path + '-tmp'
+        with open(atomic, 'wb') as fob:
+            dump(self._inventory, fob, HIGHEST_PROTOCOL)
+        shutil.move(atomic, self._inventory_path)
+
+    def _check_cache(self, path):
+        """
+        :param path: file we're checking
+        :return: uuid, info, overview_content if the data is already available without import
+        """
+        key = self._key_for_path(path)
+        nfo = self._inventory.get(key, None)
+        if nfo is None:
+            return None
+        uuid, info, data_info = nfo
+        dfilename, dtype, shape = data_info
+        dpath = os.path.join(self.cwd, dfilename)
+        if not os.path.exists(dpath):
+            del self._inventory[key]
+            self._store_inventory()
+            return None
+        data = np.memmap(dpath, dtype=dtype, mode='c', shape=shape)
+        return uuid, info, data
+
+    def _update_cache(self, path, uuid, info, data):
+        """
+        add or update the cache and put it to disk
+        :param path: path to get key from
+        :param uuid: uuid the data's been assigned
+        :param info: dataset info dictionary
+        :param data: numpy.memmap backed by a file in the workspace
+        :return:
+        """
+        key = self._key_for_path(path)
+        data_info = (os.path.split(data.filename)[1], data.dtype, data.shape)
+        nfo = (uuid, info, data_info)
+        self._inventory[key] = nfo
+        self._store_inventory()
+
+    def _clean_cache(self):
+        """
+        find stale content in the cache and get rid of it
+        this routine should eventually be compatible with backgrounding on a thread
+        possibly include a workspace setting for max workspace size in bytes?
+        :return:
+        """
+        # get information on current cache contents
+        LOG.info("cleaning cache")
+        cache = []
+        inv = dict(self._inventory)
+        total_size = 0
+        for key,nfo in self._inventory.items():
+            uuid,info,data_info = nfo
+            filename, dtype, shape = data_info
+            path = os.path.join(self.cwd, filename)
+            if os.path.exists(path):
+                st = os.stat(path)
+                cache.append((st.st_atime, st.st_size, path, key))
+                total_size += st.st_size
+            else:
+                LOG.info('removing stale {}'.format(key))
+                del inv[key]
+        # sort by atime
+        cache.sort()
+        GB = 1024**3
+        LOG.info("total cache size is {}GB of max {}GB".format(total_size/GB, self._max_size_gb))
+        max_size = self._max_size_gb * GB
+        while total_size > max_size:
+            _, size, path, key = cache.pop(0)
+            LOG.debug('{} GB in {}'.format(path, size/GB))
+            try:
+                os.remove(path)
+                LOG.info('removed {} for {}GB'.format(path, size/GB))
+            except:
+                # this could happen if the file is open in windows
+                LOG.error('unable to remove {} from cache'.format(path))
+                continue
+            del inv[key]
+            total_size -= size
+        self._inventory = inv
+        self._store_inventory()
+        # FUTURE: check for orphan files in the cache
+        return
+
+    def close(self):
+        self._clean_cache()
 
     def idle(self):
         """
@@ -210,7 +329,7 @@ class Workspace(QObject):
         """
         return False
 
-    def import_image(self, source_path=None, source_uri=None):
+    def import_image(self, source_path=None, source_uri=None, allow_cache=True):
         """
         Start loading URI data into the workspace asynchronously.
 
@@ -220,8 +339,16 @@ class Workspace(QObject):
         if source_uri is not None and source_path is None:
             raise NotImplementedError('URI load not yet supported')
 
+        nfo = None
+        if allow_cache and source_path is not None:
+            nfo = self._check_cache(source_path)
+            if nfo is not None:
+                uuid, info, data = nfo
+                self._info[uuid] = info
+                self._data[uuid] = data
+                return nfo
+
         gen = None
-        # FIXME: check if the data is already in the workspace
         uuid = uuidgen()
         for imp in self._importers:
             if imp.is_relevant(source_path=source_path):
@@ -237,14 +364,19 @@ class Workspace(QObject):
                 data = self._data[uuid] = update.data
                 LOG.debug(repr(update))
         # copy the data into an anonymous memmap
-        self._data[uuid] = self._convert_to_memmap(data)
+        self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
+        if allow_cache:
+            self._update_cache(source_path, uuid, info, data)
+        # TODO: schedule cache cleaning in background after a series of imports completes
         return uuid, info, data
 
-    def _convert_to_memmap(self, data:np.ndarray):
+    def _convert_to_memmap(self, filename, data:np.ndarray):
         if isinstance(data, np.memmap):
             return data
-        from tempfile import TemporaryFile
-        fp = TemporaryFile()
+        # from tempfile import TemporaryFile
+        # fp = TemporaryFile()
+        pathname = os.path.join(self.cwd, filename)
+        fp = open(pathname, 'wb+')
         mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
         mm[:] = data[:]
         return mm
