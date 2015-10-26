@@ -110,7 +110,7 @@ rain_rate = Colormap(colors=_rain_rate_colors, controls=_rain_rate_control_point
 
 _color11new_control_points = (0.0, 0.0019540791402051783, 0.1265266243282853, 0.2510991695163654, 0.37567171470444555, 0.43820224719101125, 0.5007327796775769, 0.625305324865657, 0.6878358573522227, 0.7503663898387885, 1.0)
 _color11new_colors = ('#7e0000', '#190000', '#fe0000', '#fffe00', '#00ff00', '#00807e', '#00fefe', '#0000ff', '#7e0080', '#fe00fe', '#000000')
-color11new = Colormap(colors=_color11new_colors, controls=_color11new_control_points)
+color11new = FlippedColormap(colors=_color11new_colors, controls=_color11new_control_points)
 # _cira_ir_default_control_points = (0.0, 0.6627450980392157, 0.7215686274509804, 0.7254901960784313, 0.7607843137254902, 0.8, 0.803921568627451, 0.8470588235294118, 0.8901960784313725, 0.9215686274509803, 0.9568627450980393, 0.9921568627450981, 1.0)
 # _cira_ir_default_colors = ('#000000', '#f9f9f9', '#686600', '#5e5a00', '#e20000', '#97009b', '#8b008c', '#00c6d0', '#006f00', '#d8d8d8', '#000077', '#360017', '#ffffff')
 # cira_ir_default = Colormap(colors=_cira_ir_default_colors, controls=_cira_ir_default_control_points)
