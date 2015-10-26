@@ -52,48 +52,57 @@ guam_cases["Introduction"] = []
 guam_cases["Introduction"].append(DataCase("Introduction",
                                            datetime(2015, 7, 17, 21, 0, 0),
                                            datetime(2015, 7, 18, 20, 0, 0),
-                                           timedelta(minutes=60)))
+                                           timedelta(minutes=60),
+                                           "all"))
 guam_cases["Introduction"].append(DataCase("Introduction",
                                            datetime(2015, 7, 18, 1, 0, 0),
                                            datetime(2015, 7, 18, 3, 20, 0),
-                                           timedelta(minutes=10)))
+                                           timedelta(minutes=10),
+                                           "all"))
 guam_cases["Introduction"].append(DataCase("Introduction",
                                            datetime(2015, 7, 18, 14, 0, 0),
                                            datetime(2015, 7, 18, 16, 0, 0),
-                                           timedelta(minutes=10)))
+                                           timedelta(minutes=10),
+                                           "all"))
 
 # Scott's Cases
 guam_cases["Water Vapor"] = []
 guam_cases["Water Vapor"].append(DataCase("Water Vapor",
                                           datetime(2015, 10, 7, 0, 0, 0),
                                           datetime(2015, 10, 8, 0, 0, 0),
-                                          timedelta(minutes=30)))
+                                          timedelta(minutes=30),
+                                          "all"))
 
 # Tim's Cases
 guam_cases["Weighting Functions"] = []
 guam_cases["Weighting Functions"].append(DataCase("Weighting Functions",
                                          datetime(2015, 9, 19, 18, 0, 0),
                                          datetime(2015, 9, 20, 18, 0, 0),
-                                         timedelta(minutes=10)))
+                                         timedelta(minutes=10),
+                                         "all"))
 
 # Jordan's Cases
 guam_cases["Extra"] = []
 guam_cases["Extra"].append(DataCase("Extra",
                                     datetime(2015, 8, 17, 12, 0, 0),
                                     datetime(2015, 8, 18, 12, 0, 0),
-                                    timedelta(minutes=60)))
+                                    timedelta(minutes=60),
+                                    "all"))
 guam_cases["Extra"].append(DataCase("Extra",
                                     datetime(2015, 8, 17, 22, 0, 0),
                                     datetime(2015, 8, 18, 1, 0, 0),
-                                    timedelta(minutes=10)))
+                                    timedelta(minutes=10),
+                                    "all"))
 guam_cases["Extra"].append(DataCase("Extra",
                                     datetime(2015, 8, 24, 15, 0, 0),
                                     datetime(2015, 8, 15, 21, 0, 0),
-                                    timedelta(minutes=60)))
+                                    timedelta(minutes=60),
+                                    "all"))
 guam_cases["Extra"].append(DataCase("Extra",
                                     datetime(2015, 8, 25, 2, 0, 0),
                                     datetime(2015, 8, 25, 5, 0, 0),
-                                    timedelta(minutes=10)))
+                                    timedelta(minutes=10),
+                                    "all"))
 
 
 def main():
@@ -119,8 +128,9 @@ def main():
     for section_name, cases in guam_cases.items():
         for case in cases:
             start_str = case.start.strftime(DT_FORMAT)
-            end_str = case.start.strftime(DT_FORMAT)
-            case_name = CASE_NAME_FORMAT.format(start=start_str, end=end_str, delta=case.delta)
+            end_str = case.end.strftime(DT_FORMAT)
+            # Note this only uses the minutes!
+            case_name = CASE_NAME_FORMAT.format(start=start_str, end=end_str, delta=int(case.delta.total_seconds()/60.0))
             case_dir = os.path.join(args.base_ahi_dir, section_name, case_name)
             if not os.path.isdir(case_dir):
                 LOG.info("Creating case directory: %s", case_dir)
@@ -131,22 +141,21 @@ def main():
 
             t = case.start
             while t <= case.end:
-                glob_pattern = t.strftime("%Y_%m_%d_%j/%H%M/*_%Y%M%d_%H%M_B??_*.merc.tif")
+                glob_pattern = t.strftime("%Y_%m_%d_%j/%H%M/*_%Y%m%d_%H%M_B??_*.merc.tif")
                 t = t + case.delta
 
                 matches = glob(glob_pattern)
-                if len(matches) != 1:
-                    LOG.error("More than 1 or no files found matching pattern: %s", glob_pattern)
+                if len(matches) == 0:
+                    LOG.error("Zero files found matching pattern: %s", glob_pattern)
                     continue
-                input_pathname = matches[0]
-
-                fn = os.path.basename(input_pathname)
-                link_path = os.path.join(case_dir, fn)
-                if os.path.exists(link_path) and not args.overwrite:
-                    LOG.debug("Link '%s' already exists, skipping...", link_path)
-                    continue
-                LOG.info("Creating hardlink '%s' -> '%s'", link_path, input_pathname)
-                os.link(input_pathname, link_path)
+                for input_pathname in matches:
+                    fn = os.path.basename(input_pathname)
+                    link_path = os.path.join(case_dir, fn)
+                    if os.path.exists(link_path) and not args.overwrite:
+                        LOG.debug("Link '%s' already exists, skipping...", link_path)
+                        continue
+                    LOG.info("Creating hardlink '%s' -> '%s'", link_path, input_pathname)
+                    os.link(input_pathname, link_path)
             LOG.info("done mirroring files")
 
 if __name__ == "__main__":
