@@ -82,7 +82,9 @@ class ProbeGraphManager (QObject) :
         self.document.didReorderLayers.connect(self.handleLayersChanged)
         self.document.didChangeLayerName.connect(self.handleLayersChanged)
         self.document.didAddLayer.connect(self.handleLayersChanged)
+        self.document.didRemoveLayer.connect(self.handleLayersChanged)
         self.document.willPurgeLayer.connect(self.handleLayersChanged)
+        self.document.didSwitchLayerSet.connect(self.handleLayersChanged)
 
     def set_up_tab (self, tab_index, do_increment_tab_letter=True) :
         """Create a new tab at tab_index and add it to the list of graphs

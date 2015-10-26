@@ -132,7 +132,19 @@ class SingleLayerSetManager (QWidget) :
 
         return self.my_layer_list
 
+class SingleLayerInfoDisplay (QWidget) :
+    """shows details about one layer that is selected in the list
+    """
 
+    def __init__(self, parent) :
+        """build our info display
+        """
+
+        super(SingleLayerInfoDisplay, self).__init__(parent)
+
+        # TODO build our layer detail info display controls
+
+        # TODO hook ourselves up to the appropriate layer changed events?
 
 
 

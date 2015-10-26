@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created: Fri Oct 23 15:46:34 2015
+# Created: Mon Oct 26 16:45:45 2015
 #      by: PyQt4 UI code generator 4.11.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -194,26 +194,14 @@ class Ui_MainWindow(object):
         sizePolicy.setHeightForWidth(self.layerConfigPane.sizePolicy().hasHeightForWidth())
         self.layerConfigPane.setSizePolicy(sizePolicy)
         self.layerConfigPane.setObjectName(_fromUtf8("layerConfigPane"))
-        self.dockWidgetContents = QtGui.QWidget()
+        self.layerInfoContents = QtGui.QWidget()
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.dockWidgetContents.sizePolicy().hasHeightForWidth())
-        self.dockWidgetContents.setSizePolicy(sizePolicy)
-        self.dockWidgetContents.setObjectName(_fromUtf8("dockWidgetContents"))
-        self.verticalLayout_9 = QtGui.QVBoxLayout(self.dockWidgetContents)
-        self.verticalLayout_9.setObjectName(_fromUtf8("verticalLayout_9"))
-        self.verticalLayout_8 = QtGui.QVBoxLayout()
-        self.verticalLayout_8.setObjectName(_fromUtf8("verticalLayout_8"))
-        self.layerNameEdit = QtGui.QLineEdit(self.dockWidgetContents)
-        self.layerNameEdit.setObjectName(_fromUtf8("layerNameEdit"))
-        self.verticalLayout_8.addWidget(self.layerNameEdit)
-        self.colorBarButton = QtGui.QPushButton(self.dockWidgetContents)
-        self.colorBarButton.setMinimumSize(QtCore.QSize(0, 32))
-        self.colorBarButton.setObjectName(_fromUtf8("colorBarButton"))
-        self.verticalLayout_8.addWidget(self.colorBarButton)
-        self.verticalLayout_9.addLayout(self.verticalLayout_8)
-        self.layerConfigPane.setWidget(self.dockWidgetContents)
+        sizePolicy.setHeightForWidth(self.layerInfoContents.sizePolicy().hasHeightForWidth())
+        self.layerInfoContents.setSizePolicy(sizePolicy)
+        self.layerInfoContents.setObjectName(_fromUtf8("layerInfoContents"))
+        self.layerConfigPane.setWidget(self.layerInfoContents)
         MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.layerConfigPane)
 
         self.retranslateUi(MainWindow)
@@ -252,6 +240,4 @@ class Ui_MainWindow(object):
         self.layerSetTabs.setTabText(self.layerSetTabs.indexOf(self.tab_plusL), _translate("MainWindow", "+", None))
         self.layerConfigPane.setStatusTip(_translate("MainWindow", "Selected layer information", None))
         self.layerConfigPane.setWindowTitle(_translate("MainWindow", "Layer Details", None))
-        self.layerNameEdit.setText(_translate("MainWindow", "Layer Name", None))
-        self.colorBarButton.setText(_translate("MainWindow", "ColorBar", None))
 
