@@ -162,7 +162,8 @@ class LayerStackListViewModel(QAbstractListModel):
         :return:
         """
         super(LayerStackListViewModel, self).__init__()
-        self.widgets = [ ] # list(widgets) # [weakref.ref(widget) for widget in widgets]
+
+        self.widgets = [ ]
         self.doc = doc
         # self._column = [self._visibilityData, self._nameData]
         self.item_delegate = LayerWidgetDelegate()

@@ -72,6 +72,9 @@ class LayerSetsManager (QObject) :
 
             self.set_up_tab(newTabIndex)
 
+        # tell the document which layer set we're using now
+        self.document.select_layer_set(newTabIndex)
+
     def set_up_tab(self, new_tab_index, do_increment_tab_number=True) :
         """Build a new layer set tab
         """
