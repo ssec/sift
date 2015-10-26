@@ -732,7 +732,7 @@ class Main(QtGui.QMainWindow):
     #         self.animation_slider_jump_frame(None)
     #         self.behaviorLayersList.select([info[INFO.UUID]])
 
-    def __init__(self, workspace_dir=None, workspace_size=None, glob_pattern=None, border_shapefile=None):
+    def __init__(self, workspace_dir=None, workspace_size=None, glob_pattern=None, border_shapefile=None, center=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
@@ -749,6 +749,7 @@ class Main(QtGui.QMainWindow):
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
                                                glob_pattern=glob_pattern,
                                                border_shapefile=border_shapefile,
+                                               center=center,
                                                parent=self)
         self.ui.mainWidgets.addTab(self.scene_manager.main_canvas.native, 'Mercator')
 
@@ -984,6 +985,8 @@ def main():
                         help="Specify alternative coastline/border shapefile")
     parser.add_argument("--glob-pattern", default=os.environ.get("TIFF_GLOB", None),
                         help="Specify glob pattern for input images")
+    parser.add_argument("-c", "--center", nargs=2, type=float,
+                        help="Specify center longitude and latitude for camera")
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=int(os.environ.get("VERBOSITY", 2)),
                         help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG (default INFO)')
     args = parser.parse_args()
@@ -999,7 +1002,8 @@ def main():
         workspace_dir=args.workspace,
         workspace_size=args.space,
         glob_pattern=args.glob_pattern,
-        border_shapefile=args.border_shapefile
+        border_shapefile=args.border_shapefile,
+        center=args.center,
     )
     window.show()
     print("running")
