@@ -21,6 +21,7 @@ from datetime import datetime
 import logging, unittest, argparse
 from enum import Enum
 from cspov.common import INFO, KIND
+from cspov.view.Colormap import DEFAULT_IR, DEFAULT_VIS
 
 LOG = logging.getLogger(__name__)
 
@@ -81,6 +82,8 @@ class GUIDE(Enum):
     BAND = 'band'  # band number (multispectral instruments)
     SCENE = 'scene'  # standard scene identifier string for instrument, e.g. FLDK
     INSTRUMENT = 'instrument'  # INSTRUMENT enumeration, or string with full standard name
+    DISPLAY_TIME = 'display_time' # time to show on animation control
+    DISPLAY_NAME = 'display_name' # preferred name in the layer list
 
 
 class AHI_HSF_Guidebook(Guidebook):
@@ -95,7 +98,7 @@ class AHI_HSF_Guidebook(Guidebook):
         return True if re.match(r'HS_H\d\d_\d{8}_\d{4}_B\d\d.*', os.path.split(pathname)[1]) else False
 
     @staticmethod
-    def metadata_for_path(pathname):
+    def _metadata_for_path(pathname):
         m = re.match(r'HS_H(\d\d)_(\d{8})_(\d{4})_B(\d\d)_([A-Za-z0-9]+).*', os.path.split(pathname)[1])
         if not m:
             return {}
@@ -103,11 +106,16 @@ class AHI_HSF_Guidebook(Guidebook):
         when = datetime.strptime(yyyymmdd + hhmm, '%Y%m%d%H%M')
         sat = 'Himawari-{}'.format(int(sat))
         band = int(bb)
+        dtime = when.strftime('%Y-%m-%d %H:%M')
+        label = 'Refl' if band in [1, 2, 3, 4, 5, 6] else 'BT'
+        name = "AHI B{0:02d} {1:s} {2:s}".format(band, label, dtime)
         return {
             GUIDE.SPACECRAFT: sat,
             GUIDE.BAND: band,
             GUIDE.SCHED_TIME: when,
-            GUIDE.SCENE: scene
+            GUIDE.DISPLAY_TIME: dtime,
+            GUIDE.SCENE: scene,
+            GUIDE.DISPLAY_NAME: name
         }
 
     def _relevant_info(self, seq):
@@ -124,11 +132,48 @@ class AHI_HSF_Guidebook(Guidebook):
             if md is not None:
                 yield each[INFO.UUID], md
             else:
-                md = self.metadata_for_path(each[INFO.PATHNAME])
+                md = self._metadata_for_path(each[INFO.PATHNAME])
                 md[GUIDE.UUID] = each[INFO.UUID]
                 md[GUIDE.INSTRUMENT] = INSTRUMENT.AHI
                 self._cache[each[INFO.UUID]] = md
                 yield each[INFO.UUID], md
+
+    def climits(self, dsi):
+        # Valid min and max for colormap use
+        nfo, = list(self._collect_info([dsi]))
+        uuid, md = nfo
+        if md[GUIDE.BAND] in [1, 2, 3, 4, 5, 6]:
+            # Reflectance/visible data limits
+            return -0.012, 1.192
+        else:
+            # BT data limits
+            return -109.0 + 273.15, 55 + 273.15
+
+    def default_colormap(self, dsi):
+        nfo, = list(self._collect_info([dsi]))
+        uuid, md = nfo
+        if md[GUIDE.BAND] in [1, 2, 3, 4, 5, 6]:
+            return DEFAULT_VIS
+        else:
+            return DEFAULT_IR
+
+    def display_time(self, dsi):
+        nfo, = list(self._collect_info([dsi]))
+        uuid, md = nfo
+        return md.get(GUIDE.DISPLAY_TIME, '--:--')
+
+    def display_name(self, dsi):
+        nfo, = list(self._collect_info([dsi]))
+        uuid, md = nfo
+        return md.get(GUIDE.DISPLAY_NAME, '--:--')
+
+    def sort_paths(self, path_seq):
+        """
+        sort a list of image paths into order
+        :param path_seq: sequence of paths
+        :return: sequence of paths
+        """
+        return list(path_seq)  # FIXME
 
     def flush(self):
         self._cache = {}
@@ -180,6 +225,17 @@ class AHI_HSF_Guidebook(Guidebook):
         sibs.sort()
         offset = [i for i,x in enumerate(sibs) if x[1]==uuid]
         return [x[1] for x in sibs], offset[0]
+
+    def time_siblings_uuids(self, uuids, infos):
+        """
+        return generator uuids for datasets which have the same band as the uuids provided
+        :param uuids: iterable of uuids
+        :param infos: list of dataset infos available, some of which may not be relevant
+        :return: generate sorted list of sibling uuids in time order and in provided uuid order
+        """
+        for requested_uuid in uuids:
+            for sibling_uuid in self.time_siblings(requested_uuid, infos)[0]:
+                yield sibling_uuid
 
 
 

@@ -26,6 +26,7 @@ call activate sift || goto :error
 :install_sift
 echo Installing SIFT...
 conda install -y -c "%channel%" "%pkg_name%" || goto :error
+conda install -y pywin32 || goto :error
 
 :anaconda_installed
 echo Creating Data Directory: C:\data
