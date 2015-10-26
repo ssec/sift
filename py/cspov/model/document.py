@@ -314,8 +314,6 @@ class Document(QObject):
         # switch to the new layer set and set off events to let others know about the change
         self.current_set_index = layer_set_index
         self.didSwitchLayerSet.emit(layer_set_index, self.current_layer_set, self.current_animation_order)
-        if not did_clone:
-            self.didReorderLayers.emit([])  # indicate that pretty much everything has changed
 
     # TODO, not being used?
     def change_layer_order(self, old_index, new_index):

@@ -82,7 +82,6 @@ class ProbeGraphManager (QObject) :
         self.document.didReorderLayers.connect(self.handleLayersChanged)
         self.document.didChangeLayerName.connect(self.handleLayersChanged)
         self.document.didAddLayer.connect(self.handleLayersChanged)
-        self.document.didRemoveLayer.connect(self.handleLayersChanged)
         self.document.willPurgeLayer.connect(self.handleLayersChanged)
         self.document.didSwitchLayerSet.connect(self.handleLayersChanged)
 
