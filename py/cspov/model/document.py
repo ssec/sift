@@ -448,6 +448,20 @@ class Document(QObject):
         uuid = self.current_layer_set[row].uuid
         return uuid
 
+    def remove_layers_from_all_sets(self, uuids):
+        for uuid in uuids:
+            # FUTURE: make this removal of presentation tuples from inactive layer sets less sucky
+            LOG.debug('removing {}'.format(uuid))
+            for dex,layer_set in enumerate(self._layer_sets):
+                if dex==self.current_set_index or layer_set is None:
+                    continue
+                for pdex, presentation in enumerate(layer_set):
+                    if presentation.uuid==uuid:
+                        del layer_set[pdex]
+                        break
+            # now remove from the active layer set
+            self.remove_layer_prez(uuid)  # this will send signal and start purge
+
     def clear_animation_order(self):
         cls = self.current_layer_set
         for i,q in enumerate(cls):

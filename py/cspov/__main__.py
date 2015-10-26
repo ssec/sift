@@ -637,9 +637,8 @@ class Main(QtGui.QMainWindow):
 
     def remove_layer(self, *args, **kwargs):
         uuids = self.behaviorLayersList.current_selected_uuids()
-        for uuid in uuids:
-            LOG.debug('removing layer {}'.format(uuid))
-            self.document.remove_layer_prez(uuid)
+        if uuids:
+            self.document.remove_layers_from_all_sets(uuids)
 
     def animation_slider_jump_frame(self, event, *args, **kwargs):
         "user has moved frame slider, update the display"
