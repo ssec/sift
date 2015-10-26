@@ -333,7 +333,8 @@ class SceneGraphManager(QObject):
     newProbePoint = pyqtSignal(object, object)
     newProbePolygon = pyqtSignal(object, object)
 
-    def __init__(self, doc, workspace, queue, border_shapefile=None, glob_pattern=None, parent=None, texture_shape=(4, 16)):
+    def __init__(self, doc, workspace, queue, border_shapefile=None, glob_pattern=None, parent=None,
+                 texture_shape=(4, 16), center=None):
         super(SceneGraphManager, self).__init__(parent)
         self.didRetilingCalcs.connect(self._set_retiled)
 
@@ -364,7 +365,7 @@ class SceneGraphManager(QObject):
             np.array([0., 0., 0., 0.], dtype=np.float32), # transparent
         ]
 
-        self.setup_initial_canvas()
+        self.setup_initial_canvas(center)
         self.pending_polygon = PendingPolygon(self.main_map)
 
     def frame_changed(self, frame_info):
@@ -388,18 +389,16 @@ class SceneGraphManager(QObject):
             vis = dict((u,tfu(u)) for u in uuids)
             self.didChangeLayerVisibility.emit(vis)
 
-    def setup_initial_canvas(self):
+    def setup_initial_canvas(self, center=None):
+        center = center or (0, 0)
         self.main_canvas = CspovMainMapCanvas(parent=self.parent())
         self.main_view = self.main_canvas.central_widget.add_view()
 
         # Camera Setup
-        self.pz_camera = PanZoomProbeCamera(name="pz_camera", aspect=1)
+        self.pz_camera = PanZoomProbeCamera(name="pz_camera", aspect=1, pan_limits=(-1., -1., 1., 1.), zoom_limits=(0.0015, 0.0015))
         self.main_view.camera = self.pz_camera
 
         self.main_view.camera.flip = (False, False, False)
-        # FIXME: these ranges just happen to look ok, but I'm not really sure the 'best' way to set these
-        self.main_view.camera.set_range(x=(-10.0, 10.0), y=(-10.0, 10.0), margin=0)
-        self.main_view.camera.zoom(0.1, (0, 0))
 
         # FIXME: These cameras are no longer needed
         # Point Probe Mode/Camera
@@ -433,6 +432,17 @@ class SceneGraphManager(QObject):
         self._latlon_grid_color_idx = 1
         self.latlon_grid = self._init_latlon_grid_layer(color=self._color_choices[self._latlon_grid_color_idx])
         self.latlon_grid.transform = STTransform(translate=(0, 0, 45))
+
+        # Make the camera center on Guam
+        center = (144.8, 13.5)
+        p = Proj(DEFAULT_PROJECTION)
+        zoom_factor = 0.2
+        # Not sure why its 15 and 50 degrees off, but eh for now
+        x, y = p(center[0] + 15., center[1] - 45.0)
+        # x, y = p(144.8 + 15, 13.5)
+        # x, y = p(center[0] - x_offset, center[1] - y_offset)
+        cam_center = self.borders.transforms.get_transform(map_to="scene").map([(x, y)])[0]
+        self.main_view.camera.zoom(zoom_factor, cam_center)
 
     def _init_latlon_grid_layer(self, color=None, resolution=5.):
         """Create a series of line segments representing latitude and longitude lines.
