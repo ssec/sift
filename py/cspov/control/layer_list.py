@@ -46,9 +46,6 @@ from cspov.view.Colormap import ALL_COLORMAPS, CATEGORIZED_COLORMAPS
 
 LOG = logging.getLogger(__name__)
 
-# FIXME: DRY violation
-COLOR_MAP_LIST = ["grays", "autumn", "fire", "hot", "winter"] + list(ALL_COLORMAPS.keys())
-
 COLUMNS=('Visibility', 'Name', 'Enhancement')
 
 class LayerWidgetDelegate(QStyledItemDelegate):
@@ -259,13 +256,17 @@ class LayerStackListViewModel(QAbstractListModel):
         # FUTURE: this is quick and dirty
         rowdict = dict((u,i) for i,u in enumerate(self.doc.current_layer_order))
         items = QItemSelection()
+        q = None
         for uuid in uuids:
-            row = rowdict[uuid]
+            row = rowdict.get(uuid, None)
+            if row is None:
+                LOG.error('UUID {} cannot be selected in list view'.format(uuid))
+                continue
             q = self.createIndex(row, 0)
             items.select(q, q)
             lbox.selectionModel().select(items, QItemSelectionModel.Select)
             # lbox.setCurrentIndex(q)
-        if scroll_to_show_single and len(uuids)==1:
+        if scroll_to_show_single and len(uuids)==1 and q is not None:
             lbox.scrollTo(q)
 
     def menu(self, pos:QPoint, *args):
@@ -273,18 +274,33 @@ class LayerStackListViewModel(QAbstractListModel):
         menu = QMenu()
         actions = {}
         lbox = self.current_set_listbox
+        # XXX: Normally we would create the menu and actions before hand but since we are checking the actions based
+        # on selection we can't. Then we would use an ActionGroup and make it exclusive
+        selected_uuids = list(self.current_selected_uuids(lbox))
+        LOG.debug("selected UUID set is {0!r:s}".format(selected_uuids))
+        current_colormaps = set(self.doc.colormap_for_uuids(selected_uuids))
         for cat, cat_colormaps in CATEGORIZED_COLORMAPS.items():
             submenu = QMenu(cat, parent=menu)
             for colormap in cat_colormaps.keys():
-                actions[submenu.addAction(colormap)] = colormap
+                action = submenu.addAction(colormap)
+                actions[action] = colormap
+                action.setCheckable(True)
+                action.setChecked(colormap in current_colormaps)
             menu.addMenu(submenu)
+        menu.addSeparator()
+        flip_action = menu.addAction("Flip Color Limits")
+        flip_action.setCheckable(True)
+        flip_action.setChecked(any(self.doc.flipped_for_uuids(selected_uuids)))
+        menu.addAction(flip_action)
         sel = menu.exec_(lbox.mapToGlobal(pos))
-        new_cmap = actions.get(sel, None)
-        selected_uuids = list(self.current_selected_uuids(lbox))
-        LOG.debug("selected UUID set is {0!r:s}".format(selected_uuids))
-        if new_cmap is not None:
-            LOG.info("changing to colormap {0} for ids {1!r:s}".format(new_cmap, selected_uuids))
-            self.doc.change_colormap_for_layers(name=new_cmap, uuids=selected_uuids)
+        if sel is flip_action:
+            LOG.info("flipping color limits for sibling ids {0!r:s}".format(selected_uuids))
+            self.doc.flip_climits_for_layers(uuids=selected_uuids)
+        else:
+            new_cmap = actions.get(sel, None)
+            if new_cmap is not None:
+                LOG.info("changing to colormap {0} for ids {1!r:s}".format(new_cmap, selected_uuids))
+                self.doc.change_colormap_for_layers(name=new_cmap, uuids=selected_uuids)
 
     @property
     def listing(self):

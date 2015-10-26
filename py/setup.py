@@ -20,7 +20,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='cspov',
-    version='0.2.2',
+    version='0.4.0',
     description="Fluid high resolution satellite and meteorological imagery viewer",
     author='Ray Garcia, SSEC',
     author_email='ray.garcia@ssec.wisc.edu',

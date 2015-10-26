@@ -29,8 +29,8 @@ from vispy import scene
 from vispy.util.keys import SHIFT
 from vispy.visuals.transforms import STTransform, MatrixTransform
 from vispy.visuals import MarkersVisual, marker_types, LineVisual
-from vispy.scene.visuals import Markers, Polygon, Compound
-from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND
+from vispy.scene.visuals import Markers, Polygon, Compound, Line
+from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND, DEFAULT_PROJECTION
 # from cspov.control.layer_list import LayerStackListViewModel
 from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.view.MapWidget import CspovMainMapCanvas
@@ -42,7 +42,7 @@ from cspov.queue import TASK_DOING, TASK_PROGRESS
 from PyQt4.QtCore import QObject, pyqtSignal
 import numpy as np
 from uuid import UUID
-
+from pyproj import Proj
 
 import os
 import logging
@@ -153,7 +153,8 @@ class LayerSet(object):
         self._animating = False
         self._frame_number = 0
         self._frame_change_cb = frame_change_cb
-        self._animation_timer = app.Timer(DEFAULT_ANIMATION_DELAY, connect=self.next_frame)
+        self._animation_speed = DEFAULT_ANIMATION_DELAY  # milliseconds
+        self._animation_timer = app.Timer(self._animation_speed/1000.0, connect=self.next_frame)
 
         if layers is not None:
             self.set_layers(layers)
@@ -165,6 +166,26 @@ class LayerSet(object):
             if frame_order is None:
                 frame_order = [x.name for x in layers.keys()]
             self.frame_order = frame_order
+
+    @property
+    def animation_speed(self):
+        """speed in milliseconds
+        """
+        return self._animation_speed
+
+    @animation_speed.setter
+    def animation_speed(self, milliseconds):
+        if milliseconds <= 0:
+            return
+        self._animation_timer.stop()
+        self._animation_speed = milliseconds
+        self._animation_timer.interval = milliseconds/1000.0
+        if self._frame_order:
+            self._animating = True
+            self._animation_timer.start()
+        if self._frame_change_cb is not None and self._frame_order:
+            uuid = self._frame_order[self._frame_number]
+            self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating, uuid))
 
     def set_layers(self, layers):
         # FIXME clear the existing layers
@@ -239,12 +260,12 @@ class LayerSet(object):
 
     @animating.setter
     def animating(self, animate):
-        print("Running animating {} with {} frames".format(animate, len(self._frame_order)))
         if self._animating and not animate:
             # We are currently, but don't want to be
             self._animating = False
             self._animation_timer.stop()
         elif not self._animating and animate and self._frame_order:
+            print("Running animating {} with {} frames".format(animate, len(self._frame_order)))
             # We are not currently, but want to be
             self._animating = True
             self._animation_timer.start()
@@ -312,7 +333,8 @@ class SceneGraphManager(QObject):
     newProbePoint = pyqtSignal(object, object)
     newProbePolygon = pyqtSignal(object, object)
 
-    def __init__(self, doc, workspace, queue, border_shapefile=None, glob_pattern=None, parent=None, texture_shape=(4, 16)):
+    def __init__(self, doc, workspace, queue, border_shapefile=None, glob_pattern=None, parent=None,
+                 texture_shape=(4, 16), center=None):
         super(SceneGraphManager, self).__init__(parent)
         self.didRetilingCalcs.connect(self._set_retiled)
 
@@ -334,7 +356,16 @@ class SceneGraphManager(QObject):
 
         self.set_document(self.document)
 
-        self.setup_initial_canvas()
+        # border and lat/lon grid color choices
+        self._color_choices = [
+            np.array([1., 1., 1., 1.], dtype=np.float32), # white
+            np.array([.5, .5, .5, 1.], dtype=np.float32), # gray
+            np.array([0., 1., 1., 1.], dtype=np.float32), # cyan
+            np.array([0., 0., 0., 1.], dtype=np.float32), # black
+            np.array([0., 0., 0., 0.], dtype=np.float32), # transparent
+        ]
+
+        self.setup_initial_canvas(center)
         self.pending_polygon = PendingPolygon(self.main_map)
 
     def frame_changed(self, frame_info):
@@ -358,19 +389,16 @@ class SceneGraphManager(QObject):
             vis = dict((u,tfu(u)) for u in uuids)
             self.didChangeLayerVisibility.emit(vis)
 
-
-    def setup_initial_canvas(self):
+    def setup_initial_canvas(self, center=None):
+        center = center or (0, 0)
         self.main_canvas = CspovMainMapCanvas(parent=self.parent())
         self.main_view = self.main_canvas.central_widget.add_view()
 
         # Camera Setup
-        self.pz_camera = PanZoomProbeCamera(name="pz_camera", aspect=1)
+        self.pz_camera = PanZoomProbeCamera(name="pz_camera", aspect=1, pan_limits=(-1., -1., 1., 1.), zoom_limits=(0.0015, 0.0015))
         self.main_view.camera = self.pz_camera
 
         self.main_view.camera.flip = (False, False, False)
-        # FIXME: these ranges just happen to look ok, but I'm not really sure the 'best' way to set these
-        self.main_view.camera.set_range(x=(-10.0, 10.0), y=(-10.0, 10.0), margin=0)
-        self.main_view.camera.zoom(0.1, (0, 0))
 
         # FIXME: These cameras are no longer needed
         # Point Probe Mode/Camera
@@ -397,8 +425,68 @@ class SceneGraphManager(QObject):
         merc_ortho.set_ortho(l, r, b, t, -100.0 * camera_z_scale, 100.0 * camera_z_scale)
         self.main_map.transform = merc_ortho
 
-        self.boundaries = NEShapefileLines(self.border_shapefile, double=True, parent=self.main_map)
-        self.boundaries.transform = STTransform(translate=(0, 0, 40))
+        self._borders_color_idx = 0
+        self.borders = NEShapefileLines(self.border_shapefile, double=True, color=self._color_choices[self._borders_color_idx], parent=self.main_map)
+        self.borders.transform = STTransform(translate=(0, 0, 40))
+
+        self._latlon_grid_color_idx = 1
+        self.latlon_grid = self._init_latlon_grid_layer(color=self._color_choices[self._latlon_grid_color_idx])
+        self.latlon_grid.transform = STTransform(translate=(0, 0, 45))
+
+        # Make the camera center on Guam
+        center = (144.8, 13.5)
+        p = Proj(DEFAULT_PROJECTION)
+        zoom_factor = 0.2
+        # Not sure why its 15 and 50 degrees off, but eh for now
+        x, y = p(center[0] + 15., center[1] - 45.0)
+        # x, y = p(144.8 + 15, 13.5)
+        # x, y = p(center[0] - x_offset, center[1] - y_offset)
+        cam_center = self.borders.transforms.get_transform(map_to="scene").map([(x, y)])[0]
+        self.main_view.camera.zoom(zoom_factor, cam_center)
+
+    def _init_latlon_grid_layer(self, color=None, resolution=5.):
+        """Create a series of line segments representing latitude and longitude lines.
+
+        :param resolution: number of degrees between lines
+        """
+        lons = np.arange(-180., 180. + resolution, resolution, dtype=np.float32)
+        lats = np.arange(-89.9, 89.9, resolution, dtype=np.float32)
+        p = Proj(DEFAULT_PROJECTION)
+
+        box_lons = np.empty(((lons.shape[0] + lats.shape[0]) * 2,), dtype=np.float32)
+        box_lons[0:lons.shape[0]] = lons
+        box_lons[lons.shape[0]:lons.shape[0] * 2] = lons
+        box_lons[lons.shape[0] * 2:lons.shape[0] * 2 + lats.shape[0]] = -180
+        box_lons[lons.shape[0] * 2 + lats.shape[0]:] = 180
+
+        box_lats = np.empty(((lons.shape[0] + lats.shape[0]) * 2,), dtype=np.float32)
+        box_lats[0:lons.shape[0]] = -89.9
+        box_lats[lons.shape[0]:lons.shape[0] * 2] = 89.9
+        box_lats[lons.shape[0] * 2: lons.shape[0] * 2 + lats.shape[0]] = lats
+        box_lats[lons.shape[0] * 2 + lats.shape[0]:] = lats
+
+        # Assume all of the longitude and latitudes map correctly
+        box_x, box_y = p(box_lons, box_lats)
+        points = np.empty((box_x.shape[0], 2), dtype=np.float32)
+        # Longitude lines
+        points[:lons.shape[0] * 2:2, 0] = box_x[:lons.shape[0]]
+        points[:lons.shape[0] * 2:2, 1] = box_y[:lons.shape[0]]
+        points[1:lons.shape[0] * 2:2, 0] = box_x[lons.shape[0]:lons.shape[0] * 2]
+        points[1:lons.shape[0] * 2:2, 1] = box_y[lons.shape[0]:lons.shape[0] * 2]
+        # Latitude lines
+        points[lons.shape[0] * 2::2, 0] = box_x[lons.shape[0] * 2:lons.shape[0] * 2 + lats.shape[0]]
+        points[lons.shape[0] * 2::2, 1] = box_y[lons.shape[0] * 2:lons.shape[0] * 2 + lats.shape[0]]
+        points[lons.shape[0] * 2 + 1::2, 0] = box_x[lons.shape[0] * 2 + lats.shape[0]:]
+        points[lons.shape[0] * 2 + 1::2, 1] = box_y[lons.shape[0] * 2 + lats.shape[0]:]
+
+        # Repeat for "second" size of the earth (180 to 540)
+        offset = box_x[lons.shape[0] - 1] - box_x[0]
+        points2 = np.empty((points.shape[0] * 2, 2), dtype=np.float32)
+        points2[:points.shape[0], :] = points
+        points2[points.shape[0]:, :] = points
+        points2[points.shape[0]:, 0] += offset
+
+        return Line(pos=points2, connect="segments", color=color, parent=self.main_map)
 
     def on_mouse_press(self, event):
         if event.handled:
@@ -409,7 +497,7 @@ class SceneGraphManager(QObject):
             buffer_pos = event.sources[0].transforms.get_transform().map(event.pos)
             # FIXME: We should be able to use the main_map object to do the transform...but it doesn't work (waiting on vispy developers)
             # map_pos = self.main_map.transforms.get_transform().imap(buffer_pos)
-            map_pos = self.boundaries.transforms.get_transform().imap(buffer_pos)
+            map_pos = self.borders.transforms.get_transform().imap(buffer_pos)
             # point_marker = Markers(parent=self.main_map, symbol="disc", pos=np.array([map_pos[:2]]))
             # self.points.append(point_marker)
             self.newProbePoint.emit(self.layer_set.top_layer_uuid(), map_pos[:2])
@@ -417,7 +505,7 @@ class SceneGraphManager(QObject):
             self.on_point_probe_set("default_probe_name", map_pos[:2])
         elif event.button == 2 and modifiers == (SHIFT,):
             buffer_pos = event.sources[0].transforms.get_transform().map(event.pos)
-            map_pos = self.boundaries.transforms.get_transform().imap(buffer_pos)
+            map_pos = self.borders.transforms.get_transform().imap(buffer_pos)
             if self.pending_polygon.add_point(event.pos[:2], map_pos[:2], 60):
                 points = self.pending_polygon.points + [self.pending_polygon.points[0]]
                 for marker in self.pending_polygon.markers:
@@ -427,8 +515,7 @@ class SceneGraphManager(QObject):
                 self.pending_polygon.reset()
                 self.newProbePolygon.emit(self.layer_set.top_layer_uuid(), points)
         else:
-            print("I don't know how to handle this camera for a mouse press")
-            print(event.buttons, modifiers)
+            LOG.error("I don't know how to handle this camera for a mouse press")
 
     def on_point_probe_set(self, probe_name, xy_pos, **kwargs):
         z = float(kwargs.get("z", 60))
@@ -460,6 +547,22 @@ class SceneGraphManager(QObject):
     def update(self):
         return self.main_canvas.update()
 
+    def cycle_borders_color(self):
+        self._borders_color_idx = (self._borders_color_idx + 1) % len(self._color_choices)
+        if self._borders_color_idx + 1 == len(self._color_choices):
+            self.borders.visible = False
+        else:
+            self.borders.set_data(color=self._color_choices[self._borders_color_idx])
+            self.borders.visible = True
+
+    def cycle_grid_color(self):
+        self._latlon_grid_color_idx = (self._latlon_grid_color_idx + 1) % len(self._color_choices)
+        if self._latlon_grid_color_idx + 1 == len(self._color_choices):
+            self.latlon_grid.visible = False
+        else:
+            self.latlon_grid.set_data(color=self._color_choices[self._latlon_grid_color_idx])
+            self.latlon_grid.visible = True
+
     def change_camera(self, idx_or_name):
         if isinstance(idx_or_name, str):
             camera = self._cameras[idx_or_name]
@@ -473,18 +576,6 @@ class SceneGraphManager(QObject):
         idx = self._camera_names.index(self.main_view.camera.name)
         idx = (idx + 1) % len(self._camera_names)
         self.change_camera(idx)
-
-    def swap_clims(self, uuid=None):
-        """Swap the Color limits of a layer so that the color map is flipped.
-        """
-        uuids = uuid
-        if uuid is None:
-            uuids = self.image_layers.keys()
-        elif not isinstance(uuid, (list, tuple)):
-            uuids = [uuid]
-
-        for uuid in uuids:
-            self.image_layers[uuid].clim = self.image_layers[uuid].clim[::-1]
 
     def _find_colormap(self, colormap):
         if isinstance(colormap, str) and colormap in self.colormaps:
@@ -506,9 +597,27 @@ class SceneGraphManager(QObject):
     def add_colormap(self, name:str, colormap):
         self.colormaps[name] = colormap
 
+    def set_color_limits(self, clims, uuid=None):
+        """Swap the Color limits of a layer so that the color map is flipped.
+        """
+        uuids = uuid
+        if uuid is None:
+            uuids = self.image_layers.keys()
+        elif not isinstance(uuid, (list, tuple)):
+            uuids = [uuid]
+
+        for uuid in uuids:
+            self.image_layers[uuid].clim = clims
+
     def change_layers_colormap(self, change_dict):
         for uuid,cmapid in change_dict.items():
+            LOG.info('changing {} to colormap {}'.format(uuid, cmapid))
             self.set_colormap(cmapid, uuid)
+
+    def change_layers_color_limits(self, change_dict):
+        for uuid, clims in change_dict.items():
+            LOG.info('changing {} to colormap {}'.format(uuid, clims))
+            self.set_color_limits(clims, uuid)
 
     def add_layer(self, new_order:list, ds_info:dict, p:prez, overview_content:np.ndarray):
         uuid = ds_info[INFO.UUID]

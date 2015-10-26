@@ -29,6 +29,7 @@ import numpy as np
 
 from vispy.scene import PanZoomCamera, BaseCamera
 from vispy.util.keys import SHIFT
+from vispy.geometry import Rect
 
 LOG = logging.getLogger(__name__)
 
@@ -52,6 +53,53 @@ class PanZoomProbeCamera(PanZoomCamera):
     #     # Scrolling
     #     BaseCamera.viewbox_mouse_event(self, event)
     #     event.handled = False
+
+    def __init__(self, *args, **kwargs):
+        self._pan_limits = kwargs.pop("pan_limits", None)
+        self._zoom_limits = kwargs.pop("zoom_limits", None)
+        super(PanZoomProbeCamera, self).__init__(*args, **kwargs)
+
+    @property
+    def rect(self):
+        """ The rectangular border of the ViewBox visible area, expressed in
+        the coordinate system of the scene.
+
+        Note that the rectangle can have negative width or height, in
+        which case the corresponding dimension is flipped (this flipping
+        is independent from the camera's ``flip`` property).
+        """
+        return self._rect
+
+    @rect.setter
+    def rect(self, args):
+        if isinstance(args, tuple):
+            rect = Rect(*args)
+        else:
+            rect = Rect(args)
+
+        # Limit how far we can pan and zoom out
+        if self._pan_limits is not None:
+            new_left = np.clip(rect.left, self._pan_limits[0], self._pan_limits[2])
+            new_right = np.clip(rect.right, self._pan_limits[0], self._pan_limits[2])
+            new_bottom = np.clip(rect.bottom, self._pan_limits[1], self._pan_limits[3])
+            new_top = np.clip(rect.top, self._pan_limits[1], self._pan_limits[3])
+        else:
+            new_left = rect.left
+            new_right = rect.right
+            new_bottom = rect.bottom
+            new_top = rect.top
+
+        # Limit how far we can zoom in
+        new_size_x = new_right - new_left
+        new_size_y = new_top - new_bottom
+        if self._zoom_limits is not None:
+            new_size_x = max(new_size_x, self._zoom_limits[0])
+            new_size_y = max(new_size_y, self._zoom_limits[1])
+        rect = Rect(new_left, new_bottom, new_size_x, new_size_y)
+
+        if self._rect != rect:
+            self._rect = rect
+            self.view_changed()
 
     def viewbox_mouse_event(self, event):
         """

@@ -80,8 +80,67 @@ def test_layers(ws, doc, glob_pattern=None):
     LOG.warning("No image glob pattern provided")
     return []
 
+class AnimationSpeedPopupWindow(QtGui.QWidget):
+    _slider = None
+    _active = False
+
+    def __init__(self, slot, *args, **kwargs):
+        super(AnimationSpeedPopupWindow, self).__init__(*args, **kwargs)
+        from PyQt4.QtCore import Qt
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Popup)
+        self.setFocusPolicy(Qt.ClickFocus)
+        self.setToolTip('Set animation speed')
+        self._slider = QtGui.QSlider(parent=self)
+        # n, x = self._convert(10, reverse=True), self._convert(5000, reverse=True)
+        n, x = 2, 150  # frames per 10 seconds
+        self._slider.setRange(n, x) #
+        # self._slider.setSingleStep(1)
+        # self._slider.setInvertedAppearance(True)
+        self._slot = slot
+        self._slider.valueChanged.connect(self._changed)
+        self._layout = QtGui.QHBoxLayout()
+        self._layout.addWidget(self._slider)
+        self.setLayout(self._layout)
+
+    def _convert(self, val, reverse=False):
+        """
+        map 1..100 nonlinearly to 10ms .. 5000ms
+        :param val: ticks to convert to milliseconds
+        :param reverse: when true, reverse conversion
+        :return:
+        """
+        if reverse: # convert milliseconds to fp10s
+            fp10s = 10000.0 / float(val)
+            return fp10s
+        else:
+            ms = 10000.0 / float(val)
+            return ms
+
+    def _changed(self, value):
+        if not self._active:
+            return
+        fps = float(value) / 10.0
+        self.setToolTip('{0:.1f} fps'.format(fps))
+        val = self._convert(value)
+        self._slot(val)
+
+    def show_at(self, pos, val):
+        from PyQt4.QtCore import QRect, QPoint, QSize
+        sz = QSize(40, 180)
+        pt = QPoint(pos.x() - 20, pos.y() - 160)
+        rect = QRect(pt, sz)
+        self.setGeometry(rect)
+        self.show()
+        self._slider.setValue(int(self._convert(val, reverse=True)))
+        self._active = True
+
+    def focusOutEvent(self, *args, **kwargs):
+        self.hide()
+        self._active = False
+
 class Main(QtGui.QMainWindow):
     _last_open_dir = None  # directory to open files in
+    _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
 
     def open_files(self):
         files = QtGui.QFileDialog.getOpenFileNames(self,
@@ -139,11 +198,6 @@ class Main(QtGui.QMainWindow):
         self.ui.animationSlider.repaint()
         self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
 
-    def change_layer_colormap(self, nfo):
-        for uuid, mapname in nfo.items():
-            LOG.info('changing {} to colormap {}'.format(uuid, mapname))
-            self.scene_manager.set_colormap(mapname, uuid=uuid)
-
     def remove_layer(self, *args, **kwargs):
         uuids = self.behaviorLayersList.current_selected_uuids()
         for uuid in uuids:
@@ -191,11 +245,13 @@ class Main(QtGui.QMainWindow):
     def next_last_band(self, direction=0, *args, **kwargs):
         LOG.info('band incr {}'.format(direction))
         uuids = self.behaviorLayersList.current_selected_uuids()
+        new_focus = None
         if not uuids:
             pass # FIXME: notify user
         for uuid in uuids:
             new_focus = self.document.next_last_step(uuid, direction, bandwise=True)
-        self.behaviorLayersList.select([new_focus])
+        if new_focus is not None:
+            self.behaviorLayersList.select([new_focus])
 
     def change_animation_to_current_selection_siblings(self, *args, **kwargs):
         uuid = self._next_last_time_visibility(direction=0)
@@ -208,9 +264,28 @@ class Main(QtGui.QMainWindow):
             self.ui.cursorProbeText.setText("Layer with time steps needed")
         LOG.info('using siblings of {} for animation loop'.format(uuids[0]))
 
+    def set_animation_speed(self, milliseconds):
+        LOG.info('animation speed set to {}ms'.format(milliseconds))
+        # FUTURE: propagate this into the document?
+        self.scene_manager.layer_set.animation_speed = milliseconds
+
+    def show_animation_speed_slider(self, pos:QtCore.QPoint, *args):
+        LOG.info('menu requested for animation control')
+        gpos = self.ui.animPlayPause.mapToGlobal(pos)
+
+        if self._animation_speed_popup is None:
+            self._animation_speed_popup = popup = AnimationSpeedPopupWindow(slot=self.set_animation_speed, parent=None)
+        else:
+            popup = self._animation_speed_popup
+        if not popup.isVisible():
+            popup.show_at(gpos, self.scene_manager.layer_set.animation_speed)
+
     def toggle_visibility_on_selected_layers(self, *args, **kwargs):
         uuids = self.behaviorLayersList.current_selected_uuids()
         self.document.toggle_layer_visibility(uuids)
+
+    def toggle_animation(self, event, *args, **kwargs):
+        self.scene_manager.layer_set.toggle_animation(*args, **kwargs)
 
     # def accept_new_layer(self, new_order, info, overview_content):
     #     LOG.debug('accepting new layer order {0!r:s}'.format(new_order))
@@ -220,8 +295,7 @@ class Main(QtGui.QMainWindow):
     #         self.animation_slider_jump_frame(None)
     #         self.behaviorLayersList.select([info[INFO.UUID]])
 
-
-    def __init__(self, workspace_dir=None, workspace_size=None, glob_pattern=None, border_shapefile=None):
+    def __init__(self, workspace_dir=None, workspace_size=None, glob_pattern=None, border_shapefile=None, center=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
@@ -238,14 +312,22 @@ class Main(QtGui.QMainWindow):
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
                                                glob_pattern=glob_pattern,
                                                border_shapefile=border_shapefile,
+                                               center=center,
                                                parent=self)
         self.ui.mainWidgets.addTab(self.scene_manager.main_canvas.native, 'Mercator')
 
         self.scene_manager.didChangeFrame.connect(self.update_frame_slider)
-        self.ui.animPlayPause.clicked.connect(self.scene_manager.layer_set.toggle_animation)
-        self.ui.animForward.clicked.connect(self.scene_manager.layer_set.next_frame)
-        last_frame = partial(self.scene_manager.layer_set.next_frame, frame_number=-1)
-        self.ui.animBack.clicked.connect(last_frame)
+        self.ui.animPlayPause.clicked.connect(self.toggle_animation)
+        self.ui.animPlayPause.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.ui.animPlayPause.customContextMenuRequested.connect(self.show_animation_speed_slider)
+        def next_frame(*args, **kwargs):
+            self.scene_manager.animating = False
+            self.scene_manager.layer_set.next_frame()
+        self.ui.animForward.clicked.connect(next_frame)
+        def prev_frame(*args, **kwargs):
+            self.scene_manager.animating = False
+            self.scene_manager.layer_set.next_frame(frame_number=-1)
+        self.ui.animBack.clicked.connect(prev_frame)
 
         # allow animation slider to set animation frame being displayed:
         self.ui.animationSlider.valueChanged.connect(self.animation_slider_jump_frame)
@@ -316,7 +398,8 @@ class Main(QtGui.QMainWindow):
         # self.queue.add('test', test_task(), 'test000')
         # self.ui.layers
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
-        self.document.didChangeColormap.connect(self.change_layer_colormap)
+        self.document.didChangeColormap.connect(self.scene_manager.change_layers_colormap)
+        self.document.didChangeColorLimits.connect(self.scene_manager.change_layers_color_limits)
 
         self.ui.panZoomToolButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.pz_camera.name))
         self.ui.pointSelectButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.point_probe_camera.name))
@@ -333,7 +416,7 @@ class Main(QtGui.QMainWindow):
 
     def toggle_animation(self, action:QtGui.QAction=None, *args):
         new_state = self.scene_manager.layer_set.toggle_animation()
-        action.setChecked(new_state)
+        self.ui.animPlayPause.setChecked(new_state)
 
     def setup_menu(self):
         open_action = QtGui.QAction("&Open", self)
@@ -382,9 +465,21 @@ class Main(QtGui.QMainWindow):
         change_order.setShortcut('O')
         change_order.triggered.connect(self.change_animation_to_current_selection_siblings)
 
+        flip_colormap = QtGui.QAction("Flip Color Limits (Top Layer)", self)
+        flip_colormap.setShortcut("/")
+        flip_colormap.triggered.connect(lambda: self.document.flip_climits_for_layers([self.document.current_visible_layer]))
+
         remove = QtGui.QAction("Remove Layer", self)
         remove.setShortcut(QtCore.Qt.Key_Delete)
         remove.triggered.connect(self.remove_layer)
+
+        cycle_borders = QtGui.QAction("Cycle &Borders", self)
+        cycle_borders.setShortcut('B')
+        cycle_borders.triggered.connect(self.scene_manager.cycle_borders_color)
+
+        cycle_grid = QtGui.QAction("Cycle &Lat/Lon Grid", self)
+        cycle_grid.setShortcut('L')
+        cycle_grid.triggered.connect(self.scene_manager.cycle_grid_color)
 
         edit_menu = menubar.addMenu('&Edit')
         edit_menu.addAction(remove)
@@ -398,10 +493,11 @@ class Main(QtGui.QMainWindow):
         view_menu.addAction(next_band)
         view_menu.addAction(change_order)
         view_menu.addAction(toggle_vis)
-
+        view_menu.addAction(flip_colormap)
+        view_menu.addAction(cycle_borders)
+        view_menu.addAction(cycle_grid)
 
         menubar.setEnabled(True)
-
 
     def setup_key_releases(self):
         def cb_factory(required_key, cb):
@@ -410,10 +506,18 @@ class Main(QtGui.QMainWindow):
                     return cb()
             return tmp_cb
 
-        # self.scene_manager.main_canvas.events.key_release.connect(cb_factory("a", self.scene_manager.layer_set.toggle_animation))
-        # self.scene_manager.main_canvas.events.key_release.connect(cb_factory("n", self.scene_manager.layer_set.next_frame))
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("c", self.scene_manager.next_camera))
-        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("/", self.scene_manager.swap_clims))
+
+        def flip_selected_layers():
+            uuid = self.document.current_visible_layer
+            if uuid is None:
+                return
+                # XXX: Do we want to use the selection instead?
+                # uuids = list(self.behaviorLayersList.current_selected_uuids())
+            else:
+                uuids = [uuid]
+            self.document.flip_climits_for_layers(uuids)
+        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("/", flip_selected_layers))
 
         class ColormapSlot(object):
             def __init__(self, sgm, key='e'):
@@ -445,6 +549,8 @@ def main():
                         help="Specify alternative coastline/border shapefile")
     parser.add_argument("--glob-pattern", default=os.environ.get("TIFF_GLOB", None),
                         help="Specify glob pattern for input images")
+    parser.add_argument("-c", "--center", nargs=2, type=float,
+                        help="Specify center longitude and latitude for camera")
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=int(os.environ.get("VERBOSITY", 2)),
                         help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG (default INFO)')
     args = parser.parse_args()
@@ -460,7 +566,8 @@ def main():
         workspace_dir=args.workspace,
         workspace_size=args.space,
         glob_pattern=args.glob_pattern,
-        border_shapefile=args.border_shapefile
+        border_shapefile=args.border_shapefile,
+        center=args.center,
     )
     window.show()
     print("running")

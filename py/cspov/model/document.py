@@ -87,6 +87,7 @@ prez = namedtuple('prez', [
     'visible',  # bool: whether it's visible or not
     'a_order',  # int: None for non-animating, 0..n-1 what order to draw in during animation
     'colormap', # name or uuid: color map to use; name for default, uuid for user-specified
+    'climits',     # tuple: valid min and valid max used for color mapping normalization
     'mixing'    # mixing mode constant
 ])
 
@@ -141,6 +142,7 @@ class Document(QObject):
     didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
     didSwitchLayerSet = pyqtSignal(int, list, list)  # new layerset number typically 0..3, list of prez tuples representing new display order, new animation order
     didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
+    didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     # didChangeShapeLayer = pyqtSignal(dict)
 
     def __init__(self, workspace, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
@@ -188,13 +190,15 @@ class Document(QObject):
         # add as visible to the front of the current set, and invisible to the rest of the available sets
         cmap = self._default_colormap(info)
         info[INFO.CLIM] = self._guidebook.climits(info)
+        info[INFO.NAME] = self._guidebook.display_name(info) or info[INFO.NAME]
         p = prez(uuid=uuid,
                  kind=info[INFO.KIND],
                  visible=True,
                  a_order=None,
                  colormap=cmap,
+                 climits=info[INFO.CLIM],
                  mixing=mixing.NORMAL)
-        q = p._replace(visible=False)
+        q = p._replace(visible=False)  # make it available but not visible in other layer sets
         old_layer_count = len(self._layer_sets[self.current_set_index])
         for dex,lset in enumerate(self._layer_sets):
             if lset is not None:  # uninitialized layer sets will be None
@@ -208,11 +212,32 @@ class Document(QObject):
 
         return uuid, info, content
 
+    def open_files(self, paths, insert_before=0):
+        paths = list(self._guidebook.sort_paths(paths))
+        for path in reversed(paths):
+            self.open_file(path, insert_before)
+
     def time_label_for_uuid(self, uuid):
         """used to update animation display when a new frame is shown
         """
         info = self._layer_with_uuid[uuid]
         return self._guidebook.display_time(info)
+
+    def prez_for_uuids(self, uuids, lset=None):
+        if lset is None:
+            lset = self.current_layer_set
+        for p in lset:
+            if p.uuid in uuids:
+                yield p
+
+    def colormap_for_uuids(self, uuids, lset=None):
+        for p in self.prez_for_uuids(uuids, lset=lset):
+            yield p.colormap
+
+    def flipped_for_uuids(self, uuids, lset=None):
+        for p in self.prez_for_uuids(uuids, lset=lset):
+            default_clim = self._layer_with_uuid[p.uuid][INFO.CLIM]
+            yield ((p.climits[1] - p.climits[0]) > 0) != ((default_clim[1] - default_clim[0]) > 0)
 
     def update_dataset_info(self, new_info):
         """
@@ -256,6 +281,12 @@ class Document(QObject):
         """
         return [x.uuid for x in self.current_layer_set]
 
+    @property
+    def current_visible_layer(self):
+        for x in self.current_layer_set:
+            if x.visible:
+                return x.uuid
+        return None
 
     def select_layer_set(self, layer_set_index):
         """
@@ -383,20 +414,32 @@ class Document(QObject):
     def change_colormap_for_layers(self, name, uuids=None):
         L = self.current_layer_set
         if uuids is not None:
-            # LOG.error('layer selection not implemented in change_colormap_for_layers')
-            nfo = dict((uuid, name) for uuid in uuids)
+            uuids = self._guidebook.time_siblings_uuids(uuids, self._layer_with_uuid.values())
         else:  # all data layers
-            uuids = []
-            nfo = {}
-            for dex in range(len(self.current_layer_set)):
-                uuid = self.current_layer_set[dex].uuid
-                nfo[uuid] = name
-                uuids.append(uuid)
+            uuids = [pinfo.uuid for pinfo in L]
+
+        nfo = {}
         for uuid in uuids:
             for dex,pinfo in enumerate(L):
                 if pinfo.uuid==uuid:
                     L[dex] = pinfo._replace(colormap=name)
+                    nfo[uuid] = name
         self.didChangeColormap.emit(nfo)
+
+    def flip_climits_for_layers(self, uuids=None):
+        L = self.current_layer_set
+        if uuids is not None:
+            uuids = self._guidebook.time_siblings_uuids(uuids, self._layer_with_uuid.values())
+        else:  # all data layers
+            uuids = [pinfo.uuid for pinfo in L]
+
+        nfo = {}
+        for uuid in uuids:
+            for dex,pinfo in enumerate(L):
+                if pinfo.uuid==uuid:
+                    nfo[uuid] = pinfo.climits[::-1]
+                    L[dex] = pinfo._replace(climits=nfo[uuid])
+        self.didChangeColorLimits.emit(nfo)
 
     def __len__(self):
         return len(self.current_layer_set)

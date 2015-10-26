@@ -32,6 +32,10 @@ from pyproj import Proj
 
 LOG = logging.getLogger(__name__)
 
+if sys.platform.startswith("win"):
+    PREFERRED_SCREEN_TO_TEXTURE_RATIO = 1.0  # screenpx:texturepx that we want to keep, ideally, by striding
+else:
+    PREFERRED_SCREEN_TO_TEXTURE_RATIO = 0.5  # screenpx:texturepx that we want to keep, ideally, by striding
 
 # http://home.online.no/~sigurdhu/WGS84_Eng.html
 
@@ -39,7 +43,7 @@ DEFAULT_TILE_HEIGHT = 512
 DEFAULT_TILE_WIDTH = 512
 DEFAULT_TEXTURE_HEIGHT=2
 DEFAULT_TEXTURE_WIDTH=16
-DEFAULT_ANIMATION_DELAY=1.0/10.0
+DEFAULT_ANIMATION_DELAY=100.0  # milliseconds
 # The values below are taken from the test geotiffs that are projected to the `DEFAULT_PROJECTION` below.
 # These units are in meters in mercator projection space
 DEFAULT_X_PIXEL_SIZE = 4891.969810251281160
@@ -47,7 +51,6 @@ DEFAULT_Y_PIXEL_SIZE = -7566.684931505724307
 DEFAULT_ORIGIN_X = -20037508.342789247632027
 DEFAULT_ORIGIN_Y = 15496570.739723727107048
 
-PREFERRED_SCREEN_TO_TEXTURE_RATIO = 0.5  # screenpx:texturepx that we want to keep, ideally, by striding
 DEFAULT_PROJECTION = "+proj=merc +datum=WGS84 +ellps=WGS84"
 DEFAULT_PROJ_OBJ = p = Proj(DEFAULT_PROJECTION)
 C_EQ = p(180, 0)[0] - p(-180, 0)[0]
