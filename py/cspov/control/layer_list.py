@@ -354,12 +354,13 @@ class LayerStackListViewModel(QAbstractListModel):
                 del order[old_row]
                 if old_row<insertion_point:
                     insertion_point -= 1
-                inserted_row_numbers.append(old_row)
+                inserted_row_numbers.insert(0, old_row)
                 uuids.append(presentation.uuid)
                 # delete_these_rows.append(old_row if old_row<row else old_row+count)
                 # inserted_presentations.append(presentation)
             order = order[:insertion_point] + inserted_row_numbers + order[insertion_point:]
             LOG.debug('new order after drop {0!r:s}'.format(order))
+            self.select([])
             self.doc.reorder_by_indices(order)
             # self.doc.insert_layer_prez(row, inserted_presentations)
             # LOG.debug('after insertion removing rows {0!r:s}'.format(delete_these_rows))
