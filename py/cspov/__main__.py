@@ -635,6 +635,10 @@ class Main(QtGui.QMainWindow):
         self.ui.animationSlider.repaint()
         self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
 
+    def update_frame_time_to_top_visible(self):
+        # FUTURE: don't address layer set directly
+        self.ui.animationLabel.setText(self.document.time_label_for_uuid(self.scene_manager.layer_set.top_layer_uuid()))
+
     def remove_layer(self, *args, **kwargs):
         uuids = self.behaviorLayersList.current_selected_uuids()
         if uuids:
@@ -677,6 +681,7 @@ class Main(QtGui.QMainWindow):
         # FIXME: force animation off
         return new_focus
         # self.document.animate_siblings_of_layer(new_focus)
+        self.update_frame_time_to_top_visible()
 
     def next_last_band(self, direction=0, *args, **kwargs):
         LOG.info('band incr {}'.format(direction))
@@ -688,6 +693,7 @@ class Main(QtGui.QMainWindow):
             new_focus = self.document.next_last_step(uuid, direction, bandwise=True)
         if new_focus is not None:
             self.behaviorLayersList.select([new_focus])
+            self.update_frame_time_to_top_visible()
 
     def change_animation_to_current_selection_siblings(self, *args, **kwargs):
         uuid = self._next_last_time_visibility(direction=0)
@@ -719,6 +725,7 @@ class Main(QtGui.QMainWindow):
     def toggle_visibility_on_selected_layers(self, *args, **kwargs):
         uuids = self.behaviorLayersList.current_selected_uuids()
         self.document.toggle_layer_visibility(uuids)
+        self.update_frame_time_to_top_visible()
 
     def toggle_animation(self, event, *args, **kwargs):
         self.scene_manager.layer_set.toggle_animation(*args, **kwargs)
@@ -795,7 +802,7 @@ class Main(QtGui.QMainWindow):
         self.behaviorLayersList = LayerStackListViewModel([self.ui.layerSet1Table, self.ui.layerSet2Table, self.ui.layerSet3Table, self.ui.layerSet4Table], doc)
 
         # coordinate what gets done when a layer is added by document
-        # self.document.didAddLayer.connect(self.accept_new_layer)
+        self.document.didAddLayer.connect(self.update_frame_time_to_top_visible)
 
         def update_probe_point(uuid, xy_pos):
             data_point = self.workspace.get_content_point(uuid, xy_pos)
