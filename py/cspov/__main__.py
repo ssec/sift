@@ -368,12 +368,17 @@ class Main(QtGui.QMainWindow):
         self.document.didAddLayer.connect(self.update_frame_time_to_top_visible)
 
         def update_probe_point(uuid, xy_pos):
-            data_point = self.workspace.get_content_point(uuid, xy_pos)
             lon, lat = DEFAULT_PROJ_OBJ(xy_pos[0], xy_pos[1], inverse=True)
             lon_str = "{:.02f} {}".format(abs(lon), "W" if lon < 0 else "E")
             lat_str = "{:.02f} {}".format(abs(lat), "S" if lat < 0 else "N")
             self.ui.cursorProbeLocation.setText("Probe Location: {}, {}".format(lon_str, lat_str))
-            self.ui.cursorProbeText.setText("Probe Value: {:.03f} ".format(float(data_point)))
+
+            if uuid is not None:
+                data_point = self.workspace.get_content_point(uuid, xy_pos)
+                data_str = "{:.03f}".format(float(data_point))
+            else:
+                data_str = "N/A"
+            self.ui.cursorProbeText.setText("Probe Value: {} ".format(data_str))
         self.scene_manager.newProbePoint.connect(update_probe_point)
 
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
