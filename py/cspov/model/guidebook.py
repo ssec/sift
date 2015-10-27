@@ -124,23 +124,27 @@ class AHI_HSF_Guidebook(Guidebook):
             if self.is_relevant(dsi[INFO.PATHNAME]):
                 yield dsi
 
-    def _collect_info(self, seq):
+    def collect_info(self, info):
+        md = self._cache.get(info[INFO.UUID], None)
+        if md is not None:
+            return md
+        else:
+            md = self._metadata_for_path(info[INFO.PATHNAME])
+            md[GUIDE.UUID] = info[INFO.UUID]
+            md[GUIDE.INSTRUMENT] = INSTRUMENT.AHI
+            self._cache[info[INFO.UUID]] = md
+            return md
+
+    def collect_info_from_seq(self, seq):
         "collect AHI metadata about a sequence of datasetinfo dictionaries"
         # FUTURE: cache uuid:metadata info in the guidebook instance for quick lookup
         for each in self._relevant_info(seq):
-            md = self._cache.get(each[INFO.UUID], None)
-            if md is not None:
-                yield each[INFO.UUID], md
-            else:
-                md = self._metadata_for_path(each[INFO.PATHNAME])
-                md[GUIDE.UUID] = each[INFO.UUID]
-                md[GUIDE.INSTRUMENT] = INSTRUMENT.AHI
-                self._cache[each[INFO.UUID]] = md
-                yield each[INFO.UUID], md
+            md = self.collect_info(each)
+            yield each[INFO.UUID], md
 
     def climits(self, dsi):
         # Valid min and max for colormap use
-        nfo, = list(self._collect_info([dsi]))
+        nfo, = list(self.collect_info_from_seq([dsi]))
         uuid, md = nfo
         if md[GUIDE.BAND] in [1, 2, 3, 4, 5, 6]:
             # Reflectance/visible data limits
@@ -150,7 +154,7 @@ class AHI_HSF_Guidebook(Guidebook):
             return -109.0 + 273.15, 55 + 273.15
 
     def default_colormap(self, dsi):
-        nfo, = list(self._collect_info([dsi]))
+        nfo, = list(self.collect_info_from_seq([dsi]))
         uuid, md = nfo
         if md[GUIDE.BAND] in [1, 2, 3, 4, 5, 6]:
             return DEFAULT_VIS
@@ -158,12 +162,12 @@ class AHI_HSF_Guidebook(Guidebook):
             return DEFAULT_IR
 
     def display_time(self, dsi):
-        nfo, = list(self._collect_info([dsi]))
+        nfo, = list(self.collect_info_from_seq([dsi]))
         uuid, md = nfo
         return md.get(GUIDE.DISPLAY_TIME, '--:--')
 
     def display_name(self, dsi):
-        nfo, = list(self._collect_info([dsi]))
+        nfo, = list(self.collect_info_from_seq([dsi]))
         uuid, md = nfo
         return md.get(GUIDE.DISPLAY_NAME, '--:--')
 
@@ -197,7 +201,7 @@ class AHI_HSF_Guidebook(Guidebook):
         :param infos:
         :return: sorted list of sibling uuids in channel order
         """
-        meta = dict(self._collect_info(infos))
+        meta = dict(self.collect_info_from_seq(infos))
         it = meta.get(uuid, None)
         if it is None:
             return None
@@ -215,7 +219,7 @@ class AHI_HSF_Guidebook(Guidebook):
         :param infos: list of dataset infos available, some of which may not be relevant
         :return: sorted list of sibling uuids in time order, index of where uuid is in the list
         """
-        meta = dict(self._collect_info(infos))
+        meta = dict(self.collect_info_from_seq(infos))
         it = meta.get(uuid, None)
         if it is None:
             return None
