@@ -186,6 +186,8 @@ class Document(QObject):
         :return: overview (uuid:UUID, datasetinfo:dict, overviewdata:numpy.ndarray)
         """
         uuid, info, content = self._workspace.import_image(source_path=path)
+        if uuid in self._layer_with_uuid:
+            return uuid, info, content
         # info.update(self._additional_guidebook_information(info))
         self._layer_with_uuid[uuid] = info
 
@@ -460,6 +462,20 @@ class Document(QObject):
         uuid = self.current_layer_set[row].uuid
         return uuid
 
+    def remove_layers_from_all_sets(self, uuids):
+        for uuid in list(uuids):
+            # FUTURE: make this removal of presentation tuples from inactive layer sets less sucky
+            LOG.debug('removing {}'.format(uuid))
+            for dex,layer_set in enumerate(self._layer_sets):
+                if dex==self.current_set_index or layer_set is None:
+                    continue
+                for pdex, presentation in enumerate(layer_set):
+                    if presentation.uuid==uuid:
+                        del layer_set[pdex]
+                        break
+            # now remove from the active layer set
+            self.remove_layer_prez(uuid)  # this will send signal and start purge
+
     def clear_animation_order(self):
         cls = self.current_layer_set
         for i,q in enumerate(cls):
@@ -502,7 +518,7 @@ class Document(QObject):
         # nfo = self._layer_with_uuid[uuid]
         # return nfo
 
-    def reorder_by_indices(self, new_order, layer_set_index=None):
+    def reorder_by_indices(self, new_order, uuids=None, layer_set_index=None):
         """given a new layer order, replace the current layer set
         emits signal to other subsystems
         """

@@ -55,6 +55,102 @@
        </spacer>
       </item>
       <item>
+       <widget class="QLabel" name="cursorProbeLocation">
+        <property name="minimumSize">
+         <size>
+          <width>256</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="palette">
+         <palette>
+          <active>
+           <colorrole role="WindowText">
+            <brush brushstyle="SolidPattern">
+             <color alpha="255">
+              <red>17</red>
+              <green>71</green>
+              <blue>5</blue>
+             </color>
+            </brush>
+           </colorrole>
+           <colorrole role="Text">
+            <brush brushstyle="SolidPattern">
+             <color alpha="255">
+              <red>17</red>
+              <green>71</green>
+              <blue>5</blue>
+             </color>
+            </brush>
+           </colorrole>
+          </active>
+          <inactive>
+           <colorrole role="WindowText">
+            <brush brushstyle="SolidPattern">
+             <color alpha="255">
+              <red>17</red>
+              <green>71</green>
+              <blue>5</blue>
+             </color>
+            </brush>
+           </colorrole>
+           <colorrole role="Text">
+            <brush brushstyle="SolidPattern">
+             <color alpha="255">
+              <red>17</red>
+              <green>71</green>
+              <blue>5</blue>
+             </color>
+            </brush>
+           </colorrole>
+          </inactive>
+          <disabled>
+           <colorrole role="WindowText">
+            <brush brushstyle="SolidPattern">
+             <color alpha="255">
+              <red>69</red>
+              <green>69</green>
+              <blue>69</blue>
+             </color>
+            </brush>
+           </colorrole>
+           <colorrole role="Text">
+            <brush brushstyle="SolidPattern">
+             <color alpha="255">
+              <red>69</red>
+              <green>69</green>
+              <blue>69</blue>
+             </color>
+            </brush>
+           </colorrole>
+          </disabled>
+         </palette>
+        </property>
+        <property name="font">
+         <font>
+          <family>Andale Mono</family>
+          <pointsize>14</pointsize>
+         </font>
+        </property>
+        <property name="toolTip">
+         <string>longitude/latitude location of point probe</string>
+        </property>
+        <property name="statusTip">
+         <string>longitude/latitude coordinates under cursor</string>
+        </property>
+        <property name="text">
+         <string>Probe Location: </string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="Line" name="line">
+        <property name="orientation">
+         <enum>Qt::Vertical</enum>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QLabel" name="cursorProbeText">
         <property name="minimumSize">
          <size>
@@ -145,7 +241,7 @@
          <string>Selected layer value under cursor</string>
         </property>
         <property name="text">
-         <string>Cursor Value</string>
+         <string>Probe Value:</string>
         </property>
        </widget>
       </item>

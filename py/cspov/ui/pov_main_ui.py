@@ -2,8 +2,7 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created: Mon Oct 26 16:45:45 2015
-#      by: PyQt4 UI code generator 4.11.3
+# Created by: PyQt4 UI code generator 4.11.4
 #
 # WARNING! All changes made in this file will be lost!
 
@@ -45,6 +44,39 @@ class Ui_MainWindow(object):
         self.horizontalLayout_2.addWidget(self.regionSelectButton)
         spacerItem = QtGui.QSpacerItem(40, 20, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
         self.horizontalLayout_2.addItem(spacerItem)
+        self.cursorProbeLocation = QtGui.QLabel(self.centralwidget)
+        self.cursorProbeLocation.setMinimumSize(QtCore.QSize(256, 0))
+        palette = QtGui.QPalette()
+        brush = QtGui.QBrush(QtGui.QColor(17, 71, 5))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.WindowText, brush)
+        brush = QtGui.QBrush(QtGui.QColor(17, 71, 5))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.Text, brush)
+        brush = QtGui.QBrush(QtGui.QColor(17, 71, 5))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.WindowText, brush)
+        brush = QtGui.QBrush(QtGui.QColor(17, 71, 5))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.Text, brush)
+        brush = QtGui.QBrush(QtGui.QColor(69, 69, 69))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.WindowText, brush)
+        brush = QtGui.QBrush(QtGui.QColor(69, 69, 69))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.Text, brush)
+        self.cursorProbeLocation.setPalette(palette)
+        font = QtGui.QFont()
+        font.setFamily(_fromUtf8("Andale Mono"))
+        font.setPointSize(14)
+        self.cursorProbeLocation.setFont(font)
+        self.cursorProbeLocation.setObjectName(_fromUtf8("cursorProbeLocation"))
+        self.horizontalLayout_2.addWidget(self.cursorProbeLocation)
+        self.line = QtGui.QFrame(self.centralwidget)
+        self.line.setFrameShape(QtGui.QFrame.VLine)
+        self.line.setFrameShadow(QtGui.QFrame.Sunken)
+        self.line.setObjectName(_fromUtf8("line"))
+        self.horizontalLayout_2.addWidget(self.line)
         self.cursorProbeText = QtGui.QLabel(self.centralwidget)
         self.cursorProbeText.setMinimumSize(QtCore.QSize(240, 0))
         self.cursorProbeText.setMaximumSize(QtCore.QSize(256, 16777215))
@@ -215,9 +247,12 @@ class Ui_MainWindow(object):
         self.panZoomToolButton.setText(_translate("MainWindow", "Pan/Zoom", None))
         self.pointSelectButton.setText(_translate("MainWindow", "Point", None))
         self.regionSelectButton.setText(_translate("MainWindow", "Region", None))
+        self.cursorProbeLocation.setToolTip(_translate("MainWindow", "longitude/latitude location of point probe", None))
+        self.cursorProbeLocation.setStatusTip(_translate("MainWindow", "longitude/latitude coordinates under cursor", None))
+        self.cursorProbeLocation.setText(_translate("MainWindow", "Probe Location: ", None))
         self.cursorProbeText.setToolTip(_translate("MainWindow", "Value under cursor", None))
         self.cursorProbeText.setStatusTip(_translate("MainWindow", "Selected layer value under cursor", None))
-        self.cursorProbeText.setText(_translate("MainWindow", "Cursor Value", None))
+        self.cursorProbeText.setText(_translate("MainWindow", "Probe Value:", None))
         self.mainWidgets.setTabText(self.mainWidgets.indexOf(self.tab), _translate("MainWindow", "Tab 1", None))
         self.mainWidgets.setTabText(self.mainWidgets.indexOf(self.tab_2), _translate("MainWindow", "Tab 2", None))
         self.queueButton.setToolTip(_translate("MainWindow", "Show Activity", None))

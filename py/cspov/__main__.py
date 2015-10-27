@@ -42,8 +42,7 @@ from functools import partial
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
-import cspov.view.Colormap
-from cspov.common import INFO, KIND
+from cspov.common import INFO, KIND, DEFAULT_PROJ_OBJ
 
 import os
 import logging
@@ -198,11 +197,14 @@ class Main(QtGui.QMainWindow):
         self.ui.animationSlider.repaint()
         self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
 
+    def update_frame_time_to_top_visible(self):
+        # FUTURE: don't address layer set directly
+        self.ui.animationLabel.setText(self.document.time_label_for_uuid(self.scene_manager.layer_set.top_layer_uuid()))
+
     def remove_layer(self, *args, **kwargs):
         uuids = self.behaviorLayersList.current_selected_uuids()
-        for uuid in uuids:
-            LOG.debug('removing layer {}'.format(uuid))
-            self.document.remove_layer_prez(uuid)
+        if uuids:
+            self.document.remove_layers_from_all_sets(uuids)
 
     def animation_slider_jump_frame(self, event, *args, **kwargs):
         "user has moved frame slider, update the display"
@@ -241,6 +243,7 @@ class Main(QtGui.QMainWindow):
         # FIXME: force animation off
         return new_focus
         # self.document.animate_siblings_of_layer(new_focus)
+        self.update_frame_time_to_top_visible()
 
     def next_last_band(self, direction=0, *args, **kwargs):
         LOG.info('band incr {}'.format(direction))
@@ -252,6 +255,7 @@ class Main(QtGui.QMainWindow):
             new_focus = self.document.next_last_step(uuid, direction, bandwise=True)
         if new_focus is not None:
             self.behaviorLayersList.select([new_focus])
+            self.update_frame_time_to_top_visible()
 
     def change_animation_to_current_selection_siblings(self, *args, **kwargs):
         uuid = self._next_last_time_visibility(direction=0)
@@ -283,6 +287,7 @@ class Main(QtGui.QMainWindow):
     def toggle_visibility_on_selected_layers(self, *args, **kwargs):
         uuids = self.behaviorLayersList.current_selected_uuids()
         self.document.toggle_layer_visibility(uuids)
+        self.update_frame_time_to_top_visible()
 
     def toggle_animation(self, event, *args, **kwargs):
         self.scene_manager.layer_set.toggle_animation(*args, **kwargs)
@@ -307,7 +312,7 @@ class Main(QtGui.QMainWindow):
         self.queue.didMakeProgress.connect(self.update_progress_bar)
 
         # create document
-        self.workspace = Workspace(workspace_dir, max_size_gb=workspace_size)
+        self.workspace = Workspace(workspace_dir, max_size_gb=workspace_size, queue=self.queue)
         self.document = doc = Document(self.workspace)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
                                                glob_pattern=glob_pattern,
@@ -360,11 +365,20 @@ class Main(QtGui.QMainWindow):
         self.behaviorLayersList = self.layerSetsManager.getLayerStackListViewModel()
 
         # coordinate what gets done when a layer is added by document
-        # self.document.didAddLayer.connect(self.accept_new_layer)
+        self.document.didAddLayer.connect(self.update_frame_time_to_top_visible)
 
         def update_probe_point(uuid, xy_pos):
-            data_point = self.workspace.get_content_point(uuid, xy_pos)
-            self.ui.cursorProbeText.setText("Point Probe: {:.03f}".format(float(data_point)))
+            lon, lat = DEFAULT_PROJ_OBJ(xy_pos[0], xy_pos[1], inverse=True)
+            lon_str = "{:.02f} {}".format(abs(lon), "W" if lon < 0 else "E")
+            lat_str = "{:.02f} {}".format(abs(lat), "S" if lat < 0 else "N")
+            self.ui.cursorProbeLocation.setText("Probe Location: {}, {}".format(lon_str, lat_str))
+
+            if uuid is not None:
+                data_point = self.workspace.get_content_point(uuid, xy_pos)
+                data_str = "{:.03f}".format(float(data_point))
+            else:
+                data_str = "N/A"
+            self.ui.cursorProbeText.setText("Probe Value: {} ".format(data_str))
         self.scene_manager.newProbePoint.connect(update_probe_point)
 
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
