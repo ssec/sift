@@ -184,6 +184,8 @@ class Document(QObject):
         :return: overview (uuid:UUID, datasetinfo:dict, overviewdata:numpy.ndarray)
         """
         uuid, info, content = self._workspace.import_image(source_path=path)
+        if uuid in self._layer_with_uuid:
+            return uuid, info, content
         # info.update(self._additional_guidebook_information(info))
         self._layer_with_uuid[uuid] = info
 
