@@ -518,7 +518,7 @@ class Document(QObject):
         # nfo = self._layer_with_uuid[uuid]
         # return nfo
 
-    def reorder_by_indices(self, new_order, layer_set_index=None):
+    def reorder_by_indices(self, new_order, uuids=None, layer_set_index=None):
         """given a new layer order, replace the current layer set
         emits signal to other subsystems
         """
