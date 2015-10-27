@@ -743,7 +743,7 @@ class Main(QtGui.QMainWindow):
         self.queue.didMakeProgress.connect(self.update_progress_bar)
 
         # create document
-        self.workspace = Workspace(workspace_dir, max_size_gb=workspace_size)
+        self.workspace = Workspace(workspace_dir, max_size_gb=workspace_size, queue=self.queue)
         self.document = doc = Document(self.workspace)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
                                                glob_pattern=glob_pattern,
