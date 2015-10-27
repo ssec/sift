@@ -41,8 +41,7 @@ from functools import partial
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
-import cspov.view.Colormap
-from cspov.common import INFO, KIND
+from cspov.common import INFO, KIND, DEFAULT_PROJ_OBJ
 
 import os
 import logging
@@ -806,7 +805,11 @@ class Main(QtGui.QMainWindow):
 
         def update_probe_point(uuid, xy_pos):
             data_point = self.workspace.get_content_point(uuid, xy_pos)
-            self.ui.cursorProbeText.setText("Point Probe: {:.03f}".format(float(data_point)))
+            lon, lat = DEFAULT_PROJ_OBJ(xy_pos[0], xy_pos[1], inverse=True)
+            lon_str = "{:.02f} {}".format(abs(lon), "W" if lon < 0 else "E")
+            lat_str = "{:.02f} {}".format(abs(lat), "S" if lat < 0 else "N")
+            self.ui.cursorProbeLocation.setText("Probe Location: {}, {}".format(lon_str, lat_str))
+            self.ui.cursorProbeText.setText("Probe Value: {:.03f} ".format(float(data_point)))
         self.scene_manager.newProbePoint.connect(update_probe_point)
 
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
