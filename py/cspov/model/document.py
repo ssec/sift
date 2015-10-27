@@ -64,6 +64,8 @@ from collections import namedtuple
 from enum import Enum
 from uuid import UUID
 import numpy as np
+from copy import deepcopy
+
 from cspov.common import KIND, INFO
 from cspov.model.guidebook import AHI_HSF_Guidebook
 
@@ -78,7 +80,7 @@ from .probes import Probe, Shape
 
 LOG = logging.getLogger(__name__)
 
-DEFAULT_LAYER_SET_COUNT = 4  # this should match the ui configuration!
+DEFAULT_LAYER_SET_COUNT = 1  # this should match the ui configuration!
 
 # presentation information for a layer; z_order comes from the layerset
 prez = namedtuple('prez', [
@@ -134,7 +136,7 @@ class Document(QObject):
 
     # signals
     didAddLayer = pyqtSignal(list, dict, prez, np.ndarray)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
-    didRemoveLayer = pyqtSignal(list, UUID)  # new order, UUID that was removed from current layer set
+    didRemoveLayers = pyqtSignal(list, list, int, int)  # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
     willPurgeLayer = pyqtSignal(UUID)  # UUID of the layer being removed
     didReorderLayers = pyqtSignal(list)  # list of original indices in their new order, None for new layers
     didChangeLayerVisibility = pyqtSignal(dict)  # {UUID: new-visibility, ...} for changed layers
@@ -184,6 +186,8 @@ class Document(QObject):
         :return: overview (uuid:UUID, datasetinfo:dict, overviewdata:numpy.ndarray)
         """
         uuid, info, content = self._workspace.import_image(source_path=path)
+        if uuid in self._layer_with_uuid:
+            return uuid, info, content
         # info.update(self._additional_guidebook_information(info))
         self._layer_with_uuid[uuid] = info
 
@@ -253,7 +257,7 @@ class Document(QObject):
         # TODO: see if this affects any presentation information; view will handle redrawing on its own
 
     def _clone_layer_set(self, existing_layer_set):
-        return existing_layer_set.deepcopy()
+        return deepcopy(existing_layer_set)
 
     @property
     def current_animation_order(self):
@@ -295,16 +299,25 @@ class Document(QObject):
           if cloning of layer set didn't occur
         :param layer_set_index: which layer set to switch to
         """
-        assert(layer_set_index<len(self._layer_sets) and layer_set_index>=0)
+
+        # the number of layer sets is no longer fixed, but you can't select more than 1 beyond the end of the list!
+        assert(layer_set_index <= len(self._layer_sets) and layer_set_index >= 0)
+
+        # if we are adding a layer set, do that now
+        if layer_set_index == len(self._layer_sets) :
+            self._layer_sets.append(None)
+
+        # if the selected layer set doesn't exist yet, clone another set to make it
         did_clone = False
         if self._layer_sets[layer_set_index] is None:
             self._layer_sets[layer_set_index] = self._clone_layer_set(self._layer_sets[self.current_set_index])
             did_clone = True
+
+        # switch to the new layer set and set off events to let others know about the change
         self.current_set_index = layer_set_index
         self.didSwitchLayerSet.emit(layer_set_index, self.current_layer_set, self.current_animation_order)
-        if not did_clone:
-            self.didReorderLayers.emit([])  # indicate that pretty much everything has changed
 
+    # TODO, not being used?
     def change_layer_order(self, old_index, new_index):
         L = self.current_layer_set
         order = list(range(len(L)))
@@ -316,6 +329,7 @@ class Document(QObject):
         L.insert(new_index, d)
         self.didReorderLayers.emit(order)
 
+    # TODO, not being used?
     def swap_layer_order(self, row1, row2):
         L = self.current_layer_set
         order = list(range(len(L)))
@@ -448,6 +462,20 @@ class Document(QObject):
         uuid = self.current_layer_set[row].uuid
         return uuid
 
+    def remove_layers_from_all_sets(self, uuids):
+        for uuid in list(uuids):
+            # FUTURE: make this removal of presentation tuples from inactive layer sets less sucky
+            LOG.debug('removing {}'.format(uuid))
+            for dex,layer_set in enumerate(self._layer_sets):
+                if dex==self.current_set_index or layer_set is None:
+                    continue
+                for pdex, presentation in enumerate(layer_set):
+                    if presentation.uuid==uuid:
+                        del layer_set[pdex]
+                        break
+            # now remove from the active layer set
+            self.remove_layer_prez(uuid)  # this will send signal and start purge
+
     def clear_animation_order(self):
         cls = self.current_layer_set
         for i,q in enumerate(cls):
@@ -490,6 +518,17 @@ class Document(QObject):
         # nfo = self._layer_with_uuid[uuid]
         # return nfo
 
+    def reorder_by_indices(self, new_order, layer_set_index=None):
+        """given a new layer order, replace the current layer set
+        emits signal to other subsystems
+        """
+        if layer_set_index is None:
+            layer_set_index = self.current_set_index
+        assert(len(new_order)==len(self._layer_sets[layer_set_index]))
+        new_layer_set = [self._layer_sets[layer_set_index][n] for n in new_order]
+        self._layer_sets[layer_set_index] = new_layer_set
+        self.didReorderLayers.emit(new_order)
+
     def insert_layer_prez(self, row:int, layer_prez_seq):
         cls = self.current_layer_set
         clo = list(range(len(cls)))
@@ -504,7 +543,6 @@ class Document(QObject):
                 continue
             cls.insert(row, p)
             clo.insert(row, None)
-        self.didReorderLayers.emit(clo)
 
     def is_using(self, uuid:UUID, layer_set:int=None):
         "return true if this dataset is still in use in one of the layer sets"
@@ -535,8 +573,8 @@ class Document(QObject):
         clo = list(range(len(self.current_layer_set)))
         del clo[row:row+count]
         del self.current_layer_set[row:row+count]
+        self.didRemoveLayers.emit(clo, uuids, row, count)
         for uuid in uuids:
-            self.didRemoveLayer.emit(clo, uuid)
             if not self.is_using(uuid):
                 LOG.info('purging layer {}, no longer in use'.format(uuid))
                 self.willPurgeLayer.emit(uuid)
