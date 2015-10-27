@@ -449,7 +449,7 @@ class Document(QObject):
         return uuid
 
     def remove_layers_from_all_sets(self, uuids):
-        for uuid in uuids:
+        for uuid in list(uuids):
             # FUTURE: make this removal of presentation tuples from inactive layer sets less sucky
             LOG.debug('removing {}'.format(uuid))
             for dex,layer_set in enumerate(self._layer_sets):
