@@ -163,6 +163,7 @@ class Workspace(QObject):
     _inventory_path = None  # filename to store and load inventory information (simple cache)
     _tempdir = None  # TemporaryDirectory, if it's needed (i.e. a directory name was not given)
     _max_size_gb = None  # maximum size in gigabytes of flat files we cache in the workspace
+    _queue = None
 
     # signals
     didStartImport = pyqtSignal(dict)  # a dataset started importing; generated after overview level of detail is available
@@ -173,7 +174,7 @@ class Workspace(QObject):
 
     IMPORT_CLASSES = [ GeoTiffImporter ]
 
-    def __init__(self, directory_path=None, process_pool=None, max_size_gb=None):
+    def __init__(self, directory_path=None, process_pool=None, max_size_gb=None, queue=None):
         """
         Initialize a new or attach an existing workspace, creating any necessary bookkeeping.
         """
@@ -381,21 +382,36 @@ class Workspace(QObject):
         mm[:] = data[:]
         return mm
 
-    def remove(self, dsi):
-        """
-        Formally detach a dataset, removing its content from the workspace fully by the time that idle() has nothing more to do.
-        :param dsi: datasetinfo dictionary or UUID of a dataset
-        :return: True if successfully deleted, False if not found
-        """
-        uuid = dsi if isinstance(dsi, UUID) else dsi[INFO.UUID]
-        zult = False
+    def _bgnd_remove(self, uuid):
+        from cspov.queue import TASK_DOING, TASK_PROGRESS
+        yield {TASK_DOING: 'purging memory', TASK_PROGRESS: 0.5}
         if uuid in self._info:
             del self._info[uuid]
             zult = True
         if uuid in self._data:
             del self._data[uuid]
             zult = True
-        return zult
+        yield {TASK_DOING: 'purging memory', TASK_PROGRESS: 1.0}
+
+    def remove(self, dsi):
+        """
+        Formally detach a dataset, removing its content from the workspace fully by the time that idle() has nothing more to do.
+        :param dsi: datasetinfo dictionary or UUID of a dataset
+        :return: True if successfully deleted, False if not found
+        """
+        if isinstance(dsi, dict):
+            name = dsi[INFO.NAME]
+        else:
+            name = 'dataset'
+        uuid = dsi if isinstance(dsi, UUID) else dsi[INFO.UUID]
+        zult = False
+
+        if self._queue is not None:
+            self._queue.add(str(uuid), self._bgnd_remove(uuid), 'Purge dataset')
+        else:
+            for blank in self._bgnd_remove(uuid):
+                pass
+        return True
 
     def get_info(self, dsi_or_uuid, lod=None):
         """
