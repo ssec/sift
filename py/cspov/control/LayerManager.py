@@ -34,6 +34,7 @@ class LayerSetsManager (QObject) :
     layer_sets = None
     max_tab_number = None
     set_behaviors = None
+    layer_info_widget = None
 
     def __init__ (self, tab_view_widget, document) :
 

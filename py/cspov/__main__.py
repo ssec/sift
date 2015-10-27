@@ -336,7 +336,7 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.didChangeLayerVisibility.connect(self.document.animation_changed_visibility)
 
         # disable close button on panes
-        for pane in [self.ui.areaProbePane, self.ui.layersPane]:
+        for pane in [self.ui.areaProbePane, self.ui.layersPane, self.ui.layerConfigPane]:
             pane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable |
                              QtGui.QDockWidget.DockWidgetMovable)
 
