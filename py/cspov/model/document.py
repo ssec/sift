@@ -190,6 +190,9 @@ class Document(QObject):
             return uuid, info, content
         # info.update(self._additional_guidebook_information(info))
         self._layer_with_uuid[uuid] = info
+        # also get info for this layer from the guidebook
+        gbinfo = self._guidebook.collect_info(info)
+        self._layer_with_uuid[uuid].update(gbinfo)
 
         # add as visible to the front of the current set, and invisible to the rest of the available sets
         cmap = self._default_colormap(info)
@@ -243,6 +246,7 @@ class Document(QObject):
             default_clim = self._layer_with_uuid[p.uuid][INFO.CLIM]
             yield ((p.climits[1] - p.climits[0]) > 0) != ((default_clim[1] - default_clim[0]) > 0)
 
+    # TODO, find out if this is needed/used and whether or not it's correct
     def update_dataset_info(self, new_info):
         """
         slot which updates document on new information workspace has provided us about a dataset
@@ -254,6 +258,8 @@ class Document(QObject):
         if uuid not in self._layer_with_uuid:
             LOG.warning('new information on uuid {0!r:s} is not for a known dataset'.format(new_info))
         self._layer_with_uuid[new_info[INFO.UUID]] = new_info
+        # TODO, also get information about this layer from the guidebook?
+
         # TODO: see if this affects any presentation information; view will handle redrawing on its own
 
     def _clone_layer_set(self, existing_layer_set):
@@ -502,9 +508,12 @@ class Document(QObject):
         self.didReorderAnimation.emit(new_anim_uuids)
         return new_anim_uuids
 
-    def get_info(self, row=None):
-        if row is not None:
-            uuid = self.current_layer_set[row].uuid
+    def get_info(self, row=None, uuid=None):
+        if row is not None :
+            uuid_temp = self.current_layer_set[row].uuid
+            nfo = self._layer_with_uuid[uuid_temp]
+            return nfo
+        elif uuid is not None :
             nfo = self._layer_with_uuid[uuid]
             return nfo
         return None

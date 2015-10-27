@@ -12,13 +12,8 @@ This module holds the code which deals with the controller and view for the area
 __author__ = 'evas'
 __docformat__ = 'reStructuredText'
 
-from vispy import app
-try:
-    app_object = app.use_app('pyqt4')
-except Exception:
-    app_object = app.use_app('pyside')
-QtCore = app_object.backend_module.QtCore
-QtGui = app_object.backend_module.QtGui
+import PyQt4.QtCore as QtCore
+import PyQt4.QtGui as QtGui
 from PyQt4.QtCore import QObject, pyqtSignal
 
 # a useful constant

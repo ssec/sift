@@ -33,13 +33,10 @@ from PyQt4.QtCore import QObject
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import os, sys
-import logging, unittest, argparse
-import weakref
+import logging
 import pickle as pkl
-import base64
-from PyQt4.QtCore import QAbstractListModel, QAbstractTableModel, QVariant, Qt, QSize, QModelIndex, QPoint, QMimeData
-from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyleOptionViewItem, QItemSelection, QItemSelectionModel
+from PyQt4.QtCore import QAbstractListModel, Qt, QSize, QModelIndex, QPoint, QMimeData, pyqtSignal
+from PyQt4.QtGui import QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyleOptionViewItem, QItemSelection, QItemSelectionModel
 from cspov.model.document import Document
 from cspov.common import INFO, KIND
 from cspov.view.Colormap import ALL_COLORMAPS, CATEGORIZED_COLORMAPS
@@ -154,6 +151,9 @@ class LayerStackListViewModel(QAbstractListModel):
     item_delegate = None
     _mimetype = 'application/vnd.row.list'
 
+    # signals
+    uuidSelectionChanged = pyqtSignal(list,)  # the list is a list of the currently selected UUIDs
+
     def __init__(self, widgets:list, doc:Document):
         """
         Connect one or more table views to the document via this model.
@@ -205,9 +205,14 @@ class LayerStackListViewModel(QAbstractListModel):
         listbox.setDragDropMode(QAbstractItemView.DragDrop)
         # listbox.setDefaultDropAction(Qt.MoveAction)
         # listbox.setDragDropOverwriteMode(False)
-        # listbox.clicked.connect(self.layer_clicked)
         # listbox.entered.connect(self.layer_entered)
-        # listbox.pressed.connect(self.layer_pressed)
+
+        # the various signals that may result from the user changing the selections
+        listbox.activated.connect(self.changedSelection)
+        listbox.clicked.connect(self.changedSelection)
+        listbox.doubleClicked.connect(self.changedSelection)
+        listbox.pressed.connect(self.changedSelection)
+
         self.widgets.append(listbox)
 
     # def supportedDragActions(self):
@@ -215,6 +220,12 @@ class LayerStackListViewModel(QAbstractListModel):
     #
     def supportedDropActions(self):
         return Qt.MoveAction # | Qt.CopyAction
+
+    def changedSelection(self, index) :
+        """connected to the various listbox signals that represent the user changing selections
+        """
+        selected_uuids = list(self.current_selected_uuids(self.current_set_listbox))
+        self.uuidSelectionChanged.emit(selected_uuids)
 
     @property
     def current_set_listbox(self):
@@ -241,6 +252,9 @@ class LayerStackListViewModel(QAbstractListModel):
         self.layoutAboutToBeChanged.emit()
         self.revert()
         self.layoutChanged.emit()
+
+        # this is an ugly way to make sure the selection stays current
+        self.changedSelection(None)
 
     def current_selected_uuids(self, lbox:QListView=None):
         lbox = self.current_set_listbox if lbox is None else lbox
@@ -500,22 +514,6 @@ class LayerStackListViewModel(QAbstractListModel):
     #
     #     else:
     #         event.ignore()
-
-
-    def layer_clicked(self, qindex):
-        pass
-
-    def layers_moved(self, qindices):
-        pass
-
-    def layer_entered(self, qindex):
-        pass
-
-    def layer_pressed(self, qindex):
-        pass
-
-    def context_menu(self, qpoint):
-        pass
 
         # self.widget().clear()
         # for x in self.doc.asListing():
