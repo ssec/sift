@@ -64,6 +64,8 @@ from collections import namedtuple
 from enum import Enum
 from uuid import UUID
 import numpy as np
+from copy import deepcopy
+
 from cspov.common import KIND, INFO
 from cspov.model.guidebook import AHI_HSF_Guidebook
 
@@ -78,7 +80,7 @@ from .probes import Probe, Shape
 
 LOG = logging.getLogger(__name__)
 
-DEFAULT_LAYER_SET_COUNT = 4  # this should match the ui configuration!
+DEFAULT_LAYER_SET_COUNT = 1  # this should match the ui configuration!
 
 # presentation information for a layer; z_order comes from the layerset
 prez = namedtuple('prez', [
@@ -255,7 +257,7 @@ class Document(QObject):
         # TODO: see if this affects any presentation information; view will handle redrawing on its own
 
     def _clone_layer_set(self, existing_layer_set):
-        return existing_layer_set.deepcopy()
+        return deepcopy(existing_layer_set)
 
     @property
     def current_animation_order(self):
@@ -297,16 +299,25 @@ class Document(QObject):
           if cloning of layer set didn't occur
         :param layer_set_index: which layer set to switch to
         """
-        assert(layer_set_index<len(self._layer_sets) and layer_set_index>=0)
+
+        # the number of layer sets is no longer fixed, but you can't select more than 1 beyond the end of the list!
+        assert(layer_set_index <= len(self._layer_sets) and layer_set_index >= 0)
+
+        # if we are adding a layer set, do that now
+        if layer_set_index == len(self._layer_sets) :
+            self._layer_sets.append(None)
+
+        # if the selected layer set doesn't exist yet, clone another set to make it
         did_clone = False
         if self._layer_sets[layer_set_index] is None:
             self._layer_sets[layer_set_index] = self._clone_layer_set(self._layer_sets[self.current_set_index])
             did_clone = True
+
+        # switch to the new layer set and set off events to let others know about the change
         self.current_set_index = layer_set_index
         self.didSwitchLayerSet.emit(layer_set_index, self.current_layer_set, self.current_animation_order)
-        if not did_clone:
-            self.didReorderLayers.emit([])  # indicate that pretty much everything has changed
 
+    # TODO, not being used?
     def change_layer_order(self, old_index, new_index):
         L = self.current_layer_set
         order = list(range(len(L)))
@@ -318,6 +329,7 @@ class Document(QObject):
         L.insert(new_index, d)
         self.didReorderLayers.emit(order)
 
+    # TODO, not being used?
     def swap_layer_order(self, row1, row2):
         L = self.current_layer_set
         order = list(range(len(L)))

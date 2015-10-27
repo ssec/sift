@@ -478,61 +478,10 @@
        <property name="currentIndex">
         <number>0</number>
        </property>
-       <widget class="QWidget" name="layerSet1Tab">
+       <widget class="QWidget" name="tab_plusL">
         <attribute name="title">
-         <string>1</string>
+         <string>+</string>
         </attribute>
-        <attribute name="toolTip">
-         <string>Layer Set 1</string>
-        </attribute>
-        <layout class="QVBoxLayout" name="verticalLayout_4">
-         <item>
-          <widget class="QListView" name="layerSet1Table">
-           <property name="statusTip">
-            <string>Current layers</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
-       <widget class="QWidget" name="layerSet2Tab">
-        <attribute name="title">
-         <string>2</string>
-        </attribute>
-        <attribute name="toolTip">
-         <string>Layer Set 2</string>
-        </attribute>
-        <layout class="QVBoxLayout" name="verticalLayout_5">
-         <item>
-          <widget class="QListView" name="layerSet2Table"/>
-         </item>
-        </layout>
-       </widget>
-       <widget class="QWidget" name="layerSet3Tab">
-        <attribute name="title">
-         <string>3</string>
-        </attribute>
-        <attribute name="toolTip">
-         <string>Layer Set 3</string>
-        </attribute>
-        <layout class="QVBoxLayout" name="verticalLayout_6">
-         <item>
-          <widget class="QListView" name="layerSet3Table"/>
-         </item>
-        </layout>
-       </widget>
-       <widget class="QWidget" name="layerSet4Tab">
-        <attribute name="title">
-         <string>4</string>
-        </attribute>
-        <attribute name="toolTip">
-         <string>Layer Set 4</string>
-        </attribute>
-        <layout class="QVBoxLayout" name="verticalLayout_7">
-         <item>
-          <widget class="QListView" name="layerSet4Table"/>
-         </item>
-        </layout>
        </widget>
       </widget>
      </item>
@@ -555,39 +504,13 @@
    <attribute name="dockWidgetArea">
     <number>2</number>
    </attribute>
-   <widget class="QWidget" name="dockWidgetContents">
+   <widget class="QWidget" name="layerInfoContents">
     <property name="sizePolicy">
      <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
       <horstretch>0</horstretch>
       <verstretch>0</verstretch>
      </sizepolicy>
     </property>
-    <layout class="QVBoxLayout" name="verticalLayout_9">
-     <item>
-      <layout class="QVBoxLayout" name="verticalLayout_8">
-       <item>
-        <widget class="QLineEdit" name="layerNameEdit">
-         <property name="text">
-          <string>Layer Name</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QPushButton" name="colorBarButton">
-         <property name="minimumSize">
-          <size>
-           <width>0</width>
-           <height>32</height>
-          </size>
-         </property>
-         <property name="text">
-          <string>ColorBar</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-    </layout>
    </widget>
   </widget>
  </widget>

@@ -714,8 +714,20 @@ class SceneGraphManager(QObject):
         self.update()
 
     def rebuild_all(self, *args, **kwargs):
+
+        # get info on the new order
         self.layer_set.set_layer_order(self.document.current_layer_order)
         self.layer_set.frame_order = self.document.current_animation_order
+
+        # refresh our presentation info
+        presentation_info = self.document.current_layer_set
+        for layer_info in presentation_info :
+            uuid_temp     = layer_info.uuid
+            self.set_colormap(layer_info.colormap, uuid=uuid_temp)
+            self.set_color_limits(layer_info.climits, uuid=uuid_temp)
+            self.set_layer_visible(uuid_temp, visible=layer_info.visible)
+            # FUTURE, if additional information is added to the presentation tuple, you must also update it here
+
         self.update()
 
     def on_view_change(self, scheduler):
