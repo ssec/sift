@@ -72,18 +72,22 @@ def content_within_shape(content:np.ndarray, display_xform:prj.Proj, shape:sgp.L
     :return: masked_content:masked_array, (y_index_offset:int, x_index_offset:int) containing minified masked content array
     """
     # invert shape to content indices
-    invproject = partial(
-        display_xform,
-        inverse=True
-    )
-    # FIXME: deal with dateline crossing
+    # invproject = partial(
+    #     display_xform,
+    #     inverse=True
+    # )
+    invproject = display_xform
+
     # convert shape from display coords to content array indices
     index_shape = sops.transform(invproject, shape)
+    index_shape = sgp.Polygon(index_shape)
+    index_shape = sgp.orient(index_shape)
 
     # now convert bounding box to content coordinates
+    # (0, 0) image index is upper-left origin of data (needs more work if otherwise)
     nx,ny,mx,my = shape.bounds  # minx,miny,maxx,maxy
-    nx, ny = display_xform(nx,ny, inverse=True)
-    mx, my = display_xform(mx,my, inverse=True)
+    nx, ny = display_xform(nx,my)
+    mx, my = display_xform(mx,ny)
     nx, ny = int(nx), int(ny)
     mx, my = int(np.ceil(mx)), int(np.ceil(my))
 
@@ -94,7 +98,7 @@ def content_within_shape(content:np.ndarray, display_xform:prj.Proj, shape:sgp.L
     # generate index arrays
     mask = mask_inside_index_shape(nx, ny, w, h, index_shape)
 
-    masked_content = np.ma.masked_array(content[ny:ny+h, nx:nx+w], mask=mask)
+    masked_content = np.ma.masked_array(content[ny:ny+h, nx:nx+w], mask=~mask)
     return masked_content
 
 

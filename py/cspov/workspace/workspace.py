@@ -33,6 +33,8 @@ from pickle import dump, load, HIGHEST_PROTOCOL
 from uuid import UUID, uuid1 as uuidgen
 from cspov.common import KIND, INFO
 from PyQt4.QtCore import QObject, pyqtSignal
+from cspov.model.shapes import content_within_shape
+from shapely.geometry.polygon import LinearRing
 
 LOG = logging.getLogger(__name__)
 
@@ -433,6 +435,18 @@ class Workspace(QObject):
             dsi_or_uuid = UUID(dsi_or_uuid)
         return self._data[dsi_or_uuid]
 
+    def _create_position_to_index_transform(self, dsi_or_uuid):
+        info = self.get_info(dsi_or_uuid)
+        origin_x = info[INFO.ORIGIN_X]
+        origin_y = info[INFO.ORIGIN_Y]
+        cell_width = info[INFO.CELL_WIDTH]
+        cell_height = info[INFO.CELL_HEIGHT]
+        def _transform(x, y, origin_x=origin_x, origin_y=origin_y, cell_width=cell_width, cell_height=cell_height):
+            col = (x - info[INFO.ORIGIN_X]) / info[INFO.CELL_WIDTH]
+            row = (y - info[INFO.ORIGIN_Y]) / info[INFO.CELL_HEIGHT]
+            return col, row
+        return _transform
+
     def _position_to_index(self, dsi_or_uuid, xy_pos):
         info = self.get_info(dsi_or_uuid)
         x = xy_pos[0]
@@ -450,21 +464,9 @@ class Workspace(QObject):
 
     def get_content_polygon(self, dsi_or_uuid, points):
         data = self.get_content(dsi_or_uuid)
-        xmin = data.shape[1]
-        xmax = 0
-        ymin = data.shape[0]
-        ymax = 0
-        for point in points:
-            row, col = self._position_to_index(dsi_or_uuid, point)
-            if row < ymin:
-                ymin = row
-            elif row > ymax:
-                ymax = row
-            if col < xmin:
-                xmin = col
-            elif col > xmax:
-                xmax = col
-        return data[ymin:ymax, xmin:xmax]
+        trans = self._create_position_to_index_transform(dsi_or_uuid)
+        data = content_within_shape(data, trans, LinearRing(points))
+        return data
 
     def __getitem__(self, datasetinfo_or_uuid):
         """
