@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-hardlink_data_dir.py
-~~~~~~~~~~~~~~~~~~~~
+organize_data_bands.py
+~~~~~~~~~~~~~~~~~~~~~~
 
 PURPOSE
 Mirror the default AHI data directory structure with band being the primary key using hardlinks.
