@@ -175,8 +175,9 @@ class Main(QtGui.QMainWindow):
         files = list(files)
         if not files:
             return
-        for load_result in self.document.open_files(files):
+        for uuid, _, _ in self.document.open_files(files):
             pass
+        self.document.animate_siblings_of_layer(uuid)
         self._last_open_dir = _common_path_prefix(files)
 
     def dropEvent(self, event):

@@ -214,9 +214,6 @@ class Document(QObject):
         reordered_indices = [None] + list(range(old_layer_count))
         # signal updates from the document
         self.didAddLayer.emit(reordered_indices, info, p, content)
-        if info[INFO.KIND]==KIND.IMAGE:  # TODO: decide if this is correct and useful behavior
-            self.animate_siblings_of_layer(uuid)
-
         return uuid, info, content
 
     def open_files(self, paths, insert_before=0):
@@ -497,11 +494,15 @@ class Document(QObject):
     def animate_siblings_of_layer(self, row_or_uuid):
         uuid = self.current_layer_set[row_or_uuid].uuid if not isinstance(row_or_uuid, UUID) else row_or_uuid
         new_anim_uuids, _ = self._guidebook.time_siblings(uuid, self._layer_with_uuid.values())
+        if new_anim_uuids is None or len(new_anim_uuids)<2:
+            LOG.info('no time siblings to chosen band, will try channel siblings to chosen time')
+            new_anim_uuids, _ = self._guidebook.channel_siblings(uuid, self._layer_with_uuid.values())
+        if new_anim_uuids is None or len(new_anim_uuids)<2:
+            LOG.warning('No animation found')
+            return []
         LOG.debug('new animation order will be {0!r:s}'.format(new_anim_uuids))
         cls = self.current_layer_set
         u2r = dict((x.uuid, i) for i,x in enumerate(cls))
-        if not new_anim_uuids or len(new_anim_uuids)==1:
-            return []
         self.clear_animation_order()
         for dex,u in enumerate(new_anim_uuids):
             LOG.debug(u)
