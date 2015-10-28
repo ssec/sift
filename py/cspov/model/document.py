@@ -220,9 +220,16 @@ class Document(QObject):
         return uuid, info, content
 
     def open_files(self, paths, insert_before=0):
-        paths = list(self._guidebook.sort_paths(paths))
-        for path in reversed(paths):
-            self.open_file(path, insert_before)
+        """
+        sort paths into preferred load order (see guidebook.py)
+        open files in order, yielding uuid, info, overview_content
+        :param paths: paths to open
+        :param insert_before: where to insert them in layer list
+        :return:
+        """
+        paths = list(self._guidebook.sort_pathnames_into_load_order(paths))
+        for path in paths:
+            yield self.open_file(path, insert_before)
 
     def time_label_for_uuid(self, uuid):
         """used to update animation display when a new frame is shown

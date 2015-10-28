@@ -137,6 +137,32 @@ class AnimationSpeedPopupWindow(QtGui.QWidget):
         self.hide()
         self._active = False
 
+def _recursive_split(path):
+    dn,fn = os.path.split(path)
+    if dn and not fn:
+        yield dn
+    if len(dn)>0 and dn!=path and len(fn)>0:
+        for pc in _recursive_split(dn):
+            yield pc
+    if len(fn):
+        yield fn
+
+def _common_path_prefix_seq(paths):
+    pathlists = [list(_recursive_split(path)) for path in paths]
+    for component_list in zip(*pathlists):
+        pc = None
+        for pc1,pc2 in zip(component_list[:-1], component_list[1:]):
+            if pc1!=pc2:
+                return
+            else:
+                pc = pc1
+        yield pc
+
+def _common_path_prefix(paths):
+    "find the most common directory shared by a list of paths"
+    return os.path.join(*_common_path_prefix_seq(paths))
+
+
 class Main(QtGui.QMainWindow):
     _last_open_dir = None  # directory to open files in
     _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
@@ -146,9 +172,12 @@ class Main(QtGui.QMainWindow):
                                                    "Select one or more files to open",
                                                    self._last_open_dir or os.getenv("HOME"),
                                                    'Mercator GeoTIFF (*.tiff *.tif)')
-        for pathname in files:
-            self.document.open_file(pathname)
-            self._last_open_dir = os.path.split(pathname)[0]
+        files = list(files)
+        if not files:
+            return
+        for load_result in self.document.open_files(files):
+            pass
+        self._last_open_dir = _common_path_prefix(files)
 
     def dropEvent(self, event):
         LOG.debug('drop event on mainwindow')

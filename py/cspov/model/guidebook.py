@@ -124,6 +124,26 @@ class AHI_HSF_Guidebook(Guidebook):
             if self.is_relevant(dsi[INFO.PATHNAME]):
                 yield dsi
 
+    def sort_pathnames_into_load_order(self, paths):
+        """
+        given a list of paths, sort them into order, assuming layers are added at top of layer list
+        first: unknown paths
+        outer order: descending band number
+        inner order: descending time step
+        :param paths: list of path strings
+        :return: ordered list of path strings
+        """
+        nfo = dict((path, self._metadata_for_path(path)) for path in paths)
+        riffraff = [path for path in paths if not nfo[path]]
+        ahi = [nfo[path] for path in paths if nfo[path]]
+        names = [path for path in paths if nfo[path]]
+        bands = [x.get(GUIDE.BAND, None) for x in ahi]
+        times = [x.get(GUIDE.SCHED_TIME, None) for x in ahi]
+        order = [(band, time, path) for band,time,path in zip(bands,times,names)]
+        order.sort(reverse=True)
+        LOG.debug(order)
+        return riffraff + [path for band,time,path in order]
+
     def collect_info(self, info):
         md = self._cache.get(info[INFO.UUID], None)
         if md is not None:
@@ -170,14 +190,6 @@ class AHI_HSF_Guidebook(Guidebook):
         nfo, = list(self.collect_info_from_seq([dsi]))
         uuid, md = nfo
         return md.get(GUIDE.DISPLAY_NAME, '--:--')
-
-    def sort_paths(self, path_seq):
-        """
-        sort a list of image paths into order
-        :param path_seq: sequence of paths
-        :return: sequence of paths
-        """
-        return list(path_seq)  # FIXME
 
     def flush(self):
         self._cache = {}
