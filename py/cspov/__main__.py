@@ -181,7 +181,10 @@ class Main(QtGui.QMainWindow):
         for uuid, _, _ in self.document.open_files(files):
             pass
         self.behaviorLayersList.select([uuid])
+        # set the animation based on the last added (topmost) layer
         self.document.animate_siblings_of_layer(uuid)
+        # force the newest layer to be visible
+        self.document.next_last_step(uuid)
         self._last_open_dir = _common_path_prefix(files)
 
     def dropEvent(self, event):
