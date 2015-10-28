@@ -140,7 +140,7 @@ class ProbeGraphManager (QObject) :
         # otherwise, just update our current index and make sure the graph is fresh
         else :
             self.selected_graph_index = newTabIndex
-            self.graphs[self.selected_graph_index].rebuildPlot()
+            # self.graphs[self.selected_graph_index].rebuildPlot()
 
         currentName = self.graphs[self.selected_graph_index].getName()
         self.didChangeTab.emit([currentName])
