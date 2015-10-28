@@ -35,6 +35,7 @@ from cspov.common import KIND, INFO
 from PyQt4.QtCore import QObject, pyqtSignal
 from cspov.model.shapes import content_within_shape
 from shapely.geometry.polygon import LinearRing
+from rasterio import Affine
 
 LOG = logging.getLogger(__name__)
 
@@ -447,6 +448,18 @@ class Workspace(QObject):
             return col, row
         return _transform
 
+    def _create_layer_affine(self, dsi_or_uuid):
+        info = self.get_info(dsi_or_uuid)
+        affine = Affine(
+            info[INFO.CELL_WIDTH],
+            0.0,
+            info[INFO.ORIGIN_X],
+            0.0,
+            info[INFO.CELL_HEIGHT],
+            info[INFO.ORIGIN_Y],
+        )
+        return affine
+
     def _position_to_index(self, dsi_or_uuid, xy_pos):
         info = self.get_info(dsi_or_uuid)
         x = xy_pos[0]
@@ -464,7 +477,7 @@ class Workspace(QObject):
 
     def get_content_polygon(self, dsi_or_uuid, points):
         data = self.get_content(dsi_or_uuid)
-        trans = self._create_position_to_index_transform(dsi_or_uuid)
+        trans = self._create_layer_affine(dsi_or_uuid)
         data = content_within_shape(data, trans, LinearRing(points))
         return data
 
