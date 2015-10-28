@@ -140,7 +140,7 @@ class ProbeGraphManager (QObject) :
         # otherwise, just update our current index and make sure the graph is fresh
         else :
             self.selected_graph_index = newTabIndex
-            # self.graphs[self.selected_graph_index].rebuildPlot()
+            self.graphs[self.selected_graph_index].rebuildPlot()
 
         currentName = self.graphs[self.selected_graph_index].getName()
         self.didChangeTab.emit([currentName])
@@ -176,6 +176,7 @@ class ProbeGraphDisplay (object) :
     xSelectedUUID   = None
     ySelectedUUID   = None
     uuidMap         = None  # this is needed because the drop downs can't properly handle objects as ids
+    _stale          = True  # whether or not the plot needs to be redrawn
 
     def __init__(self, qt_parent, workspace, name_str):
         """build the graph tab controls
@@ -253,25 +254,38 @@ class ProbeGraphDisplay (object) :
             self.uuidMap[uuid_string] = uuid
 
         # if possible, set the selections back to the way they were
+        need_rebuild = False
         xIndex = self.xDropDown.findData(str(self.xSelectedUUID))
         if xIndex >= 0 :
+            # Selection didn't change
             self.xDropDown.setCurrentIndex(xIndex)
         elif self.xDropDown.count() > 0 :
+            # Setting to a new layer
+            need_rebuild = True
             self.xSelectedUUID = self.uuidMap[self.xDropDown.itemData(0)]
             self.xDropDown.setCurrentIndex(0)
         else :
+            # we had something selected but now there is nothing new to select
+            need_rebuild = need_rebuild or self.xSelectedUUID is not None
             self.xSelectedUUID = None
         yIndex = self.yDropDown.findData(str(self.ySelectedUUID))
         if yIndex >= 0 :
+            # Selection didn't change
             self.yDropDown.setCurrentIndex(yIndex)
         elif self.yDropDown.count() > 0 :
+            # Setting to a new layer
+            need_rebuild = need_rebuild or self.yCheckBox.isChecked()
             self.ySelectedUUID = self.uuidMap[self.yDropDown.itemData(0)]
             self.yDropDown.setCurrentIndex(0)
         else :
+            # we had something selected but now there is nothing new to select
+            need_rebuild = need_rebuild or self.ySelectedUUID is not None
             self.ySelectedUUID = None
 
         # refresh the plot
-        if do_rebuild_plot :
+        self._stale = need_rebuild
+        if do_rebuild_plot:
+            # Rebuild the plot (stale is used to determine if actual rebuild is needed)
             self.rebuildPlot()
 
     def xSelected (self) :
@@ -284,6 +298,7 @@ class ProbeGraphDisplay (object) :
 
         # regenerate the plot
         if oldXStr != newXStr :
+            self._stale = True
             self.rebuildPlot()
 
     def ySelected (self) :
@@ -296,6 +311,7 @@ class ProbeGraphDisplay (object) :
 
         # regenerate the plot
         if (oldYStr != newYStr) and self.yCheckBox.isChecked() :
+            self._stale = True
             self.rebuildPlot()
 
     def vsChecked (self) :
@@ -307,6 +323,7 @@ class ProbeGraphDisplay (object) :
         self.yDropDown.setDisabled(not doPlotVS)
 
         # regenerate the plot
+        self._stale = True
         self.rebuildPlot()
 
     def setPolygon (self, polygonPoints) :
@@ -316,6 +333,7 @@ class ProbeGraphDisplay (object) :
         self.polygon = polygonPoints
 
         # regenerate the plot
+        self._stale = True
         self.rebuildPlot()
 
         # return our name to be used for the polygon name
@@ -331,6 +349,9 @@ class ProbeGraphDisplay (object) :
 
         Note: This should be called only when the selections change in some way.
         """
+        if not self._stale:
+            LOG.debug("Plot doesn't need to be rebuilt")
+            return
 
         # should be be plotting vs Y?
         doPlotVS = self.yCheckBox.isChecked()
@@ -366,6 +387,8 @@ class ProbeGraphDisplay (object) :
         else :
 
             self.clearPlot()
+
+        self._stale = False
 
 
     def plotHistogram (self, data, title, numBins=100) :
