@@ -644,7 +644,7 @@ class SceneGraphManager(QObject):
         self.layer_set.add_layer(image)
         self.on_view_change(None)
 
-    def remove_layer(self, new_order:list, uuid_removed:UUID):
+    def remove_layer(self, new_order:list, uuids_removed:list, row:int, count:int):
         """
         remove (disable) a layer, though this may be temporary due to a move.
         wait for purge to truly flush out this puppy
@@ -652,7 +652,8 @@ class SceneGraphManager(QObject):
         :param uuid_removed:
         :return:
         """
-        self.set_layer_visible(uuid_removed, False)
+        for uuid_removed in uuids_removed:
+            self.set_layer_visible(uuid_removed, False)
         self.rebuild_all()
         # LOG.error("layer removal from scenegraph complete")
 
@@ -681,7 +682,7 @@ class SceneGraphManager(QObject):
     def set_document(self, document):
         document.didReorderLayers.connect(self.rebuild_layer_order)  # current layer set changed z/anim order
         document.didAddLayer.connect(self.add_layer)  # layer added to one or more layer sets
-        document.didRemoveLayer.connect(self.remove_layer)  # layer removed from current layer set
+        document.didRemoveLayers.connect(self.remove_layer)  # layer removed from current layer set
         document.willPurgeLayer.connect(self.purge_layer)  # layer removed from document
         document.didSwitchLayerSet.connect(self.rebuild_new_layer_set)
         document.didChangeColormap.connect(self.change_layers_colormap)
@@ -713,8 +714,20 @@ class SceneGraphManager(QObject):
         self.update()
 
     def rebuild_all(self, *args, **kwargs):
+
+        # get info on the new order
         self.layer_set.set_layer_order(self.document.current_layer_order)
         self.layer_set.frame_order = self.document.current_animation_order
+
+        # refresh our presentation info
+        presentation_info = self.document.current_layer_set
+        for layer_info in presentation_info :
+            uuid_temp     = layer_info.uuid
+            self.set_colormap(layer_info.colormap, uuid=uuid_temp)
+            self.set_color_limits(layer_info.climits, uuid=uuid_temp)
+            self.set_layer_visible(uuid_temp, visible=layer_info.visible)
+            # FUTURE, if additional information is added to the presentation tuple, you must also update it here
+
         self.update()
 
     def on_view_change(self, scheduler):
