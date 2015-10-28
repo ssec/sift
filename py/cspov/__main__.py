@@ -565,6 +565,8 @@ def main():
     levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
     level=levels[min(3, args.verbosity)]
     logging.basicConfig(level=level)
+    # FIXME: This is needed because shapely 1.5.11 sucks
+    logging.getLogger().setLevel(level)
     # logging.getLogger('vispy').setLevel(level)
 
     app.create()
