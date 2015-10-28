@@ -160,6 +160,9 @@ def _common_path_prefix_seq(paths):
 
 def _common_path_prefix(paths):
     "find the most common directory shared by a list of paths"
+    paths = list(paths)
+    if len(paths)==1:
+        return os.path.split(paths[0])[0]
     return os.path.join(*_common_path_prefix_seq(paths))
 
 
@@ -177,6 +180,7 @@ class Main(QtGui.QMainWindow):
             return
         for uuid, _, _ in self.document.open_files(files):
             pass
+        self.behaviorLayersList.select([uuid])
         self.document.animate_siblings_of_layer(uuid)
         self._last_open_dir = _common_path_prefix(files)
 
