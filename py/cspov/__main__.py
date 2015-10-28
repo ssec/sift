@@ -175,9 +175,9 @@ class Main(QtGui.QMainWindow):
     def update_progress_bar(self, status_info, *args, **kwargs):
         active = status_info[0]
         LOG.debug('{0!r:s}'.format(status_info))
-        # val = active[TASK_PROGRESS]
+        val = active[TASK_PROGRESS]
         txt = active[TASK_DOING]
-        val = self.queue.progress_ratio()
+        val = self.queue.progress_ratio(val)
         self.ui.progressBar.setValue(int(val*PROGRESS_BAR_MAX))
         self.ui.progressText.setText(txt)
         #LOG.warning('progress bar updated to {}'.format(val))
@@ -421,7 +421,7 @@ class Main(QtGui.QMainWindow):
         self.change_tool()
 
         self.setup_menu()
-        self.graphManager = ProbeGraphManager(self.ui.probeTabWidget, self.workspace, self.document)
+        self.graphManager = ProbeGraphManager(self.ui.probeTabWidget, self.workspace, self.document, self.queue)
         self.graphManager.didChangeTab.connect(self.scene_manager.show_only_polygons)
 
     def closeEvent(self, event, *args, **kwargs):

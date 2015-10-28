@@ -90,19 +90,21 @@ class TaskQueue(QThread):
         info = [task_status]
         self.didMakeProgress.emit(info)
 
-    def progress_ratio(self):
-        lq = len(self.queue)
-        if lq==0:
-            self.depth = 0
+    def progress_ratio(self, current_progress=None):
+        if self.depth == 0:
             return 0.0
+        elif self.depth == 1 and current_progress is not None:
+            # show something other than 50% if there is only 1 job
+            return current_progress
         else:
-            return float(self.depth - lq) / self.depth
+            return float(self.depth - len(self.queue)) / self.depth
 
     def run(self):
         while len(self.queue)>0:
             task = self.queue.pop(0)
             for status in task:
                 self._did_progress(status)
+        self.depth = 0
         self._did_progress({TASK_DOING:'', TASK_PROGRESS:0.0})
 
 
