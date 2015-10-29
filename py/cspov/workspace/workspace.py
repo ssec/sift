@@ -33,6 +33,9 @@ from pickle import dump, load, HIGHEST_PROTOCOL
 from uuid import UUID, uuid1 as uuidgen
 from cspov.common import KIND, INFO
 from PyQt4.QtCore import QObject, pyqtSignal
+from cspov.model.shapes import content_within_shape
+from shapely.geometry.polygon import LinearRing
+from rasterio import Affine
 
 LOG = logging.getLogger(__name__)
 
@@ -64,7 +67,7 @@ class WorkspaceImporter(object):
         """
         return False
 
-    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, **kwargs):
+    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
         """
         Yield a series of import_status tuples updating status of the import.
         Typically this is going to run on TheQueue when possible.
@@ -72,6 +75,7 @@ class WorkspaceImporter(object):
         :param dest_uuid: uuid key to use in reference to this dataset at all LODs - may/not be used in file naming, but should be included in datasetinfo
         :param source_uri: uri to load from
         :param source_path: path to load from (alternative to source_uri)
+        :param cache_path: preferred cache path to place data into
         :return: sequence of import_progress, the first and last of which must include data,
                  inbetween updates typically will release data when stages complete and have None for dataset_info and data fields
         """
@@ -89,7 +93,7 @@ class GeoTiffImporter(WorkspaceImporter):
         source = source_path or source_uri
         return True if (source.lower().endswith('.tif') or source.lower().endswith('.tiff')) else False
 
-    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, **kwargs):
+    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
         # yield successive levels of detail as we load
         if source_uri is not None:
             raise NotImplementedError("GeoTiffImporter cannot read from URIs yet")
@@ -114,13 +118,42 @@ class GeoTiffImporter(WorkspaceImporter):
         d[INFO.PATHNAME] = source_path
 
         # FIXME: read this into a numpy.memmap backed by disk in the workspace
-        img_data = gtiff.GetRasterBand(1).ReadAsArray()
-        img_data = np.require(img_data, dtype=np.float32, requirements=['C'])  # FIXME: is this necessary/correct?
+        band = gtiff.GetRasterBand(1)  # FUTURE may be an assumption
+        shape = rows, cols = band.YSize, band.XSize
+        blockw, blockh = band.GetBlockSize()  # non-blocked files will report [band.XSize,1]
 
+        bandtype = gdal.GetDataTypeName(band.DataType)
+        if bandtype.lower()!='float32':
+            LOG.warning('attempting to read geotiff files with non-float32 content')
         # Full resolution shape
         # d["shape"] = self.get_dataset_data(item, time_step).shape
-        d[INFO.SHAPE] = img_data.shape
+        d[INFO.SHAPE] = shape
 
+        # shovel that data into the memmap incrementally
+        # http://geoinformaticstutorial.blogspot.com/2012/09/reading-raster-data-with-python-and-gdal.html
+        fp = open(cache_path, 'wb+')
+        img_data = np.memmap(fp, dtype=np.float32, shape=shape, mode='w+')
+        # load at an increment that matches the file's tile size if possible
+        IDEAL_INCREMENT = 512.0
+        increment = min(blockh * int(np.ceil(IDEAL_INCREMENT/blockh)), 2048)
+        # FUTURE: consider explicit block loads using band.ReadBlock(x,y) once
+        irow = 0
+        while irow < rows:
+            nrows = min(increment, rows-irow)
+            row_data = band.ReadAsArray(0, irow, cols, nrows)
+            img_data[irow:irow+nrows,:] = np.require(row_data, dtype=np.float32)
+            irow += increment
+            status = import_progress(uuid=dest_uuid,
+                                       stages=1,
+                                       current_stage=0,
+                                       completion=float(irow)/float(rows),
+                                       stage_desc="importing geotiff",
+                                       dataset_info=d,
+                                       data=img_data)
+            yield status
+
+        # img_data = gtiff.GetRasterBand(1).ReadAsArray()
+        # img_data = np.require(img_data, dtype=np.float32, requirements=['C'])  # FIXME: is this necessary/correct?
         # normally we would place a numpy.memmap in the workspace with the content of the geotiff raster band/s here
 
         # single stage import with all the data for this simple case
@@ -128,7 +161,7 @@ class GeoTiffImporter(WorkspaceImporter):
                                stages=1,
                                current_stage=0,
                                completion=1.0,
-                               stage_desc="loading geotiff",
+                               stage_desc="done loading geotiff",
                                dataset_info=d,
                                data=img_data)
         yield zult
@@ -200,8 +233,8 @@ class Workspace(QObject):
         self._data = {}
         self._info = {}
         self._importers = [x() for x in self.IMPORT_CLASSES]
+        global TheWorkspace  # singleton
         if TheWorkspace is None:
-            global TheWorkspace  # singleton
             TheWorkspace = self
 
     def _init_create_workspace(self):
@@ -353,7 +386,7 @@ class Workspace(QObject):
         uuid = uuidgen()
         for imp in self._importers:
             if imp.is_relevant(source_path=source_path):
-                gen = imp(self, self.cwd, uuid, source_path=source_path)
+                gen = imp(self, self.cwd, uuid, source_path=source_path, cache_path=self._preferred_cache_path(uuid))
                 break
         if gen is None:
             raise IOError("unable to import {}".format(source_path))
@@ -371,12 +404,16 @@ class Workspace(QObject):
         # TODO: schedule cache cleaning in background after a series of imports completes
         return uuid, info, data
 
-    def _convert_to_memmap(self, filename, data:np.ndarray):
+    def _preferred_cache_path(self, uuid):
+        filename = str(uuid)
+        return os.path.join(self.cwd, filename)
+
+    def _convert_to_memmap(self, uuid, data:np.ndarray):
         if isinstance(data, np.memmap):
             return data
         # from tempfile import TemporaryFile
         # fp = TemporaryFile()
-        pathname = os.path.join(self.cwd, filename)
+        pathname = self._preferred_cache_path(uuid)
         fp = open(pathname, 'wb+')
         mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
         mm[:] = data[:]
@@ -433,6 +470,30 @@ class Workspace(QObject):
             dsi_or_uuid = UUID(dsi_or_uuid)
         return self._data[dsi_or_uuid]
 
+    def _create_position_to_index_transform(self, dsi_or_uuid):
+        info = self.get_info(dsi_or_uuid)
+        origin_x = info[INFO.ORIGIN_X]
+        origin_y = info[INFO.ORIGIN_Y]
+        cell_width = info[INFO.CELL_WIDTH]
+        cell_height = info[INFO.CELL_HEIGHT]
+        def _transform(x, y, origin_x=origin_x, origin_y=origin_y, cell_width=cell_width, cell_height=cell_height):
+            col = (x - info[INFO.ORIGIN_X]) / info[INFO.CELL_WIDTH]
+            row = (y - info[INFO.ORIGIN_Y]) / info[INFO.CELL_HEIGHT]
+            return col, row
+        return _transform
+
+    def _create_layer_affine(self, dsi_or_uuid):
+        info = self.get_info(dsi_or_uuid)
+        affine = Affine(
+            info[INFO.CELL_WIDTH],
+            0.0,
+            info[INFO.ORIGIN_X],
+            0.0,
+            info[INFO.CELL_HEIGHT],
+            info[INFO.ORIGIN_Y],
+        )
+        return affine
+
     def _position_to_index(self, dsi_or_uuid, xy_pos):
         info = self.get_info(dsi_or_uuid)
         x = xy_pos[0]
@@ -450,21 +511,28 @@ class Workspace(QObject):
 
     def get_content_polygon(self, dsi_or_uuid, points):
         data = self.get_content(dsi_or_uuid)
-        xmin = data.shape[1]
-        xmax = 0
-        ymin = data.shape[0]
-        ymax = 0
-        for point in points:
-            row, col = self._position_to_index(dsi_or_uuid, point)
-            if row < ymin:
-                ymin = row
-            elif row > ymax:
-                ymax = row
-            if col < xmin:
-                xmin = col
-            elif col > xmax:
-                xmax = col
-        return data[ymin:ymax, xmin:xmax]
+        trans = self._create_layer_affine(dsi_or_uuid)
+        _, data = content_within_shape(data, trans, LinearRing(points))
+        return data
+
+    def highest_resolution_uuid(self, *uuids):
+        return max([self.get_info(uuid) for uuid in uuids], key=lambda i: i[INFO.CELL_WIDTH])[INFO.UUID]
+
+    def get_coordinate_mask_polygon(self, dsi_or_uuid, points):
+        data = self.get_content(dsi_or_uuid)
+        trans = self._create_layer_affine(dsi_or_uuid)
+        index_mask, data = content_within_shape(data, trans, LinearRing(points))
+        coords_mask = (index_mask[0] * trans.e + trans.f, index_mask[1] * trans.a + trans.c)
+        return coords_mask, data
+
+    def get_content_coordinate_mask(self, uuid, coords_mask):
+        data = self.get_content(uuid)
+        trans = self._create_layer_affine(uuid)
+        index_mask = (
+            ((coords_mask[0] - trans.f) / trans.e).astype(np.uint),
+            ((coords_mask[1] - trans.c) / trans.a).astype(np.uint),
+        )
+        return data[index_mask]
 
     def __getitem__(self, datasetinfo_or_uuid):
         """

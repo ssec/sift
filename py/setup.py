@@ -20,14 +20,14 @@ from setuptools import setup, find_packages
 
 setup(
     name='cspov',
-    version='0.5.0',
+    version='0.5.1',
     description="Fluid high resolution satellite and meteorological imagery viewer",
     author='Ray Garcia, SSEC',
     author_email='ray.garcia@ssec.wisc.edu',
     url='https://www.ssec.wisc.edu/',
     zip_safe=False,
     include_package_data=True,
-    install_requires=['numpy', 'pillow', 'scipy', 'numba', 'vispy>0.4.0', 'numpy', 'PyOpenGL', 'netCDF4', 'h5py', 'pyproj', 'gdal', 'pyshp'],
+    install_requires=['numpy', 'pillow', 'scipy', 'numba', 'vispy>0.4.0', 'numpy', 'PyOpenGL', 'netCDF4', 'h5py', 'pyproj', 'gdal', 'pyshp', 'shapely', 'rasterio'],
     packages=find_packages(),
     entry_points={'console_scripts': ['cspov = cspov.__main__:main']}
 )
