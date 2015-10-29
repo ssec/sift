@@ -98,7 +98,7 @@ def content_within_shape(content:np.ndarray, trans:Affine, shape:sgp.LinearRing)
     index_mask = np.nonzero(rasterize([shape], out_shape=(h, w), transform=offset_trans, default_value=1).astype(np.bool_))
     # translate the mask indexes back to the original data array coordinates (original index mask is read-only)
     index_mask = (index_mask[0] + my, index_mask[1] + nx)
-    return content[index_mask]
+    return index_mask, content[index_mask]
 
 
 def original_data_within_shape(raw_data:np.ndarray,

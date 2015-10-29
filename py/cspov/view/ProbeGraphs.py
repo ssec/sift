@@ -384,23 +384,26 @@ class ProbeGraphDisplay (object) :
 
         # if we are plotting x vs y and have x, y, and a polygon
         elif plot_versus and x_uuid is not None and y_uuid is not None and polygon is not None :
-            yield {TASK_DOING: 'Probe Plot: Collecting polygon data for "X"...', TASK_PROGRESS: 0.0}
+            yield {TASK_DOING: 'Probe Plot: Collecting polygon data for highest resolution layer...', TASK_PROGRESS: 0.0}
 
             # get the data and info we need for this plot
-            data1 = self.workspace.get_content_polygon(x_uuid, polygon)
             name1 = self.workspace.get_info(x_uuid)[INFO.NAME]
-            yield {TASK_DOING: 'Probe Plot: Collecting polygon data for "Y"...', TASK_PROGRESS: 0.15}
-            data2 = self.workspace.get_content_polygon(y_uuid, polygon)
             name2 = self.workspace.get_info(y_uuid)[INFO.NAME]
+            hires_uuid = self.workspace.highest_resolution_uuid(x_uuid, y_uuid)
+            hires_coord_mask, hires_data = self.workspace.get_coordinate_mask_polygon(hires_uuid, polygon)
+            yield {TASK_DOING: 'Probe Plot: Collecting polygon data for second layer...', TASK_PROGRESS: 0.15}
+            if hires_uuid is x_uuid:
+                # the hires data was from the X UUID
+                data1 = hires_data
+                data2 = self.workspace.get_content_coordinate_mask(y_uuid, hires_coord_mask)
+            else:
+                # the hires data was from the Y UUID
+                data2 = hires_data
+                data1 = self.workspace.get_content_coordinate_mask(x_uuid, hires_coord_mask)
             yield {TASK_DOING: 'Probe Plot: Creating scatter plot...', TASK_PROGRESS: 0.25}
 
-            # we can only scatter plot if both data sets have the same resolution
-            if data1.size != data2.size :
-                LOG.info("Unable to plot bands of different resolutions in the Area Probe Graph.")
-                self.clearPlot()
-            else:
-                # plot a scatter plot
-                self.plotScatterplot (data1.flatten(), name1, data2.flatten(), name2)
+            # plot a scatter plot
+            self.plotScatterplot (data1.flatten(), name1, data2.flatten(), name2)
 
         # if we have some combination of selections we don't understand, clear the figure
         else :
