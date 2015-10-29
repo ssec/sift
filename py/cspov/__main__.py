@@ -137,6 +137,35 @@ class AnimationSpeedPopupWindow(QtGui.QWidget):
         self.hide()
         self._active = False
 
+def _recursive_split(path):
+    dn,fn = os.path.split(path)
+    if dn and not fn:
+        yield dn
+    if len(dn)>0 and dn!=path and len(fn)>0:
+        for pc in _recursive_split(dn):
+            yield pc
+    if len(fn):
+        yield fn
+
+def _common_path_prefix_seq(paths):
+    pathlists = [list(_recursive_split(path)) for path in paths]
+    for component_list in zip(*pathlists):
+        pc = None
+        for pc1,pc2 in zip(component_list[:-1], component_list[1:]):
+            if pc1!=pc2:
+                return
+            else:
+                pc = pc1
+        yield pc
+
+def _common_path_prefix(paths):
+    "find the most common directory shared by a list of paths"
+    paths = list(paths)
+    if len(paths)==1:
+        return os.path.split(paths[0])[0]
+    return os.path.join(*_common_path_prefix_seq(paths))
+
+
 class Main(QtGui.QMainWindow):
     _last_open_dir = None  # directory to open files in
     _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
@@ -146,9 +175,17 @@ class Main(QtGui.QMainWindow):
                                                    "Select one or more files to open",
                                                    self._last_open_dir or os.getenv("HOME"),
                                                    'Mercator GeoTIFF (*.tiff *.tif)')
-        for pathname in files:
-            self.document.open_file(pathname)
-            self._last_open_dir = os.path.split(pathname)[0]
+        files = list(files)
+        if not files:
+            return
+        for uuid, _, _ in self.document.open_files(files):
+            pass
+        self.behaviorLayersList.select([uuid])
+        # set the animation based on the last added (topmost) layer
+        self.document.animate_siblings_of_layer(uuid)
+        # force the newest layer to be visible
+        self.document.next_last_step(uuid)
+        self._last_open_dir = _common_path_prefix(files)
 
     def dropEvent(self, event):
         LOG.debug('drop event on mainwindow')
@@ -325,14 +362,14 @@ class Main(QtGui.QMainWindow):
         self.ui.animPlayPause.clicked.connect(self.toggle_animation)
         self.ui.animPlayPause.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.ui.animPlayPause.customContextMenuRequested.connect(self.show_animation_speed_slider)
-        # def next_frame(*args, **kwargs):
-        #     self.scene_manager.animating = False
-        #     self.scene_manager.layer_set.next_frame()
-        # self.ui.animForward.clicked.connect(next_frame)
-        # def prev_frame(*args, **kwargs):
-        #     self.scene_manager.animating = False
-        #     self.scene_manager.layer_set.next_frame(frame_number=-1)
-        # self.ui.animBack.clicked.connect(prev_frame)
+        def next_frame(*args, **kwargs):
+            self.scene_manager.layer_set.animating = False
+            self.scene_manager.layer_set.next_frame()
+        self.ui.animForward.clicked.connect(next_frame)
+        def prev_frame(*args, **kwargs):
+            self.scene_manager.layer_set.animating = False
+            self.scene_manager.layer_set.next_frame(frame_number=-1)
+        self.ui.animBack.clicked.connect(prev_frame)
 
         # allow animation slider to set animation frame being displayed:
         self.ui.animationSlider.valueChanged.connect(self.animation_slider_jump_frame)
@@ -341,7 +378,7 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.didChangeLayerVisibility.connect(self.document.animation_changed_visibility)
 
         # disable close button on panes
-        for pane in [self.ui.areaProbePane, self.ui.layersPane]:
+        for pane in [self.ui.areaProbePane, self.ui.layersPane, self.ui.layerConfigPane]:
             pane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable |
                              QtGui.QDockWidget.DockWidgetMovable)
 
@@ -361,7 +398,7 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.main_canvas.transforms.changed.connect(partial(start_wrapper, self.scheduler))
 
         # convey action between document and layer list view
-        self.layerSetsManager = LayerSetsManager(self.ui.layerSetTabs, doc)
+        self.layerSetsManager = LayerSetsManager(self.ui.layerSetTabs, self.ui.layerInfoContents, self.document)
         self.behaviorLayersList = self.layerSetsManager.getLayerStackListViewModel()
 
         # coordinate what gets done when a layer is added by document
@@ -450,7 +487,7 @@ class Main(QtGui.QMainWindow):
         next_time.setShortcut(QtCore.Qt.Key_Right)
         next_slot = partial(self.next_last_time, direction=1)
         next_time.triggered.connect(next_slot)
-        self.ui.animForward.clicked.connect(next_slot)
+        # self.ui.animForward.clicked.connect(next_slot)
 
         focus_current = QtGui.QAction("Focus Current Timestep", self)
         focus_current.setShortcut('.')
@@ -460,7 +497,7 @@ class Main(QtGui.QMainWindow):
         prev_time.setShortcut(QtCore.Qt.Key_Left)
         prev_slot = partial(self.next_last_time, direction=-1)
         prev_time.triggered.connect(prev_slot)
-        self.ui.animBack.clicked.connect(prev_slot)
+        # self.ui.animBack.clicked.connect(prev_slot)
 
         next_band = QtGui.QAction("Next Band", self)
         next_band.setShortcut(QtCore.Qt.Key_Up)

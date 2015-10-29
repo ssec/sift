@@ -190,6 +190,9 @@ class Document(QObject):
             return uuid, info, content
         # info.update(self._additional_guidebook_information(info))
         self._layer_with_uuid[uuid] = info
+        # also get info for this layer from the guidebook
+        gbinfo = self._guidebook.collect_info(info)
+        self._layer_with_uuid[uuid].update(gbinfo)
 
         # add as visible to the front of the current set, and invisible to the rest of the available sets
         cmap = self._default_colormap(info)
@@ -211,15 +214,19 @@ class Document(QObject):
         reordered_indices = [None] + list(range(old_layer_count))
         # signal updates from the document
         self.didAddLayer.emit(reordered_indices, info, p, content)
-        if info[INFO.KIND]==KIND.IMAGE:  # TODO: decide if this is correct and useful behavior
-            self.animate_siblings_of_layer(uuid)
-
         return uuid, info, content
 
     def open_files(self, paths, insert_before=0):
-        paths = list(self._guidebook.sort_paths(paths))
-        for path in reversed(paths):
-            self.open_file(path, insert_before)
+        """
+        sort paths into preferred load order (see guidebook.py)
+        open files in order, yielding uuid, info, overview_content
+        :param paths: paths to open
+        :param insert_before: where to insert them in layer list
+        :return:
+        """
+        paths = list(self._guidebook.sort_pathnames_into_load_order(paths))
+        for path in paths:
+            yield self.open_file(path, insert_before)
 
     def time_label_for_uuid(self, uuid):
         """used to update animation display when a new frame is shown
@@ -243,6 +250,7 @@ class Document(QObject):
             default_clim = self._layer_with_uuid[p.uuid][INFO.CLIM]
             yield ((p.climits[1] - p.climits[0]) > 0) != ((default_clim[1] - default_clim[0]) > 0)
 
+    # TODO, find out if this is needed/used and whether or not it's correct
     def update_dataset_info(self, new_info):
         """
         slot which updates document on new information workspace has provided us about a dataset
@@ -254,6 +262,8 @@ class Document(QObject):
         if uuid not in self._layer_with_uuid:
             LOG.warning('new information on uuid {0!r:s} is not for a known dataset'.format(new_info))
         self._layer_with_uuid[new_info[INFO.UUID]] = new_info
+        # TODO, also get information about this layer from the guidebook?
+
         # TODO: see if this affects any presentation information; view will handle redrawing on its own
 
     def _clone_layer_set(self, existing_layer_set):
@@ -484,11 +494,15 @@ class Document(QObject):
     def animate_siblings_of_layer(self, row_or_uuid):
         uuid = self.current_layer_set[row_or_uuid].uuid if not isinstance(row_or_uuid, UUID) else row_or_uuid
         new_anim_uuids, _ = self._guidebook.time_siblings(uuid, self._layer_with_uuid.values())
+        if new_anim_uuids is None or len(new_anim_uuids)<2:
+            LOG.info('no time siblings to chosen band, will try channel siblings to chosen time')
+            new_anim_uuids, _ = self._guidebook.channel_siblings(uuid, self._layer_with_uuid.values())
+        if new_anim_uuids is None or len(new_anim_uuids)<2:
+            LOG.warning('No animation found')
+            return []
         LOG.debug('new animation order will be {0!r:s}'.format(new_anim_uuids))
         cls = self.current_layer_set
         u2r = dict((x.uuid, i) for i,x in enumerate(cls))
-        if not new_anim_uuids or len(new_anim_uuids)==1:
-            return []
         self.clear_animation_order()
         for dex,u in enumerate(new_anim_uuids):
             LOG.debug(u)
@@ -502,9 +516,12 @@ class Document(QObject):
         self.didReorderAnimation.emit(new_anim_uuids)
         return new_anim_uuids
 
-    def get_info(self, row=None):
-        if row is not None:
-            uuid = self.current_layer_set[row].uuid
+    def get_info(self, row=None, uuid=None):
+        if row is not None :
+            uuid_temp = self.current_layer_set[row].uuid
+            nfo = self._layer_with_uuid[uuid_temp]
+            return nfo
+        elif uuid is not None :
             nfo = self._layer_with_uuid[uuid]
             return nfo
         return None
@@ -518,7 +535,7 @@ class Document(QObject):
         # nfo = self._layer_with_uuid[uuid]
         # return nfo
 
-    def reorder_by_indices(self, new_order, layer_set_index=None):
+    def reorder_by_indices(self, new_order, uuids=None, layer_set_index=None):
         """given a new layer order, replace the current layer set
         emits signal to other subsystems
         """
