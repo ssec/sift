@@ -243,7 +243,7 @@ class Ui_MainWindow(object):
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
-        MainWindow.setWindowTitle(_translate("MainWindow", "SIFT Beta Test", None))
+        MainWindow.setWindowTitle(_translate("MainWindow", "SIFT Beta 0.5.1", None))
         self.panZoomToolButton.setText(_translate("MainWindow", "Pan/Zoom", None))
         self.pointSelectButton.setText(_translate("MainWindow", "Point", None))
         self.regionSelectButton.setText(_translate("MainWindow", "Region", None))
