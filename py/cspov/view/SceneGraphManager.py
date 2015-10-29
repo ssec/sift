@@ -736,11 +736,17 @@ class SceneGraphManager(QObject):
         # Stop the timer so it doesn't continuously call this slot
         if scheduler:
             scheduler.stop()
-
-        for uuid, child in self.image_layers.items():
+        def _assess(uuid, child):
             need_retile, preferred_stride, tile_box = child.assess()
             if need_retile:
                 self.start_retiling_task(uuid, preferred_stride, tile_box)
+
+        current_visible_layers = list(self.document.current_visible_layers())
+        current_invisible_layers = set(self.image_layers.keys()) - set(current_visible_layers)
+        for uuid in current_visible_layers:
+            _assess(uuid, self.image_layers[uuid])
+        for uuid in current_invisible_layers:
+            _assess(uuid, self.image_layers[uuid])
 
     def start_retiling_task(self, uuid, preferred_stride, tile_box):
         LOG.debug("Scheduling retile for child with UUID: %s", uuid)
