@@ -384,14 +384,14 @@ class ProbeGraphDisplay (object) :
 
         # if we are plotting x vs y and have x, y, and a polygon
         elif plot_versus and x_uuid is not None and y_uuid is not None and polygon is not None :
-            yield {TASK_DOING: 'Probe Plot: Collecting polygon data for highest resolution layer...', TASK_PROGRESS: 0.0}
+            yield {TASK_DOING: 'Probe Plot: Collecting polygon data (layer 1)...', TASK_PROGRESS: 0.0}
 
             # get the data and info we need for this plot
             name1 = self.workspace.get_info(x_uuid)[INFO.NAME]
             name2 = self.workspace.get_info(y_uuid)[INFO.NAME]
             hires_uuid = self.workspace.highest_resolution_uuid(x_uuid, y_uuid)
             hires_coord_mask, hires_data = self.workspace.get_coordinate_mask_polygon(hires_uuid, polygon)
-            yield {TASK_DOING: 'Probe Plot: Collecting polygon data for second layer...', TASK_PROGRESS: 0.15}
+            yield {TASK_DOING: 'Probe Plot: Collecting polygon data (layer 2)...', TASK_PROGRESS: 0.15}
             if hires_uuid is x_uuid:
                 # the hires data was from the X UUID
                 data1 = hires_data
