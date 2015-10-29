@@ -302,6 +302,15 @@ class Document(QObject):
                 return x.uuid
         return None
 
+    def current_visible_layers(self, max_layers=None):
+        count = 0
+        for x in self.current_layer_set:
+            if x.visible:
+                count += 1
+                yield x.uuid
+            if max_layers is not None and count >= max_layers:
+                break
+
     def select_layer_set(self, layer_set_index):
         """
         change the selected layer set, 0..N (typically 0..3), cloning the old set if needed
