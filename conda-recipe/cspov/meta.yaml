@@ -38,10 +38,12 @@ requirements:
     - pyopengl ==3.1.1a1
     - netcdf4 ==1.1.9
     - h5py ==2.5.0
-    - gdal ==1.11.2
-#    - gdal ==2.0.0
     - pillow
     - pyshp ==1.2.1
+    - shapely ==1.5.11
+    - rasterio ==0.24.0
+    - gdal ==1.11.2
+#    - gdal ==2.0.0
     - cython >=0.17 # [win]
 
   run:
@@ -55,10 +57,12 @@ requirements:
     - pyopengl ==3.1.1a1
     - netcdf4 ==1.1.9
     - h5py ==2.5.0
-    - gdal ==1.11.2
-#    - gdal ==2.0.0
     - pillow
     - pyshp ==1.2.1
+    - shapely ==1.5.11
+    - rasterio ==0.24.0
+    - gdal ==1.11.2
+#    - gdal ==2.0.0
 
 # test:
   # Python imports

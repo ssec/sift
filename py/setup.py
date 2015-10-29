@@ -27,7 +27,7 @@ setup(
     url='https://www.ssec.wisc.edu/',
     zip_safe=False,
     include_package_data=True,
-    install_requires=['numpy', 'pillow', 'scipy', 'numba', 'vispy>0.4.0', 'numpy', 'PyOpenGL', 'netCDF4', 'h5py', 'pyproj', 'gdal', 'pyshp'],
+    install_requires=['numpy', 'pillow', 'scipy', 'numba', 'vispy>0.4.0', 'numpy', 'PyOpenGL', 'netCDF4', 'h5py', 'pyproj', 'gdal', 'pyshp', 'shapely', 'rasterio'],
     packages=find_packages(),
     entry_points={'console_scripts': ['cspov = cspov.__main__:main']}
 )

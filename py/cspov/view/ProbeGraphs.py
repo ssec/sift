@@ -18,6 +18,7 @@ from PyQt4.QtCore import QObject, pyqtSignal
 
 # a useful constant
 from cspov.common import INFO
+from cspov.queue import TASK_PROGRESS, TASK_DOING
 
 import logging
 import numpy
@@ -25,7 +26,7 @@ import numpy
 # http://stackoverflow.com/questions/12459811/how-to-embed-matplotib-in-pyqt-for-dummies
 # see also: http://matplotlib.org/users/navigation_toolbar.html
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
+from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 from matplotlib.colors import LogNorm
 
@@ -37,15 +38,17 @@ class ProbeGraphManager (QObject) :
 
     # signals
     didChangeTab = pyqtSignal(list,)  # list of probe areas to show
+    drawChildGraph = pyqtSignal(str,)
 
     graphs = None
     selected_graph_index = -1
     workspace = None
+    queue = None
     document = None
     tab_widget_object = None
     max_tab_letter = None
 
-    def __init__(self, tab_widget, workspace, document) :
+    def __init__(self, tab_widget, workspace, document, queue) :
         """Setup our tab widget with an appropriate graph object in the first tab.
 
         FUTURE, once we are saving our graph configurations, load those instead of setting up this default.
@@ -56,6 +59,7 @@ class ProbeGraphManager (QObject) :
         # hang on to the workspace and document
         self.workspace = workspace
         self.document  = document
+        self.queue = queue
 
         # hang on to the tab widget
         self.tab_widget_object = tab_widget
@@ -72,6 +76,7 @@ class ProbeGraphManager (QObject) :
         self.tab_widget_object.connect(self.tab_widget_object,
                                        QtCore.SIGNAL('currentChanged(int)'),
                                        self.handle_tab_change)
+        self.drawChildGraph.connect(self.draw_child)
 
         # hook up the various document signals that would mean we need to reload things
         self.document.didReorderLayers.connect(self.handleLayersChanged)
@@ -79,6 +84,12 @@ class ProbeGraphManager (QObject) :
         self.document.didAddLayer.connect(self.handleLayersChanged)
         self.document.willPurgeLayer.connect(self.handleLayersChanged)
         self.document.didSwitchLayerSet.connect(self.handleLayersChanged)
+
+    def draw_child(self, child_name):
+        for child in self.graphs:
+            if child.myName == child_name:
+                child.draw()
+                break
 
     def set_up_tab (self, tab_index, do_increment_tab_letter=True) :
         """Create a new tab at tab_index and add it to the list of graphs
@@ -93,7 +104,7 @@ class ProbeGraphManager (QObject) :
         self.tab_widget_object.insertTab(tab_index, temp_widget, self.max_tab_letter)
 
         # create the associated graph display object
-        self.graphs.append(ProbeGraphDisplay(temp_widget, self.workspace, self.max_tab_letter))
+        self.graphs.append(ProbeGraphDisplay(self, temp_widget, self.workspace, self.queue, self.max_tab_letter))
 
         # go to the tab we just created
         self.tab_widget_object.setCurrentIndex(tab_index)
@@ -165,14 +176,17 @@ class ProbeGraphDisplay (object) :
 
     # internal objects to reference for info and data
     polygon         = None
+    manager         = None
     workspace       = None
+    queue           = None
 
     # internal values that control the behavior of plotting and controls
     xSelectedUUID   = None
     ySelectedUUID   = None
     uuidMap         = None  # this is needed because the drop downs can't properly handle objects as ids
+    _stale          = True  # whether or not the plot needs to be redrawn
 
-    def __init__(self, qt_parent, workspace, name_str):
+    def __init__(self, manager, qt_parent, workspace, queue, name_str):
         """build the graph tab controls
         :return:
         """
@@ -180,8 +194,10 @@ class ProbeGraphDisplay (object) :
         # hang on to our name
         self.myName = name_str
 
-        # save the workspace for use later
+        # save the workspace and queue for use later
+        self.manager = manager
         self.workspace = workspace
+        self.queue = queue
 
         # a figure instance to plot on
         self.figure = Figure(figsize=(3,3), dpi=72)
@@ -248,25 +264,38 @@ class ProbeGraphDisplay (object) :
             self.uuidMap[uuid_string] = uuid
 
         # if possible, set the selections back to the way they were
+        need_rebuild = False
         xIndex = self.xDropDown.findData(str(self.xSelectedUUID))
         if xIndex >= 0 :
+            # Selection didn't change
             self.xDropDown.setCurrentIndex(xIndex)
         elif self.xDropDown.count() > 0 :
+            # Setting to a new layer
+            need_rebuild = True
             self.xSelectedUUID = self.uuidMap[self.xDropDown.itemData(0)]
             self.xDropDown.setCurrentIndex(0)
         else :
+            # we had something selected but now there is nothing new to select
+            need_rebuild = need_rebuild or self.xSelectedUUID is not None
             self.xSelectedUUID = None
         yIndex = self.yDropDown.findData(str(self.ySelectedUUID))
         if yIndex >= 0 :
+            # Selection didn't change
             self.yDropDown.setCurrentIndex(yIndex)
         elif self.yDropDown.count() > 0 :
+            # Setting to a new layer
+            need_rebuild = need_rebuild or self.yCheckBox.isChecked()
             self.ySelectedUUID = self.uuidMap[self.yDropDown.itemData(0)]
             self.yDropDown.setCurrentIndex(0)
         else :
+            # we had something selected but now there is nothing new to select
+            need_rebuild = need_rebuild or self.ySelectedUUID is not None
             self.ySelectedUUID = None
 
         # refresh the plot
-        if do_rebuild_plot :
+        self._stale = need_rebuild
+        if do_rebuild_plot:
+            # Rebuild the plot (stale is used to determine if actual rebuild is needed)
             self.rebuildPlot()
 
     def xSelected (self) :
@@ -279,6 +308,7 @@ class ProbeGraphDisplay (object) :
 
         # regenerate the plot
         if oldXStr != newXStr :
+            self._stale = True
             self.rebuildPlot()
 
     def ySelected (self) :
@@ -291,6 +321,7 @@ class ProbeGraphDisplay (object) :
 
         # regenerate the plot
         if (oldYStr != newYStr) and self.yCheckBox.isChecked() :
+            self._stale = True
             self.rebuildPlot()
 
     def vsChecked (self) :
@@ -302,6 +333,7 @@ class ProbeGraphDisplay (object) :
         self.yDropDown.setDisabled(not doPlotVS)
 
         # regenerate the plot
+        self._stale = True
         self.rebuildPlot()
 
     def setPolygon (self, polygonPoints) :
@@ -311,6 +343,7 @@ class ProbeGraphDisplay (object) :
         self.polygon = polygonPoints
 
         # regenerate the plot
+        self._stale = True
         self.rebuildPlot()
 
         # return our name to be used for the polygon name
@@ -326,28 +359,40 @@ class ProbeGraphDisplay (object) :
 
         Note: This should be called only when the selections change in some way.
         """
+        if not self._stale:
+            LOG.debug("Plot doesn't need to be rebuilt")
+            return
 
         # should be be plotting vs Y?
         doPlotVS = self.yCheckBox.isChecked()
+        task_name = "%s_%s_region_plotting" % (self.xSelectedUUID, self.ySelectedUUID)
+        self.queue.add(task_name, self._rebuild_plot_task(self.xSelectedUUID, self.ySelectedUUID, self.polygon, plot_versus=doPlotVS), "Creating plot for region probe data")
+
+    def _rebuild_plot_task(self, x_uuid, y_uuid, polygon, plot_versus=False):
 
         # if we are plotting only x and we have a selected x and a polygon
-        if not doPlotVS and self.xSelectedUUID is not None and self.polygon is not None :
+        if not plot_versus and x_uuid is not None and polygon is not None :
+            yield {TASK_DOING: 'Probe Plot: Collecting polygon data...', TASK_PROGRESS: 0.0}
 
             # get the data and info we need for this plot
-            data_polygon = self.workspace.get_content_polygon(self.xSelectedUUID, self.polygon)
-            title = self.workspace.get_info(self.xSelectedUUID)[INFO.NAME]
+            data_polygon = self.workspace.get_content_polygon(x_uuid, polygon)
+            title = self.workspace.get_info(x_uuid)[INFO.NAME]
 
             # plot a histogram
+            yield {TASK_DOING: 'Probe Plot: Creating histogram plot', TASK_PROGRESS: 0.25}
             self.plotHistogram (data_polygon.flatten(), title)
 
         # if we are plotting x vs y and have x, y, and a polygon
-        elif doPlotVS and self.xSelectedUUID is not None and self.ySelectedUUID is not None and self.polygon is not None :
+        elif plot_versus and x_uuid is not None and y_uuid is not None and polygon is not None :
+            yield {TASK_DOING: 'Probe Plot: Collecting polygon data for "X"...', TASK_PROGRESS: 0.0}
 
             # get the data and info we need for this plot
-            data1 = self.workspace.get_content_polygon(self.xSelectedUUID, self.polygon)
-            name1 = self.workspace.get_info(self.xSelectedUUID)[INFO.NAME]
-            data2 = self.workspace.get_content_polygon(self.ySelectedUUID, self.polygon)
-            name2 = self.workspace.get_info(self.ySelectedUUID)[INFO.NAME]
+            data1 = self.workspace.get_content_polygon(x_uuid, polygon)
+            name1 = self.workspace.get_info(x_uuid)[INFO.NAME]
+            yield {TASK_DOING: 'Probe Plot: Collecting polygon data for "Y"...', TASK_PROGRESS: 0.15}
+            data2 = self.workspace.get_content_polygon(y_uuid, polygon)
+            name2 = self.workspace.get_info(y_uuid)[INFO.NAME]
+            yield {TASK_DOING: 'Probe Plot: Creating scatter plot...', TASK_PROGRESS: 0.25}
 
             # we can only scatter plot if both data sets have the same resolution
             if data1.size != data2.size :
@@ -359,9 +404,16 @@ class ProbeGraphDisplay (object) :
 
         # if we have some combination of selections we don't understand, clear the figure
         else :
-
+            yield {TASK_DOING: 'Probe Plot: Clearing plot figure...', TASK_PROGRESS: 0.0}
             self.clearPlot()
 
+        yield {TASK_DOING: 'Probe Plot: Drawing plot...', TASK_PROGRESS: 0.95}
+        self._stale = False
+        self.manager.drawChildGraph.emit(self.myName)
+        yield {TASK_DOING: 'Probe Plot: Done', TASK_PROGRESS: 1.0}
+
+    def draw(self):
+        self.canvas.draw()
 
     def plotHistogram (self, data, title, numBins=100) :
         """Make a histogram using the given data and label it with the given title
@@ -370,7 +422,6 @@ class ProbeGraphDisplay (object) :
         axes = self.figure.add_subplot(111)
         axes.hist(data, bins=self.DEFAULT_NUM_BINS)
         axes.set_title(title)
-        self.canvas.draw()
 
     def plotScatterplot (self, dataX, nameX, dataY, nameY) :
         """Make a scatter plot of the x and y data
@@ -392,8 +443,6 @@ class ProbeGraphDisplay (object) :
             axes.set_ylabel(nameY)
             axes.set_title(nameX + " vs " + nameY)
             self._draw_xy_line(axes)
-
-            self.canvas.draw()
 
     # TODO, come back to this when we are properly backgrounding our plots
     def plotDensityScatterplot (self, dataX, nameX, dataY, nameY) :
@@ -440,7 +489,6 @@ class ProbeGraphDisplay (object) :
         """
 
         self.figure.clf()
-        self.canvas.draw()
 
     def _draw_xy_line (self, axes) :
 
