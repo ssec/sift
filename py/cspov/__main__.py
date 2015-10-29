@@ -419,24 +419,15 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.newProbePoint.connect(update_probe_point)
 
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
-
-            selected_uuids = list(layerlist.current_selected_uuids())
-            LOG.debug("selected UUID set is {0!r:s}".format(selected_uuids))
-
-            # if the layer list doesn't have any selected UUIDs, use the one passed in
-            if len(selected_uuids) <= 0:
-                selected_uuids = [uuid]
-
-            # if we have more than two uuids, just plot the very first one
-            elif len(selected_uuids) > 2 :
-                selected_uuids = selected_uuids[0:1]
-
-            # now we must have 1 or 2 UUIDs in our list
+            top_uuids = list(self.document.current_visible_layers(2))
+            LOG.debug("top visible UUID is {0!r:s}".format(top_uuids))
 
             # TODO, when the plots manage their own layer selection, change this call
             # FUTURE, once the polygon is a layer, this will need to change
+            # set the selection for the probe plot to the top visible layer
+            self.graphManager.set_layer_selections(*top_uuids)
             # update our current plot with the new polygon
-            polygon_name = self.graphManager.currentPolygonChanged (polygonPoints=points)
+            polygon_name = self.graphManager.currentPolygonChanged(polygonPoints=points)
 
             # do whatever other updates the scene manager needs
             self.scene_manager.on_new_polygon(polygon_name, points)

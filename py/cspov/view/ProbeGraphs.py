@@ -131,6 +131,11 @@ class ProbeGraphManager (QObject) :
 
         return self.graphs[self.selected_graph_index].setPolygon (polygonPoints)
 
+    def set_layer_selections(self, *uuids):
+        """Set the UUIDs for the current graph.
+        """
+        return self.graphs[self.selected_graph_index].set_layer_selections(*uuids)
+
     def handle_tab_change (self, ) :
         """deal with the fact that the tab changed in the tab widget
         """
@@ -297,6 +302,26 @@ class ProbeGraphDisplay (object) :
         if do_rebuild_plot:
             # Rebuild the plot (stale is used to determine if actual rebuild is needed)
             self.rebuildPlot()
+
+    def set_layer_selections(self, *layer_uuids):
+        if len(layer_uuids) > 2:
+            raise ValueError("Probe graphs can handle a maximum of 2 layers (got %d)", len(layer_uuids))
+
+        if len(layer_uuids) >= 1:
+            xIndex = self.xDropDown.findData(str(layer_uuids[0]))
+            if xIndex >= 0:
+                self.xDropDown.setCurrentIndex(xIndex)
+                self.xSelectedUUID = layer_uuids[0]
+            else:
+                LOG.error("Tried to set probe graph to non-existent layer: %s", layer_uuids[0])
+
+        if len(layer_uuids) >= 2:
+            yIndex = self.xDropDown.findData(str(layer_uuids[1]))
+            if yIndex >= 0:
+                self.yDropDown.setCurrentIndex(yIndex)
+                self.ySelectedUUID = layer_uuids[1]
+            else:
+                LOG.error("Tried to set probe graph to non-existent layer: %s", layer_uuids[1])
 
     def xSelected (self) :
         """The user selected something in the X layer list.
