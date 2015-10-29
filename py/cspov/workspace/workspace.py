@@ -512,8 +512,27 @@ class Workspace(QObject):
     def get_content_polygon(self, dsi_or_uuid, points):
         data = self.get_content(dsi_or_uuid)
         trans = self._create_layer_affine(dsi_or_uuid)
-        data = content_within_shape(data, trans, LinearRing(points))
+        _, data = content_within_shape(data, trans, LinearRing(points))
         return data
+
+    def highest_resolution_uuid(self, *uuids):
+        return max([self.get_info(uuid) for uuid in uuids], key=lambda i: i[INFO.CELL_WIDTH])[INFO.UUID]
+
+    def get_coordinate_mask_polygon(self, dsi_or_uuid, points):
+        data = self.get_content(dsi_or_uuid)
+        trans = self._create_layer_affine(dsi_or_uuid)
+        index_mask, data = content_within_shape(data, trans, LinearRing(points))
+        coords_mask = (index_mask[0] * trans.e + trans.f, index_mask[1] * trans.a + trans.c)
+        return coords_mask, data
+
+    def get_content_coordinate_mask(self, uuid, coords_mask):
+        data = self.get_content(uuid)
+        trans = self._create_layer_affine(uuid)
+        index_mask = (
+            ((coords_mask[0] - trans.f) / trans.e).astype(np.uint),
+            ((coords_mask[1] - trans.c) / trans.a).astype(np.uint),
+        )
+        return data[index_mask]
 
     def __getitem__(self, datasetinfo_or_uuid):
         """
