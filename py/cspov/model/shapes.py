@@ -29,6 +29,7 @@ import numpy as np
 import pyproj as prj
 from numba import jit
 from rasterio.features import rasterize
+from rasterio import Affine
 
 LOG = logging.getLogger(__name__)
 
@@ -65,19 +66,39 @@ def mask_inside_index_shape(xoff, yoff, width, height, shape):
     return mask
 
 
-def content_within_shape(content:np.ndarray, display_xform:prj.Proj, shape:sgp.LinearRing):
+def content_within_shape(content:np.ndarray, trans:Affine, shape:sgp.LinearRing):
     """
 
     :param content: data being displayed on the screen
-    :param display_proj: transform between content array indices and screen coordinates
+    :param trans: affine transform between content array indices and screen coordinates
     :param shape: LinearRing in screen coordinates (e.g. mercator meters)
     :return: masked_content:masked_array, (y_index_offset:int, x_index_offset:int) containing minified masked content array
     """
+    # Get the bounds so we can limit how big our rasterize boolean array actually is
+    inv_trans = ~trans
+    # convert bounding box to content coordinates
+    # (0, 0) image index is upper-left origin of data (needs more work if otherwise)
+    nx, ny, mx, my = shape.bounds  # minx,miny,maxx,maxy
+    nx, my = inv_trans * (nx, my)
+    mx, ny = inv_trans * (mx, ny)
+    nx, my = int(nx), int(my)
+    mx, ny = int(np.ceil(mx)), int(np.ceil(ny))
+
+    # subset the content (ny is the higher *index*, my is the lower *index*)
+    w = (mx-nx)+1
+    h = (ny-my)+1
+
     # Make our linear ring a properly oriented shapely polygon
     shape = sgp.Polygon(shape)
     shape = sgp.orient(shape)
-    mask = rasterize([shape], out_shape=content.shape, transform=display_xform, default_value=1).astype(np.bool_)
-    return content[np.nonzero(mask)]
+    # create a transform that is shifted to where the polygon is
+    offset_trans = trans * Affine.translation(nx, my)
+
+    # Get boolean mask for where the polygon is and get an index mask of those positions
+    index_mask = np.nonzero(rasterize([shape], out_shape=(h, w), transform=offset_trans, default_value=1).astype(np.bool_))
+    # translate the mask indexes back to the original data array coordinates (original index mask is read-only)
+    index_mask = (index_mask[0] + my, index_mask[1] + nx)
+    return content[index_mask]
 
 
 def original_data_within_shape(raw_data:np.ndarray,
