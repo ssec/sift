@@ -64,7 +64,7 @@ class WorkspaceImporter(object):
         """
         return False
 
-    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, **kwargs):
+    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
         """
         Yield a series of import_status tuples updating status of the import.
         Typically this is going to run on TheQueue when possible.
@@ -72,6 +72,7 @@ class WorkspaceImporter(object):
         :param dest_uuid: uuid key to use in reference to this dataset at all LODs - may/not be used in file naming, but should be included in datasetinfo
         :param source_uri: uri to load from
         :param source_path: path to load from (alternative to source_uri)
+        :param cache_path: preferred cache path to place data into
         :return: sequence of import_progress, the first and last of which must include data,
                  inbetween updates typically will release data when stages complete and have None for dataset_info and data fields
         """
@@ -89,7 +90,7 @@ class GeoTiffImporter(WorkspaceImporter):
         source = source_path or source_uri
         return True if (source.lower().endswith('.tif') or source.lower().endswith('.tiff')) else False
 
-    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, **kwargs):
+    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
         # yield successive levels of detail as we load
         if source_uri is not None:
             raise NotImplementedError("GeoTiffImporter cannot read from URIs yet")
@@ -114,13 +115,38 @@ class GeoTiffImporter(WorkspaceImporter):
         d[INFO.PATHNAME] = source_path
 
         # FIXME: read this into a numpy.memmap backed by disk in the workspace
-        img_data = gtiff.GetRasterBand(1).ReadAsArray()
-        img_data = np.require(img_data, dtype=np.float32, requirements=['C'])  # FIXME: is this necessary/correct?
-
+        cols, rows = gtiff.RasterXSize, gtiff.RasterYSize
+        shape = (rows, cols)
+        band = gtiff.GetRasterBand(1)
+        bandtype = gdal.GetDataTypeName(band.DataType)
+        if bandtype.lower()!='float32':
+            LOG.warning('attempting to read geotiff files with non-float32 content')
         # Full resolution shape
         # d["shape"] = self.get_dataset_data(item, time_step).shape
-        d[INFO.SHAPE] = img_data.shape
+        d[INFO.SHAPE] = shape
 
+        # shovel that data into the memmap incrementally
+        # http://geoinformaticstutorial.blogspot.com/2012/09/reading-raster-data-with-python-and-gdal.html
+        fp = open(cache_path, 'wb+')
+        img_data = np.memmap(fp, dtype=np.float32, shape=shape, mode='w+')
+        increment = 512
+        irow = 0
+        while irow < rows:
+            nrows = min(increment, rows-irow)
+            row_data = band.ReadAsArray(0, irow, cols, nrows)
+            img_data[irow:irow+nrows,:] = np.require(row_data, dtype=np.float32)
+            irow += increment
+            status = import_progress(uuid=dest_uuid,
+                                       stages=1,
+                                       current_stage=0,
+                                       completion=float(irow)/float(rows),
+                                       stage_desc="importing geotiff",
+                                       dataset_info=d,
+                                       data=img_data)
+            yield status
+
+        # img_data = gtiff.GetRasterBand(1).ReadAsArray()
+        # img_data = np.require(img_data, dtype=np.float32, requirements=['C'])  # FIXME: is this necessary/correct?
         # normally we would place a numpy.memmap in the workspace with the content of the geotiff raster band/s here
 
         # single stage import with all the data for this simple case
@@ -128,7 +154,7 @@ class GeoTiffImporter(WorkspaceImporter):
                                stages=1,
                                current_stage=0,
                                completion=1.0,
-                               stage_desc="loading geotiff",
+                               stage_desc="done loading geotiff",
                                dataset_info=d,
                                data=img_data)
         yield zult
@@ -353,7 +379,7 @@ class Workspace(QObject):
         uuid = uuidgen()
         for imp in self._importers:
             if imp.is_relevant(source_path=source_path):
-                gen = imp(self, self.cwd, uuid, source_path=source_path)
+                gen = imp(self, self.cwd, uuid, source_path=source_path, cache_path=self._preferred_cache_path(uuid))
                 break
         if gen is None:
             raise IOError("unable to import {}".format(source_path))
@@ -371,12 +397,16 @@ class Workspace(QObject):
         # TODO: schedule cache cleaning in background after a series of imports completes
         return uuid, info, data
 
-    def _convert_to_memmap(self, filename, data:np.ndarray):
+    def _preferred_cache_path(self, uuid):
+        filename = str(uuid)
+        return os.path.join(self.cwd, filename)
+
+    def _convert_to_memmap(self, uuid, data:np.ndarray):
         if isinstance(data, np.memmap):
             return data
         # from tempfile import TemporaryFile
         # fp = TemporaryFile()
-        pathname = os.path.join(self.cwd, filename)
+        pathname = self._preferred_cache_path(uuid)
         fp = open(pathname, 'wb+')
         mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
         mm[:] = data[:]
