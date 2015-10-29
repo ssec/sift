@@ -115,9 +115,10 @@ class GeoTiffImporter(WorkspaceImporter):
         d[INFO.PATHNAME] = source_path
 
         # FIXME: read this into a numpy.memmap backed by disk in the workspace
-        cols, rows = gtiff.RasterXSize, gtiff.RasterYSize
-        shape = (rows, cols)
-        band = gtiff.GetRasterBand(1)
+        band = gtiff.GetRasterBand(1)  # FUTURE may be an assumption
+        shape = rows, cols = band.YSize, band.XSize
+        blockw, blockh = band.GetBlockSize()  # non-blocked files will report [band.XSize,1]
+
         bandtype = gdal.GetDataTypeName(band.DataType)
         if bandtype.lower()!='float32':
             LOG.warning('attempting to read geotiff files with non-float32 content')
@@ -129,7 +130,10 @@ class GeoTiffImporter(WorkspaceImporter):
         # http://geoinformaticstutorial.blogspot.com/2012/09/reading-raster-data-with-python-and-gdal.html
         fp = open(cache_path, 'wb+')
         img_data = np.memmap(fp, dtype=np.float32, shape=shape, mode='w+')
-        increment = 512
+        # load at an increment that matches the file's tile size if possible
+        IDEAL_INCREMENT = 512.0
+        increment = min(blockh * int(np.ceil(IDEAL_INCREMENT/blockh)), 2048)
+        # FUTURE: consider explicit block loads using band.ReadBlock(x,y) once
         irow = 0
         while irow < rows:
             nrows = min(increment, rows-irow)
