@@ -102,8 +102,12 @@ class TaskQueue(QThread):
     def run(self):
         while len(self.queue)>0:
             task = self.queue.pop(0)
-            for status in task:
-                self._did_progress(status)
+            try:
+                for status in task:
+                    self._did_progress(status)
+            except Exception:
+                LOG.error("Background task failed")
+                LOG.debug("Background task exception: ", exc_info=True)
         self.depth = 0
         self._did_progress({TASK_DOING:'', TASK_PROGRESS:0.0})
 
