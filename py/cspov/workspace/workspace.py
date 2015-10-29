@@ -203,8 +203,8 @@ class Workspace(QObject):
         self._data = {}
         self._info = {}
         self._importers = [x() for x in self.IMPORT_CLASSES]
+        global TheWorkspace  # singleton
         if TheWorkspace is None:
-            global TheWorkspace  # singleton
             TheWorkspace = self
 
     def _init_create_workspace(self):

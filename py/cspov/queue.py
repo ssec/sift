@@ -58,8 +58,8 @@ class TaskQueue(QThread):
         self.process_pool = process_pool
         self.thread_pool = thread_pool
         self.queue = []
-        assert(TheQueue is None)
         global TheQueue
+        assert(TheQueue is None)
         TheQueue = self
 
     def add(self, key, task_iterable, description, use_process_pool=False, use_thread_pool=False):

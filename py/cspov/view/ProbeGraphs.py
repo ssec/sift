@@ -26,7 +26,7 @@ import numpy
 # http://stackoverflow.com/questions/12459811/how-to-embed-matplotib-in-pyqt-for-dummies
 # see also: http://matplotlib.org/users/navigation_toolbar.html
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
+from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 from matplotlib.colors import LogNorm
 
