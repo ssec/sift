@@ -38,6 +38,7 @@ class ProbeGraphManager (QObject) :
 
     # signals
     didChangeTab = pyqtSignal(list,)  # list of probe areas to show
+    didClonePolygon = pyqtSignal(str, str)
     drawChildGraph = pyqtSignal(str,)
 
     graphs = None
@@ -104,14 +105,28 @@ class ProbeGraphManager (QObject) :
         self.tab_widget_object.insertTab(tab_index, temp_widget, self.max_tab_letter)
 
         # create the associated graph display object
-        self.graphs.append(ProbeGraphDisplay(self, temp_widget, self.workspace, self.queue, self.max_tab_letter))
-
-        # go to the tab we just created
-        self.tab_widget_object.setCurrentIndex(tab_index)
+        graph = ProbeGraphDisplay(self, temp_widget, self.workspace, self.queue, self.max_tab_letter)
+        self.graphs.append(graph)
 
         # load up the layers for this new tab
         uuid_list = self.document.current_layer_order
-        self.graphs[tab_index].set_possible_layers(uuid_list, do_rebuild_plot=True)
+        graph.set_possible_layers(uuid_list)
+
+        # clone the previous tab
+        if self.selected_graph_index != tab_index:
+            # if we aren't setting up the initial tab, clone the current tab
+            current_graph = self.graphs[self.selected_graph_index]
+            graph.set_default_layer_selections(current_graph.xSelectedUUID, current_graph.ySelectedUUID)
+            # give it a copy of the current polygon
+            # FIXME: Need to signal the SGM that it needs to create a new polygon
+            graph.setPolygon(current_graph.polygon[:] if current_graph.polygon is not None else None)
+            graph.checked = current_graph.checked
+
+        # Create the initial plot
+        graph.rebuildPlot()
+
+        # go to the tab we just created
+        self.tab_widget_object.setCurrentIndex(tab_index)
 
     def handleLayersChanged (self) :
         """Used when the document signals that something about the layers has changed
@@ -146,7 +161,13 @@ class ProbeGraphManager (QObject) :
         if newTabIndex == (self.tab_widget_object.count() - 1) :
             LOG.info ("Creating new area probe graph tab.")
 
+            old_name = self.graphs[self.selected_graph_index].getName()
             self.set_up_tab(newTabIndex)
+
+            # notify everyone that we cloned a polygon (if we did)
+            if self.graphs[self.selected_graph_index].polygon is not None:
+                new_name = self.graphs[-1].getName()
+                self.didClonePolygon.emit(old_name, new_name)
 
         # otherwise, just update our current index and make sure the graph is fresh
         else :
@@ -325,6 +346,14 @@ class ProbeGraphDisplay (object) :
                 self.ySelectedUUID = layer_uuids[1]
             else:
                 LOG.error("Tried to set probe graph to non-existent layer: %s", layer_uuids[1])
+
+    @property
+    def checked(self):
+        return self.yCheckBox.isChecked()
+
+    @checked.setter
+    def checked(self, is_checked):
+        return self.yCheckBox.setChecked(is_checked)
 
     def xSelected (self) :
         """The user selected something in the X layer list.

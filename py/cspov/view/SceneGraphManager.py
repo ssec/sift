@@ -540,6 +540,9 @@ class SceneGraphManager(QObject):
             self.polygon_probes[probe_name].parent = None
         self.polygon_probes[probe_name] = poly
 
+    def copy_polygon(self, old_name, new_name):
+        self.on_new_polygon(new_name, self.polygon_probes[old_name].pos)
+
     def show_only_polygons(self, list_of_polygon_names_to_show) :
         temp_set = set(list_of_polygon_names_to_show)
         for polygon_name in self.polygon_probes.keys() :

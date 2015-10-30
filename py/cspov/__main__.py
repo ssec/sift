@@ -438,11 +438,10 @@ class Main(QtGui.QMainWindow):
 
             # TODO, when the plots manage their own layer selection, change this call
             # FUTURE, once the polygon is a layer, this will need to change
-            if self.graphManager.selected_graph_index == 0:
-                # set the selection for the probe plot to the top visible layer(s)
-                # new tabs should clone the information from the currently selected tab
-                # the call below will check if this is a new polygon
-                self.graphManager.set_default_layer_selections(*top_uuids)
+            # set the selection for the probe plot to the top visible layer(s)
+            # new tabs should clone the information from the currently selected tab
+            # the call below will check if this is a new polygon
+            self.graphManager.set_default_layer_selections(*top_uuids)
             # update our current plot with the new polygon
             polygon_name = self.graphManager.currentPolygonChanged(polygonPoints=points)
 
@@ -473,6 +472,7 @@ class Main(QtGui.QMainWindow):
         self.setup_menu()
         self.graphManager = ProbeGraphManager(self.ui.probeTabWidget, self.workspace, self.document, self.queue)
         self.graphManager.didChangeTab.connect(self.scene_manager.show_only_polygons)
+        self.graphManager.didClonePolygon.connect(self.scene_manager.copy_polygon)
 
     def closeEvent(self, event, *args, **kwargs):
         LOG.debug('main window closing')
