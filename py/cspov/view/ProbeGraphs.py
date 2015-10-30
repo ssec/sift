@@ -414,7 +414,7 @@ class ProbeGraphDisplay (object) :
             # get the data and info we need for this plot
             name1 = self.workspace.get_info(x_uuid)[INFO.NAME]
             name2 = self.workspace.get_info(y_uuid)[INFO.NAME]
-            hires_uuid = self.workspace.highest_resolution_uuid(x_uuid, y_uuid)
+            hires_uuid = self.workspace.lowest_resolution_uuid(x_uuid, y_uuid)
             hires_coord_mask, hires_data = self.workspace.get_coordinate_mask_polygon(hires_uuid, polygon)
             yield {TASK_DOING: 'Probe Plot: Collecting polygon data (layer 2)...', TASK_PROGRESS: 0.15}
             if hires_uuid is x_uuid:
@@ -457,6 +457,7 @@ class ProbeGraphDisplay (object) :
 
         # we should have the same size data here
         assert(dataX.size == dataY.size)
+        print("Data size: ", dataX.size)
 
         if dataX.size > self.MAX_SCATTER_PLOT_DATA :
             LOG.info("Too much data in selected region to generate scatter plot.")
