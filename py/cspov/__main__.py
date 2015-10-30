@@ -172,6 +172,7 @@ class Main(QtGui.QMainWindow):
     _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
 
     def open_files(self):
+        self.scene_manager.layer_set.animating = False
         files = QtGui.QFileDialog.getOpenFileNames(self,
                                                    "Select one or more files to open",
                                                    self._last_open_dir or os.getenv("HOME"),
@@ -219,6 +220,7 @@ class Main(QtGui.QMainWindow):
         for path in paths:
             def openit(*args, path=path, **kwargs):
                 LOG.debug('open recent file {}'.format(path))
+                self.scene_manager.layer_set.animating = False
                 self.document.open_file(path)
             open_action = QtGui.QAction(os.path.split(path)[1], self)
             open_action.triggered.connect(openit)
