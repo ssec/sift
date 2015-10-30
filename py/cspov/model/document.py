@@ -228,6 +228,14 @@ class Document(QObject):
         for path in paths:
             yield self.open_file(path, insert_before)
 
+    def sort_paths(self, paths):
+        """
+        :param paths: list of paths
+        :return: list of paths
+        """
+        paths = list(reversed(self._guidebook.sort_pathnames_into_load_order(paths)))  # go from load order to display order by reversing
+        return paths
+
     def time_label_for_uuid(self, uuid):
         """used to update animation display when a new frame is shown
         """

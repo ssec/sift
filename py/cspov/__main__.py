@@ -168,9 +168,11 @@ def _common_path_prefix(paths):
 
 class Main(QtGui.QMainWindow):
     _last_open_dir = None  # directory to open files in
+    _recent_files_menu = None # QMenu
     _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
 
     def open_files(self):
+        self.scene_manager.layer_set.animating = False
         files = QtGui.QFileDialog.getOpenFileNames(self,
                                                    "Select one or more files to open",
                                                    self._last_open_dir or os.getenv("HOME"),
@@ -186,6 +188,7 @@ class Main(QtGui.QMainWindow):
         # force the newest layer to be visible
         self.document.next_last_step(uuid)
         self._last_open_dir = _common_path_prefix(files)
+        self.update_recent_file_menu()
 
     def dropEvent(self, event):
         LOG.debug('drop event on mainwindow')
@@ -208,6 +211,20 @@ class Main(QtGui.QMainWindow):
         for q,b in enumerate(buttons):
             b.setDown(dex==q)
         self.scene_manager.change_camera(dex)
+
+    def update_recent_file_menu(self, *args, **kwargs):
+        paths = self.workspace.paths_in_cache
+        paths = self.document.sort_paths(paths)
+        LOG.debug('recent files: {0!r:s}'.format(paths))
+        self._recent_files_menu.clear()
+        for path in paths:
+            def openit(*args, path=path, **kwargs):
+                LOG.debug('open recent file {}'.format(path))
+                self.scene_manager.layer_set.animating = False
+                self.document.open_file(path)
+            open_action = QtGui.QAction(os.path.split(path)[1], self)
+            open_action.triggered.connect(openit)
+            self._recent_files_menu.addAction(open_action)
 
     def update_progress_bar(self, status_info, *args, **kwargs):
         active = status_info[0]
@@ -474,6 +491,7 @@ class Main(QtGui.QMainWindow):
         menubar = self.ui.menubar
         file_menu = menubar.addMenu('&File')
         file_menu.addAction(open_action)
+        self._recent_files_menu = file_menu.addMenu('Open Recent')
         file_menu.addAction(exit_action)
 
         next_time = QtGui.QAction("Next Time", self)
@@ -545,6 +563,7 @@ class Main(QtGui.QMainWindow):
         view_menu.addAction(cycle_borders)
         view_menu.addAction(cycle_grid)
 
+        self.update_recent_file_menu()
         menubar.setEnabled(True)
 
     def setup_key_releases(self):
