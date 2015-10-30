@@ -13,7 +13,7 @@ update_path = os.path.join(home, "Desktop", "Update SIFT.lnk")
 print("Creating update shortcut: %s" % (update_path,))
 update_shortcut = shell.CreateShortcut(update_path)
 update_shortcut.Targetpath = 'cmd.exe'
-update_shortcut.Arguments = '/c activate {env_name} && conda update -y -f -c {channel} {pkg_name} && pause && deactivate'.format(env_name=env_name, pkg_name=pkg_name, channel=channel)
+update_shortcut.Arguments = '/c activate {env_name} && conda update -y -c {channel} {pkg_name} && pause && deactivate'.format(env_name=env_name, pkg_name=pkg_name, channel=channel)
 update_shortcut.save()
 
 run_path = os.path.join(home, "Desktop", "Run SIFT.lnk")
