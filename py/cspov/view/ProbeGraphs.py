@@ -405,7 +405,7 @@ class ProbeGraphDisplay (object) :
 
             # plot a histogram
             yield {TASK_DOING: 'Probe Plot: Creating histogram plot', TASK_PROGRESS: 0.25}
-            self.plotHistogram (data_polygon.flatten(), title)
+            self.plotHistogram (data_polygon, title)
 
         # if we are plotting x vs y and have x, y, and a polygon
         elif plot_versus and x_uuid is not None and y_uuid is not None and polygon is not None :
@@ -428,7 +428,8 @@ class ProbeGraphDisplay (object) :
             yield {TASK_DOING: 'Probe Plot: Creating scatter plot...', TASK_PROGRESS: 0.25}
 
             # plot a scatter plot
-            self.plotScatterplot (data1.flatten(), name1, data2.flatten(), name2)
+            # self.plotScatterplot (data1, name1, data2, name2)
+            self.plotDensityScatterplot (data1, name1, data2, name2)
 
         # if we have some combination of selections we don't understand, clear the figure
         else :
@@ -457,7 +458,6 @@ class ProbeGraphDisplay (object) :
 
         # we should have the same size data here
         assert(dataX.size == dataY.size)
-        print("Data size: ", dataX.size)
 
         if dataX.size > self.MAX_SCATTER_PLOT_DATA :
             LOG.info("Too much data in selected region to generate scatter plot.")
@@ -467,30 +467,28 @@ class ProbeGraphDisplay (object) :
         else :
             self.figure.clf()
             axes = self.figure.add_subplot(111)
-            axes.scatter(dataX.flatten(), dataY.flatten(), color='b', s=1, alpha=0.5)
+            axes.scatter(dataX, dataY, color='b', s=1, alpha=0.5)
             axes.set_xlabel(nameX)
             axes.set_ylabel(nameY)
             axes.set_title(nameX + " vs " + nameY)
             self._draw_xy_line(axes)
 
-    # TODO, come back to this when we are properly backgrounding our plots
     def plotDensityScatterplot (self, dataX, nameX, dataY, nameY) :
         """Make a density scatter plot for the given data
         """
-
-        # flatten our data
-        dataX = dataX.flatten()
-        dataY = dataY.flatten()
 
         # clear the figure and make a new subplot
         self.figure.clf()
         axes = self.figure.add_subplot(111)
 
         # figure out the range of the data
-        min_value = min(numpy.min(dataX), numpy.min(dataY))
-        max_value = max(numpy.max(dataX), numpy.max(dataY))
+        # you might not be comparing the same units
+        xmin_value = numpy.min(dataX)
+        xmax_value = numpy.max(dataX)
+        ymin_value = numpy.min(dataY)
+        ymax_value = numpy.max(dataY)
         # bounds should be defined in the form [[xmin, xmax], [ymin, ymax]]
-        bounds = [[min_value, max_value], [min_value, max_value]]
+        bounds = [[xmin_value, xmax_value], [ymin_value, ymax_value]]
 
         # make the binned density map for this data set
         density_map, _, _ = numpy.histogram2d(dataX, dataY, bins=self.DEFAULT_NUM_BINS, range=bounds)
@@ -498,12 +496,11 @@ class ProbeGraphDisplay (object) :
         density_map = numpy.flipud(numpy.transpose(numpy.ma.masked_array(density_map, mask=density_map == 0)))
 
         # display the density map data
-        axes.imshow(density_map, extent=[min_value, max_value, min_value, max_value],
-                    interpolation='nearest', norm=LogNorm())
+        img = axes.imshow(density_map, extent=[xmin_value, xmax_value, ymin_value, ymax_value], aspect='auto',
+                          interpolation='nearest', norm=LogNorm())
 
-        # TODO make a colorbar
-        #colorbar = self.figure.colorbar()
-        #colorbar.set_label('log(count of data points)')
+        colorbar = self.figure.colorbar(img)
+        colorbar.set_label('log(count of data points)')
 
         # set the various text labels
         axes.set_xlabel(nameX)
