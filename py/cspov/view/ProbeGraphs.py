@@ -131,10 +131,10 @@ class ProbeGraphManager (QObject) :
 
         return self.graphs[self.selected_graph_index].setPolygon (polygonPoints)
 
-    def set_layer_selections(self, *uuids):
-        """Set the UUIDs for the current graph.
+    def set_default_layer_selections(self, *uuids):
+        """Set the UUIDs for the current graph if it doesn't have a polygon
         """
-        return self.graphs[self.selected_graph_index].set_layer_selections(*uuids)
+        return self.graphs[self.selected_graph_index].set_default_layer_selections(*uuids)
 
     def handle_tab_change (self, ) :
         """deal with the fact that the tab changed in the tab widget
@@ -303,7 +303,10 @@ class ProbeGraphDisplay (object) :
             # Rebuild the plot (stale is used to determine if actual rebuild is needed)
             self.rebuildPlot()
 
-    def set_layer_selections(self, *layer_uuids):
+    def set_default_layer_selections(self, *layer_uuids):
+        # only set the defaults if we don't have a polygon yet
+        if self.polygon is not None:
+            return
         if len(layer_uuids) > 2:
             raise ValueError("Probe graphs can handle a maximum of 2 layers (got %d)", len(layer_uuids))
 
