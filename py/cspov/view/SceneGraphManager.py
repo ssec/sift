@@ -534,6 +534,7 @@ class SceneGraphManager(QObject):
         # marker default is 60, polygon default is 50 so markers can be put on top of polygons
         z = float(kwargs.get("z", 50))
         poly = Polygon(parent=self.main_map, pos=points, **kwargs)
+        poly.order = 5  # set polygons to be drawn last (stops 'see through' polygons)
         poly.transform = STTransform(translate=(0, 0, z))
         if probe_name in self.polygon_probes :
             self.polygon_probes[probe_name].parent = None
