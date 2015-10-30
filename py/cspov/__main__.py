@@ -217,9 +217,9 @@ class Main(QtGui.QMainWindow):
         LOG.debug('recent files: {0!r:s}'.format(paths))
         self._recent_files_menu.clear()
         for path in paths:
-            def openit(path=path, doc=self.document, *args, **kwargs):
+            def openit(*args, path=path, **kwargs):
                 LOG.debug('open recent file {}'.format(path))
-                doc.open_file(path)
+                self.document.open_file(path)
             open_action = QtGui.QAction(os.path.split(path)[1], self)
             open_action.triggered.connect(openit)
             self._recent_files_menu.addAction(open_action)
