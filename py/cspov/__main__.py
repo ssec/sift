@@ -401,9 +401,6 @@ class Main(QtGui.QMainWindow):
         self.layerSetsManager = LayerSetsManager(self.ui.layerSetTabs, self.ui.layerInfoContents, self.document)
         self.behaviorLayersList = self.layerSetsManager.getLayerStackListViewModel()
 
-        # coordinate what gets done when a layer is added by document
-        self.document.didAddLayer.connect(self.update_frame_time_to_top_visible)
-
         def update_probe_point(uuid, xy_pos):
             lon, lat = DEFAULT_PROJ_OBJ(xy_pos[0], xy_pos[1], inverse=True)
             lon_str = "{:.02f} {}".format(abs(lon), "W" if lon < 0 else "E")
@@ -442,6 +439,11 @@ class Main(QtGui.QMainWindow):
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
         self.document.didChangeColormap.connect(self.scene_manager.change_layers_colormap)
         self.document.didChangeColorLimits.connect(self.scene_manager.change_layers_color_limits)
+
+        self.document.didChangeLayerVisibility.connect(self.update_frame_time_to_top_visible)
+        self.document.didReorderLayers.connect(self.update_frame_time_to_top_visible)
+        self.document.didRemoveLayers.connect(self.update_frame_time_to_top_visible)
+        self.document.didAddLayer.connect(self.update_frame_time_to_top_visible)
 
         self.ui.panZoomToolButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.pz_camera.name))
         self.ui.pointSelectButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.point_probe_camera.name))
