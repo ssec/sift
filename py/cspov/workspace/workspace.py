@@ -292,6 +292,10 @@ class Workspace(QObject):
         data = np.memmap(dpath, dtype=dtype, mode='c', shape=shape)
         return uuid, info, data
 
+    @property
+    def paths_in_cache(self):
+        return [x[0] for x in self._inventory.keys()]
+
     def _update_cache(self, path, uuid, info, data):
         """
         add or update the cache and put it to disk
