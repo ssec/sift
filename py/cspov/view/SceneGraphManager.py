@@ -26,21 +26,24 @@ __author__ = 'davidh'
 
 from vispy import app
 from vispy import scene
-from vispy.util.event import Event
+from vispy.util.keys import SHIFT
 from vispy.visuals.transforms import STTransform, MatrixTransform
 from vispy.visuals import MarkersVisual, marker_types, LineVisual
-from vispy.scene.visuals import Markers, Polygon, Compound
-from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND
+from vispy.scene.visuals import Markers, Polygon, Compound, Line
+from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND, TOOL, DEFAULT_PROJECTION
 # from cspov.control.layer_list import LayerStackListViewModel
 from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.view.MapWidget import CspovMainMapCanvas
-from cspov.view.Cameras import ProbeCamera
+from cspov.view.Cameras import PanZoomProbeCamera
+from cspov.view.Colormap import ALL_COLORMAPS
+from cspov.model.document import prez
 from cspov.queue import TASK_DOING, TASK_PROGRESS
 
-from PyQt4.QtCore import QObject, pyqtSignal
+from PyQt4.QtCore import QObject, pyqtSignal, Qt
+from PyQt4.QtGui import QCursor, QPixmap
 import numpy as np
 from uuid import UUID
-
+from pyproj import Proj
 
 import os
 import logging
@@ -54,16 +57,38 @@ DEFAULT_TEXTURE_SHAPE = (4, 16)
 class FakeMarker(Compound):
     # FIXME: Temporary workaround because markers don't work on the target Windows laptops
     def __init__(self, pos=None, parent=None, symbol=None, **kwargs):
-        kwargs["connect"] = "segments"
-        margin = 50000
-        width = 5
+        self.line_one = None
+        self.line_two = None
+        self.symbol = symbol
         point = pos[0]
-        pos1 = np.array([[point[0] - margin, point[1]], [point[0] + margin, point[1]]])
-        pos2 = np.array([[point[0], point[1] - margin * 2], [point[0], point[1] + margin * 2]])
-        print("Creating FakeMarker: ", pos1, pos2)
-        self.line_one = LineVisual(pos=pos1, width=width, **kwargs)
-        self.line_two = LineVisual(pos=pos2, width=width, **kwargs)
+
+        kwargs["connect"] = "segments"
+        width = 5
+        pos1, pos2 = self._get_positions(point)
+        if self.line_one is None:
+            self.line_one = LineVisual(pos=pos1, width=width, **kwargs)
+            self.line_two = LineVisual(pos=pos2, width=width, **kwargs)
+
+        # For some reason we can't add the subvisuals later, so we'll live with redundant logic
         super().__init__((self.line_one, self.line_two), parent=parent)
+
+        # self.set_point(point, **kwargs)
+
+    def _get_positions(self, point):
+        margin = 50000
+        if self.symbol == 'x':
+            pos1 = np.array([[point[0] - margin, point[1] - margin * 2, point[2]], [point[0] + margin, point[1] + margin * 2, point[2]]])
+            pos2 = np.array([[point[0] - margin, point[1] + margin * 2, point[2]], [point[0] + margin, point[1] - margin * 2, point[2]]])
+        else:
+            pos1 = np.array([[point[0] - margin, point[1], point[2]], [point[0] + margin, point[1], point[2]]])
+            pos2 = np.array([[point[0], point[1] - margin * 2, point[2]], [point[0], point[1] + margin * 2, point[2]]])
+        return pos1, pos2
+
+    def set_point(self, point, **kwargs):
+        kwargs["connect"] = "segments"
+        pos1, pos2 = self._get_positions(point)
+        self.line_one.set_data(pos=pos1)
+        self.line_two.set_data(pos=pos2)
 
 
 class MainMap(scene.Node):
@@ -92,13 +117,15 @@ class PendingPolygon(object):
         if (p1[0] - r <= canvas_pos[0] <= p1[0] + r) and (p1[1] - r <= canvas_pos[1] <= p1[1] + r):
             return True
 
-    def add_point(self, canvas_pos, xy_pos):
+    def add_point(self, canvas_pos, xy_pos, z=100):
         if self.is_complete(canvas_pos):
             # Are you finishing the polygon by adding this point (same point as the first point...or near it)
             return True
         self.canvas_points.append(canvas_pos)
         self.points.append(xy_pos)
-        point_visual = FakeMarker(parent=self.parent, symbol="disc", pos=np.array([xy_pos[:2]]), color=np.array([0., 0.5, 0.5, 1.]))
+        if len(xy_pos) == 2:
+            xy_pos = [xy_pos[0], xy_pos[1], z]
+        point_visual = FakeMarker(parent=self.parent, symbol="disc", pos=np.array([xy_pos]), color=np.array([0., 0.5, 0.5, 1.]))
         self.markers.append(point_visual)
         return False
 
@@ -127,7 +154,8 @@ class LayerSet(object):
         self._animating = False
         self._frame_number = 0
         self._frame_change_cb = frame_change_cb
-        self._animation_timer = app.Timer(DEFAULT_ANIMATION_DELAY, connect=self.next_frame)
+        self._animation_speed = DEFAULT_ANIMATION_DELAY  # milliseconds
+        self._animation_timer = app.Timer(self._animation_speed/1000.0, connect=self.next_frame)
 
         if layers is not None:
             self.set_layers(layers)
@@ -138,7 +166,27 @@ class LayerSet(object):
 
             if frame_order is None:
                 frame_order = [x.name for x in layers.keys()]
-            self.set_frame_order(frame_order)
+            self.frame_order = frame_order
+
+    @property
+    def animation_speed(self):
+        """speed in milliseconds
+        """
+        return self._animation_speed
+
+    @animation_speed.setter
+    def animation_speed(self, milliseconds):
+        if milliseconds <= 0:
+            return
+        self._animation_timer.stop()
+        self._animation_speed = milliseconds
+        self._animation_timer.interval = milliseconds/1000.0
+        if self._frame_order:
+            self._animating = True
+            self._animation_timer.start()
+        if self._frame_change_cb is not None and self._frame_order:
+            uuid = self._frame_order[self._frame_number]
+            self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating, uuid))
 
     def set_layers(self, layers):
         # FIXME clear the existing layers
@@ -162,7 +210,12 @@ class LayerSet(object):
         self._layer_order = layer_order
         self.update_layers_z()
 
-    def set_frame_order(self, frame_order):
+    @property
+    def frame_order(self):
+        return self._frame_order
+
+    @frame_order.setter
+    def frame_order(self, frame_order):
         for o in frame_order:
             if o not in self._layers:
                 LOG.error('set_frame_order cannot deal with unknown layer {}'.format(o))
@@ -170,8 +223,9 @@ class LayerSet(object):
         self._frame_order = frame_order
         self._frame_number = 0
         LOG.debug('accepted new frame order of length {}'.format(len(frame_order)))
-        if self._frame_change_cb is not None:
-            self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating))
+        if self._frame_change_cb is not None and self._frame_order:
+            uuid = self._frame_order[self._frame_number]
+            self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating, uuid))
 
     def update_layers_z(self):
         for z_level, uuid in enumerate(self._layer_order):
@@ -207,21 +261,22 @@ class LayerSet(object):
 
     @animating.setter
     def animating(self, animate):
-        print("Running animating {} with {} frames".format(animate, len(self._frame_order)))
         if self._animating and not animate:
             # We are currently, but don't want to be
             self._animating = False
             self._animation_timer.stop()
-        elif not self._animating and animate:
+        elif not self._animating and animate and self._frame_order:
+            print("Running animating {} with {} frames".format(animate, len(self._frame_order)))
             # We are not currently, but want to be
             self._animating = True
             self._animation_timer.start()
             # TODO: Add a proper AnimationEvent to self.events
+        if self._frame_change_cb is not None and self._frame_order:
+            uuid = self._frame_order[self._frame_number]
+            self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating, uuid))
 
     def toggle_animation(self, *args):
         self.animating = not self._animating
-        if self._frame_change_cb is not None:
-            self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating))
         return self.animating
 
     def _set_visible_node(self, node):
@@ -267,17 +322,20 @@ class LayerSet(object):
         self._set_visible_child(frame)
         self._frame_number = frame
         self.parent.update()
-        if self._frame_change_cb is not None:
-            self._frame_change_cb((self._frame_number, lfo, self._animating))
+        if self._frame_change_cb is not None and lfo:
+            uuid = self._frame_order[self._frame_number]
+            self._frame_change_cb((self._frame_number, lfo, self._animating, uuid))
 
 
 class SceneGraphManager(QObject):
     didRetilingCalcs = pyqtSignal(object, object, object, object, object, object)
     didChangeFrame = pyqtSignal(tuple)
+    didChangeLayerVisibility = pyqtSignal(dict)  # similar to document didChangeLayerVisibility
     newProbePoint = pyqtSignal(object, object)
     newProbePolygon = pyqtSignal(object, object)
 
-    def __init__(self, doc, workspace, queue, border_shapefile=None, glob_pattern=None, parent=None, texture_shape=(4, 16)):
+    def __init__(self, doc, workspace, queue, border_shapefile=None, glob_pattern=None, parent=None,
+                 texture_shape=(4, 16), center=None):
         super(SceneGraphManager, self).__init__(parent)
         self.didRetilingCalcs.connect(self._set_retiled)
 
@@ -288,52 +346,65 @@ class SceneGraphManager(QObject):
         self.border_shapefile = border_shapefile or DEFAULT_SHAPE_FILE
         self.glob_pattern = glob_pattern
         self.texture_shape = texture_shape
-        self.polygons = []
+        self.polygon_probes = {}
+        self.point_probes = {}
 
         self.image_layers = {}
         self.datasets = {}
         self.colormaps = {}
+        self.colormaps.update(ALL_COLORMAPS)
         self.layer_set = LayerSet(self, frame_change_cb=self.frame_changed)
+        self._current_tool = None
 
         self.set_document(self.document)
 
-        self.setup_initial_canvas()
+        # border and lat/lon grid color choices
+        self._color_choices = [
+            np.array([1., 1., 1., 1.], dtype=np.float32), # white
+            np.array([.5, .5, .5, 1.], dtype=np.float32), # gray
+            np.array([0., 1., 1., 1.], dtype=np.float32), # cyan
+            np.array([0., 0., 0., 1.], dtype=np.float32), # black
+            np.array([0., 0., 0., 0.], dtype=np.float32), # transparent
+        ]
+
+        self.setup_initial_canvas(center)
         self.pending_polygon = PendingPolygon(self.main_map)
 
     def frame_changed(self, frame_info):
         """
         callback which emits information on current animation frame as a signal
         (see LayerSet.next_frame)
-        :param frame_info: tuple to be relayed in the signal, typically (frame_index:int, total_frames:int, animating:bool)
+        :param frame_info: tuple to be relayed in the signal, typically (frame_index:int, total_frames:int, animating:bool, frame_id:UUID)
         """
         # LOG.debug('emitting didChangeFrame')
         self.didChangeFrame.emit(frame_info)
+        is_animating = frame_info[2]
+        if not is_animating:
+            # emit a signal equivalent to document's didChangeLayerVisibility,
+            # except that visibility is being changed by animation interactions
+            # only do this when we're not animating, however
+            # watch out for signal loops!
+            uuid = frame_info[3]
+            uuids = self.layer_set.frame_order
+            tfu = lambda u: True if uuid==u else False
+            # note that all the layers in the layer_order but the current one are now invisible
+            vis = dict((u,tfu(u)) for u in uuids)
+            self.didChangeLayerVisibility.emit(vis)
 
-    def setup_initial_canvas(self):
+    def setup_initial_canvas(self, center=None):
+        center = center or (0, 0)
         self.main_canvas = CspovMainMapCanvas(parent=self.parent())
         self.main_view = self.main_canvas.central_widget.add_view()
 
         # Camera Setup
-        self.pz_camera = scene.PanZoomCamera(name="pz_camera", aspect=1)
+        self.pz_camera = PanZoomProbeCamera(name=TOOL.PAN_ZOOM, aspect=1, pan_limits=(-1., -1., 1., 1.), zoom_limits=(0.0015, 0.0015))
         self.main_view.camera = self.pz_camera
-
         self.main_view.camera.flip = (False, False, False)
-        # FIXME: these ranges just happen to look ok, but I'm not really sure the 'best' way to set these
-        self.main_view.camera.set_range(x=(-10.0, 10.0), y=(-10.0, 10.0), margin=0)
-        self.main_view.camera.zoom(0.1, (0, 0))
-
-        # Point Probe Mode/Camera
-        self.point_probe_camera = ProbeCamera(name="point_probe_camera", aspect=1)
-        self.main_view.camera.link(self.point_probe_camera)
-
-        # Polygon Probe Mode/Camera
-        self.polygon_probe_camera = ProbeCamera(name="polygon_probe_camera", aspect=1)
-        self.main_view.camera.link(self.polygon_probe_camera)
-
-        self._cameras = dict((c.name, c) for c in [self.main_view.camera, self.point_probe_camera, self.polygon_probe_camera])
-        self._camera_names = [self.pz_camera.name, self.point_probe_camera.name, self.polygon_probe_camera.name]
-
-        self.main_view.events.mouse_press.connect(self.on_mouse_press, after=list(self.main_view.events.mouse_press.callbacks))
+        # self.main_view.events.mouse_press.connect(self.on_mouse_press_point, after=list(self.main_view.events.mouse_press.callbacks))
+        # self.main_view.events.mouse_press.connect(self.on_mouse_press_region, after=list(self.main_view.events.mouse_press.callbacks))
+        self.main_view.events.mouse_press.connect(self.on_mouse_press_point)
+        self.main_view.events.mouse_press.connect(self.on_mouse_press_region)
+        self.change_tool(TOOL.PAN_ZOOM)
 
         # Head node of the map graph
         self.main_map = MainMap(name="MainMap", parent=self.main_view.scene)
@@ -342,27 +413,98 @@ class SceneGraphManager(QObject):
         camera_z_scale = 1e-6
         l, r, b, t = [getattr(WORLD_EXTENT_BOX, x) for x in ['l', 'r', 'b', 't']]
         merc_ortho.set_ortho(l, r, b, t, -100.0 * camera_z_scale, 100.0 * camera_z_scale)
-        # self.main_map.transforms.visual_transform = merc_ortho
         self.main_map.transform = merc_ortho
 
-        self.boundaries = NEShapefileLines(self.border_shapefile, double=True, parent=self.main_map)
+        self._borders_color_idx = 0
+        self.borders = NEShapefileLines(self.border_shapefile, double=True, color=self._color_choices[self._borders_color_idx], parent=self.main_map)
+        self.borders.transform = STTransform(translate=(0, 0, 40))
 
-    def on_mouse_press(self, event):
+        self._latlon_grid_color_idx = 1
+        self.latlon_grid = self._init_latlon_grid_layer(color=self._color_choices[self._latlon_grid_color_idx])
+        self.latlon_grid.transform = STTransform(translate=(0, 0, 45))
+
+        # Make the camera center on Guam
+        center = (144.8, 13.5)
+        p = Proj(DEFAULT_PROJECTION)
+        zoom_factor = 0.2
+        # Not sure why its 15 and 50 degrees off, but eh for now
+        x, y = p(center[0] + 15., center[1] - 45.0)
+        # x, y = p(144.8 + 15, 13.5)
+        # x, y = p(center[0] - x_offset, center[1] - y_offset)
+        cam_center = self.borders.transforms.get_transform(map_to="scene").map([(x, y)])[0]
+        self.main_view.camera.zoom(zoom_factor, cam_center)
+
+    def _init_latlon_grid_layer(self, color=None, resolution=5.):
+        """Create a series of line segments representing latitude and longitude lines.
+
+        :param resolution: number of degrees between lines
+        """
+        lons = np.arange(-180., 180. + resolution, resolution, dtype=np.float32)
+        lats = np.arange(-89.9, 89.9, resolution, dtype=np.float32)
+        p = Proj(DEFAULT_PROJECTION)
+
+        box_lons = np.empty(((lons.shape[0] + lats.shape[0]) * 2,), dtype=np.float32)
+        box_lons[0:lons.shape[0]] = lons
+        box_lons[lons.shape[0]:lons.shape[0] * 2] = lons
+        box_lons[lons.shape[0] * 2:lons.shape[0] * 2 + lats.shape[0]] = -180
+        box_lons[lons.shape[0] * 2 + lats.shape[0]:] = 180
+
+        box_lats = np.empty(((lons.shape[0] + lats.shape[0]) * 2,), dtype=np.float32)
+        box_lats[0:lons.shape[0]] = -89.9
+        box_lats[lons.shape[0]:lons.shape[0] * 2] = 89.9
+        box_lats[lons.shape[0] * 2: lons.shape[0] * 2 + lats.shape[0]] = lats
+        box_lats[lons.shape[0] * 2 + lats.shape[0]:] = lats
+
+        # Assume all of the longitude and latitudes map correctly
+        box_x, box_y = p(box_lons, box_lats)
+        points = np.empty((box_x.shape[0], 2), dtype=np.float32)
+        # Longitude lines
+        points[:lons.shape[0] * 2:2, 0] = box_x[:lons.shape[0]]
+        points[:lons.shape[0] * 2:2, 1] = box_y[:lons.shape[0]]
+        points[1:lons.shape[0] * 2:2, 0] = box_x[lons.shape[0]:lons.shape[0] * 2]
+        points[1:lons.shape[0] * 2:2, 1] = box_y[lons.shape[0]:lons.shape[0] * 2]
+        # Latitude lines
+        points[lons.shape[0] * 2::2, 0] = box_x[lons.shape[0] * 2:lons.shape[0] * 2 + lats.shape[0]]
+        points[lons.shape[0] * 2::2, 1] = box_y[lons.shape[0] * 2:lons.shape[0] * 2 + lats.shape[0]]
+        points[lons.shape[0] * 2 + 1::2, 0] = box_x[lons.shape[0] * 2 + lats.shape[0]:]
+        points[lons.shape[0] * 2 + 1::2, 1] = box_y[lons.shape[0] * 2 + lats.shape[0]:]
+
+        # Repeat for "second" size of the earth (180 to 540)
+        offset = box_x[lons.shape[0] - 1] - box_x[0]
+        points2 = np.empty((points.shape[0] * 2, 2), dtype=np.float32)
+        points2[:points.shape[0], :] = points
+        points2[points.shape[0]:, :] = points
+        points2[points.shape[0]:, 0] += offset
+
+        return Line(pos=points2, connect="segments", color=color, parent=self.main_map)
+
+    def on_mouse_press_point(self, event):
+        """Handle mouse events that mean we are using the point probe.
+        """
         if event.handled:
             return
-        # What does this mouse press mean?
-        if self.main_view.camera is self.point_probe_camera:
+        modifiers = event.mouse_event.modifiers
+        if (event.button == 2 and not modifiers) or (self._current_tool == TOOL.POINT_PROBE and event.button == 1):
             buffer_pos = event.sources[0].transforms.get_transform().map(event.pos)
             # FIXME: We should be able to use the main_map object to do the transform...but it doesn't work (waiting on vispy developers)
             # map_pos = self.main_map.transforms.get_transform().imap(buffer_pos)
-            map_pos = list(self.image_layers.values())[0].transforms.get_transform().imap(buffer_pos)
+            map_pos = self.borders.transforms.get_transform().imap(buffer_pos)
             # point_marker = Markers(parent=self.main_map, symbol="disc", pos=np.array([map_pos[:2]]))
             # self.points.append(point_marker)
             self.newProbePoint.emit(self.layer_set.top_layer_uuid(), map_pos[:2])
-        elif self.main_view.camera is self.polygon_probe_camera:
+            # FIXME: Move to Document (can include Z if you want, but default is fine)
+            self.on_point_probe_set("default_probe_name", map_pos[:2])
+
+    def on_mouse_press_region(self, event):
+        """Handle mouse events that mean we are using the point probe.
+        """
+        if event.handled:
+            return
+        modifiers = event.mouse_event.modifiers
+        if (event.button == 2 and modifiers == (SHIFT,)) or (self._current_tool == TOOL.REGION_PROBE and event.button == 1):
             buffer_pos = event.sources[0].transforms.get_transform().map(event.pos)
-            map_pos = list(self.image_layers.values())[0].transforms.get_transform().imap(buffer_pos)
-            if self.pending_polygon.add_point(event.pos, map_pos):
+            map_pos = self.borders.transforms.get_transform().imap(buffer_pos)
+            if self.pending_polygon.add_point(event.pos[:2], map_pos[:2], 60):
                 points = self.pending_polygon.points + [self.pending_polygon.points[0]]
                 for marker in self.pending_polygon.markers:
                     # Remove the marker from the scene graph
@@ -370,34 +512,101 @@ class SceneGraphManager(QObject):
                 # Reset the pending polygon object
                 self.pending_polygon.reset()
                 self.newProbePolygon.emit(self.layer_set.top_layer_uuid(), points)
-        else:
-            print("I don't know how to handle this camera for a mouse press")
 
-    def on_new_polygon(self, points, **kwargs):
+    def on_point_probe_set(self, probe_name, xy_pos, **kwargs):
+        z = float(kwargs.get("z", 60))
+        if len(xy_pos) == 2:
+            xy_pos = [xy_pos[0], xy_pos[1], z]
+
+        if probe_name not in self.point_probes:
+            color = kwargs.get("color", np.array([0.5, 0., 0., 1.]))
+            point_visual = FakeMarker(parent=self.main_map, symbol="x", pos=np.array([xy_pos]), color=color)
+            self.point_probes[probe_name] = point_visual
+        else:
+            self.point_probes[probe_name].set_point(xy_pos)
+
+    def on_new_polygon(self, probe_name, points, **kwargs):
         kwargs.setdefault("color", (1.0, 0.0, 1.0, 0.5))
+        # marker default is 60, polygon default is 50 so markers can be put on top of polygons
+        z = float(kwargs.get("z", 50))
         poly = Polygon(parent=self.main_map, pos=points, **kwargs)
-        self.polygons.append(poly)
+        poly.order = 5  # set polygons to be drawn last (stops 'see through' polygons)
+        poly.transform = STTransform(translate=(0, 0, z))
+        if probe_name in self.polygon_probes :
+            self.polygon_probes[probe_name].parent = None
+        self.polygon_probes[probe_name] = poly
+
+    def copy_polygon(self, old_name, new_name):
+        self.on_new_polygon(new_name, self.polygon_probes[old_name].pos)
+
+    def show_only_polygons(self, list_of_polygon_names_to_show) :
+        temp_set = set(list_of_polygon_names_to_show)
+        for polygon_name in self.polygon_probes.keys() :
+            self.polygon_probes[polygon_name].visible = polygon_name in temp_set
 
     def update(self):
         return self.main_canvas.update()
 
-    def change_camera(self, idx_or_name):
-        if isinstance(idx_or_name, str):
-            camera = self._cameras[idx_or_name]
+    def cycle_borders_color(self):
+        self._borders_color_idx = (self._borders_color_idx + 1) % len(self._color_choices)
+        if self._borders_color_idx + 1 == len(self._color_choices):
+            self.borders.visible = False
         else:
-            camera = self._cameras[self._camera_names[idx_or_name]]
+            self.borders.set_data(color=self._color_choices[self._borders_color_idx])
+            self.borders.visible = True
 
-        print("Changing camera to ", camera)
-        self.main_view.camera = camera
+    def cycle_grid_color(self):
+        self._latlon_grid_color_idx = (self._latlon_grid_color_idx + 1) % len(self._color_choices)
+        if self._latlon_grid_color_idx + 1 == len(self._color_choices):
+            self.latlon_grid.visible = False
+        else:
+            self.latlon_grid.set_data(color=self._color_choices[self._latlon_grid_color_idx])
+            self.latlon_grid.visible = True
 
-    def next_camera(self):
+    def change_tool(self, name):
+        prev_tool = self._current_tool
+        if name == prev_tool:
+            # it's the same tool
+            return
+
+        self._current_tool = name
+
+        # Set the cursor
+        if name == TOOL.PAN_ZOOM:
+            # self.main_canvas.native.setCursor(QCursor(QPixmap("py/cspov/ui/cursors/noun_275_cc.png")))
+            # self.main_canvas.native.setCursor(QCursor(Qt.SizeAllCursor))
+            self.main_canvas.native.setCursor(QCursor(Qt.OpenHandCursor))
+        elif name == TOOL.POINT_PROBE:
+            self.main_canvas.native.setCursor(QCursor(Qt.PointingHandCursor))
+        elif name == TOOL.REGION_PROBE:
+            self.main_canvas.native.setCursor(QCursor(Qt.CrossCursor))
+
+        # disconnect the previous signals (if needed)
+        if prev_tool == TOOL.PAN_ZOOM:
+            self.main_view.events.mouse_press.disconnect(self.pz_camera.viewbox_mouse_event)
+            self.main_view.events.mouse_release.disconnect(self.pz_camera.viewbox_mouse_event)
+            self.main_view.events.mouse_move.disconnect(self.pz_camera.viewbox_mouse_event)
+
+        # connect the new signals (if needed)
+        if name == TOOL.PAN_ZOOM:
+            self.main_view.events.mouse_press.connect(self.pz_camera.viewbox_mouse_event)
+            self.main_view.events.mouse_release.connect(self.pz_camera.viewbox_mouse_event)
+            self.main_view.events.mouse_move.connect(self.pz_camera.viewbox_mouse_event)
+
+        LOG.info("Changing tool to '%s'", name)
+
+    def next_tool(self):
         idx = self._camera_names.index(self.main_view.camera.name)
         idx = (idx + 1) % len(self._camera_names)
-        self.change_camera(idx)
+        self.change_tool(idx)
 
-    def set_colormap(self, colormap, uuid=None):
+    def _find_colormap(self, colormap):
         if isinstance(colormap, str) and colormap in self.colormaps:
             colormap = self.colormaps[colormap]
+        return colormap
+
+    def set_colormap(self, colormap, uuid=None):
+        colormap = self._find_colormap(colormap)
 
         uuids = uuid
         if uuid is None:
@@ -411,11 +620,29 @@ class SceneGraphManager(QObject):
     def add_colormap(self, name:str, colormap):
         self.colormaps[name] = colormap
 
+    def set_color_limits(self, clims, uuid=None):
+        """Swap the Color limits of a layer so that the color map is flipped.
+        """
+        uuids = uuid
+        if uuid is None:
+            uuids = self.image_layers.keys()
+        elif not isinstance(uuid, (list, tuple)):
+            uuids = [uuid]
+
+        for uuid in uuids:
+            self.image_layers[uuid].clim = clims
+
     def change_layers_colormap(self, change_dict):
         for uuid,cmapid in change_dict.items():
+            LOG.info('changing {} to colormap {}'.format(uuid, cmapid))
             self.set_colormap(cmapid, uuid)
 
-    def add_layer(self, new_order:list, ds_info:dict, overview_content:np.ndarray):
+    def change_layers_color_limits(self, change_dict):
+        for uuid, clims in change_dict.items():
+            LOG.info('changing {} to colormap {}'.format(uuid, clims))
+            self.set_color_limits(clims, uuid)
+
+    def add_layer(self, new_order:list, ds_info:dict, p:prez, overview_content:np.ndarray):
         uuid = ds_info[INFO.UUID]
         # create a new layer in the imagelist
         image = TiledGeolocatedImage(
@@ -428,7 +655,7 @@ class SceneGraphManager(QObject):
             clim=ds_info[INFO.CLIM],
             interpolation='nearest',
             method='tiled',
-            cmap='grays',
+            cmap=self._find_colormap(p.colormap),
             double=False,
             texture_shape=DEFAULT_TEXTURE_SHAPE,
             wrap_lon=False,
@@ -438,8 +665,9 @@ class SceneGraphManager(QObject):
         self.image_layers[uuid] = image
         self.datasets[uuid] = ds_info
         self.layer_set.add_layer(image)
+        self.on_view_change(None)
 
-    def remove_layer(self, new_order:list, uuid_removed:UUID):
+    def remove_layer(self, new_order:list, uuids_removed:list, row:int, count:int):
         """
         remove (disable) a layer, though this may be temporary due to a move.
         wait for purge to truly flush out this puppy
@@ -447,7 +675,8 @@ class SceneGraphManager(QObject):
         :param uuid_removed:
         :return:
         """
-        self.set_layer_visible(uuid_removed, False)
+        for uuid_removed in uuids_removed:
+            self.set_layer_visible(uuid_removed, False)
         self.rebuild_all()
         # LOG.error("layer removal from scenegraph complete")
 
@@ -476,7 +705,7 @@ class SceneGraphManager(QObject):
     def set_document(self, document):
         document.didReorderLayers.connect(self.rebuild_layer_order)  # current layer set changed z/anim order
         document.didAddLayer.connect(self.add_layer)  # layer added to one or more layer sets
-        document.didRemoveLayer.connect(self.remove_layer)  # layer removed from current layer set
+        document.didRemoveLayers.connect(self.remove_layer)  # layer removed from current layer set
         document.willPurgeLayer.connect(self.purge_layer)  # layer removed from document
         document.didSwitchLayerSet.connect(self.rebuild_new_layer_set)
         document.didChangeColormap.connect(self.change_layers_colormap)
@@ -504,28 +733,47 @@ class SceneGraphManager(QObject):
 
     def rebuild_frame_order(self, uuid_list:list, *args, **kwargs):
         LOG.debug('setting SGM new frame order to {0!r:s}'.format(uuid_list))
-        self.layer_set.set_frame_order(uuid_list)
+        self.layer_set.frame_order = uuid_list
         self.update()
 
     def rebuild_all(self, *args, **kwargs):
+
+        # get info on the new order
         self.layer_set.set_layer_order(self.document.current_layer_order)
-        self.layer_set.set_frame_order(self.document.current_animation_order)
+        self.layer_set.frame_order = self.document.current_animation_order
+
+        # refresh our presentation info
+        presentation_info = self.document.current_layer_set
+        for layer_info in presentation_info :
+            uuid_temp     = layer_info.uuid
+            self.set_colormap(layer_info.colormap, uuid=uuid_temp)
+            self.set_color_limits(layer_info.climits, uuid=uuid_temp)
+            self.set_layer_visible(uuid_temp, visible=layer_info.visible)
+            # FUTURE, if additional information is added to the presentation tuple, you must also update it here
+
         self.update()
 
-    def on_view_change(self, scheduler, ws=None):
+    def on_view_change(self, scheduler):
         """Simple event handler for when we need to reassess image layers.
         """
         # Stop the timer so it doesn't continuously call this slot
-        scheduler.stop()
-
-        for uuid, child in self.image_layers.items():
+        if scheduler:
+            scheduler.stop()
+        def _assess(uuid, child):
             need_retile, preferred_stride, tile_box = child.assess()
             if need_retile:
                 self.start_retiling_task(uuid, preferred_stride, tile_box)
 
+        current_visible_layers = list(self.document.current_visible_layers())
+        current_invisible_layers = set(self.image_layers.keys()) - set(current_visible_layers)
+        for uuid in current_visible_layers:
+            _assess(uuid, self.image_layers[uuid])
+        for uuid in current_invisible_layers:
+            _assess(uuid, self.image_layers[uuid])
+
     def start_retiling_task(self, uuid, preferred_stride, tile_box):
         LOG.debug("Scheduling retile for child with UUID: %s", uuid)
-        self.queue.add(str(uuid) + "_retile", self._retile_child(uuid, preferred_stride, tile_box), 'Retile calculations for image layer ' + str(uuid))
+        self.queue.add(str(uuid) + "_retile", self._retile_child(uuid, preferred_stride, tile_box), 'Retile calculations for image layer ' + str(uuid), interactive=True)
 
     def _retile_child(self, uuid, preferred_stride, tile_box):
         LOG.debug("Retiling child with UUID: '%s'", uuid)

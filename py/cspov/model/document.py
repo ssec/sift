@@ -64,6 +64,8 @@ from collections import namedtuple
 from enum import Enum
 from uuid import UUID
 import numpy as np
+from copy import deepcopy
+
 from cspov.common import KIND, INFO
 from cspov.model.guidebook import AHI_HSF_Guidebook
 
@@ -78,7 +80,7 @@ from .probes import Probe, Shape
 
 LOG = logging.getLogger(__name__)
 
-DEFAULT_LAYER_SET_COUNT = 4  # this should match the ui configuration!
+DEFAULT_LAYER_SET_COUNT = 1  # this should match the ui configuration!
 
 # presentation information for a layer; z_order comes from the layerset
 prez = namedtuple('prez', [
@@ -87,6 +89,7 @@ prez = namedtuple('prez', [
     'visible',  # bool: whether it's visible or not
     'a_order',  # int: None for non-animating, 0..n-1 what order to draw in during animation
     'colormap', # name or uuid: color map to use; name for default, uuid for user-specified
+    'climits',     # tuple: valid min and valid max used for color mapping normalization
     'mixing'    # mixing mode constant
 ])
 
@@ -132,8 +135,8 @@ class Document(QObject):
     _guidebook = None  # FUTURE: this is currently an AHI_HSF_Guidebook, make it a general guidebook
 
     # signals
-    didAddLayer = pyqtSignal(list, dict, np.ndarray)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
-    didRemoveLayer = pyqtSignal(list, UUID)  # new order, UUID that was removed from current layer set
+    didAddLayer = pyqtSignal(list, dict, prez, np.ndarray)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
+    didRemoveLayers = pyqtSignal(list, list, int, int)  # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
     willPurgeLayer = pyqtSignal(UUID)  # UUID of the layer being removed
     didReorderLayers = pyqtSignal(list)  # list of original indices in their new order, None for new layers
     didChangeLayerVisibility = pyqtSignal(dict)  # {UUID: new-visibility, ...} for changed layers
@@ -141,6 +144,8 @@ class Document(QObject):
     didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
     didSwitchLayerSet = pyqtSignal(int, list, list)  # new layerset number typically 0..3, list of prez tuples representing new display order, new animation order
     didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
+    didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
+    didCalculateLayerEqualizerValues = pyqtSignal(dict)  # dict of {uuid: (value, normalized_value_within_clim)} for equalizer display
     # didChangeShapeLayer = pyqtSignal(dict)
 
     def __init__(self, workspace, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
@@ -157,11 +162,22 @@ class Document(QObject):
         :param datasetinfo: dictionary of metadata about dataset
         :return: enhancement info and siblings participating in the enhancement
         """
-        return None
+        return self._guidebook.default_colormap(datasetinfo)
 
     @property
     def current_layer_set(self):
         return self._layer_sets[self.current_set_index]
+
+    # def _additional_guidebook_information(self, info):
+    #     """
+    #     when adding a file, return any additional information we want from the guidebook
+    #     :param info: existing datasetinfo
+    #     :return: dictionary of information not immediately available from the file itself
+    #     """
+    #     md =
+    #     return {
+    #         INFO.DISPLAY_TIME: self._guidebook.display_time(info)
+    #     }
 
     def open_file(self, path, insert_before=0):
         """
@@ -171,18 +187,26 @@ class Document(QObject):
         :return: overview (uuid:UUID, datasetinfo:dict, overviewdata:numpy.ndarray)
         """
         uuid, info, content = self._workspace.import_image(source_path=path)
-
+        if uuid in self._layer_with_uuid:
+            return uuid, info, content
+        # info.update(self._additional_guidebook_information(info))
         self._layer_with_uuid[uuid] = info
+        # also get info for this layer from the guidebook
+        gbinfo = self._guidebook.collect_info(info)
+        self._layer_with_uuid[uuid].update(gbinfo)
 
         # add as visible to the front of the current set, and invisible to the rest of the available sets
-        colormap = self._default_colormap(info)
+        cmap = self._default_colormap(info)
+        info[INFO.CLIM] = self._guidebook.climits(info)
+        info[INFO.NAME] = self._guidebook.display_name(info) or info[INFO.NAME]
         p = prez(uuid=uuid,
                  kind=info[INFO.KIND],
                  visible=True,
                  a_order=None,
-                 colormap=colormap,
+                 colormap=cmap,
+                 climits=info[INFO.CLIM],
                  mixing=mixing.NORMAL)
-        q = p._replace(visible=False)
+        q = p._replace(visible=False)  # make it available but not visible in other layer sets
         old_layer_count = len(self._layer_sets[self.current_set_index])
         for dex,lset in enumerate(self._layer_sets):
             if lset is not None:  # uninitialized layer sets will be None
@@ -190,12 +214,74 @@ class Document(QObject):
 
         reordered_indices = [None] + list(range(old_layer_count))
         # signal updates from the document
-        self.didAddLayer.emit(reordered_indices, info, content)
-        if info[INFO.KIND]==KIND.IMAGE:  # TODO: decide if this is correct and useful behavior
-            self.animate_siblings_of_layer(uuid)
-
+        self.didAddLayer.emit(reordered_indices, info, p, content)
         return uuid, info, content
 
+    def open_files(self, paths, insert_before=0):
+        """
+        sort paths into preferred load order (see guidebook.py)
+        open files in order, yielding uuid, info, overview_content
+        :param paths: paths to open
+        :param insert_before: where to insert them in layer list
+        :return:
+        """
+        paths = list(self._guidebook.sort_pathnames_into_load_order(paths))
+        for path in paths:
+            yield self.open_file(path, insert_before)
+
+    def sort_paths(self, paths):
+        """
+        :param paths: list of paths
+        :return: list of paths
+        """
+        paths = list(reversed(self._guidebook.sort_pathnames_into_load_order(paths)))  # go from load order to display order by reversing
+        return paths
+
+    def time_label_for_uuid(self, uuid):
+        """used to update animation display when a new frame is shown
+        """
+        if not uuid:
+            return "YYYY-MM-DD HH:MM"
+        info = self._layer_with_uuid[uuid]
+        return self._guidebook.display_time(info)
+
+    def prez_for_uuids(self, uuids, lset=None):
+        if lset is None:
+            lset = self.current_layer_set
+        for p in lset:
+            if p.uuid in uuids:
+                yield p
+
+    def colormap_for_uuids(self, uuids, lset=None):
+        for p in self.prez_for_uuids(uuids, lset=lset):
+            yield p.colormap
+
+    def flipped_for_uuids(self, uuids, lset=None):
+        for p in self.prez_for_uuids(uuids, lset=lset):
+            default_clim = self._layer_with_uuid[p.uuid][INFO.CLIM]
+            yield ((p.climits[1] - p.climits[0]) > 0) != ((default_clim[1] - default_clim[0]) > 0)
+
+    def update_equalizer_values(self, uuid, xy_pos):
+        """user has clicked on a point probe; determine relative and absolute values for all document image layers
+        """
+        zult = {}
+        for pinf in self.current_layer_set:
+            if pinf.uuid in zult:
+                continue
+            lyr = self._layer_with_uuid[pinf.uuid]
+            if lyr[INFO.KIND] != KIND.IMAGE:
+                continue
+            value = self._workspace.get_content_point(pinf.uuid, xy_pos)
+            # calculate normalized bar width relative to its current clim
+            nc, xc = pinf.climits
+            if np.isnan(value):
+                zult[pinf.uuid] = None
+            else:
+                bar_width = (np.clip(value, nc, xc) - nc) / (xc - nc)
+                zult[pinf.uuid] = (value, bar_width)
+        self.didCalculateLayerEqualizerValues.emit(zult)  # is picked up by layer list model to update display
+
+    # TODO, find out if this is needed/used and whether or not it's correct
     def update_dataset_info(self, new_info):
         """
         slot which updates document on new information workspace has provided us about a dataset
@@ -207,10 +293,12 @@ class Document(QObject):
         if uuid not in self._layer_with_uuid:
             LOG.warning('new information on uuid {0!r:s} is not for a known dataset'.format(new_info))
         self._layer_with_uuid[new_info[INFO.UUID]] = new_info
+        # TODO, also get information about this layer from the guidebook?
+
         # TODO: see if this affects any presentation information; view will handle redrawing on its own
 
     def _clone_layer_set(self, existing_layer_set):
-        return existing_layer_set.deepcopy()
+        return deepcopy(existing_layer_set)
 
     @property
     def current_animation_order(self):
@@ -238,6 +326,21 @@ class Document(QObject):
         """
         return [x.uuid for x in self.current_layer_set]
 
+    @property
+    def current_visible_layer(self):
+        for x in self.current_layer_set:
+            if x.visible:
+                return x.uuid
+        return None
+
+    def current_visible_layers(self, max_layers=None):
+        count = 0
+        for x in self.current_layer_set:
+            if x.visible:
+                count += 1
+                yield x.uuid
+            if max_layers is not None and count >= max_layers:
+                break
 
     def select_layer_set(self, layer_set_index):
         """
@@ -246,16 +349,25 @@ class Document(QObject):
           if cloning of layer set didn't occur
         :param layer_set_index: which layer set to switch to
         """
-        assert(layer_set_index<len(self._layer_sets) and layer_set_index>=0)
+
+        # the number of layer sets is no longer fixed, but you can't select more than 1 beyond the end of the list!
+        assert(layer_set_index <= len(self._layer_sets) and layer_set_index >= 0)
+
+        # if we are adding a layer set, do that now
+        if layer_set_index == len(self._layer_sets) :
+            self._layer_sets.append(None)
+
+        # if the selected layer set doesn't exist yet, clone another set to make it
         did_clone = False
         if self._layer_sets[layer_set_index] is None:
             self._layer_sets[layer_set_index] = self._clone_layer_set(self._layer_sets[self.current_set_index])
             did_clone = True
+
+        # switch to the new layer set and set off events to let others know about the change
         self.current_set_index = layer_set_index
         self.didSwitchLayerSet.emit(layer_set_index, self.current_layer_set, self.current_animation_order)
-        if not did_clone:
-            self.didReorderLayers.emit([])  # indicate that pretty much everything has changed
 
+    # TODO, not being used?
     def change_layer_order(self, old_index, new_index):
         L = self.current_layer_set
         order = list(range(len(L)))
@@ -267,6 +379,7 @@ class Document(QObject):
         L.insert(new_index, d)
         self.didReorderLayers.emit(order)
 
+    # TODO, not being used?
     def swap_layer_order(self, row1, row2):
         L = self.current_layer_set
         order = list(range(len(L)))
@@ -297,11 +410,27 @@ class Document(QObject):
                 dex = r2u[dex]
             old = L[dex]
             vis = (not old.visible) if visible is None else visible
-            print(vis)
+            # print(vis)
             nu = old._replace(visible=vis)
             L[dex] = nu
             zult[nu.uuid] = nu.visible
         self.didChangeLayerVisibility.emit(zult)
+
+    def animation_changed_visibility(self, changes):
+        """
+        this is triggered by animation being stopped,
+        via signal scenegraphmanager.didChangeLayerVisibility
+        in turn we generate our own didChangeLayerVisibility to ensure document views are up to date
+        :param changes: dictionary of {uuid:bool} with new visibility state
+        :return:
+        """
+        r2u = dict((q.uuid,i) for i,q in enumerate(self.current_layer_set))
+        L = self.current_layer_set
+        for uuid,visible in changes.items():
+            dex = r2u[uuid]
+            old = L[dex]
+            L[dex] = old._replace(visible=visible)
+        self.didChangeLayerVisibility.emit(changes)
 
     def next_last_step(self, uuid, delta=0, bandwise=False):
         """
@@ -349,20 +478,32 @@ class Document(QObject):
     def change_colormap_for_layers(self, name, uuids=None):
         L = self.current_layer_set
         if uuids is not None:
-            # LOG.error('layer selection not implemented in change_colormap_for_layers')
-            nfo = dict((uuid, name) for uuid in uuids)
+            uuids = self._guidebook.time_siblings_uuids(uuids, self._layer_with_uuid.values())
         else:  # all data layers
-            uuids = []
-            nfo = {}
-            for dex in range(len(self.current_layer_set)):
-                uuid = self.current_layer_set[dex].uuid
-                nfo[uuid] = name
-                uuids.append(uuid)
+            uuids = [pinfo.uuid for pinfo in L]
+
+        nfo = {}
         for uuid in uuids:
             for dex,pinfo in enumerate(L):
                 if pinfo.uuid==uuid:
                     L[dex] = pinfo._replace(colormap=name)
+                    nfo[uuid] = name
         self.didChangeColormap.emit(nfo)
+
+    def flip_climits_for_layers(self, uuids=None):
+        L = self.current_layer_set
+        if uuids is not None:
+            uuids = self._guidebook.time_siblings_uuids(uuids, self._layer_with_uuid.values())
+        else:  # all data layers
+            uuids = [pinfo.uuid for pinfo in L]
+
+        nfo = {}
+        for uuid in uuids:
+            for dex,pinfo in enumerate(L):
+                if pinfo.uuid==uuid:
+                    nfo[uuid] = pinfo.climits[::-1]
+                    L[dex] = pinfo._replace(climits=nfo[uuid])
+        self.didChangeColorLimits.emit(nfo)
 
     def __len__(self):
         return len(self.current_layer_set)
@@ -370,6 +511,20 @@ class Document(QObject):
     def uuid_for_layer(self, row):
         uuid = self.current_layer_set[row].uuid
         return uuid
+
+    def remove_layers_from_all_sets(self, uuids):
+        for uuid in list(uuids):
+            # FUTURE: make this removal of presentation tuples from inactive layer sets less sucky
+            LOG.debug('removing {}'.format(uuid))
+            for dex,layer_set in enumerate(self._layer_sets):
+                if dex==self.current_set_index or layer_set is None:
+                    continue
+                for pdex, presentation in enumerate(layer_set):
+                    if presentation.uuid==uuid:
+                        del layer_set[pdex]
+                        break
+            # now remove from the active layer set
+            self.remove_layer_prez(uuid)  # this will send signal and start purge
 
     def clear_animation_order(self):
         cls = self.current_layer_set
@@ -379,11 +534,15 @@ class Document(QObject):
     def animate_siblings_of_layer(self, row_or_uuid):
         uuid = self.current_layer_set[row_or_uuid].uuid if not isinstance(row_or_uuid, UUID) else row_or_uuid
         new_anim_uuids, _ = self._guidebook.time_siblings(uuid, self._layer_with_uuid.values())
+        if new_anim_uuids is None or len(new_anim_uuids)<2:
+            LOG.info('no time siblings to chosen band, will try channel siblings to chosen time')
+            new_anim_uuids, _ = self._guidebook.channel_siblings(uuid, self._layer_with_uuid.values())
+        if new_anim_uuids is None or len(new_anim_uuids)<2:
+            LOG.warning('No animation found')
+            return []
         LOG.debug('new animation order will be {0!r:s}'.format(new_anim_uuids))
         cls = self.current_layer_set
         u2r = dict((x.uuid, i) for i,x in enumerate(cls))
-        if not new_anim_uuids:
-            return []
         self.clear_animation_order()
         for dex,u in enumerate(new_anim_uuids):
             LOG.debug(u)
@@ -397,9 +556,12 @@ class Document(QObject):
         self.didReorderAnimation.emit(new_anim_uuids)
         return new_anim_uuids
 
-    def get_info(self, row=None):
-        if row is not None:
-            uuid = self.current_layer_set[row].uuid
+    def get_info(self, row=None, uuid=None):
+        if row is not None :
+            uuid_temp = self.current_layer_set[row].uuid
+            nfo = self._layer_with_uuid[uuid_temp]
+            return nfo
+        elif uuid is not None :
             nfo = self._layer_with_uuid[uuid]
             return nfo
         return None
@@ -412,6 +574,17 @@ class Document(QObject):
         # uuid = self.current_layer_set[dex].uuid
         # nfo = self._layer_with_uuid[uuid]
         # return nfo
+
+    def reorder_by_indices(self, new_order, uuids=None, layer_set_index=None):
+        """given a new layer order, replace the current layer set
+        emits signal to other subsystems
+        """
+        if layer_set_index is None:
+            layer_set_index = self.current_set_index
+        assert(len(new_order)==len(self._layer_sets[layer_set_index]))
+        new_layer_set = [self._layer_sets[layer_set_index][n] for n in new_order]
+        self._layer_sets[layer_set_index] = new_layer_set
+        self.didReorderLayers.emit(new_order)
 
     def insert_layer_prez(self, row:int, layer_prez_seq):
         cls = self.current_layer_set
@@ -427,7 +600,6 @@ class Document(QObject):
                 continue
             cls.insert(row, p)
             clo.insert(row, None)
-        self.didReorderLayers.emit(clo)
 
     def is_using(self, uuid:UUID, layer_set:int=None):
         "return true if this dataset is still in use in one of the layer sets"
@@ -458,8 +630,8 @@ class Document(QObject):
         clo = list(range(len(self.current_layer_set)))
         del clo[row:row+count]
         del self.current_layer_set[row:row+count]
+        self.didRemoveLayers.emit(clo, uuids, row, count)
         for uuid in uuids:
-            self.didRemoveLayer.emit(clo, uuid)
             if not self.is_using(uuid):
                 LOG.info('purging layer {}, no longer in use'.format(uuid))
                 self.willPurgeLayer.emit(uuid)

@@ -27,12 +27,20 @@ import os, sys, re
 import logging, unittest, argparse
 import gdal, osr
 import numpy as np
+import shutil
 from collections import namedtuple
+from pickle import dump, load, HIGHEST_PROTOCOL
 from uuid import UUID, uuid1 as uuidgen
 from cspov.common import KIND, INFO
 from PyQt4.QtCore import QObject, pyqtSignal
+from cspov.model.shapes import content_within_shape
+from shapely.geometry.polygon import LinearRing
+from rasterio import Affine
 
 LOG = logging.getLogger(__name__)
+
+DEFAULT_WORKSPACE_SIZE = 256
+MIN_WORKSPACE_SIZE = 8
 
 import_progress = namedtuple('import_progress', ['uuid', 'stages', 'current_stage', 'completion', 'stage_desc', 'dataset_info', 'data'])
 # stages:int, number of stages this import requires
@@ -59,7 +67,7 @@ class WorkspaceImporter(object):
         """
         return False
 
-    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, **kwargs):
+    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
         """
         Yield a series of import_status tuples updating status of the import.
         Typically this is going to run on TheQueue when possible.
@@ -67,6 +75,7 @@ class WorkspaceImporter(object):
         :param dest_uuid: uuid key to use in reference to this dataset at all LODs - may/not be used in file naming, but should be included in datasetinfo
         :param source_uri: uri to load from
         :param source_path: path to load from (alternative to source_uri)
+        :param cache_path: preferred cache path to place data into
         :return: sequence of import_progress, the first and last of which must include data,
                  inbetween updates typically will release data when stages complete and have None for dataset_info and data fields
         """
@@ -84,7 +93,7 @@ class GeoTiffImporter(WorkspaceImporter):
         source = source_path or source_uri
         return True if (source.lower().endswith('.tif') or source.lower().endswith('.tiff')) else False
 
-    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, **kwargs):
+    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
         # yield successive levels of detail as we load
         if source_uri is not None:
             raise NotImplementedError("GeoTiffImporter cannot read from URIs yet")
@@ -107,26 +116,44 @@ class GeoTiffImporter(WorkspaceImporter):
 
         d[INFO.NAME] = os.path.split(source_path)[-1]
         d[INFO.PATHNAME] = source_path
-        item = re.findall(r'_(B\d\d)_', source_path)[-1]  # FIXME: this should be a guidebook
-        # Valid min and max for colormap use
-        margin = 0.005
-        if item in ["B01", "B02", "B03", "B04", "B05", "B06"]:
-            # Reflectance/visible data limits
-            # FIXME: Are these correct?
-            d[INFO.CLIM] = (0.0, 1.0-margin)
-        else:
-            # BT data limits
-            # FIXME: Are these correct?
-            d[INFO.CLIM] = (200.0, 350.0)
 
         # FIXME: read this into a numpy.memmap backed by disk in the workspace
-        img_data = gtiff.GetRasterBand(1).ReadAsArray()
-        img_data = np.require(img_data, dtype=np.float32, requirements=['C'])  # FIXME: is this necessary/correct?
+        band = gtiff.GetRasterBand(1)  # FUTURE may be an assumption
+        shape = rows, cols = band.YSize, band.XSize
+        blockw, blockh = band.GetBlockSize()  # non-blocked files will report [band.XSize,1]
 
+        bandtype = gdal.GetDataTypeName(band.DataType)
+        if bandtype.lower()!='float32':
+            LOG.warning('attempting to read geotiff files with non-float32 content')
         # Full resolution shape
         # d["shape"] = self.get_dataset_data(item, time_step).shape
-        d[INFO.SHAPE] = img_data.shape
+        d[INFO.SHAPE] = shape
 
+        # shovel that data into the memmap incrementally
+        # http://geoinformaticstutorial.blogspot.com/2012/09/reading-raster-data-with-python-and-gdal.html
+        fp = open(cache_path, 'wb+')
+        img_data = np.memmap(fp, dtype=np.float32, shape=shape, mode='w+')
+        # load at an increment that matches the file's tile size if possible
+        IDEAL_INCREMENT = 512.0
+        increment = min(blockh * int(np.ceil(IDEAL_INCREMENT/blockh)), 2048)
+        # FUTURE: consider explicit block loads using band.ReadBlock(x,y) once
+        irow = 0
+        while irow < rows:
+            nrows = min(increment, rows-irow)
+            row_data = band.ReadAsArray(0, irow, cols, nrows)
+            img_data[irow:irow+nrows,:] = np.require(row_data, dtype=np.float32)
+            irow += increment
+            status = import_progress(uuid=dest_uuid,
+                                       stages=1,
+                                       current_stage=0,
+                                       completion=float(irow)/float(rows),
+                                       stage_desc="importing geotiff",
+                                       dataset_info=d,
+                                       data=img_data)
+            yield status
+
+        # img_data = gtiff.GetRasterBand(1).ReadAsArray()
+        # img_data = np.require(img_data, dtype=np.float32, requirements=['C'])  # FIXME: is this necessary/correct?
         # normally we would place a numpy.memmap in the workspace with the content of the geotiff raster band/s here
 
         # single stage import with all the data for this simple case
@@ -134,7 +161,7 @@ class GeoTiffImporter(WorkspaceImporter):
                                stages=1,
                                current_stage=0,
                                completion=1.0,
-                               stage_desc="loading geotiff",
+                               stage_desc="done loading geotiff",
                                dataset_info=d,
                                data=img_data)
         yield zult
@@ -165,6 +192,11 @@ class Workspace(QObject):
     _importers = None  # list of importers to consult when asked to start an import
     _info = None
     _data = None
+    _inventory = None  # dictionary of data
+    _inventory_path = None  # filename to store and load inventory information (simple cache)
+    _tempdir = None  # TemporaryDirectory, if it's needed (i.e. a directory name was not given)
+    _max_size_gb = None  # maximum size in gigabytes of flat files we cache in the workspace
+    _queue = None
 
     # signals
     didStartImport = pyqtSignal(dict)  # a dataset started importing; generated after overview level of detail is available
@@ -175,12 +207,22 @@ class Workspace(QObject):
 
     IMPORT_CLASSES = [ GeoTiffImporter ]
 
-    def __init__(self, directory_path=None, process_pool=None):
+    def __init__(self, directory_path=None, process_pool=None, max_size_gb=None, queue=None):
         """
         Initialize a new or attach an existing workspace, creating any necessary bookkeeping.
         """
         super(Workspace, self).__init__()
+
+        self._max_size_gb = max_size_gb if max_size_gb is not None else DEFAULT_WORKSPACE_SIZE
+        if self._max_size_gb < MIN_WORKSPACE_SIZE:
+            self._max_size_gb = MIN_WORKSPACE_SIZE
+        if directory_path is None:
+            import tempfile
+            self._tempdir = tempfile.TemporaryDirectory()
+            directory_path = str(self._tempdir)
+            LOG.info('using temporary directory {}'.format(directory_path))
         self.cwd = directory_path = os.path.abspath(directory_path)
+        self._inventory_path = os.path.join(self.cwd, 'inventory.pkl')
         if not os.path.isdir(directory_path):
             os.makedirs(directory_path)
             self._own_cwd = True
@@ -191,16 +233,131 @@ class Workspace(QObject):
         self._data = {}
         self._info = {}
         self._importers = [x() for x in self.IMPORT_CLASSES]
+        global TheWorkspace  # singleton
         if TheWorkspace is None:
-            global TheWorkspace  # singleton
             TheWorkspace = self
+
+    def _init_create_workspace(self):
+        """
+        initialize a previously empty workspace
+        :return:
+        """
+        self._inventory = {}
+        self._store_inventory()
 
     def _init_inventory_existing_datasets(self):
         """
         Do an inventory of an pre-existing workspace
         :return:
         """
-        pass
+        if os.path.exists(self._inventory_path):
+            with open(self._inventory_path, 'rb') as fob:
+                self._inventory = load(fob)
+        else:
+            self._init_create_workspace()
+
+    @staticmethod
+    def _key_for_path(path):
+        if not os.path.exists(path):
+            return None
+        s = os.stat(path)
+        return (os.path.realpath(path), s.st_mtime, s.st_size)
+
+    def _store_inventory(self):
+        """
+        write inventory dictionary to an inventory.pkl file in the cwd
+        :return:
+        """
+        atomic = self._inventory_path + '-tmp'
+        with open(atomic, 'wb') as fob:
+            dump(self._inventory, fob, HIGHEST_PROTOCOL)
+        shutil.move(atomic, self._inventory_path)
+
+    def _check_cache(self, path):
+        """
+        :param path: file we're checking
+        :return: uuid, info, overview_content if the data is already available without import
+        """
+        key = self._key_for_path(path)
+        nfo = self._inventory.get(key, None)
+        if nfo is None:
+            return None
+        uuid, info, data_info = nfo
+        dfilename, dtype, shape = data_info
+        dpath = os.path.join(self.cwd, dfilename)
+        if not os.path.exists(dpath):
+            del self._inventory[key]
+            self._store_inventory()
+            return None
+        data = np.memmap(dpath, dtype=dtype, mode='c', shape=shape)
+        return uuid, info, data
+
+    @property
+    def paths_in_cache(self):
+        return [x[0] for x in self._inventory.keys()]
+
+    def _update_cache(self, path, uuid, info, data):
+        """
+        add or update the cache and put it to disk
+        :param path: path to get key from
+        :param uuid: uuid the data's been assigned
+        :param info: dataset info dictionary
+        :param data: numpy.memmap backed by a file in the workspace
+        :return:
+        """
+        key = self._key_for_path(path)
+        data_info = (os.path.split(data.filename)[1], data.dtype, data.shape)
+        nfo = (uuid, info, data_info)
+        self._inventory[key] = nfo
+        self._store_inventory()
+
+    def _clean_cache(self):
+        """
+        find stale content in the cache and get rid of it
+        this routine should eventually be compatible with backgrounding on a thread
+        possibly include a workspace setting for max workspace size in bytes?
+        :return:
+        """
+        # get information on current cache contents
+        LOG.info("cleaning cache")
+        cache = []
+        inv = dict(self._inventory)
+        total_size = 0
+        for key,nfo in self._inventory.items():
+            uuid,info,data_info = nfo
+            filename, dtype, shape = data_info
+            path = os.path.join(self.cwd, filename)
+            if os.path.exists(path):
+                st = os.stat(path)
+                cache.append((st.st_atime, st.st_size, path, key))
+                total_size += st.st_size
+            else:
+                LOG.info('removing stale {}'.format(key))
+                del inv[key]
+        # sort by atime
+        cache.sort()
+        GB = 1024**3
+        LOG.info("total cache size is {}GB of max {}GB".format(total_size/GB, self._max_size_gb))
+        max_size = self._max_size_gb * GB
+        while total_size > max_size:
+            _, size, path, key = cache.pop(0)
+            LOG.debug('{} GB in {}'.format(path, size/GB))
+            try:
+                os.remove(path)
+                LOG.info('removed {} for {}GB'.format(path, size/GB))
+            except:
+                # this could happen if the file is open in windows
+                LOG.error('unable to remove {} from cache'.format(path))
+                continue
+            del inv[key]
+            total_size -= size
+        self._inventory = inv
+        self._store_inventory()
+        # FUTURE: check for orphan files in the cache
+        return
+
+    def close(self):
+        self._clean_cache()
 
     def idle(self):
         """
@@ -210,7 +367,7 @@ class Workspace(QObject):
         """
         return False
 
-    def import_image(self, source_path=None, source_uri=None):
+    def import_image(self, source_path=None, source_uri=None, allow_cache=True):
         """
         Start loading URI data into the workspace asynchronously.
 
@@ -220,12 +377,20 @@ class Workspace(QObject):
         if source_uri is not None and source_path is None:
             raise NotImplementedError('URI load not yet supported')
 
+        nfo = None
+        if allow_cache and source_path is not None:
+            nfo = self._check_cache(source_path)
+            if nfo is not None:
+                uuid, info, data = nfo
+                self._info[uuid] = info
+                self._data[uuid] = data
+                return nfo
+
         gen = None
-        # FIXME: check if the data is already in the workspace
         uuid = uuidgen()
         for imp in self._importers:
             if imp.is_relevant(source_path=source_path):
-                gen = imp(self, self.cwd, uuid, source_path=source_path)
+                gen = imp(self, self.cwd, uuid, source_path=source_path, cache_path=self._preferred_cache_path(uuid))
                 break
         if gen is None:
             raise IOError("unable to import {}".format(source_path))
@@ -237,17 +402,37 @@ class Workspace(QObject):
                 data = self._data[uuid] = update.data
                 LOG.debug(repr(update))
         # copy the data into an anonymous memmap
-        self._data[uuid] = self._convert_to_memmap(data)
+        self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
+        if allow_cache:
+            self._update_cache(source_path, uuid, info, data)
+        # TODO: schedule cache cleaning in background after a series of imports completes
         return uuid, info, data
 
-    def _convert_to_memmap(self, data:np.ndarray):
+    def _preferred_cache_path(self, uuid):
+        filename = str(uuid)
+        return os.path.join(self.cwd, filename)
+
+    def _convert_to_memmap(self, uuid, data:np.ndarray):
         if isinstance(data, np.memmap):
             return data
-        from tempfile import TemporaryFile
-        fp = TemporaryFile()
+        # from tempfile import TemporaryFile
+        # fp = TemporaryFile()
+        pathname = self._preferred_cache_path(uuid)
+        fp = open(pathname, 'wb+')
         mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
         mm[:] = data[:]
         return mm
+
+    def _bgnd_remove(self, uuid):
+        from cspov.queue import TASK_DOING, TASK_PROGRESS
+        yield {TASK_DOING: 'purging memory', TASK_PROGRESS: 0.5}
+        if uuid in self._info:
+            del self._info[uuid]
+            zult = True
+        if uuid in self._data:
+            del self._data[uuid]
+            zult = True
+        yield {TASK_DOING: 'purging memory', TASK_PROGRESS: 1.0}
 
     def remove(self, dsi):
         """
@@ -255,15 +440,19 @@ class Workspace(QObject):
         :param dsi: datasetinfo dictionary or UUID of a dataset
         :return: True if successfully deleted, False if not found
         """
+        if isinstance(dsi, dict):
+            name = dsi[INFO.NAME]
+        else:
+            name = 'dataset'
         uuid = dsi if isinstance(dsi, UUID) else dsi[INFO.UUID]
         zult = False
-        if uuid in self._info:
-            del self._info[uuid]
-            zult = True
-        if uuid in self._data:
-            del self._data[uuid]
-            zult = True
-        return zult
+
+        if self._queue is not None:
+            self._queue.add(str(uuid), self._bgnd_remove(uuid), 'Purge dataset')
+        else:
+            for blank in self._bgnd_remove(uuid):
+                pass
+        return True
 
     def get_info(self, dsi_or_uuid, lod=None):
         """
@@ -285,6 +474,30 @@ class Workspace(QObject):
             dsi_or_uuid = UUID(dsi_or_uuid)
         return self._data[dsi_or_uuid]
 
+    def _create_position_to_index_transform(self, dsi_or_uuid):
+        info = self.get_info(dsi_or_uuid)
+        origin_x = info[INFO.ORIGIN_X]
+        origin_y = info[INFO.ORIGIN_Y]
+        cell_width = info[INFO.CELL_WIDTH]
+        cell_height = info[INFO.CELL_HEIGHT]
+        def _transform(x, y, origin_x=origin_x, origin_y=origin_y, cell_width=cell_width, cell_height=cell_height):
+            col = (x - info[INFO.ORIGIN_X]) / info[INFO.CELL_WIDTH]
+            row = (y - info[INFO.ORIGIN_Y]) / info[INFO.CELL_HEIGHT]
+            return col, row
+        return _transform
+
+    def _create_layer_affine(self, dsi_or_uuid):
+        info = self.get_info(dsi_or_uuid)
+        affine = Affine(
+            info[INFO.CELL_WIDTH],
+            0.0,
+            info[INFO.ORIGIN_X],
+            0.0,
+            info[INFO.CELL_HEIGHT],
+            info[INFO.ORIGIN_Y],
+        )
+        return affine
+
     def _position_to_index(self, dsi_or_uuid, xy_pos):
         info = self.get_info(dsi_or_uuid)
         x = xy_pos[0]
@@ -302,21 +515,31 @@ class Workspace(QObject):
 
     def get_content_polygon(self, dsi_or_uuid, points):
         data = self.get_content(dsi_or_uuid)
-        xmin = data.shape[1]
-        xmax = 0
-        ymin = data.shape[0]
-        ymax = 0
-        for point in points:
-            row, col = self._position_to_index(dsi_or_uuid, point)
-            if row < ymin:
-                ymin = row
-            elif row > ymax:
-                ymax = row
-            if col < xmin:
-                xmin = col
-            elif col > xmax:
-                xmax = col
-        return data[ymin:ymax, xmin:xmax]
+        trans = self._create_layer_affine(dsi_or_uuid)
+        _, data = content_within_shape(data, trans, LinearRing(points))
+        return data
+
+    def highest_resolution_uuid(self, *uuids):
+        return min([self.get_info(uuid) for uuid in uuids], key=lambda i: i[INFO.CELL_WIDTH])[INFO.UUID]
+
+    def lowest_resolution_uuid(self, *uuids):
+        return max([self.get_info(uuid) for uuid in uuids], key=lambda i: i[INFO.CELL_WIDTH])[INFO.UUID]
+
+    def get_coordinate_mask_polygon(self, dsi_or_uuid, points):
+        data = self.get_content(dsi_or_uuid)
+        trans = self._create_layer_affine(dsi_or_uuid)
+        index_mask, data = content_within_shape(data, trans, LinearRing(points))
+        coords_mask = (index_mask[0] * trans.e + trans.f, index_mask[1] * trans.a + trans.c)
+        return coords_mask, data
+
+    def get_content_coordinate_mask(self, uuid, coords_mask):
+        data = self.get_content(uuid)
+        trans = self._create_layer_affine(uuid)
+        index_mask = (
+            ((coords_mask[0] - trans.f) / trans.e).astype(np.uint),
+            ((coords_mask[1] - trans.c) / trans.a).astype(np.uint),
+        )
+        return data[index_mask]
 
     def __getitem__(self, datasetinfo_or_uuid):
         """

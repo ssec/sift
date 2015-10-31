@@ -17,6 +17,7 @@ import osr
 from glob import glob
 from osgeo import gdal
 from pyproj import Proj
+import numpy as np
 
 from cspov.project.ahi2gtiff import create_ahi_geotiff, ahi_image_info, ahi_image_data
 
@@ -52,6 +53,8 @@ def main():
                         help="Set tile block X size")
     parser.add_argument('--blockysize', default=None, type=int,
                         help="Set tile block Y size")
+    parser.add_argument('--extents', default=[np.nan, np.nan, np.nan, np.nan], nargs=4, type=float,
+                        help="Set mercator bounds in lat/lon space (lon_min lat_min lon_max lat_max)")
 
     parser.add_argument("input_dir",
                         help="Input directory to search for the 'input_pattern' specified")
@@ -124,9 +127,23 @@ def main():
         proj = proj + " +over" if lon_east >= 180 else proj
         # Include the '+over' parameter so longitudes are wrapper around the antimeridian
         src_proj = Proj(proj)
-        x_extent = (src_proj(lon_west, 0)[0], src_proj(lon_east, 0)[0])
-        y_extent = (src_proj(0, -80)[1], src_proj(0, 80)[1])
-        # import ipdb; ipdb.set_trace()
+
+        # use image bounds
+        if np.isnan(args.extents[0]):
+            args.extents[0] = lon_west
+        if np.isnan(args.extents[1]):
+            args.extents[1] = -80
+        if np.isnan(args.extents[2]):
+            args.extents[2] = lon_east
+        if np.isnan(args.extents[3]):
+            args.extents[3] = 80
+
+        x_min, y_min = src_proj(args.extents[0], args.extents[1])
+        x_max, y_max = src_proj(args.extents[2], args.extents[3])
+        x_extent = (x_min, x_max)
+        y_extent = (y_min, y_max)
+        LOG.debug("Using extents (%f : %f : %f : %f)", x_extent[0], y_extent[0], x_extent[1], y_extent[1])
+
         gdalwarp_args = args.gdalwarp_args + [
             #"-multi",
             "-t_srs", proj,
@@ -136,6 +153,8 @@ def main():
             "{:0.03f}".format(y_extent[0]),
             "{:0.03f}".format(x_extent[1]),
             "{:0.03f}".format(y_extent[1]),
+            "-srcnodata", "nan",
+            "-dstnodata", "nan",
         ]
         if args.compress is not None:
             gdalwarp_args.extend(["-co", "COMPRESS=%s" % (args.compress,)])

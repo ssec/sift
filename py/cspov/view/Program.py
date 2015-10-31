@@ -423,7 +423,7 @@ class TextureAtlas2D(Texture2D):
             data_orig = data
             data = np.zeros(self.tile_shape, dtype=data.dtype)
             # data = data.copy()
-            # data[:] = 0.0
+            data[:] = np.nan
             data[:tile_offset[0], :tile_offset[1]] = data_orig[:tile_offset[0], :tile_offset[1]]
         super(TextureAtlas2D, self).set_data(data, offset=offset, copy=copy)
 

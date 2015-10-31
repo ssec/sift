@@ -33,19 +33,16 @@ from PyQt4.QtCore import QObject
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import os, sys
-import logging, unittest, argparse
-import weakref
+import logging
 import pickle as pkl
-import base64
-from PyQt4.QtCore import QAbstractListModel, QAbstractTableModel, QVariant, Qt, QSize, QModelIndex, QPoint, QMimeData
-from PyQt4.QtGui import QAbstractItemDelegate, QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyleOptionViewItem, QItemSelection, QItemSelectionModel
+from PyQt4.QtCore import QAbstractListModel, Qt, QSize, QModelIndex, QPoint, QMimeData, pyqtSignal, QRect
+from PyQt4.QtGui import QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QColor, QStyleOptionViewItem, QItemSelection, QItemSelectionModel, QPen
 from cspov.model.document import Document
 from cspov.common import INFO, KIND
+from cspov.view.Colormap import ALL_COLORMAPS, CATEGORIZED_COLORMAPS
 
 LOG = logging.getLogger(__name__)
 
-COLOR_MAP_LIST=["grays", "autumn", "fire", "hot", "winter", "test"]  # FIXME: DRY violation
 
 COLUMNS=('Visibility', 'Name', 'Enhancement')
 
@@ -58,33 +55,39 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     def sizeHint(self, option:QStyleOptionViewItem, index:QModelIndex):
         return QSize(100,36)
 
-    # def paint(self, painter, option, index):
-    #
-    #     painter.save()
-    #
-    #     painter.setPen(QtGui.QPen(QtCore.Qt.NoPen))
-    #
-    #     if option.state & QtGui.QStyle.State_Selected:
-    #         brush = QtGui.QBrush(QtGui.QColor("#66ff71"))
-    #         painter.setBrush(brush)
-    #
-    #     else:
-    #         brush = QtGui.QBrush(QtCore.Qt.white)
-    #         painter.setBrush(brush)
-    #
-    #     painter.drawRect(option.rect)
-    #
-    #     painter.setPen(QtGui.QPen(QtCore.Qt.blue))
-    #     value = index.data(QtCore.Qt.DisplayRole)
-    #
-    #     if value.isValid():
-    #
-    #         text = value.toString()
-    #         align = QtCore.Qt.AlignCenter
-    #         painter.drawText(option.rect, align, text)
-    #
-    #     #QtGui.QStyledItemDelegate.paint(self, painter, option, index)
-    #     painter.restore()
+    def paint(self, painter, option, index):
+        painter.save()
+        # shiftopt = QStyleOptionViewItem(option)
+        # shiftopt.rect = QRect(option.rect.left(), option.rect.top(), option.rect.width(), option.rect.height()-12)
+        super(LayerWidgetDelegate, self).paint(painter, option, index)
+
+        # painter.setPen(QPen(Qt.NoPen))
+        # if option.state & QtGui.QStyle.State_Selected:
+        #     brush = QtGui.QBrush(QtGui.QColor("#66ff71"))
+        #     painter.setBrush(brush)
+        #
+        # else:
+        #     brush = QtGui.QBrush(QtCore.Qt.white)
+        #     painter.setBrush(brush)
+
+        # add an equalizer bar
+        # painter.setPen(QPen(Qt.blue))
+        color = QColor(64, 24, 255, 64)
+        painter.setPen(QPen(color))
+        value = index.data(Qt.UserRole)
+        if value:
+            value, bar = value
+            rect = option.rect
+            w = bar * float(rect.width())
+            # h = 4
+            # r = QRect(rect.left(), rect.top() + rect.height() - h, int(w), h)
+            r = QRect(rect.left(), rect.top(), int(w), rect.height())
+            painter.fillRect(r, color)
+            # h = 8
+            # r = QRect(rect.left(), rect.top() + rect.height() - h, int(w), h)
+
+        #QtGui.QStyledItemDelegate.paint(self, painter, option, index)
+        painter.restore()
 
 
     # def paint(self, painter, option, index):
@@ -153,7 +156,11 @@ class LayerStackListViewModel(QAbstractListModel):
     widgets = None
     doc = None
     item_delegate = None
+    _last_equalizer_values = {}
     _mimetype = 'application/vnd.row.list'
+
+    # signals
+    uuidSelectionChanged = pyqtSignal(list,)  # the list is a list of the currently selected UUIDs
 
     def __init__(self, widgets:list, doc:Document):
         """
@@ -163,13 +170,15 @@ class LayerStackListViewModel(QAbstractListModel):
         :return:
         """
         super(LayerStackListViewModel, self).__init__()
-        self.widgets = list(widgets) # [weakref.ref(widget) for widget in widgets]
+
+        self.widgets = [ ]
         self.doc = doc
         # self._column = [self._visibilityData, self._nameData]
         self.item_delegate = LayerWidgetDelegate()
 
         # for now, a copout by just having a refresh to the content when document changes
         doc.didReorderLayers.connect(self.refresh)
+        doc.didRemoveLayers.connect(self.drop_layers_just_removed)
         doc.didChangeColormap.connect(self.refresh)
         doc.didChangeLayerVisibility.connect(self.refresh)
         doc.didChangeLayerName.connect(self.refresh)
@@ -177,11 +186,17 @@ class LayerStackListViewModel(QAbstractListModel):
         doc.willPurgeLayer.connect(self.refresh)
         doc.didSwitchLayerSet.connect(self.refresh)
         doc.didReorderAnimation.connect(self.refresh)
+        doc.didCalculateLayerEqualizerValues.connect(self.update_equalizer)
 
         # self.setSupportedDragActions(Qt.MoveAction)
 
+        # set up each of the widgets
         for widget in widgets:
             self._init_widget(widget)
+
+    # TODO, this wrapper is probably not needed, possibly remove later
+    def add_widget(self, listbox:QListView):
+        self._init_widget(listbox)
 
     def _init_widget(self, listbox:QListView):
         listbox.setModel(self)
@@ -199,9 +214,14 @@ class LayerStackListViewModel(QAbstractListModel):
         listbox.setDragDropMode(QAbstractItemView.DragDrop)
         # listbox.setDefaultDropAction(Qt.MoveAction)
         # listbox.setDragDropOverwriteMode(False)
-        # listbox.clicked.connect(self.layer_clicked)
         # listbox.entered.connect(self.layer_entered)
-        # listbox.pressed.connect(self.layer_pressed)
+
+        # the various signals that may result from the user changing the selections
+        listbox.activated.connect(self.changedSelection)
+        listbox.clicked.connect(self.changedSelection)
+        listbox.doubleClicked.connect(self.changedSelection)
+        listbox.pressed.connect(self.changedSelection)
+
         self.widgets.append(listbox)
 
     # def supportedDragActions(self):
@@ -209,6 +229,12 @@ class LayerStackListViewModel(QAbstractListModel):
     #
     def supportedDropActions(self):
         return Qt.MoveAction # | Qt.CopyAction
+
+    def changedSelection(self, index) :
+        """connected to the various listbox signals that represent the user changing selections
+        """
+        selected_uuids = list(self.current_selected_uuids(self.current_set_listbox))
+        self.uuidSelectionChanged.emit(selected_uuids)
 
     @property
     def current_set_listbox(self):
@@ -224,19 +250,22 @@ class LayerStackListViewModel(QAbstractListModel):
 
     def doc_added_layer(self, new_order, info, content):
         dexes = [i for i,q in enumerate(new_order) if q==None]
-        for dex in dexes:
-            self.beginInsertRows(QModelIndex(), dex, dex)
-            self.endInsertRows()
+        # for dex in dexes:
+        #     self.beginInsertRows(QModelIndex(), dex, dex)
+        #     self.endInsertRows()
         self.refresh()
 
     def refresh(self):
-        for widget in self.widgets:
-            if widget.isVisible():
-                widget.update()
-            # FIXME refresh content, or make sure we're signaling layer insertion and removal to the list box
+        # self.beginResetModel()
+        # self.endResetModel()
+        self.layoutAboutToBeChanged.emit()
+        self.revert()
+        self.layoutChanged.emit()
+
+        # this is an ugly way to make sure the selection stays current
+        self.changedSelection(None)
 
     def current_selected_uuids(self, lbox:QListView=None):
-        # FIXME: this is just plain crufty, also doesn't work!
         lbox = self.current_set_listbox if lbox is None else lbox
         if lbox is None:
             LOG.error('not sure which list box is active! oh pooh.')
@@ -244,7 +273,7 @@ class LayerStackListViewModel(QAbstractListModel):
         for q in lbox.selectedIndexes():
             yield self.doc.uuid_for_layer(q.row())
 
-    def select(self, uuids, lbox:QListView=None):
+    def select(self, uuids, lbox:QListView=None, scroll_to_show_single=True):
         lbox = self.current_set_listbox if lbox is None else lbox
         lbox.clearSelection()
         if not uuids:
@@ -252,27 +281,72 @@ class LayerStackListViewModel(QAbstractListModel):
         # FUTURE: this is quick and dirty
         rowdict = dict((u,i) for i,u in enumerate(self.doc.current_layer_order))
         items = QItemSelection()
+        q = None
         for uuid in uuids:
-            row = rowdict[uuid]
+            row = rowdict.get(uuid, None)
+            if row is None:
+                LOG.error('UUID {} cannot be selected in list view'.format(uuid))
+                continue
             q = self.createIndex(row, 0)
             items.select(q, q)
             lbox.selectionModel().select(items, QItemSelectionModel.Select)
             # lbox.setCurrentIndex(q)
+        if scroll_to_show_single and len(uuids)==1 and q is not None:
+            lbox.scrollTo(q)
+
+    def drop_layers_just_removed(self, layer_indices, uuid, row, count):
+        """
+        a layer was removed in the document, update the listview
+        :param layer_indices: list of new layer indices
+        :param uuid:
+        :return:
+        """
+        self.refresh()
+        # self.removeRows(row, count)
+
+    def update_equalizer(self, doc_values):
+        """
+        User has clicked on a point probe
+        Document is conveniently providing us values for all the image layers
+        Let's update the display to show them like a left-to-right equalizer
+        :param doc_values: {uuid: value, value-relative-to-base, is-base:bool}, values can be NaN
+        :return:
+        """
+        self._last_equalizer_values = doc_values
+        self.refresh()
 
     def menu(self, pos:QPoint, *args):
         LOG.info('menu requested for layer list')
         menu = QMenu()
         actions = {}
         lbox = self.current_set_listbox
-        for colormap in COLOR_MAP_LIST:
-            actions[menu.addAction(colormap)] = colormap
-        sel = menu.exec_(lbox.mapToGlobal(pos))
-        new_cmap = actions.get(sel, None)
+        # XXX: Normally we would create the menu and actions before hand but since we are checking the actions based
+        # on selection we can't. Then we would use an ActionGroup and make it exclusive
         selected_uuids = list(self.current_selected_uuids(lbox))
         LOG.debug("selected UUID set is {0!r:s}".format(selected_uuids))
-        if new_cmap is not None:
-            LOG.info("changing to colormap {0} for ids {1!r:s}".format(new_cmap, selected_uuids))
-            self.doc.change_colormap_for_layers(name=new_cmap) # FIXME, uuids=selected_uuids)
+        current_colormaps = set(self.doc.colormap_for_uuids(selected_uuids))
+        for cat, cat_colormaps in CATEGORIZED_COLORMAPS.items():
+            submenu = QMenu(cat, parent=menu)
+            for colormap in cat_colormaps.keys():
+                action = submenu.addAction(colormap)
+                actions[action] = colormap
+                action.setCheckable(True)
+                action.setChecked(colormap in current_colormaps)
+            menu.addMenu(submenu)
+        menu.addSeparator()
+        flip_action = menu.addAction("Flip Color Limits")
+        flip_action.setCheckable(True)
+        flip_action.setChecked(any(self.doc.flipped_for_uuids(selected_uuids)))
+        menu.addAction(flip_action)
+        sel = menu.exec_(lbox.mapToGlobal(pos))
+        if sel is flip_action:
+            LOG.info("flipping color limits for sibling ids {0!r:s}".format(selected_uuids))
+            self.doc.flip_climits_for_layers(uuids=selected_uuids)
+        else:
+            new_cmap = actions.get(sel, None)
+            if new_cmap is not None:
+                LOG.info("changing to colormap {0} for ids {1!r:s}".format(new_cmap, selected_uuids))
+                self.doc.change_colormap_for_layers(name=new_cmap, uuids=selected_uuids)
 
     @property
     def listing(self):
@@ -296,17 +370,38 @@ class LayerStackListViewModel(QAbstractListModel):
             # unpickle the presentation information and re-insert it
             # b = base64.decodebytes(mime.text())
             b = mime.data(self._mimetype)
-            l = pkl.loads(b)
-            LOG.debug('dropped: {0!r:s}'.format(l))
-            count = len(l)
+            layer_set_len, insertion_info = pkl.loads(b)
+            LOG.debug('dropped: {0!r:s}'.format(insertion_info))
+            count = len(insertion_info)
             if row == -1:
                 row = len(self.doc)  # append
             # self.insertRows(row, count)
             # for i, presentation in enumerate(l):
             #     self.setData(self.index(row+i, 0), presentation)
-            self.beginInsertRows(parent, row, row+count-1)
-            self.doc.insert_layer_prez(row, l)
-            self.endInsertRows()
+            order = list(range(layer_set_len))
+            inserted_row_numbers = []
+            # inserted_presentations = []
+            # delete_these_rows = []
+            insertion_point = row
+            uuids = []
+            for old_row, presentation in reversed(sorted(insertion_info)):
+                del order[old_row]
+                if old_row<insertion_point:
+                    insertion_point -= 1
+                inserted_row_numbers.insert(0, old_row)
+                uuids.append(presentation.uuid)
+                # delete_these_rows.append(old_row if old_row<row else old_row+count)
+                # inserted_presentations.append(presentation)
+            order = order[:insertion_point] + inserted_row_numbers + order[insertion_point:]
+            LOG.debug('new order after drop {0!r:s}'.format(order))
+            self.select([])
+            self.doc.reorder_by_indices(order)
+            # self.doc.insert_layer_prez(row, inserted_presentations)
+            # LOG.debug('after insertion removing rows {0!r:s}'.format(delete_these_rows))
+            # for exrow in delete_these_rows:
+            #     self.doc.remove_layer_prez(exrow)
+            # self.doc.didReorderLayers.emit(order)  # FUTURE: not our business to be emitting on behalf of the document
+            assert(count==len(insertion_info))
             return True
         return False
         # return super(LayerStackListViewModel, self).dropMimeData(mime, action, row, column, parent)
@@ -316,8 +411,8 @@ class LayerStackListViewModel(QAbstractListModel):
         for index in list_of_QModelIndex:
             # create a list of prez tuples showing how layers are presented
             if index.isValid():
-                l.append(self.doc[index.row()])
-        p = pkl.dumps(l, pkl.HIGHEST_PROTOCOL)
+                l.append((index.row(), self.doc[index.row()]))
+        p = pkl.dumps((len(self.doc.current_layer_set), l), pkl.HIGHEST_PROTOCOL)
         mime = QMimeData()
         # t = base64.encodebytes(p).decode('ascii')
         # LOG.debug('mimetext for drag is "{}"'.format(t))
@@ -350,15 +445,29 @@ class LayerStackListViewModel(QAbstractListModel):
         row = index.row()
         # col = index.column()
         el = self.listing
-        if role == Qt.ItemDataRole or role == Qt.EditRole:
+        info = el[row] if row<len(self.doc) else None
+        if not info:
+            return None
+        leroy = self._last_equalizer_values.get(info[INFO.UUID], None)
+        if role == Qt.UserRole:
+            return leroy
+        elif role == Qt.EditRole:
             return self.doc[index.row()] if index.row()<len(self.doc) else None
         elif role == Qt.CheckStateRole:
             check = Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
             return check
+        elif role == Qt.ToolTipRole:
+            if not leroy:
+                return None
+            value, normalized = leroy
+            return str(value)
         elif role == Qt.DisplayRole:
             lao = self.doc.layer_animation_order(row)
-            name = el[row][INFO.NAME]
+            name = info[INFO.NAME]
             # return  ('[-]  ' if lao is None else '[{}]'.format(lao+1)) + el[row]['name']
+            if leroy:
+                data = '[%.2f]  ' % leroy[0]
+                return data + name
             return name
         return None
 
@@ -405,8 +514,8 @@ class LayerStackListViewModel(QAbstractListModel):
 
     def removeRows(self, row, count, QModelIndex_parent=None, *args, **kwargs):
         self.beginRemoveRows(QModelIndex(), row, row+count-1)
-        LOG.debug(">>>> REMOVE {} rows".format(count))
-        self.doc.remove_layer_prez(row, count)
+        LOG.debug(">>>> REMOVE {} rows at {}".format(count, row))
+        # self.doc.remove_layer_prez(row, count)
         self.endRemoveRows()
         return True
 
@@ -439,22 +548,6 @@ class LayerStackListViewModel(QAbstractListModel):
     #
     #     else:
     #         event.ignore()
-
-
-    def layer_clicked(self, qindex):
-        pass
-
-    def layers_moved(self, qindices):
-        pass
-
-    def layer_entered(self, qindex):
-        pass
-
-    def layer_pressed(self, qindex):
-        pass
-
-    def context_menu(self, qpoint):
-        pass
 
         # self.widget().clear()
         # for x in self.doc.asListing():

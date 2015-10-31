@@ -1,6 +1,6 @@
 package:
   name: cspov
-  version: "0.2"
+  version: "0.5.1"
 
 source:
   path: ../../py
@@ -23,7 +23,8 @@ build:
 
   # If this is a new build for the same version, increment the build
   # number. If you do not include this key, it defaults to 0.
-  number: 0
+  # FIXME
+  number: 1
 
 requirements:
   build:
@@ -38,10 +39,12 @@ requirements:
     - pyopengl ==3.1.1a1
     - netcdf4 ==1.1.9
     - h5py ==2.5.0
-    - gdal ==1.11.2
-#    - gdal ==2.0.0
     - pillow
     - pyshp ==1.2.1
+    - shapely ==1.5.11
+    - rasterio ==0.24.0
+    - gdal ==1.11.2
+#    - gdal ==2.0.0
     - cython >=0.17 # [win]
 
   run:
@@ -55,10 +58,12 @@ requirements:
     - pyopengl ==3.1.1a1
     - netcdf4 ==1.1.9
     - h5py ==2.5.0
-    - gdal ==1.11.2
-#    - gdal ==2.0.0
     - pillow
     - pyshp ==1.2.1
+    - shapely ==1.5.11
+    - rasterio ==0.24.0
+    - gdal ==1.11.2
+#    - gdal ==2.0.0
 
 # test:
   # Python imports
