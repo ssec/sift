@@ -76,8 +76,23 @@ guam_cases["Water Vapor"].append(DataCase("Water Vapor",
 # Tim's Cases
 guam_cases["Weighting Functions"] = []
 guam_cases["Weighting Functions"].append(DataCase("Weighting Functions",
-                                         datetime(2015, 9, 19, 18, 0, 0),
-                                         datetime(2015, 9, 20, 18, 0, 0),
+                                         datetime(2015, 9, 20, 2, 30, 0),
+                                         datetime(2015, 9, 20, 2, 30, 0),
+                                         timedelta(minutes=0),
+                                         "all"))
+guam_cases["Weighting Functions"].append(DataCase("Weighting Functions",
+                                         datetime(2015, 9, 20, 0, 0, 0),
+                                         datetime(2015, 9, 20, 6, 0, 0),
+                                         timedelta(minutes=60),
+                                         "all"))
+guam_cases["Weighting Functions"].append(DataCase("Weighting Functions",
+                                         datetime(2015, 9, 20, 1, 30, 0),
+                                         datetime(2015, 9, 20, 2, 30, 0),
+                                         timedelta(minutes=10),
+                                         "all"))
+guam_cases["Weighting Functions"].append(DataCase("Weighting Functions",
+                                         datetime(2015, 9, 20, 1, 0, 0),
+                                         datetime(2015, 9, 20, 3, 0, 0),
                                          timedelta(minutes=10),
                                          "all"))
 
@@ -156,6 +171,9 @@ def main():
                         continue
                     LOG.info("Creating hardlink '%s' -> '%s'", link_path, input_pathname)
                     os.link(input_pathname, link_path)
+                if int(case.delta.total_seconds()) == 0:
+                    LOG.debug("Only one file needed to meet delta of 0")
+                    break
             LOG.info("done mirroring files")
 
 if __name__ == "__main__":
