@@ -520,6 +520,9 @@ class Workspace(QObject):
         return data
 
     def highest_resolution_uuid(self, *uuids):
+        return min([self.get_info(uuid) for uuid in uuids], key=lambda i: i[INFO.CELL_WIDTH])[INFO.UUID]
+
+    def lowest_resolution_uuid(self, *uuids):
         return max([self.get_info(uuid) for uuid in uuids], key=lambda i: i[INFO.CELL_WIDTH])[INFO.UUID]
 
     def get_coordinate_mask_polygon(self, dsi_or_uuid, points):
