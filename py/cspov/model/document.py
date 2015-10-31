@@ -272,8 +272,11 @@ class Document(QObject):
             value = self._workspace.get_content_point(pinf.uuid, xy_pos)
             # calculate normalized bar width relative to its current clim
             nc, xc = pinf.climits
-            bar_width = (value - nc) / (xc - nc)
-            zult[pinf.uuid] = (value, bar_width)
+            if np.isnan(value):
+                zult[pinf.uuid] = None
+            else:
+                bar_width = (np.clip(value, nc, xc) - nc) / (xc - nc)
+                zult[pinf.uuid] = (value, bar_width)
         self.didCalculateLayerEqualizerValues.emit(zult)  # is picked up by layer list model to update display
 
     # TODO, find out if this is needed/used and whether or not it's correct
