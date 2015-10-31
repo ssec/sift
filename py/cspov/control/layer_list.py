@@ -36,7 +36,7 @@ __docformat__ = 'reStructuredText'
 import logging
 import pickle as pkl
 from PyQt4.QtCore import QAbstractListModel, Qt, QSize, QModelIndex, QPoint, QMimeData, pyqtSignal, QRect
-from PyQt4.QtGui import QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QColor, QStyleOptionViewItem, QItemSelection, QItemSelectionModel, QPen
+from PyQt4.QtGui import QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QColor, QFont, QStyleOptionViewItem, QItemSelection, QItemSelectionModel, QPen
 from cspov.model.document import Document
 from cspov.common import INFO, KIND
 from cspov.view.Colormap import ALL_COLORMAPS, CATEGORIZED_COLORMAPS
@@ -51,6 +51,9 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     set for a specific column, controls the rendering and editing of items in that column or row of a list or table
     see QAbstractItemView.setItemDelegateForRow/Column
     """
+    def __init__(self, *args, **kwargs):
+        super(LayerWidgetDelegate, self).__init__(*args, **kwargs)
+        self.font = QFont('Andale Mono', 13)
 
     def sizeHint(self, option:QStyleOptionViewItem, index:QModelIndex):
         return QSize(100,36)
@@ -59,7 +62,6 @@ class LayerWidgetDelegate(QStyledItemDelegate):
         painter.save()
         # shiftopt = QStyleOptionViewItem(option)
         # shiftopt.rect = QRect(option.rect.left(), option.rect.top(), option.rect.width(), option.rect.height()-12)
-        super(LayerWidgetDelegate, self).paint(painter, option, index)
 
         # painter.setPen(QPen(Qt.NoPen))
         # if option.state & QtGui.QStyle.State_Selected:
@@ -85,6 +87,13 @@ class LayerWidgetDelegate(QStyledItemDelegate):
             painter.fillRect(r, color)
             # h = 8
             # r = QRect(rect.left(), rect.top() + rect.height() - h, int(w), h)
+            # r = QRect(rect.left()+48, rect.top(), rect.width()-48, rect.height())
+            # painter.setFont(self.font)
+            # shiftopt = QStyleOptionViewItem(option)
+            # shiftopt.rect = r
+            # painter.setPen(Qt.darkBlue)
+            # painter.drawText(rect.left() + 2, rect.top() + 4, '%7.2f' % value)
+        super(LayerWidgetDelegate, self).paint(painter, option, index)
 
         #QtGui.QStyledItemDelegate.paint(self, painter, option, index)
         painter.restore()
@@ -215,6 +224,7 @@ class LayerStackListViewModel(QAbstractListModel):
         # listbox.setDefaultDropAction(Qt.MoveAction)
         # listbox.setDragDropOverwriteMode(False)
         # listbox.entered.connect(self.layer_entered)
+        listbox.setFont(QFont('Andale Mono', 13))
 
         # the various signals that may result from the user changing the selections
         listbox.activated.connect(self.changedSelection)
@@ -466,7 +476,7 @@ class LayerStackListViewModel(QAbstractListModel):
             name = info[INFO.NAME]
             # return  ('[-]  ' if lao is None else '[{}]'.format(lao+1)) + el[row]['name']
             if leroy:
-                data = '[%.2f]  ' % leroy[0]
+                data = '[%7.2f] ' % leroy[0]
                 return data + name
             return name
         return None
