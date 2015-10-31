@@ -39,7 +39,8 @@ from cspov.view.Colormap import ALL_COLORMAPS
 from cspov.model.document import prez
 from cspov.queue import TASK_DOING, TASK_PROGRESS
 
-from PyQt4.QtCore import QObject, pyqtSignal
+from PyQt4.QtCore import QObject, pyqtSignal, Qt
+from PyQt4.QtGui import QCursor, QPixmap
 import numpy as np
 from uuid import UUID
 from pyproj import Proj
@@ -565,6 +566,16 @@ class SceneGraphManager(QObject):
             return
 
         self._current_tool = name
+
+        # Set the cursor
+        if name == TOOL.PAN_ZOOM:
+            # self.main_canvas.native.setCursor(QCursor(QPixmap("py/cspov/ui/cursors/noun_275_cc.png")))
+            # self.main_canvas.native.setCursor(QCursor(Qt.SizeAllCursor))
+            self.main_canvas.native.setCursor(QCursor(Qt.OpenHandCursor))
+        elif name == TOOL.POINT_PROBE:
+            self.main_canvas.native.setCursor(QCursor(Qt.PointingHandCursor))
+        elif name == TOOL.REGION_PROBE:
+            self.main_canvas.native.setCursor(QCursor(Qt.CrossCursor))
 
         # disconnect the previous signals (if needed)
         if prev_tool == TOOL.PAN_ZOOM:
