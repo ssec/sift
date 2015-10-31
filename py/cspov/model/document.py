@@ -240,6 +240,8 @@ class Document(QObject):
     def time_label_for_uuid(self, uuid):
         """used to update animation display when a new frame is shown
         """
+        if not uuid:
+            return "YYYY-MM-DD HH:MM"
         info = self._layer_with_uuid[uuid]
         return self._guidebook.display_time(info)
 
