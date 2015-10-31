@@ -145,6 +145,7 @@ class Document(QObject):
     didSwitchLayerSet = pyqtSignal(int, list, list)  # new layerset number typically 0..3, list of prez tuples representing new display order, new animation order
     didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
+    didCalculateLayerEqualizerValues = pyqtSignal(dict)  # dict of {uuid: (value, normalized_value_within_clim)} for equalizer display
     # didChangeShapeLayer = pyqtSignal(dict)
 
     def __init__(self, workspace, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
@@ -257,6 +258,23 @@ class Document(QObject):
         for p in self.prez_for_uuids(uuids, lset=lset):
             default_clim = self._layer_with_uuid[p.uuid][INFO.CLIM]
             yield ((p.climits[1] - p.climits[0]) > 0) != ((default_clim[1] - default_clim[0]) > 0)
+
+    def update_equalizer_values(self, uuid, xy_pos):
+        """user has clicked on a point probe; determine relative and absolute values for all document image layers
+        """
+        zult = {}
+        for pinf in self.current_layer_set:
+            if pinf.uuid in zult:
+                continue
+            lyr = self._layer_with_uuid[pinf.uuid]
+            if lyr[INFO.KIND] != KIND.IMAGE:
+                continue
+            value = self._workspace.get_content_point(pinf.uuid, xy_pos)
+            # calculate normalized bar width relative to its current clim
+            nc, xc = pinf.climits
+            bar_width = (value - nc) / (xc - nc)
+            zult[pinf.uuid] = (value, bar_width)
+        self.didCalculateLayerEqualizerValues.emit(zult)  # is picked up by layer list model to update display
 
     # TODO, find out if this is needed/used and whether or not it's correct
     def update_dataset_info(self, new_info):

@@ -427,6 +427,7 @@ class Main(QtGui.QMainWindow):
                 data_str = "N/A"
             self.ui.cursorProbeText.setText("Probe Value: {} ".format(data_str))
         self.scene_manager.newProbePoint.connect(update_probe_point)
+        self.scene_manager.newProbePoint.connect(self.document.update_equalizer_values)
 
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
             top_uuids = list(self.document.current_visible_layers(2))
