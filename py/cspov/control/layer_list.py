@@ -35,13 +35,14 @@ __docformat__ = 'reStructuredText'
 
 import logging
 import pickle as pkl
-from PyQt4.QtCore import QAbstractListModel, Qt, QSize, QModelIndex, QPoint, QMimeData, pyqtSignal
-from PyQt4.QtGui import QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyleOptionViewItem, QItemSelection, QItemSelectionModel
+from PyQt4.QtCore import QAbstractListModel, Qt, QSize, QModelIndex, QPoint, QMimeData, pyqtSignal, QRect
+from PyQt4.QtGui import QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QColor, QStyleOptionViewItem, QItemSelection, QItemSelectionModel, QPen
 from cspov.model.document import Document
 from cspov.common import INFO, KIND
 from cspov.view.Colormap import ALL_COLORMAPS, CATEGORIZED_COLORMAPS
 
 LOG = logging.getLogger(__name__)
+
 
 COLUMNS=('Visibility', 'Name', 'Enhancement')
 
@@ -54,33 +55,35 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     def sizeHint(self, option:QStyleOptionViewItem, index:QModelIndex):
         return QSize(100,36)
 
-    # def paint(self, painter, option, index):
-    #
-    #     painter.save()
-    #
-    #     painter.setPen(QtGui.QPen(QtCore.Qt.NoPen))
-    #
-    #     if option.state & QtGui.QStyle.State_Selected:
-    #         brush = QtGui.QBrush(QtGui.QColor("#66ff71"))
-    #         painter.setBrush(brush)
-    #
-    #     else:
-    #         brush = QtGui.QBrush(QtCore.Qt.white)
-    #         painter.setBrush(brush)
-    #
-    #     painter.drawRect(option.rect)
-    #
-    #     painter.setPen(QtGui.QPen(QtCore.Qt.blue))
-    #     value = index.data(QtCore.Qt.DisplayRole)
-    #
-    #     if value.isValid():
-    #
-    #         text = value.toString()
-    #         align = QtCore.Qt.AlignCenter
-    #         painter.drawText(option.rect, align, text)
-    #
-    #     #QtGui.QStyledItemDelegate.paint(self, painter, option, index)
-    #     painter.restore()
+    def paint(self, painter, option, index):
+        painter.save()
+        super(LayerWidgetDelegate, self).paint(painter, option, index)
+
+        # painter.setPen(QPen(Qt.NoPen))
+        # if option.state & QtGui.QStyle.State_Selected:
+        #     brush = QtGui.QBrush(QtGui.QColor("#66ff71"))
+        #     painter.setBrush(brush)
+        #
+        # else:
+        #     brush = QtGui.QBrush(QtCore.Qt.white)
+        #     painter.setBrush(brush)
+
+        # add an equalizer bar
+        # painter.setPen(QPen(Qt.blue))
+        color = QColor(40, 40, 255, 40)
+        painter.setPen(QPen(color))
+        value = index.data(Qt.UserRole)
+        if value:
+            value, bar = value
+            rect = option.rect
+            w = bar * float(rect.width())
+            # h = 4
+            # r = QRect(rect.left(), rect.top() + rect.height() - h, int(w), h)
+            r = QRect(rect.left(), rect.top(), int(w), rect.height())
+            painter.fillRect(r, color)
+
+        #QtGui.QStyledItemDelegate.paint(self, painter, option, index)
+        painter.restore()
 
 
     # def paint(self, painter, option, index):
@@ -149,6 +152,7 @@ class LayerStackListViewModel(QAbstractListModel):
     widgets = None
     doc = None
     item_delegate = None
+    _last_equalizer_values = {}
     _mimetype = 'application/vnd.row.list'
 
     # signals
@@ -178,6 +182,7 @@ class LayerStackListViewModel(QAbstractListModel):
         doc.willPurgeLayer.connect(self.refresh)
         doc.didSwitchLayerSet.connect(self.refresh)
         doc.didReorderAnimation.connect(self.refresh)
+        doc.didCalculateLayerEqualizerValues.connect(self.update_equalizer)
 
         # self.setSupportedDragActions(Qt.MoveAction)
 
@@ -294,6 +299,17 @@ class LayerStackListViewModel(QAbstractListModel):
         """
         self.refresh()
         # self.removeRows(row, count)
+
+    def update_equalizer(self, doc_values):
+        """
+        User has clicked on a point probe
+        Document is conveniently providing us values for all the image layers
+        Let's update the display to show them like a left-to-right equalizer
+        :param doc_values: {uuid: value, value-relative-to-base, is-base:bool}, values can be NaN
+        :return:
+        """
+        self._last_equalizer_values = doc_values
+        self.refresh()
 
     def menu(self, pos:QPoint, *args):
         LOG.info('menu requested for layer list')
@@ -425,7 +441,9 @@ class LayerStackListViewModel(QAbstractListModel):
         row = index.row()
         # col = index.column()
         el = self.listing
-        if role == Qt.ItemDataRole or role == Qt.EditRole:
+        if role == Qt.UserRole:
+            return self._last_equalizer_values.get(el[row][INFO.UUID], None)
+        elif role == Qt.EditRole:
             return self.doc[index.row()] if index.row()<len(self.doc) else None
         elif role == Qt.CheckStateRole:
             check = Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
