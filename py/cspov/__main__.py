@@ -42,7 +42,7 @@ from functools import partial
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
-from cspov.common import INFO, KIND, DEFAULT_PROJ_OBJ
+from cspov.common import INFO, KIND, DEFAULT_PROJ_OBJ, TOOL
 
 import os
 import logging
@@ -203,14 +203,10 @@ class Main(QtGui.QMainWindow):
         else:
             event.ignore()
 
-    def change_tool(self, name="pz_camera"):
-        buttons = [self.ui.panZoomToolButton, self.ui.pointSelectButton, self.ui.regionSelectButton]
-        names = [self.scene_manager.pz_camera.name, self.scene_manager.point_probe_camera.name, self.scene_manager.polygon_probe_camera.name]
-        names = dict((name,value) for (value,name) in enumerate(names))
-        dex = names[name]
-        for q,b in enumerate(buttons):
-            b.setDown(dex==q)
-        self.scene_manager.change_camera(dex)
+    def change_tool(self, checked, name=TOOL.PAN_ZOOM):
+        if checked != True:
+            return
+        self.scene_manager.change_tool(name)
 
     def update_recent_file_menu(self, *args, **kwargs):
         paths = self.workspace.paths_in_cache
@@ -464,10 +460,10 @@ class Main(QtGui.QMainWindow):
         self.document.didRemoveLayers.connect(self.update_frame_time_to_top_visible)
         self.document.didAddLayer.connect(self.update_frame_time_to_top_visible)
 
-        self.ui.panZoomToolButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.pz_camera.name))
-        self.ui.pointSelectButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.point_probe_camera.name))
-        self.ui.regionSelectButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.polygon_probe_camera.name))
-        self.change_tool()
+        self.ui.panZoomToolButton.toggled.connect(partial(self.change_tool, name=TOOL.PAN_ZOOM))
+        self.ui.pointSelectButton.toggled.connect(partial(self.change_tool, name=TOOL.POINT_PROBE))
+        self.ui.regionSelectButton.toggled.connect(partial(self.change_tool, name=TOOL.REGION_PROBE))
+        self.change_tool(True)
 
         self.setup_menu()
         self.graphManager = ProbeGraphManager(self.ui.probeTabWidget, self.workspace, self.document, self.queue)
@@ -576,7 +572,7 @@ class Main(QtGui.QMainWindow):
                     return cb()
             return tmp_cb
 
-        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("c", self.scene_manager.next_camera))
+        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("c", self.scene_manager.next_tool))
 
         class ColormapSlot(object):
             def __init__(self, sgm, key='e'):

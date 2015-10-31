@@ -75,6 +75,14 @@ vue = namedtuple('vue', ('b', 'l', 't', 'r', 'dy', 'dx'))  # combination of box 
 WORLD_EXTENT_BOX = box(b=-MAX_EXCURSION_Y, l=-MAX_EXCURSION_X, t=MAX_EXCURSION_Y, r=MAX_EXCURSION_X)
 
 
+class TOOL(Enum):
+    """Names for cursor tools.
+    """
+    PAN_ZOOM = "pan_zoom"
+    POINT_PROBE = "point_probe"
+    REGION_PROBE = "region_probe"
+
+
 class KIND(Enum):
     """kind of entities we're working with
     """
