@@ -57,6 +57,8 @@ class LayerWidgetDelegate(QStyledItemDelegate):
 
     def paint(self, painter, option, index):
         painter.save()
+        # shiftopt = QStyleOptionViewItem(option)
+        # shiftopt.rect = QRect(option.rect.left(), option.rect.top(), option.rect.width(), option.rect.height()-12)
         super(LayerWidgetDelegate, self).paint(painter, option, index)
 
         # painter.setPen(QPen(Qt.NoPen))
@@ -70,7 +72,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
 
         # add an equalizer bar
         # painter.setPen(QPen(Qt.blue))
-        color = QColor(40, 40, 255, 40)
+        color = QColor(64, 24, 255, 64)
         painter.setPen(QPen(color))
         value = index.data(Qt.UserRole)
         if value:
@@ -81,6 +83,8 @@ class LayerWidgetDelegate(QStyledItemDelegate):
             # r = QRect(rect.left(), rect.top() + rect.height() - h, int(w), h)
             r = QRect(rect.left(), rect.top(), int(w), rect.height())
             painter.fillRect(r, color)
+            # h = 8
+            # r = QRect(rect.left(), rect.top() + rect.height() - h, int(w), h)
 
         #QtGui.QStyledItemDelegate.paint(self, painter, option, index)
         painter.restore()
@@ -441,17 +445,29 @@ class LayerStackListViewModel(QAbstractListModel):
         row = index.row()
         # col = index.column()
         el = self.listing
+        info = el[row] if row<len(self.doc) else None
+        if not info:
+            return None
+        leroy = self._last_equalizer_values.get(info[INFO.UUID], None)
         if role == Qt.UserRole:
-            return self._last_equalizer_values.get(el[row][INFO.UUID], None)
+            return leroy
         elif role == Qt.EditRole:
             return self.doc[index.row()] if index.row()<len(self.doc) else None
         elif role == Qt.CheckStateRole:
             check = Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
             return check
+        elif role == Qt.ToolTipRole:
+            if not leroy:
+                return None
+            value, normalized = leroy
+            return str(value)
         elif role == Qt.DisplayRole:
             lao = self.doc.layer_animation_order(row)
-            name = el[row][INFO.NAME]
+            name = info[INFO.NAME]
             # return  ('[-]  ' if lao is None else '[{}]'.format(lao+1)) + el[row]['name']
+            if leroy:
+                data = '[%.2f]  ' % leroy[0]
+                return data + name
             return name
         return None
 
