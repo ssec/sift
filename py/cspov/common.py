@@ -32,10 +32,10 @@ from pyproj import Proj
 
 LOG = logging.getLogger(__name__)
 
-if sys.platform.startswith("win"):
-    PREFERRED_SCREEN_TO_TEXTURE_RATIO = 1.0  # screenpx:texturepx that we want to keep, ideally, by striding
-else:
-    PREFERRED_SCREEN_TO_TEXTURE_RATIO = 0.5  # screenpx:texturepx that we want to keep, ideally, by striding
+# if sys.platform.startswith("win"):
+PREFERRED_SCREEN_TO_TEXTURE_RATIO = 1.0  # screenpx:texturepx that we want to keep, ideally, by striding
+# else:
+#     PREFERRED_SCREEN_TO_TEXTURE_RATIO = 0.5  # screenpx:texturepx that we want to keep, ideally, by striding
 
 # http://home.online.no/~sigurdhu/WGS84_Eng.html
 
