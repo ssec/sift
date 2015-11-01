@@ -217,14 +217,13 @@ class LayerStackListViewModel(QAbstractListModel):
         listbox.setAcceptDrops(True)
         listbox.setDropIndicatorShown(True)
         listbox.setSelectionMode(listbox.ExtendedSelection)
-        # listbox.indexesMoved.connect(FIXME)
         # listbox.setMovement(QListView.Snap)
         # listbox.setDragDropMode(QListView.InternalMove)
         listbox.setDragDropMode(QAbstractItemView.DragDrop)
         # listbox.setDefaultDropAction(Qt.MoveAction)
         # listbox.setDragDropOverwriteMode(False)
         # listbox.entered.connect(self.layer_entered)
-        listbox.setFont(QFont('Andale Mono', 13))
+        # listbox.setFont(QFont('Andale Mono', 13))
 
         # the various signals that may result from the user changing the selections
         listbox.activated.connect(self.changedSelection)
@@ -476,7 +475,7 @@ class LayerStackListViewModel(QAbstractListModel):
             name = info[INFO.NAME]
             # return  ('[-]  ' if lao is None else '[{}]'.format(lao+1)) + el[row]['name']
             if leroy:
-                data = '[%7.2f] ' % leroy[0]
+                data = '[%.2f] ' % leroy[0]
                 return data + name
             return name
         return None
