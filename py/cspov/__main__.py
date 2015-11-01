@@ -422,7 +422,8 @@ class Main(QtGui.QMainWindow):
 
             if uuid is not None:
                 data_point = self.workspace.get_content_point(uuid, xy_pos)
-                data_str = "{:.03f}".format(float(data_point))
+                unit_str, converted = self.document.convert_units(uuid, data_point)
+                data_str = "{:.03f}{:s}".format(float(converted), unit_str)
             else:
                 data_str = "N/A"
             self.ui.cursorProbeText.setText("Probe Value: {} ".format(data_str))
