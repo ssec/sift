@@ -84,6 +84,7 @@ class GUIDE(Enum):
     INSTRUMENT = 'instrument'  # INSTRUMENT enumeration, or string with full standard name
     DISPLAY_TIME = 'display_time' # time to show on animation control
     DISPLAY_NAME = 'display_name' # preferred name in the layer list
+    UNIT_CONVERSION = 'unit_conversion'  # (unit string, lambda x, inverse=False: convert-to-units)
 
 
 class AHI_HSF_Guidebook(Guidebook):
@@ -152,6 +153,7 @@ class AHI_HSF_Guidebook(Guidebook):
             md = self._metadata_for_path(info[INFO.PATHNAME])
             md[GUIDE.UUID] = info[INFO.UUID]
             md[GUIDE.INSTRUMENT] = INSTRUMENT.AHI
+            # md[GUIDE.UNIT_CONVERSION] = self.units_conversion(info)  # FUTURE: decide whether this should be done for most queries
             self._cache[info[INFO.UUID]] = md
             return md
 
@@ -163,9 +165,8 @@ class AHI_HSF_Guidebook(Guidebook):
             yield each[INFO.UUID], md
 
     def climits(self, dsi):
-        # Valid min and max for colormap use
-        nfo, = list(self.collect_info_from_seq([dsi]))
-        uuid, md = nfo
+        # Valid min and max for colormap use for data values in file (unconverted)
+        md = self.collect_info(dsi)
         if md[GUIDE.BAND] in [1, 2, 3, 4, 5, 6]:
             # Reflectance/visible data limits
             return -0.012, 1.192
@@ -173,23 +174,30 @@ class AHI_HSF_Guidebook(Guidebook):
             # BT data limits
             return -109.0 + 273.15, 55 + 273.15
 
+    def units_conversion(self, dsi):
+        "return UTF8 unit string, lambda v,inverse=False: convert-raw-data-to-unis"
+        md = self.collect_info(dsi)
+        if md[GUIDE.BAND] in [1, 2, 3, 4, 5, 6]:
+            # Reflectance/visible data limits
+            return ('', lambda x, inverse=False: x)
+        else:
+            # BT data limits
+            return ("°C", lambda x, inverse=False: x - 273.15 if not inverse else x + 273.15)
+
     def default_colormap(self, dsi):
-        nfo, = list(self.collect_info_from_seq([dsi]))
-        uuid, md = nfo
+        md = self.collect_info(dsi)
         if md[GUIDE.BAND] in [1, 2, 3, 4, 5, 6]:
             return DEFAULT_VIS
         else:
             return DEFAULT_IR
 
     def display_time(self, dsi):
-        nfo, = list(self.collect_info_from_seq([dsi]))
-        uuid, md = nfo
+        md = self.collect_info(dsi)
         return md.get(GUIDE.DISPLAY_TIME, '--:--')
 
     def display_name(self, dsi):
-        nfo, = list(self.collect_info_from_seq([dsi]))
-        uuid, md = nfo
-        return md.get(GUIDE.DISPLAY_NAME, '--:--')
+        md = self.collect_info(dsi)
+        return md.get(GUIDE.DISPLAY_NAME, '-unknown-')
 
     def flush(self):
         self._cache = {}
