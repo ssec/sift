@@ -53,7 +53,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     """
     def __init__(self, *args, **kwargs):
         super(LayerWidgetDelegate, self).__init__(*args, **kwargs)
-        self.font = QFont('Andale Mono', 13)
+        self.font = QFont('Andale Mono', 12)
 
     def sizeHint(self, option:QStyleOptionViewItem, index:QModelIndex):
         return QSize(100,36)
@@ -74,12 +74,12 @@ class LayerWidgetDelegate(QStyledItemDelegate):
 
         # add an equalizer bar
         # painter.setPen(QPen(Qt.blue))
-        color = QColor(64, 24, 255, 64)
+        color = QColor(64, 255, 64, 64)
         painter.setPen(QPen(color))
         value = index.data(Qt.UserRole)
+        rect = option.rect
         if value:
             value, bar = value
-            rect = option.rect
             w = bar * float(rect.width())
             # h = 4
             # r = QRect(rect.left(), rect.top() + rect.height() - h, int(w), h)
@@ -87,13 +87,25 @@ class LayerWidgetDelegate(QStyledItemDelegate):
             painter.fillRect(r, color)
             # h = 8
             # r = QRect(rect.left(), rect.top() + rect.height() - h, int(w), h)
-            # r = QRect(rect.left()+48, rect.top(), rect.width()-48, rect.height())
-            # painter.setFont(self.font)
-            # shiftopt = QStyleOptionViewItem(option)
-            # shiftopt.rect = r
-            # painter.setPen(Qt.darkBlue)
-            # painter.drawText(rect.left() + 2, rect.top() + 4, '%7.2f' % value)
-        super(LayerWidgetDelegate, self).paint(painter, option, index)
+        r = QRect(rect.left(), rect.top(), rect.width(), rect.height()-18)
+        shiftopt = QStyleOptionViewItem(option)
+        shiftopt.rect = r
+        super(LayerWidgetDelegate, self).paint(painter, shiftopt, index)
+
+        if value:
+            painter.setFont(self.font)
+            painter.setPen(Qt.darkBlue)
+            theight = 17
+            t = rect.top() + rect.height() - theight
+            if w < 48:
+                l = int(w)
+                r = rect.width()
+                align = Qt.AlignLeft
+            else:
+                l = 0
+                r = w
+                align = Qt.AlignRight
+            painter.drawText(l, t, r-l, theight, align, '%.2f' % value)
 
         #QtGui.QStyledItemDelegate.paint(self, painter, option, index)
         painter.restore()
@@ -474,9 +486,9 @@ class LayerStackListViewModel(QAbstractListModel):
             lao = self.doc.layer_animation_order(row)
             name = info[INFO.NAME]
             # return  ('[-]  ' if lao is None else '[{}]'.format(lao+1)) + el[row]['name']
-            if leroy:
-                data = '[%.2f] ' % leroy[0]
-                return data + name
+            # if leroy:
+            #     data = '[%.2f] ' % leroy[0]
+            #     return data + name
             return name
         return None
 
