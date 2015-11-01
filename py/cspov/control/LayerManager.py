@@ -17,12 +17,14 @@ __author__ = 'evas'
 __docformat__ = 'reStructuredText'
 
 import logging
-from PyQt4.QtCore import SIGNAL, QObject
-from PyQt4.QtGui import QWidget, QListView, QGridLayout, QLabel, QScrollArea, QLayout
+from PyQt4.QtCore import SIGNAL, QObject, Qt
+from PyQt4.QtGui import QWidget, QListView, QGridLayout, QLabel, QScrollArea, QLayout, QTextDocument
+from PyQt4.QtWebKit import QWebView
 from cspov.model.guidebook import GUIDE
 from cspov.common import INFO, KIND
 from cspov.control.layer_list import LayerStackListViewModel
 import numpy as np
+from cspov.view.Colormap import ALL_COLORMAPS
 
 LOG = logging.getLogger(__name__)
 
@@ -161,6 +163,10 @@ class SingleLayerInfoDisplay (QWidget) :
         self.band_text = QLabel("")
         self.colormap_text = QLabel("")
         self.clims_text = QLabel("")
+        self.cmap_vis = QWebView()
+        self.cmap_vis.setMaximumHeight(30)
+        self.cmap_vis.setMaximumWidth(3 * 100)
+        self.cmap_vis.page().mainFrame().setScrollBarPolicy(Qt.Vertical, Qt.ScrollBarAlwaysOff)
 
         # set the layout
         # Note: add in a grid is (widget, row#, col#) or (widget, row#, col#, row_span, col_span)
@@ -171,6 +177,7 @@ class SingleLayerInfoDisplay (QWidget) :
         layout.addWidget(self.band_text,       4, 1)
         layout.addWidget(self.colormap_text,   5, 1)
         layout.addWidget(self.clims_text,      6, 1)
+        layout.addWidget(self.cmap_vis, 7, 1)
         parent.setLayout(layout)
 
         # TODO put the informational text into an area with scroll bars so it won't force the sidebar size minimum
@@ -193,6 +200,7 @@ class SingleLayerInfoDisplay (QWidget) :
             self.band_text.setText("Band: ")
             self.colormap_text.setText("Colormap: ")
             self.clims_text.setText("C-Limits: ")
+            self.cmap_vis.setHtml("")
 
         # otherwise display information on the selected layer(s)
         else :
@@ -226,7 +234,7 @@ class SingleLayerInfoDisplay (QWidget) :
                     shared_info[GUIDE.DISPLAY_TIME] = "" if shared_info[GUIDE.DISPLAY_TIME] != new_time else new_time
 
                 # instrument
-                new_inst = str(layer_info[GUIDE.INSTRUMENT]) if GUIDE.INSTRUMENT in layer_info else ""
+                new_inst = str(layer_info[GUIDE.INSTRUMENT].value) if GUIDE.INSTRUMENT in layer_info else ""
                 if GUIDE.INSTRUMENT not in shared_info :
                     shared_info[GUIDE.INSTRUMENT] = new_inst
                 else :
@@ -251,11 +259,18 @@ class SingleLayerInfoDisplay (QWidget) :
                 if this_prez is not None:
                     new_clims = np.array(this_prez.climits)
                     unit, new_clims = self.document.convert_units(this_prez.uuid, new_clims, inverse=False)
-                    new_clims = '%s ~ %s%s' % (new_clims[0], new_clims[1], unit)
+                    new_clims = '{:.3f} ~ {:.3f}{}'.format(new_clims[0], new_clims[1], unit)
                 if "climits" not in shared_info :
                     shared_info["climits"] = new_clims
                 else :
                     shared_info["climits"] = "" if shared_info["climits"] != new_clims else new_clims
+
+                # color map
+                cmap = this_prez.colormap if this_prez is not None else None
+                if "colormap" not in shared_info:
+                    shared_info["colormap"] = cmap
+                else:
+                    shared_info["colormap"] = None if shared_info["colormap"] != cmap else cmap
 
             #print("*** layer info: " + str(layer_info))
             # *** layer info: {
@@ -308,3 +323,12 @@ class SingleLayerInfoDisplay (QWidget) :
             self.colormap_text.setText("Colormap: " + temp_cmap)
             temp_clims = shared_info["climits"] if "climits" in shared_info else ""
             self.clims_text.setText("C-Limits: " + temp_clims)
+
+            # format colormap
+            if shared_info.get("colormap", None) is None:
+                self.cmap_vis.setHtml("")
+            else:
+                cmap_html = ALL_COLORMAPS[shared_info["colormap"]]._repr_html_()
+                cmap_html = cmap_html.replace("height", "border-collapse: collapse;\nheight")
+                self.cmap_vis.setHtml("""<html><head></head><body style="margin: 0px"><div>%s</div></body></html>""" % (cmap_html,))
+
