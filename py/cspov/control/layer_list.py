@@ -242,6 +242,7 @@ class LayerStackListViewModel(QAbstractListModel):
         # listbox.setMovement(QListView.Snap)
         # listbox.setDragDropMode(QListView.InternalMove)
         listbox.setDragDropMode(QAbstractItemView.DragDrop)
+        listbox.setAlternatingRowColors(True)
         # listbox.setDefaultDropAction(Qt.MoveAction)
         # listbox.setDragDropOverwriteMode(False)
         # listbox.entered.connect(self.layer_entered)
