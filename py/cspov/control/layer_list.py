@@ -238,10 +238,11 @@ class LayerStackListViewModel(QAbstractListModel):
         # listbox.setFont(QFont('Andale Mono', 13))
 
         # the various signals that may result from the user changing the selections
-        listbox.activated.connect(self.changedSelection)
-        listbox.clicked.connect(self.changedSelection)
-        listbox.doubleClicked.connect(self.changedSelection)
-        listbox.pressed.connect(self.changedSelection)
+        # listbox.activated.connect(self.changedSelection)
+        # listbox.clicked.connect(self.changedSelection)
+        # listbox.doubleClicked.connect(self.changedSelection)
+        # listbox.pressed.connect(self.changedSelection)
+        listbox.selectionModel().selectionChanged.connect(self.changedSelection)
 
         self.widgets.append(listbox)
 
@@ -251,7 +252,7 @@ class LayerStackListViewModel(QAbstractListModel):
     def supportedDropActions(self):
         return Qt.MoveAction # | Qt.CopyAction
 
-    def changedSelection(self, index) :
+    def changedSelection(self, *args) :
         """connected to the various listbox signals that represent the user changing selections
         """
         selected_uuids = list(self.current_selected_uuids(self.current_set_listbox))
@@ -285,6 +286,7 @@ class LayerStackListViewModel(QAbstractListModel):
 
         # this is an ugly way to make sure the selection stays current
         self.changedSelection(None)
+        self.current_set_listbox.update()
 
     def current_selected_uuids(self, lbox:QListView=None):
         lbox = self.current_set_listbox if lbox is None else lbox

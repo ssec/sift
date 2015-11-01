@@ -223,10 +223,10 @@ class Main(QtGui.QMainWindow):
             self._recent_files_menu.addAction(open_action)
 
     def update_progress_bar(self, status_info, *args, **kwargs):
-        active = status_info[0]
+        active = status_info[0] if len(status_info)>0 else None
         LOG.debug('{0!r:s}'.format(status_info))
-        val = active[TASK_PROGRESS]
-        txt = active[TASK_DOING]
+        val = active[TASK_PROGRESS] if active else 0.0
+        txt = active[TASK_DOING] if active else ''
         val = self.queue.progress_ratio(val)
         self.ui.progressBar.setValue(int(val*PROGRESS_BAR_MAX))
         self.ui.progressText.setText(txt)
