@@ -74,12 +74,12 @@ class LayerWidgetDelegate(QStyledItemDelegate):
 
         # add an equalizer bar
         # painter.setPen(QPen(Qt.blue))
-        color = QColor(64, 255, 64, 64)
+        color = QColor(64, 24, 255, 64)
         painter.setPen(QPen(color))
         value = index.data(Qt.UserRole)
         rect = option.rect
         if value:
-            value, bar = value
+            value, bar, unit = value
             w = bar * float(rect.width())
             # h = 4
             # r = QRect(rect.left(), rect.top() + rect.height() - h, int(w), h)
@@ -87,10 +87,13 @@ class LayerWidgetDelegate(QStyledItemDelegate):
             painter.fillRect(r, color)
             # h = 8
             # r = QRect(rect.left(), rect.top() + rect.height() - h, int(w), h)
-        r = QRect(rect.left(), rect.top(), rect.width(), rect.height()-18)
-        shiftopt = QStyleOptionViewItem(option)
-        shiftopt.rect = r
-        super(LayerWidgetDelegate, self).paint(painter, shiftopt, index)
+            # r = QRect(rect.left()+48, rect.top(), rect.width()-48, rect.height())
+            # painter.setFont(self.font)
+            # shiftopt = QStyleOptionViewItem(option)
+            # shiftopt.rect = r
+            # painter.setPen(Qt.darkBlue)
+            # painter.drawText(rect.left() + 2, rect.top() + 4, '%7.2f' % value)
+        super(LayerWidgetDelegate, self).paint(painter, option, index)
 
         if value:
             painter.setFont(self.font)
@@ -482,7 +485,7 @@ class LayerStackListViewModel(QAbstractListModel):
         elif role == Qt.ToolTipRole:
             if not leroy:
                 return None
-            value, normalized = leroy
+            value, normalized = leroy[:2]
             return str(value)
         elif role == Qt.DisplayRole:
             lao = self.doc.layer_animation_order(row)
