@@ -78,7 +78,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
         painter.setPen(QPen(color))
         value = index.data(Qt.UserRole)
         if value:
-            value, bar = value
+            value, bar, unit = value
             rect = option.rect
             w = bar * float(rect.width())
             # h = 4
@@ -470,14 +470,14 @@ class LayerStackListViewModel(QAbstractListModel):
         elif role == Qt.ToolTipRole:
             if not leroy:
                 return None
-            value, normalized = leroy
+            value, normalized = leroy[:2]
             return str(value)
         elif role == Qt.DisplayRole:
             lao = self.doc.layer_animation_order(row)
             name = info[INFO.NAME]
             # return  ('[-]  ' if lao is None else '[{}]'.format(lao+1)) + el[row]['name']
             if leroy:
-                data = '[%.2f] ' % leroy[0]
+                data = '[%.2f%s] ' % (leroy[0], leroy[2])
                 return data + name
             return name
         return None
