@@ -58,6 +58,9 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     def sizeHint(self, option:QStyleOptionViewItem, index:QModelIndex):
         return QSize(100,36)
 
+    def displayText(self, *args, **kwargs):
+        return None
+
     def paint(self, painter, option, index):
         painter.save()
         # shiftopt = QStyleOptionViewItem(option)
@@ -77,6 +80,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
         color = QColor(64, 24, 255, 64)
         painter.setPen(QPen(color))
         value = index.data(Qt.UserRole)
+        text = index.data(Qt.DisplayRole)
         rect = option.rect
         if value:
             value, bar, unit = value
@@ -95,13 +99,16 @@ class LayerWidgetDelegate(QStyledItemDelegate):
             # painter.drawText(rect.left() + 2, rect.top() + 4, '%7.2f' % value)
         super(LayerWidgetDelegate, self).paint(painter, option, index)
 
+        painter.setPen(QPen(Qt.black))
+        painter.drawText(rect.left() + 32, rect.top()+4, rect.width()-32, 16, Qt.AlignLeft, text)
+
         if value:
             painter.setFont(self.font)
             painter.setPen(Qt.darkBlue)
             theight = 17
             t = rect.top() + rect.height() - theight
             if w < 48:
-                l = int(w)
+                l = max(int(w), 32)
                 r = rect.width()
                 align = Qt.AlignLeft
             else:
