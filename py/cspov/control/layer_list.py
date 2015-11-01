@@ -273,6 +273,7 @@ class LayerStackListViewModel(QAbstractListModel):
 
         # this is an ugly way to make sure the selection stays current
         self.changedSelection(None)
+        self.current_set_listbox.update()
 
     def current_selected_uuids(self, lbox:QListView=None):
         lbox = self.current_set_listbox if lbox is None else lbox
