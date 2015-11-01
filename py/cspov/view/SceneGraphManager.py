@@ -30,7 +30,7 @@ from vispy.util.keys import SHIFT
 from vispy.visuals.transforms import STTransform, MatrixTransform
 from vispy.visuals import MarkersVisual, marker_types, LineVisual
 from vispy.scene.visuals import Markers, Polygon, Compound, Line
-from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND, DEFAULT_PROJECTION
+from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND, TOOL, DEFAULT_PROJECTION
 # from cspov.control.layer_list import LayerStackListViewModel
 from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
 from cspov.view.MapWidget import CspovMainMapCanvas
@@ -39,7 +39,8 @@ from cspov.view.Colormap import ALL_COLORMAPS
 from cspov.model.document import prez
 from cspov.queue import TASK_DOING, TASK_PROGRESS
 
-from PyQt4.QtCore import QObject, pyqtSignal
+from PyQt4.QtCore import QObject, pyqtSignal, Qt
+from PyQt4.QtGui import QCursor, QPixmap
 import numpy as np
 from uuid import UUID
 from pyproj import Proj
@@ -353,6 +354,7 @@ class SceneGraphManager(QObject):
         self.colormaps = {}
         self.colormaps.update(ALL_COLORMAPS)
         self.layer_set = LayerSet(self, frame_change_cb=self.frame_changed)
+        self._current_tool = None
 
         self.set_document(self.document)
 
@@ -395,26 +397,14 @@ class SceneGraphManager(QObject):
         self.main_view = self.main_canvas.central_widget.add_view()
 
         # Camera Setup
-        self.pz_camera = PanZoomProbeCamera(name="pz_camera", aspect=1, pan_limits=(-1., -1., 1., 1.), zoom_limits=(0.0015, 0.0015))
+        self.pz_camera = PanZoomProbeCamera(name=TOOL.PAN_ZOOM, aspect=1, pan_limits=(-1., -1., 1., 1.), zoom_limits=(0.0015, 0.0015))
         self.main_view.camera = self.pz_camera
-
         self.main_view.camera.flip = (False, False, False)
-
-        # FIXME: These cameras are no longer needed
-        # Point Probe Mode/Camera
-        self.point_probe_camera = self.pz_camera
-        # self.point_probe_camera = ProbeCamera(name="point_probe_camera", aspect=1)
-        # self.main_view.camera.link(self.point_probe_camera)
-
-        # Polygon Probe Mode/Camera
-        self.polygon_probe_camera = self.pz_camera
-        # self.polygon_probe_camera = ProbeCamera(name="polygon_probe_camera", aspect=1)
-        # self.main_view.camera.link(self.polygon_probe_camera)
-
-        self._cameras = dict((c.name, c) for c in [self.main_view.camera, self.point_probe_camera, self.polygon_probe_camera])
-        self._camera_names = [self.pz_camera.name, self.point_probe_camera.name, self.polygon_probe_camera.name]
-
-        self.main_view.events.mouse_press.connect(self.on_mouse_press, after=list(self.main_view.events.mouse_press.callbacks))
+        # self.main_view.events.mouse_press.connect(self.on_mouse_press_point, after=list(self.main_view.events.mouse_press.callbacks))
+        # self.main_view.events.mouse_press.connect(self.on_mouse_press_region, after=list(self.main_view.events.mouse_press.callbacks))
+        self.main_view.events.mouse_press.connect(self.on_mouse_press_point)
+        self.main_view.events.mouse_press.connect(self.on_mouse_press_region)
+        self.change_tool(TOOL.PAN_ZOOM)
 
         # Head node of the map graph
         self.main_map = MainMap(name="MainMap", parent=self.main_view.scene)
@@ -488,12 +478,13 @@ class SceneGraphManager(QObject):
 
         return Line(pos=points2, connect="segments", color=color, parent=self.main_map)
 
-    def on_mouse_press(self, event):
+    def on_mouse_press_point(self, event):
+        """Handle mouse events that mean we are using the point probe.
+        """
         if event.handled:
             return
-        # What does this mouse press mean?
         modifiers = event.mouse_event.modifiers
-        if event.button == 2 and not modifiers:
+        if (event.button == 2 and not modifiers) or (self._current_tool == TOOL.POINT_PROBE and event.button == 1):
             buffer_pos = event.sources[0].transforms.get_transform().map(event.pos)
             # FIXME: We should be able to use the main_map object to do the transform...but it doesn't work (waiting on vispy developers)
             # map_pos = self.main_map.transforms.get_transform().imap(buffer_pos)
@@ -503,7 +494,14 @@ class SceneGraphManager(QObject):
             self.newProbePoint.emit(self.layer_set.top_layer_uuid(), map_pos[:2])
             # FIXME: Move to Document (can include Z if you want, but default is fine)
             self.on_point_probe_set("default_probe_name", map_pos[:2])
-        elif event.button == 2 and modifiers == (SHIFT,):
+
+    def on_mouse_press_region(self, event):
+        """Handle mouse events that mean we are using the point probe.
+        """
+        if event.handled:
+            return
+        modifiers = event.mouse_event.modifiers
+        if (event.button == 2 and modifiers == (SHIFT,)) or (self._current_tool == TOOL.REGION_PROBE and event.button == 1):
             buffer_pos = event.sources[0].transforms.get_transform().map(event.pos)
             map_pos = self.borders.transforms.get_transform().imap(buffer_pos)
             if self.pending_polygon.add_point(event.pos[:2], map_pos[:2], 60):
@@ -514,8 +512,6 @@ class SceneGraphManager(QObject):
                 # Reset the pending polygon object
                 self.pending_polygon.reset()
                 self.newProbePolygon.emit(self.layer_set.top_layer_uuid(), points)
-        else:
-            LOG.error("I don't know how to handle this camera for a mouse press")
 
     def on_point_probe_set(self, probe_name, xy_pos, **kwargs):
         z = float(kwargs.get("z", 60))
@@ -567,19 +563,42 @@ class SceneGraphManager(QObject):
             self.latlon_grid.set_data(color=self._color_choices[self._latlon_grid_color_idx])
             self.latlon_grid.visible = True
 
-    def change_camera(self, idx_or_name):
-        if isinstance(idx_or_name, str):
-            camera = self._cameras[idx_or_name]
-        else:
-            camera = self._cameras[self._camera_names[idx_or_name]]
+    def change_tool(self, name):
+        prev_tool = self._current_tool
+        if name == prev_tool:
+            # it's the same tool
+            return
 
-        print("Changing camera to ", camera)
-        self.main_view.camera = camera
+        self._current_tool = name
 
-    def next_camera(self):
+        # Set the cursor
+        if name == TOOL.PAN_ZOOM:
+            # self.main_canvas.native.setCursor(QCursor(QPixmap("py/cspov/ui/cursors/noun_275_cc.png")))
+            # self.main_canvas.native.setCursor(QCursor(Qt.SizeAllCursor))
+            self.main_canvas.native.setCursor(QCursor(Qt.OpenHandCursor))
+        elif name == TOOL.POINT_PROBE:
+            self.main_canvas.native.setCursor(QCursor(Qt.PointingHandCursor))
+        elif name == TOOL.REGION_PROBE:
+            self.main_canvas.native.setCursor(QCursor(Qt.CrossCursor))
+
+        # disconnect the previous signals (if needed)
+        if prev_tool == TOOL.PAN_ZOOM:
+            self.main_view.events.mouse_press.disconnect(self.pz_camera.viewbox_mouse_event)
+            self.main_view.events.mouse_release.disconnect(self.pz_camera.viewbox_mouse_event)
+            self.main_view.events.mouse_move.disconnect(self.pz_camera.viewbox_mouse_event)
+
+        # connect the new signals (if needed)
+        if name == TOOL.PAN_ZOOM:
+            self.main_view.events.mouse_press.connect(self.pz_camera.viewbox_mouse_event)
+            self.main_view.events.mouse_release.connect(self.pz_camera.viewbox_mouse_event)
+            self.main_view.events.mouse_move.connect(self.pz_camera.viewbox_mouse_event)
+
+        LOG.info("Changing tool to '%s'", name)
+
+    def next_tool(self):
         idx = self._camera_names.index(self.main_view.camera.name)
         idx = (idx + 1) % len(self._camera_names)
-        self.change_camera(idx)
+        self.change_tool(idx)
 
     def _find_colormap(self, colormap):
         if isinstance(colormap, str) and colormap in self.colormaps:

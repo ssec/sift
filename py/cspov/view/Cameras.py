@@ -59,6 +59,30 @@ class PanZoomProbeCamera(PanZoomCamera):
         self._zoom_limits = kwargs.pop("zoom_limits", (0.001, 0.001))
         super(PanZoomProbeCamera, self).__init__(*args, **kwargs)
 
+    def _viewbox_set(self, viewbox):
+        """ Friend method of viewbox to register itself.
+        """
+        self._viewbox = viewbox
+        # Connect
+        viewbox.events.mouse_press.connect(self.viewbox_mouse_event)
+        viewbox.events.mouse_release.connect(self.viewbox_mouse_event)
+        viewbox.events.mouse_move.connect(self.viewbox_mouse_event)
+        viewbox.events.mouse_wheel.connect(self.viewbox_mouse_event)
+        viewbox.events.resize.connect(self.viewbox_resize_event)
+        # todo: also add key events! (and also on viewbox (they're missing)
+
+    def _viewbox_unset(self, viewbox):
+        """ Friend method of viewbox to unregister itself.
+        """
+        self._viewbox = None
+        # Disconnect
+        viewbox.events.mouse_press.disconnect(self.viewbox_mouse_event)
+        viewbox.events.mouse_release.disconnect(self.viewbox_mouse_event)
+        viewbox.events.mouse_move.disconnect(self.viewbox_mouse_event)
+        viewbox.events.mouse_wheel.disconnect(self.viewbox_mouse_event)
+        viewbox.events.resize.disconnect(self.viewbox_resize_event)
+
+
     @property
     def rect(self):
         """ The rectangular border of the ViewBox visible area, expressed in
