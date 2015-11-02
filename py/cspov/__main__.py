@@ -29,7 +29,7 @@ except Exception:
 QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
 
-from cspov.control.layer_list import LayerStackListViewModel
+import cspov.ui.open_cache_dialog_ui as open_cache_dialog_ui
 from cspov.control.LayerManager import LayerSetsManager
 from cspov.model import Document
 from cspov.view.SceneGraphManager import SceneGraphManager
@@ -79,6 +79,55 @@ def test_layers(ws, doc, glob_pattern=None):
         return test_layers_from_directory(ws, doc, glob_pattern, os.environ.get('RANGE', None))
     LOG.warning("No image glob pattern provided")
     return []
+
+class OpenCacheDialog(QtGui.QWidget):
+    _paths = None
+    _opener = None
+    _remover = None
+
+    def __init__(self):
+        super(OpenCacheDialog, self).__init__()
+        self.ui = open_cache_dialog_ui.Ui_openFromCacheDialog()
+        self.ui.setupUi(self)
+        self.ui.cacheListWidget.setSelectionMode(QtGui.QListWidget.ExtendedSelection)
+        self.ui.removeFromCacheButton.clicked.connect(self._do_remove)
+
+    def activate(self, paths, opener, remover):
+        self._opener = opener
+        self._remover = remover
+        pfx = _common_path_prefix(paths)
+        lpfx = len(pfx)
+        self._paths = {}
+        self.ui.cacheListWidget.clear()
+        for path in paths:
+            key = path[lpfx:].strip(os.sep)
+            li = QtGui.QListWidgetItem(key)
+            self.ui.cacheListWidget.addItem(li)
+            self._paths[key] = path
+        self.show()
+
+    def _do_remove(self, *args, **kwargs):
+        items = list(self.ui.cacheListWidget.selectedItems())
+        to_remove = [self._paths[x.text()] for x in items]
+        for item in items:
+            self.ui.cacheListWidget.removeItemWidget(item)
+        self._remover(to_remove)
+        self.hide()
+        self._doc = self._ws = self._opener = self._paths = None
+
+    def accept(self, *args, **kwargs):
+        self.hide()
+        to_open = [self._paths[x.text()] for x in self.ui.cacheListWidget.selectedItems()]
+        LOG.info("opening from cache: " + repr(to_open))
+        self._opener(to_open)
+        self._doc = self._ws = self._opener = self._paths = None
+
+    def reject(self, *args, **kwargs):
+        self.hide()
+        self._doc = self._ws = self._opener = self._paths = None
+
+
+
 
 class AnimationSpeedPopupWindow(QtGui.QWidget):
     _slider = None
@@ -171,13 +220,15 @@ class Main(QtGui.QMainWindow):
     _last_open_dir = None  # directory to open files in
     _recent_files_menu = None # QMenu
     _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
+    _open_cache_dialog = None
 
-    def open_files(self):
+    def open_files(self, files=None, *args, **kwargs):
         self.scene_manager.layer_set.animating = False
-        files = QtGui.QFileDialog.getOpenFileNames(self,
-                                                   "Select one or more files to open",
-                                                   self._last_open_dir or os.getenv("HOME"),
-                                                   'Mercator GeoTIFF (*.tiff *.tif)')
+        if files is None:
+            files = QtGui.QFileDialog.getOpenFileNames(self,
+                                                       "Select one or more files to open",
+                                                       self._last_open_dir or os.getenv("HOME"),
+                                                       'Mercator GeoTIFF (*.tiff *.tif)')
         files = list(files)
         if not files:
             return
@@ -210,7 +261,7 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.change_tool(name)
 
     def update_recent_file_menu(self, *args, **kwargs):
-        paths = self.workspace.paths_in_cache
+        paths = self.workspace.recently_used_cache_paths()
         paths = self.document.sort_paths(paths)
         LOG.debug('recent files: {0!r:s}'.format(paths))
         self._recent_files_menu.clear()
@@ -486,6 +537,12 @@ class Main(QtGui.QMainWindow):
         new_state = self.scene_manager.layer_set.toggle_animation()
         self.ui.animPlayPause.setChecked(new_state)
 
+    def open_from_cache(self, *args, **kwargs):
+        if not self._open_cache_dialog:
+            self._open_cache_dialog = OpenCacheDialog()
+        paths = self.document.sort_paths(self.workspace.paths_in_cache)
+        self._open_cache_dialog.activate(paths, self.open_files, self.workspace.remove_paths_from_cache)
+
     def remove_region_polygon(self, action:QtGui.QAction=None, *args):
         if self.scene_manager.has_pending_polygon():
             print("Clearing pending")
@@ -498,17 +555,22 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.remove_polygon(removed_name)
 
     def setup_menu(self):
-        open_action = QtGui.QAction("&Open", self)
+        open_action = QtGui.QAction("&Open...", self)
         open_action.setShortcut("Ctrl+O")
         open_action.triggered.connect(self.open_files)
 
         exit_action = QtGui.QAction("&Exit", self)
         exit_action.setShortcut("Ctrl+Q")
         exit_action.triggered.connect(QtGui.qApp.quit)
+        
+        open_cache_action = QtGui.QAction("Open from Cache...", self)
+        open_cache_action.setShortcut("Ctrl+A")
+        open_cache_action.triggered.connect(self.open_from_cache)
 
         menubar = self.ui.menubar
         file_menu = menubar.addMenu('&File')
         file_menu.addAction(open_action)
+        file_menu.addAction(open_cache_action)
         self._recent_files_menu = file_menu.addMenu('Open Recent')
         file_menu.addAction(exit_action)
 
