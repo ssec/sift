@@ -95,15 +95,16 @@ class OpenCacheDialog(QtGui.QWidget):
     def activate(self, paths, opener, remover):
         self._opener = opener
         self._remover = remover
-        pfx = _common_path_prefix(paths)
-        lpfx = len(pfx)
-        self._paths = {}
         self.ui.cacheListWidget.clear()
-        for path in paths:
-            key = path[lpfx:].strip(os.sep)
-            li = QtGui.QListWidgetItem(key)
-            self.ui.cacheListWidget.addItem(li)
-            self._paths[key] = path
+        if paths:
+            pfx = _common_path_prefix(paths)
+            lpfx = len(pfx)
+            self._paths = {}
+            for path in paths:
+                key = path[lpfx:].strip(os.sep)
+                li = QtGui.QListWidgetItem(key)
+                self.ui.cacheListWidget.addItem(li)
+                self._paths[key] = path
         self.show()
 
     def _do_remove(self, *args, **kwargs):
