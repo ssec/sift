@@ -539,10 +539,6 @@ class Main(QtGui.QMainWindow):
         flip_colormap.setShortcut("/")
         flip_colormap.triggered.connect(lambda: self.document.flip_climits_for_layers([self.document.current_visible_layer]))
 
-        remove = QtGui.QAction("Remove Layer", self)
-        remove.setShortcut(QtCore.Qt.Key_Delete)
-        remove.triggered.connect(self.remove_layer)
-
         cycle_borders = QtGui.QAction("Cycle &Borders", self)
         cycle_borders.setShortcut('B')
         cycle_borders.triggered.connect(self.scene_manager.cycle_borders_color)
@@ -551,8 +547,17 @@ class Main(QtGui.QMainWindow):
         cycle_grid.setShortcut('L')
         cycle_grid.triggered.connect(self.scene_manager.cycle_grid_color)
 
+        remove = QtGui.QAction("Remove Layer", self)
+        remove.setShortcut(QtCore.Qt.Key_Delete)
+        remove.triggered.connect(self.remove_layer)
+
+        clear = QtGui.QAction("Clear Pending Polygon", self)
+        clear.setShortcut(QtCore.Qt.Key_Escape)
+        clear.triggered.connect(self.scene_manager.clear_pending_polygon)
+
         edit_menu = menubar.addMenu('&Edit')
         edit_menu.addAction(remove)
+        edit_menu.addAction(clear)
 
         view_menu = menubar.addMenu('&View')
         view_menu.addAction(animate)
