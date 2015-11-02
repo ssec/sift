@@ -350,7 +350,7 @@ class Workspace(QObject):
         cache.sort()
         return inv, cache, total_size
 
-    def recently_used_cache_paths(self, n=20):
+    def recently_used_cache_paths(self, n=32):
         inv, cache, total_size = self._inventory_check()
         self._inventory = inv
         self._store_inventory()
