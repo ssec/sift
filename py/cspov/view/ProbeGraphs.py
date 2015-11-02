@@ -105,7 +105,7 @@ class ProbeGraphManager (QObject) :
         self.tab_widget_object.insertTab(tab_index, temp_widget, self.max_tab_letter)
 
         # create the associated graph display object
-        graph = ProbeGraphDisplay(self, temp_widget, self.workspace, self.queue, self.max_tab_letter)
+        graph = ProbeGraphDisplay(self, temp_widget, self.workspace, self.queue, self.document, self.max_tab_letter)
         self.graphs.append(graph)
 
         # load up the layers for this new tab
@@ -205,6 +205,7 @@ class ProbeGraphDisplay (object) :
     manager         = None
     workspace       = None
     queue           = None
+    document        = None
 
     # internal values that control the behavior of plotting and controls
     xSelectedUUID   = None
@@ -212,7 +213,7 @@ class ProbeGraphDisplay (object) :
     uuidMap         = None  # this is needed because the drop downs can't properly handle objects as ids
     _stale          = True  # whether or not the plot needs to be redrawn
 
-    def __init__(self, manager, qt_parent, workspace, queue, name_str):
+    def __init__(self, manager, qt_parent, workspace, queue, document, name_str):
         """build the graph tab controls
         :return:
         """
@@ -224,6 +225,7 @@ class ProbeGraphDisplay (object) :
         self.manager = manager
         self.workspace = workspace
         self.queue = queue
+        self.document = document
 
         # a figure instance to plot on
         self.figure = Figure(figsize=(3,3), dpi=72)
@@ -433,6 +435,7 @@ class ProbeGraphDisplay (object) :
 
             # get the data and info we need for this plot
             data_polygon = self.workspace.get_content_polygon(x_uuid, polygon)
+            fmt, units, data_polygon = self.document.convert_units(x_uuid, data_polygon)
             title = self.workspace.get_info(x_uuid)[INFO.NAME]
 
             # plot a histogram
@@ -448,15 +451,18 @@ class ProbeGraphDisplay (object) :
             name2 = self.workspace.get_info(y_uuid)[INFO.NAME]
             hires_uuid = self.workspace.lowest_resolution_uuid(x_uuid, y_uuid)
             hires_coord_mask, hires_data = self.workspace.get_coordinate_mask_polygon(hires_uuid, polygon)
+            _, _, hires_data = self.document.convert_units(hires_uuid, hires_data)
             yield {TASK_DOING: 'Probe Plot: Collecting polygon data (layer 2)...', TASK_PROGRESS: 0.15}
             if hires_uuid is x_uuid:
                 # the hires data was from the X UUID
                 data1 = hires_data
                 data2 = self.workspace.get_content_coordinate_mask(y_uuid, hires_coord_mask)
+                _, _, data2 = self.document.convert_units(y_uuid, data2)
             else:
                 # the hires data was from the Y UUID
                 data2 = hires_data
                 data1 = self.workspace.get_content_coordinate_mask(x_uuid, hires_coord_mask)
+                _, _, data1 = self.document.convert_units(x_uuid, data1)
             yield {TASK_DOING: 'Probe Plot: Creating scatter plot...', TASK_PROGRESS: 0.25}
 
             # plot a scatter plot
