@@ -98,6 +98,7 @@ class OpenCacheDialog(QtGui.QWidget):
         self.ui.cacheListWidget.clear()
         if paths:
             pfx = _common_path_prefix(paths)
+            self.ui.commonPathLabel.setText("Common prefix: " + pfx)
             lpfx = len(pfx)
             self._paths = {}
             for path in paths:

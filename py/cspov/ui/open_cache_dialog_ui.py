@@ -25,7 +25,7 @@ except AttributeError:
 class Ui_openFromCacheDialog(object):
     def setupUi(self, openFromCacheDialog):
         openFromCacheDialog.setObjectName(_fromUtf8("openFromCacheDialog"))
-        openFromCacheDialog.resize(593, 417)
+        openFromCacheDialog.resize(593, 427)
         self.verticalLayout = QtGui.QVBoxLayout(openFromCacheDialog)
         self.verticalLayout.setObjectName(_fromUtf8("verticalLayout"))
         self.horizontalLayout = QtGui.QHBoxLayout()
@@ -39,6 +39,9 @@ class Ui_openFromCacheDialog(object):
         self.removeFromCacheButton.setObjectName(_fromUtf8("removeFromCacheButton"))
         self.horizontalLayout.addWidget(self.removeFromCacheButton)
         self.verticalLayout.addLayout(self.horizontalLayout)
+        self.commonPathLabel = QtGui.QLabel(openFromCacheDialog)
+        self.commonPathLabel.setObjectName(_fromUtf8("commonPathLabel"))
+        self.verticalLayout.addWidget(self.commonPathLabel)
         self.cacheListWidget = QtGui.QListWidget(openFromCacheDialog)
         self.cacheListWidget.setMinimumSize(QtCore.QSize(400, 300))
         self.cacheListWidget.setObjectName(_fromUtf8("cacheListWidget"))
@@ -57,5 +60,6 @@ class Ui_openFromCacheDialog(object):
     def retranslateUi(self, openFromCacheDialog):
         openFromCacheDialog.setWindowTitle(_translate("openFromCacheDialog", "Open Cached Layers", None))
         self.label.setText(_translate("openFromCacheDialog", "Pre-processed layers stored in cache will load quickly.", None))
-        self.removeFromCacheButton.setText(_translate("openFromCacheDialog", "Remove Selected Files", None))
+        self.removeFromCacheButton.setText(_translate("openFromCacheDialog", "Remove Selected Cached Layers", None))
+        self.commonPathLabel.setText(_translate("openFromCacheDialog", "/", None))
 
