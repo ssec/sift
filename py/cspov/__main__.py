@@ -551,7 +551,7 @@ class Main(QtGui.QMainWindow):
         remove.setShortcut(QtCore.Qt.Key_Delete)
         remove.triggered.connect(self.remove_layer)
 
-        clear = QtGui.QAction("Clear Pending Polygon", self)
+        clear = QtGui.QAction("Clear Region Selection", self)
         clear.setShortcut(QtCore.Qt.Key_Escape)
         clear.triggered.connect(self.scene_manager.clear_pending_polygon)
 
