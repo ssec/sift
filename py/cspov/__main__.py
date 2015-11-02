@@ -513,11 +513,11 @@ class Main(QtGui.QMainWindow):
 
         next_band = QtGui.QAction("Next Band", self)
         next_band.setShortcut(QtCore.Qt.Key_Up)
-        next_band.triggered.connect(partial(self.next_last_band, direction=1))
+        next_band.triggered.connect(partial(self.next_last_band, direction=-1))
 
         prev_band = QtGui.QAction("Previous Band", self)
         prev_band.setShortcut(QtCore.Qt.Key_Down)
-        prev_band.triggered.connect(partial(self.next_last_band, direction=-1))
+        prev_band.triggered.connect(partial(self.next_last_band, direction=1))
 
         toggle_vis = QtGui.QAction("Toggle &Visibility", self)
         toggle_vis.setShortcut('V')
