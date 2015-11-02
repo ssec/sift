@@ -22,6 +22,7 @@ from PyQt4.QtGui import QWidget, QListView, QGridLayout, QLabel, QScrollArea, QL
 from cspov.model.guidebook import GUIDE
 from cspov.common import INFO, KIND
 from cspov.control.layer_list import LayerStackListViewModel
+import numpy as np
 
 LOG = logging.getLogger(__name__)
 
@@ -246,7 +247,11 @@ class SingleLayerInfoDisplay (QWidget) :
                     shared_info["colormap"] = "" if shared_info["colormap"] != new_cmap else new_cmap
 
                 # c-limits
-                new_clims = str(this_prez.climits) if this_prez is not None else ""
+                new_clims = ""
+                if this_prez is not None:
+                    new_clims = np.array(this_prez.climits)
+                    unit, new_clims = self.document.convert_units(this_prez.uuid, new_clims, inverse=False)
+                    new_clims = '%s ~ %s%s' % (new_clims[0], new_clims[1], unit)
                 if "climits" not in shared_info :
                     shared_info["climits"] = new_clims
                 else :

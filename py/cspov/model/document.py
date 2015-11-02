@@ -145,6 +145,7 @@ class Document(QObject):
     didSwitchLayerSet = pyqtSignal(int, list, list)  # new layerset number typically 0..3, list of prez tuples representing new display order, new animation order
     didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
+    didCalculateLayerEqualizerValues = pyqtSignal(dict)  # dict of {uuid: (value, normalized_value_within_clim)} for equalizer display
     # didChangeShapeLayer = pyqtSignal(dict)
 
     def __init__(self, workspace, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
@@ -228,9 +229,19 @@ class Document(QObject):
         for path in paths:
             yield self.open_file(path, insert_before)
 
+    def sort_paths(self, paths):
+        """
+        :param paths: list of paths
+        :return: list of paths
+        """
+        paths = list(reversed(self._guidebook.sort_pathnames_into_load_order(paths)))  # go from load order to display order by reversing
+        return paths
+
     def time_label_for_uuid(self, uuid):
         """used to update animation display when a new frame is shown
         """
+        if not uuid:
+            return "YYYY-MM-DD HH:MM"
         info = self._layer_with_uuid[uuid]
         return self._guidebook.display_time(info)
 
@@ -245,10 +256,36 @@ class Document(QObject):
         for p in self.prez_for_uuids(uuids, lset=lset):
             yield p.colormap
 
+    def convert_units(self, uuid, data, inverse=False):
+        unitstr, lam = self._guidebook.units_conversion(self._layer_with_uuid[uuid])
+        return unitstr, lam(data, inverse)
+
     def flipped_for_uuids(self, uuids, lset=None):
         for p in self.prez_for_uuids(uuids, lset=lset):
             default_clim = self._layer_with_uuid[p.uuid][INFO.CLIM]
             yield ((p.climits[1] - p.climits[0]) > 0) != ((default_clim[1] - default_clim[0]) > 0)
+
+    def update_equalizer_values(self, uuid, xy_pos):
+        """user has clicked on a point probe; determine relative and absolute values for all document image layers
+        """
+        zult = {}
+        for pinf in self.current_layer_set:
+            if pinf.uuid in zult:
+                continue
+            lyr = self._layer_with_uuid[pinf.uuid]
+            if lyr[INFO.KIND] != KIND.IMAGE:
+                continue
+            value = self._workspace.get_content_point(pinf.uuid, xy_pos)
+            unit_str, unit_conv = self._guidebook.units_conversion(self._layer_with_uuid[pinf.uuid])
+            # calculate normalized bar width relative to its current clim
+            nc, xc = unit_conv(np.array(pinf.climits))
+            value = unit_conv(value)
+            if np.isnan(value):
+                zult[pinf.uuid] = None
+            else:
+                bar_width = (np.clip(value, nc, xc) - nc) / (xc - nc)
+                zult[pinf.uuid] = (value, bar_width, unit_str)
+        self.didCalculateLayerEqualizerValues.emit(zult)  # is picked up by layer list model to update display
 
     # TODO, find out if this is needed/used and whether or not it's correct
     def update_dataset_info(self, new_info):

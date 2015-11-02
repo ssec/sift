@@ -38,6 +38,7 @@ class ProbeGraphManager (QObject) :
 
     # signals
     didChangeTab = pyqtSignal(list,)  # list of probe areas to show
+    didClonePolygon = pyqtSignal(str, str)
     drawChildGraph = pyqtSignal(str,)
 
     graphs = None
@@ -104,14 +105,28 @@ class ProbeGraphManager (QObject) :
         self.tab_widget_object.insertTab(tab_index, temp_widget, self.max_tab_letter)
 
         # create the associated graph display object
-        self.graphs.append(ProbeGraphDisplay(self, temp_widget, self.workspace, self.queue, self.max_tab_letter))
-
-        # go to the tab we just created
-        self.tab_widget_object.setCurrentIndex(tab_index)
+        graph = ProbeGraphDisplay(self, temp_widget, self.workspace, self.queue, self.max_tab_letter)
+        self.graphs.append(graph)
 
         # load up the layers for this new tab
         uuid_list = self.document.current_layer_order
-        self.graphs[tab_index].set_possible_layers(uuid_list, do_rebuild_plot=True)
+        graph.set_possible_layers(uuid_list)
+
+        # clone the previous tab
+        if self.selected_graph_index != tab_index:
+            # if we aren't setting up the initial tab, clone the current tab
+            current_graph = self.graphs[self.selected_graph_index]
+            graph.set_default_layer_selections(current_graph.xSelectedUUID, current_graph.ySelectedUUID)
+            # give it a copy of the current polygon
+            # FIXME: Need to signal the SGM that it needs to create a new polygon
+            graph.setPolygon(current_graph.polygon[:] if current_graph.polygon is not None else None)
+            graph.checked = current_graph.checked
+
+        # Create the initial plot
+        graph.rebuildPlot()
+
+        # go to the tab we just created
+        self.tab_widget_object.setCurrentIndex(tab_index)
 
     def handleLayersChanged (self) :
         """Used when the document signals that something about the layers has changed
@@ -131,10 +146,10 @@ class ProbeGraphManager (QObject) :
 
         return self.graphs[self.selected_graph_index].setPolygon (polygonPoints)
 
-    def set_layer_selections(self, *uuids):
-        """Set the UUIDs for the current graph.
+    def set_default_layer_selections(self, *uuids):
+        """Set the UUIDs for the current graph if it doesn't have a polygon
         """
-        return self.graphs[self.selected_graph_index].set_layer_selections(*uuids)
+        return self.graphs[self.selected_graph_index].set_default_layer_selections(*uuids)
 
     def handle_tab_change (self, ) :
         """deal with the fact that the tab changed in the tab widget
@@ -146,7 +161,13 @@ class ProbeGraphManager (QObject) :
         if newTabIndex == (self.tab_widget_object.count() - 1) :
             LOG.info ("Creating new area probe graph tab.")
 
+            old_name = self.graphs[self.selected_graph_index].getName()
             self.set_up_tab(newTabIndex)
+
+            # notify everyone that we cloned a polygon (if we did)
+            if self.graphs[self.selected_graph_index].polygon is not None:
+                new_name = self.graphs[-1].getName()
+                self.didClonePolygon.emit(old_name, new_name)
 
         # otherwise, just update our current index and make sure the graph is fresh
         else :
@@ -303,7 +324,10 @@ class ProbeGraphDisplay (object) :
             # Rebuild the plot (stale is used to determine if actual rebuild is needed)
             self.rebuildPlot()
 
-    def set_layer_selections(self, *layer_uuids):
+    def set_default_layer_selections(self, *layer_uuids):
+        # only set the defaults if we don't have a polygon yet
+        if self.polygon is not None:
+            return
         if len(layer_uuids) > 2:
             raise ValueError("Probe graphs can handle a maximum of 2 layers (got %d)", len(layer_uuids))
 
@@ -322,6 +346,14 @@ class ProbeGraphDisplay (object) :
                 self.ySelectedUUID = layer_uuids[1]
             else:
                 LOG.error("Tried to set probe graph to non-existent layer: %s", layer_uuids[1])
+
+    @property
+    def checked(self):
+        return self.yCheckBox.isChecked()
+
+    @checked.setter
+    def checked(self, is_checked):
+        return self.yCheckBox.setChecked(is_checked)
 
     def xSelected (self) :
         """The user selected something in the X layer list.
@@ -391,7 +423,7 @@ class ProbeGraphDisplay (object) :
         # should be be plotting vs Y?
         doPlotVS = self.yCheckBox.isChecked()
         task_name = "%s_%s_region_plotting" % (self.xSelectedUUID, self.ySelectedUUID)
-        self.queue.add(task_name, self._rebuild_plot_task(self.xSelectedUUID, self.ySelectedUUID, self.polygon, plot_versus=doPlotVS), "Creating plot for region probe data")
+        self.queue.add(task_name, self._rebuild_plot_task(self.xSelectedUUID, self.ySelectedUUID, self.polygon, plot_versus=doPlotVS), "Creating plot for region probe data", interactive=True)
 
     def _rebuild_plot_task(self, x_uuid, y_uuid, polygon, plot_versus=False):
 
@@ -405,7 +437,7 @@ class ProbeGraphDisplay (object) :
 
             # plot a histogram
             yield {TASK_DOING: 'Probe Plot: Creating histogram plot', TASK_PROGRESS: 0.25}
-            self.plotHistogram (data_polygon.flatten(), title)
+            self.plotHistogram (data_polygon, title)
 
         # if we are plotting x vs y and have x, y, and a polygon
         elif plot_versus and x_uuid is not None and y_uuid is not None and polygon is not None :
@@ -414,7 +446,7 @@ class ProbeGraphDisplay (object) :
             # get the data and info we need for this plot
             name1 = self.workspace.get_info(x_uuid)[INFO.NAME]
             name2 = self.workspace.get_info(y_uuid)[INFO.NAME]
-            hires_uuid = self.workspace.highest_resolution_uuid(x_uuid, y_uuid)
+            hires_uuid = self.workspace.lowest_resolution_uuid(x_uuid, y_uuid)
             hires_coord_mask, hires_data = self.workspace.get_coordinate_mask_polygon(hires_uuid, polygon)
             yield {TASK_DOING: 'Probe Plot: Collecting polygon data (layer 2)...', TASK_PROGRESS: 0.15}
             if hires_uuid is x_uuid:
@@ -428,7 +460,8 @@ class ProbeGraphDisplay (object) :
             yield {TASK_DOING: 'Probe Plot: Creating scatter plot...', TASK_PROGRESS: 0.25}
 
             # plot a scatter plot
-            self.plotScatterplot (data1.flatten(), name1, data2.flatten(), name2)
+            # self.plotScatterplot (data1, name1, data2, name2)
+            self.plotDensityScatterplot (data1, name1, data2, name2)
 
         # if we have some combination of selections we don't understand, clear the figure
         else :
@@ -466,30 +499,28 @@ class ProbeGraphDisplay (object) :
         else :
             self.figure.clf()
             axes = self.figure.add_subplot(111)
-            axes.scatter(dataX.flatten(), dataY.flatten(), color='b', s=1, alpha=0.5)
+            axes.scatter(dataX, dataY, color='b', s=1, alpha=0.5)
             axes.set_xlabel(nameX)
             axes.set_ylabel(nameY)
             axes.set_title(nameX + " vs " + nameY)
             self._draw_xy_line(axes)
 
-    # TODO, come back to this when we are properly backgrounding our plots
     def plotDensityScatterplot (self, dataX, nameX, dataY, nameY) :
         """Make a density scatter plot for the given data
         """
-
-        # flatten our data
-        dataX = dataX.flatten()
-        dataY = dataY.flatten()
 
         # clear the figure and make a new subplot
         self.figure.clf()
         axes = self.figure.add_subplot(111)
 
         # figure out the range of the data
-        min_value = min(numpy.min(dataX), numpy.min(dataY))
-        max_value = max(numpy.max(dataX), numpy.max(dataY))
+        # you might not be comparing the same units
+        xmin_value = numpy.min(dataX)
+        xmax_value = numpy.max(dataX)
+        ymin_value = numpy.min(dataY)
+        ymax_value = numpy.max(dataY)
         # bounds should be defined in the form [[xmin, xmax], [ymin, ymax]]
-        bounds = [[min_value, max_value], [min_value, max_value]]
+        bounds = [[xmin_value, xmax_value], [ymin_value, ymax_value]]
 
         # make the binned density map for this data set
         density_map, _, _ = numpy.histogram2d(dataX, dataY, bins=self.DEFAULT_NUM_BINS, range=bounds)
@@ -497,12 +528,11 @@ class ProbeGraphDisplay (object) :
         density_map = numpy.flipud(numpy.transpose(numpy.ma.masked_array(density_map, mask=density_map == 0)))
 
         # display the density map data
-        axes.imshow(density_map, extent=[min_value, max_value, min_value, max_value],
-                    interpolation='nearest', norm=LogNorm())
+        img = axes.imshow(density_map, extent=[xmin_value, xmax_value, ymin_value, ymax_value], aspect='auto',
+                          interpolation='nearest', norm=LogNorm())
 
-        # TODO make a colorbar
-        #colorbar = self.figure.colorbar()
-        #colorbar.set_label('log(count of data points)')
+        colorbar = self.figure.colorbar(img)
+        colorbar.set_label('log(count of data points)')
 
         # set the various text labels
         axes.set_xlabel(nameX)

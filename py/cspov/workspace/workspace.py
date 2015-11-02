@@ -292,6 +292,10 @@ class Workspace(QObject):
         data = np.memmap(dpath, dtype=dtype, mode='c', shape=shape)
         return uuid, info, data
 
+    @property
+    def paths_in_cache(self):
+        return [x[0] for x in self._inventory.keys()]
+
     def _update_cache(self, path, uuid, info, data):
         """
         add or update the cache and put it to disk
@@ -516,6 +520,9 @@ class Workspace(QObject):
         return data
 
     def highest_resolution_uuid(self, *uuids):
+        return min([self.get_info(uuid) for uuid in uuids], key=lambda i: i[INFO.CELL_WIDTH])[INFO.UUID]
+
+    def lowest_resolution_uuid(self, *uuids):
         return max([self.get_info(uuid) for uuid in uuids], key=lambda i: i[INFO.CELL_WIDTH])[INFO.UUID]
 
     def get_coordinate_mask_polygon(self, dsi_or_uuid, points):

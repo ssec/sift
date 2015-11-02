@@ -35,13 +35,14 @@ __docformat__ = 'reStructuredText'
 
 import logging
 import pickle as pkl
-from PyQt4.QtCore import QAbstractListModel, Qt, QSize, QModelIndex, QPoint, QMimeData, pyqtSignal
-from PyQt4.QtGui import QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyleOptionViewItem, QItemSelection, QItemSelectionModel
+from PyQt4.QtCore import QAbstractListModel, Qt, QSize, QModelIndex, QPoint, QMimeData, pyqtSignal, QRect
+from PyQt4.QtGui import QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QColor, QFont, QStyleOptionViewItem, QItemSelection, QItemSelectionModel, QPen
 from cspov.model.document import Document
 from cspov.common import INFO, KIND
 from cspov.view.Colormap import ALL_COLORMAPS, CATEGORIZED_COLORMAPS
 
 LOG = logging.getLogger(__name__)
+
 
 COLUMNS=('Visibility', 'Name', 'Enhancement')
 
@@ -50,37 +51,74 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     set for a specific column, controls the rendering and editing of items in that column or row of a list or table
     see QAbstractItemView.setItemDelegateForRow/Column
     """
+    def __init__(self, *args, **kwargs):
+        super(LayerWidgetDelegate, self).__init__(*args, **kwargs)
+        self.font = QFont('Andale Mono', 12)
 
     def sizeHint(self, option:QStyleOptionViewItem, index:QModelIndex):
         return QSize(100,36)
 
-    # def paint(self, painter, option, index):
-    #
-    #     painter.save()
-    #
-    #     painter.setPen(QtGui.QPen(QtCore.Qt.NoPen))
-    #
-    #     if option.state & QtGui.QStyle.State_Selected:
-    #         brush = QtGui.QBrush(QtGui.QColor("#66ff71"))
-    #         painter.setBrush(brush)
-    #
-    #     else:
-    #         brush = QtGui.QBrush(QtCore.Qt.white)
-    #         painter.setBrush(brush)
-    #
-    #     painter.drawRect(option.rect)
-    #
-    #     painter.setPen(QtGui.QPen(QtCore.Qt.blue))
-    #     value = index.data(QtCore.Qt.DisplayRole)
-    #
-    #     if value.isValid():
-    #
-    #         text = value.toString()
-    #         align = QtCore.Qt.AlignCenter
-    #         painter.drawText(option.rect, align, text)
-    #
-    #     #QtGui.QStyledItemDelegate.paint(self, painter, option, index)
-    #     painter.restore()
+    def displayText(self, *args, **kwargs):
+        return None
+
+    def paint(self, painter, option, index):
+        painter.save()
+        # shiftopt = QStyleOptionViewItem(option)
+        # shiftopt.rect = QRect(option.rect.left(), option.rect.top(), option.rect.width(), option.rect.height()-12)
+
+        # painter.setPen(QPen(Qt.NoPen))
+        # if option.state & QtGui.QStyle.State_Selected:
+        #     brush = QtGui.QBrush(QtGui.QColor("#66ff71"))
+        #     painter.setBrush(brush)
+        #
+        # else:
+        #     brush = QtGui.QBrush(QtCore.Qt.white)
+        #     painter.setBrush(brush)
+
+        # add an equalizer bar
+        # painter.setPen(QPen(Qt.blue))
+        color = QColor(64, 24, 255, 64)
+        painter.setPen(QPen(color))
+        value = index.data(Qt.UserRole)
+        text = index.data(Qt.DisplayRole)
+        rect = option.rect
+        if value:
+            value, bar, unit = value
+            w = bar * float(rect.width())
+            # h = 4
+            # r = QRect(rect.left(), rect.top() + rect.height() - h, int(w), h)
+            r = QRect(rect.left(), rect.top(), int(w), rect.height())
+            painter.fillRect(r, color)
+            # h = 8
+            # r = QRect(rect.left(), rect.top() + rect.height() - h, int(w), h)
+            # r = QRect(rect.left()+48, rect.top(), rect.width()-48, rect.height())
+            # painter.setFont(self.font)
+            # shiftopt = QStyleOptionViewItem(option)
+            # shiftopt.rect = r
+            # painter.setPen(Qt.darkBlue)
+            # painter.drawText(rect.left() + 2, rect.top() + 4, '%7.2f' % value)
+        super(LayerWidgetDelegate, self).paint(painter, option, index)
+
+        painter.setPen(QPen(Qt.black))
+        painter.drawText(rect.left() + 32, rect.top()+4, rect.width()-32, 16, Qt.AlignLeft, text)
+
+        if value:
+            painter.setFont(self.font)
+            painter.setPen(Qt.darkBlue)
+            theight = 17
+            t = rect.top() + rect.height() - theight
+            if w < 48:
+                l = max(int(w), 32)
+                r = rect.width()
+                align = Qt.AlignLeft
+            else:
+                l = 0
+                r = w
+                align = Qt.AlignRight
+            painter.drawText(l, t, r-l, theight, align, '%.2f' % value)
+
+        #QtGui.QStyledItemDelegate.paint(self, painter, option, index)
+        painter.restore()
 
 
     # def paint(self, painter, option, index):
@@ -149,6 +187,7 @@ class LayerStackListViewModel(QAbstractListModel):
     widgets = None
     doc = None
     item_delegate = None
+    _last_equalizer_values = {}
     _mimetype = 'application/vnd.row.list'
 
     # signals
@@ -178,6 +217,7 @@ class LayerStackListViewModel(QAbstractListModel):
         doc.willPurgeLayer.connect(self.refresh)
         doc.didSwitchLayerSet.connect(self.refresh)
         doc.didReorderAnimation.connect(self.refresh)
+        doc.didCalculateLayerEqualizerValues.connect(self.update_equalizer)
 
         # self.setSupportedDragActions(Qt.MoveAction)
 
@@ -199,19 +239,21 @@ class LayerStackListViewModel(QAbstractListModel):
         listbox.setAcceptDrops(True)
         listbox.setDropIndicatorShown(True)
         listbox.setSelectionMode(listbox.ExtendedSelection)
-        # listbox.indexesMoved.connect(FIXME)
         # listbox.setMovement(QListView.Snap)
         # listbox.setDragDropMode(QListView.InternalMove)
         listbox.setDragDropMode(QAbstractItemView.DragDrop)
+        listbox.setAlternatingRowColors(True)
         # listbox.setDefaultDropAction(Qt.MoveAction)
         # listbox.setDragDropOverwriteMode(False)
         # listbox.entered.connect(self.layer_entered)
+        # listbox.setFont(QFont('Andale Mono', 13))
 
         # the various signals that may result from the user changing the selections
-        listbox.activated.connect(self.changedSelection)
-        listbox.clicked.connect(self.changedSelection)
-        listbox.doubleClicked.connect(self.changedSelection)
-        listbox.pressed.connect(self.changedSelection)
+        # listbox.activated.connect(self.changedSelection)
+        # listbox.clicked.connect(self.changedSelection)
+        # listbox.doubleClicked.connect(self.changedSelection)
+        # listbox.pressed.connect(self.changedSelection)
+        listbox.selectionModel().selectionChanged.connect(self.changedSelection)
 
         self.widgets.append(listbox)
 
@@ -221,7 +263,7 @@ class LayerStackListViewModel(QAbstractListModel):
     def supportedDropActions(self):
         return Qt.MoveAction # | Qt.CopyAction
 
-    def changedSelection(self, index) :
+    def changedSelection(self, *args) :
         """connected to the various listbox signals that represent the user changing selections
         """
         selected_uuids = list(self.current_selected_uuids(self.current_set_listbox))
@@ -255,6 +297,7 @@ class LayerStackListViewModel(QAbstractListModel):
 
         # this is an ugly way to make sure the selection stays current
         self.changedSelection(None)
+        self.current_set_listbox.update()
 
     def current_selected_uuids(self, lbox:QListView=None):
         lbox = self.current_set_listbox if lbox is None else lbox
@@ -294,6 +337,17 @@ class LayerStackListViewModel(QAbstractListModel):
         """
         self.refresh()
         # self.removeRows(row, count)
+
+    def update_equalizer(self, doc_values):
+        """
+        User has clicked on a point probe
+        Document is conveniently providing us values for all the image layers
+        Let's update the display to show them like a left-to-right equalizer
+        :param doc_values: {uuid: value, value-relative-to-base, is-base:bool}, values can be NaN
+        :return:
+        """
+        self._last_equalizer_values = doc_values
+        self.refresh()
 
     def menu(self, pos:QPoint, *args):
         LOG.info('menu requested for layer list')
@@ -425,15 +479,29 @@ class LayerStackListViewModel(QAbstractListModel):
         row = index.row()
         # col = index.column()
         el = self.listing
-        if role == Qt.ItemDataRole or role == Qt.EditRole:
+        info = el[row] if row<len(self.doc) else None
+        if not info:
+            return None
+        leroy = self._last_equalizer_values.get(info[INFO.UUID], None)
+        if role == Qt.UserRole:
+            return leroy
+        elif role == Qt.EditRole:
             return self.doc[index.row()] if index.row()<len(self.doc) else None
         elif role == Qt.CheckStateRole:
             check = Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
             return check
+        elif role == Qt.ToolTipRole:
+            if not leroy:
+                return None
+            value, normalized = leroy[:2]
+            return str(value)
         elif role == Qt.DisplayRole:
             lao = self.doc.layer_animation_order(row)
-            name = el[row][INFO.NAME]
+            name = info[INFO.NAME]
             # return  ('[-]  ' if lao is None else '[{}]'.format(lao+1)) + el[row]['name']
+            # if leroy:
+            #     data = '[%.2f] ' % leroy[0]
+            #     return data + name
             return name
         return None
 

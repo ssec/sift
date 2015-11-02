@@ -42,7 +42,7 @@ from functools import partial
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
-from cspov.common import INFO, KIND, DEFAULT_PROJ_OBJ
+from cspov.common import INFO, KIND, DEFAULT_PROJ_OBJ, TOOL
 
 import os
 import logging
@@ -168,9 +168,11 @@ def _common_path_prefix(paths):
 
 class Main(QtGui.QMainWindow):
     _last_open_dir = None  # directory to open files in
+    _recent_files_menu = None # QMenu
     _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
 
     def open_files(self):
+        self.scene_manager.layer_set.animating = False
         files = QtGui.QFileDialog.getOpenFileNames(self,
                                                    "Select one or more files to open",
                                                    self._last_open_dir or os.getenv("HOME"),
@@ -186,6 +188,7 @@ class Main(QtGui.QMainWindow):
         # force the newest layer to be visible
         self.document.next_last_step(uuid)
         self._last_open_dir = _common_path_prefix(files)
+        self.update_recent_file_menu()
 
     def dropEvent(self, event):
         LOG.debug('drop event on mainwindow')
@@ -200,20 +203,30 @@ class Main(QtGui.QMainWindow):
         else:
             event.ignore()
 
-    def change_tool(self, name="pz_camera"):
-        buttons = [self.ui.panZoomToolButton, self.ui.pointSelectButton, self.ui.regionSelectButton]
-        names = [self.scene_manager.pz_camera.name, self.scene_manager.point_probe_camera.name, self.scene_manager.polygon_probe_camera.name]
-        names = dict((name,value) for (value,name) in enumerate(names))
-        dex = names[name]
-        for q,b in enumerate(buttons):
-            b.setDown(dex==q)
-        self.scene_manager.change_camera(dex)
+    def change_tool(self, checked, name=TOOL.PAN_ZOOM):
+        if checked != True:
+            return
+        self.scene_manager.change_tool(name)
+
+    def update_recent_file_menu(self, *args, **kwargs):
+        paths = self.workspace.paths_in_cache
+        paths = self.document.sort_paths(paths)
+        LOG.debug('recent files: {0!r:s}'.format(paths))
+        self._recent_files_menu.clear()
+        for path in paths:
+            def openit(*args, path=path, **kwargs):
+                LOG.debug('open recent file {}'.format(path))
+                self.scene_manager.layer_set.animating = False
+                self.document.open_file(path)
+            open_action = QtGui.QAction(os.path.split(path)[1], self)
+            open_action.triggered.connect(openit)
+            self._recent_files_menu.addAction(open_action)
 
     def update_progress_bar(self, status_info, *args, **kwargs):
-        active = status_info[0]
+        active = status_info[0] if len(status_info)>0 else None
         LOG.debug('{0!r:s}'.format(status_info))
-        val = active[TASK_PROGRESS]
-        txt = active[TASK_DOING]
+        val = active[TASK_PROGRESS] if active else 0.0
+        txt = active[TASK_DOING] if active else ''
         val = self.queue.progress_ratio(val)
         self.ui.progressBar.setValue(int(val*PROGRESS_BAR_MAX))
         self.ui.progressText.setText(txt)
@@ -401,9 +414,6 @@ class Main(QtGui.QMainWindow):
         self.layerSetsManager = LayerSetsManager(self.ui.layerSetTabs, self.ui.layerInfoContents, self.document)
         self.behaviorLayersList = self.layerSetsManager.getLayerStackListViewModel()
 
-        # coordinate what gets done when a layer is added by document
-        self.document.didAddLayer.connect(self.update_frame_time_to_top_visible)
-
         def update_probe_point(uuid, xy_pos):
             lon, lat = DEFAULT_PROJ_OBJ(xy_pos[0], xy_pos[1], inverse=True)
             lon_str = "{:.02f} {}".format(abs(lon), "W" if lon < 0 else "E")
@@ -412,11 +422,13 @@ class Main(QtGui.QMainWindow):
 
             if uuid is not None:
                 data_point = self.workspace.get_content_point(uuid, xy_pos)
-                data_str = "{:.03f}".format(float(data_point))
+                unit_str, converted = self.document.convert_units(uuid, data_point)
+                data_str = "{:.03f}{:s}".format(float(converted), unit_str)
             else:
                 data_str = "N/A"
             self.ui.cursorProbeText.setText("Probe Value: {} ".format(data_str))
         self.scene_manager.newProbePoint.connect(update_probe_point)
+        self.scene_manager.newProbePoint.connect(self.document.update_equalizer_values)
 
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
             top_uuids = list(self.document.current_visible_layers(2))
@@ -424,8 +436,10 @@ class Main(QtGui.QMainWindow):
 
             # TODO, when the plots manage their own layer selection, change this call
             # FUTURE, once the polygon is a layer, this will need to change
-            # set the selection for the probe plot to the top visible layer
-            self.graphManager.set_layer_selections(*top_uuids)
+            # set the selection for the probe plot to the top visible layer(s)
+            # new tabs should clone the information from the currently selected tab
+            # the call below will check if this is a new polygon
+            self.graphManager.set_default_layer_selections(*top_uuids)
             # update our current plot with the new polygon
             polygon_name = self.graphManager.currentPolygonChanged(polygonPoints=points)
 
@@ -443,14 +457,20 @@ class Main(QtGui.QMainWindow):
         self.document.didChangeColormap.connect(self.scene_manager.change_layers_colormap)
         self.document.didChangeColorLimits.connect(self.scene_manager.change_layers_color_limits)
 
-        self.ui.panZoomToolButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.pz_camera.name))
-        self.ui.pointSelectButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.point_probe_camera.name))
-        self.ui.regionSelectButton.clicked.connect(partial(self.change_tool, name=self.scene_manager.polygon_probe_camera.name))
-        self.change_tool()
+        self.document.didChangeLayerVisibility.connect(self.update_frame_time_to_top_visible)
+        self.document.didReorderLayers.connect(self.update_frame_time_to_top_visible)
+        self.document.didRemoveLayers.connect(self.update_frame_time_to_top_visible)
+        self.document.didAddLayer.connect(self.update_frame_time_to_top_visible)
+
+        self.ui.panZoomToolButton.toggled.connect(partial(self.change_tool, name=TOOL.PAN_ZOOM))
+        self.ui.pointSelectButton.toggled.connect(partial(self.change_tool, name=TOOL.POINT_PROBE))
+        self.ui.regionSelectButton.toggled.connect(partial(self.change_tool, name=TOOL.REGION_PROBE))
+        self.change_tool(True)
 
         self.setup_menu()
         self.graphManager = ProbeGraphManager(self.ui.probeTabWidget, self.workspace, self.document, self.queue)
         self.graphManager.didChangeTab.connect(self.scene_manager.show_only_polygons)
+        self.graphManager.didClonePolygon.connect(self.scene_manager.copy_polygon)
 
     def closeEvent(self, event, *args, **kwargs):
         LOG.debug('main window closing')
@@ -472,6 +492,7 @@ class Main(QtGui.QMainWindow):
         menubar = self.ui.menubar
         file_menu = menubar.addMenu('&File')
         file_menu.addAction(open_action)
+        self._recent_files_menu = file_menu.addMenu('Open Recent')
         file_menu.addAction(exit_action)
 
         next_time = QtGui.QAction("Next Time", self)
@@ -543,6 +564,7 @@ class Main(QtGui.QMainWindow):
         view_menu.addAction(cycle_borders)
         view_menu.addAction(cycle_grid)
 
+        self.update_recent_file_menu()
         menubar.setEnabled(True)
 
     def setup_key_releases(self):
@@ -552,7 +574,7 @@ class Main(QtGui.QMainWindow):
                     return cb()
             return tmp_cb
 
-        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("c", self.scene_manager.next_camera))
+        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("c", self.scene_manager.next_tool))
 
         class ColormapSlot(object):
             def __init__(self, sgm, key='e'):
