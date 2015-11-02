@@ -70,7 +70,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
         painter.save()
 
         # color = QColor(140, 183, 232, 255) if index.row()%2==0 else QColor(105, 168, 255, 255)
-        color = QColor(105, 168, 255, 255)
+        color = QColor(187, 213, 255, 255)
         painter.setPen(QPen(color))
         painter.setFont(self.font)
         value = index.data(Qt.UserRole)
@@ -86,7 +86,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
         super(LayerWidgetDelegate, self).paint(painter, option, index)
 
         if option.state & QStyle.State_Selected and value:
-            painter.fillRect(r, QColor(105, 168, 255, 64))
+            painter.fillRect(r, QColor(213, 187, 255, 96))
 
         painter.setPen(QPen(Qt.black))
         painter.drawText(rect.left() + LEFT_OFFSET, rect.top()+TOP_OFFSET, rect.width()-LEFT_OFFSET, CELL_HEIGHT/2-TOP_OFFSET, Qt.AlignLeft, text)
