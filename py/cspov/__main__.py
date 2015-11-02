@@ -223,24 +223,26 @@ class Main(QtGui.QMainWindow):
     _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
     _open_cache_dialog = None
 
-    def open_files(self, files=None, *args, **kwargs):
+    def open_files(self, *args, files=None, **kwargs):
         self.scene_manager.layer_set.animating = False
-        if files is None:
-            files = QtGui.QFileDialog.getOpenFileNames(self,
-                                                       "Select one or more files to open",
-                                                       self._last_open_dir or os.getenv("HOME"),
-                                                       'Mercator GeoTIFF (*.tiff *.tif)')
-        files = list(files)
-        if not files:
+        files = QtGui.QFileDialog.getOpenFileNames(self,
+                                                   "Select one or more files to open",
+                                                   self._last_open_dir or os.getenv("HOME"),
+                                                   'Mercator GeoTIFF (*.tiff *.tif)')
+        self.open_paths(files)
+
+    def open_paths(self, paths):
+        paths = list(paths)
+        if not paths:
             return
-        for uuid, _, _ in self.document.open_files(files):
+        for uuid, _, _ in self.document.open_files(paths):
             pass
         self.behaviorLayersList.select([uuid])
         # set the animation based on the last added (topmost) layer
         self.document.animate_siblings_of_layer(uuid)
         # force the newest layer to be visible
         self.document.next_last_step(uuid)
-        self._last_open_dir = _common_path_prefix(files)
+        self._last_open_dir = _common_path_prefix(paths)
         self.update_recent_file_menu()
 
     def dropEvent(self, event):
