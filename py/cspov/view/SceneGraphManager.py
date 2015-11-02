@@ -516,6 +516,23 @@ class SceneGraphManager(QObject):
         # Reset the pending polygon object
         self.pending_polygon.reset()
 
+    def remove_polygon(self, name=None):
+        """Remove a polygon from the SGM or clear the pending polygon if it exists.
+        """
+        if name is None:
+            LOG.debug("No polygon name specified to remove")
+            return
+
+        if name not in self.polygon_probes:
+            LOG.warning("Tried to remove a nonexistent polgyon: %s", name)
+            return
+
+        self.polygon_probes[name].parent = None
+        del self.polygon_probes[name]
+
+    def has_pending_polygon(self):
+        return len(self.pending_polygon.points) != 0
+
     def on_point_probe_set(self, probe_name, xy_pos, **kwargs):
         z = float(kwargs.get("z", 60))
         if len(xy_pos) == 2:

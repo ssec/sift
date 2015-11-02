@@ -486,6 +486,17 @@ class Main(QtGui.QMainWindow):
         new_state = self.scene_manager.layer_set.toggle_animation()
         self.ui.animPlayPause.setChecked(new_state)
 
+    def remove_region_polygon(self, action:QtGui.QAction=None, *args):
+        if self.scene_manager.has_pending_polygon():
+            print("Clearing pending")
+            self.scene_manager.clear_pending_polygon()
+            return
+
+        # Remove the polygon from other locations
+        removed_name = self.graphManager.currentPolygonChanged(None)
+        LOG.info("Clearing polygon with name '%s'", removed_name)
+        self.scene_manager.remove_polygon(removed_name)
+
     def setup_menu(self):
         open_action = QtGui.QAction("&Open", self)
         open_action.setShortcut("Ctrl+O")
@@ -556,7 +567,7 @@ class Main(QtGui.QMainWindow):
 
         clear = QtGui.QAction("Clear Region Selection", self)
         clear.setShortcut(QtCore.Qt.Key_Escape)
-        clear.triggered.connect(self.scene_manager.clear_pending_polygon)
+        clear.triggered.connect(self.remove_region_polygon)
 
         edit_menu = menubar.addMenu('&Edit')
         edit_menu.addAction(remove)
