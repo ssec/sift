@@ -506,12 +506,32 @@ class SceneGraphManager(QObject):
             map_pos = self.borders.transforms.get_transform().imap(buffer_pos)
             if self.pending_polygon.add_point(event.pos[:2], map_pos[:2], 60):
                 points = self.pending_polygon.points + [self.pending_polygon.points[0]]
-                for marker in self.pending_polygon.markers:
-                    # Remove the marker from the scene graph
-                    marker.parent = None
-                # Reset the pending polygon object
-                self.pending_polygon.reset()
+                self.clear_pending_polygon()
                 self.newProbePolygon.emit(self.layer_set.top_layer_uuid(), points)
+
+    def clear_pending_polygon(self):
+        for marker in self.pending_polygon.markers:
+            # Remove the marker from the scene graph
+            marker.parent = None
+        # Reset the pending polygon object
+        self.pending_polygon.reset()
+
+    def remove_polygon(self, name=None):
+        """Remove a polygon from the SGM or clear the pending polygon if it exists.
+        """
+        if name is None:
+            LOG.debug("No polygon name specified to remove")
+            return
+
+        if name not in self.polygon_probes:
+            LOG.warning("Tried to remove a nonexistent polgyon: %s", name)
+            return
+
+        self.polygon_probes[name].parent = None
+        del self.polygon_probes[name]
+
+    def has_pending_polygon(self):
+        return len(self.pending_polygon.points) != 0
 
     def on_point_probe_set(self, probe_name, xy_pos, **kwargs):
         z = float(kwargs.get("z", 60))

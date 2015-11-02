@@ -29,7 +29,7 @@ except Exception:
 QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
 
-from cspov.control.layer_list import LayerStackListViewModel
+import cspov.ui.open_cache_dialog_ui as open_cache_dialog_ui
 from cspov.control.LayerManager import LayerSetsManager
 from cspov.model import Document
 from cspov.view.SceneGraphManager import SceneGraphManager
@@ -79,6 +79,57 @@ def test_layers(ws, doc, glob_pattern=None):
         return test_layers_from_directory(ws, doc, glob_pattern, os.environ.get('RANGE', None))
     LOG.warning("No image glob pattern provided")
     return []
+
+class OpenCacheDialog(QtGui.QWidget):
+    _paths = None
+    _opener = None
+    _remover = None
+
+    def __init__(self):
+        super(OpenCacheDialog, self).__init__()
+        self.ui = open_cache_dialog_ui.Ui_openFromCacheDialog()
+        self.ui.setupUi(self)
+        self.ui.cacheListWidget.setSelectionMode(QtGui.QListWidget.ExtendedSelection)
+        self.ui.removeFromCacheButton.clicked.connect(self._do_remove)
+
+    def activate(self, paths, opener, remover):
+        self._opener = opener
+        self._remover = remover
+        self.ui.cacheListWidget.clear()
+        if paths:
+            pfx = _common_path_prefix(paths)
+            self.ui.commonPathLabel.setText("Common prefix: " + pfx)
+            lpfx = len(pfx)
+            self._paths = {}
+            for path in paths:
+                key = path[lpfx:].strip(os.sep)
+                li = QtGui.QListWidgetItem(key)
+                self.ui.cacheListWidget.addItem(li)
+                self._paths[key] = path
+        self.show()
+
+    def _do_remove(self, *args, **kwargs):
+        items = list(self.ui.cacheListWidget.selectedItems())
+        to_remove = [self._paths[x.text()] for x in items]
+        for item in items:
+            self.ui.cacheListWidget.removeItemWidget(item)
+        self._remover(to_remove)
+        self.hide()
+        self._doc = self._ws = self._opener = self._paths = None
+
+    def accept(self, *args, **kwargs):
+        self.hide()
+        to_open = [self._paths[x.text()] for x in self.ui.cacheListWidget.selectedItems()]
+        LOG.info("opening from cache: " + repr(to_open))
+        self._opener(to_open)
+        self._doc = self._ws = self._opener = self._paths = None
+
+    def reject(self, *args, **kwargs):
+        self.hide()
+        self._doc = self._ws = self._opener = self._paths = None
+
+
+
 
 class AnimationSpeedPopupWindow(QtGui.QWidget):
     _slider = None
@@ -171,24 +222,28 @@ class Main(QtGui.QMainWindow):
     _last_open_dir = None  # directory to open files in
     _recent_files_menu = None # QMenu
     _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
+    _open_cache_dialog = None
 
-    def open_files(self):
+    def interactive_open_files(self, *args, files=None, **kwargs):
         self.scene_manager.layer_set.animating = False
         files = QtGui.QFileDialog.getOpenFileNames(self,
                                                    "Select one or more files to open",
                                                    self._last_open_dir or os.getenv("HOME"),
                                                    'Mercator GeoTIFF (*.tiff *.tif)')
-        files = list(files)
-        if not files:
+        self.open_paths(files)
+
+    def open_paths(self, paths):
+        paths = list(paths)
+        if not paths:
             return
-        for uuid, _, _ in self.document.open_files(files):
+        for uuid, _, _ in self.document.open_files(paths):
             pass
         self.behaviorLayersList.select([uuid])
         # set the animation based on the last added (topmost) layer
         self.document.animate_siblings_of_layer(uuid)
         # force the newest layer to be visible
         self.document.next_last_step(uuid)
-        self._last_open_dir = _common_path_prefix(files)
+        self._last_open_dir = _common_path_prefix(paths)
         self.update_recent_file_menu()
 
     def dropEvent(self, event):
@@ -210,7 +265,7 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.change_tool(name)
 
     def update_recent_file_menu(self, *args, **kwargs):
-        paths = self.workspace.paths_in_cache
+        paths = self.workspace.recently_used_cache_paths()
         paths = self.document.sort_paths(paths)
         LOG.debug('recent files: {0!r:s}'.format(paths))
         self._recent_files_menu.clear()
@@ -449,6 +504,9 @@ class Main(QtGui.QMainWindow):
             # do whatever other updates the scene manager needs
             self.scene_manager.on_new_polygon(polygon_name, points)
 
+            if self.scene_manager._current_tool == TOOL.REGION_PROBE:
+                self.ui.panZoomToolButton.click()
+
         self.scene_manager.newProbePolygon.connect(update_probe_polygon)
 
         self.ui.mainWidgets.removeTab(0)
@@ -483,18 +541,44 @@ class Main(QtGui.QMainWindow):
         new_state = self.scene_manager.layer_set.toggle_animation()
         self.ui.animPlayPause.setChecked(new_state)
 
+    def _remove_paths_from_cache(self, paths):
+        self.workspace.remove_paths_from_cache(paths)
+        self.update_recent_file_menu()
+
+    def open_from_cache(self, *args, **kwargs):
+        if not self._open_cache_dialog:
+            self._open_cache_dialog = OpenCacheDialog()
+        paths = self.document.sort_paths(self.workspace.paths_in_cache)
+        self._open_cache_dialog.activate(paths, self.open_paths, self._remove_paths_from_cache)
+
+    def remove_region_polygon(self, action:QtGui.QAction=None, *args):
+        if self.scene_manager.has_pending_polygon():
+            print("Clearing pending")
+            self.scene_manager.clear_pending_polygon()
+            return
+
+        # Remove the polygon from other locations
+        removed_name = self.graphManager.currentPolygonChanged(None)
+        LOG.info("Clearing polygon with name '%s'", removed_name)
+        self.scene_manager.remove_polygon(removed_name)
+
     def setup_menu(self):
-        open_action = QtGui.QAction("&Open", self)
+        open_action = QtGui.QAction("&Open...", self)
         open_action.setShortcut("Ctrl+O")
-        open_action.triggered.connect(self.open_files)
+        open_action.triggered.connect(self.interactive_open_files)
 
         exit_action = QtGui.QAction("&Exit", self)
         exit_action.setShortcut("Ctrl+Q")
         exit_action.triggered.connect(QtGui.qApp.quit)
+        
+        open_cache_action = QtGui.QAction("Open from Cache...", self)
+        open_cache_action.setShortcut("Ctrl+A")
+        open_cache_action.triggered.connect(self.open_from_cache)
 
         menubar = self.ui.menubar
         file_menu = menubar.addMenu('&File')
         file_menu.addAction(open_action)
+        file_menu.addAction(open_cache_action)
         self._recent_files_menu = file_menu.addMenu('Open Recent')
         file_menu.addAction(exit_action)
 
@@ -539,10 +623,6 @@ class Main(QtGui.QMainWindow):
         flip_colormap.setShortcut("/")
         flip_colormap.triggered.connect(lambda: self.document.flip_climits_for_layers([self.document.current_visible_layer]))
 
-        remove = QtGui.QAction("Remove Layer", self)
-        remove.setShortcut(QtCore.Qt.Key_Delete)
-        remove.triggered.connect(self.remove_layer)
-
         cycle_borders = QtGui.QAction("Cycle &Borders", self)
         cycle_borders.setShortcut('B')
         cycle_borders.triggered.connect(self.scene_manager.cycle_borders_color)
@@ -551,8 +631,17 @@ class Main(QtGui.QMainWindow):
         cycle_grid.setShortcut('L')
         cycle_grid.triggered.connect(self.scene_manager.cycle_grid_color)
 
+        remove = QtGui.QAction("Remove Layer", self)
+        remove.setShortcut(QtCore.Qt.Key_Delete)
+        remove.triggered.connect(self.remove_layer)
+
+        clear = QtGui.QAction("Clear Region Selection", self)
+        clear.setShortcut(QtCore.Qt.Key_Escape)
+        clear.triggered.connect(self.remove_region_polygon)
+
         edit_menu = menubar.addMenu('&Edit')
         edit_menu.addAction(remove)
+        edit_menu.addAction(clear)
 
         view_menu = menubar.addMenu('&View')
         view_menu.addAction(animate)
