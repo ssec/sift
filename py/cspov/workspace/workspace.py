@@ -311,15 +311,27 @@ class Workspace(QObject):
         self._inventory[key] = nfo
         self._store_inventory()
 
-    def _clean_cache(self):
-        """
-        find stale content in the cache and get rid of it
-        this routine should eventually be compatible with backgrounding on a thread
-        possibly include a workspace setting for max workspace size in bytes?
-        :return:
-        """
-        # get information on current cache contents
-        LOG.info("cleaning cache")
+    def remove_paths_from_cache(self, paths):
+        keys = [self._key_for_path(path) for path in paths]
+        for key in keys:
+            entry = self._inventory.get(key, None)
+            if not entry:
+                continue
+            uuid,info,data_info = entry
+            filename, dtype, shape = data_info
+            path = os.path.join(self.cwd, filename)
+            try:
+                os.remove(path)
+                LOG.info('removed {} = {} from cache'.format(key[0], path))
+            except:
+                # this could happen if the file is open in windows
+                LOG.error('unable to remove {} from cache'.format(path))
+                continue
+            del self._inventory[key]
+        self._store_inventory()
+
+    def _inventory_check(self):
+        "return revised_inventory_dict, [(access-time, size, path, key), ...], total_size"
         cache = []
         inv = dict(self._inventory)
         total_size = 0
@@ -336,6 +348,25 @@ class Workspace(QObject):
                 del inv[key]
         # sort by atime
         cache.sort()
+        return inv, cache, total_size
+
+    def recently_used_cache_paths(self, n=20):
+        inv, cache, total_size = self._inventory_check()
+        self._inventory = inv
+        self._store_inventory()
+        # get from most recently used end of list
+        return [q[3][0] for q in cache[-n:]]
+
+    def _clean_cache(self):
+        """
+        find stale content in the cache and get rid of it
+        this routine should eventually be compatible with backgrounding on a thread
+        possibly include a workspace setting for max workspace size in bytes?
+        :return:
+        """
+        # get information on current cache contents
+        LOG.info("cleaning cache")
+        inv, cache, total_size = self._inventory_check()
         GB = 1024**3
         LOG.info("total cache size is {}GB of max {}GB".format(total_size/GB, self._max_size_gb))
         max_size = self._max_size_gb * GB
