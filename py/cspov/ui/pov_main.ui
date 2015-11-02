@@ -14,7 +14,7 @@
    <bool>true</bool>
   </property>
   <property name="windowTitle">
-   <string>SIFT Beta 0.5.1</string>
+   <string>SIFT Beta 0.6.0</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -36,6 +36,9 @@
         </property>
         <property name="toolTip">
          <string>Pan/Zoom Tool</string>
+        </property>
+        <property name="statusTip">
+         <string>Left mouse click and drag pans the scene</string>
         </property>
         <property name="text">
          <string>Pan/Zoom</string>
@@ -74,6 +77,9 @@
         <property name="toolTip">
          <string>Point Probe Tool</string>
         </property>
+        <property name="statusTip">
+         <string>Left mouse click probes a single point in the scene</string>
+        </property>
         <property name="text">
          <string>Point</string>
         </property>
@@ -95,6 +101,9 @@
         </property>
         <property name="toolTip">
          <string>Region Probe Tool</string>
+        </property>
+        <property name="statusTip">
+         <string>Left mouse click creates a polygon vertex (click initial vertex to complete)</string>
         </property>
         <property name="text">
          <string>Region</string>
@@ -199,10 +208,10 @@
          </font>
         </property>
         <property name="toolTip">
-         <string>longitude/latitude location of point probe</string>
+         <string>Longitude/Latitude location of point probe</string>
         </property>
         <property name="statusTip">
-         <string>longitude/latitude coordinates under cursor</string>
+         <string>Longitude/Latitude coordinates under point probe</string>
         </property>
         <property name="text">
          <string>Probe Location: </string>
@@ -304,7 +313,7 @@
          <string>Value under cursor</string>
         </property>
         <property name="statusTip">
-         <string>Selected layer value under cursor</string>
+         <string>Top layer data value under point probe</string>
         </property>
         <property name="text">
          <string>Probe Value:</string>
