@@ -50,6 +50,7 @@ import logging
 
 LOG = logging.getLogger(__name__)
 PROGRESS_BAR_MAX = 1000
+STATUS_BAR_DURATION = 2000  # ms
 
 
 def test_layers_from_directory(ws, doc, layer_tiff_glob, range_txt=None):
@@ -267,8 +268,7 @@ class Main(QtGui.QMainWindow):
         # TODO: if this frame is part of the animation sequence, update the slider as well!
         uuids = self.behaviorLayersList.current_selected_uuids()
         if not uuids:
-            self.ui.cursorProbeText.setText('No layer selected?')
-            pass # FIXME: notify user
+            self.ui.statusbar.showMessage('ERROR: No layer selected', STATUS_BAR_DURATION)
         new_focus = None
         for uuid in uuids:
             new_focus = self.document.next_last_step(uuid, direction, bandwise=False)
@@ -309,13 +309,16 @@ class Main(QtGui.QMainWindow):
 
     def change_animation_to_current_selection_siblings(self, *args, **kwargs):
         uuid = self._next_last_time_visibility(direction=0)
+        if uuid is None:
+            self.ui.statusbar.showMessage("ERROR: No layer selected", STATUS_BAR_DURATION)
+            return
         # calculate the new animation sequence by consulting the guidebook
         uuids = self.document.animate_siblings_of_layer(uuid)
         if uuids:
-            self.ui.cursorProbeText.setText("Frame order updated")
+            self.ui.statusbar.showMessage("INFO: Frame order updated", STATUS_BAR_DURATION)
             self.behaviorLayersList.select(uuids)
         else:
-            self.ui.cursorProbeText.setText("Layer with time steps needed")
+            self.ui.statusbar.showMessage("ERROR: Layer with time steps or band siblings needed", STATUS_BAR_DURATION)
         LOG.info('using siblings of {} for animation loop'.format(uuids[0]))
 
     def set_animation_speed(self, milliseconds):
