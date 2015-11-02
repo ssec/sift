@@ -540,11 +540,15 @@ class Main(QtGui.QMainWindow):
         new_state = self.scene_manager.layer_set.toggle_animation()
         self.ui.animPlayPause.setChecked(new_state)
 
+    def _remove_paths_from_cache(self, paths):
+        self.workspace.remove_paths_from_cache(paths)
+        self.update_recent_file_menu()
+
     def open_from_cache(self, *args, **kwargs):
         if not self._open_cache_dialog:
             self._open_cache_dialog = OpenCacheDialog()
         paths = self.document.sort_paths(self.workspace.paths_in_cache)
-        self._open_cache_dialog.activate(paths, self.open_paths, self.workspace.remove_paths_from_cache)
+        self._open_cache_dialog.activate(paths, self.open_paths, self._remove_paths_from_cache)
 
     def remove_region_polygon(self, action:QtGui.QAction=None, *args):
         if self.scene_manager.has_pending_polygon():
