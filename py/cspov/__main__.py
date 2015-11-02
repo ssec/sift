@@ -223,7 +223,7 @@ class Main(QtGui.QMainWindow):
     _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
     _open_cache_dialog = None
 
-    def open_files(self, *args, files=None, **kwargs):
+    def interactive_open_files(self, *args, files=None, **kwargs):
         self.scene_manager.layer_set.animating = False
         files = QtGui.QFileDialog.getOpenFileNames(self,
                                                    "Select one or more files to open",
@@ -544,7 +544,7 @@ class Main(QtGui.QMainWindow):
         if not self._open_cache_dialog:
             self._open_cache_dialog = OpenCacheDialog()
         paths = self.document.sort_paths(self.workspace.paths_in_cache)
-        self._open_cache_dialog.activate(paths, self.open_files, self.workspace.remove_paths_from_cache)
+        self._open_cache_dialog.activate(paths, self.open_paths, self.workspace.remove_paths_from_cache)
 
     def remove_region_polygon(self, action:QtGui.QAction=None, *args):
         if self.scene_manager.has_pending_polygon():
@@ -560,7 +560,7 @@ class Main(QtGui.QMainWindow):
     def setup_menu(self):
         open_action = QtGui.QAction("&Open...", self)
         open_action.setShortcut("Ctrl+O")
-        open_action.triggered.connect(self.open_files)
+        open_action.triggered.connect(self.interactive_open_files)
 
         exit_action = QtGui.QAction("&Exit", self)
         exit_action.setShortcut("Ctrl+Q")
