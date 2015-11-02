@@ -67,6 +67,9 @@ class LayerWidgetDelegate(QStyledItemDelegate):
         return None
 
     def paint(self, painter, option, index):
+        """draw the individual lines in the layers control
+        """
+
         painter.save()
 
         color = QColor(187, 213, 255, 255) if index.row()%2==0 else QColor(177, 223, 255, 255)
@@ -77,6 +80,12 @@ class LayerWidgetDelegate(QStyledItemDelegate):
         text = index.data(Qt.DisplayRole)
         rect = option.rect
 
+        # if we have a value, break out the animation order and other info
+        animation_order = None
+        if value :
+            value, animation_order = value
+
+        # if we have a point probe value, draw the filled bar to represent where it is in that layer's data range
         if value:
             value, bar, fmt, unit = value
             w = bar * float(rect.width())
@@ -85,12 +94,41 @@ class LayerWidgetDelegate(QStyledItemDelegate):
 
         super(LayerWidgetDelegate, self).paint(painter, option, index)
 
+        # if this layer is selected, draw a colored rectangle to highlight it
         if option.state & QStyle.State_Selected and value:
             painter.fillRect(r, QColor(213, 187, 255, 96))
 
+        # draw the name of the layer
         painter.setPen(QPen(Qt.black))
-        painter.drawText(rect.left() + LEFT_OFFSET, rect.top()+TOP_OFFSET, rect.width()-LEFT_OFFSET, CELL_HEIGHT/2-TOP_OFFSET, Qt.AlignLeft, text)
+        bounds = painter.drawText(rect.left() + LEFT_OFFSET,
+                                  rect.top()+TOP_OFFSET,
+                                  rect.width()-LEFT_OFFSET,
+                                  CELL_HEIGHT/2-TOP_OFFSET,
+                                  Qt.AlignLeft,
+                                  text,
+                                  )
 
+        # also draw the animation order
+        if animation_order is not None:
+            painter.setPen(QPen(Qt.white))
+            ao_rect = QRect(bounds.right(),
+                            rect.top()+TOP_OFFSET,
+                            rect.width()-bounds.right(),
+                            CELL_HEIGHT/2-TOP_OFFSET,
+                            )
+            # draw the text once to get the bounding rectangle
+            bounds = painter.drawText(ao_rect,
+                                      Qt.AlignRight,
+                                      str(animation_order + 1),
+                                      )
+            painter.fillRect(bounds, Qt.black)
+            # draw the text a second time to make sure it appears in the rectangle
+            painter.drawText(ao_rect,
+                             Qt.AlignRight,
+                             str(animation_order + 1),
+                             )
+
+        # if we have a point probe value, draw text with it's value
         if value:
             painter.setPen(Qt.darkBlue)
             theight = CELL_HEIGHT/2
@@ -469,9 +507,14 @@ class LayerStackListViewModel(QAbstractListModel):
         info = el[row] if row<len(self.doc) else None
         if not info:
             return None
+
+        # pass auxiliary info about the layer through the Qt.UserRole for use when displaying
         leroy = self._last_equalizer_values.get(info[INFO.UUID], None)
         if role == Qt.UserRole:
-            return leroy
+            # get the animation order also
+            animation_order = self.doc.layer_animation_order(row)
+            return (leroy, animation_order)
+
         elif role == Qt.EditRole:
             return self.doc[index.row()] if index.row()<len(self.doc) else None
         elif role == Qt.CheckStateRole:
