@@ -179,10 +179,10 @@ class AHI_HSF_Guidebook(Guidebook):
         md = self.collect_info(dsi)
         if md[GUIDE.BAND] in [1, 2, 3, 4, 5, 6]:
             # Reflectance/visible data limits
-            return ('', lambda x, inverse=False: x)
+            return ('{:.03f}', '', lambda x, inverse=False: x)
         else:
-            # BT data limits
-            return ("°C", lambda x, inverse=False: x - 273.15 if not inverse else x + 273.15)
+            # BT data limits, Kelvin to degC
+            return ("{:.02f}", "°C", lambda x, inverse=False: x - 273.15 if not inverse else x + 273.15)
 
     def default_colormap(self, dsi):
         md = self.collect_info(dsi)

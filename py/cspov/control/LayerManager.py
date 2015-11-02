@@ -258,8 +258,8 @@ class SingleLayerInfoDisplay (QWidget) :
                 new_clims = ""
                 if this_prez is not None:
                     new_clims = np.array(this_prez.climits)
-                    unit, new_clims = self.document.convert_units(this_prez.uuid, new_clims, inverse=False)
-                    new_clims = '{:.3f} ~ {:.3f}{}'.format(new_clims[0], new_clims[1], unit)
+                    fmt, unit, new_clims = self.document.convert_units(this_prez.uuid, new_clims, inverse=False)
+                    new_clims = (fmt + ' ~ ' + fmt + '{}').format(new_clims[0], new_clims[1], unit)
                 if "climits" not in shared_info :
                     shared_info["climits"] = new_clims
                 else :

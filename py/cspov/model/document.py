@@ -257,8 +257,8 @@ class Document(QObject):
             yield p.colormap
 
     def convert_units(self, uuid, data, inverse=False):
-        unitstr, lam = self._guidebook.units_conversion(self._layer_with_uuid[uuid])
-        return unitstr, lam(data, inverse)
+        formatstr, unitstr, lam = self._guidebook.units_conversion(self._layer_with_uuid[uuid])
+        return formatstr, unitstr, lam(data, inverse)
 
     def flipped_for_uuids(self, uuids, lset=None):
         for p in self.prez_for_uuids(uuids, lset=lset):
@@ -276,7 +276,7 @@ class Document(QObject):
             if lyr[INFO.KIND] != KIND.IMAGE:
                 continue
             value = self._workspace.get_content_point(pinf.uuid, xy_pos)
-            unit_str, unit_conv = self._guidebook.units_conversion(self._layer_with_uuid[pinf.uuid])
+            fmt, unit_str, unit_conv = self._guidebook.units_conversion(self._layer_with_uuid[pinf.uuid])
             # calculate normalized bar width relative to its current clim
             nc, xc = unit_conv(np.array(pinf.climits))
             value = unit_conv(value)
@@ -284,7 +284,7 @@ class Document(QObject):
                 zult[pinf.uuid] = None
             else:
                 bar_width = (np.clip(value, nc, xc) - nc) / (xc - nc)
-                zult[pinf.uuid] = (value, bar_width, unit_str)
+                zult[pinf.uuid] = (value, bar_width, fmt, unit_str)
         self.didCalculateLayerEqualizerValues.emit(zult)  # is picked up by layer list model to update display
 
     # TODO, find out if this is needed/used and whether or not it's correct
