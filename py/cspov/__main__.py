@@ -449,6 +449,9 @@ class Main(QtGui.QMainWindow):
             # do whatever other updates the scene manager needs
             self.scene_manager.on_new_polygon(polygon_name, points)
 
+            if self.scene_manager._current_tool == TOOL.REGION_PROBE:
+                self.ui.panZoomToolButton.click()
+
         self.scene_manager.newProbePolygon.connect(update_probe_polygon)
 
         self.ui.mainWidgets.removeTab(0)
