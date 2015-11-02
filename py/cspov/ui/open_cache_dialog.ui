@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>593</width>
-    <height>417</height>
+    <height>427</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -39,11 +39,18 @@
      <item>
       <widget class="QPushButton" name="removeFromCacheButton">
        <property name="text">
-        <string>Remove Selected Files</string>
+        <string>Remove Selected Cached Layers</string>
        </property>
       </widget>
      </item>
     </layout>
+   </item>
+   <item>
+    <widget class="QLabel" name="commonPathLabel">
+     <property name="text">
+      <string>/</string>
+     </property>
+    </widget>
    </item>
    <item>
     <widget class="QListWidget" name="cacheListWidget">
