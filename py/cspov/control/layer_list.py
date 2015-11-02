@@ -69,8 +69,8 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     def paint(self, painter, option, index):
         painter.save()
 
-        # color = QColor(140, 183, 232, 255) if index.row()%2==0 else QColor(105, 168, 255, 255)
-        color = QColor(187, 213, 255, 255)
+        color = QColor(187, 213, 255, 255) if index.row()%2==0 else QColor(177, 223, 255, 255)
+        # color = QColor(187, 213, 255, 255)
         painter.setPen(QPen(color))
         painter.setFont(self.font)
         value = index.data(Qt.UserRole)
