@@ -164,8 +164,7 @@ class SingleLayerInfoDisplay (QWidget) :
         self.colormap_text = QLabel("")
         self.clims_text = QLabel("")
         self.cmap_vis = QWebView()
-        self.cmap_vis.setMaximumHeight(30)
-        self.cmap_vis.setMaximumWidth(3 * 100)
+        self.cmap_vis.setFixedSize(3 * 100, 30)
         self.cmap_vis.page().mainFrame().setScrollBarPolicy(Qt.Vertical, Qt.ScrollBarAlwaysOff)
 
         # set the layout
