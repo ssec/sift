@@ -475,6 +475,8 @@ class ProbeGraphDisplay (object) :
         doPlotVS = self.yCheckBox.isChecked()
         task_name = "%s_%s_region_plotting" % (self.xSelectedUUID, self.ySelectedUUID)
         self.queue.add(task_name, self._rebuild_plot_task(self.xSelectedUUID, self.ySelectedUUID, self.polygon, plot_versus=doPlotVS), "Creating plot for region probe data", interactive=True)
+        # Assume that the task gets resolved otherwise we might try to draw multiple times
+        self._stale = False
 
     def _rebuild_plot_task(self, x_uuid, y_uuid, polygon, plot_versus=False):
 
@@ -524,7 +526,6 @@ class ProbeGraphDisplay (object) :
             self.clearPlot()
 
         yield {TASK_DOING: 'Probe Plot: Drawing plot...', TASK_PROGRESS: 0.95}
-        self._stale = False
         self.manager.drawChildGraph.emit(self.myName)
         yield {TASK_DOING: 'Probe Plot: Done', TASK_PROGRESS: 1.0}
 
