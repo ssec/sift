@@ -288,6 +288,14 @@ class Main(QtGui.QMainWindow):
         self.ui.progressText.setText(txt)
         #LOG.warning('progress bar updated to {}'.format(val))
 
+    def reset_frame_slider(self, *args, **kwargs):
+        frame_count = len(self.document.current_animation_order)
+        frame_index = None # self.scene_manager.layer_set._frame_number  # FIXME BAAD
+        self.ui.animationSlider.setRange(0, frame_count-1)
+        self.ui.animationSlider.setValue(frame_index or 0)
+        self.ui.animPlayPause.setDown(False)
+        self.ui.animationSlider.repaint()
+
     def update_frame_slider(self, frame_info):
         """
         animation is in progress or completed
@@ -329,7 +337,7 @@ class Main(QtGui.QMainWindow):
             new_focus = self.document.next_last_step(uuid, direction, bandwise=False)
         return new_focus
 
-    def update_slider_if_frame_is_in_animation(self, uuid):
+    def update_slider_if_frame_is_in_animation(self, uuid, **kwargs):
         # FUTURE: this could be a cheaper operation but it's probably fine since it's input-driven
         cao = self.document.current_animation_order
         try:
@@ -399,6 +407,10 @@ class Main(QtGui.QMainWindow):
 
     def toggle_animation(self, event, *args, **kwargs):
         self.scene_manager.layer_set.toggle_animation(*args, **kwargs)
+
+    def animation_reset_by_layer_set_switch(self, *args, **kwargs):
+        self.reset_frame_slider()
+        self.update_frame_time_to_top_visible()
 
     # def accept_new_layer(self, new_order, info, overview_content):
     #     LOG.debug('accepting new layer order {0!r:s}'.format(new_order))
@@ -517,12 +529,12 @@ class Main(QtGui.QMainWindow):
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
         self.document.didChangeColormap.connect(self.scene_manager.change_layers_colormap)
         self.document.didChangeColorLimits.connect(self.scene_manager.change_layers_color_limits)
-        self.document.didSwitchLayerSet.connect(self.update_slider_if_frame_is_in_animation)
+        self.document.didSwitchLayerSet.connect(self.animation_reset_by_layer_set_switch)
 
         self.document.didChangeLayerVisibility.connect(self.update_frame_time_to_top_visible)
         self.document.didReorderLayers.connect(self.update_frame_time_to_top_visible)
         self.document.didRemoveLayers.connect(self.update_frame_time_to_top_visible)
-        self.document.didAddLayer.connect(self.update_frame_time_to_top_visible)
+        self.document.didAddLayer.connect(self.animation_reset_by_layer_set_switch)
 
         self.ui.panZoomToolButton.toggled.connect(partial(self.change_tool, name=TOOL.PAN_ZOOM))
         self.ui.pointSelectButton.toggled.connect(partial(self.change_tool, name=TOOL.POINT_PROBE))
