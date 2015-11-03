@@ -231,6 +231,10 @@ class LayerSet(object):
     def update_layers_z(self):
         for z_level, uuid in enumerate(self._layer_order):
             self._layers[uuid].transform = STTransform(translate=(0, 0, 0-int(z_level)))
+            self._layers[uuid].order = len(self._layer_order) - int(z_level)
+        # Need to tell the scene to recalculate the drawing order (HACK, but it works)
+        # FIXME: This should probably be accomplished by overriding the right method from the Node or Visual class
+        self.parent.main_canvas._update_scenegraph(None)
 
     # def set_layer_z(self, uuid, z_level):
     #     """
@@ -551,7 +555,7 @@ class SceneGraphManager(QObject):
         # marker default is 60, polygon default is 50 so markers can be put on top of polygons
         z = float(kwargs.get("z", 50))
         poly = Polygon(parent=self.main_map, pos=points, **kwargs)
-        poly.order = 5  # set polygons to be drawn last (stops 'see through' polygons)
+        poly.order = 50  # set polygons to be drawn last (stops 'see through' polygons)
         poly.transform = STTransform(translate=(0, 0, z))
         if probe_name in self.polygon_probes :
             self.polygon_probes[probe_name].parent = None
