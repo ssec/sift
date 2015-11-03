@@ -48,8 +48,8 @@ COLUMNS=('Visibility', 'Name', 'Enhancement')
 
 CELL_HEIGHT = 36 if 'darwin' in sys.platform else 64
 CELL_WIDTH = 100 if 'darwin' in sys.platform else 128
-LEFT_OFFSET = 28
-TOP_OFFSET = 4
+LEFT_OFFSET = 28 if 'darwin' in sys.platform else 32
+TOP_OFFSET = 3
 
 class LayerWidgetDelegate(QStyledItemDelegate):
     """
