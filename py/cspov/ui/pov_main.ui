@@ -525,6 +525,12 @@
     <layout class="QVBoxLayout" name="verticalLayout">
      <item>
       <widget class="QTabWidget" name="layerSetTabs">
+       <property name="minimumSize">
+        <size>
+         <width>160</width>
+         <height>0</height>
+        </size>
+       </property>
        <property name="toolTip">
         <string>Alternate layer sets</string>
        </property>

@@ -236,6 +236,7 @@ class Ui_MainWindow(object):
         self.verticalLayout = QtGui.QVBoxLayout(self.dockWidgetContents_5)
         self.verticalLayout.setObjectName(_fromUtf8("verticalLayout"))
         self.layerSetTabs = QtGui.QTabWidget(self.dockWidgetContents_5)
+        self.layerSetTabs.setMinimumSize(QtCore.QSize(160, 0))
         self.layerSetTabs.setObjectName(_fromUtf8("layerSetTabs"))
         self.tab_plusL = QtGui.QWidget()
         self.tab_plusL.setObjectName(_fromUtf8("tab_plusL"))
