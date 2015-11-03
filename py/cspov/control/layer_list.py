@@ -33,10 +33,10 @@ from PyQt4.QtCore import QObject
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import logging
+import logging, sys, os
 import pickle as pkl
 from PyQt4.QtCore import QAbstractListModel, Qt, QSize, QModelIndex, QPoint, QMimeData, pyqtSignal, QRect
-from PyQt4.QtGui import QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QColor, QFont, QStyleOptionViewItem, QItemSelection, QItemSelectionModel, QPen
+from PyQt4.QtGui import QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyle, QColor, QFont, QStyleOptionViewItem, QItemSelection, QItemSelectionModel, QPen
 from cspov.model.document import Document
 from cspov.common import INFO, KIND
 from cspov.view.Colormap import ALL_COLORMAPS, CATEGORIZED_COLORMAPS
@@ -46,78 +46,103 @@ LOG = logging.getLogger(__name__)
 
 COLUMNS=('Visibility', 'Name', 'Enhancement')
 
+CELL_HEIGHT = 36 if 'darwin' in sys.platform else 48
+LEFT_OFFSET = 28
+TOP_OFFSET = 4
+
 class LayerWidgetDelegate(QStyledItemDelegate):
     """
     set for a specific column, controls the rendering and editing of items in that column or row of a list or table
     see QAbstractItemView.setItemDelegateForRow/Column
     """
+
     def __init__(self, *args, **kwargs):
         super(LayerWidgetDelegate, self).__init__(*args, **kwargs)
-        self.font = QFont('Andale Mono', 12)
+        self.font = QFont('Andale Mono', 12) if 'darwin' in sys.platform else QFont('Verdana', 11)
 
     def sizeHint(self, option:QStyleOptionViewItem, index:QModelIndex):
-        return QSize(100,36)
+        return QSize(100, CELL_HEIGHT)
 
     def displayText(self, *args, **kwargs):
         return None
 
     def paint(self, painter, option, index):
+        """draw the individual lines in the layers control
+        """
+
         painter.save()
-        # shiftopt = QStyleOptionViewItem(option)
-        # shiftopt.rect = QRect(option.rect.left(), option.rect.top(), option.rect.width(), option.rect.height()-12)
 
-        # painter.setPen(QPen(Qt.NoPen))
-        # if option.state & QtGui.QStyle.State_Selected:
-        #     brush = QtGui.QBrush(QtGui.QColor("#66ff71"))
-        #     painter.setBrush(brush)
-        #
-        # else:
-        #     brush = QtGui.QBrush(QtCore.Qt.white)
-        #     painter.setBrush(brush)
-
-        # add an equalizer bar
-        # painter.setPen(QPen(Qt.blue))
-        color = QColor(64, 24, 255, 64)
+        color = QColor(187, 213, 255, 255) if index.row()%2==0 else QColor(177, 223, 255, 255)
+        # color = QColor(187, 213, 255, 255)
         painter.setPen(QPen(color))
+        painter.setFont(self.font)
         value = index.data(Qt.UserRole)
         text = index.data(Qt.DisplayRole)
         rect = option.rect
+
+        # if we have a value, break out the animation order and other info
+        animation_order = None
+        if value :
+            value, animation_order = value
+
+        # if we have a point probe value, draw the filled bar to represent where it is in that layer's data range
         if value:
-            value, bar, unit = value
+            value, bar, fmt, unit = value
             w = bar * float(rect.width())
-            # h = 4
-            # r = QRect(rect.left(), rect.top() + rect.height() - h, int(w), h)
             r = QRect(rect.left(), rect.top(), int(w), rect.height())
             painter.fillRect(r, color)
-            # h = 8
-            # r = QRect(rect.left(), rect.top() + rect.height() - h, int(w), h)
-            # r = QRect(rect.left()+48, rect.top(), rect.width()-48, rect.height())
-            # painter.setFont(self.font)
-            # shiftopt = QStyleOptionViewItem(option)
-            # shiftopt.rect = r
-            # painter.setPen(Qt.darkBlue)
-            # painter.drawText(rect.left() + 2, rect.top() + 4, '%7.2f' % value)
+
         super(LayerWidgetDelegate, self).paint(painter, option, index)
 
-        painter.setPen(QPen(Qt.black))
-        painter.drawText(rect.left() + 32, rect.top()+4, rect.width()-32, 16, Qt.AlignLeft, text)
+        # if this layer is selected, draw a colored rectangle to highlight it
+        if option.state & QStyle.State_Selected and value:
+            painter.fillRect(r, QColor(213, 187, 255, 96))
 
+        # draw the name of the layer
+        painter.setPen(QPen(Qt.black))
+        bounds = painter.drawText(rect.left() + LEFT_OFFSET,
+                                  rect.top()+TOP_OFFSET,
+                                  rect.width()-LEFT_OFFSET,
+                                  CELL_HEIGHT/2-TOP_OFFSET,
+                                  Qt.AlignLeft,
+                                  text,
+                                  )
+
+        # also draw the animation order
+        if animation_order is not None:
+            painter.setPen(QPen(Qt.white))
+            ao_rect = QRect(bounds.right(),
+                            rect.top()+TOP_OFFSET,
+                            rect.width()-bounds.right(),
+                            CELL_HEIGHT/2-TOP_OFFSET,
+                            )
+            # draw the text once to get the bounding rectangle
+            bounds = painter.drawText(ao_rect,
+                                      Qt.AlignRight,
+                                      str(animation_order + 1),
+                                      )
+            painter.fillRect(bounds, Qt.black)
+            # draw the text a second time to make sure it appears in the rectangle
+            painter.drawText(ao_rect,
+                             Qt.AlignRight,
+                             str(animation_order + 1),
+                             )
+
+        # if we have a point probe value, draw text with it's value
         if value:
-            painter.setFont(self.font)
             painter.setPen(Qt.darkBlue)
-            theight = 17
+            theight = CELL_HEIGHT/2
             t = rect.top() + rect.height() - theight
-            if w < 48:
-                l = max(int(w), 32)
+            if w < rect.width()/3:  # place the text to the right of the bar instead of inside
+                l = max(int(w), LEFT_OFFSET)
                 r = rect.width()
                 align = Qt.AlignLeft
             else:
                 l = 0
                 r = w
                 align = Qt.AlignRight
-            painter.drawText(l, t, r-l, theight, align, '%.2f' % value)
+            painter.drawText(l, t, r-l, theight, align, fmt.format(value))
 
-        #QtGui.QStyledItemDelegate.paint(self, painter, option, index)
         painter.restore()
 
 
@@ -242,7 +267,7 @@ class LayerStackListViewModel(QAbstractListModel):
         # listbox.setMovement(QListView.Snap)
         # listbox.setDragDropMode(QListView.InternalMove)
         listbox.setDragDropMode(QAbstractItemView.DragDrop)
-        listbox.setAlternatingRowColors(True)
+        # listbox.setAlternatingRowColors(True)
         # listbox.setDefaultDropAction(Qt.MoveAction)
         # listbox.setDragDropOverwriteMode(False)
         # listbox.entered.connect(self.layer_entered)
@@ -482,9 +507,14 @@ class LayerStackListViewModel(QAbstractListModel):
         info = el[row] if row<len(self.doc) else None
         if not info:
             return None
+
+        # pass auxiliary info about the layer through the Qt.UserRole for use when displaying
         leroy = self._last_equalizer_values.get(info[INFO.UUID], None)
         if role == Qt.UserRole:
-            return leroy
+            # get the animation order also
+            animation_order = self.doc.layer_animation_order(row)
+            return (leroy, animation_order)
+
         elif role == Qt.EditRole:
             return self.doc[index.row()] if index.row()<len(self.doc) else None
         elif role == Qt.CheckStateRole:

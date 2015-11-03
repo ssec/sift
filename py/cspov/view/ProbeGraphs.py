@@ -30,7 +30,56 @@ from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as Navigatio
 from matplotlib.figure import Figure
 from matplotlib.colors import LogNorm
 
+# Stuff for custom toolbars
+try:
+    import six
+    from matplotlib.backends.qt_compat import QtWidgets
+    import matplotlib.backends.qt_editor.figureoptions as figureoptions
+except ImportError:
+    figureoptions = None
+
 LOG = logging.getLogger(__name__)
+
+
+class NavigationToolbar(NavigationToolbar):
+    """Custom matplotlib toolbar
+    """
+    def edit_parameters(self):
+        allaxes = self.canvas.figure.get_axes()
+        if len(allaxes) == 1:
+            axes = allaxes[0]
+        else:
+            titles = []
+            for axes in allaxes:
+                title = axes.get_title()
+                ylabel = axes.get_ylabel()
+                label = axes.get_label()
+                if title:
+                    fmt = "%(title)s"
+                    # if ylabel:
+                    #     fmt += ": %(ylabel)s"
+                    # fmt += " (%(axes_repr)s)"
+                elif ylabel:
+                    fmt = "%(axes_repr)s (%(ylabel)s)"
+                elif label:
+                    fmt = "%(axes_repr)s (%(label)s)"
+                else:
+                    fmt = "%(axes_repr)s"
+                titles.append(fmt % dict(title=title,
+                                         ylabel=ylabel, label=label,
+                                         axes_repr=repr(axes)))
+            if len(titles) == 2 and "Colorbar" in titles:
+                other_idx = titles.index("Colorbar") - 1
+                axes = allaxes[other_idx]
+            else:
+                item, ok = QtWidgets.QInputDialog.getItem(
+                    self.parent, 'Customize', 'Select axes:', titles, 0, False)
+                if ok:
+                    axes = allaxes[titles.index(six.text_type(item))]
+                else:
+                    return
+
+        figureoptions.figure_edit(axes, self)
 
 class ProbeGraphManager (QObject) :
     """The ProbeGraphManager manages the many tabs of the Area Probe Graphs.
@@ -105,7 +154,7 @@ class ProbeGraphManager (QObject) :
         self.tab_widget_object.insertTab(tab_index, temp_widget, self.max_tab_letter)
 
         # create the associated graph display object
-        graph = ProbeGraphDisplay(self, temp_widget, self.workspace, self.queue, self.max_tab_letter)
+        graph = ProbeGraphDisplay(self, temp_widget, self.workspace, self.queue, self.document, self.max_tab_letter)
         self.graphs.append(graph)
 
         # load up the layers for this new tab
@@ -205,6 +254,7 @@ class ProbeGraphDisplay (object) :
     manager         = None
     workspace       = None
     queue           = None
+    document        = None
 
     # internal values that control the behavior of plotting and controls
     xSelectedUUID   = None
@@ -212,7 +262,7 @@ class ProbeGraphDisplay (object) :
     uuidMap         = None  # this is needed because the drop downs can't properly handle objects as ids
     _stale          = True  # whether or not the plot needs to be redrawn
 
-    def __init__(self, manager, qt_parent, workspace, queue, name_str):
+    def __init__(self, manager, qt_parent, workspace, queue, document, name_str):
         """build the graph tab controls
         :return:
         """
@@ -224,6 +274,7 @@ class ProbeGraphDisplay (object) :
         self.manager = manager
         self.workspace = workspace
         self.queue = queue
+        self.document = document
 
         # a figure instance to plot on
         self.figure = Figure(figsize=(3,3), dpi=72)
@@ -433,6 +484,7 @@ class ProbeGraphDisplay (object) :
 
             # get the data and info we need for this plot
             data_polygon = self.workspace.get_content_polygon(x_uuid, polygon)
+            fmt, units, data_polygon = self.document.convert_units(x_uuid, data_polygon)
             title = self.workspace.get_info(x_uuid)[INFO.NAME]
 
             # plot a histogram
@@ -448,15 +500,18 @@ class ProbeGraphDisplay (object) :
             name2 = self.workspace.get_info(y_uuid)[INFO.NAME]
             hires_uuid = self.workspace.lowest_resolution_uuid(x_uuid, y_uuid)
             hires_coord_mask, hires_data = self.workspace.get_coordinate_mask_polygon(hires_uuid, polygon)
+            _, _, hires_data = self.document.convert_units(hires_uuid, hires_data)
             yield {TASK_DOING: 'Probe Plot: Collecting polygon data (layer 2)...', TASK_PROGRESS: 0.15}
             if hires_uuid is x_uuid:
                 # the hires data was from the X UUID
                 data1 = hires_data
                 data2 = self.workspace.get_content_coordinate_mask(y_uuid, hires_coord_mask)
+                _, _, data2 = self.document.convert_units(y_uuid, data2)
             else:
                 # the hires data was from the Y UUID
                 data2 = hires_data
                 data1 = self.workspace.get_content_coordinate_mask(x_uuid, hires_coord_mask)
+                _, _, data1 = self.document.convert_units(x_uuid, data1)
             yield {TASK_DOING: 'Probe Plot: Creating scatter plot...', TASK_PROGRESS: 0.25}
 
             # plot a scatter plot
@@ -532,6 +587,7 @@ class ProbeGraphDisplay (object) :
                           interpolation='nearest', norm=LogNorm())
 
         colorbar = self.figure.colorbar(img)
+        colorbar.ax.set_title("Colorbar")  # for the 'Customize' menu in the MPL toolbar
         colorbar.set_label('log(count of data points)')
 
         # set the various text labels
