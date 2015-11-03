@@ -353,7 +353,6 @@ class Main(QtGui.QMainWindow):
         self.behaviorLayersList.select([new_focus])
         # if this part of the animation cycle, update the animation slider and displayed time as well
         self.update_slider_if_frame_is_in_animation(new_focus)
-        # FIXME: force animation off
         return new_focus
         # self.document.animate_siblings_of_layer(new_focus)
         self.update_frame_time_to_top_visible()
@@ -369,6 +368,7 @@ class Main(QtGui.QMainWindow):
         if new_focus is not None:
             self.behaviorLayersList.select([new_focus])
             self.update_frame_time_to_top_visible()
+            self.update_slider_if_frame_is_in_animation(new_focus)
 
     def change_animation_to_current_selection_siblings(self, *args, **kwargs):
         uuid = self._next_last_time_visibility(direction=0)
