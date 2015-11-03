@@ -517,6 +517,7 @@ class Main(QtGui.QMainWindow):
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
         self.document.didChangeColormap.connect(self.scene_manager.change_layers_colormap)
         self.document.didChangeColorLimits.connect(self.scene_manager.change_layers_color_limits)
+        self.document.didSwitchLayerSet.connect(self.update_slider_if_frame_is_in_animation)
 
         self.document.didChangeLayerVisibility.connect(self.update_frame_time_to_top_visible)
         self.document.didReorderLayers.connect(self.update_frame_time_to_top_visible)

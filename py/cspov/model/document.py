@@ -460,6 +460,7 @@ class Document(QObject):
         # LOG.debug('layer {0} family is +{1} of {2!r:s}'.format(uuid, dex, sibs))
         if not sibs:
             LOG.info('nothing to do in next_last_timestep')
+            self.toggle_layer_visibility(uuid, True)
             return uuid
         dex += delta + len(sibs)
         dex %= len(sibs)
