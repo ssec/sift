@@ -221,11 +221,12 @@ class LayerSet(object):
                 LOG.error('set_frame_order cannot deal with unknown layer {}'.format(o))
                 return
         self._frame_order = frame_order
+        # ticket #92: this is not a good idea
         self._frame_number = 0
-        LOG.debug('accepted new frame order of length {}'.format(len(frame_order)))
-        if self._frame_change_cb is not None and self._frame_order:
-            uuid = self._frame_order[self._frame_number]
-            self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating, uuid))
+        # LOG.debug('accepted new frame order of length {}'.format(len(frame_order)))
+        # if self._frame_change_cb is not None and self._frame_order:
+        #     uuid = self._frame_order[self._frame_number]
+        #     self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating, uuid))
 
     def update_layers_z(self):
         for z_level, uuid in enumerate(self._layer_order):
