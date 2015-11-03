@@ -279,6 +279,8 @@ class Document(QObject):
             fmt, unit_str, unit_conv = self._guidebook.units_conversion(self._layer_with_uuid[pinf.uuid])
             # calculate normalized bar width relative to its current clim
             nc, xc = unit_conv(np.array(pinf.climits))
+            if nc > xc:  # sometimes clim is swapped to reverse color scale
+                nc, xc = xc, nc
             value = unit_conv(value)
             if np.isnan(value):
                 zult[pinf.uuid] = None
