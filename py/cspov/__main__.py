@@ -734,7 +734,15 @@ def main():
         border_shapefile=args.border_shapefile,
         center=args.center,
     )
-    window.show()
+    if 'darwin' not in sys.platform:
+        # window.resize(2000,1000)
+        screen = QtGui.QDesktopWidget().screenGeometry()
+        w,h  = screen.width() - 400, screen.height() - 300
+        window.setGeometry(200, 150, w, h)
+        # window.showMaximized()
+        window.show()
+    else:
+        window.show()
     print("running")
     # bring window to front
     window.raise_()
