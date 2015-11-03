@@ -551,6 +551,14 @@ class Main(QtGui.QMainWindow):
         paths = self.document.sort_paths(self.workspace.paths_in_cache)
         self._open_cache_dialog.activate(paths, self.open_paths, self._remove_paths_from_cache)
 
+    def open_glob(self, *args, **kwargs):
+        text, ok = QtGui.QInputDialog.getText(self, 'Open Glob Pattern',
+            'Open files matching pattern:')
+        from glob import glob
+        if ok:
+            paths = list(glob(text))
+            self.open_paths(paths)
+
     def remove_region_polygon(self, action:QtGui.QAction=None, *args):
         if self.scene_manager.has_pending_polygon():
             print("Clearing pending")
@@ -575,11 +583,17 @@ class Main(QtGui.QMainWindow):
         open_cache_action.setShortcut("Ctrl+A")
         open_cache_action.triggered.connect(self.open_from_cache)
 
+        open_glob_action = QtGui.QAction("Open Filename Pattern...", self)
+        open_glob_action.setShortcut("Ctrl+Shift+O")
+        open_glob_action.triggered.connect(self.open_glob)
+
         menubar = self.ui.menubar
         file_menu = menubar.addMenu('&File')
         file_menu.addAction(open_action)
         file_menu.addAction(open_cache_action)
+        file_menu.addAction(open_glob_action)
         self._recent_files_menu = file_menu.addMenu('Open Recent')
+
         file_menu.addAction(exit_action)
 
         next_time = QtGui.QAction("Next Time", self)

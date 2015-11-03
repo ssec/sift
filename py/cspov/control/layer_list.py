@@ -46,9 +46,10 @@ LOG = logging.getLogger(__name__)
 
 COLUMNS=('Visibility', 'Name', 'Enhancement')
 
-CELL_HEIGHT = 36 if 'darwin' in sys.platform else 48
-LEFT_OFFSET = 28
-TOP_OFFSET = 4
+CELL_HEIGHT = 36 if 'darwin' in sys.platform else 64
+CELL_WIDTH = 100 if 'darwin' in sys.platform else 128
+LEFT_OFFSET = 28 if 'darwin' in sys.platform else 32
+TOP_OFFSET = 3
 
 class LayerWidgetDelegate(QStyledItemDelegate):
     """
@@ -58,10 +59,10 @@ class LayerWidgetDelegate(QStyledItemDelegate):
 
     def __init__(self, *args, **kwargs):
         super(LayerWidgetDelegate, self).__init__(*args, **kwargs)
-        self.font = QFont('Andale Mono', 12) if 'darwin' in sys.platform else QFont('Verdana', 11)
+        self.font = QFont('Andale Mono', 12) if 'darwin' in sys.platform else QFont('Verdana', 10)
 
     def sizeHint(self, option:QStyleOptionViewItem, index:QModelIndex):
-        return QSize(100, CELL_HEIGHT)
+        return QSize(CELL_WIDTH, CELL_HEIGHT)
 
     def displayText(self, *args, **kwargs):
         return None

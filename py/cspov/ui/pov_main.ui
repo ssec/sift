@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1309</width>
-    <height>807</height>
+    <width>1397</width>
+    <height>800</height>
    </rect>
   </property>
   <property name="acceptDrops">
@@ -133,7 +133,7 @@
        <widget class="QLabel" name="cursorProbeLocation">
         <property name="minimumSize">
          <size>
-          <width>256</width>
+          <width>280</width>
           <height>0</height>
          </size>
         </property>
@@ -229,7 +229,7 @@
        <widget class="QLabel" name="cursorProbeText">
         <property name="minimumSize">
          <size>
-          <width>240</width>
+          <width>280</width>
           <height>0</height>
          </size>
         </property>
@@ -472,7 +472,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1309</width>
+     <width>1397</width>
      <height>22</height>
     </rect>
    </property>
