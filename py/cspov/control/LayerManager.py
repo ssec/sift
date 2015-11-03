@@ -319,7 +319,7 @@ class SingleLayerInfoDisplay (QWidget) :
             self.instrument_text.setText("Instrument: " + temp_inst)
             temp_band = shared_info[GUIDE.BAND] if GUIDE.BAND in shared_info else ""
             self.band_text.setText("Band: " + temp_band)
-            temp_cmap = shared_info["colormap"] if "colormap" in shared_info else ""
+            temp_cmap = shared_info["colormap"] if shared_info.get("colormap", None) is not None else ""
             self.colormap_text.setText("Colormap: " + temp_cmap)
             temp_clims = shared_info["climits"] if "climits" in shared_info else ""
             self.clims_text.setText("C-Limits: " + temp_clims)
