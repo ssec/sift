@@ -25,7 +25,7 @@ except AttributeError:
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName(_fromUtf8("MainWindow"))
-        MainWindow.resize(1309, 807)
+        MainWindow.resize(1397, 800)
         MainWindow.setAcceptDrops(True)
         self.centralwidget = QtGui.QWidget(MainWindow)
         self.centralwidget.setObjectName(_fromUtf8("centralwidget"))
@@ -73,7 +73,7 @@ class Ui_MainWindow(object):
         spacerItem = QtGui.QSpacerItem(40, 20, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
         self.horizontalLayout_2.addItem(spacerItem)
         self.cursorProbeLocation = QtGui.QLabel(self.centralwidget)
-        self.cursorProbeLocation.setMinimumSize(QtCore.QSize(256, 0))
+        self.cursorProbeLocation.setMinimumSize(QtCore.QSize(280, 0))
         palette = QtGui.QPalette()
         brush = QtGui.QBrush(QtGui.QColor(17, 71, 5))
         brush.setStyle(QtCore.Qt.SolidPattern)
@@ -106,7 +106,7 @@ class Ui_MainWindow(object):
         self.line.setObjectName(_fromUtf8("line"))
         self.horizontalLayout_2.addWidget(self.line)
         self.cursorProbeText = QtGui.QLabel(self.centralwidget)
-        self.cursorProbeText.setMinimumSize(QtCore.QSize(240, 0))
+        self.cursorProbeText.setMinimumSize(QtCore.QSize(280, 0))
         self.cursorProbeText.setMaximumSize(QtCore.QSize(256, 16777215))
         palette = QtGui.QPalette()
         brush = QtGui.QBrush(QtGui.QColor(17, 71, 5))
@@ -203,7 +203,7 @@ class Ui_MainWindow(object):
         self.verticalLayout_2.addWidget(self.groupBox)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtGui.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1309, 22))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 1397, 22))
         self.menubar.setObjectName(_fromUtf8("menubar"))
         MainWindow.setMenuBar(self.menubar)
         self.statusbar = QtGui.QStatusBar(MainWindow)
@@ -236,6 +236,7 @@ class Ui_MainWindow(object):
         self.verticalLayout = QtGui.QVBoxLayout(self.dockWidgetContents_5)
         self.verticalLayout.setObjectName(_fromUtf8("verticalLayout"))
         self.layerSetTabs = QtGui.QTabWidget(self.dockWidgetContents_5)
+        self.layerSetTabs.setMinimumSize(QtCore.QSize(160, 0))
         self.layerSetTabs.setObjectName(_fromUtf8("layerSetTabs"))
         self.tab_plusL = QtGui.QWidget()
         self.tab_plusL.setObjectName(_fromUtf8("tab_plusL"))
@@ -267,7 +268,7 @@ class Ui_MainWindow(object):
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
-        MainWindow.setWindowTitle(_translate("MainWindow", "SIFT Beta 0.7.0", None))
+        MainWindow.setWindowTitle(_translate("MainWindow", "SIFT Beta 0.7.1", None))
         self.panZoomToolButton.setToolTip(_translate("MainWindow", "Pan/Zoom Tool", None))
         self.panZoomToolButton.setStatusTip(_translate("MainWindow", "Left mouse click and drag pans the scene", None))
         self.panZoomToolButton.setText(_translate("MainWindow", "Pan/Zoom", None))

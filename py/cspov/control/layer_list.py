@@ -47,8 +47,9 @@ LOG = logging.getLogger(__name__)
 COLUMNS=('Visibility', 'Name', 'Enhancement')
 
 CELL_HEIGHT = 36 if 'darwin' in sys.platform else 48
-LEFT_OFFSET = 28
-TOP_OFFSET = 4
+CELL_WIDTH = 128 if 'darwin' in sys.platform else 160
+LEFT_OFFSET = 28 if 'darwin' in sys.platform else 32
+TOP_OFFSET = 3
 
 class LayerWidgetDelegate(QStyledItemDelegate):
     """
@@ -58,10 +59,10 @@ class LayerWidgetDelegate(QStyledItemDelegate):
 
     def __init__(self, *args, **kwargs):
         super(LayerWidgetDelegate, self).__init__(*args, **kwargs)
-        self.font = QFont('Andale Mono', 12) if 'darwin' in sys.platform else QFont('Verdana', 11)
+        self.font = QFont('Andale Mono', 12) if 'darwin' in sys.platform else QFont('Andale Mono', 7)
 
     def sizeHint(self, option:QStyleOptionViewItem, index:QModelIndex):
-        return QSize(100, CELL_HEIGHT)
+        return QSize(CELL_WIDTH, CELL_HEIGHT)
 
     def displayText(self, *args, **kwargs):
         return None
@@ -100,6 +101,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
 
         # draw the name of the layer
         painter.setPen(QPen(Qt.black))
+        painter.setFont(self.font)
         bounds = painter.drawText(rect.left() + LEFT_OFFSET,
                                   rect.top()+TOP_OFFSET,
                                   rect.width()-LEFT_OFFSET,
@@ -236,6 +238,7 @@ class LayerStackListViewModel(QAbstractListModel):
         doc.didReorderLayers.connect(self.refresh)
         doc.didRemoveLayers.connect(self.drop_layers_just_removed)
         doc.didChangeColormap.connect(self.refresh)
+        doc.didChangeColorLimits.connect(self.refresh)
         doc.didChangeLayerVisibility.connect(self.refresh)
         doc.didChangeLayerName.connect(self.refresh)
         doc.didAddLayer.connect(self.doc_added_layer)

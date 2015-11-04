@@ -288,6 +288,14 @@ class Main(QtGui.QMainWindow):
         self.ui.progressText.setText(txt)
         #LOG.warning('progress bar updated to {}'.format(val))
 
+    def reset_frame_slider(self, *args, **kwargs):
+        frame_count = len(self.document.current_animation_order)
+        frame_index = None # self.scene_manager.layer_set._frame_number  # FIXME BAAD
+        self.ui.animationSlider.setRange(0, frame_count-1)
+        self.ui.animationSlider.setValue(frame_index or 0)
+        self.ui.animPlayPause.setDown(False)
+        self.ui.animationSlider.repaint()
+
     def update_frame_slider(self, frame_info):
         """
         animation is in progress or completed
@@ -329,7 +337,7 @@ class Main(QtGui.QMainWindow):
             new_focus = self.document.next_last_step(uuid, direction, bandwise=False)
         return new_focus
 
-    def update_slider_if_frame_is_in_animation(self, uuid):
+    def update_slider_if_frame_is_in_animation(self, uuid, **kwargs):
         # FUTURE: this could be a cheaper operation but it's probably fine since it's input-driven
         cao = self.document.current_animation_order
         try:
@@ -345,7 +353,6 @@ class Main(QtGui.QMainWindow):
         self.behaviorLayersList.select([new_focus])
         # if this part of the animation cycle, update the animation slider and displayed time as well
         self.update_slider_if_frame_is_in_animation(new_focus)
-        # FIXME: force animation off
         return new_focus
         # self.document.animate_siblings_of_layer(new_focus)
         self.update_frame_time_to_top_visible()
@@ -361,6 +368,7 @@ class Main(QtGui.QMainWindow):
         if new_focus is not None:
             self.behaviorLayersList.select([new_focus])
             self.update_frame_time_to_top_visible()
+            self.update_slider_if_frame_is_in_animation(new_focus)
 
     def change_animation_to_current_selection_siblings(self, *args, **kwargs):
         uuid = self._next_last_time_visibility(direction=0)
@@ -399,6 +407,10 @@ class Main(QtGui.QMainWindow):
 
     def toggle_animation(self, event, *args, **kwargs):
         self.scene_manager.layer_set.toggle_animation(*args, **kwargs)
+
+    def animation_reset_by_layer_set_switch(self, *args, **kwargs):
+        self.reset_frame_slider()
+        self.update_frame_time_to_top_visible()
 
     # def accept_new_layer(self, new_order, info, overview_content):
     #     LOG.debug('accepting new layer order {0!r:s}'.format(new_order))
@@ -517,11 +529,12 @@ class Main(QtGui.QMainWindow):
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
         self.document.didChangeColormap.connect(self.scene_manager.change_layers_colormap)
         self.document.didChangeColorLimits.connect(self.scene_manager.change_layers_color_limits)
+        self.document.didSwitchLayerSet.connect(self.animation_reset_by_layer_set_switch)
 
         self.document.didChangeLayerVisibility.connect(self.update_frame_time_to_top_visible)
         self.document.didReorderLayers.connect(self.update_frame_time_to_top_visible)
         self.document.didRemoveLayers.connect(self.update_frame_time_to_top_visible)
-        self.document.didAddLayer.connect(self.update_frame_time_to_top_visible)
+        self.document.didAddLayer.connect(self.animation_reset_by_layer_set_switch)
 
         self.ui.panZoomToolButton.toggled.connect(partial(self.change_tool, name=TOOL.PAN_ZOOM))
         self.ui.pointSelectButton.toggled.connect(partial(self.change_tool, name=TOOL.POINT_PROBE))
@@ -551,6 +564,14 @@ class Main(QtGui.QMainWindow):
         paths = self.document.sort_paths(self.workspace.paths_in_cache)
         self._open_cache_dialog.activate(paths, self.open_paths, self._remove_paths_from_cache)
 
+    def open_glob(self, *args, **kwargs):
+        text, ok = QtGui.QInputDialog.getText(self, 'Open Glob Pattern',
+            'Open files matching pattern:')
+        from glob import glob
+        if ok:
+            paths = list(glob(text))
+            self.open_paths(paths)
+
     def remove_region_polygon(self, action:QtGui.QAction=None, *args):
         if self.scene_manager.has_pending_polygon():
             print("Clearing pending")
@@ -575,11 +596,17 @@ class Main(QtGui.QMainWindow):
         open_cache_action.setShortcut("Ctrl+A")
         open_cache_action.triggered.connect(self.open_from_cache)
 
+        open_glob_action = QtGui.QAction("Open Filename Pattern...", self)
+        open_glob_action.setShortcut("Ctrl+Shift+O")
+        open_glob_action.triggered.connect(self.open_glob)
+
         menubar = self.ui.menubar
         file_menu = menubar.addMenu('&File')
         file_menu.addAction(open_action)
         file_menu.addAction(open_cache_action)
+        file_menu.addAction(open_glob_action)
         self._recent_files_menu = file_menu.addMenu('Open Recent')
+
         file_menu.addAction(exit_action)
 
         next_time = QtGui.QAction("Next Time", self)
@@ -720,7 +747,15 @@ def main():
         border_shapefile=args.border_shapefile,
         center=args.center,
     )
-    window.show()
+    if 'darwin' not in sys.platform:
+        # window.resize(2000,1000)
+        screen = QtGui.QDesktopWidget().screenGeometry()
+        w,h  = screen.width() - 400, screen.height() - 300
+        window.setGeometry(200, 150, w, h)
+        # window.showMaximized()
+        window.show()
+    else:
+        window.show()
     print("running")
     # bring window to front
     window.raise_()

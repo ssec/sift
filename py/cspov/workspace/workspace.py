@@ -431,7 +431,7 @@ class Workspace(QObject):
             if update.data is not None:
                 info = self._info[uuid] = update.dataset_info
                 data = self._data[uuid] = update.data
-                LOG.debug(repr(update))
+                LOG.info("{} {}: {:.01f}%".format(update.dataset_info[INFO.NAME], update.stage_desc, update.completion*100.0))
         # copy the data into an anonymous memmap
         self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
         if allow_cache:
