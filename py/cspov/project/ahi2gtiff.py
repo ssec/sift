@@ -60,7 +60,7 @@ def create_geotiff(data, output_filename, proj4_str, geotransform, etype=gdal.GD
     log_level = logging.getLogger('').handlers[0].level or 0
     LOG.info("Creating geotiff '%s'" % (output_filename,))
 
-    if etype != gdal.GDT_Float32 and np.isnan(nodata):
+    if etype != gdal.GDT_Float32 and nodata is not None and np.isnan(nodata):
         nodata = 0
 
     # Find the number of bands provided
@@ -131,7 +131,8 @@ def create_geotiff(data, output_filename, proj4_str, geotransform, etype=gdal.GD
             raise ValueError("Could not write band 1 data to geotiff '%s'" % (output_filename,))
 
         # Set No Data value
-        gtiff_band.SetNoDataValue(nodata)
+        if nodata is not None:
+            gtiff_band.SetNoDataValue(nodata)
 
     if quicklook:
         png_filename = output_filename.replace(os.path.splitext(output_filename)[1], ".png")
