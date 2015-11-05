@@ -534,7 +534,7 @@ class Main(QtGui.QMainWindow):
         self.document.didChangeLayerVisibility.connect(self.update_frame_time_to_top_visible)
         self.document.didReorderLayers.connect(self.update_frame_time_to_top_visible)
         self.document.didRemoveLayers.connect(self.update_frame_time_to_top_visible)
-        self.document.didAddLayer.connect(self.animation_reset_by_layer_set_switch)
+        self.document.didAddLayer.connect(self.update_frame_time_to_top_visible)
 
         self.ui.panZoomToolButton.toggled.connect(partial(self.change_tool, name=TOOL.PAN_ZOOM))
         self.ui.pointSelectButton.toggled.connect(partial(self.change_tool, name=TOOL.POINT_PROBE))
