@@ -18,6 +18,11 @@ command.
 
 from setuptools import setup, find_packages
 
+try:
+    import py2exe
+except ImportError:
+    print("'py2exe' not available")
+
 setup(
     name='cspov',
     version='0.7.1',
