@@ -16,7 +16,7 @@ for shape_dir in ["ne_50m_admin_0_countries", "ne_110m_admin_0_countries"]:
     data_files.append((os.path.join("cspov", "data", shape_dir), os.path.join("cspov", "data", shape_dir)))
 
 a = Analysis(['cspov\\__main__.py'],
-             pathex=['C:\\Users\\User\\repos\\git\\CSPOV\\py'],
+             pathex=['Z:\\repos\\repos\\git\\CSPOV\\py'],
              binaries=None,
              datas=data_files,
              hiddenimports=["vispy.app.backends._pyqt4", "PyQt4.QtNetwork", "scipy.linalg", "scipy.linalg.cython_blas", "scipy.linalg.cython_lapack", "scipy.integrate"],
@@ -31,7 +31,7 @@ pyz = PYZ(a.pure, a.zipped_data,
 exe = EXE(pyz,
           a.scripts,
           exclude_binaries=True,
-          name='__main__',
+          name='SIFT',
           debug=False,
           strip=None,
           upx=True,
@@ -42,4 +42,4 @@ coll = COLLECT(exe,
                a.datas,
                strip=None,
                upx=True,
-               name='__main__')
+               name='SIFT')
