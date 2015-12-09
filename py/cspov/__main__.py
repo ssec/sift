@@ -715,9 +715,14 @@ class Main(QtGui.QMainWindow):
 
 
 def main():
+    if "win" in sys.platform:
+        default_workspace = os.path.expanduser(os.path.join("~", "Documents", "sift_workspace"))
+    else:
+        default_workspace = os.path.expanduser(os.path.join("~", "sift_workspace"))
+
     import argparse
     parser = argparse.ArgumentParser(description="Run CSPOV")
-    parser.add_argument("-w", "--workspace", default='.',
+    parser.add_argument("-w", "--workspace", default=default_workspace,
                         help="Specify workspace base directory")
     parser.add_argument("-s", "--space", default=256, type=int,
                         help="Specify max amount of data to hold in workspace in Gigabytes")
@@ -737,6 +742,10 @@ def main():
     # FIXME: This is needed because shapely 1.5.11 sucks
     logging.getLogger().setLevel(level)
     # logging.getLogger('vispy').setLevel(level)
+
+    if not os.path.exists(args.workspace):
+        LOG.info("Creating SIFT Workspace: %s", args.workspace)
+        os.makedirs(args.workspace)
 
     app.create()
     # app = QApplication(sys.argv)
