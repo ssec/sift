@@ -28,6 +28,7 @@ a = Analysis(['cspov\\__main__.py'],
              cipher=block_cipher)
 pyz = PYZ(a.pure, a.zipped_data,
              cipher=block_cipher)
+# FIXME: Remove the console when all diagnostics are properly shown in the GUI
 exe = EXE(pyz,
           a.scripts,
           exclude_binaries=True,
