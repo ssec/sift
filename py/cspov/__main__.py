@@ -625,11 +625,11 @@ class Main(QtGui.QMainWindow):
         prev_time.triggered.connect(prev_slot)
         # self.ui.animBack.clicked.connect(prev_slot)
 
-        focus_prev_band = QtGui.QAction("Previous Band", self)
+        focus_prev_band = QtGui.QAction("Next Band", self)
         focus_prev_band.setShortcut(QtCore.Qt.Key_Up)
         focus_prev_band.triggered.connect(partial(self.next_last_band, direction=-1))
 
-        focus_next_band = QtGui.QAction("Next Band", self)
+        focus_next_band = QtGui.QAction("Previous Band", self)
         focus_next_band.setShortcut(QtCore.Qt.Key_Down)
         focus_next_band.triggered.connect(partial(self.next_last_band, direction=1))
 
