@@ -484,7 +484,14 @@ class Main(QtGui.QMainWindow):
         self.layerSetsManager = LayerSetsManager(self.ui.layerSetTabs, self.ui.layerInfoContents, self.document)
         self.behaviorLayersList = self.layerSetsManager.getLayerStackListViewModel()
 
-        def update_probe_point(uuid, xy_pos):
+        def update_probe_point(uuid=None, xy_pos=None):
+            if uuid is None:
+                uuid = self.document.current_visible_layer
+            if xy_pos is None:
+                xy_pos = self.scene_manager.point_probe_location("default_probe_name")
+                if xy_pos is None:
+                    return
+
             lon, lat = DEFAULT_PROJ_OBJ(xy_pos[0], xy_pos[1], inverse=True)
             lon_str = "{:.02f} {}".format(abs(lon), "W" if lon < 0 else "E")
             lat_str = "{:.02f} {}".format(abs(lat), "S" if lat < 0 else "N")
@@ -499,6 +506,21 @@ class Main(QtGui.QMainWindow):
             self.ui.cursorProbeText.setText("Probe Value: {} ".format(data_str))
         self.scene_manager.newProbePoint.connect(update_probe_point)
         self.scene_manager.newProbePoint.connect(self.document.update_equalizer_values)
+        # FIXME: These were added as a simple fix to update the proble value on layer changes, but this should really
+        #        have its own manager-like object
+        def _blackhole(*args, **kwargs):
+            return update_probe_point()
+        self.document.didChangeLayerVisibility.connect(_blackhole)
+        self.document.didAddLayer.connect(_blackhole)
+        self.document.didRemoveLayers.connect(_blackhole)
+        self.document.didReorderLayers.connect(_blackhole)
+        if False:
+            # XXX: Disable the below line if updating during animation is too much work
+            # self.scene_manager.didChangeFrame.connect(lambda frame_info: update_probe_point(uuid=frame_info[-1]))
+            pass
+        else:
+            # XXX: Disable the below line if updating the probe value during animation isn't a performance problem
+            self.scene_manager.didChangeFrame.connect(lambda frame_info: self.ui.cursorProbeText.setText("Probe Value: "))
 
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
             top_uuids = list(self.document.current_visible_layers(2))
