@@ -520,7 +520,7 @@ class Main(QtGui.QMainWindow):
             pass
         else:
             # XXX: Disable the below line if updating the probe value during animation isn't a performance problem
-            self.scene_manager.didChangeFrame.connect(lambda frame_info: self.ui.cursorProbeText.setText("Probe Value: "))
+            self.scene_manager.didChangeFrame.connect(lambda frame_info: self.ui.cursorProbeText.setText("Probe Value: <animating>"))
 
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
             top_uuids = list(self.document.current_visible_layers(2))
