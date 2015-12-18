@@ -1,6 +1,6 @@
 package:
   name: cspov
-  version: "0.7.1"
+  version: "0.7.2"
 
 source:
   path: ../../py
@@ -23,7 +23,7 @@ build:
 
   # If this is a new build for the same version, increment the build
   # number. If you do not include this key, it defaults to 0.
-  number: 0
+  number: 1
 
 requirements:
   build:

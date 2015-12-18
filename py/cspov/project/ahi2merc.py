@@ -55,6 +55,8 @@ def main():
                         help="Set tile block Y size")
     parser.add_argument('--extents', default=[np.nan, np.nan, np.nan, np.nan], nargs=4, type=float,
                         help="Set mercator bounds in lat/lon space (lon_min lat_min lon_max lat_max)")
+    parser.add_argument('--nodata', default=None, type=float,
+                        help="Set the nodata value for the geotiffs that are created")
 
     parser.add_argument("input_dir",
                         help="Input directory to search for the 'input_pattern' specified")
@@ -103,7 +105,8 @@ def main():
                                    predictor=args.predictor,
                                    tiled=args.tiled,
                                    blockxsize=args.blockxsize,
-                                   blockysize=args.blockysize)
+                                   blockysize=args.blockysize,
+                                   nodata=args.nodata)
             else:
                 LOG.debug("GEOS Projection GeoTIFF already exists, won't recreate...")
             lon_west, lon_east = src_info["lon_extents"]
@@ -153,9 +156,12 @@ def main():
             "{:0.03f}".format(y_extent[0]),
             "{:0.03f}".format(x_extent[1]),
             "{:0.03f}".format(y_extent[1]),
-            "-srcnodata", "nan",
-            "-dstnodata", "nan",
         ]
+        if args.nodata is not None:
+            gdalwarp_args.extend([
+                "-srcnodata", str(args.nodata),
+                "-dstnodata", str(args.nodata),
+            ])
         if args.compress is not None:
             gdalwarp_args.extend(["-co", "COMPRESS=%s" % (args.compress,)])
             if args.predictor is not None:

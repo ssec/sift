@@ -546,9 +546,14 @@ class SceneGraphManager(QObject):
         if probe_name not in self.point_probes:
             color = kwargs.get("color", np.array([0.5, 0., 0., 1.]))
             point_visual = FakeMarker(parent=self.main_map, symbol="x", pos=np.array([xy_pos]), color=color)
-            self.point_probes[probe_name] = point_visual
+            self.point_probes[probe_name] = (xy_pos, point_visual)
         else:
-            self.point_probes[probe_name].set_point(xy_pos)
+            point_visual = self.point_probes[probe_name][1]
+            point_visual.set_point(xy_pos)
+            self.point_probes[probe_name] = (xy_pos, point_visual)
+
+    def point_probe_location(self, probe_name):
+        return self.point_probes[probe_name][0] if probe_name in self.point_probes else None
 
     def on_new_polygon(self, probe_name, points, **kwargs):
         kwargs.setdefault("color", (1.0, 0.0, 1.0, 0.5))
