@@ -2,7 +2,8 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created by: PyQt4 UI code generator 4.11.4
+# Created: Wed Dec  9 13:58:01 2015
+#      by: PyQt4 UI code generator 4.10.4
 #
 # WARNING! All changes made in this file will be lost!
 
@@ -268,7 +269,7 @@ class Ui_MainWindow(object):
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
-        MainWindow.setWindowTitle(_translate("MainWindow", "SIFT Beta 0.7.1", None))
+        MainWindow.setWindowTitle(_translate("MainWindow", "SIFT Beta 0.7.2", None))
         self.panZoomToolButton.setToolTip(_translate("MainWindow", "Pan/Zoom Tool", None))
         self.panZoomToolButton.setStatusTip(_translate("MainWindow", "Left mouse click and drag pans the scene", None))
         self.panZoomToolButton.setText(_translate("MainWindow", "Pan/Zoom", None))

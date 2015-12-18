@@ -484,7 +484,14 @@ class Main(QtGui.QMainWindow):
         self.layerSetsManager = LayerSetsManager(self.ui.layerSetTabs, self.ui.layerInfoContents, self.document)
         self.behaviorLayersList = self.layerSetsManager.getLayerStackListViewModel()
 
-        def update_probe_point(uuid, xy_pos):
+        def update_probe_point(uuid=None, xy_pos=None):
+            if uuid is None:
+                uuid = self.document.current_visible_layer
+            if xy_pos is None:
+                xy_pos = self.scene_manager.point_probe_location("default_probe_name")
+                if xy_pos is None:
+                    return
+
             lon, lat = DEFAULT_PROJ_OBJ(xy_pos[0], xy_pos[1], inverse=True)
             lon_str = "{:.02f} {}".format(abs(lon), "W" if lon < 0 else "E")
             lat_str = "{:.02f} {}".format(abs(lat), "S" if lat < 0 else "N")
@@ -499,6 +506,21 @@ class Main(QtGui.QMainWindow):
             self.ui.cursorProbeText.setText("Probe Value: {} ".format(data_str))
         self.scene_manager.newProbePoint.connect(update_probe_point)
         self.scene_manager.newProbePoint.connect(self.document.update_equalizer_values)
+        # FIXME: These were added as a simple fix to update the proble value on layer changes, but this should really
+        #        have its own manager-like object
+        def _blackhole(*args, **kwargs):
+            return update_probe_point()
+        self.document.didChangeLayerVisibility.connect(_blackhole)
+        self.document.didAddLayer.connect(_blackhole)
+        self.document.didRemoveLayers.connect(_blackhole)
+        self.document.didReorderLayers.connect(_blackhole)
+        if False:
+            # XXX: Disable the below line if updating during animation is too much work
+            # self.scene_manager.didChangeFrame.connect(lambda frame_info: update_probe_point(uuid=frame_info[-1]))
+            pass
+        else:
+            # XXX: Disable the below line if updating the probe value during animation isn't a performance problem
+            self.scene_manager.didChangeFrame.connect(lambda frame_info: self.ui.cursorProbeText.setText("Probe Value: <animating>"))
 
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
             top_uuids = list(self.document.current_visible_layers(2))
@@ -625,11 +647,11 @@ class Main(QtGui.QMainWindow):
         prev_time.triggered.connect(prev_slot)
         # self.ui.animBack.clicked.connect(prev_slot)
 
-        focus_prev_band = QtGui.QAction("Previous Band", self)
+        focus_prev_band = QtGui.QAction("Next Band", self)
         focus_prev_band.setShortcut(QtCore.Qt.Key_Up)
         focus_prev_band.triggered.connect(partial(self.next_last_band, direction=-1))
 
-        focus_next_band = QtGui.QAction("Next Band", self)
+        focus_next_band = QtGui.QAction("Previous Band", self)
         focus_next_band.setShortcut(QtCore.Qt.Key_Down)
         focus_next_band.triggered.connect(partial(self.next_last_band, direction=1))
 
@@ -715,9 +737,14 @@ class Main(QtGui.QMainWindow):
 
 
 def main():
+    if "win" in sys.platform:
+        default_workspace = os.path.expanduser(os.path.join("~", "Documents", "sift_workspace"))
+    else:
+        default_workspace = os.path.expanduser(os.path.join("~", "sift_workspace"))
+
     import argparse
     parser = argparse.ArgumentParser(description="Run CSPOV")
-    parser.add_argument("-w", "--workspace", default='.',
+    parser.add_argument("-w", "--workspace", default=default_workspace,
                         help="Specify workspace base directory")
     parser.add_argument("-s", "--space", default=256, type=int,
                         help="Specify max amount of data to hold in workspace in Gigabytes")
@@ -737,6 +764,10 @@ def main():
     # FIXME: This is needed because shapely 1.5.11 sucks
     logging.getLogger().setLevel(level)
     # logging.getLogger('vispy').setLevel(level)
+
+    if not os.path.exists(args.workspace):
+        LOG.info("Creating SIFT Workspace: %s", args.workspace)
+        os.makedirs(args.workspace)
 
     app.create()
     # app = QApplication(sys.argv)

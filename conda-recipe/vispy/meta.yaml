@@ -4,12 +4,12 @@ package:
 
 source:
   git_url: https://github.com/vispy/vispy.git
-  git_rev: 65edc3245aaf1e2e55d60d9c3c4abb68564b5972
+  git_rev: 236fa011ef5d57fecb3ab96a1d97bf8e1b08f2b7
 #  patches:
    # List any patch files here
    # - fix.patch
 
-# build:
+build:
   # noarch_python: True
   # preserve_egg_dir: True
   # entry_points:
@@ -23,7 +23,7 @@ source:
 
   # If this is a new build for the same version, increment the build
   # number. If you do not include this key, it defaults to 0.
-  # number: 1
+  number: 1
 
 requirements:
   build:
