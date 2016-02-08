@@ -71,12 +71,6 @@ from cspov.model.guidebook import AHI_HSF_Guidebook
 
 from PyQt4.QtCore import QObject, pyqtSignal
 
-# FIXME: move these out of the document and into a factory
-from ..view.LayerRep import TiledGeolocatedImage, NEShapefileLines
-from ..view.Program import GlooColormapDataTile, GlooRGBImageTile
-
-from .probes import Probe, Shape
-
 
 LOG = logging.getLogger(__name__)
 

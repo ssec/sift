@@ -60,8 +60,6 @@ from vispy.gloo import VertexBuffer
 from vispy.io.datasets import load_spatial_filters
 from vispy.visuals.shaders import FunctionChain
 
-from cspov.view.Program import GlooRGBImageTile
-
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 

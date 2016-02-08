@@ -626,9 +626,10 @@ class SceneGraphManager(QObject):
         LOG.info("Changing tool to '%s'", name)
 
     def next_tool(self):
-        idx = self._camera_names.index(self.main_view.camera.name)
-        idx = (idx + 1) % len(self._camera_names)
-        self.change_tool(idx)
+        tool_names = list(TOOL)
+        idx = tool_names.index(self._current_tool)
+        idx = (idx + 1) % len(tool_names)
+        self.change_tool(tool_names[idx])
 
     def _find_colormap(self, colormap):
         if isinstance(colormap, str) and colormap in self.colormaps:
