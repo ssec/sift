@@ -42,7 +42,7 @@ from functools import partial
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
-from cspov.common import INFO, KIND, DEFAULT_PROJ_OBJ, TOOL
+from cspov.common import INFO, KIND, DEFAULT_PROJ_OBJ, TOOL, COMPOSITE_TYPE
 
 import os
 import logging
@@ -605,6 +605,15 @@ class Main(QtGui.QMainWindow):
         LOG.info("Clearing polygon with name '%s'", removed_name)
         self.scene_manager.remove_polygon(removed_name)
 
+    def create_composite(self, action:QtGui.QAction=None, uuids=[], composite_type=COMPOSITE_TYPE.RGB):
+        if composite_type not in [COMPOSITE_TYPE.RGB]:
+            raise ValueError("Unknown or unimplemented composite type: %s" % (composite_type,))
+        if len(uuids) == 0:
+            # get the layers to composite from current selection
+            uuids = list(self.behaviorLayersList.current_selected_uuids())
+        LOG.debug("New Composite UUIDs: %r", uuids)
+        self.scene_manager.add_composite_layer(uuids, composite_type=composite_type)
+
     def setup_menu(self):
         open_action = QtGui.QAction("&Open...", self)
         open_action.setShortcut("Ctrl+O")
@@ -688,9 +697,14 @@ class Main(QtGui.QMainWindow):
         clear.setShortcut(QtCore.Qt.Key_Escape)
         clear.triggered.connect(self.remove_region_polygon)
 
+        composite = QtGui.QAction("Create Composite", self)
+        composite.setShortcut('C')
+        composite.triggered.connect(self.create_composite)
+
         edit_menu = menubar.addMenu('&Edit')
         edit_menu.addAction(remove)
         edit_menu.addAction(clear)
+        edit_menu.addAction(composite)
 
         view_menu = menubar.addMenu('&View')
         view_menu.addAction(animate)
@@ -715,7 +729,7 @@ class Main(QtGui.QMainWindow):
                     return cb()
             return tmp_cb
 
-        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("c", self.scene_manager.next_tool))
+        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("t", self.scene_manager.next_tool))
 
         class ColormapSlot(object):
             def __init__(self, sgm, key='e'):

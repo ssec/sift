@@ -92,6 +92,15 @@ class KIND(Enum):
     SHAPE = 3
     COMBINATION = 4
 
+
+class COMPOSITE_TYPE(Enum):
+    """Type of non-luminance image layers
+    """
+    RGB = 1
+    ARITHMETIC = 2
+
+
+
 class INFO(Enum):
     """
     Standard keys for info dictionaries

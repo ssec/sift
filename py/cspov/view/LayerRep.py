@@ -27,12 +27,11 @@ import logging
 import unittest
 import argparse
 
-import scipy.misc as spm
-from PyQt4.QtCore import QObject, pyqtSignal
 import shapefile
 
 from vispy.scene.visuals import create_visual_node
-from vispy.visuals import LineVisual, ImageVisual, CompoundVisual
+from vispy.visuals import LineVisual, ImageVisual, CompoundVisual, Visual
+from vispy.color import get_colormap
 from vispy.ext.six import string_types
 import numpy as np
 from datetime import datetime
@@ -448,6 +447,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
             if clim.shape != (2,):
                 raise ValueError('clim must have two elements')
         self._clim = clim
+        # FIXME: Is this supposed to be assigned to something?:
         self._data_lookup_fn
         self._need_clim_update = True
         self.update()
@@ -689,6 +689,252 @@ class TiledGeolocatedImageVisual(ImageVisual):
             self._update_method(view)
 
 TiledGeolocatedImage = create_visual_node(TiledGeolocatedImageVisual)
+
+
+class CompositeLayerVisual(Visual):
+    pass
+
+
+RGB_VERT_SHADER = """
+uniform int method;  // 0=subdivide, 1=impostor
+attribute vec2 a_position;
+attribute vec2 a_texcoord_r;
+attribute vec2 a_texcoord_g;
+attribute vec2 a_texcoord_b;
+varying vec2 v_texcoord_r;
+varying vec2 v_texcoord_g;
+varying vec2 v_texcoord_b;
+
+void main() {
+    v_texcoord_r = a_texcoord_r;
+    v_texcoord_g = a_texcoord_g;
+    v_texcoord_b = a_texcoord_b;
+    gl_Position = $transform(vec4(a_position, 0., 1.));
+}
+"""
+
+RGB_FRAG_SHADER = """
+uniform vec2 image_size;
+uniform int method;  // 0=subdivide, 1=impostor
+uniform sampler2D u_texture_r;
+uniform sampler2D u_texture_g;
+uniform sampler2D u_texture_b;
+varying vec2 v_texcoord_r;
+varying vec2 v_texcoord_g;
+varying vec2 v_texcoord_b;
+
+vec4 map_local_to_tex(vec4 x) {
+    // Cast ray from 3D viewport to surface of image
+    // (if $transform does not affect z values, then this
+    // can be optimized as simply $transform.map(x) )
+    vec4 p1 = $transform(x);
+    vec4 p2 = $transform(x + vec4(0, 0, 0.5, 0));
+    p1 /= p1.w;
+    p2 /= p2.w;
+    vec4 d = p2 - p1;
+    float f = p2.z / d.z;
+    vec4 p3 = p2 - d * f;
+
+    // finally map local to texture coords
+    return vec4(p3.xy / image_size, 0, 1);
+}
+
+
+void main()
+{
+    vec2 texcoord_r;
+    vec2 texcoord_g;
+    vec2 texcoord_b;
+    if( method == 0 ) {
+        texcoord_r = v_texcoord_r;
+        texcoord_g = v_texcoord_g;
+        texcoord_b = v_texcoord_b;
+    }
+    else {
+        // vertex shader ouptuts clip coordinates;
+        // fragment shader maps to texture coordinates
+        texcoord_r = map_local_to_tex(vec4(v_texcoord_r, 0, 1)).xy;
+        texcoord_g = map_local_to_tex(vec4(v_texcoord_g, 0, 1)).xy;
+        texcoord_b = map_local_to_tex(vec4(v_texcoord_b, 0, 1)).xy;
+    }
+
+    gl_FragColor.r = $get_data_r(texcoord_r).r;
+    gl_FragColor.g = $get_data_g(texcoord_g).r;
+    gl_FragColor.b = $get_data_b(texcoord_b).r;
+    gl_FragColor.a = 1.0;
+}
+"""  # noqa
+
+
+class RGBCompositeLayerVisual(CompositeLayerVisual):
+    def __init__(self, dep_r, dep_g, dep_b,
+                 cmap='viridis', clim='auto', **kwargs):
+        # visual nodes already have names, so be careful
+        if not hasattr(self, "name"):
+            self.name = kwargs.get("name", None)
+
+        # assume all the dependencies have the same information
+        assert(isinstance(dep_r, TiledGeolocatedImage))
+        self.dep_r = dep_r
+        assert(isinstance(dep_g, TiledGeolocatedImage))
+        self.dep_g = dep_g
+        assert(isinstance(dep_b, TiledGeolocatedImage))
+        self.dep_b = dep_b
+
+        self._need_texture_upload = True
+        self._need_vertex_update = True
+        self._need_colortransform_update = True
+        self._need_clim_update = True
+        self._need_interpolation_update = True
+        self._need_method_update = True
+        self._null_tr = NullTransform()
+        # self._subdiv_position = VertexBuffer()
+        # self._subdiv_texcoord = VertexBuffer()
+
+        self._init_view(self)
+        super(RGBCompositeLayerVisual, self).__init__(vcode=RGB_VERT_SHADER, fcode=RGB_FRAG_SHADER)
+        self.set_gl_state('translucent', cull_face=False)
+        self._draw_mode = 'triangles'
+
+        self._method = None
+        self.method = self.dep_r.method
+        self.shape = self.dep_r.shape
+        self.ndim = self.dep_r.ndim
+
+        self._data_lookup_fn_r = Function(_texture_lookup)
+        self._data_lookup_fn_g = Function(_texture_lookup)
+        self._data_lookup_fn_b = Function(_texture_lookup)
+
+        self.clim = (self.dep_r.clim, self.dep_g.clim, self.dep_b.clim)
+        self.cmap = cmap
+        self.freeze()
+
+    def _init_view(self, view):
+        # Store some extra variables per-view
+        view._need_method_update = True
+        view._method_used = None
+
+    @property
+    def cmap(self):
+        return self._cmap
+
+    @cmap.setter
+    def cmap(self, cmap):
+        self._cmap = get_colormap(cmap)
+        self._need_colortransform_update = True
+        self.update()
+
+    @property
+    def clim(self):
+        return (self._clim if isinstance(self._clim, string_types) else
+                tuple(self._clim))
+
+    @clim.setter
+    def clim(self, clim):
+        if isinstance(clim, string_types):
+            if clim != 'auto':
+                raise ValueError('clim must be "auto" if a string')
+        else:
+            clim = np.array(clim, float)
+            if clim.shape != (3, 2) and clim.shape != (2,):
+                raise ValueError('clim must have either 2 elements or 6 (2 for each color)')
+            elif clim.shape == (2,):
+                clim = np.array([clim, clim, clim], float)
+        self._clim = clim
+        self._need_clim_update = True
+        self.update()
+
+    @property
+    def method(self):
+        return self._method
+
+    @method.setter
+    def method(self, m):
+        if self._method != m:
+            self._method = m
+            self._need_vertex_update = True
+            self.update()
+
+    @property
+    def size(self):
+        return self.shape[:2][::-1]
+
+    def _update_method(self, view):
+        """Decide which method to use for *view* and configure it accordingly.
+        """
+        method = self._method
+        if method == 'auto':
+            if view.transforms.get_transform().Linear:
+                method = 'subdivide'
+            else:
+                method = 'impostor'
+        view._method_used = method
+
+        if method == 'subdivide':
+            view.view_program['method'] = 0
+            view.view_program['a_position'] = self.dep_r._subdiv_position
+            view.view_program['a_texcoord_r'] = self.dep_r._subdiv_texcoord
+            view.view_program['a_texcoord_g'] = self.dep_g._subdiv_texcoord
+            view.view_program['a_texcoord_b'] = self.dep_b._subdiv_texcoord
+        else:
+            raise ValueError("Unknown image draw method '%s'" % method)
+
+        self.shared_program['image_size'] = self.size
+        view._need_method_update = False
+        self._prepare_transforms(view)
+
+    def _prepare_transforms(self, view):
+        trs = view.transforms
+        prg = view.view_program
+        prg.vert['transform'] = trs.get_transform()
+        prg.frag['transform'] = self._null_tr
+
+    def _build_interpolation(self):
+        # assumes 'nearest' interpolation
+        self.shared_program.frag['get_data_r'] = self._data_lookup_fn_r
+        self.shared_program.frag['get_data_g'] = self._data_lookup_fn_g
+        self.shared_program.frag['get_data_b'] = self._data_lookup_fn_b
+        self._data_lookup_fn_r['texture'] = self.dep_r._texture
+        self._data_lookup_fn_g['texture'] = self.dep_g._texture
+        self._data_lookup_fn_b['texture'] = self.dep_b._texture
+        self._need_interpolation_update = False
+
+    def _build_color_transform(self):
+        if self.ndim == 2 or self.shape[2] == 1:
+            fun = FunctionChain(None, [Function(_c2l),
+                                       Function(self._cmap.glsl_map)])
+        else:
+            fun = Function(_null_color_transform)
+        # self.shared_program.frag['color_transform'] = fun
+        self._need_colortransform_update = False
+
+    def _set_clim_vars(self):
+        self._data_lookup_fn_r["vmin"] = self._clim[0, 0]
+        self._data_lookup_fn_r["vmax"] = self._clim[0, 1]
+        self._data_lookup_fn_g["vmin"] = self._clim[1, 0]
+        self._data_lookup_fn_g["vmax"] = self._clim[1, 1]
+        self._data_lookup_fn_b["vmin"] = self._clim[2, 0]
+        self._data_lookup_fn_b["vmax"] = self._clim[2, 1]
+        self._need_clim_update = False
+
+    def _prepare_draw(self, view):
+        if self._need_interpolation_update:
+            self._build_interpolation()
+
+        # if self._need_texture_upload:
+        #     self._build_texture()
+
+        if self._need_clim_update:
+            self._set_clim_vars()
+
+        if self._need_colortransform_update:
+            self._build_color_transform()
+
+        if view._need_method_update:
+            self._update_method(view)
+
+
+RGBCompositeLayer = create_visual_node(RGBCompositeLayerVisual)
 
 
 class ShapefileLinesVisual(LineVisual):

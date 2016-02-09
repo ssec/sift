@@ -30,9 +30,9 @@ from vispy.util.keys import SHIFT
 from vispy.visuals.transforms import STTransform, MatrixTransform
 from vispy.visuals import MarkersVisual, marker_types, LineVisual
 from vispy.scene.visuals import Markers, Polygon, Compound, Line
-from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND, TOOL, DEFAULT_PROJECTION
+from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND, TOOL, DEFAULT_PROJECTION, COMPOSITE_TYPE
 # from cspov.control.layer_list import LayerStackListViewModel
-from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
+from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer
 from cspov.view.MapWidget import CspovMainMapCanvas
 from cspov.view.Cameras import PanZoomProbeCamera
 from cspov.view.Colormap import ALL_COLORMAPS
@@ -355,6 +355,7 @@ class SceneGraphManager(QObject):
         self.point_probes = {}
 
         self.image_layers = {}
+        self.composite_layers = {}
         self.datasets = {}
         self.colormaps = {}
         self.colormaps.update(ALL_COLORMAPS)
@@ -697,6 +698,21 @@ class SceneGraphManager(QObject):
         self.datasets[uuid] = ds_info
         self.layer_set.add_layer(image)
         self.on_view_change(None)
+
+    def add_composite_layer(self, uuids, layer_name="Test Composite", composite_type=COMPOSITE_TYPE.RGB):
+        if composite_type == COMPOSITE_TYPE.RGB:
+            if len(uuids) != 3:
+                # don't know how to do it without 3 layers
+                raise ValueError("Must select 3 separate band layers to create an RGB layer")
+
+            assert(all([uuid in self.image_layers for uuid in uuids]))
+            dep_r = self.image_layers[uuids[0]]
+            dep_g = self.image_layers[uuids[1]]
+            dep_b = self.image_layers[uuids[2]]
+            self.composite_layers[layer_name] = layer = RGBCompositeLayer(dep_r, dep_g, dep_b, parent=self.main_map)
+            layer.transform *= STTransform(translate=(0, 0, -45.0))
+        else:
+            raise ValueError("Unknown or unimplemented composite type: %s" % (composite_type,))
 
     def remove_layer(self, new_order:list, uuids_removed:list, row:int, count:int):
         """
