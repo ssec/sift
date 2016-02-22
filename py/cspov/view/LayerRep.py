@@ -455,7 +455,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
     @property
     def size(self):
         # Added to shader program, but not used by subdivide/tiled method
-        return self.shape[:2][::-1]
+        return self.shape[-2:][::-1]
 
     def _init_overview(self, data):
         """Create and add a low resolution version of the data that is always
@@ -508,8 +508,6 @@ class TiledGeolocatedImageVisual(ImageVisual):
                 # Update the age if already in there
                 # Assume that texture_state does not change from the main thread if this is run in another
                 tex_tile_idx = self.texture_state.add_tile((stride, tiy, virt_tix))
-                if tix == 3 and tiy == 0:
-                    pass
                 if already_in:
                     # FIXME: we should make a list/set of the tiles we need to add before this
                     continue
@@ -691,24 +689,280 @@ class TiledGeolocatedImageVisual(ImageVisual):
 TiledGeolocatedImage = create_visual_node(TiledGeolocatedImageVisual)
 
 
-class CompositeLayerVisual(Visual):
-    pass
+class CompositeLayerVisual(TiledGeolocatedImageVisual):
+    VERT_SHADER = None
+    FRAG_SHADER = None
 
+    def __init__(self, data_arrays, origin_x, origin_y, cell_width, cell_height,
+                 shape=None,
+                 tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH),
+                 texture_shape=(DEFAULT_TEXTURE_HEIGHT, DEFAULT_TEXTURE_WIDTH),
+                 wrap_lon=False,
+                 cmap='viridis', method='tiled', clim='auto', interpolation='nearest', **kwargs):
+        if method != 'tiled':
+            raise ValueError("Only 'tiled' method is currently supported")
+        method = 'subdivide'
+        grid = (1, 1)
+
+        # visual nodes already have names, so be careful
+        if not hasattr(self, "name"):
+            self.name = kwargs.get("name", None)
+        self.origin_x = origin_x
+        self.origin_y = origin_y
+        self.cell_width = cell_width
+        self.cell_height = cell_height  # Note: cell_height is usually negative
+        self.texture_shape = texture_shape
+        self.tile_shape = tile_shape
+        self.num_tex_tiles = self.texture_shape[0] * self.texture_shape[1]
+        self._stride = 0  # Current stride is None when we are showing the overview
+        self._latest_tile_box = None
+        self.wrap_lon = wrap_lon
+        self._tiles = {}
+        assert (shape or data_arrays is not None), "`data` or `shape` must be provided"
+        self.shape = shape or max(data.shape for data in data_arrays)
+        self.ndim = len(self.shape) or data_arrays[0].ndim
+        self.num_channels = len(data_arrays)
+
+        # Where does this image lie in this lonely world
+        self.calc = MercatorTileCalc(
+            self.name,
+            self.shape,
+            pnt(x=self.origin_x, y=self.origin_y),
+            rez(dy=abs(self.cell_height), dx=abs(self.cell_width)),
+            self.tile_shape,
+            self.texture_shape,
+            wrap_lon=self.wrap_lon
+        )
+        # What tiles have we used and can we use (each texture uses the same 'state')
+        self.texture_state = TextureTileState(self.num_tex_tiles)
+
+        # load 'float packed rgba8' interpolation kernel
+        # to load float interpolation kernel use
+        # `load_spatial_filters(packed=False)`
+        kernel, self._interpolation_names = load_spatial_filters()
+
+        self._kerneltex = Texture2D(kernel, interpolation='nearest')
+        # The unpacking can be debugged by changing "spatial-filters.frag"
+        # to have the "unpack" function just return the .r component. That
+        # combined with using the below as the _kerneltex allows debugging
+        # of the pipeline
+        # self._kerneltex = Texture2D(kernel, interpolation='linear',
+        #                             internalformat='r32f')
+
+        # create interpolation shader functions for available
+        # interpolations
+        fun = [Function(_interpolation_template % n)
+               for n in self._interpolation_names]
+        self._interpolation_names = [n.lower()
+                                     for n in self._interpolation_names]
+
+        self._interpolation_fun = dict(zip(self._interpolation_names, fun))
+        self._interpolation_names.sort()
+        self._interpolation_names = tuple(self._interpolation_names)
+
+        # overwrite "nearest" and "bilinear" spatial-filters
+        # with  "hardware" interpolation _data_lookup_fn
+        self._interpolation_fun['nearest'] = Function(_texture_lookup)
+        self._interpolation_fun['bilinear'] = Function(_texture_lookup)
+
+        if interpolation not in self._interpolation_names:
+            raise ValueError("interpolation must be one of %s" %
+                             ', '.join(self._interpolation_names))
+
+        self._interpolation = interpolation
+
+        # check texture interpolation
+        if self._interpolation == 'bilinear':
+            texture_interpolation = 'linear'
+        else:
+            texture_interpolation = 'nearest'
+
+        self._method = method
+        self._grid = grid
+        self._need_texture_upload = True
+        self._need_vertex_update = True
+        self._need_colortransform_update = True
+        self._need_clim_update = True
+        self._need_interpolation_update = True
+        self._textures = [TextureAtlas2D(self.texture_shape, tile_shape=self.tile_shape,
+                                         interpolation=texture_interpolation,
+                                         format="LUMINANCE", internalformat="R32F",
+                                         ) for i in range(self.num_channels)
+        ]
+        self._subdiv_position = VertexBuffer()
+        self._subdiv_texcoord = VertexBuffer()
+
+        # impostor quad covers entire viewport
+        vertices = np.array([[-1, -1], [1, -1], [1, 1],
+                             [-1, -1], [1, 1], [-1, 1]],
+                            dtype=np.float32)
+        self._impostor_coords = VertexBuffer(vertices)
+        self._null_tr = NullTransform()
+
+        self._init_view(self)
+        if self.VERT_SHADER is None or self.FRAG_SHADER is None:
+            raise RuntimeError("No shader specified for this subclass")
+        super(ImageVisual, self).__init__(vcode=self.VERT_SHADER, fcode=self.FRAG_SHADER)
+        self.set_gl_state('translucent', cull_face=False)
+        self._draw_mode = 'triangles'
+
+        # define _data_lookup_fn as None, will be setup in
+        # self._build_interpolation()
+        self._data_lookup_fns = [Function(_texture_lookup) for i in range(self.num_channels)]
+
+        if isinstance(clim, str):
+            if clim != 'auto':
+                raise ValueError("C-limits can only be 'auto' or 2 floats for each provided channel")
+            clim = [clim] * self.num_channels
+        if not isinstance(cmap, (tuple, list)):
+            cmap = [cmap] * self.num_channels
+
+        assert(len(clim) == self.num_channels)
+        assert(len(cmap) == self.num_channels)
+        _clim = []
+        _cmap = []
+        for idx in range(self.num_channels):
+            cl = clim[idx]
+            if cl == 'auto':
+                _clim.append((np.nanmin(data_arrays[idx]), np.nanmax(data_arrays[idx])))
+            elif isinstance(cl, tuple) and len(cl) == 2:
+                _clim.append(cl)
+            else:
+                raise ValueError("C-limits must be a 2-element tuple or the string 'auto' for each channel provided")
+
+            cm = cmap[idx]
+            _cmap.append(cm)
+        self.clim = _clim
+        self.cmap = _cmap[0]
+
+        self.overview_info = None
+        self._init_overview(data_arrays)
+
+        self.freeze()
+
+    def _init_overview(self, data_arrays):
+        """Create and add a low resolution version of the data that is always
+        shown behind the higher resolution image tiles.
+        """
+        self.overview_info = nfo = {}
+        y_slice, x_slice = self.calc.overview_stride()
+        # Update kwargs to reflect the new spatial resolution of the overview image
+        nfo["cell_width"] = self.cell_width * x_slice.step
+        nfo["cell_height"] = self.cell_height * y_slice.step
+        # Tell the texture state that we are adding a tile that should never expire and should always exist
+        nfo["texture_tile_index"] = ttile_idx = self.texture_state.add_tile((0, 0, 0), expires=False)
+        for idx, data in enumerate(data_arrays):
+            overview_data = data[y_slice, x_slice]
+            self._textures[idx].set_tile_data(ttile_idx, self._normalize_data(overview_data))
+
+        # Handle wrapping around the anti-meridian so there is a -180/180 continuous image
+        num_tiles = 1 if not self.wrap_lon else 2
+        nfo["texture_coordinates"] = np.empty((6 * num_tiles, 2), dtype=np.float32)
+        nfo["vertex_coordinates"] = np.empty((6 * num_tiles, 2), dtype=np.float32)
+        nfo["texture_coordinates"][:6, :2] = self.calc.calc_texture_coordinates(ttile_idx)
+        nfo["vertex_coordinates"][:6, :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step)
+        if self.wrap_lon:
+            nfo["texture_coordinates"][6:12, :2] = nfo["texture_coordinates"][:6, :2]
+            nfo["vertex_coordinates"][6:12, :2] = nfo["vertex_coordinates"][:6, :2]
+            # increase the second set of X coordinates by the circumference of the earth
+            nfo["vertex_coordinates"][6:12, 0] += nfo["cell_width"] * nfo["data"].shape[1]
+        self._set_vertex_tiles(nfo["vertex_coordinates"], nfo["texture_coordinates"])
+
+    @property
+    def clim(self):
+        return (self._clim if isinstance(self._clim, string_types) else
+                tuple(self._clim))
+
+    @clim.setter
+    def clim(self, clim):
+        if isinstance(clim, string_types):
+            if clim != 'auto':
+                raise ValueError('clim must be "auto" if a string')
+        else:
+            clim = np.array(clim, float)
+            if clim.shape != (self.num_channels, 2) and clim.shape != (2,):
+                raise ValueError('clim must have either 2 elements or 6 (2 for each channel)')
+            elif clim.shape == (2,):
+                clim = np.array([clim, clim, clim], float)
+        self._clim = clim
+        self._need_clim_update = True
+        self.update()
+
+    def _set_clim_vars(self):
+        for idx, lookup_fn in enumerate(self._data_lookup_fns):
+            lookup_fn["vmin"] = self._clim[idx, 0]
+            lookup_fn["vmax"] = self._clim[idx, 1]
+            self._need_clim_update = False
+
+    def _build_color_transform(self):
+        if self.ndim == 2 or self.shape[2] == 1:
+            fun = FunctionChain(None, [Function(_c2l),
+                                       Function(self._cmap.glsl_map)])
+        else:
+            fun = Function(_null_color_transform)
+        # self.shared_program.frag['color_transform'] = fun
+        self._need_colortransform_update = False
+
+    def _build_interpolation(self):
+        # assumes 'nearest' interpolation
+        for idx, lookup_fn in enumerate(self._data_lookup_fns):
+            self.shared_program.frag['get_data_%d' % (idx + 1,)] = lookup_fn
+            lookup_fn['texture'] = self._textures[idx]
+        self._need_interpolation_update = False
+
+    def _build_texture_tiles(self, data, stride, tile_box):
+        """Prepare and organize strided data in to individual tiles with associated information.
+        """
+        data = [self._normalize_data(d) for d in data]
+
+        LOG.debug("Uploading texture data for %d tiles (%r)", (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l), tile_box)
+        max_tiles = self.calc.max_tiles_available(stride)
+
+        # Tiles start at upper-left so go from top to bottom
+        tiles_info = []
+        for tiy in range(tile_box.t, tile_box.b):
+            for tix in range(tile_box.l, tile_box.r):
+                virt_tix = tix % max_tiles[1]
+                already_in = (stride, tiy, virt_tix) in self.texture_state
+                # Update the age if already in there
+                # Assume that texture_state does not change from the main thread if this is run in another
+                tex_tile_idx = self.texture_state.add_tile((stride, tiy, virt_tix))
+                if already_in:
+                    # FIXME: we should make a list/set of the tiles we need to add before this
+                    continue
+
+                # Assume we were given a total image worth of this stride
+                y_start = tiy * self.tile_shape[0]
+                y_end = y_start + self.tile_shape[0]
+                x_start = virt_tix * self.tile_shape[1]
+                x_end = x_start + self.tile_shape[1]
+                textures_data = []
+                for chn_idx in range(self.num_channels):
+                    # force a copy of the data from the content array (provided by the workspace) to a vispy-compatible contiguous float array
+                    # this can be a potentially time-expensive operation since content array is often huge and always memory-mapped, so paging may occur
+                    # we don't want this paging deferred until we're back in the GUI thread pushing data to OpenGL!
+                    tile_data = np.array(data[chn_idx][y_start: y_end, x_start: x_end], dtype=np.float32)
+                    textures_data.append(tile_data)
+                tiles_info.append((stride, tiy, tix, tex_tile_idx, textures_data))
+
+        return tiles_info
+
+    def _set_texture_tiles(self, tiles_info):
+        for tile_info in tiles_info:
+            stride, tiy, tix, tex_tile_idx, data_arrays = tile_info
+            for idx, data in enumerate(data_arrays):
+                self._textures[idx].set_tile_data(tex_tile_idx, data)
+
+CompositeLayer = create_visual_node(CompositeLayerVisual)
 
 RGB_VERT_SHADER = """
 uniform int method;  // 0=subdivide, 1=impostor
 attribute vec2 a_position;
-attribute vec2 a_texcoord_r;
-attribute vec2 a_texcoord_g;
-attribute vec2 a_texcoord_b;
-varying vec2 v_texcoord_r;
-varying vec2 v_texcoord_g;
-varying vec2 v_texcoord_b;
+attribute vec2 a_texcoord;
+varying vec2 v_texcoord;
 
 void main() {
-    v_texcoord_r = a_texcoord_r;
-    v_texcoord_g = a_texcoord_g;
-    v_texcoord_b = a_texcoord_b;
+    v_texcoord = a_texcoord;
     gl_Position = $transform(vec4(a_position, 0., 1.));
 }
 """
@@ -716,12 +970,8 @@ void main() {
 RGB_FRAG_SHADER = """
 uniform vec2 image_size;
 uniform int method;  // 0=subdivide, 1=impostor
-uniform sampler2D u_texture_r;
-uniform sampler2D u_texture_g;
-uniform sampler2D u_texture_b;
-varying vec2 v_texcoord_r;
-varying vec2 v_texcoord_g;
-varying vec2 v_texcoord_b;
+uniform sampler2D u_texture;
+varying vec2 v_texcoord;
 
 vec4 map_local_to_tex(vec4 x) {
     // Cast ray from 3D viewport to surface of image
@@ -742,31 +992,100 @@ vec4 map_local_to_tex(vec4 x) {
 
 void main()
 {
-    vec2 texcoord_r;
-    vec2 texcoord_g;
-    vec2 texcoord_b;
+    vec2 texcoord;
     if( method == 0 ) {
-        texcoord_r = v_texcoord_r;
-        texcoord_g = v_texcoord_g;
-        texcoord_b = v_texcoord_b;
+        texcoord = v_texcoord;
     }
     else {
         // vertex shader ouptuts clip coordinates;
         // fragment shader maps to texture coordinates
-        texcoord_r = map_local_to_tex(vec4(v_texcoord_r, 0, 1)).xy;
-        texcoord_g = map_local_to_tex(vec4(v_texcoord_g, 0, 1)).xy;
-        texcoord_b = map_local_to_tex(vec4(v_texcoord_b, 0, 1)).xy;
+        texcoord = map_local_to_tex(vec4(v_texcoord, 0, 1)).xy;
     }
 
-    gl_FragColor.r = $get_data_r(texcoord_r).r;
-    gl_FragColor.g = $get_data_g(texcoord_g).r;
-    gl_FragColor.b = $get_data_b(texcoord_b).r;
+    gl_FragColor.r = $get_data_1(texcoord).r;
+    gl_FragColor.g = $get_data_2(texcoord).r;
+    gl_FragColor.b = $get_data_3(texcoord).r;
     gl_FragColor.a = 1.0;
 }
 """  # noqa
 
 
 class RGBCompositeLayerVisual(CompositeLayerVisual):
+    VERT_SHADER = RGB_VERT_SHADER
+    FRAG_SHADER = RGB_FRAG_SHADER
+
+
+RGB_VERT_SHADER_OLD = """
+uniform int method;  // 0=subdivide, 1=impostor
+attribute vec2 a_position;
+attribute vec2 a_texcoord_1;
+attribute vec2 a_texcoord_2;
+attribute vec2 a_texcoord_3;
+varying vec2 v_texcoord_1;
+varying vec2 v_texcoord_2;
+varying vec2 v_texcoord_3;
+
+void main() {
+    v_texcoord_1 = a_texcoord_1;
+    v_texcoord_2 = a_texcoord_2;
+    v_texcoord_3 = a_texcoord_3;
+    gl_Position = $transform(vec4(a_position, 0., 1.));
+}
+"""
+
+RGB_FRAG_SHADER_OLD = """
+uniform vec2 image_size;
+uniform int method;  // 0=subdivide, 1=impostor
+uniform sampler2D u_texture_1;
+uniform sampler2D u_texture_2;
+uniform sampler2D u_texture_3;
+varying vec2 v_texcoord_1;
+varying vec2 v_texcoord_2;
+varying vec2 v_texcoord_3;
+
+vec4 map_local_to_tex(vec4 x) {
+    // Cast ray from 3D viewport to surface of image
+    // (if $transform does not affect z values, then this
+    // can be optimized as simply $transform.map(x) )
+    vec4 p1 = $transform(x);
+    vec4 p2 = $transform(x + vec4(0, 0, 0.5, 0));
+    p1 /= p1.w;
+    p2 /= p2.w;
+    vec4 d = p2 - p1;
+    float f = p2.z / d.z;
+    vec4 p3 = p2 - d * f;
+
+    // finally map local to texture coords
+    return vec4(p3.xy / image_size, 0, 1);
+}
+
+
+void main()
+{
+    vec2 texcoord_1;
+    vec2 texcoord_2;
+    vec2 texcoord_3;
+    if( method == 0 ) {
+        texcoord_1 = v_texcoord_1;
+        texcoord_2 = v_texcoord_2;
+        texcoord_3 = v_texcoord_3;
+    }
+    else {
+        // vertex shader ouptuts clip coordinates;
+        // fragment shader maps to texture coordinates
+        texcoord_1 = map_local_to_tex(vec4(v_texcoord_1, 0, 1)).xy;
+        texcoord_2 = map_local_to_tex(vec4(v_texcoord_2, 0, 1)).xy;
+        texcoord_3 = map_local_to_tex(vec4(v_texcoord_3, 0, 1)).xy;
+    }
+
+    gl_FragColor.r = $get_data_1(texcoord_1).r;
+    gl_FragColor.g = $get_data_2(texcoord_2).r;
+    gl_FragColor.b = $get_data_3(texcoord_3).r;
+    gl_FragColor.a = 1.0;
+}
+"""  # noqa
+
+class RGBCompositeLayerVisualOld(CompositeLayerVisual):
     def __init__(self, dep_r, dep_g, dep_b,
                  cmap='viridis', clim='auto', **kwargs):
         # visual nodes already have names, so be careful
@@ -792,7 +1111,7 @@ class RGBCompositeLayerVisual(CompositeLayerVisual):
         # self._subdiv_texcoord = VertexBuffer()
 
         self._init_view(self)
-        super(RGBCompositeLayerVisual, self).__init__(vcode=RGB_VERT_SHADER, fcode=RGB_FRAG_SHADER)
+        super(RGBCompositeLayerVisualOld, self).__init__(vcode=RGB_VERT_SHADER_OLD, fcode=RGB_FRAG_SHADER_OLD)
         self.set_gl_state('translucent', cull_face=False)
         self._draw_mode = 'triangles'
 

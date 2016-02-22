@@ -32,7 +32,7 @@ from vispy.visuals import MarkersVisual, marker_types, LineVisual
 from vispy.scene.visuals import Markers, Polygon, Compound, Line
 from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND, TOOL, DEFAULT_PROJECTION, COMPOSITE_TYPE
 # from cspov.control.layer_list import LayerStackListViewModel
-from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer
+from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer, CompositeLayer
 from cspov.view.MapWidget import CspovMainMapCanvas
 from cspov.view.Cameras import PanZoomProbeCamera
 from cspov.view.Colormap import ALL_COLORMAPS
@@ -699,18 +699,32 @@ class SceneGraphManager(QObject):
         self.layer_set.add_layer(image)
         self.on_view_change(None)
 
-    def add_composite_layer(self, uuids, layer_name="Test Composite", composite_type=COMPOSITE_TYPE.RGB):
+    def add_composite_layer(self, new_order:list, ds_info:dict, p:prez, overview_content:list, dep_uuids, composite_type=COMPOSITE_TYPE.RGB):
         if composite_type == COMPOSITE_TYPE.RGB:
-            if len(uuids) != 3:
+            if len(dep_uuids) != 3:
                 # don't know how to do it without 3 layers
                 raise ValueError("Must select 3 separate band layers to create an RGB layer")
 
-            assert(all([uuid in self.image_layers for uuid in uuids]))
-            dep_r = self.image_layers[uuids[0]]
-            dep_g = self.image_layers[uuids[1]]
-            dep_b = self.image_layers[uuids[2]]
-            self.composite_layers[layer_name] = layer = RGBCompositeLayer(dep_r, dep_g, dep_b, parent=self.main_map)
-            layer.transform *= STTransform(translate=(0, 0, -45.0))
+            uuid = ds_info[INFO.UUID]
+            LOG.debug("Adding composite layer to Scene Graph Manager with UUID: %s", uuid)
+            self.image_layers[uuid] = layer = RGBCompositeLayer(
+                overview_content,
+                ds_info[INFO.ORIGIN_X],
+                ds_info[INFO.ORIGIN_Y],
+                ds_info[INFO.CELL_WIDTH],
+                ds_info[INFO.CELL_HEIGHT],
+                name=str(uuid),
+                clim=ds_info[INFO.CLIM],
+                interpolation='nearest',
+                method='tiled',
+                cmap=self._find_colormap("grays"),
+                double=False,
+                texture_shape=DEFAULT_TEXTURE_SHAPE,
+                wrap_lon=False,
+                parent=self.main_map)
+            layer.transform *= STTransform(translate=(0, 0, -50.0))
+            self.composite_layers[uuid] = dep_uuids
+            self.on_view_change(None)
         else:
             raise ValueError("Unknown or unimplemented composite type: %s" % (composite_type,))
 
@@ -825,14 +839,24 @@ class SceneGraphManager(QObject):
     def _retile_child(self, uuid, preferred_stride, tile_box):
         LOG.debug("Retiling child with UUID: '%s'", uuid)
         yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.0}
-        child = self.image_layers[uuid]
-        data = self.workspace.get_content(uuid, lod=preferred_stride)
-        yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.5}
-        # FIXME: Use LOD instead of stride and provide the lod to the workspace
-        data = data[::preferred_stride, ::preferred_stride]
-        tiles_info, vertices, tex_coords = child.retile(data, preferred_stride, tile_box)
-        yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 1.0}
-        self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)
+        if uuid not in self.composite_layers:
+            child = self.image_layers[uuid]
+            data = self.workspace.get_content(uuid, lod=preferred_stride)
+            yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.5}
+            # FIXME: Use LOD instead of stride and provide the lod to the workspace
+            data = data[::preferred_stride, ::preferred_stride]
+            tiles_info, vertices, tex_coords = child.retile(data, preferred_stride, tile_box)
+            yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 1.0}
+            self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)
+        else:
+            child = self.image_layers[uuid]
+            data = [self.workspace.get_content(d_uuid, lod=preferred_stride) for d_uuid in self.composite_layers[uuid]]
+            yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.5}
+            # FIXME: Use LOD instead of stride and provide the lod to the workspace
+            data = [d[::preferred_stride, ::preferred_stride] for d in data]
+            tiles_info, vertices, tex_coords = child.retile(data, preferred_stride, tile_box)
+            yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 1.0}
+            self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)
 
     def _set_retiled(self, uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords):
         """Slot to take data from background thread and apply it to the layer living in the image layer.

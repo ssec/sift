@@ -611,8 +611,27 @@ class Main(QtGui.QMainWindow):
         if len(uuids) == 0:
             # get the layers to composite from current selection
             uuids = list(self.behaviorLayersList.current_selected_uuids())
+        from uuid import UUID, uuid1 as uuidgen
         LOG.debug("New Composite UUIDs: %r", uuids)
-        self.scene_manager.add_composite_layer(uuids, composite_type=composite_type)
+        # FIXME: Add this information to a Document signal so the Document can add a composite layer
+        dep_info = [self.document.get_info(uuid=uuid) for uuid in uuids]
+        highest_res_dep = min(dep_info, key=lambda x: x[INFO.CELL_WIDTH])
+        new_order = None  # not used by SGM but passed when adding normal layers
+        ds_info = {
+            INFO.UUID: uuidgen(),
+            INFO.ORIGIN_X: highest_res_dep[INFO.ORIGIN_X],
+            INFO.ORIGIN_Y: highest_res_dep[INFO.ORIGIN_Y],
+            INFO.CELL_WIDTH: highest_res_dep[INFO.CELL_WIDTH],
+            INFO.CELL_HEIGHT: highest_res_dep[INFO.CELL_HEIGHT],
+            INFO.CLIM: tuple(d[INFO.CLIM] for d in dep_info),
+        }
+        prezs = None  # not used right now
+        overview_content = tuple(self.workspace.get_content(d[INFO.UUID]) for d in dep_info)
+        self.scene_manager.add_composite_layer(new_order,
+                                               ds_info,
+                                               prezs,
+                                               overview_content,
+                                               uuids, composite_type=composite_type)
 
     def setup_menu(self):
         open_action = QtGui.QAction("&Open...", self)
