@@ -722,6 +722,11 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         self.shape = shape or max(data.shape for data in data_arrays)
         self.ndim = len(self.shape) or data_arrays[0].ndim
         self.num_channels = len(data_arrays)
+        # how many of the higher resolution channel tiles (smaller geographic area) make
+        # up a low resolution channel tile
+        self._channel_factors = tuple(round(self.shape[0] / float(chn.shape[0])) for chn in data_arrays)
+        self._lowest_factor = max(self._channel_factors)
+        self._lowest_rez = rez(abs(self.cell_height * self._lowest_factor), abs(self.cell_width * self._lowest_factor))
 
         # Where does this image lie in this lonely world
         self.calc = MercatorTileCalc(
@@ -852,7 +857,8 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         # Tell the texture state that we are adding a tile that should never expire and should always exist
         nfo["texture_tile_index"] = ttile_idx = self.texture_state.add_tile((0, 0, 0), expires=False)
         for idx, data in enumerate(data_arrays):
-            overview_data = data[y_slice, x_slice]
+            _y_slice, _x_slice = self.calc.overview_stride(image_shape=data.shape)
+            overview_data = data[_y_slice, _x_slice]
             self._textures[idx].set_tile_data(ttile_idx, self._normalize_data(overview_data))
 
         # Handle wrapping around the anti-meridian so there is a -180/180 continuous image
@@ -952,6 +958,21 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
             stride, tiy, tix, tex_tile_idx, data_arrays = tile_info
             for idx, data in enumerate(data_arrays):
                 self._textures[idx].set_tile_data(tex_tile_idx, data)
+
+    def assess(self):
+        """Determine if a retile is needed.
+
+        Tell workspace we will be needed
+        """
+        view_box = self.get_view_box()
+        preferred_stride = self.calc.calc_stride(view_box, texture=self._lowest_rez) * self._lowest_factor
+        _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride, extra_tiles_box=box(1, 1, 1, 1))
+        num_tiles = (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l)
+        LOG.debug("Assessment: Prefer '%s' have '%s', was looking at %r, now looking at %r",
+                  preferred_stride, self._stride, self._latest_tile_box, tile_box)
+        # If we zoomed out or we panned
+        need_retile = (num_tiles > 0) and (preferred_stride != self._stride or self._latest_tile_box != tile_box)
+        return need_retile, preferred_stride, tile_box
 
 CompositeLayer = create_visual_node(CompositeLayerVisual)
 

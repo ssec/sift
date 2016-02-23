@@ -316,12 +316,13 @@ class MercatorTileCalc(object):
         return stride
 
     @jit
-    def overview_stride(self):
+    def overview_stride(self, image_shape=None):
+        image_shape = image_shape or self.image_shape
         # FUTURE: Come up with a fancier way of doing overviews like averaging each strided section, if needed
-        tsy = max(1, np.floor(self.image_shape[0] / self.tile_shape[0]))
-        tsx = max(1, np.floor(self.image_shape[1] / self.tile_shape[1]))
-        y_slice = slice(0, self.image_shape[0], tsy)
-        x_slice = slice(0, self.image_shape[1], tsx)
+        tsy = max(1, np.floor(image_shape[0] / self.tile_shape[0]))
+        tsx = max(1, np.floor(image_shape[1] / self.tile_shape[1]))
+        y_slice = slice(0, image_shape[0], tsy)
+        x_slice = slice(0, image_shape[1], tsx)
         return y_slice, x_slice
 
     @jit

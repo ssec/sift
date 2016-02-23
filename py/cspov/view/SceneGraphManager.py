@@ -853,7 +853,7 @@ class SceneGraphManager(QObject):
             data = [self.workspace.get_content(d_uuid, lod=preferred_stride) for d_uuid in self.composite_layers[uuid]]
             yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.5}
             # FIXME: Use LOD instead of stride and provide the lod to the workspace
-            data = [d[::preferred_stride, ::preferred_stride] for d in data]
+            data = [d[::int(preferred_stride / factor), ::int(preferred_stride / factor)] for factor, d in zip(child._channel_factors, data)]
             tiles_info, vertices, tex_coords = child.retile(data, preferred_stride, tile_box)
             yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 1.0}
             self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)
