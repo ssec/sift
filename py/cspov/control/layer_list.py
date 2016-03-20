@@ -377,15 +377,10 @@ class LayerStackListViewModel(QAbstractListModel):
         self._last_equalizer_values = doc_values
         self.refresh()
 
-    def menu(self, pos:QPoint, *args):
-        LOG.info('menu requested for layer list')
+    def change_layer_colormap_menu(self, pos:QPoint, lbox:QListView, selected_uuids:list, *args):
+        LOG.info('colormap menu requested for layer list')
         menu = QMenu()
         actions = {}
-        lbox = self.current_set_listbox
-        # XXX: Normally we would create the menu and actions before hand but since we are checking the actions based
-        # on selection we can't. Then we would use an ActionGroup and make it exclusive
-        selected_uuids = list(self.current_selected_uuids(lbox))
-        LOG.debug("selected UUID set is {0!r:s}".format(selected_uuids))
         current_colormaps = set(self.doc.colormap_for_uuids(selected_uuids))
         for cat, cat_colormaps in CATEGORIZED_COLORMAPS.items():
             submenu = QMenu(cat, parent=menu)
@@ -409,6 +404,55 @@ class LayerStackListViewModel(QAbstractListModel):
             if new_cmap is not None:
                 LOG.info("changing to colormap {0} for ids {1!r:s}".format(new_cmap, selected_uuids))
                 self.doc.change_colormap_for_layers(name=new_cmap, uuids=selected_uuids)
+
+    def composite_layer_menu(self, pos:QPoint, lbox:QListView, selected_uuids:list, *args):
+        """
+        provide common options for RGB or other composite layers, eventually with option to go to a compositing dialog
+
+        """
+        LOG.info('compositing menu requested for layer list')
+        menu = QMenu()
+        actions = {}
+        if len(selected_uuids)!=3:
+            return
+        ruuid, guuid, buuid = selected_uuids
+        new_layer_uuid = self.doc.add_band_rgb_affinity(r=ruuid, g=guuid, b=buuid)
+
+        # for cat, cat_colormaps in CATEGORIZED_COLORMAPS.items():
+        #     submenu = QMenu(cat, parent=menu)
+        #     for colormap in cat_colormaps.keys():
+        #         action = submenu.addAction(colormap)
+        #         actions[action] = colormap
+        #         action.setCheckable(True)
+        #         action.setChecked(colormap in current_colormaps)
+        #     menu.addMenu(submenu)
+        # menu.addSeparator()
+        # flip_action = menu.addAction("Flip Color Limits")
+        # flip_action.setCheckable(True)
+        # flip_action.setChecked(any(self.doc.flipped_for_uuids(selected_uuids)))
+        # menu.addAction(flip_action)
+        sel = menu.exec_(lbox.mapToGlobal(pos))
+        # if sel is flip_action:
+        #     LOG.info("flipping color limits for sibling ids {0!r:s}".format(selected_uuids))
+        #     self.doc.flip_climits_for_layers(uuids=selected_uuids)
+        # else:
+        #     new_cmap = actions.get(sel, None)
+        #     if new_cmap is not None:
+        #         LOG.info("changing to colormap {0} for ids {1!r:s}".format(new_cmap, selected_uuids))
+        #         self.doc.change_colormap_for_layers(name=new_cmap, uuids=selected_uuids)
+
+    def menu(self, pos: QPoint, *args):
+        lbox = self.current_set_listbox
+        # XXX: Normally we would create the menu and actions before hand but since we are checking the actions based
+        # on selection we can't. Then we would use an ActionGroup and make it exclusive
+        selected_uuids = list(self.current_selected_uuids(lbox))
+        LOG.debug("selected UUID set is {0!r:s}".format(selected_uuids))
+        if len(selected_uuids) == 1:
+            return self.change_layer_colormap_menu(pos, lbox, selected_uuids, *args)
+        elif len(selected_uuids) > 1:
+            return self.composite_layer_menu(pos, lbox, selected_uuids, *args)
+        else:
+            return
 
     @property
     def listing(self):

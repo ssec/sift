@@ -508,6 +508,18 @@ class Document(QObject):
                     L[dex] = pinfo._replace(climits=nfo[uuid])
         self.didChangeColorLimits.emit(nfo)
 
+    def add_band_rgb_affinity(self, r, g, b, all_timesteps=True):
+        """
+        user has specified that a band trio should be shown as RGB
+        disable display of the three layers
+        add a composite layer at the z level of the topmost of the three
+        do likewise for other timesteps with the same bands
+        """
+        # disable visibility of the existing layers FUTURE: remove them entirely?
+        # add notation to document on RGB affinity
+        # insert new RGB layer into layer list and scenegraph
+        raise NotImplementedError('NYI')
+
     def __len__(self):
         return len(self.current_layer_set)
 
