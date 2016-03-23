@@ -90,7 +90,8 @@ class KIND(Enum):
     IMAGE = 1
     OUTLINE = 2
     SHAPE = 3
-    COMBINATION = 4
+    RGB = 4
+    COMPOSITE = 5
 
 
 class COMPOSITE_TYPE(Enum):

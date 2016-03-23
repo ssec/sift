@@ -67,7 +67,7 @@ import numpy as np
 from copy import deepcopy
 
 from cspov.common import KIND, INFO, COMPOSITE_TYPE
-from cspov.model.guidebook import AHI_HSF_Guidebook
+from cspov.model.guidebook import AHI_HSF_Guidebook, GUIDE
 
 from PyQt4.QtCore import QObject, pyqtSignal
 
@@ -174,6 +174,27 @@ class Document(QObject):
     #         INFO.DISPLAY_TIME: self._guidebook.display_time(info)
     #     }
 
+    def _insert_layer_with_info(self, info, cmap=None, insert_before=0):
+        """
+        insert a layer into the presentations but do not signal
+        """
+        p = prez(uuid=info[INFO.UUID],
+                 kind=info[INFO.KIND],
+                 visible=True,
+                 a_order=None,
+                 colormap=cmap,
+                 climits=info[INFO.CLIM],
+                 mixing=mixing.NORMAL)
+
+        q = p._replace(visible=False)  # make it available but not visible in other layer sets
+        old_layer_count = len(self._layer_sets[self.current_set_index])
+        for dex, lset in enumerate(self._layer_sets):
+            if lset is not None:  # uninitialized layer sets will be None
+                lset.insert(insert_before, p if dex == self.current_set_index else q)
+
+        reordered_indices = [None] + list(range(old_layer_count))  # FIXME: this should obey insert_before, currently assumes always insert at top
+        return p, reordered_indices
+
     def open_file(self, path, insert_before=0):
         """
         open an arbitrary file and make it the new top layer.
@@ -188,28 +209,15 @@ class Document(QObject):
         self._layer_with_uuid[uuid] = info
         # also get info for this layer from the guidebook
         gbinfo = self._guidebook.collect_info(info)
-        self._layer_with_uuid[uuid].update(gbinfo)
+        self._layer_with_uuid[uuid].update(gbinfo)  # FUTURE: is this kosher?
 
         # add as visible to the front of the current set, and invisible to the rest of the available sets
         cmap = self._default_colormap(info)
         info[INFO.CLIM] = self._guidebook.climits(info)
         info[INFO.NAME] = self._guidebook.display_name(info) or info[INFO.NAME]
-        p = prez(uuid=uuid,
-                 kind=info[INFO.KIND],
-                 visible=True,
-                 a_order=None,
-                 colormap=cmap,
-                 climits=info[INFO.CLIM],
-                 mixing=mixing.NORMAL)
-        q = p._replace(visible=False)  # make it available but not visible in other layer sets
-        old_layer_count = len(self._layer_sets[self.current_set_index])
-        for dex,lset in enumerate(self._layer_sets):
-            if lset is not None:  # uninitialized layer sets will be None
-                lset.insert(insert_before, p if dex==self.current_set_index else q)
-
-        reordered_indices = [None] + list(range(old_layer_count))
+        presentation, reordered_indices = self._insert_layer_with_info(info, cmap=cmap, insert_before=insert_before)
         # signal updates from the document
-        self.didAddBasicLayer.emit(reordered_indices, info, p, content)
+        self.didAddBasicLayer.emit(reordered_indices, info, presentation, content)
         return uuid, info, content
 
     def open_files(self, paths, insert_before=0):
@@ -523,14 +531,30 @@ class Document(QObject):
         # insert new RGB layer into layer list and scenegraph
 
         from uuid import uuid1 as uuidgen
+        from functools import reduce
         uuids = [r,g,b]
         LOG.debug("New Composite UUIDs: %r" % uuids)
         # FIXME: register this with workspace!
         dep_info = [self.get_info(uuid=uuid) for uuid in uuids]
         highest_res_dep = min(dep_info, key=lambda x: x[INFO.CELL_WIDTH])
+        _dt = lambda nfo: nfo.get(GUIDE.DISPLAY_TIME, '<unknown time>')
+        display_time = reduce(lambda dta,b: dta if dta==_dt(b) else '<multiple times>', dep_info, _dt(dep_info[0]))
         uuid = uuidgen()  # FUTURE: workspace should be providing this?
+        try:
+            bands = (dep_info[0][GUIDE.BAND],
+                     dep_info[1][GUIDE.BAND],
+                     dep_info[2][GUIDE.BAND])
+            name = u"R:B{0:02d} G:B{1:02d} B:B{2:02d}".format(*bands)
+        except KeyError:
+            LOG.error('unable to create new name from {0!r:s}'.format(dep_info))
+            name = "RGB"
+            bands = []
         ds_info = {
             INFO.UUID: uuid,
+            INFO.NAME: name,
+            INFO.KIND: KIND.RGB,
+            GUIDE.BAND: bands,
+            GUIDE.DISPLAY_TIME: display_time,
             INFO.ORIGIN_X: highest_res_dep[INFO.ORIGIN_X],
             INFO.ORIGIN_Y: highest_res_dep[INFO.ORIGIN_Y],
             INFO.CELL_WIDTH: highest_res_dep[INFO.CELL_WIDTH],
@@ -538,14 +562,11 @@ class Document(QObject):
             INFO.CLIM: tuple(d[INFO.CLIM] for d in dep_info),
         }
         self._layer_with_uuid[uuid] = ds_info
+        presentation, reordered_indices = self._insert_layer_with_info(ds_info)
+
         prezs = None  # not used right now FIXME
         overview_content = list(self._workspace.get_content(d[INFO.UUID]) for d in dep_info)
         self.didAddCompositeLayer.emit([None], ds_info, [None], overview_content, uuids, COMPOSITE_TYPE.RGB)
-        # self.scene_manager.add_composite_layer(new_order,
-        #                                        ds_info,
-        #                                        prezs,
-        #                                        overview_content,
-        #                                        uuids, composite_type=composite_type)
 
     def __len__(self):
         return len(self.current_layer_set)
@@ -645,6 +666,8 @@ class Document(QObject):
 
     def is_using(self, uuid:UUID, layer_set:int=None):
         "return true if this dataset is still in use in one of the layer sets"
+        # FIXME: this needs to check not just which layers are being displayed, but which layers which may be in use but as part of a composite instead of a direct scenegraph entry
+        LOG.error('composite layers currently not checked for dependencies')
         if layer_set is not None:
             lss = [self._layer_sets[layer_set]]
         else:
