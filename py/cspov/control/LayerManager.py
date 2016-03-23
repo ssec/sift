@@ -161,6 +161,7 @@ class SingleLayerInfoDisplay (QWidget) :
         self.time_text = QLabel("")
         self.instrument_text = QLabel("")
         self.band_text = QLabel("")
+        self.wavelength_text = QLabel("")
         self.colormap_text = QLabel("")
         self.clims_text = QLabel("")
         self.cmap_vis = QWebView()
@@ -174,9 +175,10 @@ class SingleLayerInfoDisplay (QWidget) :
         layout.addWidget(self.time_text,       2, 1)
         layout.addWidget(self.instrument_text, 3, 1)
         layout.addWidget(self.band_text,       4, 1)
-        layout.addWidget(self.colormap_text,   5, 1)
-        layout.addWidget(self.clims_text,      6, 1)
-        layout.addWidget(self.cmap_vis, 7, 1)
+        layout.addWidget(self.wavelength_text, 5, 1)
+        layout.addWidget(self.colormap_text,   6, 1)
+        layout.addWidget(self.clims_text,      7, 1)
+        layout.addWidget(self.cmap_vis, 8, 1)
         parent.setLayout(layout)
 
         # TODO put the informational text into an area with scroll bars so it won't force the sidebar size minimum
@@ -197,6 +199,7 @@ class SingleLayerInfoDisplay (QWidget) :
             self.time_text.setText("Time: ")
             self.instrument_text.setText("Instrument: ")
             self.band_text.setText("Band: ")
+            self.wavelength_text.setText("Wavelength: ")
             self.colormap_text.setText("Colormap: ")
             self.clims_text.setText("C-Limits: ")
             self.cmap_vis.setHtml("")
@@ -245,6 +248,13 @@ class SingleLayerInfoDisplay (QWidget) :
                     shared_info[GUIDE.BAND] = new_band
                 else :
                     shared_info[GUIDE.BAND] = "" if shared_info[GUIDE.BAND] != new_band else new_band
+
+                # wavelength
+                wl = "{:0.2f} µm".format(layer_info[GUIDE.NOMINAL_WAVELENGTH]) if GUIDE.NOMINAL_WAVELENGTH in layer_info else ""
+                if GUIDE.NOMINAL_WAVELENGTH not in shared_info:
+                    shared_info[GUIDE.NOMINAL_WAVELENGTH] = wl
+                else:
+                    shared_info[GUIDE.NOMINAL_WAVELENGTH] = "" if shared_info[GUIDE.NOMINAL_WAVELENGTH] != wl else wl
 
                 # colormap
                 new_cmap = this_prez.colormap if this_prez is not None else ""
@@ -318,6 +328,8 @@ class SingleLayerInfoDisplay (QWidget) :
             self.instrument_text.setText("Instrument: " + temp_inst)
             temp_band = shared_info[GUIDE.BAND] if GUIDE.BAND in shared_info else ""
             self.band_text.setText("Band: " + temp_band)
+            temp_wl = shared_info[GUIDE.NOMINAL_WAVELENGTH] if GUIDE.NOMINAL_WAVELENGTH in shared_info else ""
+            self.wavelength_text.setText("Wavelength: " + temp_wl)
             temp_cmap = shared_info["colormap"] if shared_info.get("colormap", None) is not None else ""
             self.colormap_text.setText("Colormap: " + temp_cmap)
             temp_clims = shared_info["climits"] if "climits" in shared_info else ""

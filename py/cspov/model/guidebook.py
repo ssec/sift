@@ -85,6 +85,29 @@ class GUIDE(Enum):
     DISPLAY_TIME = 'display_time' # time to show on animation control
     DISPLAY_NAME = 'display_name' # preferred name in the layer list
     UNIT_CONVERSION = 'unit_conversion'  # (unit string, lambda x, inverse=False: convert-to-units)
+    NOMINAL_WAVELENGTH = 'nominal_wavelength'
+
+# Instrument -> Band Number -> Nominal Wavelength
+NOMINAL_WAVELENGTHS = {
+    INSTRUMENT.AHI: {
+        1: 0.47,
+        2: 0.51,
+        3: 0.64,
+        4: 0.86,
+        5: 1.6,
+        6: 2.3,
+        7: 3.9,
+        8: 6.2,
+        9: 6.9,
+        10: 7.3,
+        11: 8.6,
+        12: 9.6,
+        13: 10.4,
+        14: 11.2,
+        15: 12.4,
+        16: 13.3,
+    },
+}
 
 
 class AHI_HSF_Guidebook(Guidebook):
@@ -153,6 +176,7 @@ class AHI_HSF_Guidebook(Guidebook):
             md = self._metadata_for_path(info[INFO.PATHNAME])
             md[GUIDE.UUID] = info[INFO.UUID]
             md[GUIDE.INSTRUMENT] = INSTRUMENT.AHI
+            md[GUIDE.NOMINAL_WAVELENGTH] = NOMINAL_WAVELENGTHS[md[GUIDE.INSTRUMENT]][md[GUIDE.BAND]]
             # md[GUIDE.UNIT_CONVERSION] = self.units_conversion(info)  # FUTURE: decide whether this should be done for most queries
             self._cache[info[INFO.UUID]] = md
             return md
