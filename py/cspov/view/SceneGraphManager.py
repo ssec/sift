@@ -674,7 +674,7 @@ class SceneGraphManager(QObject):
             LOG.info('changing {} to colormap {}'.format(uuid, clims))
             self.set_color_limits(clims, uuid)
 
-    def add_layer(self, new_order:list, ds_info:dict, p:prez, overview_content:np.ndarray):
+    def add_basic_layer(self, new_order:list, ds_info:dict, p:prez, overview_content:np.ndarray):
         uuid = ds_info[INFO.UUID]
         # create a new layer in the imagelist
         image = TiledGeolocatedImage(
@@ -700,6 +700,7 @@ class SceneGraphManager(QObject):
         self.on_view_change(None)
 
     def add_composite_layer(self, new_order:list, ds_info:dict, p:prez, overview_content:list, dep_uuids, composite_type=COMPOSITE_TYPE.RGB):
+        LOG.debug("SceenGraphManager.add_composite_layer %s" % repr(ds_info))
         if composite_type == COMPOSITE_TYPE.RGB:
             if len(dep_uuids) != 3:
                 # don't know how to do it without 3 layers
@@ -765,7 +766,8 @@ class SceneGraphManager(QObject):
 
     def set_document(self, document):
         document.didReorderLayers.connect(self.rebuild_layer_order)  # current layer set changed z/anim order
-        document.didAddBasicLayer.connect(self.add_layer)  # layer added to one or more layer sets
+        document.didAddBasicLayer.connect(self.add_basic_layer)  # layer added to one or more layer sets
+        document.didAddCompositeLayer.connect(self.add_composite_layer)  # layer derived from other layers (either basic or composite themselves)
         document.didRemoveLayers.connect(self.remove_layer)  # layer removed from current layer set
         document.willPurgeLayer.connect(self.purge_layer)  # layer removed from document
         document.didSwitchLayerSet.connect(self.rebuild_new_layer_set)

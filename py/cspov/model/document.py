@@ -509,19 +509,44 @@ class Document(QObject):
                     L[dex] = pinfo._replace(climits=nfo[uuid])
         self.didChangeColorLimits.emit(nfo)
 
-    def add_band_rgb_affinity(self, r, g, b, all_timesteps=True):
+    def create_rgb_composite(self, r, g, b, all_timesteps=True):
         """
         user has specified that a band trio should be shown as RGB
         disable display of the three layers
         add a composite layer at the z level of the topmost of the three
         do likewise for other timesteps with the same bands
         """
-        # disable visibility of the existing layers FUTURE: remove them entirely?
+        # disable visibility of the existing layers FUTURE: remove them entirely? probably not
         self.toggle_layer_visibility([r,g,b], False)
         # add notation to document on RGB affinity
+        # register with workspace so that it can persist info to disk if needed
         # insert new RGB layer into layer list and scenegraph
 
-        raise NotImplementedError('NYI')
+        from uuid import uuid1 as uuidgen
+        uuids = [r,g,b]
+        LOG.debug("New Composite UUIDs: %r" % uuids)
+        # FIXME: register this with workspace!
+        dep_info = [self.get_info(uuid=uuid) for uuid in uuids]
+        highest_res_dep = min(dep_info, key=lambda x: x[INFO.CELL_WIDTH])
+        new_order = None  # not used by SGM but passed when adding normal layers FIXME
+        uuid = uuidgen()  # FUTURE: workspace should be providing this?
+        ds_info = {
+            INFO.UUID: uuid,
+            INFO.ORIGIN_X: highest_res_dep[INFO.ORIGIN_X],
+            INFO.ORIGIN_Y: highest_res_dep[INFO.ORIGIN_Y],
+            INFO.CELL_WIDTH: highest_res_dep[INFO.CELL_WIDTH],
+            INFO.CELL_HEIGHT: highest_res_dep[INFO.CELL_HEIGHT],
+            INFO.CLIM: tuple(d[INFO.CLIM] for d in dep_info),
+        }
+        self._layer_with_uuid[uuid] = ds_info
+        prezs = None  # not used right now FIXME
+        overview_content = tuple(self.workspace.get_content(d[INFO.UUID]) for d in dep_info)
+        self.didAddCompositeLayer.emit(new_order, ds_info, prezs, overview_content, uuids, COMPOSITE.RGB)
+        # self.scene_manager.add_composite_layer(new_order,
+        #                                        ds_info,
+        #                                        prezs,
+        #                                        overview_content,
+        #                                        uuids, composite_type=composite_type)
 
     def __len__(self):
         return len(self.current_layer_set)

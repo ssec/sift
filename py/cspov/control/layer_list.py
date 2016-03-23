@@ -416,7 +416,7 @@ class LayerStackListViewModel(QAbstractListModel):
         if len(selected_uuids)!=3:
             return
         ruuid, guuid, buuid = selected_uuids
-        new_layer_uuid = self.doc.add_band_rgb_affinity(r=ruuid, g=guuid, b=buuid)
+        new_layer_uuid = self.doc.create_rgb_composite(r=ruuid, g=guuid, b=buuid)
 
         # for cat, cat_colormaps in CATEGORIZED_COLORMAPS.items():
         #     submenu = QMenu(cat, parent=menu)

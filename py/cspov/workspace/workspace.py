@@ -185,6 +185,8 @@ class Workspace(QObject):
     - notify subscribers of changes to datasets (Qt signal/slot pub-sub)
     - during idle, clean out unused/idle data content, given DatasetInfo contents provides enough metadata to recreate
     - interface to external data processing or loading plug-ins and notify application of new-dataset-in-workspace
+
+    FIXME: deal with non-basic datasets (composites)
     """
     cwd = None  # directory we work in
     _own_cwd = None  # whether or not we created the cwd - which is also whether or not we're allowed to destroy it
@@ -193,6 +195,7 @@ class Workspace(QObject):
     _info = None
     _data = None
     _inventory = None  # dictionary of data
+    _composite_inventory = None  # dicionary of composite datasets: { uuid: (symbols, relation, info) }
     _inventory_path = None  # filename to store and load inventory information (simple cache)
     _tempdir = None  # TemporaryDirectory, if it's needed (i.e. a directory name was not given)
     _max_size_gb = None  # maximum size in gigabytes of flat files we cache in the workspace
@@ -223,6 +226,7 @@ class Workspace(QObject):
             LOG.info('using temporary directory {}'.format(directory_path))
         self.cwd = directory_path = os.path.abspath(directory_path)
         self._inventory_path = os.path.join(self.cwd, 'inventory.pkl')
+        self._composite_inventory = {}
         if not os.path.isdir(directory_path):
             os.makedirs(directory_path)
             self._own_cwd = True
@@ -438,6 +442,14 @@ class Workspace(QObject):
             self._update_cache(source_path, uuid, info, data)
         # TODO: schedule cache cleaning in background after a series of imports completes
         return uuid, info, data
+
+    def create_composite(self, symbols:dict, relation:dict):
+        """
+        create a layer composite in the workspace
+        :param symbols: dictionary of logical-name to uuid
+        :param relation: dictionary with information on how the relation is calculated (FUTURE)
+        """
+
 
     def _preferred_cache_path(self, uuid):
         filename = str(uuid)
