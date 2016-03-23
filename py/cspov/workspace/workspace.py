@@ -505,7 +505,7 @@ class Workspace(QObject):
         """
         if isinstance(dsi_or_uuid, str):
             dsi_or_uuid = UUID(dsi_or_uuid)
-        return self._info[dsi_or_uuid]
+        return self._info.get(dsi_or_uuid, None)
 
     def get_content(self, dsi_or_uuid, lod=None):
         """
@@ -515,7 +515,7 @@ class Workspace(QObject):
         """
         if isinstance(dsi_or_uuid, str):
             dsi_or_uuid = UUID(dsi_or_uuid)
-        return self._data[dsi_or_uuid]
+        return self._data.get(dsi_or_uuid, None)
 
     def _create_position_to_index_transform(self, dsi_or_uuid):
         info = self.get_info(dsi_or_uuid)
