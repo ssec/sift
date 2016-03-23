@@ -66,7 +66,7 @@ from uuid import UUID
 import numpy as np
 from copy import deepcopy
 
-from cspov.common import KIND, INFO
+from cspov.common import KIND, INFO, COMPOSITE_TYPE
 from cspov.model.guidebook import AHI_HSF_Guidebook
 
 from PyQt4.QtCore import QObject, pyqtSignal
@@ -130,7 +130,7 @@ class Document(QObject):
 
     # signals
     didAddBasicLayer = pyqtSignal(list, dict, prez, np.ndarray)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
-    didAddCompositeLayer = pyqtSignal(list, dict, prez)  # comp layer is derived from multiple basic layers and has its own UUID
+    didAddCompositeLayer = pyqtSignal(list, dict, list, list, list, object)  # comp layer is derived from multiple basic layers and has its own UUID
     didRemoveLayers = pyqtSignal(list, list, int, int)  # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
     willPurgeLayer = pyqtSignal(UUID)  # UUID of the layer being removed
     didReorderLayers = pyqtSignal(list)  # list of original indices in their new order, None for new layers
@@ -528,7 +528,6 @@ class Document(QObject):
         # FIXME: register this with workspace!
         dep_info = [self.get_info(uuid=uuid) for uuid in uuids]
         highest_res_dep = min(dep_info, key=lambda x: x[INFO.CELL_WIDTH])
-        new_order = None  # not used by SGM but passed when adding normal layers FIXME
         uuid = uuidgen()  # FUTURE: workspace should be providing this?
         ds_info = {
             INFO.UUID: uuid,
@@ -540,8 +539,8 @@ class Document(QObject):
         }
         self._layer_with_uuid[uuid] = ds_info
         prezs = None  # not used right now FIXME
-        overview_content = tuple(self.workspace.get_content(d[INFO.UUID]) for d in dep_info)
-        self.didAddCompositeLayer.emit(new_order, ds_info, prezs, overview_content, uuids, COMPOSITE.RGB)
+        overview_content = list(self._workspace.get_content(d[INFO.UUID]) for d in dep_info)
+        self.didAddCompositeLayer.emit([None], ds_info, [None], overview_content, uuids, COMPOSITE_TYPE.RGB)
         # self.scene_manager.add_composite_layer(new_order,
         #                                        ds_info,
         #                                        prezs,

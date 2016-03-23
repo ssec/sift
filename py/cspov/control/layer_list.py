@@ -413,33 +413,20 @@ class LayerStackListViewModel(QAbstractListModel):
         LOG.info('compositing menu requested for layer list')
         menu = QMenu()
         actions = {}
-        if len(selected_uuids)!=3:
+        if len(selected_uuids) != 3:
+            # FIXME: check that all three are basic layers!
+            LOG.warning('need 3 layers to create a composite')
             return
-        ruuid, guuid, buuid = selected_uuids
-        new_layer_uuid = self.doc.create_rgb_composite(r=ruuid, g=guuid, b=buuid)
-
-        # for cat, cat_colormaps in CATEGORIZED_COLORMAPS.items():
-        #     submenu = QMenu(cat, parent=menu)
-        #     for colormap in cat_colormaps.keys():
-        #         action = submenu.addAction(colormap)
-        #         actions[action] = colormap
-        #         action.setCheckable(True)
-        #         action.setChecked(colormap in current_colormaps)
-        #     menu.addMenu(submenu)
-        # menu.addSeparator()
-        # flip_action = menu.addAction("Flip Color Limits")
-        # flip_action.setCheckable(True)
-        # flip_action.setChecked(any(self.doc.flipped_for_uuids(selected_uuids)))
-        # menu.addAction(flip_action)
+        # combos = [x.upper() for x in [a+b+c for a in ['r', 'g', 'b'] for b in ['r', 'g', 'b'] for c in ['r','g','b']] if 'r' in x and 'g' in x and 'b' in x]
+        for rgb in ['RGB', 'RBG', 'GRB', 'GBR', 'BRG', 'BGR']:
+            action = menu.addAction(rgb)
+            request = dict((channel.lower(), uuid) for (channel,uuid) in zip(rgb, selected_uuids))
+            actions[action] = request
         sel = menu.exec_(lbox.mapToGlobal(pos))
-        # if sel is flip_action:
-        #     LOG.info("flipping color limits for sibling ids {0!r:s}".format(selected_uuids))
-        #     self.doc.flip_climits_for_layers(uuids=selected_uuids)
-        # else:
-        #     new_cmap = actions.get(sel, None)
-        #     if new_cmap is not None:
-        #         LOG.info("changing to colormap {0} for ids {1!r:s}".format(new_cmap, selected_uuids))
-        #         self.doc.change_colormap_for_layers(name=new_cmap, uuids=selected_uuids)
+        request = actions.get(sel, None)
+        if request is not None:
+            LOG.debug('RGB creation using {0!r:s}'.format(request))
+            self.doc.create_rgb_composite(**request)
 
     def menu(self, pos: QPoint, *args):
         lbox = self.current_set_listbox
@@ -451,8 +438,6 @@ class LayerStackListViewModel(QAbstractListModel):
             return self.change_layer_colormap_menu(pos, lbox, selected_uuids, *args)
         elif len(selected_uuids) > 1:
             return self.composite_layer_menu(pos, lbox, selected_uuids, *args)
-        else:
-            return
 
     @property
     def listing(self):

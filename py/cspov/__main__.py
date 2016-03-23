@@ -611,6 +611,7 @@ class Main(QtGui.QMainWindow):
         if len(uuids) == 0:
             # get the layers to composite from current selection
             uuids = list(self.behaviorLayersList.current_selected_uuids())
+        # FIXME: insert a dialog or pane for this command
         self.document.create_rgb_composite(uuids[0], uuids[1], uuids[2])
 
     def setup_menu(self):
