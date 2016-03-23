@@ -129,7 +129,8 @@ class Document(QObject):
     _guidebook = None  # FUTURE: this is currently an AHI_HSF_Guidebook, make it a general guidebook
 
     # signals
-    didAddLayer = pyqtSignal(list, dict, prez, np.ndarray)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
+    didAddBasicLayer = pyqtSignal(list, dict, prez, np.ndarray)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
+    didAddCompositeLayer = pyqtSignal(list, dict, prez)  # comp layer is derived from multiple basic layers and has its own UUID
     didRemoveLayers = pyqtSignal(list, list, int, int)  # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
     willPurgeLayer = pyqtSignal(UUID)  # UUID of the layer being removed
     didReorderLayers = pyqtSignal(list)  # list of original indices in their new order, None for new layers
@@ -208,7 +209,7 @@ class Document(QObject):
 
         reordered_indices = [None] + list(range(old_layer_count))
         # signal updates from the document
-        self.didAddLayer.emit(reordered_indices, info, p, content)
+        self.didAddBasicLayer.emit(reordered_indices, info, p, content)
         return uuid, info, content
 
     def open_files(self, paths, insert_before=0):
@@ -516,8 +517,10 @@ class Document(QObject):
         do likewise for other timesteps with the same bands
         """
         # disable visibility of the existing layers FUTURE: remove them entirely?
+        self.toggle_layer_visibility([r,g,b], False)
         # add notation to document on RGB affinity
         # insert new RGB layer into layer list and scenegraph
+
         raise NotImplementedError('NYI')
 
     def __len__(self):

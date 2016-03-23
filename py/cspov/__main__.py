@@ -511,7 +511,7 @@ class Main(QtGui.QMainWindow):
         def _blackhole(*args, **kwargs):
             return update_probe_point()
         self.document.didChangeLayerVisibility.connect(_blackhole)
-        self.document.didAddLayer.connect(_blackhole)
+        self.document.didAddBasicLayer.connect(_blackhole)
         self.document.didRemoveLayers.connect(_blackhole)
         self.document.didReorderLayers.connect(_blackhole)
         if False:
@@ -556,7 +556,7 @@ class Main(QtGui.QMainWindow):
         self.document.didChangeLayerVisibility.connect(self.update_frame_time_to_top_visible)
         self.document.didReorderLayers.connect(self.update_frame_time_to_top_visible)
         self.document.didRemoveLayers.connect(self.update_frame_time_to_top_visible)
-        self.document.didAddLayer.connect(self.update_frame_time_to_top_visible)
+        self.document.didAddBasicLayer.connect(self.update_frame_time_to_top_visible)
 
         self.ui.panZoomToolButton.toggled.connect(partial(self.change_tool, name=TOOL.PAN_ZOOM))
         self.ui.pointSelectButton.toggled.connect(partial(self.change_tool, name=TOOL.POINT_PROBE))

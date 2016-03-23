@@ -241,7 +241,7 @@ class LayerStackListViewModel(QAbstractListModel):
         doc.didChangeColorLimits.connect(self.refresh)
         doc.didChangeLayerVisibility.connect(self.refresh)
         doc.didChangeLayerName.connect(self.refresh)
-        doc.didAddLayer.connect(self.doc_added_layer)
+        doc.didAddBasicLayer.connect(self.doc_added_basic_layer)
         doc.willPurgeLayer.connect(self.refresh)
         doc.didSwitchLayerSet.connect(self.refresh)
         doc.didReorderAnimation.connect(self.refresh)
@@ -309,7 +309,7 @@ class LayerStackListViewModel(QAbstractListModel):
             if widget.isVisible():
                 return widget
 
-    def doc_added_layer(self, new_order, info, content):
+    def doc_added_basic_layer(self, new_order, info, content):
         dexes = [i for i,q in enumerate(new_order) if q==None]
         # for dex in dexes:
         #     self.beginInsertRows(QModelIndex(), dex, dex)

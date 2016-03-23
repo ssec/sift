@@ -765,7 +765,7 @@ class SceneGraphManager(QObject):
 
     def set_document(self, document):
         document.didReorderLayers.connect(self.rebuild_layer_order)  # current layer set changed z/anim order
-        document.didAddLayer.connect(self.add_layer)  # layer added to one or more layer sets
+        document.didAddBasicLayer.connect(self.add_layer)  # layer added to one or more layer sets
         document.didRemoveLayers.connect(self.remove_layer)  # layer removed from current layer set
         document.willPurgeLayer.connect(self.purge_layer)  # layer removed from document
         document.didSwitchLayerSet.connect(self.rebuild_new_layer_set)

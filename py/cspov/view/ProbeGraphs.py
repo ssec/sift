@@ -131,7 +131,7 @@ class ProbeGraphManager (QObject) :
         # hook up the various document signals that would mean we need to reload things
         self.document.didReorderLayers.connect(self.handleLayersChanged)
         self.document.didChangeLayerName.connect(self.handleLayersChanged)
-        self.document.didAddLayer.connect(self.handleLayersChanged)
+        self.document.didAddBasicLayer.connect(self.handleLayersChanged)
         self.document.willPurgeLayer.connect(self.handleLayersChanged)
         self.document.didSwitchLayerSet.connect(self.handleLayersChanged)
 
