@@ -31,6 +31,12 @@ class INSTRUMENT(Enum):
     ABI = 'ABI'
     AMI = 'AMI'
 
+
+class PLATFORM(Enum):
+    HIMAWARI_8 = 'Himawari-8'
+    HIMAWARI_9 = 'Himawari-9'
+    GOES_16 = 'GOES-16'
+
 GUIDEBOOKS = {}
 
 
@@ -76,7 +82,7 @@ class GUIDE(Enum):
     standard dictionary keys for guidebook metadata
     """
     UUID = 'uuid'  # dataset UUID, if available
-    SPACECRAFT = 'spacecraft' # full standard name of spacecraft
+    PLATFORM = 'spacecraft' # full standard name of spacecraft
     SCHED_TIME = 'timeline'  # scheduled time for observation
     OBS_TIME = 'obstime'  # actual time for observation
     BAND = 'band'  # band number (multispectral instruments)
@@ -85,6 +91,39 @@ class GUIDE(Enum):
     DISPLAY_TIME = 'display_time' # time to show on animation control
     DISPLAY_NAME = 'display_name' # preferred name in the layer list
     UNIT_CONVERSION = 'unit_conversion'  # (unit string, lambda x, inverse=False: convert-to-units)
+    CENTRAL_WAVELENGTH = 'nominal_wavelength'
+
+# Instrument -> Band Number -> Nominal Wavelength
+NOMINAL_WAVELENGTHS = {
+    PLATFORM.HIMAWARI_8: {
+        INSTRUMENT.AHI: {
+            1: 0.47,
+            2: 0.51,
+            3: 0.64,
+            4: 0.86,
+            5: 1.6,
+            6: 2.3,
+            7: 3.9,
+            8: 6.2,
+            9: 6.9,
+            10: 7.3,
+            11: 8.6,
+            12: 9.6,
+            13: 10.4,
+            14: 11.2,
+            15: 12.4,
+            16: 13.3,
+        },
+    },
+    # PLATFORM.HIMAWARI_9: {
+    #     INSTRUMENT.AHI: {
+    #     },
+    # },
+    # PLATFORM.GOES_16: {
+    #     INSTRUMENT.ABI: {
+    #     },
+    # },
+}
 
 
 
@@ -111,15 +150,15 @@ class AHI_HSF_Guidebook(Guidebook):
         m = re.match(r'HS_H(\d\d)_(\d{8})_(\d{4})_B(\d\d)_([A-Za-z0-9]+).*', os.path.split(pathname)[1])
         if not m:
             return {}
-        sat, yyyymmdd, hhmm, bb, scene = m.groups()
+        plat, yyyymmdd, hhmm, bb, scene = m.groups()
         when = datetime.strptime(yyyymmdd + hhmm, '%Y%m%d%H%M')
-        sat = 'Himawari-{}'.format(int(sat))
+        plat = PLATFORM('Himawari-{}'.format(int(plat)))
         band = int(bb)
         dtime = when.strftime('%Y-%m-%d %H:%M')
         label = 'Refl' if band in [1, 2, 3, 4, 5, 6] else 'BT'
         name = "AHI B{0:02d} {1:s} {2:s}".format(band, label, dtime)
         return {
-            GUIDE.SPACECRAFT: sat,
+            GUIDE.PLATFORM: plat,
             GUIDE.BAND: band,
             GUIDE.SCHED_TIME: when,
             GUIDE.DISPLAY_TIME: dtime,
@@ -159,6 +198,7 @@ class AHI_HSF_Guidebook(Guidebook):
             md = self._metadata_for_path(info.get(INFO.PATHNAME, None))
             md[GUIDE.UUID] = info[INFO.UUID]
             md[GUIDE.INSTRUMENT] = INSTRUMENT.AHI
+            md[GUIDE.CENTRAL_WAVELENGTH] = NOMINAL_WAVELENGTHS[md[GUIDE.PLATFORM]][md[GUIDE.INSTRUMENT]][md[GUIDE.BAND]]
             # md[GUIDE.UNIT_CONVERSION] = self.units_conversion(info)  # FUTURE: decide whether this should be done for most queries
             self._cache[info[INFO.UUID]] = md
         z = md.copy()
@@ -240,7 +280,7 @@ class AHI_HSF_Guidebook(Guidebook):
         if it is None:
             return None
         sibs = [(x[GUIDE.BAND], x[GUIDE.UUID]) for x in
-                self._filter(meta.values(), it, {GUIDE.SCENE, GUIDE.SCHED_TIME, GUIDE.INSTRUMENT, GUIDE.SPACECRAFT})]
+                self._filter(meta.values(), it, {GUIDE.SCENE, GUIDE.SCHED_TIME, GUIDE.INSTRUMENT, GUIDE.PLATFORM})]
         # then sort it by bands
         sibs.sort()
         offset = [i for i,x in enumerate(sibs) if x[1]==uuid]
@@ -258,7 +298,7 @@ class AHI_HSF_Guidebook(Guidebook):
         if it is None:
             return None
         sibs = [(x[GUIDE.SCHED_TIME], x[GUIDE.UUID]) for x in
-                self._filter(meta.values(), it, {GUIDE.SCENE, GUIDE.BAND, GUIDE.INSTRUMENT, GUIDE.SPACECRAFT})]
+                self._filter(meta.values(), it, {GUIDE.SCENE, GUIDE.BAND, GUIDE.INSTRUMENT, GUIDE.PLATFORM})]
         # then sort it into time order
         sibs.sort()
         offset = [i for i,x in enumerate(sibs) if x[1]==uuid]
