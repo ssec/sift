@@ -250,11 +250,11 @@ class SingleLayerInfoDisplay (QWidget) :
                     shared_info[GUIDE.BAND] = "" if shared_info[GUIDE.BAND] != new_band else new_band
 
                 # wavelength
-                wl = "{:0.2f} µm".format(layer_info[GUIDE.NOMINAL_WAVELENGTH]) if GUIDE.NOMINAL_WAVELENGTH in layer_info else ""
-                if GUIDE.NOMINAL_WAVELENGTH not in shared_info:
-                    shared_info[GUIDE.NOMINAL_WAVELENGTH] = wl
+                wl = "{:0.2f} µm".format(layer_info[GUIDE.CENTRAL_WAVELENGTH]) if GUIDE.CENTRAL_WAVELENGTH in layer_info else ""
+                if GUIDE.CENTRAL_WAVELENGTH not in shared_info:
+                    shared_info[GUIDE.CENTRAL_WAVELENGTH] = wl
                 else:
-                    shared_info[GUIDE.NOMINAL_WAVELENGTH] = "" if shared_info[GUIDE.NOMINAL_WAVELENGTH] != wl else wl
+                    shared_info[GUIDE.CENTRAL_WAVELENGTH] = "" if shared_info[GUIDE.CENTRAL_WAVELENGTH] != wl else wl
 
                 # colormap
                 new_cmap = this_prez.colormap if this_prez is not None else ""
@@ -328,7 +328,7 @@ class SingleLayerInfoDisplay (QWidget) :
             self.instrument_text.setText("Instrument: " + temp_inst)
             temp_band = shared_info[GUIDE.BAND] if GUIDE.BAND in shared_info else ""
             self.band_text.setText("Band: " + temp_band)
-            temp_wl = shared_info[GUIDE.NOMINAL_WAVELENGTH] if GUIDE.NOMINAL_WAVELENGTH in shared_info else ""
+            temp_wl = shared_info[GUIDE.CENTRAL_WAVELENGTH] if GUIDE.CENTRAL_WAVELENGTH in shared_info else ""
             self.wavelength_text.setText("Wavelength: " + temp_wl)
             temp_cmap = shared_info["colormap"] if shared_info.get("colormap", None) is not None else ""
             self.colormap_text.setText("Colormap: " + temp_cmap)
