@@ -60,7 +60,7 @@ import sys
 import logging
 import unittest
 import argparse
-from collections import namedtuple, MutableMapping
+from collections import namedtuple, MutableMapping, MutableSequence
 from enum import Enum
 from uuid import UUID
 import numpy as np
@@ -98,9 +98,19 @@ class mixing(Enum):
 class DocLayer(MutableMapping):
     """
     Layer as represented within the document
-    Initially functions as a dictionary, eventually dictionary interfaces will be limited to non-standard annotation keys.
+    Essentially: A helper representation of a layer and part of the public interface to the document.
+    Substitutes in for document layer information dictionaries initially,
+      but eventually dictionary interfaces will be limited to non-standard annotation keys.
+    Incrementally migrate functionality from Document into these classes as appropriate, to keep Document from getting too complicated.
+    Make sure that DocLayer classes remain serializable and long-term connected only to the document, not to UI elements or workspace.
     """
     _doc = None  # weakref to document that owns us
+
+    def __init__(self, doc, *args, **kwargs):
+        assert (isinstance(doc, Document))
+        self._doc = ref(doc)
+        self._store = dict()
+        self.update(dict(*args, **kwargs))  # use the free update to set keys
 
     @property
     def dependencies(self):
@@ -110,26 +120,28 @@ class DocLayer(MutableMapping):
         """
         return set()
 
-    def __init__(self, doc, *args, **kwargs):
-        assert(isinstance(doc, Document))
-        self._doc = ref(doc)
-        self.store = dict()
-        self.update(dict(*args, **kwargs))  # use the free update to set keys
+    @property
+    def uuid(self):
+        return self._store[INFO.UUID]
+
+    @property
+    def kind(self):
+        return self._store[INFO.KIND]
 
     def __getitem__(self, key):
-        return self.store[self.__keytransform__(key)]
+        return self._store[self.__keytransform__(key)]
 
     def __setitem__(self, key, value):
-        self.store[self.__keytransform__(key)] = value
+        self._store[self.__keytransform__(key)] = value
 
     def __delitem__(self, key):
-        del self.store[self.__keytransform__(key)]
+        del self._store[self.__keytransform__(key)]
 
     def __iter__(self):
-        return iter(self.store)
+        return iter(self._store)
 
     def __len__(self):
-        return len(self.store)
+        return len(self._store)
 
     def __keytransform__(self, key):
         return key
@@ -153,6 +165,55 @@ class DocAlgebraicLayer(DocLayer):
     """
     pass
 
+# class DocMapLayer(DocLayer):
+#     """
+#     FUTURE: A layer containing a background map as vector
+#     """
+#     pass
+#
+# class DocShapeLayer(DocLayer):
+#     """
+#     FUTURE: A layer represented in the scene graph as an editable shape
+#     """
+#     pass
+#
+# class DocProbeLayer(DocShapeLayer):
+#     """
+#     FUTURE: A shape layer which feeds probe values to another UI element or helper.
+#     """
+#
+
+class DocLayerSet(MutableSequence):
+    """
+    list-like layer set which will slowly eat functionality from Document as warranted, and provide cleaner interfacing to GUI elements
+    """
+    _doc = None
+    _store = None
+
+    def __init__(self, doc, *args, **kwargs):
+        assert (isinstance(doc, Document))
+        self._doc = ref(doc)
+        self._store = list(*args)
+
+    def __setitem__(self, index:int, value:prez):
+        if index>=0 and index<len(self._store):
+            self._store[index] = value
+        elif index == len(self._store):
+            self._store.append(value)
+        else:
+            raise IndexError('%d not a valid index' % index)
+
+    def __getitem__(self, index:int):
+        return self._store[index]
+
+    def __len__(self):
+        return len(self._store)
+
+    def __delitem__(self, index:int):
+        del self._store[index]
+
+    def insert(self, index:int, value:prez):
+        self._store.insert(index, value)
 
 
 class Document(QObject):
@@ -190,7 +251,7 @@ class Document(QObject):
         super(Document, self).__init__(**kwargs)
         self._guidebook = AHI_HSF_Guidebook()
         self._workspace = workspace
-        self._layer_sets = [list()] + [None] * (layer_set_count-1)
+        self._layer_sets = [DocLayerSet(self)] + [None] * (layer_set_count-1)
         self._layer_with_uuid = {}
         # TODO: connect signals from workspace to slots including update_dataset_info
 
@@ -247,21 +308,22 @@ class Document(QObject):
         """
         uuid, info, content = self._workspace.import_image(source_path=path)
         if uuid in self._layer_with_uuid:
+            LOG.warning("layer with UUID {0:s} already in document?".format(uuid))
             return uuid, info, content
         # info.update(self._additional_guidebook_information(info))
-        self._layer_with_uuid[uuid] = info = DocBasicLayer(self, info)
+        self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, info)
         # also get info for this layer from the guidebook
-        gbinfo = self._guidebook.collect_info(info)
-        self._layer_with_uuid[uuid].update(gbinfo)  # FUTURE: is this kosher?
+        gbinfo = self._guidebook.collect_info(dataset)
+        dataset.update(gbinfo)  # FUTURE: should guidebook be integrated into DocBasicLayer?
 
         # add as visible to the front of the current set, and invisible to the rest of the available sets
-        cmap = self._default_colormap(info)
-        info[INFO.CLIM] = self._guidebook.climits(info)
-        info[INFO.NAME] = self._guidebook.display_name(info) or info[INFO.NAME]
-        presentation, reordered_indices = self._insert_layer_with_info(info, cmap=cmap, insert_before=insert_before)
+        cmap = self._default_colormap(dataset)
+        dataset[INFO.CLIM] = self._guidebook.climits(dataset)
+        dataset[INFO.NAME] = self._guidebook.display_name(dataset) or dataset[INFO.NAME]
+        presentation, reordered_indices = self._insert_layer_with_info(dataset, cmap=cmap, insert_before=insert_before)
         # signal updates from the document
-        self.didAddBasicLayer.emit(reordered_indices, info, presentation, content)
-        return uuid, info, content
+        self.didAddBasicLayer.emit(reordered_indices, dataset, presentation, content)
+        return uuid, dataset, content
 
     def open_files(self, paths, insert_before=0):
         """
