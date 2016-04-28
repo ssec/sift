@@ -157,7 +157,12 @@ class DocCompositeLayer(DocLayer):
     """
     A layer which has a color mapping, e.g. RGB
     """
-    pass
+    def __getitem__(self, key):
+        # FIXME debug
+        if key==INFO.KIND:
+            assert(self._store[INFO.KIND]==KIND.RGB)
+        return self._store[self.__keytransform__(key)]
+
 
 class DocAlgebraicLayer(DocLayer):
     """

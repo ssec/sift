@@ -194,13 +194,15 @@ class AHI_HSF_Guidebook(Guidebook):
 
     def collect_info(self, info):
         md = self._cache.get(info[INFO.UUID], None)
-        if md is None:
+        if md is None and info[INFO.KIND] not in (KIND.IMAGE, KIND.COMPOSITE):
             md = self._metadata_for_path(info.get(INFO.PATHNAME, None))
             md[GUIDE.UUID] = info[INFO.UUID]
             md[GUIDE.INSTRUMENT] = INSTRUMENT.AHI
             md[GUIDE.CENTRAL_WAVELENGTH] = NOMINAL_WAVELENGTHS[md[GUIDE.PLATFORM]][md[GUIDE.INSTRUMENT]][md[GUIDE.BAND]]
             # md[GUIDE.UNIT_CONVERSION] = self.units_conversion(info)  # FUTURE: decide whether this should be done for most queries
             self._cache[info[INFO.UUID]] = md
+        if md is None:
+            return dict(info)
         z = md.copy()
         z.update(info)
         return z

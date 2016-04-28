@@ -56,13 +56,24 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     set for a specific column, controls the rendering and editing of items in that column or row of a list or table
     see QAbstractItemView.setItemDelegateForRow/Column
     """
+    _doc = None  # document we're representing
 
-    def __init__(self, *args, **kwargs):
+    def layer_prez(self, index:int):
+        cll = self._doc.current_layer_set
+        return cll[index] if index<len(cll) and index>=0 else None
+
+    def __init__(self, doc:Document, *args, **kwargs):
         super(LayerWidgetDelegate, self).__init__(*args, **kwargs)
+        self._doc = doc
         self.font = QFont('Andale Mono', 12) if 'darwin' in sys.platform else QFont('Andale Mono', 7)
 
     def sizeHint(self, option:QStyleOptionViewItem, index:QModelIndex):
-        return QSize(CELL_WIDTH, CELL_HEIGHT)
+        pz = self.layer_prez(index.row())
+        if pz.kind == KIND.RGB:
+            LOG.debug('triple-sizing composite layer')
+            return QSize(CELL_WIDTH, CELL_HEIGHT*3)
+        else:
+            return QSize(CELL_WIDTH, CELL_HEIGHT)
 
     def displayText(self, *args, **kwargs):
         return None
@@ -232,7 +243,7 @@ class LayerStackListViewModel(QAbstractListModel):
         self.widgets = [ ]
         self.doc = doc
         # self._column = [self._visibilityData, self._nameData]
-        self.item_delegate = LayerWidgetDelegate()
+        self.item_delegate = LayerWidgetDelegate(doc)
 
         # for now, a copout by just having a refresh to the content when document changes
         doc.didReorderLayers.connect(self.refresh)
@@ -310,7 +321,7 @@ class LayerStackListViewModel(QAbstractListModel):
                 return widget
 
     def doc_added_basic_layer(self, new_order, info, content):
-        dexes = [i for i,q in enumerate(new_order) if q==None]
+        #dexes = [i for i,q in enumerate(new_order) if q==None]
         # for dex in dexes:
         #     self.beginInsertRows(QModelIndex(), dex, dex)
         #     self.endInsertRows()
