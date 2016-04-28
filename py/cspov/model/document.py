@@ -60,11 +60,12 @@ import sys
 import logging
 import unittest
 import argparse
-from collections import namedtuple
+from collections import namedtuple, MutableMapping
 from enum import Enum
 from uuid import UUID
 import numpy as np
 from copy import deepcopy
+from weakref import ref
 
 from cspov.common import KIND, INFO, COMPOSITE_TYPE
 from cspov.model.guidebook import AHI_HSF_Guidebook, GUIDE
@@ -94,22 +95,64 @@ class mixing(Enum):
     SUBTRACT = 3
 
 
-# class LayerSet(object):
-#     """
-#     LayerSet is a visual configuration of a stack of layers
-#     """
-#     def __init__(self, prior=None):
-#         """
-#         initialize, optionally by copying a prior LayerSet
-#         """
-#
-#     def __getitem__(self, uuid):
-#         """ retrieve layer information by uuid
-#         """
-#         # FIXME
-#
-#     @property
-#     def animation_order
+class DocLayer(MutableMapping):
+    """
+    Layer as represented within the document
+    Initially functions as a dictionary, eventually dictionary interfaces will be limited to non-standard annotation keys.
+    """
+    _doc = None  # weakref to document that owns us
+
+    @property
+    def dependencies(self):
+        """
+        return set of weakrefs to layers we require in order to function
+        :return:
+        """
+        return set()
+
+    def __init__(self, doc, *args, **kwargs):
+        assert(isinstance(doc, Document))
+        self._doc = ref(doc)
+        self.store = dict()
+        self.update(dict(*args, **kwargs))  # use the free update to set keys
+
+    def __getitem__(self, key):
+        return self.store[self.__keytransform__(key)]
+
+    def __setitem__(self, key, value):
+        self.store[self.__keytransform__(key)] = value
+
+    def __delitem__(self, key):
+        del self.store[self.__keytransform__(key)]
+
+    def __iter__(self):
+        return iter(self.store)
+
+    def __len__(self):
+        return len(self.store)
+
+    def __keytransform__(self, key):
+        return key
+
+
+class DocBasicLayer(DocLayer):
+    """
+    A layer consistent of a simple scalar floating point value field, which can have color maps applied
+    """
+    pass
+
+class DocCompositeLayer(DocLayer):
+    """
+    A layer which has a color mapping, e.g. RGB
+    """
+    pass
+
+class DocAlgebraicLayer(DocLayer):
+    """
+    A value field derived from other value fields algebraically
+    """
+    pass
+
 
 
 class Document(QObject):
@@ -129,8 +172,8 @@ class Document(QObject):
     _guidebook = None  # FUTURE: this is currently an AHI_HSF_Guidebook, make it a general guidebook
 
     # signals
-    didAddBasicLayer = pyqtSignal(list, dict, prez, np.ndarray)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
-    didAddCompositeLayer = pyqtSignal(list, dict, list, list, list, object)  # comp layer is derived from multiple basic layers and has its own UUID
+    didAddBasicLayer = pyqtSignal(list, DocBasicLayer, prez, np.ndarray)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
+    didAddCompositeLayer = pyqtSignal(list, DocCompositeLayer, list, list, list, object)  # comp layer is derived from multiple basic layers and has its own UUID
     didRemoveLayers = pyqtSignal(list, list, int, int)  # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
     willPurgeLayer = pyqtSignal(UUID)  # UUID of the layer being removed
     didReorderLayers = pyqtSignal(list)  # list of original indices in their new order, None for new layers
@@ -174,7 +217,7 @@ class Document(QObject):
     #         INFO.DISPLAY_TIME: self._guidebook.display_time(info)
     #     }
 
-    def _insert_layer_with_info(self, info, cmap=None, insert_before=0):
+    def _insert_layer_with_info(self, info:DocLayer, cmap=None, insert_before=0):
         """
         insert a layer into the presentations but do not signal
         """
@@ -206,7 +249,7 @@ class Document(QObject):
         if uuid in self._layer_with_uuid:
             return uuid, info, content
         # info.update(self._additional_guidebook_information(info))
-        self._layer_with_uuid[uuid] = info
+        self._layer_with_uuid[uuid] = info = DocBasicLayer(self, info)
         # also get info for this layer from the guidebook
         gbinfo = self._guidebook.collect_info(info)
         self._layer_with_uuid[uuid].update(gbinfo)  # FUTURE: is this kosher?
@@ -561,7 +604,7 @@ class Document(QObject):
             INFO.CELL_HEIGHT: highest_res_dep[INFO.CELL_HEIGHT],
             INFO.CLIM: tuple(d[INFO.CLIM] for d in dep_info),
         }
-        self._layer_with_uuid[uuid] = ds_info
+        self._layer_with_uuid[uuid] = ds_info = DocCompositeLayer(self, ds_info)
         presentation, reordered_indices = self._insert_layer_with_info(ds_info)
 
         prezs = None  # not used right now FIXME
