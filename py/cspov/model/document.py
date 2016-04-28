@@ -228,8 +228,8 @@ class Document(QObject):
     """
     current_set_index = 0
     _workspace = None
-    _layer_sets = None  # list(list(prez) or None)
-    _layer_with_uuid = None  # dict(uuid:datasetinfo)
+    _layer_sets = None  # list(DocLayerSet(prez, ...) or None)
+    _layer_with_uuid = None  # dict(uuid:Doc____Layer)
     _guidebook = None  # FUTURE: this is currently an AHI_HSF_Guidebook, make it a general guidebook
 
     # signals
