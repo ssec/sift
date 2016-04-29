@@ -69,11 +69,11 @@ class LayerWidgetDelegate(QStyledItemDelegate):
 
     def sizeHint(self, option:QStyleOptionViewItem, index:QModelIndex):
         pz = self.layer_prez(index.row())
-        if pz.kind == KIND.RGB:
-            LOG.debug('triple-sizing composite layer')
-            return QSize(CELL_WIDTH, CELL_HEIGHT*3)
-        else:
-            return QSize(CELL_WIDTH, CELL_HEIGHT)
+        # if pz.kind == KIND.RGB:
+        #     LOG.debug('triple-sizing composite layer')
+        #     return QSize(CELL_WIDTH, CELL_HEIGHT*3)
+        # else:
+        return QSize(CELL_WIDTH, CELL_HEIGHT)
 
     def displayText(self, *args, **kwargs):
         return None

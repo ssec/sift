@@ -18,7 +18,7 @@ __docformat__ = 'reStructuredText'
 
 import logging
 from PyQt4.QtCore import SIGNAL, QObject, Qt
-from PyQt4.QtGui import QWidget, QListView, QGridLayout, QLabel, QScrollArea, QLayout, QTextDocument
+from PyQt4.QtGui import QWidget, QListView, QTreeView, QGridLayout, QLabel, QScrollArea, QLayout, QTextDocument
 from PyQt4.QtWebKit import QWebView
 from cspov.model.guidebook import GUIDE
 from cspov.common import INFO, KIND
@@ -124,7 +124,7 @@ class SingleLayerSetManager (QWidget) :
         # create our controls
 
         # the list of layers
-        self.my_layer_list = QListView (parent)
+        self.my_layer_list = QTreeView (parent)
 
         # set the layout
         # Note: add in a grid is (widget, row#, col#) or (widget, row#, col#, row_span, col_span)
