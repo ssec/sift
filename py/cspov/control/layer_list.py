@@ -35,7 +35,7 @@ __docformat__ = 'reStructuredText'
 
 import logging, sys, os
 import pickle as pkl
-from PyQt4.QtCore import QAbstractListModel, Qt, QSize, QModelIndex, QPoint, QMimeData, pyqtSignal, QRect
+from PyQt4.QtCore import QAbstractItemModel, QAbstractListModel, Qt, QSize, QModelIndex, QPoint, QMimeData, pyqtSignal, QRect
 from PyQt4.QtGui import QListView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyle, QColor, QFont, QStyleOptionViewItem, QItemSelection, QItemSelectionModel, QPen
 from cspov.model.document import Document
 from cspov.common import INFO, KIND
@@ -81,7 +81,6 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     def paint(self, painter, option, index):
         """draw the individual lines in the layers control
         """
-
         painter.save()
 
         color = QColor(187, 213, 255, 255) if index.row()%2==0 else QColor(177, 223, 255, 255)
@@ -540,6 +539,41 @@ class LayerStackListViewModel(QAbstractListModel):
     def rowCount(self, QModelIndex_parent=None, *args, **kwargs):
         # LOG.debug('{} layers'.format(len(self.doc)))
         return len(self.doc)
+
+    # def index(self, row, column, parent):
+    #     return super(LayerStackListViewModel, self).index(row, column, parent)
+        # return QModelIndex()
+        # FIXME
+        # if not self.hasIndex(row, column, parent):
+        #     return QModelIndex()
+        #
+        # if not parent.isValid():
+        #     parentItem = self.rootItem
+        # else:
+        #     parentItem = parent.internalPointer()
+        #
+        # childItem = parentItem.child(row)
+        # if childItem:
+        #     return self.createIndex(row, column, childItem)
+        # else:
+        #     return QModelIndex()
+
+    # def parent(self, index):
+    #     return QModelIndex()
+        # FIXME
+        # if not index.isValid():
+        #     return QModelIndex()
+        #
+        # childItem = index.internalPointer()
+        # if not childItem:
+        #     return QModelIndex()
+        #
+        # parentItem = childItem.parent()
+        #
+        # if parentItem == self.rootItem:
+        #     return QModelIndex()
+        #
+        # return self.createIndex(parentItem.row(), 0, parentItem)
 
     def data(self, index:QModelIndex, role:int=None):
         if not index.isValid():
