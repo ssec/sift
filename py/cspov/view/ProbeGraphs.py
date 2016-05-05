@@ -39,6 +39,7 @@ except ImportError:
     figureoptions = None
 
 LOG = logging.getLogger(__name__)
+DEFAULT_POINT_PROBE = "default_probe_name"
 
 
 class NavigationToolbar(NavigationToolbar):
@@ -89,6 +90,7 @@ class ProbeGraphManager (QObject) :
     didChangeTab = pyqtSignal(list,)  # list of probe areas to show
     didClonePolygon = pyqtSignal(str, str)
     drawChildGraph = pyqtSignal(str,)
+    pointProbeChanged = pyqtSignal(str, bool, tuple)
 
     graphs = None
     selected_graph_index = -1
@@ -115,6 +117,8 @@ class ProbeGraphManager (QObject) :
         self.tab_widget_object = tab_widget
         if self.tab_widget_object.count() != 1 :
             LOG.info("Unexpected number of tabs in the QTabWidget used for the Area Probe Graphs.")
+        # hold on to point probe locations (point probes are shared across tabs)
+        self.point_probes = {}
 
         # set up the first tab
         self.graphs = [ ]
@@ -194,6 +198,51 @@ class ProbeGraphManager (QObject) :
         """
 
         return self.graphs[self.selected_graph_index].setPolygon (polygonPoints)
+
+    def update_point_probe(self, probe_name, xy_pos=None, state=None):
+        if xy_pos is None and state is None:
+            # they didn't ask to change anything
+            return
+        if probe_name not in self.point_probes:
+            # new point
+            if xy_pos is None:
+                raise ValueError("Point probe '{}' does not exist".format(probe_name))
+            # if this is a new point probe, then it must be enabled
+            state = True if state is None else state
+        else:
+            old_state, old_xy_pos = self.point_probes[probe_name]
+            if xy_pos is None:
+                # state is what is changing
+                xy_pos = old_xy_pos
+            elif state is None:
+                # they are updating the position only
+                # we have to turn the probe back on
+                state = True
+
+            if old_state == state and old_xy_pos == xy_pos:
+                # nothing has changed so no need to tell anyone
+                return
+            if old_state != state:
+                LOG.info("Changing point probe '{}' state to '{}'".format(probe_name, "on" if state else "off"))
+            if old_xy_pos != xy_pos:
+                LOG.info("Changing point probe '{}' position to '{}'".format(probe_name, xy_pos))
+
+        self.point_probes[probe_name] = [state, xy_pos]
+        self.pointProbeChanged.emit(probe_name, state, xy_pos)
+
+    def current_point_probe_status(self, probe_name):
+        if probe_name not in self.point_probes:
+            raise KeyError("Probe '{}' does not exist".format(probe_name))
+        return self.point_probes[probe_name]
+
+    def toggle_point_probe(self, probe_name, state=None):
+        if probe_name not in self.point_probes:
+            LOG.info("No point probe to toggle")
+            return
+
+        old_state = self.point_probes[probe_name][0]
+        state = state if state is not None else not old_state
+        self.update_point_probe(probe_name, state=state)
 
     def set_default_layer_selections(self, *uuids):
         """Set the UUIDs for the current graph if it doesn't have a polygon

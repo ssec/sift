@@ -38,6 +38,7 @@ from cspov.view.Cameras import PanZoomProbeCamera
 from cspov.view.Colormap import ALL_COLORMAPS
 from cspov.model.document import prez
 from cspov.queue import TASK_DOING, TASK_PROGRESS
+from cspov.view.ProbeGraphs import DEFAULT_POINT_PROBE
 
 from PyQt4.QtCore import QObject, pyqtSignal, Qt
 from PyQt4.QtGui import QCursor, QPixmap
@@ -336,7 +337,7 @@ class SceneGraphManager(QObject):
     didRetilingCalcs = pyqtSignal(object, object, object, object, object, object)
     didChangeFrame = pyqtSignal(tuple)
     didChangeLayerVisibility = pyqtSignal(dict)  # similar to document didChangeLayerVisibility
-    newProbePoint = pyqtSignal(object, object)
+    newPointProbe = pyqtSignal(str, tuple)
     newProbePolygon = pyqtSignal(object, object)
 
     def __init__(self, doc, workspace, queue, border_shapefile=None, glob_pattern=None, parent=None,
@@ -496,9 +497,7 @@ class SceneGraphManager(QObject):
             map_pos = self.borders.transforms.get_transform().imap(buffer_pos)
             # point_marker = Markers(parent=self.main_map, symbol="disc", pos=np.array([map_pos[:2]]))
             # self.points.append(point_marker)
-            self.newProbePoint.emit(self.layer_set.top_layer_uuid(), map_pos[:2])
-            # FIXME: Move to Document (can include Z if you want, but default is fine)
-            self.on_point_probe_set("default_probe_name", map_pos[:2])
+            self.newPointProbe.emit(DEFAULT_POINT_PROBE, tuple(map_pos[:2]))
 
     def on_mouse_press_region(self, event):
         """Handle mouse events that mean we are using the point probe.
@@ -538,22 +537,23 @@ class SceneGraphManager(QObject):
     def has_pending_polygon(self):
         return len(self.pending_polygon.points) != 0
 
-    def on_point_probe_set(self, probe_name, xy_pos, **kwargs):
+    def on_point_probe_set(self, probe_name, state, xy_pos, **kwargs):
         z = float(kwargs.get("z", 60))
         if len(xy_pos) == 2:
             xy_pos = [xy_pos[0], xy_pos[1], z]
 
-        if probe_name not in self.point_probes:
+        if probe_name not in self.point_probes and xy_pos is None:
+            raise ValueError("Probe '{}' does not exist".format(probe_name))
+        elif probe_name not in self.point_probes:
             color = kwargs.get("color", np.array([0.5, 0., 0., 1.]))
             point_visual = FakeMarker(parent=self.main_map, symbol="x", pos=np.array([xy_pos]), color=color)
-            self.point_probes[probe_name] = (xy_pos, point_visual)
+            self.point_probes[probe_name] = point_visual
         else:
-            point_visual = self.point_probes[probe_name][1]
+            point_visual = self.point_probes[probe_name]
             point_visual.set_point(xy_pos)
-            self.point_probes[probe_name] = (xy_pos, point_visual)
 
-    def point_probe_location(self, probe_name):
-        return self.point_probes[probe_name][0] if probe_name in self.point_probes else None
+        # set the Point visible or not
+        point_visual.visible = state
 
     def on_new_polygon(self, probe_name, points, **kwargs):
         kwargs.setdefault("color", (1.0, 0.0, 1.0, 0.5))
