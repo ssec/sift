@@ -2,7 +2,8 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created by: PyQt4 UI code generator 4.11.4
+# Created: Fri May  6 14:52:12 2016
+#      by: PyQt4 UI code generator 4.11.3
 #
 # WARNING! All changes made in this file will be lost!
 
@@ -280,10 +281,10 @@ class Ui_MainWindow(object):
         self.regionSelectButton.setText(_translate("MainWindow", "Region", None))
         self.cursorProbeLocation.setToolTip(_translate("MainWindow", "Longitude/Latitude location of point probe", None))
         self.cursorProbeLocation.setStatusTip(_translate("MainWindow", "Longitude/Latitude coordinates under point probe", None))
-        self.cursorProbeLocation.setText(_translate("MainWindow", "Probe Location: ", None))
+        self.cursorProbeLocation.setText(_translate("MainWindow", "Probe Location: N/A", None))
         self.cursorProbeText.setToolTip(_translate("MainWindow", "Value under cursor", None))
         self.cursorProbeText.setStatusTip(_translate("MainWindow", "Top layer data value under point probe", None))
-        self.cursorProbeText.setText(_translate("MainWindow", "Probe Value:", None))
+        self.cursorProbeText.setText(_translate("MainWindow", "Probe Value: N/A", None))
         self.mainWidgets.setTabText(self.mainWidgets.indexOf(self.tab), _translate("MainWindow", "Tab 1", None))
         self.mainWidgets.setTabText(self.mainWidgets.indexOf(self.tab_2), _translate("MainWindow", "Tab 2", None))
         self.progressText.setText(_translate("MainWindow", "idle", None))

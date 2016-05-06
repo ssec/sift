@@ -245,7 +245,7 @@ class ProbeGraphManager (QObject) :
 
     def current_point_probe_status(self, probe_name):
         if probe_name not in self.point_probes:
-            raise KeyError("Probe '{}' does not exist".format(probe_name))
+            return False, None
         return self.point_probes[probe_name]
 
     def toggle_point_probe(self, probe_name, state=None):

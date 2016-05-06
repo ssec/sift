@@ -430,10 +430,13 @@ class Main(QtGui.QMainWindow):
             if xy_pos is None:
                 xy_pos = _xy_pos
 
-        lon, lat = DEFAULT_PROJ_OBJ(xy_pos[0], xy_pos[1], inverse=True)
-        lon_str = "{:.02f} {}".format(abs(lon), "W" if lon < 0 else "E")
-        lat_str = "{:.02f} {}".format(abs(lat), "S" if lat < 0 else "N")
-        self.ui.cursorProbeLocation.setText("Probe Location: {}, {}".format(lon_str, lat_str))
+        if xy_pos is not None and state:
+            lon, lat = DEFAULT_PROJ_OBJ(xy_pos[0], xy_pos[1], inverse=True)
+            lon_str = "{:.02f} {}".format(abs(lon), "W" if lon < 0 else "E")
+            lat_str = "{:.02f} {}".format(abs(lat), "S" if lat < 0 else "N")
+            self.ui.cursorProbeLocation.setText("Probe Location: {}, {}".format(lon_str, lat_str))
+        else:
+            self.ui.cursorProbeLocation.setText("Probe Location: N/A")
 
         if animating:
             data_str = "<animating>"
