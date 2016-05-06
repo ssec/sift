@@ -22,7 +22,7 @@ from PyQt4.QtGui import QWidget, QListView, QTreeView, QGridLayout, QLabel, QScr
 from PyQt4.QtWebKit import QWebView
 from cspov.model.guidebook import GUIDE
 from cspov.common import INFO, KIND
-from cspov.control.layer_list import LayerStackListViewModel
+from cspov.control.layer_list import LayerStackTreeViewModel
 import numpy as np
 from cspov.view.Colormap import ALL_COLORMAPS
 
@@ -96,7 +96,7 @@ class LayerSetsManager (QObject) :
         self.layer_sets.append(new_layer_set)
         layer_list_obj = new_layer_set.getLayerList()
         if self.set_behaviors is None :
-            self.set_behaviors = LayerStackListViewModel([layer_list_obj], self.document)
+            self.set_behaviors = LayerStackTreeViewModel([layer_list_obj], self.document)
         else :
             self.set_behaviors.add_widget(layer_list_obj)
 

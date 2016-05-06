@@ -246,7 +246,7 @@ class Document(QObject):
     didChangeLayerVisibility = pyqtSignal(dict)  # {UUID: new-visibility, ...} for changed layers
     didReorderAnimation = pyqtSignal(list)  # list of UUIDs representing new animation order
     didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
-    didSwitchLayerSet = pyqtSignal(int, list, list)  # new layerset number typically 0..3, list of prez tuples representing new display order, new animation order
+    didSwitchLayerSet = pyqtSignal(int, DocLayerSet, list)  # new layerset number typically 0..3, list of prez tuples representing new display order, new animation order
     didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didCalculateLayerEqualizerValues = pyqtSignal(dict)  # dict of {uuid: (value, normalized_value_within_clim)} for equalizer display
@@ -814,6 +814,33 @@ class Document(QObject):
                 del self._layer_with_uuid[uuid]
                 # remove from workspace
                 self._workspace.remove(uuid)
+
+
+#
+# class DocumentTreeBranch(QObject):
+#     pass
+#
+# class DocumentTreeLeaf(QObject):
+#     pass
+#
+#
+# class DocumentAsLayerTree(QObject):
+#     """
+#      DocumentAsLayerTree is a facet or wrapper (if it were a database, it would be a view; but view is already taken)
+#      It allows the layer controls - specifically a LayerStackTreeViewModel - to easily access and modify
+#      the document on behalf of the user.
+#      It includes both queries for display and changes which then turn into document updates
+#      The base model is just a list of basic layers.
+#      Composite and Algebraic layers, however, are more like folders.
+#      Other additional layer types may also have different responses to being dragged or having items dropped on them
+#     """
+#
+#     def __init__(self, doc, *args, **kwargs):
+#         self._doc = doc
+#         super(DocumentAsLayerTree, self).__init__()
+#
+#     def
+#
 
 
 def main():
