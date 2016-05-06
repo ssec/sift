@@ -171,9 +171,11 @@ class ProbeGraphManager (QObject) :
             current_graph = self.graphs[self.selected_graph_index]
             graph.set_default_layer_selections(current_graph.xSelectedUUID, current_graph.ySelectedUUID)
             # give it a copy of the current polygon
-            # FIXME: Need to signal the SGM that it needs to create a new polygon
             graph.setPolygon(current_graph.polygon[:] if current_graph.polygon is not None else None)
             graph.checked = current_graph.checked
+            point_status, point_xy = self.point_probes[DEFAULT_POINT_PROBE]
+            point_xy = point_xy if point_status else None
+            graph.setPoint(point_xy, rebuild=False)
 
         # Create the initial plot
         graph.rebuildPlot()
@@ -231,10 +233,15 @@ class ProbeGraphManager (QObject) :
         self.pointProbeChanged.emit(probe_name, state, xy_pos)
 
     def update_point_probe_graph(self, probe_name, state, xy_pos):
-        if state:
-            self.graphs[self.selected_graph_index].setPoint(xy_pos)
-        elif state == False:
-            self.graphs[self.selected_graph_index].setPoint(None)
+        # need to set the point for all graphs because the point probe
+        # is used across all plots
+        for idx, graph in enumerate(self.graphs):
+            rebuild = idx == self.selected_graph_index
+            if state:
+                graph.setPoint(xy_pos, rebuild=rebuild)
+            elif state is not None:
+                # if it is False/"off"
+                graph.setPoint(None, rebuild=rebuild)
 
     def current_point_probe_status(self, probe_name):
         if probe_name not in self.point_probes:
@@ -514,10 +521,12 @@ class ProbeGraphDisplay (object) :
         # return our name to be used for the polygon name
         return self.myName
 
-    def setPoint(self, coordinates):
+    def setPoint(self, coordinates, rebuild=True):
         self.point = coordinates
         self._stale = True
-        self.rebuildPlot()
+        # sometimes we set the point to be redrawn later
+        if rebuild:
+            self.rebuildPlot()
 
     def getName (self) :
         """Accessor method for the graph's name
