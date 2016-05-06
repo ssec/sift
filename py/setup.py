@@ -20,7 +20,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='cspov',
-    version='0.7.3',
+    version='0.7.4',
     description="Satellite Information Familiarization Tool for mercator geotiff files",
     author='Ray Garcia, SSEC',
     author_email='ray.garcia@ssec.wisc.edu',
