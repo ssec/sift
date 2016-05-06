@@ -272,7 +272,6 @@ class LayerSet(object):
             self._animating = False
             self._animation_timer.stop()
         elif not self._animating and animate and self._frame_order:
-            print("Running animating {} with {} frames".format(animate, len(self._frame_order)))
             # We are not currently, but want to be
             self._animating = True
             self._animation_timer.start()

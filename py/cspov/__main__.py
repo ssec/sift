@@ -556,6 +556,7 @@ class Main(QtGui.QMainWindow):
         self.graphManager.pointProbeChanged.connect(self.scene_manager.on_point_probe_set)
         self.graphManager.pointProbeChanged.connect(self.document.update_equalizer_values)
         self.graphManager.pointProbeChanged.connect(self.update_point_probe_text)
+        self.graphManager.pointProbeChanged.connect(self.graphManager.update_point_probe_graph)
 
         self.scene_manager.newPointProbe.connect(self.graphManager.update_point_probe)
         # FIXME: These were added as a simple fix to update the proble value on layer changes, but this should really

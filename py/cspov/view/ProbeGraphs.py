@@ -230,6 +230,12 @@ class ProbeGraphManager (QObject) :
         self.point_probes[probe_name] = [state, xy_pos]
         self.pointProbeChanged.emit(probe_name, state, xy_pos)
 
+    def update_point_probe_graph(self, probe_name, state, xy_pos):
+        if state:
+            self.graphs[self.selected_graph_index].setPoint(xy_pos)
+        elif state == False:
+            self.graphs[self.selected_graph_index].setPoint(None)
+
     def current_point_probe_status(self, probe_name):
         if probe_name not in self.point_probes:
             raise KeyError("Probe '{}' does not exist".format(probe_name))
@@ -300,6 +306,7 @@ class ProbeGraphDisplay (object) :
 
     # internal objects to reference for info and data
     polygon         = None
+    point           = None
     manager         = None
     workspace       = None
     queue           = None
@@ -507,6 +514,11 @@ class ProbeGraphDisplay (object) :
         # return our name to be used for the polygon name
         return self.myName
 
+    def setPoint(self, coordinates):
+        self.point = coordinates
+        self._stale = True
+        self.rebuildPlot()
+
     def getName (self) :
         """Accessor method for the graph's name
         """
@@ -524,11 +536,11 @@ class ProbeGraphDisplay (object) :
         # should be be plotting vs Y?
         doPlotVS = self.yCheckBox.isChecked()
         task_name = "%s_%s_region_plotting" % (self.xSelectedUUID, self.ySelectedUUID)
-        self.queue.add(task_name, self._rebuild_plot_task(self.xSelectedUUID, self.ySelectedUUID, self.polygon, plot_versus=doPlotVS), "Creating plot for region probe data", interactive=True)
+        self.queue.add(task_name, self._rebuild_plot_task(self.xSelectedUUID, self.ySelectedUUID, self.polygon, self.point, plot_versus=doPlotVS), "Creating plot for region probe data", interactive=True)
         # Assume that the task gets resolved otherwise we might try to draw multiple times
         self._stale = False
 
-    def _rebuild_plot_task(self, x_uuid, y_uuid, polygon, plot_versus=False):
+    def _rebuild_plot_task(self, x_uuid, y_uuid, polygon, point_xy, plot_versus=False):
 
         # if we are plotting only x and we have a selected x and a polygon
         if not plot_versus and x_uuid is not None and polygon is not None :
@@ -539,9 +551,16 @@ class ProbeGraphDisplay (object) :
             fmt, units, data_polygon = self.document.convert_units(x_uuid, data_polygon)
             title = self.workspace.get_info(x_uuid)[INFO.NAME]
 
+            # get point probe value
+            if point_xy:
+                x_point = self.workspace.get_content_point(x_uuid, point_xy)
+                format_str, unit_str, x_point = self.document.convert_units(x_uuid, x_point)
+            else:
+                x_point = None
+
             # plot a histogram
             yield {TASK_DOING: 'Probe Plot: Creating histogram plot', TASK_PROGRESS: 0.25}
-            self.plotHistogram (data_polygon, title)
+            self.plotHistogram (data_polygon, title, x_point)
 
         # if we are plotting x vs y and have x, y, and a polygon
         elif plot_versus and x_uuid is not None and y_uuid is not None and polygon is not None :
@@ -566,9 +585,18 @@ class ProbeGraphDisplay (object) :
                 _, _, data1 = self.document.convert_units(x_uuid, data1)
             yield {TASK_DOING: 'Probe Plot: Creating scatter plot...', TASK_PROGRESS: 0.25}
 
+            if point_xy:
+                x_point = self.workspace.get_content_point(x_uuid, point_xy)
+                format_str, unit_str, x_point = self.document.convert_units(x_uuid, x_point)
+                y_point = self.workspace.get_content_point(y_uuid, point_xy)
+                format_str, unit_str, y_point = self.document.convert_units(x_uuid, y_point)
+            else:
+                x_point = None
+                y_point = None
+
             # plot a scatter plot
             # self.plotScatterplot (data1, name1, data2, name2)
-            self.plotDensityScatterplot (data1, name1, data2, name2)
+            self.plotDensityScatterplot (data1, name1, data2, name2, x_point, y_point)
 
         # if we have some combination of selections we don't understand, clear the figure
         else :
@@ -582,12 +610,19 @@ class ProbeGraphDisplay (object) :
     def draw(self):
         self.canvas.draw()
 
-    def plotHistogram (self, data, title, numBins=100) :
+    def plotHistogram (self, data, title, x_point, numBins=100) :
         """Make a histogram using the given data and label it with the given title
         """
         self.figure.clf()
         axes = self.figure.add_subplot(111)
-        axes.hist(data, bins=self.DEFAULT_NUM_BINS)
+        bars = axes.hist(data, bins=self.DEFAULT_NUM_BINS)
+        if x_point is not None:
+            # go through each rectangle object and make the one that contains x_point 'red'
+            # default color is blue so red should stand out
+            for bar in bars[2][::-1]:
+                if bar.xy[0] <= x_point:
+                    bar.set_color('red')
+                    break
         axes.set_title(title)
 
     def plotScatterplot (self, dataX, nameX, dataY, nameY) :
@@ -611,7 +646,7 @@ class ProbeGraphDisplay (object) :
             axes.set_title(nameX + " vs " + nameY)
             self._draw_xy_line(axes)
 
-    def plotDensityScatterplot (self, dataX, nameX, dataY, nameY) :
+    def plotDensityScatterplot (self, dataX, nameX, dataY, nameY, pointX, pointY) :
         """Make a density scatter plot for the given data
         """
 
@@ -636,6 +671,12 @@ class ProbeGraphDisplay (object) :
         # display the density map data
         img = axes.imshow(density_map, extent=[xmin_value, xmax_value, ymin_value, ymax_value], aspect='auto',
                           interpolation='nearest', norm=LogNorm())
+        if pointX is not None:
+            axes.set_autoscale_on(False)
+            axes.plot(pointX, pointY, marker='o',
+                      markerfacecolor='white', markeredgecolor='black',
+                      markersize=10, markeredgewidth=1.)
+            axes.set_autoscale_on(True)
 
         colorbar = self.figure.colorbar(img)
         colorbar.ax.set_title("Colorbar")  # for the 'Customize' menu in the MPL toolbar
