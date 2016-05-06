@@ -450,11 +450,11 @@ class LayerStackTreeViewModel(QAbstractListModel):
         elif len(selected_uuids) > 1:
             return self.composite_layer_menu(pos, lbox, selected_uuids, *args)
 
-    def columnCount(self, QModelIndex_parent=None, *args, **kwargs):
-        return 1
-
-    def hasChildren(self, QModelIndex_parent=None, *args, **kwargs):
-        return False  # FIXME
+    # def columnCount(self, QModelIndex_parent=None, *args, **kwargs):
+    #     return 1
+    #
+    # def hasChildren(self, QModelIndex_parent=None, *args, **kwargs):
+    #     return False  # FIXME
 
     @property
     def listing(self):
@@ -472,7 +472,7 @@ class LayerStackTreeViewModel(QAbstractListModel):
                     LOG.debug(qurl.path())
                     if qurl.isLocalFile():
                         path = qurl.path()
-                        self.doc.open_file(path)
+                        self.doc.open_file(path)  # FIXME: replace with a signal
                 return True
         elif mime.hasFormat(self._mimetype):
             # unpickle the presentation information and re-insert it
@@ -532,6 +532,11 @@ class LayerStackTreeViewModel(QAbstractListModel):
     def mimeTypes(self):
         return ['text/uri-list', self._mimetype]  # ref https://github.com/shotgunsoftware/pyqt-uploader/blob/master/uploader.py
 
+    # http://stackoverflow.com/questions/6942098/qt-qtreeview-only-allow-to-drop-on-an-existing-item
+    # Reimplement the flags method of the underlying model to return Qt::ItemIsDropEnabled only if passed index is valid.
+    # When in between items, flags() is called with an invalid index so I can decide not to accept the drop
+    # For the inverse you can do this: if ( index.isValid() ) { return Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsDragEnabled; }
+    # else { return Qt::ItemIsSelectable | Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled | Qt::ItemIsEnabled; }
     def flags(self, index):
         # flags = super(LayerStackListViewModel, self).flags(index)
         if index.isValid():
@@ -544,20 +549,20 @@ class LayerStackTreeViewModel(QAbstractListModel):
             flags = Qt.ItemIsDropEnabled
         return flags
 
-    def hasIndex(self, row, col, QModelIndex_parent=None, *args, **kwargs):
-        if QModelIndex_parent is not None:
-            # then look up whether this layer has child layers, e.g. for RGB or algebraic
-            return False  # FIXME
-        if col!=1:
-            return False
-        return (row >=0 and row < len(self.doc))
+    # def hasIndex(self, row, col, QModelIndex_parent=None, *args, **kwargs):
+    #     if QModelIndex_parent is not None:
+    #         # then look up whether this layer has child layers, e.g. for RGB or algebraic
+    #         return False  # FIXME
+    #     if col!=1:
+    #         return False
+    #     return (row >=0 and row < len(self.doc))
 
     def rowCount(self, QModelIndex_parent=None, *args, **kwargs):
         # LOG.debug('{} layers'.format(len(self.doc)))
         return len(self.doc)
 
-    def index(self, row, column, parent):
-        return self.createIndex(row, column, parent)
+    # def index(self, row, column, parent):
+    #     return self.createIndex(row, column, parent)
         # return super(LayerStackTreeViewModel, self).index(row, column, parent)
         # return QModelIndex()
         # FIXME
