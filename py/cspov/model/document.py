@@ -153,9 +153,10 @@ class DocBasicLayer(DocLayer):
     """
     pass
 
+
 class DocCompositeLayer(DocLayer):
     """
-    A layer which has a color mapping, e.g. RGB
+    A layer which combines other layers, be they basic or composite themselves
     """
     def __getitem__(self, key):
         # FIXME debug
@@ -164,7 +165,11 @@ class DocCompositeLayer(DocLayer):
         return self._store[self.__keytransform__(key)]
 
 
-class DocAlgebraicLayer(DocLayer):
+class DocRGBLayer(DocCompositeLayer):
+    pass
+
+
+class DocAlgebraicLayer(DocCompositeLayer):
     """
     A value field derived from other value fields algebraically
     """
