@@ -113,12 +113,20 @@ class DocLayer(MutableMapping):
         self.update(dict(*args, **kwargs))  # use the free update to set keys
 
     @property
-    def dependencies(self):
+    def parent(self):
         """
-        return set of weakrefs to layers we require in order to function
+        parent layer, if any
         :return:
         """
-        return set()
+        return None
+
+    @property
+    def children(self):
+        """
+        return dictionary of weakrefs to layers we require in order to function
+        :return:
+        """
+        return {}
 
     @property
     def uuid(self):
@@ -146,6 +154,7 @@ class DocLayer(MutableMapping):
     def __keytransform__(self, key):
         return key
 
+class Doc
 
 class DocBasicLayer(DocLayer):
     """
@@ -418,7 +427,7 @@ class Document(QObject):
         uuid = new_info[INFO.UUID]
         if uuid not in self._layer_with_uuid:
             LOG.warning('new information on uuid {0!r:s} is not for a known dataset'.format(new_info))
-        self._layer_with_uuid[new_info[INFO.UUID]] = new_info
+        self._layer_with_uuid[new_info[INFO.UUID]].update(new_info)
         # TODO, also get information about this layer from the guidebook?
 
         # TODO: see if this affects any presentation information; view will handle redrawing on its own
@@ -454,12 +463,19 @@ class Document(QObject):
 
     @property
     def current_visible_layer(self):
+        """
+        :return: the topmost visible layer's UUID
+        """
         for x in self.current_layer_set:
             if x.visible:
                 return x.uuid
         return None
 
     def current_visible_layers(self, max_layers=None):
+        """
+        :param max_layers:
+        :yield: the visible layers in the current layer set
+        """
         count = 0
         for x in self.current_layer_set:
             if x.visible:
@@ -744,14 +760,14 @@ class Document(QObject):
             return nfo
         return None
 
-    def __getitem__(self, row:int):
+    def __getitem__(self, row_or_uuid):
         """
-        return info for a given layer index
+        return presentation tuple for a given layer index from the current active layer set
         """
-        return self.current_layer_set[row]
-        # uuid = self.current_layer_set[dex].uuid
-        # nfo = self._layer_with_uuid[uuid]
-        # return nfo
+        if isinstance(row_or_uuid, UUID):
+            return self._layer_with_uuid[row_or_uuid]
+        else:
+            return self.current_layer_set[row_or_uuid]
 
     def reorder_by_indices(self, new_order, uuids=None, layer_set_index=None):
         """given a new layer order, replace the current layer set
