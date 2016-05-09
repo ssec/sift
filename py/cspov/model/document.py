@@ -154,7 +154,6 @@ class DocLayer(MutableMapping):
     def __keytransform__(self, key):
         return key
 
-class Doc
 
 class DocBasicLayer(DocLayer):
     """
@@ -202,7 +201,7 @@ class DocAlgebraicLayer(DocCompositeLayer):
 #     """
 #
 
-class DocLayerSet(MutableSequence):
+class DocLayerStack(MutableSequence):
     """
     list-like layer set which will slowly eat functionality from Document as warranted, and provide cleaner interfacing to GUI elements
     """
@@ -260,7 +259,7 @@ class Document(QObject):
     didChangeLayerVisibility = pyqtSignal(dict)  # {UUID: new-visibility, ...} for changed layers
     didReorderAnimation = pyqtSignal(list)  # list of UUIDs representing new animation order
     didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
-    didSwitchLayerSet = pyqtSignal(int, DocLayerSet, list)  # new layerset number typically 0..3, list of prez tuples representing new display order, new animation order
+    didSwitchLayerSet = pyqtSignal(int, DocLayerStack, list)  # new layerset number typically 0..3, list of prez tuples representing new display order, new animation order
     didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didCalculateLayerEqualizerValues = pyqtSignal(dict)  # dict of {uuid: (value, normalized_value_within_clim)} for equalizer display
@@ -270,7 +269,7 @@ class Document(QObject):
         super(Document, self).__init__(**kwargs)
         self._guidebook = AHI_HSF_Guidebook()
         self._workspace = workspace
-        self._layer_sets = [DocLayerSet(self)] + [None] * (layer_set_count-1)
+        self._layer_sets = [DocLayerStack(self)] + [None] * (layer_set_count - 1)
         self._layer_with_uuid = {}
         # TODO: connect signals from workspace to slots including update_dataset_info
 
