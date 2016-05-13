@@ -11,6 +11,8 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
+.. seqdiag:: test.diag
+
 .. automodule:: cspov.model.document
    :members:
 

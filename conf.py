@@ -43,6 +43,9 @@ extensions = [
     'sphinxcontrib.blockdiag',
 ]
 
+seqdiag_fontpath = os.path.abspath('./fonts/DejaVuSerif.ttf')
+
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
