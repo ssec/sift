@@ -11,6 +11,14 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
+.. automodule:: cspov.model.document
+   :members:
+
+.. automodule:: cspov.view.SceneGraphManager
+   :members:
+
+.. automodule:: cspov.workspace.workspace
+   :members:
 
 
 Indices and tables

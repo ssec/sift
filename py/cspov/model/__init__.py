@@ -22,4 +22,4 @@ REQUIRES
 :license: GPLv3, see LICENSE for more details
 """
 
-from .document import Document
+from cspov.model.document import Document

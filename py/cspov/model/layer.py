@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-layers.py
+layer.py
 ~~~~~~~~~
 
 PURPOSE
@@ -17,6 +17,12 @@ REQUIRES
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
+from _weakref import ref
+from collections import MutableMapping
+from enum import Enum
+
+from cspov.common import INFO, KIND
+
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
@@ -111,6 +117,121 @@ LOG = logging.getLogger(__name__)
 
 
 
+class mixing(Enum):
+    UNKNOWN = 0
+    NORMAL = 1
+    ADD = 2
+    SUBTRACT = 3
+
+
+class DocLayer(MutableMapping):
+    """
+    Layer as represented within the document
+    Essentially: A helper representation of a layer and part of the public interface to the document.
+    Substitutes in for document layer information dictionaries initially,
+      but eventually dictionary interfaces will be limited to non-standard annotation keys.
+    Incrementally migrate functionality from Document into these classes as appropriate, to keep Document from getting too complicated.
+    Make sure that DocLayer classes remain serializable and long-term connected only to the document, not to UI elements or workspace.
+    """
+    _doc = None  # weakref to document that owns us
+
+    def __init__(self, doc, *args, **kwargs):
+        # assert (isinstance(doc, Document))
+        self._doc = ref(doc)
+        self._store = dict()
+        self.update(dict(*args, **kwargs))  # use the free update to set keys
+
+    @property
+    def parent(self):
+        """
+        parent layer, if any
+        :return:
+        """
+        return None
+
+    @property
+    def children(self):
+        """
+        return dictionary of weakrefs to layers we require in order to function
+        :return:
+        """
+        return {}
+
+    @property
+    def uuid(self):
+        return self._store[INFO.UUID]
+
+    @property
+    def kind(self):
+        return self._store[INFO.KIND]
+
+    def __getitem__(self, key):
+        return self._store[self.__keytransform__(key)]
+
+    def __setitem__(self, key, value):
+        self._store[self.__keytransform__(key)] = value
+
+    def __delitem__(self, key):
+        del self._store[self.__keytransform__(key)]
+
+    def __iter__(self):
+        return iter(self._store)
+
+    def __len__(self):
+        return len(self._store)
+
+    def __keytransform__(self, key):
+        return key
+
+
+class DocBasicLayer(DocLayer):
+    """
+    A layer consistent of a simple scalar floating point value field, which can have color maps applied
+    """
+    pass
+
+
+class DocCompositeLayer(DocLayer):
+    """
+    A layer which combines other layers, be they basic or composite themselves
+    """
+    def __getitem__(self, key):
+        # FIXME debug
+        if key==INFO.KIND:
+            assert(self._store[INFO.KIND]==KIND.RGB)
+        return self._store[self.__keytransform__(key)]
+
+
+class DocRGBLayer(DocCompositeLayer):
+    pass
+
+
+class DocAlgebraicLayer(DocCompositeLayer):
+    """
+    A value field derived from other value fields algebraically
+    """
+    pass
+
+
+
+# class DocMapLayer(DocLayer):
+#     """
+#     FUTURE: A layer containing a background map as vector
+#     """
+#     pass
+#
+# class DocShapeLayer(DocLayer):
+#     """
+#     FUTURE: A layer represented in the scene graph as an editable shape
+#     """
+#     pass
+#
+# class DocProbeLayer(DocShapeLayer):
+#     """
+#     FUTURE: A shape layer which feeds probe values to another UI element or helper.
+#     """
+
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -141,3 +262,4 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
