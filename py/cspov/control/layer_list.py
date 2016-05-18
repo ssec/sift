@@ -214,13 +214,14 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     #     return True
 
 
-class LayerStackTreeViewModel(QAbstractListModel):
+class LayerStackTreeViewModel(QAbstractItemModel):
     """ behavior connecting list widget to layer stack (both ways)
         Each table view represents a different configured document layer stack "set" - user can select from at least four.
         Convey layer set information to/from the document to the respective table, including selection.
         ref: http://duganchen.ca/a-pythonic-qt-list-model-implementation/
         http://doc.qt.io/qt-5/qabstractitemmodel.html#beginMoveRows
         http://pyqt.sourceforge.net/Docs/PyQt4/qabstractitemmodel.html
+        http://doc.qt.io/qt-5/qtwidgets-itemviews-simpletreemodel-example.html
     """
     widgets = None
     doc = None
@@ -450,11 +451,14 @@ class LayerStackTreeViewModel(QAbstractListModel):
         elif len(selected_uuids) > 1:
             return self.composite_layer_menu(pos, lbox, selected_uuids, *args)
 
-    # def columnCount(self, QModelIndex_parent=None, *args, **kwargs):
-    #     return 1
+    def columnCount(self, QModelIndex_parent=None, *args, **kwargs):
+        return 1
     #
     # def hasChildren(self, QModelIndex_parent=None, *args, **kwargs):
     #     return False  # FIXME
+
+    def headerData(self, section:int, Qt_Orientation, role=None):
+        pass
 
     @property
     def listing(self):
@@ -561,8 +565,8 @@ class LayerStackTreeViewModel(QAbstractListModel):
         # LOG.debug('{} layers'.format(len(self.doc)))
         return len(self.doc)
 
-    # def index(self, row, column, parent):
-    #     return self.createIndex(row, column, parent)
+    def index(self, row, column, parent):
+        return self.createIndex(row, column, parent)
         # return super(LayerStackTreeViewModel, self).index(row, column, parent)
         # return QModelIndex()
         # FIXME
@@ -580,7 +584,7 @@ class LayerStackTreeViewModel(QAbstractListModel):
         # else:
         #     return QModelIndex()
 
-    def parent(self, index):
+    def parent(self, index=None):
         return QModelIndex()
         # FIXME
         # if not index.isValid():
