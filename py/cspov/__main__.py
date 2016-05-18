@@ -486,7 +486,7 @@ class Main(QtGui.QMainWindow):
 
         def update_probe_point(uuid=None, xy_pos=None):
             if uuid is None:
-                uuid = self.document.current_visible_layer
+                uuid = self.document.current_visible_layer_uuid
             if xy_pos is None:
                 xy_pos = self.scene_manager.point_probe_location("default_probe_name")
                 if xy_pos is None:
@@ -523,7 +523,7 @@ class Main(QtGui.QMainWindow):
             self.scene_manager.didChangeFrame.connect(lambda frame_info: self.ui.cursorProbeText.setText("Probe Value: <animating>"))
 
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
-            top_uuids = list(self.document.current_visible_layers(2))
+            top_uuids = list(self.document.current_visible_layer_uuids(2))
             LOG.debug("top visible UUID is {0!r:s}".format(top_uuids))
 
             # TODO, when the plots manage their own layer selection, change this call
@@ -679,7 +679,7 @@ class Main(QtGui.QMainWindow):
 
         flip_colormap = QtGui.QAction("Flip Color Limits (Top Layer)", self)
         flip_colormap.setShortcut("/")
-        flip_colormap.triggered.connect(lambda: self.document.flip_climits_for_layers([self.document.current_visible_layer]))
+        flip_colormap.triggered.connect(lambda: self.document.flip_climits_for_layers([self.document.current_visible_layer_uuid]))
 
         cycle_borders = QtGui.QAction("Cycle &Borders", self)
         cycle_borders.setShortcut('B')

@@ -210,6 +210,15 @@ class Workspace(QObject):
 
     IMPORT_CLASSES = [ GeoTiffImporter ]
 
+    @staticmethod
+    def defaultWorkspace():
+        """
+        return the default (global) workspace
+        Currently no plans to have more than one workspace, but secondaries may eventually have some advantage.
+        :return: Workspace instance
+        """
+        return TheWorkspace
+
     def __init__(self, directory_path=None, process_pool=None, max_size_gb=None, queue=None):
         """
         Initialize a new or attach an existing workspace, creating any necessary bookkeeping.
@@ -219,6 +228,7 @@ class Workspace(QObject):
         self._max_size_gb = max_size_gb if max_size_gb is not None else DEFAULT_WORKSPACE_SIZE
         if self._max_size_gb < MIN_WORKSPACE_SIZE:
             self._max_size_gb = MIN_WORKSPACE_SIZE
+            LOG.warning('setting workspace size to %dGB' % self._max_size_gb)
         if directory_path is None:
             import tempfile
             self._tempdir = tempfile.TemporaryDirectory()
@@ -252,6 +262,8 @@ class Workspace(QObject):
     def _init_inventory_existing_datasets(self):
         """
         Do an inventory of an pre-existing workspace
+        FIXME: go through and check that everything in the workspace makes sense
+        FIXME: check workspace subdirectories for helper sockets and mmaps
         :return:
         """
         if os.path.exists(self._inventory_path):

@@ -1,0 +1,10 @@
+seqdiag {
+    "UserOpensFileBehavior"; "Document"; "Workspace"; "SceneGraphManager";
+
+    UserOpensFileBehavior -> Document [ label = "openFile" ];
+    Document -> Workspace [ label = "import_image" ];
+    Document <- Workspace [ label = "uuid, info-dict, initial-content-array" ];
+    Document -> SceneGraphManager [ label = "didAddBasicLayer -> add_basic_layer" ];
+    SceneGraphManager -> SceneGraphManager [ label = "on_view_change" ];
+    Document <- SceneGraphManager;
+}

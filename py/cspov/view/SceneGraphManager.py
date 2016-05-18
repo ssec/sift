@@ -790,7 +790,7 @@ class SceneGraphManager(QObject):
         :return:
         """
         # TODO this is the lazy implementation, eventually just change z order on affected layers
-        self.layer_set.set_layer_order(self.document.current_layer_order)
+        self.layer_set.set_layer_order(self.document.current_layer_uuid_order)
         print("New layer order: ", new_layer_index_order)
         self.update()
 
@@ -802,7 +802,7 @@ class SceneGraphManager(QObject):
     def rebuild_all(self, *args, **kwargs):
 
         # get info on the new order
-        self.layer_set.set_layer_order(self.document.current_layer_order)
+        self.layer_set.set_layer_order(self.document.current_layer_uuid_order)
         self.layer_set.frame_order = self.document.current_animation_order
 
         # refresh our presentation info
@@ -827,7 +827,7 @@ class SceneGraphManager(QObject):
             if need_retile:
                 self.start_retiling_task(uuid, preferred_stride, tile_box)
 
-        current_visible_layers = list(self.document.current_visible_layers())
+        current_visible_layers = list(self.document.current_visible_layer_uuids())
         current_invisible_layers = set(self.image_layers.keys()) - set(current_visible_layers)
         for uuid in current_visible_layers:
             _assess(uuid, self.image_layers[uuid])

@@ -352,7 +352,7 @@ class LayerStackTreeViewModel(QAbstractListModel):
         if not uuids:
             return
         # FUTURE: this is quick and dirty
-        rowdict = dict((u,i) for i,u in enumerate(self.doc.current_layer_order))
+        rowdict = dict((u,i) for i,u in enumerate(self.doc.current_layer_uuid_order))
         items = QItemSelection()
         q = None
         for uuid in uuids:

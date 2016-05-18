@@ -158,7 +158,7 @@ class ProbeGraphManager (QObject) :
         self.graphs.append(graph)
 
         # load up the layers for this new tab
-        uuid_list = self.document.current_layer_order
+        uuid_list = self.document.current_layer_uuid_order
         graph.set_possible_layers(uuid_list)
 
         # clone the previous tab
@@ -182,7 +182,7 @@ class ProbeGraphManager (QObject) :
         """
 
         # reload the layer list for the existing graphs
-        uuid_list = self.document.current_layer_order
+        uuid_list = self.document.current_layer_uuid_order
         for graphObj in self.graphs :
             doRebuild = graphObj is self.graphs[self.selected_graph_index]
             graphObj.set_possible_layers(uuid_list, do_rebuild_plot=doRebuild)

@@ -97,9 +97,14 @@ class DocLayerStack(MutableSequence):
     _store = None
 
     def __init__(self, doc, *args, **kwargs):
-        assert (isinstance(doc, Document))
-        self._doc = ref(doc)
-        self._store = list(*args)
+        if isinstance(doc, DocLayerStack):
+            self._doc = ref(doc._doc)
+            self._store = list(doc._store)
+        elif isinstance(doc, Document):
+            self._doc = ref(doc)
+            self._store = list(*args)
+        else:
+            raise ValueError('cannot initialize DocLayerStack using %s' % type(doc))
 
     def __setitem__(self, index:int, value:prez):
         if index>=0 and index<len(self._store):
@@ -320,7 +325,7 @@ class Document(QObject):
         # TODO: see if this affects any presentation information; view will handle redrawing on its own
 
     def _clone_layer_set(self, existing_layer_set):
-        return deepcopy(existing_layer_set)
+        return DocLayerStack(existing_layer_set)
 
     @property
     def current_animation_order(self):
@@ -341,7 +346,7 @@ class Document(QObject):
         # return [u for _,u in q]
 
     @property
-    def current_layer_order(self):
+    def current_layer_uuid_order(self):
         """
         list of UUIDs (top to bottom) currently being displayed, independent of visibility
         :return:
@@ -349,7 +354,7 @@ class Document(QObject):
         return [x.uuid for x in self.current_layer_set]
 
     @property
-    def current_visible_layer(self):
+    def current_visible_layer_uuid(self):
         """
         :return: the topmost visible layer's UUID
         """
@@ -358,7 +363,7 @@ class Document(QObject):
                 return x.uuid
         return None
 
-    def current_visible_layers(self, max_layers=None):
+    def current_visible_layer_uuids(self, max_layers=None):
         """
         :param max_layers:
         :yield: the visible layers in the current layer set
@@ -371,7 +376,7 @@ class Document(QObject):
             if max_layers is not None and count >= max_layers:
                 break
 
-    def select_layer_set(self, layer_set_index):
+    def select_layer_set(self, layer_set_index:int):
         """
         change the selected layer set, 0..N (typically 0..3), cloning the old set if needed
         emits docDidChangeLayerOrder with an empty list implying complete reassessment,
