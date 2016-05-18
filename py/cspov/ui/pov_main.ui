@@ -14,7 +14,7 @@
    <bool>true</bool>
   </property>
   <property name="windowTitle">
-   <string>SIFT Beta 0.7.2</string>
+   <string>SIFT Beta 0.7.5</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -214,7 +214,7 @@
          <string>Longitude/Latitude coordinates under point probe</string>
         </property>
         <property name="text">
-         <string>Probe Location: </string>
+         <string>Probe Location: N/A</string>
         </property>
        </widget>
       </item>
@@ -316,7 +316,7 @@
          <string>Top layer data value under point probe</string>
         </property>
         <property name="text">
-         <string>Probe Value:</string>
+         <string>Probe Value: N/A</string>
         </property>
        </widget>
       </item>

@@ -39,6 +39,7 @@ except ImportError:
     figureoptions = None
 
 LOG = logging.getLogger(__name__)
+DEFAULT_POINT_PROBE = "default_probe_name"
 
 
 class NavigationToolbar(NavigationToolbar):
@@ -89,6 +90,7 @@ class ProbeGraphManager (QObject) :
     didChangeTab = pyqtSignal(list,)  # list of probe areas to show
     didClonePolygon = pyqtSignal(str, str)
     drawChildGraph = pyqtSignal(str,)
+    pointProbeChanged = pyqtSignal(str, bool, tuple)
 
     graphs = None
     selected_graph_index = -1
@@ -115,6 +117,8 @@ class ProbeGraphManager (QObject) :
         self.tab_widget_object = tab_widget
         if self.tab_widget_object.count() != 1 :
             LOG.info("Unexpected number of tabs in the QTabWidget used for the Area Probe Graphs.")
+        # hold on to point probe locations (point probes are shared across tabs)
+        self.point_probes = {}
 
         # set up the first tab
         self.graphs = [ ]
@@ -167,9 +171,11 @@ class ProbeGraphManager (QObject) :
             current_graph = self.graphs[self.selected_graph_index]
             graph.set_default_layer_selections(current_graph.xSelectedUUID, current_graph.ySelectedUUID)
             # give it a copy of the current polygon
-            # FIXME: Need to signal the SGM that it needs to create a new polygon
             graph.setPolygon(current_graph.polygon[:] if current_graph.polygon is not None else None)
             graph.checked = current_graph.checked
+            point_status, point_xy = self.point_probes[DEFAULT_POINT_PROBE]
+            point_xy = point_xy if point_status else None
+            graph.setPoint(point_xy, rebuild=False)
 
         # Create the initial plot
         graph.rebuildPlot()
@@ -194,6 +200,63 @@ class ProbeGraphManager (QObject) :
         """
 
         return self.graphs[self.selected_graph_index].setPolygon (polygonPoints)
+
+    def update_point_probe(self, probe_name, xy_pos=None, state=None):
+        if xy_pos is None and state is None:
+            # they didn't ask to change anything
+            # but they may want to refresh stuff
+            state, xy_pos = self.point_probes[probe_name]
+        elif probe_name not in self.point_probes:
+            # new point
+            if xy_pos is None:
+                raise ValueError("Point probe '{}' does not exist".format(probe_name))
+            # if this is a new point probe, then it must be enabled
+            state = True if state is None else state
+        else:
+            old_state, old_xy_pos = self.point_probes[probe_name]
+            if xy_pos is None:
+                # state is what is changing
+                xy_pos = old_xy_pos
+            elif state is None:
+                # they are updating the position only
+                # we have to turn the probe back on
+                state = True
+
+            if old_state == state and old_xy_pos == xy_pos:
+                # nothing has changed so no need to tell anyone
+                return
+            if old_state != state:
+                LOG.info("Changing point probe '{}' state to '{}'".format(probe_name, "on" if state else "off"))
+            if old_xy_pos != xy_pos:
+                LOG.info("Changing point probe '{}' position to '{}'".format(probe_name, xy_pos))
+
+        self.point_probes[probe_name] = [state, xy_pos]
+        self.pointProbeChanged.emit(probe_name, state, xy_pos)
+
+    def update_point_probe_graph(self, probe_name, state, xy_pos):
+        # need to set the point for all graphs because the point probe
+        # is used across all plots
+        for idx, graph in enumerate(self.graphs):
+            rebuild = idx == self.selected_graph_index
+            if state:
+                graph.setPoint(xy_pos, rebuild=rebuild)
+            elif state is not None:
+                # if it is False/"off"
+                graph.setPoint(None, rebuild=rebuild)
+
+    def current_point_probe_status(self, probe_name):
+        if probe_name not in self.point_probes:
+            return False, None
+        return self.point_probes[probe_name]
+
+    def toggle_point_probe(self, probe_name, state=None):
+        if probe_name not in self.point_probes:
+            LOG.info("No point probe to toggle")
+            return
+
+        old_state = self.point_probes[probe_name][0]
+        state = state if state is not None else not old_state
+        self.update_point_probe(probe_name, state=state)
 
     def set_default_layer_selections(self, *uuids):
         """Set the UUIDs for the current graph if it doesn't have a polygon
@@ -251,6 +314,7 @@ class ProbeGraphDisplay (object) :
 
     # internal objects to reference for info and data
     polygon         = None
+    point           = None
     manager         = None
     workspace       = None
     queue           = None
@@ -458,6 +522,13 @@ class ProbeGraphDisplay (object) :
         # return our name to be used for the polygon name
         return self.myName
 
+    def setPoint(self, coordinates, rebuild=True):
+        self.point = coordinates
+        self._stale = True
+        # sometimes we set the point to be redrawn later
+        if rebuild:
+            self.rebuildPlot()
+
     def getName (self) :
         """Accessor method for the graph's name
         """
@@ -475,11 +546,11 @@ class ProbeGraphDisplay (object) :
         # should be be plotting vs Y?
         doPlotVS = self.yCheckBox.isChecked()
         task_name = "%s_%s_region_plotting" % (self.xSelectedUUID, self.ySelectedUUID)
-        self.queue.add(task_name, self._rebuild_plot_task(self.xSelectedUUID, self.ySelectedUUID, self.polygon, plot_versus=doPlotVS), "Creating plot for region probe data", interactive=True)
+        self.queue.add(task_name, self._rebuild_plot_task(self.xSelectedUUID, self.ySelectedUUID, self.polygon, self.point, plot_versus=doPlotVS), "Creating plot for region probe data", interactive=True)
         # Assume that the task gets resolved otherwise we might try to draw multiple times
         self._stale = False
 
-    def _rebuild_plot_task(self, x_uuid, y_uuid, polygon, plot_versus=False):
+    def _rebuild_plot_task(self, x_uuid, y_uuid, polygon, point_xy, plot_versus=False):
 
         # if we are plotting only x and we have a selected x and a polygon
         if not plot_versus and x_uuid is not None and polygon is not None :
@@ -490,9 +561,16 @@ class ProbeGraphDisplay (object) :
             fmt, units, data_polygon = self.document.convert_units(x_uuid, data_polygon)
             title = self.workspace.get_info(x_uuid)[INFO.NAME]
 
+            # get point probe value
+            if point_xy:
+                x_point = self.workspace.get_content_point(x_uuid, point_xy)
+                format_str, unit_str, x_point = self.document.convert_units(x_uuid, x_point)
+            else:
+                x_point = None
+
             # plot a histogram
             yield {TASK_DOING: 'Probe Plot: Creating histogram plot', TASK_PROGRESS: 0.25}
-            self.plotHistogram (data_polygon, title)
+            self.plotHistogram (data_polygon, title, x_point)
 
         # if we are plotting x vs y and have x, y, and a polygon
         elif plot_versus and x_uuid is not None and y_uuid is not None and polygon is not None :
@@ -517,9 +595,18 @@ class ProbeGraphDisplay (object) :
                 _, _, data1 = self.document.convert_units(x_uuid, data1)
             yield {TASK_DOING: 'Probe Plot: Creating scatter plot...', TASK_PROGRESS: 0.25}
 
+            if point_xy:
+                x_point = self.workspace.get_content_point(x_uuid, point_xy)
+                format_str, unit_str, x_point = self.document.convert_units(x_uuid, x_point)
+                y_point = self.workspace.get_content_point(y_uuid, point_xy)
+                format_str, unit_str, y_point = self.document.convert_units(y_uuid, y_point)
+            else:
+                x_point = None
+                y_point = None
+
             # plot a scatter plot
             # self.plotScatterplot (data1, name1, data2, name2)
-            self.plotDensityScatterplot (data1, name1, data2, name2)
+            self.plotDensityScatterplot (data1, name1, data2, name2, x_point, y_point)
 
         # if we have some combination of selections we don't understand, clear the figure
         else :
@@ -533,12 +620,19 @@ class ProbeGraphDisplay (object) :
     def draw(self):
         self.canvas.draw()
 
-    def plotHistogram (self, data, title, numBins=100) :
+    def plotHistogram (self, data, title, x_point, numBins=100) :
         """Make a histogram using the given data and label it with the given title
         """
         self.figure.clf()
         axes = self.figure.add_subplot(111)
-        axes.hist(data, bins=self.DEFAULT_NUM_BINS)
+        bars = axes.hist(data, bins=self.DEFAULT_NUM_BINS)
+        if x_point is not None:
+            # go through each rectangle object and make the one that contains x_point 'red'
+            # default color is blue so red should stand out
+            for bar in bars[2][::-1]:
+                if bar.xy[0] <= x_point:
+                    bar.set_color('red')
+                    break
         axes.set_title(title)
 
     def plotScatterplot (self, dataX, nameX, dataY, nameY) :
@@ -562,7 +656,7 @@ class ProbeGraphDisplay (object) :
             axes.set_title(nameX + " vs " + nameY)
             self._draw_xy_line(axes)
 
-    def plotDensityScatterplot (self, dataX, nameX, dataY, nameY) :
+    def plotDensityScatterplot (self, dataX, nameX, dataY, nameY, pointX, pointY) :
         """Make a density scatter plot for the given data
         """
 
@@ -587,6 +681,12 @@ class ProbeGraphDisplay (object) :
         # display the density map data
         img = axes.imshow(density_map, extent=[xmin_value, xmax_value, ymin_value, ymax_value], aspect='auto',
                           interpolation='nearest', norm=LogNorm())
+        if pointX is not None:
+            axes.set_autoscale_on(False)
+            axes.plot(pointX, pointY, marker='o',
+                      markerfacecolor='white', markeredgecolor='black',
+                      markersize=10, markeredgewidth=1.)
+            axes.set_autoscale_on(True)
 
         colorbar = self.figure.colorbar(img)
         colorbar.ax.set_title("Colorbar")  # for the 'Customize' menu in the MPL toolbar
