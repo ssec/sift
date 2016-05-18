@@ -599,7 +599,7 @@ class ProbeGraphDisplay (object) :
                 x_point = self.workspace.get_content_point(x_uuid, point_xy)
                 format_str, unit_str, x_point = self.document.convert_units(x_uuid, x_point)
                 y_point = self.workspace.get_content_point(y_uuid, point_xy)
-                format_str, unit_str, y_point = self.document.convert_units(x_uuid, y_point)
+                format_str, unit_str, y_point = self.document.convert_units(y_uuid, y_point)
             else:
                 x_point = None
                 y_point = None
