@@ -562,6 +562,7 @@ class Main(QtGui.QMainWindow):
         self.graphManager.pointProbeChanged.connect(self.graphManager.update_point_probe_graph)
 
         self.scene_manager.newPointProbe.connect(self.graphManager.update_point_probe)
+        self.document.didAddLayer.connect(lambda *args: self.graphManager.update_point_probe(DEFAULT_POINT_PROBE))
         # FIXME: These were added as a simple fix to update the proble value on layer changes, but this should really
         #        have its own manager-like object
         def _blackhole(*args, **kwargs):
