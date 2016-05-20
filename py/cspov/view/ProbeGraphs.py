@@ -203,6 +203,9 @@ class ProbeGraphManager (QObject) :
 
     def update_point_probe(self, probe_name, xy_pos=None, state=None):
         if xy_pos is None and state is None:
+            if probe_name not in self.point_probes:
+                # nothing to do
+                return
             # they didn't ask to change anything
             # but they may want to refresh stuff
             state, xy_pos = self.point_probes[probe_name]
