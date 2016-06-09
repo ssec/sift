@@ -45,6 +45,7 @@ from cspov.ui.pov_main_ui import Ui_MainWindow
 from cspov.common import INFO, KIND, DEFAULT_PROJ_OBJ, TOOL
 
 import os
+import sys
 import logging
 
 
@@ -810,5 +811,4 @@ def main():
     app.run()
 
 if __name__ == '__main__':
-    import sys
     sys.exit(main())
