@@ -1,11 +1,9 @@
-; -- Example1.iss --
-; Demonstrates copying 3 files and creating an icon.
-
+; -- sift.iss --
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING .ISS SCRIPT FILES!
 
 [Setup]
 AppName=SIFT
-AppVersion=0.7.2
+AppVersion=0.7.6
 DefaultDirName={pf}\SIFT
 DefaultGroupName=SIFT
 Compression=lzma2

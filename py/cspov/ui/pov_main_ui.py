@@ -2,8 +2,7 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created: Wed Dec  9 13:58:01 2015
-#      by: PyQt4 UI code generator 4.10.4
+# Created by: PyQt4 UI code generator 4.11.4
 #
 # WARNING! All changes made in this file will be lost!
 
@@ -269,7 +268,7 @@ class Ui_MainWindow(object):
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
-        MainWindow.setWindowTitle(_translate("MainWindow", "SIFT Beta 0.7.2", None))
+        MainWindow.setWindowTitle(_translate("MainWindow", "SIFT Beta 0.7.6", None))
         self.panZoomToolButton.setToolTip(_translate("MainWindow", "Pan/Zoom Tool", None))
         self.panZoomToolButton.setStatusTip(_translate("MainWindow", "Left mouse click and drag pans the scene", None))
         self.panZoomToolButton.setText(_translate("MainWindow", "Pan/Zoom", None))
@@ -281,10 +280,10 @@ class Ui_MainWindow(object):
         self.regionSelectButton.setText(_translate("MainWindow", "Region", None))
         self.cursorProbeLocation.setToolTip(_translate("MainWindow", "Longitude/Latitude location of point probe", None))
         self.cursorProbeLocation.setStatusTip(_translate("MainWindow", "Longitude/Latitude coordinates under point probe", None))
-        self.cursorProbeLocation.setText(_translate("MainWindow", "Probe Location: ", None))
+        self.cursorProbeLocation.setText(_translate("MainWindow", "Probe Location: N/A", None))
         self.cursorProbeText.setToolTip(_translate("MainWindow", "Value under cursor", None))
         self.cursorProbeText.setStatusTip(_translate("MainWindow", "Top layer data value under point probe", None))
-        self.cursorProbeText.setText(_translate("MainWindow", "Probe Value:", None))
+        self.cursorProbeText.setText(_translate("MainWindow", "Probe Value: N/A", None))
         self.mainWidgets.setTabText(self.mainWidgets.indexOf(self.tab), _translate("MainWindow", "Tab 1", None))
         self.mainWidgets.setTabText(self.mainWidgets.indexOf(self.tab_2), _translate("MainWindow", "Tab 2", None))
         self.progressText.setText(_translate("MainWindow", "idle", None))

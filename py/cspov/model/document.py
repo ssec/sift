@@ -284,9 +284,14 @@ class Document(QObject):
             default_clim = self._layer_with_uuid[p.uuid][INFO.CLIM]
             yield ((p.climits[1] - p.climits[0]) > 0) != ((default_clim[1] - default_clim[0]) > 0)
 
-    def update_equalizer_values(self, uuid, xy_pos):
+    def update_equalizer_values(self, uuid, state, xy_pos):
         """user has clicked on a point probe; determine relative and absolute values for all document image layers
         """
+        # if the point probe was turned off then we don't want to have the equalizer
+        if not state:
+            self.didCalculateLayerEqualizerValues.emit({})
+            return
+
         zult = {}
         for pinf in self.current_layer_set:
             if pinf.uuid in zult:
