@@ -422,7 +422,7 @@ class Main(QtGui.QMainWindow):
 
     def update_point_probe_text(self, probe_name, state=None, xy_pos=None, uuid=None, animating=None):
         if uuid is None:
-            uuid = self.document.current_visible_layer
+            uuid = self.document.current_visible_layer_uuid
         if state is None or xy_pos is None:
             _state, _xy_pos = self.graphManager.current_point_probe_status(probe_name)
             if state is None:
@@ -562,13 +562,13 @@ class Main(QtGui.QMainWindow):
         self.graphManager.pointProbeChanged.connect(self.graphManager.update_point_probe_graph)
 
         self.scene_manager.newPointProbe.connect(self.graphManager.update_point_probe)
-        self.document.didAddLayer.connect(lambda *args: self.graphManager.update_point_probe(DEFAULT_POINT_PROBE))
+        self.document.didAddBasicLayer.connect(lambda *args: self.graphManager.update_point_probe(DEFAULT_POINT_PROBE))
         # FIXME: These were added as a simple fix to update the proble value on layer changes, but this should really
         #        have its own manager-like object
         def _blackhole(*args, **kwargs):
             return self.update_point_probe_text(DEFAULT_POINT_PROBE)
         self.document.didChangeLayerVisibility.connect(_blackhole)
-        self.document.didAddLayer.connect(_blackhole)
+        self.document.didAddBasicLayer.connect(_blackhole)
         self.document.didRemoveLayers.connect(_blackhole)
         self.document.didReorderLayers.connect(_blackhole)
         if False:
