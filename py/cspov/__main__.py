@@ -33,7 +33,7 @@ import cspov.ui.open_cache_dialog_ui as open_cache_dialog_ui
 from cspov.control.LayerManager import LayerSetsManager
 from cspov.model import Document
 from cspov.view.SceneGraphManager import SceneGraphManager
-from cspov.view.ProbeGraphs import ProbeGraphManager
+from cspov.view.ProbeGraphs import ProbeGraphManager, DEFAULT_POINT_PROBE
 from cspov.queue import TaskQueue, test_task, TASK_PROGRESS, TASK_DOING
 from cspov.workspace import Workspace
 from cspov.view.Colormap import ALL_COLORMAPS
@@ -420,6 +420,34 @@ class Main(QtGui.QMainWindow):
     #         self.animation_slider_jump_frame(None)
     #         self.behaviorLayersList.select([info[INFO.UUID]])
 
+    def update_point_probe_text(self, probe_name, state=None, xy_pos=None, uuid=None, animating=None):
+        if uuid is None:
+            uuid = self.document.current_visible_layer_uuid
+        if state is None or xy_pos is None:
+            _state, _xy_pos = self.graphManager.current_point_probe_status(probe_name)
+            if state is None:
+                state = _state
+            if xy_pos is None:
+                xy_pos = _xy_pos
+
+        if xy_pos is not None and state:
+            lon, lat = DEFAULT_PROJ_OBJ(xy_pos[0], xy_pos[1], inverse=True)
+            lon_str = "{:.02f} {}".format(abs(lon), "W" if lon < 0 else "E")
+            lat_str = "{:.02f} {}".format(abs(lat), "S" if lat < 0 else "N")
+            self.ui.cursorProbeLocation.setText("Probe Location: {}, {}".format(lon_str, lat_str))
+        else:
+            self.ui.cursorProbeLocation.setText("Probe Location: N/A")
+
+        if animating:
+            data_str = "<animating>"
+        elif state and uuid is not None:
+            data_point = self.workspace.get_content_point(uuid, xy_pos)
+            format_str, unit_str, converted = self.document.convert_units(uuid, data_point)
+            data_str = (format_str + "{:s}").format(float(converted), unit_str)
+        else:
+            data_str = "N/A"
+        self.ui.cursorProbeText.setText("Probe Value: {} ".format(data_str))
+
     def __init__(self, workspace_dir=None, workspace_size=None, glob_pattern=None, border_shapefile=None, center=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
@@ -483,45 +511,6 @@ class Main(QtGui.QMainWindow):
         # convey action between document and layer list view
         self.layerSetsManager = LayerSetsManager(self.ui.layerSetTabs, self.ui.layerInfoContents, self.document)
         self.behaviorLayersList = self.layerSetsManager.getLayerStackListViewModel()
-
-        def update_probe_point(uuid=None, xy_pos=None):
-            if uuid is None:
-                uuid = self.document.current_visible_layer_uuid
-            if xy_pos is None:
-                xy_pos = self.scene_manager.point_probe_location("default_probe_name")
-                if xy_pos is None:
-                    return
-
-            lon, lat = DEFAULT_PROJ_OBJ(xy_pos[0], xy_pos[1], inverse=True)
-            lon_str = "{:.02f} {}".format(abs(lon), "W" if lon < 0 else "E")
-            lat_str = "{:.02f} {}".format(abs(lat), "S" if lat < 0 else "N")
-            self.ui.cursorProbeLocation.setText("Probe Location: {}, {}".format(lon_str, lat_str))
-
-            if uuid is not None:
-                data_point = self.workspace.get_content_point(uuid, xy_pos)
-                format_str, unit_str, converted = self.document.convert_units(uuid, data_point)
-                data_str = (format_str + "{:s}").format(float(converted), unit_str)
-            else:
-                data_str = "N/A"
-            self.ui.cursorProbeText.setText("Probe Value: {} ".format(data_str))
-        self.scene_manager.newProbePoint.connect(update_probe_point)
-        self.scene_manager.newProbePoint.connect(self.document.update_equalizer_values)
-        # FIXME: These were added as a simple fix to update the proble value on layer changes, but this should really
-        #        have its own manager-like object
-        def _blackhole(*args, **kwargs):
-            return update_probe_point()
-        self.document.didChangeLayerVisibility.connect(_blackhole)
-        self.document.didAddBasicLayer.connect(_blackhole)
-        self.document.didRemoveLayers.connect(_blackhole)
-        self.document.didReorderLayers.connect(_blackhole)
-        if False:
-            # XXX: Disable the below line if updating during animation is too much work
-            # self.scene_manager.didChangeFrame.connect(lambda frame_info: update_probe_point(uuid=frame_info[-1]))
-            pass
-        else:
-            # XXX: Disable the below line if updating the probe value during animation isn't a performance problem
-            self.scene_manager.didChangeFrame.connect(lambda frame_info: self.ui.cursorProbeText.setText("Probe Value: <animating>"))
-
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
             top_uuids = list(self.document.current_visible_layer_uuids(2))
             LOG.debug("top visible UUID is {0!r:s}".format(top_uuids))
@@ -567,6 +556,29 @@ class Main(QtGui.QMainWindow):
         self.graphManager = ProbeGraphManager(self.ui.probeTabWidget, self.workspace, self.document, self.queue)
         self.graphManager.didChangeTab.connect(self.scene_manager.show_only_polygons)
         self.graphManager.didClonePolygon.connect(self.scene_manager.copy_polygon)
+        self.graphManager.pointProbeChanged.connect(self.scene_manager.on_point_probe_set)
+        self.graphManager.pointProbeChanged.connect(self.document.update_equalizer_values)
+        self.graphManager.pointProbeChanged.connect(self.update_point_probe_text)
+        self.graphManager.pointProbeChanged.connect(self.graphManager.update_point_probe_graph)
+
+        self.scene_manager.newPointProbe.connect(self.graphManager.update_point_probe)
+        self.document.didAddBasicLayer.connect(lambda *args: self.graphManager.update_point_probe(DEFAULT_POINT_PROBE))
+        # FIXME: These were added as a simple fix to update the proble value on layer changes, but this should really
+        #        have its own manager-like object
+        def _blackhole(*args, **kwargs):
+            return self.update_point_probe_text(DEFAULT_POINT_PROBE)
+        self.document.didChangeLayerVisibility.connect(_blackhole)
+        self.document.didAddBasicLayer.connect(_blackhole)
+        self.document.didRemoveLayers.connect(_blackhole)
+        self.document.didReorderLayers.connect(_blackhole)
+        if False:
+            # XXX: Disable the below line if updating during animation is too much work
+            # self.scene_manager.didChangeFrame.connect(lambda frame_info: update_probe_point(uuid=frame_info[-1]))
+            pass
+        else:
+            # XXX: Disable the below line if updating the probe value during animation isn't a performance problem
+            self.scene_manager.didChangeFrame.connect(lambda frame_info: self.ui.cursorProbeText.setText("Probe Value: <animating>"))
+
 
     def closeEvent(self, event, *args, **kwargs):
         LOG.debug('main window closing')
@@ -701,9 +713,14 @@ class Main(QtGui.QMainWindow):
         composite.setShortcut('C')
         composite.triggered.connect(self.create_composite)
 
+        toggle_point = QtGui.QAction("Toggle Point Probe", self)
+        toggle_point.setShortcut('X')
+        toggle_point.triggered.connect(lambda: self.graphManager.toggle_point_probe(DEFAULT_POINT_PROBE))
+
         edit_menu = menubar.addMenu('&Edit')
         edit_menu.addAction(remove)
         edit_menu.addAction(clear)
+        edit_menu.addAction(toggle_point)
 
         view_menu = menubar.addMenu('&View')
         view_menu.addAction(animate)

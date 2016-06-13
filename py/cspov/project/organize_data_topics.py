@@ -64,6 +64,16 @@ guam_cases["Introduction"].append(DataCase("Introduction",
                                            datetime(2015, 7, 18, 16, 0, 0),
                                            timedelta(minutes=10),
                                            "all"))
+guam_cases["Introduction"].append(DataCase("Introduction",
+                                           datetime(2016, 3, 9, 0, 0, 0),
+                                           datetime(2016, 3, 9, 4, 0, 0),
+                                           timedelta(minutes=60),
+                                           "all"))
+guam_cases["Introduction"].append(DataCase("Introduction",
+                                           datetime(2016, 3, 9, 1, 30, 0),
+                                           datetime(2016, 3, 9, 4, 0, 0),
+                                           timedelta(minutes=10),
+                                           "all"))
 
 # Scott's Cases
 guam_cases["Water Vapor"] = []
@@ -71,6 +81,11 @@ guam_cases["Water Vapor"].append(DataCase("Water Vapor",
                                           datetime(2015, 10, 7, 0, 0, 0),
                                           datetime(2015, 10, 8, 0, 0, 0),
                                           timedelta(minutes=30),
+                                          "all"))
+guam_cases["Water Vapor"].append(DataCase("Water Vapor",
+                                          datetime(2016, 2, 19, 19, 0, 0),
+                                          datetime(2016, 2, 20, 5, 0, 0),
+                                          timedelta(minutes=60),
                                           "all"))
 
 # Tim's Cases
