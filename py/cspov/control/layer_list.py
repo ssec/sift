@@ -563,7 +563,9 @@ class LayerStackTreeViewModel(QAbstractItemModel):
 
     def rowCount(self, QModelIndex_parent=None, *args, **kwargs):
         # LOG.debug('{} layers'.format(len(self.doc)))
-        return len(self.doc)
+        if QModelIndex_parent==None or QModelIndex_parent==QModelIndex():
+            return len(self.doc)
+        return 0
 
     def index(self, row, column, parent):
         # if parent is not None:
