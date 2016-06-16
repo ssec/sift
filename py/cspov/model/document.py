@@ -52,7 +52,7 @@ between subsystems. Document rarely deals directly with content.
 :copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-from cspov.model.layer import mixing, DocLayer, DocBasicLayer, DocCompositeLayer
+from cspov.model.layer import mixing, DocLayer, DocBasicLayer, DocCompositeLayer, DocRGBLayer
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -589,7 +589,7 @@ class Document(QObject):
             INFO.CELL_HEIGHT: highest_res_dep[INFO.CELL_HEIGHT],
             INFO.CLIM: tuple(d[INFO.CLIM] for d in dep_info),
         }
-        self._layer_with_uuid[uuid] = ds_info = DocCompositeLayer(self, ds_info)
+        self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
         presentation, reordered_indices = self._insert_layer_with_info(ds_info)
 
         prezs = None  # not used right now FIXME

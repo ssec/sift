@@ -23,6 +23,7 @@ from PyQt4.QtWebKit import QWebView
 from cspov.model.guidebook import GUIDE
 from cspov.common import INFO, KIND
 from cspov.control.layer_list import LayerStackTreeViewModel
+from cspov.model.layer import DocLayer, DocBasicLayer, DocCompositeLayer, DocRGBLayer
 import cspov.ui.config_rgb_layer_ui as config_rgb_layer_ui
 import numpy as np
 from cspov.view.Colormap import ALL_COLORMAPS
@@ -199,6 +200,15 @@ class SingleLayerInfoPane (QWidget) :
 
         If the uuid list parameter is None, clear out the information instead
         """
+        if selected_UUID_list is not None and len(selected_UUID_list)==1:
+            layer_uuid, = list(selected_UUID_list)
+            layer_info = self.document.get_info(uuid=layer_uuid)
+            is_rgb = isinstance(layer_info, DocRGBLayer)
+            is_rgb = True  # FIXME DEBUG
+            if is_rgb:
+                self.setVisible(False)
+            else:
+                self.setVisible(True)
 
         # clear the list if we got None
         if selected_UUID_list is None or len(selected_UUID_list) <= 0 :
