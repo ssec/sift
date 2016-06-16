@@ -553,19 +553,25 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             flags = Qt.ItemIsDropEnabled
         return flags
 
-    # def hasIndex(self, row, col, QModelIndex_parent=None, *args, **kwargs):
-    #     if QModelIndex_parent is not None:
-    #         # then look up whether this layer has child layers, e.g. for RGB or algebraic
-    #         return False  # FIXME
-    #     if col!=1:
-    #         return False
-    #     return (row >=0 and row < len(self.doc))
+    def hasIndex(self, row, col, QModelIndex_parent=None, *args, **kwargs):
+        if QModelIndex_parent is not None:
+            # then look up whether this layer has child layers, e.g. for RGB or algebraic
+            return False  # FIXME
+        if col != 0:
+            return False
+        return (row >=0 and row < len(self.doc))
 
     def rowCount(self, QModelIndex_parent=None, *args, **kwargs):
         # LOG.debug('{} layers'.format(len(self.doc)))
         return len(self.doc)
 
     def index(self, row, column, parent):
+        # if parent is not None:
+        #     LOG.debug('parent is %s' % parent)
+        #     return QModelIndex()
+        # if not self.hasIndex(row, column, parent):
+        #     return QModelIndex()
+
         return self.createIndex(row, column, parent)
         # return super(LayerStackTreeViewModel, self).index(row, column, parent)
         # return QModelIndex()
