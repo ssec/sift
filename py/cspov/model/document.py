@@ -93,12 +93,12 @@ class DocLayerStack(MutableSequence):
     """
     list-like layer set which will slowly eat functionality from Document as warranted, and provide cleaner interfacing to GUI elements
     """
-    _doc = None
+    _doc = None  # weakref to document we belong to
     _store = None
 
     def __init__(self, doc, *args, **kwargs):
         if isinstance(doc, DocLayerStack):
-            self._doc = ref(doc._doc)
+            self._doc = ref(doc._doc())
             self._store = list(doc._store)
         elif isinstance(doc, Document):
             self._doc = ref(doc)

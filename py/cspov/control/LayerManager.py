@@ -23,6 +23,7 @@ from PyQt4.QtWebKit import QWebView
 from cspov.model.guidebook import GUIDE
 from cspov.common import INFO, KIND
 from cspov.control.layer_list import LayerStackTreeViewModel
+import cspov.ui.config_rgb_layer_ui as config_rgb_layer_ui
 import numpy as np
 from cspov.view.Colormap import ALL_COLORMAPS
 
@@ -37,7 +38,8 @@ class LayerSetsManager (QObject) :
     layer_sets = None
     max_tab_number = None
     set_behaviors = None
-    layer_info_object = None
+    layer_info_pane = None
+    rgb_config = None
 
     def __init__ (self, tab_view_widget, layer_info_widget, document) :
 
@@ -47,7 +49,10 @@ class LayerSetsManager (QObject) :
 
         # hang on to the various widgets for later
         self.tab_widget = tab_view_widget
-        self.layer_info_object = SingleLayerInfoDisplay(layer_info_widget, document)
+
+        # FIXME: we need a manager object which decides whether to show info pane or config pane
+        self.layer_info_pane = SingleLayerInfoPane(layer_info_widget, document)
+        self.rgb_config_pane = RGBLayerConfigPane(layer_info_widget, document)
 
         if tab_view_widget.count() > 1 :
             LOG.info("Unexpected number of tabs present at start up in the layer list set pane.")
@@ -57,7 +62,7 @@ class LayerSetsManager (QObject) :
 
         self.max_tab_number = 1
         self.set_up_tab(0, do_increment_tab_number=False)
-        self.set_behaviors.uuidSelectionChanged.connect(self.layer_info_object.update_display)
+        self.set_behaviors.uuidSelectionChanged.connect(self.layer_info_pane.update_display)
 
         # hook things up so we know when the selected tab changes
         self.tab_widget.connect(self.tab_widget,
@@ -69,6 +74,9 @@ class LayerSetsManager (QObject) :
         """
 
         newTabIndex = self.tab_widget.currentIndex()
+
+        self.layer_info_pane.setVisible(False)  # FIXME DEBUG
+        self.rgb_config_pane.setVisible(True)  # FIXME DEBUG
 
         # if this is the last tab, make a new tab and switch to that
         if newTabIndex == (self.tab_widget.count() - 1) :
@@ -136,7 +144,7 @@ class SingleLayerSetManager (QWidget) :
 
         return self.my_layer_list
 
-class SingleLayerInfoDisplay (QWidget) :
+class SingleLayerInfoPane (QWidget) :
     """shows details about one layer that is selected in the list
     """
 
@@ -152,7 +160,7 @@ class SingleLayerInfoDisplay (QWidget) :
         """build our info display
         """
 
-        super(SingleLayerInfoDisplay, self).__init__(parent)
+        super(SingleLayerInfoPane, self).__init__(parent)
 
         self.document = document
 
@@ -342,4 +350,12 @@ class SingleLayerInfoDisplay (QWidget) :
                 cmap_html = ALL_COLORMAPS[shared_info["colormap"]]._repr_html_()
                 cmap_html = cmap_html.replace("height", "border-collapse: collapse;\nheight")
                 self.cmap_vis.setHtml("""<html><head></head><body style="margin: 0px"><div>%s</div></body></html>""" % (cmap_html,))
+
+
+class RGBLayerConfigPane(QWidget):
+    def __init__(self, parent, document):
+        super(RGBLayerConfigPane, self).__init__(parent)
+        self.ui = config_rgb_layer_ui.Ui_config_rgb_layer()
+        self.ui.setupUi(self)
+        # FIXME: connect up sub-widgets to document signals
 
