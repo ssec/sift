@@ -36,7 +36,7 @@ from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage, RGBCompo
 from cspov.view.MapWidget import CspovMainMapCanvas
 from cspov.view.Cameras import PanZoomProbeCamera
 from cspov.view.Colormap import ALL_COLORMAPS
-from cspov.model.document import prez
+from cspov.model.document import prez, DocCompositeLayer, DocBasicLayer, DocRGBLayer
 from cspov.queue import TASK_DOING, TASK_PROGRESS
 from cspov.view.ProbeGraphs import DEFAULT_POINT_PROBE
 
@@ -698,12 +698,18 @@ class SceneGraphManager(QObject):
         self.layer_set.add_layer(image)
         self.on_view_change(None)
 
+
     def add_composite_layer(self, new_order:list, ds_info:dict, p:prez, overview_content:list, dep_uuids, composite_type=COMPOSITE_TYPE.RGB):
         LOG.debug("SceenGraphManager.add_composite_layer %s" % repr(ds_info))
         if composite_type == COMPOSITE_TYPE.RGB:
             if len(dep_uuids) != 3:
                 # don't know how to do it without 3 layers
                 raise ValueError("Must select 3 separate band layers to create an RGB layer")
+
+            r,g,b = dep_uuids
+            if r==None or g==None or b==None:
+                LOG.info("deferring creation of composite scenegraph element")
+                return False
 
             uuid = ds_info[INFO.UUID]
             LOG.debug("Adding composite layer to Scene Graph Manager with UUID: %s", uuid)
@@ -725,8 +731,22 @@ class SceneGraphManager(QObject):
             layer.transform *= STTransform(translate=(0, 0, -50.0))
             self.composite_layers[uuid] = dep_uuids
             self.on_view_change(None)
+            return True
         else:
             raise ValueError("Unknown or unimplemented composite type: %s" % (composite_type,))
+
+    def change_composite_layer(self, new_order:list, layer:DocCompositeLayer, presentation:prez, changes:dict):
+        old_element = self.image_layers.get(layer.uuid, None)
+        if old_element is None:
+            if isinstance(layer, DocRGBLayer):
+                # a deferred element creation is no longer deferred -- maybe
+                rgb_uuids = [x.uuid if x is not None else None for x in [layer.r, layer.g, layer.b]]  # FUTURE: alpha
+                did_create = self.add_composite_layer(new_order, layer, presentation, [], rgb_uuids, COMPOSITE_TYPE.RGB)
+                if did_create:
+                    LOG.info("created new element for composite layer")
+                return
+        # otherwise we have to tear down that element and make a new one with its Z
+        LOG.warning("need to implement composite layer changes")
 
     def remove_layer(self, new_order:list, uuids_removed:list, row:int, count:int):
         """

@@ -155,6 +155,7 @@ class Document(QObject):
     didSwitchLayerSet = pyqtSignal(int, DocLayerStack, list)  # new layerset number typically 0..3, list of prez tuples representing new display order, new animation order
     didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
+    didChangeComposition = pyqtSignal(list, DocCompositeLayer, prez, dict)  # new-layer-order, changed-layer, change-info: composite channels were reassigned or polynomial altered
     didCalculateLayerEqualizerValues = pyqtSignal(dict)  # dict of {uuid: (value, normalized_value_within_clim)} for equalizer display
     # didChangeShapeLayer = pyqtSignal(dict)
 
@@ -594,7 +595,16 @@ class Document(QObject):
 
         prezs = None  # not used right now FIXME
         overview_content = list(self._workspace.get_content(d[INFO.UUID]) for d in dep_info)
-        self.didAddCompositeLayer.emit([None], ds_info, [None], overview_content, uuids, COMPOSITE_TYPE.RGB)
+        self.didAddCompositeLayer.emit([None], ds_info, [None], overview_content, uuids, COMPOSITE_TYPE.RGB)  # FIXME first parm (new_order) is wrong
+        return ds_info
+
+    def create_empty_rgb_composite(self):
+        """
+        an empty RGB composite is added to the top of the current layer list.
+        since it needs R, G, and B in order to be valid, we do not yet announce it to the scenegraph
+        :return:
+        """
+        self.create_rgb_composite(None, None, None)
 
     def __len__(self):
         return len(self.current_layer_set)

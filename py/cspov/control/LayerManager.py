@@ -20,6 +20,7 @@ import logging
 from PyQt4.QtCore import SIGNAL, QObject, Qt
 from PyQt4.QtGui import QWidget, QListView, QTreeView, QGridLayout, QLabel, QScrollArea, QLayout, QTextDocument
 from PyQt4.QtWebKit import QWebView
+from weakref import ref
 from cspov.model.guidebook import GUIDE
 from cspov.common import INFO, KIND
 from cspov.control.layer_list import LayerStackTreeViewModel
@@ -56,7 +57,7 @@ class LayerSetsManager (QObject) :
         self.rgb_config_pane = RGBLayerConfigPane(layer_info_widget, document)
 
         if tab_view_widget.count() > 1 :
-            LOG.info("Unexpected number of tabs present at start up in the layer list set pane.")
+            LOG.warning("Unexpected number of tabs present at start up in the layer list set pane.")
 
         # set up our layer sets and make the first one
         self.layer_sets = [ ]
@@ -64,6 +65,7 @@ class LayerSetsManager (QObject) :
         self.max_tab_number = 1
         self.set_up_tab(0, do_increment_tab_number=False)
         self.set_behaviors.uuidSelectionChanged.connect(self.layer_info_pane.update_display)
+        self.set_behaviors.uuidSelectionChanged.connect(self.rgb_config_pane.selection_did_change)
 
         # hook things up so we know when the selected tab changes
         self.tab_widget.connect(self.tab_widget,
@@ -363,9 +365,58 @@ class SingleLayerInfoPane (QWidget) :
 
 
 class RGBLayerConfigPane(QWidget):
+    """
+    Configures RGB channel selection and ranges on behalf of document.
+    Document in turn generates update signals which cause the SceneGraph to refresh.
+    """
+    document_ref = None  # weakref to document
+    active_layer_ref = None  # weakref to RGB layer we're currently showing
+
     def __init__(self, parent, document):
         super(RGBLayerConfigPane, self).__init__(parent)
+        self.document_ref = ref(document)
         self.ui = config_rgb_layer_ui.Ui_config_rgb_layer()
         self.ui.setupUi(self)
         # FIXME: connect up sub-widgets to document signals
+
+
+    def selection_did_change(self, uuids=None):
+        """
+        document has changed selection sets,
+        figure out if we're active or not and enable/disable
+        if we're active, allow user to change which channels to use
+        :param uuids: list of selected UUIDs
+        :return:
+        """
+        if uuids is not None and len(uuids)==1:
+            layer_uuid = uuids[0]
+            layer = self.document.get_info(uuid=layer_uuid)
+            is_rgb = isinstance(layer, DocRGBLayer)
+            is_rgb = True  # FIXME DEBUG
+            self._show_settings_for_layer(None if not is_rgb else layer)
+        else:
+            self._show_settings_for_layer(None)
+
+    def _show_settings_for_layer(self, layer):
+        self.active_layer_ref = ref(layer) if layer is not None else None
+        if layer is None:
+            # self.setVisible(False)  FIXME DEBUG
+            return
+
+        # update the combo boxes
+        self._set_combos_to_layer_names_selecting_for(layer)
+
+        # update the min-max scrollers
+        self._set_minmax_sliders(layer)
+
+        self.setVisible(True)
+
+    def _set_combos_to_layer_names_selecting_for(self, layer=None):
+        """
+        update combo boxes with the list of layer names and then select the right r,g,b,a layers if they're not None
+        :return:
+        """
+        pass
+
+
 

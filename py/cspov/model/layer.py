@@ -159,11 +159,41 @@ class DocLayer(MutableMapping):
 
     @property
     def uuid(self):
+        """
+        UUID of the layer, which for basic layers is likely to be the UUID of the dataset in the workspace.
+        :return:
+        """
         return self._store[INFO.UUID]
 
     @property
     def kind(self):
+        """
+        which kind of layer it is - RGB, Algebraic, etc. This can also be tested by the class of the layer typically.
+         We may deprecate this eventually?
+        :return:
+        """
         return self._store[INFO.KIND]
+
+    @property
+    def is_valid(self):
+        """
+        invalid layers cannot be displayed (are never visible)
+        valid layers may or may not be visible
+        visibility is managed by the scenegraph
+        validity is managed by the document
+        example of an invalid layer: an RGB or algebraic layer that's insufficiently specified to actually display,
+        be it through lack of data or lack of projection information
+        however, an invalid layer may still be configurable in order to allow it to become valid and then visible
+        :return: bool
+        """
+        return True
+
+    @property
+    def range(self):
+        """
+        :return: (min, max) numerical range of the data or (None, None)
+        """
+        return (None, None)
 
     def __getitem__(self, key):
         return self._store[self.__keytransform__(key)]
@@ -203,7 +233,14 @@ class DocCompositeLayer(DocLayer):
 
 
 class DocRGBLayer(DocCompositeLayer):
-    pass
+    r,g,b,a = None, None, None, None  # Basic or Composite layers, or None
+
+    @property
+    def is_valid(self):
+        return (self.r is not None and
+                self.g is not None and
+                self.b is not None)
+
 
 
 class DocAlgebraicLayer(DocCompositeLayer):
