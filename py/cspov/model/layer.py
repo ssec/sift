@@ -189,6 +189,14 @@ class DocLayer(MutableMapping):
         return True
 
     @property
+    def is_flat_field(self):
+        """
+        return whether the layer can be represented as a flat numerical field or not (RGB layers cannot)
+        :return: bool
+        """
+        return True
+
+    @property
     def range(self):
         """
         :return: (min, max) numerical range of the data or (None, None)
@@ -240,6 +248,10 @@ class DocRGBLayer(DocCompositeLayer):
         return (self.r is not None and
                 self.g is not None and
                 self.b is not None)
+
+    @property
+    def is_flat_field(self):
+        return False
 
 
 

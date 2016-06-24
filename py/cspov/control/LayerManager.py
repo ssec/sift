@@ -23,7 +23,7 @@ from PyQt4.QtWebKit import QWebView
 from weakref import ref
 from cspov.model.guidebook import GUIDE
 from cspov.common import INFO, KIND
-from cspov.control.layer_list import LayerStackTreeViewModel
+from cspov.control.layer_tree import LayerStackTreeViewModel
 from cspov.model.layer import DocLayer, DocBasicLayer, DocCompositeLayer, DocRGBLayer
 import cspov.ui.config_rgb_layer_ui as config_rgb_layer_ui
 import numpy as np
