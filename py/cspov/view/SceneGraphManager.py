@@ -673,17 +673,20 @@ class SceneGraphManager(QObject):
             LOG.info('changing {} to colormap {}'.format(uuid, clims))
             self.set_color_limits(clims, uuid)
 
-    def add_basic_layer(self, new_order:list, ds_info:dict, p:prez, overview_content:np.ndarray):
-        uuid = ds_info[INFO.UUID]
+    def add_basic_layer(self, new_order:list, layer:DocBasicLayer, p:prez, overview_content:np.ndarray):
+        uuid = layer.uuid
         # create a new layer in the imagelist
+        if not layer.is_valid:
+            LOG.warning('unable to add an invalid layer, will try again later when layer changes')
+            return
         image = TiledGeolocatedImage(
             overview_content,
-            ds_info[INFO.ORIGIN_X],
-            ds_info[INFO.ORIGIN_Y],
-            ds_info[INFO.CELL_WIDTH],
-            ds_info[INFO.CELL_HEIGHT],
+            layer[INFO.ORIGIN_X],
+            layer[INFO.ORIGIN_Y],
+            layer[INFO.CELL_WIDTH],
+            layer[INFO.CELL_HEIGHT],
             name=str(uuid),
-            clim=ds_info[INFO.CLIM],
+            clim=layer[INFO.CLIM],
             interpolation='nearest',
             method='tiled',
             cmap=self._find_colormap(p.colormap),
@@ -694,13 +697,16 @@ class SceneGraphManager(QObject):
         )
         image.transform *= STTransform(translate=(0, 0, -50.0))
         self.image_layers[uuid] = image
-        self.datasets[uuid] = ds_info
+        self.datasets[uuid] = layer
         self.layer_set.add_layer(image)
         self.on_view_change(None)
 
 
-    def add_composite_layer(self, new_order:list, ds_info:dict, p:prez, overview_content:list, dep_uuids, composite_type=COMPOSITE_TYPE.RGB):
-        LOG.debug("SceenGraphManager.add_composite_layer %s" % repr(ds_info))
+    def add_composite_layer(self, new_order:list, layer:DocCompositeLayer, p:prez, overview_content:list, dep_uuids, composite_type=COMPOSITE_TYPE.RGB):
+        LOG.debug("SceenGraphManager.add_composite_layer %s" % repr(layer))
+        if not layer.is_valid:
+            LOG.warning('unable to add an invalid layer, will try again later when layer changes')
+            return
         if composite_type == COMPOSITE_TYPE.RGB:
             if len(dep_uuids) != 3:
                 # don't know how to do it without 3 layers
@@ -711,16 +717,16 @@ class SceneGraphManager(QObject):
                 LOG.info("deferring creation of composite scenegraph element")
                 return False
 
-            uuid = ds_info[INFO.UUID]
+            uuid = layer[INFO.UUID]
             LOG.debug("Adding composite layer to Scene Graph Manager with UUID: %s", uuid)
             self.image_layers[uuid] = layer = RGBCompositeLayer(
                 overview_content,
-                ds_info[INFO.ORIGIN_X],
-                ds_info[INFO.ORIGIN_Y],
-                ds_info[INFO.CELL_WIDTH],
-                ds_info[INFO.CELL_HEIGHT],
+                layer[INFO.ORIGIN_X],
+                layer[INFO.ORIGIN_Y],
+                layer[INFO.CELL_WIDTH],
+                layer[INFO.CELL_HEIGHT],
                 name=str(uuid),
-                clim=ds_info[INFO.CLIM],
+                clim=layer[INFO.CLIM],
                 interpolation='nearest',
                 method='tiled',
                 cmap=self._find_colormap("grays"),
