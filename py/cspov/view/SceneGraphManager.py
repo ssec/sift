@@ -362,7 +362,7 @@ class SceneGraphManager(QObject):
         self.layer_set = LayerSet(self, frame_change_cb=self.frame_changed)
         self._current_tool = None
 
-        self.set_document(self.document)
+        self._connect_doc_signals(self.document)
 
         # border and lat/lon grid color choices
         self._color_choices = [
@@ -789,7 +789,7 @@ class SceneGraphManager(QObject):
         self.rebuild_all()
         # raise NotImplementedError("layer set change not implemented in SceneGraphManager")
 
-    def set_document(self, document):
+    def _connect_doc_signals(self, document):
         document.didReorderLayers.connect(self.rebuild_layer_order)  # current layer set changed z/anim order
         document.didAddBasicLayer.connect(self.add_basic_layer)  # layer added to one or more layer sets
         document.didAddCompositeLayer.connect(self.add_composite_layer)  # layer derived from other layers (either basic or composite themselves)

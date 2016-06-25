@@ -64,7 +64,7 @@ import argparse
 from collections import namedtuple, MutableSequence
 from uuid import UUID
 import numpy as np
-from copy import deepcopy
+from abc import ABCMeta, abstractmethod, abstractproperty
 from weakref import ref
 
 from cspov.common import KIND, INFO, COMPOSITE_TYPE
@@ -127,7 +127,56 @@ class DocLayerStack(MutableSequence):
         self._store.insert(index, value)
 
 
-class Document(QObject):
+
+
+
+#
+#
+# class DocAsLayerStack(metaclass=ABCMeta):
+#     """
+#     interface used by SceneGraphManager
+#     """
+#     @abstractmethod
+#     def layers_in_z_order(self):
+#         """
+#         return current enabled list of (active layer, animation order)
+#         animation order of 0 implies not part of current animation
+#         :return:
+#         """
+#         pass
+#
+#
+# class DocAsDataSpace(metaclass=ABCMeta):
+#     """
+#     interface used to coordinate left-right-up-down keys.
+#     application behavior managing these keypresses uses this interface
+#     Typically left-right is time, up-down is channel.
+#     Consultation with the guidebook may be needed.
+#     'l', 'r', 'u', 'd', 'i', 'o': left, right, up, down, in, out
+#     """
+#     @abstractmethod
+#     def neighboring_layer(self, direction:str, amount:int=1):
+#         """
+#         return neighboring layer
+#         :param direction: l, r, u, d string indicating direction
+#         :param amount: number of steps to displace, typically +1
+#         :return:
+#         """
+#         pass
+#
+#
+# class DocAsLayerTree(metaclass=ABCMeta):
+#     """
+#     interface (facet) used to coordinate drag-and-drop layer tree
+#     """
+#     pass
+#
+
+
+
+
+
+class Document(QObject):  # base class is rightmost, mixins left of that
     """
     Document has one or more LayerSets choosable by the user (one at a time) as currentLayerSet
     LayerSets configure animation order, visibility, enhancements and linear combinations
