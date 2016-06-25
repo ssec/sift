@@ -852,7 +852,7 @@ class SceneGraphManager(QObject):
             if need_retile:
                 self.start_retiling_task(uuid, preferred_stride, tile_box)
 
-        current_visible_layers = list(self.document.current_visible_layer_uuids())
+        current_visible_layers = [p.uuid for (p,l) in self.document.active_layer_order if p.visible]
         current_invisible_layers = set(self.image_layers.keys()) - set(current_visible_layers)
         for uuid in current_visible_layers:
             _assess(uuid, self.image_layers[uuid])

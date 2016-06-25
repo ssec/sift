@@ -512,7 +512,9 @@ class Main(QtGui.QMainWindow):
         self.layerSetsManager = LayerSetsManager(self.ui.layerSetTabs, self.ui.layerInfoContents, self.document)
         self.behaviorLayersList = self.layerSetsManager.getLayerStackListViewModel()
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
-            top_uuids = list(self.document.current_visible_layer_uuids(2))
+            layers = list(self.document.active_layer_order)
+            top_uuids = [p.uuid for (p,l) in layers[:2]]
+            # top_uuids = list(self.document.current_visible_layer_uuids(2))
             LOG.debug("top visible UUID is {0!r:s}".format(top_uuids))
 
             # TODO, when the plots manage their own layer selection, change this call

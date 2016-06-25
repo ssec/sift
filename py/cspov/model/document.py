@@ -418,18 +418,33 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 return x.uuid
         return None
 
-    def current_visible_layer_uuids(self, max_layers=None):
+    # def current_visible_layer_uuids(self, max_layers=None):
+    #     """
+    #     :param max_layers:
+    #     :yield: the visible layers in the current layer set
+    #     """
+    #     count = 0
+    #     for x in self.current_layer_set:
+    #         if x.visible:
+    #             count += 1
+    #             yield x.uuid
+    #         if max_layers is not None and count >= max_layers:
+    #             break
+
+    @property
+    def active_layer_order(self):
         """
-        :param max_layers:
-        :yield: the visible layers in the current layer set
+        :return: sequence of (layer_prez, layer) pairs, with order=0 for non-animating layers
+        only layers which are viable for display (valid) and visible or part of the animation order, are included
+        typically this is used by the scenegraphmanager to synchronize the scenegraph elements
         """
-        count = 0
-        for x in self.current_layer_set:
-            if x.visible:
-                count += 1
-                yield x.uuid
-            if max_layers is not None and count >= max_layers:
-                break
+        for layer_prez in self.current_layer_set:
+            if layer_prez.visible or layer_prez.a_order>0:
+                layer = self._layer_with_uuid[layer_prez.uuid]
+                if not layer.is_valid:
+                    # we don't have enough information to display this layer yet, it's still loading or being configured
+                    continue
+                yield layer_prez, layer
 
     def select_layer_set(self, layer_set_index:int):
         """
