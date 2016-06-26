@@ -95,6 +95,7 @@ class DocLayerStack(MutableSequence):
     """
     _doc = None  # weakref to document we belong to
     _store = None
+    _u2r = None  # uuid-to-row correspondence cache
 
     def __init__(self, doc, *args, **kwargs):
         if isinstance(doc, DocLayerStack):
@@ -113,18 +114,36 @@ class DocLayerStack(MutableSequence):
             self._store.append(value)
         else:
             raise IndexError('%d not a valid index' % index)
+        self._u2r = None
 
-    def __getitem__(self, index:int):
-        return self._store[index]
+    @property
+    def uuid2row(self):
+        if self._u2r is None:
+            self._u2r = dict((p.uuid,i) for (i,p) in enumerate(self._store))
+        return self._u2r
+
+    def __getitem__(self, index:int):  # then return layer object
+        if isinstance(index, int):
+            return self._store[index]
+        elif isinstance(index, UUID):  # then return 0..n-1 index in stack
+            return self.uuid2row.get(index, None)
+        elif isinstance(index, DocLayer):
+            return self.uuid2row.get(index.uuid, None)
+        elif isinstance(index, prez):
+            return self.uuid2row.get(index.uuid, None)
+        else:
+            raise ValueError('unable to index LayerStack using %s' % repr(index))
 
     def __len__(self):
         return len(self._store)
 
     def __delitem__(self, index:int):
         del self._store[index]
+        self._u2r = None
 
     def insert(self, index:int, value:prez):
         self._store.insert(index, value)
+        self._u2r = None
 
 
 
@@ -431,15 +450,17 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     #         if max_layers is not None and count >= max_layers:
     #             break
 
+    # TODO: add a document style guide which says how different bands from different instruments are displayed
+
     @property
     def active_layer_order(self):
         """
-        :return: sequence of (layer_prez, layer) pairs, with order=0 for non-animating layers
-        only layers which are viable for display (valid) and visible or part of the animation order, are included
+        return list of valid (can-be-displayed) layers which are either visible or in the animation order
         typically this is used by the scenegraphmanager to synchronize the scenegraph elements
+        :return: sequence of (layer_prez, layer) pairs, with order=0 for non-animating layers
         """
         for layer_prez in self.current_layer_set:
-            if layer_prez.visible or layer_prez.a_order>0:
+            if layer_prez.visible or layer_prez.a_order is not None:
                 layer = self._layer_with_uuid[layer_prez.uuid]
                 if not layer.is_valid:
                     # we don't have enough information to display this layer yet, it's still loading or being configured
@@ -471,25 +492,23 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.current_set_index = layer_set_index
         self.didSwitchLayerSet.emit(layer_set_index, self.current_layer_set, self.current_animation_order)
 
-    # TODO, not being used?
-    def change_layer_order(self, old_index, new_index):
-        L = self.current_layer_set
-        order = list(range(len(L)))
-        p = L[old_index]
-        d = order[old_index]
-        del L[old_index]
-        del order[old_index]
-        L.insert(new_index, p)
-        L.insert(new_index, d)
-        self.didReorderLayers.emit(order)
+    # def change_layer_order(self, old_index, new_index):
+    #     L = self.current_layer_set
+    #     order = list(range(len(L)))
+    #     p = L[old_index]
+    #     d = order[old_index]
+    #     del L[old_index]
+    #     del order[old_index]
+    #     L.insert(new_index, p)
+    #     L.insert(new_index, d)
+    #     self.didReorderLayers.emit(order)
 
-    # TODO, not being used?
-    def swap_layer_order(self, row1, row2):
-        L = self.current_layer_set
-        order = list(range(len(L)))
-        L[row1], L[row2] = L[row2], L[row1]
-        order[row1], order[row2] = order[row2], order[row1]
-        self.didReorderLayers.emit(order)
+    # def swap_layer_order(self, row1, row2):
+    #     L = self.current_layer_set
+    #     order = list(range(len(L)))
+    #     L[row1], L[row2] = L[row2], L[row1]
+    #     order[row1], order[row2] = order[row2], order[row1]
+    #     self.didReorderLayers.emit(order)
 
     def row_for_uuid(self, *uuids):
         d = dict((q.uuid,i) for i,q in enumerate(self.current_layer_set))
@@ -506,12 +525,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """
         L = self.current_layer_set
         zult = {}
-        r2u = dict((q.uuid,i) for i,q in enumerate(self.current_layer_set))
         if isinstance(rows_or_uuids, int) or isinstance(rows_or_uuids, UUID):
             rows_or_uuids = [rows_or_uuids]
         for dex in rows_or_uuids:
             if isinstance(dex, UUID):
-                dex = r2u[dex]
+                dex = L[dex]  # returns row index
             old = L[dex]
             vis = (not old.visible) if visible is None else visible
             # print(vis)
@@ -528,10 +546,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param changes: dictionary of {uuid:bool} with new visibility state
         :return:
         """
-        r2u = dict((q.uuid,i) for i,q in enumerate(self.current_layer_set))
+        u2r = dict((q.uuid,i) for i,q in enumerate(self.current_layer_set))
         L = self.current_layer_set
         for uuid,visible in changes.items():
-            dex = r2u[uuid]
+            dex = L[uuid]
             old = L[dex]
             L[dex] = old._replace(visible=visible)
         self.didChangeLayerVisibility.emit(changes)
@@ -706,18 +724,17 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             LOG.warning('No animation found')
             return []
         LOG.debug('new animation order will be {0!r:s}'.format(new_anim_uuids))
-        cls = self.current_layer_set
-        u2r = dict((x.uuid, i) for i,x in enumerate(cls))
+        L = self.current_layer_set
         self.clear_animation_order()
         for dex,u in enumerate(new_anim_uuids):
             LOG.debug(u)
-            row = u2r.get(u, None)
+            row = L.uuid2row.get(u, None)
             if row is None:
                 LOG.error('unable to find row for uuid {} in current layer set'.format(u))
                 continue
-            old = cls[row]
+            old = L[row]
             new = old._replace(a_order=dex)
-            cls[row] = new
+            L[row] = new
         self.didReorderAnimation.emit(new_anim_uuids)
         return new_anim_uuids
 
