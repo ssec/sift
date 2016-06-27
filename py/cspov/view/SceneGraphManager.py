@@ -772,16 +772,27 @@ class SceneGraphManager(QObject):
             raise ValueError("Unknown or unimplemented composite type: %s" % (composite_type,))
 
     def change_composite_layer(self, new_order:list, layer:DocCompositeLayer, presentation:prez, changes:dict):
+        # FUTURE: more finesse, e.g.
+        # if layer.is_valid and layer.uuid not in self.image_layers:
+        #     # layer has changed state to valid and needs to be added to the graph
+        # elif not layer.is_valid and layer.uuid in self.image_layers:
+        #     # layer is no longer valid and has to be removed
+        # else:
+        #     # RGB selection has changed, rebuild the layer
         old_element = self.image_layers.get(layer.uuid, None)
-        if old_element is None:
+        if old_element is None:  #
             if isinstance(layer, DocRGBLayer):
-                # a deferred element creation is no longer deferred -- maybe
-                rgb_uuids = [x.uuid if x is not None else None for x in [layer.r, layer.g, layer.b]]  # FUTURE: alpha
-                did_create = self.add_composite_layer(new_order, layer, presentation, [], rgb_uuids, COMPOSITE_TYPE.RGB)
-                if did_create:
-                    LOG.info("created new element for composite layer")
-                return
-        # otherwise we have to tear down that element and make a new one with its Z
+                if layer.is_valid:
+                    # a deferred element creation is no longer deferred -- maybe
+                    rgb_uuids = [x.uuid if x is not None else None for x in [layer.r, layer.g, layer.b]]  # FUTURE: alpha
+                    did_create = self.add_composite_layer(new_order, layer, presentation, [], rgb_uuids, COMPOSITE_TYPE.RGB)
+                    if did_create:
+                        LOG.info("created new element for composite layer")
+                    return
+                else:  # nothing we can do, not valid yet
+                    return
+            # otherwise we have to tear down that element and make a new one with its Z
+
         LOG.warning("need to implement composite layer changes")
 
     def remove_layer(self, new_order:list, uuids_removed:list, row:int, count:int):
@@ -829,24 +840,7 @@ class SceneGraphManager(QObject):
         document.didChangeColormap.connect(self.change_layers_colormap)
         document.didChangeLayerVisibility.connect(self.change_layers_visibility)
         document.didReorderAnimation.connect(self.rebuild_frame_order)
-        document.didChangeComposition.connect(self.resolve_layer_composition)
-
-    def resolve_layer_composition(self, order:list, layer:DocCompositeLayer, presentation:prez, change_info:dict):
-        """
-        a layer has changed is composition
-        Most likely this is due to changing the selected layers for R,G,B
-        In some cases this means going from a displayable (valid) state to invalid, or vice versa
-        """
-        self.rebuild_all()
-
-        # FUTURE: more finesse please, e.g.
-        # if layer.is_valid and layer.uuid not in self.image_layers:
-        #     # layer has changed state to valid and needs to be added to the graph
-        # elif not layer.is_valid and layer.uuid in self.image_layers:
-        #     # layer is no longer valid and has to be removed
-        # else:
-        #     # RGB selection has changed, rebuild the layer
-
+        document.didChangeComposition.connect(self.change_composite_layer)
 
     def set_frame_number(self, frame_number=None):
         self.layer_set.next_frame(None, frame_number)
