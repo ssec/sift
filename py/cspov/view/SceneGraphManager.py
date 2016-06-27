@@ -333,6 +333,36 @@ class LayerSet(object):
 
 
 class SceneGraphManager(QObject):
+    """
+    SceneGraphManager represents a document as a vispy scenegraph.
+    When document changes, it updates to correspond.
+    Handles animation by cycling visibility.
+    Provides means of highlighting areas.
+    Decides what sampling to bring data in from the workspace,
+    in order to feed the display optimally.
+    """
+
+    document = None  # Document object we work with
+    workspace = None  # where we get data arrays from
+    queue = None  # background jobs go here
+
+    border_shapefile = None  # background political map
+    glob_pattern = None
+    texture_shape = None
+    polygon_probes = None
+    point_probes = None
+
+    image_layers = None  # {layer_uuid:element}
+    composite_layers = None  # {layer_uuid:set-of-dependent-uuids}
+    datasets = None
+    colormaps = None
+    layer_set = None
+
+    _current_tool = None
+    _color_choices = None
+
+    # FIXME: many more undocumented member variables
+
     didRetilingCalcs = pyqtSignal(object, object, object, object, object, object)
     didChangeFrame = pyqtSignal(tuple)
     didChangeLayerVisibility = pyqtSignal(dict)  # similar to document didChangeLayerVisibility
@@ -799,6 +829,24 @@ class SceneGraphManager(QObject):
         document.didChangeColormap.connect(self.change_layers_colormap)
         document.didChangeLayerVisibility.connect(self.change_layers_visibility)
         document.didReorderAnimation.connect(self.rebuild_frame_order)
+        document.didChangeComposition.connect(self.resolve_layer_composition)
+
+    def resolve_layer_composition(self, order:list, layer:DocCompositeLayer, presentation:prez, change_info:dict):
+        """
+        a layer has changed is composition
+        Most likely this is due to changing the selected layers for R,G,B
+        In some cases this means going from a displayable (valid) state to invalid, or vice versa
+        """
+        self.rebuild_all()
+
+        # FUTURE: more finesse please, e.g.
+        # if layer.is_valid and layer.uuid not in self.image_layers:
+        #     # layer has changed state to valid and needs to be added to the graph
+        # elif not layer.is_valid and layer.uuid in self.image_layers:
+        #     # layer is no longer valid and has to be removed
+        # else:
+        #     # RGB selection has changed, rebuild the layer
+
 
     def set_frame_number(self, frame_number=None):
         self.layer_set.next_frame(None, frame_number)
