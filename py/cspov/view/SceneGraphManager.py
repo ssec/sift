@@ -352,8 +352,8 @@ class SceneGraphManager(QObject):
     polygon_probes = None
     point_probes = None
 
-    image_layers = None  # {layer_uuid:element}
-    composite_layers = None  # {layer_uuid:set-of-dependent-uuids}
+    image_elements = None  # {layer_uuid:element}
+    composite_element_dependencies = None  # {layer_uuid:set-of-dependent-uuids}
     datasets = None
     colormaps = None
     layer_set = None
@@ -384,8 +384,8 @@ class SceneGraphManager(QObject):
         self.polygon_probes = {}
         self.point_probes = {}
 
-        self.image_layers = {}
-        self.composite_layers = {}
+        self.image_elements = {}
+        self.composite_element_dependencies = {}
         self.datasets = {}
         self.colormaps = {}
         self.colormaps.update(ALL_COLORMAPS)
@@ -671,12 +671,12 @@ class SceneGraphManager(QObject):
 
         uuids = uuid
         if uuid is None:
-            uuids = self.image_layers.keys()
+            uuids = self.image_elements.keys()
         elif not isinstance(uuid, (list, tuple)):
             uuids = [uuid]
 
         for uuid in uuids:
-            self.image_layers[uuid].cmap = colormap
+            self.image_elements[uuid].cmap = colormap
 
     def add_colormap(self, name:str, colormap):
         self.colormaps[name] = colormap
@@ -686,12 +686,14 @@ class SceneGraphManager(QObject):
         """
         uuids = uuid
         if uuid is None:
-            uuids = self.image_layers.keys()
+            uuids = self.image_elements.keys()
         elif not isinstance(uuid, (list, tuple)):
             uuids = [uuid]
 
         for uuid in uuids:
-            self.image_layers[uuid].clim = clims
+            element = self.image_elements.get(uuid, None)
+            if element is not None:
+                self.image_elements[uuid].clim = clims
 
     def change_layers_colormap(self, change_dict):
         for uuid,cmapid in change_dict.items():
@@ -726,7 +728,7 @@ class SceneGraphManager(QObject):
             parent=self.main_map,
         )
         image.transform *= STTransform(translate=(0, 0, -50.0))
-        self.image_layers[uuid] = image
+        self.image_elements[uuid] = image
         self.datasets[uuid] = layer
         self.layer_set.add_layer(image)
         self.on_view_change(None)
@@ -749,7 +751,7 @@ class SceneGraphManager(QObject):
 
             uuid = layer[INFO.UUID]
             LOG.debug("Adding composite layer to Scene Graph Manager with UUID: %s", uuid)
-            self.image_layers[uuid] = layer = RGBCompositeLayer(
+            self.image_elements[uuid] = layer = RGBCompositeLayer(
                 overview_content,
                 layer[INFO.ORIGIN_X],
                 layer[INFO.ORIGIN_Y],
@@ -765,7 +767,7 @@ class SceneGraphManager(QObject):
                 wrap_lon=False,
                 parent=self.main_map)
             layer.transform *= STTransform(translate=(0, 0, -50.0))
-            self.composite_layers[uuid] = dep_uuids
+            self.composite_element_dependencies[uuid] = dep_uuids
             self.on_view_change(None)
             return True
         else:
@@ -779,7 +781,7 @@ class SceneGraphManager(QObject):
         #     # layer is no longer valid and has to be removed
         # else:
         #     # RGB selection has changed, rebuild the layer
-        old_element = self.image_layers.get(layer.uuid, None)
+        old_element = self.image_elements.get(layer.uuid, None)
         if old_element is None:  #
             if isinstance(layer, DocRGBLayer):
                 if layer.is_valid:
@@ -815,9 +817,9 @@ class SceneGraphManager(QObject):
         :return:
         """
         self.set_layer_visible(uuid_removed, False)
-        image_layer = self.image_layers[uuid_removed]
+        image_layer = self.image_elements[uuid_removed]
         image_layer.parent = None
-        del self.image_layers[uuid_removed]
+        del self.image_elements[uuid_removed]
         del self.datasets[uuid_removed]
         # del self.image_layers[uuid_removed]
         LOG.info("layer {} purge from scenegraphmanager".format(uuid_removed))
@@ -846,7 +848,9 @@ class SceneGraphManager(QObject):
         self.layer_set.next_frame(None, frame_number)
 
     def set_layer_visible(self, uuid, visible=None):
-        image = self.image_layers[uuid]
+        image = self.image_elements.get(uuid, None)
+        if image is None:
+            return
         image.visible = not image.visible if visible is None else visible
 
     def rebuild_layer_order(self, new_layer_index_order, *args, **kwargs):
@@ -895,11 +899,17 @@ class SceneGraphManager(QObject):
                 self.start_retiling_task(uuid, preferred_stride, tile_box)
 
         current_visible_layers = [p.uuid for (p,l) in self.document.active_layer_order if p.visible]
-        current_invisible_layers = set(self.image_layers.keys()) - set(current_visible_layers)
+        current_invisible_layers = set(self.image_elements.keys()) - set(current_visible_layers)
+
+        def _assess_if_active(uuid):
+            element = self.image_elements.get(uuid, None)
+            if element is not None:
+                _assess(uuid, element)
+
         for uuid in current_visible_layers:
-            _assess(uuid, self.image_layers[uuid])
+            _assess_if_active(uuid)
         for uuid in current_invisible_layers:
-            _assess(uuid, self.image_layers[uuid])
+            _assess_if_active(uuid)
 
     def start_retiling_task(self, uuid, preferred_stride, tile_box):
         LOG.debug("Scheduling retile for child with UUID: %s", uuid)
@@ -908,8 +918,8 @@ class SceneGraphManager(QObject):
     def _retile_child(self, uuid, preferred_stride, tile_box):
         LOG.debug("Retiling child with UUID: '%s'", uuid)
         yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.0}
-        if uuid not in self.composite_layers:
-            child = self.image_layers[uuid]
+        if uuid not in self.composite_element_dependencies:
+            child = self.image_elements[uuid]
             data = self.workspace.get_content(uuid, lod=preferred_stride)
             yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.5}
             # FIXME: Use LOD instead of stride and provide the lod to the workspace
@@ -918,8 +928,8 @@ class SceneGraphManager(QObject):
             yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 1.0}
             self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)
         else:
-            child = self.image_layers[uuid]
-            data = [self.workspace.get_content(d_uuid, lod=preferred_stride) for d_uuid in self.composite_layers[uuid]]
+            child = self.image_elements[uuid]
+            data = [self.workspace.get_content(d_uuid, lod=preferred_stride) for d_uuid in self.composite_element_dependencies[uuid]]
             yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.5}
             # FIXME: Use LOD instead of stride and provide the lod to the workspace
             data = [d[::int(preferred_stride / factor), ::int(preferred_stride / factor)] for factor, d in zip(child._channel_factors, data)]
@@ -930,7 +940,7 @@ class SceneGraphManager(QObject):
     def _set_retiled(self, uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords):
         """Slot to take data from background thread and apply it to the layer living in the image layer.
         """
-        child = self.image_layers[uuid]
+        child = self.image_elements[uuid]
         child.set_retiled(preferred_stride, tile_box, tiles_info, vertices, tex_coords)
         child.update()
 
