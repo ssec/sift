@@ -422,7 +422,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     @property
     def current_layer_uuid_order(self):
         """
-        list of UUIDs (top to bottom) currently being displayed, independent of visibility
+        list of UUIDs (top to bottom) currently being displayed, independent of visibility/validity
         :return:
         """
         return [x.uuid for x in self.current_layer_set]

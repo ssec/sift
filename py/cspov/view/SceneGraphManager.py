@@ -871,19 +871,58 @@ class SceneGraphManager(QObject):
         self.update()
 
     def rebuild_all(self, *args, **kwargs):
+        """
+        resynchronize the scenegraph to the document content
+        This includes creating elements for any newly-valid layers,
+        removing elements for no-longer-valid layers, and
+        making the display order, visibility, and animation order match the document
+        """
+        # get the list of layers which are valid, and either visible or in the animation order
+        doc_layers = list(self.document.active_layer_order)
+        presentation_info = tuple(p for (p,l) in doc_layers)
+        active_layers = tuple(l for (p,l) in doc_layers)
+        active_uuids = set(x.uuid for x in active_layers)
+        active_lookup = dict((x.uuid,x) for x in active_layers)
+        prez_lookup = dict((x.uuid,x) for x in presentation_info)
+
+        uuids_w_elements = set(self.image_elements.keys())
+        # get set of valid layers not having elements and invalid layers having elements
+        inconsistent_uuids = uuids_w_elements ^ active_uuids
+
+        # current_uuid_order = self.document.current_layer_uuid_order
+        current_uuid_order = list(p.uuid for p in presentation_info)
+
+        remove_elements = []
+        for uuid in inconsistent_uuids:
+            layer = active_lookup[uuid]
+            if layer.is_valid:
+                # create elements for layers which have transitioned to a valid state
+                LOG.debug('creating deferred element for layer %s' % layer.uuid)
+                if layer.kind==KIND.RGB:
+                    # create an invisible element with the RGB
+                    #     def add_composite_layer(self, new_order:list, layer:DocCompositeLayer, p:prez, overview_content:list, dep_uuids, composite_type=COMPOSITE_TYPE.RGB):
+                    self.add_composite_layer(current_uuid_order, layer, prez_lookup[uuid], [], [layer.r.uuid, layer.g.uuid, layer.b.uuid], COMPOSITE_TYPE.RGB)
+                else:
+                    raise NotImplementedError('unable to create deferred scenegraph element for %s' % repr(layer))
+            else:
+                # remove elements for layers which are no longer valid
+                remove_elements.append(layer.uuid)
 
         # get info on the new order
-        self.layer_set.set_layer_order(self.document.current_layer_uuid_order)
+        self.layer_set.set_layer_order(current_uuid_order)
         self.layer_set.frame_order = self.document.current_animation_order
 
         # refresh our presentation info
-        presentation_info = self.document.current_layer_set
-        for layer_info in presentation_info :
-            uuid_temp     = layer_info.uuid
-            self.set_colormap(layer_info.colormap, uuid=uuid_temp)
-            self.set_color_limits(layer_info.climits, uuid=uuid_temp)
-            self.set_layer_visible(uuid_temp, visible=layer_info.visible)
+        # presentation_info = self.document.current_layer_set
+        for layer_prez in presentation_info :
+            uuid_temp     = layer_prez.uuid
+            self.set_colormap(layer_prez.colormap, uuid=uuid_temp)
+            self.set_color_limits(layer_prez.climits, uuid=uuid_temp)
+            self.set_layer_visible(uuid_temp, visible=layer_prez.visible)
             # FUTURE, if additional information is added to the presentation tuple, you must also update it here
+
+        for elem in remove_elements:
+            self.purge_layer(elem)
 
         self.update()
 
