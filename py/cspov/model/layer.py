@@ -175,6 +175,10 @@ class DocLayer(MutableMapping):
         return self._store[INFO.KIND]
 
     @property
+    def name(self):
+        return self._store[INFO.NAME]
+
+    @property
     def is_valid(self):
         """
         invalid layers cannot be displayed (are never visible)

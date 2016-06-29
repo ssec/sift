@@ -204,9 +204,8 @@ class SingleLayerInfoPane (QWidget) :
         """
         if selected_UUID_list is not None and len(selected_UUID_list)==1:
             layer_uuid, = list(selected_UUID_list)
-            layer_info = self.document.get_info(uuid=layer_uuid)
+            layer_info = self.document[layer_uuid]
             is_rgb = isinstance(layer_info, DocRGBLayer)
-            is_rgb = True  # FIXME DEBUG
             if is_rgb:
                 self.setVisible(False)
             else:
@@ -413,7 +412,7 @@ class RGBLayerConfigPane(QWidget):
             return
 
         # update the combo boxes
-        self._set_combos_to_layer_names()
+        self._set_combos_to_layer_names(exclude_uuids=set([layer.uuid]))
 
         self._select_layers_for(layer)
 
@@ -443,12 +442,13 @@ class RGBLayerConfigPane(QWidget):
             for widget in self.rgb:
                 widget.setCurrentIndex(0)
 
-    def _set_combos_to_layer_names(self, layer=None):
+    def _set_combos_to_layer_names(self, exclude_uuids=None):
         """
         update combo boxes with the list of layer names and then select the right r,g,b,a layers if they're not None
         :return:
         """
         doc = self.document_ref()
+        exclude_uuids = exclude_uuids or set()
 
         # clear out the current lists
         for widget in self.rgb:
@@ -456,15 +456,17 @@ class RGBLayerConfigPane(QWidget):
             widget.addItem('None', '')
 
         # fill up our lists of layers
-        for layer in doc.current_layer_set:
-            uuid = layer.uuid
+        for layer_prez in doc.current_layer_set:
+            uuid = layer_prez.uuid
+            if uuid in exclude_uuids:
+                continue
+            layer = doc[layer_prez.uuid]
             layer_name = layer.name
+            LOG.debug('adding layer %s to RGB combo selectors' % layer_name)
             uuid_string = str(uuid)
             for widget in self.rgb:
                 widget.addItem(layer_name, uuid_string)
 
-        if layer is not None:
-            self._show_settings_for_layer(layer)
 
 
 
