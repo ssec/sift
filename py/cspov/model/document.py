@@ -628,25 +628,47 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     L[dex] = pinfo._replace(climits=nfo[uuid])
         self.didChangeColorLimits.emit(nfo)
 
-    def create_rgb_composite(self, r, g, b, all_timesteps=True):
+    def create_rgb_composite(self, r=None, g=None, b=None, all_timesteps=True):
         """
         user has specified that a band trio should be shown as RGB
         disable display of the three layers
         add a composite layer at the z level of the topmost of the three
         do likewise for other timesteps with the same bands
         """
+        from uuid import uuid1 as uuidgen
+        from functools import reduce
+        if r is None or g is None or b is None:
+            # we have an invalid composite which needs user initialization
+            LOG.info('generating invalid composite for user to configure')
+            uuid = uuidgen()
+            name = '-RGB-'
+            ds_info = {
+                INFO.UUID: uuid,
+                INFO.NAME: name,
+                INFO.KIND: KIND.RGB,
+                GUIDE.BAND: [],
+                GUIDE.DISPLAY_TIME: None,
+                INFO.ORIGIN_X: None,
+                INFO.ORIGIN_Y: None,
+                INFO.CELL_WIDTH: None,
+                INFO.CELL_HEIGHT: None,
+                INFO.CLIM: None,
+            }
+            self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
+            presentation, reordered_indices = self._insert_layer_with_info(ds_info)
+            return
+
         # disable visibility of the existing layers FUTURE: remove them entirely? probably not
-        self.toggle_layer_visibility([r,g,b], False)
+        self.toggle_layer_visibility([x for x in [r,g,b] if x], False)
         # add notation to document on RGB affinity
         # register with workspace so that it can persist info to disk if needed
         # insert new RGB layer into layer list and scenegraph
 
-        from uuid import uuid1 as uuidgen
-        from functools import reduce
         uuids = [r,g,b]
         LOG.debug("New Composite UUIDs: %r" % uuids)
         # FIXME: register this with workspace!
-        dep_info = [self.get_info(uuid=uuid) for uuid in uuids]
+
+        dep_info = [(None if uuid is None else self.get_info(uuid=uuid)) for uuid in uuids]
         highest_res_dep = min(dep_info, key=lambda x: x[INFO.CELL_WIDTH])
         _dt = lambda nfo: nfo.get(GUIDE.DISPLAY_TIME, '<unknown time>')
         display_time = reduce(lambda dta,b: dta if dta==_dt(b) else '<multiple times>', dep_info, _dt(dep_info[0]))

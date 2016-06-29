@@ -625,7 +625,8 @@ class Main(QtGui.QMainWindow):
         if len(uuids) == 0:
             # get the layers to composite from current selection
             uuids = list(self.behaviorLayersList.current_selected_uuids())
-        # FIXME: insert a dialog or pane for this command
+        if len(uuids)<3:  # pad with None
+            uuids = uuids + ([None] * (3 - len(uuids)))
         self.document.create_rgb_composite(uuids[0], uuids[1], uuids[2])
 
     def setup_menu(self):
@@ -724,6 +725,9 @@ class Main(QtGui.QMainWindow):
         edit_menu.addAction(clear)
         edit_menu.addAction(toggle_point)
 
+        layer_menu = menubar.addMenu('&Layer')
+        layer_menu.addAction(composite)
+
         view_menu = menubar.addMenu('&View')
         view_menu.addAction(animate)
         view_menu.addAction(prev_time)
@@ -736,7 +740,6 @@ class Main(QtGui.QMainWindow):
         view_menu.addAction(flip_colormap)
         view_menu.addAction(cycle_borders)
         view_menu.addAction(cycle_grid)
-        view_menu.addAction(composite)
 
         self.update_recent_file_menu()
         menubar.setEnabled(True)

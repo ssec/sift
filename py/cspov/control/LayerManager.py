@@ -372,6 +372,8 @@ class RGBLayerConfigPane(QWidget):
     document_ref = None  # weakref to document
     active_layer_ref = None  # weakref to RGB layer we're currently showing
 
+    _rgb = None  # combo boxes in r,g,b order; cache
+
     def __init__(self, parent, document):
         super(RGBLayerConfigPane, self).__init__(parent)
         self.document_ref = ref(document)
@@ -379,6 +381,13 @@ class RGBLayerConfigPane(QWidget):
         self.ui.setupUi(self)
         # FIXME: connect up sub-widgets to document signals
 
+    @property
+    def rgb(self):
+        if self._rgb is None:
+            self._rgb = [self.ui.comboRed, self.ui.comboGreen, self.ui.comboBlue]
+            return self._rgb
+        else:
+            return self._rgb
 
     def selection_did_change(self, uuids=None):
         """
@@ -388,11 +397,11 @@ class RGBLayerConfigPane(QWidget):
         :param uuids: list of selected UUIDs
         :return:
         """
+        doc = self.document_ref()
         if uuids is not None and len(uuids)==1:
             layer_uuid = uuids[0]
-            layer = self.document.get_info(uuid=layer_uuid)
+            layer = doc[layer_uuid]
             is_rgb = isinstance(layer, DocRGBLayer)
-            is_rgb = True  # FIXME DEBUG
             self._show_settings_for_layer(None if not is_rgb else layer)
         else:
             self._show_settings_for_layer(None)
@@ -404,19 +413,60 @@ class RGBLayerConfigPane(QWidget):
             return
 
         # update the combo boxes
-        self._set_combos_to_layer_names_selecting_for(layer)
+        self._set_combos_to_layer_names()
+
+        self._select_layers_for(layer)
 
         # update the min-max scrollers
         self._set_minmax_sliders(layer)
 
         self.setVisible(True)
 
-    def _set_combos_to_layer_names_selecting_for(self, layer=None):
+    def _select_layers_for(self, layer=None):
+        """
+        set combo boxes to match selection for a given composite layer
+        :param layer:
+        :return:
+        """
+        if isinstance(layer, DocRGBLayer):
+            for slayer,widget in zip([layer.r, layer.g, layer.b], self.rgb):
+                if slayer is None:
+                    widget.setCurrentIndex(0)
+                else:
+                    dex = widget.findData(str(slayer.uuid))
+                    if dex<=0:
+                        widget.setCurrentIndex(0)
+                        LOG.error('layer %s not available to be selected' % repr(slayer))
+                    else:
+                        widget.setCurrentIndex(dex)
+        else:
+            for widget in self.rgb:
+                widget.setCurrentIndex(0)
+
+    def _set_combos_to_layer_names(self, layer=None):
         """
         update combo boxes with the list of layer names and then select the right r,g,b,a layers if they're not None
         :return:
         """
-        pass
+        doc = self.document_ref()
+
+        # clear out the current lists
+        for widget in self.rgb:
+            widget.clear()
+            widget.addItem('None', '')
+
+        # fill up our lists of layers
+        for layer in doc.current_layer_set:
+            uuid = layer.uuid
+            layer_name = layer.name
+            uuid_string = str(uuid)
+            for widget in self.rgb:
+                widget.addItem(layer_name, uuid_string)
+
+        if layer is not None:
+            self._show_settings_for_layer(layer)
+
+
 
 
 
