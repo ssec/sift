@@ -20,6 +20,7 @@ REQUIRES
 from _weakref import ref
 from collections import MutableMapping
 from enum import Enum
+from cspov.model.guidebook import AHI_HSF_Guidebook, GUIDE
 
 from cspov.common import INFO, KIND
 
@@ -285,6 +286,39 @@ class DocRGBLayer(DocCompositeLayer):
     def is_flat_field(self):
         return False
 
+    def update_metadata_from_dependencies(self):
+        """
+        recalculate origin and dimension information based on new upstream
+        :return:
+        """
+        dep_info = [self.r, self.g, self.b]
+        highest_res_dep = min(dep_info, key=lambda x: x[INFO.CELL_WIDTH])
+        _dt = lambda nfo: nfo.get(GUIDE.DISPLAY_TIME, '<unknown time>')
+        from functools import reduce
+        display_time = reduce(lambda dta, b: dta if dta == _dt(b) else '<multiple times>', dep_info, _dt(dep_info[0]))
+        try:
+            bands = (dep_info[0][GUIDE.BAND],
+                     dep_info[1][GUIDE.BAND],
+                     dep_info[2][GUIDE.BAND])
+            name = u"R:B{0:02d} G:B{1:02d} B:B{2:02d}".format(*bands)
+        except KeyError:
+            LOG.error('unable to create new name from {0!r:s}'.format(dep_info))
+            name = "RGB"
+            bands = []
+        ds_info = {
+            INFO.NAME: name,
+            INFO.KIND: KIND.RGB,
+            GUIDE.BAND: bands,
+            GUIDE.DISPLAY_TIME: display_time,
+            INFO.ORIGIN_X: highest_res_dep[INFO.ORIGIN_X],
+            INFO.ORIGIN_Y: highest_res_dep[INFO.ORIGIN_Y],
+            INFO.CELL_WIDTH: highest_res_dep[INFO.CELL_WIDTH],
+            INFO.CELL_HEIGHT: highest_res_dep[INFO.CELL_HEIGHT],
+            INFO.COLORMAP: 'autumn',  # FIXME: why do RGBs need a colormap?
+            INFO.CLIM: tuple(d[INFO.CLIM] for d in dep_info),
+        }
+        self._store.update(ds_info)
+        return ds_info
 
 
 class DocAlgebraicLayer(DocCompositeLayer):

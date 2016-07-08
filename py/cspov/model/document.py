@@ -710,7 +710,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """
         self.create_rgb_composite(None, None, None)
 
-    def revise_rgb_layer_choice(self, layer, **rgba):
+    def revise_rgb_layer_choice(self, layer:DocRGBLayer, **rgba):
         """
         change the layer composition for an RGB layer, and signal
         :param layer:
@@ -720,11 +720,18 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         LOG.debug('revising RGB layer config for %s: %s' % (layer.uuid, repr(list(rgba.keys()))))
         if layer is None or not rgba:
             return
+        changed = False
         for k,v in rgba.items():
             assert(k in 'rgba')
+            if getattr(layer,k,None) is v:
+                continue
+            changed = True
             setattr(layer, k, v)
         prez, = self.prez_for_uuids([layer.uuid])
         # this signals the scenegraph manager et al to see if the layer is now both visible and valid
+        if layer.is_valid:
+            updated = layer.update_metadata_from_dependencies()
+            LOG.info('updated metadata for layer %s: %s' % (layer.uuid, repr(list(updated.keys()))))
         self.didChangeComposition.emit([], layer, prez, rgba)
 
 

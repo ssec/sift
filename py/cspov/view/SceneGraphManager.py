@@ -737,21 +737,24 @@ class SceneGraphManager(QObject):
     def add_composite_layer(self, new_order:list, layer:DocCompositeLayer, p:prez, overview_content:list, dep_uuids, composite_type=COMPOSITE_TYPE.RGB):
         LOG.debug("SceenGraphManager.add_composite_layer %s" % repr(layer))
         if not layer.is_valid:
-            LOG.warning('unable to add an invalid layer, will try again later when layer changes')
+            LOG.info('unable to add an invalid layer, will try again later when layer changes')
             return
+        if not overview_content and composite_type==COMPOSITE_TYPE.RGB and isinstance(layer, DocRGBLayer):  # FUTURE, minify
+            overview_content = list(self.workspace.get_content(component_uuid) for component_uuid in dep_uuids)
+            # overview_content = list(self.workspace.get_content(component.uuid) for component in [layer.r, layer.g, layer.b])
         if composite_type == COMPOSITE_TYPE.RGB:
             if len(dep_uuids) != 3:
                 # don't know how to do it without 3 layers
                 raise ValueError("Must select 3 separate band layers to create an RGB layer")
 
             r,g,b = dep_uuids
-            if r==None or g==None or b==None:
+            if r==None or g==None or b==None:  # FIXME; redundant given .is_valid check
                 LOG.info("deferring creation of composite scenegraph element")
                 return False
 
             uuid = layer[INFO.UUID]
             LOG.debug("Adding composite layer to Scene Graph Manager with UUID: %s", uuid)
-            self.image_elements[uuid] = layer = RGBCompositeLayer(
+            self.image_elements[uuid] = element = RGBCompositeLayer(
                 overview_content,
                 layer[INFO.ORIGIN_X],
                 layer[INFO.ORIGIN_Y],
@@ -766,7 +769,7 @@ class SceneGraphManager(QObject):
                 texture_shape=DEFAULT_TEXTURE_SHAPE,
                 wrap_lon=False,
                 parent=self.main_map)
-            layer.transform *= STTransform(translate=(0, 0, -50.0))
+            element.transform *= STTransform(translate=(0, 0, -50.0))
             self.composite_element_dependencies[uuid] = dep_uuids
             self.on_view_change(None)
             return True
@@ -781,23 +784,25 @@ class SceneGraphManager(QObject):
         #     # layer is no longer valid and has to be removed
         # else:
         #     # RGB selection has changed, rebuild the layer
-        old_element = self.image_elements.get(layer.uuid, None)
-        if old_element is not None:
-            # FUTURE: don't delete when we can reconfigure, or do nothing
-            self.purge_layer(layer.uuid)
+        self.rebuild_all()  # FUTURE: less brute force
 
-        # now create new scenegraph element for the new configuration
-        if isinstance(layer, DocRGBLayer):
-            if layer.is_valid:
-                # a deferred element creation is no longer deferred -- maybe
-                rgb_uuids = [x.uuid if x is not None else None for x in [layer.r, layer.g, layer.b]]  # FUTURE: alpha
-                did_create = self.add_composite_layer(new_order, layer, presentation, [], rgb_uuids, COMPOSITE_TYPE.RGB)
-                if did_create:
-                    LOG.info("created element for composite layer")
-                return
-            else:  # nothing we can do, not valid yet
-                return
-        LOG.warning('need to implement z order change consistent with presentation')
+        # old_element = self.image_elements.get(layer.uuid, None)
+        # if old_element is not None:
+        #     # FUTURE: don't delete when we can reconfigure, or do nothing
+        #     self.purge_layer(layer.uuid)
+        #
+        # # now create new scenegraph element for the new configuration
+        # if isinstance(layer, DocRGBLayer):
+        #     if layer.is_valid:
+        #         # a deferred element creation is no longer deferred -- maybe
+        #         rgb_uuids = [x.uuid if x is not None else None for x in [layer.r, layer.g, layer.b]]  # FUTURE: alpha
+        #         did_create = self.add_composite_layer(new_order, layer, presentation, [], rgb_uuids, COMPOSITE_TYPE.RGB)
+        #         if did_create:
+        #             LOG.info("created element for composite layer")
+        #         return
+        #     else:  # nothing we can do, not valid yet
+        #         return
+        # LOG.warning('need to implement z order change consistent with presentation')
 
     def remove_layer(self, new_order:list, uuids_removed:list, row:int, count:int):
         """
@@ -918,8 +923,10 @@ class SceneGraphManager(QObject):
         # presentation_info = self.document.current_layer_set
         for layer_prez in presentation_info :
             uuid_temp     = layer_prez.uuid
-            self.set_colormap(layer_prez.colormap, uuid=uuid_temp)
-            self.set_color_limits(layer_prez.climits, uuid=uuid_temp)
+            layer = active_lookup[uuid_temp]
+            if layer.kind!=KIND.RGB:  # FIXME kludge
+                self.set_colormap(layer_prez.colormap, uuid=uuid_temp)
+                self.set_color_limits(layer_prez.climits, uuid=uuid_temp)
             self.set_layer_visible(uuid_temp, visible=layer_prez.visible)
             # FUTURE, if additional information is added to the presentation tuple, you must also update it here
 
@@ -981,7 +988,10 @@ class SceneGraphManager(QObject):
     def _set_retiled(self, uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords):
         """Slot to take data from background thread and apply it to the layer living in the image layer.
         """
-        child = self.image_elements[uuid]
+        child = self.image_elements.get(uuid, None)
+        if child is None:
+            LOG.warning('unable to find uuid %s in image_elements' % uuid)
+            return
         child.set_retiled(preferred_stride, tile_box, tiles_info, vertices, tex_coords)
         child.update()
 
