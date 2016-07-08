@@ -774,6 +774,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """
         return presentation tuple for a given layer index from the current active layer set
         """
+        # FIXME: this lacks consistency?
         if isinstance(row_or_uuid, UUID):
             return self._layer_with_uuid[row_or_uuid]
         else:

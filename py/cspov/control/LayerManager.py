@@ -17,8 +17,8 @@ __author__ = 'evas'
 __docformat__ = 'reStructuredText'
 
 import logging
-from PyQt4.QtCore import SIGNAL, QObject, Qt
-from PyQt4.QtGui import QWidget, QListView, QTreeView, QGridLayout, QLabel, QScrollArea, QLayout, QTextDocument
+from PyQt4.QtCore import SIGNAL, QObject, Qt, pyqtSignal
+from PyQt4.QtGui import QWidget, QListView, QComboBox, QSlider, QTreeView, QGridLayout, QLabel, QScrollArea, QLayout, QTextDocument
 from PyQt4.QtWebKit import QWebView
 from weakref import ref
 from cspov.model.guidebook import GUIDE
@@ -28,6 +28,7 @@ from cspov.model.layer import DocLayer, DocBasicLayer, DocCompositeLayer, DocRGB
 import cspov.ui.config_rgb_layer_ui as config_rgb_layer_ui
 import numpy as np
 from cspov.view.Colormap import ALL_COLORMAPS
+from uuid import UUID
 
 LOG = logging.getLogger(__name__)
 
@@ -162,7 +163,6 @@ class SingleLayerInfoPane (QWidget) :
     def __init__(self, parent, document) :
         """build our info display
         """
-
         super(SingleLayerInfoPane, self).__init__(parent)
 
         self.document = document
@@ -371,6 +371,10 @@ class RGBLayerConfigPane(QWidget):
     document_ref = None  # weakref to document
     active_layer_ref = None  # weakref to RGB layer we're currently showing
 
+    didChangeRGBLayerSelection = pyqtSignal(DocRGBLayer, str, DocLayer)  # layer being changed, character from 'rgba', layer being assigned
+    didChangeRGBLayerComponentRange = pyqtSignal(DocRGBLayer, str, float, float)  # layer being changed, char from 'rgba', new-min, new-max
+
+
     _rgb = None  # combo boxes in r,g,b order; cache
 
     def __init__(self, parent, document):
@@ -379,6 +383,14 @@ class RGBLayerConfigPane(QWidget):
         self.ui = config_rgb_layer_ui.Ui_config_rgb_layer()
         self.ui.setupUi(self)
         # FIXME: connect up sub-widgets to document signals
+        from functools import partial
+
+        [x.currentIndexChanged.connect(partial(self._combo_changed, combo=x, color=rgb))
+         for rgb,x in zip(('b', 'g', 'r'), (self.ui.comboBlue, self.ui.comboGreen, self.ui.comboRed))]
+        [x.valueChanged.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=False))
+         for rgb,x in zip(('b', 'g', 'r'), (self.ui.slideMinBlue, self.ui.slideMinGreen, self.ui.slideMinRed))]
+        [x.valueChanged.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=True))
+         for rgb, x in zip(('b', 'g', 'r'), (self.ui.slideMaxBlue, self.ui.slideMaxGreen, self.ui.slideMaxRed))]
 
     @property
     def rgb(self):
@@ -387,6 +399,39 @@ class RGBLayerConfigPane(QWidget):
             return self._rgb
         else:
             return self._rgb
+
+    def _combo_changed(self, index, combo:QComboBox=None, color=None):
+        """
+        user changed combo box, relay that to upstream as didChangeRGBLayerSelection
+        :return:
+        """
+        uuid_str = combo.itemData(index)
+        LOG.debug("RGB: user selected %s for %s" % (uuid_str, color))
+        uuid = UUID(uuid_str)
+        new_layer = self.document_ref()[uuid]
+        self.didChangeRGBLayerSelection.emit(self.active_layer_ref(), color, new_layer)
+
+    def _min_max_for_color(self, rgba:str):
+        """
+        return min value, max value as represented in sliders
+        :param rgba: char in 'rgba'
+        :return: (min-value, max-value) where min can be > max
+        """
+        LOG.warning('slider ranges not implemented, this is placeholder data')
+        return (0.0, 1.0)  # FIXME
+
+    def _slider_changed(self, value:int, slider=None, color:str=None, is_max:bool=False):
+        """
+
+        :param value: new value of the slider
+        :param slider: control
+        :param color: char in 'rgba'
+        :param is_max: whether slider's value represents the max or the min
+        :return:
+        """
+        n, x = self._min_max_for_color(color)
+        self.didChangeRGBLayerComponentRange.emit(self.active_layer_ref(), color, n, x)
+
 
     def selection_did_change(self, uuids=None):
         """

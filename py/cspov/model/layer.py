@@ -245,7 +245,35 @@ class DocCompositeLayer(DocLayer):
 
 
 class DocRGBLayer(DocCompositeLayer):
-    r,g,b,a = None, None, None, None  # Basic or Composite layers, or None
+    l = [None, None, None, None]  # RGBA upstream layers
+    n = [None, None, None, None]  # RGBA minimum value from upstream layers
+    x = [None, None, None, None]  # RGBA maximum value from upstream layers
+
+    @property
+    def r(self):
+        return self.l[0]
+    @property
+    def g(self):
+        return self.l[1]
+    @property
+    def b(self):
+        return self.l[2]
+    @property
+    def a(self):
+        return self.l[3]
+
+    @r.setter
+    def r(self, x):
+        self.l[0] = x
+    @g.setter
+    def g(self, x):
+        self.l[1] = x
+    @b.setter
+    def b(self, x):
+        self.l[2] = x
+    @a.setter
+    def a(self, x):
+        self.l[3] = x
 
     @property
     def is_valid(self):
