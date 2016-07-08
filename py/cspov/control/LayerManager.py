@@ -18,7 +18,7 @@ __docformat__ = 'reStructuredText'
 
 import logging
 from PyQt4.QtCore import SIGNAL, QObject, Qt, pyqtSignal
-from PyQt4.QtGui import QWidget, QListView, QComboBox, QSlider, QTreeView, QGridLayout, QLabel, QScrollArea, QLayout, QTextDocument
+from PyQt4.QtGui import QWidget, QListView, QComboBox, QSlider, QTreeView, QGridLayout, QVBoxLayout, QLabel, QScrollArea, QLayout, QTextDocument
 from PyQt4.QtWebKit import QWebView
 from weakref import ref
 from cspov.model.guidebook import GUIDE
@@ -44,7 +44,7 @@ class LayerSetsManager (QObject) :
     layer_info_pane = None
     rgb_config = None
 
-    def __init__ (self, tab_view_widget, layer_info_widget, document) :
+    def __init__ (self, tab_view_widget:QWidget, layer_info_widget:QWidget, document) :
 
         super(LayerSetsManager, self).__init__(tab_view_widget)
 
@@ -56,6 +56,13 @@ class LayerSetsManager (QObject) :
         # FIXME: we need a manager object which decides whether to show info pane or config pane
         self.layer_info_pane = SingleLayerInfoPane(layer_info_widget, document)
         self.rgb_config_pane = RGBLayerConfigPane(layer_info_widget, document)
+
+        # self.layer_info_pane.show()
+        # self.rgb_config_pane.show()
+        layout = QVBoxLayout()
+        layer_info_widget.setLayout(layout)
+        layout.addChildWidget(self.layer_info_pane)
+        layout.addChildWidget(self.rgb_config_pane)
 
         if tab_view_widget.count() > 1 :
             LOG.warning("Unexpected number of tabs present at start up in the layer list set pane.")
@@ -79,8 +86,8 @@ class LayerSetsManager (QObject) :
 
         newTabIndex = self.tab_widget.currentIndex()
 
-        self.layer_info_pane.setVisible(False)  # FIXME DEBUG
-        self.rgb_config_pane.setVisible(True)  # FIXME DEBUG
+        # self.layer_info_pane.setVisible(False)  # FIXME DEBUG
+        # self.rgb_config_pane.setVisible(True)  # FIXME DEBUG
 
         # if this is the last tab, make a new tab and switch to that
         if newTabIndex == (self.tab_widget.count() - 1) :
@@ -165,7 +172,7 @@ class SingleLayerInfoPane (QWidget) :
         """
         super(SingleLayerInfoPane, self).__init__(parent)
 
-        self.document = document
+        self.document = document  # FUTURE: make this a weakref?
 
         # build our layer detail info display controls
         self.name_text = QLabel("")
@@ -190,7 +197,7 @@ class SingleLayerInfoPane (QWidget) :
         layout.addWidget(self.colormap_text,   6, 1)
         layout.addWidget(self.clims_text,      7, 1)
         layout.addWidget(self.cmap_vis, 8, 1)
-        parent.setLayout(layout)
+        self.setLayout(layout)  # was parent.setLayout
 
         # TODO put the informational text into an area with scroll bars so it won't force the sidebar size minimum
 
@@ -207,9 +214,11 @@ class SingleLayerInfoPane (QWidget) :
             layer_info = self.document[layer_uuid]
             is_rgb = isinstance(layer_info, DocRGBLayer)
             if is_rgb:
-                self.setVisible(False)
+                LOG.debug('hiding basic info display')
+                self.hide()
             else:
-                self.setVisible(True)
+                LOG.debug('showing basic info display')
+                self.show()
 
         # clear the list if we got None
         if selected_UUID_list is None or len(selected_UUID_list) <= 0 :
@@ -382,7 +391,6 @@ class RGBLayerConfigPane(QWidget):
         self.document_ref = ref(document)
         self.ui = config_rgb_layer_ui.Ui_config_rgb_layer()
         self.ui.setupUi(self)
-        # FIXME: connect up sub-widgets to document signals
         from functools import partial
 
         [x.currentIndexChanged.connect(partial(self._combo_changed, combo=x, color=rgb))
@@ -407,9 +415,10 @@ class RGBLayerConfigPane(QWidget):
         """
         uuid_str = combo.itemData(index)
         LOG.debug("RGB: user selected %s for %s" % (uuid_str, color))
-        uuid = UUID(uuid_str)
-        new_layer = self.document_ref()[uuid]
-        self.didChangeRGBLayerSelection.emit(self.active_layer_ref(), color, new_layer)
+        if uuid_str:
+            uuid = UUID(uuid_str)
+            new_layer = self.document_ref()[uuid]
+            self.didChangeRGBLayerSelection.emit(self.active_layer_ref(), color, new_layer)
 
     def _min_max_for_color(self, rgba:str):
         """
@@ -453,7 +462,7 @@ class RGBLayerConfigPane(QWidget):
     def _show_settings_for_layer(self, layer):
         self.active_layer_ref = ref(layer) if layer is not None else None
         if layer is None:
-            # self.setVisible(False)  FIXME DEBUG
+            self.hide()
             return
 
         # update the combo boxes
@@ -462,9 +471,10 @@ class RGBLayerConfigPane(QWidget):
         self._select_layers_for(layer)
 
         # update the min-max scrollers
-        self._set_minmax_sliders(layer)
+        # self._set_minmax_sliders(layer)  # FIXME
+        LOG.warning('unimplemented: initializing layer sliders to min-max range')
 
-        self.setVisible(True)
+        self.show()
 
     def _select_layers_for(self, layer=None):
         """

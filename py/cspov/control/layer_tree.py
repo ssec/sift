@@ -613,7 +613,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         if not index.isValid():
             return None
         row = index.row()
-        LOG.debug("getting data for row %d" % row)
+        # LOG.debug("getting data for row %d" % row)
         # col = index.column()
         el = self.listing
         info = el[row] if row<len(self.doc) else None
