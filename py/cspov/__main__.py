@@ -31,7 +31,7 @@ QtGui = app_object.backend_module.QtGui
 
 import cspov.ui.open_cache_dialog_ui as open_cache_dialog_ui
 from cspov.control.LayerManager import LayerSetsManager
-from cspov.model import Document
+from cspov.model.document import Document, DocRGBLayer, DocCompositeLayer, DocBasicLayer, DocLayer, DocLayerStack
 from cspov.view.SceneGraphManager import SceneGraphManager
 from cspov.view.ProbeGraphs import ProbeGraphManager, DEFAULT_POINT_PROBE
 from cspov.queue import TaskQueue, test_task, TASK_PROGRESS, TASK_DOING
@@ -420,6 +420,22 @@ class Main(QtGui.QMainWindow):
     #         self.animation_slider_jump_frame(None)
     #         self.behaviorLayersList.select([info[INFO.UUID]])
 
+    def _user_set_rgb_layer(self, layer:DocRGBLayer, rgba:str, selected:DocLayer):
+        """
+        handle signal from layer info panel which says that an RGB layer selected a new layer as channel
+        :param layer: layer being edited
+        :param rgba: char from 'rgba'
+        :param selected: layer to replace, causing scene graph element to be rebuilt
+        :return:
+        """
+        # we could just modify the layer and emit the document signal, but preference is to have document generate its own signals.
+        self.document.revise_rgb_layer_choice(layer, **{rgba:selected})
+
+
+    def _user_set_rgb_range(self, layer:DocRGBLayer, rgba:str, lo:float, hi:float):
+        raise NotImplementedError('RGB range setting not yet implemented')
+
+
     def update_point_probe_text(self, probe_name, state=None, xy_pos=None, uuid=None, animating=None):
         if uuid is None:
             uuid = self.document.current_visible_layer_uuid
@@ -536,6 +552,10 @@ class Main(QtGui.QMainWindow):
 
         self.ui.mainWidgets.removeTab(0)
         self.ui.mainWidgets.removeTab(0)
+
+        # setup RGB configuration : FIXME clean this up into a behavior
+        self.layerSetsManager.didChangeRGBLayerComponentRange.connect(self._user_set_rgb_range)
+        self.layerSetsManager.didChangeRGBLayerSelection.connect(self._user_set_rgb_layer)
 
         # self.queue.add('test', test_task(), 'test000')
         # self.ui.layers

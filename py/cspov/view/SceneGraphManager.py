@@ -782,20 +782,22 @@ class SceneGraphManager(QObject):
         # else:
         #     # RGB selection has changed, rebuild the layer
         old_element = self.image_elements.get(layer.uuid, None)
-        if old_element is None:  #
-            if isinstance(layer, DocRGBLayer):
-                if layer.is_valid:
-                    # a deferred element creation is no longer deferred -- maybe
-                    rgb_uuids = [x.uuid if x is not None else None for x in [layer.r, layer.g, layer.b]]  # FUTURE: alpha
-                    did_create = self.add_composite_layer(new_order, layer, presentation, [], rgb_uuids, COMPOSITE_TYPE.RGB)
-                    if did_create:
-                        LOG.info("created new element for composite layer")
-                    return
-                else:  # nothing we can do, not valid yet
-                    return
-            # otherwise we have to tear down that element and make a new one with its Z
+        if old_element is not None:
+            # FUTURE: don't delete when we can reconfigure, or do nothing
+            self.purge_layer(layer.uuid)
 
-        LOG.warning("need to implement composite layer changes")
+        # now create new scenegraph element for the new configuration
+        if isinstance(layer, DocRGBLayer):
+            if layer.is_valid:
+                # a deferred element creation is no longer deferred -- maybe
+                rgb_uuids = [x.uuid if x is not None else None for x in [layer.r, layer.g, layer.b]]  # FUTURE: alpha
+                did_create = self.add_composite_layer(new_order, layer, presentation, [], rgb_uuids, COMPOSITE_TYPE.RGB)
+                if did_create:
+                    LOG.info("created element for composite layer")
+                return
+            else:  # nothing we can do, not valid yet
+                return
+        LOG.warning('need to implement z order change consistent with presentation')
 
     def remove_layer(self, new_order:list, uuids_removed:list, row:int, count:int):
         """

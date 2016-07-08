@@ -44,6 +44,14 @@ class LayerSetsManager (QObject) :
     layer_info_pane = None
     rgb_config = None
 
+    @property
+    def didChangeRGBLayerComponentRange(self):
+        return self.rgb_config_pane.didChangeRGBLayerComponentRange
+
+    @property
+    def didChangeRGBLayerSelection(self):
+        return self.rgb_config_pane.didChangeRGBLayerSelection
+
     def __init__ (self, tab_view_widget:QWidget, layer_info_widget:QWidget, document) :
 
         super(LayerSetsManager, self).__init__(tab_view_widget)
@@ -382,7 +390,6 @@ class RGBLayerConfigPane(QWidget):
 
     didChangeRGBLayerSelection = pyqtSignal(DocRGBLayer, str, DocLayer)  # layer being changed, character from 'rgba', layer being assigned
     didChangeRGBLayerComponentRange = pyqtSignal(DocRGBLayer, str, float, float)  # layer being changed, char from 'rgba', new-min, new-max
-
 
     _rgb = None  # combo boxes in r,g,b order; cache
 
