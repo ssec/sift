@@ -194,7 +194,8 @@ class AHI_HSF_Guidebook(Guidebook):
 
     def collect_info(self, info):
         md = self._cache.get(info[INFO.UUID], None)
-        if md is None and info[INFO.KIND] not in (KIND.IMAGE, KIND.COMPOSITE):
+        # TODO: Used to be 'info *not* in (KIND.IMAGE, KIND.COMPOSITE)', what's right?
+        if md is None and info[INFO.KIND] in (KIND.IMAGE, KIND.COMPOSITE):
             md = self._metadata_for_path(info.get(INFO.PATHNAME, None))
             md[GUIDE.UUID] = info[INFO.UUID]
             md[GUIDE.INSTRUMENT] = INSTRUMENT.AHI
