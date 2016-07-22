@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>config_rgb_layer</class>
+ <widget class="QWidget" name="config_rgb_layer">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>403</width>
+    <height>352</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <widget class="QWidget" name="verticalLayoutWidget">
+   <property name="geometry">
+    <rect>
+     <x>9</x>
+     <y>9</y>
+     <width>381</width>
+     <height>311</height>
+    </rect>
+   </property>
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QLabel" name="label">
+      <property name="text">
+       <string>RGB Layer Channels and Ranges</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QComboBox" name="comboRed">
+      <property name="toolTip">
+       <string>Red</string>
+      </property>
+      <property name="statusTip">
+       <string>Red channel</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QSlider" name="slideMinRed">
+      <property name="maximum">
+       <number>32767</number>
+      </property>
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QSlider" name="slideMaxRed">
+      <property name="maximum">
+       <number>32767</number>
+      </property>
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QComboBox" name="comboGreen">
+      <property name="toolTip">
+       <string>Green</string>
+      </property>
+      <property name="statusTip">
+       <string>Green channel</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QSlider" name="slideMinGreen">
+      <property name="maximum">
+       <number>32767</number>
+      </property>
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QSlider" name="slideMaxGreen">
+      <property name="maximum">
+       <number>32767</number>
+      </property>
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QComboBox" name="comboBlue">
+      <property name="toolTip">
+       <string>Blue</string>
+      </property>
+      <property name="statusTip">
+       <string>Blue channel</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QSlider" name="slideMinBlue">
+      <property name="maximum">
+       <number>32767</number>
+      </property>
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QSlider" name="slideMaxBlue">
+      <property name="maximum">
+       <number>32767</number>
+      </property>
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
