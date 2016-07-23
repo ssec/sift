@@ -213,7 +213,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     # signals
     didAddBasicLayer = pyqtSignal(list, DocBasicLayer, prez)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
-    didAddCompositeLayer = pyqtSignal(list, DocCompositeLayer, list, list, list, object)  # comp layer is derived from multiple basic layers and has its own UUID
+    didAddCompositeLayer = pyqtSignal(list, DocCompositeLayer, prez)  # comp layer is derived from multiple basic layers and has its own UUID
     didRemoveLayers = pyqtSignal(list, list, int, int)  # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
     willPurgeLayer = pyqtSignal(UUID)  # UUID of the layer being removed
     didReorderLayers = pyqtSignal(list)  # list of original indices in their new order, None for new layers
@@ -305,7 +305,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.didAddBasicLayer.emit(reordered_indices, dataset, presentation)
         return uuid, dataset, content
 
-    def open_files(self, paths, insert_before=0):
+    def open_files(self, paths, insert_before = 0):
         """
         sort paths into preferred load order (see guidebook.py)
         open files in order, yielding uuid, info, overview_content
@@ -697,9 +697,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
         presentation, reordered_indices = self._insert_layer_with_info(ds_info)
 
-        prezs = None  # not used right now FIXME
-        overview_content = list(self._workspace.get_content(d[INFO.UUID]) for d in dep_info)
-        self.didAddCompositeLayer.emit([None], ds_info, [None], overview_content, uuids, COMPOSITE_TYPE.RGB)  # FIXME first parm (new_order) is wrong
+        self.didAddCompositeLayer.emit([None], ds_info, None)  # FIXME first parm (new_order) is wrong
         return ds_info
 
     def create_empty_rgb_composite(self):

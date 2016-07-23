@@ -304,7 +304,11 @@ class SingleLayerInfoPane (QWidget) :
                 if this_prez is not None:
                     new_clims = np.array(this_prez.climits)
                     fmt, unit, new_clims = self.document.convert_units(this_prez.uuid, new_clims, inverse=False)
-                    new_clims = (fmt + ' ~ ' + fmt + '{}').format(new_clims[0], new_clims[1], unit)
+                    try:
+                        new_clims = (fmt + ' ~ ' + fmt + '{}').format(new_clims[0], new_clims[1], unit)
+                    except TypeError as err:
+                        LOG.warning("unknown color limit format for %s" % repr((fmt, unit, new_clims)))
+                        new_clims = "N/A"
                 if "climits" not in shared_info :
                     shared_info["climits"] = new_clims
                 else :

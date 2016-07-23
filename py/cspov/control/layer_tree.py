@@ -254,6 +254,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         doc.didChangeLayerVisibility.connect(self.refresh)
         doc.didChangeLayerName.connect(self.refresh)
         doc.didAddBasicLayer.connect(self.doc_added_basic_layer)
+        doc.didAddCompositeLayer.connect(self.refresh)
         doc.willPurgeLayer.connect(self.refresh)
         doc.didSwitchLayerSet.connect(self.refresh)
         doc.didReorderAnimation.connect(self.refresh)

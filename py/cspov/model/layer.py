@@ -201,13 +201,6 @@ class DocLayer(MutableMapping):
         """
         return True
 
-    @property
-    def range(self):
-        """
-        :return: (min, max) numerical range of the data or (None, None)
-        """
-        return (None, None)
-
     def __getitem__(self, key):
         return self._store[self.__keytransform__(key)]
 

@@ -735,25 +735,15 @@ class SceneGraphManager(QObject):
         self.on_view_change(None)
 
 
-    def add_composite_layer(self, new_order:list, layer:DocCompositeLayer, p:prez, overview_content:list, dep_uuids, composite_type=COMPOSITE_TYPE.RGB):
+    def add_composite_layer(self, new_order:list, layer:DocCompositeLayer, p:prez):
         LOG.debug("SceenGraphManager.add_composite_layer %s" % repr(layer))
         if not layer.is_valid:
             LOG.info('unable to add an invalid layer, will try again later when layer changes')
             return
-        if not overview_content and composite_type==COMPOSITE_TYPE.RGB and isinstance(layer, DocRGBLayer):  # FUTURE, minify
+        if isinstance(layer, DocRGBLayer):
+            dep_uuids = r,g,b = [component.uuid for component in [layer.r, layer.g, layer.b]]
             overview_content = list(self.workspace.get_content(component_uuid) for component_uuid in dep_uuids)
-            # overview_content = list(self.workspace.get_content(component.uuid) for component in [layer.r, layer.g, layer.b])
-        if composite_type == COMPOSITE_TYPE.RGB:
-            if len(dep_uuids) != 3:
-                # don't know how to do it without 3 layers
-                raise ValueError("Must select 3 separate band layers to create an RGB layer")
-
-            r,g,b = dep_uuids
-            if r==None or g==None or b==None:  # FIXME; redundant given .is_valid check
-                LOG.info("deferring creation of composite scenegraph element")
-                return False
-
-            uuid = layer[INFO.UUID]
+            uuid = layer.uuid
             LOG.debug("Adding composite layer to Scene Graph Manager with UUID: %s", uuid)
             self.image_elements[uuid] = element = RGBCompositeLayer(
                 overview_content,
@@ -775,7 +765,7 @@ class SceneGraphManager(QObject):
             self.on_view_change(None)
             return True
         else:
-            raise ValueError("Unknown or unimplemented composite type: %s" % (composite_type,))
+            raise ValueError("Unknown or unimplemented composite type")
 
     def change_composite_layer(self, new_order:list, layer:DocCompositeLayer, presentation:prez, changes:dict):
         # FUTURE: more finesse, e.g.
@@ -909,7 +899,7 @@ class SceneGraphManager(QObject):
                 if layer.kind==KIND.RGB:
                     # create an invisible element with the RGB
                     #     def add_composite_layer(self, new_order:list, layer:DocCompositeLayer, p:prez, overview_content:list, dep_uuids, composite_type=COMPOSITE_TYPE.RGB):
-                    self.add_composite_layer(current_uuid_order, layer, prez_lookup[uuid], [], [layer.r.uuid, layer.g.uuid, layer.b.uuid], COMPOSITE_TYPE.RGB)
+                    self.add_composite_layer(current_uuid_order, layer, prez_lookup[uuid])
                 else:
                     raise NotImplementedError('unable to create deferred scenegraph element for %s' % repr(layer))
             else:
