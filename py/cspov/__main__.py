@@ -311,7 +311,7 @@ class Main(QtGui.QMainWindow):
         self.ui.animationSlider.repaint()
         self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
 
-    def update_frame_time_to_top_visible(self):
+    def update_frame_time_to_top_visible(self, *args):
         # FUTURE: don't address layer set directly
         self.ui.animationLabel.setText(self.document.time_label_for_uuid(self.scene_manager.layer_set.top_layer_uuid()))
 

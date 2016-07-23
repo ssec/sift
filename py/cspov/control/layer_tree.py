@@ -321,7 +321,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             if widget.isVisible():
                 return widget
 
-    def doc_added_basic_layer(self, new_order, info, content):
+    def doc_added_basic_layer(self, new_order, layer, presentation):
         #dexes = [i for i,q in enumerate(new_order) if q==None]
         # for dex in dexes:
         #     self.beginInsertRows(QModelIndex(), dex, dex)

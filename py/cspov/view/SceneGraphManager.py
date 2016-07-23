@@ -705,12 +705,13 @@ class SceneGraphManager(QObject):
             LOG.info('changing {} to colormap {}'.format(uuid, clims))
             self.set_color_limits(clims, uuid)
 
-    def add_basic_layer(self, new_order:list, layer:DocBasicLayer, p:prez, overview_content:np.ndarray):
+    def add_basic_layer(self, new_order:list, layer:DocBasicLayer, p:prez):
         uuid = layer.uuid
         # create a new layer in the imagelist
         if not layer.is_valid:
             LOG.warning('unable to add an invalid layer, will try again later when layer changes')
             return
+        overview_content = self.workspace.get_content(layer.uuid)
         image = TiledGeolocatedImage(
             overview_content,
             layer[INFO.ORIGIN_X],

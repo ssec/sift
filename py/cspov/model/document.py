@@ -212,7 +212,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     _guidebook = None  # FUTURE: this is currently an AHI_HSF_Guidebook, make it a general guidebook
 
     # signals
-    didAddBasicLayer = pyqtSignal(list, DocBasicLayer, prez, np.ndarray)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
+    didAddBasicLayer = pyqtSignal(list, DocBasicLayer, prez)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
     didAddCompositeLayer = pyqtSignal(list, DocCompositeLayer, list, list, list, object)  # comp layer is derived from multiple basic layers and has its own UUID
     didRemoveLayers = pyqtSignal(list, list, int, int)  # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
     willPurgeLayer = pyqtSignal(UUID)  # UUID of the layer being removed
@@ -302,7 +302,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         dataset[INFO.NAME] = self._guidebook.display_name(dataset) or dataset[INFO.NAME]
         presentation, reordered_indices = self._insert_layer_with_info(dataset, cmap=cmap, insert_before=insert_before)
         # signal updates from the document
-        self.didAddBasicLayer.emit(reordered_indices, dataset, presentation, content)
+        self.didAddBasicLayer.emit(reordered_indices, dataset, presentation)
         return uuid, dataset, content
 
     def open_files(self, paths, insert_before=0):
