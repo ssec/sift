@@ -505,7 +505,7 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.didChangeLayerVisibility.connect(self.document.animation_changed_visibility)
 
         # disable close button on panes
-        for pane in [self.ui.areaProbePane, self.ui.layersPane, self.ui.layerConfigPane]:
+        for pane in [self.ui.areaProbePane, self.ui.layersPane, self.ui.layerDetailsPane, self.ui.rgbConfigPane]:
             pane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable |
                              QtGui.QDockWidget.DockWidgetMovable)
 
@@ -525,7 +525,7 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.main_canvas.transforms.changed.connect(partial(start_wrapper, self.scheduler))
 
         # convey action between document and layer list view
-        self.layerSetsManager = LayerSetsManager(self.ui.layerSetTabs, self.ui.layerInfoContents, self.document)
+        self.layerSetsManager = LayerSetsManager(self.ui, self.ui.layerSetTabs, self.ui.layerInfoContents, self.document)
         self.behaviorLayersList = self.layerSetsManager.getLayerStackListViewModel()
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
             layers = list(self.document.active_layer_order)

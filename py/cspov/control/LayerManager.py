@@ -52,7 +52,7 @@ class LayerSetsManager (QObject) :
     def didChangeRGBLayerSelection(self):
         return self.rgb_config_pane.didChangeRGBLayerSelection
 
-    def __init__ (self, tab_view_widget:QWidget, layer_info_widget:QWidget, document) :
+    def __init__ (self, ui, tab_view_widget:QWidget, layer_info_widget:QWidget, document) :
 
         super(LayerSetsManager, self).__init__(tab_view_widget)
 
@@ -63,7 +63,7 @@ class LayerSetsManager (QObject) :
 
         # FIXME: we need a manager object which decides whether to show info pane or config pane
         self.layer_info_pane = SingleLayerInfoPane(layer_info_widget, document)
-        self.rgb_config_pane = RGBLayerConfigPane(layer_info_widget, document)
+        self.rgb_config_pane = RGBLayerConfigPane(ui, layer_info_widget, document)
 
         # self.layer_info_pane.show()
         # self.rgb_config_pane.show()
@@ -205,7 +205,8 @@ class SingleLayerInfoPane (QWidget) :
         layout.addWidget(self.colormap_text,   6, 1)
         layout.addWidget(self.clims_text,      7, 1)
         layout.addWidget(self.cmap_vis, 8, 1)
-        self.setLayout(layout)  # was parent.setLayout
+        # self.setLayout(layout)  # was parent.setLayout
+        parent.setLayout(layout)  # FIXME how is this correct??
 
         # TODO put the informational text into an area with scroll bars so it won't force the sidebar size minimum
 
@@ -397,11 +398,10 @@ class RGBLayerConfigPane(QWidget):
 
     _rgb = None  # combo boxes in r,g,b order; cache
 
-    def __init__(self, parent, document):
+    def __init__(self, ui, parent, document):
         super(RGBLayerConfigPane, self).__init__(parent)
         self.document_ref = ref(document)
-        self.ui = config_rgb_layer_ui.Ui_config_rgb_layer()
-        self.ui.setupUi(self)
+        self.ui = ui
         from functools import partial
 
         [x.currentIndexChanged.connect(partial(self._combo_changed, combo=x, color=rgb))
