@@ -639,7 +639,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         from functools import reduce
         if r is None or g is None or b is None:
             # we have an invalid composite which needs user initialization
-            LOG.info('generating invalid composite for user to configure')
+            LOG.info('generating incomplete (invalid) composite for user to configure')
             uuid = uuidgen()
             name = '-RGB-'
             ds_info = {
@@ -656,7 +656,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             }
             self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
             presentation, reordered_indices = self._insert_layer_with_info(ds_info)
-            return
+            self.didAddCompositeLayer.emit(reordered_indices, ds_info, presentation)
+            return ds_info
 
         # disable visibility of the existing layers FUTURE: remove them entirely? probably not
         self.toggle_layer_visibility([x for x in [r,g,b] if x], False)
@@ -696,8 +697,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         }
         self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
         presentation, reordered_indices = self._insert_layer_with_info(ds_info)
-
-        self.didAddCompositeLayer.emit([None], ds_info, None)  # FIXME first parm (new_order) is wrong
+        self.didAddCompositeLayer.emit(reordered_indices, ds_info, presentation)
         return ds_info
 
     def create_empty_rgb_composite(self):

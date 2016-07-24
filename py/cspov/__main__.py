@@ -568,6 +568,7 @@ class Main(QtGui.QMainWindow):
         self.document.didReorderLayers.connect(self.update_frame_time_to_top_visible)
         self.document.didRemoveLayers.connect(self.update_frame_time_to_top_visible)
         self.document.didAddBasicLayer.connect(self.update_frame_time_to_top_visible)
+        self.document.didAddCompositeLayer.connect(self.update_frame_time_to_top_visible)
 
         self.ui.panZoomToolButton.toggled.connect(partial(self.change_tool, name=TOOL.PAN_ZOOM))
         self.ui.pointSelectButton.toggled.connect(partial(self.change_tool, name=TOOL.POINT_PROBE))
@@ -584,13 +585,16 @@ class Main(QtGui.QMainWindow):
         self.graphManager.pointProbeChanged.connect(self.graphManager.update_point_probe_graph)
 
         self.scene_manager.newPointProbe.connect(self.graphManager.update_point_probe)
-        self.document.didAddBasicLayer.connect(lambda *args: self.graphManager.update_point_probe(DEFAULT_POINT_PROBE))
+        zap = lambda *args: self.graphManager.update_point_probe(DEFAULT_POINT_PROBE)
+        self.document.didAddBasicLayer.connect(zap)
+        self.document.didAddCompositeLayer.connect(zap)
         # FIXME: These were added as a simple fix to update the proble value on layer changes, but this should really
         #        have its own manager-like object
         def _blackhole(*args, **kwargs):
             return self.update_point_probe_text(DEFAULT_POINT_PROBE)
         self.document.didChangeLayerVisibility.connect(_blackhole)
         self.document.didAddBasicLayer.connect(_blackhole)
+        self.document.didAddCompositeLayer.connect(_blackhole)
         self.document.didRemoveLayers.connect(_blackhole)
         self.document.didReorderLayers.connect(_blackhole)
         if False:
@@ -647,7 +651,8 @@ class Main(QtGui.QMainWindow):
             uuids = list(self.behaviorLayersList.current_selected_uuids())
         if len(uuids)<3:  # pad with None
             uuids = uuids + ([None] * (3 - len(uuids)))
-        self.document.create_rgb_composite(uuids[0], uuids[1], uuids[2])
+        layer = self.document.create_rgb_composite(uuids[0], uuids[1], uuids[2])
+        self.behaviorLayersList.select([layer.uuid])
 
     def setup_menu(self):
         open_action = QtGui.QAction("&Open...", self)
