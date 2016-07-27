@@ -467,6 +467,30 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     continue
                 yield layer_prez, layer
 
+    def layers_where(self, is_valid=None, is_active=None, in_type_set=None):
+        """
+        query current layer set for layers matching criteria
+        :param is_valid: None, or True/False whether layer is valid (could be displayed)
+        :param is_active: None, or True/False whether layer is active (valid & (visible | animatable))
+        :param in_type_set: None, or set of Python types that the layer falls into
+        :return: sequence of layers in no particular order
+        """
+        for layer_prez in self.current_layer_set:
+            layer = self._layer_with_uuid[layer_prez.uuid]
+            valid = layer.is_valid
+            if is_valid is not None:
+                if valid != is_valid:
+                    continue
+            if is_active is not None:
+                active = valid and (layer_prez.visible or layer_prez.a_order is not None)
+                if active != is_active:
+                    continue
+            if in_type_set is not None:
+                if type(layer) not in in_type_set:
+                    continue
+            yield layer
+
+
     def select_layer_set(self, layer_set_index:int):
         """
         change the selected layer set, 0..N (typically 0..3), cloning the old set if needed
