@@ -393,7 +393,7 @@ class RGBLayerConfigPane(QWidget):
     document_ref = None  # weakref to document
     active_layer_ref = None  # weakref to RGB layer we're currently showing
 
-    didChangeRGBLayerSelection = pyqtSignal(DocRGBLayer, str, DocLayer)  # layer being changed, character from 'rgba', layer being assigned
+    didChangeRGBLayerSelection = pyqtSignal(DocRGBLayer, str, object)  # layer being changed, character from 'rgba', layer being assigned
     didChangeRGBLayerComponentRange = pyqtSignal(DocRGBLayer, str, float, float)  # layer being changed, char from 'rgba', new-min, new-max
 
     _rgb = None  # combo boxes in r,g,b order; cache
@@ -454,6 +454,7 @@ class RGBLayerConfigPane(QWidget):
             self._clims[color_index] = new_layer[INFO.CLIM]
         else:
             self._clims[color_index] = None
+            new_layer = None
         # reset slider position to min and max for layer
         self.sliders[color_index][0].setSliderPosition(0)
         self.sliders[color_index][1].setSliderPosition(self._slider_steps)

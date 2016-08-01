@@ -782,7 +782,7 @@ class SceneGraphManager(QObject):
                 else:
                     # layer is no longer valid and has to be removed
                     LOG.debug("Purging composite ")
-                    self.purge_layer([layer.uuid])
+                    self.purge_layer(layer.uuid)
             else:
                 if layer.is_valid:
                     # Add this now valid layer
@@ -819,12 +819,15 @@ class SceneGraphManager(QObject):
         :return:
         """
         self.set_layer_visible(uuid_removed, False)
-        image_layer = self.image_elements[uuid_removed]
-        image_layer.parent = None
-        del self.image_elements[uuid_removed]
-        del self.datasets[uuid_removed]
-        # del self.image_layers[uuid_removed]
-        LOG.info("layer {} purge from scenegraphmanager".format(uuid_removed))
+        if uuid_removed in self.image_elements:
+            image_layer = self.image_elements[uuid_removed]
+            image_layer.parent = None
+            del self.image_elements[uuid_removed]
+            del self.datasets[uuid_removed]
+            # del self.image_layers[uuid_removed]
+            LOG.info("layer {} purge from scenegraphmanager".format(uuid_removed))
+        else:
+            LOG.debug("Layer {} already purged from Scene Graph".format(uuid_removed))
 
     def _purge_layer(self, *args, **kwargs):
         res = self.purge_layer(*args, **kwargs)
