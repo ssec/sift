@@ -364,7 +364,7 @@ class SingleLayerInfoPane (QWidget) :
             temp_name = shared_info[INFO.NAME] if INFO.NAME in shared_info else ""
             self.name_text.setText("Name: " + temp_name)
             temp_time = shared_info[GUIDE.DISPLAY_TIME] if GUIDE.DISPLAY_TIME in shared_info else ""
-            self.time_text.setText("Time: " + temp_time)
+            self.time_text.setText("Time: " + (temp_time or ""))
             temp_inst = shared_info[GUIDE.INSTRUMENT] if GUIDE.INSTRUMENT in shared_info else ""
             self.instrument_text.setText("Instrument: " + temp_inst)
             temp_band = shared_info[GUIDE.BAND] if GUIDE.BAND in shared_info else ""
@@ -397,6 +397,8 @@ class RGBLayerConfigPane(QWidget):
     didChangeRGBLayerComponentRange = pyqtSignal(DocRGBLayer, str, float, float)  # layer being changed, char from 'rgba', new-min, new-max
 
     _rgb = None  # combo boxes in r,g,b order; cache
+    _sliders = None  # sliders in r,g,b order; cache
+    _clims = [None, None, None]  # tuples of each layer's c-limits
 
     def __init__(self, ui, parent, document):
         super(RGBLayerConfigPane, self).__init__(parent)
@@ -404,11 +406,20 @@ class RGBLayerConfigPane(QWidget):
         self.ui = ui
         from functools import partial
 
+        # TODO: Put in UI file?
+        self._slider_steps = 100
+        self.ui.slideMinRed.setRange(0, self._slider_steps)
+        self.ui.slideMaxRed.setRange(0, self._slider_steps)
+        self.ui.slideMinGreen.setRange(0, self._slider_steps)
+        self.ui.slideMaxGreen.setRange(0, self._slider_steps)
+        self.ui.slideMinBlue.setRange(0, self._slider_steps)
+        self.ui.slideMaxBlue.setRange(0, self._slider_steps)
+
         [x.currentIndexChanged.connect(partial(self._combo_changed, combo=x, color=rgb))
          for rgb,x in zip(('b', 'g', 'r'), (self.ui.comboBlue, self.ui.comboGreen, self.ui.comboRed))]
-        [x.valueChanged.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=False))
+        [x.sliderReleased.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=False))
          for rgb,x in zip(('b', 'g', 'r'), (self.ui.slideMinBlue, self.ui.slideMinGreen, self.ui.slideMinRed))]
-        [x.valueChanged.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=True))
+        [x.sliderReleased.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=True))
          for rgb, x in zip(('b', 'g', 'r'), (self.ui.slideMaxBlue, self.ui.slideMaxGreen, self.ui.slideMaxRed))]
 
     @property
@@ -419,17 +430,34 @@ class RGBLayerConfigPane(QWidget):
         else:
             return self._rgb
 
+    @property
+    def sliders(self):
+        if self._sliders is None:
+            self._sliders = [
+                (self.ui.slideMinRed, self.ui.slideMaxRed),
+                (self.ui.slideMinGreen, self.ui.slideMaxGreen),
+                (self.ui.slideMinBlue, self.ui.slideMaxBlue),
+            ]
+        return self._sliders
+
     def _combo_changed(self, index, combo:QComboBox=None, color=None):
         """
         user changed combo box, relay that to upstream as didChangeRGBLayerSelection
         :return:
         """
         uuid_str = combo.itemData(index)
+        color_index = "rgba".index(color)
         LOG.debug("RGB: user selected %s for %s" % (uuid_str, color))
         if uuid_str:
             uuid = UUID(uuid_str)
             new_layer = self.document_ref()[uuid]
-            self.didChangeRGBLayerSelection.emit(self.active_layer_ref(), color, new_layer)
+            self._clims[color_index] = new_layer[INFO.CLIM]
+        else:
+            self._clims[color_index] = None
+        # reset slider position to min and max for layer
+        self.sliders[color_index][0].setSliderPosition(0)
+        self.sliders[color_index][1].setSliderPosition(self._slider_steps)
+        self.didChangeRGBLayerSelection.emit(self.active_layer_ref(), color, new_layer)
 
     def _min_max_for_color(self, rgba:str):
         """
@@ -440,7 +468,7 @@ class RGBLayerConfigPane(QWidget):
         LOG.warning('slider ranges not implemented, this is placeholder data')
         return (0.0, 1.0)  # FIXME
 
-    def _slider_changed(self, value:int, slider=None, color:str=None, is_max:bool=False):
+    def _slider_changed(self, slider=None, color:str=None, is_max:bool=False):
         """
 
         :param value: new value of the slider
@@ -449,9 +477,12 @@ class RGBLayerConfigPane(QWidget):
         :param is_max: whether slider's value represents the max or the min
         :return:
         """
-        n, x = self._min_max_for_color(color)
+        idx = "rgba".index(color)
+        slider = self.sliders[idx]
+        n, x = self._clims[idx]
+        n = (slider[0].value() / self._slider_steps) * (x - n) + n
+        x = (slider[1].value() / self._slider_steps) * (x - n) + n
         self.didChangeRGBLayerComponentRange.emit(self.active_layer_ref(), color, n, x)
-
 
     def selection_did_change(self, uuids=None):
         """
@@ -477,13 +508,13 @@ class RGBLayerConfigPane(QWidget):
             return
 
         # update the combo boxes
-        self._set_combos_to_layer_names(exclude_uuids=set([layer.uuid]))
+        self._set_combos_to_layer_names()
 
         self._select_layers_for(layer)
 
         # update the min-max scrollers
         # self._set_minmax_sliders(layer)  # FIXME
-        LOG.warning('unimplemented: initializing layer sliders to min-max range')
+        # LOG.warning('unimplemented: initializing layer sliders to min-max range')
 
         self.show()
 
@@ -508,13 +539,14 @@ class RGBLayerConfigPane(QWidget):
             for widget in self.rgb:
                 widget.setCurrentIndex(0)
 
-    def _set_combos_to_layer_names(self, exclude_uuids=None):
+    def _set_combos_to_layer_names(self):
         """
         update combo boxes with the list of layer names and then select the right r,g,b,a layers if they're not None
         :return:
         """
         doc = self.document_ref()
-        exclude_uuids = exclude_uuids or set()
+        non_rgb_classes = [DocBasicLayer, DocCompositeLayer]
+        # non_rgb_kinds = [k for k in KIND if k != KIND.RGB]
 
         # clear out the current lists
         for widget in self.rgb:
@@ -522,10 +554,8 @@ class RGBLayerConfigPane(QWidget):
             widget.addItem('None', '')
 
         # fill up our lists of layers
-        for layer_prez in doc.current_layer_set:
+        for layer_prez in doc.layers_where(is_valid=True, in_type_set=non_rgb_classes):
             uuid = layer_prez.uuid
-            if uuid in exclude_uuids:
-                continue
             layer = doc[layer_prez.uuid]
             layer_name = layer.name
             LOG.debug('adding layer %s to RGB combo selectors' % layer_name)

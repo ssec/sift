@@ -250,7 +250,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         doc.didReorderLayers.connect(self.refresh)
         doc.didRemoveLayers.connect(self.drop_layers_just_removed)
         doc.didChangeColormap.connect(self.refresh)
-        doc.didChangeColorLimits.connect(self.refresh)
+        # doc.didChangeColorLimits.connect(self.refresh)
         doc.didChangeLayerVisibility.connect(self.refresh)
         doc.didChangeLayerName.connect(self.refresh)
         doc.didAddBasicLayer.connect(self.doc_added_basic_layer)

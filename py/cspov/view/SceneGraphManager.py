@@ -734,7 +734,6 @@ class SceneGraphManager(QObject):
         self.layer_set.add_layer(image)
         self.on_view_change(None)
 
-
     def add_composite_layer(self, new_order:list, layer:DocCompositeLayer, p:prez):
         LOG.debug("SceenGraphManager.add_composite_layer %s" % repr(layer))
         if not layer.is_valid:
@@ -762,38 +761,38 @@ class SceneGraphManager(QObject):
                 parent=self.main_map)
             element.transform *= STTransform(translate=(0, 0, -50.0))
             self.composite_element_dependencies[uuid] = dep_uuids
+            self.layer_set.add_layer(element)
             self.on_view_change(None)
             return True
         else:
             raise ValueError("Unknown or unimplemented composite type")
 
     def change_composite_layer(self, new_order:list, layer:DocCompositeLayer, presentation:prez, changes:dict):
-        # FUTURE: more finesse, e.g.
-        # if layer.is_valid and layer.uuid not in self.image_layers:
-        #     # layer has changed state to valid and needs to be added to the graph
-        # elif not layer.is_valid and layer.uuid in self.image_layers:
-        #     # layer is no longer valid and has to be removed
-        # else:
-        #     # RGB selection has changed, rebuild the layer
-        self.rebuild_all()  # FUTURE: less brute force
-
-        # old_element = self.image_elements.get(layer.uuid, None)
-        # if old_element is not None:
-        #     # FUTURE: don't delete when we can reconfigure, or do nothing
-        #     self.purge_layer(layer.uuid)
-        #
-        # # now create new scenegraph element for the new configuration
-        # if isinstance(layer, DocRGBLayer):
-        #     if layer.is_valid:
-        #         # a deferred element creation is no longer deferred -- maybe
-        #         rgb_uuids = [x.uuid if x is not None else None for x in [layer.r, layer.g, layer.b]]  # FUTURE: alpha
-        #         did_create = self.add_composite_layer(new_order, layer, presentation, [], rgb_uuids, COMPOSITE_TYPE.RGB)
-        #         if did_create:
-        #             LOG.info("created element for composite layer")
-        #         return
-        #     else:  # nothing we can do, not valid yet
-        #         return
-        # LOG.warning('need to implement z order change consistent with presentation')
+        if isinstance(layer, DocRGBLayer):
+            if layer.uuid in self.image_elements:
+                if layer.is_valid:
+                    # RGB selection has changed, rebuild the layer
+                    LOG.debug("Changing existing composite layer to Scene Graph Manager with UUID: %s", layer.uuid)
+                    dep_uuids = r,g,b = [component.uuid for component in [layer.r, layer.g, layer.b]]
+                    overview_content = list(self.workspace.get_content(component_uuid) for component_uuid in dep_uuids)
+                    self.composite_element_dependencies[layer.uuid] = dep_uuids
+                    self.image_elements[layer.uuid].set_channels(overview_content)
+                    self.image_elements[layer.uuid].init_overview(overview_content)
+                    self.on_view_change(None)
+                else:
+                    # layer is no longer valid and has to be removed
+                    LOG.debug("Purging composite ")
+                    self.purge_layer([layer.uuid])
+            else:
+                if layer.is_valid:
+                    # Add this now valid layer
+                    self.add_composite_layer(new_order, layer, presentation)
+                else:
+                    LOG.info('unable to add an invalid layer, will try again later when layer changes')
+                    return
+            self.update()
+        else:
+            raise ValueError("Unknown or unimplemented composite type")
 
     def remove_layer(self, new_order:list, uuids_removed:list, row:int, count:int):
         """
@@ -805,8 +804,13 @@ class SceneGraphManager(QObject):
         """
         for uuid_removed in uuids_removed:
             self.set_layer_visible(uuid_removed, False)
-        self.rebuild_all()
-        # LOG.error("layer removal from scenegraph complete")
+        # XXX: Used to rebuild_all instead of just update, is that actually needed?
+        # self.rebuild_all()
+
+    def _remove_layer(self, *args, **kwargs):
+        self.remove_layer(*args, **kwargs)
+        # when removing the layer is the only operation being performed then update when we are done
+        self.update()
 
     def purge_layer(self, uuid_removed:UUID):
         """
@@ -822,6 +826,12 @@ class SceneGraphManager(QObject):
         # del self.image_layers[uuid_removed]
         LOG.info("layer {} purge from scenegraphmanager".format(uuid_removed))
 
+    def _purge_layer(self, *args, **kwargs):
+        res = self.purge_layer(*args, **kwargs)
+        # when purging the layer is the only operation being performed then update when we are done
+        self.update()
+        return res
+
     def change_layers_visibility(self, layers_changed:dict):
         for uuid, visible in layers_changed.items():
             self.set_layer_visible(uuid, visible)
@@ -831,16 +841,17 @@ class SceneGraphManager(QObject):
         # raise NotImplementedError("layer set change not implemented in SceneGraphManager")
 
     def _connect_doc_signals(self, document):
-        document.didReorderLayers.connect(self.rebuild_layer_order)  # current layer set changed z/anim order
+        document.didReorderLayers.connect(self._rebuild_layer_order)  # current layer set changed z/anim order
         document.didAddBasicLayer.connect(self.add_basic_layer)  # layer added to one or more layer sets
         document.didAddCompositeLayer.connect(self.add_composite_layer)  # layer derived from other layers (either basic or composite themselves)
-        document.didRemoveLayers.connect(self.remove_layer)  # layer removed from current layer set
-        document.willPurgeLayer.connect(self.purge_layer)  # layer removed from document
+        document.didRemoveLayers.connect(self._remove_layer)  # layer removed from current layer set
+        document.willPurgeLayer.connect(self._purge_layer)  # layer removed from document
         document.didSwitchLayerSet.connect(self.rebuild_new_layer_set)
         document.didChangeColormap.connect(self.change_layers_colormap)
         document.didChangeLayerVisibility.connect(self.change_layers_visibility)
-        document.didReorderAnimation.connect(self.rebuild_frame_order)
+        document.didReorderAnimation.connect(self._rebuild_frame_order)
         document.didChangeComposition.connect(self.change_composite_layer)
+        document.didChangeColorLimits.connect(self.change_layers_color_limits)
 
     def set_frame_number(self, frame_number=None):
         self.layer_set.next_frame(None, frame_number)
@@ -861,12 +872,30 @@ class SceneGraphManager(QObject):
         # TODO this is the lazy implementation, eventually just change z order on affected layers
         self.layer_set.set_layer_order(self.document.current_layer_uuid_order)
         print("New layer order: ", new_layer_index_order)
+
+    def _rebuild_layer_order(self, *args, **kwargs):
+        res = self.rebuild_layer_order(*args, **kwargs)
         self.update()
+        return res
 
     def rebuild_frame_order(self, uuid_list:list, *args, **kwargs):
         LOG.debug('setting SGM new frame order to {0!r:s}'.format(uuid_list))
         self.layer_set.frame_order = uuid_list
+
+    def _rebuild_frame_order(self, *args, **kwargs):
+        res = self.rebuild_frame_order(*args, **kwargs)
+        # when purging the layer is the only operation being performed then update when we are done
         self.update()
+        return res
+
+    def rebuild_presentation(self, presentation_info:dict):
+        # refresh our presentation info
+        # presentation_info = self.document.current_layer_set
+        for uuid, layer_prez in presentation_info.items():
+            self.set_colormap(layer_prez.colormap, uuid=uuid)
+            self.set_color_limits(layer_prez.climits, uuid=uuid)
+            self.set_layer_visible(uuid, visible=layer_prez.visible)
+            # FUTURE, if additional information is added to the presentation tuple, you must also update it here
 
     def rebuild_all(self, *args, **kwargs):
         """
@@ -892,34 +921,23 @@ class SceneGraphManager(QObject):
 
         remove_elements = []
         for uuid in inconsistent_uuids:
-            layer = active_lookup[uuid]
-            if layer.is_valid:
+            if uuid in active_lookup and active_lookup[uuid].is_valid:
+                layer = active_lookup[uuid]
                 # create elements for layers which have transitioned to a valid state
                 LOG.debug('creating deferred element for layer %s' % layer.uuid)
-                if layer.kind==KIND.RGB:
+                if layer.kind in [KIND.COMPOSITE, KIND.RGB]:
                     # create an invisible element with the RGB
-                    #     def add_composite_layer(self, new_order:list, layer:DocCompositeLayer, p:prez, overview_content:list, dep_uuids, composite_type=COMPOSITE_TYPE.RGB):
-                    self.add_composite_layer(current_uuid_order, layer, prez_lookup[uuid])
+                    self.change_composite_layer(current_uuid_order, layer, prez_lookup[uuid])
                 else:
                     raise NotImplementedError('unable to create deferred scenegraph element for %s' % repr(layer))
             else:
                 # remove elements for layers which are no longer valid
-                remove_elements.append(layer.uuid)
+                remove_elements.append(uuid)
 
         # get info on the new order
         self.layer_set.set_layer_order(current_uuid_order)
         self.layer_set.frame_order = self.document.current_animation_order
-
-        # refresh our presentation info
-        # presentation_info = self.document.current_layer_set
-        for layer_prez in presentation_info :
-            uuid_temp     = layer_prez.uuid
-            layer = active_lookup[uuid_temp]
-            if layer.kind!=KIND.RGB:  # FIXME kludge
-                self.set_colormap(layer_prez.colormap, uuid=uuid_temp)
-                self.set_color_limits(layer_prez.climits, uuid=uuid_temp)
-            self.set_layer_visible(uuid_temp, visible=layer_prez.visible)
-            # FUTURE, if additional information is added to the presentation tuple, you must also update it here
+        self.rebuild_presentation(presentation_info)
 
         for elem in remove_elements:
             self.purge_layer(elem)

@@ -756,6 +756,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             LOG.info('updated metadata for layer %s: %s' % (layer.uuid, repr(list(updated.keys()))))
         self.didChangeComposition.emit([], layer, prez, rgba)
 
+    def set_rgb_range(self, layer:DocRGBLayer, rgba:str, min:float, max:float):
+        layer[INFO.CLIM] = tuple(x if c != rgba else (min, max) for c, x in zip("rgba", layer[INFO.CLIM]))
+        self.didChangeColorLimits.emit({layer[INFO.UUID]: layer[INFO.CLIM]})
 
     def __len__(self):
         return len(self.current_layer_set)

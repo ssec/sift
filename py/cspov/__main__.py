@@ -431,10 +431,8 @@ class Main(QtGui.QMainWindow):
         # we could just modify the layer and emit the document signal, but preference is to have document generate its own signals.
         self.document.revise_rgb_layer_choice(layer, **{rgba:selected})
 
-
     def _user_set_rgb_range(self, layer:DocRGBLayer, rgba:str, lo:float, hi:float):
-        raise NotImplementedError('RGB range setting not yet implemented')
-
+        self.document.set_rgb_range(layer, rgba, lo, hi)
 
     def update_point_probe_text(self, probe_name, state=None, xy_pos=None, uuid=None, animating=None):
         if uuid is None:

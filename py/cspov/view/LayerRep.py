@@ -237,11 +237,7 @@ class TextureTileState(object):
     """
     def __init__(self, num_tiles):
         self.num_tiles = num_tiles
-        self.itile_cache = {}
-        self._rev_cache = {}
-        # True if the data doesn't matter, False if data matters
-        self.tile_free = [True] * num_tiles
-        self.itile_age = []
+        self.reset()
 
     def __getitem__(self, item):
         """Get the texture index associated with this image tile index.
@@ -256,7 +252,8 @@ class TextureTileState(object):
     def reset(self):
         self.itile_cache = {}
         self._rev_cache = {}
-        self.tile_tree[:] = True
+        # True if the data doesn't matter, False if data matters
+        self.tile_free = [True] * self.num_tiles
         self.itile_age = []
 
     def next_available_tile(self):
@@ -428,7 +425,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self.cmap = cmap
 
         self.overview_info = None
-        self._init_overview(data)
+        self.init_overview(data)
 
         self.freeze()
 
@@ -457,7 +454,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         # Added to shader program, but not used by subdivide/tiled method
         return self.shape[-2:][::-1]
 
-    def _init_overview(self, data):
+    def init_overview(self, data):
         """Create and add a low resolution version of the data that is always
         shown behind the higher resolution image tiles.
         """
@@ -584,7 +581,6 @@ class TiledGeolocatedImageVisual(ImageVisual):
 
                 # we should have already loaded the texture data in to the GPU so get the index of that texture
                 tex_tile_idx = self.texture_state[(preferred_stride, tiy, virt_tix)]
-                # print(tex_tile_idx, preferred_stride, tiy, tix)
                 tex_coords[used_tile_idx*6: (used_tile_idx+1)*6, :] = self.calc.calc_texture_coordinates(tex_tile_idx)
                 vertices[used_tile_idx*6: (used_tile_idx+1)*6, :] = self.calc.calc_vertex_coordinates(tiy, tix, preferred_stride, preferred_stride)
 
@@ -718,28 +714,13 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         self._latest_tile_box = None
         self.wrap_lon = wrap_lon
         self._tiles = {}
-        assert (shape or data_arrays is not None), "`data` or `shape` must be provided"
-        self.shape = shape or max(data.shape for data in data_arrays)
-        self.ndim = len(self.shape) or data_arrays[0].ndim
-        self.num_channels = len(data_arrays)
-        # how many of the higher resolution channel tiles (smaller geographic area) make
-        # up a low resolution channel tile
-        self._channel_factors = tuple(round(self.shape[0] / float(chn.shape[0])) for chn in data_arrays)
-        self._lowest_factor = max(self._channel_factors)
-        self._lowest_rez = rez(abs(self.cell_height * self._lowest_factor), abs(self.cell_width * self._lowest_factor))
 
-        # Where does this image lie in this lonely world
-        self.calc = MercatorTileCalc(
-            self.name,
-            self.shape,
-            pnt(x=self.origin_x, y=self.origin_y),
-            rez(dy=abs(self.cell_height), dx=abs(self.cell_width)),
-            self.tile_shape,
-            self.texture_shape,
-            wrap_lon=self.wrap_lon
-        )
         # What tiles have we used and can we use (each texture uses the same 'state')
         self.texture_state = TextureTileState(self.num_tex_tiles)
+
+        self.set_channels(data_arrays, shape=shape)
+        self.ndim = len(self.shape) or data_arrays[0].ndim
+        self.num_channels = len(data_arrays)
 
         # load 'float packed rgba8' interpolation kernel
         # to load float interpolation kernel use
@@ -841,11 +822,40 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         self.cmap = _cmap[0]
 
         self.overview_info = None
-        self._init_overview(data_arrays)
+        self.init_overview(data_arrays)
 
         self.freeze()
 
-    def _init_overview(self, data_arrays):
+    def set_channels(self, data_arrays, shape=None):
+        assert (shape or data_arrays is not None), "`data` or `shape` must be provided"
+        self.shape = shape or max(data.shape for data in data_arrays)
+        # how many of the higher resolution channel tiles (smaller geographic area) make
+        # up a low resolution channel tile
+        self._channel_factors = tuple(round(self.shape[0] / float(chn.shape[0])) for chn in data_arrays)
+        self._lowest_factor = max(self._channel_factors)
+        self._lowest_rez = rez(abs(self.cell_height * self._lowest_factor), abs(self.cell_width * self._lowest_factor))
+
+        # Where does this image lie in this lonely world
+        self.calc = MercatorTileCalc(
+            self.name,
+            self.shape,
+            pnt(x=self.origin_x, y=self.origin_y),
+            rez(dy=abs(self.cell_height), dx=abs(self.cell_width)),
+            self.tile_shape,
+            self.texture_shape,
+            wrap_lon=self.wrap_lon
+        )
+
+        # Reset texture state, if we change things to know which texture
+        # don't need to be updated then this can be removed/changed
+        self.texture_state.reset()
+        self._need_texture_upload = True
+        self._need_vertex_update = True
+        # Reset the tiling logic to force a retile
+        # even though we might be looking at the exact same spot
+        self._latest_tile_box = None
+
+    def init_overview(self, data_arrays):
         """Create and add a low resolution version of the data that is always
         shown behind the higher resolution image tiles.
         """
@@ -1284,7 +1294,7 @@ class ShapefileLinesVisual(LineVisual):
         # FUTURE: Proj stuff should be done in GLSL for better speeds and flexibility with swapping projection (may require something in addition to transform)
         self.proj = Proj(projection)
 
-        print("Loading boundaries: ", datetime.utcnow().isoformat(" "))
+        LOG.info("Loading boundaries: %s", datetime.utcnow().isoformat(" "))
         # Prepare the arrays
         total_points = 0
         total_parts = 0
@@ -1315,7 +1325,7 @@ class ShapefileLinesVisual(LineVisual):
         kwargs.setdefault("color", (1.0, 1.0, 1.0, 1.0))
         kwargs.setdefault("width", 1)
         super().__init__(pos=vertex_buffer, connect="segments", **kwargs)
-        print("Done loading boundaries: ", datetime.utcnow().isoformat(" "))
+        LOG.info("Done loading boundaries: %s", datetime.utcnow().isoformat(" "))
 
 
 
