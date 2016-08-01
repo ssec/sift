@@ -505,8 +505,21 @@ class RGBLayerConfigPane(QWidget):
     def _show_settings_for_layer(self, layer):
         self.active_layer_ref = ref(layer) if layer is not None else None
         if layer is None:
+            for slider in self.sliders:
+                slider[0].setDisabled(True)
+                slider[1].setDisabled(True)
+            for combo in self.rgb:
+                combo.setDisabled(True)
+            # Hide the widget if possible
             self.hide()
             return
+        else:
+            # re-enable all the widgets
+            for slider in self.sliders:
+                slider[0].setDisabled(False)
+                slider[1].setDisabled(False)
+            for combo in self.rgb:
+                combo.setDisabled(False)
 
         # update the combo boxes
         self._set_combos_to_layer_names()
@@ -550,7 +563,10 @@ class RGBLayerConfigPane(QWidget):
         # non_rgb_kinds = [k for k in KIND if k != KIND.RGB]
 
         # clear out the current lists
+        layer_list = list(doc.layers_where(is_valid=True, in_type_set=non_rgb_classes))
         for widget in self.rgb:
+            # block signals so an existing RGB layer doesn't get overwritten with new layer selections
+            widget.blockSignals(True)
             widget.clear()
             widget.addItem('None', '')
 
@@ -563,6 +579,10 @@ class RGBLayerConfigPane(QWidget):
             uuid_string = str(uuid)
             for widget in self.rgb:
                 widget.addItem(layer_name, uuid_string)
+
+        for widget in self.rgb:
+            # reenable signals so the combo boxes work as expected
+            widget.blockSignals(False)
 
 
 
