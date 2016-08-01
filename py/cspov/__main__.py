@@ -813,6 +813,8 @@ def main():
                         help="Specify glob pattern for input images")
     parser.add_argument("-c", "--center", nargs=2, type=float,
                         help="Specify center longitude and latitude for camera")
+    parser.add_argument("--desktop", type=int, default=0,
+                        help="Number of monitor/display to show the main window on (0 for main, 1 for secondary, etc.)")
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=int(os.environ.get("VERBOSITY", 2)),
                         help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG (default INFO)')
     args = parser.parse_args()
@@ -837,15 +839,20 @@ def main():
         border_shapefile=args.border_shapefile,
         center=args.center,
     )
+    screen = QtGui.QApplication.desktop()
+    screen_geometry = screen.screenGeometry(args.desktop)
     if 'darwin' not in sys.platform:
-        # window.resize(2000,1000)
-        screen = QtGui.QDesktopWidget().screenGeometry()
-        w,h  = screen.width() - 400, screen.height() - 300
+        w, h = screen_geometry.width() - 400, screen_geometry.height() - 300
         window.setGeometry(200, 150, w, h)
-        # window.showMaximized()
-        window.show()
     else:
-        window.show()
+        size = window.size()
+        w, h = size.width(), size.height()
+        center = screen_geometry.center()
+        screen_x, screen_y = center.x(), center.y()
+        window.move(int(screen_x - w / 2.), int(screen_y - h / 2.))
+
+
+    window.show()
     print("running")
     # bring window to front
     window.raise_()
