@@ -299,7 +299,7 @@ class AHI_HSF_Guidebook(Guidebook):
         meta = dict(self.collect_info_from_seq(infos))
         it = meta.get(uuid, None)
         if it is None:
-            return None
+            return [], 0
         sibs = [(x[GUIDE.SCHED_TIME], x[GUIDE.UUID]) for x in
                 self._filter(meta.values(), it, {GUIDE.SCENE, GUIDE.BAND, GUIDE.INSTRUMENT, GUIDE.PLATFORM})]
         # then sort it into time order
