@@ -398,7 +398,7 @@ class RGBLayerConfigPane(QWidget):
 
     _rgb = None  # combo boxes in r,g,b order; cache
     _sliders = None  # sliders in r,g,b order; cache
-    _clims = [None, None, None]  # tuples of each layer's c-limits
+    _valid_ranges = [None, None, None]  # tuples of each layer's c-limits
 
     def __init__(self, ui, parent, document):
         super(RGBLayerConfigPane, self).__init__(parent)
@@ -446,19 +446,23 @@ class RGBLayerConfigPane(QWidget):
         :return:
         """
         uuid_str = combo.itemData(index)
-        color_index = "rgba".index(color)
+
         LOG.debug("RGB: user selected %s for %s" % (uuid_str, color))
         if uuid_str:
             uuid = UUID(uuid_str)
             new_layer = self.document_ref()[uuid]
-            self._clims[color_index] = new_layer[INFO.CLIM]
         else:
-            self._clims[color_index] = None
             new_layer = None
+
         # reset slider position to min and max for layer
-        self.sliders[color_index][0].setSliderPosition(0)
-        self.sliders[color_index][1].setSliderPosition(self._slider_steps)
+        self._set_minmax_slider(color, new_layer)
         self.didChangeRGBLayerSelection.emit(self.active_layer_ref(), color, new_layer)
+
+    def _get_slider_value(self, valid_min, valid_max, slider_val):
+        return (slider_val / self._slider_steps) * (valid_max - valid_min) + valid_min
+
+    def _create_slider_value(self, valid_min, valid_max, channel_val):
+        return ((channel_val - valid_min) / (valid_max - valid_min)) * self._slider_steps
 
     def _min_max_for_color(self, rgba:str):
         """
@@ -466,23 +470,22 @@ class RGBLayerConfigPane(QWidget):
         :param rgba: char in 'rgba'
         :return: (min-value, max-value) where min can be > max
         """
-        LOG.warning('slider ranges not implemented, this is placeholder data')
-        return (0.0, 1.0)  # FIXME
+        idx = "rgba".index(rgba)
+        slider = self.sliders[idx]
+        valid_min, valid_max = self._valid_ranges[idx]
+        n = self._get_slider_value(valid_min, valid_max, slider[0].value())
+        x = self._get_slider_value(valid_min, valid_max, slider[1].value())
+        return n, x
 
     def _slider_changed(self, slider=None, color:str=None, is_max:bool=False):
         """
 
-        :param value: new value of the slider
         :param slider: control
         :param color: char in 'rgba'
         :param is_max: whether slider's value represents the max or the min
         :return:
         """
-        idx = "rgba".index(color)
-        slider = self.sliders[idx]
-        n, x = self._clims[idx]
-        n = (slider[0].value() / self._slider_steps) * (x - n) + n
-        x = (slider[1].value() / self._slider_steps) * (x - n) + n
+        n, x = self._min_max_for_color(color)
         self.didChangeRGBLayerComponentRange.emit(self.active_layer_ref(), color, n, x)
 
     def selection_did_change(self, uuids=None):
@@ -521,16 +524,48 @@ class RGBLayerConfigPane(QWidget):
             for combo in self.rgb:
                 combo.setDisabled(False)
 
+        for widget in self.rgb:
+            # block signals so an existing RGB layer doesn't get overwritten with new layer selections
+            widget.blockSignals(True)
+
         # update the combo boxes
         self._set_combos_to_layer_names()
-
         self._select_layers_for(layer)
+        self._set_minmax_sliders(layer)
 
-        # update the min-max scrollers
-        # self._set_minmax_sliders(layer)  # FIXME
-        # LOG.warning('unimplemented: initializing layer sliders to min-max range')
+        for widget in self.rgb:
+            # block signals so an existing RGB layer doesn't get overwritten with new layer selections
+            widget.blockSignals(False)
 
         self.show()
+
+    def _set_minmax_slider(self, color:str, layer, clims=None, valid_range=None):
+        idx = "rgba".index(color)
+        slider = self.sliders[idx]
+        if layer is None:
+            self._valid_ranges[idx] = None
+            slider[0].setSliderPosition(0)
+            slider[1].setSliderPosition(0)
+        else:
+            valid_range = self.document_ref().valid_range_for_uuid(layer.uuid) if valid_range is None else valid_range
+            clims = valid_range if clims is None else clims
+            self._valid_ranges[idx] = valid_range
+
+            slider_val = self._create_slider_value(valid_range[0], valid_range[1], clims[0])
+            slider[0].setSliderPosition(max(slider_val, 0))
+            slider_val = self._create_slider_value(valid_range[0], valid_range[1], clims[1])
+            slider[1].setSliderPosition(min(slider_val, self._slider_steps))
+
+    def _set_minmax_sliders(self, layer=None, rgb_clims=None):
+        if isinstance(layer, DocRGBLayer):
+            rgb_clims = layer[INFO.CLIM] if rgb_clims is None else rgb_clims
+            for idx, (color, sub_layer) in enumerate(zip("rgb", [layer.r, layer.g, layer.b])):
+                clim = rgb_clims[idx] if rgb_clims else None
+                self._set_minmax_slider(color, sub_layer, clim)
+        else:
+            self._set_minmax_slider("r", None)
+            self._set_minmax_slider("g", None)
+            self._set_minmax_slider("b", None)
 
     def _select_layers_for(self, layer=None):
         """
@@ -565,8 +600,6 @@ class RGBLayerConfigPane(QWidget):
         # clear out the current lists
         layer_list = list(doc.layers_where(is_valid=True, in_type_set=non_rgb_classes))
         for widget in self.rgb:
-            # block signals so an existing RGB layer doesn't get overwritten with new layer selections
-            widget.blockSignals(True)
             widget.clear()
             widget.addItem('None', '')
 
@@ -579,13 +612,3 @@ class RGBLayerConfigPane(QWidget):
             uuid_string = str(uuid)
             for widget in self.rgb:
                 widget.addItem(layer_name, uuid_string)
-
-        for widget in self.rgb:
-            # reenable signals so the combo boxes work as expected
-            widget.blockSignals(False)
-
-
-
-
-
-

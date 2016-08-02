@@ -344,6 +344,15 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for p in self.prez_for_uuids(uuids, lset=lset):
             yield p.colormap
 
+    def valid_range_for_uuid(self, uuid):
+        # Limit ourselves to what information
+        layer = self._layer_with_uuid[uuid]
+        return self._guidebook.climits({
+            INFO.UUID: uuid,
+            INFO.KIND: layer[INFO.KIND],
+            INFO.PATHNAME: layer[INFO.PATHNAME],
+        })
+
     def convert_units(self, uuid, data, inverse=False):
         formatstr, unitstr, lam = self._guidebook.units_conversion(self._layer_with_uuid[uuid])
         return formatstr, unitstr, lam(data, inverse)
