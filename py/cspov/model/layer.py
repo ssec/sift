@@ -239,9 +239,11 @@ class DocCompositeLayer(DocLayer):
 
 
 class DocRGBLayer(DocCompositeLayer):
-    l = [None, None, None, None]  # RGBA upstream layers
-    n = [None, None, None, None]  # RGBA minimum value from upstream layers
-    x = [None, None, None, None]  # RGBA maximum value from upstream layers
+    def __init__(self, *args, **kwargs):
+        self.l = [None, None, None, None]  # RGBA upstream layers
+        self.n = [None, None, None, None]  # RGBA minimum value from upstream layers
+        self.x = [None, None, None, None]  # RGBA maximum value from upstream layers
+        super().__init__(*args, **kwargs)
 
     @property
     def r(self):

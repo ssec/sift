@@ -649,6 +649,8 @@ class Main(QtGui.QMainWindow):
             uuids = list(self.behaviorLayersList.current_selected_uuids())
         if len(uuids)<3:  # pad with None
             uuids = uuids + ([None] * (3 - len(uuids)))
+        # Don't use non-basic layers as starting points for the new composite
+        uuids = [uuid if uuid is not None and self.document[uuid][INFO.KIND] == KIND.IMAGE else None for uuid in uuids]
         layer = self.document.create_rgb_composite(uuids[0], uuids[1], uuids[2])
         self.behaviorLayersList.select([layer.uuid])
 
