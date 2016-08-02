@@ -386,7 +386,6 @@ class SceneGraphManager(QObject):
 
         self.image_elements = {}
         self.composite_element_dependencies = {}
-        self.datasets = {}
         self.colormaps = {}
         self.colormaps.update(ALL_COLORMAPS)
         self.layer_set = LayerSet(self, frame_change_cb=self.frame_changed)
@@ -730,7 +729,6 @@ class SceneGraphManager(QObject):
         )
         image.transform *= STTransform(translate=(0, 0, -50.0))
         self.image_elements[uuid] = image
-        self.datasets[uuid] = layer
         self.layer_set.add_layer(image)
         self.on_view_change(None)
 
@@ -823,8 +821,6 @@ class SceneGraphManager(QObject):
             image_layer = self.image_elements[uuid_removed]
             image_layer.parent = None
             del self.image_elements[uuid_removed]
-            del self.datasets[uuid_removed]
-            # del self.image_layers[uuid_removed]
             LOG.info("layer {} purge from scenegraphmanager".format(uuid_removed))
         else:
             LOG.debug("Layer {} already purged from Scene Graph".format(uuid_removed))
