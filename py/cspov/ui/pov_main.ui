@@ -479,6 +479,9 @@
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QDockWidget" name="areaProbePane">
+   <property name="features">
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
+   </property>
    <property name="windowTitle">
     <string>Area Probe Graphs</string>
    </property>
@@ -515,6 +518,9 @@
    </widget>
   </widget>
   <widget class="QDockWidget" name="layersPane">
+   <property name="features">
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
+   </property>
    <property name="windowTitle">
     <string>Layers</string>
    </property>
@@ -560,6 +566,9 @@
    <property name="statusTip">
     <string>Selected layer information</string>
    </property>
+   <property name="features">
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
+   </property>
    <property name="windowTitle">
     <string>Layer Details</string>
    </property>
@@ -576,8 +585,29 @@
    </widget>
   </widget>
   <widget class="QDockWidget" name="rgbConfigPane">
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
+   <property name="maximumSize">
+    <size>
+     <width>800</width>
+     <height>800</height>
+    </size>
+   </property>
+   <property name="baseSize">
+    <size>
+     <width>128</width>
+     <height>128</height>
+    </size>
+   </property>
+   <property name="features">
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
+   </property>
    <property name="windowTitle">
-    <string>RGB Layer</string>
+    <string>Change Layer Colors</string>
    </property>
    <attribute name="dockWidgetArea">
     <number>2</number>

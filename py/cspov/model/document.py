@@ -134,6 +134,10 @@ class DocLayerStack(MutableSequence):
         else:
             raise ValueError('unable to index LayerStack using %s' % repr(index))
 
+    def __iter__(self):
+        for each in self._store:
+            yield each
+
     def __len__(self):
         return len(self._store)
 
@@ -144,6 +148,10 @@ class DocLayerStack(MutableSequence):
     def insert(self, index:int, value:prez):
         self._store.insert(index, value)
         self._u2r = None
+
+    def clear_animation_order(self):
+        for i,q in enumerate(self._store):
+            self._store[i] = q._replace(a_order=None)
 
 
 
@@ -212,18 +220,18 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     _guidebook = None  # FUTURE: this is currently an AHI_HSF_Guidebook, make it a general guidebook
 
     # signals
-    didAddBasicLayer = pyqtSignal(list, DocBasicLayer, prez)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
-    didAddCompositeLayer = pyqtSignal(list, DocCompositeLayer, prez)  # comp layer is derived from multiple basic layers and has its own UUID
-    didRemoveLayers = pyqtSignal(list, list, int, int)  # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
+    didAddBasicLayer = pyqtSignal(tuple, UUID, prez)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
+    didAddCompositeLayer = pyqtSignal(tuple, UUID, prez)  # comp layer is derived from multiple basic layers and has its own UUID
+    didRemoveLayers = pyqtSignal(tuple, list, int, int)  # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
     willPurgeLayer = pyqtSignal(UUID)  # UUID of the layer being removed
-    didReorderLayers = pyqtSignal(list)  # list of original indices in their new order, None for new layers
+    didReorderLayers = pyqtSignal(tuple)  # list of original indices in their new order, None for new layers
     didChangeLayerVisibility = pyqtSignal(dict)  # {UUID: new-visibility, ...} for changed layers
-    didReorderAnimation = pyqtSignal(list)  # list of UUIDs representing new animation order
+    didReorderAnimation = pyqtSignal(tuple)  # list of UUIDs representing new animation order
     didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
-    didSwitchLayerSet = pyqtSignal(int, DocLayerStack, list)  # new layerset number typically 0..3, list of prez tuples representing new display order, new animation order
+    didSwitchLayerSet = pyqtSignal(int, tuple, tuple)  # new layerset number typically 0..3, list of prez tuples representing new display order, new animation order
     didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
-    didChangeComposition = pyqtSignal(list, DocCompositeLayer, prez, dict)  # new-layer-order, changed-layer, change-info: composite channels were reassigned or polynomial altered
+    didChangeComposition = pyqtSignal(tuple, UUID, prez, dict)  # new-layer-order, changed-layer, change-info: composite channels were reassigned or polynomial altered
     didCalculateLayerEqualizerValues = pyqtSignal(dict)  # dict of {uuid: (value, normalized_value_within_clim)} for equalizer display
     # didChangeShapeLayer = pyqtSignal(dict)
 
@@ -261,6 +269,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def _insert_layer_with_info(self, info: DocLayer, cmap=None, insert_before=0):
         """
         insert a layer into the presentations but do not signal
+        :return: new prez tuple, new reordered indices tuple
         """
         p = prez(uuid=info[INFO.UUID],
                  kind=info[INFO.KIND],
@@ -276,7 +285,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             if lset is not None:  # uninitialized layer sets will be None
                 lset.insert(insert_before, p if dex == self.current_set_index else q)
 
-        reordered_indices = [None] + list(range(old_layer_count))  # FIXME: this should obey insert_before, currently assumes always insert at top
+        reordered_indices = tuple([None] + list(range(old_layer_count)))  # FIXME: this should obey insert_before, currently assumes always insert at top
         return p, reordered_indices
 
     def open_file(self, path, insert_before=0):
@@ -302,7 +311,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         dataset[INFO.NAME] = self._guidebook.display_name(dataset) or dataset[INFO.NAME]
         presentation, reordered_indices = self._insert_layer_with_info(dataset, cmap=cmap, insert_before=insert_before)
         # signal updates from the document
-        self.didAddBasicLayer.emit(reordered_indices, dataset, presentation)
+        self.didAddBasicLayer.emit(reordered_indices, dataset.uuid, presentation)
         return uuid, dataset, content
 
     def open_files(self, paths, insert_before = 0):
@@ -413,13 +422,13 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     @property
     def current_animation_order(self):
         """
-        return list of UUIDs representing the animation order in the currently selected layer set
-        :return: list of UUIDs
+        return tuple of UUIDs representing the animation order in the currently selected layer set
+        :return: tuple of UUIDs
         """
         cls = self.current_layer_set
         aouu = [(x.a_order, x.uuid) for x in cls if (x.a_order is not None)]
         aouu.sort()
-        ao = [u for a,u in aouu]
+        ao = tuple(u for a,u in aouu)
         LOG.debug('animation order is {0!r:s}'.format(ao))
         return ao
         # return list(reversed(self.current_layer_order))
@@ -434,7 +443,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         list of UUIDs (top to bottom) currently being displayed, independent of visibility/validity
         :return:
         """
-        return [x.uuid for x in self.current_layer_set]
+        return tuple(x.uuid for x in self.current_layer_set)
 
     @property
     def current_visible_layer_uuid(self):
@@ -689,7 +698,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             }
             self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
             presentation, reordered_indices = self._insert_layer_with_info(ds_info)
-            self.didAddCompositeLayer.emit(reordered_indices, ds_info, presentation)
+            self.didAddCompositeLayer.emit(reordered_indices, ds_info.uuid, presentation)
             return ds_info
 
         # disable visibility of the existing layers FUTURE: remove them entirely? probably not
@@ -730,7 +739,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         }
         self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
         presentation, reordered_indices = self._insert_layer_with_info(ds_info)
-        self.didAddCompositeLayer.emit(reordered_indices, ds_info, presentation)
+        self.didAddCompositeLayer.emit(reordered_indices, ds_info.uuid, presentation)
         return ds_info
 
     def create_empty_rgb_composite(self):
@@ -763,7 +772,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if layer.is_valid:
             updated = layer.update_metadata_from_dependencies()
             LOG.info('updated metadata for layer %s: %s' % (layer.uuid, repr(list(updated.keys()))))
-        self.didChangeComposition.emit([], layer, prez, rgba)
+        self.didChangeComposition.emit((), layer.uuid, prez, rgba)
 
     def set_rgb_range(self, layer:DocRGBLayer, rgba:str, min:float, max:float):
         layer[INFO.CLIM] = tuple(x if c != rgba else (min, max) for c, x in zip("rgba", layer[INFO.CLIM]))
@@ -790,11 +799,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             # now remove from the active layer set
             self.remove_layer_prez(uuid)  # this will send signal and start purge
 
-    def clear_animation_order(self):
-        cls = self.current_layer_set
-        for i,q in enumerate(cls):
-            cls[i] = q._replace(a_order=None)
-
     def animate_siblings_of_layer(self, row_or_uuid):
         uuid = self.current_layer_set[row_or_uuid].uuid if not isinstance(row_or_uuid, UUID) else row_or_uuid
         new_anim_uuids, _ = self._guidebook.time_siblings(uuid, self._layer_with_uuid.values())
@@ -806,8 +810,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             return []
         LOG.debug('new animation order will be {0!r:s}'.format(new_anim_uuids))
         L = self.current_layer_set
-        self.clear_animation_order()
-        for dex,u in enumerate(new_anim_uuids):
+        L.clear_animation_order()
+        for dex,u in enumerate(new_anim_uuids):  # FUTURE: migrate function to DocLayerStack?
             LOG.debug(u)
             row = L.uuid2row.get(u, None)
             if row is None:
@@ -816,7 +820,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             old = L[row]
             new = old._replace(a_order=dex)
             L[row] = new
-        self.didReorderAnimation.emit(new_anim_uuids)
+        self.didReorderAnimation.emit(tuple(new_anim_uuids))
         return new_anim_uuids
 
     def get_info(self, row=None, uuid=None):
@@ -837,6 +841,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if isinstance(row_or_uuid, UUID):
             return self._layer_with_uuid[row_or_uuid]
         else:
+            LOG.warning('DEPRECATED usage document[index:int] -> DocLayerStack[index]')
             return self.current_layer_set[row_or_uuid]
 
     def reorder_by_indices(self, new_order, uuids=None, layer_set_index=None):
@@ -848,7 +853,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         assert(len(new_order)==len(self._layer_sets[layer_set_index]))
         new_layer_set = [self._layer_sets[layer_set_index][n] for n in new_order]
         self._layer_sets[layer_set_index] = new_layer_set
-        self.didReorderLayers.emit(new_order)
+        self.didReorderLayers.emit(tuple(new_order))
 
     def insert_layer_prez(self, row:int, layer_prez_seq):
         cls = self.current_layer_set
@@ -896,7 +901,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         clo = list(range(len(self.current_layer_set)))
         del clo[row:row+count]
         del self.current_layer_set[row:row+count]
-        self.didRemoveLayers.emit(clo, uuids, row, count)
+        self.didRemoveLayers.emit(tuple(clo), uuids, row, count)
         for uuid in uuids:
             if not self.is_using(uuid):
                 LOG.info('purging layer {}, no longer in use'.format(uuid))

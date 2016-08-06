@@ -704,8 +704,8 @@ class SceneGraphManager(QObject):
             LOG.info('changing {} to colormap {}'.format(uuid, clims))
             self.set_color_limits(clims, uuid)
 
-    def add_basic_layer(self, new_order:list, layer:DocBasicLayer, p:prez):
-        uuid = layer.uuid
+    def add_basic_layer(self, new_order:tuple, uuid:UUID, p:prez):
+        layer = self.document[uuid]
         # create a new layer in the imagelist
         if not layer.is_valid:
             LOG.warning('unable to add an invalid layer, will try again later when layer changes')
@@ -732,7 +732,8 @@ class SceneGraphManager(QObject):
         self.layer_set.add_layer(image)
         self.on_view_change(None)
 
-    def add_composite_layer(self, new_order:list, layer:DocCompositeLayer, p:prez):
+    def add_composite_layer(self, new_order:tuple, uuid:UUID, p:prez):
+        layer = self.document[uuid]
         LOG.debug("SceenGraphManager.add_composite_layer %s" % repr(layer))
         if not layer.is_valid:
             LOG.info('unable to add an invalid layer, will try again later when layer changes')
@@ -765,7 +766,8 @@ class SceneGraphManager(QObject):
         else:
             raise ValueError("Unknown or unimplemented composite type")
 
-    def change_composite_layer(self, new_order:list, layer:DocCompositeLayer, presentation:prez, changes:dict):
+    def change_composite_layer(self, new_order:tuple, uuid:UUID, presentation:prez, changes:dict):
+        layer = self.document[uuid]
         if isinstance(layer, DocRGBLayer):
             if layer.uuid in self.image_elements:
                 if layer.is_valid:
@@ -792,7 +794,7 @@ class SceneGraphManager(QObject):
         else:
             raise ValueError("Unknown or unimplemented composite type")
 
-    def remove_layer(self, new_order:list, uuids_removed:list, row:int, count:int):
+    def remove_layer(self, new_order:tuple, uuids_removed:tuple, row:int, count:int):
         """
         remove (disable) a layer, though this may be temporary due to a move.
         wait for purge to truly flush out this puppy
