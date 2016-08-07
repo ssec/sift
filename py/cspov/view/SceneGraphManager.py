@@ -734,7 +734,7 @@ class SceneGraphManager(QObject):
 
     def add_composite_layer(self, new_order:tuple, uuid:UUID, p:prez):
         layer = self.document[uuid]
-        LOG.debug("SceenGraphManager.add_composite_layer %s" % repr(layer))
+        LOG.debug("SceneGraphManager.add_composite_layer %s" % repr(layer))
         if not layer.is_valid:
             LOG.info('unable to add an invalid layer, will try again later when layer changes')
             return
@@ -786,7 +786,7 @@ class SceneGraphManager(QObject):
             else:
                 if layer.is_valid:
                     # Add this now valid layer
-                    self.add_composite_layer(new_order, layer, presentation)
+                    self.add_composite_layer(new_order, layer.uuid, presentation)
                 else:
                     LOG.info('unable to add an invalid layer, will try again later when layer changes')
                     return

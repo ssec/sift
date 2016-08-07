@@ -833,16 +833,17 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             return nfo
         return None
 
-    def __getitem__(self, row_or_uuid):
+    def __getitem__(self, layer_uuid):
         """
-        return presentation tuple for a given layer index from the current active layer set
+        return layer with the given UUID
         """
         # FIXME: this lacks consistency?
-        if isinstance(row_or_uuid, UUID):
-            return self._layer_with_uuid[row_or_uuid]
+        if isinstance(layer_uuid, UUID):
+            return self._layer_with_uuid[layer_uuid]
         else:
-            LOG.warning('DEPRECATED usage document[index:int] -> DocLayerStack[index]')
-            return self.current_layer_set[row_or_uuid]
+            raise ValueError('document[UUID] required, %r was used' % type(layer_uuid))
+            # LOG.error('DEPRECATED usage document[index:int] -> DocLayerStack[index]; arg type is %r' % type(row_or_uuid))
+            # return self.current_layer_set[row_or_uuid]
 
     def reorder_by_indices(self, new_order, uuids=None, layer_set_index=None):
         """given a new layer order, replace the current layer set
