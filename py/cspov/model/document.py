@@ -709,7 +709,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         uuids = [r,g,b]
         LOG.debug("New Composite UUIDs: %r" % uuids)
-        # FIXME: register this with workspace!
+        # FUTURE: register this with workspace!
 
         dep_info = [(None if uuid is None else self.get_info(uuid=uuid)) for uuid in uuids]
         highest_res_dep = min(dep_info, key=lambda x: x[INFO.CELL_WIDTH])
@@ -775,6 +775,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.didChangeComposition.emit((), layer.uuid, prez, rgba)
 
     def set_rgb_range(self, layer:DocRGBLayer, rgba:str, min:float, max:float):
+        # FUTURE: migrate RGB clim into prez and not layer
         layer[INFO.CLIM] = tuple(x if c != rgba else (min, max) for c, x in zip("rgba", layer[INFO.CLIM]))
         self.didChangeColorLimits.emit({layer[INFO.UUID]: layer[INFO.CLIM]})
 
@@ -837,7 +838,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """
         return layer with the given UUID
         """
-        # FIXME: this lacks consistency?
         if isinstance(layer_uuid, UUID):
             return self._layer_with_uuid[layer_uuid]
         else:
