@@ -456,7 +456,7 @@ class RGBLayerConfigPane(QWidget):
 
         # reset slider position to min and max for layer
         self._set_minmax_slider(color, new_layer)
-        self.didChangeRGBLayerSelection.emit(self.active_layer_ref(), color, new_layer)
+        self.didChangeRGBLayerSelection.emit(self.active_layer_ref().uuid, color, new_layer)
 
     def _get_slider_value(self, valid_min, valid_max, slider_val):
         return (slider_val / self._slider_steps) * (valid_max - valid_min) + valid_min
@@ -486,7 +486,7 @@ class RGBLayerConfigPane(QWidget):
         :return:
         """
         n, x = self._min_max_for_color(color)
-        self.didChangeRGBLayerComponentRange.emit(self.active_layer_ref(), color, n, x)
+        self.didChangeRGBLayerComponentRange.emit(self.active_layer_ref().uuid, color, n, x)
 
     def selection_did_change(self, uuids=None):
         """
