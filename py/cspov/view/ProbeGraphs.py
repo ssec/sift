@@ -87,7 +87,7 @@ class ProbeGraphManager (QObject) :
     """
 
     # signals
-    didChangeTab = pyqtSignal(list,)  # list of probe areas to show
+    didChangeTab = pyqtSignal(tuple,)  # list of probe areas to show
     didClonePolygon = pyqtSignal(str, str)
     drawChildGraph = pyqtSignal(str,)
     pointProbeChanged = pyqtSignal(str, bool, tuple)
@@ -290,7 +290,7 @@ class ProbeGraphManager (QObject) :
             self.graphs[self.selected_graph_index].rebuildPlot()
 
         currentName = self.graphs[self.selected_graph_index].getName()
-        self.didChangeTab.emit([currentName])
+        self.didChangeTab.emit((currentName,))
 
 class ProbeGraphDisplay (object) :
     """The ProbeGraphDisplay controls one tab of the Area Probe Graphs.

@@ -20,7 +20,7 @@ REQUIRES
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-
+from uuid import UUID
 from vispy import app
 try:
     app_object = app.use_app('pyqt4')
@@ -420,7 +420,7 @@ class Main(QtGui.QMainWindow):
     #         self.animation_slider_jump_frame(None)
     #         self.behaviorLayersList.select([info[INFO.UUID]])
 
-    def _user_set_rgb_layer(self, layer:DocRGBLayer, rgba:str, selected:DocLayer):
+    def _user_set_rgb_layer(self, uuid:UUID, rgba:str, selected:DocLayer):
         """
         handle signal from layer info panel which says that an RGB layer selected a new layer as channel
         :param layer: layer being edited
@@ -429,9 +429,11 @@ class Main(QtGui.QMainWindow):
         :return:
         """
         # we could just modify the layer and emit the document signal, but preference is to have document generate its own signals.
+        layer = self.document[uuid]
         self.document.revise_rgb_layer_choice(layer, **{rgba:selected})
 
-    def _user_set_rgb_range(self, layer:DocRGBLayer, rgba:str, lo:float, hi:float):
+    def _user_set_rgb_range(self, uuid:UUID, rgba:str, lo:float, hi:float):
+        layer = self.document[uuid]
         self.document.set_rgb_range(layer, rgba, lo, hi)
 
     def update_point_probe_text(self, probe_name, state=None, xy_pos=None, uuid=None, animating=None):

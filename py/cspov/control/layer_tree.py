@@ -230,7 +230,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
     _mimetype = 'application/vnd.row.list'
 
     # signals
-    uuidSelectionChanged = pyqtSignal(list,)  # the list is a list of the currently selected UUIDs
+    uuidSelectionChanged = pyqtSignal(tuple,)  # the list is a list of the currently selected UUIDs
 
     def __init__(self, widgets:list, doc:Document):
         """
@@ -307,7 +307,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
     def changedSelection(self, *args) :
         """connected to the various listbox signals that represent the user changing selections
         """
-        selected_uuids = list(self.current_selected_uuids(self.current_set_listbox))
+        selected_uuids = tuple(self.current_selected_uuids(self.current_set_listbox))
         self.uuidSelectionChanged.emit(selected_uuids)
 
     @property
@@ -317,7 +317,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         Return whichever one is currently active.
         :return:
         """
-        # FIXME this is fugly
+        # FUTURE this is brute force and could be tracked
         for widget in self.widgets:
             if widget.isVisible():
                 return widget

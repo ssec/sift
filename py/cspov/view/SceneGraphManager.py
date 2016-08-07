@@ -598,8 +598,8 @@ class SceneGraphManager(QObject):
     def copy_polygon(self, old_name, new_name):
         self.on_new_polygon(new_name, self.polygon_probes[old_name].pos)
 
-    def show_only_polygons(self, list_of_polygon_names_to_show) :
-        temp_set = set(list_of_polygon_names_to_show)
+    def show_only_polygons(self, polygon_names_to_show) :
+        temp_set = set(polygon_names_to_show)
         for polygon_name in self.polygon_probes.keys() :
             self.polygon_probes[polygon_name].visible = polygon_name in temp_set
 

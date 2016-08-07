@@ -393,8 +393,8 @@ class RGBLayerConfigPane(QWidget):
     document_ref = None  # weakref to document
     active_layer_ref = None  # weakref to RGB layer we're currently showing
 
-    didChangeRGBLayerSelection = pyqtSignal(DocRGBLayer, str, object)  # layer being changed, character from 'rgba', layer being assigned
-    didChangeRGBLayerComponentRange = pyqtSignal(DocRGBLayer, str, float, float)  # layer being changed, char from 'rgba', new-min, new-max
+    didChangeRGBLayerSelection = pyqtSignal(UUID, str, object)  # layer being changed, character from 'rgba', layer being assigned
+    didChangeRGBLayerComponentRange = pyqtSignal(UUID, str, float, float)  # layer being changed, char from 'rgba', new-min, new-max
 
     _rgb = None  # combo boxes in r,g,b order; cache
     _sliders = None  # sliders in r,g,b order; cache
