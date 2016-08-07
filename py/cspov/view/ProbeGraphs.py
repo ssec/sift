@@ -173,7 +173,7 @@ class ProbeGraphManager (QObject) :
             # give it a copy of the current polygon
             graph.setPolygon(current_graph.polygon[:] if current_graph.polygon is not None else None)
             graph.checked = current_graph.checked
-            point_status, point_xy = self.point_probes[DEFAULT_POINT_PROBE]
+            point_status, point_xy = self.point_probes.get(DEFAULT_POINT_PROBE, (None,None))
             point_xy = point_xy if point_status else None
             graph.setPoint(point_xy, rebuild=False)
 
