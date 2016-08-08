@@ -432,9 +432,9 @@ class RGBLayerConfigPane(QWidget):
          for rgb,x in zip(('b', 'g', 'r'), (self.ui.slideMinBlue, self.ui.slideMinGreen, self.ui.slideMinRed))]
         [x.sliderReleased.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=True))
          for rgb, x in zip(('b', 'g', 'r'), (self.ui.slideMaxBlue, self.ui.slideMaxGreen, self.ui.slideMaxRed))]
-        [x.returnPressed.connect(partial(self._edit_changed, line_edit=x, color=rgb, is_max=False))
+        [x.editingFinished.connect(partial(self._edit_changed, line_edit=x, color=rgb, is_max=False))
          for rgb, x in zip(('b', 'g', 'r'), (self.ui.editMinBlue, self.ui.editMinGreen, self.ui.editMinRed))]
-        [x.returnPressed.connect(partial(self._edit_changed, line_edit=x, color=rgb, is_max=True))
+        [x.editingFinished.connect(partial(self._edit_changed, line_edit=x, color=rgb, is_max=True))
          for rgb, x in zip(('b', 'g', 'r'), (self.ui.editMaxBlue, self.ui.editMaxGreen, self.ui.editMaxRed))]
 
     @property
