@@ -384,6 +384,7 @@ class SingleLayerInfoPane (QWidget) :
                 cmap_html = cmap_html.replace("height", "border-collapse: collapse;\nheight")
                 self.cmap_vis.setHtml("""<html><head></head><body style="margin: 0px"><div>%s</div></body></html>""" % (cmap_html,))
 
+RGBA2IDX = dict(r=0, g=1, b=2, a=3)
 
 class RGBLayerConfigPane(QWidget):
     """
@@ -494,7 +495,7 @@ class RGBLayerConfigPane(QWidget):
         :param rgba: char in 'rgba'
         :return: (min-value, max-value) where min can be > max
         """
-        idx = "rgba".index(rgba)
+        idx = RGBA2IDX[rgba]
         slider = self.sliders[idx]
         valid_min, valid_max = self._valid_ranges[idx]
         n = self._get_slider_value(valid_min, valid_max, slider[0].value())
@@ -502,7 +503,7 @@ class RGBLayerConfigPane(QWidget):
         return n, x
 
     def _update_edits(self, color:str, n:float, x:float):
-        idx = "rgba".index(color)
+        idx = RGBA2IDX[color]
         edn, edx = self.line_edits[idx]
         edn.setText('%f' % n)
         edx.setText('%f' % x)
@@ -529,7 +530,7 @@ class RGBLayerConfigPane(QWidget):
         :param is_max: whether the min or max edit field was changed
         :return:
         """
-        idx = "rgba".index(color)
+        idx = RGBA2IDX[color]
         vn, vx= self._valid_ranges[idx]
         v = float(line_edit.text())
         sv = self._create_slider_value(vn, vx, v)
@@ -596,7 +597,7 @@ class RGBLayerConfigPane(QWidget):
         self.show()
 
     def _set_minmax_slider(self, color:str, layer, clims=None, valid_range=None):
-        idx = "rgba".index(color)
+        idx = RGBA2IDX[color]
         slider = self.sliders[idx]
         editn, editx = self.line_edits[idx]
         if layer is None:
