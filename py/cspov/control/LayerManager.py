@@ -433,9 +433,9 @@ class RGBLayerConfigPane(QWidget):
         [x.sliderReleased.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=True))
          for rgb, x in zip(('b', 'g', 'r'), (self.ui.slideMaxBlue, self.ui.slideMaxGreen, self.ui.slideMaxRed))]
         [x.returnPressed.connect(partial(self._edit_changed, line_edit=x, color=rgb, is_max=False))
-         for rgb, x in zip(('b', 'g', 'r'), (self.ui.editMinRed, self.ui.editMinGreen, self.ui.editMinBlue))]
+         for rgb, x in zip(('b', 'g', 'r'), (self.ui.editMinBlue, self.ui.editMinGreen, self.ui.editMinRed))]
         [x.returnPressed.connect(partial(self._edit_changed, line_edit=x, color=rgb, is_max=True))
-         for rgb, x in zip(('b', 'g', 'r'), (self.ui.editMaxRed, self.ui.editMaxGreen, self.ui.editMaxBlue))]
+         for rgb, x in zip(('b', 'g', 'r'), (self.ui.editMaxBlue, self.ui.editMaxGreen, self.ui.editMaxRed))]
 
     @property
     def rgb(self):
@@ -502,25 +502,44 @@ class RGBLayerConfigPane(QWidget):
         x = self._get_slider_value(valid_min, valid_max, slider[1].value())
         return n, x
 
-    def _update_edits(self, color:str, n:float, x:float):
+    def _update_line_edits(self, color:str, n:float=None, x:float=None):
+        """
+        update edit controls to match non-None values provided
+        if called with just color, returns current min and max
+        :param color: in 'rgba'
+        :param n: minimum value or None
+        :param x: max value or None
+        :return: new min, new max
+        """
         idx = RGBA2IDX[color]
         edn, edx = self.line_edits[idx]
-        edn.setText('%f' % n)
-        edx.setText('%f' % x)
-        # FIXME: verify no signal loops
+        if n is not None:
+            edn.setText('%f' % n)
+        else:
+            n = float(edn.text())
+        if x is not None:
+            edx.setText('%f' % x)
+        else:
+            x = float(edx.text())
+        return n, x
 
-    def _slider_changed(self, slider=None, color:str=None, is_max:bool=False, from_line_edit=False):
+    def _signal_color_changing_range(self, color:str, n:float, x:float):
+        self.didChangeRGBLayerComponentRange.emit(self.active_layer_ref().uuid, color, n, x)
+
+    def _slider_changed(self, slider=None, color:str=None, is_max:bool=False):
         """
-
+        handle slider update event from user
         :param slider: control
         :param color: char in 'rgba'
         :param is_max: whether slider's value represents the max or the min
         :return:
         """
-        n, x = self._min_max_for_color(color)
-        if not from_line_edit:  # avoid signal feedback loops
-            self._update_edits(color, n, x)
-        self.didChangeRGBLayerComponentRange.emit(self.active_layer_ref().uuid, color, n, x)
+        idx = RGBA2IDX[color]
+        valid_min, valid_max = self._valid_ranges[idx]
+        val = self._get_slider_value(valid_min, valid_max, slider.value())
+        LOG.debug('slider %s %s => %f' % (color, 'max' if is_max else 'min', val))
+        n, x = self._update_line_edits(color, val if not is_max else None, val if is_max else None)
+        self._signal_color_changing_range(color, n, x)
 
     def _edit_changed(self, line_edit:QLineEdit=None, color:str=None, is_max:bool=False):
         """
@@ -532,12 +551,12 @@ class RGBLayerConfigPane(QWidget):
         """
         idx = RGBA2IDX[color]
         vn, vx= self._valid_ranges[idx]
-        v = float(line_edit.text())
-        sv = self._create_slider_value(vn, vx, v)
+        val = float(line_edit.text())
+        LOG.debug('line edit %s %s => %f' % (color, 'max' if is_max else 'min', val))
+        sv = self._create_slider_value(vn, vx, val)
         slider = self.sliders[idx][1 if is_max else 0]
         slider.setValue(sv)
-        self._slider_changed(slider, color, is_max, from_line_edit=True)
-        # FIXME: propagate _slider_changed but avoid signal loops
+        self._signal_color_changing_range(color, *self._update_line_edits(color))
 
     def selection_did_change(self, uuids=None):
         """
@@ -614,7 +633,7 @@ class RGBLayerConfigPane(QWidget):
             slider[0].setSliderPosition(max(slider_val, 0))
             slider_val = self._create_slider_value(valid_range[0], valid_range[1], clims[1])
             slider[1].setSliderPosition(min(slider_val, self._slider_steps))
-            self._update_edits(color, *clims)
+            self._update_line_edits(color, *clims)
 
     def _set_minmax_sliders(self, layer=None, rgb_clims=None):
         if isinstance(layer, DocRGBLayer):
