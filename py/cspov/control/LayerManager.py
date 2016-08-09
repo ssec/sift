@@ -238,7 +238,7 @@ class SingleLayerInfoPane (QWidget) :
             self.band_text.setText("Band: ")
             self.wavelength_text.setText("Wavelength: ")
             self.colormap_text.setText("Colormap: ")
-            self.clims_text.setText("C-Limits: ")
+            self.clims_text.setText("Color Limits: ")
             self.cmap_vis.setHtml("")
 
         # otherwise display information on the selected layer(s)
@@ -374,7 +374,7 @@ class SingleLayerInfoPane (QWidget) :
             temp_cmap = shared_info["colormap"] if shared_info.get("colormap", None) is not None else ""
             self.colormap_text.setText("Colormap: " + temp_cmap)
             temp_clims = shared_info["climits"] if "climits" in shared_info else ""
-            self.clims_text.setText("C-Limits: " + temp_clims)
+            self.clims_text.setText("Color Limits: " + temp_clims)
 
             # format colormap
             if shared_info.get("colormap", None) is None:

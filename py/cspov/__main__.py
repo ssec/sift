@@ -468,6 +468,13 @@ class Main(QtGui.QMainWindow):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+        self.tabifyDockWidget(self.ui.layersPane, self.ui.areaProbePane)
+        self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.rgbConfigPane)
+
+        # self.tabifyDockWidget(self.ui.rgbConfigPane, self.ui.layerDetailsPane)
+        # Make the layer list and layer details shown
+        self.ui.layersPane.raise_()
+        self.ui.layerDetailsPane.raise_()
         # refer to objectName'd entities as self.ui.objectName
         self.setAcceptDrops(True)
 
