@@ -627,8 +627,8 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>296</width>
-          <height>478</height>
+          <width>274</width>
+          <height>435</height>
          </rect>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_33">
@@ -665,6 +665,12 @@
               </item>
               <item>
                <widget class="QLineEdit" name="editMinRed">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
                 <property name="minimumSize">
                  <size>
                   <width>80</width>

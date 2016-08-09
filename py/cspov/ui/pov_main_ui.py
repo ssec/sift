@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created: Tue Aug  9 15:05:02 2016
+# Created: Tue Aug  9 16:42:53 2016
 #      by: PyQt4 UI code generator 4.10.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -283,7 +283,7 @@ class Ui_MainWindow(object):
         self.scrollArea.setWidgetResizable(True)
         self.scrollArea.setObjectName(_fromUtf8("scrollArea"))
         self.scrollAreaWidgetContents_8 = QtGui.QWidget()
-        self.scrollAreaWidgetContents_8.setGeometry(QtCore.QRect(0, 0, 296, 478))
+        self.scrollAreaWidgetContents_8.setGeometry(QtCore.QRect(0, 0, 274, 435))
         self.scrollAreaWidgetContents_8.setObjectName(_fromUtf8("scrollAreaWidgetContents_8"))
         self.verticalLayout_33 = QtGui.QVBoxLayout(self.scrollAreaWidgetContents_8)
         self.verticalLayout_33.setObjectName(_fromUtf8("verticalLayout_33"))
@@ -302,6 +302,11 @@ class Ui_MainWindow(object):
         self.slideMinRed.setObjectName(_fromUtf8("slideMinRed"))
         self.horizontalLayout_3.addWidget(self.slideMinRed)
         self.editMinRed = QtGui.QLineEdit(self.groupBox_3)
+        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.editMinRed.sizePolicy().hasHeightForWidth())
+        self.editMinRed.setSizePolicy(sizePolicy)
         self.editMinRed.setMinimumSize(QtCore.QSize(80, 0))
         self.editMinRed.setObjectName(_fromUtf8("editMinRed"))
         self.horizontalLayout_3.addWidget(self.editMinRed)
@@ -507,4 +512,4 @@ class Ui_MainWindow(object):
         self.slideMinBlue.setToolTip(_translate("MainWindow", "value at 0% blue", None))
         self.slideMaxBlue.setToolTip(_translate("MainWindow", "value at 100% blue", None))
 
-from cspov.ui.custom_widgets import QNoScrollComboBox, QNoScrollSlider
+from cspov.ui.custom_widgets import QNoScrollSlider, QNoScrollComboBox
