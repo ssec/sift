@@ -436,6 +436,16 @@ class Main(QtGui.QMainWindow):
         layer = self.document[uuid]
         self.document.set_rgb_range(layer, rgba, lo, hi)
 
+    def _refresh_probe_results(self, *args):
+        arg1 = args[0]
+        if isinstance(arg1, dict):
+            # Given a dictionary of changes
+            uuids = arg1.keys()
+        else:
+            uuids = [arg1]
+        _state, _xy_pos = self.graphManager.current_point_probe_status(DEFAULT_POINT_PROBE)
+        self.document.update_equalizer_values(DEFAULT_POINT_PROBE, _state, _xy_pos, uuids=uuids)
+
     def update_point_probe_text(self, probe_name, state=None, xy_pos=None, uuid=None, animating=None):
         if uuid is None:
             uuid = self.document.current_visible_layer_uuid
@@ -458,8 +468,11 @@ class Main(QtGui.QMainWindow):
             data_str = "<animating>"
         elif state and uuid is not None:
             data_point = self.workspace.get_content_point(uuid, xy_pos)
-            format_str, unit_str, converted = self.document.convert_units(uuid, data_point)
-            data_str = (format_str + "{:s}").format(float(converted), unit_str)
+            if data_point is None:
+                data_str = "N/A"
+            else:
+                format_str, unit_str, converted = self.document.convert_units(uuid, data_point)
+                data_str = (format_str + "{:s}").format(float(converted), unit_str)
         else:
             data_str = "N/A"
         self.ui.cursorProbeText.setText("Probe Value: {} ".format(data_str))
@@ -563,6 +576,8 @@ class Main(QtGui.QMainWindow):
         # setup RGB configuration : FIXME clean this up into a behavior
         self.layerSetsManager.didChangeRGBLayerComponentRange.connect(self._user_set_rgb_range)
         self.layerSetsManager.didChangeRGBLayerSelection.connect(self._user_set_rgb_layer)
+        self.document.didChangeComposition.connect(lambda *args: self._refresh_probe_results(*args[1:]))
+        self.document.didChangeColorLimits.connect(self._refresh_probe_results)
 
         # self.queue.add('test', test_task(), 'test000')
         # self.ui.layers

@@ -46,6 +46,7 @@ class TextureAtlas2D(Texture2D):
         # Number of rows and columns to hold all of these tiles in one texture
         shape = (self.texture_shape[0] * self.tile_shape[0], self.texture_shape[1] * self.tile_shape[1])
         self.texture_size = shape
+        self._fill_array = np.tile(np.nan, self.tile_shape).astype(np.float32)
         # will add self.shape:
         super(TextureAtlas2D, self).__init__(None, format, resizable, interpolation,
                                              wrapping, shape, internalformat, resizeable)
@@ -63,16 +64,20 @@ class TextureAtlas2D(Texture2D):
         """Write a single tile of data into the texture.
         """
         offset = self._tex_offset(tile_idx)
-        # FIXME: Doesn't this always return the shape of the input data?
-        tile_offset = (min(self.tile_shape[0], data.shape[0]),
-                       min(self.tile_shape[1], data.shape[1]))
-        if tile_offset[0] < self.tile_shape[0] or tile_offset[1] < self.tile_shape[1]:
-            # FIXME: This should be handled by the caller to expand the array to be NaN filled and aligned
-            # Assign a fill value, make sure to copy the data so that we don't overwrite the original
-            data_orig = data
-            data = np.zeros(self.tile_shape, dtype=data.dtype)
-            # data = data.copy()
-            data[:] = np.nan
-            data[:tile_offset[0], :tile_offset[1]] = data_orig[:tile_offset[0], :tile_offset[1]]
+        if data is None:
+            # Special "fill" parameter
+            data = self._fill_array
+        else:
+            # FIXME: Doesn't this always return the shape of the input data?
+            tile_offset = (min(self.tile_shape[0], data.shape[0]),
+                           min(self.tile_shape[1], data.shape[1]))
+            if tile_offset[0] < self.tile_shape[0] or tile_offset[1] < self.tile_shape[1]:
+                # FIXME: This should be handled by the caller to expand the array to be NaN filled and aligned
+                # Assign a fill value, make sure to copy the data so that we don't overwrite the original
+                data_orig = data
+                data = np.zeros(self.tile_shape, dtype=data.dtype)
+                # data = data.copy()
+                data[:] = np.nan
+                data[:tile_offset[0], :tile_offset[1]] = data_orig[:tile_offset[0], :tile_offset[1]]
         super(TextureAtlas2D, self).set_data(data, offset=offset, copy=copy)
 

@@ -483,7 +483,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self._set_vertex_tiles(nfo["vertex_coordinates"], nfo["texture_coordinates"])
 
     def _normalize_data(self, data):
-        if data.dtype == np.float64:
+        if data is not None and data.dtype == np.float64:
             data = data.astype(np.float32)
 
         return data
@@ -684,6 +684,34 @@ class TiledGeolocatedImageVisual(ImageVisual):
 
 TiledGeolocatedImage = create_visual_node(TiledGeolocatedImageVisual)
 
+_rgb_texture_lookup = """
+    vec4 texture_lookup(vec2 texcoord) {
+        if(texcoord.x < 0.0 || texcoord.x > 1.0 ||
+        texcoord.y < 0.0 || texcoord.y > 1.0) {
+            discard;
+        }
+        vec4 val = texture2D($texture, texcoord);
+        // http://stackoverflow.com/questions/11810158/how-to-deal-with-nan-or-inf-in-opengl-es-2-0-shaders
+        if (!(val.r <= 0.0 || 0.0 <= val.r)) {
+            val.r = 0;
+            val.g = 0;
+            val.b = 0;
+            val.a = 0;
+            return val;
+        }
+
+        if ($vmin < $vmax) {
+            val.r = clamp(val.r, $vmin, $vmax);
+        } else {
+            val.r = clamp(val.r, $vmax, $vmin);
+        }
+        val.r = (val.r-$vmin)/($vmax-$vmin);
+        val.g = val.r;
+        val.b = val.r;
+
+        return val;
+    }"""
+
 
 class CompositeLayerVisual(TiledGeolocatedImageVisual):
     VERT_SHADER = None
@@ -719,7 +747,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         self.texture_state = TextureTileState(self.num_tex_tiles)
 
         self.set_channels(data_arrays, shape=shape)
-        self.ndim = len(self.shape) or data_arrays[0].ndim
+        self.ndim = len(self.shape) or [x for x in data_arrays if x is not None][0].ndim
         self.num_channels = len(data_arrays)
 
         # load 'float packed rgba8' interpolation kernel
@@ -794,7 +822,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
 
         # define _data_lookup_fn as None, will be setup in
         # self._build_interpolation()
-        self._data_lookup_fns = [Function(_texture_lookup) for i in range(self.num_channels)]
+        self._data_lookup_fns = [Function(_rgb_texture_lookup) for i in range(self.num_channels)]
 
         if isinstance(clim, str):
             if clim != 'auto':
@@ -811,6 +839,9 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
             cl = clim[idx]
             if cl == 'auto':
                 _clim.append((np.nanmin(data_arrays[idx]), np.nanmax(data_arrays[idx])))
+            elif cl is None:
+                # Color limits don't matter (either empty channel array or other)
+                _clim.append((0., 1.))
             elif isinstance(cl, tuple) and len(cl) == 2:
                 _clim.append(cl)
             else:
@@ -828,10 +859,10 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
 
     def set_channels(self, data_arrays, shape=None):
         assert (shape or data_arrays is not None), "`data` or `shape` must be provided"
-        self.shape = shape or max(data.shape for data in data_arrays)
+        self.shape = shape or max(data.shape for data in data_arrays if data is not None)
         # how many of the higher resolution channel tiles (smaller geographic area) make
         # up a low resolution channel tile
-        self._channel_factors = tuple(round(self.shape[0] / float(chn.shape[0])) for chn in data_arrays)
+        self._channel_factors = tuple(round(self.shape[0] / float(chn.shape[0])) if chn is not None else 1. for chn in data_arrays)
         self._lowest_factor = max(self._channel_factors)
         self._lowest_rez = rez(abs(self.cell_height * self._lowest_factor), abs(self.cell_width * self._lowest_factor))
 
@@ -867,8 +898,11 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         # Tell the texture state that we are adding a tile that should never expire and should always exist
         nfo["texture_tile_index"] = ttile_idx = self.texture_state.add_tile((0, 0, 0), expires=False)
         for idx, data in enumerate(data_arrays):
-            _y_slice, _x_slice = self.calc.overview_stride(image_shape=data.shape)
-            overview_data = data[_y_slice, _x_slice]
+            if data is not None:
+                _y_slice, _x_slice = self.calc.overview_stride(image_shape=data.shape)
+                overview_data = data[_y_slice, _x_slice]
+            else:
+                overview_data = None
             self._textures[idx].set_tile_data(ttile_idx, self._normalize_data(overview_data))
 
         # Handle wrapping around the anti-meridian so there is a -180/180 continuous image
@@ -895,6 +929,8 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
             if clim != 'auto':
                 raise ValueError('clim must be "auto" if a string')
         else:
+            # set clim to 0 and 1 for non-existent arrays
+            clim = [c if c is not None else (0., 1.) for c in clim]
             clim = np.array(clim, float)
             if clim.shape != (self.num_channels, 2) and clim.shape != (2,):
                 raise ValueError('clim must have either 2 elements or 6 (2 for each channel)')
@@ -957,7 +993,11 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
                     # force a copy of the data from the content array (provided by the workspace) to a vispy-compatible contiguous float array
                     # this can be a potentially time-expensive operation since content array is often huge and always memory-mapped, so paging may occur
                     # we don't want this paging deferred until we're back in the GUI thread pushing data to OpenGL!
-                    tile_data = np.array(data[chn_idx][y_start: y_end, x_start: x_end], dtype=np.float32)
+                    if data[chn_idx] is None:
+                        # we need to fill the texture with NaNs instead of actual data
+                        tile_data = None
+                    else:
+                        tile_data = np.array(data[chn_idx][y_start: y_end, x_start: x_end], dtype=np.float32)
                     textures_data.append(tile_data)
                 tiles_info.append((stride, tiy, tix, tex_tile_idx, textures_data))
 
@@ -1033,10 +1073,20 @@ void main()
         texcoord = map_local_to_tex(vec4(v_texcoord, 0, 1)).xy;
     }
 
-    gl_FragColor.r = $get_data_1(texcoord).r;
-    gl_FragColor.g = $get_data_2(texcoord).r;
-    gl_FragColor.b = $get_data_3(texcoord).r;
-    gl_FragColor.a = 1.0;
+    vec4 r_tmp, g_tmp, b_tmp;
+    r_tmp = $get_data_1(texcoord);
+    g_tmp = $get_data_2(texcoord);
+    b_tmp = $get_data_3(texcoord);
+
+    // Make the pixel transparent if all of the values are NaN/fill values
+    if (r_tmp.a == 0 && g_tmp.a == 0 && b_tmp.a == 0) {
+        gl_FragColor.a = 0;
+    } else {
+        gl_FragColor.a = 1;
+    }
+    gl_FragColor.r = r_tmp.r;
+    gl_FragColor.g = g_tmp.r;
+    gl_FragColor.b = b_tmp.r;
 }
 """  # noqa
 
