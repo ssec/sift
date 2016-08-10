@@ -156,7 +156,7 @@ class TaskQueue(QObject):
         # report on the lowest worker number that's active; (0,1 interactive; 2 background)
         # yes, this will be redundant and #FUTURE make this a more useful signal content, rather than relying on progress_ratio back-query
         for wdex,status in enumerate(self._last_status):
-            if self.workers[wdex].isRunning():
+            if self.workers[wdex].isRunning() and status is not None:
                 self.didMakeProgress.emit(status)
                 return
 

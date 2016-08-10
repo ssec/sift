@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-cspov.model.core
-~~~~~~~~~~~~~~~~
+cspov.model.document
+--------------------
 
 PURPOSE
 Core (low-level) document model for CSPOV.
@@ -52,6 +52,7 @@ between subsystems. Document rarely deals directly with content.
 :copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
+from cspov.model.layer import mixing, DocLayer, DocBasicLayer, DocCompositeLayer, DocRGBLayer
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -60,22 +61,16 @@ import sys
 import logging
 import unittest
 import argparse
-from collections import namedtuple
-from enum import Enum
+from collections import namedtuple, MutableSequence
 from uuid import UUID
 import numpy as np
-from copy import deepcopy
+from abc import ABCMeta, abstractmethod, abstractproperty
+from weakref import ref
 
-from cspov.common import KIND, INFO
-from cspov.model.guidebook import AHI_HSF_Guidebook
+from cspov.common import KIND, INFO, COMPOSITE_TYPE
+from cspov.model.guidebook import AHI_HSF_Guidebook, GUIDE
 
 from PyQt4.QtCore import QObject, pyqtSignal
-
-# FIXME: move these out of the document and into a factory
-from ..view.LayerRep import TiledGeolocatedImage, NEShapefileLines
-from ..view.Program import GlooColormapDataTile, GlooRGBImageTile
-
-from .probes import Probe, Shape
 
 
 LOG = logging.getLogger(__name__)
@@ -93,32 +88,122 @@ prez = namedtuple('prez', [
     'mixing'    # mixing mode constant
 ])
 
-class mixing(Enum):
-    UNKNOWN = 0
-    NORMAL = 1
-    ADD = 2
-    SUBTRACT = 3
+
+class DocLayerStack(MutableSequence):
+    """
+    list-like layer set which will slowly eat functionality from Document as warranted, and provide cleaner interfacing to GUI elements
+    """
+    _doc = None  # weakref to document we belong to
+    _store = None
+    _u2r = None  # uuid-to-row correspondence cache
+
+    def __init__(self, doc, *args, **kwargs):
+        if isinstance(doc, DocLayerStack):
+            self._doc = ref(doc._doc())
+            self._store = list(doc._store)
+        elif isinstance(doc, Document):
+            self._doc = ref(doc)
+            self._store = list(*args)
+        else:
+            raise ValueError('cannot initialize DocLayerStack using %s' % type(doc))
+
+    def __setitem__(self, index:int, value:prez):
+        if index>=0 and index<len(self._store):
+            self._store[index] = value
+        elif index == len(self._store):
+            self._store.append(value)
+        else:
+            raise IndexError('%d not a valid index' % index)
+        self._u2r = None
+
+    @property
+    def uuid2row(self):
+        if self._u2r is None:
+            self._u2r = dict((p.uuid,i) for (i,p) in enumerate(self._store))
+        return self._u2r
+
+    def __getitem__(self, index:int):  # then return layer object
+        if isinstance(index, int):
+            return self._store[index]
+        elif isinstance(index, UUID):  # then return 0..n-1 index in stack
+            return self.uuid2row.get(index, None)
+        elif isinstance(index, DocLayer):
+            return self.uuid2row.get(index.uuid, None)
+        elif isinstance(index, prez):
+            return self.uuid2row.get(index.uuid, None)
+        else:
+            raise ValueError('unable to index LayerStack using %s' % repr(index))
+
+    def __iter__(self):
+        for each in self._store:
+            yield each
+
+    def __len__(self):
+        return len(self._store)
+
+    def __delitem__(self, index:int):
+        del self._store[index]
+        self._u2r = None
+
+    def insert(self, index:int, value:prez):
+        self._store.insert(index, value)
+        self._u2r = None
+
+    def clear_animation_order(self):
+        for i,q in enumerate(self._store):
+            self._store[i] = q._replace(a_order=None)
 
 
-# class LayerSet(object):
-#     """
-#     LayerSet is a visual configuration of a stack of layers
-#     """
-#     def __init__(self, prior=None):
-#         """
-#         initialize, optionally by copying a prior LayerSet
-#         """
+
+
+
 #
-#     def __getitem__(self, uuid):
-#         """ retrieve layer information by uuid
-#         """
-#         # FIXME
 #
-#     @property
-#     def animation_order
+# class DocAsLayerStack(metaclass=ABCMeta):
+#     """
+#     interface used by SceneGraphManager
+#     """
+#     @abstractmethod
+#     def layers_in_z_order(self):
+#         """
+#         return current enabled list of (active layer, animation order)
+#         animation order of 0 implies not part of current animation
+#         :return:
+#         """
+#         pass
+#
+#
+# class DocAsDataSpace(metaclass=ABCMeta):
+#     """
+#     interface used to coordinate left-right-up-down keys.
+#     application behavior managing these keypresses uses this interface
+#     Typically left-right is time, up-down is channel.
+#     Consultation with the guidebook may be needed.
+#     'l', 'r', 'u', 'd', 'i', 'o': left, right, up, down, in, out
+#     """
+#     @abstractmethod
+#     def neighboring_layer(self, direction:str, amount:int=1):
+#         """
+#         return neighboring layer
+#         :param direction: l, r, u, d string indicating direction
+#         :param amount: number of steps to displace, typically +1
+#         :return:
+#         """
+#         pass
+#
+#
+# class DocAsLayerTree(metaclass=ABCMeta):
+#     """
+#     interface (facet) used to coordinate drag-and-drop layer tree
+#     """
+#     pass
+#
 
 
-class Document(QObject):
+
+
+
+class Document(QObject):  # base class is rightmost, mixins left of that
     """
     Document has one or more LayerSets choosable by the user (one at a time) as currentLayerSet
     LayerSets configure animation order, visibility, enhancements and linear combinations
@@ -130,21 +215,23 @@ class Document(QObject):
     """
     current_set_index = 0
     _workspace = None
-    _layer_sets = None  # list(list(prez) or None)
-    _layer_with_uuid = None  # dict(uuid:datasetinfo)
+    _layer_sets = None  # list(DocLayerSet(prez, ...) or None)
+    _layer_with_uuid = None  # dict(uuid:Doc____Layer)
     _guidebook = None  # FUTURE: this is currently an AHI_HSF_Guidebook, make it a general guidebook
 
     # signals
-    didAddLayer = pyqtSignal(list, dict, prez, np.ndarray)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
-    didRemoveLayers = pyqtSignal(list, list, int, int)  # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
+    didAddBasicLayer = pyqtSignal(tuple, UUID, prez)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
+    didAddCompositeLayer = pyqtSignal(tuple, UUID, prez)  # comp layer is derived from multiple basic layers and has its own UUID
+    didRemoveLayers = pyqtSignal(tuple, list, int, int)  # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
     willPurgeLayer = pyqtSignal(UUID)  # UUID of the layer being removed
-    didReorderLayers = pyqtSignal(list)  # list of original indices in their new order, None for new layers
+    didReorderLayers = pyqtSignal(tuple)  # list of original indices in their new order, None for new layers
     didChangeLayerVisibility = pyqtSignal(dict)  # {UUID: new-visibility, ...} for changed layers
-    didReorderAnimation = pyqtSignal(list)  # list of UUIDs representing new animation order
+    didReorderAnimation = pyqtSignal(tuple)  # list of UUIDs representing new animation order
     didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
-    didSwitchLayerSet = pyqtSignal(int, list, list)  # new layerset number typically 0..3, list of prez tuples representing new display order, new animation order
+    didSwitchLayerSet = pyqtSignal(int, tuple, tuple)  # new layerset number typically 0..3, list of prez tuples representing new display order, new animation order
     didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
+    didChangeComposition = pyqtSignal(tuple, UUID, prez, dict)  # new-layer-order, changed-layer, change-info: composite channels were reassigned or polynomial altered
     didCalculateLayerEqualizerValues = pyqtSignal(dict)  # dict of {uuid: (value, normalized_value_within_clim)} for equalizer display
     # didChangeShapeLayer = pyqtSignal(dict)
 
@@ -152,7 +239,7 @@ class Document(QObject):
         super(Document, self).__init__(**kwargs)
         self._guidebook = AHI_HSF_Guidebook()
         self._workspace = workspace
-        self._layer_sets = [list()] + [None] * (layer_set_count-1)
+        self._layer_sets = [DocLayerStack(self)] + [None] * (layer_set_count - 1)
         self._layer_with_uuid = {}
         # TODO: connect signals from workspace to slots including update_dataset_info
 
@@ -179,6 +266,28 @@ class Document(QObject):
     #         INFO.DISPLAY_TIME: self._guidebook.display_time(info)
     #     }
 
+    def _insert_layer_with_info(self, info: DocLayer, cmap=None, insert_before=0):
+        """
+        insert a layer into the presentations but do not signal
+        :return: new prez tuple, new reordered indices tuple
+        """
+        p = prez(uuid=info[INFO.UUID],
+                 kind=info[INFO.KIND],
+                 visible=True,
+                 a_order=None,
+                 colormap=cmap,
+                 climits=info[INFO.CLIM],
+                 mixing=mixing.NORMAL)
+
+        q = p._replace(visible=False)  # make it available but not visible in other layer sets
+        old_layer_count = len(self._layer_sets[self.current_set_index])
+        for dex, lset in enumerate(self._layer_sets):
+            if lset is not None:  # uninitialized layer sets will be None
+                lset.insert(insert_before, p if dex == self.current_set_index else q)
+
+        reordered_indices = tuple([None] + list(range(old_layer_count)))  # FIXME: this should obey insert_before, currently assumes always insert at top
+        return p, reordered_indices
+
     def open_file(self, path, insert_before=0):
         """
         open an arbitrary file and make it the new top layer.
@@ -188,36 +297,24 @@ class Document(QObject):
         """
         uuid, info, content = self._workspace.import_image(source_path=path)
         if uuid in self._layer_with_uuid:
+            LOG.warning("layer with UUID {0:s} already in document?".format(uuid))
             return uuid, info, content
         # info.update(self._additional_guidebook_information(info))
-        self._layer_with_uuid[uuid] = info
+        self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, info)
         # also get info for this layer from the guidebook
-        gbinfo = self._guidebook.collect_info(info)
-        self._layer_with_uuid[uuid].update(gbinfo)
+        gbinfo = self._guidebook.collect_info(dataset)
+        dataset.update(gbinfo)  # FUTURE: should guidebook be integrated into DocBasicLayer?
 
         # add as visible to the front of the current set, and invisible to the rest of the available sets
-        cmap = self._default_colormap(info)
-        info[INFO.CLIM] = self._guidebook.climits(info)
-        info[INFO.NAME] = self._guidebook.display_name(info) or info[INFO.NAME]
-        p = prez(uuid=uuid,
-                 kind=info[INFO.KIND],
-                 visible=True,
-                 a_order=None,
-                 colormap=cmap,
-                 climits=info[INFO.CLIM],
-                 mixing=mixing.NORMAL)
-        q = p._replace(visible=False)  # make it available but not visible in other layer sets
-        old_layer_count = len(self._layer_sets[self.current_set_index])
-        for dex,lset in enumerate(self._layer_sets):
-            if lset is not None:  # uninitialized layer sets will be None
-                lset.insert(insert_before, p if dex==self.current_set_index else q)
-
-        reordered_indices = [None] + list(range(old_layer_count))
+        cmap = self._default_colormap(dataset)
+        dataset[INFO.CLIM] = self._guidebook.climits(dataset)
+        dataset[INFO.NAME] = self._guidebook.display_name(dataset) or dataset[INFO.NAME]
+        presentation, reordered_indices = self._insert_layer_with_info(dataset, cmap=cmap, insert_before=insert_before)
         # signal updates from the document
-        self.didAddLayer.emit(reordered_indices, info, p, content)
-        return uuid, info, content
+        self.didAddBasicLayer.emit(reordered_indices, dataset.uuid, presentation)
+        return uuid, dataset, content
 
-    def open_files(self, paths, insert_before=0):
+    def open_files(self, paths, insert_before = 0):
         """
         sort paths into preferred load order (see guidebook.py)
         open files in order, yielding uuid, info, overview_content
@@ -256,7 +353,22 @@ class Document(QObject):
         for p in self.prez_for_uuids(uuids, lset=lset):
             yield p.colormap
 
+    def valid_range_for_uuid(self, uuid):
+        # Limit ourselves to what information
+        layer = self._layer_with_uuid[uuid]
+        return self._guidebook.climits({
+            INFO.UUID: uuid,
+            INFO.KIND: layer[INFO.KIND],
+            INFO.PATHNAME: layer[INFO.PATHNAME],
+        })
+
     def convert_units(self, uuid, data, inverse=False):
+        """
+        :param uuid: layer id
+        :param data: values to convert
+        :param inverse: when true, convert from display units to data units
+        :return:
+        """
         formatstr, unitstr, lam = self._guidebook.units_conversion(self._layer_with_uuid[uuid])
         return formatstr, unitstr, lam(data, inverse)
 
@@ -265,7 +377,7 @@ class Document(QObject):
             default_clim = self._layer_with_uuid[p.uuid][INFO.CLIM]
             yield ((p.climits[1] - p.climits[0]) > 0) != ((default_clim[1] - default_clim[0]) > 0)
 
-    def update_equalizer_values(self, uuid, state, xy_pos):
+    def update_equalizer_values(self, probe_name, state, xy_pos, uuids=None):
         """user has clicked on a point probe; determine relative and absolute values for all document image layers
         """
         # if the point probe was turned off then we don't want to have the equalizer
@@ -273,25 +385,63 @@ class Document(QObject):
             self.didCalculateLayerEqualizerValues.emit({})
             return
 
+        if uuids is None:
+            uuids = [(pinf.uuid, pinf) for pinf in self.current_layer_set]
+        else:
+            uuids = [(uuid, self._layer_with_uuid[uuid]) for uuid in uuids]
         zult = {}
-        for pinf in self.current_layer_set:
-            if pinf.uuid in zult:
-                continue
+        for uuid, pinf in uuids:
             lyr = self._layer_with_uuid[pinf.uuid]
-            if lyr[INFO.KIND] != KIND.IMAGE:
-                continue
-            value = self._workspace.get_content_point(pinf.uuid, xy_pos)
-            fmt, unit_str, unit_conv = self._guidebook.units_conversion(self._layer_with_uuid[pinf.uuid])
-            # calculate normalized bar width relative to its current clim
-            nc, xc = unit_conv(np.array(pinf.climits))
-            if nc > xc:  # sometimes clim is swapped to reverse color scale
-                nc, xc = xc, nc
-            value = unit_conv(value)
-            if np.isnan(value):
-                zult[pinf.uuid] = None
-            else:
-                bar_width = (np.clip(value, nc, xc) - nc) / (xc - nc)
-                zult[pinf.uuid] = (value, bar_width, fmt, unit_str)
+            if lyr[INFO.KIND] == KIND.IMAGE:
+                value = self._workspace.get_content_point(pinf.uuid, xy_pos)
+                fmt, unit_str, unit_conv = self._guidebook.units_conversion(self._layer_with_uuid[pinf.uuid])
+                # calculate normalized bar width relative to its current clim
+                nc, xc = unit_conv(np.array(pinf.climits))
+                if nc > xc:  # sometimes clim is swapped to reverse color scale
+                    nc, xc = xc, nc
+                value = unit_conv(value)
+                if np.isnan(value):
+                    zult[pinf.uuid] = None
+                else:
+                    bar_width = (np.clip(value, nc, xc) - nc) / (xc - nc)
+                    zult[pinf.uuid] = (value, bar_width, fmt, unit_str)
+            elif lyr[INFO.KIND] == KIND.RGB:
+                # We can show a valid RGB
+                # Get 3 values for each channel
+                # XXX: Better place for this?
+                def _sci_to_rgb(v, cmin, cmax):
+                    if cmin > cmax:
+                        tmp = cmax
+                        cmax = cmin
+                        cmin = tmp
+                    elif cmin == cmax:
+                        return 0
+
+                    if v < cmin:
+                        v = cmin
+                    elif v > cmax:
+                        v = cmax
+                    return int(round((v - cmin) / (cmax - cmin) * 255.))
+                values = []
+                for dep_lyr, clims in zip(lyr.l[:3], lyr[INFO.CLIM]):
+                    if dep_lyr is None:
+                        values.append(None)
+                    elif clims is None:
+                        values.append(None)
+                    else:
+                        value = self._workspace.get_content_point(dep_lyr[INFO.UUID], xy_pos)
+                        values.append(_sci_to_rgb(value, clims[0], clims[1]))
+
+                # fmt = "{:3d}"
+                fmt = "{}"
+                unit_str = ""
+                nc = 0
+                xc = 255
+                bar_widths = [(np.clip(value, nc, xc) - nc) / (xc - nc) for value in values if value is not None]
+                bar_width = np.mean(bar_widths) if len(bar_widths) > 0 else 0
+                values = ",".join(["{:3d}".format(v if v is not None else 0) for v in values])
+                zult[pinf.uuid] = (values, bar_width, fmt, unit_str)
+
         self.didCalculateLayerEqualizerValues.emit(zult)  # is picked up by layer list model to update display
 
     # TODO, find out if this is needed/used and whether or not it's correct
@@ -305,24 +455,24 @@ class Document(QObject):
         uuid = new_info[INFO.UUID]
         if uuid not in self._layer_with_uuid:
             LOG.warning('new information on uuid {0!r:s} is not for a known dataset'.format(new_info))
-        self._layer_with_uuid[new_info[INFO.UUID]] = new_info
+        self._layer_with_uuid[new_info[INFO.UUID]].update(new_info)
         # TODO, also get information about this layer from the guidebook?
 
         # TODO: see if this affects any presentation information; view will handle redrawing on its own
 
     def _clone_layer_set(self, existing_layer_set):
-        return deepcopy(existing_layer_set)
+        return DocLayerStack(existing_layer_set)
 
     @property
     def current_animation_order(self):
         """
-        return list of UUIDs representing the animation order in the currently selected layer set
-        :return: list of UUIDs
+        return tuple of UUIDs representing the animation order in the currently selected layer set
+        :return: tuple of UUIDs
         """
         cls = self.current_layer_set
         aouu = [(x.a_order, x.uuid) for x in cls if (x.a_order is not None)]
         aouu.sort()
-        ao = [u for a,u in aouu]
+        ao = tuple(u for a,u in aouu)
         LOG.debug('animation order is {0!r:s}'.format(ao))
         return ao
         # return list(reversed(self.current_layer_order))
@@ -332,30 +482,78 @@ class Document(QObject):
         # return [u for _,u in q]
 
     @property
-    def current_layer_order(self):
+    def current_layer_uuid_order(self):
         """
-        list of UUIDs (top to bottom) currently being displayed, independent of visibility
+        list of UUIDs (top to bottom) currently being displayed, independent of visibility/validity
         :return:
         """
-        return [x.uuid for x in self.current_layer_set]
+        return tuple(x.uuid for x in self.current_layer_set)
 
     @property
-    def current_visible_layer(self):
+    def current_visible_layer_uuid(self):
+        """
+        :return: the topmost visible layer's UUID
+        """
         for x in self.current_layer_set:
             if x.visible:
                 return x.uuid
         return None
 
-    def current_visible_layers(self, max_layers=None):
-        count = 0
-        for x in self.current_layer_set:
-            if x.visible:
-                count += 1
-                yield x.uuid
-            if max_layers is not None and count >= max_layers:
-                break
+    # def current_visible_layer_uuids(self, max_layers=None):
+    #     """
+    #     :param max_layers:
+    #     :yield: the visible layers in the current layer set
+    #     """
+    #     count = 0
+    #     for x in self.current_layer_set:
+    #         if x.visible:
+    #             count += 1
+    #             yield x.uuid
+    #         if max_layers is not None and count >= max_layers:
+    #             break
 
-    def select_layer_set(self, layer_set_index):
+    # TODO: add a document style guide which says how different bands from different instruments are displayed
+
+    @property
+    def active_layer_order(self):
+        """
+        return list of valid (can-be-displayed) layers which are either visible or in the animation order
+        typically this is used by the scenegraphmanager to synchronize the scenegraph elements
+        :return: sequence of (layer_prez, layer) pairs, with order=0 for non-animating layers
+        """
+        for layer_prez in self.current_layer_set:
+            if layer_prez.visible or layer_prez.a_order is not None:
+                layer = self._layer_with_uuid[layer_prez.uuid]
+                if not layer.is_valid:
+                    # we don't have enough information to display this layer yet, it's still loading or being configured
+                    continue
+                yield layer_prez, layer
+
+    def layers_where(self, is_valid=None, is_active=None, in_type_set=None):
+        """
+        query current layer set for layers matching criteria
+        :param is_valid: None, or True/False whether layer is valid (could be displayed)
+        :param is_active: None, or True/False whether layer is active (valid & (visible | animatable))
+        :param in_type_set: None, or set of Python types that the layer falls into
+        :return: sequence of layers in no particular order
+        """
+        for layer_prez in self.current_layer_set:
+            layer = self._layer_with_uuid[layer_prez.uuid]
+            valid = layer.is_valid
+            if is_valid is not None:
+                if valid != is_valid:
+                    continue
+            if is_active is not None:
+                active = valid and (layer_prez.visible or layer_prez.a_order is not None)
+                if active != is_active:
+                    continue
+            if in_type_set is not None:
+                if type(layer) not in in_type_set:
+                    continue
+            yield layer
+
+
+    def select_layer_set(self, layer_set_index:int):
         """
         change the selected layer set, 0..N (typically 0..3), cloning the old set if needed
         emits docDidChangeLayerOrder with an empty list implying complete reassessment,
@@ -380,25 +578,23 @@ class Document(QObject):
         self.current_set_index = layer_set_index
         self.didSwitchLayerSet.emit(layer_set_index, self.current_layer_set, self.current_animation_order)
 
-    # TODO, not being used?
-    def change_layer_order(self, old_index, new_index):
-        L = self.current_layer_set
-        order = list(range(len(L)))
-        p = L[old_index]
-        d = order[old_index]
-        del L[old_index]
-        del order[old_index]
-        L.insert(new_index, p)
-        L.insert(new_index, d)
-        self.didReorderLayers.emit(order)
+    # def change_layer_order(self, old_index, new_index):
+    #     L = self.current_layer_set
+    #     order = list(range(len(L)))
+    #     p = L[old_index]
+    #     d = order[old_index]
+    #     del L[old_index]
+    #     del order[old_index]
+    #     L.insert(new_index, p)
+    #     L.insert(new_index, d)
+    #     self.didReorderLayers.emit(order)
 
-    # TODO, not being used?
-    def swap_layer_order(self, row1, row2):
-        L = self.current_layer_set
-        order = list(range(len(L)))
-        L[row1], L[row2] = L[row2], L[row1]
-        order[row1], order[row2] = order[row2], order[row1]
-        self.didReorderLayers.emit(order)
+    # def swap_layer_order(self, row1, row2):
+    #     L = self.current_layer_set
+    #     order = list(range(len(L)))
+    #     L[row1], L[row2] = L[row2], L[row1]
+    #     order[row1], order[row2] = order[row2], order[row1]
+    #     self.didReorderLayers.emit(order)
 
     def row_for_uuid(self, *uuids):
         d = dict((q.uuid,i) for i,q in enumerate(self.current_layer_set))
@@ -415,12 +611,11 @@ class Document(QObject):
         """
         L = self.current_layer_set
         zult = {}
-        r2u = dict((q.uuid,i) for i,q in enumerate(self.current_layer_set))
         if isinstance(rows_or_uuids, int) or isinstance(rows_or_uuids, UUID):
             rows_or_uuids = [rows_or_uuids]
         for dex in rows_or_uuids:
             if isinstance(dex, UUID):
-                dex = r2u[dex]
+                dex = L[dex]  # returns row index
             old = L[dex]
             vis = (not old.visible) if visible is None else visible
             # print(vis)
@@ -437,10 +632,10 @@ class Document(QObject):
         :param changes: dictionary of {uuid:bool} with new visibility state
         :return:
         """
-        r2u = dict((q.uuid,i) for i,q in enumerate(self.current_layer_set))
+        u2r = dict((q.uuid,i) for i,q in enumerate(self.current_layer_set))
         L = self.current_layer_set
         for uuid,visible in changes.items():
-            dex = r2u[uuid]
+            dex = L[uuid]
             old = L[dex]
             L[dex] = old._replace(visible=visible)
         self.didChangeLayerVisibility.emit(changes)
@@ -504,6 +699,40 @@ class Document(QObject):
                     nfo[uuid] = name
         self.didChangeColormap.emit(nfo)
 
+    def current_layers_where(self, kinds=None, bands=None, uuids=None):
+        """
+        check current layer list for criteria and yield
+        :param kinds: None, or set(KIND.xxx)
+        :param bands: None, or set(band or band-trio)
+        :param uuids: None, or set(UUID)
+        :return: yield (index, prez, layer) from current layer set
+        """
+        L = self.current_layer_set
+        for idx,p in enumerate(L):
+            if (uuids is not None) and (p.uuid not in uuids):
+                continue
+            layer = self._layer_with_uuid[p.uuid]
+            if (kinds is not None) and (layer.kind not in kinds):
+                continue
+            if (bands is not None) and (layer.band not in bands):
+                continue
+            yield (idx, p, layer)
+
+    def change_clims_for_layers_where(self, clims, **query):
+        """
+        query using .current_layers_where() and change clims en masse
+        :param clims: new color limits consistent with layer's presentation
+        :param query: see current_layers_where()
+        :return:
+        """
+        nfo = {}
+        L = self.current_layer_set
+        for idx, pz, layer in self.current_layers_where(**query):
+            new_pz = pz._replace(climits=clims)
+            nfo[layer.uuid] = new_pz
+            L[idx] = new_pz
+        self.didChangeColorLimits.emit(nfo)
+
     def flip_climits_for_layers(self, uuids=None):
         L = self.current_layer_set
         if uuids is not None:
@@ -519,10 +748,120 @@ class Document(QObject):
                     L[dex] = pinfo._replace(climits=nfo[uuid])
         self.didChangeColorLimits.emit(nfo)
 
+    def create_rgb_composite(self, r=None, g=None, b=None, all_timesteps=True):
+        """
+        user has specified that a band trio should be shown as RGB
+        disable display of the three layers
+        add a composite layer at the z level of the topmost of the three
+        do likewise for other timesteps with the same bands
+        """
+        from uuid import uuid1 as uuidgen
+        from functools import reduce
+        if r is None or g is None or b is None:
+            # we have an invalid composite which needs user initialization
+            LOG.info('generating incomplete (invalid) composite for user to configure')
+            uuid = uuidgen()
+            name = '-RGB-'
+            ds_info = {
+                INFO.UUID: uuid,
+                INFO.NAME: name,
+                INFO.KIND: KIND.RGB,
+                GUIDE.BAND: [],
+                GUIDE.DISPLAY_TIME: None,
+                INFO.ORIGIN_X: None,
+                INFO.ORIGIN_Y: None,
+                INFO.CELL_WIDTH: None,
+                INFO.CELL_HEIGHT: None,
+                INFO.CLIM: (None, None, None),
+            }
+            self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
+            presentation, reordered_indices = self._insert_layer_with_info(ds_info)
+            self.didAddCompositeLayer.emit(reordered_indices, ds_info.uuid, presentation)
+            return ds_info
+
+        # disable visibility of the existing layers FUTURE: remove them entirely? probably not
+        self.toggle_layer_visibility([x for x in [r,g,b] if x], False)
+        # add notation to document on RGB affinity
+        # register with workspace so that it can persist info to disk if needed
+        # insert new RGB layer into layer list and scenegraph
+
+        uuids = [r,g,b]
+        LOG.debug("New Composite UUIDs: %r" % uuids)
+        # FUTURE: register this with workspace!
+
+        dep_info = [(None if uuid is None else self.get_info(uuid=uuid)) for uuid in uuids]
+        highest_res_dep = min(dep_info, key=lambda x: x[INFO.CELL_WIDTH])
+        _dt = lambda nfo: nfo.get(GUIDE.DISPLAY_TIME, '<unknown time>')
+        display_time = reduce(lambda dta,b: dta if dta==_dt(b) else '<multiple times>', dep_info, _dt(dep_info[0]))
+        uuid = uuidgen()  # FUTURE: workspace should be providing this?
+        try:
+            bands = (dep_info[0][GUIDE.BAND],
+                     dep_info[1][GUIDE.BAND],
+                     dep_info[2][GUIDE.BAND])
+            name = u"R:B{0:02d} G:B{1:02d} B:B{2:02d}".format(*bands)
+        except KeyError:
+            LOG.error('unable to create new name from {0!r:s}'.format(dep_info))
+            name = "RGB"
+            bands = []
+        ds_info = {
+            INFO.UUID: uuid,
+            INFO.NAME: name,
+            INFO.KIND: KIND.RGB,
+            GUIDE.BAND: bands,
+            GUIDE.DISPLAY_TIME: display_time,
+            INFO.ORIGIN_X: highest_res_dep[INFO.ORIGIN_X],
+            INFO.ORIGIN_Y: highest_res_dep[INFO.ORIGIN_Y],
+            INFO.CELL_WIDTH: highest_res_dep[INFO.CELL_WIDTH],
+            INFO.CELL_HEIGHT: highest_res_dep[INFO.CELL_HEIGHT],
+            INFO.CLIM: tuple(d[INFO.CLIM] for d in dep_info),
+        }
+        self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
+        presentation, reordered_indices = self._insert_layer_with_info(ds_info)
+        self.didAddCompositeLayer.emit(reordered_indices, ds_info.uuid, presentation)
+        return ds_info
+
+    def create_empty_rgb_composite(self):
+        """
+        an empty RGB composite is added to the top of the current layer list.
+        since it needs R, G, and B in order to be valid, we do not yet announce it to the scenegraph
+        :return:
+        """
+        self.create_rgb_composite(None, None, None)
+
+    def revise_rgb_layer_choice(self, layer:DocRGBLayer, **rgba):
+        """
+        change the layer composition for an RGB layer, and signal
+        :param layer:
+        :param rgba:
+        :return:
+        """
+        LOG.debug('revising RGB layer config for %s: %s' % (layer.uuid, repr(list(rgba.keys()))))
+        if layer is None or not rgba:
+            return
+        changed = False
+        for k,v in rgba.items():
+            assert(k in 'rgba')
+            if getattr(layer,k,None) is v:
+                continue
+            changed = True
+            setattr(layer, k, v)
+        prez, = self.prez_for_uuids([layer.uuid])
+        # this signals the scenegraph manager et al to see if the layer is now both visible and valid
+        updated = layer.update_metadata_from_dependencies()
+        LOG.info('updated metadata for layer %s: %s' % (layer.uuid, repr(list(updated.keys()))))
+        self.didChangeComposition.emit((), layer.uuid, prez, rgba)
+
+    def set_rgb_range(self, layer:DocRGBLayer, rgba:str, min:float, max:float):
+        new_clims = tuple(x if c != rgba else (min, max) for c, x in zip("rgba", layer[INFO.CLIM]))
+        # FIXME: migrate RGB clim into prez and not layer; only set INFO.CLIM if it hasn't already been set
+        # self.change_clims_for_layers_where(new_clims, uuids={layer.uuid})
+        layer[INFO.CLIM] = new_clims
+        self.didChangeColorLimits.emit({layer[INFO.UUID]: layer[INFO.CLIM]})
+
     def __len__(self):
         return len(self.current_layer_set)
 
-    def uuid_for_layer(self, row):
+    def uuid_for_current_layer(self, row):
         uuid = self.current_layer_set[row].uuid
         return uuid
 
@@ -540,11 +879,6 @@ class Document(QObject):
             # now remove from the active layer set
             self.remove_layer_prez(uuid)  # this will send signal and start purge
 
-    def clear_animation_order(self):
-        cls = self.current_layer_set
-        for i,q in enumerate(cls):
-            cls[i] = q._replace(a_order=None)
-
     def animate_siblings_of_layer(self, row_or_uuid):
         uuid = self.current_layer_set[row_or_uuid].uuid if not isinstance(row_or_uuid, UUID) else row_or_uuid
         new_anim_uuids, _ = self._guidebook.time_siblings(uuid, self._layer_with_uuid.values())
@@ -555,19 +889,18 @@ class Document(QObject):
             LOG.warning('No animation found')
             return []
         LOG.debug('new animation order will be {0!r:s}'.format(new_anim_uuids))
-        cls = self.current_layer_set
-        u2r = dict((x.uuid, i) for i,x in enumerate(cls))
-        self.clear_animation_order()
-        for dex,u in enumerate(new_anim_uuids):
+        L = self.current_layer_set
+        L.clear_animation_order()
+        for dex,u in enumerate(new_anim_uuids):  # FUTURE: migrate function to DocLayerStack?
             LOG.debug(u)
-            row = u2r.get(u, None)
+            row = L.uuid2row.get(u, None)
             if row is None:
                 LOG.error('unable to find row for uuid {} in current layer set'.format(u))
                 continue
-            old = cls[row]
+            old = L[row]
             new = old._replace(a_order=dex)
-            cls[row] = new
-        self.didReorderAnimation.emit(new_anim_uuids)
+            L[row] = new
+        self.didReorderAnimation.emit(tuple(new_anim_uuids))
         return new_anim_uuids
 
     def get_info(self, row=None, uuid=None):
@@ -580,14 +913,16 @@ class Document(QObject):
             return nfo
         return None
 
-    def __getitem__(self, row:int):
+    def __getitem__(self, layer_uuid):
         """
-        return info for a given layer index
+        return layer with the given UUID
         """
-        return self.current_layer_set[row]
-        # uuid = self.current_layer_set[dex].uuid
-        # nfo = self._layer_with_uuid[uuid]
-        # return nfo
+        if isinstance(layer_uuid, UUID):
+            return self._layer_with_uuid[layer_uuid]
+        else:
+            raise ValueError('document[UUID] required, %r was used' % type(layer_uuid))
+            # LOG.error('DEPRECATED usage document[index:int] -> DocLayerStack[index]; arg type is %r' % type(row_or_uuid))
+            # return self.current_layer_set[row_or_uuid]
 
     def reorder_by_indices(self, new_order, uuids=None, layer_set_index=None):
         """given a new layer order, replace the current layer set
@@ -598,7 +933,7 @@ class Document(QObject):
         assert(len(new_order)==len(self._layer_sets[layer_set_index]))
         new_layer_set = [self._layer_sets[layer_set_index][n] for n in new_order]
         self._layer_sets[layer_set_index] = new_layer_set
-        self.didReorderLayers.emit(new_order)
+        self.didReorderLayers.emit(tuple(new_order))
 
     def insert_layer_prez(self, row:int, layer_prez_seq):
         cls = self.current_layer_set
@@ -617,6 +952,8 @@ class Document(QObject):
 
     def is_using(self, uuid:UUID, layer_set:int=None):
         "return true if this dataset is still in use in one of the layer sets"
+        # FIXME: this needs to check not just which layers are being displayed, but which layers which may be in use but as part of a composite instead of a direct scenegraph entry
+        LOG.error('composite layers currently not checked for dependencies')
         if layer_set is not None:
             lss = [self._layer_sets[layer_set]]
         else:
@@ -644,7 +981,7 @@ class Document(QObject):
         clo = list(range(len(self.current_layer_set)))
         del clo[row:row+count]
         del self.current_layer_set[row:row+count]
-        self.didRemoveLayers.emit(clo, uuids, row, count)
+        self.didRemoveLayers.emit(tuple(clo), uuids, row, count)
         for uuid in uuids:
             if not self.is_using(uuid):
                 LOG.info('purging layer {}, no longer in use'.format(uuid))
@@ -653,6 +990,33 @@ class Document(QObject):
                 del self._layer_with_uuid[uuid]
                 # remove from workspace
                 self._workspace.remove(uuid)
+
+
+#
+# class DocumentTreeBranch(QObject):
+#     pass
+#
+# class DocumentTreeLeaf(QObject):
+#     pass
+#
+#
+# class DocumentAsLayerTree(QObject):
+#     """
+#      DocumentAsLayerTree is a facet or wrapper (if it were a database, it would be a view; but view is already taken)
+#      It allows the layer controls - specifically a LayerStackTreeViewModel - to easily access and modify
+#      the document on behalf of the user.
+#      It includes both queries for display and changes which then turn into document updates
+#      The base model is just a list of basic layers.
+#      Composite and Algebraic layers, however, are more like folders.
+#      Other additional layer types may also have different responses to being dragged or having items dropped on them
+#     """
+#
+#     def __init__(self, doc, *args, **kwargs):
+#         self._doc = doc
+#         super(DocumentAsLayerTree, self).__init__()
+#
+#     def
+#
 
 
 def main():

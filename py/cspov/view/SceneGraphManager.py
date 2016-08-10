@@ -30,13 +30,13 @@ from vispy.util.keys import SHIFT
 from vispy.visuals.transforms import STTransform, MatrixTransform
 from vispy.visuals import MarkersVisual, marker_types, LineVisual
 from vispy.scene.visuals import Markers, Polygon, Compound, Line
-from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND, TOOL, DEFAULT_PROJECTION
+from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND, TOOL, DEFAULT_PROJECTION, COMPOSITE_TYPE
 # from cspov.control.layer_list import LayerStackListViewModel
-from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage
+from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer, CompositeLayer
 from cspov.view.MapWidget import CspovMainMapCanvas
 from cspov.view.Cameras import PanZoomProbeCamera
 from cspov.view.Colormap import ALL_COLORMAPS
-from cspov.model.document import prez
+from cspov.model.document import prez, DocCompositeLayer, DocBasicLayer, DocRGBLayer
 from cspov.queue import TASK_DOING, TASK_PROGRESS
 from cspov.view.ProbeGraphs import DEFAULT_POINT_PROBE
 
@@ -333,6 +333,36 @@ class LayerSet(object):
 
 
 class SceneGraphManager(QObject):
+    """
+    SceneGraphManager represents a document as a vispy scenegraph.
+    When document changes, it updates to correspond.
+    Handles animation by cycling visibility.
+    Provides means of highlighting areas.
+    Decides what sampling to bring data in from the workspace,
+    in order to feed the display optimally.
+    """
+
+    document = None  # Document object we work with
+    workspace = None  # where we get data arrays from
+    queue = None  # background jobs go here
+
+    border_shapefile = None  # background political map
+    glob_pattern = None
+    texture_shape = None
+    polygon_probes = None
+    point_probes = None
+
+    image_elements = None  # {layer_uuid:element}
+    composite_element_dependencies = None  # {layer_uuid:set-of-dependent-uuids}
+    datasets = None
+    colormaps = None
+    layer_set = None
+
+    _current_tool = None
+    _color_choices = None
+
+    # FIXME: many more undocumented member variables
+
     didRetilingCalcs = pyqtSignal(object, object, object, object, object, object)
     didChangeFrame = pyqtSignal(tuple)
     didChangeLayerVisibility = pyqtSignal(dict)  # similar to document didChangeLayerVisibility
@@ -354,14 +384,14 @@ class SceneGraphManager(QObject):
         self.polygon_probes = {}
         self.point_probes = {}
 
-        self.image_layers = {}
-        self.datasets = {}
+        self.image_elements = {}
+        self.composite_element_dependencies = {}
         self.colormaps = {}
         self.colormaps.update(ALL_COLORMAPS)
         self.layer_set = LayerSet(self, frame_change_cb=self.frame_changed)
         self._current_tool = None
 
-        self.set_document(self.document)
+        self._connect_doc_signals(self.document)
 
         # border and lat/lon grid color choices
         self._color_choices = [
@@ -568,8 +598,8 @@ class SceneGraphManager(QObject):
     def copy_polygon(self, old_name, new_name):
         self.on_new_polygon(new_name, self.polygon_probes[old_name].pos)
 
-    def show_only_polygons(self, list_of_polygon_names_to_show) :
-        temp_set = set(list_of_polygon_names_to_show)
+    def show_only_polygons(self, polygon_names_to_show) :
+        temp_set = set(polygon_names_to_show)
         for polygon_name in self.polygon_probes.keys() :
             self.polygon_probes[polygon_name].visible = polygon_name in temp_set
 
@@ -625,9 +655,10 @@ class SceneGraphManager(QObject):
         LOG.info("Changing tool to '%s'", name)
 
     def next_tool(self):
-        idx = self._camera_names.index(self.main_view.camera.name)
-        idx = (idx + 1) % len(self._camera_names)
-        self.change_tool(idx)
+        tool_names = list(TOOL)
+        idx = tool_names.index(self._current_tool)
+        idx = (idx + 1) % len(tool_names)
+        self.change_tool(tool_names[idx])
 
     def _find_colormap(self, colormap):
         if isinstance(colormap, str) and colormap in self.colormaps:
@@ -639,12 +670,12 @@ class SceneGraphManager(QObject):
 
         uuids = uuid
         if uuid is None:
-            uuids = self.image_layers.keys()
+            uuids = self.image_elements.keys()
         elif not isinstance(uuid, (list, tuple)):
             uuids = [uuid]
 
         for uuid in uuids:
-            self.image_layers[uuid].cmap = colormap
+            self.image_elements[uuid].cmap = colormap
 
     def add_colormap(self, name:str, colormap):
         self.colormaps[name] = colormap
@@ -654,12 +685,14 @@ class SceneGraphManager(QObject):
         """
         uuids = uuid
         if uuid is None:
-            uuids = self.image_layers.keys()
+            uuids = self.image_elements.keys()
         elif not isinstance(uuid, (list, tuple)):
             uuids = [uuid]
 
         for uuid in uuids:
-            self.image_layers[uuid].clim = clims
+            element = self.image_elements.get(uuid, None)
+            if element is not None:
+                self.image_elements[uuid].clim = clims
 
     def change_layers_colormap(self, change_dict):
         for uuid,cmapid in change_dict.items():
@@ -671,17 +704,21 @@ class SceneGraphManager(QObject):
             LOG.info('changing {} to colormap {}'.format(uuid, clims))
             self.set_color_limits(clims, uuid)
 
-    def add_layer(self, new_order:list, ds_info:dict, p:prez, overview_content:np.ndarray):
-        uuid = ds_info[INFO.UUID]
+    def add_basic_layer(self, new_order:tuple, uuid:UUID, p:prez):
+        layer = self.document[uuid]
         # create a new layer in the imagelist
+        if not layer.is_valid:
+            LOG.warning('unable to add an invalid layer, will try again later when layer changes')
+            return
+        overview_content = self.workspace.get_content(layer.uuid)
         image = TiledGeolocatedImage(
             overview_content,
-            ds_info[INFO.ORIGIN_X],
-            ds_info[INFO.ORIGIN_Y],
-            ds_info[INFO.CELL_WIDTH],
-            ds_info[INFO.CELL_HEIGHT],
+            layer[INFO.ORIGIN_X],
+            layer[INFO.ORIGIN_Y],
+            layer[INFO.CELL_WIDTH],
+            layer[INFO.CELL_HEIGHT],
             name=str(uuid),
-            clim=ds_info[INFO.CLIM],
+            clim=layer[INFO.CLIM],
             interpolation='nearest',
             method='tiled',
             cmap=self._find_colormap(p.colormap),
@@ -691,12 +728,75 @@ class SceneGraphManager(QObject):
             parent=self.main_map,
         )
         image.transform *= STTransform(translate=(0, 0, -50.0))
-        self.image_layers[uuid] = image
-        self.datasets[uuid] = ds_info
+        self.image_elements[uuid] = image
         self.layer_set.add_layer(image)
         self.on_view_change(None)
 
-    def remove_layer(self, new_order:list, uuids_removed:list, row:int, count:int):
+    def add_composite_layer(self, new_order:tuple, uuid:UUID, p:prez):
+        layer = self.document[uuid]
+        LOG.debug("SceneGraphManager.add_composite_layer %s" % repr(layer))
+        if not layer.is_valid:
+            LOG.info('unable to add an invalid layer, will try again later when layer changes')
+            return
+        if isinstance(layer, DocRGBLayer):
+            dep_uuids = r,g,b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
+            overview_content = list(self.workspace.get_content(cuuid) for cuuid in dep_uuids)
+            uuid = layer.uuid
+            LOG.debug("Adding composite layer to Scene Graph Manager with UUID: %s", uuid)
+            self.image_elements[uuid] = element = RGBCompositeLayer(
+                overview_content,
+                layer[INFO.ORIGIN_X],
+                layer[INFO.ORIGIN_Y],
+                layer[INFO.CELL_WIDTH],
+                layer[INFO.CELL_HEIGHT],
+                name=str(uuid),
+                clim=layer[INFO.CLIM],
+                interpolation='nearest',
+                method='tiled',
+                cmap=self._find_colormap("grays"),
+                double=False,
+                texture_shape=DEFAULT_TEXTURE_SHAPE,
+                wrap_lon=False,
+                parent=self.main_map)
+            element.transform *= STTransform(translate=(0, 0, -50.0))
+            self.composite_element_dependencies[uuid] = dep_uuids
+            self.layer_set.add_layer(element)
+            if new_order:
+                self.layer_set.set_layer_order(new_order)
+            self.on_view_change(None)
+            return True
+        else:
+            raise ValueError("Unknown or unimplemented composite type")
+
+    def change_composite_layer(self, new_order:tuple, uuid:UUID, presentation:prez, changes:dict):
+        layer = self.document[uuid]
+        if isinstance(layer, DocRGBLayer):
+            if layer.uuid in self.image_elements:
+                if layer.is_valid:
+                    # RGB selection has changed, rebuild the layer
+                    LOG.debug("Changing existing composite layer to Scene Graph Manager with UUID: %s", layer.uuid)
+                    dep_uuids = r,g,b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
+                    overview_content = list(self.workspace.get_content(cuuid) for cuuid in dep_uuids)
+                    self.composite_element_dependencies[layer.uuid] = dep_uuids
+                    self.image_elements[layer.uuid].set_channels(overview_content)
+                    self.image_elements[layer.uuid].init_overview(overview_content)
+                    self.on_view_change(None)
+                else:
+                    # layer is no longer valid and has to be removed
+                    LOG.debug("Purging composite ")
+                    self.purge_layer(layer.uuid)
+            else:
+                if layer.is_valid:
+                    # Add this now valid layer
+                    self.add_composite_layer(new_order, layer.uuid, presentation)
+                else:
+                    LOG.info('unable to add an invalid layer, will try again later when layer changes')
+                    return
+            self.update()
+        else:
+            raise ValueError("Unknown or unimplemented composite type")
+
+    def remove_layer(self, new_order:tuple, uuids_removed:tuple, row:int, count:int):
         """
         remove (disable) a layer, though this may be temporary due to a move.
         wait for purge to truly flush out this puppy
@@ -706,8 +806,13 @@ class SceneGraphManager(QObject):
         """
         for uuid_removed in uuids_removed:
             self.set_layer_visible(uuid_removed, False)
-        self.rebuild_all()
-        # LOG.error("layer removal from scenegraph complete")
+        # XXX: Used to rebuild_all instead of just update, is that actually needed?
+        # self.rebuild_all()
+
+    def _remove_layer(self, *args, **kwargs):
+        self.remove_layer(*args, **kwargs)
+        # when removing the layer is the only operation being performed then update when we are done
+        self.update()
 
     def purge_layer(self, uuid_removed:UUID):
         """
@@ -716,12 +821,19 @@ class SceneGraphManager(QObject):
         :return:
         """
         self.set_layer_visible(uuid_removed, False)
-        image_layer = self.image_layers[uuid_removed]
-        image_layer.parent = None
-        del self.image_layers[uuid_removed]
-        del self.datasets[uuid_removed]
-        # del self.image_layers[uuid_removed]
-        LOG.info("layer {} purge from scenegraphmanager".format(uuid_removed))
+        if uuid_removed in self.image_elements:
+            image_layer = self.image_elements[uuid_removed]
+            image_layer.parent = None
+            del self.image_elements[uuid_removed]
+            LOG.info("layer {} purge from scenegraphmanager".format(uuid_removed))
+        else:
+            LOG.debug("Layer {} already purged from Scene Graph".format(uuid_removed))
+
+    def _purge_layer(self, *args, **kwargs):
+        res = self.purge_layer(*args, **kwargs)
+        # when purging the layer is the only operation being performed then update when we are done
+        self.update()
+        return res
 
     def change_layers_visibility(self, layers_changed:dict):
         for uuid, visible in layers_changed.items():
@@ -731,21 +843,26 @@ class SceneGraphManager(QObject):
         self.rebuild_all()
         # raise NotImplementedError("layer set change not implemented in SceneGraphManager")
 
-    def set_document(self, document):
-        document.didReorderLayers.connect(self.rebuild_layer_order)  # current layer set changed z/anim order
-        document.didAddLayer.connect(self.add_layer)  # layer added to one or more layer sets
-        document.didRemoveLayers.connect(self.remove_layer)  # layer removed from current layer set
-        document.willPurgeLayer.connect(self.purge_layer)  # layer removed from document
+    def _connect_doc_signals(self, document):
+        document.didReorderLayers.connect(self._rebuild_layer_order)  # current layer set changed z/anim order
+        document.didAddBasicLayer.connect(self.add_basic_layer)  # layer added to one or more layer sets
+        document.didAddCompositeLayer.connect(self.add_composite_layer)  # layer derived from other layers (either basic or composite themselves)
+        document.didRemoveLayers.connect(self._remove_layer)  # layer removed from current layer set
+        document.willPurgeLayer.connect(self._purge_layer)  # layer removed from document
         document.didSwitchLayerSet.connect(self.rebuild_new_layer_set)
         document.didChangeColormap.connect(self.change_layers_colormap)
         document.didChangeLayerVisibility.connect(self.change_layers_visibility)
-        document.didReorderAnimation.connect(self.rebuild_frame_order)
+        document.didReorderAnimation.connect(self._rebuild_frame_order)
+        document.didChangeComposition.connect(self.change_composite_layer)
+        document.didChangeColorLimits.connect(self.change_layers_color_limits)
 
     def set_frame_number(self, frame_number=None):
         self.layer_set.next_frame(None, frame_number)
 
     def set_layer_visible(self, uuid, visible=None):
-        image = self.image_layers[uuid]
+        image = self.image_elements.get(uuid, None)
+        if image is None:
+            return
         image.visible = not image.visible if visible is None else visible
 
     def rebuild_layer_order(self, new_layer_index_order, *args, **kwargs):
@@ -756,29 +873,77 @@ class SceneGraphManager(QObject):
         :return:
         """
         # TODO this is the lazy implementation, eventually just change z order on affected layers
-        self.layer_set.set_layer_order(self.document.current_layer_order)
+        self.layer_set.set_layer_order(self.document.current_layer_uuid_order)
         print("New layer order: ", new_layer_index_order)
+
+    def _rebuild_layer_order(self, *args, **kwargs):
+        res = self.rebuild_layer_order(*args, **kwargs)
         self.update()
+        return res
 
     def rebuild_frame_order(self, uuid_list:list, *args, **kwargs):
         LOG.debug('setting SGM new frame order to {0!r:s}'.format(uuid_list))
         self.layer_set.frame_order = uuid_list
+
+    def _rebuild_frame_order(self, *args, **kwargs):
+        res = self.rebuild_frame_order(*args, **kwargs)
+        # when purging the layer is the only operation being performed then update when we are done
         self.update()
+        return res
+
+    def rebuild_presentation(self, presentation_info:dict):
+        # refresh our presentation info
+        # presentation_info = self.document.current_layer_set
+        for uuid, layer_prez in presentation_info.items():
+            self.set_colormap(layer_prez.colormap, uuid=uuid)
+            self.set_color_limits(layer_prez.climits, uuid=uuid)
+            self.set_layer_visible(uuid, visible=layer_prez.visible)
+            # FUTURE, if additional information is added to the presentation tuple, you must also update it here
 
     def rebuild_all(self, *args, **kwargs):
+        """
+        resynchronize the scenegraph to the document content
+        This includes creating elements for any newly-valid layers,
+        removing elements for no-longer-valid layers, and
+        making the display order, visibility, and animation order match the document
+        """
+        # get the list of layers which are valid, and either visible or in the animation order
+        doc_layers = list(self.document.active_layer_order)
+        presentation_info = tuple(p for (p,l) in doc_layers)
+        active_layers = tuple(l for (p,l) in doc_layers)
+        active_uuids = set(x.uuid for x in active_layers)
+        active_lookup = dict((x.uuid,x) for x in active_layers)
+        prez_lookup = dict((x.uuid,x) for x in presentation_info)
+
+        uuids_w_elements = set(self.image_elements.keys())
+        # get set of valid layers not having elements and invalid layers having elements
+        inconsistent_uuids = uuids_w_elements ^ active_uuids
+
+        # current_uuid_order = self.document.current_layer_uuid_order
+        current_uuid_order = list(p.uuid for p in presentation_info)
+
+        remove_elements = []
+        for uuid in inconsistent_uuids:
+            if uuid in active_lookup and active_lookup[uuid].is_valid:
+                layer = active_lookup[uuid]
+                # create elements for layers which have transitioned to a valid state
+                LOG.debug('creating deferred element for layer %s' % layer.uuid)
+                if layer.kind in [KIND.COMPOSITE, KIND.RGB]:
+                    # create an invisible element with the RGB
+                    self.change_composite_layer(current_uuid_order, layer, prez_lookup[uuid])
+                else:
+                    raise NotImplementedError('unable to create deferred scenegraph element for %s' % repr(layer))
+            else:
+                # remove elements for layers which are no longer valid
+                remove_elements.append(uuid)
 
         # get info on the new order
-        self.layer_set.set_layer_order(self.document.current_layer_order)
+        self.layer_set.set_layer_order(current_uuid_order)
         self.layer_set.frame_order = self.document.current_animation_order
+        self.rebuild_presentation(presentation_info)
 
-        # refresh our presentation info
-        presentation_info = self.document.current_layer_set
-        for layer_info in presentation_info :
-            uuid_temp     = layer_info.uuid
-            self.set_colormap(layer_info.colormap, uuid=uuid_temp)
-            self.set_color_limits(layer_info.climits, uuid=uuid_temp)
-            self.set_layer_visible(uuid_temp, visible=layer_info.visible)
-            # FUTURE, if additional information is added to the presentation tuple, you must also update it here
+        for elem in remove_elements:
+            self.purge_layer(elem)
 
         self.update()
 
@@ -793,12 +958,18 @@ class SceneGraphManager(QObject):
             if need_retile:
                 self.start_retiling_task(uuid, preferred_stride, tile_box)
 
-        current_visible_layers = list(self.document.current_visible_layers())
-        current_invisible_layers = set(self.image_layers.keys()) - set(current_visible_layers)
+        current_visible_layers = [p.uuid for (p,l) in self.document.active_layer_order if p.visible]
+        current_invisible_layers = set(self.image_elements.keys()) - set(current_visible_layers)
+
+        def _assess_if_active(uuid):
+            element = self.image_elements.get(uuid, None)
+            if element is not None:
+                _assess(uuid, element)
+
         for uuid in current_visible_layers:
-            _assess(uuid, self.image_layers[uuid])
+            _assess_if_active(uuid)
         for uuid in current_invisible_layers:
-            _assess(uuid, self.image_layers[uuid])
+            _assess_if_active(uuid)
 
     def start_retiling_task(self, uuid, preferred_stride, tile_box):
         LOG.debug("Scheduling retile for child with UUID: %s", uuid)
@@ -807,19 +978,32 @@ class SceneGraphManager(QObject):
     def _retile_child(self, uuid, preferred_stride, tile_box):
         LOG.debug("Retiling child with UUID: '%s'", uuid)
         yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.0}
-        child = self.image_layers[uuid]
-        data = self.workspace.get_content(uuid, lod=preferred_stride)
-        yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.5}
-        # FIXME: Use LOD instead of stride and provide the lod to the workspace
-        data = data[::preferred_stride, ::preferred_stride]
-        tiles_info, vertices, tex_coords = child.retile(data, preferred_stride, tile_box)
-        yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 1.0}
-        self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)
+        if uuid not in self.composite_element_dependencies:
+            child = self.image_elements[uuid]
+            data = self.workspace.get_content(uuid, lod=preferred_stride)
+            yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.5}
+            # FIXME: Use LOD instead of stride and provide the lod to the workspace
+            data = data[::preferred_stride, ::preferred_stride]
+            tiles_info, vertices, tex_coords = child.retile(data, preferred_stride, tile_box)
+            yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 1.0}
+            self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)
+        else:
+            child = self.image_elements[uuid]
+            data = [self.workspace.get_content(d_uuid, lod=preferred_stride) for d_uuid in self.composite_element_dependencies[uuid]]
+            yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.5}
+            # FIXME: Use LOD instead of stride and provide the lod to the workspace
+            data = [d[::int(preferred_stride / factor), ::int(preferred_stride / factor)] if d is not None else None for factor, d in zip(child._channel_factors, data)]
+            tiles_info, vertices, tex_coords = child.retile(data, preferred_stride, tile_box)
+            yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 1.0}
+            self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)
 
     def _set_retiled(self, uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords):
         """Slot to take data from background thread and apply it to the layer living in the image layer.
         """
-        child = self.image_layers[uuid]
+        child = self.image_elements.get(uuid, None)
+        if child is None:
+            LOG.warning('unable to find uuid %s in image_elements' % uuid)
+            return
         child.set_retiled(preferred_stride, tile_box, tiles_info, vertices, tex_coords)
         child.update()
 

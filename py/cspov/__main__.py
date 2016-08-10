@@ -20,7 +20,7 @@ REQUIRES
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-
+from uuid import UUID
 from vispy import app
 try:
     app_object = app.use_app('pyqt4')
@@ -31,7 +31,7 @@ QtGui = app_object.backend_module.QtGui
 
 import cspov.ui.open_cache_dialog_ui as open_cache_dialog_ui
 from cspov.control.LayerManager import LayerSetsManager
-from cspov.model import Document
+from cspov.model.document import Document, DocRGBLayer, DocCompositeLayer, DocBasicLayer, DocLayer, DocLayerStack
 from cspov.view.SceneGraphManager import SceneGraphManager
 from cspov.view.ProbeGraphs import ProbeGraphManager, DEFAULT_POINT_PROBE
 from cspov.queue import TaskQueue, test_task, TASK_PROGRESS, TASK_DOING
@@ -42,7 +42,7 @@ from functools import partial
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from cspov.ui.pov_main_ui import Ui_MainWindow
-from cspov.common import INFO, KIND, DEFAULT_PROJ_OBJ, TOOL
+from cspov.common import INFO, KIND, DEFAULT_PROJ_OBJ, TOOL, COMPOSITE_TYPE
 
 import os
 import sys
@@ -312,7 +312,7 @@ class Main(QtGui.QMainWindow):
         self.ui.animationSlider.repaint()
         self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
 
-    def update_frame_time_to_top_visible(self):
+    def update_frame_time_to_top_visible(self, *args):
         # FUTURE: don't address layer set directly
         self.ui.animationLabel.setText(self.document.time_label_for_uuid(self.scene_manager.layer_set.top_layer_uuid()))
 
@@ -421,9 +421,35 @@ class Main(QtGui.QMainWindow):
     #         self.animation_slider_jump_frame(None)
     #         self.behaviorLayersList.select([info[INFO.UUID]])
 
+    def _user_set_rgb_layer(self, uuid:UUID, rgba:str, selected:DocLayer):
+        """
+        handle signal from layer info panel which says that an RGB layer selected a new layer as channel
+        :param layer: layer being edited
+        :param rgba: char from 'rgba'
+        :param selected: layer to replace, causing scene graph element to be rebuilt
+        :return:
+        """
+        # we could just modify the layer and emit the document signal, but preference is to have document generate its own signals.
+        layer = self.document[uuid]
+        self.document.revise_rgb_layer_choice(layer, **{rgba:selected})
+
+    def _user_set_rgb_range(self, uuid:UUID, rgba:str, lo:float, hi:float):
+        layer = self.document[uuid]
+        self.document.set_rgb_range(layer, rgba, lo, hi)
+
+    def _refresh_probe_results(self, *args):
+        arg1 = args[0]
+        if isinstance(arg1, dict):
+            # Given a dictionary of changes
+            uuids = arg1.keys()
+        else:
+            uuids = [arg1]
+        _state, _xy_pos = self.graphManager.current_point_probe_status(DEFAULT_POINT_PROBE)
+        self.document.update_equalizer_values(DEFAULT_POINT_PROBE, _state, _xy_pos, uuids=uuids)
+
     def update_point_probe_text(self, probe_name, state=None, xy_pos=None, uuid=None, animating=None):
         if uuid is None:
-            uuid = self.document.current_visible_layer
+            uuid = self.document.current_visible_layer_uuid
         if state is None or xy_pos is None:
             _state, _xy_pos = self.graphManager.current_point_probe_status(probe_name)
             if state is None:
@@ -443,8 +469,11 @@ class Main(QtGui.QMainWindow):
             data_str = "<animating>"
         elif state and uuid is not None:
             data_point = self.workspace.get_content_point(uuid, xy_pos)
-            format_str, unit_str, converted = self.document.convert_units(uuid, data_point)
-            data_str = (format_str + "{:s}").format(float(converted), unit_str)
+            if data_point is None:
+                data_str = "N/A"
+            else:
+                format_str, unit_str, converted = self.document.convert_units(uuid, data_point)
+                data_str = (format_str + "{:s}").format(float(converted), unit_str)
         else:
             data_str = "N/A"
         self.ui.cursorProbeText.setText("Probe Value: {} ".format(data_str))
@@ -453,6 +482,13 @@ class Main(QtGui.QMainWindow):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+        self.tabifyDockWidget(self.ui.layersPane, self.ui.areaProbePane)
+        self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.rgbConfigPane)
+
+        # self.tabifyDockWidget(self.ui.rgbConfigPane, self.ui.layerDetailsPane)
+        # Make the layer list and layer details shown
+        self.ui.layersPane.raise_()
+        self.ui.layerDetailsPane.raise_()
         # refer to objectName'd entities as self.ui.objectName
         self.setAcceptDrops(True)
 
@@ -490,7 +526,7 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.didChangeLayerVisibility.connect(self.document.animation_changed_visibility)
 
         # disable close button on panes
-        for pane in [self.ui.areaProbePane, self.ui.layersPane, self.ui.layerConfigPane]:
+        for pane in [self.ui.areaProbePane, self.ui.layersPane, self.ui.layerDetailsPane, self.ui.rgbConfigPane]:
             pane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable |
                              QtGui.QDockWidget.DockWidgetMovable)
 
@@ -510,10 +546,12 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.main_canvas.transforms.changed.connect(partial(start_wrapper, self.scheduler))
 
         # convey action between document and layer list view
-        self.layerSetsManager = LayerSetsManager(self.ui.layerSetTabs, self.ui.layerInfoContents, self.document)
+        self.layerSetsManager = LayerSetsManager(self.ui, self.ui.layerSetTabs, self.ui.layerInfoContents, self.document)
         self.behaviorLayersList = self.layerSetsManager.getLayerStackListViewModel()
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
-            top_uuids = list(self.document.current_visible_layers(2))
+            layers = list(self.document.active_layer_order)
+            top_uuids = [p.uuid for (p,l) in layers[:2]]
+            # top_uuids = list(self.document.current_visible_layer_uuids(2))
             LOG.debug("top visible UUID is {0!r:s}".format(top_uuids))
 
             # TODO, when the plots manage their own layer selection, change this call
@@ -536,6 +574,12 @@ class Main(QtGui.QMainWindow):
         self.ui.mainWidgets.removeTab(0)
         self.ui.mainWidgets.removeTab(0)
 
+        # setup RGB configuration : FIXME clean this up into a behavior
+        self.layerSetsManager.didChangeRGBLayerComponentRange.connect(self._user_set_rgb_range)
+        self.layerSetsManager.didChangeRGBLayerSelection.connect(self._user_set_rgb_layer)
+        self.document.didChangeComposition.connect(lambda *args: self._refresh_probe_results(*args[1:]))
+        self.document.didChangeColorLimits.connect(self._refresh_probe_results)
+
         # self.queue.add('test', test_task(), 'test000')
         # self.ui.layers
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
@@ -546,7 +590,8 @@ class Main(QtGui.QMainWindow):
         self.document.didChangeLayerVisibility.connect(self.update_frame_time_to_top_visible)
         self.document.didReorderLayers.connect(self.update_frame_time_to_top_visible)
         self.document.didRemoveLayers.connect(self.update_frame_time_to_top_visible)
-        self.document.didAddLayer.connect(self.update_frame_time_to_top_visible)
+        self.document.didAddBasicLayer.connect(self.update_frame_time_to_top_visible)
+        self.document.didAddCompositeLayer.connect(self.update_frame_time_to_top_visible)
 
         self.ui.panZoomToolButton.toggled.connect(partial(self.change_tool, name=TOOL.PAN_ZOOM))
         self.ui.pointSelectButton.toggled.connect(partial(self.change_tool, name=TOOL.POINT_PROBE))
@@ -563,13 +608,16 @@ class Main(QtGui.QMainWindow):
         self.graphManager.pointProbeChanged.connect(self.graphManager.update_point_probe_graph)
 
         self.scene_manager.newPointProbe.connect(self.graphManager.update_point_probe)
-        self.document.didAddLayer.connect(lambda *args: self.graphManager.update_point_probe(DEFAULT_POINT_PROBE))
+        zap = lambda *args: self.graphManager.update_point_probe(DEFAULT_POINT_PROBE)
+        self.document.didAddBasicLayer.connect(zap)
+        self.document.didAddCompositeLayer.connect(zap)
         # FIXME: These were added as a simple fix to update the proble value on layer changes, but this should really
         #        have its own manager-like object
         def _blackhole(*args, **kwargs):
             return self.update_point_probe_text(DEFAULT_POINT_PROBE)
         self.document.didChangeLayerVisibility.connect(_blackhole)
-        self.document.didAddLayer.connect(_blackhole)
+        self.document.didAddBasicLayer.connect(_blackhole)
+        self.document.didAddCompositeLayer.connect(_blackhole)
         self.document.didRemoveLayers.connect(_blackhole)
         self.document.didReorderLayers.connect(_blackhole)
         if False:
@@ -617,6 +665,19 @@ class Main(QtGui.QMainWindow):
         removed_name = self.graphManager.currentPolygonChanged(None)
         LOG.info("Clearing polygon with name '%s'", removed_name)
         self.scene_manager.remove_polygon(removed_name)
+
+    def create_composite(self, action:QtGui.QAction=None, uuids=[], composite_type=COMPOSITE_TYPE.RGB):
+        if composite_type not in [COMPOSITE_TYPE.RGB]:
+            raise ValueError("Unknown or unimplemented composite type: %s" % (composite_type,))
+        if len(uuids) == 0:
+            # get the layers to composite from current selection
+            uuids = list(self.behaviorLayersList.current_selected_uuids())
+        if len(uuids)<3:  # pad with None
+            uuids = uuids + ([None] * (3 - len(uuids)))
+        # Don't use non-basic layers as starting points for the new composite
+        uuids = [uuid if uuid is not None and self.document[uuid][INFO.KIND] == KIND.IMAGE else None for uuid in uuids]
+        layer = self.document.create_rgb_composite(uuids[0], uuids[1], uuids[2])
+        self.behaviorLayersList.select([layer.uuid])
 
     def setup_menu(self):
         open_action = QtGui.QAction("&Open...", self)
@@ -683,7 +744,7 @@ class Main(QtGui.QMainWindow):
 
         flip_colormap = QtGui.QAction("Flip Color Limits (Top Layer)", self)
         flip_colormap.setShortcut("/")
-        flip_colormap.triggered.connect(lambda: self.document.flip_climits_for_layers([self.document.current_visible_layer]))
+        flip_colormap.triggered.connect(lambda: self.document.flip_climits_for_layers([self.document.current_visible_layer_uuid]))
 
         cycle_borders = QtGui.QAction("Cycle &Borders", self)
         cycle_borders.setShortcut('B')
@@ -701,6 +762,10 @@ class Main(QtGui.QMainWindow):
         clear.setShortcut(QtCore.Qt.Key_Escape)
         clear.triggered.connect(self.remove_region_polygon)
 
+        composite = QtGui.QAction("Create Composite", self)
+        composite.setShortcut('C')
+        composite.triggered.connect(self.create_composite)
+
         toggle_point = QtGui.QAction("Toggle Point Probe", self)
         toggle_point.setShortcut('X')
         toggle_point.triggered.connect(lambda: self.graphManager.toggle_point_probe(DEFAULT_POINT_PROBE))
@@ -709,6 +774,9 @@ class Main(QtGui.QMainWindow):
         edit_menu.addAction(remove)
         edit_menu.addAction(clear)
         edit_menu.addAction(toggle_point)
+
+        layer_menu = menubar.addMenu('&Layer')
+        layer_menu.addAction(composite)
 
         view_menu = menubar.addMenu('&View')
         view_menu.addAction(animate)
@@ -733,7 +801,7 @@ class Main(QtGui.QMainWindow):
                     return cb()
             return tmp_cb
 
-        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("c", self.scene_manager.next_tool))
+        self.scene_manager.main_canvas.events.key_release.connect(cb_factory("t", self.scene_manager.next_tool))
 
         class ColormapSlot(object):
             def __init__(self, sgm, key='e'):
@@ -772,6 +840,8 @@ def main():
                         help="Specify glob pattern for input images")
     parser.add_argument("-c", "--center", nargs=2, type=float,
                         help="Specify center longitude and latitude for camera")
+    parser.add_argument("--desktop", type=int, default=0,
+                        help="Number of monitor/display to show the main window on (0 for main, 1 for secondary, etc.)")
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=int(os.environ.get("VERBOSITY", 2)),
                         help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG (default INFO)')
     args = parser.parse_args()
@@ -796,15 +866,20 @@ def main():
         border_shapefile=args.border_shapefile,
         center=args.center,
     )
+    screen = QtGui.QApplication.desktop()
+    screen_geometry = screen.screenGeometry(args.desktop)
     if 'darwin' not in sys.platform:
-        # window.resize(2000,1000)
-        screen = QtGui.QDesktopWidget().screenGeometry()
-        w,h  = screen.width() - 400, screen.height() - 300
+        w, h = screen_geometry.width() - 400, screen_geometry.height() - 300
         window.setGeometry(200, 150, w, h)
-        # window.showMaximized()
-        window.show()
     else:
-        window.show()
+        size = window.size()
+        w, h = size.width(), size.height()
+        center = screen_geometry.center()
+        screen_x, screen_y = center.x(), center.y()
+        window.move(int(screen_x - w / 2.), int(screen_y - h / 2.))
+
+
+    window.show()
     print("running")
     # bring window to front
     window.raise_()

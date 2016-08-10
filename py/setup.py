@@ -20,14 +20,18 @@ from setuptools import setup, find_packages
 
 setup(
     name='cspov',
-    version='0.7.6',
+    version='0.8.0',
     description="Satellite Information Familiarization Tool for mercator geotiff files",
-    author='Ray Garcia, SSEC',
-    author_email='ray.garcia@ssec.wisc.edu',
+    author='R.K.Garcia, University of Wisconsin - Madison Space Science & Engineering Center',
+    author_email='rkgarcia@wisc.edu',
     url='https://www.ssec.wisc.edu/',
     zip_safe=False,
     include_package_data=True,
-    install_requires=['numpy', 'pillow', 'scipy', 'numba', 'vispy>0.4.0', 'numpy', 'PyOpenGL', 'netCDF4', 'h5py', 'pyproj', 'gdal', 'pyshp', 'shapely', 'rasterio'],
+    install_requires=['numpy', 'pillow', 'scipy', 'numba', 'vispy>0.4.0',
+                      'PyOpenGL', 'netCDF4', 'h5py', 'pyproj', 'gdal',
+                      'pyshp', 'shapely', 'rasterio', 'multipledispatch',
+                      'blockdiag', 'sphinx', 'sphinx_rtd_theme',
+                      'sphinxcontrib-seqdiag', 'sphinxcontrib-blockdiag'],
     packages=find_packages(),
     entry_points={'console_scripts': ['cspov = cspov.__main__:main']}
 )

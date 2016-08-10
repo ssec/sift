@@ -185,6 +185,8 @@ class Workspace(QObject):
     - notify subscribers of changes to datasets (Qt signal/slot pub-sub)
     - during idle, clean out unused/idle data content, given DatasetInfo contents provides enough metadata to recreate
     - interface to external data processing or loading plug-ins and notify application of new-dataset-in-workspace
+
+    FIXME: deal with non-basic datasets (composites)
     """
     cwd = None  # directory we work in
     _own_cwd = None  # whether or not we created the cwd - which is also whether or not we're allowed to destroy it
@@ -193,6 +195,7 @@ class Workspace(QObject):
     _info = None
     _data = None
     _inventory = None  # dictionary of data
+    _composite_inventory = None  # dicionary of composite datasets: { uuid: (symbols, relation, info) }
     _inventory_path = None  # filename to store and load inventory information (simple cache)
     _tempdir = None  # TemporaryDirectory, if it's needed (i.e. a directory name was not given)
     _max_size_gb = None  # maximum size in gigabytes of flat files we cache in the workspace
@@ -207,6 +210,15 @@ class Workspace(QObject):
 
     IMPORT_CLASSES = [ GeoTiffImporter ]
 
+    @staticmethod
+    def defaultWorkspace():
+        """
+        return the default (global) workspace
+        Currently no plans to have more than one workspace, but secondaries may eventually have some advantage.
+        :return: Workspace instance
+        """
+        return TheWorkspace
+
     def __init__(self, directory_path=None, process_pool=None, max_size_gb=None, queue=None):
         """
         Initialize a new or attach an existing workspace, creating any necessary bookkeeping.
@@ -216,6 +228,7 @@ class Workspace(QObject):
         self._max_size_gb = max_size_gb if max_size_gb is not None else DEFAULT_WORKSPACE_SIZE
         if self._max_size_gb < MIN_WORKSPACE_SIZE:
             self._max_size_gb = MIN_WORKSPACE_SIZE
+            LOG.warning('setting workspace size to %dGB' % self._max_size_gb)
         if directory_path is None:
             import tempfile
             self._tempdir = tempfile.TemporaryDirectory()
@@ -223,6 +236,7 @@ class Workspace(QObject):
             LOG.info('using temporary directory {}'.format(directory_path))
         self.cwd = directory_path = os.path.abspath(directory_path)
         self._inventory_path = os.path.join(self.cwd, 'inventory.pkl')
+        self._composite_inventory = {}
         if not os.path.isdir(directory_path):
             os.makedirs(directory_path)
             self._own_cwd = True
@@ -248,6 +262,8 @@ class Workspace(QObject):
     def _init_inventory_existing_datasets(self):
         """
         Do an inventory of an pre-existing workspace
+        FIXME: go through and check that everything in the workspace makes sense
+        FIXME: check workspace subdirectories for helper sockets and mmaps
         :return:
         """
         if os.path.exists(self._inventory_path):
@@ -439,6 +455,14 @@ class Workspace(QObject):
         # TODO: schedule cache cleaning in background after a series of imports completes
         return uuid, info, data
 
+    def create_composite(self, symbols:dict, relation:dict):
+        """
+        create a layer composite in the workspace
+        :param symbols: dictionary of logical-name to uuid
+        :param relation: dictionary with information on how the relation is calculated (FUTURE)
+        """
+
+
     def _preferred_cache_path(self, uuid):
         filename = str(uuid)
         return os.path.join(self.cwd, filename)
@@ -493,7 +517,7 @@ class Workspace(QObject):
         """
         if isinstance(dsi_or_uuid, str):
             dsi_or_uuid = UUID(dsi_or_uuid)
-        return self._info[dsi_or_uuid]
+        return self._info.get(dsi_or_uuid, None)
 
     def get_content(self, dsi_or_uuid, lod=None):
         """
@@ -503,7 +527,7 @@ class Workspace(QObject):
         """
         if isinstance(dsi_or_uuid, str):
             dsi_or_uuid = UUID(dsi_or_uuid)
-        return self._data[dsi_or_uuid]
+        return self._data.get(dsi_or_uuid, None)
 
     def _create_position_to_index_transform(self, dsi_or_uuid):
         info = self.get_info(dsi_or_uuid)
@@ -531,6 +555,8 @@ class Workspace(QObject):
 
     def _position_to_index(self, dsi_or_uuid, xy_pos):
         info = self.get_info(dsi_or_uuid)
+        if info is None:
+            return None, None
         x = xy_pos[0]
         y = xy_pos[1]
         col = (x - info[INFO.ORIGIN_X]) / info[INFO.CELL_WIDTH]
@@ -539,6 +565,8 @@ class Workspace(QObject):
 
     def get_content_point(self, dsi_or_uuid, xy_pos):
         row, col = self._position_to_index(dsi_or_uuid, xy_pos)
+        if row is None or col is None:
+            return None
         data = self.get_content(dsi_or_uuid)
         if not ((0 <= col < data.shape[1]) and (0 <= row < data.shape[0])):
             raise ValueError("X/Y position is outside of image with UUID: %s", dsi_or_uuid)

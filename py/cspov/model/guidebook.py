@@ -56,7 +56,7 @@ class Guidebook(object):
         :return:
         """
         if info and not path:
-            path = info[INFO.PATHNAME]
+            path = info.get(INFO.PATHNAME, None)
 
     def channel_siblings(self, uuid, infos):
         """
@@ -126,19 +126,27 @@ NOMINAL_WAVELENGTHS = {
 }
 
 
+
 class AHI_HSF_Guidebook(Guidebook):
     "e.g. HS_H08_20150714_0030_B10_FLDK_R20.merc.tif"
     _cache = None  # {uuid:metadata-dictionary, ...}
+
+    REFL_BANDS = [1, 2, 3, 4, 5, 6]
+    BT_BANDS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 
     def __init__(self):
         self._cache = {}
 
     @staticmethod
     def is_relevant(pathname):
+        if not pathname:
+            return False
         return True if re.match(r'HS_H\d\d_\d{8}_\d{4}_B\d\d.*', os.path.split(pathname)[1]) else False
 
     @staticmethod
     def _metadata_for_path(pathname):
+        if not pathname:
+            return {}
         m = re.match(r'HS_H(\d\d)_(\d{8})_(\d{4})_B(\d\d)_([A-Za-z0-9]+).*', os.path.split(pathname)[1])
         if not m:
             return {}
@@ -161,7 +169,7 @@ class AHI_HSF_Guidebook(Guidebook):
     def _relevant_info(self, seq):
         "filter datasetinfo dictionaries in sequence, if they're not relevant to us (i.e. not AHI)"
         for dsi in seq:
-            if self.is_relevant(dsi[INFO.PATHNAME]):
+            if self.is_relevant(dsi.get(INFO.PATHNAME, None)):
                 yield dsi
 
     def sort_pathnames_into_load_order(self, paths):
@@ -186,16 +194,19 @@ class AHI_HSF_Guidebook(Guidebook):
 
     def collect_info(self, info):
         md = self._cache.get(info[INFO.UUID], None)
-        if md is not None:
-            return md
-        else:
-            md = self._metadata_for_path(info[INFO.PATHNAME])
+        # TODO: Used to be 'info *not* in (KIND.IMAGE, KIND.COMPOSITE)', what's right?
+        if md is None and info[INFO.KIND] in (KIND.IMAGE, KIND.COMPOSITE):
+            md = self._metadata_for_path(info.get(INFO.PATHNAME, None))
             md[GUIDE.UUID] = info[INFO.UUID]
             md[GUIDE.INSTRUMENT] = INSTRUMENT.AHI
             md[GUIDE.CENTRAL_WAVELENGTH] = NOMINAL_WAVELENGTHS[md[GUIDE.PLATFORM]][md[GUIDE.INSTRUMENT]][md[GUIDE.BAND]]
             # md[GUIDE.UNIT_CONVERSION] = self.units_conversion(info)  # FUTURE: decide whether this should be done for most queries
             self._cache[info[INFO.UUID]] = md
-            return md
+        if md is None:
+            return dict(info)
+        z = md.copy()
+        z.update(info)
+        return z
 
     def collect_info_from_seq(self, seq):
         "collect AHI metadata about a sequence of datasetinfo dictionaries"
@@ -207,29 +218,35 @@ class AHI_HSF_Guidebook(Guidebook):
     def climits(self, dsi):
         # Valid min and max for colormap use for data values in file (unconverted)
         md = self.collect_info(dsi)
-        if md[GUIDE.BAND] in [1, 2, 3, 4, 5, 6]:
+        if md[GUIDE.BAND] in self.REFL_BANDS:
             # Reflectance/visible data limits
             return -0.012, 1.192
-        else:
+        elif md[GUIDE.BAND] in self.BT_BANDS:
             # BT data limits
             return -109.0 + 273.15, 55 + 273.15
+        else:
+            return None
 
     def units_conversion(self, dsi):
         "return UTF8 unit string, lambda v,inverse=False: convert-raw-data-to-unis"
         md = self.collect_info(dsi)
-        if md[GUIDE.BAND] in [1, 2, 3, 4, 5, 6]:
+        if md[GUIDE.BAND] in self.REFL_BANDS:
             # Reflectance/visible data limits
             return ('{:.03f}', '', lambda x, inverse=False: x)
-        else:
+        elif md[GUIDE.BAND] in self.BT_BANDS:
             # BT data limits, Kelvin to degC
             return ("{:.02f}", "°C", lambda x, inverse=False: x - 273.15 if not inverse else x + 273.15)
+        else:
+            return ("", "", lambda x, inverse=False: 0.0)
 
     def default_colormap(self, dsi):
         md = self.collect_info(dsi)
-        if md[GUIDE.BAND] in [1, 2, 3, 4, 5, 6]:
+        if md[GUIDE.BAND] in self.REFL_BANDS:
             return DEFAULT_VIS
-        else:
+        elif md[GUIDE.BAND] in self.BT_BANDS:
             return DEFAULT_IR
+        else:
+            return None
 
     def display_time(self, dsi):
         md = self.collect_info(dsi)
@@ -282,7 +299,7 @@ class AHI_HSF_Guidebook(Guidebook):
         meta = dict(self.collect_info_from_seq(infos))
         it = meta.get(uuid, None)
         if it is None:
-            return None
+            return [], 0
         sibs = [(x[GUIDE.SCHED_TIME], x[GUIDE.UUID]) for x in
                 self._filter(meta.values(), it, {GUIDE.SCENE, GUIDE.BAND, GUIDE.INSTRUMENT, GUIDE.PLATFORM})]
         # then sort it into time order

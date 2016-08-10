@@ -87,7 +87,7 @@ class ProbeGraphManager (QObject) :
     """
 
     # signals
-    didChangeTab = pyqtSignal(list,)  # list of probe areas to show
+    didChangeTab = pyqtSignal(tuple,)  # list of probe areas to show
     didClonePolygon = pyqtSignal(str, str)
     drawChildGraph = pyqtSignal(str,)
     pointProbeChanged = pyqtSignal(str, bool, tuple)
@@ -135,7 +135,7 @@ class ProbeGraphManager (QObject) :
         # hook up the various document signals that would mean we need to reload things
         self.document.didReorderLayers.connect(self.handleLayersChanged)
         self.document.didChangeLayerName.connect(self.handleLayersChanged)
-        self.document.didAddLayer.connect(self.handleLayersChanged)
+        self.document.didAddBasicLayer.connect(self.handleLayersChanged)
         self.document.willPurgeLayer.connect(self.handleLayersChanged)
         self.document.didSwitchLayerSet.connect(self.handleLayersChanged)
 
@@ -162,7 +162,7 @@ class ProbeGraphManager (QObject) :
         self.graphs.append(graph)
 
         # load up the layers for this new tab
-        uuid_list = self.document.current_layer_order
+        uuid_list = self.document.current_layer_uuid_order
         graph.set_possible_layers(uuid_list)
 
         # clone the previous tab
@@ -173,7 +173,7 @@ class ProbeGraphManager (QObject) :
             # give it a copy of the current polygon
             graph.setPolygon(current_graph.polygon[:] if current_graph.polygon is not None else None)
             graph.checked = current_graph.checked
-            point_status, point_xy = self.point_probes[DEFAULT_POINT_PROBE]
+            point_status, point_xy = self.point_probes.get(DEFAULT_POINT_PROBE, (None,None))
             point_xy = point_xy if point_status else None
             graph.setPoint(point_xy, rebuild=False)
 
@@ -188,7 +188,7 @@ class ProbeGraphManager (QObject) :
         """
 
         # reload the layer list for the existing graphs
-        uuid_list = self.document.current_layer_order
+        uuid_list = self.document.current_layer_uuid_order
         for graphObj in self.graphs :
             doRebuild = graphObj is self.graphs[self.selected_graph_index]
             graphObj.set_possible_layers(uuid_list, do_rebuild_plot=doRebuild)
@@ -290,7 +290,7 @@ class ProbeGraphManager (QObject) :
             self.graphs[self.selected_graph_index].rebuildPlot()
 
         currentName = self.graphs[self.selected_graph_index].getName()
-        self.didChangeTab.emit([currentName])
+        self.didChangeTab.emit((currentName,))
 
 class ProbeGraphDisplay (object) :
     """The ProbeGraphDisplay controls one tab of the Area Probe Graphs.
