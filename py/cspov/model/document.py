@@ -655,6 +655,40 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     nfo[uuid] = name
         self.didChangeColormap.emit(nfo)
 
+    def current_layers_where(self, kinds=None, bands=None, uuids=None):
+        """
+        check current layer list for criteria and yield
+        :param kinds: None, or set(KIND.xxx)
+        :param bands: None, or set(band or band-trio)
+        :param uuids: None, or set(UUID)
+        :return: yield (index, prez, layer) from current layer set
+        """
+        L = self.current_layer_set
+        for idx,p in enumerate(L):
+            if (uuids is not None) and (p.uuid not in uuids):
+                continue
+            layer = self._layer_with_uuid[p.uuid]
+            if (kinds is not None) and (layer.kind not in kinds):
+                continue
+            if (bands is not None) and (layer.band not in bands):
+                continue
+            yield (idx, p, layer)
+
+    def change_clims_for_layers_where(self, clims, **query):
+        """
+        query using .current_layers_where() and change clims en masse
+        :param clims: new color limits consistent with layer's presentation
+        :param query: see current_layers_where()
+        :return:
+        """
+        nfo = {}
+        L = self.current_layer_set
+        for idx, pz, layer in self.current_layers_where(**query):
+            new_pz = pz._replace(climits=clims)
+            nfo[layer.uuid] = new_pz
+            L[idx] = new_pz
+        self.didChangeColorLimits.emit(nfo)
+
     def flip_climits_for_layers(self, uuids=None):
         L = self.current_layer_set
         if uuids is not None:
@@ -694,7 +728,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 INFO.ORIGIN_Y: None,
                 INFO.CELL_WIDTH: None,
                 INFO.CELL_HEIGHT: None,
-                INFO.CLIM: None,
+                INFO.CLIM: (None, None, None),
             }
             self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
             presentation, reordered_indices = self._insert_layer_with_info(ds_info)
@@ -775,14 +809,16 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.didChangeComposition.emit((), layer.uuid, prez, rgba)
 
     def set_rgb_range(self, layer:DocRGBLayer, rgba:str, min:float, max:float):
-        # FUTURE: migrate RGB clim into prez and not layer
-        layer[INFO.CLIM] = tuple(x if c != rgba else (min, max) for c, x in zip("rgba", layer[INFO.CLIM]))
+        new_clims = tuple(x if c != rgba else (min, max) for c, x in zip("rgba", layer[INFO.CLIM]))
+        # FIXME: migrate RGB clim into prez and not layer; only set INFO.CLIM if it hasn't already been set
+        # self.change_clims_for_layers_where(new_clims, uuids={layer.uuid})
+        layer[INFO.CLIM] = new_clims
         self.didChangeColorLimits.emit({layer[INFO.UUID]: layer[INFO.CLIM]})
 
     def __len__(self):
         return len(self.current_layer_set)
 
-    def uuid_for_layer(self, row):
+    def uuid_for_current_layer(self, row):
         uuid = self.current_layer_set[row].uuid
         return uuid
 

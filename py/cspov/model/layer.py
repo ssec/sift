@@ -176,6 +176,10 @@ class DocLayer(MutableMapping):
         return self._store[INFO.KIND]
 
     @property
+    def band(self):
+        return self._store.get(GUIDE.BAND, None)
+
+    @property
     def name(self):
         return self._store[INFO.NAME]
 
@@ -280,6 +284,11 @@ class DocRGBLayer(DocCompositeLayer):
     @property
     def is_flat_field(self):
         return False
+
+    @property
+    def band(self):
+        gb = lambda l: None if (l is None) else l.band
+        return (gb(self.r), gb(self.g), gb(self.b))
 
     def update_metadata_from_dependencies(self):
         """

@@ -346,7 +346,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             LOG.error('not sure which list box is active! oh pooh.')
             return
         for q in lbox.selectedIndexes():
-            yield self.doc.uuid_for_layer(q.row())
+            yield self.doc.uuid_for_current_layer(q.row())
 
     def select(self, uuids, lbox:QTreeView=None, scroll_to_show_single=True):
         lbox = self.current_set_listbox if lbox is None else lbox
