@@ -363,6 +363,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         })
 
     def convert_units(self, uuid, data, inverse=False):
+        """
+        :param uuid: layer id
+        :param data: values to convert
+        :param inverse: when true, convert from display units to data units
+        :return:
+        """
         formatstr, unitstr, lam = self._guidebook.units_conversion(self._layer_with_uuid[uuid])
         return formatstr, unitstr, lam(data, inverse)
 
