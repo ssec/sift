@@ -371,7 +371,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             default_clim = self._layer_with_uuid[p.uuid][INFO.CLIM]
             yield ((p.climits[1] - p.climits[0]) > 0) != ((default_clim[1] - default_clim[0]) > 0)
 
-    def update_equalizer_values(self, uuid, state, xy_pos):
+    def update_equalizer_values(self, probe_name, state, xy_pos, uuids=None):
         """user has clicked on a point probe; determine relative and absolute values for all document image layers
         """
         # if the point probe was turned off then we don't want to have the equalizer
@@ -379,10 +379,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             self.didCalculateLayerEqualizerValues.emit({})
             return
 
+        if uuids is None:
+            uuids = [(pinf.uuid, pinf) for pinf in self.current_layer_set]
+        else:
+            uuids = [(uuid, self._layer_with_uuid[uuid]) for uuid in uuids]
         zult = {}
-        for pinf in self.current_layer_set:
-            if pinf.uuid in zult:
-                continue
+        for uuid, pinf in uuids:
             lyr = self._layer_with_uuid[pinf.uuid]
             if lyr[INFO.KIND] == KIND.IMAGE:
                 value = self._workspace.get_content_point(pinf.uuid, xy_pos)
@@ -406,6 +408,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                         v = cmin
                     elif v > cmax:
                         v = cmax
+                    if cmin == cmax:
+                        return 0
                     return int(round((v - cmin) / (cmax - cmin) * 255.))
                 values = []
                 for dep_lyr, clims in zip(lyr.l[:3], lyr[INFO.CLIM]):

@@ -735,12 +735,12 @@ class SceneGraphManager(QObject):
     def add_composite_layer(self, new_order:tuple, uuid:UUID, p:prez):
         layer = self.document[uuid]
         LOG.debug("SceneGraphManager.add_composite_layer %s" % repr(layer))
-        if not layer.is_valid or layer.r is None or layer.g is None or layer.b is None:
+        if not layer.is_valid:
             LOG.info('unable to add an invalid layer, will try again later when layer changes')
             return
         if isinstance(layer, DocRGBLayer):
-            dep_uuids = r,g,b = [component.uuid for component in [layer.r, layer.g, layer.b]]
-            overview_content = list(self.workspace.get_content(component_uuid) for component_uuid in dep_uuids)
+            dep_uuids = r,g,b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
+            overview_content = list(self.workspace.get_content(cuuid) for cuuid in dep_uuids)
             uuid = layer.uuid
             LOG.debug("Adding composite layer to Scene Graph Manager with UUID: %s", uuid)
             self.image_elements[uuid] = element = RGBCompositeLayer(
@@ -761,6 +761,8 @@ class SceneGraphManager(QObject):
             element.transform *= STTransform(translate=(0, 0, -50.0))
             self.composite_element_dependencies[uuid] = dep_uuids
             self.layer_set.add_layer(element)
+            if new_order:
+                self.layer_set.set_layer_order(new_order)
             self.on_view_change(None)
             return True
         else:
@@ -773,8 +775,8 @@ class SceneGraphManager(QObject):
                 if layer.is_valid:
                     # RGB selection has changed, rebuild the layer
                     LOG.debug("Changing existing composite layer to Scene Graph Manager with UUID: %s", layer.uuid)
-                    dep_uuids = r,g,b = [component.uuid for component in [layer.r, layer.g, layer.b]]
-                    overview_content = list(self.workspace.get_content(component_uuid) for component_uuid in dep_uuids)
+                    dep_uuids = r,g,b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
+                    overview_content = list(self.workspace.get_content(cuuid) for cuuid in dep_uuids)
                     self.composite_element_dependencies[layer.uuid] = dep_uuids
                     self.image_elements[layer.uuid].set_channels(overview_content)
                     self.image_elements[layer.uuid].init_overview(overview_content)
@@ -990,7 +992,7 @@ class SceneGraphManager(QObject):
             data = [self.workspace.get_content(d_uuid, lod=preferred_stride) for d_uuid in self.composite_element_dependencies[uuid]]
             yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.5}
             # FIXME: Use LOD instead of stride and provide the lod to the workspace
-            data = [d[::int(preferred_stride / factor), ::int(preferred_stride / factor)] for factor, d in zip(child._channel_factors, data)]
+            data = [d[::int(preferred_stride / factor), ::int(preferred_stride / factor)] if d is not None else None for factor, d in zip(child._channel_factors, data)]
             tiles_info, vertices, tex_coords = child.retile(data, preferred_stride, tile_box)
             yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 1.0}
             self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)
