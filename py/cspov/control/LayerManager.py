@@ -401,12 +401,14 @@ class RGBLayerConfigPane(QWidget):
     _sliders = None  # sliders in r,g,b order; cache
     _edits = None
     _valid_ranges = None # tuples of each layer's c-limits
+    _uuids = None  # [r-uuid, g, b]; used for conversion purposes
 
     def __init__(self, ui, parent, document):
         super(RGBLayerConfigPane, self).__init__(parent)
         self.document_ref = ref(document)
         self.ui = ui
         self._valid_ranges = [None, None, None]
+        self._uuids = [None, None, None ]
         from functools import partial
 
         # TODO: Put in UI file?
@@ -476,12 +478,29 @@ class RGBLayerConfigPane(QWidget):
         if uuid_str:
             uuid = UUID(uuid_str)
             new_layer = self.document_ref()[uuid]
+            self._uuids[RGBA2IDX[color]] = uuid
         else:
             new_layer = None
-
+            self._uuids[RGBA2IDX[color]] = None
         # reset slider position to min and max for layer
         self._set_minmax_slider(color, new_layer)
         self.didChangeRGBLayerSelection.emit(self.active_layer_ref().uuid, color, new_layer)
+
+    def _display_to_data(self, color:str, values):
+        "convert display value to data value"
+        uuid = self._uuids[RGBA2IDX[color]]
+        if not uuid:
+            return values
+        format, units, data= self.document_ref().convert_units(uuid, values, inverse=True)
+        return data
+
+    def _data_to_display(self, color:str, values):
+        "convert data value to display value"
+        uuid = self._uuids[RGBA2IDX[color]]
+        if not uuid:
+            return values
+        format, units, display = self.document_ref().convert_units(uuid, values, inverse=False)
+        return display
 
     def _get_slider_value(self, valid_min, valid_max, slider_val):
         return (slider_val / self._slider_steps) * (valid_max - valid_min) + valid_min
@@ -506,21 +525,27 @@ class RGBLayerConfigPane(QWidget):
         """
         update edit controls to match non-None values provided
         if called with just color, returns current min and max
+        implicitly convert data values to and from display values
         :param color: in 'rgba'
-        :param n: minimum value or None
-        :param x: max value or None
+        :param n: minimum data value or None
+        :param x: max data value or None
         :return: new min, new max
         """
         idx = RGBA2IDX[color]
         edn, edx = self.line_edits[idx]
         if n is not None:
-            edn.setText('%f' % n)
+            ndis = self._data_to_display(color, n)
+            LOG.debug('%s min %f => %f' % (color, n, ndis))
+            edn.setText('%f' % ndis)
         else:
-            n = float(edn.text())
+            ndis = float(edn.text())
+            n = self._display_to_data(color, ndis)
         if x is not None:
-            edx.setText('%f' % x)
+            xdis = self._data_to_display(color, x)
+            edx.setText('%f' % xdis)
         else:
-            x = float(edx.text())
+            xdis = float(edx.text())
+            x = self._display_to_data(color, xdis)
         return n, x
 
     def _signal_color_changing_range(self, color:str, n:float, x:float):
@@ -551,8 +576,9 @@ class RGBLayerConfigPane(QWidget):
         """
         idx = RGBA2IDX[color]
         vn, vx= self._valid_ranges[idx]
-        val = float(line_edit.text())
-        LOG.debug('line edit %s %s => %f' % (color, 'max' if is_max else 'min', val))
+        vdis = float(line_edit.text())
+        val = self._display_to_data(color, vdis)
+        LOG.debug('line edit %s %s => %f => %f' % (color, 'max' if is_max else 'min', vdis, val))
         sv = self._create_slider_value(vn, vx, val)
         slider = self.sliders[idx][1 if is_max else 0]
         slider.setValue(sv)
@@ -604,6 +630,9 @@ class RGBLayerConfigPane(QWidget):
             # block signals so an existing RGB layer doesn't get overwritten with new layer selections
             widget.blockSignals(True)
 
+        guuid = lambda lyr: lyr.uuid if lyr is not None else None
+        self._uuids = [guuid(layer.r), guuid(layer.g), guuid(layer.b)] if layer is not None else [None, None, None]
+
         # update the combo boxes
         self._set_combos_to_layer_names()
         self._select_layers_for(layer)
@@ -624,6 +653,7 @@ class RGBLayerConfigPane(QWidget):
             slider[0].setSliderPosition(0)
             slider[1].setSliderPosition(0)
             editn.setText('0.0')
+            editx.setText('0.0')
         else:
             valid_range = self.document_ref().valid_range_for_uuid(layer.uuid) if valid_range is None else valid_range
             clims = valid_range if clims is None else clims
@@ -637,7 +667,7 @@ class RGBLayerConfigPane(QWidget):
 
     def _set_minmax_sliders(self, layer=None, rgb_clims=None):
         if isinstance(layer, DocRGBLayer):
-            rgb_clims = layer[INFO.CLIM] if rgb_clims is None else rgb_clims
+            rgb_clims = layer[INFO.CLIM] if rgb_clims is None else rgb_clims  # FIXME: migrate to using prez instead of layer
             for idx, (color, sub_layer) in enumerate(zip("rgb", [layer.r, layer.g, layer.b])):
                 clim = rgb_clims[idx] if rgb_clims else None
                 self._set_minmax_slider(color, sub_layer, clim)
