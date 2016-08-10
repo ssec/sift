@@ -273,8 +273,8 @@ class DocRGBLayer(DocCompositeLayer):
 
     @property
     def is_valid(self):
-        return (self.r is not None and
-                self.g is not None and
+        return (self.r is not None or
+                self.g is not None or
                 self.b is not None)
 
     @property
@@ -287,31 +287,53 @@ class DocRGBLayer(DocCompositeLayer):
         :return:
         """
         dep_info = [self.r, self.g, self.b]
-        highest_res_dep = min(dep_info, key=lambda x: x[INFO.CELL_WIDTH])
-        _dt = lambda nfo: nfo.get(GUIDE.DISPLAY_TIME, '<unknown time>')
-        from functools import reduce
-        display_time = reduce(lambda dta, b: dta if dta == _dt(b) else '<multiple times>', dep_info, _dt(dep_info[0]))
-        try:
-            bands = (dep_info[0][GUIDE.BAND],
-                     dep_info[1][GUIDE.BAND],
-                     dep_info[2][GUIDE.BAND])
-            name = u"R:B{0:02d} G:B{1:02d} B:B{2:02d}".format(*bands)
-        except KeyError:
-            LOG.error('unable to create new name from {0!r:s}'.format(dep_info))
-            name = "RGB"
-            bands = []
-        ds_info = {
-            INFO.NAME: name,
-            INFO.KIND: KIND.RGB,
-            GUIDE.BAND: bands,
-            GUIDE.DISPLAY_TIME: display_time,
-            INFO.ORIGIN_X: highest_res_dep[INFO.ORIGIN_X],
-            INFO.ORIGIN_Y: highest_res_dep[INFO.ORIGIN_Y],
-            INFO.CELL_WIDTH: highest_res_dep[INFO.CELL_WIDTH],
-            INFO.CELL_HEIGHT: highest_res_dep[INFO.CELL_HEIGHT],
-            INFO.COLORMAP: 'autumn',  # FIXME: why do RGBs need a colormap?
-            INFO.CLIM: tuple(d[INFO.CLIM] for d in dep_info),
-        }
+        bands = [nfo[GUIDE.BAND] if nfo is not None else None for nfo in dep_info]
+        if self.r is None and self.g is None and self.b is None:
+            ds_info = {
+                INFO.NAME: "RGB",
+                INFO.KIND: KIND.RGB,
+                GUIDE.BAND: bands,
+                GUIDE.DISPLAY_TIME: '<unknown time>',
+                INFO.ORIGIN_X: None,
+                INFO.ORIGIN_Y: None,
+                INFO.CELL_WIDTH: None,
+                INFO.CELL_HEIGHT: None,
+                INFO.COLORMAP: 'autumn',  # FIXME: why do RGBs need a colormap?
+                INFO.CLIM: [None, None, None],
+            }
+        else:
+            highest_res_dep = min([x for x in dep_info if x is not None], key=lambda x: x[INFO.CELL_WIDTH])
+            valid_times = [nfo.get(GUIDE.DISPLAY_TIME, '<unknown time>') for nfo in dep_info if nfo is not None]
+            if len(valid_times) == 0:
+                display_time = '<unknown time>'
+            else:
+                display_time = valid_times[0] if len(valid_times) and all(t == valid_times[0] for t in valid_times[1:]) else '<multiple times>'
+            try:
+                names = []
+                for color, band in zip("RGB", bands):
+                    if band is None:
+                        name = u"{}:---".format(color)
+                    else:
+                        name = u"{}:B{:02d}".format(color, band)
+                        bands = []
+                    names.append(name)
+                name = u" ".join(names)
+            except KeyError:
+                LOG.error('unable to create new name from {0!r:s}'.format(dep_info))
+                name = "RGB"
+                bands = []
+            ds_info = {
+                INFO.NAME: name,
+                INFO.KIND: KIND.RGB,
+                GUIDE.BAND: bands,
+                GUIDE.DISPLAY_TIME: display_time,
+                INFO.ORIGIN_X: highest_res_dep[INFO.ORIGIN_X],
+                INFO.ORIGIN_Y: highest_res_dep[INFO.ORIGIN_Y],
+                INFO.CELL_WIDTH: highest_res_dep[INFO.CELL_WIDTH],
+                INFO.CELL_HEIGHT: highest_res_dep[INFO.CELL_HEIGHT],
+                INFO.COLORMAP: 'autumn',  # FIXME: why do RGBs need a colormap?
+                INFO.CLIM: tuple(d[INFO.CLIM] if d is not None else None for d in dep_info),
+            }
         self._store.update(ds_info)
         return ds_info
 

@@ -735,7 +735,7 @@ class SceneGraphManager(QObject):
     def add_composite_layer(self, new_order:tuple, uuid:UUID, p:prez):
         layer = self.document[uuid]
         LOG.debug("SceneGraphManager.add_composite_layer %s" % repr(layer))
-        if not layer.is_valid:
+        if not layer.is_valid or layer.r is None or layer.g is None or layer.b is None:
             LOG.info('unable to add an invalid layer, will try again later when layer changes')
             return
         if isinstance(layer, DocRGBLayer):

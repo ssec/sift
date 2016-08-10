@@ -384,20 +384,49 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             if pinf.uuid in zult:
                 continue
             lyr = self._layer_with_uuid[pinf.uuid]
-            if lyr[INFO.KIND] != KIND.IMAGE:
-                continue
-            value = self._workspace.get_content_point(pinf.uuid, xy_pos)
-            fmt, unit_str, unit_conv = self._guidebook.units_conversion(self._layer_with_uuid[pinf.uuid])
-            # calculate normalized bar width relative to its current clim
-            nc, xc = unit_conv(np.array(pinf.climits))
-            if nc > xc:  # sometimes clim is swapped to reverse color scale
-                nc, xc = xc, nc
-            value = unit_conv(value)
-            if np.isnan(value):
-                zult[pinf.uuid] = None
-            else:
-                bar_width = (np.clip(value, nc, xc) - nc) / (xc - nc)
-                zult[pinf.uuid] = (value, bar_width, fmt, unit_str)
+            if lyr[INFO.KIND] == KIND.IMAGE:
+                value = self._workspace.get_content_point(pinf.uuid, xy_pos)
+                fmt, unit_str, unit_conv = self._guidebook.units_conversion(self._layer_with_uuid[pinf.uuid])
+                # calculate normalized bar width relative to its current clim
+                nc, xc = unit_conv(np.array(pinf.climits))
+                if nc > xc:  # sometimes clim is swapped to reverse color scale
+                    nc, xc = xc, nc
+                value = unit_conv(value)
+                if np.isnan(value):
+                    zult[pinf.uuid] = None
+                else:
+                    bar_width = (np.clip(value, nc, xc) - nc) / (xc - nc)
+                    zult[pinf.uuid] = (value, bar_width, fmt, unit_str)
+            elif lyr[INFO.KIND] == KIND.RGB:
+                # We can show a valid RGB
+                # Get 3 values for each channel
+                # XXX: Better place for this?
+                def _sci_to_rgb(v, cmin, cmax):
+                    if v < cmin:
+                        v = cmin
+                    elif v > cmax:
+                        v = cmax
+                    return int(round((v - cmin) / (cmax - cmin) * 255.))
+                values = []
+                for dep_lyr, clims in zip(lyr.l[:3], lyr[INFO.CLIM]):
+                    if dep_lyr is None:
+                        values.append(None)
+                    elif clims is None:
+                        values.append(None)
+                    else:
+                        value = self._workspace.get_content_point(dep_lyr[INFO.UUID], xy_pos)
+                        values.append(_sci_to_rgb(value, clims[0], clims[1]))
+
+                # fmt = "{:3d}"
+                fmt = "{}"
+                unit_str = ""
+                nc = 0
+                xc = 255
+                bar_widths = [(np.clip(value, nc, xc) - nc) / (xc - nc) for value in values if value is not None]
+                bar_width = np.mean(bar_widths) if len(bar_widths) > 0 else 0
+                values = ",".join(["{:3d}".format(v if v is not None else 0) for v in values])
+                zult[pinf.uuid] = (values, bar_width, fmt, unit_str)
+
         self.didCalculateLayerEqualizerValues.emit(zult)  # is picked up by layer list model to update display
 
     # TODO, find out if this is needed/used and whether or not it's correct
@@ -694,7 +723,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 INFO.ORIGIN_Y: None,
                 INFO.CELL_WIDTH: None,
                 INFO.CELL_HEIGHT: None,
-                INFO.CLIM: None,
+                INFO.CLIM: [None, None, None],
             }
             self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
             presentation, reordered_indices = self._insert_layer_with_info(ds_info)
@@ -769,9 +798,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             setattr(layer, k, v)
         prez, = self.prez_for_uuids([layer.uuid])
         # this signals the scenegraph manager et al to see if the layer is now both visible and valid
-        if layer.is_valid:
-            updated = layer.update_metadata_from_dependencies()
-            LOG.info('updated metadata for layer %s: %s' % (layer.uuid, repr(list(updated.keys()))))
+        updated = layer.update_metadata_from_dependencies()
+        LOG.info('updated metadata for layer %s: %s' % (layer.uuid, repr(list(updated.keys()))))
         self.didChangeComposition.emit((), layer.uuid, prez, rgba)
 
     def set_rgb_range(self, layer:DocRGBLayer, rgba:str, min:float, max:float):

@@ -555,6 +555,8 @@ class Workspace(QObject):
 
     def _position_to_index(self, dsi_or_uuid, xy_pos):
         info = self.get_info(dsi_or_uuid)
+        if info is None:
+            return None, None
         x = xy_pos[0]
         y = xy_pos[1]
         col = (x - info[INFO.ORIGIN_X]) / info[INFO.CELL_WIDTH]
@@ -563,6 +565,8 @@ class Workspace(QObject):
 
     def get_content_point(self, dsi_or_uuid, xy_pos):
         row, col = self._position_to_index(dsi_or_uuid, xy_pos)
+        if row is None or col is None:
+            return None
         data = self.get_content(dsi_or_uuid)
         if not ((0 <= col < data.shape[1]) and (0 <= row < data.shape[0])):
             raise ValueError("X/Y position is outside of image with UUID: %s", dsi_or_uuid)
