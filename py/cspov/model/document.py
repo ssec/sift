@@ -856,7 +856,81 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # FIXME: migrate RGB clim into prez and not layer; only set INFO.CLIM if it hasn't already been set
         # self.change_clims_for_layers_where(new_clims, uuids={layer.uuid})
         layer[INFO.CLIM] = new_clims
-        self.didChangeColorLimits.emit({layer[INFO.UUID]: layer[INFO.CLIM]})
+        self.didChangeColorLimits.emit({layer.uuid: layer[INFO.CLIM]})
+
+    def _timesteps_for_instrument_band(self, instrument, bands, directory):
+        """
+        yield tuples of (datetime, (uuid, uuid, ...)) matching bands
+        :param instrument: currently not examined
+        :param bands: (band1:int, band2:int, ...)
+        :param directory: {UUID: (datetime, instrument, band), ...}
+        :return:
+        """
+
+
+    def _directory_of_layers(self, kind=KIND.IMAGE):
+        for x in [q for q in self._layer_with_uuid.values() if q.kind==kind]:
+            yield x.uuid, (x.platform, x.instrument, x.sched_time, x.band)
+
+    def loop_rgb_layers_following(self, rgb_uuid:UUID, create_all=True, make_others_invisible=True):
+        """
+        LOOP BUTTON
+        create RGB layers matching the configuration of the indicated layer (if create_all==True)
+        Take all time steps with RGB layers for this channel set and make an animation loop
+        Mark all layers which are not contributing to the loop as invisible.
+        :param rgb_uuid:
+        :param create_all:
+        :param make_others_invisible: whether or not to make layers not part of hte loop invisible
+        :return:
+        """
+        master = self._layer_with_uuid[rgb_uuid]
+        if not isinstance(master, DocRGBLayer):
+            LOG.warning('loop_rgb_layers_following can only operate on RGB layers')
+            return
+        if None is master.sched_time:
+            LOG.warning("cannot identify schedule time of master")
+            return
+
+        # build a directory of image layers to draw from
+        building_blocks = dict((key,uuid) for (uuid,key) in self._directory_of_layers(kind=KIND.IMAGE))
+
+        # find the list of loaded timesteps
+        loaded_timesteps = set(x.sched_time for x in self._layer_with_uuid.values())
+        LOG.debug('time steps available: %s' % repr(loaded_timesteps))
+
+        # animation sequence we're going to use
+        sequence = [(master.sched_time, master.uuid)]
+
+        # build a directory of RGB layers we already have
+        already_have = dict((key,uuid) for (uuid,key) in self._directory_of_layers(kind=KIND.RGB))
+        to_build = []
+        # figure out what layers we can build matching pattern, using building blocks
+        rband, gband, bband = master.band[:3]
+        plat, inst, sched_time = master.platform, master.instrument, master.sched_time
+        for step in loaded_timesteps:
+            if step==sched_time:
+                continue
+            noneed = already_have.get((plat, inst, step, master.band), None)
+            if noneed:
+                sequence.append((step, noneed))
+                continue
+            LOG.debug('assessing %s' % step)
+            # look for the bands
+            r = building_blocks.get((plat, inst, step, rband), None)
+            g = building_blocks.get((plat, inst, step, gband), None)
+            b = building_blocks.get((plat, inst, step, bband), None)
+            if r and g and b:
+                to_build.append((r,g,b))
+                LOG.info('will build RGB from r=%s g=%s b=%s' % (r,g,b))
+
+        # build new RGB layers
+        FIXME
+
+        # set animation order
+        sequence.sort()
+        new_anim_order = tuple(uu for (t,uu) in sequence)
+        self.set_animation_order(new_anim_order)  FIXME
+
 
     def __len__(self):
         return len(self.current_layer_set)
