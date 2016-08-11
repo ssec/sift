@@ -153,8 +153,24 @@ class DocLayerStack(MutableSequence):
         for i,q in enumerate(self._store):
             self._store[i] = q._replace(a_order=None)
 
+    @property
+    def animation_order(self):
+        aouu = [(x.a_order, x.uuid) for x in self._store if (x.a_order is not None)]
+        aouu.sort()
+        ao = tuple(u for a,u in aouu)
+        LOG.debug('animation order is {0!r:s}'.format(ao))
+        return ao
 
-
+    @animation_order.setter
+    def animation_order(self, layer_or_uuid_seq):
+        self.clear_animation_order()
+        for nth,lu in enumerate(layer_or_uuid_seq):
+            try:
+                idx = self[lu]
+            except ValueError:
+                LOG.warning('unable to find layer in LayerStack')
+                raise
+            self._store[idx] = self._store[idx]._replace(a_order=nth)
 
 
 #
@@ -469,17 +485,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         return tuple of UUIDs representing the animation order in the currently selected layer set
         :return: tuple of UUIDs
         """
-        cls = self.current_layer_set
-        aouu = [(x.a_order, x.uuid) for x in cls if (x.a_order is not None)]
-        aouu.sort()
-        ao = tuple(u for a,u in aouu)
-        LOG.debug('animation order is {0!r:s}'.format(ao))
-        return ao
-        # return list(reversed(self.current_layer_order))
-        # FIXME DEBUG - use this code once we have animation order setting commands
-        # q = [(x.a_order, x.uuid) for x in self.current_layer_set if x.a_order is not None]
-        # q.sort()
-        # return [u for _,u in q]
+        return self.current_layer_set.animation_order
 
     @property
     def current_layer_uuid_order(self):
@@ -920,17 +926,21 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             g = building_blocks.get((plat, inst, step, gband), None)
             b = building_blocks.get((plat, inst, step, bband), None)
             if r and g and b:
-                to_build.append((r,g,b))
+                to_build.append((step,r,g,b))
                 LOG.info('will build RGB from r=%s g=%s b=%s' % (r,g,b))
 
         # build new RGB layers
-        FIXME
+        if create_all:
+            for (when,r,g,b) in to_build:
+                rl,gl,bl = self._layer_with_uuid[r], self._layer_with_uuid[g], self._layer_with_uuid[b]
+                new_layer = self.create_rgb_composite(rl, gl, bl)
+                sequence.append((when, new_layer.uuid))
 
         # set animation order
         sequence.sort()
         new_anim_order = tuple(uu for (t,uu) in sequence)
-        self.set_animation_order(new_anim_order)  FIXME
-
+        self.current_layer_set.animation_order = new_anim_order
+        self.didReorderAnimation.emit(new_anim_order)
 
     def __len__(self):
         return len(self.current_layer_set)
@@ -955,6 +965,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def animate_siblings_of_layer(self, row_or_uuid):
         uuid = self.current_layer_set[row_or_uuid].uuid if not isinstance(row_or_uuid, UUID) else row_or_uuid
+        layer = self._layer_with_uuid[uuid]
+        if isinstance(layer, DocRGBLayer):
+            return self.loop_rgb_layers_following(layer.uuid)
         new_anim_uuids, _ = self._guidebook.time_siblings(uuid, self._layer_with_uuid.values())
         if new_anim_uuids is None or len(new_anim_uuids)<2:
             LOG.info('no time siblings to chosen band, will try channel siblings to chosen time')
@@ -964,16 +977,17 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             return []
         LOG.debug('new animation order will be {0!r:s}'.format(new_anim_uuids))
         L = self.current_layer_set
-        L.clear_animation_order()
-        for dex,u in enumerate(new_anim_uuids):  # FUTURE: migrate function to DocLayerStack?
-            LOG.debug(u)
-            row = L.uuid2row.get(u, None)
-            if row is None:
-                LOG.error('unable to find row for uuid {} in current layer set'.format(u))
-                continue
-            old = L[row]
-            new = old._replace(a_order=dex)
-            L[row] = new
+        L.animation_order = new_anim_uuids
+        # L.clear_animation_order()
+        # for dex,u in enumerate(new_anim_uuids):
+        #     LOG.debug(u)
+        #     row = L.uuid2row.get(u, None)
+        #     if row is None:
+        #         LOG.error('unable to find row for uuid {} in current layer set'.format(u))
+        #         continue
+        #     old = L[row]
+        #     new = old._replace(a_order=dex)
+        #     L[row] = new
         self.didReorderAnimation.emit(tuple(new_anim_uuids))
         return new_anim_uuids
 

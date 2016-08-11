@@ -362,6 +362,7 @@ class DocRGBLayer(DocCompositeLayer):
                 display_time = valid_times[0] if len(valid_times) and all(t == valid_times[0] for t in valid_times[1:]) else '<multiple times>'
             try:
                 names = []
+                # FIXME: include date and time in default name
                 for color, band in zip("RGB", bands):
                     if band is None:
                         name = u"{}:---".format(color)
