@@ -793,7 +793,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             self.revise_rgb_layer_choice(ds_info, **color_assignments)
 
         if color_assignments and clim:
-            self.change_rgb_clims(clim, [ds_info])
+            self.change_rgbs_clims(clim, [ds_info])
 
         # disable visibility of the existing layers FUTURE: remove them entirely? probably not; also consider consistent behavior
         if color_assignments:
@@ -826,20 +826,34 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         LOG.info('updated metadata for layer %s: %s' % (layer.uuid, repr(list(updated.keys()))))
         self.didChangeComposition.emit((), layer.uuid, prez, rgba)
 
-    def change_rgb_range(self, layer:DocRGBLayer, new_clims:tuple):
+    def change_and_propagate_rgb_clims(self, layer:DocRGBLayer, new_clims:tuple, include_siblings=True):
         # FIXME: migrate RGB clim into prez and not layer; only set INFO.CLIM if it hasn't already been set
         # self.change_clims_for_layers_where(new_clims, uuids={layer.uuid})
         # old_clim = layer[INFO.CLIM]
         # if isinstance(old_clim, tuple) and old_clim==new_clims:
         #     return
         layer[INFO.CLIM] = new_clims
-        self.didChangeColorLimits.emit({layer.uuid: layer[INFO.CLIM]})
+        changed = {layer.uuid: new_clims}
+        if include_siblings:
+            for similar in self._rgb_layer_siblings_uuids(layer):
+                if similar in changed:
+                    continue
+                simlyr = self._layer_with_uuid[similar]
+                changed[similar] = new_clims
+                simlyr[INFO.CLIM] = new_clims
+        self.didChangeColorLimits.emit(changed)
 
     def set_rgb_range(self, layer:DocRGBLayer, rgba:str, min:float, max:float):
         new_clims = tuple(x if c != rgba else (min, max) for c, x in zip("rgba", layer[INFO.CLIM]))
-        self.change_rgb_clims(new_clims, [layer])
+        self.change_and_propagate_rgb_clims(layer, new_clims)
 
-    def change_rgb_clims(self, clims, layers):
+    def change_rgbs_clims(self, clims, layers):
+        """
+        change color limits for one or more RGB layers in one swipe
+        :param clims: tuple of ((minred, maxred), (mingreen, maxgreen), (minblue,maxblue))
+        :param layers: sequence of layer objects or UUIDs
+        :return:
+        """
         changed = {}
         # FIXME: deprecate this routine since display limits should be part of presentation tuple; data limits are part of layer
         for layer in layers:
@@ -865,6 +879,27 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def _directory_of_layers(self, kind=KIND.IMAGE):
         for x in [q for q in self._layer_with_uuid.values() if q.kind==kind]:
             yield x.uuid, (x.platform, x.instrument, x.sched_time, x.band)
+
+    def _rgb_layer_siblings_uuids(self, master_layer:DocRGBLayer):
+        """
+        given an RGB layer, find all the other layers with similar instrument-band selection
+        :param master_layer:
+        :return: list of uuids, including master layer itself
+        """
+        siblings = []
+        master_subkey = master_layer.platform, master_layer.instrument, master_layer.band
+        for (uuid,key) in self._directory_of_layers(kind=KIND.RGB):
+            subkey = (key[0], key[1], key[3])
+            if subkey==master_subkey:
+                siblings.append((key[2], uuid))
+        siblings.sort()
+        LOG.debug('found RGB siblings %s' % repr(siblings))
+        return [uu for time,uu in siblings]
+
+    # def _propagate_clims_to_rgb_similars(self, master_layer:DocRGBLayer, clims:tuple, inclusive=True):
+    #     to_update = [x for x in self._rgb_layer_siblings(master_layer) if x != master_layer.uuid]
+    #     LOG.debug('updating %d RGB layer clims' % len(to_update))
+    #     self.change_rgb_clims(clims, to_update)
 
     def loop_rgb_layers_following(self, rgb_uuid:UUID,
                                   create_additional_layers=True,
@@ -933,7 +968,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 sequence.append((when, new_layer.uuid))
 
         if force_color_limits:
-            self.change_rgb_clims(master[INFO.CLIM], (uu for _,uu in sequence))
+            self.change_rgbs_clims(master[INFO.CLIM], (uu for _, uu in sequence))
 
         if make_contributing_layers_invisible:
             buhbye = set(to_make_invisible)
