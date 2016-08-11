@@ -370,7 +370,7 @@ class DocRGBLayer(DocCompositeLayer):
                         name = u"{}:B{:02d}".format(color, band)
                         bands = []
                     names.append(name)
-                name = u" ".join(names)
+                name = u" ".join(names) + u' ' + display_time
             except KeyError:
                 LOG.error('unable to create new name from {0!r:s}'.format(dep_info))
                 name = "RGB"

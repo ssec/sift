@@ -799,6 +799,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         _dt = lambda nfo: nfo.get(GUIDE.DISPLAY_TIME, '<unknown time>')
         display_time = reduce(lambda dta,b: dta if dta==_dt(b) else '<multiple times>', dep_info, _dt(dep_info[0]))
         uuid = uuidgen()  # FUTURE: workspace should be providing this?
+        # FIXME: this is redundant given DocRGBLayer.update_metadata_from_dependencies, chop it down to one definitive
         try:
             bands = (dep_info[0][GUIDE.BAND],
                      dep_info[1][GUIDE.BAND],
@@ -821,6 +822,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             INFO.CLIM: tuple(d[INFO.CLIM] for d in dep_info) if clim is None else tuple(clim),  # FUTURE: put this in presentation, not layer metadata
         }
         self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
+        ds_info.update_metadata_from_dependencies()
         presentation, reordered_indices = self._insert_layer_with_info(ds_info)
         self.didAddCompositeLayer.emit(reordered_indices, ds_info.uuid, presentation)
         return ds_info
@@ -952,6 +954,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         # build new RGB layers
         if create_additional_layers:
+            LOG.info('creating %d additional RGB layers from loaded image layers' % len(to_build))
             for (when,r,g,b) in to_build:
                 # rl,gl,bl = self._layer_with_uuid[r], self._layer_with_uuid[g], self._layer_with_uuid[b]
                 new_layer = self.create_rgb_composite(r, g, b, master[INFO.CLIM])
