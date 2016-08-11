@@ -817,18 +817,23 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # identify siblings before we make any changes!
         siblings = self._rgb_layer_siblings_uuids(layer) if propagate_to_siblings else None
         changed = False
+        clims = list(layer[INFO.CLIM])
         for k,v in rgba.items():
-            assert(k in 'rgba')
+            # assert(k in 'rgba')
+            idx = 'rgba'.index(k)
             if getattr(layer,k,None) is v:
                 continue
             changed = True
             setattr(layer, k, v)
-        # this signals the scenegraph manager et al to see if the layer is now both visible and valid
+            clims[idx] = None  # causes update_metadata to pull in upstream clim values
         if not changed:
             return
+        # force an update of clims for components that changed
+        layer[INFO.CLIM] = tuple(clims)
         updated = layer.update_metadata_from_dependencies()
         LOG.info('updated metadata for layer %s: %s' % (layer.uuid, repr(list(updated.keys()))))
         prez, = self.prez_for_uuids([layer.uuid])
+        # this signals the scenegraph manager et al to see if the layer is now both visible and valid
         self.didChangeComposition.emit((), layer.uuid, prez, rgba)
         if propagate_to_siblings:
             self._propagate_matched_rgb_components_and_clims(layer, siblings)
