@@ -180,8 +180,25 @@ class DocLayer(MutableMapping):
         return self._store.get(GUIDE.BAND, None)
 
     @property
+    def instrument(self):
+        return self._store.get(GUIDE.INSTRUMENT, None)
+
+    @property
+    def platform(self):
+        return self._store.get(GUIDE.PLATFORM, None)
+
+    @property
+    def sched_time(self):
+        return self._store.get(GUIDE.SCHED_TIME, None)
+
+    @property
     def name(self):
         return self._store[INFO.NAME]
+
+    @name.setter
+    def name(self, new_name):
+        self._store[INFO.NAME] = new_name
+
 
     @property
     def is_valid(self):
@@ -241,6 +258,16 @@ class DocCompositeLayer(DocLayer):
             assert(self._store[INFO.KIND]==KIND.RGB)
         return self._store[self.__keytransform__(key)]
 
+def _concurring(*q):
+    if len(q)==0:
+        return None
+    elif len(q)==1:
+        return q[0]
+    for a,b in zip(q[:-1], q[1:]):
+        if a!=b:
+            return False
+    return q[0]
+
 
 class DocRGBLayer(DocCompositeLayer):
     def __init__(self, *args, **kwargs):
@@ -290,11 +317,27 @@ class DocRGBLayer(DocCompositeLayer):
         gb = lambda l: None if (l is None) else l.band
         return (gb(self.r), gb(self.g), gb(self.b))
 
+    @property
+    def sched_time(self):
+        gst = lambda x: None if (x is None) else x.sched_time
+        return _concurring(gst(self.r), gst(self.g), gst(self.b))
+
+    @property
+    def instrument(self):
+        gst = lambda x: None if (x is None) else x.instrument
+        return _concurring(gst(self.r), gst(self.g), gst(self.b))
+
+    @property
+    def platform(self):
+        gst = lambda x: None if (x is None) else x.platform
+        return _concurring(gst(self.r), gst(self.g), gst(self.b))
+
     def update_metadata_from_dependencies(self):
         """
         recalculate origin and dimension information based on new upstream
         :return:
         """
+        # FUTURE: resolve dictionary-style into attribute-style uses
         dep_info = [self.r, self.g, self.b]
         bands = [nfo[GUIDE.BAND] if nfo is not None else None for nfo in dep_info]
         if self.r is None and self.g is None and self.b is None:
@@ -319,6 +362,7 @@ class DocRGBLayer(DocCompositeLayer):
                 display_time = valid_times[0] if len(valid_times) and all(t == valid_times[0] for t in valid_times[1:]) else '<multiple times>'
             try:
                 names = []
+                # FIXME: include date and time in default name
                 for color, band in zip("RGB", bands):
                     if band is None:
                         name = u"{}:---".format(color)
@@ -326,7 +370,7 @@ class DocRGBLayer(DocCompositeLayer):
                         name = u"{}:B{:02d}".format(color, band)
                         bands = []
                     names.append(name)
-                name = u" ".join(names)
+                name = u" ".join(names) + u' ' + display_time
             except KeyError:
                 LOG.error('unable to create new name from {0!r:s}'.format(dep_info))
                 name = "RGB"

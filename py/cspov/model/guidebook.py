@@ -93,6 +93,7 @@ class GUIDE(Enum):
     UNIT_CONVERSION = 'unit_conversion'  # (unit string, lambda x, inverse=False: convert-to-units)
     CENTRAL_WAVELENGTH = 'nominal_wavelength'
 
+
 # Instrument -> Band Number -> Nominal Wavelength
 NOMINAL_WAVELENGTHS = {
     PLATFORM.HIMAWARI_8: {
@@ -160,6 +161,7 @@ class AHI_HSF_Guidebook(Guidebook):
         return {
             GUIDE.PLATFORM: plat,
             GUIDE.BAND: band,
+            GUIDE.INSTRUMENT: INSTRUMENT.AHI,
             GUIDE.SCHED_TIME: when,
             GUIDE.DISPLAY_TIME: dtime,
             GUIDE.SCENE: scene,

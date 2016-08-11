@@ -153,8 +153,24 @@ class DocLayerStack(MutableSequence):
         for i,q in enumerate(self._store):
             self._store[i] = q._replace(a_order=None)
 
+    @property
+    def animation_order(self):
+        aouu = [(x.a_order, x.uuid) for x in self._store if (x.a_order is not None)]
+        aouu.sort()
+        ao = tuple(u for a,u in aouu)
+        LOG.debug('animation order is {0!r:s}'.format(ao))
+        return ao
 
-
+    @animation_order.setter
+    def animation_order(self, layer_or_uuid_seq):
+        self.clear_animation_order()
+        for nth,lu in enumerate(layer_or_uuid_seq):
+            try:
+                idx = self[lu]
+            except ValueError:
+                LOG.warning('unable to find layer in LayerStack')
+                raise
+            self._store[idx] = self._store[idx]._replace(a_order=nth)
 
 
 #
@@ -469,17 +485,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         return tuple of UUIDs representing the animation order in the currently selected layer set
         :return: tuple of UUIDs
         """
-        cls = self.current_layer_set
-        aouu = [(x.a_order, x.uuid) for x in cls if (x.a_order is not None)]
-        aouu.sort()
-        ao = tuple(u for a,u in aouu)
-        LOG.debug('animation order is {0!r:s}'.format(ao))
-        return ao
-        # return list(reversed(self.current_layer_order))
-        # FIXME DEBUG - use this code once we have animation order setting commands
-        # q = [(x.a_order, x.uuid) for x in self.current_layer_set if x.a_order is not None]
-        # q.sort()
-        # return [u for _,u in q]
+        return self.current_layer_set.animation_order
 
     @property
     def current_layer_uuid_order(self):
@@ -748,85 +754,54 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     L[dex] = pinfo._replace(climits=nfo[uuid])
         self.didChangeColorLimits.emit(nfo)
 
-    def create_rgb_composite(self, r=None, g=None, b=None, all_timesteps=True):
+    def create_rgb_composite(self, r=None, g=None, b=None, clim=None, all_timesteps=True):
         """
         user has specified that a band trio should be shown as RGB
         disable display of the three layers
         add a composite layer at the z level of the topmost of the three
-        do likewise for other timesteps with the same bands
         """
         from uuid import uuid1 as uuidgen
-        from functools import reduce
-        if r is None or g is None or b is None:
-            # we have an invalid composite which needs user initialization
-            LOG.info('generating incomplete (invalid) composite for user to configure')
-            uuid = uuidgen()
-            name = '-RGB-'
-            ds_info = {
-                INFO.UUID: uuid,
-                INFO.NAME: name,
-                INFO.KIND: KIND.RGB,
-                GUIDE.BAND: [],
-                GUIDE.DISPLAY_TIME: None,
-                INFO.ORIGIN_X: None,
-                INFO.ORIGIN_Y: None,
-                INFO.CELL_WIDTH: None,
-                INFO.CELL_HEIGHT: None,
-                INFO.CLIM: (None, None, None),
-            }
-            self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
-            presentation, reordered_indices = self._insert_layer_with_info(ds_info)
-            self.didAddCompositeLayer.emit(reordered_indices, ds_info.uuid, presentation)
-            return ds_info
-
-        # disable visibility of the existing layers FUTURE: remove them entirely? probably not
-        self.toggle_layer_visibility([x for x in [r,g,b] if x], False)
-        # add notation to document on RGB affinity
-        # register with workspace so that it can persist info to disk if needed
-        # insert new RGB layer into layer list and scenegraph
-
-        uuids = [r,g,b]
-        LOG.debug("New Composite UUIDs: %r" % uuids)
-        # FUTURE: register this with workspace!
-
-        dep_info = [(None if uuid is None else self.get_info(uuid=uuid)) for uuid in uuids]
-        highest_res_dep = min(dep_info, key=lambda x: x[INFO.CELL_WIDTH])
-        _dt = lambda nfo: nfo.get(GUIDE.DISPLAY_TIME, '<unknown time>')
-        display_time = reduce(lambda dta,b: dta if dta==_dt(b) else '<multiple times>', dep_info, _dt(dep_info[0]))
-        uuid = uuidgen()  # FUTURE: workspace should be providing this?
-        try:
-            bands = (dep_info[0][GUIDE.BAND],
-                     dep_info[1][GUIDE.BAND],
-                     dep_info[2][GUIDE.BAND])
-            name = u"R:B{0:02d} G:B{1:02d} B:B{2:02d}".format(*bands)
-        except KeyError:
-            LOG.error('unable to create new name from {0!r:s}'.format(dep_info))
-            name = "RGB"
-            bands = []
+        uuid = uuidgen()
         ds_info = {
             INFO.UUID: uuid,
-            INFO.NAME: name,
+            INFO.NAME: '-RGB-',
             INFO.KIND: KIND.RGB,
-            GUIDE.BAND: bands,
-            GUIDE.DISPLAY_TIME: display_time,
-            INFO.ORIGIN_X: highest_res_dep[INFO.ORIGIN_X],
-            INFO.ORIGIN_Y: highest_res_dep[INFO.ORIGIN_Y],
-            INFO.CELL_WIDTH: highest_res_dep[INFO.CELL_WIDTH],
-            INFO.CELL_HEIGHT: highest_res_dep[INFO.CELL_HEIGHT],
-            INFO.CLIM: tuple(d[INFO.CLIM] for d in dep_info),
+            GUIDE.BAND: [],
+            GUIDE.DISPLAY_TIME: None,
+            INFO.ORIGIN_X: None,
+            INFO.ORIGIN_Y: None,
+            INFO.CELL_WIDTH: None,
+            INFO.CELL_HEIGHT: None,
+            INFO.CLIM: (None, None, None)
         }
+
         self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
         presentation, reordered_indices = self._insert_layer_with_info(ds_info)
-        self.didAddCompositeLayer.emit(reordered_indices, ds_info.uuid, presentation)
-        return ds_info
 
-    def create_empty_rgb_composite(self):
-        """
-        an empty RGB composite is added to the top of the current layer list.
-        since it needs R, G, and B in order to be valid, we do not yet announce it to the scenegraph
-        :return:
-        """
-        self.create_rgb_composite(None, None, None)
+        LOG.info('generating incomplete (invalid) composite for user to configure')
+        self.didAddCompositeLayer.emit(reordered_indices, ds_info.uuid, presentation)
+
+        color_assignments = {}
+        def _(color, lyr):
+            if lyr:
+                color_assignments[color] = self._layer_with_uuid[lyr] if isinstance(lyr, UUID) else lyr
+        _('r', r)
+        _('g', g)
+        _('b', b)
+        LOG.debug("New Composite UUIDs: %s" % repr(color_assignments))
+        if color_assignments:
+            self.revise_rgb_layer_choice(ds_info, **color_assignments)
+
+        if color_assignments and clim:
+            self.change_rgbs_clims(clim, [ds_info])
+
+        # disable visibility of the existing layers FUTURE: remove them entirely? probably not; also consider consistent behavior
+        if color_assignments:
+            self.toggle_layer_visibility((x for x in (r,g,b) if x is not None), False)
+
+        # FUTURE: add rule to document on RGB affinity
+        # FUTURE: register with workspace so that it can persist info to disk if needed
+        return ds_info
 
     def revise_rgb_layer_choice(self, layer:DocRGBLayer, **rgba):
         """
@@ -851,14 +826,163 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         LOG.info('updated metadata for layer %s: %s' % (layer.uuid, repr(list(updated.keys()))))
         self.didChangeComposition.emit((), layer.uuid, prez, rgba)
 
-    def set_rgb_range(self, layer:DocRGBLayer, rgba:str, min:float, max:float):
-        new_clims = tuple(x if c != rgba else (min, max) for c, x in zip("rgba", layer[INFO.CLIM]))
+    def change_and_propagate_rgb_clims(self, layer:DocRGBLayer, new_clims:tuple, include_siblings=True):
         # FIXME: migrate RGB clim into prez and not layer; only set INFO.CLIM if it hasn't already been set
         # self.change_clims_for_layers_where(new_clims, uuids={layer.uuid})
+        # old_clim = layer[INFO.CLIM]
+        # if isinstance(old_clim, tuple) and old_clim==new_clims:
+        #     return
         layer[INFO.CLIM] = new_clims
-        self.didChangeColorLimits.emit({layer[INFO.UUID]: layer[INFO.CLIM]})
+        changed = {layer.uuid: new_clims}
+        if include_siblings:
+            for similar in self._rgb_layer_siblings_uuids(layer):
+                if similar in changed:
+                    continue
+                simlyr = self._layer_with_uuid[similar]
+                changed[similar] = new_clims
+                simlyr[INFO.CLIM] = new_clims
+        self.didChangeColorLimits.emit(changed)
+
+    def set_rgb_range(self, layer:DocRGBLayer, rgba:str, min:float, max:float):
+        new_clims = tuple(x if c != rgba else (min, max) for c, x in zip("rgba", layer[INFO.CLIM]))
+        self.change_and_propagate_rgb_clims(layer, new_clims)
+
+    def change_rgbs_clims(self, clims, layers):
+        """
+        change color limits for one or more RGB layers in one swipe
+        :param clims: tuple of ((minred, maxred), (mingreen, maxgreen), (minblue,maxblue))
+        :param layers: sequence of layer objects or UUIDs
+        :return:
+        """
+        changed = {}
+        # FIXME: deprecate this routine since display limits should be part of presentation tuple; data limits are part of layer
+        for layer in layers:
+            if isinstance(layer, UUID):
+                layer = self._layer_with_uuid[layer]
+            if not isinstance(layer, DocRGBLayer):
+                continue
+            if layer[INFO.CLIM] == clims:
+                continue
+            changed[layer.uuid] = clims
+            layer[INFO.CLIM] = clims
+        self.didChangeColorLimits.emit(changed)
+
+    def _timesteps_for_instrument_band(self, instrument, bands, directory):
+        """
+        yield tuples of (datetime, (uuid, uuid, ...)) matching bands
+        :param instrument: currently not examined
+        :param bands: (band1:int, band2:int, ...)
+        :param directory: {UUID: (datetime, instrument, band), ...}
+        :return:
+        """
+
+    def _directory_of_layers(self, kind=KIND.IMAGE):
+        for x in [q for q in self._layer_with_uuid.values() if q.kind==kind]:
+            yield x.uuid, (x.platform, x.instrument, x.sched_time, x.band)
+
+    def _rgb_layer_siblings_uuids(self, master_layer:DocRGBLayer):
+        """
+        given an RGB layer, find all the other layers with similar instrument-band selection
+        :param master_layer:
+        :return: list of uuids, including master layer itself
+        """
+        siblings = []
+        master_subkey = master_layer.platform, master_layer.instrument, master_layer.band
+        for (uuid,key) in self._directory_of_layers(kind=KIND.RGB):
+            subkey = (key[0], key[1], key[3])
+            if subkey==master_subkey:
+                siblings.append((key[2], uuid))
+        siblings.sort()
+        LOG.debug('found RGB siblings %s' % repr(siblings))
+        return [uu for time,uu in siblings]
+
+    # def _propagate_clims_to_rgb_similars(self, master_layer:DocRGBLayer, clims:tuple, inclusive=True):
+    #     to_update = [x for x in self._rgb_layer_siblings(master_layer) if x != master_layer.uuid]
+    #     LOG.debug('updating %d RGB layer clims' % len(to_update))
+    #     self.change_rgb_clims(clims, to_update)
+
+    def loop_rgb_layers_following(self, rgb_uuid:UUID,
+                                  create_additional_layers=True,
+                                  force_color_limits=True,
+                                  make_contributing_layers_invisible=True):
+        """
+        LOOP BUTTON
+        create RGB layers matching the configuration of the indicated layer (if create_all==True)
+        Take all time steps with RGB layers for this channel set and make an animation loop
+        Mark all layers which are not contributing to the loop as invisible.
+        :param rgb_uuid:
+        :param create_additional_layers:
+        :param make_contributing_layers_invisible: whether or not to make layers not part of hte loop invisible
+        :return:
+        """
+        master = self._layer_with_uuid[rgb_uuid]
+        if not isinstance(master, DocRGBLayer):
+            LOG.warning('loop_rgb_layers_following can only operate on RGB layers')
+            return
+        if None is master.sched_time:
+            LOG.warning("cannot identify schedule time of master")
+            return
+
+        # build a directory of image layers to draw from
+        building_blocks = dict((key,uuid) for (uuid,key) in self._directory_of_layers(kind=KIND.IMAGE))
+
+        # find the list of loaded timesteps
+        loaded_timesteps = set(x.sched_time for x in self._layer_with_uuid.values())
+        loaded_timesteps = list(sorted(loaded_timesteps, reverse=True))  # build in last-to-first order to get proper layer list order
+        LOG.debug('time steps available: %s' % repr(loaded_timesteps))
+
+        # animation sequence we're going to use
+        sequence = [(master.sched_time, master.uuid)]
+
+        # build a directory of RGB layers we already have
+        already_have = dict((key,uuid) for (uuid,key) in self._directory_of_layers(kind=KIND.RGB))
+        to_build, to_make_invisible = [], []
+        # figure out what layers we can build matching pattern, using building blocks
+        rband, gband, bband = master.band[:3]
+        plat, inst, sched_time = master.platform, master.instrument, master.sched_time
+        for step in loaded_timesteps:
+            if step==sched_time:
+                continue
+            preexisting_layer_uuid = already_have.get((plat, inst, step, master.band), None)
+            if preexisting_layer_uuid:
+                sequence.append((step, preexisting_layer_uuid))
+                continue
+            LOG.debug('assessing %s' % step)
+            # look for the bands
+            r = building_blocks.get((plat, inst, step, rband), None)
+            g = building_blocks.get((plat, inst, step, gband), None)
+            b = building_blocks.get((plat, inst, step, bband), None)
+            if r and g and b:
+                to_build.append((step,r,g,b))
+                to_make_invisible.extend([r,g,b])
+                LOG.info('will build RGB from r=%s g=%s b=%s' % (r,g,b))
+            else:
+                LOG.info("no complete RGB could be made for %s" % step)
+
+        # build new RGB layers
+        if create_additional_layers:
+            LOG.info('creating %d additional RGB layers from loaded image layers' % len(to_build))
+            for (when,r,g,b) in to_build:
+                # rl,gl,bl = self._layer_with_uuid[r], self._layer_with_uuid[g], self._layer_with_uuid[b]
+                new_layer = self.create_rgb_composite(r, g, b)
+                sequence.append((when, new_layer.uuid))
+
+        if force_color_limits:
+            self.change_rgbs_clims(master[INFO.CLIM], (uu for _, uu in sequence))
+
+        if make_contributing_layers_invisible:
+            buhbye = set(to_make_invisible)
+            LOG.debug('making %d layers invisible after using them to make RGBs' % len(buhbye))
+            self.toggle_layer_visibility(buhbye, False)
+
+        # set animation order
+        sequence.sort()
+        new_anim_order = tuple(uu for (t,uu) in sequence)
+        self.current_layer_set.animation_order = new_anim_order
+        self.didReorderAnimation.emit(new_anim_order)
 
     def __len__(self):
+        # FIXME: this should be consistent with __getitem__, not self.current_layer_set
         return len(self.current_layer_set)
 
     def uuid_for_current_layer(self, row):
@@ -881,6 +1005,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def animate_siblings_of_layer(self, row_or_uuid):
         uuid = self.current_layer_set[row_or_uuid].uuid if not isinstance(row_or_uuid, UUID) else row_or_uuid
+        layer = self._layer_with_uuid[uuid]
+        if isinstance(layer, DocRGBLayer):
+            return self.loop_rgb_layers_following(layer.uuid)
         new_anim_uuids, _ = self._guidebook.time_siblings(uuid, self._layer_with_uuid.values())
         if new_anim_uuids is None or len(new_anim_uuids)<2:
             LOG.info('no time siblings to chosen band, will try channel siblings to chosen time')
@@ -890,16 +1017,17 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             return []
         LOG.debug('new animation order will be {0!r:s}'.format(new_anim_uuids))
         L = self.current_layer_set
-        L.clear_animation_order()
-        for dex,u in enumerate(new_anim_uuids):  # FUTURE: migrate function to DocLayerStack?
-            LOG.debug(u)
-            row = L.uuid2row.get(u, None)
-            if row is None:
-                LOG.error('unable to find row for uuid {} in current layer set'.format(u))
-                continue
-            old = L[row]
-            new = old._replace(a_order=dex)
-            L[row] = new
+        L.animation_order = new_anim_uuids
+        # L.clear_animation_order()
+        # for dex,u in enumerate(new_anim_uuids):
+        #     LOG.debug(u)
+        #     row = L.uuid2row.get(u, None)
+        #     if row is None:
+        #         LOG.error('unable to find row for uuid {} in current layer set'.format(u))
+        #         continue
+        #     old = L[row]
+        #     new = old._replace(a_order=dex)
+        #     L[row] = new
         self.didReorderAnimation.emit(tuple(new_anim_uuids))
         return new_anim_uuids
 
