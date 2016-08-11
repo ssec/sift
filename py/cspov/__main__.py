@@ -430,7 +430,7 @@ class Main(QtGui.QMainWindow):
         """
         # we could just modify the layer and emit the document signal, but preference is to have document generate its own signals.
         layer = self.document[uuid]
-        self.document.revise_rgb_layer_choice(layer, **{rgba:selected})
+        self.document.change_rgb_component_layer(layer, **{rgba:selected})
 
     def _user_set_rgb_range(self, uuid:UUID, rgba:str, lo:float, hi:float):
         layer = self.document[uuid]
