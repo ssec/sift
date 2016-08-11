@@ -878,15 +878,15 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for x in [q for q in self._layer_with_uuid.values() if q.kind==kind]:
             yield x.uuid, (x.platform, x.instrument, x.sched_time, x.band)
 
-    def loop_rgb_layers_following(self, rgb_uuid:UUID, create_all=True, make_others_invisible=True):
+    def loop_rgb_layers_following(self, rgb_uuid:UUID, create_additional_layers=True, make_contributing_layers_invisible=True):
         """
         LOOP BUTTON
         create RGB layers matching the configuration of the indicated layer (if create_all==True)
         Take all time steps with RGB layers for this channel set and make an animation loop
         Mark all layers which are not contributing to the loop as invisible.
         :param rgb_uuid:
-        :param create_all:
-        :param make_others_invisible: whether or not to make layers not part of hte loop invisible
+        :param create_additional_layers:
+        :param make_contributing_layers_invisible: whether or not to make layers not part of hte loop invisible
         :return:
         """
         master = self._layer_with_uuid[rgb_uuid]
@@ -909,7 +909,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         # build a directory of RGB layers we already have
         already_have = dict((key,uuid) for (uuid,key) in self._directory_of_layers(kind=KIND.RGB))
-        to_build = []
+        to_build, to_make_invisible = [], []
         # figure out what layers we can build matching pattern, using building blocks
         rband, gband, bband = master.band[:3]
         plat, inst, sched_time = master.platform, master.instrument, master.sched_time
@@ -927,14 +927,22 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             b = building_blocks.get((plat, inst, step, bband), None)
             if r and g and b:
                 to_build.append((step,r,g,b))
+                to_make_invisible.extend([r,g,b])
                 LOG.info('will build RGB from r=%s g=%s b=%s' % (r,g,b))
+            else:
+                LOG.info("no complete RGB could be made for %s" % step)
 
         # build new RGB layers
-        if create_all:
+        if create_additional_layers:
             for (when,r,g,b) in to_build:
                 rl,gl,bl = self._layer_with_uuid[r], self._layer_with_uuid[g], self._layer_with_uuid[b]
                 new_layer = self.create_rgb_composite(rl, gl, bl)
                 sequence.append((when, new_layer.uuid))
+
+        if make_contributing_layers_invisible:
+            buhbye = set(to_make_invisible)
+            LOG.debug('making %d layers invisible after using them to make RGBs' % len(buhbye))
+            self.toggle_layer_visibility(buhbye, False)
 
         # set animation order
         sequence.sort()
@@ -943,6 +951,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.didReorderAnimation.emit(new_anim_order)
 
     def __len__(self):
+        # FIXME: this should be consistent with __getitem__, not self.current_layer_set
         return len(self.current_layer_set)
 
     def uuid_for_current_layer(self, row):
