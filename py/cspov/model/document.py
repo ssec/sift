@@ -835,8 +835,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         prez, = self.prez_for_uuids([layer.uuid])
         # this signals the scenegraph manager et al to see if the layer is now both visible and valid
         self.didChangeComposition.emit((), layer.uuid, prez, rgba)
+        all_changed_layer_uuids = [layer.uuid]
         if propagate_to_siblings:
-            self._propagate_matched_rgb_components_and_clims(layer, siblings)
+            all_changed_layer_uuids += list(self._propagate_matched_rgb_components(layer, siblings))
+        # now propagate CLIMs and signal
+        self.change_rgbs_clims(layer[INFO.CLIM], all_changed_layer_uuids)
 
     def change_and_propagate_rgb_clims(self, layer:DocRGBLayer, new_clims:tuple, include_siblings=True):
         # FIXME: migrate RGB clim into prez and not layer; only set INFO.CLIM if it hasn't already been set
@@ -904,7 +907,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     #     LOG.debug('updating %d RGB layer clims' % len(to_update))
     #     self.change_rgb_clims(clims, to_update)
 
-    def _propagate_matched_rgb_components_and_clims(self, master_layer, sibling_layers):
+    def _propagate_matched_rgb_components(self, master_layer, sibling_layers):
         """
         user has changed RGB selection on a layer which has siblings (e.g. animation loop)
         hunt down corresponding loaded channels for the sibling layer timesteps
@@ -934,8 +937,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 continue
             did_change.append(sibling.uuid)
             self.change_rgb_component_layer(sibling, propagate_to_siblings=False, **change_these)
-        # now propagate CLIMs
-        self.change_rgbs_clims(master_layer[INFO.CLIM], did_change)
+        return did_change
 
     def loop_rgb_layers_following(self, rgb_uuid:UUID,
                                   create_additional_layers=True,
