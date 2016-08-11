@@ -525,7 +525,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         for index in list_of_QModelIndex:
             # create a list of prez tuples showing how layers are presented
             if index.isValid():
-                l.append((index.row(), self.doc[index.row()]))
+                l.append((index.row(), self.doc.current_layer_set[index.row()]))
         p = pkl.dumps((len(self.doc.current_layer_set), l), pkl.HIGHEST_PROTOCOL)
         mime = QMimeData()
         # t = base64.encodebytes(p).decode('ascii')
@@ -629,7 +629,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             return (eq_content, animation_order)
 
         elif role == Qt.EditRole:
-            return self.doc[index.row()] if index.row()<len(self.doc) else None
+            return self.doc.current_layer_set[index.row()] if index.row()<len(self.doc) else None
         elif role == Qt.CheckStateRole:
             check = Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
             return check
