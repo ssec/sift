@@ -790,7 +790,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         _('b', b)
         LOG.debug("New Composite UUIDs: %s" % repr(color_assignments))
         if color_assignments:
-            self.revise_rgb_layer_choice(ds_info, **color_assignments)
+            self.change_rgb_component_layer(ds_info, **color_assignments)
 
         if color_assignments and clim:
             self.change_rgbs_clims(clim, [ds_info])
@@ -803,9 +803,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # FUTURE: register with workspace so that it can persist info to disk if needed
         return ds_info
 
-    def revise_rgb_layer_choice(self, layer:DocRGBLayer, **rgba):
+    def change_rgb_component_layer(self, layer:DocRGBLayer, propagate_to_siblings=True, **rgba):
         """
         change the layer composition for an RGB layer, and signal
+        by default, propagate the changes to sibling layers matching this layer's configuration
         :param layer:
         :param rgba:
         :return:
@@ -813,18 +814,32 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         LOG.debug('revising RGB layer config for %s: %s' % (layer.uuid, repr(list(rgba.keys()))))
         if layer is None or not rgba:
             return
+        # identify siblings before we make any changes!
+        siblings = self._rgb_layer_siblings_uuids(layer) if propagate_to_siblings else None
         changed = False
+        clims = list(layer[INFO.CLIM])
         for k,v in rgba.items():
-            assert(k in 'rgba')
+            # assert(k in 'rgba')
+            idx = 'rgba'.index(k)
             if getattr(layer,k,None) is v:
                 continue
             changed = True
             setattr(layer, k, v)
-        prez, = self.prez_for_uuids([layer.uuid])
-        # this signals the scenegraph manager et al to see if the layer is now both visible and valid
+            clims[idx] = None  # causes update_metadata to pull in upstream clim values
+        if not changed:
+            return
+        # force an update of clims for components that changed
+        layer[INFO.CLIM] = tuple(clims)
         updated = layer.update_metadata_from_dependencies()
         LOG.info('updated metadata for layer %s: %s' % (layer.uuid, repr(list(updated.keys()))))
+        prez, = self.prez_for_uuids([layer.uuid])
+        # this signals the scenegraph manager et al to see if the layer is now both visible and valid
         self.didChangeComposition.emit((), layer.uuid, prez, rgba)
+        all_changed_layer_uuids = [layer.uuid]
+        if propagate_to_siblings:
+            all_changed_layer_uuids += list(self._propagate_matched_rgb_components(layer, siblings))
+        # now propagate CLIMs and signal
+        self.change_rgbs_clims(layer[INFO.CLIM], all_changed_layer_uuids)
 
     def change_and_propagate_rgb_clims(self, layer:DocRGBLayer, new_clims:tuple, include_siblings=True):
         # FIXME: migrate RGB clim into prez and not layer; only set INFO.CLIM if it hasn't already been set
@@ -867,15 +882,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             layer[INFO.CLIM] = clims
         self.didChangeColorLimits.emit(changed)
 
-    def _timesteps_for_instrument_band(self, instrument, bands, directory):
-        """
-        yield tuples of (datetime, (uuid, uuid, ...)) matching bands
-        :param instrument: currently not examined
-        :param bands: (band1:int, band2:int, ...)
-        :param directory: {UUID: (datetime, instrument, band), ...}
-        :return:
-        """
-
     def _directory_of_layers(self, kind=KIND.IMAGE):
         for x in [q for q in self._layer_with_uuid.values() if q.kind==kind]:
             yield x.uuid, (x.platform, x.instrument, x.sched_time, x.band)
@@ -900,6 +906,38 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     #     to_update = [x for x in self._rgb_layer_siblings(master_layer) if x != master_layer.uuid]
     #     LOG.debug('updating %d RGB layer clims' % len(to_update))
     #     self.change_rgb_clims(clims, to_update)
+
+    def _propagate_matched_rgb_components(self, master_layer, sibling_layers):
+        """
+        user has changed RGB selection on a layer which has siblings (e.g. animation loop)
+        hunt down corresponding loaded channels for the sibling layer timesteps
+        update those layers to match
+        :param master_layer: layer which is steering this change and has changed band selection
+        :param sibling_layers: layers which are supposed to follow master
+        :return:
+        """
+        # FUTURE: consolidate/promote commonalities with loop_rgb_layers_following
+        # build a directory of image layers to draw from
+        building_blocks = dict((key,uuid) for (uuid,key) in self._directory_of_layers(kind=KIND.IMAGE))
+        plat, inst, band = master_layer.platform, master_layer.instrument, master_layer.band
+        did_change = []
+        for sibling in sibling_layers:
+            if isinstance(sibling, UUID):
+                sibling = self._layer_with_uuid[sibling]
+            if sibling.uuid == master_layer.uuid:
+                continue
+            change_these = {}
+            for mb,sb,b in zip(band, sibling.band, 'rgb'):
+                if mb==sb:
+                    continue
+                key_we_want = (plat, inst, sibling.sched_time, mb)
+                new_uuid = building_blocks.get(key_we_want, None)
+                change_these[b] = self._layer_with_uuid[new_uuid]
+            if not change_these:
+                continue
+            did_change.append(sibling.uuid)
+            self.change_rgb_component_layer(sibling, propagate_to_siblings=False, **change_these)
+        return did_change
 
     def loop_rgb_layers_following(self, rgb_uuid:UUID,
                                   create_additional_layers=True,

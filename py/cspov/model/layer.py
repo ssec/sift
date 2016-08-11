@@ -351,7 +351,7 @@ class DocRGBLayer(DocCompositeLayer):
                 INFO.CELL_WIDTH: None,
                 INFO.CELL_HEIGHT: None,
                 INFO.COLORMAP: 'autumn',  # FIXME: why do RGBs need a colormap?
-                INFO.CLIM: [None, None, None],
+                INFO.CLIM: (None, None, None),  # defer initialization until we have upstream layers
             }
         else:
             highest_res_dep = min([x for x in dep_info if x is not None], key=lambda x: x[INFO.CELL_WIDTH])
@@ -385,8 +385,14 @@ class DocRGBLayer(DocCompositeLayer):
                 INFO.CELL_WIDTH: highest_res_dep[INFO.CELL_WIDTH],
                 INFO.CELL_HEIGHT: highest_res_dep[INFO.CELL_HEIGHT],
                 INFO.COLORMAP: 'autumn',  # FIXME: why do RGBs need a colormap?
-                INFO.CLIM: tuple(d[INFO.CLIM] if d is not None else None for d in dep_info),
             }
+        old_clim = self._store.get(INFO.CLIM, None)
+        if not old_clim:  # initialize from upstream default maxima
+            self._store[INFO.CLIM] = tuple(d[INFO.CLIM] if d is not None else None for d in dep_info)
+        else:  # merge upstream with existing settings, replacing None with upstream; watch out for upstream==None case
+            upclim = lambda up: None if (up is None) else up.get(INFO.CLIM, None)
+            self._store[INFO.CLIM] = tuple((existing or upclim(upstream)) for (existing,upstream) in zip(old_clim, dep_info))
+
         self._store.update(ds_info)
         return ds_info
 
