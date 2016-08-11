@@ -761,79 +761,47 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         add a composite layer at the z level of the topmost of the three
         """
         from uuid import uuid1 as uuidgen
-        from functools import reduce
-        if r is None or g is None or b is None:
-            # we have an invalid composite which needs user initialization
-            LOG.info('generating incomplete (invalid) composite for user to configure')
-            uuid = uuidgen()
-            name = '-RGB-'
-            ds_info = {
-                INFO.UUID: uuid,
-                INFO.NAME: name,
-                INFO.KIND: KIND.RGB,
-                GUIDE.BAND: [],
-                GUIDE.DISPLAY_TIME: None,
-                INFO.ORIGIN_X: None,
-                INFO.ORIGIN_Y: None,
-                INFO.CELL_WIDTH: None,
-                INFO.CELL_HEIGHT: None,
-                INFO.CLIM: (None, None, None),
-            }
-            self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
-            presentation, reordered_indices = self._insert_layer_with_info(ds_info)
-            self.didAddCompositeLayer.emit(reordered_indices, ds_info.uuid, presentation)
-            return ds_info
-
-        # disable visibility of the existing layers FUTURE: remove them entirely? probably not
-        self.toggle_layer_visibility([x for x in [r,g,b] if x], False)
-        # add notation to document on RGB affinity
-        # register with workspace so that it can persist info to disk if needed
-        # insert new RGB layer into layer list and scenegraph
-
-        uuids = [r,g,b]
-        LOG.debug("New Composite UUIDs: %r" % uuids)
-        # FUTURE: register this with workspace!
-
-        dep_info = [(None if uuid is None else self.get_info(uuid=uuid)) for uuid in uuids]
-        highest_res_dep = min(dep_info, key=lambda x: x[INFO.CELL_WIDTH])
-        _dt = lambda nfo: nfo.get(GUIDE.DISPLAY_TIME, '<unknown time>')
-        display_time = reduce(lambda dta,b: dta if dta==_dt(b) else '<multiple times>', dep_info, _dt(dep_info[0]))
-        uuid = uuidgen()  # FUTURE: workspace should be providing this?
-        # FIXME: this is redundant given DocRGBLayer.update_metadata_from_dependencies, chop it down to one definitive
-        try:
-            bands = (dep_info[0][GUIDE.BAND],
-                     dep_info[1][GUIDE.BAND],
-                     dep_info[2][GUIDE.BAND])
-            name = u"R:B{0:02d} G:B{1:02d} B:B{2:02d}".format(*bands)
-        except KeyError:
-            LOG.error('unable to create new name from {0!r:s}'.format(dep_info))
-            name = "RGB"
-            bands = []
+        uuid = uuidgen()
         ds_info = {
             INFO.UUID: uuid,
-            INFO.NAME: name,
+            INFO.NAME: '-RGB-',
             INFO.KIND: KIND.RGB,
-            GUIDE.BAND: bands,
-            GUIDE.DISPLAY_TIME: display_time,
-            INFO.ORIGIN_X: highest_res_dep[INFO.ORIGIN_X],
-            INFO.ORIGIN_Y: highest_res_dep[INFO.ORIGIN_Y],
-            INFO.CELL_WIDTH: highest_res_dep[INFO.CELL_WIDTH],
-            INFO.CELL_HEIGHT: highest_res_dep[INFO.CELL_HEIGHT],
-            INFO.CLIM: tuple(d[INFO.CLIM] for d in dep_info) if clim is None else tuple(clim),  # FUTURE: put this in presentation, not layer metadata
+            GUIDE.BAND: [],
+            GUIDE.DISPLAY_TIME: None,
+            INFO.ORIGIN_X: None,
+            INFO.ORIGIN_Y: None,
+            INFO.CELL_WIDTH: None,
+            INFO.CELL_HEIGHT: None,
+            INFO.CLIM: (None, None, None)
         }
-        self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
-        ds_info.update_metadata_from_dependencies()
-        presentation, reordered_indices = self._insert_layer_with_info(ds_info)
-        self.didAddCompositeLayer.emit(reordered_indices, ds_info.uuid, presentation)
-        return ds_info
 
-    def create_empty_rgb_composite(self):
-        """
-        an empty RGB composite is added to the top of the current layer list.
-        since it needs R, G, and B in order to be valid, we do not yet announce it to the scenegraph
-        :return:
-        """
-        self.create_rgb_composite(None, None, None)
+        self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
+        presentation, reordered_indices = self._insert_layer_with_info(ds_info)
+
+        LOG.info('generating incomplete (invalid) composite for user to configure')
+        self.didAddCompositeLayer.emit(reordered_indices, ds_info.uuid, presentation)
+
+        color_assignments = {}
+        def _(color, lyr):
+            if lyr:
+                color_assignments[color] = self._layer_with_uuid[lyr] if isinstance(lyr, UUID) else lyr
+        _('r', r)
+        _('g', g)
+        _('b', b)
+        LOG.debug("New Composite UUIDs: %s" % repr(color_assignments))
+        if color_assignments:
+            self.revise_rgb_layer_choice(ds_info, **color_assignments)
+
+        if color_assignments and clim:
+            self.change_rgb_clims(clim, [ds_info])
+
+        # disable visibility of the existing layers FUTURE: remove them entirely? probably not; also consider consistent behavior
+        if color_assignments:
+            self.toggle_layer_visibility((x for x in (r,g,b) if x is not None), False)
+
+        # FUTURE: add rule to document on RGB affinity
+        # FUTURE: register with workspace so that it can persist info to disk if needed
+        return ds_info
 
     def revise_rgb_layer_choice(self, layer:DocRGBLayer, **rgba):
         """
@@ -858,8 +826,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         LOG.info('updated metadata for layer %s: %s' % (layer.uuid, repr(list(updated.keys()))))
         self.didChangeComposition.emit((), layer.uuid, prez, rgba)
 
-    def set_rgb_range(self, layer:DocRGBLayer, rgba:str, min:float, max:float):
-        new_clims = tuple(x if c != rgba else (min, max) for c, x in zip("rgba", layer[INFO.CLIM]))
+    def change_rgb_range(self, layer:DocRGBLayer, new_clims:tuple):
         # FIXME: migrate RGB clim into prez and not layer; only set INFO.CLIM if it hasn't already been set
         # self.change_clims_for_layers_where(new_clims, uuids={layer.uuid})
         # old_clim = layer[INFO.CLIM]
@@ -867,6 +834,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         #     return
         layer[INFO.CLIM] = new_clims
         self.didChangeColorLimits.emit({layer.uuid: layer[INFO.CLIM]})
+
+    def set_rgb_range(self, layer:DocRGBLayer, rgba:str, min:float, max:float):
+        new_clims = tuple(x if c != rgba else (min, max) for c, x in zip("rgba", layer[INFO.CLIM]))
+        self.change_rgb_clims(new_clims, [layer])
 
     def change_rgb_clims(self, clims, layers):
         changed = {}
@@ -936,9 +907,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for step in loaded_timesteps:
             if step==sched_time:
                 continue
-            noneed = already_have.get((plat, inst, step, master.band), None)
-            if noneed:
-                sequence.append((step, noneed))
+            preexisting_layer_uuid = already_have.get((plat, inst, step, master.band), None)
+            if preexisting_layer_uuid:
+                sequence.append((step, preexisting_layer_uuid))
                 continue
             LOG.debug('assessing %s' % step)
             # look for the bands
@@ -957,7 +928,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             LOG.info('creating %d additional RGB layers from loaded image layers' % len(to_build))
             for (when,r,g,b) in to_build:
                 # rl,gl,bl = self._layer_with_uuid[r], self._layer_with_uuid[g], self._layer_with_uuid[b]
-                new_layer = self.create_rgb_composite(r, g, b, master[INFO.CLIM])
+                new_layer = self.create_rgb_composite(r, g, b)
                 sequence.append((when, new_layer.uuid))
 
         if force_color_limits:
