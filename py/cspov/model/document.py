@@ -754,12 +754,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     L[dex] = pinfo._replace(climits=nfo[uuid])
         self.didChangeColorLimits.emit(nfo)
 
-    def create_rgb_composite(self, r=None, g=None, b=None, all_timesteps=True):
+    def create_rgb_composite(self, r=None, g=None, b=None, clim=None, all_timesteps=True):
         """
         user has specified that a band trio should be shown as RGB
         disable display of the three layers
         add a composite layer at the z level of the topmost of the three
-        do likewise for other timesteps with the same bands
         """
         from uuid import uuid1 as uuidgen
         from functools import reduce
@@ -819,7 +818,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             INFO.ORIGIN_Y: highest_res_dep[INFO.ORIGIN_Y],
             INFO.CELL_WIDTH: highest_res_dep[INFO.CELL_WIDTH],
             INFO.CELL_HEIGHT: highest_res_dep[INFO.CELL_HEIGHT],
-            INFO.CLIM: tuple(d[INFO.CLIM] for d in dep_info),
+            INFO.CLIM: tuple(d[INFO.CLIM] for d in dep_info) if clim is None else tuple(clim),  # FUTURE: put this in presentation, not layer metadata
         }
         self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
         presentation, reordered_indices = self._insert_layer_with_info(ds_info)
@@ -861,8 +860,25 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         new_clims = tuple(x if c != rgba else (min, max) for c, x in zip("rgba", layer[INFO.CLIM]))
         # FIXME: migrate RGB clim into prez and not layer; only set INFO.CLIM if it hasn't already been set
         # self.change_clims_for_layers_where(new_clims, uuids={layer.uuid})
+        # old_clim = layer[INFO.CLIM]
+        # if isinstance(old_clim, tuple) and old_clim==new_clims:
+        #     return
         layer[INFO.CLIM] = new_clims
         self.didChangeColorLimits.emit({layer.uuid: layer[INFO.CLIM]})
+
+    def change_rgb_clims(self, clims, layers):
+        changed = {}
+        # FIXME: deprecate this routine since display limits should be part of presentation tuple; data limits are part of layer
+        for layer in layers:
+            if isinstance(layer, UUID):
+                layer = self._layer_with_uuid[layer]
+            if not isinstance(layer, DocRGBLayer):
+                continue
+            if layer[INFO.CLIM] == clims:
+                continue
+            changed[layer.uuid] = clims
+            layer[INFO.CLIM] = clims
+        self.didChangeColorLimits.emit(changed)
 
     def _timesteps_for_instrument_band(self, instrument, bands, directory):
         """
@@ -873,12 +889,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :return:
         """
 
-
     def _directory_of_layers(self, kind=KIND.IMAGE):
         for x in [q for q in self._layer_with_uuid.values() if q.kind==kind]:
             yield x.uuid, (x.platform, x.instrument, x.sched_time, x.band)
 
-    def loop_rgb_layers_following(self, rgb_uuid:UUID, create_additional_layers=True, make_contributing_layers_invisible=True):
+    def loop_rgb_layers_following(self, rgb_uuid:UUID,
+                                  create_additional_layers=True,
+                                  force_color_limits=True,
+                                  make_contributing_layers_invisible=True):
         """
         LOOP BUTTON
         create RGB layers matching the configuration of the indicated layer (if create_all==True)
@@ -935,9 +953,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # build new RGB layers
         if create_additional_layers:
             for (when,r,g,b) in to_build:
-                rl,gl,bl = self._layer_with_uuid[r], self._layer_with_uuid[g], self._layer_with_uuid[b]
-                new_layer = self.create_rgb_composite(rl, gl, bl)
+                # rl,gl,bl = self._layer_with_uuid[r], self._layer_with_uuid[g], self._layer_with_uuid[b]
+                new_layer = self.create_rgb_composite(r, g, b, master[INFO.CLIM])
                 sequence.append((when, new_layer.uuid))
+
+        if force_color_limits:
+            self.change_rgb_clims(master[INFO.CLIM], (uu for _,uu in sequence))
 
         if make_contributing_layers_invisible:
             buhbye = set(to_make_invisible)
