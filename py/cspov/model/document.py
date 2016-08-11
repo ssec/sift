@@ -893,6 +893,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         # find the list of loaded timesteps
         loaded_timesteps = set(x.sched_time for x in self._layer_with_uuid.values())
+        loaded_timesteps = list(sorted(loaded_timesteps, reverse=True))  # build in last-to-first order to get proper layer list order
         LOG.debug('time steps available: %s' % repr(loaded_timesteps))
 
         # animation sequence we're going to use
