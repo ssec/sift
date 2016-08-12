@@ -384,7 +384,7 @@ class Main(QtGui.QMainWindow):
             self.behaviorLayersList.select(uuids)
         else:
             self.ui.statusbar.showMessage("ERROR: Layer with time steps or band siblings needed", STATUS_BAR_DURATION)
-        LOG.info('using siblings of {} for animation loop'.format(uuids[0]))
+        LOG.info('using siblings of {} for animation loop'.format(uuids[0] if uuids else '-unknown-'))
 
     def set_animation_speed(self, milliseconds):
         LOG.info('animation speed set to {}ms'.format(milliseconds))
