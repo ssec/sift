@@ -1,4 +1,6 @@
-cd py
+echo %cd%
+cd C:\Users\User\repos2\git\CSPOV\py
+if errorlevel 1 exit 1
 "%PYTHON%" setup.py install
 if errorlevel 1 exit 1
 
