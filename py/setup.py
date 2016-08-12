@@ -43,5 +43,5 @@ setup(
                       ],
     extras_require=extras_require,
     packages=find_packages(),
-    entry_points={'console_scripts': ['cspov = cspov.__main__:main']}
+    entry_points={}
 )
