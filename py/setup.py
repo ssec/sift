@@ -23,6 +23,11 @@ script_dir = os.path.dirname(os.path.realpath(__file__))
 version_pathname = os.path.join(script_dir, "cspov", "version.py")
 version = open(version_pathname).readlines()[-1].split()[-1].strip("\"\'")
 
+extras_require = {
+    "docs": ['blockdiag', 'sphinx', 'sphinx_rtd_theme',
+             'sphinxcontrib-seqdiag', 'sphinxcontrib-blockdiag'],
+}
+
 setup(
     name='cspov',
     version=version,
@@ -34,9 +39,9 @@ setup(
     include_package_data=True,
     install_requires=['numpy', 'pillow', 'scipy', 'numba', 'vispy>0.4.0',
                       'PyOpenGL', 'netCDF4', 'h5py', 'pyproj', 'gdal',
-                      'pyshp', 'shapely', 'rasterio', 'multipledispatch',
-                      'blockdiag', 'sphinx', 'sphinx_rtd_theme',
-                      'sphinxcontrib-seqdiag', 'sphinxcontrib-blockdiag'],
+                      'pyshp', 'shapely', 'rasterio',
+                      ],
+    extras_require=extras_require,
     packages=find_packages(),
     entry_points={'console_scripts': ['cspov = cspov.__main__:main']}
 )
