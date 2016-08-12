@@ -1,5 +1,5 @@
 #!/bin/bash
-
+cd py
 $PYTHON setup.py install
 
 # Add more build steps here, if they are necessary.

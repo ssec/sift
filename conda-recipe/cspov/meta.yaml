@@ -1,29 +1,17 @@
 package:
   name: cspov
-  version: "0.7.6"
+  version: {{ GIT_DESCRIBE_TAG }}
 
 source:
-  path: ../../py
+  git_url: ../../
 #  patches:
    # List any patch files here
    # - fix.patch
 
 build:
-  script: python setup.py install
-  # noarch_python: True
-  # preserve_egg_dir: True
-  # entry_points:
-    # Put any entry points (scripts to be generated automatically) here. The
-    # syntax is module:function.  For example
-    #
-    # - pyresample = pyresample:main
-    #
-    # Would create an entry point called pyresample that calls pyresample.main()
-
-
   # If this is a new build for the same version, increment the build
   # number. If you do not include this key, it defaults to 0.
-  number: 1
+  number: {{ GIT_DESCRIBE_NUMBER }}
 
 requirements:
   build:
@@ -33,7 +21,7 @@ requirements:
     - matplotlib
     - scipy
     - numba
-    - pyproj ==1.9.4
+    - pyproj >=1.9.4
     - vispy ==0.5.0dev
     - pyopengl ==3.1.1a1
     - netcdf4 ==1.1.9
@@ -53,7 +41,7 @@ requirements:
     - matplotlib
     - scipy
     - numba
-    - pyproj ==1.9.4
+    - pyproj >=1.9.4
     - vispy ==0.5.0dev
     - pyopengl ==3.1.1a1
     - netcdf4 ==1.1.9
