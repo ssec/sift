@@ -16,11 +16,16 @@ command.
 
 """
 
+import os
 from setuptools import setup, find_packages
+
+script_dir = os.path.dirname(os.path.realpath(__file__))
+version_pathname = os.path.join(script_dir, "cspov", "version.py")
+version = open(version_pathname).readlines()[-1].split()[-1].strip("\"\'")
 
 setup(
     name='cspov',
-    version='0.8.0',
+    version=version,
     description="Satellite Information Familiarization Tool for mercator geotiff files",
     author='R.K.Garcia, University of Wisconsin - Madison Space Science & Engineering Center',
     author_email='rkgarcia@wisc.edu',

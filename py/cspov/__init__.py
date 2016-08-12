@@ -22,6 +22,7 @@ __docformat__ = 'reStructuredText'
 
 import os, sys
 import logging, unittest, argparse
+from cspov.version import __version__
 
 LOG = logging.getLogger(__name__)
 

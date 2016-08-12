@@ -37,6 +37,7 @@ from cspov.view.ProbeGraphs import ProbeGraphManager, DEFAULT_POINT_PROBE
 from cspov.queue import TaskQueue, test_task, TASK_PROGRESS, TASK_DOING
 from cspov.workspace import Workspace
 from cspov.view.Colormap import ALL_COLORMAPS
+from cspov import __version__
 
 from functools import partial
 
@@ -482,6 +483,7 @@ class Main(QtGui.QMainWindow):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+        self.setWindowTitle(self.windowTitle().replace("|X.X.X|", __version__))
         self.tabifyDockWidget(self.ui.layersPane, self.ui.areaProbePane)
         self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.rgbConfigPane)
 

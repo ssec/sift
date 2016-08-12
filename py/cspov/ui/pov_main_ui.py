@@ -2,8 +2,7 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created: Tue Aug  9 16:42:53 2016
-#      by: PyQt4 UI code generator 4.10.4
+# Created by: PyQt4 UI code generator 4.11.4
 #
 # WARNING! All changes made in this file will be lost!
 
@@ -460,7 +459,7 @@ class Ui_MainWindow(object):
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
-        MainWindow.setWindowTitle(_translate("MainWindow", "SIFT Beta 0.8.0a1", None))
+        MainWindow.setWindowTitle(_translate("MainWindow", "SIFT Beta |X.X.X|", None))
         self.panZoomToolButton.setToolTip(_translate("MainWindow", "Pan/Zoom Tool", None))
         self.panZoomToolButton.setStatusTip(_translate("MainWindow", "Left mouse click and drag pans the scene", None))
         self.panZoomToolButton.setText(_translate("MainWindow", "Pan/Zoom", None))
@@ -512,4 +511,4 @@ class Ui_MainWindow(object):
         self.slideMinBlue.setToolTip(_translate("MainWindow", "value at 0% blue", None))
         self.slideMaxBlue.setToolTip(_translate("MainWindow", "value at 100% blue", None))
 
-from cspov.ui.custom_widgets import QNoScrollSlider, QNoScrollComboBox
+from cspov.ui.custom_widgets import QNoScrollComboBox, QNoScrollSlider
