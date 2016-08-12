@@ -658,11 +658,16 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :return: UUID of new focus layer
         """
         # get list of UUIDs in time order, plus index where the focus uuid is
-        if bandwise:  # next or last band
-            consult_guide = self._guidebook.channel_siblings
+        layer = self._layer_with_uuid[uuid]
+        if isinstance(layer, DocRGBLayer):
+            sibs = self._rgb_layer_siblings_uuids(layer)
+            dex = sibs.index(uuid)
         else:
-            consult_guide = self._guidebook.time_siblings
-        sibs, dex = consult_guide(uuid, self._layer_with_uuid.values())
+            if bandwise:  # next or last band
+                consult_guide = self._guidebook.channel_siblings
+            else:
+                consult_guide = self._guidebook.time_siblings
+            sibs, dex = consult_guide(uuid, self._layer_with_uuid.values())
         # LOG.debug('layer {0} family is +{1} of {2!r:s}'.format(uuid, dex, sibs))
         if not sibs:
             LOG.info('nothing to do in next_last_timestep')
