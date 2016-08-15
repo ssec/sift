@@ -731,10 +731,6 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         # visual nodes already have names, so be careful
         if not hasattr(self, "name"):
             self.name = kwargs.get("name", None)
-        self.origin_x = origin_x
-        self.origin_y = origin_y
-        self.cell_width = cell_width
-        self.cell_height = cell_height  # Note: cell_height is usually negative
         self.texture_shape = texture_shape
         self.tile_shape = tile_shape
         self.num_tex_tiles = self.texture_shape[0] * self.texture_shape[1]
@@ -746,7 +742,9 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         # What tiles have we used and can we use (each texture uses the same 'state')
         self.texture_state = TextureTileState(self.num_tex_tiles)
 
-        self.set_channels(data_arrays, shape=shape)
+        self.set_channels(data_arrays, shape=shape,
+                          cell_width=cell_width, cell_height=cell_height,
+                          origin_x=origin_x, origin_y=origin_y)
         self.ndim = len(self.shape) or [x for x in data_arrays if x is not None][0].ndim
         self.num_channels = len(data_arrays)
 
@@ -857,9 +855,20 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
 
         self.freeze()
 
-    def set_channels(self, data_arrays, shape=None):
+    def set_channels(self, data_arrays, shape=None,
+                     cell_width=None, cell_height=None,
+                     origin_x=None, origin_y=None, **kwargs):
         assert (shape or data_arrays is not None), "`data` or `shape` must be provided"
+        if cell_width is not None:
+            self.cell_width = cell_width
+        if cell_height:
+            self.cell_height = cell_height  # Note: cell_height is usually negative
+        if origin_x:
+            self.origin_x = origin_x
+        if origin_y:
+            self.origin_y = origin_y
         self.shape = shape or max(data.shape for data in data_arrays if data is not None)
+        assert None not in (self.cell_width, self.cell_height, self.origin_x, self.origin_y, self.shape)
         # how many of the higher resolution channel tiles (smaller geographic area) make
         # up a low resolution channel tile
         self._channel_factors = tuple(round(self.shape[0] / float(chn.shape[0])) if chn is not None else 1. for chn in data_arrays)

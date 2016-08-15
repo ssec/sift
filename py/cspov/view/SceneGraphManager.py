@@ -778,7 +778,11 @@ class SceneGraphManager(QObject):
                     dep_uuids = r,g,b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
                     overview_content = list(self.workspace.get_content(cuuid) for cuuid in dep_uuids)
                     self.composite_element_dependencies[layer.uuid] = dep_uuids
-                    self.image_elements[layer.uuid].set_channels(overview_content)
+                    self.image_elements[layer.uuid].set_channels(overview_content,
+                                                                 cell_width=layer[INFO.CELL_WIDTH],
+                                                                 cell_height=layer[INFO.CELL_HEIGHT],
+                                                                 origin_x=layer[INFO.ORIGIN_X],
+                                                                 origin_y=layer[INFO.ORIGIN_Y])
                     self.image_elements[layer.uuid].init_overview(overview_content)
                     self.on_view_change(None)
                 else:
