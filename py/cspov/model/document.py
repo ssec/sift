@@ -153,6 +153,11 @@ class DocLayerStack(MutableSequence):
         for i,q in enumerate(self._store):
             self._store[i] = q._replace(a_order=None)
 
+    def index(self, uuid):
+        assert(isinstance(uuid, UUID))
+        u2r = self.uuid2row
+        return u2r.get(uuid, None)
+
     @property
     def animation_order(self):
         aouu = [(x.a_order, x.uuid) for x in self._store if (x.a_order is not None)]
@@ -621,7 +626,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             rows_or_uuids = [rows_or_uuids]
         for dex in rows_or_uuids:
             if isinstance(dex, UUID):
-                dex = L[dex]  # returns row index
+                dex = L.index(dex)  # returns row index
             old = L[dex]
             vis = (not old.visible) if visible is None else visible
             # print(vis)
