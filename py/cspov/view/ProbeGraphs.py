@@ -191,7 +191,7 @@ class ProbeGraphManager (QObject) :
         uuid_list = self.document.current_layer_uuid_order
         for graphObj in self.graphs :
             doRebuild = graphObj is self.graphs[self.selected_graph_index]
-            graphObj.set_possible_layers(uuid_list, do_rebuild_plot=doRebuild)
+            graphObj.set_possible_layers(uuid_list, do_rebuild_plot=doRebuild)  # FIXME
 
     def currentPolygonChanged (self, polygonPoints) :
         """Update the current polygon in the selected graph and rebuild it's plot
@@ -400,8 +400,10 @@ class ProbeGraphDisplay (object) :
 
         # fill up our lists of layers
         for uuid in uuid_list :
-
-            layer_name = self.workspace.get_info(uuid)[INFO.NAME]
+            nfo = self.document.get_info(uuid)
+            layer_name = nfo.get(INFO.NAME, "??unknown layer??")
+            if nfo.get(INFO.KIND, None) == KIND.RGB:  # skip RGB layers
+                continue
             uuid_string = str(uuid)
             self.xDropDown.addItem(layer_name, uuid_string)
             self.yDropDown.addItem(layer_name, uuid_string)
