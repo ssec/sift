@@ -31,7 +31,7 @@ requirements:
     - shapely ==1.5.11
     - rasterio ==0.24.0
     - gdal ==1.11.2
-    - pyqt ==4.10.4
+    - pyqt >=4.10.4
 #    - gdal ==2.0.0
     - cython >=0.17 # [win]
 
@@ -51,7 +51,7 @@ requirements:
     - shapely ==1.5.11
     - rasterio ==0.24.0
     - gdal ==1.11.2
-    - pyqt ==4.10.4
+    - pyqt >=4.10.4
 #    - gdal ==2.0.0
 
 # test:
