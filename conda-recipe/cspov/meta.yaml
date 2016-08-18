@@ -17,58 +17,44 @@ requirements:
   build:
     - python
     - setuptools
-    - numpy ==1.9.3
+    - numpy
     - matplotlib
     - scipy
     - numba
     - pyproj >=1.9.4
     - vispy ==0.5.0dev
-    - pyopengl ==3.1.1a1
-    - netcdf4 ==1.1.9
-    - h5py ==2.5.0
+    - pyopengl
+    - netcdf4
+    - h5py
     - pillow
     - pyshp ==1.2.1
     - shapely ==1.5.11
-    - rasterio ==0.24.0
-    - gdal ==1.11.2
-    - pyqt >=4.10.4
-#    - gdal ==2.0.0
+    - rasterio
+    - gdal
+    - pyqt
     - cython >=0.17 # [win]
 
   run:
     - python
-    - numpy ==1.9.3
+    - numpy
     - matplotlib
     - scipy
     - numba
     - pyproj >=1.9.4
     - vispy ==0.5.0dev
-    - pyopengl ==3.1.1a1
-    - netcdf4 ==1.1.9
-    - h5py ==2.5.0
+    - pyopengl
+    - netcdf4
+    - h5py
     - pillow
     - pyshp ==1.2.1
     - shapely ==1.5.11
-    - rasterio ==0.24.0
-    - gdal ==1.11.2
-    - pyqt >=4.10.4
-#    - gdal ==2.0.0
+    - rasterio
+    - gdal
+    - pyqt
 
-# test:
-  # Python imports
-  # imports:
-
-  # commands:
-    # You can put test commands to be run here.  Use this to test that the
-    # entry points work.
-
-
-  # You can also put a file called run_test.py in the recipe that will be run
-  # at test time.
-
-  # requires:
-    # Put any additional test requirements here.  For example
-    # - nose
+test:
+  commands:
+    - "python -m cspov -h"
 
 about:
   #home: The package home page
