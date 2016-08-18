@@ -500,7 +500,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         tiles_info = []
         for tiy in range(tile_box.t, tile_box.b):
             for tix in range(tile_box.l, tile_box.r):
-                virt_tix = tix % max_tiles[1]
+                virt_tix = int(tix % max_tiles[1])
                 already_in = (stride, tiy, virt_tix) in self.texture_state
                 # Update the age if already in there
                 # Assume that texture_state does not change from the main thread if this is run in another
