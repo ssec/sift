@@ -1080,11 +1080,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         return new_anim_uuids
 
     def get_info(self, row=None, uuid=None):
-        if row is not None :
+        if row is not None:
             uuid_temp = self.current_layer_set[row].uuid
             nfo = self._layer_with_uuid[uuid_temp]
             return nfo
-        elif uuid is not None :
+        elif uuid is not None:
             nfo = self._layer_with_uuid[uuid]
             return nfo
         return None

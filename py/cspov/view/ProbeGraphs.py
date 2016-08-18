@@ -17,7 +17,7 @@ import PyQt4.QtGui as QtGui
 from PyQt4.QtCore import QObject, pyqtSignal
 
 # a useful constant
-from cspov.common import INFO
+from cspov.common import INFO, KIND
 from cspov.queue import TASK_PROGRESS, TASK_DOING
 
 import logging
@@ -399,8 +399,8 @@ class ProbeGraphDisplay (object) :
         self.yDropDown.clear()
 
         # fill up our lists of layers
-        for uuid in uuid_list :
-            nfo = self.document.get_info(uuid)
+        for uuid in uuid_list:
+            nfo = self.document.get_info(uuid=uuid)
             layer_name = nfo.get(INFO.NAME, "??unknown layer??")
             if nfo.get(INFO.KIND, None) == KIND.RGB:  # skip RGB layers
                 continue
