@@ -119,11 +119,13 @@ class BumpCommand(Command):
         else:
             commit_args[-1] = "\"" + commit_args[-1] + "\""
             tag_args[-1] = "\"" + tag_args[-1] + "\""
+            print("To appropriate files:")
+            print("    ", " ".join(add_args))
             print("To commit after run:")
             print("    ", " ".join(commit_args))
             print("Followed by:")
             print("    ", " ".join(tag_args))
-        print("Run:\n    git push --tags")
+        print("Run:\n    git push --follow-tags")
 
 setup(
     name='cspov',
