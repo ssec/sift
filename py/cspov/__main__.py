@@ -826,6 +826,7 @@ class Main(QtGui.QMainWindow):
 
 def main():
     if "win" in sys.platform:
+        # Windows AND Mac/OSX
         default_workspace = os.path.expanduser(os.path.join("~", "Documents", "sift_workspace"))
     else:
         default_workspace = os.path.expanduser(os.path.join("~", "sift_workspace"))
@@ -858,6 +859,8 @@ def main():
     if not os.path.exists(args.workspace):
         LOG.info("Creating SIFT Workspace: %s", args.workspace)
         os.makedirs(args.workspace)
+    else:
+        LOG.info("Using SIFT Workspace: %s", args.workspace)
 
     app.create()
     # app = QApplication(sys.argv)
