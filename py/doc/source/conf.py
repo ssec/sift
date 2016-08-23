@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # SIFT documentation build configuration file, created by
-# sphinx-quickstart on Fri May 13 08:35:57 2016.
+# sphinx-quickstart on Tue Aug 23 13:49:22 2016.
 #
 # This file is execfile()d with the current directory set to its
 # containing dir.
@@ -21,7 +21,7 @@ import sphinx_rtd_theme
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-sys.path.insert(0, os.path.abspath('./py'))
+#sys.path.insert(0, os.path.abspath('../'))
 
 # -- General configuration ------------------------------------------------
 
@@ -43,7 +43,7 @@ extensions = [
     'sphinxcontrib.blockdiag',
 ]
 
-seqdiag_fontpath = os.path.abspath('./fonts/DejaVuSerif.ttf')
+seqdiag_fontpath = os.path.abspath('./source/fonts/DejaVuSerif.ttf')
 
 
 # Add any paths that contain templates here, relative to this directory.
@@ -63,13 +63,14 @@ master_doc = 'index'
 # General information about the project.
 project = 'SIFT'
 copyright = '2016, University of Wisconsin Regents'
-author = 'R.K.Garcia'
+author = 'SIFT Developers'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
 # The short X.Y version.
+# FIXME: Get version from setup.py or cspov.__version__
 version = '0.8.0'
 # The full version, including alpha/beta/rc tags.
 release = '0.8.0'
@@ -89,7 +90,7 @@ language = None
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['_build']
+exclude_patterns = []
 
 # The reST default role (used for this markup: `text`) to use for all
 # documents.
@@ -239,7 +240,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
   (master_doc, 'SIFT.tex', 'SIFT Documentation',
-   'R.K.Garcia', 'manual'),
+   'SIFT Developers', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
