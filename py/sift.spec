@@ -16,14 +16,6 @@ data_files = [
     (os.path.join(os.path.dirname(vispy.io.__file__), "_data"), os.path.join("vispy", "io", "_data")),
 ]
 
-if is_win:
-    from llvmlite.binding.ffi import _lib_dir, _lib_name
-    data_files += [
-        (os.path.join(_lib_dir, _lib_name), '.'),
-        (os.path.join(_lib_dir, "MSVCP120.dll"), '.'),
-        (os.path.join(_lib_dir, "MSVCR120.dll"), '.'),
-    ]
-
 for shape_dir in ["ne_50m_admin_0_countries", "ne_110m_admin_0_countries"]:
     data_files.append((os.path.join("cspov", "data", shape_dir), os.path.join("cspov", "data", shape_dir)))
 
@@ -32,12 +24,19 @@ hidden_imports = [
     "vispy.app.backends._pyqt4",
 ] + collect_submodules("rasterio")
 
+# Add missing shared libraries
 binaries = []
 if is_darwin:
     lib_dir = sys.executable.replace(os.path.join("bin", "python"), "lib")
     binaries += [(os.path.join(lib_dir, 'libgeos_c.dylib'), '')]
     binaries += [(os.path.join(lib_dir, 'libgeos.dylib'), '')]
-
+    binaries += [(os.path.join(lib_dir, 'libmkl_*.dylib'), '')]
+elif is_win:
+    lib_dir = sys.executable.replace("python.exe", os.path.join("Library", "bin"))
+    binaries += [(os.path.join(lib_dir, 'geos_c.dll'), '')]
+    binaries += [(os.path.join(lib_dir, 'geos.dll'), '')]
+    binaries += [(os.path.join(lib_dir, 'mkl_*.dll'), '')]
+    
 a = Analysis([main_script_pathname],
              pathex=[_script_base],
              binaries=binaries,
