@@ -36,7 +36,7 @@ elif is_win:
     binaries += [(os.path.join(lib_dir, 'geos_c.dll'), '')]
     binaries += [(os.path.join(lib_dir, 'geos.dll'), '')]
     binaries += [(os.path.join(lib_dir, 'mkl_*.dll'), '')]
-    
+
 a = Analysis([main_script_pathname],
              pathex=[_script_base],
              binaries=binaries,
