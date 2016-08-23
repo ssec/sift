@@ -13,7 +13,7 @@ source:
 build:
   # If this is a new build for the same version, increment the build
   # number. If you do not include this key, it defaults to 0.
-  number: 1
+  number: 2
 
 requirements:
   build:
@@ -32,8 +32,9 @@ requirements:
     - pyshp ==1.2.1
     - shapely ==1.5.11
     - rasterio
-    - gdal
-    - pyqt
+    - gdal >=1.11.4 # [unix]
+    - gdal ==1.11.2 # [win]
+    - pyqt ==4.10.4
     - cython >=0.17 # [win]
 
   run:
@@ -51,8 +52,9 @@ requirements:
     - pyshp ==1.2.1
     - shapely ==1.5.11
     - rasterio
-    - gdal
-    - pyqt
+    - gdal >=1.11.4 # [unix]
+    - gdal ==1.11.2 # [win]
+    - pyqt ==4.10.4
 
 test:
   commands:
