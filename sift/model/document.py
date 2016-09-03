@@ -434,18 +434,20 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 # Get 3 values for each channel
                 # XXX: Better place for this?
                 def _sci_to_rgb(v, cmin, cmax):
-                    if cmin > cmax:
-                        tmp = cmax
-                        cmax = cmin
-                        cmin = tmp
-                    elif cmin == cmax:
+                    if cmin == cmax:
                         return 0
+                    elif cmin > cmax:
+                        if v > cmin:
+                            v = cmin
+                        elif v < cmax:
+                            v = cmax
+                    else:
+                        if v < cmin:
+                            v = cmin
+                        elif v > cmax:
+                            v = cmax
 
-                    if v < cmin:
-                        v = cmin
-                    elif v > cmax:
-                        v = cmax
-                    return int(round((v - cmin) / (cmax - cmin) * 255.))
+                    return int(round(abs(v - cmin) / abs(cmax - cmin) * 255.))
                 values = []
                 for dep_lyr, clims in zip(lyr.l[:3], lyr[INFO.CLIM]):
                     if dep_lyr is None:
