@@ -1,15 +1,15 @@
 @ECHO OFF
 set home_path=C:\Users\%username%
 set desktop_path=%home_path%\Desktop
-set channel=http://larch.ssec.wisc.edu/channels/cspov
+set channel=http://larch.ssec.wisc.edu/channels/sift
 set workspace=%home_path%\sift_workspace
-set pkg_name=cspov
+set pkg_name=sift
 set env_name=sift
 
 REM The best thing would be to do "activate sift" but for some reason we can't do goto's properly when using that
 python -V || goto :install_anaconda
 call activate sift || goto :create_env
-python -m cspov -h || goto :install_sift
+python -m sift -h || goto :install_sift
 
 goto :anaconda_installed
 

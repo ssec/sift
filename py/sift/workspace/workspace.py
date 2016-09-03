@@ -31,9 +31,9 @@ import shutil
 from collections import namedtuple
 from pickle import dump, load, HIGHEST_PROTOCOL
 from uuid import UUID, uuid1 as uuidgen
-from cspov.common import KIND, INFO
+from sift.common import KIND, INFO
 from PyQt4.QtCore import QObject, pyqtSignal
-from cspov.model.shapes import content_within_shape
+from sift.model.shapes import content_within_shape
 from shapely.geometry.polygon import LinearRing
 from rasterio import Affine
 
@@ -479,7 +479,7 @@ class Workspace(QObject):
         return mm
 
     def _bgnd_remove(self, uuid):
-        from cspov.queue import TASK_DOING, TASK_PROGRESS
+        from sift.queue import TASK_DOING, TASK_PROGRESS
         yield {TASK_DOING: 'purging memory', TASK_PROGRESS: 0.5}
         if uuid in self._info:
             del self._info[uuid]

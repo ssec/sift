@@ -21,13 +21,13 @@ from PyQt4.QtCore import SIGNAL, QObject, Qt, pyqtSignal
 from PyQt4.QtGui import QWidget, QListView, QComboBox, QSlider, QTreeView, QGridLayout, QVBoxLayout, QLabel, QLineEdit, QScrollArea, QLayout, QTextDocument, QDoubleValidator
 from PyQt4.QtWebKit import QWebView
 from weakref import ref
-from cspov.model.guidebook import GUIDE
-from cspov.common import INFO, KIND
-from cspov.control.layer_tree import LayerStackTreeViewModel
-from cspov.model.layer import DocLayer, DocBasicLayer, DocCompositeLayer, DocRGBLayer
-import cspov.ui.config_rgb_layer_ui as config_rgb_layer_ui
+from sift.model.guidebook import GUIDE
+from sift.common import INFO, KIND
+from sift.control.layer_tree import LayerStackTreeViewModel
+from sift.model.layer import DocLayer, DocBasicLayer, DocCompositeLayer, DocRGBLayer
+import sift.ui.config_rgb_layer_ui as config_rgb_layer_ui
 import numpy as np
-from cspov.view.Colormap import ALL_COLORMAPS
+from sift.view.Colormap import ALL_COLORMAPS
 from uuid import UUID
 
 LOG = logging.getLogger(__name__)

@@ -23,11 +23,11 @@ import numpy as np
 from vispy.util.transforms import translate, ortho
 from numba import jit
 
-from cspov.common import box, MAX_EXCURSION_X, vue
+from sift.common import box, MAX_EXCURSION_X, vue
 
 
 
-# from cspov.view.Program import GlooRGBTile
+# from sift.view.Program import GlooRGBTile
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -202,11 +202,11 @@ class Animating(Idling):
     """
 
 
-class CspovMainMapCanvas(scene.SceneCanvas):
+class SIFTMainMapCanvas(scene.SceneCanvas):
     pass
 
 
-class CspovMainMapWidget(app.Canvas):
+class SIFTMainMapWidget(app.Canvas):
 
     # signals
     # viewportDidChange = pyqtSignal(box)
@@ -224,7 +224,7 @@ class CspovMainMapWidget(app.Canvas):
     _deferred_render_timer = None
 
     def __init__(self, **kwargs):
-        super(CspovMainMapWidget, self).__init__(**kwargs)
+        super(SIFTMainMapWidget, self).__init__(**kwargs)
 
         self._activity_stack = [Idling(self)]
         self._deferred_render_layers = []

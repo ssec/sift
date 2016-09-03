@@ -1,7 +1,7 @@
 {% set data = load_setup_py_data() %}
 
 package:
-  name: cspov
+  name: sift
   version: {{ data.get('version') }}
 
 source:
@@ -62,7 +62,7 @@ requirements:
 
 test:
   commands:
-    - "python -m cspov -h"
+    - "python -m sift -h"
 
 about:
   #home: The package home page

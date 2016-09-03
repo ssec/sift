@@ -20,9 +20,9 @@ REQUIRES
 from _weakref import ref
 from collections import MutableMapping
 from enum import Enum
-from cspov.model.guidebook import AHI_HSF_Guidebook, GUIDE
+from sift.model.guidebook import AHI_HSF_Guidebook, GUIDE
 
-from cspov.common import INFO, KIND
+from sift.common import INFO, KIND
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'

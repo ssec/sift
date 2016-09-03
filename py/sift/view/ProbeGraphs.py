@@ -17,8 +17,8 @@ import PyQt4.QtGui as QtGui
 from PyQt4.QtCore import QObject, pyqtSignal
 
 # a useful constant
-from cspov.common import INFO, KIND
-from cspov.queue import TASK_PROGRESS, TASK_DOING
+from sift.common import INFO, KIND
+from sift.queue import TASK_PROGRESS, TASK_DOING
 
 import logging
 import numpy

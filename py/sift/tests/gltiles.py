@@ -40,7 +40,7 @@ import vispy
 vispy.use(app='PyQt4') #, gl='gl+')
 
 import vispy.scene as vps
-from cspov.view.MapWidget import CspovMainMapWidget
+from sift.view.MapWidget import SIFTMainMapWidget
 
 
 
@@ -68,7 +68,7 @@ class MainWindow(QMainWindow):
         self.scenegraph = vps.SceneCanvas('vispy', app='PyQt4')
         widget.addTab(self.scenegraph.native, 'vispy')
 
-        things = [CspovMainMapWidget, QTextEdit]
+        things = [SIFTMainMapWidget, QTextEdit]
         for w in things: 
             if w is QLabel:
                 wid = QLabel('hola')

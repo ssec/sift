@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-cspov.model.document
+sift.model.document
 --------------------
 
-Core (low-level) document model for CSPOV.
+Core (low-level) document model for SIFT.
 The core is sometimes accessed via Facets, which are like database views for a specific group of use cases
 
 The document model is a metadata representation which permits the workspace to be constructed and managed.
@@ -55,7 +55,7 @@ between subsystems. Document rarely deals directly with content.
 :copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-from cspov.model.layer import mixing, DocLayer, DocBasicLayer, DocCompositeLayer, DocRGBLayer
+from sift.model.layer import mixing, DocLayer, DocBasicLayer, DocCompositeLayer, DocRGBLayer
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -70,8 +70,8 @@ import numpy as np
 from abc import ABCMeta, abstractmethod, abstractproperty
 from weakref import ref
 
-from cspov.common import KIND, INFO, COMPOSITE_TYPE
-from cspov.model.guidebook import AHI_HSF_Guidebook, GUIDE
+from sift.common import KIND, INFO, COMPOSITE_TYPE
+from sift.model.guidebook import AHI_HSF_Guidebook, GUIDE
 
 from PyQt4.QtCore import QObject, pyqtSignal
 

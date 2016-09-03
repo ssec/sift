@@ -70,7 +70,7 @@ author = 'SIFT Developers'
 # built documents.
 #
 # The short X.Y version.
-# FIXME: Get version from setup.py or cspov.__version__
+# FIXME: Get version from setup.py or sift.__version__
 version = '0.8.0'
 # The full version, including alpha/beta/rc tags.
 release = '0.8.0'

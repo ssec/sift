@@ -30,15 +30,15 @@ from vispy.util.keys import SHIFT
 from vispy.visuals.transforms import STTransform, MatrixTransform
 from vispy.visuals import MarkersVisual, marker_types, LineVisual
 from vispy.scene.visuals import Markers, Polygon, Compound, Line
-from cspov.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND, TOOL, DEFAULT_PROJECTION, COMPOSITE_TYPE
-# from cspov.control.layer_list import LayerStackListViewModel
-from cspov.view.LayerRep import NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer, CompositeLayer
-from cspov.view.MapWidget import CspovMainMapCanvas
-from cspov.view.Cameras import PanZoomProbeCamera
-from cspov.view.Colormap import ALL_COLORMAPS
-from cspov.model.document import prez, DocCompositeLayer, DocBasicLayer, DocRGBLayer
-from cspov.queue import TASK_DOING, TASK_PROGRESS
-from cspov.view.ProbeGraphs import DEFAULT_POINT_PROBE
+from sift.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND, TOOL, DEFAULT_PROJECTION, COMPOSITE_TYPE
+# from sift.control.layer_list import LayerStackListViewModel
+from sift.view.LayerRep import NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer, CompositeLayer
+from sift.view.MapWidget import SIFTMainMapCanvas
+from sift.view.Cameras import PanZoomProbeCamera
+from sift.view.Colormap import ALL_COLORMAPS
+from sift.model.document import prez, DocCompositeLayer, DocBasicLayer, DocRGBLayer
+from sift.queue import TASK_DOING, TASK_PROGRESS
+from sift.view.ProbeGraphs import DEFAULT_POINT_PROBE
 
 from PyQt4.QtCore import QObject, pyqtSignal, Qt
 from PyQt4.QtGui import QCursor, QPixmap
@@ -428,7 +428,7 @@ class SceneGraphManager(QObject):
 
     def setup_initial_canvas(self, center=None):
         center = center or (0, 0)
-        self.main_canvas = CspovMainMapCanvas(parent=self.parent())
+        self.main_canvas = SIFTMainMapCanvas(parent=self.parent())
         self.main_view = self.main_canvas.central_widget.add_view()
 
         # Camera Setup
@@ -632,7 +632,7 @@ class SceneGraphManager(QObject):
 
         # Set the cursor
         if name == TOOL.PAN_ZOOM:
-            # self.main_canvas.native.setCursor(QCursor(QPixmap("py/cspov/ui/cursors/noun_275_cc.png")))
+            # self.main_canvas.native.setCursor(QCursor(QPixmap("py/sift/ui/cursors/noun_275_cc.png")))
             # self.main_canvas.native.setCursor(QCursor(Qt.SizeAllCursor))
             self.main_canvas.native.setCursor(QCursor(Qt.OpenHandCursor))
         elif name == TOOL.POINT_PROBE:

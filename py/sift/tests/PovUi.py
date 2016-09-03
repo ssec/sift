@@ -27,7 +27,7 @@ from PyQt4 import QtGui
 LOG = logging.getLogger(__name__)
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
-from cspov.ui.pov_main_ui import Ui_MainWindow
+from sift.ui.pov_main_ui import Ui_MainWindow
 
 class Main(QtGui.QMainWindow):
     def __init__(self):

@@ -20,8 +20,8 @@ import os, sys, re
 from datetime import datetime
 import logging, unittest, argparse
 from enum import Enum
-from cspov.common import INFO, KIND
-from cspov.view.Colormap import DEFAULT_IR, DEFAULT_VIS
+from sift.common import INFO, KIND
+from sift.view.Colormap import DEFAULT_IR, DEFAULT_VIS
 
 LOG = logging.getLogger(__name__)
 

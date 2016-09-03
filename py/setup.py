@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Setuptools installation script for the CSPOV python package.
+"""Setuptools installation script for the SIFT python package.
 
 To install from source run the following command::
 
@@ -34,7 +34,7 @@ import re
 from setuptools import setup, find_packages, Command
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
-version_pathname = os.path.join(script_dir, "cspov", "version.py")
+version_pathname = os.path.join(script_dir, "sift", "version.py")
 version_str = open(version_pathname).readlines()[-1].split()[-1].strip("\"\'")
 version_regex = re.compile('^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<micro>\d+)(?:(?P<dev_level>[ab])(?P<dev_version>\d))?$')
 version_info = version_regex.match(version_str).groupdict()
@@ -159,7 +159,7 @@ class BumpCommand(Command):
         print("To push git changes to remote, run:\n    git push --follow-tags")
 
 setup(
-    name='cspov',
+    name='sift',
     version=version_str,
     description="Satellite Information Familiarization Tool for mercator geotiff files",
     author='R.K.Garcia, University of Wisconsin - Madison Space Science & Engineering Center',

@@ -37,21 +37,21 @@ import numpy as np
 from datetime import datetime
 from pyproj import Proj
 
-from cspov.common import (DEFAULT_X_PIXEL_SIZE,
-                          DEFAULT_Y_PIXEL_SIZE,
-                          DEFAULT_ORIGIN_X,
-                          DEFAULT_ORIGIN_Y,
-                          DEFAULT_PROJECTION,
-                          DEFAULT_TILE_HEIGHT,
-                          DEFAULT_TILE_WIDTH,
-                          DEFAULT_TEXTURE_HEIGHT,
-                          DEFAULT_TEXTURE_WIDTH,
-                          WORLD_EXTENT_BOX,
-                          C_EQ,
-                          box, pnt, rez, vue,
-                          MercatorTileCalc
-                          )
-from cspov.view.Program import TextureAtlas2D, Texture2D
+from sift.common import (DEFAULT_X_PIXEL_SIZE,
+                         DEFAULT_Y_PIXEL_SIZE,
+                         DEFAULT_ORIGIN_X,
+                         DEFAULT_ORIGIN_Y,
+                         DEFAULT_PROJECTION,
+                         DEFAULT_TILE_HEIGHT,
+                         DEFAULT_TILE_WIDTH,
+                         DEFAULT_TEXTURE_HEIGHT,
+                         DEFAULT_TEXTURE_WIDTH,
+                         WORLD_EXTENT_BOX,
+                         C_EQ,
+                         box, pnt, rez, vue,
+                         MercatorTileCalc
+                         )
+from sift.view.Program import TextureAtlas2D, Texture2D
 # The below imports are needed because we subclassed the ImageVisual
 from vispy.visuals.shaders import Function
 from vispy.visuals.transforms import NullTransform
@@ -94,7 +94,7 @@ class GeolocatedImageVisual(ImageVisual):
         """Rebuild the vertex buffers used for rendering the image when using
         the subdivide method.
 
-        CSPOV Note: Copied from 0.5.0dev original ImageVisual class
+        SIFT Note: Copied from 0.5.0dev original ImageVisual class
         """
         grid = self._grid
         w = 1.0 / grid[1]
@@ -531,7 +531,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         """Rebuild the vertex buffers used for rendering the image when using
         the subdivide method.
 
-        CSPOV Note: Copied from 0.5.0dev original ImageVisual class
+        SIFT Note: Copied from 0.5.0dev original ImageVisual class
         """
         max_tiles = self.calc.max_tiles_available(preferred_stride)
         total_num_tiles = (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l)

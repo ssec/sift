@@ -511,4 +511,4 @@ class Ui_MainWindow(object):
         self.slideMinBlue.setToolTip(_translate("MainWindow", "value at 0% blue", None))
         self.slideMaxBlue.setToolTip(_translate("MainWindow", "value at 100% blue", None))
 
-from cspov.ui.custom_widgets import QNoScrollComboBox, QNoScrollSlider
+from sift.ui.custom_widgets import QNoScrollComboBox, QNoScrollSlider

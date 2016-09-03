@@ -37,9 +37,9 @@ import logging, sys, os
 import pickle as pkl
 from PyQt4.QtCore import QAbstractItemModel, QAbstractListModel, Qt, QSize, QModelIndex, QPoint, QMimeData, pyqtSignal, QRect
 from PyQt4.QtGui import QTreeView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyle, QColor, QFont, QStyleOptionViewItem, QItemSelection, QItemSelectionModel, QPen
-from cspov.model.document import Document
-from cspov.common import INFO, KIND
-from cspov.view.Colormap import ALL_COLORMAPS, CATEGORIZED_COLORMAPS
+from sift.model.document import Document
+from sift.common import INFO, KIND
+from sift.view.Colormap import ALL_COLORMAPS, CATEGORIZED_COLORMAPS
 
 LOG = logging.getLogger(__name__)
 

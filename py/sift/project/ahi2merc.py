@@ -19,7 +19,7 @@ from osgeo import gdal
 from pyproj import Proj
 import numpy as np
 
-from cspov.project.ahi2gtiff import create_ahi_geotiff, ahi_image_info, ahi_image_data
+from sift.project.ahi2gtiff import create_ahi_geotiff, ahi_image_info, ahi_image_data
 
 LOG = logging.getLogger(__name__)
 GTIFF_DRIVER = gdal.GetDriverByName("GTIFF")

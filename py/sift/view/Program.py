@@ -22,7 +22,7 @@ import numpy as np
 import logging
 from vispy.gloo import Texture2D
 
-from cspov.common import DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH
+from sift.common import DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'

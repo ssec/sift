@@ -8,7 +8,7 @@ import vispy.io
 
 block_cipher = None
 exe_name = "SIFT"
-main_script_pathname = os.path.join("cspov", "__main__.py")
+main_script_pathname = os.path.join("sift", "__main__.py")
 _script_base = os.path.dirname(os.path.realpath(sys.argv[0]))
 
 data_files = [
@@ -17,7 +17,7 @@ data_files = [
 ]
 
 for shape_dir in ["ne_50m_admin_0_countries", "ne_110m_admin_0_countries"]:
-    data_files.append((os.path.join("cspov", "data", shape_dir), os.path.join("cspov", "data", shape_dir)))
+    data_files.append((os.path.join("sift", "data", shape_dir), os.path.join("sift", "data", shape_dir)))
 
 hidden_imports = [
     "vispy.ext._bundled.six",

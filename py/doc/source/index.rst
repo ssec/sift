@@ -13,13 +13,13 @@ Contents:
 
 .. seqdiag:: test.diag
 
-.. automodule:: cspov.model.document
+.. automodule:: sift.model.document
    :members:
 
-.. automodule:: cspov.view.SceneGraphManager
+.. automodule:: sift.view.SceneGraphManager
    :members:
 
-.. automodule:: cspov.workspace.workspace
+.. automodule:: sift.workspace.workspace
    :members:
 
 

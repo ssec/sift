@@ -29,21 +29,21 @@ except Exception:
 QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
 
-import cspov.ui.open_cache_dialog_ui as open_cache_dialog_ui
-from cspov.control.LayerManager import LayerSetsManager
-from cspov.model.document import Document, DocRGBLayer, DocCompositeLayer, DocBasicLayer, DocLayer, DocLayerStack
-from cspov.view.SceneGraphManager import SceneGraphManager
-from cspov.view.ProbeGraphs import ProbeGraphManager, DEFAULT_POINT_PROBE
-from cspov.queue import TaskQueue, test_task, TASK_PROGRESS, TASK_DOING
-from cspov.workspace import Workspace
-from cspov.view.Colormap import ALL_COLORMAPS
-from cspov import __version__
+import sift.ui.open_cache_dialog_ui as open_cache_dialog_ui
+from sift.control.LayerManager import LayerSetsManager
+from sift.model.document import Document, DocRGBLayer, DocCompositeLayer, DocBasicLayer, DocLayer, DocLayerStack
+from sift.view.SceneGraphManager import SceneGraphManager
+from sift.view.ProbeGraphs import ProbeGraphManager, DEFAULT_POINT_PROBE
+from sift.queue import TaskQueue, test_task, TASK_PROGRESS, TASK_DOING
+from sift.workspace import Workspace
+from sift.view.Colormap import ALL_COLORMAPS
+from sift import __version__
 
 from functools import partial
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
-from cspov.ui.pov_main_ui import Ui_MainWindow
-from cspov.common import INFO, KIND, DEFAULT_PROJ_OBJ, TOOL, COMPOSITE_TYPE
+from sift.ui.pov_main_ui import Ui_MainWindow
+from sift.common import INFO, KIND, DEFAULT_PROJ_OBJ, TOOL, COMPOSITE_TYPE
 
 import os
 import sys
@@ -57,7 +57,7 @@ STATUS_BAR_DURATION = 2000  # ms
 
 def test_layers_from_directory(ws, doc, layer_tiff_glob, range_txt=None):
     """
-    TIFF_GLOB='/Users/keoni/Data/CSPOV/2015_07_14_195/00?0/HS*_B03_*merc.tif' VERBOSITY=3 python -m cspov
+    TIFF_GLOB='/Users/keoni/Data/CSPOV/2015_07_14_195/00?0/HS*_B03_*merc.tif' VERBOSITY=3 python -m sift
     :param model:
     :param view:
     :param layer_tiff_glob:
