@@ -5,7 +5,7 @@ package:
   version: {{ data.get('version') }}
 
 source:
-  path: ../../py/
+  path: ../../
 #  patches:
    # List any patch files here
    # - fix.patch
