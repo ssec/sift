@@ -17,7 +17,7 @@ build:
 
 requirements:
   build:
-    - python
+    - python >=3.4
     - setuptools
     - numpy
     - matplotlib
@@ -40,7 +40,7 @@ requirements:
     - cython >=0.17 # [win]
 
   run:
-    - python
+    - python >=3.4
     - numpy
     - matplotlib
     - scipy
