@@ -135,9 +135,8 @@ def create_geotiff(data, output_filename, proj4_str, geotransform, etype=gdal.GD
             gtiff_band.SetNoDataValue(nodata)
 
     if meta is not None:
-        # import ipdb; ipdb.set_trace()
         for k, v in meta.items():
-            if isinstance(v, (list, tuple, set)):
+            if isinstance(v, (list, tuple, set, np.ndarray)):
                 v = ",".join((str(x) for x in v))
             else:
                 v = str(v)

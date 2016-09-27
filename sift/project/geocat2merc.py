@@ -118,6 +118,12 @@ def ahi_dataset_metadata(input_filename, dataset):
     # __dict__ gets us all the attributes but is likely OrderedDict
     # make it a normal dict
     metadata = dict(input_var.__dict__)
+    metadata.setdefault("name", dataset)
+    metadata.setdefault("platform", nc.Spacecraft_Name.title())
+    metadata.setdefault("sensor", nc.Sensor_Name)
+    # sensor is wrong in the file
+    if metadata["sensor"] == "himawari8":
+        metadata["sensor"] = "AHI"
 
     # if we have valid_min and valid_max then get the scaled values
     valid_min, valid_max = metadata.pop("valid_range", (metadata.pop("valid_min", None), metadata.pop("valid_max", None)))
