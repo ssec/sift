@@ -20,8 +20,6 @@ REQUIRES
 from _weakref import ref
 from collections import MutableMapping
 from enum import Enum
-from sift.model.guidebook import AHI_HSF_Guidebook, GUIDE
-
 from sift.common import INFO, KIND
 
 __author__ = 'rayg'
@@ -177,19 +175,19 @@ class DocLayer(MutableMapping):
 
     @property
     def band(self):
-        return self._store.get(GUIDE.BAND, None)
+        return self._store.get(INFO.BAND, None)
 
     @property
     def instrument(self):
-        return self._store.get(GUIDE.INSTRUMENT, None)
+        return self._store.get(INFO.INSTRUMENT, None)
 
     @property
     def platform(self):
-        return self._store.get(GUIDE.PLATFORM, None)
+        return self._store.get(INFO.PLATFORM, None)
 
     @property
     def sched_time(self):
-        return self._store.get(GUIDE.SCHED_TIME, None)
+        return self._store.get(INFO.SCHED_TIME, None)
 
     @property
     def name(self):
@@ -339,13 +337,13 @@ class DocRGBLayer(DocCompositeLayer):
         """
         # FUTURE: resolve dictionary-style into attribute-style uses
         dep_info = [self.r, self.g, self.b]
-        bands = [nfo[GUIDE.BAND] if nfo is not None else None for nfo in dep_info]
+        bands = [nfo.get(INFO.BAND) if nfo is not None else None for nfo in dep_info]
         if self.r is None and self.g is None and self.b is None:
             ds_info = {
                 INFO.NAME: "RGB",
                 INFO.KIND: KIND.RGB,
-                GUIDE.BAND: bands,
-                GUIDE.DISPLAY_TIME: '<unknown time>',
+                INFO.BAND: bands,
+                INFO.DISPLAY_TIME: '<unknown time>',
                 INFO.ORIGIN_X: None,
                 INFO.ORIGIN_Y: None,
                 INFO.CELL_WIDTH: None,
@@ -355,7 +353,7 @@ class DocRGBLayer(DocCompositeLayer):
             }
         else:
             highest_res_dep = min([x for x in dep_info if x is not None], key=lambda x: x[INFO.CELL_WIDTH])
-            valid_times = [nfo.get(GUIDE.DISPLAY_TIME, '<unknown time>') for nfo in dep_info if nfo is not None]
+            valid_times = [nfo.get(INFO.DISPLAY_TIME, '<unknown time>') for nfo in dep_info if nfo is not None]
             if len(valid_times) == 0:
                 display_time = '<unknown time>'
             else:
@@ -378,8 +376,8 @@ class DocRGBLayer(DocCompositeLayer):
             ds_info = {
                 INFO.NAME: name,
                 INFO.KIND: KIND.RGB,
-                GUIDE.BAND: bands,
-                GUIDE.DISPLAY_TIME: display_time,
+                INFO.BAND: bands,
+                INFO.DISPLAY_TIME: display_time,
                 INFO.ORIGIN_X: highest_res_dep[INFO.ORIGIN_X],
                 INFO.ORIGIN_Y: highest_res_dep[INFO.ORIGIN_Y],
                 INFO.CELL_WIDTH: highest_res_dep[INFO.CELL_WIDTH],

@@ -101,6 +101,34 @@ class COMPOSITE_TYPE(Enum):
     ARITHMETIC = 2
 
 
+class INSTRUMENT(Enum):
+    UNKNOWN = '???'
+    AHI = 'AHI'
+    ABI = 'ABI'
+    AMI = 'AMI'
+
+    @classmethod
+    def from_value(cls, value_str):
+        """Convert external string to Enum"""
+        for m in cls:
+            if m.value == value_str:
+                return m
+        return None
+
+
+class PLATFORM(Enum):
+    UNKNOWN = '???'
+    HIMAWARI_8 = 'Himawari-8'
+    HIMAWARI_9 = 'Himawari-9'
+    GOES_16 = 'GOES-16'
+
+    @classmethod
+    def from_value(cls, value_str):
+        """Convert external string to Enum"""
+        for m in cls:
+            if m.value == value_str:
+                return m
+        return INSTRUMENT.UNKNOWN
 
 class INFO(Enum):
     """
@@ -120,6 +148,17 @@ class INFO(Enum):
     SHAPE = 'shape' # (rows, columns) or (rows, columns, levels) data shape
     COLORMAP = 'colormap'  # name or UUID of a color map
     DISPLAY_TIME = 'display_time'  # typically from guidebook, used for labeling animation frame
+    # Previously in the GUIDE Enum:
+    PLATFORM = 'platform' # full standard name of spacecraft
+    SCHED_TIME = 'timeline'  # scheduled time for observation
+    OBS_TIME = 'obstime'  # actual time for observation
+    BAND = 'band'  # band number (multispectral instruments)
+    SCENE = 'scene'  # standard scene identifier string for instrument, e.g. FLDK
+    INSTRUMENT = 'instrument'  # INSTRUMENT enumeration, or string with full standard name
+    DISPLAY_NAME = 'display_name' # preferred name in the layer list
+    UNIT_CONVERSION = 'unit_conversion'  # (unit string, lambda x, inverse=False: convert-to-units)
+    CENTRAL_WAVELENGTH = 'nominal_wavelength'
+
 
 class MercatorTileCalc(object):
     """

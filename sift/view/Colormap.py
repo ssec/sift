@@ -246,5 +246,6 @@ CATEGORIZED_COLORMAPS = OrderedDict([
     ("Other", OTHER_COLORMAPS),
 ])
 
+DEFAULT_UNKNOWN = "grays"
 DEFAULT_VIS = "Square Root (Vis Default)"
 DEFAULT_IR = "Rainbow (IR Default)"

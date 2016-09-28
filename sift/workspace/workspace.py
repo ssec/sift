@@ -28,10 +28,11 @@ import logging, unittest, argparse
 import gdal, osr
 import numpy as np
 import shutil
+from datetime import datetime
 from collections import namedtuple
 from pickle import dump, load, HIGHEST_PROTOCOL
 from uuid import UUID, uuid1 as uuidgen
-from sift.common import KIND, INFO
+from sift.common import KIND, INFO, INSTRUMENT, PLATFORM
 from PyQt4.QtCore import QObject, pyqtSignal
 from sift.model.shapes import content_within_shape
 from shapely.geometry.polygon import LinearRing
@@ -93,14 +94,39 @@ class GeoTiffImporter(WorkspaceImporter):
         source = source_path or source_uri
         return True if (source.lower().endswith('.tif') or source.lower().endswith('.tiff')) else False
 
-    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
-        # yield successive levels of detail as we load
+    @staticmethod
+    def _metadata_for_path(pathname):
+        meta = {}
+        if not pathname:
+            return meta
+
+        # Old but still necesary, get some information from the filename instead of the content
+        m = re.match(r'HS_H(\d\d)_(\d{8})_(\d{4})_B(\d\d)_([A-Za-z0-9]+).*', os.path.split(pathname)[1])
+        if m is not None:
+            plat, yyyymmdd, hhmm, bb, scene = m.groups()
+            when = datetime.strptime(yyyymmdd + hhmm, '%Y%m%d%H%M')
+            plat = PLATFORM('Himawari-{}'.format(int(plat)))
+            band = int(bb)
+            dtime = when.strftime('%Y-%m-%d %H:%M')
+            label = 'Refl' if band in [1, 2, 3, 4, 5, 6] else 'BT'
+            name = "AHI B{0:02d} {1:s} {2:s}".format(band, label, dtime)
+
+            meta.update({
+                INFO.PLATFORM: plat,
+                INFO.BAND: band,
+                INFO.INSTRUMENT: INSTRUMENT.AHI,
+                INFO.SCHED_TIME: when,
+                INFO.DISPLAY_TIME: dtime,
+                INFO.SCENE: scene,
+                INFO.DISPLAY_NAME: name
+            })
+        return meta
+
+    def get_metadata(self, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
         if source_uri is not None:
             raise NotImplementedError("GeoTiffImporter cannot read from URIs yet")
-        d = {}
+        d = self._metadata_for_path(source_path)
         gtiff = gdal.Open(source_path)
-
-        # FIXME: consider yielding status at this point so our progress bar starts moving
 
         ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
         d[INFO.UUID] = dest_uuid
@@ -116,6 +142,33 @@ class GeoTiffImporter(WorkspaceImporter):
 
         d[INFO.NAME] = os.path.split(source_path)[-1]
         d[INFO.PATHNAME] = source_path
+        band = gtiff.GetRasterBand(1)
+        d[INFO.SHAPE] = (band.YSize, band.XSize)
+
+        gtiff_meta = gtiff.GetMetadata()
+        # Sanitize metadata from the file to use SIFT's Enums
+        if "name" in gtiff_meta:
+            d[INFO.NAME] = gtiff_meta.pop("name")
+        if "platform" in gtiff_meta:
+            plat = gtiff_meta.pop("platform")
+            d[INFO.PLATFORM] = PLATFORM.from_value(plat)
+            if d[INFO.PLATFORM] == PLATFORM.UNKNOWN:
+                LOG.warning("Unknown platform being loaded: {}".format(plat))
+        if "instrument" in gtiff_meta or "sensor" in gtiff_meta:
+            inst = gtiff_meta.pop("sensor", gtiff_meta.pop("instrument", None))
+            d[INFO.INSTRUMENT] = INSTRUMENT.from_value(inst)
+            if d[INFO.INSTRUMENT] == INSTRUMENT.UNKNOWN:
+                LOG.warning("Unknown instrument being loaded: {}".format(inst))
+
+        d.update(gtiff_meta)
+        return d
+
+    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
+        # yield successive levels of detail as we load
+        if source_uri is not None:
+            raise NotImplementedError("GeoTiffImporter cannot read from URIs yet")
+        # Additional metadata that we've learned by loading the data
+        gtiff = gdal.Open(source_path)
 
         # FIXME: read this into a numpy.memmap backed by disk in the workspace
         band = gtiff.GetRasterBand(1)  # FUTURE may be an assumption
@@ -123,11 +176,10 @@ class GeoTiffImporter(WorkspaceImporter):
         blockw, blockh = band.GetBlockSize()  # non-blocked files will report [band.XSize,1]
 
         bandtype = gdal.GetDataTypeName(band.DataType)
-        if bandtype.lower()!='float32':
+        if bandtype.lower() != 'float32':
             LOG.warning('attempting to read geotiff files with non-float32 content')
         # Full resolution shape
         # d["shape"] = self.get_dataset_data(item, time_step).shape
-        d[INFO.SHAPE] = shape
 
         # shovel that data into the memmap incrementally
         # http://geoinformaticstutorial.blogspot.com/2012/09/reading-raster-data-with-python-and-gdal.html
@@ -148,7 +200,7 @@ class GeoTiffImporter(WorkspaceImporter):
                                        current_stage=0,
                                        completion=float(irow)/float(rows),
                                        stage_desc="importing geotiff",
-                                       dataset_info=d,
+                                       dataset_info=None,
                                        data=img_data)
             yield status
 
@@ -162,7 +214,7 @@ class GeoTiffImporter(WorkspaceImporter):
                                current_stage=0,
                                completion=1.0,
                                stage_desc="done loading geotiff",
-                               dataset_info=d,
+                               dataset_info=None,
                                data=img_data)
         yield zult
         # further yields would logically add levels of detail with their own sampling values
@@ -300,17 +352,25 @@ class Workspace(QObject):
             return None
         uuid, info, data_info = nfo
         dfilename, dtype, shape = data_info
-        dpath = os.path.join(self.cwd, dfilename)
-        if not os.path.exists(dpath):
-            del self._inventory[key]
-            self._store_inventory()
-            return None
-        data = np.memmap(dpath, dtype=dtype, mode='c', shape=shape)
+        if dfilename is None:
+            LOG.debug("No data loaded from {}".format(path))
+            data = None
+        else:
+            dpath = os.path.join(self.cwd, dfilename)
+            if not os.path.exists(dpath):
+                del self._inventory[key]
+                self._store_inventory()
+                return None
+            data = np.memmap(dpath, dtype=dtype, mode='c', shape=shape)
         return uuid, info, data
 
     @property
     def paths_in_cache(self):
         return [x[0] for x in self._inventory.keys()]
+
+    @property
+    def uuids_in_cache(self):
+        return self._inventory.keys()
 
     def _update_cache(self, path, uuid, info, data):
         """
@@ -322,7 +382,16 @@ class Workspace(QObject):
         :return:
         """
         key = self._key_for_path(path)
-        data_info = (os.path.split(data.filename)[1], data.dtype, data.shape)
+        prev_nfo = self._inventory.get(key, (uuid, None, (None, None, None)))
+
+        if info is None:
+            info = prev_nfo[1]
+
+        if data is None:
+            data_info = prev_nfo[2]
+        else:
+            data_info = (os.path.split(data.filename)[1], data.dtype, data.shape)
+
         nfo = (uuid, info, data_info)
         self._inventory[key] = nfo
         self._store_inventory()
@@ -414,6 +483,12 @@ class Workspace(QObject):
         """
         return False
 
+    def get_metadata(self, uuid_or_path):
+        if isinstance(uuid_or_path, UUID):
+            return self._info[uuid_or_path]
+        else:
+            return self._inventory[self._key_for_path(uuid_or_path)][1]
+
     def import_image(self, source_path=None, source_uri=None, allow_cache=True):
         """
         Start loading URI data into the workspace asynchronously.
@@ -424,36 +499,55 @@ class Workspace(QObject):
         if source_uri is not None and source_path is None:
             raise NotImplementedError('URI load not yet supported')
 
-        nfo = None
         if allow_cache and source_path is not None:
             nfo = self._check_cache(source_path)
             if nfo is not None:
                 uuid, info, data = nfo
                 self._info[uuid] = info
                 self._data[uuid] = data
-                return nfo
+                return info
 
-        gen = None
         uuid = uuidgen()
+
+        # find the best importer
         for imp in self._importers:
             if imp.is_relevant(source_path=source_path):
-                gen = imp(self, self.cwd, uuid, source_path=source_path, cache_path=self._preferred_cache_path(uuid))
                 break
-        if gen is None:
+        else:
+            raise IOError("unable to import {}".format(source_path))
+
+        # Collect and cache metadata
+        # collect metadata before iterating because we need metadata as soon as possible
+        info = self._info[uuid] = imp.get_metadata(uuid, source_path=source_path)
+        # we haven't loaded the data yet (will do it asynchronously later)
+        self._data[uuid] = None
+        if allow_cache:
+            self._update_cache(source_path, uuid, info, None)
+        return info
+
+    def import_image_data(self, uuid, allow_cache=True):
+        metadata = self.get_metadata(uuid)
+        name = metadata[INFO.NAME]
+        source_path = metadata[INFO.PATHNAME]
+
+        for imp in self._importers:
+            if imp.is_relevant(source_path=source_path):
+                break
+        else:
             raise IOError("unable to import {}".format(source_path))
 
         # FIXME: for now, just iterate the incremental load. later we want to add this to TheQueue and update the UI as we get more data loaded
+        gen = imp(self, self.cwd, uuid, source_path=source_path, cache_path=self._preferred_cache_path(uuid))
         for update in gen:
             if update.data is not None:
-                info = self._info[uuid] = update.dataset_info
                 data = self._data[uuid] = update.data
-                LOG.info("{} {}: {:.01f}%".format(update.dataset_info[INFO.NAME], update.stage_desc, update.completion*100.0))
+                LOG.info("{} {}: {:.01f}%".format(name, update.stage_desc, update.completion*100.0))
         # copy the data into an anonymous memmap
         self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
         if allow_cache:
-            self._update_cache(source_path, uuid, info, data)
+            self._update_cache(source_path, uuid, None, data)
         # TODO: schedule cache cleaning in background after a series of imports completes
-        return uuid, info, data
+        return data
 
     def create_composite(self, symbols:dict, relation:dict):
         """
@@ -461,7 +555,7 @@ class Workspace(QObject):
         :param symbols: dictionary of logical-name to uuid
         :param relation: dictionary with information on how the relation is calculated (FUTURE)
         """
-
+        raise NotImplementedError()
 
     def _preferred_cache_path(self, uuid):
         filename = str(uuid)

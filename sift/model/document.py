@@ -71,7 +71,7 @@ from abc import ABCMeta, abstractmethod, abstractproperty
 from weakref import ref
 
 from sift.common import KIND, INFO, COMPOSITE_TYPE
-from sift.model.guidebook import AHI_HSF_Guidebook, GUIDE
+from sift.model.guidebook import AHI_HSF_Guidebook
 
 from PyQt4.QtCore import QObject, pyqtSignal
 
@@ -319,10 +319,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param path: file to open and add
         :return: overview (uuid:UUID, datasetinfo:dict, overviewdata:numpy.ndarray)
         """
-        uuid, info, content = self._workspace.import_image(source_path=path)
+        info = self._workspace.import_image(source_path=path)
+        uuid = info[INFO.UUID]
         if uuid in self._layer_with_uuid:
             LOG.warning("layer with UUID {0:s} already in document?".format(uuid))
             return uuid, info, content
+
         # info.update(self._additional_guidebook_information(info))
         self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, info)
         # also get info for this layer from the guidebook
@@ -334,11 +336,16 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         dataset[INFO.CLIM] = self._guidebook.climits(dataset)
         dataset[INFO.NAME] = self._guidebook.display_name(dataset) or dataset[INFO.NAME]
         presentation, reordered_indices = self._insert_layer_with_info(dataset, cmap=cmap, insert_before=insert_before)
+
+        # FUTURE: Load this async, the slots for the below signal need to be OK with that
+        content = self._workspace.import_image_data(uuid)
+
         # signal updates from the document
         self.didAddBasicLayer.emit(reordered_indices, dataset.uuid, presentation)
+
         return uuid, dataset, content
 
-    def open_files(self, paths, insert_before = 0):
+    def open_files(self, paths, insert_before=0):
         """
         sort paths into preferred load order (see guidebook.py)
         open files in order, yielding uuid, info, overview_content
@@ -346,7 +353,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param insert_before: where to insert them in layer list
         :return:
         """
-        paths = list(self._guidebook.sort_pathnames_into_load_order(paths))
+        # Load all the metadata so we can sort the files
+        infos = [self._workspace.import_image(path) for path in paths]
+
+        # Use the metadata to sort the paths
+        paths = list(self.sort_datasets_into_load_order(infos))
         for path in paths:
             yield self.open_file(path, insert_before)
 
@@ -355,7 +366,35 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param paths: list of paths
         :return: list of paths
         """
-        paths = list(reversed(self._guidebook.sort_pathnames_into_load_order(paths)))  # go from load order to display order by reversing
+        infos = [self._workspace.get_metadata(path) for path in paths]
+        paths = list(reversed(self.sort_datasets_into_load_order(infos)))  # go from load order to display order by reversing
+        return paths
+
+    def sort_datasets_into_load_order(self, infos):
+        """
+        given a list of paths, sort them into order, assuming layers are added at top of layer list
+        first: unknown paths
+        outer order: descending band number
+        inner order: descending time step
+        :param infos: iterable of info dictionaries
+        :return: ordered list of path strings
+        """
+        # FIXME: It is not possible for a pathname to be considered "irrelevant"
+        # riffraff = [path for path in paths if not nfo[path]]
+        riffraff = []
+        # ahi = [nfo[path] for path in paths if nfo[path]]
+        # names = [path for path in paths if nfo[path]]
+        # bands = [x.get(INFO.BAND, None) for x in ahi]
+        # times = [x.get(INFO.SCHED_TIME, None) for x in ahi]
+        # order = [(band, time, path) for band,time,path in zip(bands,times,names)]
+
+        def _sort_key(info):
+            return (info.get(INFO.BAND),
+                    info.get(INFO.SCHED_TIME),
+                    info.get(INFO.PATHNAME))
+        order = sorted(infos, key=_sort_key, reverse=True)
+        paths = riffraff + [info.get(INFO.PATHNAME) for info in order]
+        LOG.debug(paths)
         return paths
 
     def time_label_for_uuid(self, uuid):
@@ -380,11 +419,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def valid_range_for_uuid(self, uuid):
         # Limit ourselves to what information
         layer = self._layer_with_uuid[uuid]
-        return self._guidebook.climits({
-            INFO.UUID: uuid,
-            INFO.KIND: layer[INFO.KIND],
-            INFO.PATHNAME: layer[INFO.PATHNAME],
-        })
+        return self._guidebook.climits(layer)
 
     def convert_units(self, uuid, data, inverse=False):
         """
@@ -675,10 +710,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             dex = sibs.index(uuid)
         else:
             if bandwise:  # next or last band
-                consult_guide = self._guidebook.channel_siblings
+                consult_guide = self.channel_siblings
             else:
-                consult_guide = self._guidebook.time_siblings
-            sibs, dex = consult_guide(uuid, self._layer_with_uuid.values())
+                consult_guide = self.time_siblings
+            sibs, dex = consult_guide(uuid)
         # LOG.debug('layer {0} family is +{1} of {2!r:s}'.format(uuid, dex, sibs))
         if not sibs:
             LOG.info('nothing to do in next_last_timestep')
@@ -709,7 +744,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def change_colormap_for_layers(self, name, uuids=None):
         L = self.current_layer_set
         if uuids is not None:
-            uuids = self._guidebook.time_siblings_uuids(uuids, self._layer_with_uuid.values())
+            uuids = self.time_siblings_uuids(uuids)
         else:  # all data layers
             uuids = [pinfo.uuid for pinfo in L]
 
@@ -758,7 +793,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def flip_climits_for_layers(self, uuids=None):
         L = self.current_layer_set
         if uuids is not None:
-            uuids = self._guidebook.time_siblings_uuids(uuids, self._layer_with_uuid.values())
+            uuids = self.time_siblings_uuids(uuids)
         else:  # all data layers
             uuids = [pinfo.uuid for pinfo in L]
 
@@ -782,8 +817,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             INFO.UUID: uuid,
             INFO.NAME: '-RGB-',
             INFO.KIND: KIND.RGB,
-            GUIDE.BAND: [],
-            GUIDE.DISPLAY_TIME: None,
+            INFO.BAND: [],
+            INFO.DISPLAY_TIME: None,
             INFO.ORIGIN_X: None,
             INFO.ORIGIN_Y: None,
             INFO.CELL_WIDTH: None,
@@ -1062,10 +1097,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         layer = self._layer_with_uuid[uuid]
         if isinstance(layer, DocRGBLayer):
             return self.loop_rgb_layers_following(layer.uuid)
-        new_anim_uuids, _ = self._guidebook.time_siblings(uuid, self._layer_with_uuid.values())
+        new_anim_uuids, _ = self.time_siblings(uuid)
         if new_anim_uuids is None or len(new_anim_uuids)<2:
             LOG.info('no time siblings to chosen band, will try channel siblings to chosen time')
-            new_anim_uuids, _ = self._guidebook.channel_siblings(uuid, self._layer_with_uuid.values())
+            new_anim_uuids, _ = self.channel_siblings(uuid)
         if new_anim_uuids is None or len(new_anim_uuids)<2:
             LOG.warning('No animation found')
             return []
@@ -1172,6 +1207,68 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 del self._layer_with_uuid[uuid]
                 # remove from workspace
                 self._workspace.remove(uuid)
+
+    def channel_siblings(self, uuid, sibling_infos=None):
+        """
+        filter document info to just dataset of the same channels
+        :param uuid: focus UUID we're trying to build around
+        :param sibling_infos: dictionary of UUID -> Dataset Info to sort through
+        :return: sorted list of sibling uuids in channel order
+        """
+        if sibling_infos is None:
+            sibling_infos = self._layer_with_uuid
+        it = sibling_infos.get(uuid, None)
+        if it is None:
+            return None
+        sibs = [(x[INFO.BAND], x[INFO.UUID]) for x in
+                self._filter(sibling_infos.values(), it, {INFO.SCENE, INFO.SCHED_TIME, INFO.INSTRUMENT, INFO.PLATFORM})]
+        # then sort it by bands
+        sibs.sort()
+        offset = [i for i, x in enumerate(sibs) if x[1] == uuid]
+        return [x[1] for x in sibs], offset[0]
+
+    def _filter(self, seq, reference, keys):
+        "filter a sequence of metadata dictionaries to matching keys with reference"
+        for md in seq:
+            fail = False
+            for key in keys:
+                val = reference.get(key, None)
+                v = md.get(key, None)
+                if val != v:
+                    fail=True
+            if not fail:
+                yield md
+
+    def time_siblings(self, uuid, sibling_infos=None):
+        """
+        return time-ordered list of datasets which have the same band, in time order
+        :param uuid: focus UUID we're trying to build around
+        :param sibling_infos: dictionary of UUID -> Dataset Info to sort through
+        :return: sorted list of sibling uuids in time order, index of where uuid is in the list
+        """
+        if sibling_infos is None:
+            sibling_infos = self._layer_with_uuid
+        it = sibling_infos.get(uuid, None)
+        if it is None:
+            return [], 0
+        sibs = [(x[INFO.SCHED_TIME], x[INFO.UUID]) for x in
+                self._filter(sibling_infos.values(), it, {INFO.SCENE, INFO.BAND, INFO.INSTRUMENT, INFO.PLATFORM})]
+        # then sort it into time order
+        sibs.sort()
+        offset = [i for i,x in enumerate(sibs) if x[1]==uuid]
+        return [x[1] for x in sibs], offset[0]
+
+    def time_siblings_uuids(self, uuids, sibling_infos):
+        """
+        return generator uuids for datasets which have the same band as the uuids provided
+        :param uuids: iterable of uuids
+        :param infos: list of dataset infos available, some of which may not be relevant
+        :return: generate sorted list of sibling uuids in time order and in provided uuid order
+        """
+        for requested_uuid in uuids:
+            for sibling_uuid in self.time_siblings(requested_uuid, sibling_infos)[0]:
+                yield sibling_uuid
+
 
 
 #
