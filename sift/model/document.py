@@ -1160,13 +1160,17 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         "return true if this dataset is still in use in one of the layer sets"
         # FIXME: this needs to check not just which layers are being displayed, but which layers which may be in use but as part of a composite instead of a direct scenegraph entry
         LOG.error('composite layers currently not checked for dependencies')
+        layer = self._layer_with_uuid[uuid]
         if layer_set is not None:
             lss = [self._layer_sets[layer_set]]
         else:
             lss = [q for q in self._layer_sets if q is not None]
         for ls in lss:
             for p in ls:
-                if p.uuid==uuid:
+                if p.uuid == uuid:
+                    return True
+                parent_layer = self._layer_with_uuid[p.uuid]
+                if parent_layer.kind == KIND.RGB and layer in parent_layer.l:
                     return True
         return False
 
