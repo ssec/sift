@@ -666,7 +666,8 @@ class RGBLayerConfigPane(QWidget):
 
     def _set_minmax_sliders(self, layer=None, rgb_clims=None):
         if isinstance(layer, DocRGBLayer):
-            rgb_clims = layer[INFO.CLIM] if rgb_clims is None else rgb_clims  # FIXME: migrate to using prez instead of layer
+            prez, = self.document_ref().prez_for_uuids([layer.uuid])
+            rgb_clims = prez.climits if rgb_clims is None else rgb_clims  # FIXME: migrate to using prez instead of layer
             for idx, (color, sub_layer) in enumerate(zip("rgb", [layer.r, layer.g, layer.b])):
                 clim = rgb_clims[idx] if rgb_clims else None
                 self._set_minmax_slider(color, sub_layer, clim)

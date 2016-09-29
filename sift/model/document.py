@@ -419,6 +419,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def valid_range_for_uuid(self, uuid):
         # Limit ourselves to what information
         layer = self._layer_with_uuid[uuid]
+        # FIXME: This should probably just get the limits from the layer object
         return self._guidebook.climits(layer)
 
     def convert_units(self, uuid, data, inverse=False):
@@ -447,7 +448,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if uuids is None:
             uuids = [(pinf.uuid, pinf) for pinf in self.current_layer_set]
         else:
-            uuids = [(uuid, self._layer_with_uuid[uuid]) for uuid in uuids]
+            uuids = [(pinf.uuid, pinf) for pinf in self.prez_for_uuids(uuids)]
         zult = {}
         for uuid, pinf in uuids:
             lyr = self._layer_with_uuid[pinf.uuid]
@@ -484,7 +485,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
                     return int(round(abs(v - cmin) / abs(cmax - cmin) * 255.))
                 values = []
-                for dep_lyr, clims in zip(lyr.l[:3], lyr[INFO.CLIM]):
+                for dep_lyr, clims in zip(lyr.l[:3], pinf.climits):
                     if dep_lyr is None:
                         values.append(None)
                     elif clims is None:
@@ -844,7 +845,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             self.change_rgb_component_layer(ds_info, **color_assignments)
 
         if color_assignments and clim:
-            self.change_rgbs_clims(clim, [ds_info])
+            self.change_rgbs_clims(clim, [uuid])
 
         # disable visibility of the existing layers FUTURE: remove them entirely? probably not; also consider consistent behavior
         if color_assignments:
@@ -868,7 +869,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # identify siblings before we make any changes!
         siblings = self._rgb_layer_siblings_uuids(layer) if propagate_to_siblings else None
         changed = False
+        prez, = self.prez_for_uuids([layer.uuid])
         clims = list(layer[INFO.CLIM])
+        prez_clims = list(prez.climits)
         for k,v in rgba.items():
             # assert(k in 'rgba')
             idx = 'rgba'.index(k)
@@ -877,60 +880,45 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             changed = True
             setattr(layer, k, v)
             clims[idx] = None  # causes update_metadata to pull in upstream clim values
+            prez_clims[idx] = None
         if not changed:
             return
         # force an update of clims for components that changed
+        # These clims are the current state of the default clims for each sub-layer
         layer[INFO.CLIM] = tuple(clims)
         updated = layer.update_metadata_from_dependencies()
         LOG.info('updated metadata for layer %s: %s' % (layer.uuid, repr(list(updated.keys()))))
-        prez, = self.prez_for_uuids([layer.uuid])
-        # this signals the scenegraph manager et al to see if the layer is now both visible and valid
-        self.didChangeComposition.emit((), layer.uuid, prez, rgba)
+        # These clims are the presentation versions
+        prez_clims = tuple(cl if cl is not None else layer[INFO.CLIM][idx] for idx, cl in enumerate(prez_clims))
+
         all_changed_layer_uuids = [layer.uuid]
         if propagate_to_siblings:
             all_changed_layer_uuids += list(self._propagate_matched_rgb_components(layer, siblings))
         # now propagate CLIMs and signal
-        self.change_rgbs_clims(layer[INFO.CLIM], all_changed_layer_uuids)
+        self.change_rgbs_clims(prez_clims, all_changed_layer_uuids)
 
-    def change_and_propagate_rgb_clims(self, layer:DocRGBLayer, new_clims:tuple, include_siblings=True):
-        # FIXME: migrate RGB clim into prez and not layer; only set INFO.CLIM if it hasn't already been set
-        # self.change_clims_for_layers_where(new_clims, uuids={layer.uuid})
-        # old_clim = layer[INFO.CLIM]
-        # if isinstance(old_clim, tuple) and old_clim==new_clims:
-        #     return
-        layer[INFO.CLIM] = new_clims
-        changed = {layer.uuid: new_clims}
-        if include_siblings:
-            for similar in self._rgb_layer_siblings_uuids(layer):
-                if similar in changed:
-                    continue
-                simlyr = self._layer_with_uuid[similar]
-                changed[similar] = new_clims
-                simlyr[INFO.CLIM] = new_clims
-        self.didChangeColorLimits.emit(changed)
+        # this signals the scenegraph manager et al to see if the layer is now both visible and valid
+        self.didChangeComposition.emit((), layer.uuid, prez, rgba)
 
     def set_rgb_range(self, layer:DocRGBLayer, rgba:str, min:float, max:float):
-        new_clims = tuple(x if c != rgba else (min, max) for c, x in zip("rgba", layer[INFO.CLIM]))
-        self.change_and_propagate_rgb_clims(layer, new_clims)
+        prez, = self.prez_for_uuids([layer.uuid])
+        new_clims = tuple(x if c != rgba else (min, max) for c, x in zip("rgba", prez.climits))
+        # update the ranges on this layer and all it's siblings
+        uuids = [layer.uuid] + list(self._rgb_layer_siblings_uuids(layer))
+        self.change_rgbs_clims(new_clims, uuids)
 
-    def change_rgbs_clims(self, clims, layers):
+    def change_rgbs_clims(self, clims, uuids):
         """
         change color limits for one or more RGB layers in one swipe
         :param clims: tuple of ((minred, maxred), (mingreen, maxgreen), (minblue,maxblue))
-        :param layers: sequence of layer objects or UUIDs
+        :param uuids: sequence of UUIDs
         :return:
         """
         changed = {}
-        # FIXME: deprecate this routine since display limits should be part of presentation tuple; data limits are part of layer
-        for layer in layers:
-            if isinstance(layer, UUID):
-                layer = self._layer_with_uuid[layer]
-            if not isinstance(layer, DocRGBLayer):
-                continue
-            if layer[INFO.CLIM] == clims:
-                continue
-            changed[layer.uuid] = clims
-            layer[INFO.CLIM] = clims
+        for dex, pinfo in enumerate(self.current_layer_set):
+            if pinfo.uuid in uuids:
+                self.current_layer_set[dex] = pinfo._replace(climits=clims)
+                changed[pinfo.uuid] = clims
         self.didChangeColorLimits.emit(changed)
 
     def _directory_of_layers(self, kind=KIND.IMAGE):
@@ -1057,7 +1045,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 sequence.append((when, new_layer.uuid))
 
         if force_color_limits:
-            self.change_rgbs_clims(master[INFO.CLIM], (uu for _, uu in sequence))
+            pinfo, = self.prez_for_uuids(master.uuid)
+            self.change_rgbs_clims(pinfo.climits, (uu for _, uu in sequence))
 
         if make_contributing_layers_invisible:
             buhbye = set(to_make_invisible)

@@ -655,7 +655,7 @@ class Workspace(QObject):
         y = xy_pos[1]
         col = (x - info[INFO.ORIGIN_X]) / info[INFO.CELL_WIDTH]
         row = (y - info[INFO.ORIGIN_Y]) / info[INFO.CELL_HEIGHT]
-        return np.round(row), np.round(col)
+        return int(np.round(row)), int(np.round(col))
 
     def get_content_point(self, dsi_or_uuid, xy_pos):
         row, col = self._position_to_index(dsi_or_uuid, xy_pos)
