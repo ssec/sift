@@ -488,7 +488,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 for dep_lyr, clims in zip(lyr.l[:3], pinf.climits):
                     if dep_lyr is None:
                         values.append(None)
-                    elif clims is None:
+                    elif clims is None or clims[0] is None:
                         values.append(None)
                     else:
                         value = self._workspace.get_content_point(dep_lyr[INFO.UUID], xy_pos)

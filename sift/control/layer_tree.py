@@ -387,7 +387,10 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         :param doc_values: {uuid: value, value-relative-to-base, is-base:bool}, values can be NaN
         :return:
         """
-        self._last_equalizer_values = doc_values
+        self._last_equalizer_values.update(doc_values)
+        # for k in self._last_equalizer_values.keys():
+        #     if self._last_equalizer_values[k] is None:
+        #         del self._last_equalizer_values[k]
         self.refresh()
 
     def change_layer_colormap_menu(self, pos:QPoint, lbox:QTreeView, selected_uuids:list, *args):
