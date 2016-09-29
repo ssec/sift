@@ -1158,8 +1158,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def is_using(self, uuid:UUID, layer_set:int=None):
         "return true if this dataset is still in use in one of the layer sets"
-        # FIXME: this needs to check not just which layers are being displayed, but which layers which may be in use but as part of a composite instead of a direct scenegraph entry
-        LOG.error('composite layers currently not checked for dependencies')
         layer = self._layer_with_uuid[uuid]
         if layer_set is not None:
             lss = [self._layer_sets[layer_set]]
@@ -1192,6 +1190,18 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         del clo[row:row+count]
         del self.current_layer_set[row:row+count]
         self.didRemoveLayers.emit(tuple(clo), uuids, row, count)
+        # Remove this layer from any RGBs it is a part of
+        # FIXME: This is really ugly just to remove the layer from an RGB
+        for uuid in uuids:
+            layer = self._layer_with_uuid[uuid]
+            for pinfo in self.current_layer_set:
+                parent_layer = self._layer_with_uuid[pinfo.uuid]
+                if isinstance(parent_layer, DocRGBLayer) and layer in parent_layer.l:
+                    # remove this layer from this RGB layer
+                    channel_name = "rgba"[parent_layer.l.index(layer)]
+                    self.change_rgb_component_layer(parent_layer, **{channel_name: None})
+
+        # Purge this layer if we can
         for uuid in uuids:
             if not self.is_using(uuid):
                 LOG.info('purging layer {}, no longer in use'.format(uuid))
