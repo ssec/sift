@@ -13,7 +13,7 @@ source:
 build:
   # If this is a new build for the same version, increment the build
   # number. If you do not include this key, it defaults to 0.
-  number: 2
+  number: 1
 
 requirements:
   build:
@@ -24,18 +24,20 @@ requirements:
     - scipy
     - numba
     - pyproj >=1.9.4
-    - vispy ==0.5.0dev
+    - vispy ==0.5.0dev2
     - pyopengl
     - netcdf4
     - h5py
     - pillow
     - pyshp ==1.2.1
-    - shapely ==1.5.11
+    - shapely >=1.5.11
     - rasterio
-    - gdal >=1.11.4 # [unix]
+    - gdal >=1.11.4 # [osx]
     - libgdal ==1.11.2 # [win]
     - gdal ==1.11.2 # [win]
-    - geos ==3.4.2 # [linux]
+    - geos >=3.5 # [linux]
+    - gdal >=2.1.0 # [linux]
+    - libgdal >=2.1.0 # [linux]
     - pyqt ==4.10.4
     - cython >=0.17 # [win]
 
@@ -46,23 +48,29 @@ requirements:
     - scipy
     - numba
     - pyproj >=1.9.4
-    - vispy ==0.5.0dev
+    - vispy ==0.5.0dev2
     - pyopengl
     - netcdf4
     - h5py
     - pillow
     - pyshp ==1.2.1
-    - shapely ==1.5.11
+    - shapely >=1.5.11
     - rasterio
     - gdal >=1.11.4 # [unix]
     - libgdal ==1.11.2 # [win]
     - gdal ==1.11.2 # [win]
-    - geos ==3.4.2 # [linux]
+    - geos >=3.5 # [linux]
+    - gdal >=2.1.0 # [linux]
+    - libgdal >=2.1.0 # [linux]
     - pyqt ==4.10.4
 
 test:
   commands:
     - "python -m sift -h"
+    - "python -c 'import gdal'"
+    - "python -c 'from PyQt4 import QtGui, QtCore'"
+    - "python -c 'from netCDF4 import Dataset'"
+    - "python -c 'import h5py'"
 
 about:
   #home: The package home page
