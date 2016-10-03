@@ -42,7 +42,7 @@ assert version_info is not None, "Invalid version in version.py: {}".format(vers
 version_info["major"] = int(version_info["major"])
 version_info["minor"] = int(version_info["minor"])
 version_info["micro"] = int(version_info["micro"])
-version_info["dev_version"] = int(version_info["dev_version"])
+version_info["dev_version"] = int(version_info["dev_version"] or 0)
 
 extras_require = {
     "docs": ['blockdiag', 'sphinx', 'sphinx_rtd_theme',
@@ -173,7 +173,7 @@ setup(
                       ],
     extras_require=extras_require,
     packages=find_packages(),
-    entry_points={},
+    #entry_points={},
     cmdclass={
         'bump': BumpCommand,
     }
