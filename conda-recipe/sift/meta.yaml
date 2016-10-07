@@ -66,11 +66,11 @@ requirements:
 
 test:
   commands:
-    - "python -m sift -h"
-    - "python -c 'import gdal'"
-    - "python -c 'from PyQt4 import QtGui, QtCore'"
-    - "python -c 'from netCDF4 import Dataset'"
-    - "python -c 'import h5py'"
+    - python -m sift -h
+    - python -c "import gdal"
+    - python -c "from PyQt4 import QtGui, QtCore"
+    - python -c "from netCDF4 import Dataset"
+    - python -c "import h5py"
 
 about:
   #home: The package home page
