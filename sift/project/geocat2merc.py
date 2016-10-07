@@ -133,6 +133,10 @@ def ahi_dataset_metadata(input_filename, dataset):
         metadata["valid_min"] = valid_min * scale_factor + add_offset
         metadata["valid_max"] = valid_max * scale_factor + add_offset
 
+    # mimic satpy metadata
+    metadata["start_time"] = getattr(nc, "Image_Date_Time")
+    metadata["end_time"] = getattr(nc, "Image_Date_Time")
+
     # get rid of keys that don't make sense once the data is in the geotiff
     for k in ["scale_factor", "add_offset", "_FillValue"]:
         metadata.pop(k, None)

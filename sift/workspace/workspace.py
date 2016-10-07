@@ -107,18 +107,14 @@ class GeoTiffImporter(WorkspaceImporter):
             when = datetime.strptime(yyyymmdd + hhmm, '%Y%m%d%H%M')
             plat = PLATFORM('Himawari-{}'.format(int(plat)))
             band = int(bb)
-            dtime = when.strftime('%Y-%m-%d %H:%M')
-            label = 'Refl' if band in [1, 2, 3, 4, 5, 6] else 'BT'
-            name = "AHI B{0:02d} {1:s} {2:s}".format(band, label, dtime)
 
             meta.update({
                 INFO.PLATFORM: plat,
                 INFO.BAND: band,
                 INFO.INSTRUMENT: INSTRUMENT.AHI,
                 INFO.SCHED_TIME: when,
-                INFO.DISPLAY_TIME: dtime,
+                INFO.OBS_TIME: when,
                 INFO.SCENE: scene,
-                INFO.DISPLAY_NAME: name
             })
         return meta
 
@@ -159,6 +155,13 @@ class GeoTiffImporter(WorkspaceImporter):
             d[INFO.INSTRUMENT] = INSTRUMENT.from_value(inst)
             if d[INFO.INSTRUMENT] == INSTRUMENT.UNKNOWN:
                 LOG.warning("Unknown instrument being loaded: {}".format(inst))
+        if "start_time" in gtiff_meta:
+            start_time = datetime.strptime(gtiff_meta["start_time"], "%Y-%m-%dT%H:%M:%SZ")
+            d[INFO.SCHED_TIME] = start_time
+            d[INFO.OBS_TIME] = start_time
+            if "end_time" in gtiff_meta:
+                end_time = datetime.strptime(gtiff_meta["end_time"], "%Y-%m-%dT%H:%M:%SZ")
+                d[INFO.OBS_DURATION] = end_time - start_time
 
         d.update(gtiff_meta)
         return d

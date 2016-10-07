@@ -137,6 +137,9 @@ class INFO(Enum):
 
     PATHNAME = 'pathname'  # full path to the data file
     NAME = 'name'  # logical name of the file (possibly human assigned)
+    SHORT_NAME = 'short_name'  # CF short_name
+    LONG_NAME = 'long_name'  # CF long_name
+    STANDARD_NAME = 'standard_name'  # CF compliant standard_name (when possible)
     KIND = 'kind'  # KIND enumeration on what kind of layer this makes
     UUID = 'uuid'  # UUID assigned on import, which follows the layer around the system
     ORIGIN_X = 'origin_x'
@@ -152,6 +155,7 @@ class INFO(Enum):
     PLATFORM = 'platform' # full standard name of spacecraft
     SCHED_TIME = 'timeline'  # scheduled time for observation
     OBS_TIME = 'obstime'  # actual time for observation
+    OBS_DURATION = 'obsduration'  # time from start of observation to end of observation
     BAND = 'band'  # band number (multispectral instruments)
     SCENE = 'scene'  # standard scene identifier string for instrument, e.g. FLDK
     INSTRUMENT = 'instrument'  # INSTRUMENT enumeration, or string with full standard name

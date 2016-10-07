@@ -19,6 +19,7 @@ REQUIRES
 """
 from _weakref import ref
 from collections import MutableMapping
+from itertools import chain
 from enum import Enum
 from sift.common import INFO, KIND
 
@@ -135,10 +136,12 @@ class DocLayer(MutableMapping):
     _doc = None  # weakref to document that owns us
 
     def __init__(self, doc, *args, **kwargs):
-        # assert (isinstance(doc, Document))
         self._doc = ref(doc)
-        self._store = dict()
-        self.update(dict(*args, **kwargs))  # use the free update to set keys
+        # store of metadata that comes from the input content and does not change
+        self._definitive = dict()
+        # implied metadata that was derived from definitive metadata
+        self._implied_cache = dict()
+        self._definitive.update(dict(*args, **kwargs))
 
     @property
     def parent(self):
@@ -162,7 +165,7 @@ class DocLayer(MutableMapping):
         UUID of the layer, which for basic layers is likely to be the UUID of the dataset in the workspace.
         :return:
         """
-        return self._store[INFO.UUID]
+        return self._definitive[INFO.UUID]
 
     @property
     def kind(self):
@@ -171,31 +174,31 @@ class DocLayer(MutableMapping):
          We may deprecate this eventually?
         :return:
         """
-        return self._store[INFO.KIND]
+        return self._definitive[INFO.KIND]
 
     @property
     def band(self):
-        return self._store.get(INFO.BAND, None)
+        return self._definitive.get(INFO.BAND, None)
 
     @property
     def instrument(self):
-        return self._store.get(INFO.INSTRUMENT, None)
+        return self._definitive.get(INFO.INSTRUMENT, None)
 
     @property
     def platform(self):
-        return self._store.get(INFO.PLATFORM, None)
+        return self._definitive.get(INFO.PLATFORM, None)
 
     @property
     def sched_time(self):
-        return self._store.get(INFO.SCHED_TIME, None)
+        return self._definitive.get(INFO.SCHED_TIME, None)
 
     @property
     def name(self):
-        return self._store[INFO.NAME]
+        return self._implied_cache[INFO.NAME]
 
     @name.setter
     def name(self, new_name):
-        self._store[INFO.NAME] = new_name
+        self._implied_cache[INFO.NAME] = new_name
 
 
     @property
@@ -221,22 +224,25 @@ class DocLayer(MutableMapping):
         return True
 
     def __getitem__(self, key):
-        return self._store[self.__keytransform__(key)]
+        if key not in self._definitive:
+            return self._implied_cache[key]
+        return self._definitive[key]
 
     def __setitem__(self, key, value):
-        self._store[self.__keytransform__(key)] = value
+        if key in self._definitive:
+            raise ValueError("Can't set value on definitive metadata: {}".format(key))
+        self._implied_cache[key] = value
 
     def __delitem__(self, key):
-        del self._store[self.__keytransform__(key)]
+        if key in self._definitive:
+            raise ValueError("Can't delete definitive metadata: {}".format(key))
+        del self._implied_cache[key]
 
     def __iter__(self):
-        return iter(self._store)
+        return chain(iter(self._definitive), iter(self._implied_cache))
 
     def __len__(self):
-        return len(self._store)
-
-    def __keytransform__(self, key):
-        return key
+        return len(self._definitive) + len(self._implied_cache)
 
 
 class DocBasicLayer(DocLayer):

@@ -67,7 +67,6 @@ import argparse
 from collections import namedtuple, MutableSequence
 from uuid import UUID
 import numpy as np
-from abc import ABCMeta, abstractmethod, abstractproperty
 from weakref import ref
 
 from sift.common import KIND, INFO, COMPOSITE_TYPE
@@ -275,20 +274,34 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """
         return self._guidebook.default_colormap(datasetinfo)
 
+    def _default_display_time(self, ds_info):
+        # FUTURE: This can be customized by the user
+        when = ds_info.get(INFO.SCHED_TIME, ds_info.get(INFO.OBS_TIME))
+        if when is None:
+            dtime = '--:--'
+        else:
+            dtime = when.strftime('%Y-%m-%d %H:%M')
+        return dtime
+
+    def _default_display_name(self, ds_info):
+        # FUTURE: This can be customized by the user
+        sat = ds_info[INFO.PLATFORM]
+        inst = ds_info[INFO.INSTRUMENT]
+        name = ds_info.get(INFO.SHORT_NAME, '-unknown-')
+
+        label = ds_info.get(INFO.STANDARD_NAME, '')
+        if label == 'toa_bidirection_reflectance':
+            label = 'Refl'
+        elif label == 'toa_brightness_temperature':
+            label = 'BT'
+
+        dtime = ds_info.get(INFO.DISPLAY_TIME, self._default_display_time(ds_info))
+        name = "{inst} {name} {standard_name} {dtime}".format(inst=inst.value, name=name, standard_name=label, dtime=dtime)
+        return name
+
     @property
     def current_layer_set(self):
         return self._layer_sets[self.current_set_index]
-
-    # def _additional_guidebook_information(self, info):
-    #     """
-    #     when adding a file, return any additional information we want from the guidebook
-    #     :param info: existing datasetinfo
-    #     :return: dictionary of information not immediately available from the file itself
-    #     """
-    #     md =
-    #     return {
-    #         INFO.DISPLAY_TIME: self._guidebook.display_time(info)
-    #     }
 
     def _insert_layer_with_info(self, info: DocLayer, cmap=None, insert_before=0):
         """
@@ -323,6 +336,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         uuid = info[INFO.UUID]
         if uuid in self._layer_with_uuid:
             LOG.warning("layer with UUID {0:s} already in document?".format(uuid))
+            content = self._workspace.get_content(uuid)
             return uuid, info, content
 
         # info.update(self._additional_guidebook_information(info))
@@ -334,7 +348,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # add as visible to the front of the current set, and invisible to the rest of the available sets
         cmap = self._default_colormap(dataset)
         dataset[INFO.CLIM] = self._guidebook.climits(dataset)
-        dataset[INFO.NAME] = self._guidebook.display_name(dataset) or dataset[INFO.NAME]
         presentation, reordered_indices = self._insert_layer_with_info(dataset, cmap=cmap, insert_before=insert_before)
 
         # FUTURE: Load this async, the slots for the below signal need to be OK with that
