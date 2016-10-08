@@ -13,7 +13,7 @@ source:
 build:
   # If this is a new build for the same version, increment the build
   # number. If you do not include this key, it defaults to 0.
-  number: 1
+  number: 2
 
 requirements:
   build:
@@ -29,15 +29,12 @@ requirements:
     - netcdf4
     - h5py
     - pillow
-    - pyshp ==1.2.1
+    - pyshp >=1.2.1
     - shapely >=1.5.11
     - rasterio
-    - gdal >=1.11.4 # [osx]
-    - libgdal ==1.11.2 # [win]
-    - gdal ==1.11.2 # [win]
-    - geos >=3.5 # [linux]
-    - gdal >=2.1.0 # [linux]
-    - libgdal >=2.1.0 # [linux]
+#    - gdal >=1.11.4 # [osx]
+#    - gdal ==1.11.2 # [win]
+    - gdal >=2.1.0
     - pyqt ==4.10.4
     - cython >=0.17 # [win]
 
@@ -53,15 +50,12 @@ requirements:
     - netcdf4
     - h5py
     - pillow
-    - pyshp ==1.2.1
+    - pyshp >=1.2.1
     - shapely >=1.5.11
     - rasterio
-    - gdal >=1.11.4 # [unix]
-    - libgdal ==1.11.2 # [win]
-    - gdal ==1.11.2 # [win]
-    - geos >=3.5 # [linux]
-    - gdal >=2.1.0 # [linux]
-    - libgdal >=2.1.0 # [linux]
+#    - gdal >=1.11.4 # [unix]
+#    - gdal ==1.11.2 # [win]
+    - gdal >=2.1.0
     - pyqt ==4.10.4
 
 test:
