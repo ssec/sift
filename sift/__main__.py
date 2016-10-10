@@ -22,10 +22,7 @@ __docformat__ = 'reStructuredText'
 
 from uuid import UUID
 from vispy import app
-try:
-    app_object = app.use_app('pyqt4')
-except Exception:
-    app_object = app.use_app('pyside')
+app_object = app.use_app('pyqt4')
 QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
 
