@@ -400,9 +400,9 @@ class ProbeGraphDisplay (object) :
 
         # fill up our lists of layers
         for uuid in uuid_list:
-            nfo = self.document.get_info(uuid=uuid)
-            layer_name = nfo.get(INFO.NAME, "??unknown layer??")
-            if nfo.get(INFO.KIND, None) == KIND.RGB:  # skip RGB layers
+            layer = self.document[uuid]
+            layer_name = layer.get(INFO.DISPLAY_NAME, "??unknown layer??")
+            if layer.get(INFO.KIND, None) == KIND.RGB:  # skip RGB layers
                 continue
             uuid_string = str(uuid)
             self.xDropDown.addItem(layer_name, uuid_string)
@@ -564,7 +564,7 @@ class ProbeGraphDisplay (object) :
             # get the data and info we need for this plot
             data_polygon = self.workspace.get_content_polygon(x_uuid, polygon)
             fmt, units, data_polygon = self.document.convert_units(x_uuid, data_polygon)
-            title = self.workspace.get_info(x_uuid)[INFO.NAME]
+            title = self.document[x_uuid][INFO.DISPLAY_NAME]
 
             # get point probe value
             if point_xy:
@@ -582,8 +582,8 @@ class ProbeGraphDisplay (object) :
             yield {TASK_DOING: 'Probe Plot: Collecting polygon data (layer 1)...', TASK_PROGRESS: 0.0}
 
             # get the data and info we need for this plot
-            name1 = self.workspace.get_info(x_uuid)[INFO.NAME]
-            name2 = self.workspace.get_info(y_uuid)[INFO.NAME]
+            name1 = self.document[x_uuid][INFO.DISPLAY_NAME]
+            name2 = self.document[y_uuid][INFO.DISPLAY_NAME]
             hires_uuid = self.workspace.lowest_resolution_uuid(x_uuid, y_uuid)
             hires_coord_mask, hires_data = self.workspace.get_coordinate_mask_polygon(hires_uuid, polygon)
             _, _, hires_data = self.document.convert_units(hires_uuid, hires_data)

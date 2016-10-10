@@ -716,7 +716,7 @@ class RGBLayerConfigPane(QWidget):
         for layer_prez in doc.layers_where(is_valid=True, in_type_set=non_rgb_classes):
             uuid = layer_prez.uuid
             layer = doc[layer_prez.uuid]
-            layer_name = layer.name
+            layer_name = layer[INFO.NAME]
             LOG.debug('adding layer %s to RGB combo selectors' % layer_name)
             uuid_string = str(uuid)
             for widget in self.rgb:

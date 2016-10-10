@@ -107,6 +107,13 @@ class GeoTiffImporter(WorkspaceImporter):
             when = datetime.strptime(yyyymmdd + hhmm, '%Y%m%d%H%M')
             plat = PLATFORM('Himawari-{}'.format(int(plat)))
             band = int(bb)
+            #
+            # # workaround to make old files work with new information
+            # from sift.model.guidebook import AHI_HSF_Guidebook
+            # if band in AHI_HSF_Guidebook.REFL_BANDS:
+            #     standard_name = "toa_bidirectional_reflectance"
+            # else:
+            #     standard_name = "toa_brightness_temperature"
 
             meta.update({
                 INFO.PLATFORM: plat,
@@ -136,7 +143,16 @@ class GeoTiffImporter(WorkspaceImporter):
         srs.ImportFromWkt(gtiff.GetProjection())
         d[INFO.PROJ] = srs.ExportToProj4()
 
-        d[INFO.NAME] = os.path.split(source_path)[-1]
+        # Workaround for previously supported files
+        # give them some kind of name that means something
+        print(d)
+        if INFO.BAND in d:
+            d[INFO.NAME] = "B{:02d}".format(d[INFO.BAND])
+        else:
+            # for new files, use this as a basic default
+            # FUTURE: Use Dataset name instead when we can read multi-dataset files
+            d[INFO.NAME] = os.path.split(source_path)[-1]
+
         d[INFO.PATHNAME] = source_path
         band = gtiff.GetRasterBand(1)
         d[INFO.SHAPE] = (band.YSize, band.XSize)
@@ -592,10 +608,6 @@ class Workspace(QObject):
         :param dsi: datasetinfo dictionary or UUID of a dataset
         :return: True if successfully deleted, False if not found
         """
-        if isinstance(dsi, dict):
-            name = dsi[INFO.NAME]
-        else:
-            name = 'dataset'
         uuid = dsi if isinstance(dsi, UUID) else dsi[INFO.UUID]
         zult = False
 

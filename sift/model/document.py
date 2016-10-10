@@ -266,39 +266,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self._layer_with_uuid = {}
         # TODO: connect signals from workspace to slots including update_dataset_info
 
-    def _default_colormap(self, datasetinfo):
-        """
-        consult guidebook and user preferences for which enhancement should be used for a given datasetinfo
-        :param datasetinfo: dictionary of metadata about dataset
-        :return: enhancement info and siblings participating in the enhancement
-        """
-        return self._guidebook.default_colormap(datasetinfo)
-
-    def _default_display_time(self, ds_info):
-        # FUTURE: This can be customized by the user
-        when = ds_info.get(INFO.SCHED_TIME, ds_info.get(INFO.OBS_TIME))
-        if when is None:
-            dtime = '--:--'
-        else:
-            dtime = when.strftime('%Y-%m-%d %H:%M')
-        return dtime
-
-    def _default_display_name(self, ds_info):
-        # FUTURE: This can be customized by the user
-        sat = ds_info[INFO.PLATFORM]
-        inst = ds_info[INFO.INSTRUMENT]
-        name = ds_info.get(INFO.SHORT_NAME, '-unknown-')
-
-        label = ds_info.get(INFO.STANDARD_NAME, '')
-        if label == 'toa_bidirection_reflectance':
-            label = 'Refl'
-        elif label == 'toa_brightness_temperature':
-            label = 'BT'
-
-        dtime = ds_info.get(INFO.DISPLAY_TIME, self._default_display_time(ds_info))
-        name = "{inst} {name} {standard_name} {dtime}".format(inst=inst.value, name=name, standard_name=label, dtime=dtime)
-        return name
-
     @property
     def current_layer_set(self):
         return self._layer_sets[self.current_set_index]
@@ -308,6 +275,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         insert a layer into the presentations but do not signal
         :return: new prez tuple, new reordered indices tuple
         """
+        if cmap is None:
+            cmap = info.get(INFO.COLORMAP)
+
         p = prez(uuid=info[INFO.UUID],
                  kind=info[INFO.KIND],
                  visible=True,
@@ -325,6 +295,19 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         reordered_indices = tuple([None] + list(range(old_layer_count)))  # FIXME: this should obey insert_before, currently assumes always insert at top
         return p, reordered_indices
 
+    def _generate_implied_metadata(self, layer):
+        # also get info for this layer from the guidebook
+        gbinfo = self._guidebook.collect_info(layer)
+        layer.update(gbinfo)  # FUTURE: should guidebook be integrated into DocBasicLayer?
+
+        # add as visible to the front of the current set, and invisible to the rest of the available sets
+        layer[INFO.COLORMAP] = self._guidebook.default_colormap(layer)
+        layer[INFO.CLIM] = self._guidebook.climits(layer)
+        layer[INFO.DISPLAY_TIME] = self._guidebook._default_display_time(layer)
+        layer[INFO.DISPLAY_NAME] = self._guidebook._default_display_name(layer)
+
+        return layer
+
     def open_file(self, path, insert_before=0):
         """
         open an arbitrary file and make it the new top layer.
@@ -341,14 +324,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         # info.update(self._additional_guidebook_information(info))
         self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, info)
-        # also get info for this layer from the guidebook
-        gbinfo = self._guidebook.collect_info(dataset)
-        dataset.update(gbinfo)  # FUTURE: should guidebook be integrated into DocBasicLayer?
-
-        # add as visible to the front of the current set, and invisible to the rest of the available sets
-        cmap = self._default_colormap(dataset)
-        dataset[INFO.CLIM] = self._guidebook.climits(dataset)
-        presentation, reordered_indices = self._insert_layer_with_info(dataset, cmap=cmap, insert_before=insert_before)
+        self._generate_implied_metadata(dataset)
+        presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
 
         # FUTURE: Load this async, the slots for the below signal need to be OK with that
         content = self._workspace.import_image_data(uuid)
@@ -416,7 +393,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if not uuid:
             return "YYYY-MM-DD HH:MM"
         info = self._layer_with_uuid[uuid]
-        return self._guidebook.display_time(info)
+        # return self._guidebook.display_time(info)
+        return info.get(INFO.DISPLAY_TIME, '--:--')
 
     def prez_for_uuids(self, uuids, lset=None):
         if lset is None:
@@ -752,6 +730,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         uuid = self.current_layer_set[row].uuid if not isinstance(row, UUID) else row
         info = self._layer_with_uuid[uuid]
         assert(uuid==info[INFO.UUID])
+        # XXX: Where does this get called, should this be DISPLAY_NAME
         info[INFO.NAME] = new_name
         self.didChangeLayerName.emit(uuid, new_name)
 
@@ -829,18 +808,21 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         uuid = uuidgen()
         ds_info = {
             INFO.UUID: uuid,
-            INFO.NAME: '-RGB-',
             INFO.KIND: KIND.RGB,
+        }
+        changeable_meta = {
+            INFO.NAME: '-RGB-',
             INFO.BAND: [],
             INFO.DISPLAY_TIME: None,
             INFO.ORIGIN_X: None,
             INFO.ORIGIN_Y: None,
             INFO.CELL_WIDTH: None,
             INFO.CELL_HEIGHT: None,
-            INFO.CLIM: (None, None, None)
+            INFO.CLIM: (None, None, None),
         }
 
         self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
+        ds_info.update(changeable_meta)
         presentation, reordered_indices = self._insert_layer_with_info(ds_info)
 
         LOG.info('generating incomplete (invalid) composite for user to configure')

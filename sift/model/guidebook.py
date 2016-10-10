@@ -199,11 +199,36 @@ class AHI_HSF_Guidebook(Guidebook):
         else:
             return DEFAULT_UNKNOWN
 
-    def display_time(self, dsi):
-        return dsi.get(INFO.DISPLAY_TIME, '--:--')
+    # def display_time(self, dsi):
+    #     return dsi.get(INFO.DISPLAY_TIME, '--:--')
+    #
+    # def display_name(self, dsi):
+    #     return dsi.get(INFO.DISPLAY_NAME, '-unknown-')
 
-    def display_name(self, dsi):
-        return dsi.get(INFO.DISPLAY_NAME, '-unknown-')
+    def _default_display_time(self, ds_info):
+        # FUTURE: This can be customized by the user
+        when = ds_info.get(INFO.SCHED_TIME, ds_info.get(INFO.OBS_TIME))
+        if when is None:
+            dtime = '--:--'
+        else:
+            dtime = when.strftime('%Y-%m-%d %H:%M')
+        return dtime
+
+    def _default_display_name(self, ds_info):
+        # FUTURE: This can be customized by the user
+        sat = ds_info[INFO.PLATFORM]
+        inst = ds_info[INFO.INSTRUMENT]
+        name = ds_info.get(INFO.SHORT_NAME, '-unknown-')
+
+        label = ds_info.get(INFO.STANDARD_NAME, '')
+        if label == 'toa_bidirectional_reflectance':
+            label = 'Refl'
+        elif label == 'toa_brightness_temperature':
+            label = 'BT'
+
+        dtime = ds_info.get(INFO.DISPLAY_TIME, self._default_display_time(ds_info))
+        name = "{inst} {name} {standard_name} {dtime}".format(inst=inst.value, name=name, standard_name=label, dtime=dtime)
+        return name
 
 
 

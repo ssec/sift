@@ -192,13 +192,14 @@ class DocLayer(MutableMapping):
     def sched_time(self):
         return self._definitive.get(INFO.SCHED_TIME, None)
 
-    @property
-    def name(self):
-        return self._implied_cache[INFO.NAME]
-
-    @name.setter
-    def name(self, new_name):
-        self._implied_cache[INFO.NAME] = new_name
+    # @property
+    # def name(self):
+    #     # FIXME: Should this maybe be DISPLAY_NAME
+    #     return self._implied_cache[INFO.NAME]
+    #
+    # @name.setter
+    # def name(self, new_name):
+    #     self._implied_cache[INFO.NAME] = new_name
 
 
     @property
@@ -256,11 +257,7 @@ class DocCompositeLayer(DocLayer):
     """
     A layer which combines other layers, be they basic or composite themselves
     """
-    def __getitem__(self, key):
-        # FIXME debug
-        if key==INFO.KIND:
-            assert(self._store[INFO.KIND]==KIND.RGB)
-        return self._store[self.__keytransform__(key)]
+    pass
 
 def _concurring(*q):
     if len(q)==0:
@@ -278,6 +275,8 @@ class DocRGBLayer(DocCompositeLayer):
         self.l = [None, None, None, None]  # RGBA upstream layers
         self.n = [None, None, None, None]  # RGBA minimum value from upstream layers
         self.x = [None, None, None, None]  # RGBA maximum value from upstream layers
+        if len(args) and isinstance(args, dict):
+            args[0].setdefault(INFO.KIND, KIND.RGB)
         super().__init__(*args, **kwargs)
 
     @property
@@ -347,7 +346,7 @@ class DocRGBLayer(DocCompositeLayer):
         if self.r is None and self.g is None and self.b is None:
             ds_info = {
                 INFO.NAME: "RGB",
-                INFO.KIND: KIND.RGB,
+                INFO.DISPLAY_NAME: "RGB",
                 INFO.BAND: bands,
                 INFO.DISPLAY_TIME: '<unknown time>',
                 INFO.ORIGIN_X: None,
@@ -381,7 +380,7 @@ class DocRGBLayer(DocCompositeLayer):
                 bands = []
             ds_info = {
                 INFO.NAME: name,
-                INFO.KIND: KIND.RGB,
+                INFO.DISPLAY_NAME: name,
                 INFO.BAND: bands,
                 INFO.DISPLAY_TIME: display_time,
                 INFO.ORIGIN_X: highest_res_dep[INFO.ORIGIN_X],
@@ -390,14 +389,15 @@ class DocRGBLayer(DocCompositeLayer):
                 INFO.CELL_HEIGHT: highest_res_dep[INFO.CELL_HEIGHT],
                 INFO.COLORMAP: 'autumn',  # FIXME: why do RGBs need a colormap?
             }
-        old_clim = self._store.get(INFO.CLIM, None)
+
+        old_clim = self.get(INFO.CLIM, None)
         if not old_clim:  # initialize from upstream default maxima
-            self._store[INFO.CLIM] = tuple(d[INFO.CLIM] if d is not None else None for d in dep_info)
+            self[INFO.CLIM] = tuple(d[INFO.CLIM] if d is not None else None for d in dep_info)
         else:  # merge upstream with existing settings, replacing None with upstream; watch out for upstream==None case
             upclim = lambda up: None if (up is None) else up.get(INFO.CLIM, None)
-            self._store[INFO.CLIM] = tuple((existing or upclim(upstream)) for (existing,upstream) in zip(old_clim, dep_info))
+            self[INFO.CLIM] = tuple((existing or upclim(upstream)) for (existing,upstream) in zip(old_clim, dep_info))
 
-        self._store.update(ds_info)
+        self.update(ds_info)
         return ds_info
 
 
