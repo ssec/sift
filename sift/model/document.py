@@ -379,7 +379,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # order = [(band, time, path) for band,time,path in zip(bands,times,names)]
 
         def _sort_key(info):
-            return (info.get(INFO.BAND),
+            return (info.get(INFO.DATASET_NAME),
                     info.get(INFO.SCHED_TIME),
                     info.get(INFO.PATHNAME))
         order = sorted(infos, key=_sort_key, reverse=True)
@@ -730,8 +730,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         uuid = self.current_layer_set[row].uuid if not isinstance(row, UUID) else row
         info = self._layer_with_uuid[uuid]
         assert(uuid==info[INFO.UUID])
-        # XXX: Where does this get called, should this be DISPLAY_NAME
-        info[INFO.NAME] = new_name
+        if not new_name:
+            # empty string, reset to default DISPLAY_NAME
+            new_name = self._guidebook._default_display_name(info)
+        info[INFO.DISPLAY_NAME] = new_name
         self.didChangeLayerName.emit(uuid, new_name)
 
     def change_colormap_for_layers(self, name, uuids=None):
@@ -811,7 +813,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             INFO.KIND: KIND.RGB,
         }
         changeable_meta = {
-            INFO.NAME: '-RGB-',
+            INFO.DATASET_NAME: '-RGB-',
             INFO.BAND: [],
             INFO.DISPLAY_TIME: None,
             INFO.ORIGIN_X: None,
@@ -1218,8 +1220,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         it = sibling_infos.get(uuid, None)
         if it is None:
             return None
-        sibs = [(x[INFO.BAND], x[INFO.UUID]) for x in
-                self._filter(sibling_infos.values(), it, {INFO.SCENE, INFO.SCHED_TIME, INFO.INSTRUMENT, INFO.PLATFORM})]
+        sibs = [(x[INFO.DATASET_NAME], x[INFO.UUID]) for x in
+                self._filter(sibling_infos.values(), it, {INFO.DATASET_NAME, INFO.STANDARD_NAME, INFO.SCENE, INFO.SCHED_TIME, INFO.INSTRUMENT, INFO.PLATFORM})]
         # then sort it by bands
         sibs.sort()
         offset = [i for i, x in enumerate(sibs) if x[1] == uuid]
@@ -1256,7 +1258,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         offset = [i for i,x in enumerate(sibs) if x[1]==uuid]
         return [x[1] for x in sibs], offset[0]
 
-    def time_siblings_uuids(self, uuids, sibling_infos):
+    def time_siblings_uuids(self, uuids, sibling_infos=None):
         """
         return generator uuids for datasets which have the same band as the uuids provided
         :param uuids: iterable of uuids
@@ -1264,7 +1266,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :return: generate sorted list of sibling uuids in time order and in provided uuid order
         """
         for requested_uuid in uuids:
-            for sibling_uuid in self.time_siblings(requested_uuid, sibling_infos)[0]:
+            for sibling_uuid in self.time_siblings(requested_uuid, sibling_infos=sibling_infos)[0]:
                 yield sibling_uuid
 
 

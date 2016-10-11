@@ -147,11 +147,11 @@ class GeoTiffImporter(WorkspaceImporter):
         # give them some kind of name that means something
         print(d)
         if INFO.BAND in d:
-            d[INFO.NAME] = "B{:02d}".format(d[INFO.BAND])
+            d[INFO.DATASET_NAME] = "B{:02d}".format(d[INFO.BAND])
         else:
             # for new files, use this as a basic default
             # FUTURE: Use Dataset name instead when we can read multi-dataset files
-            d[INFO.NAME] = os.path.split(source_path)[-1]
+            d[INFO.DATASET_NAME] = os.path.split(source_path)[-1]
 
         d[INFO.PATHNAME] = source_path
         band = gtiff.GetRasterBand(1)
@@ -160,7 +160,7 @@ class GeoTiffImporter(WorkspaceImporter):
         gtiff_meta = gtiff.GetMetadata()
         # Sanitize metadata from the file to use SIFT's Enums
         if "name" in gtiff_meta:
-            d[INFO.NAME] = gtiff_meta.pop("name")
+            d[INFO.DATASET_NAME] = gtiff_meta.pop("name")
         if "platform" in gtiff_meta:
             plat = gtiff_meta.pop("platform")
             d[INFO.PLATFORM] = PLATFORM.from_value(plat)
@@ -178,6 +178,10 @@ class GeoTiffImporter(WorkspaceImporter):
             if "end_time" in gtiff_meta:
                 end_time = datetime.strptime(gtiff_meta["end_time"], "%Y-%m-%dT%H:%M:%SZ")
                 d[INFO.OBS_DURATION] = end_time - start_time
+        if "valid_min" in gtiff_meta:
+            gtiff_meta["valid_min"] = float(gtiff_meta["valid_min"])
+        if "valid_max" in gtiff_meta:
+            gtiff_meta["valid_max"] = float(gtiff_meta["valid_max"])
 
         d.update(gtiff_meta)
         return d
@@ -546,7 +550,7 @@ class Workspace(QObject):
 
     def import_image_data(self, uuid, allow_cache=True):
         metadata = self.get_metadata(uuid)
-        name = metadata[INFO.NAME]
+        name = metadata[INFO.DATASET_NAME]
         source_path = metadata[INFO.PATHNAME]
 
         for imp in self._importers:

@@ -136,7 +136,7 @@ class INFO(Enum):
     """
 
     PATHNAME = 'pathname'  # full path to the data file
-    NAME = 'name'  # logical name of the file (possibly human assigned)
+    DATASET_NAME = 'dataset_name'  # logical name of the file (possibly human assigned)
     SHORT_NAME = 'short_name'  # CF short_name
     LONG_NAME = 'long_name'  # CF long_name
     STANDARD_NAME = 'standard_name'  # CF compliant standard_name (when possible)

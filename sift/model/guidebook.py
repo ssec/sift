@@ -149,7 +149,7 @@ class AHI_HSF_Guidebook(Guidebook):
         if INFO.BAND in info:
             band_short_name = "B{:02d}".format(info[INFO.BAND])
         else:
-            band_short_name = info.get(INFO.NAME, '???')
+            band_short_name = info.get(INFO.DATASET_NAME, '???')
         z[INFO.SHORT_NAME] = info.get(INFO.SHORT_NAME, band_short_name)
         z[INFO.LONG_NAME] = info.get(INFO.LONG_NAME, z[INFO.SHORT_NAME])
 
@@ -177,6 +177,8 @@ class AHI_HSF_Guidebook(Guidebook):
         elif self._is_bt(dsi):
             # BT data limits
             return -109.0 + 273.15, 55 + 273.15
+        elif "valid_min" in dsi and "valid_max" in dsi:
+            return dsi["valid_min"], dsi["valid_max"]
         else:
             return None, None
 
@@ -189,7 +191,7 @@ class AHI_HSF_Guidebook(Guidebook):
             # BT data limits, Kelvin to degC
             return ("{:.02f}", "°C", lambda x, inverse=False: x - 273.15 if not inverse else x + 273.15)
         else:
-            return ("", "", lambda x, inverse=False: 0.0)
+            return ("{:.03f}", dsi.get("units", ""), lambda x, inverse=False: x)
 
     def default_colormap(self, dsi):
         if self._is_refl(dsi):

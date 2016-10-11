@@ -658,11 +658,8 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         if role == Qt.EditRole:
             if isinstance(data, str):
                 LOG.debug("changing row {0:d} name to {1!r:s}".format(index.row(), data))
-                if not data:
-                    LOG.warning("skipping rename to nothing")
-                else:
-                    self.doc.change_layer_name(index.row(), data)
-                    self.dataChanged.emit(index, index)
+                self.doc.change_layer_name(index.row(), data)
+                self.dataChanged.emit(index, index)
                 return True
             else:
                 LOG.debug("data type is {0!r:s}".format(type(data)))

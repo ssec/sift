@@ -192,15 +192,17 @@ class DocLayer(MutableMapping):
     def sched_time(self):
         return self._definitive.get(INFO.SCHED_TIME, None)
 
-    # @property
-    # def name(self):
-    #     # FIXME: Should this maybe be DISPLAY_NAME
-    #     return self._implied_cache[INFO.NAME]
-    #
-    # @name.setter
-    # def name(self, new_name):
-    #     self._implied_cache[INFO.NAME] = new_name
+    @property
+    def dataset_name(self):
+        return self._definitive[INFO.DATASET_NAME]
 
+    @property
+    def display_name(self):
+        return self._implied_cache[INFO.DISPLAY_NAME]
+
+    @display_name.setter
+    def display_name(self, value):
+        self._implied_cache[INFO.DISPLAY_NAME] = value
 
     @property
     def is_valid(self):
@@ -345,7 +347,7 @@ class DocRGBLayer(DocCompositeLayer):
         bands = [nfo.get(INFO.BAND) if nfo is not None else None for nfo in dep_info]
         if self.r is None and self.g is None and self.b is None:
             ds_info = {
-                INFO.NAME: "RGB",
+                INFO.DATASET_NAME: "RGB",
                 INFO.DISPLAY_NAME: "RGB",
                 INFO.BAND: bands,
                 INFO.DISPLAY_TIME: '<unknown time>',
@@ -363,6 +365,7 @@ class DocRGBLayer(DocCompositeLayer):
                 display_time = '<unknown time>'
             else:
                 display_time = valid_times[0] if len(valid_times) and all(t == valid_times[0] for t in valid_times[1:]) else '<multiple times>'
+            # FIXME: Move this to guidebook
             try:
                 names = []
                 # FIXME: include date and time in default name
@@ -379,7 +382,7 @@ class DocRGBLayer(DocCompositeLayer):
                 name = "RGB"
                 bands = []
             ds_info = {
-                INFO.NAME: name,
+                INFO.DATASET_NAME: name,
                 INFO.DISPLAY_NAME: name,
                 INFO.BAND: bands,
                 INFO.DISPLAY_TIME: display_time,

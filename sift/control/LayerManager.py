@@ -258,11 +258,11 @@ class SingleLayerInfoPane (QWidget) :
                 # compare our various values
 
                 # name
-                new_name = layer_info[INFO.NAME] if INFO.NAME in layer_info else ""
-                if INFO.NAME not in shared_info :
-                    shared_info[INFO.NAME] = new_name
+                new_name = layer_info[INFO.DATASET_NAME] if INFO.DATASET_NAME in layer_info else ""
+                if INFO.DATASET_NAME not in shared_info :
+                    shared_info[INFO.DATASET_NAME] = new_name
                 else :
-                    shared_info[INFO.NAME] = "" if shared_info[INFO.NAME] != new_name else new_name
+                    shared_info[INFO.DATASET_NAME] = "" if shared_info[INFO.DATASET_NAME] != new_name else new_name
 
                 # time
                 new_time = layer_info[INFO.DISPLAY_TIME] if INFO.DISPLAY_TIME in layer_info else ""
@@ -331,7 +331,7 @@ class SingleLayerInfoPane (QWidget) :
             # <INFO.CLIM: 'clim'>: (-0.012, 1.192),
             # <INFO.CELL_HEIGHT: 'cell_height'>: -1000.0,
             # <GUIDE.UUID: 'uuid'>: UUID('5f547fae-7c26-11e5-bece-28cfe915d94b'),
-            # <INFO.NAME: 'name'>: 'AHI B01 Refl 2015-08-24 19:00',
+            # <INFO.DATASET_NAME: 'name'>: 'AHI B01 Refl 2015-08-24 19:00',
             # <INFO.UUID: 'uuid'>: UUID('5f547fae-7c26-11e5-bece-28cfe915d94b'),
             # <INFO.CELL_WIDTH: 'cell_width'>: 1000.0,
             # <INFO.KIND: 'kind'>: <KIND.IMAGE: 1>,
@@ -360,7 +360,7 @@ class SingleLayerInfoPane (QWidget) :
             #   mixing=<mixing.NORMAL: 1>)]
 
             # set the various text displays
-            temp_name = shared_info[INFO.NAME] if INFO.NAME in shared_info else ""
+            temp_name = shared_info[INFO.DATASET_NAME] if INFO.DATASET_NAME in shared_info else ""
             self.name_text.setText("Name: " + temp_name)
             temp_time = shared_info[INFO.DISPLAY_TIME] if INFO.DISPLAY_TIME in shared_info else ""
             self.time_text.setText("Time: " + (temp_time or ""))
@@ -716,7 +716,7 @@ class RGBLayerConfigPane(QWidget):
         for layer_prez in doc.layers_where(is_valid=True, in_type_set=non_rgb_classes):
             uuid = layer_prez.uuid
             layer = doc[layer_prez.uuid]
-            layer_name = layer[INFO.NAME]
+            layer_name = layer[INFO.DATASET_NAME]
             LOG.debug('adding layer %s to RGB combo selectors' % layer_name)
             uuid_string = str(uuid)
             for widget in self.rgb:
