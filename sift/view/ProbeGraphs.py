@@ -21,7 +21,7 @@ from sift.common import INFO, KIND
 from sift.queue import TASK_PROGRESS, TASK_DOING
 
 import logging
-import numpy
+import numpy as np
 
 # http://stackoverflow.com/questions/12459811/how-to-embed-matplotib-in-pyqt-for-dummies
 # see also: http://matplotlib.org/users/navigation_toolbar.html
@@ -630,7 +630,7 @@ class ProbeGraphDisplay (object) :
         """
         self.figure.clf()
         axes = self.figure.add_subplot(111)
-        bars = axes.hist(data, bins=self.DEFAULT_NUM_BINS)
+        bars = axes.hist(data[~np.isnan(data)], bins=self.DEFAULT_NUM_BINS)
         if x_point is not None:
             # go through each rectangle object and make the one that contains x_point 'red'
             # default color is blue so red should stand out
@@ -671,17 +671,17 @@ class ProbeGraphDisplay (object) :
 
         # figure out the range of the data
         # you might not be comparing the same units
-        xmin_value = numpy.min(dataX)
-        xmax_value = numpy.max(dataX)
-        ymin_value = numpy.min(dataY)
-        ymax_value = numpy.max(dataY)
+        xmin_value = np.min(dataX)
+        xmax_value = np.max(dataX)
+        ymin_value = np.min(dataY)
+        ymax_value = np.max(dataY)
         # bounds should be defined in the form [[xmin, xmax], [ymin, ymax]]
         bounds = [[xmin_value, xmax_value], [ymin_value, ymax_value]]
 
         # make the binned density map for this data set
-        density_map, _, _ = numpy.histogram2d(dataX, dataY, bins=self.DEFAULT_NUM_BINS, range=bounds)
+        density_map, _, _ = np.histogram2d(dataX, dataY, bins=self.DEFAULT_NUM_BINS, range=bounds)
         # mask out zero counts; flip because y goes the opposite direction in an imshow graph
-        density_map = numpy.flipud(numpy.transpose(numpy.ma.masked_array(density_map, mask=density_map == 0)))
+        density_map = np.flipud(np.transpose(np.ma.masked_array(density_map, mask=density_map == 0)))
 
         # display the density map data
         img = axes.imshow(density_map, extent=[xmin_value, xmax_value, ymin_value, ymax_value], aspect='auto',
