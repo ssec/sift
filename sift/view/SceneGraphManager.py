@@ -878,7 +878,6 @@ class SceneGraphManager(QObject):
         """
         # TODO this is the lazy implementation, eventually just change z order on affected layers
         self.layer_set.set_layer_order(list(self.document.current_layer_uuid_order))
-        print("New layer order: ", new_layer_index_order)
 
     def _rebuild_layer_order(self, *args, **kwargs):
         res = self.rebuild_layer_order(*args, **kwargs)
