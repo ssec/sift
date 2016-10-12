@@ -162,11 +162,11 @@ class LayerSet(object):
             self.set_layers(layers)
 
             if layer_order is None:
-                layer_order = [x.dataset_name for x in layers.keys()]
+                layer_order = [x.name for x in layers.keys()]
             self.set_layer_order(layer_order)
 
             if frame_order is None:
-                frame_order = [x.dataset_name for x in layers.keys()]
+                frame_order = [x.name for x in layers.keys()]
             self.frame_order = frame_order
 
     @property
@@ -196,7 +196,7 @@ class LayerSet(object):
 
     def add_layer(self, layer):
         LOG.debug('add layer {}'.format(layer))
-        uuid = UUID(layer.dataset_name)  # we backitty-forth this because
+        uuid = UUID(layer.name)  # we backitty-forth this because
         self._layers[uuid] = layer
         self._layer_order.insert(0, uuid)
         self.update_layers_z()

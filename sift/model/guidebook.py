@@ -66,6 +66,14 @@ class Guidebook(object):
         return None, None
 
 
+DEFAULT_COLORMAPS = {
+    'toa_bidirectional_reflectance': DEFAULT_VIS,
+    'toa_brightness_temperature': DEFAULT_IR,
+    'height_at_cloud_top': 'Cloud Top Height',
+    # 'thermodynamic_phase_of_cloud_water_particles_at_cloud_top': 'Cloud Phase',
+}
+
+
 # Instrument -> Band Number -> Nominal Wavelength
 NOMINAL_WAVELENGTHS = {
     PLATFORM.HIMAWARI_8: {
@@ -150,13 +158,16 @@ class AHI_HSF_Guidebook(Guidebook):
             band_short_name = "B{:02d}".format(info[INFO.BAND])
         else:
             band_short_name = info.get(INFO.DATASET_NAME, '???')
-        z[INFO.SHORT_NAME] = info.get(INFO.SHORT_NAME, band_short_name)
-        z[INFO.LONG_NAME] = info.get(INFO.LONG_NAME, z[INFO.SHORT_NAME])
+        if INFO.SHORT_NAME not in info:
+            z[INFO.SHORT_NAME] = band_short_name
+        if INFO.LONG_NAME not in info:
+            z[INFO.LONG_NAME] = info.get(INFO.SHORT_NAME, z[INFO.SHORT_NAME])
 
-        try:
-            z[INFO.STANDARD_NAME] = info.get(INFO.STANDARD_NAME, STANDARD_NAMES[info[INFO.PLATFORM]][info[INFO.INSTRUMENT]][info[INFO.BAND]])
-        except KeyError:
-            z[INFO.STANDARD_NAME] = info.get(INFO.STANDARD_NAME, z.get(INFO.SHORT_NAME))
+        if INFO.STANDARD_NAME not in info:
+            try:
+                z[INFO.STANDARD_NAME] = STANDARD_NAMES[info[INFO.PLATFORM]][info[INFO.INSTRUMENT]][info[INFO.BAND]]
+            except KeyError:
+                z[INFO.STANDARD_NAME] = z.get(INFO.SHORT_NAME)
 
         return z
 
@@ -179,27 +190,31 @@ class AHI_HSF_Guidebook(Guidebook):
             return -109.0 + 273.15, 55 + 273.15
         elif "valid_min" in dsi and "valid_max" in dsi:
             return dsi["valid_min"], dsi["valid_max"]
+        elif "flag_values" in dsi:
+            return min(dsi["flag_values"]), max(dsi["flag_values"])
         else:
-            return None, None
+            # some kind of default
+            return 0., 255.
 
     def units_conversion(self, dsi):
         "return UTF8 unit string, lambda v,inverse=False: convert-raw-data-to-unis"
+        units = dsi.get("units", "")
+        if units == "1":
+            units = ""
+
         if self._is_refl(dsi):
             # Reflectance/visible data limits
             return ('{:.03f}', '', lambda x, inverse=False: x)
         elif self._is_bt(dsi):
             # BT data limits, Kelvin to degC
             return ("{:.02f}", "°C", lambda x, inverse=False: x - 273.15 if not inverse else x + 273.15)
+        elif "flag_values" in dsi:
+            return ("{:0.0f}", units, lambda x, inverse=False: x)
         else:
-            return ("{:.03f}", dsi.get("units", ""), lambda x, inverse=False: x)
+            return ("{:.03f}", units, lambda x, inverse=False: x)
 
     def default_colormap(self, dsi):
-        if self._is_refl(dsi):
-            return DEFAULT_VIS
-        elif self._is_bt(dsi):
-            return DEFAULT_IR
-        else:
-            return DEFAULT_UNKNOWN
+        return DEFAULT_COLORMAPS.get(dsi.get(INFO.STANDARD_NAME), DEFAULT_UNKNOWN)
 
     # def display_time(self, dsi):
     #     return dsi.get(INFO.DISPLAY_TIME, '--:--')

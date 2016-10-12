@@ -31,6 +31,26 @@ DEFAULT_DATASETS = [
     "enterprise_cldphase_10_11_13_14_15_cloud_type",
     "ACHA_mode_8_cloud_top_height",
 ]
+LEVEL_1_DATASETS = [
+    'himawari_8_ahi_channel_1_reflectance',
+    'himawari_8_ahi_channel_2_reflectance',
+    'himawari_8_ahi_channel_3_reflectance',
+    'himawari_8_ahi_channel_4_reflectance',
+    'himawari_8_ahi_channel_5_reflectance',
+    'himawari_8_ahi_channel_6_reflectance',
+    'himawari_8_ahi_channel_7_brightness_temperature',
+    # 'himawari_8_ahi_channel_7_emissivity',
+    # 'himawari_8_ahi_channel_7_reflectance',
+    'himawari_8_ahi_channel_8_brightness_temperature',
+    'himawari_8_ahi_channel_9_brightness_temperature',
+    'himawari_8_ahi_channel_10_brightness_temperature',
+    'himawari_8_ahi_channel_11_brightness_temperature',
+    'himawari_8_ahi_channel_12_brightness_temperature',
+    'himawari_8_ahi_channel_13_brightness_temperature',
+    'himawari_8_ahi_channel_14_brightness_temperature',
+    'himawari_8_ahi_channel_15_brightness_temperature',
+    'himawari_8_ahi_channel_16_brightness_temperature',
+]
 
 
 def run_gdalwarp(input_file, output_file, *args):
@@ -112,13 +132,23 @@ def ahi_image_info(input_filename):
     return info
 
 
-def ahi_dataset_metadata(input_filename, dataset):
+VAR_NAME_STANDARD_NAME = {
+    'cloud_top_height': 'height_at_cloud_top',
+    'cloud_phase': 'thermodynamic_phase_of_cloud_water_particles_at_cloud_top',
+    'cloud_type': 'cloud_type',
+    'cloud_mask': 'cloud_mask',
+    'brightness_temperature': 'toa_brightness_temperature',
+    'reflectance': 'toa_bidirectional_reflectance',
+}
+
+
+def ahi_dataset_metadata(input_filename, dataset_name):
     nc = Dataset(input_filename, "r")
-    input_var = nc.variables[dataset]
+    input_var = nc.variables[dataset_name]
     # __dict__ gets us all the attributes but is likely OrderedDict
     # make it a normal dict
     metadata = dict(input_var.__dict__)
-    metadata.setdefault("name", dataset)
+    metadata.setdefault("name", dataset_name)
     metadata.setdefault("platform", nc.Spacecraft_Name.title())
     metadata.setdefault("sensor", nc.Sensor_Name)
     # sensor is wrong in the file
@@ -136,6 +166,11 @@ def ahi_dataset_metadata(input_filename, dataset):
     # mimic satpy metadata
     metadata["start_time"] = getattr(nc, "Image_Date_Time")
     metadata["end_time"] = getattr(nc, "Image_Date_Time")
+    if "standard_name" not in metadata:
+        for k, v in VAR_NAME_STANDARD_NAME.items():
+            if dataset_name.endswith(k):
+                metadata["standard_name"] = v
+                break
 
     # get rid of keys that don't make sense once the data is in the geotiff
     for k in ["scale_factor", "add_offset", "_FillValue"]:
@@ -180,7 +215,8 @@ def main():
                         help="Set the nodata value for the geotiffs that are created")
     parser.add_argument('--datasets', default=DEFAULT_DATASETS, nargs="+",
                         help="Specify variables to load from input file")
-
+    parser.add_argument('--level1-channels', dest="datasets", action='store_const', const=LEVEL_1_DATASETS,
+                        help="Use the default Level 1 dataset names instead of `--datasets`")
     parser.add_argument("input_dir",
                         help="Input directory to search for the 'input_pattern' specified")
     parser.add_argument("output_dir",
@@ -227,7 +263,7 @@ def main():
             try:
                 if not os.path.exists(geos_file):
                     src_data = ahi_image_data(nc_file, dataset=dataset)
-                    src_meta = ahi_dataset_metadata(nc_file, dataset=dataset)
+                    src_meta = ahi_dataset_metadata(nc_file, dataset_name=dataset)
                     # print("### Source Data: Min (%f) | Max (%f)" % (src_data.min(), src_data.max()))
                     create_ahi_geotiff(src_info, src_meta, src_data, geos_file,
                                        compress=args.compress,

@@ -182,6 +182,14 @@ class GeoTiffImporter(WorkspaceImporter):
             gtiff_meta["valid_min"] = float(gtiff_meta["valid_min"])
         if "valid_max" in gtiff_meta:
             gtiff_meta["valid_max"] = float(gtiff_meta["valid_max"])
+        if "standard_name" in gtiff_meta:
+            gtiff_meta[INFO.STANDARD_NAME] = gtiff_meta["standard_name"]
+        if "flag_values" in gtiff_meta:
+            gtiff_meta["flag_values"] = tuple(int(x) for x in gtiff_meta["flag_values"].split(','))
+        if "flag_masks" in gtiff_meta:
+            gtiff_meta["flag_masks"] = tuple(int(x) for x in gtiff_meta["flag_masks"].split(','))
+        if "flag_meanings" in gtiff_meta:
+            gtiff_meta["flag_meanings"] = gtiff_meta["flag_meanings"].split(' ')
 
         d.update(gtiff_meta)
         return d
