@@ -474,7 +474,8 @@ class Main(QtGui.QMainWindow):
                 data_str = "N/A"
             else:
                 format_str, unit_str, converted = self.document.convert_units(uuid, data_point)
-                data_str = (format_str + "{:s}").format(float(converted), unit_str)
+                converted = converted if isinstance(converted, str) else float(converted)
+                data_str = (format_str + "{:s}").format(converted, unit_str)
         else:
             data_str = "N/A"
         self.ui.cursorProbeText.setText("Probe Value: {} ".format(data_str))

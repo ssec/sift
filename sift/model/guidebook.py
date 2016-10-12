@@ -17,9 +17,7 @@ __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
 import logging
-import os
-import re
-from datetime import datetime
+import numpy as np
 
 from sift.common import INFO, KIND, INSTRUMENT, PLATFORM
 from sift.view.Colormap import DEFAULT_IR, DEFAULT_VIS, DEFAULT_UNKNOWN
@@ -209,7 +207,34 @@ class AHI_HSF_Guidebook(Guidebook):
             # BT data limits, Kelvin to degC
             return ("{:.02f}", "°C", lambda x, inverse=False: x - 273.15 if not inverse else x + 273.15)
         elif "flag_values" in dsi:
-            return ("{:0.0f}", units, lambda x, inverse=False: x)
+            if "flag_meanings" in dsi:
+                flag_masks = dsi["flag_masks"] if "flag_masks" in dsi else [-1] * len(dsi["flag_values"])
+                def _flag_meaning(x, inverse=False):
+                    single = False
+                    if isinstance(x, np.ndarray):
+                        if x.size == 2:
+                            # assume color limits
+                            return [str(val) for val in x]
+                    else:
+                        x = [x]
+                        single = True
+
+                    all_strings = []
+                    for data_val in x:
+                        meanings = []
+                        data_val = int(data_val)
+                        for fmean, fval, fmask in zip(dsi["flag_meanings"], dsi["flag_values"], flag_masks):
+                            if (data_val & fmask) == fval:
+                                meanings.append(fmean)
+                        s = "{:d} ({:s})".format(data_val, ", ".join(meanings))
+                        all_strings.append(s)
+                    if single:
+                        return all_strings[0]
+                    return all_strings
+
+                return ("{:s}", units, _flag_meaning)
+            else:
+                return ("{:0.0f}", units, lambda x, inverse=False: x)
         else:
             return ("{:.03f}", units, lambda x, inverse=False: x)
 

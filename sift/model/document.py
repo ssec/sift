@@ -447,15 +447,21 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 value = self._workspace.get_content_point(pinf.uuid, xy_pos)
                 fmt, unit_str, unit_conv = self._guidebook.units_conversion(self._layer_with_uuid[pinf.uuid])
                 # calculate normalized bar width relative to its current clim
-                nc, xc = unit_conv(np.array(pinf.climits))
-                if nc > xc:  # sometimes clim is swapped to reverse color scale
-                    nc, xc = xc, nc
-                value = unit_conv(value)
-                if np.isnan(value):
-                    zult[pinf.uuid] = None
-                else:
+                new_value = unit_conv(value)
+                if isinstance(new_value, str):
+                    # assume that the values weren't converted do different units (use pre-unit_conv)
+                    nc, xc = pinf.climits
                     bar_width = (np.clip(value, nc, xc) - nc) / (xc - nc)
-                    zult[pinf.uuid] = (value, bar_width, fmt, unit_str)
+                    zult[pinf.uuid] = (new_value, bar_width, fmt, unit_str)
+                else:
+                    nc, xc = unit_conv(np.array(pinf.climits))
+                    if nc > xc:  # sometimes clim is swapped to reverse color scale
+                        nc, xc = xc, nc
+                    if np.isnan(new_value):
+                        zult[pinf.uuid] = None
+                    else:
+                        bar_width = (np.clip(new_value, nc, xc) - nc) / (xc - nc)
+                        zult[pinf.uuid] = (new_value, bar_width, fmt, unit_str)
             elif lyr[INFO.KIND] == KIND.RGB:
                 # We can show a valid RGB
                 # Get 3 values for each channel
