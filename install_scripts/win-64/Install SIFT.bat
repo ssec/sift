@@ -19,8 +19,6 @@ echo NOTE: Please use defaults for BETA Version SIFT
 %cd%\Anaconda3-2.3.0-Windows-x86_64.exe /InstallationType=AllUsers /AddToPath=1
 
 :create_env
-echo Update conda installer
-conda update -y conda || goto :error
 echo Creating environment for SIFT
 conda create -y -n %env_name% python=3.4 anaconda || goto :error
 call activate sift || goto :error
@@ -28,6 +26,8 @@ call activate sift || goto :error
 :install_sift
 echo Adding Conda Forge channel to config...
 conda config --add channels conda-forge || goto :error
+echo Update conda installer
+conda update -n root -y conda || goto :error
 echo Installing SIFT...
 conda install -y -c "%channel%" "%pkg_name%" || goto :error
 conda install -y pywin32 || goto :error
