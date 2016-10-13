@@ -12,7 +12,7 @@ OutputDir=sift_inno_setup_output
 
 [Files]
 Source: "dist\SIFT\*"; DestDir: "{app}\bin"; Flags: replacesameversion recursesubdirs
-Source: "..\README.md"; DestName: "README.txt"; DestDir: "{app}"; Flags: isreadme; AfterInstall: ConvertLineEndings
+Source: "README.md"; DestName: "README.txt"; DestDir: "{app}"; Flags: isreadme; AfterInstall: ConvertLineEndings
 
 [Dirs]
 Name: "{userdocs}\sift_workspace"; Flags: setntfscompression; Tasks: workspace
