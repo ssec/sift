@@ -409,9 +409,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def valid_range_for_uuid(self, uuid):
         # Limit ourselves to what information
-        layer = self._layer_with_uuid[uuid]
-        # FIXME: This should probably just get the limits from the layer object
-        return self._guidebook.climits(layer)
+        # in the future valid range may be different than the default CLIMs
+        return self[uuid][INFO.CLIM]
 
     def convert_units(self, uuid, data, inverse=False):
         """
@@ -820,6 +819,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         }
         changeable_meta = {
             INFO.DATASET_NAME: '-RGB-',
+            INFO.DISPLAY_NAME: '-RGB-',
             INFO.BAND: [],
             INFO.DISPLAY_TIME: None,
             INFO.ORIGIN_X: None,

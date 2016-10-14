@@ -344,61 +344,40 @@ class DocRGBLayer(DocCompositeLayer):
         """
         # FUTURE: resolve dictionary-style into attribute-style uses
         dep_info = [self.r, self.g, self.b]
+        display_time = self._doc()._guidebook._default_display_time(self)
+        name = self._doc()._guidebook._default_display_name(self, display_time=display_time)
         bands = [nfo.get(INFO.BAND) if nfo is not None else None for nfo in dep_info]
+        ds_info = {
+            INFO.DATASET_NAME: name,
+            INFO.DISPLAY_NAME: name,
+            INFO.DISPLAY_TIME: display_time,
+            INFO.BAND: bands,
+            INFO.COLORMAP: 'autumn',  # FIXME: why do RGBs need a colormap?
+        }
+
         if self.r is None and self.g is None and self.b is None:
-            ds_info = {
-                INFO.DATASET_NAME: "RGB",
-                INFO.DISPLAY_NAME: "RGB",
-                INFO.BAND: bands,
-                INFO.DISPLAY_TIME: '<unknown time>',
+            ds_info.update({
                 INFO.ORIGIN_X: None,
                 INFO.ORIGIN_Y: None,
                 INFO.CELL_WIDTH: None,
                 INFO.CELL_HEIGHT: None,
-                INFO.COLORMAP: 'autumn',  # FIXME: why do RGBs need a colormap?
                 INFO.CLIM: (None, None, None),  # defer initialization until we have upstream layers
-            }
+            })
         else:
             highest_res_dep = min([x for x in dep_info if x is not None], key=lambda x: x[INFO.CELL_WIDTH])
-            valid_times = [nfo.get(INFO.DISPLAY_TIME, '<unknown time>') for nfo in dep_info if nfo is not None]
-            if len(valid_times) == 0:
-                display_time = '<unknown time>'
-            else:
-                display_time = valid_times[0] if len(valid_times) and all(t == valid_times[0] for t in valid_times[1:]) else '<multiple times>'
-            # FIXME: Move this to guidebook
-            try:
-                names = []
-                # FIXME: include date and time in default name
-                for color, band in zip("RGB", bands):
-                    if band is None:
-                        name = u"{}:---".format(color)
-                    else:
-                        name = u"{}:B{:02d}".format(color, band)
-                        bands = []
-                    names.append(name)
-                name = u" ".join(names) + u' ' + display_time
-            except KeyError:
-                LOG.error('unable to create new name from {0!r:s}'.format(dep_info))
-                name = "RGB"
-                bands = []
-            ds_info = {
-                INFO.DATASET_NAME: name,
-                INFO.DISPLAY_NAME: name,
-                INFO.BAND: bands,
-                INFO.DISPLAY_TIME: display_time,
+            ds_info.update({
                 INFO.ORIGIN_X: highest_res_dep[INFO.ORIGIN_X],
                 INFO.ORIGIN_Y: highest_res_dep[INFO.ORIGIN_Y],
                 INFO.CELL_WIDTH: highest_res_dep[INFO.CELL_WIDTH],
                 INFO.CELL_HEIGHT: highest_res_dep[INFO.CELL_HEIGHT],
-                INFO.COLORMAP: 'autumn',  # FIXME: why do RGBs need a colormap?
-            }
+            })
 
-        old_clim = self.get(INFO.CLIM, None)
-        if not old_clim:  # initialize from upstream default maxima
-            self[INFO.CLIM] = tuple(d[INFO.CLIM] if d is not None else None for d in dep_info)
-        else:  # merge upstream with existing settings, replacing None with upstream; watch out for upstream==None case
-            upclim = lambda up: None if (up is None) else up.get(INFO.CLIM, None)
-            self[INFO.CLIM] = tuple((existing or upclim(upstream)) for (existing,upstream) in zip(old_clim, dep_info))
+            old_clim = self.get(INFO.CLIM, None)
+            if not old_clim:  # initialize from upstream default maxima
+                ds_info[INFO.CLIM] = tuple(d[INFO.CLIM] if d is not None else None for d in dep_info)
+            else:  # merge upstream with existing settings, replacing None with upstream; watch out for upstream==None case
+                upclim = lambda up: None if (up is None) else up.get(INFO.CLIM, None)
+                ds_info[INFO.CLIM] = tuple((existing or upclim(upstream)) for (existing,upstream) in zip(old_clim, dep_info))
 
         self.update(ds_info)
         return ds_info

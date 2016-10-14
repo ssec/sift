@@ -207,6 +207,7 @@ class AHI_HSF_Guidebook(Guidebook):
             # BT data limits, Kelvin to degC
             return ("{:.02f}", "°C", lambda x, inverse=False: x - 273.15 if not inverse else x + 273.15)
         elif "flag_values" in dsi:
+            # XXX: Better place to put all this logic?
             if "flag_meanings" in dsi:
                 flag_masks = dsi["flag_masks"] if "flag_masks" in dsi else [-1] * len(dsi["flag_values"])
                 def _flag_meaning(x, inverse=False):
@@ -247,7 +248,20 @@ class AHI_HSF_Guidebook(Guidebook):
     # def display_name(self, dsi):
     #     return dsi.get(INFO.DISPLAY_NAME, '-unknown-')
 
+    def _default_display_time_rgb(self, ds_info):
+        dep_info = [ds_info.r, ds_info.g, ds_info.b]
+        valid_times = [nfo.get(INFO.DISPLAY_TIME, '<unknown time>') for nfo in dep_info if nfo is not None]
+        if len(valid_times) == 0:
+            display_time = '<unknown time>'
+        else:
+            display_time = valid_times[0] if len(valid_times) and all(t == valid_times[0] for t in valid_times[1:]) else '<multiple times>'
+
+        return display_time
+
     def _default_display_time(self, ds_info):
+        if ds_info.kind == KIND.RGB:
+            return self._default_display_time_rgb(ds_info)
+
         # FUTURE: This can be customized by the user
         when = ds_info.get(INFO.SCHED_TIME, ds_info.get(INFO.OBS_TIME))
         if when is None:
@@ -256,7 +270,30 @@ class AHI_HSF_Guidebook(Guidebook):
             dtime = when.strftime('%Y-%m-%d %H:%M')
         return dtime
 
-    def _default_display_name(self, ds_info):
+    def _default_display_name_rgb(self, ds_info, display_name=None):
+        dep_info = [ds_info.r, ds_info.g, ds_info.b]
+        if display_name is None:
+            display_time = self._default_display_time(ds_info)
+
+        try:
+            names = []
+            for color, dep_layer in zip("RGB", dep_info):
+                if dep_layer is None:
+                    name = u"{}:---".format(color)
+                else:
+                    name = u"{}:{}".format(color, dep_layer.dataset_name)
+                names.append(name)
+            name = u' '.join(names) + u' ' + display_time
+        except KeyError:
+            LOG.error('unable to create new name from {0!r:s}'.format(dep_info))
+            name = "-RGB-"
+
+        return name
+
+    def _default_display_name(self, ds_info, display_time=None):
+        if ds_info[INFO.KIND] == KIND.RGB:
+            return self._default_display_name_rgb(ds_info)
+
         # FUTURE: This can be customized by the user
         sat = ds_info[INFO.PLATFORM]
         inst = ds_info[INFO.INSTRUMENT]
@@ -268,8 +305,10 @@ class AHI_HSF_Guidebook(Guidebook):
         elif label == 'toa_brightness_temperature':
             label = 'BT'
 
-        dtime = ds_info.get(INFO.DISPLAY_TIME, self._default_display_time(ds_info))
-        name = "{inst} {name} {standard_name} {dtime}".format(inst=inst.value, name=name, standard_name=label, dtime=dtime)
+        if display_time is None:
+            display_time = ds_info.get(INFO.DISPLAY_TIME, self._default_display_time(ds_info))
+        name = "{inst} {name} {standard_name} {dtime}".format(
+            inst=inst.value, name=name, standard_name=label, dtime=display_time)
         return name
 
 
