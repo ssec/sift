@@ -352,7 +352,7 @@ class DocRGBLayer(DocCompositeLayer):
             INFO.DISPLAY_NAME: name,
             INFO.DISPLAY_TIME: display_time,
             INFO.BAND: bands,
-            INFO.COLORMAP: 'autumn',  # FIXME: why do RGBs need a colormap?
+            INFO.UNIT_CONVERSION: self._doc()._guidebook.units_conversion(self),
         }
 
         if self.r is None and self.g is None and self.b is None:
@@ -361,7 +361,7 @@ class DocRGBLayer(DocCompositeLayer):
                 INFO.ORIGIN_Y: None,
                 INFO.CELL_WIDTH: None,
                 INFO.CELL_HEIGHT: None,
-                INFO.CLIM: (None, None, None),  # defer initialization until we have upstream layers
+                INFO.CLIM: ((None, None), (None, None), (None, None)),  # defer initialization until we have upstream layers
             })
         else:
             highest_res_dep = min([x for x in dep_info if x is not None], key=lambda x: x[INFO.CELL_WIDTH])
@@ -374,9 +374,9 @@ class DocRGBLayer(DocCompositeLayer):
 
             old_clim = self.get(INFO.CLIM, None)
             if not old_clim:  # initialize from upstream default maxima
-                ds_info[INFO.CLIM] = tuple(d[INFO.CLIM] if d is not None else None for d in dep_info)
+                ds_info[INFO.CLIM] = tuple(tuple(d[INFO.CLIM]) if d is not None else (None, None) for d in dep_info)
             else:  # merge upstream with existing settings, replacing None with upstream; watch out for upstream==None case
-                upclim = lambda up: None if (up is None) else up.get(INFO.CLIM, None)
+                upclim = lambda up: (None, None) if (up is None) else tuple(up.get(INFO.CLIM, (None, None)))
                 ds_info[INFO.CLIM] = tuple((existing or upclim(upstream)) for (existing,upstream) in zip(old_clim, dep_info))
 
         self.update(ds_info)

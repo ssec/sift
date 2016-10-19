@@ -140,6 +140,7 @@ class INFO(Enum):
     SHORT_NAME = 'short_name'  # CF short_name
     LONG_NAME = 'long_name'  # CF long_name
     STANDARD_NAME = 'standard_name'  # CF compliant standard_name (when possible)
+    UNITS = 'units'  # CF compliant (udunits compliant) units string, original data units
     KIND = 'kind'  # KIND enumeration on what kind of layer this makes
     UUID = 'uuid'  # UUID assigned on import, which follows the layer around the system
     ORIGIN_X = 'origin_x'
@@ -159,8 +160,10 @@ class INFO(Enum):
     BAND = 'band'  # band number (multispectral instruments)
     SCENE = 'scene'  # standard scene identifier string for instrument, e.g. FLDK
     INSTRUMENT = 'instrument'  # INSTRUMENT enumeration, or string with full standard name
-    DISPLAY_NAME = 'display_name' # preferred name in the layer list
-    UNIT_CONVERSION = 'unit_conversion'  # (unit string, lambda x, inverse=False: convert-to-units)
+    DISPLAY_NAME = 'display_name'  # preferred name in the layer list
+    UNIT_CONVERSION = 'unit_conversion'  # (preferred CF units, convert_func, format_func)
+    # unit numeric conversion func: lambda x, inverse=False: convert-to-units
+    # unit string format func: lambda x, numeric=True, units=True: formatted string
     CENTRAL_WAVELENGTH = 'nominal_wavelength'
 
 

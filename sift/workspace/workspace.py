@@ -145,7 +145,6 @@ class GeoTiffImporter(WorkspaceImporter):
 
         # Workaround for previously supported files
         # give them some kind of name that means something
-        print(d)
         if INFO.BAND in d:
             d[INFO.DATASET_NAME] = "B{:02d}".format(d[INFO.BAND])
         else:
@@ -190,6 +189,8 @@ class GeoTiffImporter(WorkspaceImporter):
             gtiff_meta["flag_masks"] = tuple(int(x) for x in gtiff_meta["flag_masks"].split(','))
         if "flag_meanings" in gtiff_meta:
             gtiff_meta["flag_meanings"] = gtiff_meta["flag_meanings"].split(' ')
+        if "units" in gtiff_meta:
+            gtiff_meta[INFO.UNITS] = gtiff_meta.pop('units')
 
         d.update(gtiff_meta)
         return d

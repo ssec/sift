@@ -305,6 +305,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         layer[INFO.CLIM] = self._guidebook.climits(layer)
         layer[INFO.DISPLAY_TIME] = self._guidebook._default_display_time(layer)
         layer[INFO.DISPLAY_NAME] = self._guidebook._default_display_name(layer)
+        layer[INFO.UNIT_CONVERSION] = self._guidebook.units_conversion(layer)
 
         return layer
 
@@ -412,15 +413,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # in the future valid range may be different than the default CLIMs
         return self[uuid][INFO.CLIM]
 
-    def convert_units(self, uuid, data, inverse=False):
-        """
-        :param uuid: layer id
-        :param data: values to convert
-        :param inverse: when true, convert from display units to data units
-        :return:
-        """
-        formatstr, unitstr, lam = self._guidebook.units_conversion(self._layer_with_uuid[uuid])
-        return formatstr, unitstr, lam(data, inverse)
+    def convert_value(self, uuid, x, inverse=False):
+        return self[uuid][INFO.UNIT_CONVERSION][1](x, inverse=inverse)
+
+    def format_value(self, uuid, x, numeric=True, units=True):
+        return self[uuid][INFO.UNIT_CONVERSION][2](x, numeric=numeric, units=units)
 
     def flipped_for_uuids(self, uuids, lset=None):
         for p in self.prez_for_uuids(uuids, lset=lset):
@@ -444,28 +441,25 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             lyr = self._layer_with_uuid[pinf.uuid]
             if lyr[INFO.KIND] == KIND.IMAGE:
                 value = self._workspace.get_content_point(pinf.uuid, xy_pos)
-                fmt, unit_str, unit_conv = self._guidebook.units_conversion(self._layer_with_uuid[pinf.uuid])
+                unit_info = self._guidebook.units_conversion(self._layer_with_uuid[pinf.uuid])
+                nc, xc = unit_info[1](np.array(pinf.climits))
                 # calculate normalized bar width relative to its current clim
-                new_value = unit_conv(value)
-                if isinstance(new_value, str):
-                    # assume that the values weren't converted do different units (use pre-unit_conv)
-                    nc, xc = pinf.climits
-                    bar_width = (np.clip(value, nc, xc) - nc) / (xc - nc)
-                    zult[pinf.uuid] = (new_value, bar_width, fmt, unit_str)
+                new_value = unit_info[1](value)
+                if nc > xc:  # sometimes clim is swapped to reverse color scale
+                    nc, xc = xc, nc
+                if np.isnan(new_value):
+                    zult[pinf.uuid] = None
                 else:
-                    nc, xc = unit_conv(np.array(pinf.climits))
-                    if nc > xc:  # sometimes clim is swapped to reverse color scale
-                        nc, xc = xc, nc
-                    if np.isnan(new_value):
-                        zult[pinf.uuid] = None
-                    else:
-                        bar_width = (np.clip(new_value, nc, xc) - nc) / (xc - nc)
-                        zult[pinf.uuid] = (new_value, bar_width, fmt, unit_str)
+                    bar_width = (np.clip(new_value, nc, xc) - nc) / (xc - nc)
+                    zult[pinf.uuid] = (new_value, bar_width, unit_info[2](new_value, numeric=False))
             elif lyr[INFO.KIND] == KIND.RGB:
                 # We can show a valid RGB
                 # Get 3 values for each channel
                 # XXX: Better place for this?
                 def _sci_to_rgb(v, cmin, cmax):
+                    if np.isnan(v):
+                        return None
+
                     if cmin == cmax:
                         return 0
                     elif cmin > cmax:
@@ -490,15 +484,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                         value = self._workspace.get_content_point(dep_lyr[INFO.UUID], xy_pos)
                         values.append(_sci_to_rgb(value, clims[0], clims[1]))
 
-                # fmt = "{:3d}"
-                fmt = "{}"
-                unit_str = ""
                 nc = 0
                 xc = 255
                 bar_widths = [(np.clip(value, nc, xc) - nc) / (xc - nc) for value in values if value is not None]
                 bar_width = np.mean(bar_widths) if len(bar_widths) > 0 else 0
                 values = ",".join(["{:3d}".format(v if v is not None else 0) for v in values])
-                zult[pinf.uuid] = (values, bar_width, fmt, unit_str)
+                zult[pinf.uuid] = (values, bar_width, values)
 
         self.didCalculateLayerEqualizerValues.emit(zult)  # is picked up by layer list model to update display
 
@@ -817,6 +808,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             INFO.UUID: uuid,
             INFO.KIND: KIND.RGB,
         }
+
+        self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
+
         changeable_meta = {
             INFO.DATASET_NAME: '-RGB-',
             INFO.DISPLAY_NAME: '-RGB-',
@@ -826,11 +820,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             INFO.ORIGIN_Y: None,
             INFO.CELL_WIDTH: None,
             INFO.CELL_HEIGHT: None,
-            INFO.CLIM: (None, None, None),
+            INFO.CLIM: ((None, None), (None, None), (None, None)),
+            INFO.UNIT_CONVERSION: self._guidebook.units_conversion(ds_info),
         }
-
-        self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
         ds_info.update(changeable_meta)
+        ds_info.update_metadata_from_dependencies()
         presentation, reordered_indices = self._insert_layer_with_info(ds_info)
 
         LOG.info('generating incomplete (invalid) composite for user to configure')
@@ -839,7 +833,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         color_assignments = {}
         def _(color, lyr):
             if lyr:
-                color_assignments[color] = self._layer_with_uuid[lyr] if isinstance(lyr, UUID) else lyr
+                color_assignments[color] = self[lyr] if isinstance(lyr, UUID) else lyr
         _('r', r)
         _('g', g)
         _('b', b)

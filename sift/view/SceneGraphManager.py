@@ -701,7 +701,7 @@ class SceneGraphManager(QObject):
 
     def change_layers_color_limits(self, change_dict):
         for uuid, clims in change_dict.items():
-            LOG.info('changing {} to colormap {}'.format(uuid, clims))
+            LOG.info('changing {} to color limits {}'.format(uuid, clims))
             self.set_color_limits(clims, uuid)
 
     def add_basic_layer(self, new_order:tuple, uuid:UUID, p:prez):

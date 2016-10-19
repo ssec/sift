@@ -167,6 +167,14 @@ class AHI_HSF_Guidebook(Guidebook):
             except KeyError:
                 z[INFO.STANDARD_NAME] = z.get(INFO.SHORT_NAME)
 
+        # Only needed for backwards compatibility with originally supported geotiffs
+        if INFO.UNITS not in info:
+            standard_name = info.get(INFO.STANDARD_NAME, z.get(INFO.STANDARD_NAME))
+            if standard_name == 'toa_bidirectional_reflectance':
+                z[INFO.UNITS] = '1'
+            elif standard_name == 'toa_brightness_temperature':
+                z[INFO.UNITS] = 'kelvin'
+
         return z
 
     def _is_refl(self, dsi):
@@ -194,50 +202,101 @@ class AHI_HSF_Guidebook(Guidebook):
             # some kind of default
             return 0., 255.
 
+    def preferred_units(self, dsi):
+        # FUTURE: Use cfunits or cf_units package
+        if self._is_refl(dsi):
+            return '1'
+        elif self._is_bt(dsi):
+            return 'degrees_Celsius'
+        else:
+            return dsi.get(INFO.UNITS, None)
+
+    def unit_symbol(self, unit):
+        # FUTURE: Use cfunits or cf_units package
+        # cf_units gives the wrong symbol for celsius
+        if unit == '1':
+            return ''
+        elif unit == 'degrees_Celsius' or unit == 'C':
+            return '°C'
+        elif unit == 'kelvin' or unit == 'K':
+            return 'K'
+        else:
+            return unit or ""
+
+    def _unit_format_func(self, layer, units):
+        units = self.unit_symbol(units)
+
+        # default formatting string
+        def _format_unit(val, numeric=True, include_units=True):
+            return '{:.03f}{units:s}'.format(val, units=units if include_units else "")
+
+        if self._is_bt(layer):
+            # BT data limits, Kelvin to degC
+            def _format_unit(val, numeric=True, include_units=True):
+                return '{:.02f}{units}'.format(val, units=units if include_units else "")
+        elif "flag_values" in layer:
+            # flag values don't have units
+            if "flag_meanings" in layer:
+                flag_masks = layer["flag_masks"] if "flag_masks" in layer else [-1] * len(layer["flag_values"])
+                flag_info = tuple(zip(layer["flag_meanings"], layer["flag_values"], flag_masks))
+                def _format_unit(val, numeric=True, include_units=True, flag_info=flag_info):
+                    val = int(val)
+                    if numeric:
+                        return '{:d}'.format(val)
+
+                    meanings = []
+                    for fmean, fval, fmask in flag_info:
+                        if (val & fmask) == fval:
+                            meanings.append(fmean)
+                    return "{:d} ({:s})".format(val, ", ".join(meanings))
+            else:
+                def _format_unit(val, numeric=True, include_units=True):
+                    return '{:d}'.format(int(val))
+
+        return _format_unit
+
+    def units_conversion_rgb(self, dsi):
+        def conv_func(x, inverse=False, deps=(dsi.r, dsi.g, dsi.b)):
+            if isinstance(x, np.ndarray):
+                # some sort of array
+                x_tmp = x.ravel()
+                assert x_tmp.size % len(deps) == 0
+                num_elems = x_tmp.size // len(deps)
+                new_vals = []
+                for i, dep in enumerate(deps):
+                    new_val = x_tmp[i * num_elems: (i + 1) * num_elems]
+                    if dep is not None:
+                        new_val = dep[INFO.UNIT_CONVERSION][1](new_val, inverse=inverse)
+                    new_vals.append(new_val)
+                res = np.array(new_vals).reshape(x.shape)
+                return res
+            else:
+                # Not sure this should ever happen (should always be at least 3
+                return x
+
+        def format_func(val, numeric=True, include_units=False):
+            return ", ".join("{}".format(v) if v is None else "{:0.03f}".format(v) for v in val)
+        return None, conv_func, format_func
+
     def units_conversion(self, dsi):
         "return UTF8 unit string, lambda v,inverse=False: convert-raw-data-to-unis"
-        units = dsi.get("units", "")
-        if units == "1":
-            units = ""
+        if dsi[INFO.KIND] == KIND.RGB:
+            return self.units_conversion_rgb(dsi)
 
-        if self._is_refl(dsi):
-            # Reflectance/visible data limits
-            return ('{:.03f}', '', lambda x, inverse=False: x)
-        elif self._is_bt(dsi):
-            # BT data limits, Kelvin to degC
-            return ("{:.02f}", "°C", lambda x, inverse=False: x - 273.15 if not inverse else x + 273.15)
-        elif "flag_values" in dsi:
-            # XXX: Better place to put all this logic?
-            if "flag_meanings" in dsi:
-                flag_masks = dsi["flag_masks"] if "flag_masks" in dsi else [-1] * len(dsi["flag_values"])
-                def _flag_meaning(x, inverse=False):
-                    single = False
-                    if isinstance(x, np.ndarray):
-                        if x.size == 2:
-                            # assume color limits
-                            return [str(val) for val in x]
-                    else:
-                        x = [x]
-                        single = True
+        # the dataset might be in one unit, but the user may want something else
+        # FUTURE: Use cfunits or cf_units package
+        preferred_units = self.preferred_units(dsi)
 
-                    all_strings = []
-                    for data_val in x:
-                        meanings = []
-                        data_val = int(data_val)
-                        for fmean, fval, fmask in zip(dsi["flag_meanings"], dsi["flag_values"], flag_masks):
-                            if (data_val & fmask) == fval:
-                                meanings.append(fmean)
-                        s = "{:d} ({:s})".format(data_val, ", ".join(meanings))
-                        all_strings.append(s)
-                    if single:
-                        return all_strings[0]
-                    return all_strings
-
-                return ("{:s}", units, _flag_meaning)
-            else:
-                return ("{:0.0f}", units, lambda x, inverse=False: x)
+        # Conversion functions
+        # FUTURE: Use cfunits or cf_units package
+        if dsi.get(INFO.UNITS) in ('kelvin', 'K') and preferred_units in ('degrees_Celsius', 'C'):
+            conv_func = lambda x, inverse=False: x - 273.15 if not inverse else x + 273.15
         else:
-            return ("{:.03f}", units, lambda x, inverse=False: x)
+            conv_func = lambda x, inverse=False: x
+
+        # Format strings
+        format_func = self._unit_format_func(dsi, preferred_units)
+        return (preferred_units, conv_func, format_func)
 
     def default_colormap(self, dsi):
         return DEFAULT_COLORMAPS.get(dsi.get(INFO.STANDARD_NAME), DEFAULT_UNKNOWN)

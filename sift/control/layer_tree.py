@@ -98,7 +98,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
 
         # if we have a point probe value, draw the filled bar to represent where it is in that layer's data range
         if value:
-            value, bar, fmt, unit = value
+            value, bar, fmtd_str = value
             w = bar * float(rect.width())
             r = QRect(rect.left(), rect.top(), int(w), rect.height())
             painter.fillRect(r, color)
@@ -153,7 +153,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
                 l = 0
                 r = w
                 align = Qt.AlignRight
-            painter.drawText(l, t, r-l, theight, align, fmt.format(value))
+            painter.drawText(l, t, r-l, theight, align, fmtd_str)
 
         painter.restore()
 

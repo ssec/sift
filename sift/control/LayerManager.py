@@ -303,11 +303,29 @@ class SingleLayerInfoPane (QWidget) :
                 new_clims = ""
                 if this_prez is not None:
                     new_clims = np.array(this_prez.climits)
-                    fmt, unit, new_clims = self.document.convert_units(this_prez.uuid, new_clims, inverse=False)
+                    unit_info = self.document[this_prez.uuid][INFO.UNIT_CONVERSION]
+                    new_clims = unit_info[1](new_clims, inverse=False)
                     try:
-                        new_clims = (fmt + ' ~ ' + fmt + '{}').format(new_clims[0], new_clims[1], unit)
+                        if layer_info[INFO.KIND] == KIND.IMAGE:
+                            min_str = layer_info[INFO.UNIT_CONVERSION][2](new_clims[0], include_units=False)
+                            max_str = layer_info[INFO.UNIT_CONVERSION][2](new_clims[1])
+                            new_clims = '{} ~ {}'.format(min_str, max_str)
+                        else:
+                            # FUTURE: Other layer types
+                            deps = (layer_info.r, layer_info.g, layer_info.b)
+
+                            tmp_clims = []
+                            for i, dep in enumerate(deps):
+                                if dep is None:
+                                    tmp_clims.append('N/A')
+                                    continue
+
+                                min_str = dep[INFO.UNIT_CONVERSION][2](new_clims[i][0], include_units=False)
+                                max_str = dep[INFO.UNIT_CONVERSION][2](new_clims[i][1])
+                                tmp_clims.append('{} ~ {}'.format(min_str, max_str))
+                            new_clims = ", ".join(tmp_clims)
                     except TypeError as err:
-                        LOG.warning("unknown color limit format for %s" % repr((fmt, unit, new_clims)))
+                        LOG.warning("unable to format color limit: %r" % (new_clims,), exc_info=True)
                         new_clims = "N/A"
                 if "climits" not in shared_info :
                     shared_info["climits"] = new_clims
@@ -490,16 +508,14 @@ class RGBLayerConfigPane(QWidget):
         uuid = self._uuids[RGBA2IDX[color]]
         if not uuid:
             return values
-        format, units, data= self.document_ref().convert_units(uuid, values, inverse=True)
-        return data
+        return self.document_ref()[uuid][INFO.UNIT_CONVERSION][1](values, inverse=True)
 
     def _data_to_display(self, color:str, values):
         "convert data value to display value"
         uuid = self._uuids[RGBA2IDX[color]]
         if not uuid:
             return values
-        format, units, display = self.document_ref().convert_units(uuid, values, inverse=False)
-        return display
+        return self.document_ref()[uuid][INFO.UNIT_CONVERSION][1](values)
 
     def _get_slider_value(self, valid_min, valid_max, slider_val):
         return (slider_val / self._slider_steps) * (valid_max - valid_min) + valid_min

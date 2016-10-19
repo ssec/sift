@@ -563,13 +563,14 @@ class ProbeGraphDisplay (object) :
 
             # get the data and info we need for this plot
             data_polygon = self.workspace.get_content_polygon(x_uuid, polygon)
-            fmt, units, data_polygon = self.document.convert_units(x_uuid, data_polygon)
+            unit_info = self.document[x_uuid][INFO.UNIT_CONVERSION]
+            data_polygon = unit_info[1](data_polygon)
             title = self.document[x_uuid][INFO.DISPLAY_NAME]
 
             # get point probe value
             if point_xy:
                 x_point = self.workspace.get_content_point(x_uuid, point_xy)
-                format_str, unit_str, x_point = self.document.convert_units(x_uuid, x_point)
+                x_point = unit_info[1](x_point)
             else:
                 x_point = None
 
@@ -586,25 +587,28 @@ class ProbeGraphDisplay (object) :
             name2 = self.document[y_uuid][INFO.DISPLAY_NAME]
             hires_uuid = self.workspace.lowest_resolution_uuid(x_uuid, y_uuid)
             hires_coord_mask, hires_data = self.workspace.get_coordinate_mask_polygon(hires_uuid, polygon)
-            _, _, hires_data = self.document.convert_units(hires_uuid, hires_data)
+            hires_conv_func = self.document[hires_uuid][INFO.UNIT_CONVERSION][1]
+            x_conv_func = self.document[x_uuid][INFO.UNIT_CONVERSION][1]
+            y_conv_func = self.document[y_uuid][INFO.UNIT_CONVERSION][1]
+            hires_data = hires_conv_func(hires_data)
             yield {TASK_DOING: 'Probe Plot: Collecting polygon data (layer 2)...', TASK_PROGRESS: 0.15}
             if hires_uuid is x_uuid:
                 # the hires data was from the X UUID
                 data1 = hires_data
                 data2 = self.workspace.get_content_coordinate_mask(y_uuid, hires_coord_mask)
-                _, _, data2 = self.document.convert_units(y_uuid, data2)
+                data2 = y_conv_func(data2)
             else:
                 # the hires data was from the Y UUID
                 data2 = hires_data
                 data1 = self.workspace.get_content_coordinate_mask(x_uuid, hires_coord_mask)
-                _, _, data1 = self.document.convert_units(x_uuid, data1)
+                data1 = x_conv_func(data1)
             yield {TASK_DOING: 'Probe Plot: Creating scatter plot...', TASK_PROGRESS: 0.25}
 
             if point_xy:
                 x_point = self.workspace.get_content_point(x_uuid, point_xy)
-                format_str, unit_str, x_point = self.document.convert_units(x_uuid, x_point)
+                x_point = x_conv_func(x_point)
                 y_point = self.workspace.get_content_point(y_uuid, point_xy)
-                format_str, unit_str, y_point = self.document.convert_units(y_uuid, y_point)
+                y_point = y_conv_func(y_point)
             else:
                 x_point = None
                 y_point = None
