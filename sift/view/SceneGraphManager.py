@@ -47,11 +47,15 @@ from uuid import UUID
 from pyproj import Proj
 
 import os
+import sys
 import logging
 
 LOG = logging.getLogger(__name__)
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
-DEFAULT_SHAPE_FILE = os.path.realpath(os.path.join(SCRIPT_DIR, "..", "data", "ne_50m_admin_0_countries", "ne_50m_admin_0_countries.shp"))
+if getattr(sys, 'frozen', False):
+    DEFAULT_SHAPE_FILE = os.path.realpath(os.path.join(SCRIPT_DIR, "..", "..", "sift_data", "ne_50m_admin_0_countries", "ne_50m_admin_0_countries.shp"))
+else:
+    DEFAULT_SHAPE_FILE = os.path.realpath(os.path.join(SCRIPT_DIR, "..", "data", "ne_50m_admin_0_countries", "ne_50m_admin_0_countries.shp"))
 DEFAULT_TEXTURE_SHAPE = (4, 16)
 
 

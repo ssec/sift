@@ -17,7 +17,7 @@ data_files = [
 ]
 
 for shape_dir in ["ne_50m_admin_0_countries", "ne_110m_admin_0_countries"]:
-    data_files.append((os.path.join("sift", "data", shape_dir), os.path.join("sift", "data", shape_dir)))
+    data_files.append((os.path.join("sift", "data", shape_dir), os.path.join("sift_data", shape_dir)))
 
 hidden_imports = [
     "vispy.ext._bundled.six",
