@@ -277,7 +277,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     @property
     def current_layer_set(self):
-        return self._layer_sets[self.current_set_index]
+        cls = self._layer_sets[self.current_set_index]
+        assert(isinstance(cls, DocLayerStack))
+        return cls
 
     # def _additional_guidebook_information(self, info):
     #     """
@@ -632,7 +634,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             rows_or_uuids = [rows_or_uuids]
         for dex in rows_or_uuids:
             if isinstance(dex, UUID):
-                dex = L.index(dex)  # returns row index
+                dex = L.uuid2row[dex]  # returns row index
             old = L[dex]
             vis = (not old.visible) if visible is None else visible
             # print(vis)
@@ -649,10 +651,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param changes: dictionary of {uuid:bool} with new visibility state
         :return:
         """
-        u2r = dict((q.uuid,i) for i,q in enumerate(self.current_layer_set))
         L = self.current_layer_set
         for uuid,visible in changes.items():
-            dex = L[uuid]
+            dex = L.uuid2row[uuid]
             old = L[dex]
             L[dex] = old._replace(visible=visible)
         self.didChangeLayerVisibility.emit(changes)
