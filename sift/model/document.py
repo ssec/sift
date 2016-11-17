@@ -161,6 +161,11 @@ class DocLayerStack(MutableSequence):
         u2r = self.uuid2row
         return u2r.get(uuid, None)
 
+    def change_order_by_indices(self, new_order):
+        self._u2r = None
+        revised = [self._store[n] for n in new_order]
+        self._store = revised
+
     @property
     def animation_order(self):
         aouu = [(x.a_order, x.uuid) for x in self._store if (x.a_order is not None)]
@@ -634,7 +639,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             rows_or_uuids = [rows_or_uuids]
         for dex in rows_or_uuids:
             if isinstance(dex, UUID):
-                dex = L.uuid2row[dex]  # returns row index
+                dex = L.index(dex)  # returns row index
             old = L[dex]
             vis = (not old.visible) if visible is None else visible
             # print(vis)
@@ -653,7 +658,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """
         L = self.current_layer_set
         for uuid,visible in changes.items():
-            dex = L.uuid2row[uuid]
+            dex = L.index(uuid)
             old = L[dex]
             L[dex] = old._replace(visible=visible)
         self.didChangeLayerVisibility.emit(changes)
@@ -1114,8 +1119,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if layer_set_index is None:
             layer_set_index = self.current_set_index
         assert(len(new_order)==len(self._layer_sets[layer_set_index]))
-        new_layer_set = [self._layer_sets[layer_set_index][n] for n in new_order]
-        self._layer_sets[layer_set_index] = new_layer_set
+        layer_set = self._layer_sets[layer_set_index]
+        layer_set.change_order_by_indices(new_order)
         self.didReorderLayers.emit(tuple(new_order))
 
     def insert_layer_prez(self, row:int, layer_prez_seq):
