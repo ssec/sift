@@ -308,6 +308,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         """connected to the various listbox signals that represent the user changing selections
         """
         selected_uuids = tuple(self.current_selected_uuids(self.current_set_listbox))
+        self.current_set_listbox.update()  # FUTURE: this is needed in order to prevent selection display artifacts. why?
         self.uuidSelectionChanged.emit(selected_uuids)
 
     @property
