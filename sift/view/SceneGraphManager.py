@@ -271,7 +271,10 @@ class LayerSet(object):
 
     @animating.setter
     def animating(self, animate):
-        if self._animating and not animate:
+        if animate == self._animating:
+            # Don't update anything if nothing about the animation has changed
+            return
+        elif self._animating and not animate:
             # We are currently, but don't want to be
             self._animating = False
             self._animation_timer.stop()
@@ -882,7 +885,6 @@ class SceneGraphManager(QObject):
         """
         # TODO this is the lazy implementation, eventually just change z order on affected layers
         self.layer_set.set_layer_order(self.document.current_layer_uuid_order)
-        print("New layer order: ", new_layer_index_order)
 
     def _rebuild_layer_order(self, *args, **kwargs):
         res = self.rebuild_layer_order(*args, **kwargs)
