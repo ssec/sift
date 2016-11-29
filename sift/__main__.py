@@ -501,7 +501,9 @@ class Main(QtGui.QMainWindow):
                                                border_shapefile=border_shapefile,
                                                center=center,
                                                parent=self)
-        self.ui.mainWidgets.addTab(self.scene_manager.main_canvas.native, 'Mercator')
+        self.ui.mainMapWidget.layout().addWidget(self.scene_manager.main_canvas.native)
+        self.ui.projectionComboBox.addItems(tuple(self.document.available_projections.keys()))
+        self.ui.projectionComboBox.currentIndexChanged.connect(self.change_projection_index)
 
         self.scene_manager.didChangeFrame.connect(self.update_frame_slider)
         self.ui.animPlayPause.clicked.connect(self.toggle_animation)
@@ -568,9 +570,6 @@ class Main(QtGui.QMainWindow):
 
         self.scene_manager.newProbePolygon.connect(update_probe_polygon)
 
-        self.ui.mainWidgets.removeTab(0)
-        self.ui.mainWidgets.removeTab(0)
-
         # setup RGB configuration : FIXME clean this up into a behavior
         self.layerSetsManager.didChangeRGBLayerComponentRange.connect(self._user_set_rgb_range)
         self.layerSetsManager.didChangeRGBLayerSelection.connect(self._user_set_rgb_layer)
@@ -625,6 +624,11 @@ class Main(QtGui.QMainWindow):
             # XXX: Disable the below line if updating the probe value during animation isn't a performance problem
             self.scene_manager.didChangeFrame.connect(lambda frame_info: self.ui.cursorProbeText.setText("Probe Value: <animating>"))
 
+    def change_projection_index(self, idx):
+        return self.change_projection(tuple(self.document.available_projections.keys())[idx])
+
+    def change_projection(self, projection_name):
+        print(projection_name)
 
     def closeEvent(self, event, *args, **kwargs):
         LOG.debug('main window closing')
