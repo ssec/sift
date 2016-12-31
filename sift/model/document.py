@@ -216,6 +216,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didChangeComposition = pyqtSignal(tuple, UUID, prez, dict)  # new-layer-order, changed-layer, change-info: composite channels were reassigned or polynomial altered
     didCalculateLayerEqualizerValues = pyqtSignal(dict)  # dict of {uuid: (value, normalized_value_within_clim)} for equalizer display
+    didChangeProjection = pyqtSignal(str, dict)  # name of projection, dict of projection information
     # didChangeShapeLayer = pyqtSignal(dict)
 
     def __init__(self, workspace, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
@@ -225,12 +226,43 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self._layer_sets = [DocLayerStack(self)] + [None] * (layer_set_count - 1)
         self._layer_with_uuid = {}
         self.available_projections = OrderedDict((
-            ('Mercator', {}),
+            ('Mercator', {
+                'proj4_str': '+proj=merc +datum=WGS84 +ellps=WGS84 +over',
+                'default_center': (144.8, 13.5),  # lon, lat center point (Guam)
+                'default_width': 20.,  # degrees from left edge to right edge
+                'default_height': 20.,  # degrees from bottom edge to top edge
+            }),
+            ('LCC (CONUS)', {
+                'proj4_str': '+proj=lcc +a=6371200 +b=6371200 +lat_0=25 +lat_1=25 +lon_0=-95 +units=m +no_defs',
+                'default_center': (-123.044, 59.844),
+                'default_width': 20.,
+                'default_height': 20.,
+            }),
+            ('Platte Carre', {}),
             ('Himawari Geos', {}),
             ('GOES Geos', {}),
         ))
         self.default_projection = 'Mercator'
+        self.current_projection = self.default_projection
         # TODO: connect signals from workspace to slots including update_dataset_info
+
+    def projection_info(self, projection_name=None):
+        return self.available_projections[projection_name or self.current_projection]
+
+    def change_projection(self, projection_name=None):
+        if projection_name is None:
+            projection_name = self.default_projection
+        assert projection_name in self.available_projections
+        if projection_name != self.current_projection:
+            LOG.info("Changing projection from '{}' to '{}'".format(self.current_projection, projection_name))
+            self.current_projection = projection_name
+            self.didChangeProjection.emit(
+                self.current_projection,
+                self.available_projections[self.current_projection]
+            )
+
+    def change_projection_index(self, idx):
+        return self.change_projection(tuple(self.available_projections.keys())[idx])
 
     def _default_colormap(self, datasetinfo):
         """
@@ -384,7 +416,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for uuid, pinf in uuids:
             lyr = self._layer_with_uuid[pinf.uuid]
             if lyr[INFO.KIND] == KIND.IMAGE:
-                value = self._workspace.get_content_point(pinf.uuid, xy_pos)
+                try:
+                    value = self._workspace.get_content_point(pinf.uuid, xy_pos)
+                except ValueError:
+                    value = None
+                if value is None:
+                    value = np.nan
                 fmt, unit_str, unit_conv = self._guidebook.units_conversion(self._layer_with_uuid[pinf.uuid])
                 # calculate normalized bar width relative to its current clim
                 nc, xc = unit_conv(np.array(pinf.climits))
@@ -422,7 +459,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     elif clims is None:
                         values.append(None)
                     else:
-                        value = self._workspace.get_content_point(dep_lyr[INFO.UUID], xy_pos)
+                        try:
+                            value = self._workspace.get_content_point(dep_lyr[INFO.UUID], xy_pos)
+                        except ValueError:
+                            value = None
                         values.append(_sci_to_rgb(value, clims[0], clims[1]))
 
                 # fmt = "{:3d}"

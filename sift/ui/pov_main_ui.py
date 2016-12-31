@@ -292,7 +292,7 @@ class Ui_MainWindow(object):
         self.scrollArea.setWidgetResizable(True)
         self.scrollArea.setObjectName(_fromUtf8("scrollArea"))
         self.scrollAreaWidgetContents_8 = QtGui.QWidget()
-        self.scrollAreaWidgetContents_8.setGeometry(QtCore.QRect(0, 0, 274, 435))
+        self.scrollAreaWidgetContents_8.setGeometry(QtCore.QRect(0, 0, 225, 420))
         self.scrollAreaWidgetContents_8.setObjectName(_fromUtf8("scrollAreaWidgetContents_8"))
         self.verticalLayout_33 = QtGui.QVBoxLayout(self.scrollAreaWidgetContents_8)
         self.verticalLayout_33.setObjectName(_fromUtf8("verticalLayout_33"))

@@ -35,7 +35,6 @@ from vispy.color import get_colormap
 from vispy.ext.six import string_types
 import numpy as np
 from datetime import datetime
-from pyproj import Proj
 
 from sift.common import (DEFAULT_X_PIXEL_SIZE,
                          DEFAULT_Y_PIXEL_SIZE,
@@ -52,6 +51,7 @@ from sift.common import (DEFAULT_X_PIXEL_SIZE,
                          MercatorTileCalc
                          )
 from sift.view.Program import TextureAtlas2D, Texture2D
+from sift.view.transform import PROJ4Transform
 # The below imports are needed because we subclassed the ImageVisual
 from vispy.visuals.shaders import Function
 from vispy.visuals.transforms import NullTransform
@@ -312,7 +312,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
                  shape=None,
                  tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH),
                  texture_shape=(DEFAULT_TEXTURE_HEIGHT, DEFAULT_TEXTURE_WIDTH),
-                 wrap_lon=False,
+                 wrap_lon=False, projection=DEFAULT_PROJECTION,
                  cmap='viridis', method='tiled', clim='auto', interpolation='nearest', **kwargs):
         if method != 'tiled':
             raise ValueError("Only 'tiled' method is currently supported")
@@ -345,7 +345,8 @@ class TiledGeolocatedImageVisual(ImageVisual):
             rez(dy=abs(self.cell_height), dx=abs(self.cell_width)),
             self.tile_shape,
             self.texture_shape,
-            wrap_lon=self.wrap_lon
+            wrap_lon=self.wrap_lon,
+            projection=projection,
         )
         # What tiles have we used and can we use
         self.texture_state = TextureTileState(self.num_tex_tiles)
@@ -426,6 +427,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
 
         self.overview_info = None
         self.init_overview(data)
+        # self.transform = PROJ4Transform(projection, inverse=True)
 
         self.freeze()
 
@@ -1351,7 +1353,7 @@ class ShapefileLinesVisual(LineVisual):
         LOG.debug("Using border shapefile '%s'", filepath)
         self.sf = shapefile.Reader(filepath)
         # FUTURE: Proj stuff should be done in GLSL for better speeds and flexibility with swapping projection (may require something in addition to transform)
-        self.proj = Proj(projection)
+        # self.proj = Proj(projection)
 
         LOG.info("Loading boundaries: %s", datetime.utcnow().isoformat(" "))
         # Prepare the arrays
@@ -1374,12 +1376,13 @@ class ShapefileLinesVisual(LineVisual):
 
         # Clip lats to +/- 89.9 otherwise PROJ.4 on mercator projection will fail
         np.clip(vertex_buffer[:, 1], -89.9, 89.9, out=vertex_buffer[:, 1])
-        vertex_buffer[:, 0], vertex_buffer[:, 1] = self.proj(vertex_buffer[:, 0], vertex_buffer[:, 1])
+        # vertex_buffer[:, 0], vertex_buffer[:, 1] = self.proj(vertex_buffer[:, 0], vertex_buffer[:, 1])
         if double:
             LOG.debug("Adding 180 to 540 double of shapefile")
             orig_points = vertex_buffer.shape[0]
             vertex_buffer = np.concatenate((vertex_buffer, vertex_buffer), axis=0)
-            vertex_buffer[orig_points:, 0] += C_EQ
+            # vertex_buffer[orig_points:, 0] += C_EQ
+            vertex_buffer[orig_points:, 0] += 360
 
         kwargs.setdefault("color", (1.0, 1.0, 1.0, 1.0))
         kwargs.setdefault("width", 1)
