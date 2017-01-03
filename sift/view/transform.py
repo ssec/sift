@@ -7,17 +7,51 @@ possible to implement in Matrix transforms that come with VisPy.
 
 """
 
+import re
 from pyproj import Proj, pj_ellps
 import numpy as np
 from vispy.visuals.transforms import BaseTransform
 from vispy.visuals.transforms._util import arg_to_vec4, as_vec4
 from vispy.visuals.shaders import Function, Variable
+from vispy.visuals.shaders.expression import TextExpression
 
+
+class MacroExpression(TextExpression):
+    macro_regex = re.compile(r'^#define\s+(?P<name>\w+)\s+(?P<expression>[^\s]+)')
+
+    def __init__(self, text):
+        match = self.macro_regex.match(text)
+        if match is None:
+            raise ValueError("Invalid macro definition: {}".format(text))
+        match_dict = match.groupdict()
+        self._name = match_dict['name']
+        super(MacroExpression, self).__init__(text)
+
+    def definition(self, names):
+        return self.text
+
+    @property
+    def name(self):
+        return self._name
+
+COMMON_DEFINITIONS = """#define SPI     3.14159265359
+#define TWOPI   6.2831853071795864769
+#define ONEPI   3.14159265358979323846
+#define M_PI    3.14159265358979310
+#define M_PI_2  1.57079632679489660
+#define M_PI_4  0.78539816339744828
+#define M_FORTPI        M_PI_4                   /* pi/4 */
+#define M_HALFPI        M_PI_2                   /* pi/2 */
+#define M_PI_HALFPI     4.71238898038468985769   /* 1.5*pi */
+#define M_TWOPI         6.28318530717958647693   /* 2*pi */
+#define M_TWO_D_PI      M_2_PI                   /* 2/pi */
+#define M_TWOPI_HALFPI  7.85398163397448309616   /* 2.5*pi */
+"""
+COMMON_DEFINITIONS = tuple(MacroExpression(line) for line in COMMON_DEFINITIONS.splitlines())
 
 # proj_name -> (param_defaults, map_ellps, map_spher, imap_ellps, imap_spher)
 # where 'map' is lon/lat to X/Y
 # and 'imap' is X/Y to lon/lat
-# Assume spheroid unless stated otherwise
 # WARNING: Need double {{ }} for functions for string formatting to work properly
 PROJECTIONS = {
     'merc': (
@@ -26,7 +60,7 @@ PROJECTIONS = {
             float lambda = radians(pos.x);
             float phi = radians(pos.y);
             float x = {a} * (lambda - {lon_0}f);
-            float y = {a} * log(tan(M_PI / 4.f + phi / 2.f));
+            float y = {a} * -log(pj_tsfn(phi, sin(phi), {e}));
             return vec4(x, y, pos.z, pos.w);
         }}""",
         """vec4 merc_map_s(vec4 pos) {{
@@ -41,7 +75,8 @@ PROJECTIONS = {
             float x = pos.x;
             float y = pos.y;
             float lambda = degrees({lon_0}f + x / {a});
-            float phi = degrees(2.f * atan(exp(y / {a})) - M_PI / 2.f);
+            {over}
+            float phi = degrees(pj_phi2(exp(-y / {a}), {e}));
             return vec4(lambda, phi, pos.z, pos.w);
         }}""",
         """vec4 merc_imap_s(vec4 pos) {{
@@ -55,6 +90,51 @@ PROJECTIONS = {
     ),
     # 'lcc': (),
 }
+
+# Misc GLSL functions used in one or more mapping functions above
+adjlon_func = Function("""
+    float adjlon(float lon) {
+        if (abs(lon) <= M_PI) return (lon);
+        lon += M_PI; // adjust to 0..2pi rad
+        lon -= M_PI * 2 * floor(lon / M_PI / 2); // remove integral # of 'revolutions'
+        lon -= M_PI;  // adjust back to -pi..pi rad
+        return( lon );
+    }
+    """)
+
+pj_msfn = Function("""
+    float pj_msfn(float sinphi, float cosphi, float es) {
+        return (cosphi / sqrt (1. - es * sinphi * sinphi));
+    }
+    """)
+
+pj_tsfn = Function("""
+    float pj_tsfn(float phi, float sinphi, float e) {
+        sinphi *= e;
+        return (tan (.5 * (M_HALFPI - phi)) /
+           pow((1. - sinphi) / (1. + sinphi), .5 * e));
+    }
+    """)
+
+pj_phi2 = Function("""
+    float pj_phi2(float ts, float e) {
+        float eccnth, Phi, con, dphi;
+
+        eccnth = .5 * e;
+        Phi = M_HALFPI - 2. * atan (ts);
+        for (int i=15; i >= 0; --i) {
+            con = e * sin(Phi);
+            dphi = M_HALFPI - 2. * atan(ts * pow((1. - con) / (1. + con), eccnth)) - Phi;
+            Phi += dphi;
+            if (abs(dphi) <= 1.0e-10) {
+                break;
+            }
+        }
+        //if (i <= 0)
+        //    pj_ctx_set_errno( ctx, -18 );
+        return Phi;
+    }
+    """)
 
 
 class PROJ4Transform(BaseTransform):
@@ -80,7 +160,6 @@ class PROJ4Transform(BaseTransform):
 
     # Scale factors are applied equally to all axes.
     Isometric = False
-    M_PI = Variable("M_PI", value=3.1415926535897932384626433832795, dtype=float)
 
     def __init__(self, proj4_str, inverse=False):
         self.proj4_str = proj4_str
@@ -112,18 +191,12 @@ class PROJ4Transform(BaseTransform):
             self.glsl_map, self.glsl_imap = self.glsl_imap, self.glsl_map
 
         super(PROJ4Transform, self).__init__()
-        # PI = Variable("M_PI", value=3.1415926535897932384626433832795, dtype=float)
-        adjlon_func = Function("""
-        float adjlon(float lon) {
-            if (abs(lon) <= M_PI) return (lon);
-            lon += M_PI; // adjust to 0..2pi rad
-            lon -= M_PI * 2 * floor(lon / M_PI / 2); // remove integral # of 'revolutions'
-            lon -= M_PI;  // adjust back to -pi..pi rad
-            return( lon );
-        }
-        """, dependencies=[self.M_PI])
-        self._shader_map._add_dep(self.M_PI)
-        self._shader_imap._add_dep(self.M_PI)
+
+        # Add common definitions and functions
+        for d in COMMON_DEFINITIONS + (pj_tsfn, pj_phi2):
+            self._shader_map._add_dep(d)
+            self._shader_imap._add_dep(d)
+
         if proj_args['over']:
             self._shader_map._add_dep(adjlon_func)
             self._shader_imap._add_dep(adjlon_func)

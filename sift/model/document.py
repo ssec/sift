@@ -258,7 +258,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             self.current_projection = projection_name
             self.didChangeProjection.emit(
                 self.current_projection,
-                self.available_projections[self.current_projection]
+                self.projection_info(self.current_projection)
             )
 
     def change_projection_index(self, idx):

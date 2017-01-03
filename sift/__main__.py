@@ -593,6 +593,7 @@ class Main(QtGui.QMainWindow):
         self.document.didRemoveLayers.connect(self.update_frame_time_to_top_visible)
         self.document.didAddBasicLayer.connect(self.update_frame_time_to_top_visible)
         self.document.didAddCompositeLayer.connect(self.update_frame_time_to_top_visible)
+        self.document.didChangeProjection.connect(self.scene_manager.set_projection)
 
         self.ui.panZoomToolButton.toggled.connect(partial(self.change_tool, name=TOOL.PAN_ZOOM))
         self.ui.pointSelectButton.toggled.connect(partial(self.change_tool, name=TOOL.POINT_PROBE))

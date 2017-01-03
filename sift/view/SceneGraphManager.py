@@ -39,6 +39,7 @@ from sift.view.Colormap import ALL_COLORMAPS
 from sift.model.document import prez, DocCompositeLayer, DocBasicLayer, DocRGBLayer
 from sift.queue import TASK_DOING, TASK_PROGRESS
 from sift.view.ProbeGraphs import DEFAULT_POINT_PROBE
+from sift.view.transform import PROJ4Transform
 
 from PyQt4.QtCore import QObject, pyqtSignal, Qt
 from PyQt4.QtGui import QCursor, QPixmap
@@ -236,7 +237,6 @@ class LayerSet(object):
     def update_layers_z(self):
         for z_level, uuid in enumerate(self._layer_order):
             # assume ChainTransform where the last transform is STTransform for Z level
-            print(self._layers[uuid].transform)
             self._layers[uuid].transform.transforms[-1].translate = (0, 0, 0-int(z_level))
             self._layers[uuid].order = len(self._layer_order) - int(z_level)
         # Need to tell the scene to recalculate the drawing order (HACK, but it works)
@@ -459,7 +459,6 @@ class SceneGraphManager(QObject):
         self.main_map_parent.transform = z_level_transform
 
         # Head node of the map graph
-        from sift.view.transform import PROJ4Transform
         proj_info = self.document.projection_info()
         self.main_map = MainMap(name="MainMap", parent=self.main_map_parent)
         self.main_map.transform = PROJ4Transform(proj_info['proj4_str'])
@@ -467,6 +466,7 @@ class SceneGraphManager(QObject):
         self._borders_color_idx = 0
         self.borders = NEShapefileLines(self.border_shapefile, double=True, color=self._color_choices[self._borders_color_idx], parent=self.main_map)
         self.borders.transform = STTransform(translate=(0, 0, 40))
+        # print(self.borders.transforms.get_transform().shader_map().compile())
 
         self._latlon_grid_color_idx = 1
         self.latlon_grid = self._init_latlon_grid_layer(color=self._color_choices[self._latlon_grid_color_idx])
@@ -481,6 +481,9 @@ class SceneGraphManager(QObject):
         ur_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] + width, center[1] + height)])[0][:2]
         from vispy.geometry import Rect
         self.main_view.camera.rect = Rect(ll_xy, (ur_xy[0] - ll_xy[0], ur_xy[1] - ll_xy[1]))
+
+    def set_projection(self, projection_name, projection_info):
+        self.main_map.transform = PROJ4Transform(projection_info['proj4_str'])
 
     def _init_latlon_grid_layer(self, color=None, resolution=5.):
         """Create a series of line segments representing latitude and longitude lines.
