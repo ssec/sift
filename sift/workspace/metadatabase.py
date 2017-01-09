@@ -61,15 +61,20 @@ class Product(Base):
     kind = Column(PickleType)  # class or callable which can perform transformations on this data in workspace
 
     # cached metadata, consult file importer for definitive
-    spacecraft = Column(String)  # eg "GOES-16", "Himawari-8"
-    identifier = Column(String)  # eg "B01", "B02"
+    kind = Column(String)  # "image"
+    spacecraft = Column(String)  # "GOES-16", "Himawari-8"
+    identifier = Column(String)  # "B01", "B02"
     start = Column(DateTime)
     duration = Column(Interval)
     resolution = Column(Integer, default=0)  # meters max resolution, e.g. 500, 1000, 2000, 4000
-    proj4 = Column(String, default='')  # projection of the data in its native format, if applicable
+    proj4 = Column(String, default='')  # native projection of the data in its original form, if one exists
     units = Column(Unicode, default=u'1')  # udunits compliant units, e.g. 'K'
     label = Column(Unicode, default=u'')  # "AHI Refl B11"
     description = Column(UnicodeText, default=u'')
+
+    # link to workspace cache
+    uuid = Column(PickleType)  # UUID object representing this data, or None if not in cache
+    cache = relationship("CachedData", backref="product")
 
     info = relationship("KeyValue", backref="product")
 
@@ -83,6 +88,34 @@ class KeyValue(Base):
     product_id = Column(Integer, ForeignKey('products.id'))
     key = Column(String)
     value = Column(UnicodeText, default=u'')
+
+
+class CachedData(Base):
+    """
+    represent flattened products in cache
+     a given product may have several CachedData for different projections
+    """
+    __tablename__ = 'workspace_cached'
+    id = Column(Integer, primary_key=True)
+    product_id = Column(Integer, ForeignKey('products.id'))
+
+    # memory mappable read-only data files loaded from native format
+    # data_type = Column(String)  # almost always float32; can be int16 in the future
+    data_rows, data_cols, data_levels = Column(Integer), Column(Integer), Column(Integer, default=1)
+    data_path = Column(String, unique=True)  # relative to workspace, binary array of data
+    proj4 = Column(String, default='')  # proj4 projection string for the data in this array, if one exists; else assume y=lat/x=lon
+    y_path = Column(String, default='')  # if needed, y location cache path relative to workspace
+    x_path = Column(String, default='')  # if needed, y location cache path relative to workspace
+
+    # sparsity and coverage arrays are int8
+    sparsity_rows, sparsity_cols = Column(Integer, default=0), Column(Integer, default=0)
+    sparsity_path = Column(String, unique=True, default='')  # availability array being broadcast across data, 0==unavailable, default 1s
+    coverage_rows, coverage_cols = Column(Integer, default=0), Column(Integer, default=0)
+    coverage_path = Column(String, unique=True, default='')  # availability array being stretched across data, 0==unavailable, default 1s
+    metadata_path = Column(String, unique=True, default='')  # json metadata path, optional
+
+    mtime = Column(DateTime)  # last observed mtime of the file, for change checking
+    atime = Column(DateTime)  # last time this file was accessed by application
 
 
 # ============================
