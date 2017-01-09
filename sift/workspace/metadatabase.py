@@ -42,7 +42,8 @@ Base = declarative_base()
 class File(Base):
     __tablename__ = 'files'
     id = Column(Integer, primary_key=True)
-    importer = Column(PickleType)  # class or callable which can work with this data
+
+    format = Column(PickleType)  # class or callable which can pull this data into workspace from storage
 
     file_name = Column(Unicode)  # basename
     dir_path = Column(Unicode)  # dirname
@@ -57,14 +58,15 @@ class Product(Base):
     id = Column(Integer, primary_key=True)
     file_id = Column(Integer, ForeignKey('files.id'))
 
+    kind = Column(PickleType)  # class or callable which can perform transformations on this data in workspace
+
     # cached metadata, consult file importer for definitive
-    kind = Column(String)  # "image"
-    spacecraft = Column(String)  # "GOES-16", "Himawari-8"
-    identifier = Column(String)  # "B01", "B02"
+    spacecraft = Column(String)  # eg "GOES-16", "Himawari-8"
+    identifier = Column(String)  # eg "B01", "B02"
     start = Column(DateTime)
     duration = Column(Interval)
     resolution = Column(Integer, default=0)  # meters max resolution, e.g. 500, 1000, 2000, 4000
-    proj4 = Column(String, default='')
+    proj4 = Column(String, default='')  # projection of the data in its native format, if applicable
     units = Column(Unicode, default=u'1')  # udunits compliant units, e.g. 'K'
     label = Column(Unicode, default=u'')  # "AHI Refl B11"
     description = Column(UnicodeText, default=u'')
