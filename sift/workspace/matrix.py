@@ -8,7 +8,7 @@ PURPOSE
 DataMatrix is products X timesteps matrix
 Each matrix cell has a state
 Some states have UUIDs and therefore data
-Search directories
+Search directories and create index of what data is where
 
 USAGE
 
@@ -67,7 +67,6 @@ column_info = namedtuple('column_info', ('time', 'product_count'))
 row_info = namedtuple('row_info', ('product_name', 'timestep_count'))
 
 product_info = namedtuple('product_info', ('product_name', 'time', 'state', 'path', 'variable', 'slice'))
-
 
 
 class DataMatrix(QObject):
