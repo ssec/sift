@@ -25,8 +25,8 @@ __docformat__ = 'reStructuredText'
 import os, sys
 import logging, unittest, argparse
 
-from sqlalchemy import Column, Integer, String, UnicodeText, Unicode, ForeignKey, DateTime, Interval, PickleType, PrimaryKeyConstraint
-from sqlalchemy.orm import Session, relationship
+from sqlalchemy import Column, Integer, String, UnicodeText, Unicode, ForeignKey, DateTime, Interval, PickleType, create_engine
+from sqlalchemy.orm import Session, relationship, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
 
@@ -155,18 +155,65 @@ class CachedData(Base):
         return self.product.uuid
 
 
+_MDB = None
+
+class Metadatabase(object):
+    """
+    singleton interface to application metadatabase
+    """
+    engine = None
+    connection = None
+    session_factory = None
+
+    def __init__(self, uri=None, **kwargs):
+        global _MDB
+        if _MDB is not None:
+            raise AssertionError('Metadatabase is a singleton and already exists')
+        if uri:
+            self.connect(uri, **kwargs)
+
+    @staticmethod
+    def instance():
+        global _MDB
+        if _MDB is None:
+            _MDB = Metadatabase()
+        return _MDB
+
+    def connect(self, uri, **kwargs):
+        assert(self.engine is None)
+        assert(self.connection is None)
+        self.engine = create_engine(uri, **kwargs)
+        self.connection = self.engine.connect()
+
+    def create_tables(self):
+        Base.metadata.create_all(self.engine)
+
+    def session(self):
+        if self.session_factory is None:
+            self.session_factory = sessionmaker(bind=self.engine)
+        return self.session_factory()
+
+
+
 # ============================
 # support and testing routines
 
 class tests(unittest.TestCase):
-    data_file = os.environ.get('TEST_DATA', os.path.expanduser("~/Data/test_files/thing.dat"))
+    # data_file = os.environ.get('TEST_DATA', os.path.expanduser("~/Data/test_files/thing.dat"))
+    mdb = None
 
     def setUp(self):
         pass
 
-    def test_something(self):
-        pass
-
+    def test_insert(self):
+        from datetime import datetime
+        mdb = Metadatabase('sqlite://')
+        mdb.create_tables()
+        s = mdb.session()
+        when = datetime.utcnow()
+        f = File(filename='foo.bar', dirname='/baz', mtime=when, atime=when, format=None)
+        s.add(f)
+        s.commit()
 
 def _debug(type, value, tb):
     "enable with sys.excepthook = debug"
