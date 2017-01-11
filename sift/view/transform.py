@@ -49,13 +49,54 @@ COMMON_DEFINITIONS = """#define SPI     3.14159265359
 """
 COMMON_DEFINITIONS = tuple(MacroExpression(line) for line in COMMON_DEFINITIONS.splitlines())
 
-# proj_name -> (param_defaults, map_ellps, map_spher, imap_ellps, imap_spher)
+
+def merc_init(proj_dict):
+    proj_dict.setdefault('lon_0', 0.)
+    return proj_dict
+
+
+def geos_init(proj_dict):
+    if 'h' not in proj_dict:
+        raise ValueError("PROJ.4 'h' parameter is required for 'geos' projection")
+
+    proj_dict.setdefault('lat_0', 0.)
+    proj_dict.setdefault('lon_0', 0.)
+    # lat_0 is set to phi0 in the PROJ.4 C source code
+    # if 'lat_0' not in proj_dict:
+    #     raise ValueError("PROJ.4 'lat_0' parameter is required for 'geos' projection")
+
+    if 'sweep_axis' not in proj_dict or proj_dict['sweep_axis'] is None:
+        proj_dict['flip_axis'] = 0
+    elif proj_dict['sweep_axis'] not in ['x', 'y']:
+        raise ValueError("PROJ.4 'sweep_axis' parameter must be 'x' or 'y'")
+    elif proj_dict['sweep_axis'] == 'x':
+        proj_dict['flip_axis'] = 0
+    else:
+        proj_dict['flip_axis'] = 1
+
+    proj_dict['radius_g_1'] = proj_dict['h'] / proj_dict['a']
+    proj_dict['radius_g'] = 1. + proj_dict['radius_g_1']
+    proj_dict['C'] = proj_dict['radius_g'] * proj_dict['radius_g'] - 1.0
+    if proj_dict['a'] != proj_dict['b']:
+        # ellipsoid
+        proj_dict['one_es'] = 1. - proj_dict['es']
+        proj_dict['rone_es'] = 1. / proj_dict['one_es']
+        proj_dict['radius_p'] = np.sqrt(proj_dict['one_es'])
+        proj_dict['radius_p2'] = proj_dict['one_es']
+        proj_dict['radius_p_inv2'] = proj_dict['rone_es']
+    else:
+        proj_dict['radius_p'] = proj_dict['radius_p2'] = proj_dict['radius_p_inv2'] = 1.0
+
+    return proj_dict
+
+
+# proj_name -> (proj_init, map_ellps, map_spher, imap_ellps, imap_spher)
 # where 'map' is lon/lat to X/Y
 # and 'imap' is X/Y to lon/lat
 # WARNING: Need double {{ }} for functions for string formatting to work properly
 PROJECTIONS = {
     'merc': (
-        {'lon_0': 0.},
+        merc_init,
         """vec4 merc_map_e(vec4 pos) {{
             float lambda = radians(pos.x);
             float phi = radians(pos.y);
@@ -89,6 +130,72 @@ PROJECTIONS = {
         }}""",
     ),
     # 'lcc': (),
+    'geos': (
+        geos_init,
+        """vec4 geos_map_e(vec4 pos) {{
+            float lambda = radians(pos.x - {lon_0});
+            {over}
+            float phi = atan({radius_p2} * tan(radians(pos.y)));
+            float r = {radius_p} / hypot({radius_p} * cos(phi), sin(phi));
+            float Vx = r * cos(lambda) * cos(phi);
+            float Vy = r * sin(lambda) * cos(phi);
+            float Vz = r * sin(phi);
+
+            // TODO: Best way to 'discard' a vertex
+            if ((({radius_g} - Vx) * Vx - Vy * Vy - Vz * Vz * {radius_p_inv2}) < 0.)
+               //return vec4(lambda, phi, nan, pos.w);
+               // FIXME
+               return vec4(1. / 0., 1. / 0., pos.z, pos.w);
+
+            float tmp = {radius_g} - Vx;
+
+            if ({flip_axis} == 1) {{
+                lambda = {radius_g_1} * atan(Vy / hypot(Vz, tmp));
+                phi = {radius_g_1} * atan(Vz / tmp);
+            }} else {{
+                lambda = {radius_g_1} * atan(Vy / tmp);
+                phi = {radius_g_1} * atan(Vz / hypot(Vy, tmp));
+            }}
+
+            return vec4(lambda * {a}, phi * {a}, pos.z, pos.w);
+        }}""",
+        None, #"""vec4 geos_map_s(vec4 pos) {{ }}""",
+        """vec4 geos_imap_e(vec4 pos) {{
+            float a, b, k, det, x, y, Vx, Vy, Vz, lambda, phi;
+            x = pos.x / {a};
+            y = pos.y / {a};
+
+            Vx = -1.0;
+            if ({flip_axis} == 1) {{
+                Vz = tan(y / {radius_g_1});
+                Vy = tan(x / {radius_g_1}) * hypot(1.0, Vz);
+            }} else {{
+                Vy = tan(x / {radius_g_1});
+                Vz = tan(y / {radius_g_1}) * hypot(1.0, Vy);
+            }}
+
+            a = Vz / {radius_p};
+            a = Vy * Vy + a * a + Vx * Vx;
+            b = 2 * {radius_g} * Vx;
+            det = ((b * b) - 4 * a * {C})
+            if (det < 0.) {{
+                // FIXME
+                return vec4(1. / 0., 1. / 0., pos.z, pos.w);
+            }}
+
+            k = (-b - sqrt(det)) / (2. * a);
+            Vx = {radius_g} + k * Vx;
+            Vy *= k;
+            Vz *= k;
+
+            lambda = atan2(Vy, Vx) + {lon_0};
+            {over}
+            phi = atan(Vz * cos(lambda) / Vx);
+            phi = atan({radius_p_inv2} * tan(phi));
+            return vec4(lambda, phi, pos.z, pos.w);
+        }}""",
+        None, #"""vec4 geos_imap_s(vec4 pos) {{ }}""",
+    ),
 }
 
 # Misc GLSL functions used in one or more mapping functions above
@@ -136,6 +243,26 @@ pj_phi2 = Function("""
     }
     """)
 
+hypot = Function("""
+float hypot(float x, float y) {
+    if ( x < 0.)
+        x = -x;
+    else if (x == 0.)
+        return (y < 0. ? -y : y);
+    if (y < 0.)
+        y = -y;
+    else if (y == 0.)
+        return (x);
+    if ( x < y ) {
+        x /= y;
+        return ( y * sqrt( 1. + x * x ) );
+    } else {
+        y /= x;
+        return ( x * sqrt( 1. + y * y ) );
+    }
+}
+""")
+
 
 class PROJ4Transform(BaseTransform):
     glsl_map = None
@@ -165,13 +292,13 @@ class PROJ4Transform(BaseTransform):
         self.proj4_str = proj4_str
         self.proj = Proj(proj4_str)
         self._proj4_inverse = inverse
-        proj_dict = self._proj_dict(proj4_str)
+        proj_dict = self.proj_dict(proj4_str)
 
         # Get the specific functions for this projection
         proj_funcs = PROJECTIONS[proj_dict['proj']]
         # set default function parameters
-        proj_args = proj_funcs[0].copy()
-        proj_args.update(proj_dict)
+        proj_init = proj_funcs[0]
+        proj_args = proj_init(proj_dict)
 
         if proj_args.get('over'):
             proj_args['over'] = 'lambda = adjlon(lambda);'
@@ -180,12 +307,19 @@ class PROJ4Transform(BaseTransform):
 
         if proj_dict['a'] == proj_dict['b']:
             # spheroid
-            self.glsl_map = proj_funcs[2].format(**proj_args)
-            self.glsl_imap = proj_funcs[4].format(**proj_args)
+            self.glsl_map = proj_funcs[2]
+            self.glsl_imap = proj_funcs[4]
+            if self.glsl_map is None or self.glsl_imap is None:
+                raise ValueError("Spheroid transform for {} not implemented yet".format(proj_dict['proj']))
         else:
             # ellipsoid
-            self.glsl_map = proj_funcs[1].format(**proj_args)
-            self.glsl_imap = proj_funcs[3].format(**proj_args)
+            self.glsl_map = proj_funcs[1]
+            self.glsl_imap = proj_funcs[3]
+            if self.glsl_map is None or self.glsl_imap is None:
+                raise ValueError("Ellipsoid transform for {} not implemented yet".format(proj_dict['proj']))
+
+        self.glsl_map = self.glsl_map.format(**proj_args)
+        self.glsl_imap = self.glsl_imap.format(**proj_args)
 
         if self._proj4_inverse:
             self.glsl_map, self.glsl_imap = self.glsl_imap, self.glsl_map
@@ -193,7 +327,7 @@ class PROJ4Transform(BaseTransform):
         super(PROJ4Transform, self).__init__()
 
         # Add common definitions and functions
-        for d in COMMON_DEFINITIONS + (pj_tsfn, pj_phi2):
+        for d in COMMON_DEFINITIONS + (pj_tsfn, pj_phi2, hypot):
             self._shader_map._add_dep(d)
             self._shader_imap._add_dep(d)
 
@@ -203,7 +337,7 @@ class PROJ4Transform(BaseTransform):
 
         # print(self._shader_map.compile())
 
-    def _proj_dict(self, proj_str):
+    def proj_dict(self, proj_str):
         d = tuple(x.replace("+", "").split("=") for x in proj_str.split(" "))
         d = dict((x[0], x[1] if len(x) > 1 else 'true') for x in d)
 
@@ -213,6 +347,8 @@ class PROJ4Transform(BaseTransform):
                 d[k] = float(d[k])
             except ValueError:
                 pass
+
+        d['proj4_str'] = proj_str
 
         # if they haven't provided a radius then they must have provided a datum or ellps
         if 'a' not in d:
