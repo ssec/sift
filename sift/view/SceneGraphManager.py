@@ -30,6 +30,7 @@ from vispy.util.keys import SHIFT
 from vispy.visuals.transforms import STTransform, MatrixTransform
 from vispy.visuals import MarkersVisual, marker_types, LineVisual
 from vispy.scene.visuals import Markers, Polygon, Compound, Line
+from vispy.geometry import Rect
 from sift.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND, TOOL, DEFAULT_PROJECTION, COMPOSITE_TYPE
 # from sift.control.layer_list import LayerStackListViewModel
 from sift.view.LayerRep import NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer, CompositeLayer
@@ -479,11 +480,16 @@ class SceneGraphManager(QObject):
         height = proj_info["default_height"] / 2.
         ll_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] - width, center[1] - height)])[0][:2]
         ur_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] + width, center[1] + height)])[0][:2]
-        from vispy.geometry import Rect
         self.main_view.camera.rect = Rect(ll_xy, (ur_xy[0] - ll_xy[0], ur_xy[1] - ll_xy[1]))
 
-    def set_projection(self, projection_name, projection_info):
-        self.main_map.transform = PROJ4Transform(projection_info['proj4_str'])
+    def set_projection(self, projection_name, proj_info, center=None):
+        self.main_map.transform = PROJ4Transform(proj_info['proj4_str'])
+        center = center or proj_info["default_center"]
+        width = proj_info["default_width"] / 2.
+        height = proj_info["default_height"] / 2.
+        ll_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] - width, center[1] - height)])[0][:2]
+        ur_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] + width, center[1] + height)])[0][:2]
+        self.main_view.camera.rect = Rect(ll_xy, (ur_xy[0] - ll_xy[0], ur_xy[1] - ll_xy[1]))
 
     def _init_latlon_grid_layer(self, color=None, resolution=5.):
         """Create a series of line segments representing latitude and longitude lines.
