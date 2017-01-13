@@ -5,11 +5,19 @@ metadatabase.py
 ===============
 
 PURPOSE
-Manage SQLAlchemy database of information used by DataMatrix
-Used by DataMatrix, which is in turn used by Workspace
+Manage SQLAlchemy database of information used to manage workspace
+Used by DataMatrix as well
 
 
-REFERENCES
+OVERVIEW
+
+The workspace caches content, which represents products, the native form of which resides in a file
+
+File : a file somewhere in the filesystem
+ |_ StoredProduct* : product stored in a file
+     |_ Content* : workspace cache content corresponding to a product
+     |   |_ ContentKeyValue* : additional information on content
+     |_ ProductKeyValue* : additional information on product
 
 
 REQUIRES
@@ -105,54 +113,73 @@ class StoredProduct(Base):
 
     # link to workspace cache
     uuid = Column(PickleType, nullable=True)  # UUID object representing this data in SIFT, or None if not in cache
-    cache = relationship("CachedData", backref="product")
+    cache = relationship("Content", backref="product")
 
     # link to key-value further information
-    info = relationship("KeyValue", backref="product")
+    info = relationship("ProductKeyValue", backref="product")
 
 
-class KeyValue(Base):
+class ProductKeyValue(Base):
     """
     key-value pairs associated with a product
     """
-    __tablename__ = 'keyvalues'
+    __tablename__ = 'product_key_values'
     id = Column(Integer, primary_key=True)
     product_id = Column(Integer, ForeignKey('products.id'))
     key = Column(String)
     value = Column(PickleType)
 
 
-class CachedData(Base):
+class Content(Base):
     """
-    represent flattened products in cache
-     a given product may have several CachedData for different projections
+    represent flattened product data files in cache (i.e. cache content)
+    typically memory-map ready data (np.memmap)
+    basic correspondence to projection/geolocation information may accompany
+    images will typically have rows>0 cols>0 levels=None (implied levels=1)
+    profiles may have rows>0 cols=None (implied cols=1) levels>0
+    a given product may have several Content for different projections
     """
-    __tablename__ = 'workspace_content'
+    __tablename__ = 'contents'
     id = Column(Integer, primary_key=True)
     product_id = Column(Integer, ForeignKey('products.id'))
 
     # memory mappable read-only data files loaded from native format
-    # data_type = Column(String)  # almost always float32; can be int16 in the future
-    data_rows, data_cols, data_levels = Column(Integer), Column(Integer), Column(Integer, nullable=True)
+    data_rows, data_cols, data_levels = Column(Integer), Column(Integer, nullable=True), Column(Integer, nullable=True)
+    data_type = Column(String, nullable=True)  # default float32; can be int16 in the future for scaled integer images for instance; should be a numpy type name
+    data_coeffs = Column(PickleType, nullable=True)  # numpy array with polynomial coefficients for transforming native data to natural units (e.g. for scaled integers), c[0] + c[1]*x + c[2]*x**2 ...
     data_path = Column(String, unique=True)  # relative to workspace, binary array of data
-    proj4 = Column(String, nullable=True)  # proj4 projection string for the data in this array, if one exists; else assume y=lat/x=lon
     y_path = Column(String, nullable=True)  # if needed, y location cache path relative to workspace
     x_path = Column(String, nullable=True)  # if needed, x location cache path relative to workspace
     z_path = Column(String, nullable=True)  # if needed, x location cache path relative to workspace
+    proj4 = Column(String, nullable=True)  # proj4 projection string for the data in this array, if one exists; else assume y=lat/x=lon
 
-    # sparsity and coverage arrays are int8
+    # sparsity and coverage arrays are int8, must be factors of data_rows and data_cols
     sparsity_rows, sparsity_cols = Column(Integer, nullable=True), Column(Integer, nullable=True)
-    sparsity_path = Column(String, unique=True, nullable=True)  # availability array being broadcast across data, 0==unavailable, default 1s
+    sparsity_path = Column(String, unique=True, nullable=True)  # availability array being _broadcast_ across data, 0==unavailable, if not provided assume 1
     coverage_rows, coverage_cols = Column(Integer, nullable=True), Column(Integer, nullable=True)
-    coverage_path = Column(String, unique=True, nullable=True)  # availability array being stretched across data, 0==unavailable, default 1s
+    coverage_path = Column(String, unique=True, nullable=True)  # availability array being _stretched_ across data, 0==unavailable, if not provided assume 1
     metadata_path = Column(String, unique=True, nullable=True)  # json metadata path, optional
 
     mtime = Column(DateTime)  # last observed mtime of the file, for change checking
-    atime = Column(DateTime)  # last time this file was accessed by application
+    atime = Column(DateTime)  # last time this product was accessed by application
+
+    # link to key-value further information; primarily a hedge in case specific information has to be squirreled away for later consideration for main content table
+    info = relationship("ContentKeyValue", backref="content")
 
     @property
     def uuid(self):
         return self.product.uuid
+
+
+class ContentKeyValue(Base):
+    """
+    key-value pairs associated with a product
+    """
+    __tablename__ = 'content_key_values'
+    id = Column(Integer, primary_key=True)
+    product_id = Column(Integer, ForeignKey('contents.id'))
+    key = Column(String)
+    value = Column(PickleType)
 
 
 _MDB = None
