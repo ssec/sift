@@ -47,43 +47,34 @@ LOG = logging.getLogger(__name__)
 Base = declarative_base()
 
 
-class File(Base):
+class Source(Base):
     """
     held metadata regarding a file that we can access and import data into the workspace from
     """
-    __tablename__ = 'files'
+    __tablename__ = 'sources'
     # identity information
     id = Column(Integer, primary_key=True)
 
     # primary handler
     format = Column(PickleType)  # class or callable which can pull this data into workspace from storage
 
-    filename = Column(Unicode)  # basename, no path separators
-    dirname = Column(Unicode)  # directory, no trailing separator
+    uri = Column(Unicode)  # full URI of the file or other source type
     mtime = Column(DateTime)  # last observed mtime of the file, for change checking
     atime = Column(DateTime)  # last time this file was accessed by application
 
-    products = relationship("StoredProduct", backref="file")
-
-    @property
-    def path(self):
-        return os.path.join(self.dirname, self.filename)
-
-    @property
-    def is_orphan(self):
-        return not os.path.isfile(self.path)
+    products = relationship("Product", backref="source")
 
     # def touch(self, session=None):
     #     ismine, session = (False, session) if session is not None else
     #     self.atime = datetime.utcnow()
 
 
-class StoredProduct(Base):
+class Product(Base):
     """
     Primary entity being tracked in metadatabase
     One or more StoredProduct are held in a single File
-    A StoredProduct has zero or more CachedData representations, potentially at different projections
-    A StoredProduct has zero or more KeyValue pairs with additional metadata
+    A StoredProduct has zero or more Content representations, potentially at different projections
+    A StoredProduct has zero or more ProductKeyValue pairs with additional metadata
     A File's format allows data to be imported to the workspace
     A StoredProduct's kind determines how its cached data is transformed to different representations for display
     """
@@ -91,7 +82,7 @@ class StoredProduct(Base):
 
     # identity information
     id = Column(Integer, primary_key=True)
-    file_id = Column(Integer, ForeignKey('files.id'))
+    file_id = Column(Integer, ForeignKey('sources.id'))
 
     # primary handler
     kind = Column(PickleType)  # class or callable which can perform transformations on this data in workspace
@@ -182,7 +173,9 @@ class ContentKeyValue(Base):
     value = Column(PickleType)
 
 
+# singleton instance
 _MDB = None
+
 
 class Metadatabase(object):
     """
@@ -200,10 +193,10 @@ class Metadatabase(object):
             self.connect(uri, **kwargs)
 
     @staticmethod
-    def instance():
+    def instance(*args):
         global _MDB
         if _MDB is None:
-            _MDB = Metadatabase()
+            _MDB = Metadatabase(*args)
         return _MDB
 
     def connect(self, uri, **kwargs):
@@ -234,11 +227,11 @@ class tests(unittest.TestCase):
 
     def test_insert(self):
         from datetime import datetime
-        mdb = Metadatabase('sqlite://')
+        mdb = Metadatabase.instance('sqlite://')
         mdb.create_tables()
         s = mdb.session()
         when = datetime.utcnow()
-        f = File(filename='foo.bar', dirname='/baz', mtime=when, atime=when, format=None)
+        f = Source(uri=u'file://foo.bar', mtime=when, atime=when, format=None)
         s.add(f)
         s.commit()
 
