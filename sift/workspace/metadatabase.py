@@ -58,7 +58,11 @@ class Source(Base):
     # primary handler
     format = Column(PickleType)  # class or callable which can pull this data into workspace from storage
 
-    uri = Column(Unicode)  # full URI of the file or other source type
+    # {scheme}://{path}/{name}?{query}, default is just an absolute path in filesystem
+    scheme = Column(Unicode, nullable=True)  # uri scheme for the content (the part left of ://), assume file:// by default
+    path = Column(Unicode)  # directory or path component not including name
+    name = Column(Unicode)  # the name of the file or resource, incl suffix but not query
+    query = Column(Unicode, nullable=True)  # query portion of a URI or URL, e.g. 'interval=1m&stride=2'
     mtime = Column(DateTime)  # last observed mtime of the file, for change checking
     atime = Column(DateTime)  # last time this file was accessed by application
 

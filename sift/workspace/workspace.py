@@ -36,6 +36,7 @@ from PyQt4.QtCore import QObject, pyqtSignal
 from sift.model.shapes import content_within_shape
 from shapely.geometry.polygon import LinearRing
 from rasterio import Affine
+import sift.workspace.metadatabase as mdb
 
 LOG = logging.getLogger(__name__)
 
@@ -194,8 +195,7 @@ class Workspace(QObject):
     _importers = None  # list of importers to consult when asked to start an import
     _info = None
     _data = None
-    _inventory = None  # dictionary of data
-    _composite_inventory = None  # dicionary of composite datasets: { uuid: (symbols, relation, info) }
+    _inventory = None  # metadatabase instance, sqlalchemy
     _inventory_path = None  # filename to store and load inventory information (simple cache)
     _tempdir = None  # TemporaryDirectory, if it's needed (i.e. a directory name was not given)
     _max_size_gb = None  # maximum size in gigabytes of flat files we cache in the workspace
@@ -235,8 +235,7 @@ class Workspace(QObject):
             directory_path = str(self._tempdir)
             LOG.info('using temporary directory {}'.format(directory_path))
         self.cwd = directory_path = os.path.abspath(directory_path)
-        self._inventory_path = os.path.join(self.cwd, 'inventory.pkl')
-        self._composite_inventory = {}
+        self._inventory_path = os.path.join(self.cwd, '_inventory.db')
         if not os.path.isdir(directory_path):
             os.makedirs(directory_path)
             self._own_cwd = True
@@ -256,8 +255,10 @@ class Workspace(QObject):
         initialize a previously empty workspace
         :return:
         """
-        self._inventory = {}
-        self._store_inventory()
+        should_init = os.path.exists(self._inventory_path)
+        self._inventory = md = mdb.Metadatabase('sqlite://' + self._inventory_path)
+        if should_init:
+            md.create_tables()
 
     def _init_inventory_existing_datasets(self):
         """
@@ -266,11 +267,8 @@ class Workspace(QObject):
         FIXME: check workspace subdirectories for helper sockets and mmaps
         :return:
         """
-        if os.path.exists(self._inventory_path):
-            with open(self._inventory_path, 'rb') as fob:
-                self._inventory = load(fob)
-        else:
-            self._init_create_workspace()
+        # attach the database, creating it if needed
+        return self._init_create_workspace()
 
     @staticmethod
     def _key_for_path(path):
@@ -284,10 +282,7 @@ class Workspace(QObject):
         write inventory dictionary to an inventory.pkl file in the cwd
         :return:
         """
-        atomic = self._inventory_path + '-tmp'
-        with open(atomic, 'wb') as fob:
-            dump(self._inventory, fob, HIGHEST_PROTOCOL)
-        shutil.move(atomic, self._inventory_path)
+        pass
 
     def _check_cache(self, path):
         """
