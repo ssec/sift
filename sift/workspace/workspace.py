@@ -34,7 +34,7 @@ from PyQt4.QtCore import QObject, pyqtSignal
 from sift.model.shapes import content_within_shape
 from shapely.geometry.polygon import LinearRing
 from rasterio import Affine
-import sift.workspace.metadatabase as mdb
+from pyproj import Proj
 
 LOG = logging.getLogger(__name__)
 
@@ -550,8 +550,8 @@ class Workspace(QObject):
         info = self.get_info(dsi_or_uuid)
         if info is None:
             return None, None
-        x = xy_pos[0]
-        y = xy_pos[1]
+        # Assume `xy_pos` is lon/lat value
+        x, y = Proj(info[INFO.PROJ])(*xy_pos)
         col = (x - info[INFO.ORIGIN_X]) / info[INFO.CELL_WIDTH]
         row = (y - info[INFO.ORIGIN_Y]) / info[INFO.CELL_HEIGHT]
         return np.round(row), np.round(col)

@@ -51,7 +51,7 @@ DEFAULT_Y_PIXEL_SIZE = -7566.684931505724307
 DEFAULT_ORIGIN_X = -20037508.342789247632027
 DEFAULT_ORIGIN_Y = 15496570.739723727107048
 
-DEFAULT_PROJECTION = "+proj=merc +datum=WGS84 +ellps=WGS84"
+DEFAULT_PROJECTION = "+proj=merc +datum=WGS84 +ellps=WGS84 +over"
 DEFAULT_PROJ_OBJ = p = Proj(DEFAULT_PROJECTION)
 C_EQ = p(180, 0)[0] - p(-180, 0)[0]
 C_POL = p(0, 89.9)[1] - p(0, -89.9)[1]
@@ -169,8 +169,9 @@ class MercatorTileCalc(object):
         self.image_tiles_avail = (self.image_shape[0] / self.tile_shape[0], self.image_shape[1] / self.tile_shape[1])
         self.wrap_lon = wrap_lon
 
-        p = Proj(projection)
+        self.proj = p = Proj(projection)
         # Note: this logic probably only works for mercator or other cylindrical projections
+        # FIXME: Fix this for other projections
         self.world_extents_box = box(
             b=p(0, -89.9)[1],
             t=p(0, 89.9)[1],
@@ -391,6 +392,8 @@ class MercatorTileCalc(object):
         quad[:, 0] += image_origin_x + (tile_width * virt_tix)
         quad[:, 1] *= -tile_height  # Origin is upper-left so image goes down
         quad[:, 1] += self.ul_origin.y - tile_height * tiy
+        # FIXME: Can we do this in the workspace?
+        # quad[:, 0], quad[:, 1] = self.proj(quad[:, 0], quad[:, 1], inverse=True)
         quad = quad.reshape(6, 3)
         return quad[:, :2]
 

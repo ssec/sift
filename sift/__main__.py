@@ -454,7 +454,7 @@ class Main(QtGui.QMainWindow):
                 xy_pos = _xy_pos
 
         if xy_pos is not None and state:
-            lon, lat = DEFAULT_PROJ_OBJ(xy_pos[0], xy_pos[1], inverse=True)
+            lon, lat = xy_pos
             lon_str = "{:.02f} {}".format(abs(lon), "W" if lon < 0 else "E")
             lat_str = "{:.02f} {}".format(abs(lat), "S" if lat < 0 else "N")
             self.ui.cursorProbeLocation.setText("Probe Location: {}, {}".format(lon_str, lat_str))
@@ -464,7 +464,12 @@ class Main(QtGui.QMainWindow):
         if animating:
             data_str = "<animating>"
         elif state and uuid is not None:
-            data_point = self.workspace.get_content_point(uuid, xy_pos)
+            try:
+                data_point = self.workspace.get_content_point(uuid, xy_pos)
+            except ValueError:
+                LOG.debug("Could not get data value", exc_info=True)
+                data_point = None
+
             if data_point is None:
                 data_str = "N/A"
             else:
@@ -501,7 +506,9 @@ class Main(QtGui.QMainWindow):
                                                border_shapefile=border_shapefile,
                                                center=center,
                                                parent=self)
-        self.ui.mainWidgets.addTab(self.scene_manager.main_canvas.native, 'Mercator')
+        self.ui.mainMapWidget.layout().addWidget(self.scene_manager.main_canvas.native)
+        self.ui.projectionComboBox.addItems(tuple(self.document.available_projections.keys()))
+        self.ui.projectionComboBox.currentIndexChanged.connect(self.document.change_projection_index)
 
         self.scene_manager.didChangeFrame.connect(self.update_frame_slider)
         self.ui.animPlayPause.clicked.connect(self.toggle_animation)
@@ -568,9 +575,6 @@ class Main(QtGui.QMainWindow):
 
         self.scene_manager.newProbePolygon.connect(update_probe_polygon)
 
-        self.ui.mainWidgets.removeTab(0)
-        self.ui.mainWidgets.removeTab(0)
-
         # setup RGB configuration : FIXME clean this up into a behavior
         self.layerSetsManager.didChangeRGBLayerComponentRange.connect(self._user_set_rgb_range)
         self.layerSetsManager.didChangeRGBLayerSelection.connect(self._user_set_rgb_layer)
@@ -589,6 +593,7 @@ class Main(QtGui.QMainWindow):
         self.document.didRemoveLayers.connect(self.update_frame_time_to_top_visible)
         self.document.didAddBasicLayer.connect(self.update_frame_time_to_top_visible)
         self.document.didAddCompositeLayer.connect(self.update_frame_time_to_top_visible)
+        self.document.didChangeProjection.connect(self.scene_manager.set_projection)
 
         self.ui.panZoomToolButton.toggled.connect(partial(self.change_tool, name=TOOL.PAN_ZOOM))
         self.ui.pointSelectButton.toggled.connect(partial(self.change_tool, name=TOOL.POINT_PROBE))
@@ -625,6 +630,8 @@ class Main(QtGui.QMainWindow):
             # XXX: Disable the below line if updating the probe value during animation isn't a performance problem
             self.scene_manager.didChangeFrame.connect(lambda frame_info: self.ui.cursorProbeText.setText("Probe Value: <animating>"))
 
+        # Set the projection based on the document's default
+        self.document.change_projection()
 
     def closeEvent(self, event, *args, **kwargs):
         LOG.debug('main window closing')
