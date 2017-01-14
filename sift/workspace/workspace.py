@@ -32,6 +32,7 @@ from uuid import UUID, uuid1 as uuidgen
 from sift.common import KIND, INFO
 from PyQt4.QtCore import QObject, pyqtSignal
 from sift.model.shapes import content_within_shape
+import sift.workspace.metadatabase as mdb
 from shapely.geometry.polygon import LinearRing
 from rasterio import Affine
 from pyproj import Proj
