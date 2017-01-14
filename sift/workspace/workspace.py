@@ -27,9 +27,7 @@ import os, sys, re
 import logging, unittest, argparse
 import gdal, osr
 import numpy as np
-import shutil
 from collections import namedtuple
-from pickle import dump, load, HIGHEST_PROTOCOL
 from uuid import UUID, uuid1 as uuidgen
 from sift.common import KIND, INFO
 from PyQt4.QtCore import QObject, pyqtSignal
@@ -54,13 +52,13 @@ import_progress = namedtuple('import_progress', ['uuid', 'stages', 'current_stag
 TheWorkspace = None
 
 
-class WorkspaceImporter(object):
+class Importer(object):
     """
     Instances of this class are typically singletons owned by Workspace.
     They're used to perform background activity for importing large input files.
     """
     def __init__(self, **kwargs):
-        super(WorkspaceImporter, self).__init__()
+        super(Importer, self).__init__()
     
     def is_relevant(self, source_path=None, source_uri=None):
         """
@@ -83,7 +81,7 @@ class WorkspaceImporter(object):
         raise NotImplementedError('subclass must implement')
 
 
-class GeoTiffImporter(WorkspaceImporter):
+class GeoTiffImporter(Importer):
     """
     GeoTIFF data importer
     """
