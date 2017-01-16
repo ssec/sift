@@ -29,13 +29,15 @@ import gdal, osr
 import numpy as np
 from collections import namedtuple
 from uuid import UUID, uuid1 as uuidgen
-from sift.common import KIND, INFO
+from functools import lru_cache
 from PyQt4.QtCore import QObject, pyqtSignal
-from sift.model.shapes import content_within_shape
-import sift.workspace.metadatabase as mdb
 from shapely.geometry.polygon import LinearRing
 from rasterio import Affine
 from pyproj import Proj
+
+from sift.common import KIND, INFO
+from sift.model.shapes import content_within_shape
+import sift.workspace.metadatabase as mdb
 
 LOG = logging.getLogger(__name__)
 
@@ -371,6 +373,7 @@ class Workspace(QObject):
     # often-used queries
     #
 
+    @lru_cache
     def _product_with_uuid(self, uuid):
         return self._S.query(mdb.Product).filter_by(uuid=uuid).first()
 
@@ -432,6 +435,7 @@ class Workspace(QObject):
     #     s = os.stat(path)
     #     return (os.path.realpath(path), s.st_mtime, s.st_size)
 
+    # @lru_cache
     def _product_std_info(self, prod:mdb.Product):
         nat = self._product_native_content(prod)
 
@@ -453,7 +457,6 @@ class Workspace(QObject):
         :param lod: desired level of detail to focus
         :return:
         """
-        from sift.workspace.metadatabase import ProductInfoAsWritableMappingAdapter as PIWMA
         from collections import ChainMap
 
         if isinstance(dsi_or_uuid, str):
@@ -463,8 +466,7 @@ class Workspace(QObject):
         if prod is None:
             return None
 
-
-        return ChainMap(PIWMA(self._S, prod), self._product_std_info(prod))
+        return ChainMap(prod, self._product_std_info(prod))
 
 
 #----------------------------------------------------------------------

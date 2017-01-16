@@ -130,7 +130,7 @@ class Product(ProxiedDictMixin, Base):
     id = Column(Integer, primary_key=True)
     source_id = Column(Integer, ForeignKey(Source.id))
     # relationship: .source
-    uuid = Column(String, nullable=True)  # UUID representing this data in SIFT, or None if not in cache
+    uuid = Column(String, nullable=False, unique=True)  # UUID representing this data in SIFT, or None if not in cache
 
     # primary handler
     kind = Column(PickleType)  # class or callable which can perform transformations on this data in workspace
@@ -354,9 +354,11 @@ class tests(unittest.TestCase):
         mdb = Metadatabase.instance('sqlite://')
         mdb.create_tables()
         s = mdb.session()
+        from uuid import uuid1
+        uu = uuid1()
         when = datetime.utcnow()
         f = Source(path='', name='foo.bar', mtime=when, atime=when, format=None)
-        p = Product(source=f, platform='TEST', identifier='B00')
+        p = Product(uuid=str(uu), source=f, platform='TEST', identifier='B00')
         p['test_key'] = u'test_value'
         s.add(f)
         s.add(p)
