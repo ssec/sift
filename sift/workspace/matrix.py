@@ -9,10 +9,11 @@ DataMatrix is products X timesteps matrix
 Each matrix cell has a state
 Some states have UUIDs and therefore data
 Search directories and create index of what data is where
+Used by Workspace to respond to adjacency queries / product matrix requests
 
 USAGE
 
-dm = DataMatrix('/data', recurse=True)
+dm = DataAdjacencyMatrix('/data', recurse=True)
 # search through files
 for _ in dm.finditer():
     pass
@@ -69,7 +70,7 @@ row_info = namedtuple('row_info', ('product_name', 'timestep_count'))
 product_info = namedtuple('product_info', ('product_name', 'time', 'state', 'path', 'variable', 'slice'))
 
 
-class DataMatrix(QObject):
+class DataAdjacencyMatrix(QObject):
     """
     A product x time matrix of available data.
     - directs the workspace to load or unload data
@@ -78,7 +79,7 @@ class DataMatrix(QObject):
     - allows re-ordering of products, resulting in z-order scenegraph changes
     """
     def __init__(self, initial_search_paths=[]):
-        super(DataMatrix, self).__init__()
+        super(DataAdjacencyMatrix, self).__init__()
 
     def add_search_paths(self, *paths):
         pass

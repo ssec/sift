@@ -5,8 +5,8 @@ metadatabase.py
 ===============
 
 PURPOSE
-Manage SQLAlchemy database of information used to manage workspace
-Used by DataMatrix as well
+SQLAlchemy database tables of metadata used by Workspace to manage its local cache.
+Incidentally used by manage adjacency matrix (DataMatrix).
 
 
 OVERVIEW
@@ -14,10 +14,12 @@ OVERVIEW
 The workspace caches content, which represents products, the native form of which resides in a file
 
 File : a file somewhere in the filesystem
- |_ StoredProduct* : product stored in a file
+ |_ Product* : product stored in a file
      |_ Content* : workspace cache content corresponding to a product
      |   |_ ContentKeyValue* : additional information on content
      |_ ProductKeyValue* : additional information on product
+
+A typical baseline product will have two content: and overview (lod==0) and a native resolution (lod>0)
 
 
 REQUIRES
@@ -88,6 +90,7 @@ class Product(Base):
     id = Column(Integer, primary_key=True)
     source_id = Column(Integer, ForeignKey(Source.id))
     # relationship: .source
+    uuid = Column(String, nullable=True)  # UUID representing this data in SIFT, or None if not in cache
 
     # primary handler
     kind = Column(PickleType)  # class or callable which can perform transformations on this data in workspace
@@ -111,7 +114,6 @@ class Product(Base):
     description = Column(UnicodeText, nullable=True)
 
     # link to workspace cache
-    uuid = Column(PickleType, nullable=True)  # UUID object representing this data in SIFT, or None if not in cache
     cache = relationship("Content", backref="product")
 
     # link to key-value further information
@@ -185,6 +187,20 @@ class Content(Base):
     @property
     def uuid(self):
         return self.product.uuid
+
+    @property
+    def is_overview(self):
+        return self.lod==0
+
+    def __str__(self):
+        product = "%s:%s.%s" % (self.product.source.name or '?', self.product.platform or '?', self.product.identifier or '?')
+        isoverview = ' overview' if self.is_overview else ''
+        dtype = self.dtype or 'float32'
+        xyzcs = ' '.join(
+            q for (q,p) in zip('XYZCS', (self.x_path, self.y_path, self.z_path, self.coverage_path, self.sparsity_path)) if p
+        )
+        return "<product {product} content{isoverview} with path={path} dtype={dtype} {xyzcs}>".format(
+            product=product, isoverview=isoverview, path=self.path, dtype=dtype, xyzcs=xyzcs)
 
 
 class ContentKeyValue(Base):

@@ -53,6 +53,9 @@ import_progress = namedtuple('import_progress', ['uuid', 'stages', 'current_stag
 TheWorkspace = None
 
 
+workspace_data_arrays = namedtuple('workspace_data_arrays', ('rcl', 'data', 'sparsity', 'coverage', 'y', 'x', 'z'))
+
+
 class Importer(object):
     """
     Instances of this class are typically singletons owned by Workspace.
@@ -170,8 +173,6 @@ class GeoTiffImporter(Importer):
         # note that once the coarse data is yielded, we may be operating in another thread - think about that for now?
 
 
-
-
 class Workspace(QObject):
     """
     Workspace is a singleton object which works with Datasets shall:
@@ -194,6 +195,7 @@ class Workspace(QObject):
     _importers = None  # list of importers to consult when asked to start an import
     _info = None
     _data = None
+    _available = None  # dictionary of {Content.id : workspace_data_arrays}
     _inventory = None  # metadatabase instance, sqlalchemy
     _inventory_path = None  # filename to store and load inventory information (simple cache)
     _mdb_session = None  # MDB session
@@ -275,6 +277,54 @@ class Workspace(QObject):
         # attach the database, creating it if needed
         return self._init_create_workspace()
 
+    @staticmethod
+    def _rcls(r:int, c:int, l:int):
+        """
+        :param r: rows or None
+        :param c: columns or None
+        :param l: levels or None
+        :return: condensed tuple(string with 'rcl', 'rc', 'rl', dimension tuple corresponding to string)
+        """
+        rcl_shape = tuple(
+            (name, dimension) for (name, dimension) in zip('rcl', (r, c, l)) if dimension)
+        rcl = tuple(x[0] for x in rcl_shape)
+        shape = tuple(x[1] for x in rcl_shape)
+        return rcl, shape
+
+    # data array handling
+    def _attach_content(self, c: mdb.Content):
+        """
+        attach content arrays, for holding by workspace in _available
+        :param c: Content entity from database
+        :return: workspace_data_arrays instance
+        """
+        rcl, shape = self._rcl(c.rows, c.cols, c.levels)
+        data = np.memmap(os.path.join(self.cwd, c.path), dtype=c.dtype or np.float32, mode='r', shape=shape)
+        y = np.memmap(os.path.join(self.cwd, c.y_path), dtype=c.dtype or np.float32, mode='r', shape=shape) if c.y_path else None
+        x = np.memmap(os.path.join(self.cwd, c.x_path), dtype=c.dtype or np.float32, mode='r', shape=shape) if c.x_path else None
+        z = np.memmap(os.path.join(self.cwd, c.z_path), dtype=c.dtype or np.float32, mode='r', shape=shape) if c.z_path else None
+
+        _, cshape = self._rcls(c.coverage_cols, c.coverage_cols, c.coverage_levels)
+        coverage = np.memmap(os.path.join(self.cwd, c.coverage_path), dtype=np.int8, mode='r', shape=cshape) if c.coverage_path else None
+        _, sshape = self._rcls(c.coverage_cols, c.coverage_cols, c.coverage_levels)
+        sparsity = np.memmap(os.path.join(self.cwd, c.sparsity_path), dtype=np.int8, mode='r', shape=sshape) if c.sparsity_path else None
+
+        return workspace_data_arrays(rcl = rcl, data = data,
+                                     y=None, x=None, z=None,
+                                     coverage=coverage, sparsity=sparsity)
+
+    def _cached_arrays_for_content(self, c:mdb.Content):
+        """
+        :param c: metadatabase Content object
+        :return: workspace_content_arrays
+        """
+        cache_entry = self._available.get(c.id, None)
+        if cache_entry is None:
+            new_entry = self._attach_content(c)
+            self._available[c.id] = cache_entry = new_entry
+        return cache_entry
+
+
     @property
     def _total_workspace_bytes(self):
         """
@@ -283,7 +333,9 @@ class Workspace(QObject):
         """
         total = 0
         for root, dirs, files in os.walk(self.cwd):
-            total += sum(os.path.getsize(os.path.join(root, name)) for name in files)
+            sz = sum(os.path.getsize(os.path.join(root, name)) for name in files)
+            LOG.debug('%d bytes in %s' % (sz, root))
+
         return total
 
     # @staticmethod
@@ -305,6 +357,7 @@ class Workspace(QObject):
         :param path: file we're checking
         :return: uuid, info, overview_content if the data is already available without import
         """
+        FIXME
         key = self._key_for_path(path)
         nfo = self._inventory.get(key, None)
         if nfo is None:
@@ -321,7 +374,8 @@ class Workspace(QObject):
 
     @property
     def paths_in_cache(self):
-        return [x[0] for x in self._inventory.keys()]
+        # find non-overview non-auxiliary data files
+        return [x.path for x in self._S.query(mdb.Content).filter(mdb.Content.lod>0).all()]
 
     def _update_cache(self, path, uuid, info, data):
         """
@@ -332,6 +386,7 @@ class Workspace(QObject):
         :param data: numpy.memmap backed by a file in the workspace
         :return:
         """
+        FIXME
         key = self._key_for_path(path)
         data_info = (os.path.split(data.filename)[1], data.dtype, data.shape)
         nfo = (uuid, info, data_info)
@@ -339,6 +394,7 @@ class Workspace(QObject):
         self._store_inventory()
 
     def remove_paths_from_cache(self, paths):
+        FIXME
         keys = [self._key_for_path(path) for path in paths]
         for key in keys:
             entry = self._inventory.get(key, None)
@@ -359,6 +415,7 @@ class Workspace(QObject):
 
     def _inventory_check(self):
         "return revised_inventory_dict, [(access-time, size, path, key), ...], total_size"
+        FIXME
         cache = []
         inv = dict(self._inventory)
         total_size = 0
@@ -377,7 +434,11 @@ class Workspace(QObject):
         cache.sort()
         return inv, cache, total_size
 
+    def _product_with_uuid(self, uuid):
+        return self._S.query(mdb.Product).filter_by(uuid=uuid).first()
+
     def recently_used_cache_paths(self, n=32):
+        FIXME "replace this completely with product list"
         inv, cache, total_size = self._inventory_check()
         self._inventory = inv
         self._store_inventory()
@@ -391,6 +452,7 @@ class Workspace(QObject):
         possibly include a workspace setting for max workspace size in bytes?
         :return:
         """
+        FIXME
         # get information on current cache contents
         LOG.info("cleaning cache")
         inv, cache, total_size = self._inventory_check()
@@ -466,12 +528,6 @@ class Workspace(QObject):
         # TODO: schedule cache cleaning in background after a series of imports completes
         return uuid, info, data
 
-    def create_composite(self, symbols:dict, relation:dict):
-        """
-        create a layer composite in the workspace
-        :param symbols: dictionary of logical-name to uuid
-        :param relation: dictionary with information on how the relation is calculated (FUTURE)
-        """
 
 
     def _preferred_cache_path(self, uuid):
@@ -486,6 +542,7 @@ class Workspace(QObject):
         pathname = self._preferred_cache_path(uuid)
         fp = open(pathname, 'wb+')
         mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
+        FIXME: register with content table
         mm[:] = data[:]
         return mm
 
@@ -506,6 +563,7 @@ class Workspace(QObject):
         :param dsi: datasetinfo dictionary or UUID of a dataset
         :return: True if successfully deleted, False if not found
         """
+        FIXME
         if isinstance(dsi, dict):
             name = dsi[INFO.NAME]
         else:
@@ -533,11 +591,14 @@ class Workspace(QObject):
     def get_content(self, dsi_or_uuid, lod=None):
         """
         :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
-        :param lod: desired level of detail to focus
+        :param lod: desired level of detail to focus  (0 for overview)
         :return:
         """
+        FIXME
         if isinstance(dsi_or_uuid, str):
             dsi_or_uuid = UUID(dsi_or_uuid)
+        prod = self._product_with_uuid(dsi_or_uuid)
+
         return self._data.get(dsi_or_uuid, None)
 
     def _create_position_to_index_transform(self, dsi_or_uuid):
@@ -611,29 +672,7 @@ class Workspace(QObject):
         )
         return data[index_mask]
 
-    def __getitem__(self, datasetinfo_or_uuid):
-        """
-        return science content proxy capable of generating a numpy array when sliced
-        :param datasetinfo_or_uuid: metadata or key for the dataset
-        :return: sliceable object returning numpy arrays
-        """
-        pass
 
-    def asProbeDataSource(self, **kwargs):
-        """
-        Produce delegate used to match masks to data content.
-        :param kwargs:
-        :return: delegate object used by probe objects to access workspace content
-        """
-        return self  # FUTURE: revise this once we have more of an interface specification
-
-    def asLayerDataSource(self, uuid=None, **kwargs):
-        """
-        produce layer data source delegate to be handed to a LayerRep
-        :param kwargs:
-        :return:
-        """
-        return self  # FUTURE: revise this once we have more of an interface specification
 
 
 def main():
