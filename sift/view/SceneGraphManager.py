@@ -497,13 +497,12 @@ class SceneGraphManager(QObject):
         :param resolution: number of degrees between lines
         """
         lons = np.arange(-180., 180. + resolution, resolution, dtype=np.float32)
-        lats = np.arange(-89.9, 89.9 + resolution, resolution, dtype=np.float32)
+        lats = np.arange(-90., 90. + resolution, resolution, dtype=np.float32)
 
         # One long line of lawn mower pattern (lon lines, then lat lines)
         points = np.empty((lons.shape[0] * lats.shape[0] * 2, 2), np.float32)
         LOG.debug("Generating longitude lines...")
         for idx, lon_point in enumerate(lons):
-            print(lon_point)
             points[idx * lats.shape[0]:(idx + 1) * lats.shape[0], 0] = lon_point
             if idx % 2 == 0:
                 points[idx * lats.shape[0]:(idx + 1) * lats.shape[0], 1] = lats
@@ -527,6 +526,7 @@ class SceneGraphManager(QObject):
 
         # return Line(pos=points2, connect="segments", color=color, parent=self.main_map)
         return Line(pos=points2, connect="strip", color=color, parent=self.main_map)
+        # return Line(pos=points, connect="strip", color=color, parent=self.main_map)
 
     def on_mouse_press_point(self, event):
         """Handle mouse events that mean we are using the point probe.
