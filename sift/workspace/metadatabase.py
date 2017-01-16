@@ -39,9 +39,43 @@ from collections import MutableMapping
 from sqlalchemy import Column, Integer, String, UnicodeText, Unicode, ForeignKey, DateTime, Interval, PickleType, Float, create_engine
 from sqlalchemy.orm import Session, relationship, sessionmaker, backref
 from sqlalchemy.ext.declarative import declarative_base
-
+from sqlalchemy.orm.collections import attribute_mapped_collection
+from sqlalchemy.ext.associationproxy import association_proxy
 
 LOG = logging.getLogger(__name__)
+
+#
+# ref   http://docs.sqlalchemy.org/en/latest/_modules/examples/vertical/dictlike.html
+#
+
+class ProxiedDictMixin(object):
+    """Adds obj[key] access to a mapped class.
+
+    This class basically proxies dictionary access to an attribute
+    called ``_proxied``.  The class which inherits this class
+    should have an attribute called ``_proxied`` which points to a dictionary.
+
+    """
+
+    def __len__(self):
+        return len(self._proxied)
+
+    def __iter__(self):
+        return iter(self._proxied)
+
+    def __getitem__(self, key):
+        return self._proxied[key]
+
+    def __contains__(self, key):
+        return key in self._proxied
+
+    def __setitem__(self, key, value):
+        self._proxied[key] = value
+
+    def __delitem__(self, key):
+        del self._proxied[key]
+
+
 
 
 # =================
@@ -80,7 +114,7 @@ class Source(Base):
     #     self.atime = datetime.utcnow()
 
 
-class Product(Base):
+class Product(ProxiedDictMixin, Base):
     """
     Primary entity being tracked in metadatabase
     One or more StoredProduct are held in a single File
@@ -88,6 +122,7 @@ class Product(Base):
     A StoredProduct has zero or more ProductKeyValue pairs with additional metadata
     A File's format allows data to be imported to the workspace
     A StoredProduct's kind determines how its cached data is transformed to different representations for display
+    additional information is stored in a key-value table addressable as product[key:str]
     """
     __tablename__ = 'products'
 
@@ -121,7 +156,10 @@ class Product(Base):
     contents = relationship("Content", backref=backref("product", cascade="all"))
 
     # link to key-value further information
-    info = relationship("ProductKeyValue", backref=backref("product", cascade="all"))
+    # this provides dictionary style access to key-value pairs
+    info = relationship("ProductKeyValue", collection_class=attribute_mapped_collection('key'))
+    _proxied = association_proxy("info", "value",
+                                 creator=lambda key, value: ProductKeyValue(key=key, value=value))
 
 
 class ProductKeyValue(Base):
@@ -135,7 +173,7 @@ class ProductKeyValue(Base):
     value = Column(PickleType)
 
 
-class Content(Base):
+class Content(ProxiedDictMixin, Base):
     """
     represent flattened product data files in cache (i.e. cache content)
     typically memory-map ready data (np.memmap)
@@ -143,6 +181,7 @@ class Content(Base):
     images will typically have rows>0 cols>0 levels=None (implied levels=1)
     profiles may have rows>0 cols=None (implied cols=1) levels>0
     a given product may have several Content for different projections
+    additional information is stored in a key-value table addressable as content[key:str]
     """
     __tablename__ = 'contents'
     id = Column(Integer, primary_key=True)
@@ -186,9 +225,11 @@ class Content(Base):
     x_path = Column(String, nullable=True)  # if needed, x location cache path relative to workspace
     z_path = Column(String, nullable=True)  # if needed, x location cache path relative to workspace
 
-
     # link to key-value further information; primarily a hedge in case specific information has to be squirreled away for later consideration for main content table
-    info = relationship("ContentKeyValue", backref=backref("content", cascade="all"))
+    # this provides dictionary style access to key-value pairs
+    info = relationship("ContentKeyValue", collection_class=attribute_mapped_collection('key'))
+    _proxied = association_proxy("info", "value",
+                                 creator=lambda key, value: ContentKeyValue(key=key, value=value))
 
     @property
     def uuid(self):
@@ -260,42 +301,42 @@ class Metadatabase(object):
         return self.session_factory()
 
 
-# ============================
-# mapping wrappers
-
-class ProductInfoAsWritableMappingAdapter(MutableMapping):
-    """
-    database Product.info dictionary adapter
-    """
-    def __init__(self, session, product, warn_on_write=True):
-        self.S = session
-        self.prod = product
-        self.wow = warn_on_write
-
-    def __contains__(self, item):
-        items = self.S.query(ProductKeyValue).filter_by(product_id=self.prod.id, key=item).all()
-        return len(items)>0
-
-    def __getitem__(self, item:str):
-        kvs = self.S.query(ProductKeyValue).filter_by(product_id=self.prod.id, key=item).all()
-        if not kvs:
-            raise KeyError("product does not have value for key {}".format(item))
-        if len(kvs)>1:
-            raise AssertionError('more than one value for %s' % item)
-
-    def __setitem__(self, key, value):
-        if self.wow:
-            LOG.warning('attempting to write to Product info dictionary in workspace??')
-        kvs = self.S.query(ProductKeyValue).filter_by(product_id=self.prod.id, key=key).all()
-        if not kvs:
-            kv = ProductKeyValue(key=key, value=value)
-            self.S.add(kv)
-            self.product.info.append(kv)
-            self.S.commit()
-        if len(kvs)>1:
-            raise AssertionError('more than one value for {}'.format(key))
-        kvs[0].value = value
-        self.S.commit()
+# # ============================
+# # mapping wrappers
+#
+# class ProductInfoAsWritableMappingAdapter(MutableMapping):
+#     """
+#     database Product.info dictionary adapter
+#     """
+#     def __init__(self, session, product, warn_on_write=True):
+#         self.S = session
+#         self.prod = product
+#         self.wow = warn_on_write
+#
+#     def __contains__(self, item):
+#         items = self.S.query(ProductKeyValue).filter_by(product_id=self.prod.id, key=item).all()
+#         return len(items)>0
+#
+#     def __getitem__(self, item:str):
+#         kvs = self.S.query(ProductKeyValue).filter_by(product_id=self.prod.id, key=item).all()
+#         if not kvs:
+#             raise KeyError("product does not have value for key {}".format(item))
+#         if len(kvs)>1:
+#             raise AssertionError('more than one value for %s' % item)
+#
+#     def __setitem__(self, key, value):
+#         if self.wow:
+#             LOG.warning('attempting to write to Product info dictionary in workspace??')
+#         kvs = self.S.query(ProductKeyValue).filter_by(product_id=self.prod.id, key=key).all()
+#         if not kvs:
+#             kv = ProductKeyValue(key=key, value=value)
+#             self.S.add(kv)
+#             self.product.info.append(kv)
+#             self.S.commit()
+#         if len(kvs)>1:
+#             raise AssertionError('more than one value for {}'.format(key))
+#         kvs[0].value = value
+#         self.S.commit()
 
 
 # ============================
