@@ -34,7 +34,7 @@ import os, sys
 import logging, unittest, argparse
 
 from sqlalchemy import Column, Integer, String, UnicodeText, Unicode, ForeignKey, DateTime, Interval, PickleType, create_engine
-from sqlalchemy.orm import Session, relationship, sessionmaker
+from sqlalchemy.orm import Session, relationship, sessionmaker, backref
 from sqlalchemy.ext.declarative import declarative_base
 
 
@@ -86,7 +86,8 @@ class Product(Base):
 
     # identity information
     id = Column(Integer, primary_key=True)
-    file_id = Column(Integer, ForeignKey('sources.id'))
+    source_id = Column(Integer, ForeignKey(Source.id))
+    # relationship: .source
 
     # primary handler
     kind = Column(PickleType)  # class or callable which can perform transformations on this data in workspace
@@ -94,13 +95,16 @@ class Product(Base):
     # cached metadata provided by the file format handler
     platform = Column(String)  # platform or satellite name e.g. "GOES-16", "Himawari-8"
     identifier = Column(String)  # product identifier eg "B01", "B02"
+
     # times
     timeline = Column(DateTime)  # normalized instantaneous scheduled observation time e.g. 20170122T2310
     start = Column(DateTime, nullable=True)  # actual observation time start
     duration = Column(Interval, nullable=True)  # actual observation duration
+
     # geometry
     resolution = Column(Integer, nullable=True)  # meters max resolution, e.g. 500, 1000, 2000, 4000
     proj4 = Column(String, nullable=True)  # native projection of the data in its original form, if one exists
+
     # descriptive
     units = Column(Unicode, nullable=True)  # udunits compliant units, e.g. 'K'
     label = Column(Unicode, nullable=True)  # "AHI Refl B11"
@@ -120,7 +124,8 @@ class ProductKeyValue(Base):
     """
     __tablename__ = 'product_key_values'
     id = Column(Integer, primary_key=True)
-    product_id = Column(Integer, ForeignKey('products.id'))
+    product_id = Column(Integer, ForeignKey(Product.id))
+    # relationship: .product
     key = Column(String)
     value = Column(PickleType)
 
@@ -136,27 +141,43 @@ class Content(Base):
     """
     __tablename__ = 'contents'
     id = Column(Integer, primary_key=True)
-    product_id = Column(Integer, ForeignKey('products.id'))
+    product_id = Column(Integer, ForeignKey(Product.id))
 
-    # memory mappable read-only data files loaded from native format
-    data_rows, data_cols, data_levels = Column(Integer), Column(Integer, nullable=True), Column(Integer, nullable=True)
-    data_type = Column(String, nullable=True)  # default float32; can be int16 in the future for scaled integer images for instance; should be a numpy type name
-    data_coeffs = Column(PickleType, nullable=True)  # numpy array with polynomial coefficients for transforming native data to natural units (e.g. for scaled integers), c[0] + c[1]*x + c[2]*x**2 ...
-    data_path = Column(String, unique=True)  # relative to workspace, binary array of data
+    # handle overview versus detailed data
+    lod = Column(Integer)  # power of 2 level of detail; 0 for coarse-resolution overview
+    resolution = Column(Integer)  # maximum resolution in meters for this representation of the dataset
+
+    # time accounting, used to check if data needs to be re-imported to workspace, or whether data is LRU and can be removed from a crowded workspace
+    mtime = Column(DateTime)  # last observed mtime of the original source of this data, for change checking
+    atime = Column(DateTime)  # last time this product was accessed by application
+
+    # actual data content
+    # NaNs are used to signify missing data; NaNs can include integer category fields in significand; please ref IEEE 754
+    path = Column(String, unique=True)  # relative to workspace, binary array of data
+    rows, cols, levels = Column(Integer), Column(Integer, nullable=True), Column(Integer, nullable=True)
+    dtype = Column(String, nullable=True)  # default float32; can be int16 in the future for scaled integer images for instance; should be a numpy type name
+    proj4 = Column(String, nullable=True)  # proj4 projection string for the data in this array, if one exists; else assume y=lat/x=lon
+    coeffs = Column(String, nullable=True)  # json for numpy array with polynomial coefficients for transforming native data to natural units (e.g. for scaled integers), c[0] + c[1]*x + c[2]*x**2 ...
+    values = Column(String, nullable=True)  # json for optional dict {int:string} lookup table for NaN flag fields (when dtype is float32 or float64) or integer values (when dtype is an int8/16/32/64)
+
+    # sparsity and coverage, int8 arrays if needed to show incremental availability of the data
+    # dimensionality is always a reduction factor of rows/cols/levels
+    # coverage is stretched across the data array
+    #   e.g. for loading data sectioned or blocked across multiple files
+    # sparsity is broadcast over the data array
+    #   e.g. for incrementally loading sparse data into a dense array
+    # a zero value indicates data is not available, nonzero signifies availability
+    coverage_rows, coverage_cols, coverage_levels = Column(Integer, nullable=True), Column(Integer, nullable=True), Column(Integer, nullable=True)
+    coverage_path = Column(String, nullable=True)
+    sparsity_rows, sparsity_cols, sparsity_levels = Column(Integer, nullable=True), Column(Integer, nullable=True), Column(Integer, nullable=True)
+    sparsity_path = Column(String, nullable=True)
+
+    # navigation information, if required
+    xyz_dtype = Column(String, nullable=True)  # dtype of x,y,z arrays, default float32
     y_path = Column(String, nullable=True)  # if needed, y location cache path relative to workspace
     x_path = Column(String, nullable=True)  # if needed, x location cache path relative to workspace
     z_path = Column(String, nullable=True)  # if needed, x location cache path relative to workspace
-    proj4 = Column(String, nullable=True)  # proj4 projection string for the data in this array, if one exists; else assume y=lat/x=lon
 
-    # sparsity and coverage arrays are int8, must be factors of data_rows and data_cols
-    sparsity_rows, sparsity_cols = Column(Integer, nullable=True), Column(Integer, nullable=True)
-    sparsity_path = Column(String, unique=True, nullable=True)  # availability array being _broadcast_ across data, 0==unavailable, if not provided assume 1
-    coverage_rows, coverage_cols = Column(Integer, nullable=True), Column(Integer, nullable=True)
-    coverage_path = Column(String, unique=True, nullable=True)  # availability array being _stretched_ across data, 0==unavailable, if not provided assume 1
-    metadata_path = Column(String, unique=True, nullable=True)  # json metadata path, optional
-
-    mtime = Column(DateTime)  # last observed mtime of the file, for change checking
-    atime = Column(DateTime)  # last time this product was accessed by application
 
     # link to key-value further information; primarily a hedge in case specific information has to be squirreled away for later consideration for main content table
     info = relationship("ContentKeyValue", backref="content")
@@ -172,7 +193,7 @@ class ContentKeyValue(Base):
     """
     __tablename__ = 'content_key_values'
     id = Column(Integer, primary_key=True)
-    product_id = Column(Integer, ForeignKey('contents.id'))
+    content_id = Column(Integer, ForeignKey(Content.id))
     key = Column(String)
     value = Column(PickleType)
 
@@ -235,7 +256,7 @@ class tests(unittest.TestCase):
         mdb.create_tables()
         s = mdb.session()
         when = datetime.utcnow()
-        f = Source(uri=u'file://foo.bar', mtime=when, atime=when, format=None)
+        f = Source(path='', name='foo.bar', mtime=when, atime=when, format=None)
         s.add(f)
         s.commit()
 

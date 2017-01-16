@@ -196,6 +196,7 @@ class Workspace(QObject):
     _data = None
     _inventory = None  # metadatabase instance, sqlalchemy
     _inventory_path = None  # filename to store and load inventory information (simple cache)
+    _mdb_session = None  # MDB session
     _tempdir = None  # TemporaryDirectory, if it's needed (i.e. a directory name was not given)
     _max_size_gb = None  # maximum size in gigabytes of flat files we cache in the workspace
     _queue = None
@@ -208,6 +209,10 @@ class Workspace(QObject):
     didDiscoverExternalDataset = pyqtSignal(dict)  # a new dataset was added to the workspace from an external agent
 
     IMPORT_CLASSES = [ GeoTiffImporter ]
+
+    @property
+    def _S(self):
+        return self._mdb_session
 
     @staticmethod
     def defaultWorkspace():
@@ -258,6 +263,7 @@ class Workspace(QObject):
         self._inventory = md = mdb.Metadatabase('sqlite://' + self._inventory_path)
         if should_init:
             md.create_tables()
+        self._mdb_session = md.session()
 
     def _init_inventory_existing_datasets(self):
         """
@@ -269,19 +275,30 @@ class Workspace(QObject):
         # attach the database, creating it if needed
         return self._init_create_workspace()
 
-    @staticmethod
-    def _key_for_path(path):
-        if not os.path.exists(path):
-            return None
-        s = os.stat(path)
-        return (os.path.realpath(path), s.st_mtime, s.st_size)
+    @property
+    def _total_workspace_bytes(self):
+        """
+        total number of bytes in the workspace by brute force instead of metadata search
+        :return:
+        """
+        total = 0
+        for root, dirs, files in os.walk(self.cwd):
+            total += sum(os.path.getsize(os.path.join(root, name)) for name in files)
+        return total
+
+    # @staticmethod
+    # def _key_for_path(path):
+    #     if not os.path.exists(path):
+    #         return None
+    #     s = os.stat(path)
+    #     return (os.path.realpath(path), s.st_mtime, s.st_size)
 
     def _store_inventory(self):
         """
         write inventory dictionary to an inventory.pkl file in the cwd
         :return:
         """
-        pass
+        self._S.commit()
 
     def _check_cache(self, path):
         """
