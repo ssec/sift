@@ -497,43 +497,36 @@ class SceneGraphManager(QObject):
         :param resolution: number of degrees between lines
         """
         lons = np.arange(-180., 180. + resolution, resolution, dtype=np.float32)
-        lats = np.arange(-89.9, 89.9, resolution, dtype=np.float32)
+        lats = np.arange(-89.9, 89.9 + resolution, resolution, dtype=np.float32)
 
-        box_lons = np.empty(((lons.shape[0] + lats.shape[0]) * 2,), dtype=np.float32)
-        box_lons[0:lons.shape[0]] = lons
-        box_lons[lons.shape[0]:lons.shape[0] * 2] = lons
-        box_lons[lons.shape[0] * 2:lons.shape[0] * 2 + lats.shape[0]] = -180
-        box_lons[lons.shape[0] * 2 + lats.shape[0]:] = 180
-
-        box_lats = np.empty(((lons.shape[0] + lats.shape[0]) * 2,), dtype=np.float32)
-        box_lats[0:lons.shape[0]] = -89.9
-        box_lats[lons.shape[0]:lons.shape[0] * 2] = 89.9
-        box_lats[lons.shape[0] * 2: lons.shape[0] * 2 + lats.shape[0]] = lats
-        box_lats[lons.shape[0] * 2 + lats.shape[0]:] = lats
-
-        # Assume all of the longitude and latitudes map correctly
-        # box_x, box_y = p(box_lons, box_lats)
-        box_x, box_y = box_lons, box_lats
-        points = np.empty((box_x.shape[0], 2), dtype=np.float32)
-        # Longitude lines
-        points[:lons.shape[0] * 2:2, 0] = box_x[:lons.shape[0]]
-        points[:lons.shape[0] * 2:2, 1] = box_y[:lons.shape[0]]
-        points[1:lons.shape[0] * 2:2, 0] = box_x[lons.shape[0]:lons.shape[0] * 2]
-        points[1:lons.shape[0] * 2:2, 1] = box_y[lons.shape[0]:lons.shape[0] * 2]
-        # Latitude lines
-        points[lons.shape[0] * 2::2, 0] = box_x[lons.shape[0] * 2:lons.shape[0] * 2 + lats.shape[0]]
-        points[lons.shape[0] * 2::2, 1] = box_y[lons.shape[0] * 2:lons.shape[0] * 2 + lats.shape[0]]
-        points[lons.shape[0] * 2 + 1::2, 0] = box_x[lons.shape[0] * 2 + lats.shape[0]:]
-        points[lons.shape[0] * 2 + 1::2, 1] = box_y[lons.shape[0] * 2 + lats.shape[0]:]
+        # One long line of lawn mower pattern (lon lines, then lat lines)
+        points = np.empty((lons.shape[0] * lats.shape[0] * 2, 2), np.float32)
+        LOG.debug("Generating longitude lines...")
+        for idx, lon_point in enumerate(lons):
+            print(lon_point)
+            points[idx * lats.shape[0]:(idx + 1) * lats.shape[0], 0] = lon_point
+            if idx % 2 == 0:
+                points[idx * lats.shape[0]:(idx + 1) * lats.shape[0], 1] = lats
+            else:
+                points[idx * lats.shape[0]:(idx + 1) * lats.shape[0], 1] = lats[::-1]
+        start_idx = lons.shape[0] * lats.shape[0]
+        LOG.debug("Generating latitude lines...")
+        for idx, lat_point in enumerate(lats[::-1]):
+            points[start_idx + idx * lons.shape[0]:start_idx + (idx + 1) * lons.shape[0], 1] = lat_point
+            if idx % 2 == 0:
+                points[start_idx + idx * lons.shape[0]:start_idx + (idx + 1) * lons.shape[0], 0] = lons
+            else:
+                points[start_idx + idx * lons.shape[0]:start_idx + (idx + 1) * lons.shape[0], 0] = lons[::-1]
 
         # Repeat for "second" size of the earth (180 to 540)
-        offset = box_x[lons.shape[0] - 1] - box_x[0]
+        offset = 360  # box_x[lons.shape[0] - 1] - box_x[0]
         points2 = np.empty((points.shape[0] * 2, 2), dtype=np.float32)
         points2[:points.shape[0], :] = points
         points2[points.shape[0]:, :] = points
         points2[points.shape[0]:, 0] += offset
 
-        return Line(pos=points2, connect="segments", color=color, parent=self.main_map)
+        # return Line(pos=points2, connect="segments", color=color, parent=self.main_map)
+        return Line(pos=points2, connect="strip", color=color, parent=self.main_map)
 
     def on_mouse_press_point(self, event):
         """Handle mouse events that mean we are using the point probe.
