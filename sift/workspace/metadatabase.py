@@ -356,8 +356,13 @@ class tests(unittest.TestCase):
         s = mdb.session()
         when = datetime.utcnow()
         f = Source(path='', name='foo.bar', mtime=when, atime=when, format=None)
+        p = Product(source=f, platform='TEST', identifier='B00')
+        p['test_key'] = u'test_value'
         s.add(f)
+        s.add(p)
         s.commit()
+        q = s.query(Product).filter_by(source=f).first()
+        self.assertEquals(q['test_key'], u'test_value')
 
 def _debug(type, value, tb):
     "enable with sys.excepthook = debug"
