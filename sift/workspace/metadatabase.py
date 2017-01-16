@@ -36,7 +36,7 @@ import os, sys
 import logging, unittest, argparse
 from collections import MutableMapping
 
-from sqlalchemy import Column, Integer, String, UnicodeText, Unicode, ForeignKey, DateTime, Interval, PickleType, create_engine
+from sqlalchemy import Column, Integer, String, UnicodeText, Unicode, ForeignKey, DateTime, Interval, PickleType, Float, create_engine
 from sqlalchemy.orm import Session, relationship, sessionmaker, backref
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -70,6 +70,10 @@ class Source(Base):
     atime = Column(DateTime)  # last time this file was accessed by application
 
     products = relationship("Product", backref=backref("source", cascade="all"))
+
+    @property
+    def uri(self):
+        return os.path.join(self.path, self.name) if not self.scheme else "{}://{}/{}".format(self.scheme, self.path, self.name)
 
     # def touch(self, session=None):
     #     ismine, session = (False, session) if session is not None else
@@ -105,9 +109,8 @@ class Product(Base):
     start = Column(DateTime, nullable=True)  # actual observation time start
     duration = Column(Interval, nullable=True)  # actual observation duration
 
-    # geometry
+    # native resolution information - see Content for projection details at different LODs
     resolution = Column(Integer, nullable=True)  # meters max resolution, e.g. 500, 1000, 2000, 4000
-    proj4 = Column(String, nullable=True)  # native projection of the data in its original form, if one exists
 
     # descriptive
     units = Column(Unicode, nullable=True)  # udunits compliant units, e.g. 'K'
@@ -126,10 +129,9 @@ class ProductKeyValue(Base):
     key-value pairs associated with a product
     """
     __tablename__ = 'product_key_values'
-    id = Column(Integer, primary_key=True)
-    product_id = Column(Integer, ForeignKey(Product.id))
+    product_id = Column(ForeignKey(Product.id), primary_key=True)
+    key = Column(String, primary_key=True)
     # relationship: .product
-    key = Column(String)
     value = Column(PickleType)
 
 
@@ -159,9 +161,12 @@ class Content(Base):
     path = Column(String, unique=True)  # relative to workspace, binary array of data
     rows, cols, levels = Column(Integer), Column(Integer, nullable=True), Column(Integer, nullable=True)
     dtype = Column(String, nullable=True)  # default float32; can be int16 in the future for scaled integer images for instance; should be a numpy type name
-    proj4 = Column(String, nullable=True)  # proj4 projection string for the data in this array, if one exists; else assume y=lat/x=lon
     coeffs = Column(String, nullable=True)  # json for numpy array with polynomial coefficients for transforming native data to natural units (e.g. for scaled integers), c[0] + c[1]*x + c[2]*x**2 ...
     values = Column(String, nullable=True)  # json for optional dict {int:string} lookup table for NaN flag fields (when dtype is float32 or float64) or integer values (when dtype is an int8/16/32/64)
+
+    # projection information for this representation of the data
+    proj4 = Column(String, nullable=True)  # proj4 projection string for the data in this array, if one exists; else assume y=lat/x=lon
+    cell_width, cell_height, origin_x, origin_y = Column(Float, nullable=True), Column(Float, nullable=True), Column(Float, nullable=True), Column(Float, nullable=True)  # FIXME DJH should explain these
 
     # sparsity and coverage, int8 arrays if needed to show incremental availability of the data
     # dimensionality is always a reduction factor of rows/cols/levels
@@ -209,9 +214,8 @@ class ContentKeyValue(Base):
     key-value pairs associated with a product
     """
     __tablename__ = 'content_key_values'
-    id = Column(Integer, primary_key=True)
-    content_id = Column(Integer, ForeignKey(Content.id))
-    key = Column(String)
+    product_id = Column(ForeignKey(Content.id), primary_key=True)
+    key = Column(String, primary_key=True)
     value = Column(PickleType)
 
 

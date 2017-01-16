@@ -433,11 +433,17 @@ class Workspace(QObject):
     #     return (os.path.realpath(path), s.st_mtime, s.st_size)
 
     def _product_std_info(self, prod:mdb.Product):
+        nat = self._product_native_content(prod)
+
         std_info_dict = {
             INFO.NAME: prod.identifier,
-            INFO.PATH: os.path.join(prod.source.path, prod.source.name),  # FUTURE: url join including scheme?
+            INFO.PATH: prod.uri,
             INFO.UUID: prod.uuid,
-            INFO.PROJ: prod.proj4,
+            INFO.PROJ: nat.proj4,
+            INFO.CELL_WIDTH: nat.cell_width,
+            INFO.CELL_HEIGHT: nat.cell_height,
+            INFO.ORIGIN_X: nat.origin_x,
+            INFO.ORIGIN_Y: nat.origin_y,
         }
         return std_info_dict
 
@@ -457,8 +463,6 @@ class Workspace(QObject):
         if prod is None:
             return None
 
-        # FUTURE: may want to move native content information out of product.info and into Content.info
-        # native_content = self._product_native_content(prod)
 
         return ChainMap(PIWMA(self._S, prod), self._product_std_info(prod))
 
