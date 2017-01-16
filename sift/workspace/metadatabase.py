@@ -34,6 +34,7 @@ __docformat__ = 'reStructuredText'
 
 import os, sys
 import logging, unittest, argparse
+from collections import MutableMapping
 
 from sqlalchemy import Column, Integer, String, UnicodeText, Unicode, ForeignKey, DateTime, Interval, PickleType, create_engine
 from sqlalchemy.orm import Session, relationship, sessionmaker, backref
@@ -68,7 +69,7 @@ class Source(Base):
     mtime = Column(DateTime)  # last observed mtime of the file, for change checking
     atime = Column(DateTime)  # last time this file was accessed by application
 
-    products = relationship("Product", backref="source")
+    products = relationship("Product", backref=backref("source", cascade="all"))
 
     # def touch(self, session=None):
     #     ismine, session = (False, session) if session is not None else
@@ -113,11 +114,11 @@ class Product(Base):
     label = Column(Unicode, nullable=True)  # "AHI Refl B11"
     description = Column(UnicodeText, nullable=True)
 
-    # link to workspace cache
-    cache = relationship("Content", backref="product")
+    # link to workspace cache files representing this data, not lod=0 is overview
+    contents = relationship("Content", backref=backref("product", cascade="all"))
 
     # link to key-value further information
-    info = relationship("ProductKeyValue", backref="product")
+    info = relationship("ProductKeyValue", backref=backref("product", cascade="all"))
 
 
 class ProductKeyValue(Base):
@@ -182,7 +183,7 @@ class Content(Base):
 
 
     # link to key-value further information; primarily a hedge in case specific information has to be squirreled away for later consideration for main content table
-    info = relationship("ContentKeyValue", backref="content")
+    info = relationship("ContentKeyValue", backref=backref("content", cascade="all"))
 
     @property
     def uuid(self):
@@ -254,6 +255,43 @@ class Metadatabase(object):
             self.session_factory = sessionmaker(bind=self.engine)
         return self.session_factory()
 
+
+# ============================
+# mapping wrappers
+
+class ProductInfoAsWritableMappingAdapter(MutableMapping):
+    """
+    database Product.info dictionary adapter
+    """
+    def __init__(self, session, product, warn_on_write=True):
+        self.S = session
+        self.prod = product
+        self.wow = warn_on_write
+
+    def __contains__(self, item):
+        items = self.S.query(ProductKeyValue).filter_by(product_id=self.prod.id, key=item).all()
+        return len(items)>0
+
+    def __getitem__(self, item:str):
+        kvs = self.S.query(ProductKeyValue).filter_by(product_id=self.prod.id, key=item).all()
+        if not kvs:
+            raise KeyError("product does not have value for key {}".format(item))
+        if len(kvs)>1:
+            raise AssertionError('more than one value for %s' % item)
+
+    def __setitem__(self, key, value):
+        if self.wow:
+            LOG.warning('attempting to write to Product info dictionary in workspace??')
+        kvs = self.S.query(ProductKeyValue).filter_by(product_id=self.prod.id, key=key).all()
+        if not kvs:
+            kv = ProductKeyValue(key=key, value=value)
+            self.S.add(kv)
+            self.product.info.append(kv)
+            self.S.commit()
+        if len(kvs)>1:
+            raise AssertionError('more than one value for {}'.format(key))
+        kvs[0].value = value
+        self.S.commit()
 
 
 # ============================

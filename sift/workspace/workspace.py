@@ -173,6 +173,35 @@ class GeoTiffImporter(Importer):
         # note that once the coarse data is yielded, we may be operating in another thread - think about that for now?
 
 
+
+# from collections import MutableMapping
+# from weakref import ref
+
+# class WorkspaceDatasetInfoMapping(MutableMapping):
+#     """
+#     provide a dictionary shim for metadata product database
+#     """
+#     def __init__(self, w:Workspace, p:mdb.Product):
+#         self._w = ref(w)
+#         self._p = ref(p)
+#
+#     mdb_mapping = {
+#         INFO.NAME: lambda p: p.identifier,
+#         INFO.PATHNAME: lambda p: os.path.join(p.source.path, p.source.name),
+#         INFO.
+#     }
+#
+#     def __getitem__(self, item):
+#
+#
+#     def __setitem__(self, key, value):
+#         raise KeyError('Workspace does not permit writing to metadata derived from file content')
+
+
+
+
+
+
 class Workspace(QObject):
     """
     Workspace is a singleton object which works with Datasets shall:
@@ -277,6 +306,17 @@ class Workspace(QObject):
         # attach the database, creating it if needed
         return self._init_create_workspace()
 
+    def _store_inventory(self):
+        """
+        write inventory dictionary to an inventory.pkl file in the cwd
+        :return:
+        """
+        self._S.commit()
+
+    #
+    #  data array handling
+    #
+
     @staticmethod
     def _rcls(r:int, c:int, l:int):
         """
@@ -291,30 +331,32 @@ class Workspace(QObject):
         shape = tuple(x[1] for x in rcl_shape)
         return rcl, shape
 
-    # data array handling
-    def _attach_content(self, c: mdb.Content):
+
+    def _attach_content(self, c: mdb.Content, mode='r'):
         """
         attach content arrays, for holding by workspace in _available
         :param c: Content entity from database
         :return: workspace_data_arrays instance
         """
         rcl, shape = self._rcl(c.rows, c.cols, c.levels)
-        data = np.memmap(os.path.join(self.cwd, c.path), dtype=c.dtype or np.float32, mode='r', shape=shape)
-        y = np.memmap(os.path.join(self.cwd, c.y_path), dtype=c.dtype or np.float32, mode='r', shape=shape) if c.y_path else None
-        x = np.memmap(os.path.join(self.cwd, c.x_path), dtype=c.dtype or np.float32, mode='r', shape=shape) if c.x_path else None
-        z = np.memmap(os.path.join(self.cwd, c.z_path), dtype=c.dtype or np.float32, mode='r', shape=shape) if c.z_path else None
+        data = np.memmap(os.path.join(self.cwd, c.path), dtype=c.dtype or np.float32, mode=mode, shape=shape)
+        y = np.memmap(os.path.join(self.cwd, c.y_path), dtype=c.dtype or np.float32, mode=mode, shape=shape) if c.y_path else None
+        x = np.memmap(os.path.join(self.cwd, c.x_path), dtype=c.dtype or np.float32, mode=mode, shape=shape) if c.x_path else None
+        z = np.memmap(os.path.join(self.cwd, c.z_path), dtype=c.dtype or np.float32, mode=mode, shape=shape) if c.z_path else None
 
         _, cshape = self._rcls(c.coverage_cols, c.coverage_cols, c.coverage_levels)
-        coverage = np.memmap(os.path.join(self.cwd, c.coverage_path), dtype=np.int8, mode='r', shape=cshape) if c.coverage_path else None
+        coverage = np.memmap(os.path.join(self.cwd, c.coverage_path), dtype=np.int8, mode=mode, shape=cshape) if c.coverage_path else None
         _, sshape = self._rcls(c.coverage_cols, c.coverage_cols, c.coverage_levels)
-        sparsity = np.memmap(os.path.join(self.cwd, c.sparsity_path), dtype=np.int8, mode='r', shape=sshape) if c.sparsity_path else None
+        sparsity = np.memmap(os.path.join(self.cwd, c.sparsity_path), dtype=np.int8, mode=mode, shape=sshape) if c.sparsity_path else None
 
         return workspace_data_arrays(rcl = rcl, data = data,
-                                     y=None, x=None, z=None,
+                                     y=y, x=x, z=z,
                                      coverage=coverage, sparsity=sparsity)
+
 
     def _cached_arrays_for_content(self, c:mdb.Content):
         """
+        attach cached data indicated in Content, unless it's been attached already and is in _available
         :param c: metadatabase Content object
         :return: workspace_content_arrays
         """
@@ -324,6 +366,51 @@ class Workspace(QObject):
             self._available[c.id] = cache_entry = new_entry
         return cache_entry
 
+
+    #
+    # often-used queries
+    #
+
+    def _product_with_uuid(self, uuid):
+        return self._S.query(mdb.Product).filter_by(uuid=uuid).first()
+
+    def _content_ordered_by_lod(self, p:mdb.Product):
+        """
+        return content entries ordered by ascending LOD, i.e. lowest (overview) to highest (native)
+        :param p: Product
+        :return: tuple of Content entries
+        """
+        cs = tuple(self._S.query(mdb.Content).filter_by(product_id=p.id).order_by(mdb.Content.lod).all())
+        return cs
+
+    def _product_overview_content(self, p:mdb.Product):
+        return self._S.query(mdb.Content).filter_by(product_id=p.id).order_by(mdb.Content.lod).first()
+
+    def _product_native_content(self, p:mdb.Product):
+        return self._S.query(mdb.Content).filter_by(product_id=p.id).order_by(mdb.Content.lod.desc()).first()
+
+    #
+    # combining queries with data content
+    #
+
+    def _overview_content_for_uuid(self, uuid):
+        # FUTURE: do a compound query for this to get the Content entry
+        prod = self._product_with_uuid(uuid)
+        ovc = self._product_overview_content(prod)
+        arrays = self._cached_arrays_for_content(ovc)
+        return arrays.data
+
+    def _native_content_for_uuid(self, uuid):
+        # FUTURE: do a compound query for this to get the Content entry
+        prod = self._product_with_uuid(uuid)
+        ovc = self._product_native_content(prod)
+        arrays = self._cached_arrays_for_content(ovc)
+        return arrays.data
+
+
+    #
+    # workspace file management
+    #
 
     @property
     def _total_workspace_bytes(self):
@@ -345,12 +432,39 @@ class Workspace(QObject):
     #     s = os.stat(path)
     #     return (os.path.realpath(path), s.st_mtime, s.st_size)
 
-    def _store_inventory(self):
+    def _product_std_info(self, prod:mdb.Product):
+        std_info_dict = {
+            INFO.NAME: prod.identifier,
+            INFO.PATH: os.path.join(prod.source.path, prod.source.name),  # FUTURE: url join including scheme?
+            INFO.UUID: prod.uuid,
+            INFO.PROJ: prod.proj4,
+        }
+        return std_info_dict
+
+    def get_info(self, dsi_or_uuid, lod=None):
         """
-        write inventory dictionary to an inventory.pkl file in the cwd
+        :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
+        :param lod: desired level of detail to focus
         :return:
         """
-        self._S.commit()
+        from sift.workspace.metadatabase import ProductInfoAsWritableMappingAdapter as PIWMA
+        from collections import ChainMap
+
+        if isinstance(dsi_or_uuid, str):
+            dsi_or_uuid = UUID(dsi_or_uuid)
+        # look up the product for that uuid
+        prod = self._product_with_uuid(dsi_or_uuid)
+        if prod is None:
+            return None
+
+        # FUTURE: may want to move native content information out of product.info and into Content.info
+        # native_content = self._product_native_content(prod)
+
+        return ChainMap(PIWMA(self._S, prod), self._product_std_info(prod))
+
+
+#----------------------------------------------------------------------
+
 
     def _check_cache(self, path):
         """
@@ -433,9 +547,6 @@ class Workspace(QObject):
         # sort by atime
         cache.sort()
         return inv, cache, total_size
-
-    def _product_with_uuid(self, uuid):
-        return self._S.query(mdb.Product).filter_by(uuid=uuid).first()
 
     def recently_used_cache_paths(self, n=32):
         FIXME "replace this completely with product list"
@@ -578,15 +689,6 @@ class Workspace(QObject):
                 pass
         return True
 
-    def get_info(self, dsi_or_uuid, lod=None):
-        """
-        :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
-        :param lod: desired level of detail to focus
-        :return:
-        """
-        if isinstance(dsi_or_uuid, str):
-            dsi_or_uuid = UUID(dsi_or_uuid)
-        return self._info.get(dsi_or_uuid, None)
 
     def get_content(self, dsi_or_uuid, lod=None):
         """
