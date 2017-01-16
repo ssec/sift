@@ -48,10 +48,58 @@ COMMON_DEFINITIONS = """#define SPI     3.14159265359
 #define M_TWOPI_HALFPI  7.85398163397448309616   /* 2.5*pi */
 """
 COMMON_DEFINITIONS = tuple(MacroExpression(line) for line in COMMON_DEFINITIONS.splitlines())
+M_FORTPI = M_PI_4 = 0.78539816339744828
+M_HALFPI = M_PI_2 = 1.57079632679489660
 
 
 def merc_init(proj_dict):
     proj_dict.setdefault('lon_0', 0.)
+    return proj_dict
+
+
+def lcc_init(proj_dict):
+    M_HALFPI = 1.57079632679489660
+    M_FORTPI = 0.78539816339744828
+
+    if 'lat_1' not in proj_dict:
+        raise ValueError("PROJ.4 'lat_1' parameter is required for 'lcc' projection")
+
+    proj_dict.setdefault('lon_0', 0.)
+    proj_dict.setdefault('lat_2', proj_dict['lat_1'])
+    proj_dict.setdefault('lat_0', proj_dict['lat_1'])
+    proj_dict['phi0'] = proj_dict['lat_0']
+    proj_dict['phi1'] = proj_dict['lat_1']
+    proj_dict['phi2'] = proj_dict['lat_2']
+
+    if abs(proj_dict['lat_1'] + proj_dict['lat_2']) < 1e-10:
+        raise ValueError("'lat_1' + 'lat_2' for 'lcc' projection must be greater than 1e-10.")
+
+    proj_dict['n'] = sinphi = proj_dict['sinphi'] = np.sin(proj_dict['lat_1'])
+    cosphi = np.cos(proj_dict['phi1'])
+    secant = abs(proj_dict['lat_1'] - proj_dict['lat_2']) >= 1e-10
+    proj_dict['ellips'] = proj_dict['a'] != proj_dict['b']
+    if proj_dict['ellips']:
+        # ellipsoid
+        m1 = pj_msfn_py(sinphi, cosphi, proj_dict['es'])
+        ml1 = pj_tsfn_py(proj_dict['phi1'], sinphi, proj_dict['e'])
+        if secant:
+            sinphi = np.sin(proj_dict['phi2'])
+            proj_dict['n'] = np.log(m1 / pj_msfn_py(sinphi, np.cos(proj_dict['phi2']), proj_dict['es']))
+            proj_dict['n'] /= np.log(ml1 / pj_tsfn_py(proj_dict['phi2'], sinphi, proj_dict['e']))
+        proj_dict['c'] = proj_dict['rho0'] = m1 * pow(ml1, -proj_dict['n'])
+        proj_dict['rho0'] *= 0. if abs(abs(proj_dict['phi0']) - M_HALFPI) < 1e-10 else \
+            pow(pj_tsfn_py(proj_dict['phi0'], np.sin(proj_dict['phi0']), proj_dict['e']), proj_dict['n'])
+    else:
+        # spheroid
+        if secant:
+            proj_dict['n'] = np.log(cosphi / np.cos(proj_dict['phi2'])) / np.log(
+                np.tan(M_FORTPI + 0.5 * proj_dict['phi2']) / np.tan(M_FORTPI + 0.5 * proj_dict['phi1'])
+            )
+        proj_dict['c'] = cosphi * pow(np.tan(M_FORTPI + 0.5 * proj_dict['phi1']), proj_dict['n']) / proj_dict['n']
+        proj_dict['rho0'] = 0. if abs(abs(proj_dict['phi0']) - M_HALFPI) < 1e-10 else \
+            proj_dict['c'] * pow(np.tan(M_FORTPI + 0.5 * proj_dict['phi0']), -proj_dict['n'])
+    proj_dict['ellips'] = 'true' if proj_dict['ellips'] else 'false'
+
     return proj_dict
 
 
@@ -129,7 +177,58 @@ PROJECTIONS = {
             return vec4(lambda, phi, pos.z, pos.w);
         }}""",
     ),
-    # 'lcc': (),
+    'lcc': (
+        lcc_init,
+        """vec4 lcc_map_e(vec4 pos) {{
+            float rho;
+            float lambda = radians(pos.x - {lon_0});
+            float phi = radians(pos.y);
+            {over}
+
+            if (abs(abs(phi) - M_HALFPI) < 1e-10) {{
+                if ((phi * {n}) < 0.) {{
+                    return vec4(1. / 0., 1. / 0., pos.z, pos.w);
+                }}
+                rho = 0.;
+            }} else {{
+                rho = {c} * ({ellips} ? pow(pj_tsfn(phi, sin(phi),
+                    {e}), {n}) : pow(tan(M_FORTPI + .5 * phi), -1. * {n}));
+            }}
+
+            lambda *= {n};
+            return vec4({a} * (rho * sin(lambda)), {a} * ({rho0} - rho * cos(lambda)), pos.z, pos.w);
+        }}""",
+        None,
+        """vec4 lcc_imap_e(vec4 pos) {{
+            float rho, phi, lambda;
+            float x = pos.x / {a};
+            float y = pos.y / {a};
+            y = {rho0} - y;
+            rho = hypot(x, y);
+            if (rho != 0.0) {{
+                if ({n} < 0.) {{
+                    rho = -rho;
+                    x = -x;
+                    y = -y;
+                }}
+                if ({ellips}) {{
+                    phi = pj_phi2(pow(rho / {c}, 1. / {n}), {e});
+                    if (phi == HUGE_VAL) {{
+                        return vec4(1. / 0., 1. / 0., pos.z, pos.w);
+                    }}
+                }} else {{
+                    phi = 2. * atan(pow({c} / rho, 1. / {n})) - M_HALFPI;
+                }}
+                lambda = atan2(x, y) / {n};
+            }} else {{
+                lamdba = 0;
+                phi = {n} > 0. ? M_HALFPI : - M_HALFPI;
+            }}
+            {over}
+            return vec4(lambda, phi, pos.z, pos.w);
+        }}""",
+        None,
+    ),
     'geos': (
         geos_init,
         """vec4 geos_map_e(vec4 pos) {{
@@ -197,6 +296,12 @@ PROJECTIONS = {
         None, #"""vec4 geos_imap_s(vec4 pos) {{ }}""",
     ),
 }
+PROJECTIONS['lcc'] = (lcc_init,
+                      PROJECTIONS['lcc'][1],
+                      PROJECTIONS['lcc'][1],
+                      PROJECTIONS['lcc'][3],
+                      PROJECTIONS['lcc'][3],
+                      )
 
 # Misc GLSL functions used in one or more mapping functions above
 adjlon_func = Function("""
@@ -215,6 +320,10 @@ pj_msfn = Function("""
     }
     """)
 
+
+def pj_msfn_py(sinphi, cosphi, es):
+    return cosphi / np.sqrt(1. - es * sinphi * sinphi)
+
 pj_tsfn = Function("""
     float pj_tsfn(float phi, float sinphi, float e) {
         sinphi *= e;
@@ -222,6 +331,13 @@ pj_tsfn = Function("""
            pow((1. - sinphi) / (1. + sinphi), .5 * e));
     }
     """)
+
+
+def pj_tsfn_py(phi, sinphi, e):
+    sinphi *= e
+    return (np.tan(.5 * (M_HALFPI - phi)) /
+            pow((1. - sinphi) / (1. + sinphi), .5 * e))
+
 
 pj_phi2 = Function("""
     float pj_phi2(float ts, float e) {
@@ -369,10 +485,15 @@ class PROJ4Transform(BaseTransform):
         if 'rf' not in d:
             if 'f' in d:
                 d['rf'] = 1. / d['f']
+            elif d['a'] == d['b']:
+                d['rf'] = 0.
             else:
                 d['rf'] = d['a'] / (d['a'] - d['b'])
         if 'f' not in d:
-            d['f'] = 1. / d['rf']
+            if d['rf']:
+                d['f'] = 1. / d['rf']
+            else:
+                d['f'] = 0.
         if 'b' not in d:
             # a and rf must be in the dict
             d['b'] = d['a'] * (1. - d['f'])
