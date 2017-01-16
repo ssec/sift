@@ -58,25 +58,24 @@ def merc_init(proj_dict):
 
 
 def lcc_init(proj_dict):
-    M_HALFPI = 1.57079632679489660
-    M_FORTPI = 0.78539816339744828
-
     if 'lat_1' not in proj_dict:
         raise ValueError("PROJ.4 'lat_1' parameter is required for 'lcc' projection")
 
     proj_dict.setdefault('lon_0', 0.)
-    proj_dict.setdefault('lat_2', proj_dict['lat_1'])
-    proj_dict.setdefault('lat_0', proj_dict['lat_1'])
-    proj_dict['phi0'] = proj_dict['lat_0']
-    proj_dict['phi1'] = proj_dict['lat_1']
-    proj_dict['phi2'] = proj_dict['lat_2']
+    if 'lat_2' not in proj_dict:
+        proj_dict['lat_2'] = proj_dict['lat_1']
+        if 'lat_0' not in proj_dict:
+            proj_dict['lat_0'] = proj_dict['lat_1']
+    proj_dict['phi1'] = np.radians(proj_dict['lat_1'])
+    proj_dict['phi2'] = np.radians(proj_dict['lat_2'])
+    proj_dict['phi0'] = np.radians(proj_dict['lat_0'])
 
-    if abs(proj_dict['lat_1'] + proj_dict['lat_2']) < 1e-10:
-        raise ValueError("'lat_1' + 'lat_2' for 'lcc' projection must be greater than 1e-10.")
+    if abs(proj_dict['phi1'] + proj_dict['phi2']) < 1e-10:
+        raise ValueError("'lat_1' + 'lat_2' for 'lcc' projection when converted to radians must be greater than 1e-10.")
 
-    proj_dict['n'] = sinphi = proj_dict['sinphi'] = np.sin(proj_dict['lat_1'])
+    proj_dict['n'] = sinphi = np.sin(proj_dict['phi1'])
     cosphi = np.cos(proj_dict['phi1'])
-    secant = abs(proj_dict['lat_1'] - proj_dict['lat_2']) >= 1e-10
+    secant = abs(proj_dict['phi1'] - proj_dict['phi2']) >= 1e-10
     proj_dict['ellips'] = proj_dict['a'] != proj_dict['b']
     if proj_dict['ellips']:
         # ellipsoid
@@ -186,7 +185,7 @@ PROJECTIONS = {
             {over}
 
             if (abs(abs(phi) - M_HALFPI) < 1e-10) {{
-                if ((phi * {n}) < 0.) {{
+                if ((phi * {n}) <= 0.) {{
                     return vec4(1. / 0., 1. / 0., pos.z, pos.w);
                 }}
                 rho = 0.;

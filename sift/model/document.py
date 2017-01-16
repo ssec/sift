@@ -238,14 +238,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 'default_width': 20.,
                 'default_height': 20.,
             }),
-            ('Platte Carre', {}),
+            # ('Platte Carre', {}),
             ('Himawari Geos', {
                 'proj4_str': '+proj=geos +a=6378137 +b=6356752.299581327 +lon_0=140.7 +h=35785863 +over',
                 'default_center': (144.8, 13.5),  # lon, lat center point (Guam)
                 'default_width': 20.,  # degrees from left edge to right edge
                 'default_height': 20.,  # degrees from bottom edge to top edge
             }),
-            ('GOES Geos', {}),
+            # ('GOES Geos', {}),
         ))
         self.default_projection = 'Mercator'
         self.current_projection = self.default_projection
