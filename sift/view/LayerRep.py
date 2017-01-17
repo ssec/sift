@@ -45,6 +45,7 @@ from sift.common import (DEFAULT_X_PIXEL_SIZE,
                          DEFAULT_TILE_WIDTH,
                          DEFAULT_TEXTURE_HEIGHT,
                          DEFAULT_TEXTURE_WIDTH,
+                         TESS_LEVEL,
                          WORLD_EXTENT_BOX,
                          C_EQ,
                          box, pnt, rez, vue,
@@ -473,15 +474,15 @@ class TiledGeolocatedImageVisual(ImageVisual):
 
         # Handle wrapping around the anti-meridian so there is a -180/180 continuous image
         num_tiles = 1 if not self.wrap_lon else 2
-        nfo["texture_coordinates"] = np.empty((6 * num_tiles, 2), dtype=np.float32)
-        nfo["vertex_coordinates"] = np.empty((6 * num_tiles, 2), dtype=np.float32)
-        nfo["texture_coordinates"][:6, :2] = self.calc.calc_texture_coordinates(ttile_idx)
-        nfo["vertex_coordinates"][:6, :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step)
-        if self.wrap_lon:
-            nfo["texture_coordinates"][6:12, :2] = nfo["texture_coordinates"][:6, :2]
-            nfo["vertex_coordinates"][6:12, :2] = nfo["vertex_coordinates"][:6, :2]
-            # increase the second set of X coordinates by the circumference of the earth
-            nfo["vertex_coordinates"][6:12, 0] += nfo["cell_width"] * nfo["data"].shape[1]
+        nfo["texture_coordinates"] = np.empty((6 * num_tiles * (TESS_LEVEL * TESS_LEVEL), 2), dtype=np.float32)
+        nfo["vertex_coordinates"] = np.empty((6 * num_tiles * (TESS_LEVEL * TESS_LEVEL), 2), dtype=np.float32)
+        nfo["texture_coordinates"][:6 * (TESS_LEVEL * TESS_LEVEL), :2] = self.calc.calc_texture_coordinates(ttile_idx, tessellation_level=TESS_LEVEL)
+        nfo["vertex_coordinates"][:6 * (TESS_LEVEL * TESS_LEVEL), :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step, tessellation_level=TESS_LEVEL)
+        # if self.wrap_lon:
+        #     nfo["texture_coordinates"][6:12, :2] = nfo["texture_coordinates"][:6, :2]
+        #     nfo["vertex_coordinates"][6:12, :2] = nfo["vertex_coordinates"][:6, :2]
+        #     # increase the second set of X coordinates by the circumference of the earth
+        #     nfo["vertex_coordinates"][6:12, 0] += nfo["cell_width"] * nfo["data"].shape[1]
         self._set_vertex_tiles(nfo["vertex_coordinates"], nfo["texture_coordinates"])
 
     def _normalize_data(self, data):
@@ -541,7 +542,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         total_overview_tiles = 0
         if self.overview_info is not None:
             # we should be providing an overview image
-            total_overview_tiles = int(self.overview_info["vertex_coordinates"].shape[0] / 6)
+            total_overview_tiles = int(self.overview_info["vertex_coordinates"].shape[0] / 6 / (TESS_LEVEL * TESS_LEVEL))
 
         if total_num_tiles <= 0:
             # we aren't looking at this image
@@ -552,16 +553,16 @@ class TiledGeolocatedImageVisual(ImageVisual):
             # We continue on because there should be an overview image for any tiles that can't be drawn
         total_num_tiles += total_overview_tiles
 
-        tex_coords = np.empty((6 * total_num_tiles, 2), dtype=np.float32)
-        vertices = np.empty((6 * total_num_tiles, 2), dtype=np.float32)
+        tex_coords = np.empty((6 * total_num_tiles * (TESS_LEVEL * TESS_LEVEL), 2), dtype=np.float32)
+        vertices = np.empty((6 * total_num_tiles * (TESS_LEVEL * TESS_LEVEL), 2), dtype=np.float32)
 
         # What tile are we currently describing out of all the tiles being viewed
         used_tile_idx = -1
         # Set up the overview tile
         if self.overview_info is not None:
             # XXX: This completely depends on drawing order, putting it at the end seems to work
-            tex_coords[-6 * total_overview_tiles:, :] = self.overview_info["texture_coordinates"]
-            vertices[-6 * total_overview_tiles:, :] = self.overview_info["vertex_coordinates"]
+            tex_coords[-6 * total_overview_tiles * TESS_LEVEL * TESS_LEVEL:, :] = self.overview_info["texture_coordinates"]
+            vertices[-6 * total_overview_tiles * TESS_LEVEL * TESS_LEVEL:, :] = self.overview_info["vertex_coordinates"]
 
         # preferred_stride = 1
         LOG.debug("Building vertex data for %d tiles (%r)", total_num_tiles, tile_box)
@@ -577,14 +578,14 @@ class TiledGeolocatedImageVisual(ImageVisual):
                 # Check if the tile we want to draw is actually in the GPU, if not (atlas too small?) fill with zeros and keep going
                 if (preferred_stride, tiy, virt_tix) not in self.texture_state:
                     # THIS SHOULD NEVER HAPPEN IF TEXTURE BUILDING IS DONE CORRECTLY AND THE ATLAS IS BIG ENOUGH
-                    tex_coords[used_tile_idx*6: (used_tile_idx+1)*6, :] = 0
-                    vertices[used_tile_idx*6: (used_tile_idx+1)*6, :] = 0
+                    tex_coords[TESS_LEVEL*TESS_LEVEL*used_tile_idx*6: TESS_LEVEL*TESS_LEVEL*(used_tile_idx+1)*6, :] = 0
+                    vertices[TESS_LEVEL*TESS_LEVEL*used_tile_idx*6: TESS_LEVEL*TESS_LEVEL*(used_tile_idx+1)*6, :] = 0
                     continue
 
                 # we should have already loaded the texture data in to the GPU so get the index of that texture
                 tex_tile_idx = self.texture_state[(preferred_stride, tiy, virt_tix)]
-                tex_coords[used_tile_idx*6: (used_tile_idx+1)*6, :] = self.calc.calc_texture_coordinates(tex_tile_idx)
-                vertices[used_tile_idx*6: (used_tile_idx+1)*6, :] = self.calc.calc_vertex_coordinates(tiy, tix, preferred_stride, preferred_stride)
+                tex_coords[TESS_LEVEL*TESS_LEVEL*used_tile_idx*6: TESS_LEVEL*TESS_LEVEL*(used_tile_idx+1)*6, :] = self.calc.calc_texture_coordinates(tex_tile_idx, tessellation_level=TESS_LEVEL)
+                vertices[TESS_LEVEL*TESS_LEVEL*used_tile_idx*6: TESS_LEVEL*TESS_LEVEL*(used_tile_idx+1)*6, :] = self.calc.calc_vertex_coordinates(tiy, tix, preferred_stride, preferred_stride, tessellation_level=TESS_LEVEL)
 
         return vertices, tex_coords
 

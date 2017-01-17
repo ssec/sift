@@ -57,6 +57,8 @@ C_EQ = p(180, 0)[0] - p(-180, 0)[0]
 C_POL = p(0, 89.9)[1] - p(0, -89.9)[1]
 MAX_EXCURSION_Y = C_POL/2.0
 MAX_EXCURSION_X = C_EQ/2.0
+# how many 'tessellation' tiles in one texture tile? 2 = 2 rows x 2 cols
+TESS_LEVEL = 2
 
 #R_EQ = 6378.1370  # km
 #R_POL = 6356.7523142  # km
@@ -376,10 +378,11 @@ class MercatorTileCalc(object):
         return (tile_start_idx - int(self.image_shape[1] / stride)) / self.tile_shape[1]
 
     @jit
-    def calc_vertex_coordinates(self, tiy, tix, stridey, stridex):
+    def calc_vertex_coordinates(self, tiy, tix, stridey, stridex, tessellation_level=1):
         quad = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0],
                          [0, 0, 0], [1, 1, 0], [0, 1, 0]],
                         dtype=np.float32)
+        quads = np.tile(quad, (tessellation_level * tessellation_level, 1))
         tile_width = self.pixel_rez.dx * self.tile_shape[1] * stridex
         tile_height = self.pixel_rez.dy * self.tile_shape[0] * stridey
         max_tiles = self.max_tiles_available(stridex)
@@ -388,17 +391,20 @@ class MercatorTileCalc(object):
         image_idx = int(tix / max_tiles[1])
         # one whole image in the X direction is this many meters:
         image_origin_x = self.ul_origin.x + self.pixel_rez.dx * self.image_shape[1] * image_idx
-        quad[:, 0] *= tile_width
-        quad[:, 0] += image_origin_x + (tile_width * virt_tix)
-        quad[:, 1] *= -tile_height  # Origin is upper-left so image goes down
-        quad[:, 1] += self.ul_origin.y - tile_height * tiy
+        for x_idx in range(tessellation_level):
+            for y_idx in range(tessellation_level):
+                start_idx = x_idx * tessellation_level + y_idx
+                quads[start_idx * 6:(start_idx + 1) * 6, 0] *= tile_width / tessellation_level
+                quads[start_idx * 6:(start_idx + 1) * 6, 0] += image_origin_x + (tile_width * virt_tix) + (tile_width * x_idx) / tessellation_level
+                quads[start_idx * 6:(start_idx + 1) * 6, 1] *= -tile_height / tessellation_level  # Origin is upper-left so image goes down
+                quads[start_idx * 6:(start_idx + 1) * 6, 1] += self.ul_origin.y - tile_height * tiy - (tile_height * y_idx) / tessellation_level
         # FIXME: Can we do this in the workspace?
         # quad[:, 0], quad[:, 1] = self.proj(quad[:, 0], quad[:, 1], inverse=True)
-        quad = quad.reshape(6, 3)
-        return quad[:, :2]
+        quads = quads.reshape(tessellation_level * tessellation_level * 6, 3)
+        return quads[:, :2]
 
     @jit
-    def calc_texture_coordinates(self, ttile_idx):
+    def calc_texture_coordinates(self, ttile_idx, tessellation_level=1):
         """Get texture coordinates for one tile as a quad.
 
         :param ttile_idx: int, texture 1D index that maps to some internal texture tile location
@@ -409,16 +415,21 @@ class MercatorTileCalc(object):
         quad = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0],
                          [0, 0, 0], [1, 1, 0], [0, 1, 0]],
                         dtype=np.float32)
+        quads = np.tile(quad, (tessellation_level * tessellation_level, 1))
         # Now scale and translate the coordinates so they only apply to one tile in the texture
         one_tile_tex_width = 1.0 / self.texture_size[1] * self.tile_shape[1]
         one_tile_tex_height = 1.0 / self.texture_size[0] * self.tile_shape[0]
-        quad[:, 0] *= one_tile_tex_width
-        quad[:, 0] += one_tile_tex_width * tix
-        quad[:, 1] *= one_tile_tex_height
-        quad[:, 1] += one_tile_tex_height * tiy
-        quad = quad.reshape(6, 3)
-        quad = np.ascontiguousarray(quad[:, :2])
-        return quad
+        for x_idx in range(tessellation_level):
+            for y_idx in range(tessellation_level):
+                start_idx = x_idx * tessellation_level + y_idx
+                quads[start_idx * 6:(start_idx + 1) * 6, 0] *= one_tile_tex_width / tessellation_level
+                # FIXME: This offset needs to change as the index changes
+                quads[start_idx * 6:(start_idx + 1) * 6, 0] += one_tile_tex_width * tix + (one_tile_tex_width * x_idx) / tessellation_level
+                quads[start_idx * 6:(start_idx + 1) * 6, 1] *= one_tile_tex_height / tessellation_level
+                quads[start_idx * 6:(start_idx + 1) * 6, 1] += one_tile_tex_height * tiy + (one_tile_tex_height * y_idx) / tessellation_level
+        quads = quads.reshape(6 * tessellation_level * tessellation_level, 3)
+        quads = np.ascontiguousarray(quads[:, :2])
+        return quads
 
 
 def main():
