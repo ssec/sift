@@ -1,53 +1,72 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-.py
-~~~
+goesr_pug.py
+============
 
 PURPOSE
-
+Toolbox for extracting imagery from GOES-16 PUG L1B NetCDF4 files
 
 REFERENCES
-
+GOES-R Product User's Guide Rev E
 
 REQUIRES
+numpy
+netCDF4
 
 
 :author: R.K.Garcia <rayg@ssec.wisc.edu>
 :copyright: 2016 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-__author__ = 'rayg'
-__docformat__ = 'reStructuredText'
-
 import os, sys
 import logging, unittest, argparse
 import numpy as np
 import netCDF4 as nc4
 
+__author__ = 'rayg'
+__docformat__ = 'reStructuredText'
+
 LOG = logging.getLogger(__name__)
 
+# default variable names for PUG L1b files
 DEFAULT_RADIANCE_VAR_NAME = 'Rad'
+DEFAULT_Y_CENTER_VAR_NAME = 'y_image'
+DEFAULT_X_CENTER_VAR_NAME = 'x_image'
+
 
 # ref https://gitlab.ssec.wisc.edu/scottm/QL_package/blob/master/cspp_ql/geo_proj.py
 def proj4_params(lon_center_of_projection, perspective_point_height, semi_major_axis, semi_minor_axis,
-                sweep_angle_axis='x', x_plus=0, y_plus=0, **etc):
+                 sweep_angle_axis='x', y_0=0, x_0=0, **etc):
+    """
+    Generate PROJ.4 parameters for Fixed Grid projection
+    :param lon_center_of_projection: longitude at center of projection, related to sub-satellite point
+    :param perspective_point_height: effective projection height in m
+    :param semi_major_axis: ellipsoid semi-major axis in m
+    :param semi_minor_axis: ellipsoid semi-minor axis in m
+    :param sweep_angle_axis: 'x' for GOES-R, 'y' for original CGMS
+    :param y_0:
+    :param x_0:
+    :return: tuple of (key,value) pairs
+    """
     return (('proj', 'geos'),
             ('lon_0', lon_center_of_projection),
             ('h', perspective_point_height),
-            ('x_0', x_plus),
-            ('y_0', y_plus),
             ('a', semi_major_axis),
             ('b', semi_minor_axis),
+            ('x_0', x_0),
+            ('y_0', y_0),
             ('sweep', sweep_angle_axis),
-            ('ellps', 'GRS80'),  # FIXME: redundant given +a and +b?
+            ('ellps', 'GRS80'),  # FIXME: probably redundant given +a and +b, PUG states GRS80 and not WGS84
             ('units', 'm'),
             )
 
 
-def proj4_string(lon_center_of_projection, perspective_point_height, x_plus, y_plus, semi_major_axis, semi_minor_axis,
-                 **etc):
-    p4p = proj4_params(lon_center_of_projection, perspective_point_height, x_plus, y_plus, semi_major_axis, semi_minor_axis, **etc)
+def proj4_string(**kwargs):
+    """
+    see proj4_params()
+    """
+    p4p = proj4_params(**kwargs)
     return ' '.join( ('+%s=%s' % q) for q in p4p )
     # return '+proj=geos +sweep=x +lon_0=%f +h=%f +x_0=%d +y_0=%d +a=%f +b=%f +units=m +ellps=GRS80' % (
     #     lon_center_of_projection,
@@ -59,7 +78,7 @@ def proj4_string(lon_center_of_projection, perspective_point_height, x_plus, y_p
     # )
 
 
-def calc_bt(L: np.ndarray, fk1, fk2, bc1, bc2, **etc):
+def calc_bt(L: np.ndarray, fk1: float, fk2: float, bc1: float, bc2: float, **etc):
     """
     convert brightness temperature bands from radiance
     ref PUG Vol4 7.1.3.1 Radiances Product : Description
@@ -70,15 +89,15 @@ def calc_bt(L: np.ndarray, fk1, fk2, bc1, bc2, **etc):
     :param fk2: calibration constant
     :param bc1: calibration constant
     :param bc2: calibration constant
-    :return: BT converted radiance data
+    :return: BT converted radiance data, K
     """
     T = (fk2 / (np.log(fk1 / L) + 1.0) - bc1) / bc2
-    # Tmin = -bc1 / bc2
-    T[L <= 0.0] = 0.0  # Tmin
+    # Tmin = -bc1 / bc2   # when L<=0
+    T[L <= 0.0] = 0.0  # Tmin, but for now truncate to absolute 0
     return T
 
 
-def calc_refl(L: np.ndarray, kappa0, **etc):
+def calc_refl(L: np.ndarray, kappa0: float, **etc):
     """
     convert reflectance bands from radiance
     ref PUG Vol4 7.1.3.1 Radiances Product : Description
@@ -89,7 +108,7 @@ def calc_refl(L: np.ndarray, kappa0, **etc):
     return L * kappa0
 
 
-def is_band_refl_or_bt(band):
+def is_band_refl_or_bt(band: int):
     """
     :param band: band number, 1..16
     :return: "refl", "bt" or None
@@ -97,7 +116,7 @@ def is_band_refl_or_bt(band):
     return 'refl' if (1 <= band <= 6) else 'bt' if (7 <= band <= 16) else None
 
 
-def nc_cal_values(nc):
+def nc_cal_values(nc: nc4.Dataset):
     """
     extract a dictionary of calibration parameters to use
     :param nc: PUG netCDF4 instance
@@ -112,9 +131,16 @@ def nc_cal_values(nc):
     }
 
 
-def nc_nav_values(nc, radiance_var_name=None, proj_var_name=None):
+def nc_nav_values(nc, radiance_var_name: str=None,
+                  proj_var_name: str=None,
+                  y_image_var_name: str=DEFAULT_Y_CENTER_VAR_NAME,
+                  x_image_var_name: str=DEFAULT_X_CENTER_VAR_NAME):
     """
     extract a dictionary of navigation parameters to use
+    :param radiance_var_name: radiance variable name to follow .grid_mapping of, optional with default
+    :param proj_var_name: alternately, projection variable to fetch parameters from
+    :param y_image_var_name: variable holding center of image in FGF y/x radiance, if available
+    :param x_image_var_name: variable holding center of image in FGF y/x radiance, if available
     :param nc: PUG netCDF4 instance
     :return: dict
     """
@@ -127,12 +153,21 @@ def nc_nav_values(nc, radiance_var_name=None, proj_var_name=None):
     if proj_var_name is None:
         raise ValueError('unknown projection variable to read')
     proj = nc[proj_var_name]
-    return dict((name, getattr(proj, name, None)) for name in (
+    nav = dict((name, getattr(proj, name, None)) for name in (
         'grid_mapping_name', 'perspective_point_height', 'semi_major_axis', 'semi_minor_axis',
         'inverse_flattening', 'latitude_of_projection_origin', 'longitude_of_projection_origin', 'sweep_angle_axis'))
 
+    x_0, y_0 = 0, 0
+    if y_image_var_name in nc.variables.keys():
+        y_0 = float(nc[y_image_var_name][:])
+    if x_image_var_name in nc.variables.keys():
+        x_0 = float(nc[x_image_var_name][:])
+    nav['y_0'], nav['x_0'] = y_0, x_0
 
-class PugBandTools(object):
+    return nav
+
+
+class PugL1bTools(object):
     """
     PUG helper routines for a single band, given a single-band NetCDF4 file
     or a multi-band NetCDF4 file and an offset in the band dimension
@@ -153,15 +188,21 @@ class PugBandTools(object):
         :return: ('refl' or 'bt', measurement array, 'K' or '')
         """
         kind = self.bt_or_refl
-        if kind=='refl':
-            return (kind, calc_refl(rad, **self.cal), '')
-        elif kind=='bt':
-            return (kind, calc_bt(rad, **self.cal), 'K')
+        if kind == 'refl':
+            return kind, calc_refl(rad, **self.cal), ''
+        elif kind == 'bt':
+            return kind, calc_bt(rad, **self.cal), 'K'
 
-    def __init__(self, nc:nc4.Dataset, radiance_var=DEFAULT_RADIANCE_VAR_NAME, band_offset=0):
-        super(PugBandTools, self).__init__()
+    def __init__(self, nc: nc4.Dataset, radiance_var: str=DEFAULT_RADIANCE_VAR_NAME, band_offset: int=0):
+        """
+        Initialize cal and nav helper object from a PUG NetCDF4 L1B file
+        :param nc:
+        :param radiance_var: radiance variable to convert to BT/Refl
+        :param band_offset: typically 0, eventually nonzero for multi-band files
+        """
+        super(PugL1bTools, self).__init__()
         self.rad_var_name = radiance_var
-        self.band = nc['band_id'][band_offset]  # FUTURE: this has a band dimension
+        self.band = int(nc['band_id'][band_offset])  # FUTURE: this has a band dimension
         self.cal = nc_cal_values(nc)            # but for some reason these do not?
         self.nav = nc_nav_values(nc, self.rad_var_name)
 
@@ -173,7 +214,7 @@ class PugBandTools(object):
     def proj4_params(self):
         return proj4_params(**self.cal)
 
-    def convert_from_nc(self, nc):
+    def convert_from_nc(self, nc: nc4.Dataset):
         rad = nc[self.rad_var_name][:]
         return self.convert(rad)
 
