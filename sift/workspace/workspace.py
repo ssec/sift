@@ -15,6 +15,18 @@ REFERENCES
 
 REQUIRES
 
+NOTES
+    FUTURE import sequence:
+        trigger: user requests skim (metadata only) or import (metadata plus bring into document) of a file or directory system
+         for each file selected
+        phase 1: regex for file patterns identifies which importers are worth trying
+        phase 2: background: importers open files, form metadatabase insert transaction, first importer to succeed wins (priority order).
+        stop after this if just skimming
+        phase 3: background: load of overview (lod=0), adding flat files to workspace and Content entry to metadatabase
+        phase 3a: document and scenegraph show overview up on screen
+        phase 4: background: load of one or more levels of detail, with max LOD currently being considered native
+        phase 4a: document updates to show most useful LOD+stride content
+
 
 :author: R.K.Garcia <rayg@ssec.wisc.edu>
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
