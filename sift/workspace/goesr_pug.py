@@ -171,10 +171,11 @@ class PugL1bTools(object):
     PUG helper routines for a single band, given a single-band NetCDF4 file
     or a multi-band NetCDF4 file and an offset in the band dimension
     """
-    band = None
-    cal = None
-    nav = None
-    rad_var_name = None
+    band = None  # band number
+    cal = None  # dictionary of cal parameters
+    nav = None  # dictionary of nav parameters
+    shape = None  # (lines, elements)
+    rad_var_name = None  # radiance variable to focus on, default is DEFAULT_RADIANCE_VAR_NAME
 
     @property
     def bt_or_refl(self):
@@ -204,6 +205,7 @@ class PugL1bTools(object):
         self.band = int(nc['band_id'][band_offset])  # FUTURE: this has a band dimension
         self.cal = nc_cal_values(nc)            # but for some reason these do not?
         self.nav = nc_nav_values(nc, self.rad_var_name)
+        self.shape = nc[radiance_var].shape
 
     @property
     def proj4(self):
@@ -212,6 +214,10 @@ class PugL1bTools(object):
     @property
     def proj4_params(self):
         return proj4_params(**self.cal)
+
+    @property
+    def proj4_string(self):
+        return proj4_string(**self.cal)
 
     def convert_from_nc(self, nc: nc4.Dataset):
         rad = nc[self.rad_var_name][:]

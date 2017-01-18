@@ -28,6 +28,7 @@ import logging, unittest, argparse
 import gdal, osr
 import numpy as np
 import shutil
+import netCDF4 as nc4
 from collections import namedtuple
 from pickle import dump, load, HIGHEST_PROTOCOL
 from uuid import UUID, uuid1 as uuidgen
@@ -182,9 +183,6 @@ class GoesRPUGImporter(WorkspaceImporter):
     def __init__(self, **kwargs):
         super(GoesRPUGImporter, self).__init__()
 
-    _rad_vn = "RAD"
-
-
     def is_relevant(self, source_path=None, source_uri=None):
         source = source_path or source_uri
         return True if (source.lower().endswith('.nc') or source.lower().endswith('.nc4')) else False
@@ -193,77 +191,82 @@ class GoesRPUGImporter(WorkspaceImporter):
         # yield successive levels of detail as we load
         if source_uri is not None:
             raise NotImplementedError("GoesRPUGImporter cannot read from URIs yet")
+
+        #
+        # step 1: get any additional metadata and an overview tile
+        #
+
         d = {}
-        gtiff = gdal.Open(source_path)
+        nc = nc4.Dataset(source_path)
+        pug = PugL1bTools(nc)
 
-        # FIXME: consider yielding status at this point so our progress bar starts moving
 
-        ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
         d[INFO.UUID] = dest_uuid
+        d[INFO.NAME] = os.path.split(source_path)[-1]
+        d[INFO.PATHNAME] = source_path
         d[INFO.KIND] = KIND.IMAGE
+        d[INFO.PROJ] = pug.proj4_string
+
+        # FUTURE: consider yielding status at this point so our progress bar starts moving
+
+        # FIXME: what are these values?
         d[INFO.ORIGIN_X] = ox
         d[INFO.ORIGIN_Y] = oy
         d[INFO.CELL_WIDTH] = cw
         d[INFO.CELL_HEIGHT] = ch
-        # FUTURE: Should the Workspace normalize all input data or should the Image Layer handle any projection?
-        srs = osr.SpatialReference()
-        srs.ImportFromWkt(gtiff.GetProjection())
-        d[INFO.PROJ] = srs.ExportToProj4()
 
-        d[INFO.NAME] = os.path.split(source_path)[-1]
-        d[INFO.PATHNAME] = source_path
-
-        # FIXME: read this into a numpy.memmap backed by disk in the workspace
-        band = gtiff.GetRasterBand(1)  # FUTURE may be an assumption
-        shape = rows, cols = band.YSize, band.XSize
-        blockw, blockh = band.GetBlockSize()  # non-blocked files will report [band.XSize,1]
-
-        bandtype = gdal.GetDataTypeName(band.DataType)
-        if bandtype.lower()!='float32':
-            LOG.warning('attempting to read geotiff files with non-float32 content')
-        # Full resolution shape
-        # d["shape"] = self.get_dataset_data(item, time_step).shape
+        bandtype = np.float32
+        shape = rows, cols = pug.shape
         d[INFO.SHAPE] = shape
 
+        overview_image = fixme  # FIXME, we need a properly navigated overview image here
+
+        # we got some metadata, let's yield progress
+        yield    import_progress(uuid=dest_uuid,
+                                 stages=1,
+                                 current_stage=0,
+                                 completion=1.0/3.0,
+                                 stage_desc="calculating imagery",
+                                 dataset_info=d,
+                                 data=overview_image)
+
+        #
+        # step 2: read and convert the image data
+        #   - in chunks if it's a huge image so we can show progress and/or cancel
+        #   - push the data into a workspace memmap
+        #   - record the content information in the workspace metadatabase
+        #
+
         # shovel that data into the memmap incrementally
-        # http://geoinformaticstutorial.blogspot.com/2012/09/reading-raster-data-with-python-and-gdal.html
+        # FUTURE as we're doing so, also update coverage array (showing what sections of data are loaded)
+        # FUTURE and for some cases the sparsity array, if the data is interleaved (N/A for NetCDF imagery)
+
         fp = open(cache_path, 'wb+')
         img_data = np.memmap(fp, dtype=np.float32, shape=shape, mode='w+')
-        # load at an increment that matches the file's tile size if possible
-        IDEAL_INCREMENT = 512.0
-        increment = min(blockh * int(np.ceil(IDEAL_INCREMENT/blockh)), 2048)
-        # FUTURE: consider explicit block loads using band.ReadBlock(x,y) once
-        irow = 0
-        while irow < rows:
-            nrows = min(increment, rows-irow)
-            row_data = band.ReadAsArray(0, irow, cols, nrows)
-            img_data[irow:irow+nrows,:] = np.require(row_data, dtype=np.float32)
-            irow += increment
-            status = import_progress(uuid=dest_uuid,
-                                       stages=1,
-                                       current_stage=0,
-                                       completion=float(irow)/float(rows),
-                                       stage_desc="importing geotiff",
-                                       dataset_info=d,
-                                       data=img_data)
-            yield status
+        # FUTURE: workspace content can be int16 with conversion coefficients applied on the fly, after feature-matrix-model goes in
 
-        # img_data = gtiff.GetRasterBand(1).ReadAsArray()
-        # img_data = np.require(img_data, dtype=np.float32, requirements=['C'])  # FIXME: is this necessary/correct?
-        # normally we would place a numpy.memmap in the workspace with the content of the geotiff raster band/s here
+        # FIXME: for test purpose just brute-force the whole thing into place instead of doing incremental partial-coverage loads
+        kind, data, unit = pug.convert_from_nc(nc)   # hopefully only a few seconds... but not good in long term to leave this
 
-        # single stage import with all the data for this simple case
-        zult = import_progress(uuid=dest_uuid,
-                               stages=1,
-                               current_stage=0,
-                               completion=1.0,
-                               stage_desc="done loading geotiff",
-                               dataset_info=d,
-                               data=img_data)
-        yield zult
-        # further yields would logically add levels of detail with their own sampling values
-        # FIXME: provide example of multiple LOD loading and how datasetinfo dictionary/dictionaries look in that case
-        # note that once the coarse data is yielded, we may be operating in another thread - think about that for now?
+        yield import_progress(uuid=dest_uuid,
+                             stages=1,
+                             current_stage=0,
+                             completion=2.0/3.0,
+                             stage_desc="GOES PUG data add to workspace",
+                             dataset_info=d,
+                             data=img_data)
+
+        # even worse, copying data over to memmap-on-disk
+        img_data[:] = data
+
+
+        yield import_progress(uuid=dest_uuid,
+                             stages=1,
+                             current_stage=0,
+                             completion=1.0,
+                             stage_desc="done importing GOESR pug",
+                             dataset_info=d,
+                             data=img_data)
 
 
 class Workspace(QObject):
@@ -302,7 +305,7 @@ class Workspace(QObject):
     didFinishImport = pyqtSignal(dict)  # all loading activities for a dataset have completed
     didDiscoverExternalDataset = pyqtSignal(dict)  # a new dataset was added to the workspace from an external agent
 
-    IMPORT_CLASSES = [ GeoTiffImporter ]
+    IMPORT_CLASSES = [ GeoTiffImporter, GoesRPUGImporter ]
 
     @staticmethod
     def defaultWorkspace():
