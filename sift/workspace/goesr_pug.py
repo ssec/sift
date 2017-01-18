@@ -83,8 +83,7 @@ def calc_bt(L: np.ndarray, fk1: float, fk2: float, bc1: float, bc2: float, **etc
     convert brightness temperature bands from radiance
     ref PUG Vol4 7.1.3.1 Radiances Product : Description
     Note: marginally negative radiances can occur and will result in NaN values!
-    :param: bt: output array, preallocated to match size of input
-    :param L: raw image data as masked array (dtype=(np.float32, np.float64))
+    :param L: raw radiance image data as masked array
     :param fk1: calibration constant
     :param fk2: calibration constant
     :param bc1: calibration constant
@@ -101,7 +100,7 @@ def calc_refl(L: np.ndarray, kappa0: float, **etc):
     """
     convert reflectance bands from radiance
     ref PUG Vol4 7.1.3.1 Radiances Product : Description
-    :param L: radiance array
+    :param L: raw radiance image data as masked array
     :param kappa0: conversion factor radiance to reflectance
     :return:
     """
