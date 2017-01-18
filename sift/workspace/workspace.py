@@ -33,8 +33,8 @@ from pickle import dump, load, HIGHEST_PROTOCOL
 from uuid import UUID, uuid1 as uuidgen
 from sift.common import KIND, INFO
 from PyQt4.QtCore import QObject, pyqtSignal
-from netCDF4 import Dataset as nc4Dataset
 from sift.model.shapes import content_within_shape
+from sift.workspace.goesr_pug import PugBandTools
 from shapely.geometry.polygon import LinearRing
 from rasterio import Affine
 from pyproj import Proj
@@ -173,6 +173,8 @@ class GeoTiffImporter(WorkspaceImporter):
         # note that once the coarse data is yielded, we may be operating in another thread - think about that for now?
 
 
+
+
 class GoesRPUGImporter(WorkspaceImporter):
     """
     Import from PUG format GOES-16 netCDF4 files
@@ -181,78 +183,6 @@ class GoesRPUGImporter(WorkspaceImporter):
         super(GoesRPUGImporter, self).__init__()
 
     _rad_vn = "RAD"
-
-    # ref https://gitlab.ssec.wisc.edu/scottm/QL_package/blob/master/cspp_ql/geo_proj.py
-    @staticmethod
-    def _proj4_string(lon_center_of_projection, perspective_point_height, x_plus, y_plus, semi_major_axis, semi_minor_axis, **etc):
-        return '+proj=geos +sweep=y +lon_0=%f  +h=%f  +x_0=%d +y_0=%d +a=%f +b=%f +units=m +ellps=GRS80' % (
-            lon_center_of_projection,
-            perspective_point_height,
-            x_plus,
-            y_plus,
-            semi_major_axis,
-            semi_minor_axis
-        )
-
-    @staticmethod
-    def _bt_transform(bt: np.ndarray, L: np.ndarray, fk1, fk2, bc1, bc2, **etc):
-        """
-        convert brightness temperature bands from radiance
-        ref PUG Vol4 7.1.3.1 Radiances Product : Description
-        Note: marginally negative radiances can occur and will result in NaN values!
-        :param: bt: output array, preallocated to match size of input
-        :param L: raw image data as np.array(dtype=(np.float32, np.float64))
-        :param fk1:
-        :param fk2:
-        :param bc1:
-        :param bc2:
-        :param etc:
-        :return: BT converted data, dtype=float32
-        """
-        T = (fk2 / (np.log(fk1 / L) + 1.0) - bc1 ) / bc2
-        bt[:] = T[:]
-
-
-    @staticmethod
-    def _refl_transform(refl: np.ndarray, L: np.ndarray, kappa0, **etc):
-        """
-        convert reflectance bands from radiance
-        ref PUG Vol4 7.1.3.1 Radiances Product : Description
-        :param refl: output array, same size as input
-        :param L: radiance array
-        :param kappa0: conversion factor radiance to reflectance
-        :param etc:
-        :return:
-        """
-        refl[:] = L * kappa0
-
-    @staticmethod
-    def is_band_refl_or_bt(band):
-        return 'refl' if (1 <= band <= 6) else 'bt' if (7 <= band <= 16) else None
-
-
-
-    @staticmethod
-    def _nc_cal_parameters(nc):
-        """
-        extract a dictionary of calibration parameters to use
-        :param nc: PUG netCDF4 instance
-        :return: dict
-        """
-        return {
-            'fk1': nc['planck_fk1'][:],
-            'fk2': nc['planck_fk2'][:],
-            'bc1': nc['planck_bc1']
-        }
-
-    @staticmethod
-    def _nc_nav_parameters(nc):
-        """
-        extract a dictionary of navigation parameters to use
-        :param nc: PUG netCDF4 instance
-        :return: dict
-        """
-
 
 
     def is_relevant(self, source_path=None, source_uri=None):
