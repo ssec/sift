@@ -36,11 +36,12 @@ DEFAULT_X_CENTER_VAR_NAME = 'x_image'
 
 
 # ref https://gitlab.ssec.wisc.edu/scottm/QL_package/blob/master/cspp_ql/geo_proj.py
-def proj4_params(lon_center_of_projection, perspective_point_height, semi_major_axis, semi_minor_axis,
-                 sweep_angle_axis='x', y_0=0, x_0=0, **etc):
+def proj4_params(longitude_of_projection_origin=0.0, perspective_point_height=0.0,
+                 semi_major_axis=0.0, semi_minor_axis=0.0,
+                 sweep_angle_axis='x', latitude_of_projection_origin=0.0, y_0=0, x_0=0, **etc):
     """
     Generate PROJ.4 parameters for Fixed Grid projection
-    :param lon_center_of_projection: longitude at center of projection, related to sub-satellite point
+    :param longitude_of_projection_origin: longitude at center of projection, related to sub-satellite point
     :param perspective_point_height: effective projection height in m
     :param semi_major_axis: ellipsoid semi-major axis in m
     :param semi_minor_axis: ellipsoid semi-minor axis in m
@@ -49,8 +50,9 @@ def proj4_params(lon_center_of_projection, perspective_point_height, semi_major_
     :param x_0:
     :return: tuple of (key,value) pairs
     """
+    assert(latitude_of_projection_origin==0.0)  # assert your assumptions: need to revisit this routine if this is not the case
     return (('proj', 'geos'),
-            ('lon_0', lon_center_of_projection),
+            ('lon_0', longitude_of_projection_origin),
             ('h', perspective_point_height),
             ('a', semi_major_axis),
             ('b', semi_minor_axis),
@@ -144,7 +146,7 @@ def nc_nav_values(nc, radiance_var_name: str=None,
     :return: dict
     """
     if proj_var_name is None:
-        v = nc.get(radiance_var_name or DEFAULT_RADIANCE_VAR_NAME, None)
+        v = nc.variables.get(radiance_var_name or DEFAULT_RADIANCE_VAR_NAME, None)
         if v is not None:
             a = getattr(v, 'grid_mapping', None)
             if a is not None:
@@ -213,11 +215,11 @@ class PugL1bTools(object):
 
     @property
     def proj4_params(self):
-        return proj4_params(**self.cal)
+        return proj4_params(**self.nav)
 
     @property
     def proj4_string(self):
-        return proj4_string(**self.cal)
+        return proj4_string(**self.nav)
 
     def convert_from_nc(self, nc: nc4.Dataset):
         rad = nc[self.rad_var_name][:]
@@ -225,13 +227,24 @@ class PugL1bTools(object):
 
 
 class tests(unittest.TestCase):
-    data_file = os.environ.get('TEST_DATA', os.path.expanduser("~/Data/test_files/thing.dat"))
+    data_file = os.environ.get('TEST_DATA', os.path.expanduser("~/mnt/changeo/home/rayg/Data/test_data/goesr/awgonly/2017/020/OR_ABI-L1b-RadF-M3C12_G16_s20170200635589_e20170200646362_c20170200646413.nc"))
 
     def setUp(self):
         pass
 
-    def test_something(self):
-        pass
+    def test_proj4_string(self):
+        nc = nc4.Dataset(self.data_file)
+        t = PugL1bTools(nc)
+        print(t.proj4_string)
+        nc.close()
+
+    @staticmethod
+    def hello():
+        nc = nc4.Dataset(tests.data_file)
+        t = PugL1bTools(nc)
+        t.nc = nc
+        return t
+
 
 
 def _debug(type, value, tb):
