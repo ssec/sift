@@ -54,6 +54,23 @@ M_HALFPI = M_PI_2 = 1.57079632679489660
 
 def merc_init(proj_dict):
     proj_dict.setdefault('lon_0', 0.)
+    proj_dict.setdefault('k0', 1.)
+
+    phits = 0.
+    is_phits = 'lat_ts' in proj_dict
+    if is_phits:
+        phits = np.radians(proj_dict['lat_ts'])
+        if phits >= M_HALFPI:
+            raise ValueError("PROJ.4 'lat_ts' parameter must be greater than PI/2")
+
+    if proj_dict['a'] != proj_dict['b']:
+        # ellipsoid
+        if is_phits:
+            proj_dict['k0'] = pj_msfn_py(np.sin(phits), np.cos(phits), proj_dict['es'])
+    elif is_phits:
+        # spheroid
+        proj_dict['k0'] = np.cos(phits)
+
     return proj_dict
 
 
@@ -146,33 +163,42 @@ PROJECTIONS = {
         merc_init,
         """vec4 merc_map_e(vec4 pos) {{
             float lambda = radians(pos.x);
+            {over}
             float phi = radians(pos.y);
-            float x = {a} * (lambda - {lon_0}f);
-            float y = {a} * -log(pj_tsfn(phi, sin(phi), {e}));
+            if (abs(abs(phi) - M_HALFPI) <= 1.e-10) {{
+                return vec4(1. / 0., 1. / 0., pos.z, pos.w);
+            }}
+            float x = {a} * {k0} * (lambda - {lon_0}f);
+            float y = {a} * {k0} * -log(pj_tsfn(phi, sin(phi), {e}));
             return vec4(x, y, pos.z, pos.w);
         }}""",
         """vec4 merc_map_s(vec4 pos) {{
             float lambda = radians(pos.x);
             {over}
             float phi = radians(pos.y);
-            float x = {a} * (lambda - {lon_0}f);
-            float y = {a} * log(tan(M_PI / 4.f + phi / 2.f));
+            if (abs(abs(phi) - M_HALFPI) <= 1.e-10) {{
+                return vec4(1. / 0., 1. / 0., pos.z, pos.w);
+            }}
+            float x = {a} * {k0} * (lambda - {lon_0}f);
+            float y = {a} * {k0} * log(tan(M_PI / 4.f + phi / 2.f));
             return vec4(x, y, pos.z, pos.w);
         }}""",
         """vec4 merc_imap_e(vec4 pos) {{
             float x = pos.x;
             float y = pos.y;
-            float lambda = degrees({lon_0}f + x / {a});
+            float lambda = {lon_0}f + x / ({a} * {k0});
             {over}
-            float phi = degrees(pj_phi2(exp(-y / {a}), {e}));
+            lambda = degrees(lambda);
+            float phi = degrees(pj_phi2(exp(-y / ({a} * {k0})), {e}));
             return vec4(lambda, phi, pos.z, pos.w);
         }}""",
         """vec4 merc_imap_s(vec4 pos) {{
             float x = pos.x;
             float y = pos.y;
-            float lambda = degrees({lon_0}f + x / {a});
+            float lambda = {lon_0}f + x / ({a} * {k0});
             {over}
-            float phi = degrees(2.f * atan(exp(y / {a})) - M_PI / 2.f);
+            lambda = degrees(lambda);
+            float phi = degrees(2.f * atan(exp(y / ({a} * {k0}))) - M_PI / 2.f);
             return vec4(lambda, phi, pos.z, pos.w);
         }}""",
     ),
@@ -307,7 +333,7 @@ adjlon_func = Function("""
     float adjlon(float lon) {
         if (abs(lon) <= M_PI) return (lon);
         lon += M_PI; // adjust to 0..2pi rad
-        lon -= M_PI * 2 * floor(lon / M_PI / 2); // remove integral # of 'revolutions'
+        lon -= M_TWOPI * floor(lon / M_TWOPI); // remove integral # of 'revolutions'
         lon -= M_PI;  // adjust back to -pi..pi rad
         return( lon );
     }
@@ -416,9 +442,9 @@ class PROJ4Transform(BaseTransform):
         proj_args = proj_init(proj_dict)
 
         if proj_args.get('over'):
-            proj_args['over'] = 'lambda = adjlon(lambda);'
-        else:
             proj_args['over'] = ''
+        else:
+            proj_args['over'] = 'lambda = adjlon(lambda);'
 
         if proj_dict['a'] == proj_dict['b']:
             # spheroid
