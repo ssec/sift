@@ -59,6 +59,7 @@ MAX_EXCURSION_Y = C_POL/2.0
 MAX_EXCURSION_X = C_EQ/2.0
 # how many 'tessellation' tiles in one texture tile? 2 = 2 rows x 2 cols
 TESS_LEVEL = 2
+IMAGE_MESH_SIZE = 10
 
 #R_EQ = 6378.1370  # km
 #R_POL = 6356.7523142  # km
@@ -171,21 +172,17 @@ class MercatorTileCalc(object):
         self.image_tiles_avail = (self.image_shape[0] / self.tile_shape[0], self.image_shape[1] / self.tile_shape[1])
         self.wrap_lon = wrap_lon
 
-        self.proj = p = Proj(projection)
-        # Note: this logic probably only works for mercator or other cylindrical projections
-        # FIXME: Fix this for other projections
-        self.world_extents_box = box(
-            b=p(0, -89.9)[1],
-            t=p(0, 89.9)[1],
-            l=p(-180, 0)[0],
-            r=p(180, 0)[0],
-        )
-        self.image_extents_box = box(
+        self.proj = Proj(projection)
+        self.image_extents_box = e = box(
             b=self.ul_origin[0] - self.image_shape[0] * self.pixel_rez.dy,
             t=self.ul_origin[0],
             l=self.ul_origin[1],
             r=self.ul_origin[1] + self.image_shape[1] * self.pixel_rez.dx,
         )
+        # Array of points across the image space to be used as an estimate of image coverage
+        # Used when checking if the image is viewable on the current canvas's projection
+        self.image_mesh = np.meshgrid(np.linspace(e.l, e.r, IMAGE_MESH_SIZE), np.linspace(e.b, e.t, IMAGE_MESH_SIZE))
+        self.image_mesh = np.column_stack((self.image_mesh[0].ravel(), self.image_mesh[1].ravel(),))
 
     @jit
     def visible_tiles(self, visible_geom, stride=1, extra_tiles_box=box(0,0,0,0)):
@@ -398,8 +395,6 @@ class MercatorTileCalc(object):
                 quads[start_idx * 6:(start_idx + 1) * 6, 0] += image_origin_x + (tile_width * virt_tix) + (tile_width * x_idx) / tessellation_level
                 quads[start_idx * 6:(start_idx + 1) * 6, 1] *= -tile_height / tessellation_level  # Origin is upper-left so image goes down
                 quads[start_idx * 6:(start_idx + 1) * 6, 1] += self.ul_origin.y - tile_height * tiy - (tile_height * y_idx) / tessellation_level
-        # FIXME: Can we do this in the workspace?
-        # quad[:, 0], quad[:, 1] = self.proj(quad[:, 0], quad[:, 1], inverse=True)
         quads = quads.reshape(tessellation_level * tessellation_level * 6, 3)
         return quads[:, :2]
 

@@ -46,13 +46,11 @@ from sift.common import (DEFAULT_X_PIXEL_SIZE,
                          DEFAULT_TEXTURE_HEIGHT,
                          DEFAULT_TEXTURE_WIDTH,
                          TESS_LEVEL,
-                         WORLD_EXTENT_BOX,
                          C_EQ,
                          box, pnt, rez, vue,
                          MercatorTileCalc
                          )
 from sift.view.Program import TextureAtlas2D, Texture2D
-from sift.view.transform import PROJ4Transform
 # The below imports are needed because we subclassed the ImageVisual
 from vispy.visuals.shaders import Function
 from vispy.visuals.transforms import NullTransform
@@ -64,6 +62,13 @@ __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
 LOG = logging.getLogger(__name__)
+# if the absolute value of a vertex coordinate is beyond 'CANVAS_EPSILON'
+# then we consider it invalid
+# these values can get large when zoomed way in
+CANVAS_EPSILON = 1e5
+# smallest difference between two image extents (in canvas units)
+# before the image is considered "out of view"
+CANVAS_EXTENTS_EPSILON = 1e-4
 
 
 class GeolocatedImageVisual(ImageVisual):
@@ -594,15 +599,89 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self._subdiv_texcoord.set_data(tex_coords.astype('float32'))
 
     def get_view_box(self):
-        ll_corner, ur_corner = self.transforms.get_transform().imap([(-1, -1, 1), (1, 1, 1)])
-        # How many tiles should be contained in this view?
-        view_box = box(
-            b=ll_corner[1],
-            l=ll_corner[0],
-            t=ur_corner[1],
-            r=ur_corner[0]
-        )
-        view_box = vue(*view_box, dy=(view_box.t - view_box.b)/self.canvas.size[1], dx=(view_box.r - view_box.l)/self.canvas.size[0])
+        """Calculate shown portion of image and image units per pixel
+
+        This method utilizes a precomputed "mesh" of relatively evenly
+        spaced points over the entire image space. This mesh is transformed
+        to the canvas space (-1 to 1 user-viewed space) to figure out which
+        portions of the image are currently being viewed and which portions
+        can actually be projected on the viewed projection.
+
+        While the result of the chosen method may not always be completely
+        accurate, it should work for all possible viewing cases.
+        """
+        img_cmesh = self.transforms.get_transform().map(self.calc.image_mesh)
+        # Mask any points that are really far off screen (can't be transformed)
+        valid_mask = (np.abs(img_cmesh[:, 0]) < CANVAS_EPSILON) & (np.abs(img_cmesh[:, 1]) < CANVAS_EPSILON)
+        # The image mesh projected to canvas coordinates
+        img_cmesh = img_cmesh[valid_mask]
+        # The image mesh of only valid "viewable" projected coordinates
+        img_vbox = self.calc.image_mesh[valid_mask]
+
+        # Need at least 2 valid points to do calculations
+        if img_cmesh.shape[0] < 2:
+            LOG.error("Image '%s' is not viewable in this projection" % (self.name,))
+            view_box = vue(0, 0, 0, 0, 0, 0)
+        else:
+            # Sort points by nearest to further from the 0,0 center of the canvas
+            # Uses a cheap Pythagorean theorem by summing X + Y
+            near_points = np.sum(np.abs(img_cmesh), axis=1).argsort()
+            ref_idx_1 = near_points[0]
+            # pick a second reference point that isn't in the same row or column as the first
+            near_points_2 = near_points[~np.isclose(img_vbox[near_points][:, 0], img_vbox[ref_idx_1][0]) &
+                                        ~np.isclose(img_vbox[near_points][:, 1], img_vbox[ref_idx_1][1])]
+            if near_points_2.shape[0] == 0:
+                LOG.error("Can't determine position of image '%s' within canvas" % (self.name,))
+                view_box = vue(0, 0, 0, 0, 0, 0)
+            else:
+                ref_idx_2 = near_points_2[0]
+
+                # Calculate the number of image meters per display pixel
+                # That is, use the ratio of the distance in canvas space
+                # between two points to the distance of the canvas
+                # (1 - (-1) = 2). Use this ratio to calculate number of
+                # screen pixels between the two reference points. Then
+                # determine how many image units cover that number of pixels.
+                dx = abs((img_vbox[ref_idx_2, 0] - img_vbox[ref_idx_1, 0]) /
+                         (self.canvas.size[0] * (img_cmesh[ref_idx_2, 0] - img_cmesh[ref_idx_1, 0]) / 2.))
+                dy = abs((img_vbox[ref_idx_2, 1] - img_vbox[ref_idx_1, 1]) /
+                         (self.canvas.size[1] * (img_cmesh[ref_idx_2, 1] - img_cmesh[ref_idx_1, 1]) / 2.))
+
+                # Find the distance in image space between the closest
+                # reference point and the center of the canvas view (0, 0)
+                viewed_img_center_shift_x = (img_cmesh[ref_idx_1, 0] / 2. * self.canvas.size[0] * dx)
+                viewed_img_center_shift_y = (img_cmesh[ref_idx_1, 1] / 2. * self.canvas.size[1] * dx)
+                # Find the theoretical center of the canvas in image space (X/Y)
+                viewed_img_center_x = img_vbox[ref_idx_1, 0] - viewed_img_center_shift_x
+                viewed_img_center_y = img_vbox[ref_idx_1, 1] - viewed_img_center_shift_y
+                # Find the theoretical number of image units (meters) that
+                # would cover an entire canvas in a perfect world
+                half_canvas_width = self.canvas.size[0] * dx / 2.
+                half_canvas_height = self.canvas.size[1] * dy / 2.
+                # Calculate the theoretical bounding box if the image was
+                # perfectly centered on the closest reference point
+                l = viewed_img_center_x - half_canvas_width,
+                r = viewed_img_center_x + half_canvas_width,
+                b = viewed_img_center_y - half_canvas_height,
+                t = viewed_img_center_y + half_canvas_height,
+                # Clip the bounding box to the extents of the image
+                view_box = vue(
+                    l=np.clip(l, self.calc.image_extents_box.l, self.calc.image_extents_box.r),
+                    r=np.clip(r, self.calc.image_extents_box.l, self.calc.image_extents_box.r),
+                    b=np.clip(b, self.calc.image_extents_box.b, self.calc.image_extents_box.t),
+                    t=np.clip(t, self.calc.image_extents_box.b, self.calc.image_extents_box.t),
+                    dy=dy,
+                    dx=dx,
+                )
+
+        if (view_box.r - view_box.l) < CANVAS_EXTENTS_EPSILON or (view_box.t - view_box.b) < CANVAS_EXTENTS_EPSILON:
+            # they are viewing essentially nothing or the image isn't in view
+            LOG.warning("Image '%s' can't be viewed" % (self.name,))
+            view_box = vue(0, 0, 0, 0, 0, 0)
+
+        # ll_corner, ur_corner = self.transforms.get_transform().imap([(-1, -1, 1), (1, 1, 1)])
+        # print("Old method: ", ll_corner, ur_corner, "dy: %f" % ((ur_corner[1] - ll_corner[1]) / self.canvas.size[1]), "dx: %f" % ((ur_corner[0] - ll_corner[0]) / self.canvas.size[0]))
+        # print("View Box: ", view_box)
         return view_box
 
     def assess(self):
