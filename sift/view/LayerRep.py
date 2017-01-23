@@ -48,7 +48,7 @@ from sift.common import (DEFAULT_X_PIXEL_SIZE,
                          TESS_LEVEL,
                          C_EQ,
                          box, pnt, rez, vue,
-                         MercatorTileCalc
+                         TileCalculator
                          )
 from sift.view.Program import TextureAtlas2D, Texture2D
 # The below imports are needed because we subclassed the ImageVisual
@@ -341,7 +341,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self.ndim = len(self.shape) or data.ndim
 
         # Where does this image lie in this lonely world
-        self.calc = MercatorTileCalc(
+        self.calc = TileCalculator(
             self.name,
             self.shape,
             pnt(x=self.origin_x, y=self.origin_y),
@@ -910,7 +910,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         self._lowest_rez = rez(abs(self.cell_height * self._lowest_factor), abs(self.cell_width * self._lowest_factor))
 
         # Where does this image lie in this lonely world
-        self.calc = MercatorTileCalc(
+        self.calc = TileCalculator(
             self.name,
             self.shape,
             pnt(x=self.origin_x, y=self.origin_y),

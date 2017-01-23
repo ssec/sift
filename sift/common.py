@@ -107,7 +107,6 @@ class COMPOSITE_TYPE(Enum):
     ARITHMETIC = 2
 
 
-
 class INFO(Enum):
     """
     Standard keys for info dictionaries
@@ -127,7 +126,8 @@ class INFO(Enum):
     COLORMAP = 'colormap'  # name or UUID of a color map
     DISPLAY_TIME = 'display_time'  # typically from guidebook, used for labeling animation frame
 
-class MercatorTileCalc(object):
+
+class TileCalculator(object):
     """
     common calculations for mercator tile groups in an array or file
     tiles are identified by (iy,ix) zero-based indicators
@@ -162,7 +162,7 @@ class MercatorTileCalc(object):
         World coordinates are eqm such that 0,0 matches 0°N 0°E, going north/south +-90° and west/east +-180°
         Data coordinates are pixels with b l or b r corner being 0,0
         """
-        super(MercatorTileCalc, self).__init__()
+        super(TileCalculator, self).__init__()
         self.name = name
         self.image_shape = image_shape
         self.ul_origin = ul_origin
