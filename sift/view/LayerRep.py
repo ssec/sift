@@ -36,20 +36,23 @@ from vispy.ext.six import string_types
 import numpy as np
 from datetime import datetime
 
-from sift.common import (DEFAULT_X_PIXEL_SIZE,
-                         DEFAULT_Y_PIXEL_SIZE,
-                         DEFAULT_ORIGIN_X,
-                         DEFAULT_ORIGIN_Y,
-                         DEFAULT_PROJECTION,
-                         DEFAULT_TILE_HEIGHT,
-                         DEFAULT_TILE_WIDTH,
-                         DEFAULT_TEXTURE_HEIGHT,
-                         DEFAULT_TEXTURE_WIDTH,
-                         TESS_LEVEL,
-                         C_EQ,
-                         box, pnt, rez, vue,
-                         TileCalculator
-                         )
+from sift.common import (
+    DEFAULT_X_PIXEL_SIZE,
+    DEFAULT_Y_PIXEL_SIZE,
+    DEFAULT_ORIGIN_X,
+    DEFAULT_ORIGIN_Y,
+    DEFAULT_PROJECTION,
+    DEFAULT_TILE_HEIGHT,
+    DEFAULT_TILE_WIDTH,
+    DEFAULT_TEXTURE_HEIGHT,
+    DEFAULT_TEXTURE_WIDTH,
+    TESS_LEVEL,
+    C_EQ,
+    box, pnt, rez, vue,
+    TileCalculator,
+    calc_pixel_size,
+    get_reference_points,
+    )
 from sift.view.Program import TextureAtlas2D, Texture2D
 # The below imports are needed because we subclassed the ImageVisual
 from vispy.visuals.shaders import Function
@@ -619,10 +622,10 @@ class TiledGeolocatedImageVisual(ImageVisual):
         if img_cmesh.shape[0] < 2:
             raise ValueError("Image '%s' is not viewable in this projection" % (self.name,))
 
-        ref_idx_1, ref_idx_2 = self.calc.get_reference_points(img_cmesh, img_vbox)
-        dx, dy = self.calc.calc_pixel_size(img_cmesh[(ref_idx_1, ref_idx_2), :],
-                                           img_vbox[(ref_idx_1, ref_idx_2), :],
-                                           self.canvas.size)
+        ref_idx_1, ref_idx_2 = get_reference_points(img_cmesh, img_vbox)
+        dx, dy = calc_pixel_size(img_cmesh[(ref_idx_1, ref_idx_2), :],
+                                 img_vbox[(ref_idx_1, ref_idx_2), :],
+                                 self.canvas.size)
         view_extents = self.calc.calc_view_extents(img_cmesh[ref_idx_1], img_vbox[ref_idx_1], self.canvas.size, dx, dy)
 
         # ll_corner, ur_corner = self.transforms.get_transform().imap([(-1, -1, 1), (1, 1, 1)])

@@ -27,7 +27,7 @@ __docformat__ = 'reStructuredText'
 
 import os, sys
 import logging, unittest, argparse
-from numba import jit
+from numba import jit, float64, int64, types as nb_types
 from pyproj import Proj
 
 LOG = logging.getLogger(__name__)
@@ -125,6 +125,70 @@ class INFO(Enum):
     SHAPE = 'shape' # (rows, columns) or (rows, columns, levels) data shape
     COLORMAP = 'colormap'  # name or UUID of a color map
     DISPLAY_TIME = 'display_time'  # typically from guidebook, used for labeling animation frame
+
+
+@jit(nb_types.UniTuple(int64, 2)(float64[:, :], float64[:, :]))
+def get_reference_points(img_cmesh, img_vbox):
+    """Get two image reference point indexes.
+
+    This function will return the two nearest reference points to the
+    center of the viewed canvas. The first argument `img_cmesh` is all
+    valid image mesh points that were successfully transformed to the
+    view projection. The second argument `img_vbox` is these same mesh
+    points, but in the original image projection units.
+
+    If there are not enough valid points the second reference point
+    will be `None`.
+
+    :param img_cmesh: (N, 2) array of valid points across the image space
+    :param img_vbox: (N, 2) array of valid points across the image space
+    :return: (reference array index 1, reference array index 2)
+    """
+    # Sort points by nearest to further from the 0,0 center of the canvas
+    # Uses a cheap Pythagorean theorem by summing X + Y
+    near_points = np.sum(np.abs(img_cmesh), axis=1).argsort()
+    ref_idx_1 = near_points[0]
+    # pick a second reference point that isn't in the same row or column as the first
+    near_points_2 = near_points[~np.isclose(img_vbox[near_points][:, 0], img_vbox[ref_idx_1][0]) &
+                                ~np.isclose(img_vbox[near_points][:, 1], img_vbox[ref_idx_1][1])]
+    if near_points_2.shape[0] == 0:
+        raise ValueError("Could not determine reference points")
+
+    return ref_idx_1, near_points_2[0]
+
+
+@jit(nb_types.UniTuple(float64, 2)(float64, float64, int64, float64), nopython=True)
+def _calc_extent_component(canvas_point, image_point, num_pixels, meters_per_pixel):
+    """Calculate """
+    # Find the distance in image space between the closest
+    # reference point and the center of the canvas view (0, 0)
+    viewed_img_center_shift_x = (canvas_point / 2. * num_pixels * meters_per_pixel)
+    # Find the theoretical center of the canvas in image space (X/Y)
+    viewed_img_center_x = image_point - viewed_img_center_shift_x
+    # Find the theoretical number of image units (meters) that
+    # would cover an entire canvas in a perfect world
+    half_canvas_width = num_pixels * meters_per_pixel / 2.
+    # Calculate the theoretical bounding box if the image was
+    # perfectly centered on the closest reference point
+    # Clip the bounding box to the extents of the image
+    l = viewed_img_center_x - half_canvas_width
+    r = viewed_img_center_x + half_canvas_width
+    return l, r
+
+
+@jit(nb_types.UniTuple(float64, 2)(float64[:, :], float64[:, :], nb_types.UniTuple(int64, 2)), nopython=True)
+def calc_pixel_size(canvas_point, image_point, canvas_size):
+    # Calculate the number of image meters per display pixel
+    # That is, use the ratio of the distance in canvas space
+    # between two points to the distance of the canvas
+    # (1 - (-1) = 2). Use this ratio to calculate number of
+    # screen pixels between the two reference points. Then
+    # determine how many image units cover that number of pixels.
+    dx = abs((image_point[1, 0] - image_point[0, 0]) /
+             (canvas_size[0] * (canvas_point[1, 0] - canvas_point[0, 0]) / 2.))
+    dy = abs((image_point[1, 1] - image_point[0, 1]) /
+             (canvas_size[1] * (canvas_point[1, 1] - canvas_point[0, 1]) / 2.))
+    return dx, dy
 
 
 class TileCalculator(object):
@@ -282,26 +346,6 @@ class TileCalculator(object):
         return ath, atw
 
     @jit
-    def calc_sampling(self, visible, stride, texture=None):
-        """
-        estimate whether we're oversampled, undersampled or well-sampled
-        visible.dy, .dx: d(world distance)/d(screen pixels)
-        texture.dy, .dx: d(world distance)/d(texture pixels)
-        texture pixels / screen pixels = visible / texture
-        1:1 is optimal, 2:1 is oversampled, 1:2 is undersampled
-        """
-        texture = texture or self.pixel_rez
-        tsy = visible.dy / (texture.dy * float(stride))
-        tsx = visible.dx / (texture.dx * float(stride))
-        if min(tsy,tsx) <= 0.5:
-            LOG.debug('undersampled tsy,tsx = {0:.2f},{1:.2f}'.format(tsy,tsx))
-            return self.UNDERSAMPLED
-        if max(tsy,tsx) >= 2.0:
-            LOG.debug('oversampled tsy,tsx = {0:.2f},{1:.2f}'.format(tsy,tsx))
-            return self.OVERSAMPLED
-        return self.WELLSAMPLED
-
-    @jit
     def calc_stride(self, visible, texture=None):
         """
         given world geometry and sampling as a vue or rez tuple
@@ -359,6 +403,7 @@ class TileCalculator(object):
         x_slice = slice(tix*self.tile_shape[1]*stride, (tix+1)*self.tile_shape[1]*stride, stride)
         return y_slice, x_slice
 
+    @jit
     def tile_pixels(self, data, tiy, tix, stride):
         """
         extract pixel data for a given tile
@@ -430,59 +475,12 @@ class TileCalculator(object):
         return quads
 
     @jit
-    def get_reference_points(self, img_cmesh, img_vbox):
-        """Get two image reference point indexes.
-
-        This function will return the two nearest reference points to the
-        center of the viewed canvas. The first argument `img_cmesh` is all
-        valid image mesh points that were successfully transformed to the
-        view projection. The second argument `img_vbox` is these same mesh
-        points, but in the original image projection units.
-
-        If there are not enough valid points the second reference point
-        will be `None`.
-
-        :param img_cmesh: (N, 2) array of valid points across the image space
-        :param img_vbox: (N, 2) array of valid points across the image space
-        :return: (reference array index 1, reference array index 2)
-        """
-        # Sort points by nearest to further from the 0,0 center of the canvas
-        # Uses a cheap Pythagorean theorem by summing X + Y
-        near_points = np.sum(np.abs(img_cmesh), axis=1).argsort()
-        ref_idx_1 = near_points[0]
-        # pick a second reference point that isn't in the same row or column as the first
-        near_points_2 = near_points[~np.isclose(img_vbox[near_points][:, 0], img_vbox[ref_idx_1][0]) &
-                                    ~np.isclose(img_vbox[near_points][:, 1], img_vbox[ref_idx_1][1])]
-        if near_points_2.shape[0] == 0:
-            raise ValueError("Could not determine reference points for '%s'" % (self.name,))
-
-        return ref_idx_1, near_points_2[0]
-
-    @jit
-    def _calc_extent_component(self, canvas_point, image_point, num_pixels, meters_per_pixel):
-        """Calculate """
-        # Find the distance in image space between the closest
-        # reference point and the center of the canvas view (0, 0)
-        viewed_img_center_shift_x = (canvas_point / 2. * num_pixels * meters_per_pixel)
-        # Find the theoretical center of the canvas in image space (X/Y)
-        viewed_img_center_x = image_point - viewed_img_center_shift_x
-        # Find the theoretical number of image units (meters) that
-        # would cover an entire canvas in a perfect world
-        half_canvas_width = num_pixels * meters_per_pixel / 2.
-        # Calculate the theoretical bounding box if the image was
-        # perfectly centered on the closest reference point
-        # Clip the bounding box to the extents of the image
-        l = viewed_img_center_x - half_canvas_width
-        r = viewed_img_center_x + half_canvas_width
-        return l, r
-
-    @jit
     def calc_view_extents(self, canvas_point, image_point, canvas_size, dx, dy):
-        l, r = self._calc_extent_component(canvas_point[0], image_point[0], canvas_size[0], dx)
+        l, r = _calc_extent_component(canvas_point[0], image_point[0], canvas_size[0], dx)
         l = np.clip(l, self.image_extents_box.l, self.image_extents_box.r)
         r = np.clip(r, self.image_extents_box.l, self.image_extents_box.r)
 
-        b, t = self._calc_extent_component(canvas_point[1], image_point[1], canvas_size[1], dy)
+        b, t = _calc_extent_component(canvas_point[1], image_point[1], canvas_size[1], dy)
         b = np.clip(b, self.image_extents_box.b, self.image_extents_box.t)
         t = np.clip(t, self.image_extents_box.b, self.image_extents_box.t)
 
@@ -491,20 +489,6 @@ class TileCalculator(object):
             raise ValueError("Image '%s' can't be viewed" % (self.name,))
 
         return box(l=l, r=r, b=b, t=t)
-
-    @jit
-    def calc_pixel_size(self, canvas_point, image_point, canvas_size):
-        # Calculate the number of image meters per display pixel
-        # That is, use the ratio of the distance in canvas space
-        # between two points to the distance of the canvas
-        # (1 - (-1) = 2). Use this ratio to calculate number of
-        # screen pixels between the two reference points. Then
-        # determine how many image units cover that number of pixels.
-        dx = abs((image_point[1, 0] - image_point[0, 0]) /
-                 (canvas_size[0] * (canvas_point[1, 0] - canvas_point[0, 0]) / 2.))
-        dy = abs((image_point[1, 1] - image_point[0, 1]) /
-                 (canvas_size[1] * (canvas_point[1, 1] - canvas_point[0, 1]) / 2.))
-        return dx, dy
 
 
 def main():
