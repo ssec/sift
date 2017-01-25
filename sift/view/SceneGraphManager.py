@@ -59,6 +59,12 @@ else:
 DEFAULT_TEXTURE_SHAPE = (4, 16)
 
 
+class Markers2(Markers):
+    def _set_clipper(self, node, clipper):
+        return
+Markers = Markers2
+
+
 class FakeMarker(Compound):
     # FIXME: Temporary workaround because markers don't work on the target Windows laptops
     def __init__(self, pos=None, parent=None, symbol=None, **kwargs):
