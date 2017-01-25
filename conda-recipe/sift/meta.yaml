@@ -39,6 +39,7 @@ requirements:
     - gdal >=2.1.0 # [unix]
     - pyqt ==4.10.4
     - cython >=0.17 # [win]
+    - olefile
 
   run:
     - python >=3.4
@@ -61,6 +62,7 @@ requirements:
     - libgdal >=2.1 # [win]
     - gdal >=2.1.0 # [unix]
     - pyqt ==4.10.4
+    - olefile
 
 test:
   commands:
