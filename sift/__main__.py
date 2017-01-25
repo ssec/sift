@@ -654,7 +654,6 @@ class Main(QtGui.QMainWindow):
 
     def remove_region_polygon(self, action:QtGui.QAction=None, *args):
         if self.scene_manager.has_pending_polygon():
-            print("Clearing pending")
             self.scene_manager.clear_pending_polygon()
             return
 

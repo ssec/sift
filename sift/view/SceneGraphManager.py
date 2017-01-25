@@ -130,7 +130,14 @@ class PendingPolygon(object):
         self.points.append(xy_pos)
         if len(xy_pos) == 2:
             xy_pos = [xy_pos[0], xy_pos[1], z]
-        point_visual = FakeMarker(parent=self.parent, symbol="disc", pos=np.array([xy_pos]), color=np.array([0., 0.5, 0.5, 1.]))
+        # point_visual = FakeMarker(parent=self.parent, symbol="disc", pos=np.array([xy_pos]), color=np.array([0., 0.5, 0.5, 1.]))
+        point_visual = Markers(parent=self.parent,
+                               name='polygon_%02d' % (len(self.markers),),
+                               symbol="disc", pos=np.array([xy_pos]),
+                               face_color=np.array([0., 0.5, 0.5, 1.]),
+                               edge_color=np.array([0., 0.5, 0.5, 1.]),
+                               size=12.,
+                               )
         self.markers.append(point_visual)
         return False
 
@@ -575,18 +582,30 @@ class SceneGraphManager(QObject):
 
     def on_point_probe_set(self, probe_name, state, xy_pos, **kwargs):
         z = float(kwargs.get("z", 60))
+        edge_color = kwargs.get("edge_color", np.array([1.0, 0.5, 0.5, 1.]))
+        face_color = kwargs.get("face_color", np.array([0.5, 0., 0., 1.]))
         if len(xy_pos) == 2:
             xy_pos = [xy_pos[0], xy_pos[1], z]
+
+        probe_kwargs = {
+            'symbol': 'disc',
+            'pos': np.array([xy_pos]),
+            'face_color': face_color,
+            'edge_color': edge_color,
+            'size': 12.,
+            'edge_width': 2.,
+        }
 
         if probe_name not in self.point_probes and xy_pos is None:
             raise ValueError("Probe '{}' does not exist".format(probe_name))
         elif probe_name not in self.point_probes:
-            color = kwargs.get("color", np.array([0.5, 0., 0., 1.]))
-            point_visual = FakeMarker(parent=self.main_map, symbol="x", pos=np.array([xy_pos]), color=color)
+            # point_visual = FakeMarker(parent=self.main_map, symbol="x", pos=np.array([xy_pos]), color=color)
+            point_visual = Markers(parent=self.main_map, name=probe_name, **probe_kwargs)
             self.point_probes[probe_name] = point_visual
         else:
             point_visual = self.point_probes[probe_name]
-            point_visual.set_point(xy_pos)
+            # point_visual.set_point(xy_pos)
+            point_visual.set_data(**probe_kwargs)
 
         # set the Point visible or not
         point_visual.visible = state
