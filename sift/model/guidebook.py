@@ -22,6 +22,7 @@ import logging, unittest, argparse
 from enum import Enum
 from sift.common import INFO, KIND
 from sift.view.Colormap import DEFAULT_IR, DEFAULT_VIS
+import sift.workspace.goesr_pug as pug
 
 LOG = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ class INSTRUMENT(Enum):
 class PLATFORM(Enum):
     HIMAWARI_8 = 'Himawari-8'
     HIMAWARI_9 = 'Himawari-9'
-    GOES_16 = 'GOES-16'
+    GOES_16 = 'G16'
 
 GUIDEBOOKS = {}
 
@@ -120,15 +121,31 @@ NOMINAL_WAVELENGTHS = {
     #     INSTRUMENT.AHI: {
     #     },
     # },
-    # PLATFORM.GOES_16: {
-    #     INSTRUMENT.ABI: {
-    #     },
-    # },
+    PLATFORM.GOES_16: {
+        INSTRUMENT.ABI: {  # http://www.goes-r.gov/education/ABI-bands-quick-info.html
+            1: 0.47,
+            2: 0.64,
+            3: 0.86,
+            4: 1.37,
+            5: 1.6,
+            6: 2.2,
+            7: 3.9,
+            8: 6.2,
+            9: 6.9,
+            10: 7.3,
+            11: 8.4,
+            12: 9.6,
+            13: 10.3,
+            14: 11.2,
+            15: 12.3,
+            16: 13.3,
+        },
+    },
 }
 
 
 
-class AHI_HSF_Guidebook(Guidebook):
+class ABI_AHI_Guidebook(Guidebook):
     "e.g. HS_H08_20150714_0030_B10_FLDK_R20.merc.tif"
     _cache = None  # {uuid:metadata-dictionary, ...}
 
@@ -139,13 +156,21 @@ class AHI_HSF_Guidebook(Guidebook):
         self._cache = {}
 
     @staticmethod
-    def is_relevant(pathname):
+    def identify_instrument_for_path(pathname):
         if not pathname:
-            return False
-        return True if re.match(r'HS_H\d\d_\d{8}_\d{4}_B\d\d.*', os.path.split(pathname)[1]) else False
+            return None
+        if pathname.endswith('.nc') or pathname.endswith('.nc4'):  # FUTURE: tighten this constraint to not assume ABI
+            return INSTRUMENT.ABI
+        elif re.match(r'HS_H\d\d_\d{8}_\d{4}_B\d\d.*', os.path.split(pathname)[1]):
+            return INSTRUMENT.AHI
+        return None
 
     @staticmethod
-    def _metadata_for_path(pathname):
+    def is_relevant(pathname):
+        return ABI_AHI_Guidebook.identify_instrument_for_path(pathname) in {INSTRUMENT.ABI, INSTRUMENT.AHI}
+
+    @staticmethod
+    def _metadata_for_ahi_path(pathname):
         if not pathname:
             return {}
         m = re.match(r'HS_H(\d\d)_(\d{8})_(\d{4})_B(\d\d)_([A-Za-z0-9]+).*', os.path.split(pathname)[1])
@@ -167,6 +192,25 @@ class AHI_HSF_Guidebook(Guidebook):
             GUIDE.SCENE: scene,
             GUIDE.DISPLAY_NAME: name
         }
+
+    @staticmethod
+    def _metadata_for_abi_path(pathname):  # FUTURE: since for ABI this is really coming from the file, decide whether the guidebook should be doing it
+        abi = pug.PugL1bTools(pathname)
+        return {
+            GUIDE.PLATFORM: abi.platform,  # e.g. G16
+            GUIDE.BAND: abi.band,
+            GUIDE.INSTRUMENT: INSTRUMENT.ABI,
+            GUIDE.SCHED_TIME: abi.sched_time,
+            GUIDE.DISPLAY_TIME: abi.display_time,
+            GUIDE.SCENE: abi.scene_id,
+            GUIDE.DISPLAY_NAME: abi.display_name
+        }
+
+    @staticmethod
+    def _metadata_for_path(pathname):
+        which = ABI_AHI_Guidebook.identify_instrument_for_path(pathname)
+        return {INSTRUMENT.ABI: ABI_AHI_Guidebook._metadata_for_abi_path,
+                INSTRUMENT.AHI: ABI_AHI_Guidebook._metadata_for_ahi_path}[which](pathname)
 
     def _relevant_info(self, seq):
         "filter datasetinfo dictionaries in sequence, if they're not relevant to us (i.e. not AHI)"
@@ -200,7 +244,7 @@ class AHI_HSF_Guidebook(Guidebook):
         if md is None and info[INFO.KIND] in (KIND.IMAGE, KIND.COMPOSITE):
             md = self._metadata_for_path(info.get(INFO.PATHNAME, None))
             md[GUIDE.UUID] = info[INFO.UUID]
-            md[GUIDE.INSTRUMENT] = INSTRUMENT.AHI
+            md[GUIDE.INSTRUMENT] = info.get(GUIDE.INSTRUMENT, self.identify_instrument_for_path(info[INFO.PATHNAME]))
             md[GUIDE.CENTRAL_WAVELENGTH] = NOMINAL_WAVELENGTHS[md[GUIDE.PLATFORM]][md[GUIDE.INSTRUMENT]][md[GUIDE.BAND]]
             # md[GUIDE.UNIT_CONVERSION] = self.units_conversion(info)  # FUTURE: decide whether this should be done for most queries
             self._cache[info[INFO.UUID]] = md

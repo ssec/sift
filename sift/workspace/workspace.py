@@ -218,17 +218,19 @@ class GoesRPUGImporter(WorkspaceImporter):
         bandtype = np.float32
         shape = rows, cols = pug.shape
         d[INFO.SHAPE] = shape
+        d[INFO.DISPLAY_TIME] = pug.display_time
 
-        overview_image = fixme  # FIXME, we need a properly navigated overview image here
+        bt_or_refl, image, units = pug.convert_from_nc(nc)  # FIXME expensive
+        # overview_image = fixme  # FIXME, we need a properly navigated overview image here
 
         # we got some metadata, let's yield progress
-        yield    import_progress(uuid=dest_uuid,
-                                 stages=1,
-                                 current_stage=0,
-                                 completion=1.0/3.0,
-                                 stage_desc="calculating imagery",
-                                 dataset_info=d,
-                                 data=overview_image)
+        # yield    import_progress(uuid=dest_uuid,
+        #                          stages=1,
+        #                          current_stage=0,
+        #                          completion=1.0/3.0,
+        #                          stage_desc="calculating imagery",
+        #                          dataset_info=d,
+        #                          data=image)
 
         #
         # step 2: read and convert the image data
@@ -243,6 +245,8 @@ class GoesRPUGImporter(WorkspaceImporter):
 
         fp = open(cache_path, 'wb+')
         img_data = np.memmap(fp, dtype=np.float32, shape=shape, mode='w+')
+        img_data[:] = np.ma.fix_invalid(image, copy=False, fill_value=np.NAN)  # FIXME: expensive
+
         # FUTURE: workspace content can be int16 with conversion coefficients applied on the fly, after feature-matrix-model goes in
 
         # FIXME: for test purpose just brute-force the whole thing into place instead of doing incremental partial-coverage loads
@@ -256,17 +260,16 @@ class GoesRPUGImporter(WorkspaceImporter):
                              dataset_info=d,
                              data=img_data)
 
-        # even worse, copying data over to memmap-on-disk
-        img_data[:] = data
+        # # even worse, copying data over to memmap-on-disk
+        # img_data[:] = data
 
-
-        yield import_progress(uuid=dest_uuid,
-                             stages=1,
-                             current_stage=0,
-                             completion=1.0,
-                             stage_desc="done importing GOESR pug",
-                             dataset_info=d,
-                             data=img_data)
+        # yield import_progress(uuid=dest_uuid,
+        #                      stages=1,
+        #                      current_stage=0,
+        #                      completion=1.0,
+        #                      stage_desc="done importing GOESR pug",
+        #                      dataset_info=d,
+        #                      data=img_data)
 
 
 class Workspace(QObject):

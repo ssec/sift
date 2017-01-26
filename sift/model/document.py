@@ -71,7 +71,7 @@ from abc import ABCMeta, abstractmethod, abstractproperty
 from weakref import ref
 
 from sift.common import KIND, INFO, COMPOSITE_TYPE
-from sift.model.guidebook import AHI_HSF_Guidebook, GUIDE
+from sift.model.guidebook import ABI_AHI_Guidebook, GUIDE
 
 from PyQt4.QtCore import QObject, pyqtSignal
 
@@ -200,7 +200,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     _workspace = None
     _layer_sets = None  # list(DocLayerSet(prez, ...) or None)
     _layer_with_uuid = None  # dict(uuid:Doc____Layer)
-    _guidebook = None  # FUTURE: this is currently an AHI_HSF_Guidebook, make it a general guidebook
+    _guidebook = None  # FUTURE: this is currently an ABI_AHI_Guidebook, make it a general guidebook
 
     # signals
     didAddBasicLayer = pyqtSignal(tuple, UUID, prez)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
@@ -221,7 +221,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def __init__(self, workspace, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
         super(Document, self).__init__(**kwargs)
-        self._guidebook = AHI_HSF_Guidebook()
+        self._guidebook = ABI_AHI_Guidebook()
         self._workspace = workspace
         self._layer_sets = [DocLayerStack(self)] + [None] * (layer_set_count - 1)
         self._layer_with_uuid = {}

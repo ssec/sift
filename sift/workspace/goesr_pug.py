@@ -22,6 +22,8 @@ netCDF4
 import os, sys
 import logging, unittest, argparse
 import numpy as np
+import re
+from datetime import datetime
 import netCDF4 as nc4
 
 __author__ = 'rayg'
@@ -173,6 +175,31 @@ def nc_nav_values(nc, radiance_var_name: str=None,
 
     return nav
 
+RE_PUG_ISO = re.compile(r'(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d).(\d+)Z')
+
+def timecode_to_datetime(iso):
+    m = RE_PUG_ISO.match(iso.strip())
+    nums = list(m.groups())
+    nums[6] += '0' * min(0,6-len(nums[6]))  # .9 -> 900000µs
+    yyyy, mm, dd, h, m, s, t = map(int, nums)
+    return datetime(yyyy, mm, dd, h, m, s, t)
+
+
+def snap_scene_onto_schedule(start: datetime, end: datetime, scene_id: str=None, timeline_id: str=None):
+    """
+    assign a "timeline" time to an image by looking at its coverage
+     currently this is done by taking the center time and dropping it to the previous
+    :param start: datetime object, time_coverage_start
+    :param end: datetime
+    :param scene_id: string, typically 'Full Disk'
+    :param timeline_id: instrument mode, typically "Mode 3" or "Mode 4"
+    :return: datetime of 'timeline' time
+    """
+    c = start + (end - start)/2
+    snap = 5 if (scene_id is 'Full Disk') else 1
+    m = c.minute - (c.minute % snap) if snap!=0 else c.minute
+    return c.replace(minute=m,second=0,microsecond=0)
+
 
 class PugL1bTools(object):
     """
@@ -180,6 +207,14 @@ class PugL1bTools(object):
     or a multi-band NetCDF4 file and an offset in the band dimension
     """
     band = None  # band number
+    platform = None  # platform_ID as string
+    sched_time = None  # datetime object, nominal/normalized/snapped time of the image onto a 1min/5min/10min/15min timeline based on mode/scene
+    time_span = None  # (start,end) datetime pair
+    timeline_id = None  # string, instrument mode
+    scene_id = None  # string, type of scene e.g. "Full Disk"
+    display_time = None  # str form of timeline YYYY-mm-dd HH:MM
+    display_name = None  # str form of platform + scene + band
+
     cal = None  # dictionary of cal parameters
     nav = None  # dictionary of nav parameters
     shape = None  # (lines, elements)
@@ -201,7 +236,7 @@ class PugL1bTools(object):
         elif kind == 'bt':
             return kind, calc_bt(rad, **self.cal), 'K'
 
-    def __init__(self, nc: nc4.Dataset, radiance_var: str=DEFAULT_RADIANCE_VAR_NAME, band_offset: int=0):
+    def __init__(self, nc: (nc4.Dataset, str), radiance_var: str=DEFAULT_RADIANCE_VAR_NAME, band_offset: int=0):
         """
         Initialize cal and nav helper object from a PUG NetCDF4 L1B file
         :param nc:
@@ -209,11 +244,20 @@ class PugL1bTools(object):
         :param band_offset: typically 0, eventually nonzero for multi-band files
         """
         super(PugL1bTools, self).__init__()
+        if not isinstance(nc, nc4.Dataset):
+            nc = nc4.Dataset(nc)
         self.rad_var_name = radiance_var
         self.band = int(nc['band_id'][band_offset])  # FUTURE: this has a band dimension
         self.cal = nc_cal_values(nc)            # but for some reason these do not?
         self.nav = nc_nav_values(nc, self.rad_var_name)
         self.shape = nc[radiance_var].shape
+        self.platform = nc.platform_ID.encode('ASCII')
+        self.time_span = st, en = timecode_to_datetime(nc.time_coverage_start), timecode_to_datetime(nc.time_coverage_end)
+        self.timeline_id = nc.timeline_id
+        self.scene_id = nc.scene_id
+        self.sched_time = snap_scene_onto_schedule(st, en, self.scene_id, self.timeline_id)
+        self.display_time = self.sched_time.strftime('%Y-%m-%d %H:%M')
+        self.display_name = '{} ABI B{:02d} %s'.format(self.platform, self.band, self.scene_id)
 
     @property
     def proj4(self):
