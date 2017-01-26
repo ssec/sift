@@ -80,21 +80,27 @@ def proj4_string(**kwargs):
     # )
 
 
-def calc_bt(L: np.ndarray, fk1: float, fk2: float, bc1: float, bc2: float, **etc):
+def calc_bt(L: (np.ndarray, np.ma.masked_array), fk1: float, fk2: float, bc1: float, bc2: float, mask_invalid: bool=True, **etc):
     """
     convert brightness temperature bands from radiance
     ref PUG Vol4 7.1.3.1 Radiances Product : Description
     Note: marginally negative radiances can occur and will result in NaN values!
-    :param L: raw radiance image data as masked array
+    We handle this by setting anything with radiance <=0.0 to return 0K
+    :param L: raw radiance image data, preferably as masked array
     :param fk1: calibration constant
     :param fk2: calibration constant
     :param bc1: calibration constant
     :param bc2: calibration constant
-    :return: BT converted radiance data, K
+    :param mask_invalid: bool, whether to include radiances <=0.0 in array mask - iff Lis masked array
+    :return: BT converted radiance data, K; if input is masked_array, L<=0.0 will also be masked
     """
     T = (fk2 / (np.log(fk1 / L) + 1.0) - bc1) / bc2
-    # Tmin = -bc1 / bc2   # when L<=0
-    T[L <= 0.0] = 0.0  # Tmin, but for now truncate to absolute 0
+    if mask_invalid and isinstance(L, np.ma.masked_array):
+        T.unshare_mask()
+        T.mask |= (L.data <= 0.0)
+    else:
+        # Tmin = -bc1 / bc2   # when L<=0
+        T[L <= 0.0] = 0.0  # Tmin, but for now truncate to absolute 0
     return T
 
 
@@ -244,7 +250,6 @@ class tests(unittest.TestCase):
         t = PugL1bTools(nc)
         t.nc = nc
         return t
-
 
 
 def _debug(type, value, tb):
