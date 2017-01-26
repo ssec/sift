@@ -744,7 +744,6 @@ class SceneGraphManager(QObject):
             parent=self.main_map,
             projection=layer[INFO.PROJ],
         )
-        from sift.view.transform import PROJ4Transform
         image.transform = PROJ4Transform(layer[INFO.PROJ], inverse=True)
         image.transform *= STTransform(translate=(0, 0, -50.0))
         self.image_elements[uuid] = image
@@ -779,6 +778,7 @@ class SceneGraphManager(QObject):
                 parent=self.main_map,
                 projection=layer[INFO.PROJ],
             )
+            element.transform = PROJ4Transform(layer[INFO.PROJ], inverse=True)
             element.transform *= STTransform(translate=(0, 0, -50.0))
             self.composite_element_dependencies[uuid] = dep_uuids
             self.layer_set.add_layer(element)

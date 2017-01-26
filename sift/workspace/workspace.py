@@ -116,7 +116,7 @@ class GeoTiffImporter(WorkspaceImporter):
         # FUTURE: Should the Workspace normalize all input data or should the Image Layer handle any projection?
         srs = osr.SpatialReference()
         srs.ImportFromWkt(gtiff.GetProjection())
-        d[INFO.PROJ] = srs.ExportToProj4()
+        d[INFO.PROJ] = srs.ExportToProj4().strip()  # remove extra whitespace
 
         d[INFO.NAME] = os.path.split(source_path)[-1]
         d[INFO.PATHNAME] = source_path
@@ -125,6 +125,14 @@ class GeoTiffImporter(WorkspaceImporter):
         band = gtiff.GetRasterBand(1)  # FUTURE may be an assumption
         shape = rows, cols = band.YSize, band.XSize
         blockw, blockh = band.GetBlockSize()  # non-blocked files will report [band.XSize,1]
+
+        # Fix PROJ4 string if it needs an "+over" parameter
+        p = Proj(d[INFO.PROJ])
+        lon_l, lat_u = p(ox, oy, inverse=True)
+        lon_r, lat_b = p(ox + cw * cols, oy + ch * rows, inverse=True)
+        if "+over" not in d[INFO.PROJ] and lon_r < lon_l:
+            LOG.debug("Add '+over' to geotiff PROJ.4 because it seems to cross the anti-meridian")
+            d[INFO.PROJ] += " +over"
 
         bandtype = gdal.GetDataTypeName(band.DataType)
         if bandtype.lower()!='float32':

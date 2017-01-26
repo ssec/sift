@@ -233,7 +233,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 'default_height': 20.,  # degrees from bottom edge to top edge
             }),
             ('LCC (CONUS)', {
-                'proj4_str': '+proj=lcc +a=6371200 +b=6371200 +lat_0=25 +lat_1=25 +lon_0=-95 +units=m +no_defs',
+                'proj4_str': '+proj=lcc +a=6371200 +b=6371200 +lat_0=25 +lat_1=25 +lon_0=-95 +units=m +no_defs +over',
                 'default_center': (-123.044, 59.844),
                 'default_width': 20.,
                 'default_height': 20.,
