@@ -100,6 +100,7 @@ class GeoTiffImporter(WorkspaceImporter):
         if source_uri is not None:
             raise NotImplementedError("GeoTiffImporter cannot read from URIs yet")
         d = {}
+        gtiff = gdal.Open(source_path)
 
         # FIXME: consider yielding status at this point so our progress bar starts moving
 
