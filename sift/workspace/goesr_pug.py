@@ -61,8 +61,8 @@ def proj4_params(longitude_of_projection_origin=0.0, perspective_point_height=0.
             ('x_0', x_0),
             ('y_0', y_0),
             ('sweep', sweep_angle_axis),
-            ('ellps', 'GRS80'),  # FIXME: probably redundant given +a and +b, PUG states GRS80 and not WGS84
             ('units', 'm'),
+            # ('ellps', 'GRS80'),  # redundant given +a and +b, PUG states GRS80 and not WGS84
             )
 
 
@@ -175,6 +175,21 @@ def nc_nav_values(nc, radiance_var_name: str=None,
 
     return nav
 
+def nc_y_x_names(nc, radiance_var_name: str=None):
+    """
+    read .coordinates from variable to get names of y and x variables
+    note that PUG files may have multiple named coordinate variables for band/time preceding
+    :param nc: netcdf file
+    :param radiance_var_name: variable of interest, typically DEFAULT_RADIANCE_VAR_NAME
+    :return:
+    """
+    v = nc.variables.get(radiance_var_name or DEFAULT_RADIANCE_VAR_NAME, None)
+    c = v.coordinates.encode('ASCII').split()
+    return c[-2:]
+
+
+
+
 RE_PUG_ISO = re.compile(r'(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d).(\d+)Z')
 
 def timecode_to_datetime(iso):
@@ -224,7 +239,7 @@ class PugL1bTools(object):
     def bt_or_refl(self):
         return is_band_refl_or_bt(self.band)
 
-    def convert(self, rad):
+    def convert_radiances(self, rad):
         """
         calculate BT or Refl based on band
         :param rad: radiance array from file
@@ -238,14 +253,16 @@ class PugL1bTools(object):
 
     def __init__(self, nc: (nc4.Dataset, str), radiance_var: str=DEFAULT_RADIANCE_VAR_NAME, band_offset: int=0):
         """
-        Initialize cal and nav helper object from a PUG NetCDF4 L1B file
-        :param nc:
+        Initialize cal and nav helper object from a PUG NetCDF4 L1B file.
+        Can be used as a cal/nav/metadata fetch, or as a file wrapper.
+        :param nc: netCDF4 Dataset if only metadata is desired; netcdf pathname if file should be opened and retained
         :param radiance_var: radiance variable to convert to BT/Refl
         :param band_offset: typically 0, eventually nonzero for multi-band files
         """
         super(PugL1bTools, self).__init__()
-        if not isinstance(nc, nc4.Dataset):
+        if not isinstance(nc, nc4.Dataset):  # then we can open and retain the file for our use
             nc = nc4.Dataset(nc)
+            self.nc = nc
         self.rad_var_name = radiance_var
         self.band = int(nc['band_id'][band_offset])  # FUTURE: this has a band dimension
         self.cal = nc_cal_values(nc)            # but for some reason these do not?
@@ -253,11 +270,12 @@ class PugL1bTools(object):
         self.shape = nc[radiance_var].shape
         self.platform = nc.platform_ID.encode('ASCII')
         self.time_span = st, en = timecode_to_datetime(nc.time_coverage_start), timecode_to_datetime(nc.time_coverage_end)
-        self.timeline_id = nc.timeline_id
-        self.scene_id = nc.scene_id
+        self.timeline_id = nc.timeline_id.encode('ASCII')
+        self.scene_id = nc.scene_id.encode('ASCII')
         self.sched_time = snap_scene_onto_schedule(st, en, self.scene_id, self.timeline_id)
         self.display_time = self.sched_time.strftime('%Y-%m-%d %H:%M')
         self.display_name = '{} ABI B{:02d} %s'.format(self.platform, self.band, self.scene_id)
+        self.y_var_name, self.x_var_name = nc_y_x_names(nc, self.rad_var_name)
 
     @property
     def proj4(self):
@@ -271,9 +289,60 @@ class PugL1bTools(object):
     def proj4_string(self):
         return proj4_string(**self.nav)
 
-    def convert_from_nc(self, nc: nc4.Dataset):
+    def convert_from_nc(self, nc: nc4.Dataset=None):
+        nc = nc or self.nc
+        if not nc:
+            raise ValueError('must provide a valid netCDF file')
         rad = nc[self.rad_var_name][:]
-        return self.convert(rad)
+        return self.convert_radiances(rad)
+
+    @property
+    def bt(self):
+        if None is self.nc:
+            return None
+        if 'bt' is self.bt_or_refl:
+            return self.convert_from_nc(self.nc)
+        LOG.warning('cannot request bt from non-emissive band')
+        return None
+
+    @property
+    def refl(self):
+        if None is self.nc:
+            return None
+        if 'refl' is self.bt_or_refl:
+            return self.convert_from_nc(self.nc)
+        LOG.warning('cannot request refl from non-reflectance band')
+        return None
+
+    @property
+    def y(self):
+        if None is self.nc:
+            return None
+        return self.nc[self.y_var_name][:]
+
+    @property
+    def x(self):
+        if None is self.nc:
+            return None
+        return self.nc[self.x_var_name][:]
+
+    @property
+    def proj_y(self):
+        """
+        projection coordinate as cartesian nadir-meters as used by PROJ.4
+        ref http://proj4.org/projections/geos.html
+        scanning_angle (radians) = projection_coordinate / h
+        """
+        return self.y * self.nav['perspective_point_height']
+
+    @property
+    def proj_x(self):
+        """
+        projection coordinate as cartesian nadir-meters as used by PROJ.4
+        ref http://proj4.org/projections/geos.html
+        scanning_angle (radians) = projection_coordinate / h
+        """
+        return self.x * self.nav['perspective_point_height']
 
 
 class tests(unittest.TestCase):

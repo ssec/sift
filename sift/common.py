@@ -116,10 +116,10 @@ class INFO(Enum):
     NAME = 'name'  # logical name of the file (possibly human assigned)
     KIND = 'kind'  # KIND enumeration on what kind of layer this makes
     UUID = 'uuid'  # UUID assigned on import, which follows the layer around the system
-    ORIGIN_X = 'origin_x'
-    ORIGIN_Y = 'origin_y'
-    CELL_WIDTH = 'cell_width'
-    CELL_HEIGHT = 'cell_height'
+    ORIGIN_X = 'origin_x'  # image (0,0) in nadir-meters relative to the projection center
+    ORIGIN_Y = 'origin_y'  # image (0,0) in nadir-meters relative to the projection center
+    CELL_WIDTH = 'cell_width'  # size of an image pixel in nadir-meters
+    CELL_HEIGHT = 'cell_height'  # size of an image pixel in nadir-meters
     PROJ = 'proj4_string'
     CLIM = 'clim'  # (min,max) color map limits
     SHAPE = 'shape' # (rows, columns) or (rows, columns, levels) data shape

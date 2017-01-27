@@ -28,7 +28,6 @@ import logging, unittest, argparse
 import gdal, osr
 import numpy as np
 import shutil
-import netCDF4 as nc4
 from collections import namedtuple
 from pickle import dump, load, HIGHEST_PROTOCOL
 from uuid import UUID, uuid1 as uuidgen
@@ -101,12 +100,10 @@ class GeoTiffImporter(WorkspaceImporter):
         if source_uri is not None:
             raise NotImplementedError("GeoTiffImporter cannot read from URIs yet")
         d = {}
-        nc = nc4Dataset(source_path)
 
         # FIXME: consider yielding status at this point so our progress bar starts moving
 
         ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
-        d[INFO.PROJ] = self._proj4_string_from_nc(nc)
         d[INFO.UUID] = dest_uuid
         d[INFO.KIND] = KIND.IMAGE
         d[INFO.ORIGIN_X] = ox
@@ -205,30 +202,38 @@ class GoesRPUGImporter(WorkspaceImporter):
         #
 
         d = {}
-        nc = nc4.Dataset(source_path)
-        pug = PugL1bTools(nc)
-
+        # nc = nc4.Dataset(source_path)
+        pug = PugL1bTools(source_path)
 
         d[INFO.UUID] = dest_uuid
         d[INFO.NAME] = os.path.split(source_path)[-1]
         d[INFO.PATHNAME] = source_path
         d[INFO.KIND] = KIND.IMAGE
+
         d[INFO.PROJ] = pug.proj4_string
+        # get nadir-meter-ish projection coordinate vectors to be used by proj4
+        y,x = pug.proj_y, pug.proj_x
+        d[INFO.ORIGIN_X] = x[0]
+        d[INFO.ORIGIN_Y] = y[0]
+        # note that coordiantes
+        midyi, midxi = int(y.shape[0] / 2), int(x.shape[0] / 2)
+        # PUG states radiance at index [0,0] extends between coordinates [0,0] thru [1,1]
+        # centers of pixels are therefore at +0.5, +0.5
+        # for a (e.g.) H x W image this means [H/2,W/2] coordinates are image center
+        # for now assume all scenes are even-dimensioned (e.g. 5424x5424)
+        # given that coordinates are evenly spaced in angular -> nadir-meters space,
+        # technically this should work with any two neighbor values
+        d[INFO.CELL_WIDTH] = x[midxi+1] - x[midxi]
+        d[INFO.CELL_HEIGHT] = x[midyi+1] - x[midyi]
 
         # FUTURE: consider yielding status at this point so our progress bar starts moving
-
-        # FIXME: what are these values?
-        d[INFO.ORIGIN_X] = ox
-        d[INFO.ORIGIN_Y] = oy
-        d[INFO.CELL_WIDTH] = cw
-        d[INFO.CELL_HEIGHT] = ch
 
         bandtype = np.float32
         shape = rows, cols = pug.shape
         d[INFO.SHAPE] = shape
         d[INFO.DISPLAY_TIME] = pug.display_time
 
-        bt_or_refl, image, units = pug.convert_from_nc(nc)  # FIXME expensive
+        bt_or_refl, image, units = pug.convert_from_nc()  # FIXME expensive
         # overview_image = fixme  # FIXME, we need a properly navigated overview image here
 
         # we got some metadata, let's yield progress
@@ -247,7 +252,6 @@ class GoesRPUGImporter(WorkspaceImporter):
         #   - record the content information in the workspace metadatabase
         #
 
-        # shovel that data into the memmap incrementally
         # FUTURE as we're doing so, also update coverage array (showing what sections of data are loaded)
         # FUTURE and for some cases the sparsity array, if the data is interleaved (N/A for NetCDF imagery)
 
@@ -258,7 +262,7 @@ class GoesRPUGImporter(WorkspaceImporter):
         # FUTURE: workspace content can be int16 with conversion coefficients applied on the fly, after feature-matrix-model goes in
 
         # FIXME: for test purpose just brute-force the whole thing into place instead of doing incremental partial-coverage loads
-        kind, data, unit = pug.convert_from_nc(nc)   # hopefully only a few seconds... but not good in long term to leave this
+        # kind, data, unit = pug.convert_from_nc()   # hopefully only a few seconds... but not good in long term to leave this
 
         yield import_progress(uuid=dest_uuid,
                              stages=1,
