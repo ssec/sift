@@ -141,8 +141,9 @@ class PendingPolygon(object):
                                name='polygon_%02d' % (len(self.markers),),
                                symbol="disc", pos=np.array([xy_pos]),
                                face_color=np.array([0., 0.5, 0.5, 1.]),
-                               edge_color=np.array([0., 0.5, 0.5, 1.]),
-                               size=12.,
+                               edge_color=np.array([.5, 1.0, 1.0, 1.]),
+                               size=18.,
+                               edge_width=3.,
                                )
         self.markers.append(point_visual)
         return False
@@ -544,8 +545,6 @@ class SceneGraphManager(QObject):
             # FIXME: We should be able to use the main_map object to do the transform...but it doesn't work (waiting on vispy developers)
             # map_pos = self.main_map.transforms.get_transform().imap(buffer_pos)
             map_pos = self.borders.transforms.get_transform().imap(buffer_pos)
-            # point_marker = Markers(parent=self.main_map, symbol="disc", pos=np.array([map_pos[:2]]))
-            # self.points.append(point_marker)
             self.newPointProbe.emit(DEFAULT_POINT_PROBE, tuple(map_pos[:2]))
 
     def on_mouse_press_region(self, event):
@@ -598,8 +597,8 @@ class SceneGraphManager(QObject):
             'pos': np.array([xy_pos]),
             'face_color': face_color,
             'edge_color': edge_color,
-            'size': 12.,
-            'edge_width': 2.,
+            'size': 18.,
+            'edge_width': 3.,
         }
 
         if probe_name not in self.point_probes and xy_pos is None:
