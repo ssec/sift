@@ -216,16 +216,16 @@ class GoesRPUGImporter(WorkspaceImporter):
         y,x = pug.proj_y, pug.proj_x
         d[INFO.ORIGIN_X] = x[0]
         d[INFO.ORIGIN_Y] = y[0]
-        # note that coordiantes
+
         midyi, midxi = int(y.shape[0] / 2), int(x.shape[0] / 2)
-        # PUG states radiance at index [0,0] extends between coordinates [0,0] thru [1,1]
+        # PUG states radiance at index [0,0] extends between coordinates [0,0] to [1,1] on a quadrille
         # centers of pixels are therefore at +0.5, +0.5
         # for a (e.g.) H x W image this means [H/2,W/2] coordinates are image center
         # for now assume all scenes are even-dimensioned (e.g. 5424x5424)
         # given that coordinates are evenly spaced in angular -> nadir-meters space,
         # technically this should work with any two neighbor values
         d[INFO.CELL_WIDTH] = x[midxi+1] - x[midxi]
-        d[INFO.CELL_HEIGHT] = x[midyi+1] - x[midyi]
+        d[INFO.CELL_HEIGHT] = y[midyi+1] - y[midyi]
 
         # FUTURE: consider yielding status at this point so our progress bar starts moving
 
