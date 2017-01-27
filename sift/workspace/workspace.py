@@ -234,6 +234,7 @@ class GoesRPUGImporter(WorkspaceImporter):
         d[INFO.SHAPE] = shape
         d[INFO.DISPLAY_TIME] = pug.display_time
 
+        LOG.info('converting radiance to %s' % pug.bt_or_refl)
         bt_or_refl, image, units = pug.convert_from_nc()  # FIXME expensive
         # overview_image = fixme  # FIXME, we need a properly navigated overview image here
 
@@ -256,9 +257,12 @@ class GoesRPUGImporter(WorkspaceImporter):
         # FUTURE as we're doing so, also update coverage array (showing what sections of data are loaded)
         # FUTURE and for some cases the sparsity array, if the data is interleaved (N/A for NetCDF imagery)
 
+        LOG.info('caching PUG imagery in workspace %s' % cache_path)
         fp = open(cache_path, 'wb+')
         img_data = np.memmap(fp, dtype=np.float32, shape=shape, mode='w+')
         img_data[:] = np.ma.fix_invalid(image, copy=False, fill_value=np.NAN)  # FIXME: expensive
+
+        LOG.debug(repr(d))
 
         # FUTURE: workspace content can be int16 with conversion coefficients applied on the fly, after feature-matrix-model goes in
 
@@ -268,7 +272,7 @@ class GoesRPUGImporter(WorkspaceImporter):
         yield import_progress(uuid=dest_uuid,
                              stages=1,
                              current_stage=0,
-                             completion=2.0/3.0,
+                             completion=1.0,
                              stage_desc="GOES PUG data add to workspace",
                              dataset_info=d,
                              data=img_data)
