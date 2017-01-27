@@ -22,6 +22,8 @@ netCDF4
 import os, sys
 import logging, unittest, argparse
 import numpy as np
+import numba
+from numba.decorators import jit
 import re
 from datetime import datetime
 import netCDF4 as nc4
@@ -81,6 +83,10 @@ def proj4_string(**kwargs):
     #     semi_minor_axis
     # )
 
+@jit((numba.float32[:,:], numba.double, numba.double, numba.double, numba.double))
+def _calc_bt(L: np.ndarray, fk1: float, fk2: float, bc1: float, bc2: float):
+    return (fk2 / (np.log(fk1 / L) + 1.0) - bc1) / bc2
+
 
 def calc_bt(L: (np.ndarray, np.ma.masked_array), fk1: float, fk2: float, bc1: float, bc2: float, mask_invalid: bool=True, **etc):
     """
@@ -96,15 +102,21 @@ def calc_bt(L: (np.ndarray, np.ma.masked_array), fk1: float, fk2: float, bc1: fl
     :param mask_invalid: bool, whether to include radiances <=0.0 in array mask - iff Lis masked array
     :return: BT converted radiance data, K; if input is masked_array, L<=0.0 will also be masked
     """
-    T = (fk2 / (np.log(fk1 / L) + 1.0) - bc1) / bc2
-    if mask_invalid and isinstance(L, np.ma.masked_array):
-        T.unshare_mask()
-        T.mask |= (L.data <= 0.0)
+    T = _calc_bt(L.data, fk1, fk2, bc1, bc2)
+    if isinstance(L, np.ma.masked_array):
+        if mask_invalid:
+            T = np.ma.masked_array(T, (L.data <= 0.0) | L.mask)
+        else:
+            T = np.ma.masked_array(T, L.mask)
     else:
         # Tmin = -bc1 / bc2   # when L<=0
         T[L <= 0.0] = 0.0  # Tmin, but for now truncate to absolute 0
     return T
 
+
+# @jit((numba.float32[:,:], numba.double))
+# def _calc_refl(L, kappa0):
+#     return L * kappa0
 
 def calc_refl(L: np.ndarray, kappa0: float, **etc):
     """
@@ -115,6 +127,10 @@ def calc_refl(L: np.ndarray, kappa0: float, **etc):
     :return:
     """
     return L * kappa0
+    # if isinstance(L, np.ma.masked_array):
+    #     refl = _calc_refl(L.data, kappa0)
+    #     return np.ma.masked_array(refl, L.mask)
+    # return _calc_refl(L, kappa0)
 
 
 def is_band_refl_or_bt(band: int):
