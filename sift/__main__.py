@@ -225,10 +225,12 @@ class Main(QtGui.QMainWindow):
 
     def interactive_open_files(self, *args, files=None, **kwargs):
         self.scene_manager.layer_set.animating = False
+        # http://pyqt.sourceforge.net/Docs/PyQt4/qfiledialog.html#getOpenFileNames
         files = QtGui.QFileDialog.getOpenFileNames(self,
                                                    "Select one or more files to open",
                                                    self._last_open_dir or os.getenv("HOME"),
-                                                   'Mercator GeoTIFF (*.tiff *.tif)')
+                                                   ';;'.join(['Mercator GeoTIFF (*.tiff *.tif)',
+                                                              'GOES-R PUG netCDF (*.nc *.nc4)']))
         self.open_paths(files)
 
     def open_paths(self, paths):

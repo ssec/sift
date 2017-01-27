@@ -37,6 +37,7 @@ class PLATFORM(Enum):
     HIMAWARI_8 = 'Himawari-8'
     HIMAWARI_9 = 'Himawari-9'
     GOES_16 = 'G16'
+    GOES_17 = 'G17'
 
 GUIDEBOOKS = {}
 
@@ -143,6 +144,14 @@ NOMINAL_WAVELENGTHS = {
     },
 }
 
+# map .platform_id in PUG format files to SIFT platform enum
+PLATFORM_ID_TO_PLATFORM = {
+    'G16': PLATFORM.GOES_16,
+    'G17': PLATFORM.GOES_17,
+    # hsd2nc export of AHI data as PUG format
+    'Himawari-8': PLATFORM.HIMAWARI_8,
+    'Himawari-9': PLATFORM.HIMAWARI_9
+}
 
 
 class ABI_AHI_Guidebook(Guidebook):
@@ -197,7 +206,7 @@ class ABI_AHI_Guidebook(Guidebook):
     def _metadata_for_abi_path(pathname):  # FUTURE: since for ABI this is really coming from the file, decide whether the guidebook should be doing it
         abi = pug.PugL1bTools(pathname)
         return {
-            GUIDE.PLATFORM: abi.platform,  # e.g. G16
+            GUIDE.PLATFORM: PLATFORM_ID_TO_PLATFORM[abi.platform],  # e.g. G16
             GUIDE.BAND: abi.band,
             GUIDE.INSTRUMENT: INSTRUMENT.ABI,
             GUIDE.SCHED_TIME: abi.sched_time,
