@@ -184,7 +184,7 @@ def nc_y_x_names(nc, radiance_var_name: str=None):
     :return:
     """
     v = nc.variables.get(radiance_var_name or DEFAULT_RADIANCE_VAR_NAME, None)
-    c = v.coordinates.encode('ASCII').split()
+    c = v.coordinates.split()
     return c[-2:]
 
 
@@ -268,10 +268,10 @@ class PugL1bTools(object):
         self.cal = nc_cal_values(nc)            # but for some reason these do not?
         self.nav = nc_nav_values(nc, self.rad_var_name)
         self.shape = nc[radiance_var].shape
-        self.platform = nc.platform_ID.encode('ASCII')
+        self.platform = nc.platform_ID
         self.time_span = st, en = timecode_to_datetime(nc.time_coverage_start), timecode_to_datetime(nc.time_coverage_end)
-        self.timeline_id = nc.timeline_id.encode('ASCII')
-        self.scene_id = nc.scene_id.encode('ASCII')
+        self.timeline_id = nc.timeline_id
+        self.scene_id = nc.scene_id
         self.sched_time = snap_scene_onto_schedule(st, en, self.scene_id, self.timeline_id)
         self.display_time = self.sched_time.strftime('%Y-%m-%d %H:%M')
         self.display_name = '{} ABI B{:02d} %s'.format(self.platform, self.band, self.scene_id)
@@ -352,16 +352,26 @@ class tests(unittest.TestCase):
         pass
 
     def test_proj4_string(self):
-        nc = nc4.Dataset(self.data_file)
-        t = PugL1bTools(nc)
+        t = PugL1bTools(self.data_file)
         print(t.proj4_string)
-        nc.close()
+
+    def test_proj4(self):
+        t = PugL1bTools(self.data_file)
+        import pyproj
+        px = pyproj.Proj(t.proj4_string)
+        # convert nadir-meters to lat/lon
+        lon, lat = px(t.proj_x[1500], t.proj_y[2000], inverse=True)
+        self.assertTrue(int(lon)==-113)
+        self.assertTrue(int(lat)==13)
+        lopo = t.nav['longitude_of_projection_origin']
+        lapo = t.nav['latitude_of_projection_origin']
+        x,y = px(lopo,lapo)
+        self.assertTrue(x==y==0.0)
+
 
     @staticmethod
     def hello():
-        nc = nc4.Dataset(tests.data_file)
-        t = PugL1bTools(nc)
-        t.nc = nc
+        t = PugL1bTools(tests.data_file)
         return t
 
 
