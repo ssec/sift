@@ -478,7 +478,7 @@ class PROJ4Transform(BaseTransform):
             self._shader_map._add_dep(adjlon_func)
             self._shader_imap._add_dep(adjlon_func)
 
-        print(self._shader_map.compile())
+        # print(self._shader_map.compile())
 
     def proj_dict(self, proj_str):
         d = tuple(x.replace("+", "").split("=") for x in proj_str.split(" "))
