@@ -314,11 +314,11 @@ PROJECTIONS = {
             Vz *= k;
 
             // atan2 in C
-            lambda = atan(Vy, Vx) + {lon_0};
+            lambda = atan(Vy, Vx);
             {over}
             phi = atan(Vz * cos(lambda) / Vx);
             phi = atan({radius_p_inv2} * tan(phi));
-            return vec4(degrees(lambda), degrees(phi), pos.z, pos.w);
+            return vec4(degrees(lambda) + {lon_0}, degrees(phi), pos.z, pos.w);
         }}""",
         None, #"""vec4 geos_imap_s(vec4 pos) {{ }}""",
     ),
