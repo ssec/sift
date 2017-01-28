@@ -129,14 +129,14 @@ def geos_init(proj_dict):
     # if 'lat_0' not in proj_dict:
     #     raise ValueError("PROJ.4 'lat_0' parameter is required for 'geos' projection")
 
-    if 'sweep_axis' not in proj_dict or proj_dict['sweep_axis'] is None:
-        proj_dict['flip_axis'] = 0
-    elif proj_dict['sweep_axis'] not in ['x', 'y']:
-        raise ValueError("PROJ.4 'sweep_axis' parameter must be 'x' or 'y'")
-    elif proj_dict['sweep_axis'] == 'x':
-        proj_dict['flip_axis'] = 0
+    if 'sweep' not in proj_dict or proj_dict['sweep'] is None:
+        proj_dict['flip_axis'] = 'false'
+    elif proj_dict['sweep'] not in ['x', 'y']:
+        raise ValueError("PROJ.4 'sweep' parameter must be 'x' or 'y'")
+    elif proj_dict['sweep'] == 'x':
+        proj_dict['flip_axis'] = 'false'
     else:
-        proj_dict['flip_axis'] = 1
+        proj_dict['flip_axis'] = 'true'
 
     proj_dict['radius_g_1'] = proj_dict['h'] / proj_dict['a']
     proj_dict['radius_g'] = 1. + proj_dict['radius_g_1']
@@ -274,7 +274,7 @@ PROJECTIONS = {
 
             float tmp = {radius_g} - Vx;
 
-            if ({flip_axis} == 1) {{
+            if ({flip_axis}) {{
                 lambda = {radius_g_1} * atan(Vy / hypot(Vz, tmp));
                 phi = {radius_g_1} * atan(Vz / tmp);
             }} else {{
@@ -291,7 +291,7 @@ PROJECTIONS = {
             y = pos.y / {a};
 
             Vx = -1.0;
-            if ({flip_axis} == 1) {{
+            if ({flip_axis}) {{
                 Vz = tan(y / {radius_g_1});
                 Vy = tan(x / {radius_g_1}) * hypot(1.0, Vz);
             }} else {{
