@@ -244,7 +244,8 @@ PROJECTIONS = {
                 }} else {{
                     phi = 2. * atan(pow({c} / rho, 1. / {n})) - M_HALFPI;
                 }}
-                lambda = atan2(x, y) / {n};
+                // atan2 in C
+                lambda = atan(x, y) / {n};
             }} else {{
                 lamdba = 0;
                 phi = {n} > 0. ? M_HALFPI : - M_HALFPI;
@@ -301,7 +302,7 @@ PROJECTIONS = {
             a = Vz / {radius_p};
             a = Vy * Vy + a * a + Vx * Vx;
             b = 2 * {radius_g} * Vx;
-            det = ((b * b) - 4 * a * {C})
+            det = ((b * b) - 4 * a * {C});
             if (det < 0.) {{
                 // FIXME
                 return vec4(1. / 0., 1. / 0., pos.z, pos.w);
@@ -312,7 +313,8 @@ PROJECTIONS = {
             Vy *= k;
             Vz *= k;
 
-            lambda = atan2(Vy, Vx) + {lon_0};
+            // atan2 in C
+            lambda = atan(Vy, Vx) + {lon_0};
             {over}
             phi = atan(Vz * cos(lambda) / Vx);
             phi = atan({radius_p_inv2} * tan(phi));
@@ -476,7 +478,7 @@ class PROJ4Transform(BaseTransform):
             self._shader_map._add_dep(adjlon_func)
             self._shader_imap._add_dep(adjlon_func)
 
-        # print(self._shader_map.compile())
+        print(self._shader_map.compile())
 
     def proj_dict(self, proj_str):
         d = tuple(x.replace("+", "").split("=") for x in proj_str.split(" "))
