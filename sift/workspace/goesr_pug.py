@@ -102,7 +102,7 @@ def calc_bt(L: (np.ndarray, np.ma.masked_array), fk1: float, fk2: float, bc1: fl
     :param mask_invalid: bool, whether to include radiances <=0.0 in array mask - iff Lis masked array
     :return: BT converted radiance data, K; if input is masked_array, L<=0.0 will also be masked
     """
-    T = _calc_bt(L.data, fk1, fk2, bc1, bc2)
+    T = _calc_bt(L, fk1, fk2, bc1, bc2)
     if isinstance(L, np.ma.masked_array):
         if mask_invalid:
             T = np.ma.masked_array(T, (L.data <= 0.0) | L.mask)
