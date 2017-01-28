@@ -183,11 +183,12 @@ def nc_nav_values(nc, radiance_var_name: str=None,
         'inverse_flattening', 'latitude_of_projection_origin', 'longitude_of_projection_origin', 'sweep_angle_axis'))
 
     x_0, y_0 = 0, 0
-    if y_image_var_name in nc.variables.keys():
-        y_0 = float(nc[y_image_var_name][:]) * nav['perspective_point_height']  # convert to nadir-meter for proj4
-    if x_image_var_name in nc.variables.keys():
-        x_0 = float(nc[x_image_var_name][:]) * nav['perspective_point_height']
-    nav['y_0'], nav['x_0'] = y_0, x_0
+    # false easting / false northing
+    # if y_image_var_name in nc.variables.keys():
+    #     y_0 = float(nc[y_image_var_name][:]) * nav['perspective_point_height']  # convert to nadir-meter for proj4
+    # if x_image_var_name in nc.variables.keys():
+    #     x_0 = float(nc[x_image_var_name][:]) * nav['perspective_point_height']
+    # nav['y_0'], nav['x_0'] = y_0, x_0
 
     return nav
 
