@@ -267,10 +267,9 @@ PROJECTIONS = {
             float Vz = r * sin(phi);
 
             // TODO: Best way to 'discard' a vertex
-            if ((({radius_g} - Vx) * Vx - Vy * Vy - Vz * Vz * {radius_p_inv2}) < 0.)
-               //return vec4(lambda, phi, nan, pos.w);
-               // FIXME
+            if ((({radius_g} - Vx) * Vx - Vy * Vy - Vz * Vz * {radius_p_inv2}) < 0.) {{
                return vec4(1. / 0., 1. / 0., pos.z, pos.w);
+            }}
 
             float tmp = {radius_g} - Vx;
 
@@ -477,6 +476,12 @@ class PROJ4Transform(BaseTransform):
         if proj_args['over']:
             self._shader_map._add_dep(adjlon_func)
             self._shader_imap._add_dep(adjlon_func)
+
+        # Add special handling of possible infinity lon/lat values
+        self._shader_map['pre'] = """
+    if (abs(pos.x) > 1e30 || abs(pos.y) > 1e30)
+        return vec4(1. / 0., 1. / 0., pos.z, pos.w);
+        """
 
         # print(self._shader_map.compile())
 
