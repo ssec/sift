@@ -611,6 +611,8 @@ class ProbeGraphDisplay (object) :
 
             # plot a scatter plot
             # self.plotScatterplot (data1, name1, data2, name2)
+            data1 = data1[~numpy.isnan(data1)]
+            data2 = data2[~numpy.isnan(data2)]
             self.plotDensityScatterplot (data1, name1, data2, name2, x_point, y_point)
 
         # if we have some combination of selections we don't understand, clear the figure
@@ -630,7 +632,7 @@ class ProbeGraphDisplay (object) :
         """
         self.figure.clf()
         axes = self.figure.add_subplot(111)
-        bars = axes.hist(data, bins=self.DEFAULT_NUM_BINS)
+        bars = axes.hist(data[~numpy.isnan(data)], bins=self.DEFAULT_NUM_BINS)
         if x_point is not None:
             # go through each rectangle object and make the one that contains x_point 'red'
             # default color is blue so red should stand out
