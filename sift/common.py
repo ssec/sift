@@ -58,7 +58,7 @@ C_POL = p(0, 89.9)[1] - p(0, -89.9)[1]
 MAX_EXCURSION_Y = C_POL/2.0
 MAX_EXCURSION_X = C_EQ/2.0
 # how many 'tessellation' tiles in one texture tile? 2 = 2 rows x 2 cols
-TESS_LEVEL = 2
+TESS_LEVEL = 20
 IMAGE_MESH_SIZE = 10
 # smallest difference between two image extents (in canvas units)
 # before the image is considered "out of view"
