@@ -20,7 +20,7 @@ REQUIRES
 from _weakref import ref
 from collections import MutableMapping
 from enum import Enum
-from sift.model.guidebook import AHI_HSF_Guidebook, GUIDE
+from sift.model.guidebook import ABI_AHI_Guidebook, GUIDE
 
 from sift.common import INFO, KIND
 

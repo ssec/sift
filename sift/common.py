@@ -27,7 +27,7 @@ __docformat__ = 'reStructuredText'
 
 import os, sys
 import logging, unittest, argparse
-from numba import jit
+from numba import jit, float64, int64, types as nb_types
 from pyproj import Proj
 
 LOG = logging.getLogger(__name__)
@@ -51,12 +51,18 @@ DEFAULT_Y_PIXEL_SIZE = -7566.684931505724307
 DEFAULT_ORIGIN_X = -20037508.342789247632027
 DEFAULT_ORIGIN_Y = 15496570.739723727107048
 
-DEFAULT_PROJECTION = "+proj=merc +datum=WGS84 +ellps=WGS84"
+DEFAULT_PROJECTION = "+proj=merc +datum=WGS84 +ellps=WGS84 +over"
 DEFAULT_PROJ_OBJ = p = Proj(DEFAULT_PROJECTION)
 C_EQ = p(180, 0)[0] - p(-180, 0)[0]
 C_POL = p(0, 89.9)[1] - p(0, -89.9)[1]
 MAX_EXCURSION_Y = C_POL/2.0
 MAX_EXCURSION_X = C_EQ/2.0
+# how many 'tessellation' tiles in one texture tile? 2 = 2 rows x 2 cols
+TESS_LEVEL = 20
+IMAGE_MESH_SIZE = 10
+# smallest difference between two image extents (in canvas units)
+# before the image is considered "out of view"
+CANVAS_EXTENTS_EPSILON = 1e-4
 
 #R_EQ = 6378.1370  # km
 #R_POL = 6356.7523142  # km
@@ -101,7 +107,6 @@ class COMPOSITE_TYPE(Enum):
     ARITHMETIC = 2
 
 
-
 class INFO(Enum):
     """
     Standard keys for info dictionaries
@@ -111,17 +116,82 @@ class INFO(Enum):
     NAME = 'name'  # logical name of the file (possibly human assigned)
     KIND = 'kind'  # KIND enumeration on what kind of layer this makes
     UUID = 'uuid'  # UUID assigned on import, which follows the layer around the system
-    ORIGIN_X = 'origin_x'
-    ORIGIN_Y = 'origin_y'
-    CELL_WIDTH = 'cell_width'
-    CELL_HEIGHT = 'cell_height'
+    ORIGIN_X = 'origin_x'  # image (0,0) in nadir-meters relative to the projection center
+    ORIGIN_Y = 'origin_y'  # image (0,0) in nadir-meters relative to the projection center
+    CELL_WIDTH = 'cell_width'  # size of an image pixel in nadir-meters
+    CELL_HEIGHT = 'cell_height'  # size of an image pixel in nadir-meters
     PROJ = 'proj4_string'
     CLIM = 'clim'  # (min,max) color map limits
     SHAPE = 'shape' # (rows, columns) or (rows, columns, levels) data shape
     COLORMAP = 'colormap'  # name or UUID of a color map
     DISPLAY_TIME = 'display_time'  # typically from guidebook, used for labeling animation frame
 
-class MercatorTileCalc(object):
+
+@jit(nb_types.UniTuple(int64, 2)(float64[:, :], float64[:, :]))
+def get_reference_points(img_cmesh, img_vbox):
+    """Get two image reference point indexes.
+
+    This function will return the two nearest reference points to the
+    center of the viewed canvas. The first argument `img_cmesh` is all
+    valid image mesh points that were successfully transformed to the
+    view projection. The second argument `img_vbox` is these same mesh
+    points, but in the original image projection units.
+
+    If there are not enough valid points the second reference point
+    will be `None`.
+
+    :param img_cmesh: (N, 2) array of valid points across the image space
+    :param img_vbox: (N, 2) array of valid points across the image space
+    :return: (reference array index 1, reference array index 2)
+    """
+    # Sort points by nearest to further from the 0,0 center of the canvas
+    # Uses a cheap Pythagorean theorem by summing X + Y
+    near_points = np.sum(np.abs(img_cmesh), axis=1).argsort()
+    ref_idx_1 = near_points[0]
+    # pick a second reference point that isn't in the same row or column as the first
+    near_points_2 = near_points[~np.isclose(img_vbox[near_points][:, 0], img_vbox[ref_idx_1][0]) &
+                                ~np.isclose(img_vbox[near_points][:, 1], img_vbox[ref_idx_1][1])]
+    if near_points_2.shape[0] == 0:
+        raise ValueError("Could not determine reference points")
+
+    return ref_idx_1, near_points_2[0]
+
+
+@jit(nb_types.UniTuple(float64, 2)(float64, float64, int64, float64), nopython=True)
+def _calc_extent_component(canvas_point, image_point, num_pixels, meters_per_pixel):
+    """Calculate """
+    # Find the distance in image space between the closest
+    # reference point and the center of the canvas view (0, 0)
+    viewed_img_center_shift_x = (canvas_point / 2. * num_pixels * meters_per_pixel)
+    # Find the theoretical center of the canvas in image space (X/Y)
+    viewed_img_center_x = image_point - viewed_img_center_shift_x
+    # Find the theoretical number of image units (meters) that
+    # would cover an entire canvas in a perfect world
+    half_canvas_width = num_pixels * meters_per_pixel / 2.
+    # Calculate the theoretical bounding box if the image was
+    # perfectly centered on the closest reference point
+    # Clip the bounding box to the extents of the image
+    l = viewed_img_center_x - half_canvas_width
+    r = viewed_img_center_x + half_canvas_width
+    return l, r
+
+
+@jit(nb_types.UniTuple(float64, 2)(float64[:, :], float64[:, :], nb_types.UniTuple(int64, 2)), nopython=True)
+def calc_pixel_size(canvas_point, image_point, canvas_size):
+    # Calculate the number of image meters per display pixel
+    # That is, use the ratio of the distance in canvas space
+    # between two points to the distance of the canvas
+    # (1 - (-1) = 2). Use this ratio to calculate number of
+    # screen pixels between the two reference points. Then
+    # determine how many image units cover that number of pixels.
+    dx = abs((image_point[1, 0] - image_point[0, 0]) /
+             (canvas_size[0] * (canvas_point[1, 0] - canvas_point[0, 0]) / 2.))
+    dy = abs((image_point[1, 1] - image_point[0, 1]) /
+             (canvas_size[1] * (canvas_point[1, 1] - canvas_point[0, 1]) / 2.))
+    return dx, dy
+
+
+class TileCalculator(object):
     """
     common calculations for mercator tile groups in an array or file
     tiles are identified by (iy,ix) zero-based indicators
@@ -156,7 +226,7 @@ class MercatorTileCalc(object):
         World coordinates are eqm such that 0,0 matches 0°N 0°E, going north/south +-90° and west/east +-180°
         Data coordinates are pixels with b l or b r corner being 0,0
         """
-        super(MercatorTileCalc, self).__init__()
+        super(TileCalculator, self).__init__()
         self.name = name
         self.image_shape = image_shape
         self.ul_origin = ul_origin
@@ -169,20 +239,17 @@ class MercatorTileCalc(object):
         self.image_tiles_avail = (self.image_shape[0] / self.tile_shape[0], self.image_shape[1] / self.tile_shape[1])
         self.wrap_lon = wrap_lon
 
-        p = Proj(projection)
-        # Note: this logic probably only works for mercator or other cylindrical projections
-        self.world_extents_box = box(
-            b=p(0, -89.9)[1],
-            t=p(0, 89.9)[1],
-            l=p(-180, 0)[0],
-            r=p(180, 0)[0],
-        )
-        self.image_extents_box = box(
+        self.proj = Proj(projection)
+        self.image_extents_box = e = box(
             b=self.ul_origin[0] - self.image_shape[0] * self.pixel_rez.dy,
             t=self.ul_origin[0],
             l=self.ul_origin[1],
             r=self.ul_origin[1] + self.image_shape[1] * self.pixel_rez.dx,
         )
+        # Array of points across the image space to be used as an estimate of image coverage
+        # Used when checking if the image is viewable on the current canvas's projection
+        self.image_mesh = np.meshgrid(np.linspace(e.l, e.r, IMAGE_MESH_SIZE), np.linspace(e.b, e.t, IMAGE_MESH_SIZE))
+        self.image_mesh = np.column_stack((self.image_mesh[0].ravel(), self.image_mesh[1].ravel(),))
 
     @jit
     def visible_tiles(self, visible_geom, stride=1, extra_tiles_box=box(0,0,0,0)):
@@ -279,26 +346,6 @@ class MercatorTileCalc(object):
         return ath, atw
 
     @jit
-    def calc_sampling(self, visible, stride, texture=None):
-        """
-        estimate whether we're oversampled, undersampled or well-sampled
-        visible.dy, .dx: d(world distance)/d(screen pixels)
-        texture.dy, .dx: d(world distance)/d(texture pixels)
-        texture pixels / screen pixels = visible / texture
-        1:1 is optimal, 2:1 is oversampled, 1:2 is undersampled
-        """
-        texture = texture or self.pixel_rez
-        tsy = visible.dy / (texture.dy * float(stride))
-        tsx = visible.dx / (texture.dx * float(stride))
-        if min(tsy,tsx) <= 0.5:
-            LOG.debug('undersampled tsy,tsx = {0:.2f},{1:.2f}'.format(tsy,tsx))
-            return self.UNDERSAMPLED
-        if max(tsy,tsx) >= 2.0:
-            LOG.debug('oversampled tsy,tsx = {0:.2f},{1:.2f}'.format(tsy,tsx))
-            return self.OVERSAMPLED
-        return self.WELLSAMPLED
-
-    @jit
     def calc_stride(self, visible, texture=None):
         """
         given world geometry and sampling as a vue or rez tuple
@@ -356,6 +403,7 @@ class MercatorTileCalc(object):
         x_slice = slice(tix*self.tile_shape[1]*stride, (tix+1)*self.tile_shape[1]*stride, stride)
         return y_slice, x_slice
 
+    @jit
     def tile_pixels(self, data, tiy, tix, stride):
         """
         extract pixel data for a given tile
@@ -375,10 +423,11 @@ class MercatorTileCalc(object):
         return (tile_start_idx - int(self.image_shape[1] / stride)) / self.tile_shape[1]
 
     @jit
-    def calc_vertex_coordinates(self, tiy, tix, stridey, stridex):
+    def calc_vertex_coordinates(self, tiy, tix, stridey, stridex, tessellation_level=1):
         quad = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0],
                          [0, 0, 0], [1, 1, 0], [0, 1, 0]],
                         dtype=np.float32)
+        quads = np.tile(quad, (tessellation_level * tessellation_level, 1))
         tile_width = self.pixel_rez.dx * self.tile_shape[1] * stridex
         tile_height = self.pixel_rez.dy * self.tile_shape[0] * stridey
         max_tiles = self.max_tiles_available(stridex)
@@ -387,15 +436,18 @@ class MercatorTileCalc(object):
         image_idx = int(tix / max_tiles[1])
         # one whole image in the X direction is this many meters:
         image_origin_x = self.ul_origin.x + self.pixel_rez.dx * self.image_shape[1] * image_idx
-        quad[:, 0] *= tile_width
-        quad[:, 0] += image_origin_x + (tile_width * virt_tix)
-        quad[:, 1] *= -tile_height  # Origin is upper-left so image goes down
-        quad[:, 1] += self.ul_origin.y - tile_height * tiy
-        quad = quad.reshape(6, 3)
-        return quad[:, :2]
+        for x_idx in range(tessellation_level):
+            for y_idx in range(tessellation_level):
+                start_idx = x_idx * tessellation_level + y_idx
+                quads[start_idx * 6:(start_idx + 1) * 6, 0] *= tile_width / tessellation_level
+                quads[start_idx * 6:(start_idx + 1) * 6, 0] += image_origin_x + (tile_width * virt_tix) + (tile_width * x_idx) / tessellation_level
+                quads[start_idx * 6:(start_idx + 1) * 6, 1] *= -tile_height / tessellation_level  # Origin is upper-left so image goes down
+                quads[start_idx * 6:(start_idx + 1) * 6, 1] += self.ul_origin.y - tile_height * tiy - (tile_height * y_idx) / tessellation_level
+        quads = quads.reshape(tessellation_level * tessellation_level * 6, 3)
+        return quads[:, :2]
 
     @jit
-    def calc_texture_coordinates(self, ttile_idx):
+    def calc_texture_coordinates(self, ttile_idx, tessellation_level=1):
         """Get texture coordinates for one tile as a quad.
 
         :param ttile_idx: int, texture 1D index that maps to some internal texture tile location
@@ -406,16 +458,37 @@ class MercatorTileCalc(object):
         quad = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0],
                          [0, 0, 0], [1, 1, 0], [0, 1, 0]],
                         dtype=np.float32)
+        quads = np.tile(quad, (tessellation_level * tessellation_level, 1))
         # Now scale and translate the coordinates so they only apply to one tile in the texture
         one_tile_tex_width = 1.0 / self.texture_size[1] * self.tile_shape[1]
         one_tile_tex_height = 1.0 / self.texture_size[0] * self.tile_shape[0]
-        quad[:, 0] *= one_tile_tex_width
-        quad[:, 0] += one_tile_tex_width * tix
-        quad[:, 1] *= one_tile_tex_height
-        quad[:, 1] += one_tile_tex_height * tiy
-        quad = quad.reshape(6, 3)
-        quad = np.ascontiguousarray(quad[:, :2])
-        return quad
+        for x_idx in range(tessellation_level):
+            for y_idx in range(tessellation_level):
+                start_idx = x_idx * tessellation_level + y_idx
+                quads[start_idx * 6:(start_idx + 1) * 6, 0] *= one_tile_tex_width / tessellation_level
+                # FIXME: This offset needs to change as the index changes
+                quads[start_idx * 6:(start_idx + 1) * 6, 0] += one_tile_tex_width * tix + (one_tile_tex_width * x_idx) / tessellation_level
+                quads[start_idx * 6:(start_idx + 1) * 6, 1] *= one_tile_tex_height / tessellation_level
+                quads[start_idx * 6:(start_idx + 1) * 6, 1] += one_tile_tex_height * tiy + (one_tile_tex_height * y_idx) / tessellation_level
+        quads = quads.reshape(6 * tessellation_level * tessellation_level, 3)
+        quads = np.ascontiguousarray(quads[:, :2])
+        return quads
+
+    @jit
+    def calc_view_extents(self, canvas_point, image_point, canvas_size, dx, dy):
+        l, r = _calc_extent_component(canvas_point[0], image_point[0], canvas_size[0], dx)
+        l = np.clip(l, self.image_extents_box.l, self.image_extents_box.r)
+        r = np.clip(r, self.image_extents_box.l, self.image_extents_box.r)
+
+        b, t = _calc_extent_component(canvas_point[1], image_point[1], canvas_size[1], dy)
+        b = np.clip(b, self.image_extents_box.b, self.image_extents_box.t)
+        t = np.clip(t, self.image_extents_box.b, self.image_extents_box.t)
+
+        if (r - l) < CANVAS_EXTENTS_EPSILON or (t - b) < CANVAS_EXTENTS_EPSILON:
+            # they are viewing essentially nothing or the image isn't in view
+            raise ValueError("Image '%s' can't be viewed" % (self.name,))
+
+        return box(l=l, r=r, b=b, t=t)
 
 
 def main():

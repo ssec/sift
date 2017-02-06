@@ -30,6 +30,7 @@ from vispy.util.keys import SHIFT
 from vispy.visuals.transforms import STTransform, MatrixTransform
 from vispy.visuals import MarkersVisual, marker_types, LineVisual
 from vispy.scene.visuals import Markers, Polygon, Compound, Line
+from vispy.geometry import Rect
 from sift.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND, TOOL, DEFAULT_PROJECTION, COMPOSITE_TYPE
 # from sift.control.layer_list import LayerStackListViewModel
 from sift.view.LayerRep import NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer, CompositeLayer
@@ -39,6 +40,7 @@ from sift.view.Colormap import ALL_COLORMAPS
 from sift.model.document import prez, DocCompositeLayer, DocBasicLayer, DocRGBLayer
 from sift.queue import TASK_DOING, TASK_PROGRESS
 from sift.view.ProbeGraphs import DEFAULT_POINT_PROBE
+from sift.view.transform import PROJ4Transform
 
 from PyQt4.QtCore import QObject, pyqtSignal, Qt
 from PyQt4.QtGui import QCursor, QPixmap
@@ -86,7 +88,7 @@ class FakeMarker(Compound):
         # self.set_point(point, **kwargs)
 
     def _get_positions(self, point):
-        margin = 50000
+        margin = 0.5
         if self.symbol == 'x':
             pos1 = np.array([[point[0] - margin, point[1] - margin * 2, point[2]], [point[0] + margin, point[1] + margin * 2, point[2]]])
             pos2 = np.array([[point[0] - margin, point[1] + margin * 2, point[2]], [point[0] + margin, point[1] - margin * 2, point[2]]])
@@ -249,7 +251,8 @@ class LayerSet(object):
 
     def update_layers_z(self):
         for z_level, uuid in enumerate(self._layer_order):
-            self._layers[uuid].transform = STTransform(translate=(0, 0, 0-int(z_level)))
+            # assume ChainTransform where the last transform is STTransform for Z level
+            self._layers[uuid].transform.transforms[-1].translate = (0, 0, 0-int(z_level))
             self._layers[uuid].order = len(self._layer_order) - int(z_level)
         # Need to tell the scene to recalculate the drawing order (HACK, but it works)
         # FIXME: This should probably be accomplished by overriding the right method from the Node or Visual class
@@ -448,7 +451,6 @@ class SceneGraphManager(QObject):
             self.didChangeLayerVisibility.emit(vis)
 
     def setup_initial_canvas(self, center=None):
-        center = center or (0, 0)
         self.main_canvas = SIFTMainMapCanvas(parent=self.parent())
         self.main_view = self.main_canvas.central_widget.add_view()
 
@@ -462,33 +464,46 @@ class SceneGraphManager(QObject):
         self.main_view.events.mouse_press.connect(self.on_mouse_press_region)
         self.change_tool(TOOL.PAN_ZOOM)
 
-        # Head node of the map graph
-        self.main_map = MainMap(name="MainMap", parent=self.main_view.scene)
-        merc_ortho = MatrixTransform()
+        z_level_transform = MatrixTransform()
         # near/far is backwards it seems:
         camera_z_scale = 1e-6
-        l, r, b, t = [getattr(WORLD_EXTENT_BOX, x) for x in ['l', 'r', 'b', 't']]
-        merc_ortho.set_ortho(l, r, b, t, -100.0 * camera_z_scale, 100.0 * camera_z_scale)
-        self.main_map.transform = merc_ortho
+        z_level_transform.set_ortho(-1., 1., -1., 1., -100.0 * camera_z_scale, 100.0 * camera_z_scale)
+
+        # Head node of all visualizations, needed mostly to scale Z level
+        self.main_map_parent = scene.Node(name="HeadNode", parent=self.main_view.scene)
+        self.main_map_parent.transform = z_level_transform
+
+        # Head node of the map graph
+        proj_info = self.document.projection_info()
+        self.main_map = MainMap(name="MainMap", parent=self.main_map_parent)
+        self.main_map.transform = PROJ4Transform(proj_info['proj4_str'])
 
         self._borders_color_idx = 0
         self.borders = NEShapefileLines(self.border_shapefile, double=True, color=self._color_choices[self._borders_color_idx], parent=self.main_map)
         self.borders.transform = STTransform(translate=(0, 0, 40))
+        # print(self.borders.transforms.get_transform().shader_map().compile())
 
         self._latlon_grid_color_idx = 1
         self.latlon_grid = self._init_latlon_grid_layer(color=self._color_choices[self._latlon_grid_color_idx])
         self.latlon_grid.transform = STTransform(translate=(0, 0, 45))
 
         # Make the camera center on Guam
-        center = (144.8, 13.5)
-        p = Proj(DEFAULT_PROJECTION)
-        zoom_factor = 0.2
-        # Not sure why its 15 and 50 degrees off, but eh for now
-        x, y = p(center[0] + 15., center[1] - 45.0)
-        # x, y = p(144.8 + 15, 13.5)
-        # x, y = p(center[0] - x_offset, center[1] - y_offset)
-        cam_center = self.borders.transforms.get_transform(map_to="scene").map([(x, y)])[0]
-        self.main_view.camera.zoom(zoom_factor, cam_center)
+        # center = (144.8, 13.5)
+        center = center or proj_info["default_center"]
+        width = proj_info["default_width"] / 2.
+        height = proj_info["default_height"] / 2.
+        ll_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] - width, center[1] - height)])[0][:2]
+        ur_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] + width, center[1] + height)])[0][:2]
+        self.main_view.camera.rect = Rect(ll_xy, (ur_xy[0] - ll_xy[0], ur_xy[1] - ll_xy[1]))
+
+    def set_projection(self, projection_name, proj_info, center=None):
+        self.main_map.transform = PROJ4Transform(proj_info['proj4_str'])
+        center = center or proj_info["default_center"]
+        width = proj_info["default_width"] / 2.
+        height = proj_info["default_height"] / 2.
+        ll_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] - width, center[1] - height)])[0][:2]
+        ur_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] + width, center[1] + height)])[0][:2]
+        self.main_view.camera.rect = Rect(ll_xy, (ur_xy[0] - ll_xy[0], ur_xy[1] - ll_xy[1]))
 
     def _init_latlon_grid_layer(self, color=None, resolution=5.):
         """Create a series of line segments representing latitude and longitude lines.
@@ -496,43 +511,36 @@ class SceneGraphManager(QObject):
         :param resolution: number of degrees between lines
         """
         lons = np.arange(-180., 180. + resolution, resolution, dtype=np.float32)
-        lats = np.arange(-89.9, 89.9, resolution, dtype=np.float32)
-        p = Proj(DEFAULT_PROJECTION)
+        lats = np.arange(-90., 90. + resolution, resolution, dtype=np.float32)
 
-        box_lons = np.empty(((lons.shape[0] + lats.shape[0]) * 2,), dtype=np.float32)
-        box_lons[0:lons.shape[0]] = lons
-        box_lons[lons.shape[0]:lons.shape[0] * 2] = lons
-        box_lons[lons.shape[0] * 2:lons.shape[0] * 2 + lats.shape[0]] = -180
-        box_lons[lons.shape[0] * 2 + lats.shape[0]:] = 180
-
-        box_lats = np.empty(((lons.shape[0] + lats.shape[0]) * 2,), dtype=np.float32)
-        box_lats[0:lons.shape[0]] = -89.9
-        box_lats[lons.shape[0]:lons.shape[0] * 2] = 89.9
-        box_lats[lons.shape[0] * 2: lons.shape[0] * 2 + lats.shape[0]] = lats
-        box_lats[lons.shape[0] * 2 + lats.shape[0]:] = lats
-
-        # Assume all of the longitude and latitudes map correctly
-        box_x, box_y = p(box_lons, box_lats)
-        points = np.empty((box_x.shape[0], 2), dtype=np.float32)
-        # Longitude lines
-        points[:lons.shape[0] * 2:2, 0] = box_x[:lons.shape[0]]
-        points[:lons.shape[0] * 2:2, 1] = box_y[:lons.shape[0]]
-        points[1:lons.shape[0] * 2:2, 0] = box_x[lons.shape[0]:lons.shape[0] * 2]
-        points[1:lons.shape[0] * 2:2, 1] = box_y[lons.shape[0]:lons.shape[0] * 2]
-        # Latitude lines
-        points[lons.shape[0] * 2::2, 0] = box_x[lons.shape[0] * 2:lons.shape[0] * 2 + lats.shape[0]]
-        points[lons.shape[0] * 2::2, 1] = box_y[lons.shape[0] * 2:lons.shape[0] * 2 + lats.shape[0]]
-        points[lons.shape[0] * 2 + 1::2, 0] = box_x[lons.shape[0] * 2 + lats.shape[0]:]
-        points[lons.shape[0] * 2 + 1::2, 1] = box_y[lons.shape[0] * 2 + lats.shape[0]:]
+        # One long line of lawn mower pattern (lon lines, then lat lines)
+        points = np.empty((lons.shape[0] * lats.shape[0] * 2, 2), np.float32)
+        LOG.debug("Generating longitude lines...")
+        for idx, lon_point in enumerate(lons):
+            points[idx * lats.shape[0]:(idx + 1) * lats.shape[0], 0] = lon_point
+            if idx % 2 == 0:
+                points[idx * lats.shape[0]:(idx + 1) * lats.shape[0], 1] = lats
+            else:
+                points[idx * lats.shape[0]:(idx + 1) * lats.shape[0], 1] = lats[::-1]
+        start_idx = lons.shape[0] * lats.shape[0]
+        LOG.debug("Generating latitude lines...")
+        for idx, lat_point in enumerate(lats[::-1]):
+            points[start_idx + idx * lons.shape[0]:start_idx + (idx + 1) * lons.shape[0], 1] = lat_point
+            if idx % 2 == 0:
+                points[start_idx + idx * lons.shape[0]:start_idx + (idx + 1) * lons.shape[0], 0] = lons
+            else:
+                points[start_idx + idx * lons.shape[0]:start_idx + (idx + 1) * lons.shape[0], 0] = lons[::-1]
 
         # Repeat for "second" size of the earth (180 to 540)
-        offset = box_x[lons.shape[0] - 1] - box_x[0]
+        offset = 360  # box_x[lons.shape[0] - 1] - box_x[0]
         points2 = np.empty((points.shape[0] * 2, 2), dtype=np.float32)
         points2[:points.shape[0], :] = points
         points2[points.shape[0]:, :] = points
         points2[points.shape[0]:, 0] += offset
 
-        return Line(pos=points2, connect="segments", color=color, parent=self.main_map)
+        # return Line(pos=points2, connect="segments", color=color, parent=self.main_map)
+        return Line(pos=points2, connect="strip", color=color, parent=self.main_map)
+        # return Line(pos=points, connect="strip", color=color, parent=self.main_map)
 
     def on_mouse_press_point(self, event):
         """Handle mouse events that mean we are using the point probe.
@@ -545,6 +553,9 @@ class SceneGraphManager(QObject):
             # FIXME: We should be able to use the main_map object to do the transform...but it doesn't work (waiting on vispy developers)
             # map_pos = self.main_map.transforms.get_transform().imap(buffer_pos)
             map_pos = self.borders.transforms.get_transform().imap(buffer_pos)
+            # point_marker = Markers(parent=self.main_map, symbol="disc", pos=np.array([map_pos[:2]]))
+            # self.points.append(point_marker)
+            print("Map position: ", map_pos)
             self.newPointProbe.emit(DEFAULT_POINT_PROBE, tuple(map_pos[:2]))
 
     def on_mouse_press_region(self, event):
@@ -757,7 +768,9 @@ class SceneGraphManager(QObject):
             texture_shape=DEFAULT_TEXTURE_SHAPE,
             wrap_lon=False,
             parent=self.main_map,
+            projection=layer[INFO.PROJ],
         )
+        image.transform = PROJ4Transform(layer[INFO.PROJ], inverse=True)
         image.transform *= STTransform(translate=(0, 0, -50.0))
         self.image_elements[uuid] = image
         self.layer_set.add_layer(image)
@@ -788,7 +801,10 @@ class SceneGraphManager(QObject):
                 double=False,
                 texture_shape=DEFAULT_TEXTURE_SHAPE,
                 wrap_lon=False,
-                parent=self.main_map)
+                parent=self.main_map,
+                projection=layer[INFO.PROJ],
+            )
+            element.transform = PROJ4Transform(layer[INFO.PROJ], inverse=True)
             element.transform *= STTransform(translate=(0, 0, -50.0))
             self.composite_element_dependencies[uuid] = dep_uuids
             self.layer_set.add_layer(element)

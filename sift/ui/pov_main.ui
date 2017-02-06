@@ -14,7 +14,7 @@
    <bool>true</bool>
   </property>
   <property name="windowTitle">
-    <string>SIFT Beta |X.X.X|</string>
+   <string>SIFT Beta |X.X.X|</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -114,6 +114,23 @@
         <attribute name="buttonGroup">
          <string notr="true">buttonGroup</string>
         </attribute>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="projectionLabel">
+        <property name="enabled">
+         <bool>true</bool>
+        </property>
+        <property name="text">
+         <string>Projection:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QNoScrollComboBox" name="projectionComboBox">
+        <property name="enabled">
+         <bool>true</bool>
+        </property>
        </widget>
       </item>
       <item>
@@ -323,28 +340,25 @@
      </layout>
     </item>
     <item>
+     <widget class="QWidget" name="mainMapWidget" native="true">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <layout class="QVBoxLayout" name="verticalLayout_5">
+       <item>
+        <layout class="QVBoxLayout" name="verticalLayout_3"/>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
      <widget class="Line" name="line_2">
       <property name="orientation">
        <enum>Qt::Vertical</enum>
       </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QTabWidget" name="mainWidgets">
-      <property name="currentIndex">
-       <number>0</number>
-      </property>
-      <widget class="QWidget" name="tab">
-       <attribute name="title">
-        <string>Tab 1</string>
-       </attribute>
-       <layout class="QVBoxLayout" name="verticalLayout_3"/>
-      </widget>
-      <widget class="QWidget" name="tab_2">
-       <attribute name="title">
-        <string>Tab 2</string>
-       </attribute>
-      </widget>
      </widget>
     </item>
     <item>
@@ -627,8 +641,8 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>274</width>
-          <height>435</height>
+          <width>225</width>
+          <height>420</height>
          </rect>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_33">
@@ -941,12 +955,12 @@
   <customwidget>
    <class>QNoScrollComboBox</class>
    <extends>QComboBox</extends>
-   <header>cspov.ui.custom_widgets</header>
+   <header>sift.ui.custom_widgets</header>
   </customwidget>
   <customwidget>
    <class>QNoScrollSlider</class>
    <extends>QSlider</extends>
-   <header>cspov.ui.custom_widgets</header>
+   <header>sift.ui.custom_widgets</header>
   </customwidget>
  </customwidgets>
  <resources/>

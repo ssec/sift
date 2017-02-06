@@ -64,14 +64,14 @@ import sys
 import logging
 import unittest
 import argparse
-from collections import namedtuple, MutableSequence
+from collections import namedtuple, MutableSequence, OrderedDict
 from uuid import UUID
 import numpy as np
 from abc import ABCMeta, abstractmethod, abstractproperty
 from weakref import ref
 
 from sift.common import KIND, INFO, COMPOSITE_TYPE
-from sift.model.guidebook import AHI_HSF_Guidebook, GUIDE
+from sift.model.guidebook import ABI_AHI_Guidebook, GUIDE
 
 from PyQt4.QtCore import QObject, pyqtSignal
 
@@ -186,52 +186,6 @@ class DocLayerStack(MutableSequence):
             self._store[idx] = self._store[idx]._replace(a_order=nth)
 
 
-#
-#
-# class DocAsLayerStack(metaclass=ABCMeta):
-#     """
-#     interface used by SceneGraphManager
-#     """
-#     @abstractmethod
-#     def layers_in_z_order(self):
-#         """
-#         return current enabled list of (active layer, animation order)
-#         animation order of 0 implies not part of current animation
-#         :return:
-#         """
-#         pass
-#
-#
-# class DocAsDataSpace(metaclass=ABCMeta):
-#     """
-#     interface used to coordinate left-right-up-down keys.
-#     application behavior managing these keypresses uses this interface
-#     Typically left-right is time, up-down is channel.
-#     Consultation with the guidebook may be needed.
-#     'l', 'r', 'u', 'd', 'i', 'o': left, right, up, down, in, out
-#     """
-#     @abstractmethod
-#     def neighboring_layer(self, direction:str, amount:int=1):
-#         """
-#         return neighboring layer
-#         :param direction: l, r, u, d string indicating direction
-#         :param amount: number of steps to displace, typically +1
-#         :return:
-#         """
-#         pass
-#
-#
-# class DocAsLayerTree(metaclass=ABCMeta):
-#     """
-#     interface (facet) used to coordinate drag-and-drop layer tree
-#     """
-#     pass
-#
-
-
-
-
-
 class Document(QObject):  # base class is rightmost, mixins left of that
     """
     Document has one or more LayerSets choosable by the user (one at a time) as currentLayerSet
@@ -246,7 +200,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     _workspace = None
     _layer_sets = None  # list(DocLayerSet(prez, ...) or None)
     _layer_with_uuid = None  # dict(uuid:Doc____Layer)
-    _guidebook = None  # FUTURE: this is currently an AHI_HSF_Guidebook, make it a general guidebook
+    _guidebook = None  # FUTURE: this is currently an ABI_AHI_Guidebook, make it a general guidebook
 
     # signals
     didAddBasicLayer = pyqtSignal(tuple, UUID, prez)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
@@ -262,15 +216,81 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didChangeComposition = pyqtSignal(tuple, UUID, prez, dict)  # new-layer-order, changed-layer, change-info: composite channels were reassigned or polynomial altered
     didCalculateLayerEqualizerValues = pyqtSignal(dict)  # dict of {uuid: (value, normalized_value_within_clim)} for equalizer display
+    didChangeProjection = pyqtSignal(str, dict)  # name of projection, dict of projection information
     # didChangeShapeLayer = pyqtSignal(dict)
 
     def __init__(self, workspace, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
         super(Document, self).__init__(**kwargs)
-        self._guidebook = AHI_HSF_Guidebook()
+        self._guidebook = ABI_AHI_Guidebook()
         self._workspace = workspace
         self._layer_sets = [DocLayerStack(self)] + [None] * (layer_set_count - 1)
         self._layer_with_uuid = {}
+        self.available_projections = OrderedDict((
+            ('Mercator', {
+                'proj4_str': '+proj=merc +datum=WGS84 +ellps=WGS84 +over',
+                'default_center': (144.8, 13.5),  # lon, lat center point (Guam)
+                'default_width': 20.,  # degrees from left edge to right edge
+                'default_height': 20.,  # degrees from bottom edge to top edge
+            }),
+            ('LCC (CONUS)', {
+                'proj4_str': '+proj=lcc +a=6371200 +b=6371200 +lat_0=25 +lat_1=25 +lon_0=-95 +units=m +no_defs +over',
+                'default_center': (-123.044, 59.844),
+                'default_width': 20.,
+                'default_height': 20.,
+            }),
+            # ('Platte Carre', {}),
+            ('Himawari Geos', {
+                'proj4_str': '+proj=geos +a=6378137 +b=6356752.299581327 +lon_0=140.7 +h=35785863 +over',
+                'default_center': (144.8, 13.5),  # lon, lat center point (Guam)
+                'default_width': 20.,  # degrees from left edge to right edge
+                'default_height': 20.,  # degrees from bottom edge to top edge
+            }),
+            ('GOES-R East', {
+                'proj4_str': '+proj=geos +lon_0=-75 +h=35786023.0 +a=6378137.0 +b=6356752.31414 +sweep=x +units=m',
+                'default_center': (-75, 13.5),  # lon, lat center point (Guam)
+                'default_width': 20.,  # degrees from left edge to right edge
+                'default_height': 20.,  # degrees from bottom edge to top edge
+            }),
+            ('GOES-R Test', {
+                'proj4_str': '+proj=geos +lon_0=-89.5 +h=35786023.0 +a=6378137.0 +b=6356752.31414 +sweep=x +units=m',
+                'default_center': (-89.5, 13.5),  # lon, lat center point (Guam)
+                'default_width': 20.,  # degrees from left edge to right edge
+                'default_height': 20.,  # degrees from bottom edge to top edge
+            }),
+            ('GOES-R Central', {
+                'proj4_str': '+proj=geos +lon_0=-105 +h=35786023.0 +a=6378137.0 +b=6356752.31414 +sweep=x +units=m',
+                'default_center': (-105, 13.5),  # lon, lat center point (Guam)
+                'default_width': 20.,  # degrees from left edge to right edge
+                'default_height': 20.,  # degrees from bottom edge to top edge
+            }),
+            ('GOES-R West', {
+                'proj4_str': '+proj=geos +lon_0=-137 +h=35786023.0 +a=6378137.0 +b=6356752.31414 +sweep=x +units=m',
+                'default_center': (-137, 13.5),  # lon, lat center point (Guam)
+                'default_width': 20.,  # degrees from left edge to right edge
+                'default_height': 20.,  # degrees from bottom edge to top edge
+            }),
+        ))
+        self.default_projection = 'Mercator'
+        self.current_projection = self.default_projection
         # TODO: connect signals from workspace to slots including update_dataset_info
+
+    def projection_info(self, projection_name=None):
+        return self.available_projections[projection_name or self.current_projection]
+
+    def change_projection(self, projection_name=None):
+        if projection_name is None:
+            projection_name = self.default_projection
+        assert projection_name in self.available_projections
+        if projection_name != self.current_projection:
+            LOG.info("Changing projection from '{}' to '{}'".format(self.current_projection, projection_name))
+            self.current_projection = projection_name
+            self.didChangeProjection.emit(
+                self.current_projection,
+                self.projection_info(self.current_projection)
+            )
+
+    def change_projection_index(self, idx):
+        return self.change_projection(tuple(self.available_projections.keys())[idx])
 
     def _default_colormap(self, datasetinfo):
         """
@@ -424,7 +444,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for uuid, pinf in uuids:
             lyr = self._layer_with_uuid[pinf.uuid]
             if lyr[INFO.KIND] == KIND.IMAGE:
-                value = self._workspace.get_content_point(pinf.uuid, xy_pos)
+                try:
+                    value = self._workspace.get_content_point(pinf.uuid, xy_pos)
+                except ValueError:
+                    value = None
+                if value is None:
+                    value = np.nan
                 fmt, unit_str, unit_conv = self._guidebook.units_conversion(self._layer_with_uuid[pinf.uuid])
                 # calculate normalized bar width relative to its current clim
                 nc, xc = unit_conv(np.array(pinf.climits))
@@ -462,7 +487,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     elif clims is None:
                         values.append(None)
                     else:
-                        value = self._workspace.get_content_point(dep_lyr[INFO.UUID], xy_pos)
+                        try:
+                            value = self._workspace.get_content_point(dep_lyr[INFO.UUID], xy_pos)
+                        except ValueError:
+                            value = None
                         values.append(_sci_to_rgb(value, clims[0], clims[1]))
 
                 # fmt = "{:3d}"
