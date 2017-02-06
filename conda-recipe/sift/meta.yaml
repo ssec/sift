@@ -17,9 +17,8 @@ build:
 
 requirements:
   build:
-    - python >=3.4
+    - python >=3.6
     - setuptools
- #   - numpy ==1.9 # [win]
     - numpy >=1.11
     - matplotlib
     - scipy
@@ -30,21 +29,15 @@ requirements:
     - netcdf4
     - h5py
     - pillow
-    - pyshp >=1.2.1
-    - shapely >=1.5.11
+    - pyshp
+    - shapely
     - rasterio
-#    - gdal >=1.11.4 # [osx]
-    - gdal >=2.1 # [win]
-    - libgdal >=2.1 # [win]
-    - gdal >=2.1.0 # [unix]
-    - pyqt ==4.10.4
+    - gdal
+    - pyqt
     - cython >=0.17 # [win]
-    # Only needed for pillow 4.0.0_0-py34, remove  after any of those change
-    - olefile
 
   run:
-    - python >=3.4
-#    - numpy ==1.9 # [win]
+    - python >=3.6
     - numpy >=1.11
     - matplotlib
     - scipy
@@ -55,16 +48,11 @@ requirements:
     - netcdf4
     - h5py
     - pillow
-    - pyshp >=1.2.1
-    - shapely >=1.5.11
+    - pyshp
+    - shapely
     - rasterio
-#    - gdal >=1.11.4 # [unix]
-    - gdal >=2.1 # [win]
-    - libgdal >=2.1 # [win]
-    - gdal >=2.1.0 # [unix]
-    - pyqt ==4.10.4
-    # Only needed for pillow 4.0.0_0-py34, remove  after any of those change
-    - olefile
+    - gdal
+    - pyqt
 
 test:
   commands:
