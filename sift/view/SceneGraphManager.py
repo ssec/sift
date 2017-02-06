@@ -553,9 +553,6 @@ class SceneGraphManager(QObject):
             # FIXME: We should be able to use the main_map object to do the transform...but it doesn't work (waiting on vispy developers)
             # map_pos = self.main_map.transforms.get_transform().imap(buffer_pos)
             map_pos = self.borders.transforms.get_transform().imap(buffer_pos)
-            # point_marker = Markers(parent=self.main_map, symbol="disc", pos=np.array([map_pos[:2]]))
-            # self.points.append(point_marker)
-            print("Map position: ", map_pos)
             self.newPointProbe.emit(DEFAULT_POINT_PROBE, tuple(map_pos[:2]))
 
     def on_mouse_press_region(self, event):
