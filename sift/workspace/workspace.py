@@ -680,6 +680,16 @@ class Workspace(QObject):
         row = (y - info[INFO.ORIGIN_Y]) / info[INFO.CELL_HEIGHT]
         return np.round(row), np.round(col)
 
+    def layer_proj(self, dsi_or_uuid):
+        """Project lon/lat probe points to image X/Y"""
+        info = self.get_info(dsi_or_uuid)
+        return Proj(info[INFO.PROJ])
+
+    def _project_points(self, p, points):
+        points = np.array(points)
+        points[:, 0], points[:, 1] = p(points[:, 0], points[:, 1])
+        return points
+
     def get_content_point(self, dsi_or_uuid, xy_pos):
         row, col = self._position_to_index(dsi_or_uuid, xy_pos)
         if row is None or col is None:
@@ -692,6 +702,8 @@ class Workspace(QObject):
     def get_content_polygon(self, dsi_or_uuid, points):
         data = self.get_content(dsi_or_uuid)
         trans = self._create_layer_affine(dsi_or_uuid)
+        p = self.layer_proj(dsi_or_uuid)
+        points = self._project_points(p, points)
         _, data = content_within_shape(data, trans, LinearRing(points))
         return data
 
@@ -704,16 +716,21 @@ class Workspace(QObject):
     def get_coordinate_mask_polygon(self, dsi_or_uuid, points):
         data = self.get_content(dsi_or_uuid)
         trans = self._create_layer_affine(dsi_or_uuid)
+        p = self.layer_proj(dsi_or_uuid)
+        points = self._project_points(p, points)
         index_mask, data = content_within_shape(data, trans, LinearRing(points))
         coords_mask = (index_mask[0] * trans.e + trans.f, index_mask[1] * trans.a + trans.c)
+        coords_mask = p(*coords_mask, inverse=True)
         return coords_mask, data
 
     def get_content_coordinate_mask(self, uuid, coords_mask):
         data = self.get_content(uuid)
         trans = self._create_layer_affine(uuid)
+        p = self.layer_proj(uuid)
+        coords_mask = p(*coords_mask)
         index_mask = (
-            ((coords_mask[0] - trans.f) / trans.e).astype(np.uint),
-            ((coords_mask[1] - trans.c) / trans.a).astype(np.uint),
+            np.round((coords_mask[0] - trans.f) / trans.e).astype(np.uint),
+            np.round((coords_mask[1] - trans.c) / trans.a).astype(np.uint),
         )
         return data[index_mask]
 
