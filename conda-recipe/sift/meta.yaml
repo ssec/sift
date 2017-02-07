@@ -41,6 +41,8 @@ requirements:
     - cython >=0.17 # [win]
     # Only needed for pillow 4.0.0_0-py34, remove  after any of those change
     - olefile
+    - icu <57
+    - libdap4 <=3.18.2
 
   run:
     - python >=3.4
@@ -65,6 +67,8 @@ requirements:
     - pyqt ==4.10.4
     # Only needed for pillow 4.0.0_0-py34, remove  after any of those change
     - olefile
+    - icu <57
+    - libdap4 <=3.18.2
 
 test:
   commands:
