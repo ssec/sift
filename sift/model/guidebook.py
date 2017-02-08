@@ -218,8 +218,12 @@ class ABI_AHI_Guidebook(Guidebook):
     @staticmethod
     def _metadata_for_path(pathname):
         which = ABI_AHI_Guidebook.identify_instrument_for_path(pathname)
-        return {INSTRUMENT.ABI: ABI_AHI_Guidebook._metadata_for_abi_path,
-                INSTRUMENT.AHI: ABI_AHI_Guidebook._metadata_for_ahi_path}[which](pathname)
+        try:
+            return {INSTRUMENT.ABI: ABI_AHI_Guidebook._metadata_for_abi_path,
+                    INSTRUMENT.AHI: ABI_AHI_Guidebook._metadata_for_ahi_path}[which](pathname)
+        except (OSError, ValueError, KeyError):
+            LOG.error("Unable to get metadata for path '{}'".format(pathname))
+            return None
 
     def _relevant_info(self, seq):
         "filter datasetinfo dictionaries in sequence, if they're not relevant to us (i.e. not AHI)"
