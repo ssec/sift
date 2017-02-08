@@ -549,7 +549,8 @@ class RGBLayerConfigPane(QWidget):
         return n, x
 
     def _signal_color_changing_range(self, color:str, n:float, x:float):
-        self.didChangeRGBLayerComponentRange.emit(self.active_layer_ref().uuid, color, n, x)
+        if self.active_layer_ref is not None:
+            self.didChangeRGBLayerComponentRange.emit(self.active_layer_ref().uuid, color, n, x)
 
     def _slider_changed(self, slider=None, color:str=None, is_max:bool=False):
         """

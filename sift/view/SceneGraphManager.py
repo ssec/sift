@@ -813,6 +813,7 @@ class SceneGraphManager(QObject):
                 self.layer_set.set_layer_order(new_order)
             self.on_view_change(None)
             element.determine_reference_points()
+            self.update()
             return True
         else:
             raise ValueError("Unknown or unimplemented composite type")
@@ -827,17 +828,21 @@ class SceneGraphManager(QObject):
                     dep_uuids = r,g,b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
                     overview_content = list(self.workspace.get_content(cuuid) for cuuid in dep_uuids)
                     self.composite_element_dependencies[layer.uuid] = dep_uuids
-                    self.image_elements[layer.uuid].set_channels(overview_content,
-                                                                 cell_width=layer[INFO.CELL_WIDTH],
-                                                                 cell_height=layer[INFO.CELL_HEIGHT],
-                                                                 origin_x=layer[INFO.ORIGIN_X],
-                                                                 origin_y=layer[INFO.ORIGIN_Y])
-                    self.image_elements[layer.uuid].init_overview(overview_content)
+                    elem = self.image_elements[layer.uuid]
+                    elem.set_channels(overview_content,
+                                      cell_width=layer[INFO.CELL_WIDTH],
+                                      cell_height=layer[INFO.CELL_HEIGHT],
+                                      origin_x=layer[INFO.ORIGIN_X],
+                                      origin_y=layer[INFO.ORIGIN_Y])
+                    elem.init_overview(overview_content)
+                    elem.clim = layer[INFO.CLIM]
                     self.on_view_change(None)
+                    elem.determine_reference_points()
                 else:
                     # layer is no longer valid and has to be removed
                     LOG.debug("Purging composite ")
                     self.purge_layer(layer.uuid)
+                self.update()
             else:
                 if layer.is_valid:
                     # Add this now valid layer
@@ -845,7 +850,6 @@ class SceneGraphManager(QObject):
                 else:
                     LOG.info('unable to add an invalid layer, will try again later when layer changes')
                     return
-            self.update()
         else:
             raise ValueError("Unknown or unimplemented composite type")
 
@@ -1035,7 +1039,7 @@ class SceneGraphManager(QObject):
             data = self.workspace.get_content(uuid, lod=preferred_stride)
             yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.5}
             # FIXME: Use LOD instead of stride and provide the lod to the workspace
-            data = data[::preferred_stride, ::preferred_stride]
+            data = data[::preferred_stride[0], ::preferred_stride[1]]
             tiles_info, vertices, tex_coords = child.retile(data, preferred_stride, tile_box)
             yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 1.0}
             self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)
@@ -1044,7 +1048,7 @@ class SceneGraphManager(QObject):
             data = [self.workspace.get_content(d_uuid, lod=preferred_stride) for d_uuid in self.composite_element_dependencies[uuid]]
             yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.5}
             # FIXME: Use LOD instead of stride and provide the lod to the workspace
-            data = [d[::int(preferred_stride / factor), ::int(preferred_stride / factor)] if d is not None else None for factor, d in zip(child._channel_factors, data)]
+            data = [d[::int(preferred_stride[0] / factor), ::int(preferred_stride[1] / factor)] if d is not None else None for factor, d in zip(child._channel_factors, data)]
             tiles_info, vertices, tex_coords = child.retile(data, preferred_stride, tile_box)
             yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 1.0}
             self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)

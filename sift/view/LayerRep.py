@@ -403,8 +403,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         shown behind the higher resolution image tiles.
         """
         self.overview_info = nfo = {}
-        y_slice, x_slice = self.calc.overview_stride()
-        # overview_stride = (int(image_shape[0]/tile_shape[0]), int(image_shape[1]/tile_shape[1]))
+        y_slice, x_slice = self.calc.overview_stride
         nfo["data"] = data[y_slice, x_slice]
         # Update kwargs to reflect the new spatial resolution of the overview image
         nfo["cell_width"] = self.cell_width * x_slice.step
@@ -434,17 +433,14 @@ class TiledGeolocatedImageVisual(ImageVisual):
         data = self._normalize_data(data)
 
         LOG.debug("Uploading texture data for %d tiles (%r)", (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l), tile_box)
-        max_tiles = self.calc.max_tiles_available(stride)
-
         # Tiles start at upper-left so go from top to bottom
         tiles_info = []
         for tiy in range(tile_box.t, tile_box.b):
             for tix in range(tile_box.l, tile_box.r):
-                virt_tix = int(tix % max_tiles[1])
-                already_in = (stride, tiy, virt_tix) in self.texture_state
+                already_in = (stride, tiy, tix) in self.texture_state
                 # Update the age if already in there
                 # Assume that texture_state does not change from the main thread if this is run in another
-                tex_tile_idx = self.texture_state.add_tile((stride, tiy, virt_tix))
+                tex_tile_idx = self.texture_state.add_tile((stride, tiy, tix))
                 if already_in:
                     # FIXME: we should make a list/set of the tiles we need to add before this
                     continue
@@ -452,7 +448,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
                 # Assume we were given a total image worth of this stride
                 y_start = tiy * self.tile_shape[0]
                 y_end = y_start + self.tile_shape[0]
-                x_start = virt_tix * self.tile_shape[1]
+                x_start = tix * self.tile_shape[1]
                 x_end = x_start + self.tile_shape[1]
                 # force a copy of the data from the content array (provided by the workspace) to a vispy-compatible contiguous float array
                 # this can be a potentially time-expensive operation since content array is often huge and always memory-mapped, so paging may occur
@@ -473,9 +469,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
 
         SIFT Note: Copied from 0.5.0dev original ImageVisual class
         """
-        max_tiles = self.calc.max_tiles_available(preferred_stride)
         total_num_tiles = (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l)
-
         total_overview_tiles = 0
         if self.overview_info is not None:
             # we should be providing an overview image
@@ -501,28 +495,25 @@ class TiledGeolocatedImageVisual(ImageVisual):
             tex_coords[-6 * total_overview_tiles * TESS_LEVEL * TESS_LEVEL:, :] = self.overview_info["texture_coordinates"]
             vertices[-6 * total_overview_tiles * TESS_LEVEL * TESS_LEVEL:, :] = self.overview_info["vertex_coordinates"]
 
-        # preferred_stride = 1
         LOG.debug("Building vertex data for %d tiles (%r)", total_num_tiles, tile_box)
+        tl = TESS_LEVEL * TESS_LEVEL
         # Tiles start at upper-left so go from top to bottom
         for tiy in range(tile_box.t, tile_box.b):
             for tix in range(tile_box.l, tile_box.r):
                 # Update the index here because we have multiple exit/continuation points
                 used_tile_idx += 1
 
-                # Tiles on the "second" longitude wrapped image are the same tiles in the first/original images
-                virt_tix = tix % max_tiles[1]
-
                 # Check if the tile we want to draw is actually in the GPU, if not (atlas too small?) fill with zeros and keep going
-                if (preferred_stride, tiy, virt_tix) not in self.texture_state:
+                if (preferred_stride, tiy, tix) not in self.texture_state:
                     # THIS SHOULD NEVER HAPPEN IF TEXTURE BUILDING IS DONE CORRECTLY AND THE ATLAS IS BIG ENOUGH
                     tex_coords[TESS_LEVEL*TESS_LEVEL*used_tile_idx*6: TESS_LEVEL*TESS_LEVEL*(used_tile_idx+1)*6, :] = 0
                     vertices[TESS_LEVEL*TESS_LEVEL*used_tile_idx*6: TESS_LEVEL*TESS_LEVEL*(used_tile_idx+1)*6, :] = 0
                     continue
 
                 # we should have already loaded the texture data in to the GPU so get the index of that texture
-                tex_tile_idx = self.texture_state[(preferred_stride, tiy, virt_tix)]
-                tex_coords[TESS_LEVEL*TESS_LEVEL*used_tile_idx*6: TESS_LEVEL*TESS_LEVEL*(used_tile_idx+1)*6, :] = self.calc.calc_texture_coordinates(tex_tile_idx, tessellation_level=TESS_LEVEL)
-                vertices[TESS_LEVEL*TESS_LEVEL*used_tile_idx*6: TESS_LEVEL*TESS_LEVEL*(used_tile_idx+1)*6, :] = self.calc.calc_vertex_coordinates(tiy, tix, preferred_stride, preferred_stride, tessellation_level=TESS_LEVEL)
+                tex_tile_idx = self.texture_state[(preferred_stride, tiy, tix)]
+                tex_coords[tl*used_tile_idx*6: tl*(used_tile_idx+1)*6, :] = self.calc.calc_texture_coordinates(tex_tile_idx, tessellation_level=TESS_LEVEL)
+                vertices[tl*used_tile_idx*6: tl*(used_tile_idx+1)*6, :] = self.calc.calc_vertex_coordinates(tiy, tix, preferred_stride[0], preferred_stride[1], tessellation_level=TESS_LEVEL)
 
         return vertices, tex_coords
 
@@ -720,7 +711,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         # visual nodes already have names, so be careful
         if not hasattr(self, "name"):
             self.name = kwargs.get("name", None)
-        self._valid_mesh_mask = None
+        self._viewable_mesh_mask = None
         self._ref1 = None
         self._ref2 = None
 
@@ -893,7 +884,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         shown behind the higher resolution image tiles.
         """
         self.overview_info = nfo = {}
-        y_slice, x_slice = self.calc.overview_stride()
+        y_slice, x_slice = self.calc.overview_stride
         # Update kwargs to reflect the new spatial resolution of the overview image
         nfo["cell_width"] = self.cell_width * x_slice.step
         nfo["cell_height"] = self.cell_height * y_slice.step
@@ -901,7 +892,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         nfo["texture_tile_index"] = ttile_idx = self.texture_state.add_tile((0, 0, 0), expires=False)
         for idx, data in enumerate(data_arrays):
             if data is not None:
-                _y_slice, _x_slice = self.calc.overview_stride(image_shape=data.shape)
+                _y_slice, _x_slice = self.calc.calc_overview_stride(image_shape=data.shape)
                 overview_data = data[_y_slice, _x_slice]
             else:
                 overview_data = None
@@ -972,11 +963,10 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         tiles_info = []
         for tiy in range(tile_box.t, tile_box.b):
             for tix in range(tile_box.l, tile_box.r):
-                virt_tix = tix % max_tiles[1]
-                already_in = (stride, tiy, virt_tix) in self.texture_state
+                already_in = (stride, tiy, tix) in self.texture_state
                 # Update the age if already in there
                 # Assume that texture_state does not change from the main thread if this is run in another
-                tex_tile_idx = self.texture_state.add_tile((stride, tiy, virt_tix))
+                tex_tile_idx = self.texture_state.add_tile((stride, tiy, tix))
                 if already_in:
                     # FIXME: we should make a list/set of the tiles we need to add before this
                     continue
@@ -984,7 +974,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
                 # Assume we were given a total image worth of this stride
                 y_start = tiy * self.tile_shape[0]
                 y_end = y_start + self.tile_shape[0]
-                x_start = virt_tix * self.tile_shape[1]
+                x_start = tix * self.tile_shape[1]
                 x_end = x_start + self.tile_shape[1]
                 textures_data = []
                 for chn_idx in range(self.num_channels):
@@ -1008,8 +998,8 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
                 self._textures[idx].set_tile_data(tex_tile_idx, data)
 
     def _get_stride(self, view_box):
-        return self.calc.calc_stride(
-            view_box, texture=self._lowest_rez) * self._lowest_factor
+        s = self.calc.calc_stride( view_box, texture=self._lowest_rez)
+        return s[0] * self._lowest_factor, s[1] * self._lowest_factor
 
 CompositeLayer = create_visual_node(CompositeLayerVisual)
 

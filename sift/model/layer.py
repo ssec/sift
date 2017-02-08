@@ -303,10 +303,18 @@ class DocRGBLayer(DocCompositeLayer):
         self.l[3] = x
 
     @property
-    def is_valid(self):
+    def has_deps(self):
         return (self.r is not None or
                 self.g is not None or
                 self.b is not None)
+
+    @property
+    def shared_projections(self):
+        return all(x[INFO.PROJ] == self[INFO.PROJ] for x in self.l[:3] if x is not None)
+
+    @property
+    def is_valid(self):
+        return self.shared_projections and self.has_deps
 
     @property
     def is_flat_field(self):
@@ -350,6 +358,7 @@ class DocRGBLayer(DocCompositeLayer):
                 INFO.ORIGIN_Y: None,
                 INFO.CELL_WIDTH: None,
                 INFO.CELL_HEIGHT: None,
+                INFO.PROJ: None,
                 INFO.COLORMAP: 'autumn',  # FIXME: why do RGBs need a colormap?
                 INFO.CLIM: (None, None, None),  # defer initialization until we have upstream layers
             }
@@ -375,6 +384,7 @@ class DocRGBLayer(DocCompositeLayer):
                 LOG.error('unable to create new name from {0!r:s}'.format(dep_info))
                 name = "RGB"
                 bands = []
+
             ds_info = {
                 INFO.NAME: name,
                 INFO.KIND: KIND.RGB,
@@ -384,6 +394,7 @@ class DocRGBLayer(DocCompositeLayer):
                 INFO.ORIGIN_Y: highest_res_dep[INFO.ORIGIN_Y],
                 INFO.CELL_WIDTH: highest_res_dep[INFO.CELL_WIDTH],
                 INFO.CELL_HEIGHT: highest_res_dep[INFO.CELL_HEIGHT],
+                INFO.PROJ: highest_res_dep[INFO.PROJ],
                 INFO.COLORMAP: 'autumn',  # FIXME: why do RGBs need a colormap?
             }
         old_clim = self._store.get(INFO.CLIM, None)
@@ -394,6 +405,9 @@ class DocRGBLayer(DocCompositeLayer):
             self._store[INFO.CLIM] = tuple((existing or upclim(upstream)) for (existing,upstream) in zip(old_clim, dep_info))
 
         self._store.update(ds_info)
+        if not self.shared_projections:
+            LOG.warning("RGB dependency layers don't share the same projection")
+
         return ds_info
 
 

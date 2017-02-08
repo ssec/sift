@@ -888,7 +888,6 @@ def main():
 
 
     window.show()
-    print("running")
     # bring window to front
     window.raise_()
     app.run()
