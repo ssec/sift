@@ -348,7 +348,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """
         uuid, info, content = self._workspace.import_image(source_path=path)
         if uuid in self._layer_with_uuid:
-            LOG.warning("layer with UUID {0:s} already in document?".format(uuid))
+            LOG.warning("layer with UUID {} already in document?".format(uuid))
             return uuid, info, content
         # info.update(self._additional_guidebook_information(info))
         self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, info)

@@ -31,7 +31,6 @@ import shapefile
 
 from vispy.scene.visuals import create_visual_node
 from vispy.visuals import LineVisual, ImageVisual, CompoundVisual, Visual
-from vispy.color import get_colormap
 from vispy.ext.six import string_types
 import numpy as np
 from datetime import datetime
@@ -52,6 +51,7 @@ from sift.common import (
     TileCalculator,
     calc_pixel_size,
     get_reference_points,
+    get_reference_points_image,
     )
 from sift.view.Program import TextureAtlas2D, Texture2D
 # The below imports are needed because we subclassed the ImageVisual
@@ -69,6 +69,7 @@ LOG = logging.getLogger(__name__)
 # then we consider it invalid
 # these values can get large when zoomed way in
 CANVAS_EPSILON = 1e5
+# CANVAS_EPSILON = 1e30
 
 
 VERT_SHADER = """
@@ -259,6 +260,10 @@ class TiledGeolocatedImageVisual(ImageVisual):
         # visual nodes already have names, so be careful
         if not hasattr(self, "name"):
             self.name = kwargs.get("name", None)
+        self._viewable_mesh_mask = None
+        self._ref1 = None
+        self._ref2 = None
+
         self.origin_x = origin_x
         self.origin_y = origin_y
         self.cell_width = cell_width
@@ -410,15 +415,11 @@ class TiledGeolocatedImageVisual(ImageVisual):
 
         # Handle wrapping around the anti-meridian so there is a -180/180 continuous image
         num_tiles = 1 if not self.wrap_lon else 2
-        nfo["texture_coordinates"] = np.empty((6 * num_tiles * (TESS_LEVEL * TESS_LEVEL), 2), dtype=np.float32)
-        nfo["vertex_coordinates"] = np.empty((6 * num_tiles * (TESS_LEVEL * TESS_LEVEL), 2), dtype=np.float32)
-        nfo["texture_coordinates"][:6 * (TESS_LEVEL * TESS_LEVEL), :2] = self.calc.calc_texture_coordinates(ttile_idx, tessellation_level=TESS_LEVEL)
-        nfo["vertex_coordinates"][:6 * (TESS_LEVEL * TESS_LEVEL), :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step, tessellation_level=TESS_LEVEL)
-        # if self.wrap_lon:
-        #     nfo["texture_coordinates"][6:12, :2] = nfo["texture_coordinates"][:6, :2]
-        #     nfo["vertex_coordinates"][6:12, :2] = nfo["vertex_coordinates"][:6, :2]
-        #     # increase the second set of X coordinates by the circumference of the earth
-        #     nfo["vertex_coordinates"][6:12, 0] += nfo["cell_width"] * nfo["data"].shape[1]
+        tl = TESS_LEVEL * TESS_LEVEL
+        nfo["texture_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
+        nfo["vertex_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
+        nfo["texture_coordinates"][:6 * tl, :2] = self.calc.calc_texture_coordinates(ttile_idx, tessellation_level=TESS_LEVEL)
+        nfo["vertex_coordinates"][:6 * tl, :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step, tessellation_level=TESS_LEVEL)
         self._set_vertex_tiles(nfo["vertex_coordinates"], nfo["texture_coordinates"])
 
     def _normalize_data(self, data):
@@ -529,6 +530,26 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self._subdiv_position.set_data(vertices.astype('float32'))
         self._subdiv_texcoord.set_data(tex_coords.astype('float32'))
 
+    def determine_reference_points(self):
+        # Image points transformed to canvas coordinates
+        img_cmesh = self.transforms.get_transform().map(self.calc.image_mesh)
+        # Mask any points that are really far off screen (can't be transformed)
+        valid_mask = (np.abs(img_cmesh[:, 0]) < CANVAS_EPSILON) & (np.abs(img_cmesh[:, 1]) < CANVAS_EPSILON)
+        # The image mesh projected to canvas coordinates (valid only)
+        img_cmesh = img_cmesh[valid_mask]
+        # The image mesh of only valid "viewable" projected coordinates
+        img_vbox = self.calc.image_mesh[valid_mask]
+
+        x_cmin, x_cmax = img_cmesh[:, 0].min(), img_cmesh[:, 0].max()
+        y_cmin, y_cmax = img_cmesh[:, 1].min(), img_cmesh[:, 1].max()
+        center_x = (x_cmax - x_cmin) / 2. + x_cmin
+        center_y = (y_cmax - y_cmin) / 2. + y_cmin
+        dist = img_cmesh.copy()
+        dist[:, 0] = center_x - img_cmesh[:, 0]
+        dist[:, 1] = center_y - img_cmesh[:, 1]
+        self._viewable_mesh_mask = valid_mask
+        self._ref1, self._ref2 = get_reference_points(dist, img_vbox)
+
     def get_view_box(self):
         """Calculate shown portion of image and image units per pixel
 
@@ -541,28 +562,28 @@ class TiledGeolocatedImageVisual(ImageVisual):
         While the result of the chosen method may not always be completely
         accurate, it should work for all possible viewing cases.
         """
-        img_cmesh = self.transforms.get_transform().map(self.calc.image_mesh)
-        # Mask any points that are really far off screen (can't be transformed)
-        valid_mask = (np.abs(img_cmesh[:, 0]) < CANVAS_EPSILON) & (np.abs(img_cmesh[:, 1]) < CANVAS_EPSILON)
-        # The image mesh projected to canvas coordinates
-        img_cmesh = img_cmesh[valid_mask]
-        # The image mesh of only valid "viewable" projected coordinates
-        img_vbox = self.calc.image_mesh[valid_mask]
-
-        # Need at least 2 valid points to do calculations
-        if img_cmesh.shape[0] < 2:
+        if self._viewable_mesh_mask is None:
             raise ValueError("Image '%s' is not viewable in this projection" % (self.name,))
 
+        # Image points transformed to canvas coordinates
+        img_cmesh = self.transforms.get_transform().map(self.calc.image_mesh)
+        # The image mesh projected to canvas coordinates (valid only)
+        img_cmesh = img_cmesh[self._viewable_mesh_mask]
+        # The image mesh of only valid "viewable" projected coordinates
+        img_vbox = self.calc.image_mesh[self._viewable_mesh_mask]
+
         ref_idx_1, ref_idx_2 = get_reference_points(img_cmesh, img_vbox)
-        dx, dy = calc_pixel_size(img_cmesh[(ref_idx_1, ref_idx_2), :],
-                                 img_vbox[(ref_idx_1, ref_idx_2), :],
+        dx, dy = calc_pixel_size(img_cmesh[(self._ref1, self._ref2), :],
+                                 img_vbox[(self._ref1, self._ref2), :],
                                  self.canvas.size)
         view_extents = self.calc.calc_view_extents(img_cmesh[ref_idx_1], img_vbox[ref_idx_1], self.canvas.size, dx, dy)
-
         # ll_corner, ur_corner = self.transforms.get_transform().imap([(-1, -1, 1), (1, 1, 1)])
         # print("Old method: ", ll_corner, ur_corner, "dy: %f" % ((ur_corner[1] - ll_corner[1]) / self.canvas.size[1]), "dx: %f" % ((ur_corner[0] - ll_corner[0]) / self.canvas.size[0]))
         # print("View Box: ", view_box)
         return vue(*view_extents, dx=dx, dy=dy)
+
+    def _get_stride(self, view_box):
+        return self.calc.calc_stride(view_box)
 
     def assess(self):
         """Determine if a retile is needed.
@@ -571,7 +592,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         """
         try:
             view_box = self.get_view_box()
-            preferred_stride = self.calc.calc_stride(view_box)
+            preferred_stride = self._get_stride(view_box)
             _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride, extra_tiles_box=box(1, 1, 1, 1))
         except ValueError:
             return False, self._stride, self._latest_tile_box
@@ -699,6 +720,10 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         # visual nodes already have names, so be careful
         if not hasattr(self, "name"):
             self.name = kwargs.get("name", None)
+        self._valid_mesh_mask = None
+        self._ref1 = None
+        self._ref2 = None
+
         self.texture_shape = texture_shape
         self.tile_shape = tile_shape
         self.num_tex_tiles = self.texture_shape[0] * self.texture_shape[1]
@@ -884,15 +909,11 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
 
         # Handle wrapping around the anti-meridian so there is a -180/180 continuous image
         num_tiles = 1 if not self.wrap_lon else 2
-        nfo["texture_coordinates"] = np.empty((6 * num_tiles, 2), dtype=np.float32)
-        nfo["vertex_coordinates"] = np.empty((6 * num_tiles, 2), dtype=np.float32)
-        nfo["texture_coordinates"][:6, :2] = self.calc.calc_texture_coordinates(ttile_idx)
-        nfo["vertex_coordinates"][:6, :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step)
-        if self.wrap_lon:
-            nfo["texture_coordinates"][6:12, :2] = nfo["texture_coordinates"][:6, :2]
-            nfo["vertex_coordinates"][6:12, :2] = nfo["vertex_coordinates"][:6, :2]
-            # increase the second set of X coordinates by the circumference of the earth
-            nfo["vertex_coordinates"][6:12, 0] += nfo["cell_width"] * nfo["data"].shape[1]
+        tl = TESS_LEVEL * TESS_LEVEL
+        nfo["texture_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
+        nfo["vertex_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
+        nfo["texture_coordinates"][:6 * tl, :2] = self.calc.calc_texture_coordinates(ttile_idx, tessellation_level=TESS_LEVEL)
+        nfo["vertex_coordinates"][:6 * tl, :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step, tessellation_level=TESS_LEVEL)
         self._set_vertex_tiles(nfo["vertex_coordinates"], nfo["texture_coordinates"])
 
     @property
@@ -986,20 +1007,9 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
             for idx, data in enumerate(data_arrays):
                 self._textures[idx].set_tile_data(tex_tile_idx, data)
 
-    def assess(self):
-        """Determine if a retile is needed.
-
-        Tell workspace we will be needed
-        """
-        view_box = self.get_view_box()
-        preferred_stride = self.calc.calc_stride(view_box, texture=self._lowest_rez) * self._lowest_factor
-        _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride, extra_tiles_box=box(1, 1, 1, 1))
-        num_tiles = (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l)
-        LOG.debug("Assessment: Prefer '%s' have '%s', was looking at %r, now looking at %r",
-                  preferred_stride, self._stride, self._latest_tile_box, tile_box)
-        # If we zoomed out or we panned
-        need_retile = (num_tiles > 0) and (preferred_stride != self._stride or self._latest_tile_box != tile_box)
-        return need_retile, preferred_stride, tile_box
+    def _get_stride(self, view_box):
+        return self.calc.calc_stride(
+            view_box, texture=self._lowest_rez) * self._lowest_factor
 
 CompositeLayer = create_visual_node(CompositeLayerVisual)
 

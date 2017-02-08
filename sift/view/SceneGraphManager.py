@@ -504,6 +504,9 @@ class SceneGraphManager(QObject):
         ll_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] - width, center[1] - height)])[0][:2]
         ur_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] + width, center[1] + height)])[0][:2]
         self.main_view.camera.rect = Rect(ll_xy, (ur_xy[0] - ll_xy[0], ur_xy[1] - ll_xy[1]))
+        for img in self.image_elements.values():
+            img.determine_reference_points()
+        self.on_view_change(None)
 
     def _init_latlon_grid_layer(self, color=None, resolution=5.):
         """Create a series of line segments representing latitude and longitude lines.
@@ -771,6 +774,7 @@ class SceneGraphManager(QObject):
         image.transform *= STTransform(translate=(0, 0, -50.0))
         self.image_elements[uuid] = image
         self.layer_set.add_layer(image)
+        image.determine_reference_points()
         self.on_view_change(None)
 
     def add_composite_layer(self, new_order:tuple, uuid:UUID, p:prez):
@@ -808,6 +812,7 @@ class SceneGraphManager(QObject):
             if new_order:
                 self.layer_set.set_layer_order(new_order)
             self.on_view_change(None)
+            element.determine_reference_points()
             return True
         else:
             raise ValueError("Unknown or unimplemented composite type")

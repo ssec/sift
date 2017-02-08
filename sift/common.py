@@ -27,7 +27,7 @@ __docformat__ = 'reStructuredText'
 
 import os, sys
 import logging, unittest, argparse
-from numba import jit, float64, int64, types as nb_types
+from numba import jit, float64, int64, uint64, boolean, types as nb_types
 from pyproj import Proj
 
 LOG = logging.getLogger(__name__)
@@ -137,12 +137,11 @@ def get_reference_points(img_cmesh, img_vbox):
     view projection. The second argument `img_vbox` is these same mesh
     points, but in the original image projection units.
 
-    If there are not enough valid points the second reference point
-    will be `None`.
-
     :param img_cmesh: (N, 2) array of valid points across the image space
     :param img_vbox: (N, 2) array of valid points across the image space
     :return: (reference array index 1, reference array index 2)
+    :raises: ValueError if not enough valid points to create
+             two reference points
     """
     # Sort points by nearest to further from the 0,0 center of the canvas
     # Uses a cheap Pythagorean theorem by summing X + Y
@@ -157,11 +156,46 @@ def get_reference_points(img_cmesh, img_vbox):
     return ref_idx_1, near_points_2[0]
 
 
+@jit(nb_types.UniTuple(int64, 2)(float64[:, :], boolean[:, :]))
+def get_reference_points_image(img_dist, valid_mask):
+    """Get two image reference point indexes close to image center.
+
+    This function will return the two nearest reference points to the
+    center of the image. The argument `img_vbox` is an array of points
+    across the image that can be successfully projected to the viewed
+    projection.
+
+    :param img_dist: (N, 2) array of distances from the image center
+                     in image space for points that can be projected
+                     to the viewed projection
+    :return: (reference array index 1, reference array index 2)
+    :raises: ValueError if not enough valid points to create
+             two reference points
+    """
+    # Sort points by nearest to further from the 0,0 center of the canvas
+    # Uses a cheap Pythagorean theorem by summing X + Y
+    near_points = np.sum(np.abs(img_dist), axis=1)
+    print(near_points.shape, valid_mask.shape)
+    near_points[~valid_mask] = np.inf
+    near_points = near_points.argsort()
+    ref_idx_1 = near_points[0]
+    if np.isinf(near_points[ref_idx_1]):
+        raise ValueError("Could not determine reference points")
+    # pick a second reference point that isn't in the same row or column as the first
+    near_points_2 = near_points[~np.isclose(img_dist[near_points][:, 0], img_dist[ref_idx_1][0]) &
+                                ~np.isclose(img_dist[near_points][:, 1], img_dist[ref_idx_1][1])]
+    if near_points_2.shape[0] == 0:
+        raise ValueError("Could not determine reference points")
+
+    return ref_idx_1, near_points_2[0]
+
+
 @jit(nb_types.UniTuple(float64, 2)(float64, float64, int64, float64), nopython=True)
 def _calc_extent_component(canvas_point, image_point, num_pixels, meters_per_pixel):
     """Calculate """
     # Find the distance in image space between the closest
     # reference point and the center of the canvas view (0, 0)
+    # divide canvas_point coordinate by 2 to get the ratio of that distance to the entire canvas view (-1 to 1)
     viewed_img_center_shift_x = (canvas_point / 2. * num_pixels * meters_per_pixel)
     # Find the theoretical center of the canvas in image space (X/Y)
     viewed_img_center_x = image_point - viewed_img_center_shift_x
@@ -250,6 +284,10 @@ class TileCalculator(object):
         # Used when checking if the image is viewable on the current canvas's projection
         self.image_mesh = np.meshgrid(np.linspace(e.l, e.r, IMAGE_MESH_SIZE), np.linspace(e.b, e.t, IMAGE_MESH_SIZE))
         self.image_mesh = np.column_stack((self.image_mesh[0].ravel(), self.image_mesh[1].ravel(),))
+        # distance the mesh points are from the center
+        # self.mesh_center_distance = self.image_mesh.copy()
+        # self.mesh_center_distance[:, 0] = (ul_origin[0] + pixel_rez.dx * (image_shape[1] / 2.)) - self.image_mesh[:, 0]
+        # self.mesh_center_distance[:, 1] = (ul_origin[1] - pixel_rez.dy * (image_shape[0] / 2.)) - self.image_mesh[:, 1]
 
     @jit
     def visible_tiles(self, visible_geom, stride=1, extra_tiles_box=box(0,0,0,0)):
