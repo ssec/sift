@@ -85,7 +85,7 @@ def proj4_string(**kwargs):
 
 @jit((numba.float32[:,:], numba.double, numba.double, numba.double, numba.double))
 def _calc_bt(L: np.ndarray, fk1: float, fk2: float, bc1: float, bc2: float):
-    return (fk2 / (np.log(fk1 / L) + 1.0) - bc1) / bc2
+    return (fk2 / np.log((fk1 / L) + 1.0) - bc1) / bc2
 
 
 def calc_bt(L: (np.ndarray, np.ma.masked_array), fk1: float, fk2: float, bc1: float, bc2: float, mask_invalid: bool=True, **etc):
