@@ -271,7 +271,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self.texture_shape = texture_shape
         self.tile_shape = tile_shape
         self.num_tex_tiles = self.texture_shape[0] * self.texture_shape[1]
-        self._stride = 0  # Current stride is None when we are showing the overview
+        self._stride = (0, 0)  # Current stride is None when we are showing the overview
         self._latest_tile_box = None
         self.wrap_lon = wrap_lon
         self._tiles = {}
@@ -417,8 +417,9 @@ class TiledGeolocatedImageVisual(ImageVisual):
         tl = TESS_LEVEL * TESS_LEVEL
         nfo["texture_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
         nfo["vertex_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
-        nfo["texture_coordinates"][:6 * tl, :2] = self.calc.calc_texture_coordinates(ttile_idx, tessellation_level=TESS_LEVEL)
-        nfo["vertex_coordinates"][:6 * tl, :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step, tessellation_level=TESS_LEVEL)
+        factor_rez, offset_rez = self.calc.calc_tile_fraction(0, 0, (y_slice.step, x_slice.step))
+        nfo["texture_coordinates"][:6 * tl, :2] = self.calc.calc_texture_coordinates(ttile_idx, factor_rez, offset_rez, tessellation_level=TESS_LEVEL)
+        nfo["vertex_coordinates"][:6 * tl, :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step, factor_rez, offset_rez, tessellation_level=TESS_LEVEL)
         self._set_vertex_tiles(nfo["vertex_coordinates"], nfo["texture_coordinates"])
 
     def _normalize_data(self, data):
@@ -446,14 +447,11 @@ class TiledGeolocatedImageVisual(ImageVisual):
                     continue
 
                 # Assume we were given a total image worth of this stride
-                y_start = tiy * self.tile_shape[0]
-                y_end = y_start + self.tile_shape[0]
-                x_start = tix * self.tile_shape[1]
-                x_end = x_start + self.tile_shape[1]
+                y_slice, x_slice = self.calc.calc_tile_slice(tiy, tix, stride)
                 # force a copy of the data from the content array (provided by the workspace) to a vispy-compatible contiguous float array
                 # this can be a potentially time-expensive operation since content array is often huge and always memory-mapped, so paging may occur
                 # we don't want this paging deferred until we're back in the GUI thread pushing data to OpenGL!
-                tile_data = np.array(data[y_start: y_end, x_start: x_end], dtype=np.float32)
+                tile_data = np.array(data[y_slice, x_slice], dtype=np.float32)
                 tiles_info.append((stride, tiy, tix, tex_tile_idx, tile_data))
 
         return tiles_info
@@ -512,8 +510,12 @@ class TiledGeolocatedImageVisual(ImageVisual):
 
                 # we should have already loaded the texture data in to the GPU so get the index of that texture
                 tex_tile_idx = self.texture_state[(preferred_stride, tiy, tix)]
-                tex_coords[tl*used_tile_idx*6: tl*(used_tile_idx+1)*6, :] = self.calc.calc_texture_coordinates(tex_tile_idx, tessellation_level=TESS_LEVEL)
-                vertices[tl*used_tile_idx*6: tl*(used_tile_idx+1)*6, :] = self.calc.calc_vertex_coordinates(tiy, tix, preferred_stride[0], preferred_stride[1], tessellation_level=TESS_LEVEL)
+                factor_rez, offset_rez = self.calc.calc_tile_fraction(tiy, tix, preferred_stride)
+                tex_coords[tl*used_tile_idx*6: tl*(used_tile_idx+1)*6, :] = self.calc.calc_texture_coordinates(tex_tile_idx, factor_rez, offset_rez, tessellation_level=TESS_LEVEL)
+                vertices[tl*used_tile_idx*6: tl*(used_tile_idx+1)*6, :] = self.calc.calc_vertex_coordinates(tiy, tix,
+                                                                                                            preferred_stride[0], preferred_stride[1],
+                                                                                                            factor_rez, offset_rez,
+                                                                                                            tessellation_level=TESS_LEVEL)
 
         return vertices, tex_coords
 
@@ -584,7 +586,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         try:
             view_box = self.get_view_box()
             preferred_stride = self._get_stride(view_box)
-            _, tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride, extra_tiles_box=box(1, 1, 1, 1))
+            tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride, extra_tiles_box=box(1, 1, 1, 1))
         except ValueError:
             return False, self._stride, self._latest_tile_box
 
@@ -903,8 +905,9 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         tl = TESS_LEVEL * TESS_LEVEL
         nfo["texture_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
         nfo["vertex_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
-        nfo["texture_coordinates"][:6 * tl, :2] = self.calc.calc_texture_coordinates(ttile_idx, tessellation_level=TESS_LEVEL)
-        nfo["vertex_coordinates"][:6 * tl, :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step, tessellation_level=TESS_LEVEL)
+        factor_rez, offset_rez = self.calc.calc_tile_fraction(0, 0, (y_slice.step, x_slice.step))
+        nfo["texture_coordinates"][:6 * tl, :2] = self.calc.calc_texture_coordinates(ttile_idx, factor_rez, offset_rez, tessellation_level=TESS_LEVEL)
+        nfo["vertex_coordinates"][:6 * tl, :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step, factor_rez, offset_rez, tessellation_level=TESS_LEVEL)
         self._set_vertex_tiles(nfo["vertex_coordinates"], nfo["texture_coordinates"])
 
     @property
@@ -957,8 +960,6 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         data = [self._normalize_data(d) for d in data]
 
         LOG.debug("Uploading texture data for %d tiles (%r)", (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l), tile_box)
-        max_tiles = self.calc.max_tiles_available(stride)
-
         # Tiles start at upper-left so go from top to bottom
         tiles_info = []
         for tiy in range(tile_box.t, tile_box.b):
@@ -972,10 +973,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
                     continue
 
                 # Assume we were given a total image worth of this stride
-                y_start = tiy * self.tile_shape[0]
-                y_end = y_start + self.tile_shape[0]
-                x_start = tix * self.tile_shape[1]
-                x_end = x_start + self.tile_shape[1]
+                y_slice, x_slice = self.calc.calc_tile_slice(tiy, tix, stride)
                 textures_data = []
                 for chn_idx in range(self.num_channels):
                     # force a copy of the data from the content array (provided by the workspace) to a vispy-compatible contiguous float array
@@ -985,7 +983,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
                         # we need to fill the texture with NaNs instead of actual data
                         tile_data = None
                     else:
-                        tile_data = np.array(data[chn_idx][y_start: y_end, x_start: x_end], dtype=np.float32)
+                        tile_data = np.array(data[chn_idx][y_slice, x_slice], dtype=np.float32)
                     textures_data.append(tile_data)
                 tiles_info.append((stride, tiy, tix, tex_tile_idx, textures_data))
 
@@ -999,7 +997,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
 
     def _get_stride(self, view_box):
         s = self.calc.calc_stride( view_box, texture=self._lowest_rez)
-        return s[0] * self._lowest_factor, s[1] * self._lowest_factor
+        return pnt(s[0] * self._lowest_factor, s[1] * self._lowest_factor)
 
 CompositeLayer = create_visual_node(CompositeLayerVisual)
 

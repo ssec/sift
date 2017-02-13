@@ -263,7 +263,7 @@ class TileCalculator(object):
         super(TileCalculator, self).__init__()
         self.name = name
         self.image_shape = image_shape
-        self.ul_origin = ul_origin
+        self.ul_origin = pnt(*ul_origin)
         self.pixel_rez = pixel_rez
         self.tile_shape = tile_shape
         # in units of tiles:
@@ -284,6 +284,10 @@ class TileCalculator(object):
         # Used when checking if the image is viewable on the current canvas's projection
         self.image_mesh = np.meshgrid(np.linspace(e.l, e.r, IMAGE_MESH_SIZE), np.linspace(e.b, e.t, IMAGE_MESH_SIZE))
         self.image_mesh = np.column_stack((self.image_mesh[0].ravel(), self.image_mesh[1].ravel(),))
+        self.image_center = pnt(self.ul_origin.y - self.image_shape[0] / 2. * self.pixel_rez.dy,
+                                self.ul_origin.x + self.image_shape[1] / 2. * self.pixel_rez.dx)
+        # size of tile in image projection
+        self.tile_size = rez(self.pixel_rez.dy * self.tile_shape[0], self.pixel_rez.dx * self.tile_shape[1])
         # distance the mesh points are from the center
         # self.mesh_center_distance = self.image_mesh.copy()
         # self.mesh_center_distance[:, 0] = (ul_origin[0] + pixel_rez.dx * (image_shape[1] / 2.)) - self.image_mesh[:, 0]
@@ -292,7 +296,7 @@ class TileCalculator(object):
         self.overview_stride = self.calc_overview_stride()
 
     @jit
-    def visible_tiles(self, visible_geom, stride=(1, 1), extra_tiles_box=box(0,0,0,0)):
+    def visible_tiles(self, visible_geom, stride=pnt(1, 1), extra_tiles_box=box(0,0,0,0)):
         """
         given a visible world geometry and sampling, return (sampling-state, [box-of-tiles-to-draw])
         sampling state is WELLSAMPLED/OVERSAMPLED/UNDERSAMPLED
@@ -302,80 +306,144 @@ class TileCalculator(object):
         """
         V = visible_geom
         X = extra_tiles_box  # FUTURE: extra_geom_box specifies in world coordinates instead of tile count
-        E = self.image_extents_box
         Z = self.pixel_rez
+        tile_size = rez(self.tile_size.dy * stride.y, self.tile_size.dx * stride.x)
+        # should be the upper-left corner of the tile centered on the center of the image
+        to = pnt(self.image_center[0] + tile_size.dy / 2.,
+                 self.image_center[1] - tile_size.dx / 2.)  # tile origin
 
-        # convert world coords to pixel coords
-        # py0, px0 = self.extents_box.b, self.extents_box.l
-
-        # pixel view b
+        # number of data pixels between view edge and originpoint
         pv = box(
-            b = (V.b - E.t)/-(Z.dy * stride[0]),
-            l = (V.l - E.l)/(Z.dx * stride[1]),
-            t = (V.t - E.t)/-(Z.dy * stride[0]),
-            r = (V.r - E.l)/(Z.dx * stride[1])
+            b=(V.b - to.y) / -(Z.dy * stride[0]),
+            t=(V.t - to.y) / -(Z.dy * stride[0]),
+            l=(V.l - to.x) / (Z.dx * stride[1]),
+            r=(V.r - to.x) / (Z.dx * stride[1])
         )
 
+        th, tw = self.tile_shape
+        # first tile we'll need is (tiy0, tix0)
+        # floor to make sure we get the upper-left of the theoretical tile
+        tiy0 = np.floor(pv.t / th)
+        tix0 = np.floor(pv.l / tw)
         # number of tiles wide and high we'll absolutely need
-        th,tw = self.tile_shape
-        nth = int(np.ceil((pv.b - pv.t) / th)) + 1  # FIXME: is the +1 correct?
-        ntw = int(np.ceil((pv.r - pv.l) / tw)) + 1
-
-        # first tile we'll need is (tiy0,tix0)
-        tiy0 = int(np.floor(pv.t / th))
-        tix0 = int(np.floor(pv.l / tw))
+        # add 0.5 and ceil to make sure we include all possible tiles
+        # NOTE: output r and b values are exclusive, l and t are inclusive
+        nth = np.ceil((pv.b - tiy0 * th) / th + 0.5)
+        ntw = np.ceil((pv.r - tix0 * tw) / tw + 0.5)
 
         # now add the extras
-        if X.b>0:
-            tiy0 -= int(X.b)
+        if X.b > 0:
             nth += int(X.b)
-        if X.l>0:
+        if X.l > 0:
             tix0 -= int(X.l)
             ntw += int(X.l)
-        if X.t>0:
+        if X.t > 0:
+            tiy0 -= int(X.t)
             nth += int(X.t)
-        if X.r>0:
+        if X.r > 0:
             ntw += int(X.r)
 
-        # truncate to the available tiles
-        if tix0<0:
-            ntw += tix0
-            tix0 = 0
-        if tiy0<0:
-            nth += tiy0
-            tiy0 = 0
-
-        # Total number of tiles in this image at this stride
+        # Total number of tiles in this image at this stride (could be fractional)
         ath, atw = self.max_tiles_available(stride)
-        xth = ath - (tiy0 + nth)
-        if xth < 0:  # then we're asking for tiles that don't exist
-            nth += xth  # trim it back
-        xtw = atw - (tix0 + ntw)
-        if xtw < 0:  # likewise with tiles wide
-            ntw += xtw
-
-        # FIXME: use vue() instead of box() to represent visible geometry,
-        #        so we can estimate sampledness and decide when to re-render
-        overunder = None
-        # if not isinstance(visible_geom, vue):
-        #     overunder = None
-        # else:  # use dy/dx to calculate texture pixels to screen pixels ratio
-        #     overunder = self.calc_sampling(visible_geom, Z)
+        # truncate to the available tiles
+        hw = atw / 2.
+        hh = ath / 2.
+        # center tile is half pixel off because we want center of the center
+        # tile to be at the center of the image
+        if tix0 < -hw + 0.5:
+            ntw += hw - 0.5 + tix0
+            tix0 = -hw + 0.5
+        if tiy0 < -hh + 0.5:
+            nth += hh - 0.5 + tiy0
+            tiy0 = -hh + 0.5
+        # add 0.5 to include the "end of the tile" since the r and b are exclusive
+        if tix0 + ntw > hw + 0.5:
+            ntw = hw + 0.5 - tix0
+        if tiy0 + nth > hh + 0.5:
+            nth = hh + 0.5 - tiy0
 
         tilebox = box(
-            b = int(tiy0 + nth),
-            l = int(tix0),
-            t = int(tiy0),
-            r = int(tix0 + ntw)
+            b=int(np.ceil(tiy0 + nth)),
+            l=int(np.floor(tix0)),
+            t=int(np.floor(tiy0)),
+            r=int(np.ceil(tix0 + ntw)),
         )
+        return tilebox
 
-        return overunder, tilebox
+    @jit
+    def calc_tile_slice(self, tiy, tix, stride):
+        """Calculate the slice needed to get data.
+
+        The returned slice assumes the original image data has already
+        been reduced by the provided stride.
+
+        Args:
+            tiy (int): Tile Y index (down is positive)
+            tix (int): Tile X index (right is positive)
+            stride (tuple): (Original data Y-stride, Original data X-stride)
+
+        """
+        y_offset = int(self.image_shape[0] / 2. / stride[0] - self.tile_shape[0] / 2.)
+        y_start = int(tiy * self.tile_shape[0] + y_offset)
+        if y_start < 0:
+            row_slice = slice(0, max(0, y_start + self.tile_shape[0]), 1)
+        else:
+            row_slice = slice(y_start, y_start + self.tile_shape[0], 1)
+
+        x_offset = int(self.image_shape[1] / 2. / stride[1] - self.tile_shape[1] / 2.)
+        x_start = int(tix * self.tile_shape[1] + x_offset)
+        if x_start < 0:
+            col_slice = slice(0, max(0, x_start + self.tile_shape[1]), 1)
+        else:
+            col_slice = slice(x_start, x_start + self.tile_shape[1], 1)
+        return row_slice, col_slice
 
     @jit
     def max_tiles_available(self, stride):
-        ath = np.ceil((self.image_shape[0] / float(stride[1])) / self.tile_shape[0])
-        atw = np.ceil((self.image_shape[1] / float(stride[0])) / self.tile_shape[1])
+        ath = (self.image_shape[0] / float(stride[0])) / self.tile_shape[0]
+        atw = (self.image_shape[1] / float(stride[1])) / self.tile_shape[1]
         return ath, atw
+
+    @jit
+    def calc_tile_fraction(self, tiy, tix, stride):
+        """Calculate the fractional components of the specified tile
+
+        Returns:
+            (factor, offset): Two `rez` objects stating the relative size
+                              of the tile compared to a whole tile and the
+                              offset from the origin of a whole tile.
+        """
+        mt = self.max_tiles_available(stride)
+
+        if tix < -mt[1] / 2. + 0.5:
+            # left edge tile
+            offset_x = -mt[1] / 2. + 0.5 - tix
+            factor_x = 1 - offset_x
+        elif mt[1] / 2. + 0.5 - tix < 1:
+            # right edge tile
+            offset_x = 0.
+            factor_x = mt[1] / 2. + 0.5 - tix
+        else:
+            # full tile
+            offset_x = 0.
+            factor_x = 1.
+
+        if tiy < -mt[0] / 2. + 0.5:
+            # left edge tile
+            offset_y = -mt[0] / 2. + 0.5 - tiy
+            factor_y = 1 - offset_y
+        elif mt[0] / 2. + 0.5 - tiy < 1:
+            # right edge tile
+            offset_y = 0.
+            factor_y = mt[0] / 2. + 0.5 - tiy
+        else:
+            # full tile
+            offset_y = 0.
+            factor_y = 1.
+
+        factor_rez = rez(dy=factor_y, dx=factor_x)
+        offset_rez = rez(dy=offset_y, dx=offset_x)
+        return factor_rez, offset_rez
 
     @jit
     def calc_stride(self, visible, texture=None):
@@ -391,9 +459,7 @@ class TileCalculator(object):
         texture = texture or self.pixel_rez
         tsy = min(self.overview_stride[0].step, max(1, np.ceil(visible.dy * PREFERRED_SCREEN_TO_TEXTURE_RATIO / texture.dy)))
         tsx = min(self.overview_stride[1].step, max(1, np.ceil(visible.dx * PREFERRED_SCREEN_TO_TEXTURE_RATIO / texture.dx)))
-        # ts = min(tsy, tsx)
-        # stride = int(ts)
-        return int(tsy), int(tsx)
+        return pnt(int(tsy), int(tsx))
 
     @jit
     def calc_overview_stride(self, image_shape=None):
@@ -406,80 +472,28 @@ class TileCalculator(object):
         return y_slice, x_slice
 
     @jit
-    def tile_world_box(self, tiy, tix, ny=1, nx=1):
-        """
-        return world coordinate box a given tile fills
-        """
-        LOG.debug('{}y, {}x'.format(tiy,tix))
-        eb,el = self.image_extents_box.b, self.image_extents_box.l
-        dy,dx = self.pixel_rez
-        if dy<0:
-            LOG.warning('unexpected dy={}'.format(dy))
-        if dx<0:
-            LOG.warning('unexpected dx={}'.format(dx))
-        th,tw = map(float, self.tile_shape)
-
-        b = eb + dy*(th*tiy)
-        t = eb + dy*(th*(tiy+ny))
-        l = el + dx*(tw*tix)
-        r = el + dx*(tw*(tix+nx))
-
-        if l>=r:
-            LOG.warning('left > right')
-
-        return box(b=b,l=l,t=t,r=r)
-
-    # @jit
-    # def tile_slices(self, tiy, tix, stride):
-    #     y_slice = slice(tiy*self.tile_shape[0]*stride, (tiy+1)*self.tile_shape[0]*stride, stride)
-    #     x_slice = slice(tix*self.tile_shape[1]*stride, (tix+1)*self.tile_shape[1]*stride, stride)
-    #     return y_slice, x_slice
-
-    # @jit
-    # def tile_pixels(self, data, tiy, tix, stride):
-    #     """
-    #     extract pixel data for a given tile
-    #     """
-    #     return data[
-    #            tiy*self.tile_shape[0]:(tiy+1)*self.tile_shape[0]:stride,
-    #            tix*self.tile_shape[1]:(tix+1)*self.tile_shape[1]:stride
-    #            ]
-
-    # @jit
-    # def fractional_wrapped_tile(self, stride):
-    #     """The amount of tile that overlaps at the antimeridian and should be removed from the wrapped tiles.
-    #     """
-    #     # Index of the first
-    #     tix = self.max_tiles_available(stride)[1]
-    #     tile_start_idx = tix * self.tile_shape[1]
-    #     return (tile_start_idx - int(self.image_shape[1] / stride)) / self.tile_shape[1]
-
-    @jit
-    def calc_vertex_coordinates(self, tiy, tix, stridey, stridex, tessellation_level=1):
+    def calc_vertex_coordinates(self, tiy, tix, stridey, stridex,
+                                factor_rez, offset_rez, tessellation_level=1):
         quad = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0],
                          [0, 0, 0], [1, 1, 0], [0, 1, 0]],
                         dtype=np.float32)
         quads = np.tile(quad, (tessellation_level * tessellation_level, 1))
-        tile_width = self.pixel_rez.dx * self.tile_shape[1] * stridex
-        tile_height = self.pixel_rez.dy * self.tile_shape[0] * stridey
-        max_tiles = self.max_tiles_available((stridey, stridex))
-        virt_tix = tix % max_tiles[1]
-        # which image of the repeating/wrapping images are we in
-        image_idx = int(tix / max_tiles[1])
-        # one whole image in the X direction is this many meters:
-        image_origin_x = self.ul_origin.x + self.pixel_rez.dx * self.image_shape[1] * image_idx
+        tile_w = self.pixel_rez.dx * self.tile_shape[1] * stridex
+        tile_h = self.pixel_rez.dy * self.tile_shape[0] * stridey
+        origin_x = self.image_center[1] - tile_w / 2.
+        origin_y = self.image_center[0] + tile_h / 2.
         for x_idx in range(tessellation_level):
             for y_idx in range(tessellation_level):
                 start_idx = x_idx * tessellation_level + y_idx
-                quads[start_idx * 6:(start_idx + 1) * 6, 0] *= tile_width / tessellation_level
-                quads[start_idx * 6:(start_idx + 1) * 6, 0] += image_origin_x + (tile_width * virt_tix) + (tile_width * x_idx) / tessellation_level
-                quads[start_idx * 6:(start_idx + 1) * 6, 1] *= -tile_height / tessellation_level  # Origin is upper-left so image goes down
-                quads[start_idx * 6:(start_idx + 1) * 6, 1] += self.ul_origin.y - tile_height * tiy - (tile_height * y_idx) / tessellation_level
+                quads[start_idx * 6:(start_idx + 1) * 6, 0] *= tile_w * factor_rez.dx / tessellation_level
+                quads[start_idx * 6:(start_idx + 1) * 6, 0] += origin_x + tile_w * (tix + offset_rez.dx + factor_rez.dx * x_idx / tessellation_level)
+                quads[start_idx * 6:(start_idx + 1) * 6, 1] *= -tile_h * factor_rez.dy / tessellation_level  # Origin is upper-left so image goes down
+                quads[start_idx * 6:(start_idx + 1) * 6, 1] += origin_y - tile_h * (tiy + offset_rez.dy + factor_rez.dy * y_idx / tessellation_level)
         quads = quads.reshape(tessellation_level * tessellation_level * 6, 3)
         return quads[:, :2]
 
     @jit
-    def calc_texture_coordinates(self, ttile_idx, tessellation_level=1):
+    def calc_texture_coordinates(self, ttile_idx, factor_rez, offset_rez, tessellation_level=1):
         """Get texture coordinates for one tile as a quad.
 
         :param ttile_idx: int, texture 1D index that maps to some internal texture tile location
@@ -497,11 +511,13 @@ class TileCalculator(object):
         for x_idx in range(tessellation_level):
             for y_idx in range(tessellation_level):
                 start_idx = x_idx * tessellation_level + y_idx
-                quads[start_idx * 6:(start_idx + 1) * 6, 0] *= one_tile_tex_width / tessellation_level
-                # FIXME: This offset needs to change as the index changes
-                quads[start_idx * 6:(start_idx + 1) * 6, 0] += one_tile_tex_width * tix + (one_tile_tex_width * x_idx) / tessellation_level
-                quads[start_idx * 6:(start_idx + 1) * 6, 1] *= one_tile_tex_height / tessellation_level
-                quads[start_idx * 6:(start_idx + 1) * 6, 1] += one_tile_tex_height * tiy + (one_tile_tex_height * y_idx) / tessellation_level
+                # offset for this tile isn't needed because the data should
+                # have been inserted as close to the top-left of the texture
+                # location as possible
+                quads[start_idx * 6:(start_idx + 1) * 6, 0] *= one_tile_tex_width * factor_rez.dx / tessellation_level
+                quads[start_idx * 6:(start_idx + 1) * 6, 0] += one_tile_tex_width * (tix + factor_rez.dx * x_idx / tessellation_level)
+                quads[start_idx * 6:(start_idx + 1) * 6, 1] *= one_tile_tex_height * factor_rez.dy / tessellation_level
+                quads[start_idx * 6:(start_idx + 1) * 6, 1] += one_tile_tex_height * (tiy + factor_rez.dy * y_idx / tessellation_level)
         quads = quads.reshape(6 * tessellation_level * tessellation_level, 3)
         quads = np.ascontiguousarray(quads[:, :2])
         return quads
