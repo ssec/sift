@@ -76,7 +76,6 @@ def test_layers_from_directory(ws, doc, layer_tiff_glob, range_txt=None):
 def test_layers(ws, doc, glob_pattern=None):
     if glob_pattern:
         return test_layers_from_directory(ws, doc, glob_pattern, os.environ.get('RANGE', None))
-    LOG.warning("No image glob pattern provided")
     return []
 
 class OpenCacheDialog(QtGui.QWidget):
@@ -504,7 +503,6 @@ class Main(QtGui.QMainWindow):
         self.workspace = Workspace(workspace_dir, max_size_gb=workspace_size, queue=self.queue)
         self.document = doc = Document(self.workspace)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
-                                               glob_pattern=glob_pattern,
                                                border_shapefile=border_shapefile,
                                                center=center,
                                                parent=self)

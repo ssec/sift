@@ -1074,11 +1074,9 @@ RGBCompositeLayer = create_visual_node(RGBCompositeLayerVisual)
 
 
 class ShapefileLinesVisual(LineVisual):
-    def __init__(self, filepath, projection=DEFAULT_PROJECTION, double=False, **kwargs):
+    def __init__(self, filepath, double=False, **kwargs):
         LOG.debug("Using border shapefile '%s'", filepath)
         self.sf = shapefile.Reader(filepath)
-        # FUTURE: Proj stuff should be done in GLSL for better speeds and flexibility with swapping projection (may require something in addition to transform)
-        # self.proj = Proj(projection)
 
         LOG.info("Loading boundaries: %s", datetime.utcnow().isoformat(" "))
         # Prepare the arrays

@@ -56,8 +56,10 @@ LOG = logging.getLogger(__name__)
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 if getattr(sys, 'frozen', False):
     DEFAULT_SHAPE_FILE = os.path.realpath(os.path.join(SCRIPT_DIR, "..", "..", "sift_data", "ne_50m_admin_0_countries", "ne_50m_admin_0_countries.shp"))
+    DEFAULT_STATES_SHAPE_FILE = os.path.realpath(os.path.join(SCRIPT_DIR, "..", "..", "sift_data", "ne_50m_admin_1_states_provinces_lakes", "ne_50m_admin_1_states_provinces_lakes.shp"))
 else:
     DEFAULT_SHAPE_FILE = os.path.realpath(os.path.join(SCRIPT_DIR, "..", "data", "ne_50m_admin_0_countries", "ne_50m_admin_0_countries.shp"))
+    DEFAULT_STATES_SHAPE_FILE = os.path.realpath(os.path.join(SCRIPT_DIR, "..", "data", "ne_50m_admin_1_states_provinces_lakes", "ne_50m_admin_1_states_provinces_lakes.shp"))
 DEFAULT_TEXTURE_SHAPE = (4, 16)
 
 
@@ -258,23 +260,6 @@ class LayerSet(object):
         # FIXME: This should probably be accomplished by overriding the right method from the Node or Visual class
         self.parent.main_canvas._update_scenegraph(None)
 
-    # def set_layer_z(self, uuid, z_level):
-    #     """
-    #     :param uuid: layer to change
-    #     :param z_level: -100..100, 100 being closest to the camera
-    #     :return:
-    #     """
-    #     self._layers[uuid].transform = STTransform(translate=(0, 0, int(z_level)))
-    #
-    # def set_layers_z(self, layer_levels):
-    #     """
-    #     z_levels are -100..100, 100 being closest to the camera
-    #     :param layer_levels: {uuid:level}
-    #     :return:
-    #     """
-    #     for uuid, z_level in layer_levels.items():
-    #         self._layers[uuid].transform = STTransform(translate=(0, 0, int(z_level)))
-
     def top_layer_uuid(self):
         for layer_uuid in self._layer_order:
             if self._layers[layer_uuid].visible:
@@ -371,7 +356,6 @@ class SceneGraphManager(QObject):
     queue = None  # background jobs go here
 
     border_shapefile = None  # background political map
-    glob_pattern = None
     texture_shape = None
     polygon_probes = None
     point_probes = None
@@ -393,8 +377,9 @@ class SceneGraphManager(QObject):
     newPointProbe = pyqtSignal(str, tuple)
     newProbePolygon = pyqtSignal(object, object)
 
-    def __init__(self, doc, workspace, queue, border_shapefile=None, glob_pattern=None, parent=None,
-                 texture_shape=(4, 16), center=None):
+    def __init__(self, doc, workspace, queue,
+                 border_shapefile=None, states_shapefile=None,
+                 parent=None, texture_shape=(4, 16), center=None):
         super(SceneGraphManager, self).__init__(parent)
         self.didRetilingCalcs.connect(self._set_retiled)
 
@@ -403,7 +388,7 @@ class SceneGraphManager(QObject):
         self.workspace = workspace
         self.queue = queue
         self.border_shapefile = border_shapefile or DEFAULT_SHAPE_FILE
-        self.glob_pattern = glob_pattern
+        self.conus_states_shapefile = states_shapefile or DEFAULT_STATES_SHAPE_FILE
         self.texture_shape = texture_shape
         self.polygon_probes = {}
         self.point_probes = {}
@@ -481,7 +466,8 @@ class SceneGraphManager(QObject):
         self._borders_color_idx = 0
         self.borders = NEShapefileLines(self.border_shapefile, double=True, color=self._color_choices[self._borders_color_idx], parent=self.main_map)
         self.borders.transform = STTransform(translate=(0, 0, 40))
-        # print(self.borders.transforms.get_transform().shader_map().compile())
+        self.conus_states = NEShapefileLines(self.conus_states_shapefile, double=True, color=self._color_choices[self._borders_color_idx], parent=self.main_map)
+        self.conus_states.transform = STTransform(translate=(0, 0, 40))
 
         self._latlon_grid_color_idx = 1
         self.latlon_grid = self._init_latlon_grid_layer(color=self._color_choices[self._latlon_grid_color_idx])
@@ -652,9 +638,12 @@ class SceneGraphManager(QObject):
         self._borders_color_idx = (self._borders_color_idx + 1) % len(self._color_choices)
         if self._borders_color_idx + 1 == len(self._color_choices):
             self.borders.visible = False
+            self.conus_states.visible = False
         else:
             self.borders.set_data(color=self._color_choices[self._borders_color_idx])
             self.borders.visible = True
+            self.conus_states.set_data(color=self._color_choices[self._borders_color_idx])
+            self.conus_states.visible = True
 
     def cycle_grid_color(self):
         self._latlon_grid_color_idx = (self._latlon_grid_color_idx + 1) % len(self._color_choices)
