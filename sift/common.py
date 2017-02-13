@@ -225,6 +225,140 @@ def calc_pixel_size(canvas_point, image_point, canvas_size):
     return dx, dy
 
 
+@jit(nopython=True)
+def clip(v, n, x):
+    return max(min(v, x), n)
+
+
+@jit(nb_types.NamedUniTuple(float64, 4, box)(
+        nb_types.NamedUniTuple(float64, 4, box),
+        nb_types.Array(float64, 1, 'C'),
+        nb_types.Array(float64, 1, 'C'),
+        nb_types.UniTuple(int64, 2),
+        float64,
+        float64
+    ),
+    nopython=True)
+def calc_view_extents(image_extents_box, canvas_point, image_point, canvas_size, dx, dy):
+    l, r = _calc_extent_component(canvas_point[0], image_point[0], canvas_size[0], dx)
+    l = clip(l, image_extents_box.l, image_extents_box.r)
+    r = clip(r, image_extents_box.l, image_extents_box.r)
+
+    b, t = _calc_extent_component(canvas_point[1], image_point[1], canvas_size[1], dy)
+    b = clip(b, image_extents_box.b, image_extents_box.t)
+    t = clip(t, image_extents_box.b, image_extents_box.t)
+
+    if (r - l) < CANVAS_EXTENTS_EPSILON or (t - b) < CANVAS_EXTENTS_EPSILON:
+        # they are viewing essentially nothing or the image isn't in view
+        raise ValueError("Image can't be currently viewed")
+
+    return box(l=l, r=r, b=b, t=t)
+
+
+@jit(nb_types.UniTuple(float64, 2)(
+        nb_types.UniTuple(int64, 2),
+        nb_types.UniTuple(int64, 2),
+        nb_types.NamedUniTuple(int64, 2, pnt)
+    ),
+     nopython=True)
+def max_tiles_available(image_shape, tile_shape, stride):
+    ath = (image_shape[0] / float(stride[0])) / tile_shape[0]
+    atw = (image_shape[1] / float(stride[1])) / tile_shape[1]
+    return ath, atw
+
+
+# @jit(nb_types.NamedUniTuple(int64, 4, box)(
+#         nb_types.NamedUniTuple(float64, 2, rez),
+#         nb_types.NamedUniTuple(float64, 2, rez),
+#         nb_types.NamedUniTuple(float64, 2, pnt),
+#         nb_types.UniTuple(int64, 2),
+#         nb_types.UniTuple(int64, 2),
+#         nb_types.NamedUniTuple(float64, 6, vue),
+#         nb_types.NamedUniTuple(int64, 2, pnt),
+#         nb_types.NamedUniTuple(int64, 4, box)
+#     ),
+#      nopython=True)
+@jit(nopython=True)
+def visible_tiles(pixel_rez,
+                  tile_size,
+                  image_center,
+                  image_shape,
+                  tile_shape,
+                  visible_geom, stride, extra_tiles_box):
+    """
+    given a visible world geometry and sampling, return (sampling-state, [box-of-tiles-to-draw])
+    sampling state is WELLSAMPLED/OVERSAMPLED/UNDERSAMPLED
+    returned box should be iterated per standard start:stop style
+    tiles are specified as (iy,ix) integer pairs
+    extra_box value says how many extra tiles to include around each edge
+    """
+    V = visible_geom
+    X = extra_tiles_box  # FUTURE: extra_geom_box specifies in world coordinates instead of tile count
+    Z = pixel_rez
+    tile_size = rez(tile_size.dy * stride[0], tile_size.dx * stride[1])
+    # should be the upper-left corner of the tile centered on the center of the image
+    to = pnt(image_center[0] + tile_size.dy / 2.,
+             image_center[1] - tile_size.dx / 2.)  # tile origin
+
+    # number of data pixels between view edge and originpoint
+    pv = box(
+        b=(V.b - to.y) / -(Z.dy * stride[0]),
+        t=(V.t - to.y) / -(Z.dy * stride[0]),
+        l=(V.l - to.x) / (Z.dx * stride[1]),
+        r=(V.r - to.x) / (Z.dx * stride[1])
+    )
+
+    th, tw = tile_shape
+    # first tile we'll need is (tiy0, tix0)
+    # floor to make sure we get the upper-left of the theoretical tile
+    tiy0 = np.floor(pv.t / th)
+    tix0 = np.floor(pv.l / tw)
+    # number of tiles wide and high we'll absolutely need
+    # add 0.5 and ceil to make sure we include all possible tiles
+    # NOTE: output r and b values are exclusive, l and t are inclusive
+    nth = np.ceil((pv.b - tiy0 * th) / th + 0.5)
+    ntw = np.ceil((pv.r - tix0 * tw) / tw + 0.5)
+
+    # now add the extras
+    if X.b > 0:
+        nth += int(X.b)
+    if X.l > 0:
+        tix0 -= int(X.l)
+        ntw += int(X.l)
+    if X.t > 0:
+        tiy0 -= int(X.t)
+        nth += int(X.t)
+    if X.r > 0:
+        ntw += int(X.r)
+
+    # Total number of tiles in this image at this stride (could be fractional)
+    ath, atw = max_tiles_available(image_shape, tile_shape, stride)
+    # truncate to the available tiles
+    hw = atw / 2.
+    hh = ath / 2.
+    # center tile is half pixel off because we want center of the center
+    # tile to be at the center of the image
+    if tix0 < -hw + 0.5:
+        ntw += hw - 0.5 + tix0
+        tix0 = -hw + 0.5
+    if tiy0 < -hh + 0.5:
+        nth += hh - 0.5 + tiy0
+        tiy0 = -hh + 0.5
+    # add 0.5 to include the "end of the tile" since the r and b are exclusive
+    if tix0 + ntw > hw + 0.5:
+        ntw = hw + 0.5 - tix0
+    if tiy0 + nth > hh + 0.5:
+        nth = hh + 0.5 - tiy0
+
+    tilebox = box(
+        b=np.int64(np.ceil(tiy0 + nth)),
+        l=np.int64(np.floor(tix0)),
+        t=np.int64(np.floor(tiy0)),
+        r=np.int64(np.ceil(tix0 + ntw)),
+    )
+    return tilebox
+
+
 class TileCalculator(object):
     """
     common calculations for mercator tile groups in an array or file
@@ -275,10 +409,10 @@ class TileCalculator(object):
 
         self.proj = Proj(projection)
         self.image_extents_box = e = box(
-            b=self.ul_origin[0] - self.image_shape[0] * self.pixel_rez.dy,
-            t=self.ul_origin[0],
-            l=self.ul_origin[1],
-            r=self.ul_origin[1] + self.image_shape[1] * self.pixel_rez.dx,
+            b=np.float64(self.ul_origin[0] - self.image_shape[0] * self.pixel_rez.dy),
+            t=np.float64(self.ul_origin[0]),
+            l=np.float64(self.ul_origin[1]),
+            r=np.float64(self.ul_origin[1] + self.image_shape[1] * self.pixel_rez.dx),
         )
         # Array of points across the image space to be used as an estimate of image coverage
         # Used when checking if the image is viewable on the current canvas's projection
@@ -288,87 +422,17 @@ class TileCalculator(object):
                                 self.ul_origin.x + self.image_shape[1] / 2. * self.pixel_rez.dx)
         # size of tile in image projection
         self.tile_size = rez(self.pixel_rez.dy * self.tile_shape[0], self.pixel_rez.dx * self.tile_shape[1])
-        # distance the mesh points are from the center
-        # self.mesh_center_distance = self.image_mesh.copy()
-        # self.mesh_center_distance[:, 0] = (ul_origin[0] + pixel_rez.dx * (image_shape[1] / 2.)) - self.image_mesh[:, 0]
-        # self.mesh_center_distance[:, 1] = (ul_origin[1] - pixel_rez.dy * (image_shape[0] / 2.)) - self.image_mesh[:, 1]
-
         self.overview_stride = self.calc_overview_stride()
 
-    @jit
-    def visible_tiles(self, visible_geom, stride=pnt(1, 1), extra_tiles_box=box(0,0,0,0)):
-        """
-        given a visible world geometry and sampling, return (sampling-state, [box-of-tiles-to-draw])
-        sampling state is WELLSAMPLED/OVERSAMPLED/UNDERSAMPLED
-        returned box should be iterated per standard start:stop style
-        tiles are specified as (iy,ix) integer pairs
-        extra_box value says how many extra tiles to include around each edge
-        """
-        V = visible_geom
-        X = extra_tiles_box  # FUTURE: extra_geom_box specifies in world coordinates instead of tile count
-        Z = self.pixel_rez
-        tile_size = rez(self.tile_size.dy * stride.y, self.tile_size.dx * stride.x)
-        # should be the upper-left corner of the tile centered on the center of the image
-        to = pnt(self.image_center[0] + tile_size.dy / 2.,
-                 self.image_center[1] - tile_size.dx / 2.)  # tile origin
-
-        # number of data pixels between view edge and originpoint
-        pv = box(
-            b=(V.b - to.y) / -(Z.dy * stride[0]),
-            t=(V.t - to.y) / -(Z.dy * stride[0]),
-            l=(V.l - to.x) / (Z.dx * stride[1]),
-            r=(V.r - to.x) / (Z.dx * stride[1])
-        )
-
-        th, tw = self.tile_shape
-        # first tile we'll need is (tiy0, tix0)
-        # floor to make sure we get the upper-left of the theoretical tile
-        tiy0 = np.floor(pv.t / th)
-        tix0 = np.floor(pv.l / tw)
-        # number of tiles wide and high we'll absolutely need
-        # add 0.5 and ceil to make sure we include all possible tiles
-        # NOTE: output r and b values are exclusive, l and t are inclusive
-        nth = np.ceil((pv.b - tiy0 * th) / th + 0.5)
-        ntw = np.ceil((pv.r - tix0 * tw) / tw + 0.5)
-
-        # now add the extras
-        if X.b > 0:
-            nth += int(X.b)
-        if X.l > 0:
-            tix0 -= int(X.l)
-            ntw += int(X.l)
-        if X.t > 0:
-            tiy0 -= int(X.t)
-            nth += int(X.t)
-        if X.r > 0:
-            ntw += int(X.r)
-
-        # Total number of tiles in this image at this stride (could be fractional)
-        ath, atw = self.max_tiles_available(stride)
-        # truncate to the available tiles
-        hw = atw / 2.
-        hh = ath / 2.
-        # center tile is half pixel off because we want center of the center
-        # tile to be at the center of the image
-        if tix0 < -hw + 0.5:
-            ntw += hw - 0.5 + tix0
-            tix0 = -hw + 0.5
-        if tiy0 < -hh + 0.5:
-            nth += hh - 0.5 + tiy0
-            tiy0 = -hh + 0.5
-        # add 0.5 to include the "end of the tile" since the r and b are exclusive
-        if tix0 + ntw > hw + 0.5:
-            ntw = hw + 0.5 - tix0
-        if tiy0 + nth > hh + 0.5:
-            nth = hh + 0.5 - tiy0
-
-        tilebox = box(
-            b=int(np.ceil(tiy0 + nth)),
-            l=int(np.floor(tix0)),
-            t=int(np.floor(tiy0)),
-            r=int(np.ceil(tix0 + ntw)),
-        )
-        return tilebox
+    def visible_tiles(self, visible_geom, stride=pnt(1, 1), extra_tiles_box=box(0, 0, 0, 0)):
+        return visible_tiles(self.pixel_rez,
+                             self.tile_size,
+                             self.image_center,
+                             self.image_shape,
+                             self.tile_shape,
+                             visible_geom,
+                             stride,
+                             extra_tiles_box)
 
     @jit
     def calc_tile_slice(self, tiy, tix, stride):
@@ -399,12 +463,6 @@ class TileCalculator(object):
         return row_slice, col_slice
 
     @jit
-    def max_tiles_available(self, stride):
-        ath = (self.image_shape[0] / float(stride[0])) / self.tile_shape[0]
-        atw = (self.image_shape[1] / float(stride[1])) / self.tile_shape[1]
-        return ath, atw
-
-    @jit
     def calc_tile_fraction(self, tiy, tix, stride):
         """Calculate the fractional components of the specified tile
 
@@ -413,7 +471,7 @@ class TileCalculator(object):
                               of the tile compared to a whole tile and the
                               offset from the origin of a whole tile.
         """
-        mt = self.max_tiles_available(stride)
+        mt = max_tiles_available(self.image_shape, self.tile_shape, stride)
 
         if tix < -mt[1] / 2. + 0.5:
             # left edge tile
@@ -459,7 +517,7 @@ class TileCalculator(object):
         texture = texture or self.pixel_rez
         tsy = min(self.overview_stride[0].step, max(1, np.ceil(visible.dy * PREFERRED_SCREEN_TO_TEXTURE_RATIO / texture.dy)))
         tsx = min(self.overview_stride[1].step, max(1, np.ceil(visible.dx * PREFERRED_SCREEN_TO_TEXTURE_RATIO / texture.dx)))
-        return pnt(int(tsy), int(tsx))
+        return pnt(np.int64(tsy), np.int64(tsx))
 
     @jit
     def calc_overview_stride(self, image_shape=None):
@@ -522,21 +580,8 @@ class TileCalculator(object):
         quads = np.ascontiguousarray(quads[:, :2])
         return quads
 
-    @jit
     def calc_view_extents(self, canvas_point, image_point, canvas_size, dx, dy):
-        l, r = _calc_extent_component(canvas_point[0], image_point[0], canvas_size[0], dx)
-        l = np.clip(l, self.image_extents_box.l, self.image_extents_box.r)
-        r = np.clip(r, self.image_extents_box.l, self.image_extents_box.r)
-
-        b, t = _calc_extent_component(canvas_point[1], image_point[1], canvas_size[1], dy)
-        b = np.clip(b, self.image_extents_box.b, self.image_extents_box.t)
-        t = np.clip(t, self.image_extents_box.b, self.image_extents_box.t)
-
-        if (r - l) < CANVAS_EXTENTS_EPSILON or (t - b) < CANVAS_EXTENTS_EPSILON:
-            # they are viewing essentially nothing or the image isn't in view
-            raise ValueError("Image '%s' can't be viewed" % (self.name,))
-
-        return box(l=l, r=r, b=b, t=t)
+        return calc_view_extents(self.image_extents_box, canvas_point, image_point, canvas_size, dx, dy)
 
 
 def main():

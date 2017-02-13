@@ -417,7 +417,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         tl = TESS_LEVEL * TESS_LEVEL
         nfo["texture_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
         nfo["vertex_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
-        factor_rez, offset_rez = self.calc.calc_tile_fraction(0, 0, (y_slice.step, x_slice.step))
+        factor_rez, offset_rez = self.calc.calc_tile_fraction(0, 0, pnt(np.int64(y_slice.step), np.int64(x_slice.step)))
         nfo["texture_coordinates"][:6 * tl, :2] = self.calc.calc_texture_coordinates(ttile_idx, factor_rez, offset_rez, tessellation_level=TESS_LEVEL)
         nfo["vertex_coordinates"][:6 * tl, :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step, factor_rez, offset_rez, tessellation_level=TESS_LEVEL)
         self._set_vertex_tiles(nfo["vertex_coordinates"], nfo["texture_coordinates"])
@@ -588,6 +588,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
             preferred_stride = self._get_stride(view_box)
             tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride, extra_tiles_box=box(1, 1, 1, 1))
         except ValueError:
+            LOG.error("Could not determine viewable image area for '{}'".format(self.name))
             return False, self._stride, self._latest_tile_box
 
         num_tiles = (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l)
@@ -905,7 +906,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         tl = TESS_LEVEL * TESS_LEVEL
         nfo["texture_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
         nfo["vertex_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
-        factor_rez, offset_rez = self.calc.calc_tile_fraction(0, 0, (y_slice.step, x_slice.step))
+        factor_rez, offset_rez = self.calc.calc_tile_fraction(0, 0, pnt(y_slice.step, x_slice.step))
         nfo["texture_coordinates"][:6 * tl, :2] = self.calc.calc_texture_coordinates(ttile_idx, factor_rez, offset_rez, tessellation_level=TESS_LEVEL)
         nfo["vertex_coordinates"][:6 * tl, :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step, factor_rez, offset_rez, tessellation_level=TESS_LEVEL)
         self._set_vertex_tiles(nfo["vertex_coordinates"], nfo["texture_coordinates"])
