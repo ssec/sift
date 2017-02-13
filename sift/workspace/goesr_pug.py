@@ -291,7 +291,7 @@ class PugL1bTools(object):
         self.scene_id = nc.scene_id
         self.sched_time = snap_scene_onto_schedule(st, en, self.scene_id, self.timeline_id)
         self.display_time = self.sched_time.strftime('%Y-%m-%d %H:%M')
-        self.display_name = '{} ABI B{:02d} {}'.format(self.platform, self.band, self.scene_id)
+        self.display_name = '{} ABI B{:02d} {} {}'.format(self.platform, self.band, self.scene_id, self.display_time)
         self.y_var_name, self.x_var_name = nc_y_x_names(nc, self.rad_var_name)
 
     @property
