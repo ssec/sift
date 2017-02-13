@@ -228,7 +228,7 @@ def snap_scene_onto_schedule(start: datetime, end: datetime, scene_id: str=None,
     :return: datetime of 'timeline' time
     """
     c = start + (end - start)/2
-    snap = 5 if (scene_id is 'Full Disk') else 1
+    snap = 5 if (scene_id.strip() == 'Full Disk') else 1
     m = c.minute - (c.minute % snap) if snap!=0 else c.minute
     return c.replace(minute=m,second=0,microsecond=0)
 
