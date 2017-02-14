@@ -906,7 +906,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         tl = TESS_LEVEL * TESS_LEVEL
         nfo["texture_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
         nfo["vertex_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
-        factor_rez, offset_rez = self.calc.calc_tile_fraction(0, 0, pnt(y_slice.step, x_slice.step))
+        factor_rez, offset_rez = self.calc.calc_tile_fraction(0, 0, pnt(np.int64(y_slice.step), np.int64(x_slice.step)))
         nfo["texture_coordinates"][:6 * tl, :2] = self.calc.calc_texture_coordinates(ttile_idx, factor_rez, offset_rez, tessellation_level=TESS_LEVEL)
         nfo["vertex_coordinates"][:6 * tl, :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step, factor_rez, offset_rez, tessellation_level=TESS_LEVEL)
         self._set_vertex_tiles(nfo["vertex_coordinates"], nfo["texture_coordinates"])
