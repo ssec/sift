@@ -428,6 +428,8 @@ class DocRGBLayer(DocCompositeLayer):
         self._store.update(ds_info)
         if not self.shared_projections:
             LOG.warning("RGB dependency layers don't share the same projection")
+        if not self.shared_origin:
+            LOG.warning("RGB dependency layers don't share the same origin")
 
         return ds_info
 
