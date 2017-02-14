@@ -583,7 +583,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     continue
                 yield layer_prez, layer
 
-    def layers_where(self, is_valid=None, is_active=None, in_type_set=None):
+    def layers_where(self, is_valid=None, is_active=None, in_type_set=None,
+                     have_proj=None):
         """
         query current layer set for layers matching criteria
         :param is_valid: None, or True/False whether layer is valid (could be displayed)
@@ -603,6 +604,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     continue
             if in_type_set is not None:
                 if type(layer) not in in_type_set:
+                    continue
+            if have_proj is not None:
+                if layer[INFO.PROJ] != have_proj:
                     continue
             yield layer
 

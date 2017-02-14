@@ -705,16 +705,15 @@ class RGBLayerConfigPane(QWidget):
         """
         doc = self.document_ref()
         non_rgb_classes = [DocBasicLayer, DocCompositeLayer]
-        # non_rgb_kinds = [k for k in KIND if k != KIND.RGB]
 
         # clear out the current lists
-        layer_list = list(doc.layers_where(is_valid=True, in_type_set=non_rgb_classes))
         for widget in self.rgb:
             widget.clear()
             widget.addItem('None', '')
 
         # fill up our lists of layers
-        for layer_prez in doc.layers_where(is_valid=True, in_type_set=non_rgb_classes):
+        p = self.active_layer_ref()[INFO.PROJ] if self.active_layer_ref() is not None else None
+        for layer_prez in doc.layers_where(is_valid=True, in_type_set=non_rgb_classes, have_proj=p):
             uuid = layer_prez.uuid
             layer = doc[layer_prez.uuid]
             layer_name = layer.name
