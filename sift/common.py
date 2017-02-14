@@ -256,8 +256,8 @@ def calc_view_extents(image_extents_box, canvas_point, image_point, canvas_size,
 
 
 @jit(nb_types.UniTuple(float64, 2)(
-        nb_types.UniTuple(int64, 2),
-        nb_types.UniTuple(int64, 2),
+        nb_types.NamedUniTuple(int64, 2, pnt),
+        nb_types.NamedUniTuple(int64, 2, pnt),
         nb_types.NamedUniTuple(int64, 2, pnt)
     ),
      nopython=True)
@@ -271,8 +271,8 @@ def max_tiles_available(image_shape, tile_shape, stride):
 #         nb_types.NamedUniTuple(float64, 2, rez),
 #         nb_types.NamedUniTuple(float64, 2, rez),
 #         nb_types.NamedUniTuple(float64, 2, pnt),
-#         nb_types.UniTuple(int64, 2),
-#         nb_types.UniTuple(int64, 2),
+#         nb_types.NamedUniTuple(int64, 2, pnt),
+#         nb_types.NamedUniTuple(int64, 2, pnt),
 #         nb_types.NamedUniTuple(float64, 6, vue),
 #         nb_types.NamedUniTuple(int64, 2, pnt),
 #         nb_types.NamedUniTuple(int64, 4, box)
@@ -396,10 +396,10 @@ class TileCalculator(object):
         """
         super(TileCalculator, self).__init__()
         self.name = name
-        self.image_shape = image_shape
+        self.image_shape = pnt(np.int64(image_shape[0]), np.int64(image_shape[1]))
         self.ul_origin = pnt(*ul_origin)
-        self.pixel_rez = pixel_rez
-        self.tile_shape = tile_shape
+        self.pixel_rez = rez(np.float64(pixel_rez[0]), np.float64(pixel_rez[1]))
+        self.tile_shape = pnt(np.int64(tile_shape[0]), np.int64(tile_shape[1]))
         # in units of tiles:
         self.texture_shape = texture_shape
         # in units of data elements (float32):
@@ -425,14 +425,32 @@ class TileCalculator(object):
         self.overview_stride = self.calc_overview_stride()
 
     def visible_tiles(self, visible_geom, stride=pnt(1, 1), extra_tiles_box=box(0, 0, 0, 0)):
-        return visible_tiles(self.pixel_rez,
-                             self.tile_size,
-                             self.image_center,
-                             self.image_shape,
-                             self.tile_shape,
-                             visible_geom,
-                             stride,
-                             extra_tiles_box)
+        # return visible_tiles(self.pixel_rez,
+        #                      self.tile_size,
+        #                      self.image_center,
+        #                      self.image_shape,
+        #                      self.tile_shape,
+        #                      visible_geom,
+        #                      stride,
+        #                      extra_tiles_box)
+        v = visible_geom
+        e = extra_tiles_box
+        return visible_tiles(
+            rez(np.float64(self.pixel_rez[0]), np.float64(self.pixel_rez[1])),
+            rez(np.float64(self.tile_size[0]), np.float64(self.tile_size[1])),
+            pnt(np.float64(self.image_center[0]), np.float64(self.image_center[1])),
+            pnt(np.int64(self.image_shape[0]), np.int64(self.image_shape[1])),
+            pnt(np.int64(self.tile_shape[0]), np.int64(self.tile_shape[1])),
+            vue(
+                np.float64(v[0]), np.float64(v[1]),
+                np.float64(v[2]), np.float64(v[3]),
+                np.float64(v[4]), np.float64(v[5]),
+                ),
+            pnt(np.int64(stride[0]), np.int64(stride[1])),
+            box(
+                np.int64(e[0]), np.int64(e[1]),
+                np.int64(e[2]), np.int64(e[3])
+            ))
 
     @jit
     def calc_tile_slice(self, tiy, tix, stride):
