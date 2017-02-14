@@ -858,7 +858,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         assert None not in (self.cell_width, self.cell_height, self.origin_x, self.origin_y, self.shape)
         # how many of the higher resolution channel tiles (smaller geographic area) make
         # up a low resolution channel tile
-        self._channel_factors = tuple(round(self.shape[0] / float(chn.shape[0])) if chn is not None else 1. for chn in data_arrays)
+        self._channel_factors = tuple(self.shape[0] / float(chn.shape[0]) if chn is not None else 1. for chn in data_arrays)
         self._lowest_factor = max(self._channel_factors)
         self._lowest_rez = rez(abs(self.cell_height * self._lowest_factor), abs(self.cell_width * self._lowest_factor))
 
@@ -998,7 +998,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
 
     def _get_stride(self, view_box):
         s = self.calc.calc_stride( view_box, texture=self._lowest_rez)
-        return pnt(s[0] * self._lowest_factor, s[1] * self._lowest_factor)
+        return pnt(np.int64(s[0] * self._lowest_factor), np.int64(s[1] * self._lowest_factor))
 
 CompositeLayer = create_visual_node(CompositeLayerVisual)
 

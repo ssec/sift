@@ -27,8 +27,12 @@ from sift.common import INFO, KIND
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import os, sys
-import logging, unittest, argparse
+import os
+import sys
+import logging
+import numpy as np
+import unittest
+import argparse
 
 LOG = logging.getLogger(__name__)
 
@@ -313,8 +317,25 @@ class DocRGBLayer(DocCompositeLayer):
         return all(x[INFO.PROJ] == self[INFO.PROJ] for x in self.l[:3] if x is not None)
 
     @property
+    def shared_origin(self):
+        if all(x is None for x in self.l[:3]):
+            return False
+
+        atol = max(abs(x[INFO.CELL_WIDTH])
+                   for x in self.l[:3] if x is not None)
+        shared_x = all(np.isclose(x[INFO.ORIGIN_X], self[INFO.ORIGIN_X], atol=atol)
+                       for x in self.l[:3] if x is not None)
+
+        atol = max(abs(x[INFO.CELL_HEIGHT])
+                   for x in self.l[:3] if x is not None)
+        shared_y = all(np.isclose(x[INFO.ORIGIN_Y], self[INFO.ORIGIN_Y], atol=atol)
+                       for x in self.l[:3] if x is not None)
+        return shared_x and shared_y
+
+    @property
     def is_valid(self):
-        return self.shared_projections and self.has_deps
+        return self.has_deps and self.shared_projections and \
+               self.shared_origin
 
     @property
     def is_flat_field(self):
