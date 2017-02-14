@@ -632,6 +632,7 @@ class Main(QtGui.QMainWindow):
 
         # Set the projection based on the document's default
         self.document.change_projection()
+        self.ui.projectionComboBox.setCurrentIndex(self.document.current_projection_index())
 
     def closeEvent(self, event, *args, **kwargs):
         LOG.debug('main window closing')

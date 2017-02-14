@@ -234,9 +234,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             }),
             ('LCC (CONUS)', {
                 'proj4_str': '+proj=lcc +a=6371200 +b=6371200 +lat_0=25 +lat_1=25 +lon_0=-95 +units=m +no_defs +over',
-                'default_center': (-123.044, 59.844),
-                'default_width': 20.,
-                'default_height': 20.,
+                'default_center': (-95, 35.),
+                'default_width': 25.,
+                'default_height': 25.,
             }),
             # ('Platte Carre', {}),
             ('Himawari Geos', {
@@ -270,7 +270,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 'default_height': 20.,  # degrees from bottom edge to top edge
             }),
         ))
-        self.default_projection = 'Mercator'
+        self.default_projection = 'LCC (CONUS)'
         self.current_projection = self.default_projection
         # TODO: connect signals from workspace to slots including update_dataset_info
 
@@ -288,6 +288,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 self.current_projection,
                 self.projection_info(self.current_projection)
             )
+
+    def current_projection_index(self):
+        return list(self.available_projections.keys()).index(self.current_projection)
 
     def change_projection_index(self, idx):
         return self.change_projection(tuple(self.available_projections.keys())[idx])
