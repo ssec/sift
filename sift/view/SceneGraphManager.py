@@ -556,6 +556,9 @@ class SceneGraphManager(QObject):
         if (event.button == 2 and modifiers == (SHIFT,)) or (self._current_tool == TOOL.REGION_PROBE and event.button == 1):
             buffer_pos = event.sources[0].transforms.get_transform().map(event.pos)
             map_pos = self.borders.transforms.get_transform().imap(buffer_pos)
+            if np.any(np.abs(map_pos[:2]) > 1e25):
+                LOG.error("Invalid region probe location")
+                return
             if self.pending_polygon.add_point(event.pos[:2], map_pos[:2], 60):
                 points = self.pending_polygon.points + [self.pending_polygon.points[0]]
                 self.clear_pending_polygon()
