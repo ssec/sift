@@ -467,7 +467,7 @@ class SceneGraphManager(QObject):
         self.borders = NEShapefileLines(self.border_shapefile, double=True, color=self._color_choices[self._borders_color_idx], parent=self.main_map)
         self.borders.transform = STTransform(translate=(0, 0, 40))
         self.conus_states = NEShapefileLines(self.conus_states_shapefile, double=True, color=self._color_choices[self._borders_color_idx], parent=self.main_map)
-        self.conus_states.transform = STTransform(translate=(0, 0, 40))
+        self.conus_states.transform = STTransform(translate=(0, 0, 45))
 
         self._latlon_grid_color_idx = 1
         self.latlon_grid = self._init_latlon_grid_layer(color=self._color_choices[self._latlon_grid_color_idx])
