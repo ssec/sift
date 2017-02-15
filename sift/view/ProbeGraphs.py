@@ -449,8 +449,6 @@ class ProbeGraphDisplay (object) :
         # only set the defaults if we don't have a polygon yet
         if self.polygon is not None:
             return
-        if len(layer_uuids) > 2:
-            raise ValueError("Probe graphs can handle a maximum of 2 layers (got %d)", len(layer_uuids))
 
         if len(layer_uuids) >= 1:
             xIndex = self.xDropDown.findData(str(layer_uuids[0]))

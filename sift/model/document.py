@@ -548,23 +548,16 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """
         :return: the topmost visible layer's UUID
         """
-        for x in self.current_layer_set:
-            if x.visible:
-                return x.uuid
+        for x in self.current_visible_layer_uuids:
+            return x
         return None
 
-    # def current_visible_layer_uuids(self, max_layers=None):
-    #     """
-    #     :param max_layers:
-    #     :yield: the visible layers in the current layer set
-    #     """
-    #     count = 0
-    #     for x in self.current_layer_set:
-    #         if x.visible:
-    #             count += 1
-    #             yield x.uuid
-    #         if max_layers is not None and count >= max_layers:
-    #             break
+    @property
+    def current_visible_layer_uuids(self):
+        for x in self.current_layer_set:
+            layer = self._layer_with_uuid[x.uuid]
+            if x.visible and layer.is_valid:
+                yield x.uuid
 
     # TODO: add a document style guide which says how different bands from different instruments are displayed
 
