@@ -25,7 +25,7 @@ import numpy as np
 import numba
 from numba.decorators import jit
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 import netCDF4 as nc4
 
 __author__ = 'rayg'
@@ -217,6 +217,11 @@ def timecode_to_datetime(iso):
     return datetime(yyyy, mm, dd, h, m, s, t)
 
 
+DEFAULT_SNAP_SECONDS = 60
+SNAP_SECONDS = {'Full Disk': 5*60,
+                'Mesoscale': 15,
+                }
+
 def snap_scene_onto_schedule(start: datetime, end: datetime, scene_id: str=None, timeline_id: str=None):
     """
     assign a "timeline" time to an image by looking at its coverage
@@ -228,9 +233,12 @@ def snap_scene_onto_schedule(start: datetime, end: datetime, scene_id: str=None,
     :return: datetime of 'timeline' time
     """
     c = start # + (end - start)/2
-    snap = 5 if (scene_id.strip() == 'Full Disk') else 1
-    m = c.minute - (c.minute % snap) if snap!=0 else c.minute
-    return c.replace(minute=m,second=0,microsecond=0)
+    b = datetime(c.year, c.month, c.day, c.hour)
+    d = (c - b).total_seconds()  # seconds within hour of image start time
+    sns = SNAP_SECONDS.get(scene_id.strip(), DEFAULT_SNAP_SECONDS)  # resolution to snap to
+    d = int(d) - (int(d) % sns)
+    m = b + timedelta(seconds=d)
+    return m
 
 
 class PugL1bTools(object):
@@ -290,7 +298,7 @@ class PugL1bTools(object):
         self.timeline_id = nc.timeline_id
         self.scene_id = nc.scene_id
         self.sched_time = snap_scene_onto_schedule(st, en, self.scene_id, self.timeline_id)
-        self.display_time = self.sched_time.strftime('%Y-%m-%d %H:%M')
+        self.display_time = self.sched_time.strftime('%Y-%m-%d %H:%M:%S')
         self.display_name = '{} ABI B{:02d} {} {}'.format(self.platform, self.band, self.scene_id, self.display_time)
         self.y_var_name, self.x_var_name = nc_y_x_names(nc, self.rad_var_name)
 
