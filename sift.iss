@@ -3,7 +3,7 @@
 
 [Setup]
 AppName=SIFT
-AppVersion=0.9.0b2
+AppVersion=0.9.0rc0
 DefaultDirName={pf}\SIFT
 DefaultGroupName=SIFT
 Compression=lzma2
