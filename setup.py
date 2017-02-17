@@ -36,7 +36,7 @@ from setuptools import setup, find_packages, Command
 script_dir = os.path.dirname(os.path.realpath(__file__))
 version_pathname = os.path.join(script_dir, "sift", "version.py")
 version_str = open(version_pathname).readlines()[-1].split()[-1].strip("\"\'")
-version_regex = re.compile('^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<micro>\d+)(?:(?P<dev_level>[ab])(?P<dev_version>\d))?$')
+version_regex = re.compile('^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<micro>\d+)(?:(?P<dev_level>(a|b|rc))(?P<dev_version>\d))?$')
 version_info = version_regex.match(version_str).groupdict()
 assert version_info is not None, "Invalid version in version.py: {}".format(version_str)
 version_info["major"] = int(version_info["major"])
