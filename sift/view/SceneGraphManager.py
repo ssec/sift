@@ -37,7 +37,7 @@ from sift.view.LayerRep import NEShapefileLines, TiledGeolocatedImage, RGBCompos
 from sift.view.MapWidget import SIFTMainMapCanvas
 from sift.view.Cameras import PanZoomProbeCamera
 from sift.view.Colormap import ALL_COLORMAPS
-from sift.model.document import prez, DocCompositeLayer, DocBasicLayer, DocRGBLayer
+from sift.model.document import prez, DocCompositeLayer, DocBasicLayer, DocRGBLayer, DocLayerStack
 from sift.queue import TASK_DOING, TASK_PROGRESS
 from sift.view.ProbeGraphs import DEFAULT_POINT_PROBE
 from sift.view.transform import PROJ4Transform
@@ -891,7 +891,7 @@ class SceneGraphManager(QObject):
         for uuid, visible in layers_changed.items():
             self.set_layer_visible(uuid, visible)
 
-    def rebuild_new_layer_set(self, new_set_number:int, new_prez_order:list, new_anim_order:list):
+    def rebuild_new_layer_set(self, new_set_number:int, new_prez_order:DocLayerStack, new_anim_order:list):
         self.rebuild_all()
         # raise NotImplementedError("layer set change not implemented in SceneGraphManager")
 
@@ -971,7 +971,7 @@ class SceneGraphManager(QObject):
         inconsistent_uuids = uuids_w_elements ^ active_uuids
 
         # current_uuid_order = self.document.current_layer_uuid_order
-        current_uuid_order = list(p.uuid for p in presentation_info)
+        current_uuid_order = tuple(p.uuid for p in presentation_info)
 
         remove_elements = []
         for uuid in inconsistent_uuids:
@@ -983,7 +983,8 @@ class SceneGraphManager(QObject):
                     # create an invisible element with the RGB
                     self.change_composite_layer(current_uuid_order, layer, prez_lookup[uuid])
                 else:
-                    raise NotImplementedError('unable to create deferred scenegraph element for %s' % repr(layer))
+                    # FIXME this was previously a NotImplementedError
+                    LOG.warning('unable to create deferred scenegraph element for %s' % repr(layer))
             else:
                 # remove elements for layers which are no longer valid
                 remove_elements.append(uuid)
@@ -991,7 +992,7 @@ class SceneGraphManager(QObject):
         # get info on the new order
         self.layer_set.set_layer_order(current_uuid_order)
         self.layer_set.frame_order = self.document.current_animation_order
-        self.rebuild_presentation(presentation_info)
+        self.rebuild_presentation(prez_lookup)
 
         for elem in remove_elements:
             self.purge_layer(elem)
