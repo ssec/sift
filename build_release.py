@@ -56,7 +56,7 @@ def _build_conda(output_dir=DIST_DIR):
     run(CONDA_BUILD_CMD.split(' '))
     # check for build revisision
     for i in range(4, -1, -1):
-        f = os.path.join(DIST_DIR, 'sift-{}-{}.tar.bz2'.format(version.__version__, i))
+        f = os.path.join(DIST_DIR, CONDA_PLAT[platform], 'sift-{}-{}.tar.bz2'.format(version.__version__, i))
         if os.path.isfile(f):
             return f
     raise FileNotFoundError("Conda package was not built")
