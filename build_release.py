@@ -26,6 +26,7 @@ FTP_HOST_PATH = os.environ.get("SIFT_FTP_HOST_PATH", "repos/git/CSPOV/dist")
 FTP_PATH = os.environ.get("SIFT_FTP_PATH", "pub/sift/dist")
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 DIST_DIR = os.path.join(SCRIPT_DIR, 'dist')
+ISCC_PATH = os.path.join("C:/", "Program Files (x86)", "Inno Setup 5", "ISCC.exe")
 
 
 PLATFORMS = ['darwin', 'linux', 'win']
@@ -94,7 +95,7 @@ def package_installer_linux():
 
 
 def package_installer_win():
-    run("iscc \"sift.iss\"")
+    run("{} \"sift.iss\"".format(ISCC_PATH).split(' '))
     vol_name = "SIFT_{}.exe".format(version.__version__)
     vol_name = os.path.join('sift_inno_setup_output', vol_name)
     old_name = os.path.join('sift_inno_setup_output', 'setup.exe')
