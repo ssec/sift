@@ -228,8 +228,7 @@ class Main(QtGui.QMainWindow):
         files = QtGui.QFileDialog.getOpenFileNames(self,
                                                    "Select one or more files to open",
                                                    self._last_open_dir or os.getenv("HOME"),
-                                                   ';;'.join(['GOES-R PUG netCDF (*.nc *.nc4)',
-                                                              'Mercator GeoTIFF (*.tiff *.tif)']))
+                                                   ';;'.join(['GOES-R netCDF or Merc GTIFF (*.nc *.nc4 *.tiff *.tif)']))
         self.open_paths(files)
 
     def open_paths(self, paths):
