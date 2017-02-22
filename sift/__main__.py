@@ -294,6 +294,7 @@ class Main(QtGui.QMainWindow):
         self.ui.animationSlider.setValue(frame_index or 0)
         self.ui.animPlayPause.setDown(False)
         self.ui.animationSlider.repaint()
+        self.update_frame_time_to_top_visible()
 
     def update_frame_slider(self, frame_info):
         """
@@ -308,7 +309,10 @@ class Main(QtGui.QMainWindow):
         # LOG.debug('did update animation slider {} {}'.format(frame_index, frame_count))
         self.ui.animPlayPause.setDown(animating)
         self.ui.animationSlider.repaint()
-        self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
+        if animating:
+            self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
+        else:
+            self.update_frame_time_to_top_visible()
 
     def update_frame_time_to_top_visible(self, *args):
         # FUTURE: don't address layer set directly
