@@ -20,15 +20,19 @@ REQUIRES
 from _weakref import ref
 from collections import MutableMapping
 from enum import Enum
-from sift.model.guidebook import AHI_HSF_Guidebook, GUIDE
+from sift.model.guidebook import ABI_AHI_Guidebook, GUIDE
 
 from sift.common import INFO, KIND
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import os, sys
-import logging, unittest, argparse
+import os
+import sys
+import logging
+import numpy as np
+import unittest
+import argparse
 
 LOG = logging.getLogger(__name__)
 
@@ -303,10 +307,35 @@ class DocRGBLayer(DocCompositeLayer):
         self.l[3] = x
 
     @property
-    def is_valid(self):
+    def has_deps(self):
         return (self.r is not None or
                 self.g is not None or
                 self.b is not None)
+
+    @property
+    def shared_projections(self):
+        return all(x[INFO.PROJ] == self[INFO.PROJ] for x in self.l[:3] if x is not None)
+
+    @property
+    def shared_origin(self):
+        if all(x is None for x in self.l[:3]):
+            return False
+
+        atol = max(abs(x[INFO.CELL_WIDTH])
+                   for x in self.l[:3] if x is not None)
+        shared_x = all(np.isclose(x[INFO.ORIGIN_X], self[INFO.ORIGIN_X], atol=atol)
+                       for x in self.l[:3] if x is not None)
+
+        atol = max(abs(x[INFO.CELL_HEIGHT])
+                   for x in self.l[:3] if x is not None)
+        shared_y = all(np.isclose(x[INFO.ORIGIN_Y], self[INFO.ORIGIN_Y], atol=atol)
+                       for x in self.l[:3] if x is not None)
+        return shared_x and shared_y
+
+    @property
+    def is_valid(self):
+        return self.has_deps and self.shared_projections and \
+               self.shared_origin
 
     @property
     def is_flat_field(self):
@@ -350,6 +379,7 @@ class DocRGBLayer(DocCompositeLayer):
                 INFO.ORIGIN_Y: None,
                 INFO.CELL_WIDTH: None,
                 INFO.CELL_HEIGHT: None,
+                INFO.PROJ: None,
                 INFO.COLORMAP: 'autumn',  # FIXME: why do RGBs need a colormap?
                 INFO.CLIM: (None, None, None),  # defer initialization until we have upstream layers
             }
@@ -375,6 +405,7 @@ class DocRGBLayer(DocCompositeLayer):
                 LOG.error('unable to create new name from {0!r:s}'.format(dep_info))
                 name = "RGB"
                 bands = []
+
             ds_info = {
                 INFO.NAME: name,
                 INFO.KIND: KIND.RGB,
@@ -384,6 +415,7 @@ class DocRGBLayer(DocCompositeLayer):
                 INFO.ORIGIN_Y: highest_res_dep[INFO.ORIGIN_Y],
                 INFO.CELL_WIDTH: highest_res_dep[INFO.CELL_WIDTH],
                 INFO.CELL_HEIGHT: highest_res_dep[INFO.CELL_HEIGHT],
+                INFO.PROJ: highest_res_dep[INFO.PROJ],
                 INFO.COLORMAP: 'autumn',  # FIXME: why do RGBs need a colormap?
             }
         old_clim = self._store.get(INFO.CLIM, None)
@@ -394,6 +426,11 @@ class DocRGBLayer(DocCompositeLayer):
             self._store[INFO.CLIM] = tuple((existing or upclim(upstream)) for (existing,upstream) in zip(old_clim, dep_info))
 
         self._store.update(ds_info)
+        if not self.shared_projections:
+            LOG.warning("RGB dependency layers don't share the same projection")
+        if not self.shared_origin:
+            LOG.warning("RGB dependency layers don't share the same origin")
+
         return ds_info
 
 

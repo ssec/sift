@@ -43,6 +43,8 @@ from collections import namedtuple
 from uuid import UUID, uuid1 as uuidgen
 from functools import lru_cache
 from PyQt4.QtCore import QObject, pyqtSignal
+from sift.model.shapes import content_within_shape
+from sift.workspace.goesr_pug import PugL1bTools
 from shapely.geometry.polygon import LinearRing
 from rasterio import Affine
 from pyproj import Proj
@@ -129,7 +131,7 @@ class GeoTiffImporter(Importer):
         # FUTURE: Should the Workspace normalize all input data or should the Image Layer handle any projection?
         srs = osr.SpatialReference()
         srs.ImportFromWkt(gtiff.GetProjection())
-        d[INFO.PROJ] = srs.ExportToProj4()
+        d[INFO.PROJ] = srs.ExportToProj4().strip()  # remove extra whitespace
 
         d[INFO.NAME] = os.path.split(source_path)[-1]
         d[INFO.PATHNAME] = source_path
@@ -138,6 +140,14 @@ class GeoTiffImporter(Importer):
         band = gtiff.GetRasterBand(1)  # FUTURE may be an assumption
         shape = rows, cols = band.YSize, band.XSize
         blockw, blockh = band.GetBlockSize()  # non-blocked files will report [band.XSize,1]
+
+        # Fix PROJ4 string if it needs an "+over" parameter
+        p = Proj(d[INFO.PROJ])
+        lon_l, lat_u = p(ox, oy, inverse=True)
+        lon_r, lat_b = p(ox + cw * cols, oy + ch * rows, inverse=True)
+        if "+over" not in d[INFO.PROJ] and lon_r < lon_l:
+            LOG.debug("Add '+over' to geotiff PROJ.4 because it seems to cross the anti-meridian")
+            d[INFO.PROJ] += " +over"
 
         bandtype = gdal.GetDataTypeName(band.DataType)
         if bandtype.lower()!='float32':
@@ -188,32 +198,112 @@ class GeoTiffImporter(Importer):
 
 
 
-# from collections import MutableMapping
-# from weakref import ref
 
-# class WorkspaceDatasetInfoMapping(MutableMapping):
-#     """
-#     provide a dictionary shim for metadata product database
-#     """
-#     def __init__(self, w:Workspace, p:mdb.Product):
-#         self._w = ref(w)
-#         self._p = ref(p)
-#
-#     mdb_mapping = {
-#         INFO.NAME: lambda p: p.identifier,
-#         INFO.PATHNAME: lambda p: os.path.join(p.source.path, p.source.name),
-#         INFO.
-#     }
-#
-#     def __getitem__(self, item):
-#
-#
-#     def __setitem__(self, key, value):
-#         raise KeyError('Workspace does not permit writing to metadata derived from file content')
+class GoesRPUGImporter(WorkspaceImporter):
+    """
+    Import from PUG format GOES-16 netCDF4 files
+    """
+    def __init__(self, **kwargs):
+        super(GoesRPUGImporter, self).__init__()
 
+    def is_relevant(self, source_path=None, source_uri=None):
+        source = source_path or source_uri
+        return True if (source.lower().endswith('.nc') or source.lower().endswith('.nc4')) else False
 
+    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
+        # yield successive levels of detail as we load
+        if source_uri is not None:
+            raise NotImplementedError("GoesRPUGImporter cannot read from URIs yet")
 
+        #
+        # step 1: get any additional metadata and an overview tile
+        #
 
+        d = {}
+        # nc = nc4.Dataset(source_path)
+        pug = PugL1bTools(source_path)
+
+        d[INFO.UUID] = dest_uuid
+        d[INFO.NAME] = os.path.split(source_path)[-1]
+        d[INFO.PATHNAME] = source_path
+        d[INFO.KIND] = KIND.IMAGE
+
+        d[INFO.PROJ] = pug.proj4_string
+        # get nadir-meter-ish projection coordinate vectors to be used by proj4
+        y,x = pug.proj_y, pug.proj_x
+        d[INFO.ORIGIN_X] = x[0]
+        d[INFO.ORIGIN_Y] = y[0]
+
+        midyi, midxi = int(y.shape[0] / 2), int(x.shape[0] / 2)
+        # PUG states radiance at index [0,0] extends between coordinates [0,0] to [1,1] on a quadrille
+        # centers of pixels are therefore at +0.5, +0.5
+        # for a (e.g.) H x W image this means [H/2,W/2] coordinates are image center
+        # for now assume all scenes are even-dimensioned (e.g. 5424x5424)
+        # given that coordinates are evenly spaced in angular -> nadir-meters space,
+        # technically this should work with any two neighbor values
+        d[INFO.CELL_WIDTH] = x[midxi+1] - x[midxi]
+        d[INFO.CELL_HEIGHT] = y[midyi+1] - y[midyi]
+
+        # FUTURE: consider yielding status at this point so our progress bar starts moving
+
+        bandtype = np.float32
+        shape = rows, cols = pug.shape
+        d[INFO.SHAPE] = shape
+        d[INFO.DISPLAY_TIME] = pug.display_time
+
+        LOG.info('converting radiance to %s' % pug.bt_or_refl)
+        bt_or_refl, image, units = pug.convert_from_nc()  # FIXME expensive
+        # overview_image = fixme  # FIXME, we need a properly navigated overview image here
+
+        # we got some metadata, let's yield progress
+        # yield    import_progress(uuid=dest_uuid,
+        #                          stages=1,
+        #                          current_stage=0,
+        #                          completion=1.0/3.0,
+        #                          stage_desc="calculating imagery",
+        #                          dataset_info=d,
+        #                          data=image)
+
+        #
+        # step 2: read and convert the image data
+        #   - in chunks if it's a huge image so we can show progress and/or cancel
+        #   - push the data into a workspace memmap
+        #   - record the content information in the workspace metadatabase
+        #
+
+        # FUTURE as we're doing so, also update coverage array (showing what sections of data are loaded)
+        # FUTURE and for some cases the sparsity array, if the data is interleaved (N/A for NetCDF imagery)
+
+        LOG.info('caching PUG imagery in workspace %s' % cache_path)
+        fp = open(cache_path, 'wb+')
+        img_data = np.memmap(fp, dtype=np.float32, shape=shape, mode='w+')
+        img_data[:] = np.ma.fix_invalid(image, copy=False, fill_value=np.NAN)  # FIXME: expensive
+
+        LOG.debug(repr(d))
+
+        # FUTURE: workspace content can be int16 with conversion coefficients applied on the fly, after feature-matrix-model goes in
+
+        # FIXME: for test purpose just brute-force the whole thing into place instead of doing incremental partial-coverage loads
+        # kind, data, unit = pug.convert_from_nc()   # hopefully only a few seconds... but not good in long term to leave this
+
+        yield import_progress(uuid=dest_uuid,
+                             stages=1,
+                             current_stage=0,
+                             completion=1.0,
+                             stage_desc="GOES PUG data add to workspace",
+                             dataset_info=d,
+                             data=img_data)
+
+        # # even worse, copying data over to memmap-on-disk
+        # img_data[:] = data
+
+        # yield import_progress(uuid=dest_uuid,
+        #                      stages=1,
+        #                      current_stage=0,
+        #                      completion=1.0,
+        #                      stage_desc="done importing GOESR pug",
+        #                      dataset_info=d,
+        #                      data=img_data)
 
 
 class Workspace(QObject):
@@ -253,7 +343,7 @@ class Workspace(QObject):
     didFinishImport = pyqtSignal(dict)  # all loading activities for a dataset have completed
     didDiscoverExternalDataset = pyqtSignal(dict)  # a new dataset was added to the workspace from an external agent
 
-    IMPORT_CLASSES = [ GeoTiffImporter ]
+    IMPORT_CLASSES = [ GeoTiffImporter, GoesRPUGImporter ]
 
     @property
     def _S(self):
@@ -753,7 +843,17 @@ class Workspace(QObject):
         x, y = Proj(info[INFO.PROJ])(*xy_pos)
         col = (x - info[INFO.ORIGIN_X]) / info[INFO.CELL_WIDTH]
         row = (y - info[INFO.ORIGIN_Y]) / info[INFO.CELL_HEIGHT]
-        return np.round(row), np.round(col)
+        return np.int64(np.round(row)), np.int64(np.round(col))
+
+    def layer_proj(self, dsi_or_uuid):
+        """Project lon/lat probe points to image X/Y"""
+        info = self.get_info(dsi_or_uuid)
+        return Proj(info[INFO.PROJ])
+
+    def _project_points(self, p, points):
+        points = np.array(points)
+        points[:, 0], points[:, 1] = p(points[:, 0], points[:, 1])
+        return points
 
     def get_content_point(self, dsi_or_uuid, xy_pos):
         row, col = self._position_to_index(dsi_or_uuid, xy_pos)
@@ -767,6 +867,8 @@ class Workspace(QObject):
     def get_content_polygon(self, dsi_or_uuid, points):
         data = self.get_content(dsi_or_uuid)
         trans = self._create_layer_affine(dsi_or_uuid)
+        p = self.layer_proj(dsi_or_uuid)
+        points = self._project_points(p, points)
         _, data = content_within_shape(data, trans, LinearRing(points))
         return data
 
@@ -779,16 +881,21 @@ class Workspace(QObject):
     def get_coordinate_mask_polygon(self, dsi_or_uuid, points):
         data = self.get_content(dsi_or_uuid)
         trans = self._create_layer_affine(dsi_or_uuid)
+        p = self.layer_proj(dsi_or_uuid)
+        points = self._project_points(p, points)
         index_mask, data = content_within_shape(data, trans, LinearRing(points))
         coords_mask = (index_mask[0] * trans.e + trans.f, index_mask[1] * trans.a + trans.c)
+        coords_mask = p(*coords_mask, inverse=True)
         return coords_mask, data
 
     def get_content_coordinate_mask(self, uuid, coords_mask):
         data = self.get_content(uuid)
         trans = self._create_layer_affine(uuid)
+        p = self.layer_proj(uuid)
+        coords_mask = p(*coords_mask)
         index_mask = (
-            ((coords_mask[0] - trans.f) / trans.e).astype(np.uint),
-            ((coords_mask[1] - trans.c) / trans.a).astype(np.uint),
+            np.round((coords_mask[0] - trans.f) / trans.e).astype(np.uint),
+            np.round((coords_mask[1] - trans.c) / trans.a).astype(np.uint),
         )
         return data[index_mask]
 

@@ -18,11 +18,13 @@ REQUIRES
 :license: GPLv3, see LICENSE for more details
 """
 
-import numpy as np
+import os
 import logging
+import numpy as np
 from vispy.gloo import Texture2D
 
 from sift.common import DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH
+DEBUG_IMAGE_TILE = bool(os.environ.get("SIFT_DEBUG_TILES", False))
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -79,5 +81,10 @@ class TextureAtlas2D(Texture2D):
                 # data = data.copy()
                 data[:] = np.nan
                 data[:tile_offset[0], :tile_offset[1]] = data_orig[:tile_offset[0], :tile_offset[1]]
+        if DEBUG_IMAGE_TILE:
+            data[:5, :] = 1000.
+            data[-5:, :] = 1000.
+            data[:, :5] = 1000.
+            data[:, -5:] = 1000.
         super(TextureAtlas2D, self).set_data(data, offset=offset, copy=copy)
 

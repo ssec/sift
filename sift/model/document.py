@@ -71,7 +71,7 @@ from abc import ABCMeta, abstractmethod, abstractproperty
 from weakref import ref
 
 from sift.common import KIND, INFO, COMPOSITE_TYPE
-from sift.model.guidebook import AHI_HSF_Guidebook, GUIDE
+from sift.model.guidebook import ABI_AHI_Guidebook, GUIDE
 
 from PyQt4.QtCore import QObject, pyqtSignal
 
@@ -200,7 +200,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     _workspace = None
     _layer_sets = None  # list(DocLayerSet(prez, ...) or None)
     _layer_with_uuid = None  # dict(uuid:Doc____Layer)
-    _guidebook = None  # FUTURE: this is currently an AHI_HSF_Guidebook, make it a general guidebook
+    _guidebook = None  # FUTURE: this is currently an ABI_AHI_Guidebook, make it a general guidebook
 
     # signals
     didAddBasicLayer = pyqtSignal(tuple, UUID, prez)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
@@ -211,7 +211,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didChangeLayerVisibility = pyqtSignal(dict)  # {UUID: new-visibility, ...} for changed layers
     didReorderAnimation = pyqtSignal(tuple)  # list of UUIDs representing new animation order
     didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
-    didSwitchLayerSet = pyqtSignal(int, tuple, tuple)  # new layerset number typically 0..3, list of prez tuples representing new display order, new animation order
+    didSwitchLayerSet = pyqtSignal(int, DocLayerStack, tuple)  # new layerset number typically 0..3, list of prez tuples representing new display order, new animation order
     didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didChangeComposition = pyqtSignal(tuple, UUID, prez, dict)  # new-layer-order, changed-layer, change-info: composite channels were reassigned or polynomial altered
@@ -221,7 +221,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def __init__(self, workspace, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
         super(Document, self).__init__(**kwargs)
-        self._guidebook = AHI_HSF_Guidebook()
+        self._guidebook = ABI_AHI_Guidebook()
         self._workspace = workspace
         self._layer_sets = [DocLayerStack(self)] + [None] * (layer_set_count - 1)
         self._layer_with_uuid = {}
@@ -233,21 +233,44 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 'default_height': 20.,  # degrees from bottom edge to top edge
             }),
             ('LCC (CONUS)', {
-                'proj4_str': '+proj=lcc +a=6371200 +b=6371200 +lat_0=25 +lat_1=25 +lon_0=-95 +units=m +no_defs',
-                'default_center': (-123.044, 59.844),
-                'default_width': 20.,
-                'default_height': 20.,
+                'proj4_str': '+proj=lcc +a=6371200 +b=6371200 +lat_0=25 +lat_1=25 +lon_0=-95 +units=m +no_defs +over',
+                'default_center': (-95, 35.),
+                'default_width': 25.,
+                'default_height': 25.,
             }),
-            ('Platte Carre', {}),
+            # ('Platte Carre', {}),
             ('Himawari Geos', {
                 'proj4_str': '+proj=geos +a=6378137 +b=6356752.299581327 +lon_0=140.7 +h=35785863 +over',
                 'default_center': (144.8, 13.5),  # lon, lat center point (Guam)
                 'default_width': 20.,  # degrees from left edge to right edge
                 'default_height': 20.,  # degrees from bottom edge to top edge
             }),
-            ('GOES Geos', {}),
+            ('GOES-R East', {
+                'proj4_str': '+proj=geos +lon_0=-75 +h=35786023.0 +a=6378137.0 +b=6356752.31414 +sweep=x +units=m',
+                'default_center': (-75, 13.5),  # lon, lat center point (Guam)
+                'default_width': 20.,  # degrees from left edge to right edge
+                'default_height': 20.,  # degrees from bottom edge to top edge
+            }),
+            ('GOES-R Test', {
+                'proj4_str': '+proj=geos +lon_0=-89.5 +h=35786023.0 +a=6378137.0 +b=6356752.31414 +sweep=x +units=m',
+                'default_center': (-89.5, 13.5),  # lon, lat center point (Guam)
+                'default_width': 20.,  # degrees from left edge to right edge
+                'default_height': 20.,  # degrees from bottom edge to top edge
+            }),
+            ('GOES-R Central', {
+                'proj4_str': '+proj=geos +lon_0=-105 +h=35786023.0 +a=6378137.0 +b=6356752.31414 +sweep=x +units=m',
+                'default_center': (-105, 13.5),  # lon, lat center point (Guam)
+                'default_width': 20.,  # degrees from left edge to right edge
+                'default_height': 20.,  # degrees from bottom edge to top edge
+            }),
+            ('GOES-R West', {
+                'proj4_str': '+proj=geos +lon_0=-137 +h=35786023.0 +a=6378137.0 +b=6356752.31414 +sweep=x +units=m',
+                'default_center': (-137, 13.5),  # lon, lat center point (Guam)
+                'default_width': 20.,  # degrees from left edge to right edge
+                'default_height': 20.,  # degrees from bottom edge to top edge
+            }),
         ))
-        self.default_projection = 'Mercator'
+        self.default_projection = 'LCC (CONUS)'
         self.current_projection = self.default_projection
         # TODO: connect signals from workspace to slots including update_dataset_info
 
@@ -265,6 +288,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 self.current_projection,
                 self.projection_info(self.current_projection)
             )
+
+    def current_projection_index(self):
+        return list(self.available_projections.keys()).index(self.current_projection)
 
     def change_projection_index(self, idx):
         return self.change_projection(tuple(self.available_projections.keys())[idx])
@@ -325,7 +351,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """
         uuid, info, content = self._workspace.import_image(source_path=path)
         if uuid in self._layer_with_uuid:
-            LOG.warning("layer with UUID {0:s} already in document?".format(uuid))
+            LOG.warning("layer with UUID {} already in document?".format(uuid))
             return uuid, info, content
         # info.update(self._additional_guidebook_information(info))
         self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, info)
@@ -522,23 +548,16 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """
         :return: the topmost visible layer's UUID
         """
-        for x in self.current_layer_set:
-            if x.visible:
-                return x.uuid
+        for x in self.current_visible_layer_uuids:
+            return x
         return None
 
-    # def current_visible_layer_uuids(self, max_layers=None):
-    #     """
-    #     :param max_layers:
-    #     :yield: the visible layers in the current layer set
-    #     """
-    #     count = 0
-    #     for x in self.current_layer_set:
-    #         if x.visible:
-    #             count += 1
-    #             yield x.uuid
-    #         if max_layers is not None and count >= max_layers:
-    #             break
+    @property
+    def current_visible_layer_uuids(self):
+        for x in self.current_layer_set:
+            layer = self._layer_with_uuid[x.uuid]
+            if x.visible and layer.is_valid:
+                yield x.uuid
 
     # TODO: add a document style guide which says how different bands from different instruments are displayed
 
@@ -557,7 +576,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     continue
                 yield layer_prez, layer
 
-    def layers_where(self, is_valid=None, is_active=None, in_type_set=None):
+    def layers_where(self, is_valid=None, is_active=None, in_type_set=None,
+                     have_proj=None):
         """
         query current layer set for layers matching criteria
         :param is_valid: None, or True/False whether layer is valid (could be displayed)
@@ -577,6 +597,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     continue
             if in_type_set is not None:
                 if type(layer) not in in_type_set:
+                    continue
+            if have_proj is not None:
+                if layer[INFO.PROJ] != have_proj:
                     continue
             yield layer
 

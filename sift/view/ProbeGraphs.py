@@ -18,6 +18,7 @@ from PyQt4.QtCore import QObject, pyqtSignal
 
 # a useful constant
 from sift.common import INFO, KIND
+from sift.model.guidebook import GUIDE
 from sift.queue import TASK_PROGRESS, TASK_DOING
 
 import logging
@@ -449,8 +450,6 @@ class ProbeGraphDisplay (object) :
         # only set the defaults if we don't have a polygon yet
         if self.polygon is not None:
             return
-        if len(layer_uuids) > 2:
-            raise ValueError("Probe graphs can handle a maximum of 2 layers (got %d)", len(layer_uuids))
 
         if len(layer_uuids) >= 1:
             xIndex = self.xDropDown.findData(str(layer_uuids[0]))
@@ -564,7 +563,7 @@ class ProbeGraphDisplay (object) :
             # get the data and info we need for this plot
             data_polygon = self.workspace.get_content_polygon(x_uuid, polygon)
             fmt, units, data_polygon = self.document.convert_units(x_uuid, data_polygon)
-            title = self.workspace.get_info(x_uuid)[INFO.NAME]
+            title = self.document.get_info(uuid=x_uuid)[GUIDE.DISPLAY_NAME]
 
             # get point probe value
             if point_xy:
@@ -582,8 +581,8 @@ class ProbeGraphDisplay (object) :
             yield {TASK_DOING: 'Probe Plot: Collecting polygon data (layer 1)...', TASK_PROGRESS: 0.0}
 
             # get the data and info we need for this plot
-            name1 = self.workspace.get_info(x_uuid)[INFO.NAME]
-            name2 = self.workspace.get_info(y_uuid)[INFO.NAME]
+            name1 = self.document.get_info(uuid=x_uuid)[GUIDE.DISPLAY_NAME]
+            name2 = self.document.get_info(uuid=y_uuid)[GUIDE.DISPLAY_NAME]
             hires_uuid = self.workspace.lowest_resolution_uuid(x_uuid, y_uuid)
             hires_coord_mask, hires_data = self.workspace.get_coordinate_mask_polygon(hires_uuid, polygon)
             _, _, hires_data = self.document.convert_units(hires_uuid, hires_data)
@@ -611,6 +610,8 @@ class ProbeGraphDisplay (object) :
 
             # plot a scatter plot
             # self.plotScatterplot (data1, name1, data2, name2)
+            data1 = data1[~numpy.isnan(data1)]
+            data2 = data2[~numpy.isnan(data2)]
             self.plotDensityScatterplot (data1, name1, data2, name2, x_point, y_point)
 
         # if we have some combination of selections we don't understand, clear the figure
@@ -630,7 +631,7 @@ class ProbeGraphDisplay (object) :
         """
         self.figure.clf()
         axes = self.figure.add_subplot(111)
-        bars = axes.hist(data, bins=self.DEFAULT_NUM_BINS)
+        bars = axes.hist(data[~numpy.isnan(data)], bins=self.DEFAULT_NUM_BINS)
         if x_point is not None:
             # go through each rectangle object and make the one that contains x_point 'red'
             # default color is blue so red should stand out

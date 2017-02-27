@@ -76,7 +76,6 @@ def test_layers_from_directory(ws, doc, layer_tiff_glob, range_txt=None):
 def test_layers(ws, doc, glob_pattern=None):
     if glob_pattern:
         return test_layers_from_directory(ws, doc, glob_pattern, os.environ.get('RANGE', None))
-    LOG.warning("No image glob pattern provided")
     return []
 
 class OpenCacheDialog(QtGui.QWidget):
@@ -225,10 +224,11 @@ class Main(QtGui.QMainWindow):
 
     def interactive_open_files(self, *args, files=None, **kwargs):
         self.scene_manager.layer_set.animating = False
+        # http://pyqt.sourceforge.net/Docs/PyQt4/qfiledialog.html#getOpenFileNames
         files = QtGui.QFileDialog.getOpenFileNames(self,
                                                    "Select one or more files to open",
                                                    self._last_open_dir or os.getenv("HOME"),
-                                                   'Mercator GeoTIFF (*.tiff *.tif)')
+                                                   ';;'.join(['GOES-R netCDF or Merc GTIFF (*.nc *.nc4 *.tiff *.tif)']))
         self.open_paths(files)
 
     def open_paths(self, paths):
@@ -294,6 +294,7 @@ class Main(QtGui.QMainWindow):
         self.ui.animationSlider.setValue(frame_index or 0)
         self.ui.animPlayPause.setDown(False)
         self.ui.animationSlider.repaint()
+        self.update_frame_time_to_top_visible()
 
     def update_frame_slider(self, frame_info):
         """
@@ -308,7 +309,10 @@ class Main(QtGui.QMainWindow):
         # LOG.debug('did update animation slider {} {}'.format(frame_index, frame_count))
         self.ui.animPlayPause.setDown(animating)
         self.ui.animationSlider.repaint()
-        self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
+        if animating:
+            self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
+        else:
+            self.update_frame_time_to_top_visible()
 
     def update_frame_time_to_top_visible(self, *args):
         # FUTURE: don't address layer set directly
@@ -502,7 +506,6 @@ class Main(QtGui.QMainWindow):
         self.workspace = Workspace(workspace_dir, max_size_gb=workspace_size, queue=self.queue)
         self.document = doc = Document(self.workspace)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
-                                               glob_pattern=glob_pattern,
                                                border_shapefile=border_shapefile,
                                                center=center,
                                                parent=self)
@@ -553,9 +556,7 @@ class Main(QtGui.QMainWindow):
         self.layerSetsManager = LayerSetsManager(self.ui, self.ui.layerSetTabs, self.ui.layerInfoContents, self.document)
         self.behaviorLayersList = self.layerSetsManager.getLayerStackListViewModel()
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
-            layers = list(self.document.active_layer_order)
-            top_uuids = [p.uuid for (p,l) in layers[:2]]
-            # top_uuids = list(self.document.current_visible_layer_uuids(2))
+            top_uuids = list(self.document.current_visible_layer_uuids)
             LOG.debug("top visible UUID is {0!r:s}".format(top_uuids))
 
             # TODO, when the plots manage their own layer selection, change this call
@@ -632,6 +633,7 @@ class Main(QtGui.QMainWindow):
 
         # Set the projection based on the document's default
         self.document.change_projection()
+        self.ui.projectionComboBox.setCurrentIndex(self.document.current_projection_index())
 
     def closeEvent(self, event, *args, **kwargs):
         LOG.debug('main window closing')
@@ -661,7 +663,6 @@ class Main(QtGui.QMainWindow):
 
     def remove_region_polygon(self, action:QtGui.QAction=None, *args):
         if self.scene_manager.has_pending_polygon():
-            print("Clearing pending")
             self.scene_manager.clear_pending_polygon()
             return
 
@@ -887,7 +888,6 @@ def main():
 
 
     window.show()
-    print("running")
     # bring window to front
     window.raise_()
     app.run()

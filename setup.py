@@ -36,7 +36,7 @@ from setuptools import setup, find_packages, Command
 script_dir = os.path.dirname(os.path.realpath(__file__))
 version_pathname = os.path.join(script_dir, "sift", "version.py")
 version_str = open(version_pathname).readlines()[-1].split()[-1].strip("\"\'")
-version_regex = re.compile('^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<micro>\d+)(?:(?P<dev_level>[ab])(?P<dev_version>\d))?$')
+version_regex = re.compile('^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<micro>\d+)(?:(?P<dev_level>(a|b|rc))(?P<dev_version>\d))?$')
 version_info = version_regex.match(version_str).groupdict()
 assert version_info is not None, "Invalid version in version.py: {}".format(version_str)
 version_info["major"] = int(version_info["major"])
@@ -54,7 +54,7 @@ class BumpCommand(Command):
     description = "bump package version by one micro, minor, or major version number (major.minor.micro[a/b])"
     user_options = [
         ("bump-level=", 'b', "major, minor, micro (default: None)"),
-        ("dev-level=", 'd', "alpha or beta (default: None)"),
+        ("dev-level=", 'd', "alpha, beta, rc (default: None)"),
         ("new-version=", 'v', "specify exact new version number (default: None"),
         ("dry-run", 'n', "dry run, don't change anything"),
         ("tag", "t", "add a git tag for this version (default: False)"),
@@ -73,7 +73,7 @@ class BumpCommand(Command):
     def finalize_options(self):
         if self.bump_level not in ["major", "minor", "micro", None]:
             raise ValueError("Bump level must be one of ['major', 'minor', 'micro', <unspecified>]")
-        if self.dev_level not in ["alpha", "beta", None]:
+        if self.dev_level not in ["alpha", "beta", "rc", None]:
             raise ValueError("Dev level must be one of ['alpha', 'beta', <unspecified>]")
 
     def run(self):
@@ -94,18 +94,13 @@ class BumpCommand(Command):
                 new_version["micro"] = 0
             new_version_str = "{major:d}.{minor:d}.{micro:d}".format(**new_version)
 
-            if self.dev_level == "alpha":
-                if current_version["dev_level"] == "a" and self.bump_level is None:
+            if self.dev_level:
+                short_level = {'alpha': 'a', 'beta': 'b', 'rc': 'rc'}[self.dev_level]
+                if current_version["dev_level"] == short_level and self.bump_level is None:
                     new_dev_version = current_version["dev_version"] + 1
                 else:
                     new_dev_version = 0
-                new_version_str += "a{:d}".format(new_dev_version)
-            elif self.dev_level == "beta":
-                if current_version["dev_level"] == "b" and self.bump_level is None:
-                    new_dev_version = current_version["dev_version"] + 1
-                else:
-                    new_dev_version = 0
-                new_version_str += "b{:d}".format(new_dev_version)
+                new_version_str += "{:s}{:d}".format(short_level, new_dev_version)
 
         # Update the version test in the version.py file
         print("Old Version: {}".format(version_str))

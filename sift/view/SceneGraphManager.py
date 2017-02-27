@@ -37,7 +37,7 @@ from sift.view.LayerRep import NEShapefileLines, TiledGeolocatedImage, RGBCompos
 from sift.view.MapWidget import SIFTMainMapCanvas
 from sift.view.Cameras import PanZoomProbeCamera
 from sift.view.Colormap import ALL_COLORMAPS
-from sift.model.document import prez, DocCompositeLayer, DocBasicLayer, DocRGBLayer
+from sift.model.document import prez, DocCompositeLayer, DocBasicLayer, DocRGBLayer, DocLayerStack
 from sift.queue import TASK_DOING, TASK_PROGRESS
 from sift.view.ProbeGraphs import DEFAULT_POINT_PROBE
 from sift.view.transform import PROJ4Transform
@@ -56,9 +56,17 @@ LOG = logging.getLogger(__name__)
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 if getattr(sys, 'frozen', False):
     DEFAULT_SHAPE_FILE = os.path.realpath(os.path.join(SCRIPT_DIR, "..", "..", "sift_data", "ne_50m_admin_0_countries", "ne_50m_admin_0_countries.shp"))
+    DEFAULT_STATES_SHAPE_FILE = os.path.realpath(os.path.join(SCRIPT_DIR, "..", "..", "sift_data", "ne_50m_admin_1_states_provinces_lakes", "ne_50m_admin_1_states_provinces_lakes.shp"))
 else:
     DEFAULT_SHAPE_FILE = os.path.realpath(os.path.join(SCRIPT_DIR, "..", "data", "ne_50m_admin_0_countries", "ne_50m_admin_0_countries.shp"))
+    DEFAULT_STATES_SHAPE_FILE = os.path.realpath(os.path.join(SCRIPT_DIR, "..", "data", "ne_50m_admin_1_states_provinces_lakes", "ne_50m_admin_1_states_provinces_lakes.shp"))
 DEFAULT_TEXTURE_SHAPE = (4, 16)
+
+
+class Markers2(Markers):
+    def _set_clipper(self, node, clipper):
+        return
+Markers = Markers2
 
 
 class FakeMarker(Compound):
@@ -132,7 +140,15 @@ class PendingPolygon(object):
         self.points.append(xy_pos)
         if len(xy_pos) == 2:
             xy_pos = [xy_pos[0], xy_pos[1], z]
-        point_visual = FakeMarker(parent=self.parent, symbol="disc", pos=np.array([xy_pos]), color=np.array([0., 0.5, 0.5, 1.]))
+        # point_visual = FakeMarker(parent=self.parent, symbol="disc", pos=np.array([xy_pos]), color=np.array([0., 0.5, 0.5, 1.]))
+        point_visual = Markers(parent=self.parent,
+                               name='polygon_%02d' % (len(self.markers),),
+                               symbol="disc", pos=np.array([xy_pos]),
+                               face_color=np.array([0., 0.5, 0.5, 1.]),
+                               edge_color=np.array([.5, 1.0, 1.0, 1.]),
+                               size=18.,
+                               edge_width=3.,
+                               )
         self.markers.append(point_visual)
         return False
 
@@ -244,23 +260,6 @@ class LayerSet(object):
         # FIXME: This should probably be accomplished by overriding the right method from the Node or Visual class
         self.parent.main_canvas._update_scenegraph(None)
 
-    # def set_layer_z(self, uuid, z_level):
-    #     """
-    #     :param uuid: layer to change
-    #     :param z_level: -100..100, 100 being closest to the camera
-    #     :return:
-    #     """
-    #     self._layers[uuid].transform = STTransform(translate=(0, 0, int(z_level)))
-    #
-    # def set_layers_z(self, layer_levels):
-    #     """
-    #     z_levels are -100..100, 100 being closest to the camera
-    #     :param layer_levels: {uuid:level}
-    #     :return:
-    #     """
-    #     for uuid, z_level in layer_levels.items():
-    #         self._layers[uuid].transform = STTransform(translate=(0, 0, int(z_level)))
-
     def top_layer_uuid(self):
         for layer_uuid in self._layer_order:
             if self._layers[layer_uuid].visible:
@@ -357,7 +356,6 @@ class SceneGraphManager(QObject):
     queue = None  # background jobs go here
 
     border_shapefile = None  # background political map
-    glob_pattern = None
     texture_shape = None
     polygon_probes = None
     point_probes = None
@@ -379,8 +377,9 @@ class SceneGraphManager(QObject):
     newPointProbe = pyqtSignal(str, tuple)
     newProbePolygon = pyqtSignal(object, object)
 
-    def __init__(self, doc, workspace, queue, border_shapefile=None, glob_pattern=None, parent=None,
-                 texture_shape=(4, 16), center=None):
+    def __init__(self, doc, workspace, queue,
+                 border_shapefile=None, states_shapefile=None,
+                 parent=None, texture_shape=(4, 16), center=None):
         super(SceneGraphManager, self).__init__(parent)
         self.didRetilingCalcs.connect(self._set_retiled)
 
@@ -389,7 +388,7 @@ class SceneGraphManager(QObject):
         self.workspace = workspace
         self.queue = queue
         self.border_shapefile = border_shapefile or DEFAULT_SHAPE_FILE
-        self.glob_pattern = glob_pattern
+        self.conus_states_shapefile = states_shapefile or DEFAULT_STATES_SHAPE_FILE
         self.texture_shape = texture_shape
         self.polygon_probes = {}
         self.point_probes = {}
@@ -467,7 +466,8 @@ class SceneGraphManager(QObject):
         self._borders_color_idx = 0
         self.borders = NEShapefileLines(self.border_shapefile, double=True, color=self._color_choices[self._borders_color_idx], parent=self.main_map)
         self.borders.transform = STTransform(translate=(0, 0, 40))
-        # print(self.borders.transforms.get_transform().shader_map().compile())
+        self.conus_states = NEShapefileLines(self.conus_states_shapefile, double=True, color=self._color_choices[self._borders_color_idx], parent=self.main_map)
+        self.conus_states.transform = STTransform(translate=(0, 0, 45))
 
         self._latlon_grid_color_idx = 1
         self.latlon_grid = self._init_latlon_grid_layer(color=self._color_choices[self._latlon_grid_color_idx])
@@ -490,6 +490,9 @@ class SceneGraphManager(QObject):
         ll_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] - width, center[1] - height)])[0][:2]
         ur_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] + width, center[1] + height)])[0][:2]
         self.main_view.camera.rect = Rect(ll_xy, (ur_xy[0] - ll_xy[0], ur_xy[1] - ll_xy[1]))
+        for img in self.image_elements.values():
+            img.determine_reference_points()
+        self.on_view_change(None)
 
     def _init_latlon_grid_layer(self, color=None, resolution=5.):
         """Create a series of line segments representing latitude and longitude lines.
@@ -497,13 +500,12 @@ class SceneGraphManager(QObject):
         :param resolution: number of degrees between lines
         """
         lons = np.arange(-180., 180. + resolution, resolution, dtype=np.float32)
-        lats = np.arange(-89.9, 89.9 + resolution, resolution, dtype=np.float32)
+        lats = np.arange(-90., 90. + resolution, resolution, dtype=np.float32)
 
         # One long line of lawn mower pattern (lon lines, then lat lines)
         points = np.empty((lons.shape[0] * lats.shape[0] * 2, 2), np.float32)
         LOG.debug("Generating longitude lines...")
         for idx, lon_point in enumerate(lons):
-            print(lon_point)
             points[idx * lats.shape[0]:(idx + 1) * lats.shape[0], 0] = lon_point
             if idx % 2 == 0:
                 points[idx * lats.shape[0]:(idx + 1) * lats.shape[0], 1] = lats
@@ -527,6 +529,7 @@ class SceneGraphManager(QObject):
 
         # return Line(pos=points2, connect="segments", color=color, parent=self.main_map)
         return Line(pos=points2, connect="strip", color=color, parent=self.main_map)
+        # return Line(pos=points, connect="strip", color=color, parent=self.main_map)
 
     def on_mouse_press_point(self, event):
         """Handle mouse events that mean we are using the point probe.
@@ -539,9 +542,9 @@ class SceneGraphManager(QObject):
             # FIXME: We should be able to use the main_map object to do the transform...but it doesn't work (waiting on vispy developers)
             # map_pos = self.main_map.transforms.get_transform().imap(buffer_pos)
             map_pos = self.borders.transforms.get_transform().imap(buffer_pos)
-            # point_marker = Markers(parent=self.main_map, symbol="disc", pos=np.array([map_pos[:2]]))
-            # self.points.append(point_marker)
-            print("Map position: ", map_pos)
+            if np.any(np.abs(map_pos[:2]) > 1e25):
+                LOG.error("Invalid point probe location")
+                return
             self.newPointProbe.emit(DEFAULT_POINT_PROBE, tuple(map_pos[:2]))
 
     def on_mouse_press_region(self, event):
@@ -553,6 +556,9 @@ class SceneGraphManager(QObject):
         if (event.button == 2 and modifiers == (SHIFT,)) or (self._current_tool == TOOL.REGION_PROBE and event.button == 1):
             buffer_pos = event.sources[0].transforms.get_transform().map(event.pos)
             map_pos = self.borders.transforms.get_transform().imap(buffer_pos)
+            if np.any(np.abs(map_pos[:2]) > 1e25):
+                LOG.error("Invalid region probe location")
+                return
             if self.pending_polygon.add_point(event.pos[:2], map_pos[:2], 60):
                 points = self.pending_polygon.points + [self.pending_polygon.points[0]]
                 self.clear_pending_polygon()
@@ -584,18 +590,30 @@ class SceneGraphManager(QObject):
 
     def on_point_probe_set(self, probe_name, state, xy_pos, **kwargs):
         z = float(kwargs.get("z", 60))
+        edge_color = kwargs.get("edge_color", np.array([1.0, 0.5, 0.5, 1.]))
+        face_color = kwargs.get("face_color", np.array([0.5, 0., 0., 1.]))
         if len(xy_pos) == 2:
             xy_pos = [xy_pos[0], xy_pos[1], z]
+
+        probe_kwargs = {
+            'symbol': 'disc',
+            'pos': np.array([xy_pos]),
+            'face_color': face_color,
+            'edge_color': edge_color,
+            'size': 18.,
+            'edge_width': 3.,
+        }
 
         if probe_name not in self.point_probes and xy_pos is None:
             raise ValueError("Probe '{}' does not exist".format(probe_name))
         elif probe_name not in self.point_probes:
-            color = kwargs.get("color", np.array([0.5, 0., 0., 1.]))
-            point_visual = FakeMarker(parent=self.main_map, symbol="x", pos=np.array([xy_pos]), color=color)
+            # point_visual = FakeMarker(parent=self.main_map, symbol="x", pos=np.array([xy_pos]), color=color)
+            point_visual = Markers(parent=self.main_map, name=probe_name, **probe_kwargs)
             self.point_probes[probe_name] = point_visual
         else:
             point_visual = self.point_probes[probe_name]
-            point_visual.set_point(xy_pos)
+            # point_visual.set_point(xy_pos)
+            point_visual.set_data(**probe_kwargs)
 
         # set the Point visible or not
         point_visual.visible = state
@@ -626,9 +644,12 @@ class SceneGraphManager(QObject):
         self._borders_color_idx = (self._borders_color_idx + 1) % len(self._color_choices)
         if self._borders_color_idx + 1 == len(self._color_choices):
             self.borders.visible = False
+            self.conus_states.visible = False
         else:
             self.borders.set_data(color=self._color_choices[self._borders_color_idx])
             self.borders.visible = True
+            self.conus_states.set_data(color=self._color_choices[self._borders_color_idx])
+            self.conus_states.visible = True
 
     def cycle_grid_color(self):
         self._latlon_grid_color_idx = (self._latlon_grid_color_idx + 1) % len(self._color_choices)
@@ -744,11 +765,11 @@ class SceneGraphManager(QObject):
             parent=self.main_map,
             projection=layer[INFO.PROJ],
         )
-        from sift.view.transform import PROJ4Transform
         image.transform = PROJ4Transform(layer[INFO.PROJ], inverse=True)
         image.transform *= STTransform(translate=(0, 0, -50.0))
         self.image_elements[uuid] = image
         self.layer_set.add_layer(image)
+        image.determine_reference_points()
         self.on_view_change(None)
 
     def add_composite_layer(self, new_order:tuple, uuid:UUID, p:prez):
@@ -779,12 +800,15 @@ class SceneGraphManager(QObject):
                 parent=self.main_map,
                 projection=layer[INFO.PROJ],
             )
+            element.transform = PROJ4Transform(layer[INFO.PROJ], inverse=True)
             element.transform *= STTransform(translate=(0, 0, -50.0))
             self.composite_element_dependencies[uuid] = dep_uuids
             self.layer_set.add_layer(element)
             if new_order:
                 self.layer_set.set_layer_order(new_order)
             self.on_view_change(None)
+            element.determine_reference_points()
+            self.update()
             return True
         else:
             raise ValueError("Unknown or unimplemented composite type")
@@ -799,17 +823,21 @@ class SceneGraphManager(QObject):
                     dep_uuids = r,g,b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
                     overview_content = list(self.workspace.get_content(cuuid) for cuuid in dep_uuids)
                     self.composite_element_dependencies[layer.uuid] = dep_uuids
-                    self.image_elements[layer.uuid].set_channels(overview_content,
-                                                                 cell_width=layer[INFO.CELL_WIDTH],
-                                                                 cell_height=layer[INFO.CELL_HEIGHT],
-                                                                 origin_x=layer[INFO.ORIGIN_X],
-                                                                 origin_y=layer[INFO.ORIGIN_Y])
-                    self.image_elements[layer.uuid].init_overview(overview_content)
+                    elem = self.image_elements[layer.uuid]
+                    elem.set_channels(overview_content,
+                                      cell_width=layer[INFO.CELL_WIDTH],
+                                      cell_height=layer[INFO.CELL_HEIGHT],
+                                      origin_x=layer[INFO.ORIGIN_X],
+                                      origin_y=layer[INFO.ORIGIN_Y])
+                    elem.init_overview(overview_content)
+                    elem.clim = layer[INFO.CLIM]
                     self.on_view_change(None)
+                    elem.determine_reference_points()
                 else:
                     # layer is no longer valid and has to be removed
                     LOG.debug("Purging composite ")
                     self.purge_layer(layer.uuid)
+                self.update()
             else:
                 if layer.is_valid:
                     # Add this now valid layer
@@ -817,7 +845,6 @@ class SceneGraphManager(QObject):
                 else:
                     LOG.info('unable to add an invalid layer, will try again later when layer changes')
                     return
-            self.update()
         else:
             raise ValueError("Unknown or unimplemented composite type")
 
@@ -864,7 +891,7 @@ class SceneGraphManager(QObject):
         for uuid, visible in layers_changed.items():
             self.set_layer_visible(uuid, visible)
 
-    def rebuild_new_layer_set(self, new_set_number:int, new_prez_order:list, new_anim_order:list):
+    def rebuild_new_layer_set(self, new_set_number:int, new_prez_order:DocLayerStack, new_anim_order:list):
         self.rebuild_all()
         # raise NotImplementedError("layer set change not implemented in SceneGraphManager")
 
@@ -944,7 +971,7 @@ class SceneGraphManager(QObject):
         inconsistent_uuids = uuids_w_elements ^ active_uuids
 
         # current_uuid_order = self.document.current_layer_uuid_order
-        current_uuid_order = list(p.uuid for p in presentation_info)
+        current_uuid_order = tuple(p.uuid for p in presentation_info)
 
         remove_elements = []
         for uuid in inconsistent_uuids:
@@ -956,7 +983,8 @@ class SceneGraphManager(QObject):
                     # create an invisible element with the RGB
                     self.change_composite_layer(current_uuid_order, layer, prez_lookup[uuid])
                 else:
-                    raise NotImplementedError('unable to create deferred scenegraph element for %s' % repr(layer))
+                    # FIXME this was previously a NotImplementedError
+                    LOG.warning('unable to create deferred scenegraph element for %s' % repr(layer))
             else:
                 # remove elements for layers which are no longer valid
                 remove_elements.append(uuid)
@@ -964,7 +992,7 @@ class SceneGraphManager(QObject):
         # get info on the new order
         self.layer_set.set_layer_order(current_uuid_order)
         self.layer_set.frame_order = self.document.current_animation_order
-        self.rebuild_presentation(presentation_info)
+        self.rebuild_presentation(prez_lookup)
 
         for elem in remove_elements:
             self.purge_layer(elem)
@@ -1007,7 +1035,7 @@ class SceneGraphManager(QObject):
             data = self.workspace.get_content(uuid, lod=preferred_stride)
             yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.5}
             # FIXME: Use LOD instead of stride and provide the lod to the workspace
-            data = data[::preferred_stride, ::preferred_stride]
+            data = data[::preferred_stride[0], ::preferred_stride[1]]
             tiles_info, vertices, tex_coords = child.retile(data, preferred_stride, tile_box)
             yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 1.0}
             self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)
@@ -1016,7 +1044,7 @@ class SceneGraphManager(QObject):
             data = [self.workspace.get_content(d_uuid, lod=preferred_stride) for d_uuid in self.composite_element_dependencies[uuid]]
             yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.5}
             # FIXME: Use LOD instead of stride and provide the lod to the workspace
-            data = [d[::int(preferred_stride / factor), ::int(preferred_stride / factor)] if d is not None else None for factor, d in zip(child._channel_factors, data)]
+            data = [d[::int(preferred_stride[0] / factor), ::int(preferred_stride[1] / factor)] if d is not None else None for factor, d in zip(child._channel_factors, data)]
             tiles_info, vertices, tex_coords = child.retile(data, preferred_stride, tile_box)
             yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 1.0}
             self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)
