@@ -2,7 +2,8 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created by: PyQt4 UI code generator 4.11.4
+# Created: Mon Mar 13 16:02:43 2017
+#      by: PyQt4 UI code generator 4.10.4
 #
 # WARNING! All changes made in this file will be lost!
 
@@ -140,6 +141,7 @@ class Ui_MainWindow(object):
         font.setFamily(_fromUtf8("Andale Mono"))
         font.setPointSize(14)
         self.cursorProbeText.setFont(font)
+        self.cursorProbeText.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.cursorProbeText.setObjectName(_fromUtf8("cursorProbeText"))
         self.horizontalLayout_2.addWidget(self.cursorProbeText)
         self.verticalLayout_2.addLayout(self.horizontalLayout_2)
@@ -151,6 +153,7 @@ class Ui_MainWindow(object):
         self.mainMapWidget.setSizePolicy(sizePolicy)
         self.mainMapWidget.setObjectName(_fromUtf8("mainMapWidget"))
         self.verticalLayout_5 = QtGui.QVBoxLayout(self.mainMapWidget)
+        self.verticalLayout_5.setMargin(0)
         self.verticalLayout_5.setObjectName(_fromUtf8("verticalLayout_5"))
         self.verticalLayout_3 = QtGui.QVBoxLayout()
         self.verticalLayout_3.setObjectName(_fromUtf8("verticalLayout_3"))
@@ -292,7 +295,7 @@ class Ui_MainWindow(object):
         self.scrollArea.setWidgetResizable(True)
         self.scrollArea.setObjectName(_fromUtf8("scrollArea"))
         self.scrollAreaWidgetContents_8 = QtGui.QWidget()
-        self.scrollAreaWidgetContents_8.setGeometry(QtCore.QRect(0, 0, 225, 420))
+        self.scrollAreaWidgetContents_8.setGeometry(QtCore.QRect(0, 0, 272, 477))
         self.scrollAreaWidgetContents_8.setObjectName(_fromUtf8("scrollAreaWidgetContents_8"))
         self.verticalLayout_33 = QtGui.QVBoxLayout(self.scrollAreaWidgetContents_8)
         self.verticalLayout_33.setObjectName(_fromUtf8("verticalLayout_33"))
@@ -519,4 +522,4 @@ class Ui_MainWindow(object):
         self.slideMinBlue.setToolTip(_translate("MainWindow", "value at 0% blue", None))
         self.slideMaxBlue.setToolTip(_translate("MainWindow", "value at 100% blue", None))
 
-from sift.ui.custom_widgets import QNoScrollComboBox, QNoScrollSlider
+from sift.ui.custom_widgets import QNoScrollSlider, QNoScrollComboBox

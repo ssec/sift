@@ -335,6 +335,9 @@
         <property name="text">
          <string>Probe Value: N/A</string>
         </property>
+        <property name="alignment">
+         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+        </property>
        </widget>
       </item>
      </layout>
@@ -628,7 +631,16 @@
    </attribute>
    <widget class="QWidget" name="dockWidgetContents">
     <layout class="QVBoxLayout" name="verticalLayout_4">
-     <property name="margin">
+     <property name="leftMargin">
+      <number>0</number>
+     </property>
+     <property name="topMargin">
+      <number>0</number>
+     </property>
+     <property name="rightMargin">
+      <number>0</number>
+     </property>
+     <property name="bottomMargin">
       <number>0</number>
      </property>
      <item>
@@ -641,8 +653,8 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>225</width>
-          <height>420</height>
+          <width>272</width>
+          <height>477</height>
          </rect>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_33">
