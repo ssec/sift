@@ -1,5 +1,64 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+"""Build a conda package and all-in-one installer for the current platform.
+
+.. note::
+
+    A current anaconda environment with all dependencies must be loaded
+    before the below commands will complete. Usually `source activate sift`
+    or `activate sift` on Windows.
+
+Run the following commands to build an anaconda package and a all-in-one
+installer application for the platform this script is executed on.
+These commands assume the current machine has direct access to the SSEC
+or other servers needed to complete the package uploads.
+
+.. warning::
+
+    This script does not do the final upload to the FTP server.
+
+Mac OSX
+-------
+
+    python build_release.py
+
+Windows 64-bit
+--------------
+
+    python build_release.py --no-conda-upload --no-installer-upload
+
+The above assumes that an SCP and SSH client are not available on the Windows
+build machine otherwise the uploads can be attempted. If they are not
+available then a shared folder should be used to transport the conda package
+and installer ".exe" to the appropriate servers.
+
+Linux 64-bit
+------------
+
+    python build_release.py
+
+Environment Variables
+---------------------
+
+SIFT_CHANNEL_HOST: (default 'larch') Server where the conda packages are
+    served via HTTP.
+
+SIFT_CHANNEL_PATH: (default '/var/apache/larch/htdocs/channels/sift')
+    Path on SIFT_CHANNEL_HOST where conda packages are served. There should
+    be `win-64`, `linux-64`, `osx-64`, and `noarch` directories in this
+    directory.
+
+SIFT_FTP_HOST: (default 'meelo')
+    Server that has permission to upload to the SSEC FTP server.
+
+SIFT_FTP_HOST_PATH: (default '~/repos/git/CSPOV/dist') Where on the FTP host
+    should all-in-one installers be placed before being uploaded to the FTP
+    server.
+
+SIFT_FTP_PATH: (default 'pub/sift/dist') Where on the SSEC FTP server should
+    packages be uploaded.
+
+"""
 
 import os
 import sys
@@ -95,7 +154,7 @@ def package_installer_linux():
 
 
 def package_installer_win():
-    run("{} \"sift.iss\"".format(ISCC_PATH).split(' '))
+    run([ISCC_PATH], "sift.iss")
     vol_name = "SIFT_{}.exe".format(version.__version__)
     vol_name = os.path.join('sift_inno_setup_output', vol_name)
     old_name = os.path.join('sift_inno_setup_output', 'setup.exe')
