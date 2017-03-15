@@ -154,7 +154,7 @@ def package_installer_linux():
 
 
 def package_installer_win():
-    run([ISCC_PATH], "sift.iss")
+    run([ISCC_PATH, "sift.iss"])
     vol_name = "SIFT_{}.exe".format(version.__version__)
     vol_name = os.path.join('sift_inno_setup_output', vol_name)
     old_name = os.path.join('sift_inno_setup_output', 'setup.exe')
