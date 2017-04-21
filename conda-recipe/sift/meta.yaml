@@ -33,7 +33,7 @@ requirements:
     - shapely
     - rasterio
     - gdal
-    - pyqt
+    - pyqt <5
     - cython >=0.17 # [win]
 
   run:
@@ -52,7 +52,7 @@ requirements:
     - shapely
     - rasterio
     - gdal
-    - pyqt
+    - pyqt <5
 
 test:
   commands:
