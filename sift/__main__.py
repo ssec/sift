@@ -27,6 +27,7 @@ QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
 
 import sift.ui.open_cache_dialog_ui as open_cache_dialog_ui
+from sift.ui import export_image_dialog_ui
 from sift.control.LayerManager import LayerSetsManager
 from sift.model.document import Document, DocRGBLayer, DocCompositeLayer, DocBasicLayer, DocLayer, DocLayerStack
 from sift.view.SceneGraphManager import SceneGraphManager
@@ -127,6 +128,76 @@ class OpenCacheDialog(QtGui.QWidget):
         self._doc = self._ws = self._opener = self._paths = None
 
 
+class ExportImageDialog(QtGui.QDialog):
+    def __init__(self, parent):
+        super(ExportImageDialog, self).__init__(parent)
+        self._last_dir = os.getcwd()
+
+        self.ui = export_image_dialog_ui.Ui_ExportImageDialog()
+        self.ui.setupUi(self)
+
+        self.ui.frameRangeFrom.setValidator(QtGui.QIntValidator())
+        self.ui.frameRangeTo.setValidator(QtGui.QIntValidator())
+        self.ui.saveAsLineEdit.textChanged.connect(self._validate_filename)
+        self.ui.saveAsButton.clicked.connect(self._show_file_dialog)
+        self._validate_filename()
+
+        self.ui.frameAllRadio.clicked.connect(self.change_frame_range)
+        self.ui.frameCurrentRadio.clicked.connect(self.change_frame_range)
+        self.ui.frameRangeRadio.clicked.connect(self.change_frame_range)
+        self.change_frame_range()  # set default
+
+    def _show_file_dialog(self):
+        fn = QtGui.QFileDialog.getSaveFileName(self,
+                                               self.tr('Screenshot Filename'),
+                                               self._last_dir,
+                                               self.tr('Image Files (*.png *.jpg *.gif)'))
+        if fn:
+            self.filename = fn
+            self.ui.saveAsLineEdit.setText(self.filename)
+        # bring this dialog back in focus
+        self.raise_()
+        self.activateWindow()
+
+    def _validate_filename(self):
+        t = self.ui.saveAsLineEdit.text()
+        bt = self.ui.buttonBox.button(QtGui.QDialogButtonBox.Save)
+        if not t or os.path.splitext(t)[-1] not in ['.png', '.jpg', '.gif']:
+            bt.setDisabled(True)
+        else:
+            self._last_dir = os.path.dirname(t)
+            bt.setDisabled(False)
+
+    def change_frame_range(self):
+        if self.ui.frameRangeRadio.isChecked():
+            self.ui.frameRangeFrom.setDisabled(False)
+            self.ui.frameRangeTo.setDisabled(False)
+        else:
+            self.ui.frameRangeFrom.setDisabled(True)
+            self.ui.frameRangeTo.setDisabled(True)
+
+    def get_frame_range(self):
+        if self.ui.frameCurrentRadio.isChecked():
+            frame = None
+        elif self.ui.frameAllRadio.isChecked():
+            frame = [None, None]
+        elif self.ui.frameRangeRadio.isChecked():
+            frame = [
+                int(self.ui.frameRangeFrom.text()),
+                int(self.ui.frameRangeTo.text())
+            ]
+        else:
+            LOG.error("Unknown frame range selection")
+            return
+        return frame
+
+    def get_info(self):
+        info = {
+            'frame_range': self.get_frame_range(),
+            'include_footer': self.ui.includeFooterCheckbox.isChecked(),
+            'filename': self.filename,
+        }
+        return info
 
 
 class AnimationSpeedPopupWindow(QtGui.QWidget):
@@ -221,6 +292,7 @@ class Main(QtGui.QMainWindow):
     _recent_files_menu = None # QMenu
     _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
     _open_cache_dialog = None
+    _screenshot_dialog = None
 
     def interactive_open_files(self, *args, files=None, **kwargs):
         self.scene_manager.layer_set.animating = False
@@ -684,6 +756,29 @@ class Main(QtGui.QMainWindow):
         layer = self.document.create_rgb_composite(uuids[0], uuids[1], uuids[2])
         self.behaviorLayersList.select([layer.uuid])
 
+    def take_screenshot(self):
+        if not self._screenshot_dialog:
+            self._screenshot_dialog = ExportImageDialog(self)
+            self._screenshot_dialog.accepted.connect(self._save_screenshot)
+        self._screenshot_dialog.show()
+
+    def _save_screenshot(self):
+        from PIL import Image
+        info = self._screenshot_dialog.get_info()
+        LOG.info("Exporting image with options: {}".format(info))
+        img_arrays = self.scene_manager.get_screenshot_array(info['frame_range'])
+        if isinstance(img_arrays, list):
+            if not len(img_arrays):
+                LOG.error("Can't save zero frames returned from scene")
+                return
+            images = [Image.fromarray(x) for x in img_arrays]
+            LOG.info("Saving screenshot to '{}'".format(info['filename']))
+            images[0].save(info['filename'], save_all=True, append_images=images[1:])
+        else:
+            new_img = Image.fromarray(img_arrays)
+            LOG.info("Saving screenshot to '{}'".format(info['filename']))
+            new_img.save(info['filename'])
+
     def setup_menu(self):
         open_action = QtGui.QAction("&Open...", self)
         open_action.setShortcut("Ctrl+O")
@@ -707,6 +802,11 @@ class Main(QtGui.QMainWindow):
         file_menu.addAction(open_cache_action)
         file_menu.addAction(open_glob_action)
         self._recent_files_menu = file_menu.addMenu('Open Recent')
+
+        screenshot_action = QtGui.QAction("Export Image", self)
+        screenshot_action.setShortcut("Ctrl+I")
+        screenshot_action.triggered.connect(self.take_screenshot)
+        file_menu.addAction(screenshot_action)
 
         file_menu.addAction(exit_action)
 

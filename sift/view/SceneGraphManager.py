@@ -192,6 +192,14 @@ class LayerSet(object):
             self.frame_order = frame_order
 
     @property
+    def current_frame(self):
+        return self._frame_number
+
+    @property
+    def max_frame(self):
+        return len(self._frame_order)
+
+    @property
     def animation_speed(self):
         """speed in milliseconds
         """
@@ -244,7 +252,7 @@ class LayerSet(object):
                 LOG.error('set_frame_order cannot deal with unknown layer {}'.format(o))
                 return
         self._frame_order = frame_order
-        # ticket #92: this is not a good idea
+        # FIXME: ticket #92: this is not a good idea
         self._frame_number = 0
         # LOG.debug('accepted new frame order of length {}'.format(len(frame_order)))
         # if self._frame_change_cb is not None and self._frame_order:
@@ -413,6 +421,30 @@ class SceneGraphManager(QObject):
 
         self.setup_initial_canvas(center)
         self.pending_polygon = PendingPolygon(self.main_map)
+
+    def get_screenshot_array(self, frame_range):
+        from vispy.gloo.util import _screenshot
+        if frame_range is None:
+            return _screenshot()
+        s, e = frame_range
+        # user provided frames are 1-based, scene graph are 0-based
+        if s is None:
+            s = 1
+        if e is None:
+            e = max(self.layer_set.max_frame, 1)
+
+        # reset the view once we are done
+        c = self.layer_set.current_frame
+        images = []
+        for i in range(s - 1, e):
+            self.set_frame_number(i)
+            self.update()
+            self.main_canvas.on_draw(None)
+            images.append(_screenshot())
+        self.set_frame_number(c)
+        self.update()
+        self.main_canvas.on_draw(None)
+        return images
 
     def frame_changed(self, frame_info):
         """
