@@ -422,7 +422,7 @@ class SceneGraphManager(QObject):
         self.setup_initial_canvas(center)
         self.pending_polygon = PendingPolygon(self.main_map)
 
-    def get_screenshot_array(self, frame_range):
+    def get_screenshot_array(self, frame_range=None):
         from vispy.gloo.util import _screenshot
         if frame_range is None:
             return _screenshot()

@@ -136,8 +136,15 @@ class ExportImageDialog(QtGui.QDialog):
         self.ui = export_image_dialog_ui.Ui_ExportImageDialog()
         self.ui.setupUi(self)
 
-        self.ui.frameRangeFrom.setValidator(QtGui.QIntValidator())
-        self.ui.frameRangeTo.setValidator(QtGui.QIntValidator())
+        self.ui.animationGroupBox.setDisabled(True)
+        self.ui.constantDelaySpin.setDisabled(True)
+        self.ui.timeLapseRadio.setChecked(True)
+        self.ui.timeLapseRadio.clicked.connect(self._delay_clicked)
+        self.ui.constantDelayRadio.clicked.connect(self._delay_clicked)
+        self._delay_clicked()
+
+        self.ui.frameRangeFrom.setValidator(QtGui.QIntValidator(1, 1))
+        self.ui.frameRangeTo.setValidator(QtGui.QIntValidator(1, 1))
         self.ui.saveAsLineEdit.textChanged.connect(self._validate_filename)
         self.ui.saveAsButton.clicked.connect(self._show_file_dialog)
         self._validate_filename()
@@ -147,14 +154,25 @@ class ExportImageDialog(QtGui.QDialog):
         self.ui.frameRangeRadio.clicked.connect(self.change_frame_range)
         self.change_frame_range()  # set default
 
+    def set_total_frames(self, n):
+        self.ui.frameRangeFrom.validator().setBottom(1)
+        self.ui.frameRangeTo.validator().setBottom(2)
+        self.ui.frameRangeFrom.validator().setTop(n - 1)
+        self.ui.frameRangeTo.validator().setTop(n)
+
+    def _delay_clicked(self):
+        if self.ui.constantDelayRadio.isChecked():
+            self.ui.constantDelaySpin.setDisabled(False)
+        else:
+            self.ui.constantDelaySpin.setDisabled(True)
+
     def _show_file_dialog(self):
         fn = QtGui.QFileDialog.getSaveFileName(self,
                                                self.tr('Screenshot Filename'),
                                                self._last_dir,
                                                self.tr('Image Files (*.png *.jpg *.gif)'))
         if fn:
-            self.filename = fn
-            self.ui.saveAsLineEdit.setText(self.filename)
+            self.ui.saveAsLineEdit.setText(fn)
         # bring this dialog back in focus
         self.raise_()
         self.activateWindow()
@@ -176,6 +194,13 @@ class ExportImageDialog(QtGui.QDialog):
             self.ui.frameRangeFrom.setDisabled(True)
             self.ui.frameRangeTo.setDisabled(True)
 
+        if self.ui.frameCurrentRadio.isChecked():
+            self.ui.animationGroupBox.setDisabled(True)
+            self.ui.frameDelayGroup.setDisabled(True)
+        else:
+            self.ui.animationGroupBox.setDisabled(False)
+            self.ui.frameDelayGroup.setDisabled(False)
+
     def get_frame_range(self):
         if self.ui.frameCurrentRadio.isChecked():
             frame = None
@@ -192,10 +217,19 @@ class ExportImageDialog(QtGui.QDialog):
         return frame
 
     def get_info(self):
+        if self.ui.timeLapseRadio.isChecked():
+            delay = None
+        else:
+            delay = self.ui.constantDelaySpin.value()
+
+        # loop is actually an integer of number of times to loop (0 infinite)
         info = {
             'frame_range': self.get_frame_range(),
             'include_footer': self.ui.includeFooterCheckbox.isChecked(),
-            'filename': self.filename,
+            # 'transparency': self.ui.transparentCheckbox.isChecked(),
+            'loop': self.ui.loopRadio.isChecked(),
+            'filename': self.ui.saveAsLineEdit.text(),
+            'delay': delay,
         }
         return info
 
@@ -760,6 +794,7 @@ class Main(QtGui.QMainWindow):
         if not self._screenshot_dialog:
             self._screenshot_dialog = ExportImageDialog(self)
             self._screenshot_dialog.accepted.connect(self._save_screenshot)
+        self._screenshot_dialog.set_total_frames(self.scene_manager.layer_set.max_frame + 1)
         self._screenshot_dialog.show()
 
     def _save_screenshot(self):
@@ -767,17 +802,38 @@ class Main(QtGui.QMainWindow):
         info = self._screenshot_dialog.get_info()
         LOG.info("Exporting image with options: {}".format(info))
         img_arrays = self.scene_manager.get_screenshot_array(info['frame_range'])
+        params = {
+            # 'transparency': info['transparency'],
+            'duration': info['delay'],
+        }
+
         if isinstance(img_arrays, list):
             if not len(img_arrays):
                 LOG.error("Can't save zero frames returned from scene")
                 return
-            images = [Image.fromarray(x) for x in img_arrays]
-            LOG.info("Saving screenshot to '{}'".format(info['filename']))
-            images[0].save(info['filename'], save_all=True, append_images=images[1:])
+            if info['filename'].endswith('.gif'):
+                images = [Image.fromarray(x) for x in img_arrays]
+                params['save_all'] = True
+                if info['delay'] is None:
+                    # FIXME: Talk to the document about frame delays
+                    params['delay'] = [200] * len(images)
+                else:
+                    params['delay'] = info['delay']
+                if not info['loop']:
+                    # rocking animation
+                    # we want frames 0, 1, 2, 3, 2, 1
+                    images = images + images[-2:0:-1]
+                params['loop'] = 0  # infinite number of loops
+                new_img = images[0]
+                params['append_images'] = images[1:]
+            else:
+                LOG.warning("File format does not support animation: {}".format(info['filename']))
+                new_img = Image.fromarray(img_arrays[0])
         else:
             new_img = Image.fromarray(img_arrays)
-            LOG.info("Saving screenshot to '{}'".format(info['filename']))
-            new_img.save(info['filename'])
+
+        LOG.info("Saving screenshot to '{}'".format(info['filename']))
+        new_img.save(info['filename'], **params)
 
     def setup_menu(self):
         open_action = QtGui.QAction("&Open...", self)
