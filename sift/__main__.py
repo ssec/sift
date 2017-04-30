@@ -814,15 +814,15 @@ class Main(QtGui.QMainWindow):
             if info['filename'].endswith('.gif'):
                 images = [Image.fromarray(x) for x in img_arrays]
                 params['save_all'] = True
+                if not info['loop']:
+                    # rocking animation
+                    # we want frames 0, 1, 2, 3, 2, 1
+                    images = images + images[-2:0:-1]
                 if info['delay'] is None:
                     # FIXME: Talk to the document about frame delays
                     params['delay'] = [200] * len(images)
                 else:
                     params['delay'] = info['delay']
-                if not info['loop']:
-                    # rocking animation
-                    # we want frames 0, 1, 2, 3, 2, 1
-                    images = images + images[-2:0:-1]
                 params['loop'] = 0  # infinite number of loops
                 new_img = images[0]
                 params['append_images'] = images[1:]
