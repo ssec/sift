@@ -149,6 +149,9 @@ class ExportImageDialog(QtGui.QDialog):
         self.ui.saveAsButton.clicked.connect(self._show_file_dialog)
         self._validate_filename()
 
+        self.ui.includeFooterCheckbox.clicked.connect(self._footer_changed)
+        self._footer_changed()
+
         self.ui.frameAllRadio.clicked.connect(self.change_frame_range)
         self.ui.frameCurrentRadio.clicked.connect(self.change_frame_range)
         self.ui.frameRangeRadio.clicked.connect(self.change_frame_range)
@@ -165,6 +168,12 @@ class ExportImageDialog(QtGui.QDialog):
             self.ui.constantDelaySpin.setDisabled(False)
         else:
             self.ui.constantDelaySpin.setDisabled(True)
+
+    def _footer_changed(self):
+        if self.ui.includeFooterCheckbox.isChecked():
+            self.ui.footerFontSizeSpinBox.setDisabled(False)
+        else:
+            self.ui.footerFontSizeSpinBox.setDisabled(True)
 
     def _show_file_dialog(self):
         fn = QtGui.QFileDialog.getSaveFileName(self,
@@ -230,6 +239,7 @@ class ExportImageDialog(QtGui.QDialog):
             'loop': self.ui.loopRadio.isChecked(),
             'filename': self.ui.saveAsLineEdit.text(),
             'delay': delay,
+            'font_size': self.ui.footerFontSizeSpinBox.value(),
         }
         return info
 
@@ -801,7 +811,7 @@ class Main(QtGui.QMainWindow):
         from PIL import Image, ImageDraw, ImageFont
         orig_w, orig_h = im.size
         font = ImageFont.truetype('Andale Mono', font_size)
-        banner_h = font.get_size()[1]
+        banner_h = font_size
         new_im = Image.new(im.mode, (orig_w, orig_h + banner_h), "black")
         new_draw = ImageDraw.Draw(new_im)
         new_draw.rectangle([0, orig_h, orig_w, orig_h + banner_h], fill="#000000")
@@ -818,10 +828,7 @@ class Main(QtGui.QMainWindow):
         info = self._screenshot_dialog.get_info()
         LOG.info("Exporting image with options: {}".format(info))
         img_arrays = self.scene_manager.get_screenshot_array(info['frame_range'])
-        params = {
-            # 'transparency': info['transparency'],
-            # 'duration': info['delay'],
-        }
+        params = {}
 
         if not len(img_arrays):
             LOG.error("Can't save zero frames returned from scene")
@@ -830,7 +837,7 @@ class Main(QtGui.QMainWindow):
         images = [(u, Image.fromarray(x)) for u, x in img_arrays]
         if info['include_footer']:
             banner_text = [self.document[u][INFO.NAME] if u else "" for u, im in images]
-            images = [(u, self._add_screenshot_footer(im, bt)) for (u, im), bt in zip(images, banner_text)]
+            images = [(u, self._add_screenshot_footer(im, bt, font_size=info['font_size'])) for (u, im), bt in zip(images, banner_text)]
         new_img = images[0][1]
 
         if info['filename'].endswith('.gif'):

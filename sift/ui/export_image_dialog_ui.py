@@ -25,7 +25,7 @@ except AttributeError:
 class Ui_ExportImageDialog(object):
     def setupUi(self, ExportImageDialog):
         ExportImageDialog.setObjectName(_fromUtf8("ExportImageDialog"))
-        ExportImageDialog.resize(340, 365)
+        ExportImageDialog.resize(340, 360)
         ExportImageDialog.setStyleSheet(_fromUtf8(""))
         self.buttonBox = QtGui.QDialogButtonBox(ExportImageDialog)
         self.buttonBox.setEnabled(True)
@@ -99,7 +99,7 @@ class Ui_ExportImageDialog(object):
         self.constantDelayRadio.setGeometry(QtCore.QRect(10, 60, 81, 21))
         self.constantDelayRadio.setObjectName(_fromUtf8("constantDelayRadio"))
         self.constantDelaySpin = QtGui.QSpinBox(self.frameDelayGroup)
-        self.constantDelaySpin.setGeometry(QtCore.QRect(90, 60, 131, 21))
+        self.constantDelaySpin.setGeometry(QtCore.QRect(90, 60, 81, 21))
         self.constantDelaySpin.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.constantDelaySpin.setFrame(True)
         self.constantDelaySpin.setButtonSymbols(QtGui.QAbstractSpinBox.UpDownArrows)
@@ -108,6 +108,15 @@ class Ui_ExportImageDialog(object):
         self.constantDelaySpin.setMinimum(100)
         self.constantDelaySpin.setMaximum(5000)
         self.constantDelaySpin.setObjectName(_fromUtf8("constantDelaySpin"))
+        self.label_3 = QtGui.QLabel(ExportImageDialog)
+        self.label_3.setGeometry(QtCore.QRect(150, 300, 61, 21))
+        self.label_3.setObjectName(_fromUtf8("label_3"))
+        self.footerFontSizeSpinBox = QtGui.QSpinBox(ExportImageDialog)
+        self.footerFontSizeSpinBox.setGeometry(QtCore.QRect(210, 300, 61, 20))
+        self.footerFontSizeSpinBox.setMinimum(8)
+        self.footerFontSizeSpinBox.setMaximum(72)
+        self.footerFontSizeSpinBox.setProperty("value", 11)
+        self.footerFontSizeSpinBox.setObjectName(_fromUtf8("footerFontSizeSpinBox"))
 
         self.retranslateUi(ExportImageDialog)
         QtCore.QObject.connect(self.buttonBox, QtCore.SIGNAL(_fromUtf8("accepted()")), ExportImageDialog.accept)
@@ -132,4 +141,6 @@ class Ui_ExportImageDialog(object):
         self.timeLapseRadio.setText(_translate("ExportImageDialog", "Time Lapse", None))
         self.constantDelayRadio.setText(_translate("ExportImageDialog", "Constant:", None))
         self.constantDelaySpin.setSuffix(_translate("ExportImageDialog", "ms", None))
+        self.label_3.setText(_translate("ExportImageDialog", "Font Size:", None))
+        self.footerFontSizeSpinBox.setSuffix(_translate("ExportImageDialog", "px", None))
 
