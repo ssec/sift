@@ -797,6 +797,22 @@ class Main(QtGui.QMainWindow):
         self._screenshot_dialog.set_total_frames(self.scene_manager.layer_set.max_frame + 1)
         self._screenshot_dialog.show()
 
+    def _add_screenshot_footer(self, im, banner_text, font_size=11):
+        from PIL import Image, ImageDraw, ImageFont
+        orig_w, orig_h = im.size
+        font = ImageFont.truetype('Andale Mono', font_size)
+        banner_h = font.get_size()[1]
+        new_im = Image.new(im.mode, (orig_w, orig_h + banner_h), "black")
+        new_draw = ImageDraw.Draw(new_im)
+        new_draw.rectangle([0, orig_h, orig_w, orig_h + banner_h], fill="#000000")
+        # give one extra pixel on the left to make sure letters
+        # don't get cut off
+        new_draw.text([1, orig_h], banner_text, fill="#ffffff", font=font)
+        txt_w, txt_h = new_draw.textsize("SIFT", font)
+        new_draw.text([orig_w - txt_w, orig_h], "SIFT", fill="#ffffff", font=font)
+        new_im.paste(im, (0, 0, orig_w, orig_h))
+        return new_im
+
     def _save_screenshot(self):
         from PIL import Image
         info = self._screenshot_dialog.get_info()
@@ -804,35 +820,46 @@ class Main(QtGui.QMainWindow):
         img_arrays = self.scene_manager.get_screenshot_array(info['frame_range'])
         params = {
             # 'transparency': info['transparency'],
-            'duration': info['delay'],
+            # 'duration': info['delay'],
         }
 
-        if isinstance(img_arrays, list):
-            if not len(img_arrays):
-                LOG.error("Can't save zero frames returned from scene")
-                return
-            if info['filename'].endswith('.gif'):
-                images = [Image.fromarray(x) for x in img_arrays]
-                params['save_all'] = True
-                if not info['loop']:
-                    # rocking animation
-                    # we want frames 0, 1, 2, 3, 2, 1
-                    images = images + images[-2:0:-1]
-                if info['delay'] is None:
-                    # FIXME: Talk to the document about frame delays
-                    params['delay'] = [200] * len(images)
-                else:
-                    params['delay'] = info['delay']
-                params['loop'] = 0  # infinite number of loops
-                new_img = images[0]
-                params['append_images'] = images[1:]
+        if not len(img_arrays):
+            LOG.error("Can't save zero frames returned from scene")
+            return
+
+        images = [(u, Image.fromarray(x)) for u, x in img_arrays]
+        if info['include_footer']:
+            banner_text = [self.document[u][INFO.NAME] if u else "" for u, im in images]
+            images = [(u, self._add_screenshot_footer(im, bt)) for (u, im), bt in zip(images, banner_text)]
+        new_img = images[0][1]
+
+        if info['filename'].endswith('.gif'):
+            params['save_all'] = True
+            if info['delay'] is None:
+                from sift.model.guidebook import GUIDE
+                t = [self.document[u][GUIDE.SCHED_TIME] for u, im in images]
+                t_diff = [(t[i] - t[i - 1]).total_seconds() for i in range(1, len(t))]
+                min_diff = float(min(t_diff))
+                duration = [100 * int(this_diff / min_diff) for this_diff in t_diff]
+                params['duration'] = [duration[0]] + duration
+                # params['duration'] = [50 * i for i in range(len(images))]
+                if info['loop']:
+                    params['duration'] = params['duration'] + params['duration'][-2:0:-1]
             else:
-                LOG.warning("File format does not support animation: {}".format(info['filename']))
-                new_img = Image.fromarray(img_arrays[0])
-        else:
-            new_img = Image.fromarray(img_arrays)
+                params['duration'] = info['delay']
+            if not info['loop']:
+                # rocking animation
+                # we want frames 0, 1, 2, 3, 2, 1
+                images = images + images[-2:0:-1]
+
+            params['loop'] = 0  # infinite number of loops
+            new_img = images[0][1]
+            params['append_images'] = [x for u,x in images[1:]]
+        elif len(images) != 1:
+            LOG.warning("File format does not support animation: {}".format(info['filename']))
 
         LOG.info("Saving screenshot to '{}'".format(info['filename']))
+        LOG.debug("File save parameters: {}".format(params))
         new_img.save(info['filename'], **params)
 
     def setup_menu(self):

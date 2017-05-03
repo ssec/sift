@@ -425,7 +425,7 @@ class SceneGraphManager(QObject):
     def get_screenshot_array(self, frame_range=None):
         from vispy.gloo.util import _screenshot
         if frame_range is None:
-            return _screenshot()
+            return [(self.layer_set.top_layer_uuid(), _screenshot())]
         s, e = frame_range
         # user provided frames are 1-based, scene graph are 0-based
         if s is None:
@@ -440,7 +440,7 @@ class SceneGraphManager(QObject):
             self.set_frame_number(i)
             self.update()
             self.main_canvas.on_draw(None)
-            images.append(_screenshot())
+            images.append((self.layer_set.top_layer_uuid(), _screenshot()))
         self.set_frame_number(c)
         self.update()
         self.main_canvas.on_draw(None)
