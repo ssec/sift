@@ -12,8 +12,7 @@ This module holds the code which deals with the controller and view for the area
 __author__ = 'evas'
 __docformat__ = 'reStructuredText'
 
-import PyQt4.QtCore as QtCore
-import PyQt4.QtGui as QtGui
+from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import QObject, pyqtSignal
 
 # a useful constant
