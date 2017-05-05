@@ -129,15 +129,17 @@ class OpenCacheDialog(QtGui.QWidget):
 
 
 class ExportImageDialog(QtGui.QDialog):
+    default_filename = 'sift_screenshot.png'
+
     def __init__(self, parent):
         super(ExportImageDialog, self).__init__(parent)
-        self._last_dir = os.getcwd()
 
         self.ui = export_image_dialog_ui.Ui_ExportImageDialog()
         self.ui.setupUi(self)
 
         self.ui.animationGroupBox.setDisabled(True)
         self.ui.constantDelaySpin.setDisabled(True)
+        self.ui.constantDelaySpin.setValue(100)
         self.ui.timeLapseRadio.setChecked(True)
         self.ui.timeLapseRadio.clicked.connect(self._delay_clicked)
         self.ui.constantDelayRadio.clicked.connect(self._delay_clicked)
@@ -147,6 +149,15 @@ class ExportImageDialog(QtGui.QDialog):
         self.ui.frameRangeTo.setValidator(QtGui.QIntValidator(1, 1))
         self.ui.saveAsLineEdit.textChanged.connect(self._validate_filename)
         self.ui.saveAsButton.clicked.connect(self._show_file_dialog)
+
+        try:
+            if sys.platform.startswith('win'):
+                self._last_dir = os.path.join(os.environ['USERPROFILE'], 'Desktop')
+            else:
+                self._last_dir = os.path.join(os.path.expanduser('~'), 'Desktop')
+        except (KeyError, ValueError):
+            self._last_dir = os.getcwd()
+        self.ui.saveAsLineEdit.setText(os.path.join(self._last_dir, self.default_filename))
         self._validate_filename()
 
         self.ui.includeFooterCheckbox.clicked.connect(self._footer_changed)
@@ -177,9 +188,10 @@ class ExportImageDialog(QtGui.QDialog):
 
     def _show_file_dialog(self):
         fn = QtGui.QFileDialog.getSaveFileName(self,
-                                               self.tr('Screenshot Filename'),
-                                               self._last_dir,
-                                               self.tr('Image Files (*.png *.jpg *.gif)'))
+                                               caption=self.tr('Screenshot Filename'),
+                                               directory=os.path.join(self._last_dir, self.default_filename),
+                                               filter=self.tr('Image Files (*.png *.jpg *.gif)'),
+                                               options=QtGui.QFileDialog.DontConfirmOverwrite)
         if fn:
             self.ui.saveAsLineEdit.setText(fn)
         # bring this dialog back in focus
@@ -825,22 +837,62 @@ class Main(QtGui.QMainWindow):
 
     def _save_screenshot(self):
         from PIL import Image
+        from sift.model.guidebook import GUIDE
         info = self._screenshot_dialog.get_info()
         LOG.info("Exporting image with options: {}".format(info))
-        img_arrays = self.scene_manager.get_screenshot_array(info['frame_range'])
-        params = {}
+        uuids = self.scene_manager.layer_set.frame_order
+        if uuids:
+            filenames = []
+            if info['filename'].endswith('.gif'):
+                # only use the first uuid to fill in filename information
+                file_uuids = uuids[:1]
+            else:
+                file_uuids = uuids
+            for u in file_uuids:
+                layer_info = self.document[u]
+                fn = info['filename'].format(
+                    start_time=layer_info[GUIDE.SCHED_TIME],
+                    scene=GUIDE.SCENE,
+                    instrument=GUIDE.INSTRUMENT,
+                )
+                filenames.append(fn)
+        else:
+            uuids = [None]
+            filenames = [info['filename']]
 
+        # check for duplicate filenames
+        if len(filenames) > 1 and all(filenames[0] == fn for fn in filenames):
+            ext = os.path.splitext(filenames[0])[-1]
+            filenames = [os.path.splitext(fn)[0] + "_{:03d}".format(i + 1) + ext for i, fn in enumerate(filenames)]
+
+        if any(os.path.isfile(fn) for fn in filenames):
+            msg = QtGui.QMessageBox()
+            msg.setWindowTitle("Overwrite File(s)?")
+            msg.setText("One or more files already exist.")
+            msg.setInformativeText("Do you want to overwrite existing files?")
+            msg.setStandardButtons(msg.Cancel)
+            msg.setDefaultButton(msg.Cancel)
+            msg.addButton("Overwrite All", msg.YesRole)
+            # XXX: may raise "modalSession has been exited prematurely" for pyqt4 on mac
+            ret = msg.exec_()
+            if ret == msg.Cancel:
+                # XXX: This could technically reach a recursion limit
+                self.take_screenshot()
+                return
+
+        img_arrays = self.scene_manager.get_screenshot_array(info['frame_range'])
         if not len(img_arrays):
             LOG.error("Can't save zero frames returned from scene")
             return
 
+        assert len(uuids) == len(img_arrays), "Number of filenames does not equal number of frames"
+        params = {}
         images = [(u, Image.fromarray(x)) for u, x in img_arrays]
         if info['include_footer']:
             banner_text = [self.document[u][INFO.NAME] if u else "" for u, im in images]
             images = [(u, self._add_screenshot_footer(im, bt, font_size=info['font_size'])) for (u, im), bt in zip(images, banner_text)]
-        new_img = images[0][1]
 
-        if info['filename'].endswith('.gif'):
+        if filenames[0].endswith('.gif'):
             params['save_all'] = True
             if info['delay'] is None:
                 from sift.model.guidebook import GUIDE
@@ -850,7 +902,7 @@ class Main(QtGui.QMainWindow):
                 duration = [100 * int(this_diff / min_diff) for this_diff in t_diff]
                 params['duration'] = [duration[0]] + duration
                 # params['duration'] = [50 * i for i in range(len(images))]
-                if info['loop']:
+                if not info['loop']:
                     params['duration'] = params['duration'] + params['duration'][-2:0:-1]
             else:
                 params['duration'] = info['delay']
@@ -862,12 +914,15 @@ class Main(QtGui.QMainWindow):
             params['loop'] = 0  # infinite number of loops
             new_img = images[0][1]
             params['append_images'] = [x for u,x in images[1:]]
-        elif len(images) != 1:
-            LOG.warning("File format does not support animation: {}".format(info['filename']))
 
-        LOG.info("Saving screenshot to '{}'".format(info['filename']))
-        LOG.debug("File save parameters: {}".format(params))
-        new_img.save(info['filename'], **params)
+            LOG.info("Saving screenshot to '{}'".format(info['filename']))
+            LOG.debug("File save parameters: {}".format(params))
+            new_img.save(filenames[0], **params)
+        else:
+            for fn, (u, new_img) in zip(filenames, images):
+                LOG.info("Saving screenshot to '{}'".format(fn))
+                LOG.debug("File save parameters: {}".format(params))
+                new_img.save(fn, **params)
 
     def setup_menu(self):
         open_action = QtGui.QAction("&Open...", self)

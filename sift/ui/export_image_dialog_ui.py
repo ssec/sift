@@ -105,7 +105,7 @@ class Ui_ExportImageDialog(object):
         self.constantDelaySpin.setButtonSymbols(QtGui.QAbstractSpinBox.UpDownArrows)
         self.constantDelaySpin.setAccelerated(True)
         self.constantDelaySpin.setKeyboardTracking(True)
-        self.constantDelaySpin.setMinimum(100)
+        self.constantDelaySpin.setMinimum(25)
         self.constantDelaySpin.setMaximum(5000)
         self.constantDelaySpin.setObjectName(_fromUtf8("constantDelaySpin"))
         self.label_3 = QtGui.QLabel(ExportImageDialog)

@@ -440,7 +440,8 @@ class SceneGraphManager(QObject):
             self.set_frame_number(i)
             self.update()
             self.main_canvas.on_draw(None)
-            images.append((self.layer_set.top_layer_uuid(), _screenshot()))
+            u = self.layer_set.frame_order[i]
+            images.append((u, _screenshot()))
         self.set_frame_number(c)
         self.update()
         self.main_canvas.on_draw(None)

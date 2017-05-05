@@ -319,7 +319,7 @@
      <string>ms</string>
     </property>
     <property name="minimum">
-     <number>100</number>
+     <number>25</number>
     </property>
     <property name="maximum">
      <number>5000</number>
