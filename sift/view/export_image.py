@@ -11,6 +11,16 @@ from sift.model.guidebook import GUIDE
 LOG = logging.getLogger(__name__)
 
 
+def _default_directory():
+    try:
+        if sys.platform.startswith('win'):
+            return os.path.join(os.environ['USERPROFILE'], 'Desktop')
+        else:
+            return os.path.join(os.path.expanduser('~'), 'Desktop')
+    except (KeyError, ValueError):
+        return os.getcwd()
+
+
 class ExportImageDialog(QtGui.QDialog):
     default_filename = 'sift_screenshot.png'
 
@@ -33,13 +43,7 @@ class ExportImageDialog(QtGui.QDialog):
         self.ui.saveAsLineEdit.textChanged.connect(self._validate_filename)
         self.ui.saveAsButton.clicked.connect(self._show_file_dialog)
 
-        try:
-            if sys.platform.startswith('win'):
-                self._last_dir = os.path.join(os.environ['USERPROFILE'], 'Desktop')
-            else:
-                self._last_dir = os.path.join(os.path.expanduser('~'), 'Desktop')
-        except (KeyError, ValueError):
-            self._last_dir = os.getcwd()
+        self._last_dir = _default_directory()
         self.ui.saveAsLineEdit.setText(os.path.join(self._last_dir, self.default_filename))
         self._validate_filename()
 
@@ -56,6 +60,11 @@ class ExportImageDialog(QtGui.QDialog):
         self.ui.frameRangeTo.validator().setBottom(2)
         self.ui.frameRangeFrom.validator().setTop(n - 1)
         self.ui.frameRangeTo.validator().setTop(n)
+        if (self.ui.frameRangeFrom.text() == '' or
+            int(self.ui.frameRangeFrom.text()) > n - 1):
+            self.ui.frameRangeFrom.setText('1')
+        if self.ui.frameRangeTo.text() in ['', '1']:
+            self.ui.frameRangeTo.setText(str(n))
 
     def _delay_clicked(self):
         if self.ui.constantDelayRadio.isChecked():
@@ -89,6 +98,22 @@ class ExportImageDialog(QtGui.QDialog):
         else:
             self._last_dir = os.path.dirname(t)
             bt.setDisabled(False)
+        self._check_animation_controls()
+
+    def _is_animation_filename(self):
+        fn = self.ui.saveAsLineEdit.text()
+        return os.path.splitext(fn)[-1] in ['.gif']
+
+    def _check_animation_controls(self):
+        disable = (self.ui.frameCurrentRadio.isChecked() or
+                   not self._is_animation_filename() or
+                   self.ui.frameRangeTo.validator().top() == 1)
+        if disable:
+            self.ui.animationGroupBox.setDisabled(True)
+            self.ui.frameDelayGroup.setDisabled(True)
+        else:
+            self.ui.animationGroupBox.setDisabled(False)
+            self.ui.frameDelayGroup.setDisabled(False)
 
     def change_frame_range(self):
         if self.ui.frameRangeRadio.isChecked():
@@ -98,12 +123,7 @@ class ExportImageDialog(QtGui.QDialog):
             self.ui.frameRangeFrom.setDisabled(True)
             self.ui.frameRangeTo.setDisabled(True)
 
-        if self.ui.frameCurrentRadio.isChecked():
-            self.ui.animationGroupBox.setDisabled(True)
-            self.ui.frameDelayGroup.setDisabled(True)
-        else:
-            self.ui.animationGroupBox.setDisabled(False)
-            self.ui.frameDelayGroup.setDisabled(False)
+        self._check_animation_controls()
 
     def get_frame_range(self):
         if self.ui.frameCurrentRadio.isChecked():
@@ -138,9 +158,15 @@ class ExportImageDialog(QtGui.QDialog):
         }
         return info
 
+    def show(self):
+        self._check_animation_controls()
+        return super(ExportImageDialog, self).show()
+
 
 class ExportImageHelper(QtCore.QObject):
     """Handle all the logic for creating screenshot images"""
+    default_font = 'Andale Mono'
+
     def __init__(self, parent, doc, sgm):
         """Initialize helper with defaults and other object handles.
         
@@ -152,19 +178,17 @@ class ExportImageHelper(QtCore.QObject):
         self.doc = doc
         self.sgm = sgm
         self._screenshot_dialog = None
-        print("Export Image Helper init")
 
     def take_screenshot(self):
-        print("Screenshot dialog")
         if not self._screenshot_dialog:
             self._screenshot_dialog = ExportImageDialog(self.parent())
             self._screenshot_dialog.accepted.connect(self._save_screenshot)
-        self._screenshot_dialog.set_total_frames(self.sgm.layer_set.max_frame + 1)
+        self._screenshot_dialog.set_total_frames(max(self.sgm.layer_set.max_frame, 1))
         self._screenshot_dialog.show()
 
     def _add_screenshot_footer(self, im, banner_text, font_size=11):
         orig_w, orig_h = im.size
-        font = ImageFont.truetype('Andale Mono', font_size)
+        font = ImageFont.truetype(self.default_font, font_size)
         banner_h = font_size
         new_im = Image.new(im.mode, (orig_w, orig_h + banner_h), "black")
         new_draw = ImageDraw.Draw(new_im)
@@ -177,90 +201,116 @@ class ExportImageHelper(QtCore.QObject):
         new_im.paste(im, (0, 0, orig_w, orig_h))
         return new_im
 
-    def _save_screenshot(self):
-        info = self._screenshot_dialog.get_info()
-        LOG.info("Exporting image with options: {}".format(info))
-        uuids = self.sgm.layer_set.frame_order
-        if uuids:
-            filenames = []
-            if info['filename'].endswith('.gif'):
-                # only use the first uuid to fill in filename information
-                file_uuids = uuids[:1]
-            else:
-                file_uuids = uuids
-            for u in file_uuids:
-                layer_info = self.doc[u]
-                fn = info['filename'].format(
-                    start_time=layer_info[GUIDE.SCHED_TIME],
-                    scene=GUIDE.SCENE,
-                    instrument=GUIDE.INSTRUMENT,
-                )
-                filenames.append(fn)
-        else:
-            uuids = [None]
-            filenames = [info['filename']]
+    def _create_filenames(self, uuids, base_filename):
+        if not uuids:
+            return [None], [base_filename]
+        filenames = []
+        # only use the first uuid to fill in filename information
+        file_uuids = uuids[:1] if base_filename.endswith('.gif') else uuids
+        for u in file_uuids:
+            layer_info = self.doc[u]
+            fn = base_filename.format(
+                start_time=layer_info[GUIDE.SCHED_TIME],
+                scene=GUIDE.SCENE,
+                instrument=GUIDE.INSTRUMENT,
+            )
+            filenames.append(fn)
 
         # check for duplicate filenames
         if len(filenames) > 1 and all(filenames[0] == fn for fn in filenames):
             ext = os.path.splitext(filenames[0])[-1]
             filenames = [os.path.splitext(fn)[0] + "_{:03d}".format(i + 1) + ext for i, fn in enumerate(filenames)]
 
-        if any(os.path.isfile(fn) for fn in filenames):
-            msg = QtGui.QMessageBox()
-            msg.setWindowTitle("Overwrite File(s)?")
-            msg.setText("One or more files already exist.")
-            msg.setInformativeText("Do you want to overwrite existing files?")
-            msg.setStandardButtons(msg.Cancel)
-            msg.setDefaultButton(msg.Cancel)
-            msg.addButton("Overwrite All", msg.YesRole)
-            # XXX: may raise "modalSession has been exited prematurely" for pyqt4 on mac
-            ret = msg.exec_()
-            if ret == msg.Cancel:
-                # XXX: This could technically reach a recursion limit
-                self.take_screenshot()
-                return
+        return uuids, filenames
 
-        img_arrays = self.sgm.get_screenshot_array(info['frame_range'])
-        if not len(img_arrays):
-            LOG.error("Can't save zero frames returned from scene")
+    def _overwrite_dialog(self):
+        msg = QtGui.QMessageBox(self.parent())
+        msg.setWindowTitle("Overwrite File(s)?")
+        msg.setText("One or more files already exist.")
+        msg.setInformativeText("Do you want to overwrite existing files?")
+        msg.setStandardButtons(msg.Cancel)
+        msg.setDefaultButton(msg.Cancel)
+        msg.addButton("Overwrite All", msg.YesRole)
+        # XXX: may raise "modalSession has been exited prematurely" for pyqt4 on mac
+        ret = msg.exec_()
+        if ret == msg.Cancel:
+            # XXX: This could technically reach a recursion limit
+            self.take_screenshot()
+            return False
+        return True
+
+    def _get_animation_parameters(self, info, images):
+        params = {}
+        params['save_all'] = True
+        if info['delay'] is None:
+            from sift.model.guidebook import GUIDE
+            t = [self.doc[u][GUIDE.SCHED_TIME] for u, im in images]
+            t_diff = [(t[i] - t[i - 1]).total_seconds() for i in range(1, len(t))]
+            min_diff = float(min(t_diff))
+            duration = [100 * int(this_diff / min_diff) for this_diff in t_diff]
+            params['duration'] = [duration[0]] + duration
+            # params['duration'] = [50 * i for i in range(len(images))]
+            if not info['loop']:
+                params['duration'] = params['duration'] + params['duration'][-2:0:-1]
+        else:
+            params['duration'] = info['delay']
+        if not info['loop']:
+            # rocking animation
+            # we want frames 0, 1, 2, 3, 2, 1
+            images = images + images[-2:0:-1]
+
+        params['loop'] = 0  # infinite number of loops
+        params['append_images'] = [x for u, x in images[1:]]
+        return params
+
+    def _convert_frame_range(self, frame_range):
+        """Convert 1-based frame range to SGM's 0-based"""
+        if frame_range is None:
+            return None
+        s, e = frame_range
+        # user provided frames are 1-based, scene graph are 0-based
+        if s is None:
+            s = 1
+        if e is None:
+            e = max(self.sgm.layer_set.max_frame, 1)
+        return s - 1, e - 1
+
+    def _save_screenshot(self):
+        info = self._screenshot_dialog.get_info()
+        LOG.info("Exporting image with options: {}".format(info))
+        info['frame_range'] = self._convert_frame_range(info['frame_range'])
+        if info['frame_range']:
+            s, e = info['frame_range']
+            uuids = self.sgm.layer_set.frame_order[s: e + 1]
+        else:
+            uuids = [self.sgm.layer_set.top_layer_uuid()]
+        uuids, filenames = self._create_filenames(uuids, info['filename'])
+
+        # check for existing filenames
+        if (any(os.path.isfile(fn) for fn in filenames) and
+                not self._overwrite_dialog()):
             return
 
-        assert len(uuids) == len(img_arrays), "Number of filenames does not equal number of frames"
-        params = {}
+        # get canvas screenshot arrays (numpy arrays of canvas pixels)
+        img_arrays = self.sgm.get_screenshot_array(info['frame_range'])
+        if not len(img_arrays) or len(uuids) != len(img_arrays):
+            LOG.error("Number of frames does not equal number of filenames")
+            return
+
         images = [(u, Image.fromarray(x)) for u, x in img_arrays]
         if info['include_footer']:
             banner_text = [self.doc[u][INFO.NAME] if u else "" for u, im in images]
             images = [(u, self._add_screenshot_footer(im, bt, font_size=info['font_size'])) for (u, im), bt in zip(images, banner_text)]
 
-        if filenames[0].endswith('.gif'):
-            params['save_all'] = True
-            if info['delay'] is None:
-                from sift.model.guidebook import GUIDE
-                t = [self.doc[u][GUIDE.SCHED_TIME] for u, im in images]
-                t_diff = [(t[i] - t[i - 1]).total_seconds() for i in range(1, len(t))]
-                min_diff = float(min(t_diff))
-                duration = [100 * int(this_diff / min_diff) for this_diff in t_diff]
-                params['duration'] = [duration[0]] + duration
-                # params['duration'] = [50 * i for i in range(len(images))]
-                if not info['loop']:
-                    params['duration'] = params['duration'] + params['duration'][-2:0:-1]
-            else:
-                params['duration'] = info['delay']
-            if not info['loop']:
-                # rocking animation
-                # we want frames 0, 1, 2, 3, 2, 1
-                images = images + images[-2:0:-1]
-
-            params['loop'] = 0  # infinite number of loops
-            new_img = images[0][1]
-            params['append_images'] = [x for u,x in images[1:]]
-
-            LOG.info("Saving screenshot to '{}'".format(info['filename']))
-            LOG.debug("File save parameters: {}".format(params))
-            new_img.save(filenames[0], **params)
+        if filenames[0].endswith('.gif') and len(images) > 1:
+            params = self._get_animation_parameters(info, images)
+            filenames = filenames[:1]
+            images = images[:1]
         else:
-            for fn, (u, new_img) in zip(filenames, images):
-                LOG.info("Saving screenshot to '{}'".format(fn))
-                LOG.debug("File save parameters: {}".format(params))
-                new_img.save(fn, **params)
+            params = {}
+
+        for fn, (u, new_img) in zip(filenames, images):
+            LOG.info("Saving screenshot to '{}'".format(fn))
+            LOG.debug("File save parameters: {}".format(params))
+            new_img.save(fn, **params)
 

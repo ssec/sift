@@ -427,20 +427,15 @@ class SceneGraphManager(QObject):
         if frame_range is None:
             return [(self.layer_set.top_layer_uuid(), _screenshot())]
         s, e = frame_range
-        # user provided frames are 1-based, scene graph are 0-based
-        if s is None:
-            s = 1
-        if e is None:
-            e = max(self.layer_set.max_frame, 1)
 
         # reset the view once we are done
         c = self.layer_set.current_frame
         images = []
-        for i in range(s - 1, e):
+        for i in range(s, e + 1):
             self.set_frame_number(i)
             self.update()
             self.main_canvas.on_draw(None)
-            u = self.layer_set.frame_order[i]
+            u = self.layer_set.frame_order[i] if self.layer_set.frame_order else None
             images.append((u, _screenshot()))
         self.set_frame_number(c)
         self.update()

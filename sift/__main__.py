@@ -716,9 +716,7 @@ class Main(QtGui.QMainWindow):
 
         screenshot_action = QtGui.QAction("Export Image", self)
         screenshot_action.setShortcut("Ctrl+I")
-        screenshot_action.triggered.connect(lambda: print("TEST 1"))
         screenshot_action.triggered.connect(self.export_image.take_screenshot)
-        screenshot_action.triggered.connect(lambda: print("TEST 2"))
         file_menu.addAction(screenshot_action)
 
         file_menu.addAction(exit_action)
