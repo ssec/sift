@@ -23,6 +23,9 @@ hidden_imports = [
     "vispy.ext._bundled.six",
     "vispy.app.backends._pyqt4",
 ] + collect_submodules("rasterio")
+if is_win:
+    hidden_imports += collect_submodules("encodings")
+
 
 # Add missing shared libraries
 binaries = []
