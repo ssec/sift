@@ -1,7 +1,7 @@
 # -*- mode: python -*-
 
 import sys
-from PyInstaller.compat import is_win, is_darwin
+from PyInstaller.compat import is_win, is_darwin, is_linux
 from PyInstaller.utils.hooks import collect_submodules
 import vispy.glsl
 import vispy.io
@@ -29,7 +29,13 @@ if is_win:
 
 # Add missing shared libraries
 binaries = []
-if is_darwin:
+if is_linux:
+    # shapely 1.5.17 hates me
+    lib_dir = sys.executable.replace(os.path.join("bin", "python"), "lib")
+    binaries += [(os.path.join(lib_dir, 'libgeos_c.so'), '')]
+    binaries += [(os.path.join(lib_dir, 'libgeos.so'), '')]
+    binaries += [(os.path.join(lib_dir, 'libmkl_*.so'), '')]
+elif is_darwin:
     lib_dir = sys.executable.replace(os.path.join("bin", "python"), "lib")
     binaries += [(os.path.join(lib_dir, 'libgeos_c.dylib'), '')]
     binaries += [(os.path.join(lib_dir, 'libgeos.dylib'), '')]
