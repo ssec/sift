@@ -17,6 +17,8 @@ REQUIRES
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
+from sift.view.export_image import ExportImageDialog
+
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
@@ -28,10 +30,11 @@ QtGui = app_object.backend_module.QtGui
 
 import sift.ui.open_cache_dialog_ui as open_cache_dialog_ui
 from sift.control.LayerManager import LayerSetsManager
-from sift.model.document import Document, DocRGBLayer, DocCompositeLayer, DocBasicLayer, DocLayer, DocLayerStack
+from sift.model.document import Document, DocLayer
 from sift.view.SceneGraphManager import SceneGraphManager
 from sift.view.ProbeGraphs import ProbeGraphManager, DEFAULT_POINT_PROBE
-from sift.queue import TaskQueue, test_task, TASK_PROGRESS, TASK_DOING
+from sift.view.export_image import ExportImageHelper
+from sift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
 from sift.workspace import Workspace
 from sift.view.Colormap import ALL_COLORMAPS
 from sift import __version__
@@ -40,7 +43,7 @@ from functools import partial
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from sift.ui.pov_main_ui import Ui_MainWindow
-from sift.common import INFO, KIND, DEFAULT_PROJ_OBJ, TOOL, COMPOSITE_TYPE
+from sift.common import INFO, KIND, TOOL, COMPOSITE_TYPE
 
 import os
 import sys
@@ -77,6 +80,7 @@ def test_layers(ws, doc, glob_pattern=None):
     if glob_pattern:
         return test_layers_from_directory(ws, doc, glob_pattern, os.environ.get('RANGE', None))
     return []
+
 
 class OpenCacheDialog(QtGui.QWidget):
     _paths = None
@@ -125,8 +129,6 @@ class OpenCacheDialog(QtGui.QWidget):
     def reject(self, *args, **kwargs):
         self.hide()
         self._doc = self._ws = self._opener = self._paths = None
-
-
 
 
 class AnimationSpeedPopupWindow(QtGui.QWidget):
@@ -221,6 +223,7 @@ class Main(QtGui.QMainWindow):
     _recent_files_menu = None # QMenu
     _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
     _open_cache_dialog = None
+    _screenshot_dialog = None
 
     def interactive_open_files(self, *args, files=None, **kwargs):
         self.scene_manager.layer_set.animating = False
@@ -502,13 +505,16 @@ class Main(QtGui.QMainWindow):
         self.ui.progressBar.setRange(0, PROGRESS_BAR_MAX)
         self.queue.didMakeProgress.connect(self.update_progress_bar)
 
-        # create document
+        # create manager and helper classes
         self.workspace = Workspace(workspace_dir, max_size_gb=workspace_size, queue=self.queue)
         self.document = doc = Document(self.workspace)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
                                                border_shapefile=border_shapefile,
                                                center=center,
                                                parent=self)
+        self.export_image = ExportImageHelper(self, self.document, self.scene_manager)
+
+        # connect canvas and projection pieces
         self.ui.mainMapWidget.layout().addWidget(self.scene_manager.main_canvas.native)
         self.ui.projectionComboBox.addItems(tuple(self.document.available_projections.keys()))
         self.ui.projectionComboBox.currentIndexChanged.connect(self.document.change_projection_index)
@@ -707,6 +713,11 @@ class Main(QtGui.QMainWindow):
         file_menu.addAction(open_cache_action)
         file_menu.addAction(open_glob_action)
         self._recent_files_menu = file_menu.addMenu('Open Recent')
+
+        screenshot_action = QtGui.QAction("Export Image", self)
+        screenshot_action.setShortcut("Ctrl+I")
+        screenshot_action.triggered.connect(self.export_image.take_screenshot)
+        file_menu.addAction(screenshot_action)
 
         file_menu.addAction(exit_action)
 

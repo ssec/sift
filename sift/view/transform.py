@@ -134,9 +134,9 @@ def geos_init(proj_dict):
     elif proj_dict['sweep'] not in ['x', 'y']:
         raise ValueError("PROJ.4 'sweep' parameter must be 'x' or 'y'")
     elif proj_dict['sweep'] == 'x':
-        proj_dict['flip_axis'] = 'false'
-    else:
         proj_dict['flip_axis'] = 'true'
+    else:
+        proj_dict['flip_axis'] = 'false'
 
     proj_dict['radius_g_1'] = proj_dict['h'] / proj_dict['a']
     proj_dict['radius_g'] = 1. + proj_dict['radius_g_1']

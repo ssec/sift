@@ -25,6 +25,71 @@ from collections import OrderedDict
 import numpy as np
 
 
+def _get_awips_colors(cmap_file):
+    from xml.etree import ElementTree
+    tree = ElementTree.parse(cmap_file)
+    colors = np.array([(float(c.get('r')), float(c.get('g')), float(c.get('b'))) for c in tree.findall('color')])
+    return colors
+
+
+def generate_from_awips_cmap(cmap_file):
+    colors = _get_awips_colors(cmap_file)
+    changes = np.abs(np.diff(np.diff(colors, axis=0), axis=0))
+    control_indexes = np.sort(list({0, colors.shape[0] - 1} |
+                              set(np.nonzero(changes[:, 0] > 1e-7)[0] + 1) |
+                              set(np.nonzero(changes[:, 1] > 1e-7)[0] + 1) |
+                              set(np.nonzero(changes[:, 2] > 1e-7)[0] + 1)
+                                   ))
+    control_points = control_indexes / (colors.shape[0] - 1)
+    hex_colors = ["#{:02x}{:02x}{:02x}".format(*[int(x*255) for x in c])
+                  for c in colors[control_indexes]]
+
+
+    # red_changes = np.nonzero(np.abs(np.diff(np.diff(colors[:, 0]))) > 1e-7)[0] + 1
+    # green_changes = np.nonzero(np.abs(np.diff(np.diff(colors[:, 1]))) > 1e-7)[0] + 1
+    # blue_changes = np.nonzero(np.abs(np.diff(np.diff(colors[:, 2]))) > 1e-7)[0] + 1
+    # control_indexes = sorted({0} | {colors.shape[0] - 1} | set(red_changes) | set(green_changes) | set(blue_changes))
+    return control_points, hex_colors
+
+
+def generate_awips_cmap_debug_plot(cmap_file, out_fn):
+    import matplotlib.pyplot as plt
+    colors = _get_awips_colors(cmap_file)
+    velocity = np.diff(colors, axis=0)
+    acc = np.abs(np.diff(velocity, axis=0))
+    fig = plt.figure()
+    # 3 columns - R, G, B
+    # 3 Rows - color, vel, acc
+    ax = fig.add_subplot(3, 3, 1)
+    ax.set_ylabel('Color')
+    ax.set_title('Red')
+    ax.plot(colors[:, 0])
+    ax = fig.add_subplot(3, 3, 2)
+    ax.set_title('Green')
+    ax.plot(colors[:, 0])
+    ax = fig.add_subplot(3, 3, 3)
+    ax.set_title('Blue')
+    ax.plot(colors[:, 2])
+
+    ax = fig.add_subplot(3, 3, 4)
+    ax.set_ylabel('Velocity')
+    ax.plot(velocity[:, 0])
+    ax = fig.add_subplot(3, 3, 5)
+    ax.plot(velocity[:, 1])
+    ax = fig.add_subplot(3, 3, 6)
+    ax.plot(velocity[:, 2])
+
+    ax = fig.add_subplot(3, 3, 7)
+    ax.set_ylabel('Acceleration')
+    ax.plot(acc[:, 0])
+    ax = fig.add_subplot(3, 3, 8)
+    ax.plot(acc[:, 1])
+    ax = fig.add_subplot(3, 3, 9)
+    ax.plot(acc[:, 2])
+
+    plt.savefig(out_fn)
+
+
 class SquareRootColormap(BaseColormap):
     colors = [(0.0, 0.0, 0.0, 1.0),
               (1.0, 1.0, 1.0, 1.0)]
@@ -108,8 +173,15 @@ _rain_rate_control_points = (0.0, 0.5215686274509804, 0.6, 0.6470588235294118, 0
 _rain_rate_colors = ('#000000', '#c7c7c7', '#00ffff', '#0000ff', '#00ff00', '#ffff00', '#ff9500', '#e20000', '#f00000', '#ff00ff', '#ffffff')
 rain_rate = Colormap(colors=_rain_rate_colors, controls=_rain_rate_control_points)
 
-_color11new_control_points = (0.0, 0.0019540791402051783, 0.1265266243282853, 0.2510991695163654, 0.37567171470444555, 0.43820224719101125, 0.5007327796775769, 0.625305324865657, 0.6878358573522227, 0.7503663898387885, 1.0)
-_color11new_colors = ('#7e0000', '#190000', '#fe0000', '#fffe00', '#00ff00', '#00807e', '#00fefe', '#0000ff', '#7e0080', '#fe00fe', '#000000')
+_color11new_control_points = (0.0, 0.0024425989252564728,
+ 0.064484611626770882, 0.12701514411333659, 0.189057156814851,
+ 0.25158768930141673, 0.31411822178798243, 0.37616023448949681,
+ 0.43869076697606252, 0.50122129946262828, 0.56375183194919398,
+ 0.62579384465070831, 0.68832437713727401, 0.75085490962383972,
+ 0.87542745481191986, 1.0)
+_color11new_colors = ['#7e0000', '#000000', '#7e3e1f', '#ff0000', '#ff7e7e',
+ '#ffff00', '#7eff7e', '#00ff00', '#007e7e', '#00ffff', '#7e7eff', '#0000ff',
+ '#7e007e', '#ff00ff', '#ffffff', '#000000']
 color11new = FlippedColormap(colors=_color11new_colors, controls=_color11new_control_points)
 # _cira_ir_default_control_points = (0.0, 0.6627450980392157, 0.7215686274509804, 0.7254901960784313, 0.7607843137254902, 0.8, 0.803921568627451, 0.8470588235294118, 0.8901960784313725, 0.9215686274509803, 0.9568627450980393, 0.9921568627450981, 1.0)
 # _cira_ir_default_colors = ('#000000', '#f9f9f9', '#686600', '#5e5a00', '#e20000', '#97009b', '#8b008c', '#00c6d0', '#006f00', '#d8d8d8', '#000077', '#360017', '#ffffff')
