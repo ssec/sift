@@ -7,8 +7,10 @@ from PIL import Image, ImageDraw, ImageFont
 from sift.common import INFO
 from sift.ui import export_image_dialog_ui
 from sift.model.guidebook import GUIDE
+from sift.util import get_data_dir
 
 LOG = logging.getLogger(__name__)
+DATA_DIR = get_data_dir()
 
 
 def _default_directory():
@@ -165,7 +167,7 @@ class ExportImageDialog(QtGui.QDialog):
 
 class ExportImageHelper(QtCore.QObject):
     """Handle all the logic for creating screenshot images"""
-    default_font = 'Andale Mono'
+    default_font = os.path.join(DATA_DIR, 'fonts', 'Andale Mono.ttf')
 
     def __init__(self, parent, doc, sgm):
         """Initialize helper with defaults and other object handles.
@@ -202,7 +204,7 @@ class ExportImageHelper(QtCore.QObject):
         return new_im
 
     def _create_filenames(self, uuids, base_filename):
-        if not uuids:
+        if not uuids or uuids[0] is None:
             return [None], [base_filename]
         filenames = []
         # only use the first uuid to fill in filename information
