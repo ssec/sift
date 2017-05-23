@@ -6,7 +6,6 @@ from PyQt4 import QtCore, QtGui
 from PIL import Image, ImageDraw, ImageFont
 from sift.common import INFO
 from sift.ui import export_image_dialog_ui
-from sift.model.guidebook import GUIDE
 from sift.util import get_data_dir
 
 LOG = logging.getLogger(__name__)
@@ -212,9 +211,9 @@ class ExportImageHelper(QtCore.QObject):
         for u in file_uuids:
             layer_info = self.doc[u]
             fn = base_filename.format(
-                start_time=layer_info[GUIDE.SCHED_TIME],
-                scene=GUIDE.SCENE,
-                instrument=GUIDE.INSTRUMENT,
+                start_time=layer_info[INFO.SCHED_TIME],
+                scene=INFO.SCENE,
+                instrument=INFO.INSTRUMENT,
             )
             filenames.append(fn)
 
@@ -245,8 +244,8 @@ class ExportImageHelper(QtCore.QObject):
         params = {}
         params['save_all'] = True
         if info['delay'] is None:
-            from sift.model.guidebook import GUIDE
-            t = [self.doc[u][GUIDE.SCHED_TIME] for u, im in images]
+            from sift.model.guidebook import INFO
+            t = [self.doc[u][INFO.SCHED_TIME] for u, im in images]
             t_diff = [(t[i] - t[i - 1]).total_seconds() for i in range(1, len(t))]
             min_diff = float(min(t_diff))
             duration = [100 * int(this_diff / min_diff) for this_diff in t_diff]
@@ -301,7 +300,7 @@ class ExportImageHelper(QtCore.QObject):
 
         images = [(u, Image.fromarray(x)) for u, x in img_arrays]
         if info['include_footer']:
-            banner_text = [self.doc[u][INFO.NAME] if u else "" for u, im in images]
+            banner_text = [self.doc[u][INFO.DATASET_NAME] if u else "" for u, im in images]
             images = [(u, self._add_screenshot_footer(im, bt, font_size=info['font_size'])) for (u, im), bt in zip(images, banner_text)]
 
         if filenames[0].endswith('.gif') and len(images) > 1:

@@ -17,8 +17,6 @@ REQUIRES
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-from sift.view.export_image import ExportImageDialog
-
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 

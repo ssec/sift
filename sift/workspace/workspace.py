@@ -116,7 +116,7 @@ class GeoTiffImporter(WorkspaceImporter):
         srs.ImportFromWkt(gtiff.GetProjection())
         d[INFO.PROJ] = srs.ExportToProj4().strip()  # remove extra whitespace
 
-        d[INFO.NAME] = os.path.split(source_path)[-1]
+        d[INFO.DATASET_NAME] = os.path.split(source_path)[-1]
         d[INFO.PATHNAME] = source_path
 
         # FIXME: read this into a numpy.memmap backed by disk in the workspace
@@ -207,7 +207,7 @@ class GoesRPUGImporter(WorkspaceImporter):
         pug = PugL1bTools(source_path)
 
         d[INFO.UUID] = dest_uuid
-        d[INFO.NAME] = os.path.split(source_path)[-1]
+        d[INFO.DATASET_NAME] = os.path.split(source_path)[-1]
         d[INFO.PATHNAME] = source_path
         d[INFO.KIND] = KIND.IMAGE
 
@@ -564,7 +564,7 @@ class Workspace(QObject):
             if update.data is not None:
                 info = self._info[uuid] = update.dataset_info
                 data = self._data[uuid] = update.data
-                LOG.info("{} {}: {:.01f}%".format(update.dataset_info[INFO.NAME], update.stage_desc, update.completion*100.0))
+                LOG.info("{} {}: {:.01f}%".format(update.dataset_info[INFO.DATASET_NAME], update.stage_desc, update.completion * 100.0))
         # copy the data into an anonymous memmap
         self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
         if allow_cache:
@@ -613,7 +613,7 @@ class Workspace(QObject):
         :return: True if successfully deleted, False if not found
         """
         if isinstance(dsi, dict):
-            name = dsi[INFO.NAME]
+            name = dsi[INFO.DATASET_NAME]
         else:
             name = 'dataset'
         uuid = dsi if isinstance(dsi, UUID) else dsi[INFO.UUID]

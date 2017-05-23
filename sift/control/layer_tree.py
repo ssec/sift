@@ -641,7 +641,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             return str(value)
         elif role == Qt.DisplayRole:
             # lao = self.doc.layer_animation_order(row)
-            name = info[INFO.NAME]
+            name = info[INFO.DATASET_NAME]
             # return  ('[-]  ' if lao is None else '[{}]'.format(lao+1)) + el[row]['name']
             # if leroy:
             #     data = '[%.2f] ' % leroy[0]

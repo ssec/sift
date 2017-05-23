@@ -17,7 +17,6 @@ from PyQt4.QtCore import QObject, pyqtSignal
 
 # a useful constant
 from sift.common import INFO, KIND
-from sift.model.guidebook import GUIDE
 from sift.queue import TASK_PROGRESS, TASK_DOING
 
 import logging
@@ -401,7 +400,7 @@ class ProbeGraphDisplay (object) :
         # fill up our lists of layers
         for uuid in uuid_list:
             nfo = self.document.get_info(uuid=uuid)
-            layer_name = nfo.get(INFO.NAME, "??unknown layer??")
+            layer_name = nfo.get(INFO.DATASET_NAME, "??unknown layer??")
             if nfo.get(INFO.KIND, None) == KIND.RGB:  # skip RGB layers
                 continue
             uuid_string = str(uuid)
@@ -562,7 +561,7 @@ class ProbeGraphDisplay (object) :
             # get the data and info we need for this plot
             data_polygon = self.workspace.get_content_polygon(x_uuid, polygon)
             fmt, units, data_polygon = self.document.convert_units(x_uuid, data_polygon)
-            title = self.document.get_info(uuid=x_uuid)[GUIDE.DISPLAY_NAME]
+            title = self.document.get_info(uuid=x_uuid)[INFO.DISPLAY_NAME]
 
             # get point probe value
             if point_xy:
@@ -580,8 +579,8 @@ class ProbeGraphDisplay (object) :
             yield {TASK_DOING: 'Probe Plot: Collecting polygon data (layer 1)...', TASK_PROGRESS: 0.0}
 
             # get the data and info we need for this plot
-            name1 = self.document.get_info(uuid=x_uuid)[GUIDE.DISPLAY_NAME]
-            name2 = self.document.get_info(uuid=y_uuid)[GUIDE.DISPLAY_NAME]
+            name1 = self.document.get_info(uuid=x_uuid)[INFO.DISPLAY_NAME]
+            name2 = self.document.get_info(uuid=y_uuid)[INFO.DISPLAY_NAME]
             hires_uuid = self.workspace.lowest_resolution_uuid(x_uuid, y_uuid)
             hires_coord_mask, hires_data = self.workspace.get_coordinate_mask_polygon(hires_uuid, polygon)
             _, _, hires_data = self.document.convert_units(hires_uuid, hires_data)

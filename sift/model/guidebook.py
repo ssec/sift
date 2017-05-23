@@ -16,29 +16,15 @@ This module is the "scientific expert knowledge" that is consulted.
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import os, sys, re
+import os
+import re
+import logging
 from datetime import datetime
-import logging, unittest, argparse
-from enum import Enum
-from sift.common import INFO, KIND
+from sift.common import INFO, KIND, PLATFORM, INSTRUMENT
 from sift.view.Colormap import DEFAULT_IR, DEFAULT_VIS
 import sift.workspace.goesr_pug as pug
 
 LOG = logging.getLogger(__name__)
-
-class INSTRUMENT(Enum):
-    UNKNOWN = '???'
-    AHI = 'AHI'
-    ABI = 'ABI'
-    AMI = 'AMI'
-
-
-class PLATFORM(Enum):
-    HIMAWARI_8 = 'Himawari-8'
-    HIMAWARI_9 = 'Himawari-9'
-    GOES_16 = 'G16'
-    GOES_17 = 'G17'
-
 GUIDEBOOKS = {}
 
 
@@ -77,23 +63,6 @@ class Guidebook(object):
         :return: (list,offset:int): list of [uuid,uuid,uuid] for siblings in order; offset of where the input is found in list
         """
         return None, None
-
-
-class GUIDE(Enum):
-    """
-    standard dictionary keys for guidebook metadata
-    """
-    UUID = 'uuid'  # dataset UUID, if available
-    PLATFORM = 'spacecraft' # full standard name of spacecraft
-    SCHED_TIME = 'timeline'  # scheduled time for observation
-    OBS_TIME = 'obstime'  # actual time for observation
-    BAND = 'band'  # band number (multispectral instruments)
-    SCENE = 'scene'  # standard scene identifier string for instrument, e.g. FLDK
-    INSTRUMENT = 'instrument'  # INSTRUMENT enumeration, or string with full standard name
-    DISPLAY_TIME = 'display_time' # time to show on animation control
-    DISPLAY_NAME = 'display_name' # preferred name in the layer list
-    UNIT_CONVERSION = 'unit_conversion'  # (unit string, lambda x, inverse=False: convert-to-units)
-    CENTRAL_WAVELENGTH = 'nominal_wavelength'
 
 
 # Instrument -> Band Number -> Nominal Wavelength
@@ -193,26 +162,26 @@ class ABI_AHI_Guidebook(Guidebook):
         label = 'Refl' if band in [1, 2, 3, 4, 5, 6] else 'BT'
         name = "AHI B{0:02d} {1:s} {2:s}".format(band, label, dtime)
         return {
-            GUIDE.PLATFORM: plat,
-            GUIDE.BAND: band,
-            GUIDE.INSTRUMENT: INSTRUMENT.AHI,
-            GUIDE.SCHED_TIME: when,
-            GUIDE.DISPLAY_TIME: dtime,
-            GUIDE.SCENE: scene,
-            GUIDE.DISPLAY_NAME: name
+            INFO.PLATFORM: plat,
+            INFO.BAND: band,
+            INFO.INSTRUMENT: INSTRUMENT.AHI,
+            INFO.SCHED_TIME: when,
+            INFO.DISPLAY_TIME: dtime,
+            INFO.SCENE: scene,
+            INFO.DISPLAY_NAME: name
         }
 
     @staticmethod
     def _metadata_for_abi_path(pathname):  # FUTURE: since for ABI this is really coming from the file, decide whether the guidebook should be doing it
         abi = pug.PugL1bTools(pathname)
         return {
-            GUIDE.PLATFORM: PLATFORM_ID_TO_PLATFORM[abi.platform],  # e.g. G16
-            GUIDE.BAND: abi.band,
-            GUIDE.INSTRUMENT: INSTRUMENT.ABI,
-            GUIDE.SCHED_TIME: abi.sched_time,
-            GUIDE.DISPLAY_TIME: abi.display_time,
-            GUIDE.SCENE: abi.scene_id,
-            GUIDE.DISPLAY_NAME: abi.display_name
+            INFO.PLATFORM: PLATFORM_ID_TO_PLATFORM[abi.platform],  # e.g. G16
+            INFO.BAND: abi.band,
+            INFO.INSTRUMENT: INSTRUMENT.ABI,
+            INFO.SCHED_TIME: abi.sched_time,
+            INFO.DISPLAY_TIME: abi.display_time,
+            INFO.SCENE: abi.scene_id,
+            INFO.DISPLAY_NAME: abi.display_name
         }
 
     @staticmethod
@@ -244,8 +213,8 @@ class ABI_AHI_Guidebook(Guidebook):
         riffraff = [path for path in paths if not nfo[path]]
         ahi = [nfo[path] for path in paths if nfo[path]]
         names = [path for path in paths if nfo[path]]
-        bands = [x.get(GUIDE.BAND, None) for x in ahi]
-        times = [x.get(GUIDE.SCHED_TIME, None) for x in ahi]
+        bands = [x.get(INFO.BAND, None) for x in ahi]
+        times = [x.get(INFO.SCHED_TIME, None) for x in ahi]
         order = [(band, time, path) for band,time,path in zip(bands,times,names)]
         order.sort(reverse=True)
         LOG.debug(order)
@@ -256,10 +225,10 @@ class ABI_AHI_Guidebook(Guidebook):
         # TODO: Used to be 'info *not* in (KIND.IMAGE, KIND.COMPOSITE)', what's right?
         if md is None and info[INFO.KIND] in (KIND.IMAGE, KIND.COMPOSITE):
             md = self._metadata_for_path(info.get(INFO.PATHNAME, None))
-            md[GUIDE.UUID] = info[INFO.UUID]
-            md[GUIDE.INSTRUMENT] = info.get(GUIDE.INSTRUMENT, self.identify_instrument_for_path(info[INFO.PATHNAME]))
-            md[GUIDE.CENTRAL_WAVELENGTH] = NOMINAL_WAVELENGTHS[md[GUIDE.PLATFORM]][md[GUIDE.INSTRUMENT]][md[GUIDE.BAND]]
-            # md[GUIDE.UNIT_CONVERSION] = self.units_conversion(info)  # FUTURE: decide whether this should be done for most queries
+            md[INFO.UUID] = info[INFO.UUID]
+            md[INFO.INSTRUMENT] = info.get(INFO.INSTRUMENT, self.identify_instrument_for_path(info[INFO.PATHNAME]))
+            md[INFO.CENTRAL_WAVELENGTH] = NOMINAL_WAVELENGTHS[md[INFO.PLATFORM]][md[INFO.INSTRUMENT]][md[INFO.BAND]]
+            # md[INFO.UNIT_CONVERSION] = self.units_conversion(info)  # FUTURE: decide whether this should be done for most queries
             self._cache[info[INFO.UUID]] = md
         if md is None:
             return dict(info)
@@ -277,10 +246,10 @@ class ABI_AHI_Guidebook(Guidebook):
     def climits(self, dsi):
         # Valid min and max for colormap use for data values in file (unconverted)
         md = self.collect_info(dsi)
-        if md[GUIDE.BAND] in self.REFL_BANDS:
+        if md[INFO.BAND] in self.REFL_BANDS:
             # Reflectance/visible data limits
             return -0.012, 1.192
-        elif md[GUIDE.BAND] in self.BT_BANDS:
+        elif md[INFO.BAND] in self.BT_BANDS:
             # BT data limits
             return -109.0 + 273.15, 55 + 273.15
         else:
@@ -289,10 +258,10 @@ class ABI_AHI_Guidebook(Guidebook):
     def units_conversion(self, dsi):
         "return UTF8 unit string, lambda v,inverse=False: convert-raw-data-to-unis"
         md = self.collect_info(dsi)
-        if md[GUIDE.BAND] in self.REFL_BANDS:
+        if md[INFO.BAND] in self.REFL_BANDS:
             # Reflectance/visible data limits
             return ('{:.03f}', '', lambda x, inverse=False: x)
-        elif md[GUIDE.BAND] in self.BT_BANDS:
+        elif md[INFO.BAND] in self.BT_BANDS:
             # BT data limits, Kelvin to degC
             return ("{:.02f}", "°C", lambda x, inverse=False: x - 273.15 if not inverse else x + 273.15)
         else:
@@ -300,20 +269,20 @@ class ABI_AHI_Guidebook(Guidebook):
 
     def default_colormap(self, dsi):
         md = self.collect_info(dsi)
-        if md[GUIDE.BAND] in self.REFL_BANDS:
+        if md[INFO.BAND] in self.REFL_BANDS:
             return DEFAULT_VIS
-        elif md[GUIDE.BAND] in self.BT_BANDS:
+        elif md[INFO.BAND] in self.BT_BANDS:
             return DEFAULT_IR
         else:
             return None
 
     def display_time(self, dsi):
         md = self.collect_info(dsi)
-        return md.get(GUIDE.DISPLAY_TIME, '--:--')
+        return md.get(INFO.DISPLAY_TIME, '--:--')
 
     def display_name(self, dsi):
         md = self.collect_info(dsi)
-        return md.get(GUIDE.DISPLAY_NAME, '-unknown-')
+        return md.get(INFO.DISPLAY_NAME, '-unknown-')
 
     def flush(self):
         self._cache = {}
@@ -341,8 +310,8 @@ class ABI_AHI_Guidebook(Guidebook):
         it = meta.get(uuid, None)
         if it is None:
             return None
-        sibs = [(x[GUIDE.BAND], x[GUIDE.UUID]) for x in
-                self._filter(meta.values(), it, {GUIDE.SCENE, GUIDE.SCHED_TIME, GUIDE.INSTRUMENT, GUIDE.PLATFORM})]
+        sibs = [(x[INFO.BAND], x[INFO.UUID]) for x in
+                self._filter(meta.values(), it, {INFO.SCENE, INFO.SCHED_TIME, INFO.INSTRUMENT, INFO.PLATFORM})]
         # then sort it by bands
         sibs.sort()
         offset = [i for i,x in enumerate(sibs) if x[1]==uuid]
@@ -359,8 +328,8 @@ class ABI_AHI_Guidebook(Guidebook):
         it = meta.get(uuid, None)
         if it is None:
             return [], 0
-        sibs = [(x[GUIDE.SCHED_TIME], x[GUIDE.UUID]) for x in
-                self._filter(meta.values(), it, {GUIDE.SCENE, GUIDE.BAND, GUIDE.INSTRUMENT, GUIDE.PLATFORM})]
+        sibs = [(x[INFO.SCHED_TIME], x[INFO.UUID]) for x in
+                self._filter(meta.values(), it, {INFO.SCENE, INFO.BAND, INFO.INSTRUMENT, INFO.PLATFORM})]
         # then sort it into time order
         sibs.sort()
         offset = [i for i,x in enumerate(sibs) if x[1]==uuid]

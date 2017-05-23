@@ -107,24 +107,72 @@ class COMPOSITE_TYPE(Enum):
     ARITHMETIC = 2
 
 
+class INSTRUMENT(Enum):
+    UNKNOWN = '???'
+    AHI = 'AHI'
+    ABI = 'ABI'
+    AMI = 'AMI'
+
+    @classmethod
+    def from_value(cls, value_str):
+        """Convert external string to Enum"""
+        for m in cls:
+            if m.value == value_str:
+                return m
+        return None
+
+
+class PLATFORM(Enum):
+    UNKNOWN = '???'
+    HIMAWARI_8 = 'Himawari-8'
+    HIMAWARI_9 = 'Himawari-9'
+    GOES_16 = 'G16'
+    GOES_17 = 'G17'
+
+    @classmethod
+    def from_value(cls, value_str):
+        """Convert external string to Enum"""
+        for m in cls:
+            if m.value == value_str:
+                return m
+        return INSTRUMENT.UNKNOWN
+
+
 class INFO(Enum):
     """
     Standard keys for info dictionaries
     """
 
     PATHNAME = 'pathname'  # full path to the data file
-    NAME = 'name'  # logical name of the file (possibly human assigned)
+    DATASET_NAME = 'dataset_name'  # logical name of the file (possibly human assigned)
+    SHORT_NAME = 'short_name'  # CF short_name
+    LONG_NAME = 'long_name'  # CF long_name
+    STANDARD_NAME = 'standard_name'  # CF compliant standard_name (when possible)
+    UNITS = 'units'  # CF compliant (udunits compliant) units string, original data units
     KIND = 'kind'  # KIND enumeration on what kind of layer this makes
     UUID = 'uuid'  # UUID assigned on import, which follows the layer around the system
-    ORIGIN_X = 'origin_x'  # image (0,0) in nadir-meters relative to the projection center
-    ORIGIN_Y = 'origin_y'  # image (0,0) in nadir-meters relative to the projection center
-    CELL_WIDTH = 'cell_width'  # size of an image pixel in nadir-meters
-    CELL_HEIGHT = 'cell_height'  # size of an image pixel in nadir-meters
+    ORIGIN_X = 'origin_x'
+    ORIGIN_Y = 'origin_y'
+    CELL_WIDTH = 'cell_width'
+    CELL_HEIGHT = 'cell_height'
     PROJ = 'proj4_string'
     CLIM = 'clim'  # (min,max) color map limits
     SHAPE = 'shape' # (rows, columns) or (rows, columns, levels) data shape
     COLORMAP = 'colormap'  # name or UUID of a color map
     DISPLAY_TIME = 'display_time'  # typically from guidebook, used for labeling animation frame
+    # Previously in the GUIDE Enum:
+    PLATFORM = 'platform' # full standard name of spacecraft
+    SCHED_TIME = 'timeline'  # scheduled time for observation
+    OBS_TIME = 'obstime'  # actual time for observation
+    OBS_DURATION = 'obsduration'  # time from start of observation to end of observation
+    BAND = 'band'  # band number (multispectral instruments)
+    SCENE = 'scene'  # standard scene identifier string for instrument, e.g. FLDK
+    INSTRUMENT = 'instrument'  # INSTRUMENT enumeration, or string with full standard name
+    DISPLAY_NAME = 'display_name'  # preferred name in the layer list
+    UNIT_CONVERSION = 'unit_conversion'  # (preferred CF units, convert_func, format_func)
+    # unit numeric conversion func: lambda x, inverse=False: convert-to-units
+    # unit string format func: lambda x, numeric=True, units=True: formatted string
+    CENTRAL_WAVELENGTH = 'nominal_wavelength'
 
 
 @jit(nb_types.UniTuple(int64, 2)(float64[:, :], float64[:, :]))

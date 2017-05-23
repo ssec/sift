@@ -21,7 +21,7 @@ from PyQt4.QtCore import SIGNAL, QObject, Qt, pyqtSignal
 from PyQt4.QtGui import QWidget, QListView, QComboBox, QSlider, QTreeView, QGridLayout, QVBoxLayout, QLabel, QLineEdit, QScrollArea, QLayout, QTextDocument, QDoubleValidator
 from PyQt4.QtWebKit import QWebView
 from weakref import ref
-from sift.model.guidebook import GUIDE
+from sift.model.guidebook import INFO
 from sift.common import INFO, KIND
 from sift.control.layer_tree import LayerStackTreeViewModel
 from sift.model.layer import DocLayer, DocBasicLayer, DocCompositeLayer, DocRGBLayer
@@ -259,39 +259,39 @@ class SingleLayerInfoPane (QWidget) :
                 # compare our various values
 
                 # name
-                new_name = layer_info[INFO.NAME] if INFO.NAME in layer_info else ""
-                if INFO.NAME not in shared_info :
-                    shared_info[INFO.NAME] = new_name
+                new_name = layer_info[INFO.DATASET_NAME] if INFO.DATASET_NAME in layer_info else ""
+                if INFO.DATASET_NAME not in shared_info :
+                    shared_info[INFO.DATASET_NAME] = new_name
                 else :
-                    shared_info[INFO.NAME] = "" if shared_info[INFO.NAME] != new_name else new_name
+                    shared_info[INFO.DATASET_NAME] = "" if shared_info[INFO.DATASET_NAME] != new_name else new_name
 
                 # time
-                new_time = layer_info[GUIDE.DISPLAY_TIME] if GUIDE.DISPLAY_TIME in layer_info else ""
-                if GUIDE.DISPLAY_TIME not in shared_info :
-                    shared_info[GUIDE.DISPLAY_TIME] = new_time
+                new_time = layer_info[INFO.DISPLAY_TIME] if INFO.DISPLAY_TIME in layer_info else ""
+                if INFO.DISPLAY_TIME not in shared_info :
+                    shared_info[INFO.DISPLAY_TIME] = new_time
                 else :
-                    shared_info[GUIDE.DISPLAY_TIME] = "" if shared_info[GUIDE.DISPLAY_TIME] != new_time else new_time
+                    shared_info[INFO.DISPLAY_TIME] = "" if shared_info[INFO.DISPLAY_TIME] != new_time else new_time
 
                 # instrument
-                new_inst = str(layer_info[GUIDE.INSTRUMENT].value) if GUIDE.INSTRUMENT in layer_info else ""
-                if GUIDE.INSTRUMENT not in shared_info :
-                    shared_info[GUIDE.INSTRUMENT] = new_inst
+                new_inst = str(layer_info[INFO.INSTRUMENT].value) if INFO.INSTRUMENT in layer_info else ""
+                if INFO.INSTRUMENT not in shared_info :
+                    shared_info[INFO.INSTRUMENT] = new_inst
                 else :
-                    shared_info[GUIDE.INSTRUMENT] = "" if shared_info[GUIDE.INSTRUMENT] != new_inst else new_inst
+                    shared_info[INFO.INSTRUMENT] = "" if shared_info[INFO.INSTRUMENT] != new_inst else new_inst
 
                 # band
-                new_band = str(layer_info[GUIDE.BAND]) if GUIDE.BAND in layer_info else ""
-                if GUIDE.BAND not in shared_info :
-                    shared_info[GUIDE.BAND] = new_band
+                new_band = str(layer_info[INFO.BAND]) if INFO.BAND in layer_info else ""
+                if INFO.BAND not in shared_info :
+                    shared_info[INFO.BAND] = new_band
                 else :
-                    shared_info[GUIDE.BAND] = "" if shared_info[GUIDE.BAND] != new_band else new_band
+                    shared_info[INFO.BAND] = "" if shared_info[INFO.BAND] != new_band else new_band
 
                 # wavelength
-                wl = "{:0.2f} µm".format(layer_info[GUIDE.CENTRAL_WAVELENGTH]) if GUIDE.CENTRAL_WAVELENGTH in layer_info else ""
-                if GUIDE.CENTRAL_WAVELENGTH not in shared_info:
-                    shared_info[GUIDE.CENTRAL_WAVELENGTH] = wl
+                wl = "{:0.2f} µm".format(layer_info[INFO.CENTRAL_WAVELENGTH]) if INFO.CENTRAL_WAVELENGTH in layer_info else ""
+                if INFO.CENTRAL_WAVELENGTH not in shared_info:
+                    shared_info[INFO.CENTRAL_WAVELENGTH] = wl
                 else:
-                    shared_info[GUIDE.CENTRAL_WAVELENGTH] = "" if shared_info[GUIDE.CENTRAL_WAVELENGTH] != wl else wl
+                    shared_info[INFO.CENTRAL_WAVELENGTH] = "" if shared_info[INFO.CENTRAL_WAVELENGTH] != wl else wl
 
                 # colormap
                 new_cmap = this_prez.colormap if this_prez is not None else ""
@@ -324,25 +324,25 @@ class SingleLayerInfoPane (QWidget) :
 
             #print("*** layer info: " + str(layer_info))
             # *** layer info: {
-            # <GUIDE.INSTRUMENT: 'instrument'>: <INSTRUMENT.AHI: 'AHI'>,
+            # <INFO.INSTRUMENT: 'instrument'>: <INSTRUMENT.AHI: 'AHI'>,
             # <INFO.PROJ: 'proj4_string'>: '+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs ',
-            # <GUIDE.SCHED_TIME: 'timeline'>: datetime.datetime(2015, 8, 24, 19, 0),
+            # <INFO.SCHED_TIME: 'timeline'>: datetime.datetime(2015, 8, 24, 19, 0),
             # <INFO.ORIGIN_X: 'origin_x'>: 6614709.252,
-            # <GUIDE.DISPLAY_TIME: 'display_time'>: '2015-08-24 19:00',
+            # <INFO.DISPLAY_TIME: 'display_time'>: '2015-08-24 19:00',
             # <INFO.CLIM: 'clim'>: (-0.012, 1.192),
             # <INFO.CELL_HEIGHT: 'cell_height'>: -1000.0,
-            # <GUIDE.UUID: 'uuid'>: UUID('5f547fae-7c26-11e5-bece-28cfe915d94b'),
+            # <INFO.UUID: 'uuid'>: UUID('5f547fae-7c26-11e5-bece-28cfe915d94b'),
             # <INFO.NAME: 'name'>: 'AHI B01 Refl 2015-08-24 19:00',
             # <INFO.UUID: 'uuid'>: UUID('5f547fae-7c26-11e5-bece-28cfe915d94b'),
             # <INFO.CELL_WIDTH: 'cell_width'>: 1000.0,
             # <INFO.KIND: 'kind'>: <KIND.IMAGE: 1>,
             # <INFO.SHAPE: 'shape'>: (30993, 18096),
-            # <GUIDE.SPACECRAFT: 'spacecraft'>: 'Himawari-8',
-            # <GUIDE.BAND: 'band'>: 1,
+            # <INFO.SPACECRAFT: 'spacecraft'>: 'Himawari-8',
+            # <INFO.BAND: 'band'>: 1,
             # <INFO.PATHNAME: 'pathname'>: './test_data/ahi 2015_08_24_236 1900/HS_H08_20150824_1900_B01_FLDK_R20.merc.tif',
-            # <GUIDE.SCENE: 'scene'>: 'FLDK',
+            # <INFO.SCENE: 'scene'>: 'FLDK',
             # <INFO.ORIGIN_Y: 'origin_y'>: 15496570.74,
-            # <GUIDE.DISPLAY_NAME: 'display_name'>: 'AHI B01 Refl 2015-08-24 19:00'}
+            # <INFO.DISPLAY_NAME: 'display_name'>: 'AHI B01 Refl 2015-08-24 19:00'}
 
             #print ("*** layer presentation info: " + str(this_prez))
             # *** layer presentation info: [
@@ -361,15 +361,15 @@ class SingleLayerInfoPane (QWidget) :
             #   mixing=<mixing.NORMAL: 1>)]
 
             # set the various text displays
-            temp_name = shared_info[INFO.NAME] if INFO.NAME in shared_info else ""
+            temp_name = shared_info[INFO.DATASET_NAME] if INFO.DATASET_NAME in shared_info else ""
             self.name_text.setText("Name: " + temp_name)
-            temp_time = shared_info[GUIDE.DISPLAY_TIME] if GUIDE.DISPLAY_TIME in shared_info else ""
+            temp_time = shared_info[INFO.DISPLAY_TIME] if INFO.DISPLAY_TIME in shared_info else ""
             self.time_text.setText("Time: " + (temp_time or ""))
-            temp_inst = shared_info[GUIDE.INSTRUMENT] if GUIDE.INSTRUMENT in shared_info else ""
+            temp_inst = shared_info[INFO.INSTRUMENT] if INFO.INSTRUMENT in shared_info else ""
             self.instrument_text.setText("Instrument: " + temp_inst)
-            temp_band = shared_info[GUIDE.BAND] if GUIDE.BAND in shared_info else ""
+            temp_band = shared_info[INFO.BAND] if INFO.BAND in shared_info else ""
             self.band_text.setText("Band: " + temp_band)
-            temp_wl = shared_info[GUIDE.CENTRAL_WAVELENGTH] if GUIDE.CENTRAL_WAVELENGTH in shared_info else ""
+            temp_wl = shared_info[INFO.CENTRAL_WAVELENGTH] if INFO.CENTRAL_WAVELENGTH in shared_info else ""
             self.wavelength_text.setText("Wavelength: " + temp_wl)
             temp_cmap = shared_info["colormap"] if shared_info.get("colormap", None) is not None else ""
             self.colormap_text.setText("Colormap: " + temp_cmap)

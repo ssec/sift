@@ -67,11 +67,10 @@ import argparse
 from collections import namedtuple, MutableSequence, OrderedDict
 from uuid import UUID
 import numpy as np
-from abc import ABCMeta, abstractmethod, abstractproperty
 from weakref import ref
 
-from sift.common import KIND, INFO, COMPOSITE_TYPE
-from sift.model.guidebook import ABI_AHI_Guidebook, GUIDE
+from sift.common import KIND
+from sift.model.guidebook import ABI_AHI_Guidebook, INFO
 
 from PyQt4.QtCore import QObject, pyqtSignal
 
@@ -362,7 +361,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # add as visible to the front of the current set, and invisible to the rest of the available sets
         cmap = self._default_colormap(dataset)
         dataset[INFO.CLIM] = self._guidebook.climits(dataset)
-        dataset[INFO.NAME] = self._guidebook.display_name(dataset) or dataset[INFO.NAME]
+        dataset[INFO.DATASET_NAME] = self._guidebook.display_name(dataset) or dataset[INFO.DATASET_NAME]
         presentation, reordered_indices = self._insert_layer_with_info(dataset, cmap=cmap, insert_before=insert_before)
         # signal updates from the document
         self.didAddBasicLayer.emit(reordered_indices, dataset.uuid, presentation)
@@ -737,7 +736,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         uuid = self.current_layer_set[row].uuid if not isinstance(row, UUID) else row
         info = self._layer_with_uuid[uuid]
         assert(uuid==info[INFO.UUID])
-        info[INFO.NAME] = new_name
+        info[INFO.DATASET_NAME] = new_name
         self.didChangeLayerName.emit(uuid, new_name)
 
     def change_colormap_for_layers(self, name, uuids=None):
@@ -814,10 +813,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         uuid = uuidgen()
         ds_info = {
             INFO.UUID: uuid,
-            INFO.NAME: '-RGB-',
+            INFO.DATASET_NAME: '-RGB-',
             INFO.KIND: KIND.RGB,
-            GUIDE.BAND: [],
-            GUIDE.DISPLAY_TIME: None,
+            INFO.BAND: [],
+            INFO.DISPLAY_TIME: None,
             INFO.ORIGIN_X: None,
             INFO.ORIGIN_Y: None,
             INFO.CELL_WIDTH: None,
