@@ -19,9 +19,8 @@ REQUIRES
 """
 from _weakref import ref
 from collections import MutableMapping
+from itertools import chain
 from enum import Enum
-from sift.model.guidebook import ABI_AHI_Guidebook, INFO
-
 from sift.common import INFO, KIND
 
 __author__ = 'rayg'
@@ -141,10 +140,12 @@ class DocLayer(MutableMapping):
     _doc = None  # weakref to document that owns us
 
     def __init__(self, doc, *args, **kwargs):
-        # assert (isinstance(doc, Document))
         self._doc = ref(doc)
-        self._store = dict()
-        self.update(dict(*args, **kwargs))  # use the free update to set keys
+        # store of metadata that comes from the input content and does not change
+        self._definitive = dict()
+        # implied metadata that was derived from definitive metadata
+        self._implied_cache = dict()
+        self._definitive.update(dict(*args, **kwargs))
 
     @property
     def parent(self):
@@ -168,7 +169,7 @@ class DocLayer(MutableMapping):
         UUID of the layer, which for basic layers is likely to be the UUID of the dataset in the workspace.
         :return:
         """
-        return self._store[INFO.UUID]
+        return self._definitive[INFO.UUID]
 
     @property
     def kind(self):
@@ -177,32 +178,35 @@ class DocLayer(MutableMapping):
          We may deprecate this eventually?
         :return:
         """
-        return self._store[INFO.KIND]
+        return self._definitive[INFO.KIND]
 
     @property
     def band(self):
-        return self._store.get(INFO.BAND, None)
+        return self._definitive.get(INFO.BAND, None)
 
     @property
     def instrument(self):
-        return self._store.get(INFO.INSTRUMENT, None)
+        return self._definitive.get(INFO.INSTRUMENT, None)
 
     @property
     def platform(self):
-        return self._store.get(INFO.PLATFORM, None)
+        return self._definitive.get(INFO.PLATFORM, None)
 
     @property
     def sched_time(self):
-        return self._store.get(INFO.SCHED_TIME, None)
+        return self._definitive.get(INFO.SCHED_TIME, None)
 
     @property
-    def name(self):
-        return self._store[INFO.DATASET_NAME]
+    def dataset_name(self):
+        return self._definitive[INFO.DATASET_NAME]
 
-    @name.setter
-    def name(self, new_name):
-        self._store[INFO.DATASET_NAME] = new_name
+    @property
+    def display_name(self):
+        return self._implied_cache[INFO.DISPLAY_NAME]
 
+    @display_name.setter
+    def display_name(self, value):
+        self._implied_cache[INFO.DISPLAY_NAME] = value
 
     @property
     def is_valid(self):
@@ -227,22 +231,31 @@ class DocLayer(MutableMapping):
         return True
 
     def __getitem__(self, key):
-        return self._store[self.__keytransform__(key)]
+        if key not in self._definitive:
+            return self._implied_cache[key]
+        return self._definitive[key]
 
     def __setitem__(self, key, value):
-        self._store[self.__keytransform__(key)] = value
+        if key in self._definitive:
+            raise ValueError("Can't set value on definitive metadata: {}".format(key))
+        self._implied_cache[key] = value
 
     def __delitem__(self, key):
-        del self._store[self.__keytransform__(key)]
+        if key in self._definitive:
+            raise ValueError("Can't delete definitive metadata: {}".format(key))
+        del self._implied_cache[key]
+
+    def update(self, *args, **kwds):
+        if args:
+            kwds.update(args[0])
+        for k, v in kwds.items():
+            self[k] = v
 
     def __iter__(self):
-        return iter(self._store)
+        return chain(iter(self._definitive), iter(self._implied_cache))
 
     def __len__(self):
-        return len(self._store)
-
-    def __keytransform__(self, key):
-        return key
+        return len(self._definitive) + len(self._implied_cache)
 
 
 class DocBasicLayer(DocLayer):
@@ -257,10 +270,11 @@ class DocCompositeLayer(DocLayer):
     A layer which combines other layers, be they basic or composite themselves
     """
     def __getitem__(self, key):
+        value = super(DocCompositeLayer, self).__getitem__(key)
         # FIXME debug
-        if key==INFO.KIND:
-            assert(self._store[INFO.KIND]==KIND.RGB)
-        return self._store[self.__keytransform__(key)]
+        if key == INFO.KIND:
+            assert(value == KIND.RGB)
+        return value
 
 def _concurring(*q):
     if len(q)==0:
@@ -278,6 +292,8 @@ class DocRGBLayer(DocCompositeLayer):
         self.l = [None, None, None, None]  # RGBA upstream layers
         self.n = [None, None, None, None]  # RGBA minimum value from upstream layers
         self.x = [None, None, None, None]  # RGBA maximum value from upstream layers
+        if len(args) and isinstance(args, dict):
+            args[0].setdefault(INFO.KIND, KIND.RGB)
         super().__init__(*args, **kwargs)
 
     @property
@@ -368,64 +384,48 @@ class DocRGBLayer(DocCompositeLayer):
         """
         # FUTURE: resolve dictionary-style into attribute-style uses
         dep_info = [self.r, self.g, self.b]
-        bands = [nfo[INFO.BAND] if nfo is not None else None for nfo in dep_info]
+        display_time = self._doc()._guidebook._default_display_time(self)
+        name = self._doc()._guidebook._default_display_name(self, display_time=display_time)
+        bands = [nfo.get(INFO.BAND) if nfo is not None else None for nfo in dep_info]
+        insts = [nfo.get(INFO.INSTRUMENT) if nfo is not None else None for nfo in dep_info]
+        plats = [nfo.get(INFO.PLATFORM) if nfo is not None else None for nfo in dep_info]
+        ds_info = {
+            INFO.DATASET_NAME: name,
+            INFO.DISPLAY_NAME: name,
+            INFO.DISPLAY_TIME: display_time,
+            INFO.BAND: bands,
+            INFO.INSTRUMENT: insts[0] if all(inst == insts[0] for inst in insts[1:]) else None,
+            INFO.PLATFORM: plats[0] if all(plat == plats[0] for plat in plats[1:]) else None,
+            INFO.UNIT_CONVERSION: self._doc()._guidebook.units_conversion(self),
+        }
+
         if self.r is None and self.g is None and self.b is None:
-            ds_info = {
-                INFO.DATASET_NAME: "RGB",
-                INFO.KIND: KIND.RGB,
-                INFO.BAND: bands,
-                INFO.DISPLAY_TIME: '<unknown time>',
+            ds_info.update({
                 INFO.ORIGIN_X: None,
                 INFO.ORIGIN_Y: None,
                 INFO.CELL_WIDTH: None,
                 INFO.CELL_HEIGHT: None,
                 INFO.PROJ: None,
-                INFO.COLORMAP: 'autumn',  # FIXME: why do RGBs need a colormap?
-                INFO.CLIM: (None, None, None),  # defer initialization until we have upstream layers
-            }
+                INFO.CLIM: ((None, None), (None, None), (None, None)),  # defer initialization until we have upstream layers
+            })
         else:
             highest_res_dep = min([x for x in dep_info if x is not None], key=lambda x: x[INFO.CELL_WIDTH])
-            valid_times = [nfo.get(INFO.DISPLAY_TIME, '<unknown time>') for nfo in dep_info if nfo is not None]
-            if len(valid_times) == 0:
-                display_time = '<unknown time>'
-            else:
-                display_time = valid_times[0] if len(valid_times) and all(t == valid_times[0] for t in valid_times[1:]) else '<multiple times>'
-            try:
-                names = []
-                # FIXME: include date and time in default name
-                for color, band in zip("RGB", bands):
-                    if band is None:
-                        name = u"{}:---".format(color)
-                    else:
-                        name = u"{}:B{:02d}".format(color, band)
-                        bands = []
-                    names.append(name)
-                name = u" ".join(names) + u' ' + display_time
-            except KeyError:
-                LOG.error('unable to create new name from {0!r:s}'.format(dep_info))
-                name = "RGB"
-                bands = []
-
-            ds_info = {
-                INFO.DATASET_NAME: name,
-                INFO.KIND: KIND.RGB,
-                INFO.BAND: bands,
-                INFO.DISPLAY_TIME: display_time,
+            ds_info.update({
                 INFO.ORIGIN_X: highest_res_dep[INFO.ORIGIN_X],
                 INFO.ORIGIN_Y: highest_res_dep[INFO.ORIGIN_Y],
                 INFO.CELL_WIDTH: highest_res_dep[INFO.CELL_WIDTH],
                 INFO.CELL_HEIGHT: highest_res_dep[INFO.CELL_HEIGHT],
                 INFO.PROJ: highest_res_dep[INFO.PROJ],
-                INFO.COLORMAP: 'autumn',  # FIXME: why do RGBs need a colormap?
-            }
-        old_clim = self._store.get(INFO.CLIM, None)
-        if not old_clim:  # initialize from upstream default maxima
-            self._store[INFO.CLIM] = tuple(d[INFO.CLIM] if d is not None else None for d in dep_info)
-        else:  # merge upstream with existing settings, replacing None with upstream; watch out for upstream==None case
-            upclim = lambda up: None if (up is None) else up.get(INFO.CLIM, None)
-            self._store[INFO.CLIM] = tuple((existing or upclim(upstream)) for (existing,upstream) in zip(old_clim, dep_info))
+            })
 
-        self._store.update(ds_info)
+            old_clim = self.get(INFO.CLIM, None)
+            if not old_clim:  # initialize from upstream default maxima
+                ds_info[INFO.CLIM] = tuple(tuple(d[INFO.CLIM]) if d is not None else (None, None) for d in dep_info)
+            else:  # merge upstream with existing settings, replacing None with upstream; watch out for upstream==None case
+                upclim = lambda up: (None, None) if (up is None) else tuple(up.get(INFO.CLIM, (None, None)))
+                ds_info[INFO.CLIM] = tuple((existing or upclim(upstream)) for (existing,upstream) in zip(old_clim, dep_info))
+
+        self.update(ds_info)
         if not self.shared_projections:
             LOG.warning("RGB dependency layers don't share the same projection")
         if not self.shared_origin:

@@ -28,10 +28,11 @@ import logging, unittest, argparse
 import gdal, osr
 import numpy as np
 import shutil
+from datetime import datetime
 from collections import namedtuple
 from pickle import dump, load, HIGHEST_PROTOCOL
 from uuid import UUID, uuid1 as uuidgen
-from sift.common import KIND, INFO
+from sift.common import KIND, INFO, INSTRUMENT, PLATFORM
 from PyQt4.QtCore import QObject, pyqtSignal
 from sift.model.shapes import content_within_shape
 from sift.workspace.goesr_pug import PugL1bTools
@@ -95,14 +96,42 @@ class GeoTiffImporter(WorkspaceImporter):
         source = source_path or source_uri
         return True if (source.lower().endswith('.tif') or source.lower().endswith('.tiff')) else False
 
-    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
-        # yield successive levels of detail as we load
+    @staticmethod
+    def _metadata_for_path(pathname):
+        meta = {}
+        if not pathname:
+            return meta
+
+        # Old but still necesary, get some information from the filename instead of the content
+        m = re.match(r'HS_H(\d\d)_(\d{8})_(\d{4})_B(\d\d)_([A-Za-z0-9]+).*', os.path.split(pathname)[1])
+        if m is not None:
+            plat, yyyymmdd, hhmm, bb, scene = m.groups()
+            when = datetime.strptime(yyyymmdd + hhmm, '%Y%m%d%H%M')
+            plat = PLATFORM('Himawari-{}'.format(int(plat)))
+            band = int(bb)
+            #
+            # # workaround to make old files work with new information
+            # from sift.model.guidebook import AHI_HSF_Guidebook
+            # if band in AHI_HSF_Guidebook.REFL_BANDS:
+            #     standard_name = "toa_bidirectional_reflectance"
+            # else:
+            #     standard_name = "toa_brightness_temperature"
+
+            meta.update({
+                INFO.PLATFORM: plat,
+                INFO.BAND: band,
+                INFO.INSTRUMENT: INSTRUMENT.AHI,
+                INFO.SCHED_TIME: when,
+                INFO.OBS_TIME: when,
+                INFO.SCENE: scene,
+            })
+        return meta
+
+    def get_metadata(self, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
         if source_uri is not None:
             raise NotImplementedError("GeoTiffImporter cannot read from URIs yet")
-        d = {}
+        d = self._metadata_for_path(source_path)
         gtiff = gdal.Open(source_path)
-
-        # FIXME: consider yielding status at this point so our progress bar starts moving
 
         ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
         d[INFO.UUID] = dest_uuid
@@ -116,8 +145,64 @@ class GeoTiffImporter(WorkspaceImporter):
         srs.ImportFromWkt(gtiff.GetProjection())
         d[INFO.PROJ] = srs.ExportToProj4().strip()  # remove extra whitespace
 
-        d[INFO.DATASET_NAME] = os.path.split(source_path)[-1]
+        # Workaround for previously supported files
+        # give them some kind of name that means something
+        if INFO.BAND in d:
+            d[INFO.DATASET_NAME] = "B{:02d}".format(d[INFO.BAND])
+        else:
+            # for new files, use this as a basic default
+            # FUTURE: Use Dataset name instead when we can read multi-dataset files
+            d[INFO.DATASET_NAME] = os.path.split(source_path)[-1]
+
         d[INFO.PATHNAME] = source_path
+        band = gtiff.GetRasterBand(1)
+        d[INFO.SHAPE] = (band.YSize, band.XSize)
+
+        gtiff_meta = gtiff.GetMetadata()
+        # Sanitize metadata from the file to use SIFT's Enums
+        if "name" in gtiff_meta:
+            d[INFO.DATASET_NAME] = gtiff_meta.pop("name")
+        if "platform" in gtiff_meta:
+            plat = gtiff_meta.pop("platform")
+            d[INFO.PLATFORM] = PLATFORM.from_value(plat)
+            if d[INFO.PLATFORM] == PLATFORM.UNKNOWN:
+                LOG.warning("Unknown platform being loaded: {}".format(plat))
+        if "instrument" in gtiff_meta or "sensor" in gtiff_meta:
+            inst = gtiff_meta.pop("sensor", gtiff_meta.pop("instrument", None))
+            d[INFO.INSTRUMENT] = INSTRUMENT.from_value(inst)
+            if d[INFO.INSTRUMENT] == INSTRUMENT.UNKNOWN:
+                LOG.warning("Unknown instrument being loaded: {}".format(inst))
+        if "start_time" in gtiff_meta:
+            start_time = datetime.strptime(gtiff_meta["start_time"], "%Y-%m-%dT%H:%M:%SZ")
+            d[INFO.SCHED_TIME] = start_time
+            d[INFO.OBS_TIME] = start_time
+            if "end_time" in gtiff_meta:
+                end_time = datetime.strptime(gtiff_meta["end_time"], "%Y-%m-%dT%H:%M:%SZ")
+                d[INFO.OBS_DURATION] = end_time - start_time
+        if "valid_min" in gtiff_meta:
+            gtiff_meta["valid_min"] = float(gtiff_meta["valid_min"])
+        if "valid_max" in gtiff_meta:
+            gtiff_meta["valid_max"] = float(gtiff_meta["valid_max"])
+        if "standard_name" in gtiff_meta:
+            gtiff_meta[INFO.STANDARD_NAME] = gtiff_meta["standard_name"]
+        if "flag_values" in gtiff_meta:
+            gtiff_meta["flag_values"] = tuple(int(x) for x in gtiff_meta["flag_values"].split(','))
+        if "flag_masks" in gtiff_meta:
+            gtiff_meta["flag_masks"] = tuple(int(x) for x in gtiff_meta["flag_masks"].split(','))
+        if "flag_meanings" in gtiff_meta:
+            gtiff_meta["flag_meanings"] = gtiff_meta["flag_meanings"].split(' ')
+        if "units" in gtiff_meta:
+            gtiff_meta[INFO.UNITS] = gtiff_meta.pop('units')
+
+        d.update(gtiff_meta)
+        return d
+
+    def __call__(self, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
+        # yield successive levels of detail as we load
+        if source_uri is not None:
+            raise NotImplementedError("GeoTiffImporter cannot read from URIs yet")
+        # Additional metadata that we've learned by loading the data
+        gtiff = gdal.Open(source_path)
 
         # FIXME: read this into a numpy.memmap backed by disk in the workspace
         band = gtiff.GetRasterBand(1)  # FUTURE may be an assumption
@@ -133,7 +218,7 @@ class GeoTiffImporter(WorkspaceImporter):
             d[INFO.PROJ] += " +over"
 
         bandtype = gdal.GetDataTypeName(band.DataType)
-        if bandtype.lower()!='float32':
+        if bandtype.lower() != 'float32':
             LOG.warning('attempting to read geotiff files with non-float32 content')
         # Full resolution shape
         # d["shape"] = self.get_dataset_data(item, time_step).shape
@@ -158,7 +243,7 @@ class GeoTiffImporter(WorkspaceImporter):
                                        current_stage=0,
                                        completion=float(irow)/float(rows),
                                        stage_desc="importing geotiff",
-                                       dataset_info=d,
+                                       dataset_info=None,
                                        data=img_data)
             yield status
 
@@ -172,7 +257,7 @@ class GeoTiffImporter(WorkspaceImporter):
                                current_stage=0,
                                completion=1.0,
                                stage_desc="done loading geotiff",
-                               dataset_info=d,
+                               dataset_info=None,
                                data=img_data)
         yield zult
         # further yields would logically add levels of detail with their own sampling values
@@ -180,7 +265,14 @@ class GeoTiffImporter(WorkspaceImporter):
         # note that once the coarse data is yielded, we may be operating in another thread - think about that for now?
 
 
-
+# map .platform_id in PUG format files to SIFT platform enum
+PLATFORM_ID_TO_PLATFORM = {
+    'G16': PLATFORM.GOES_16,
+    'G17': PLATFORM.GOES_17,
+    # hsd2nc export of AHI data as PUG format
+    'Himawari-8': PLATFORM.HIMAWARI_8,
+    'Himawari-9': PLATFORM.HIMAWARI_9
+}
 
 class GoesRPUGImporter(WorkspaceImporter):
     """
@@ -189,11 +281,23 @@ class GoesRPUGImporter(WorkspaceImporter):
     def __init__(self, **kwargs):
         super(GoesRPUGImporter, self).__init__()
 
+    @staticmethod
+    def _metadata_for_abi_path(abi):
+        return {
+            INFO.PLATFORM: PLATFORM_ID_TO_PLATFORM[abi.platform],  # e.g. G16
+            INFO.BAND: abi.band,
+            INFO.INSTRUMENT: INSTRUMENT.ABI,
+            INFO.SCHED_TIME: abi.sched_time,
+            INFO.DISPLAY_TIME: abi.display_time,
+            INFO.SCENE: abi.scene_id,
+            INFO.DISPLAY_NAME: abi.display_name
+        }
+
     def is_relevant(self, source_path=None, source_uri=None):
         source = source_path or source_uri
         return True if (source.lower().endswith('.nc') or source.lower().endswith('.nc4')) else False
 
-    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
+    def get_metadata(self, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
         # yield successive levels of detail as we load
         if source_uri is not None:
             raise NotImplementedError("GoesRPUGImporter cannot read from URIs yet")
@@ -206,6 +310,7 @@ class GoesRPUGImporter(WorkspaceImporter):
         # nc = nc4.Dataset(source_path)
         pug = PugL1bTools(source_path)
 
+        d.update(self._metadata_for_abi_path(pug))
         d[INFO.UUID] = dest_uuid
         d[INFO.DATASET_NAME] = os.path.split(source_path)[-1]
         d[INFO.PATHNAME] = source_path
@@ -227,13 +332,13 @@ class GoesRPUGImporter(WorkspaceImporter):
         d[INFO.CELL_WIDTH] = x[midxi+1] - x[midxi]
         d[INFO.CELL_HEIGHT] = y[midyi+1] - y[midyi]
 
-        # FUTURE: consider yielding status at this point so our progress bar starts moving
-
-        bandtype = np.float32
         shape = rows, cols = pug.shape
         d[INFO.SHAPE] = shape
-        d[INFO.DISPLAY_TIME] = pug.display_time
+        LOG.debug(repr(d))
+        return d
 
+    def __call__(self, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
+        pug = PugL1bTools(source_path)
         LOG.info('converting radiance to %s' % pug.bt_or_refl)
         bt_or_refl, image, units = pug.convert_from_nc()  # FIXME expensive
         # overview_image = fixme  # FIXME, we need a properly navigated overview image here
@@ -257,36 +362,19 @@ class GoesRPUGImporter(WorkspaceImporter):
         # FUTURE as we're doing so, also update coverage array (showing what sections of data are loaded)
         # FUTURE and for some cases the sparsity array, if the data is interleaved (N/A for NetCDF imagery)
 
+        bandtype = np.float32
         LOG.info('caching PUG imagery in workspace %s' % cache_path)
         fp = open(cache_path, 'wb+')
-        img_data = np.memmap(fp, dtype=np.float32, shape=shape, mode='w+')
+        img_data = np.memmap(fp, dtype=np.float32, shape=pug.shape, mode='w+')
         img_data[:] = np.ma.fix_invalid(image, copy=False, fill_value=np.NAN)  # FIXME: expensive
-
-        LOG.debug(repr(d))
-
-        # FUTURE: workspace content can be int16 with conversion coefficients applied on the fly, after feature-matrix-model goes in
-
-        # FIXME: for test purpose just brute-force the whole thing into place instead of doing incremental partial-coverage loads
-        # kind, data, unit = pug.convert_from_nc()   # hopefully only a few seconds... but not good in long term to leave this
 
         yield import_progress(uuid=dest_uuid,
                              stages=1,
                              current_stage=0,
                              completion=1.0,
                              stage_desc="GOES PUG data add to workspace",
-                             dataset_info=d,
+                             dataset_info=None,
                              data=img_data)
-
-        # # even worse, copying data over to memmap-on-disk
-        # img_data[:] = data
-
-        # yield import_progress(uuid=dest_uuid,
-        #                      stages=1,
-        #                      current_stage=0,
-        #                      completion=1.0,
-        #                      stage_desc="done importing GOESR pug",
-        #                      dataset_info=d,
-        #                      data=img_data)
 
 
 class Workspace(QObject):
@@ -417,17 +505,25 @@ class Workspace(QObject):
             return None
         uuid, info, data_info = nfo
         dfilename, dtype, shape = data_info
-        dpath = os.path.join(self.cwd, dfilename)
-        if not os.path.exists(dpath):
-            del self._inventory[key]
-            self._store_inventory()
-            return None
-        data = np.memmap(dpath, dtype=dtype, mode='c', shape=shape)
+        if dfilename is None:
+            LOG.debug("No data loaded from {}".format(path))
+            data = None
+        else:
+            dpath = os.path.join(self.cwd, dfilename)
+            if not os.path.exists(dpath):
+                del self._inventory[key]
+                self._store_inventory()
+                return None
+            data = np.memmap(dpath, dtype=dtype, mode='c', shape=shape)
         return uuid, info, data
 
     @property
     def paths_in_cache(self):
         return [x[0] for x in self._inventory.keys()]
+
+    @property
+    def uuids_in_cache(self):
+        return self._inventory.keys()
 
     def _update_cache(self, path, uuid, info, data):
         """
@@ -439,7 +535,16 @@ class Workspace(QObject):
         :return:
         """
         key = self._key_for_path(path)
-        data_info = (os.path.split(data.filename)[1], data.dtype, data.shape)
+        prev_nfo = self._inventory.get(key, (uuid, None, (None, None, None)))
+
+        if info is None:
+            info = prev_nfo[1]
+
+        if data is None:
+            data_info = prev_nfo[2]
+        else:
+            data_info = (os.path.split(data.filename)[1], data.dtype, data.shape)
+
         nfo = (uuid, info, data_info)
         self._inventory[key] = nfo
         self._store_inventory()
@@ -531,6 +636,12 @@ class Workspace(QObject):
         """
         return False
 
+    def get_metadata(self, uuid_or_path):
+        if isinstance(uuid_or_path, UUID):
+            return self._info[uuid_or_path]
+        else:
+            return self._inventory[self._key_for_path(uuid_or_path)][1]
+
     def import_image(self, source_path=None, source_uri=None, allow_cache=True):
         """
         Start loading URI data into the workspace asynchronously.
@@ -541,36 +652,56 @@ class Workspace(QObject):
         if source_uri is not None and source_path is None:
             raise NotImplementedError('URI load not yet supported')
 
-        nfo = None
         if allow_cache and source_path is not None:
             nfo = self._check_cache(source_path)
             if nfo is not None:
                 uuid, info, data = nfo
                 self._info[uuid] = info
                 self._data[uuid] = data
-                return nfo
+                return info
 
-        gen = None
         uuid = uuidgen()
+
+        # find the best importer
         for imp in self._importers:
             if imp.is_relevant(source_path=source_path):
-                gen = imp(self, self.cwd, uuid, source_path=source_path, cache_path=self._preferred_cache_path(uuid))
+                # gen = imp(self, self.cwd, uuid, source_path=source_path, cache_path=self._preferred_cache_path(uuid))
                 break
-        if gen is None:
+        else:
+            raise IOError("unable to import {}".format(source_path))
+
+        # Collect and cache metadata
+        # collect metadata before iterating because we need metadata as soon as possible
+        info = self._info[uuid] = imp.get_metadata(uuid, source_path=source_path)
+        # we haven't loaded the data yet (will do it asynchronously later)
+        self._data[uuid] = None
+        if allow_cache:
+            self._update_cache(source_path, uuid, info, None)
+        return info
+
+    def import_image_data(self, uuid, allow_cache=True):
+        metadata = self.get_metadata(uuid)
+        name = metadata[INFO.DATASET_NAME]
+        source_path = metadata[INFO.PATHNAME]
+
+        for imp in self._importers:
+            if imp.is_relevant(source_path=source_path):
+                break
+        else:
             raise IOError("unable to import {}".format(source_path))
 
         # FIXME: for now, just iterate the incremental load. later we want to add this to TheQueue and update the UI as we get more data loaded
+        gen = imp(uuid, source_path=source_path, cache_path=self._preferred_cache_path(uuid))
         for update in gen:
             if update.data is not None:
-                info = self._info[uuid] = update.dataset_info
                 data = self._data[uuid] = update.data
-                LOG.info("{} {}: {:.01f}%".format(update.dataset_info[INFO.DATASET_NAME], update.stage_desc, update.completion * 100.0))
+                LOG.info("{} {}: {:.01f}%".format(name, update.stage_desc, update.completion*100.0))
         # copy the data into an anonymous memmap
         self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
         if allow_cache:
-            self._update_cache(source_path, uuid, info, data)
+            self._update_cache(source_path, uuid, None, data)
         # TODO: schedule cache cleaning in background after a series of imports completes
-        return uuid, info, data
+        return data
 
     def create_composite(self, symbols:dict, relation:dict):
         """
@@ -578,7 +709,7 @@ class Workspace(QObject):
         :param symbols: dictionary of logical-name to uuid
         :param relation: dictionary with information on how the relation is calculated (FUTURE)
         """
-
+        raise NotImplementedError()
 
     def _preferred_cache_path(self, uuid):
         filename = str(uuid)
@@ -612,10 +743,6 @@ class Workspace(QObject):
         :param dsi: datasetinfo dictionary or UUID of a dataset
         :return: True if successfully deleted, False if not found
         """
-        if isinstance(dsi, dict):
-            name = dsi[INFO.DATASET_NAME]
-        else:
-            name = 'dataset'
         uuid = dsi if isinstance(dsi, UUID) else dsi[INFO.UUID]
         zult = False
 

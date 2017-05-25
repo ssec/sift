@@ -20,7 +20,7 @@ from sift.common import INFO, KIND
 from sift.queue import TASK_PROGRESS, TASK_DOING
 
 import logging
-import numpy
+import numpy as np
 
 # http://stackoverflow.com/questions/12459811/how-to-embed-matplotib-in-pyqt-for-dummies
 # see also: http://matplotlib.org/users/navigation_toolbar.html
@@ -399,9 +399,9 @@ class ProbeGraphDisplay (object) :
 
         # fill up our lists of layers
         for uuid in uuid_list:
-            nfo = self.document.get_info(uuid=uuid)
-            layer_name = nfo.get(INFO.DATASET_NAME, "??unknown layer??")
-            if nfo.get(INFO.KIND, None) == KIND.RGB:  # skip RGB layers
+            layer = self.document[uuid]
+            layer_name = layer.get(INFO.DISPLAY_NAME, "??unknown layer??")
+            if layer.get(INFO.KIND, None) == KIND.RGB:  # skip RGB layers
                 continue
             uuid_string = str(uuid)
             self.xDropDown.addItem(layer_name, uuid_string)
@@ -560,13 +560,14 @@ class ProbeGraphDisplay (object) :
 
             # get the data and info we need for this plot
             data_polygon = self.workspace.get_content_polygon(x_uuid, polygon)
-            fmt, units, data_polygon = self.document.convert_units(x_uuid, data_polygon)
-            title = self.document.get_info(uuid=x_uuid)[INFO.DISPLAY_NAME]
+            unit_info = self.document[x_uuid][INFO.UNIT_CONVERSION]
+            data_polygon = unit_info[1](data_polygon)
+            title = self.document[x_uuid][INFO.DISPLAY_NAME]
 
             # get point probe value
             if point_xy:
                 x_point = self.workspace.get_content_point(x_uuid, point_xy)
-                format_str, unit_str, x_point = self.document.convert_units(x_uuid, x_point)
+                x_point = unit_info[1](x_point)
             else:
                 x_point = None
 
@@ -579,37 +580,40 @@ class ProbeGraphDisplay (object) :
             yield {TASK_DOING: 'Probe Plot: Collecting polygon data (layer 1)...', TASK_PROGRESS: 0.0}
 
             # get the data and info we need for this plot
-            name1 = self.document.get_info(uuid=x_uuid)[INFO.DISPLAY_NAME]
-            name2 = self.document.get_info(uuid=y_uuid)[INFO.DISPLAY_NAME]
+            name1 = self.document[x_uuid][INFO.DISPLAY_NAME]
+            name2 = self.document[y_uuid][INFO.DISPLAY_NAME]
             hires_uuid = self.workspace.lowest_resolution_uuid(x_uuid, y_uuid)
             hires_coord_mask, hires_data = self.workspace.get_coordinate_mask_polygon(hires_uuid, polygon)
-            _, _, hires_data = self.document.convert_units(hires_uuid, hires_data)
+            hires_conv_func = self.document[hires_uuid][INFO.UNIT_CONVERSION][1]
+            x_conv_func = self.document[x_uuid][INFO.UNIT_CONVERSION][1]
+            y_conv_func = self.document[y_uuid][INFO.UNIT_CONVERSION][1]
+            hires_data = hires_conv_func(hires_data)
             yield {TASK_DOING: 'Probe Plot: Collecting polygon data (layer 2)...', TASK_PROGRESS: 0.15}
             if hires_uuid is x_uuid:
                 # the hires data was from the X UUID
                 data1 = hires_data
                 data2 = self.workspace.get_content_coordinate_mask(y_uuid, hires_coord_mask)
-                _, _, data2 = self.document.convert_units(y_uuid, data2)
+                data2 = y_conv_func(data2)
             else:
                 # the hires data was from the Y UUID
                 data2 = hires_data
                 data1 = self.workspace.get_content_coordinate_mask(x_uuid, hires_coord_mask)
-                _, _, data1 = self.document.convert_units(x_uuid, data1)
+                data1 = x_conv_func(data1)
             yield {TASK_DOING: 'Probe Plot: Creating scatter plot...', TASK_PROGRESS: 0.25}
 
             if point_xy:
                 x_point = self.workspace.get_content_point(x_uuid, point_xy)
-                format_str, unit_str, x_point = self.document.convert_units(x_uuid, x_point)
+                x_point = x_conv_func(x_point)
                 y_point = self.workspace.get_content_point(y_uuid, point_xy)
-                format_str, unit_str, y_point = self.document.convert_units(y_uuid, y_point)
+                y_point = y_conv_func(y_point)
             else:
                 x_point = None
                 y_point = None
 
             # plot a scatter plot
             # self.plotScatterplot (data1, name1, data2, name2)
-            data1 = data1[~numpy.isnan(data1)]
-            data2 = data2[~numpy.isnan(data2)]
+            data1 = data1[~np.isnan(data1)]
+            data2 = data2[~np.isnan(data2)]
             self.plotDensityScatterplot (data1, name1, data2, name2, x_point, y_point)
 
         # if we have some combination of selections we don't understand, clear the figure
@@ -629,7 +633,7 @@ class ProbeGraphDisplay (object) :
         """
         self.figure.clf()
         axes = self.figure.add_subplot(111)
-        bars = axes.hist(data[~numpy.isnan(data)], bins=self.DEFAULT_NUM_BINS)
+        bars = axes.hist(data[~np.isnan(data)], bins=self.DEFAULT_NUM_BINS)
         if x_point is not None:
             # go through each rectangle object and make the one that contains x_point 'red'
             # default color is blue so red should stand out
@@ -670,17 +674,17 @@ class ProbeGraphDisplay (object) :
 
         # figure out the range of the data
         # you might not be comparing the same units
-        xmin_value = numpy.min(dataX)
-        xmax_value = numpy.max(dataX)
-        ymin_value = numpy.min(dataY)
-        ymax_value = numpy.max(dataY)
+        xmin_value = np.min(dataX)
+        xmax_value = np.max(dataX)
+        ymin_value = np.min(dataY)
+        ymax_value = np.max(dataY)
         # bounds should be defined in the form [[xmin, xmax], [ymin, ymax]]
         bounds = [[xmin_value, xmax_value], [ymin_value, ymax_value]]
 
         # make the binned density map for this data set
-        density_map, _, _ = numpy.histogram2d(dataX, dataY, bins=self.DEFAULT_NUM_BINS, range=bounds)
+        density_map, _, _ = np.histogram2d(dataX, dataY, bins=self.DEFAULT_NUM_BINS, range=bounds)
         # mask out zero counts; flip because y goes the opposite direction in an imshow graph
-        density_map = numpy.flipud(numpy.transpose(numpy.ma.masked_array(density_map, mask=density_map == 0)))
+        density_map = np.flipud(np.transpose(np.ma.masked_array(density_map, mask=density_map == 0)))
 
         # display the density map data
         img = axes.imshow(density_map, extent=[xmin_value, xmax_value, ymin_value, ymax_value], aspect='auto',

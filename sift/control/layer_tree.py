@@ -98,7 +98,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
 
         # if we have a point probe value, draw the filled bar to represent where it is in that layer's data range
         if value:
-            value, bar, fmt, unit = value
+            value, bar, fmtd_str = value
             w = bar * float(rect.width())
             r = QRect(rect.left(), rect.top(), int(w), rect.height())
             painter.fillRect(r, color)
@@ -153,7 +153,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
                 l = 0
                 r = w
                 align = Qt.AlignRight
-            painter.drawText(l, t, r-l, theight, align, fmt.format(value))
+            painter.drawText(l, t, r-l, theight, align, fmtd_str)
 
         painter.restore()
 
@@ -388,7 +388,10 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         :param doc_values: {uuid: value, value-relative-to-base, is-base:bool}, values can be NaN
         :return:
         """
-        self._last_equalizer_values = doc_values
+        self._last_equalizer_values.update(doc_values)
+        # for k in self._last_equalizer_values.keys():
+        #     if self._last_equalizer_values[k] is None:
+        #         del self._last_equalizer_values[k]
         self.refresh()
 
     def change_layer_colormap_menu(self, pos:QPoint, lbox:QTreeView, selected_uuids:list, *args):
@@ -641,7 +644,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             return str(value)
         elif role == Qt.DisplayRole:
             # lao = self.doc.layer_animation_order(row)
-            name = info[INFO.DATASET_NAME]
+            name = info[INFO.DISPLAY_NAME]
             # return  ('[-]  ' if lao is None else '[{}]'.format(lao+1)) + el[row]['name']
             # if leroy:
             #     data = '[%.2f] ' % leroy[0]
@@ -656,11 +659,8 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         if role == Qt.EditRole:
             if isinstance(data, str):
                 LOG.debug("changing row {0:d} name to {1!r:s}".format(index.row(), data))
-                if not data:
-                    LOG.warning("skipping rename to nothing")
-                else:
-                    self.doc.change_layer_name(index.row(), data)
-                    self.dataChanged.emit(index, index)
+                self.doc.change_layer_name(index.row(), data)
+                self.dataChanged.emit(index, index)
                 return True
             else:
                 LOG.debug("data type is {0!r:s}".format(type(data)))

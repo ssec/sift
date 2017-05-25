@@ -119,7 +119,7 @@ class INSTRUMENT(Enum):
         for m in cls:
             if m.value == value_str:
                 return m
-        return None
+        return INSTRUMENT.UNKNOWN
 
 
 class PLATFORM(Enum):
