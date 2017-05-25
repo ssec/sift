@@ -141,9 +141,10 @@ class PLATFORM(Enum):
 class INFO(Enum):
     """
     Standard keys for info dictionaries
+    Note: some fields correspond to database fields in workspace.metadatabase !
     """
 
-    PATHNAME = 'pathname'  # full path to the data file
+    PATHNAME = 'path'  # full path to the data file
     DATASET_NAME = 'dataset_name'  # logical name of the file (possibly human assigned)
     SHORT_NAME = 'short_name'  # CF short_name
     LONG_NAME = 'long_name'  # CF long_name
@@ -155,7 +156,7 @@ class INFO(Enum):
     ORIGIN_Y = 'origin_y'
     CELL_WIDTH = 'cell_width'
     CELL_HEIGHT = 'cell_height'
-    PROJ = 'proj4_string'
+    PROJ = 'proj4'
     CLIM = 'clim'  # (min,max) color map limits
     SHAPE = 'shape' # (rows, columns) or (rows, columns, levels) data shape
     COLORMAP = 'colormap'  # name or UUID of a color map

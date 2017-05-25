@@ -34,7 +34,7 @@ __docformat__ = 'reStructuredText'
 
 import os, sys
 import logging, unittest, argparse
-from collections import MutableMapping
+from sift.common import INFO
 
 from sqlalchemy import Column, Integer, String, UnicodeText, Unicode, ForeignKey, DateTime, Interval, PickleType, Float, create_engine
 from sqlalchemy.orm import Session, relationship, sessionmaker, backref
@@ -114,7 +114,13 @@ class Source(Base):
     #     self.atime = datetime.utcnow()
 
 
-class Product(ProxiedDictMixin, Base):
+class InfoDictMixin:
+    """
+    mixin to allow INFO attributes to be accessed as __getitem__
+    """
+
+
+class Product(ProxiedDictMixin, InfoDictMixin, Base):
     """
     Primary entity being tracked in metadatabase
     One or more StoredProduct are held in a single File
@@ -160,6 +166,34 @@ class Product(ProxiedDictMixin, Base):
     info = relationship("ProductKeyValue", collection_class=attribute_mapped_collection('key'))
     _proxied = association_proxy("info", "value",
                                  creator=lambda key, value: ProductKeyValue(key=key, value=value))
+
+    # allow product[INFO.key] to access fields where intersections occur; otherwise punt to key-value table
+    def __getitem__(self, item):
+        if item in INFO:
+            k = str(item)
+            if hasattr(self, k):
+                return getattr(self, k)
+            else:
+                assert False
+
+        return self._proxied[item]
+
+    def __setitem__(self, key, value):
+        if key in INFO:
+            k = str(key)
+            if hasattr(self, k):
+                return super(Product, self).__setitem__(key, value)
+        self._proxied[key] = value
+
+    def __delitem__(self, key):
+        del self._proxied[key]
+
+    def __contains__(self, key):
+        return ((key in INFO) and hasattr(self, str(key))) or (key in self._proxied)
+
+    def has_key(self, key):
+        # testlib.pragma exempt:__hash__
+        return key in self
 
 
 class ProductKeyValue(Base):
@@ -366,6 +400,7 @@ class tests(unittest.TestCase):
         s.commit()
         q = s.query(Product).filter_by(source=f).first()
         self.assertEqual(q['test_key'], u'test_value')
+        self.assertEquals(q[INFO.UUID], q.uuid)
         self.assertEqual(q['turkey'], u'cobbler')
 
 def _debug(type, value, tb):
