@@ -55,7 +55,7 @@ between subsystems. Document rarely deals directly with content.
 :copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-from sift.model.layer import mixing, DocLayer, DocBasicLayer, DocCompositeLayer, DocRGBLayer
+from sift.model.layer import Mixing, DocLayer, DocBasicLayer, DocCompositeLayer, DocRGBLayer
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -333,7 +333,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                  a_order=None,
                  colormap=cmap,
                  climits=info[INFO.CLIM],
-                 mixing=mixing.NORMAL)
+                 mixing=Mixing.NORMAL)
 
         q = p._replace(visible=False)  # make it available but not visible in other layer sets
         old_layer_count = len(self._layer_sets[self.current_set_index])
@@ -385,8 +385,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                                                               display_time=info.pop(INFO.DISPLAY_TIME, None))
         self._generate_implied_metadata(dataset)
         presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
-        print(dataset._definitive)
-        print(dataset._implied_cache)
 
         # FUTURE: Load this async, the slots for the below signal need to be OK with that
         content = self._workspace.import_image_data(uuid)
@@ -787,7 +785,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         assert(uuid==info[INFO.UUID])
         if not new_name:
             # empty string, reset to default DISPLAY_NAME
-            new_name = self._guidebook._default_display_name(info)
+            new_name = info.default_display_name
         info[INFO.DISPLAY_NAME] = new_name
         self.didChangeLayerName.emit(uuid, new_name)
 
