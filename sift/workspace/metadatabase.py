@@ -209,7 +209,7 @@ class Content(ProxiedDictMixin, Base):
 
     # projection information for this representation of the data
     proj4 = Column(String, nullable=True)  # proj4 projection string for the data in this array, if one exists; else assume y=lat/x=lon
-    cell_width, cell_height, origin_x, origin_y = Column(Float, nullable=True), Column(Float, nullable=True), Column(Float, nullable=True), Column(Float, nullable=True)  # FIXME DJH should explain these
+    cell_width, cell_height, origin_x, origin_y = Column(Float, nullable=True), Column(Float, nullable=True), Column(Float, nullable=True), Column(Float, nullable=True)
 
     # sparsity and coverage, int8 arrays if needed to show incremental availability of the data
     # dimensionality is always a reduction factor of rows/cols/levels
@@ -370,7 +370,7 @@ class tests(unittest.TestCase):
         s.commit()
         q = s.query(Product).filter_by(source=f).first()
         self.assertEqual(q['test_key'], u'test_value')
-        self.assertEquals(q[INFO.UUID], q.uuid)
+        # self.assertEquals(q[INFO.UUID], q.uuid)
         self.assertEqual(q['turkey'], u'cobbler')
 
 def _debug(type, value, tb):
