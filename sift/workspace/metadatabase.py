@@ -360,11 +360,13 @@ class tests(unittest.TestCase):
         f = Source(path='', name='foo.bar', mtime=when, atime=when, format=None)
         p = Product(uuid=str(uu), source=f, platform='TEST', identifier='B00')
         p['test_key'] = u'test_value'
+        p['turkey'] = u'cobbler'
         s.add(f)
         s.add(p)
         s.commit()
         q = s.query(Product).filter_by(source=f).first()
-        self.assertEquals(q['test_key'], u'test_value')
+        self.assertEqual(q['test_key'], u'test_value')
+        self.assertEqual(q['turkey'], u'cobbler')
 
 def _debug(type, value, tb):
     "enable with sys.excepthook = debug"
