@@ -64,6 +64,10 @@ class ProxiedDictMixin(object):
         return iter(self._proxied)
 
     def __getitem__(self, key):
+        # if key in INFO:
+        #     v = getattr(self, str(key), INFO)
+        #     if v is not INFO:
+        #         return v
         return self._proxied[key]
 
     def __contains__(self, key):
@@ -114,13 +118,7 @@ class Source(Base):
     #     self.atime = datetime.utcnow()
 
 
-class InfoDictMixin:
-    """
-    mixin to allow INFO attributes to be accessed as __getitem__
-    """
-
-
-class Product(ProxiedDictMixin, InfoDictMixin, Base):
+class Product(ProxiedDictMixin, Base):
     """
     Primary entity being tracked in metadatabase
     One or more StoredProduct are held in a single File
@@ -153,10 +151,10 @@ class Product(ProxiedDictMixin, InfoDictMixin, Base):
     # native resolution information - see Content for projection details at different LODs
     resolution = Column(Integer, nullable=True)  # meters max resolution, e.g. 500, 1000, 2000, 4000
 
-    # descriptive
-    units = Column(Unicode, nullable=True)  # udunits compliant units, e.g. 'K'
-    label = Column(Unicode, nullable=True)  # "AHI Refl B11"
-    description = Column(UnicodeText, nullable=True)
+    # descriptive - move these to INFO keys
+    # units = Column(Unicode, nullable=True)  # udunits compliant units, e.g. 'K'
+    # label = Column(Unicode, nullable=True)  # "AHI Refl B11"
+    # description = Column(UnicodeText, nullable=True)
 
     # link to workspace cache files representing this data, not lod=0 is overview
     contents = relationship("Content", backref=backref("product", cascade="all"))
@@ -166,34 +164,6 @@ class Product(ProxiedDictMixin, InfoDictMixin, Base):
     info = relationship("ProductKeyValue", collection_class=attribute_mapped_collection('key'))
     _proxied = association_proxy("info", "value",
                                  creator=lambda key, value: ProductKeyValue(key=key, value=value))
-
-    # allow product[INFO.key] to access fields where intersections occur; otherwise punt to key-value table
-    def __getitem__(self, item):
-        if item in INFO:
-            k = str(item)
-            if hasattr(self, k):
-                return getattr(self, k)
-            else:
-                assert False
-
-        return self._proxied[item]
-
-    def __setitem__(self, key, value):
-        if key in INFO:
-            k = str(key)
-            if hasattr(self, k):
-                return super(Product, self).__setitem__(key, value)
-        self._proxied[key] = value
-
-    def __delitem__(self, key):
-        del self._proxied[key]
-
-    def __contains__(self, key):
-        return ((key in INFO) and hasattr(self, str(key))) or (key in self._proxied)
-
-    def has_key(self, key):
-        # testlib.pragma exempt:__hash__
-        return key in self
 
 
 class ProductKeyValue(Base):
