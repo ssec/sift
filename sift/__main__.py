@@ -17,8 +17,6 @@ REQUIRES
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-from sift.view.export_image import ExportImageDialog
-
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
@@ -480,8 +478,9 @@ class Main(QtGui.QMainWindow):
             if data_point is None:
                 data_str = "N/A"
             else:
-                format_str, unit_str, converted = self.document.convert_units(uuid, data_point)
-                data_str = (format_str + "{:s}").format(float(converted), unit_str)
+                unit_info = self.document[uuid][INFO.UNIT_CONVERSION]
+                data_point = unit_info[1](data_point)
+                data_str = unit_info[2](data_point, numeric=False)
         else:
             data_str = "N/A"
         self.ui.cursorProbeText.setText("Probe Value: {} ".format(data_str))

@@ -16,7 +16,7 @@ data_files = [
     (os.path.join(os.path.dirname(vispy.io.__file__), "_data"), os.path.join("vispy", "io", "_data")),
 ]
 
-for shape_dir in ["ne_50m_admin_0_countries", "ne_110m_admin_0_countries", "ne_50m_admin_1_states_provinces_lakes"]:
+for shape_dir in ["ne_50m_admin_0_countries", "ne_110m_admin_0_countries", "ne_50m_admin_1_states_provinces_lakes", "fonts"]:
     data_files.append((os.path.join("sift", "data", shape_dir), os.path.join("sift_data", shape_dir)))
 
 hidden_imports = [

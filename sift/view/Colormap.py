@@ -20,7 +20,7 @@ REQUIRES
 __docformat__ = 'reStructuredText'
 __author__ = 'cphillips'
 
-from vispy.color.colormap import Colormap, BaseColormap, _mix_simple
+from vispy.color.colormap import Colormap, BaseColormap, _mix_simple, _colormaps
 from collections import OrderedDict
 import numpy as np
 
@@ -300,6 +300,7 @@ OTHER_COLORMAPS = OrderedDict([
 ])
 
 ALL_COLORMAPS = {}
+ALL_COLORMAPS.update(_colormaps)  # vispy's colormaps
 ALL_COLORMAPS.update(VIS_COLORMAPS)
 ALL_COLORMAPS.update(IR_COLORMAPS)
 ALL_COLORMAPS.update(LIFTED_INDEX_COLORMAPS)
@@ -318,5 +319,6 @@ CATEGORIZED_COLORMAPS = OrderedDict([
     ("Other", OTHER_COLORMAPS),
 ])
 
+DEFAULT_UNKNOWN = "grays"
 DEFAULT_VIS = "Square Root (Vis Default)"
 DEFAULT_IR = "Rainbow (IR Default)"

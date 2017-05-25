@@ -21,7 +21,6 @@ from PyQt4.QtCore import SIGNAL, QObject, Qt, pyqtSignal
 from PyQt4.QtGui import QWidget, QListView, QComboBox, QSlider, QTreeView, QGridLayout, QVBoxLayout, QLabel, QLineEdit, QScrollArea, QLayout, QTextDocument, QDoubleValidator
 from PyQt4.QtWebKit import QWebView
 from weakref import ref
-from sift.model.guidebook import GUIDE
 from sift.common import INFO, KIND
 from sift.control.layer_tree import LayerStackTreeViewModel
 from sift.model.layer import DocLayer, DocBasicLayer, DocCompositeLayer, DocRGBLayer
@@ -52,7 +51,7 @@ class LayerSetsManager (QObject) :
     def didChangeRGBLayerSelection(self):
         return self.rgb_config_pane.didChangeRGBLayerSelection
 
-    def __init__ (self, ui, tab_view_widget:QWidget, layer_info_widget:QWidget, document) :
+    def __init__(self, ui, tab_view_widget:QWidget, layer_info_widget:QWidget, document):
 
         super(LayerSetsManager, self).__init__(tab_view_widget)
 
@@ -259,39 +258,39 @@ class SingleLayerInfoPane (QWidget) :
                 # compare our various values
 
                 # name
-                new_name = layer_info[INFO.NAME] if INFO.NAME in layer_info else ""
-                if INFO.NAME not in shared_info :
-                    shared_info[INFO.NAME] = new_name
-                else :
-                    shared_info[INFO.NAME] = "" if shared_info[INFO.NAME] != new_name else new_name
+                new_name = layer_info[INFO.DISPLAY_NAME] if INFO.DISPLAY_NAME in layer_info else ""
+                if INFO.DISPLAY_NAME not in shared_info:
+                    shared_info[INFO.DISPLAY_NAME] = new_name
+                else:
+                    shared_info[INFO.DISPLAY_NAME] = "" if shared_info[INFO.DISPLAY_NAME] != new_name else new_name
 
                 # time
-                new_time = layer_info[GUIDE.DISPLAY_TIME] if GUIDE.DISPLAY_TIME in layer_info else ""
-                if GUIDE.DISPLAY_TIME not in shared_info :
-                    shared_info[GUIDE.DISPLAY_TIME] = new_time
+                new_time = layer_info[INFO.DISPLAY_TIME] if INFO.DISPLAY_TIME in layer_info else ""
+                if INFO.DISPLAY_TIME not in shared_info :
+                    shared_info[INFO.DISPLAY_TIME] = new_time
                 else :
-                    shared_info[GUIDE.DISPLAY_TIME] = "" if shared_info[GUIDE.DISPLAY_TIME] != new_time else new_time
+                    shared_info[INFO.DISPLAY_TIME] = "" if shared_info[INFO.DISPLAY_TIME] != new_time else new_time
 
                 # instrument
-                new_inst = str(layer_info[GUIDE.INSTRUMENT].value) if GUIDE.INSTRUMENT in layer_info else ""
-                if GUIDE.INSTRUMENT not in shared_info :
-                    shared_info[GUIDE.INSTRUMENT] = new_inst
+                new_inst = str(layer_info[INFO.INSTRUMENT].value) if INFO.INSTRUMENT in layer_info else ""
+                if INFO.INSTRUMENT not in shared_info :
+                    shared_info[INFO.INSTRUMENT] = new_inst
                 else :
-                    shared_info[GUIDE.INSTRUMENT] = "" if shared_info[GUIDE.INSTRUMENT] != new_inst else new_inst
+                    shared_info[INFO.INSTRUMENT] = "" if shared_info[INFO.INSTRUMENT] != new_inst else new_inst
 
                 # band
-                new_band = str(layer_info[GUIDE.BAND]) if GUIDE.BAND in layer_info else ""
-                if GUIDE.BAND not in shared_info :
-                    shared_info[GUIDE.BAND] = new_band
+                new_band = str(layer_info[INFO.BAND]) if INFO.BAND in layer_info else ""
+                if INFO.BAND not in shared_info :
+                    shared_info[INFO.BAND] = new_band
                 else :
-                    shared_info[GUIDE.BAND] = "" if shared_info[GUIDE.BAND] != new_band else new_band
+                    shared_info[INFO.BAND] = "" if shared_info[INFO.BAND] != new_band else new_band
 
                 # wavelength
-                wl = "{:0.2f} µm".format(layer_info[GUIDE.CENTRAL_WAVELENGTH]) if GUIDE.CENTRAL_WAVELENGTH in layer_info else ""
-                if GUIDE.CENTRAL_WAVELENGTH not in shared_info:
-                    shared_info[GUIDE.CENTRAL_WAVELENGTH] = wl
+                wl = "{:0.2f} µm".format(layer_info[INFO.CENTRAL_WAVELENGTH]) if layer_info.get(INFO.CENTRAL_WAVELENGTH) is not None else ""
+                if INFO.CENTRAL_WAVELENGTH not in shared_info:
+                    shared_info[INFO.CENTRAL_WAVELENGTH] = wl
                 else:
-                    shared_info[GUIDE.CENTRAL_WAVELENGTH] = "" if shared_info[GUIDE.CENTRAL_WAVELENGTH] != wl else wl
+                    shared_info[INFO.CENTRAL_WAVELENGTH] = "" if shared_info[INFO.CENTRAL_WAVELENGTH] != wl else wl
 
                 # colormap
                 new_cmap = this_prez.colormap if this_prez is not None else ""
@@ -304,11 +303,29 @@ class SingleLayerInfoPane (QWidget) :
                 new_clims = ""
                 if this_prez is not None:
                     new_clims = np.array(this_prez.climits)
-                    fmt, unit, new_clims = self.document.convert_units(this_prez.uuid, new_clims, inverse=False)
+                    unit_info = self.document[this_prez.uuid][INFO.UNIT_CONVERSION]
+                    new_clims = unit_info[1](new_clims, inverse=False)
                     try:
-                        new_clims = (fmt + ' ~ ' + fmt + '{}').format(new_clims[0], new_clims[1], unit)
+                        if layer_info[INFO.KIND] == KIND.IMAGE:
+                            min_str = layer_info[INFO.UNIT_CONVERSION][2](new_clims[0], include_units=False)
+                            max_str = layer_info[INFO.UNIT_CONVERSION][2](new_clims[1])
+                            new_clims = '{} ~ {}'.format(min_str, max_str)
+                        else:
+                            # FUTURE: Other layer types
+                            deps = (layer_info.r, layer_info.g, layer_info.b)
+
+                            tmp_clims = []
+                            for i, dep in enumerate(deps):
+                                if dep is None:
+                                    tmp_clims.append('N/A')
+                                    continue
+
+                                min_str = dep[INFO.UNIT_CONVERSION][2](new_clims[i][0], include_units=False)
+                                max_str = dep[INFO.UNIT_CONVERSION][2](new_clims[i][1])
+                                tmp_clims.append('{} ~ {}'.format(min_str, max_str))
+                            new_clims = ", ".join(tmp_clims)
                     except TypeError as err:
-                        LOG.warning("unknown color limit format for %s" % repr((fmt, unit, new_clims)))
+                        LOG.warning("unable to format color limit: %r" % (new_clims,), exc_info=True)
                         new_clims = "N/A"
                 if "climits" not in shared_info :
                     shared_info["climits"] = new_clims
@@ -324,25 +341,25 @@ class SingleLayerInfoPane (QWidget) :
 
             #print("*** layer info: " + str(layer_info))
             # *** layer info: {
-            # <GUIDE.INSTRUMENT: 'instrument'>: <INSTRUMENT.AHI: 'AHI'>,
+            # <INFO.INSTRUMENT: 'instrument'>: <INSTRUMENT.AHI: 'AHI'>,
             # <INFO.PROJ: 'proj4_string'>: '+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs ',
-            # <GUIDE.SCHED_TIME: 'timeline'>: datetime.datetime(2015, 8, 24, 19, 0),
+            # <INFO.SCHED_TIME: 'timeline'>: datetime.datetime(2015, 8, 24, 19, 0),
             # <INFO.ORIGIN_X: 'origin_x'>: 6614709.252,
-            # <GUIDE.DISPLAY_TIME: 'display_time'>: '2015-08-24 19:00',
+            # <INFO.DISPLAY_TIME: 'display_time'>: '2015-08-24 19:00',
             # <INFO.CLIM: 'clim'>: (-0.012, 1.192),
             # <INFO.CELL_HEIGHT: 'cell_height'>: -1000.0,
-            # <GUIDE.UUID: 'uuid'>: UUID('5f547fae-7c26-11e5-bece-28cfe915d94b'),
+            # <INFO.UUID: 'uuid'>: UUID('5f547fae-7c26-11e5-bece-28cfe915d94b'),
             # <INFO.NAME: 'name'>: 'AHI B01 Refl 2015-08-24 19:00',
             # <INFO.UUID: 'uuid'>: UUID('5f547fae-7c26-11e5-bece-28cfe915d94b'),
             # <INFO.CELL_WIDTH: 'cell_width'>: 1000.0,
             # <INFO.KIND: 'kind'>: <KIND.IMAGE: 1>,
             # <INFO.SHAPE: 'shape'>: (30993, 18096),
-            # <GUIDE.SPACECRAFT: 'spacecraft'>: 'Himawari-8',
-            # <GUIDE.BAND: 'band'>: 1,
+            # <INFO.SPACECRAFT: 'spacecraft'>: 'Himawari-8',
+            # <INFO.BAND: 'band'>: 1,
             # <INFO.PATHNAME: 'pathname'>: './test_data/ahi 2015_08_24_236 1900/HS_H08_20150824_1900_B01_FLDK_R20.merc.tif',
-            # <GUIDE.SCENE: 'scene'>: 'FLDK',
+            # <INFO.SCENE: 'scene'>: 'FLDK',
             # <INFO.ORIGIN_Y: 'origin_y'>: 15496570.74,
-            # <GUIDE.DISPLAY_NAME: 'display_name'>: 'AHI B01 Refl 2015-08-24 19:00'}
+            # <INFO.DISPLAY_NAME: 'display_name'>: 'AHI B01 Refl 2015-08-24 19:00'}
 
             #print ("*** layer presentation info: " + str(this_prez))
             # *** layer presentation info: [
@@ -361,15 +378,15 @@ class SingleLayerInfoPane (QWidget) :
             #   mixing=<mixing.NORMAL: 1>)]
 
             # set the various text displays
-            temp_name = shared_info[INFO.NAME] if INFO.NAME in shared_info else ""
+            temp_name = shared_info[INFO.DISPLAY_NAME] if INFO.DISPLAY_NAME in shared_info else ""
             self.name_text.setText("Name: " + temp_name)
-            temp_time = shared_info[GUIDE.DISPLAY_TIME] if GUIDE.DISPLAY_TIME in shared_info else ""
+            temp_time = shared_info[INFO.DISPLAY_TIME] if INFO.DISPLAY_TIME in shared_info else ""
             self.time_text.setText("Time: " + (temp_time or ""))
-            temp_inst = shared_info[GUIDE.INSTRUMENT] if GUIDE.INSTRUMENT in shared_info else ""
+            temp_inst = shared_info[INFO.INSTRUMENT] if INFO.INSTRUMENT in shared_info else ""
             self.instrument_text.setText("Instrument: " + temp_inst)
-            temp_band = shared_info[GUIDE.BAND] if GUIDE.BAND in shared_info else ""
+            temp_band = shared_info[INFO.BAND] if INFO.BAND in shared_info else ""
             self.band_text.setText("Band: " + temp_band)
-            temp_wl = shared_info[GUIDE.CENTRAL_WAVELENGTH] if GUIDE.CENTRAL_WAVELENGTH in shared_info else ""
+            temp_wl = shared_info[INFO.CENTRAL_WAVELENGTH] if INFO.CENTRAL_WAVELENGTH in shared_info else ""
             self.wavelength_text.setText("Wavelength: " + temp_wl)
             temp_cmap = shared_info["colormap"] if shared_info.get("colormap", None) is not None else ""
             self.colormap_text.setText("Colormap: " + temp_cmap)
@@ -491,16 +508,14 @@ class RGBLayerConfigPane(QWidget):
         uuid = self._uuids[RGBA2IDX[color]]
         if not uuid:
             return values
-        format, units, data= self.document_ref().convert_units(uuid, values, inverse=True)
-        return data
+        return self.document_ref()[uuid][INFO.UNIT_CONVERSION][1](values, inverse=True)
 
     def _data_to_display(self, color:str, values):
         "convert data value to display value"
         uuid = self._uuids[RGBA2IDX[color]]
         if not uuid:
             return values
-        format, units, display = self.document_ref().convert_units(uuid, values, inverse=False)
-        return display
+        return self.document_ref()[uuid][INFO.UNIT_CONVERSION][1](values)
 
     def _get_slider_value(self, valid_min, valid_max, slider_val):
         return (slider_val / self._slider_steps) * (valid_max - valid_min) + valid_min
@@ -549,8 +564,7 @@ class RGBLayerConfigPane(QWidget):
         return n, x
 
     def _signal_color_changing_range(self, color:str, n:float, x:float):
-        if self.active_layer_ref is not None:
-            self.didChangeRGBLayerComponentRange.emit(self.active_layer_ref().uuid, color, n, x)
+        self.didChangeRGBLayerComponentRange.emit(self.active_layer_ref().uuid, color, n, x)
 
     def _slider_changed(self, slider=None, color:str=None, is_max:bool=False):
         """
@@ -668,7 +682,8 @@ class RGBLayerConfigPane(QWidget):
 
     def _set_minmax_sliders(self, layer=None, rgb_clims=None):
         if isinstance(layer, DocRGBLayer):
-            rgb_clims = layer[INFO.CLIM] if rgb_clims is None else rgb_clims  # FIXME: migrate to using prez instead of layer
+            prez, = self.document_ref().prez_for_uuids([layer.uuid])
+            rgb_clims = prez.climits if rgb_clims is None else rgb_clims
             for idx, (color, sub_layer) in enumerate(zip("rgb", [layer.r, layer.g, layer.b])):
                 clim = rgb_clims[idx] if rgb_clims else None
                 self._set_minmax_slider(color, sub_layer, clim)
@@ -705,18 +720,19 @@ class RGBLayerConfigPane(QWidget):
         """
         doc = self.document_ref()
         non_rgb_classes = [DocBasicLayer, DocCompositeLayer]
+        # non_rgb_kinds = [k for k in KIND if k != KIND.RGB]
 
         # clear out the current lists
+        layer_list = list(doc.layers_where(is_valid=True, in_type_set=non_rgb_classes))
         for widget in self.rgb:
             widget.clear()
             widget.addItem('None', '')
 
         # fill up our lists of layers
-        p = self.active_layer_ref()[INFO.PROJ] if self.active_layer_ref() is not None else None
-        for layer_prez in doc.layers_where(is_valid=True, in_type_set=non_rgb_classes, have_proj=p):
+        for layer_prez in doc.layers_where(is_valid=True, in_type_set=non_rgb_classes):
             uuid = layer_prez.uuid
             layer = doc[layer_prez.uuid]
-            layer_name = layer.name
+            layer_name = layer[INFO.DISPLAY_NAME]
             LOG.debug('adding layer %s to RGB combo selectors' % layer_name)
             uuid_string = str(uuid)
             for widget in self.rgb:
