@@ -55,7 +55,7 @@ between subsystems. Document rarely deals directly with content.
 :copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-from sift.model.layer import Mixing, DocLayer, DocBasicLayer, DocCompositeLayer, DocRGBLayer
+from sift.model.layer import Mixing, DocLayer, DocBasicLayer, DocRGBLayer
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -64,14 +64,12 @@ import sys
 import logging
 import unittest
 import argparse
-from collections import namedtuple, MutableSequence, OrderedDict
+from collections import MutableSequence, OrderedDict
 from uuid import UUID
 import numpy as np
 from weakref import ref
 
-from sift.common import KIND, INFO
-from sift.model.guidebook import ABI_AHI_Guidebook
-
+from sift.common import KIND, INFO, prez
 from PyQt4.QtCore import QObject, pyqtSignal
 
 
@@ -79,16 +77,79 @@ LOG = logging.getLogger(__name__)
 
 DEFAULT_LAYER_SET_COUNT = 1  # this should match the ui configuration!
 
-# presentation information for a layer; z_order comes from the layerset
-prez = namedtuple('prez', [
-    'uuid',     # UUID: dataset in the document/workspace
-    'kind',     # what kind of layer it is
-    'visible',  # bool: whether it's visible or not
-    'a_order',  # int: None for non-animating, 0..n-1 what order to draw in during animation
-    'colormap', # name or uuid: color map to use; name for default, uuid for user-specified
-    'climits',     # tuple: valid min and valid max used for color mapping normalization
-    'mixing'    # mixing mode constant
-])
+
+def unit_symbol(unit):
+    # FUTURE: Use cfunits or cf_units package
+    # cf_units gives the wrong symbol for celsius
+    if unit == '1':
+        return ''
+    elif unit == 'degrees_Celsius' or unit == 'C':
+        return '°C'
+    elif unit == 'kelvin' or unit == 'K':
+        return 'K'
+    else:
+        return unit or ""
+
+
+def _unit_format_func(layer, units):
+    units = unit_symbol(units)
+
+    # default formatting string
+    def _format_unit(val, numeric=True, include_units=True):
+        return '{:.03f}{units:s}'.format(val, units=units if include_units else "")
+
+    if layer[INFO.STANDARD_NAME] in ('toa_brightness_temperature', 'brightness_temperature'):
+        # BT data limits, Kelvin to degC
+        def _format_unit(val, numeric=True, include_units=True):
+            return '{:.02f}{units}'.format(val, units=units if include_units else "")
+    elif "flag_values" in layer:
+        # flag values don't have units
+        if "flag_meanings" in layer:
+            flag_masks = layer["flag_masks"] if "flag_masks" in layer else [-1] * len(layer["flag_values"])
+            flag_info = tuple(zip(layer["flag_meanings"], layer["flag_values"], flag_masks))
+            def _format_unit(val, numeric=True, include_units=True, flag_info=flag_info):
+                val = int(val)
+                if numeric:
+                    return '{:d}'.format(val)
+
+                meanings = []
+                for fmean, fval, fmask in flag_info:
+                    if (val & fmask) == fval:
+                        meanings.append(fmean)
+                return "{:d} ({:s})".format(val, ", ".join(meanings))
+        else:
+            def _format_unit(val, numeric=True, include_units=True):
+                return '{:d}'.format(int(val))
+
+    return _format_unit
+
+
+def preferred_units(dsi):
+    # FUTURE: Use cfunits or cf_units package
+    if dsi[INFO.STANDARD_NAME] == 'toa_bidirectional_reflectance':
+        return '1'
+    elif dsi[INFO.STANDARD_NAME] in ('toa_brightness_temperature', 'brightness_temperature'):
+        return 'degrees_Celsius'
+    else:
+        return dsi.get(INFO.UNITS, None)
+
+
+def units_conversion(dsi):
+    "return UTF8 unit string, lambda v,inverse=False: convert-raw-data-to-unis"
+    # the dataset might be in one unit, but the user may want something else
+    # FUTURE: Use cfunits or cf_units package
+    punits = preferred_units(dsi)
+
+    # Conversion functions
+    # FUTURE: Use cfunits or cf_units package
+    if dsi.get(INFO.UNITS) in ('kelvin', 'K') and punits in ('degrees_Celsius', 'C'):
+        conv_func = lambda x, inverse=False: x - 273.15 if not inverse else x + 273.15
+    else:
+        conv_func = lambda x, inverse=False: x
+
+    # Format strings
+    format_func = _unit_format_func(dsi, punits)
+    return punits, conv_func, format_func
 
 
 class DocLayerStack(MutableSequence):
@@ -109,7 +170,7 @@ class DocLayerStack(MutableSequence):
         else:
             raise ValueError('cannot initialize DocLayerStack using %s' % type(doc))
 
-    def __setitem__(self, index:int, value:prez):
+    def __setitem__(self, index:int, value: prez):
         if index>=0 and index<len(self._store):
             self._store[index] = value
         elif index == len(self._store):
@@ -147,7 +208,7 @@ class DocLayerStack(MutableSequence):
         del self._store[index]
         self._u2r = None
 
-    def insert(self, index:int, value:prez):
+    def insert(self, index:int, value: prez):
         self._store.insert(index, value)
         self._u2r = None
 
@@ -199,7 +260,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     _workspace = None
     _layer_sets = None  # list(DocLayerSet(prez, ...) or None)
     _layer_with_uuid = None  # dict(uuid:Doc____Layer)
-    _guidebook = None  # FUTURE: this is currently an ABI_AHI_Guidebook, make it a general guidebook
 
     # signals
     didAddBasicLayer = pyqtSignal(tuple, UUID, prez)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
@@ -220,7 +280,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def __init__(self, workspace, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
         super(Document, self).__init__(**kwargs)
-        self._guidebook = ABI_AHI_Guidebook()
         self._workspace = workspace
         self._layer_sets = [DocLayerStack(self)] + [None] * (layer_set_count - 1)
         self._layer_with_uuid = {}
@@ -294,30 +353,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def change_projection_index(self, idx):
         return self.change_projection(tuple(self.available_projections.keys())[idx])
 
-    def _default_colormap(self, datasetinfo):
-        """
-        consult guidebook and user preferences for which enhancement should be used for a given datasetinfo
-        :param datasetinfo: dictionary of metadata about dataset
-        :return: enhancement info and siblings participating in the enhancement
-        """
-        return self._guidebook.default_colormap(datasetinfo)
-
     @property
     def current_layer_set(self):
         cls = self._layer_sets[self.current_set_index]
         assert(isinstance(cls, DocLayerStack))
         return cls
-
-    # def _additional_guidebook_information(self, info):
-    #     """
-    #     when adding a file, return any additional information we want from the guidebook
-    #     :param info: existing datasetinfo
-    #     :return: dictionary of information not immediately available from the file itself
-    #     """
-    #     md =
-    #     return {
-    #         INFO.DISPLAY_TIME: self._guidebook.display_time(info)
-    #     }
 
     def _insert_layer_with_info(self, info: DocLayer, cmap=None, insert_before=0):
         """
@@ -344,26 +384,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         reordered_indices = tuple([None] + list(range(old_layer_count)))  # FIXME: this should obey insert_before, currently assumes always insert at top
         return p, reordered_indices
 
-    def _generate_implied_metadata(self, layer, display_name=None, display_time=None):
-        # also get info for this layer from the guidebook
-        gbinfo = self._guidebook.collect_info(layer)
-        layer.update(gbinfo)  # FUTURE: should guidebook be integrated into DocBasicLayer?
-
-        # add as visible to the front of the current set, and invisible to the rest of the available sets
-        layer[INFO.COLORMAP] = self._guidebook.default_colormap(layer)
-        layer[INFO.CLIM] = self._guidebook.climits(layer)
-        if display_time is None:
-            layer[INFO.DISPLAY_TIME] = self._guidebook._default_display_time(layer)
-        else:
-            layer[INFO.DISPLAY_TIME] = display_time
-        if display_name is None:
-            layer[INFO.DISPLAY_NAME] = self._guidebook._default_display_name(layer)
-        else:
-            layer[INFO.DISPLAY_NAME] = display_name
-        layer[INFO.UNIT_CONVERSION] = self._guidebook.units_conversion(layer)
-
-        return layer
-
     def open_file(self, path, insert_before=0):
         """
         open an arbitrary file and make it the new top layer.
@@ -378,12 +398,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             content = self._workspace.get_content(uuid)
             return uuid, info, content
 
-        # info.update(self._additional_guidebook_information(info))
-        # XXX: HACK: Remove display info
-        self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, info,
-                                                              display_name=info.pop(INFO.DISPLAY_NAME, None),
-                                                              display_time=info.pop(INFO.DISPLAY_TIME, None))
-        self._generate_implied_metadata(dataset)
+        self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, info)
+        if INFO.UNIT_CONVERSION not in dataset:
+            dataset[INFO.UNIT_CONVERSION] = units_conversion(dataset)
         presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
 
         # FUTURE: Load this async, the slots for the below signal need to be OK with that
@@ -396,7 +413,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def open_files(self, paths, insert_before=0):
         """
-        sort paths into preferred load order (see guidebook.py)
+        sort paths into preferred load order
         open files in order, yielding uuid, info, overview_content
         :param paths: paths to open
         :param insert_before: where to insert them in layer list
@@ -452,7 +469,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if not uuid:
             return "YYYY-MM-DD HH:MM"
         info = self._layer_with_uuid[uuid]
-        # return self._guidebook.display_time(info)
         return info.get(INFO.DISPLAY_TIME, '--:--')
 
     def prez_for_uuids(self, uuids, lset=None):
@@ -499,7 +515,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             lyr = self._layer_with_uuid[pinf.uuid]
             if lyr[INFO.KIND] == KIND.IMAGE:
                 value = self._workspace.get_content_point(pinf.uuid, xy_pos)
-                unit_info = self._guidebook.units_conversion(self._layer_with_uuid[pinf.uuid])
+                unit_info = lyr[INFO.UNIT_CONVERSION]
                 nc, xc = unit_info[1](np.array(pinf.climits))
                 # calculate normalized bar width relative to its current clim
                 new_value = unit_info[1](value)
@@ -550,22 +566,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 zult[pinf.uuid] = (values, bar_width, values)
 
         self.didCalculateLayerEqualizerValues.emit(zult)  # is picked up by layer list model to update display
-
-    # TODO, find out if this is needed/used and whether or not it's correct
-    def update_dataset_info(self, new_info):
-        """
-        slot which updates document on new information workspace has provided us about a dataset
-        typically signaled by importer operating in the workspace
-        :param new_info: information dictionary including projection, levels of detail, etc
-        :return: None
-        """
-        uuid = new_info[INFO.UUID]
-        if uuid not in self._layer_with_uuid:
-            LOG.warning('new information on uuid {0!r:s} is not for a known dataset'.format(new_info))
-        self._layer_with_uuid[new_info[INFO.UUID]].update(new_info)
-        # TODO, also get information about this layer from the guidebook?
-
-        # TODO: see if this affects any presentation information; view will handle redrawing on its own
 
     def _clone_layer_set(self, existing_layer_set):
         return DocLayerStack(existing_layer_set)
@@ -715,7 +715,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 dex = L.index(dex)  # returns row index
             old = L[dex]
             vis = (not old.visible) if visible is None else visible
-            # print(vis)
             nu = old._replace(visible=vis)
             L[dex] = nu
             zult[nu.uuid] = nu.visible
@@ -740,7 +739,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def next_last_step(self, uuid, delta=0, bandwise=False):
         """
         given a selected layer uuid,
-        use the data guidebook to
         find the next or last time/bandstep (default: the layer itself) in the document
         make all layers in the sibling group invisible save that timestep
         :param uuid: layer we're focusing on as reference
@@ -867,20 +865,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         }
 
         self._layer_with_uuid[uuid] = ds_info = DocRGBLayer(self, ds_info)
-
-        changeable_meta = {
-            INFO.DATASET_NAME: '-RGB-',
-            INFO.DISPLAY_NAME: '-RGB-',
-            INFO.BAND: [],
-            INFO.DISPLAY_TIME: None,
-            INFO.ORIGIN_X: None,
-            INFO.ORIGIN_Y: None,
-            INFO.CELL_WIDTH: None,
-            INFO.CELL_HEIGHT: None,
-            INFO.CLIM: ((None, None), (None, None), (None, None)),
-            INFO.UNIT_CONVERSION: self._guidebook.units_conversion(ds_info),
-        }
-        ds_info.update(changeable_meta)
         ds_info.update_metadata_from_dependencies()
         presentation, reordered_indices = self._insert_layer_with_info(ds_info)
 
@@ -1191,7 +1175,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if layer_set_index is None:
             layer_set_index = self.current_set_index
         assert(len(new_order)==len(self._layer_sets[layer_set_index]))
-        new_layer_set = [self._layer_sets[layer_set_index][n] for n in new_order]
+        new_layer_set = DocLayerStack(self, [self._layer_sets[layer_set_index][n] for n in new_order])
         self._layer_sets[layer_set_index] = new_layer_set
         self.didReorderLayers.emit(tuple(new_order))
 

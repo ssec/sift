@@ -16,14 +16,9 @@ This module is the "scientific expert knowledge" that is consulted.
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import os
-import re
 import logging
-import numpy as np
-from datetime import datetime
 from sift.common import INFO, KIND, PLATFORM, INSTRUMENT
 from sift.view.Colormap import DEFAULT_IR, DEFAULT_VIS, DEFAULT_UNKNOWN
-import sift.workspace.goesr_pug as pug
 
 LOG = logging.getLogger(__name__)
 GUIDEBOOKS = {}
@@ -233,6 +228,7 @@ class ABI_AHI_Guidebook(Guidebook):
     def _is_bt(self, dsi):
         return dsi.get(INFO.BAND) in self.BT_BANDS or \
                dsi.get(INFO.STANDARD_NAME) == "toa_brightness_temperature"
+
     def collect_info_from_seq(self, seq):
         "collect AHI metadata about a sequence of datasetinfo dictionaries"
         # FUTURE: cache uuid:metadata info in the guidebook instance for quick lookup
@@ -256,125 +252,10 @@ class ABI_AHI_Guidebook(Guidebook):
             # some kind of default
             return 0., 255.
 
-    def preferred_units(self, dsi):
-        # FUTURE: Use cfunits or cf_units package
-        if self._is_refl(dsi):
-            return '1'
-        elif self._is_bt(dsi):
-            return 'degrees_Celsius'
-        else:
-            return dsi.get(INFO.UNITS, None)
-
-    def unit_symbol(self, unit):
-        # FUTURE: Use cfunits or cf_units package
-        # cf_units gives the wrong symbol for celsius
-        if unit == '1':
-            return ''
-        elif unit == 'degrees_Celsius' or unit == 'C':
-            return '°C'
-        elif unit == 'kelvin' or unit == 'K':
-            return 'K'
-        else:
-            return unit or ""
-
-    def _unit_format_func(self, layer, units):
-        units = self.unit_symbol(units)
-
-        # default formatting string
-        def _format_unit(val, numeric=True, include_units=True):
-            return '{:.03f}{units:s}'.format(val, units=units if include_units else "")
-
-        if self._is_bt(layer):
-            # BT data limits, Kelvin to degC
-            def _format_unit(val, numeric=True, include_units=True):
-                return '{:.02f}{units}'.format(val, units=units if include_units else "")
-        elif "flag_values" in layer:
-            # flag values don't have units
-            if "flag_meanings" in layer:
-                flag_masks = layer["flag_masks"] if "flag_masks" in layer else [-1] * len(layer["flag_values"])
-                flag_info = tuple(zip(layer["flag_meanings"], layer["flag_values"], flag_masks))
-                def _format_unit(val, numeric=True, include_units=True, flag_info=flag_info):
-                    val = int(val)
-                    if numeric:
-                        return '{:d}'.format(val)
-
-                    meanings = []
-                    for fmean, fval, fmask in flag_info:
-                        if (val & fmask) == fval:
-                            meanings.append(fmean)
-                    return "{:d} ({:s})".format(val, ", ".join(meanings))
-            else:
-                def _format_unit(val, numeric=True, include_units=True):
-                    return '{:d}'.format(int(val))
-
-        return _format_unit
-
-    def units_conversion_rgb(self, dsi):
-        def conv_func(x, inverse=False, deps=(dsi.r, dsi.g, dsi.b)):
-            if isinstance(x, np.ndarray):
-                # some sort of array
-                x_tmp = x.ravel()
-                assert x_tmp.size % len(deps) == 0
-                num_elems = x_tmp.size // len(deps)
-                new_vals = []
-                for i, dep in enumerate(deps):
-                    new_val = x_tmp[i * num_elems: (i + 1) * num_elems]
-                    if dep is not None:
-                        new_val = dep[INFO.UNIT_CONVERSION][1](new_val, inverse=inverse)
-                    new_vals.append(new_val)
-                res = np.array(new_vals).reshape(x.shape)
-                return res
-            else:
-                # Not sure this should ever happen (should always be at least 3
-                return x
-
-        def format_func(val, numeric=True, include_units=False):
-            return ", ".join("{}".format(v) if v is None else "{:0.03f}".format(v) for v in val)
-        return None, conv_func, format_func
-
-    def units_conversion(self, dsi):
-        "return UTF8 unit string, lambda v,inverse=False: convert-raw-data-to-unis"
-        if dsi[INFO.KIND] == KIND.RGB:
-            return self.units_conversion_rgb(dsi)
-
-        # the dataset might be in one unit, but the user may want something else
-        # FUTURE: Use cfunits or cf_units package
-        preferred_units = self.preferred_units(dsi)
-
-        # Conversion functions
-        # FUTURE: Use cfunits or cf_units package
-        if dsi.get(INFO.UNITS) in ('kelvin', 'K') and preferred_units in ('degrees_Celsius', 'C'):
-            conv_func = lambda x, inverse=False: x - 273.15 if not inverse else x + 273.15
-        else:
-            conv_func = lambda x, inverse=False: x
-
-        # Format strings
-        format_func = self._unit_format_func(dsi, preferred_units)
-        return (preferred_units, conv_func, format_func)
-
     def default_colormap(self, dsi):
         return DEFAULT_COLORMAPS.get(dsi.get(INFO.STANDARD_NAME), DEFAULT_UNKNOWN)
 
-    # def display_time(self, dsi):
-    #     return dsi.get(INFO.DISPLAY_TIME, '--:--')
-    #
-    # def display_name(self, dsi):
-    #     return dsi.get(INFO.DISPLAY_NAME, '-unknown-')
-
-    def _default_display_time_rgb(self, ds_info):
-        dep_info = [ds_info.r, ds_info.g, ds_info.b]
-        valid_times = [nfo.get(INFO.DISPLAY_TIME, '<unknown time>') for nfo in dep_info if nfo is not None]
-        if len(valid_times) == 0:
-            display_time = '<unknown time>'
-        else:
-            display_time = valid_times[0] if len(valid_times) and all(t == valid_times[0] for t in valid_times[1:]) else '<multiple times>'
-
-        return display_time
-
     def _default_display_time(self, ds_info):
-        if ds_info.kind == KIND.RGB:
-            return self._default_display_time_rgb(ds_info)
-
         # FUTURE: This can be customized by the user
         when = ds_info.get(INFO.SCHED_TIME, ds_info.get(INFO.OBS_TIME))
         if when is None:
@@ -383,30 +264,7 @@ class ABI_AHI_Guidebook(Guidebook):
             dtime = when.strftime('%Y-%m-%d %H:%M')
         return dtime
 
-    def _default_display_name_rgb(self, ds_info, display_name=None):
-        dep_info = [ds_info.r, ds_info.g, ds_info.b]
-        if display_name is None:
-            display_time = self._default_display_time(ds_info)
-
-        try:
-            names = []
-            for color, dep_layer in zip("RGB", dep_info):
-                if dep_layer is None:
-                    name = u"{}:---".format(color)
-                else:
-                    name = u"{}:{}".format(color, dep_layer[INFO.SHORT_NAME])
-                names.append(name)
-            name = u' '.join(names) + u' ' + display_time
-        except KeyError:
-            LOG.error('unable to create new name from {0!r:s}'.format(dep_info))
-            name = "-RGB-"
-
-        return name
-
     def _default_display_name(self, ds_info, display_time=None):
-        if ds_info[INFO.KIND] == KIND.RGB:
-            return self._default_display_name_rgb(ds_info)
-
         # FUTURE: This can be customized by the user
         sat = ds_info[INFO.PLATFORM]
         inst = ds_info[INFO.INSTRUMENT]

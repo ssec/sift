@@ -272,7 +272,7 @@ class SingleLayerInfoPane (QWidget) :
                     shared_info[INFO.DISPLAY_TIME] = "" if shared_info[INFO.DISPLAY_TIME] != new_time else new_time
 
                 # instrument
-                new_inst = str(layer_info[INFO.INSTRUMENT].value) if INFO.INSTRUMENT in layer_info else ""
+                new_inst = str(layer_info[INFO.INSTRUMENT].value) if layer_info.get(INFO.INSTRUMENT) else ""
                 if INFO.INSTRUMENT not in shared_info :
                     shared_info[INFO.INSTRUMENT] = new_inst
                 else :

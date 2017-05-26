@@ -252,6 +252,59 @@ class DocRGBLayer(DocCompositeLayer):
         gst = lambda x: None if (x is None) else x.platform
         return _concurring(gst(self.r), gst(self.g), gst(self.b))
 
+    def _get_units_conversion(self):
+        def conv_func(x, inverse=False, deps=(self.r, self.g, self.b)):
+            if isinstance(x, np.ndarray):
+                # some sort of array
+                x_tmp = x.ravel()
+                assert x_tmp.size % len(deps) == 0
+                num_elems = x_tmp.size // len(deps)
+                new_vals = []
+                for i, dep in enumerate(deps):
+                    new_val = x_tmp[i * num_elems: (i + 1) * num_elems]
+                    if dep is not None:
+                        new_val = dep[INFO.UNIT_CONVERSION][1](new_val, inverse=inverse)
+                    new_vals.append(new_val)
+                res = np.array(new_vals).reshape(x.shape)
+                return res
+            else:
+                # Not sure this should ever happen (should always be at least 3
+                return x
+
+        def format_func(val, numeric=True, include_units=False):
+            return ", ".join("{}".format(v) if v is None else "{:0.03f}".format(v) for v in val)
+        return None, conv_func, format_func
+
+    def _default_display_time(self):
+        dep_info = [self.r, self.g, self.b]
+        valid_times = [nfo.get(INFO.DISPLAY_TIME, '<unknown time>') for nfo in dep_info if nfo is not None]
+        if len(valid_times) == 0:
+            display_time = '<unknown time>'
+        else:
+            display_time = valid_times[0] if len(valid_times) and all(t == valid_times[0] for t in valid_times[1:]) else '<multiple times>'
+
+        return display_time
+
+    def _default_display_name(self, display_time=None):
+        dep_info = [self.r, self.g, self.b]
+        if display_time is None:
+            display_time = self._default_display_time()
+
+        try:
+            names = []
+            for color, dep_layer in zip("RGB", dep_info):
+                if dep_layer is None:
+                    name = u"{}:---".format(color)
+                else:
+                    name = u"{}:{}".format(color, dep_layer[INFO.SHORT_NAME])
+                names.append(name)
+            name = u' '.join(names) + u' ' + display_time
+        except KeyError:
+            LOG.error('unable to create new name from {0!r:s}'.format(dep_info))
+            name = "-RGB-"
+
+        return name
+
     def update_metadata_from_dependencies(self):
         """
         recalculate origin and dimension information based on new upstream
@@ -259,8 +312,8 @@ class DocRGBLayer(DocCompositeLayer):
         """
         # FUTURE: resolve dictionary-style into attribute-style uses
         dep_info = [self.r, self.g, self.b]
-        display_time = self._doc()._guidebook._default_display_time(self)
-        name = self._doc()._guidebook._default_display_name(self, display_time=display_time)
+        display_time = self._default_display_time()
+        name = self._default_display_name(display_time=display_time)
         bands = [nfo.get(INFO.BAND) if nfo is not None else None for nfo in dep_info]
         insts = [nfo.get(INFO.INSTRUMENT) if nfo is not None else None for nfo in dep_info]
         plats = [nfo.get(INFO.PLATFORM) if nfo is not None else None for nfo in dep_info]
@@ -271,7 +324,7 @@ class DocRGBLayer(DocCompositeLayer):
             INFO.BAND: bands,
             INFO.INSTRUMENT: insts[0] if all(inst == insts[0] for inst in insts[1:]) else None,
             INFO.PLATFORM: plats[0] if all(plat == plats[0] for plat in plats[1:]) else None,
-            INFO.UNIT_CONVERSION: self._doc()._guidebook.units_conversion(self),
+            INFO.UNIT_CONVERSION: self._get_units_conversion(),
         }
 
         if self.r is None and self.g is None and self.b is None:
