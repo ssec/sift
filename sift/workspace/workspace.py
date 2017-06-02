@@ -596,7 +596,6 @@ class Workspace(QObject):
     # often-used queries
     #
 
-    @lru_cache
     def _product_with_uuid(self, uuid):
         return self._S.query(mdb.Product).filter_by(uuid=uuid).first()
 
@@ -663,7 +662,7 @@ class Workspace(QObject):
         nat = self._product_native_content(prod)
 
         std_info_dict = {
-            INFO.NAME: prod.identifier,
+            INFO.NAME: prod.short_name,
             INFO.PATH: prod.uri,
             INFO.UUID: prod.uuid,
             INFO.PROJ: nat.proj4,
@@ -697,9 +696,23 @@ class Workspace(QObject):
 
     def _check_cache(self, path):
         """
+        FIXME: does not work if more than one product inside a path
         :param path: file we're checking
         :return: uuid, info, overview_content if the data is already available without import
         """
+        hits = self._S.query(mdb.Resource).filter_by(path=path).all()
+        if not hits:
+            return None
+        if len(hits)==1:
+            resource = hits[0]
+            hits = self._S.query(mdb.Content).filter(
+                mdb.Content.lod==mdb.Content.LOD_OVERVIEW).filter(
+                mdb.Content.product_id==mdb.Product.id).filter(
+                mdb.Product.resource_id==resource.id).all()
+            if len(hits)==1:
+                content = hits[0]
+                return UUID(content.product.uuid), content.info,
+
         FIXME
         key = self._key_for_path(path)
         nfo = self._inventory.get(key, None)
@@ -726,6 +739,7 @@ class Workspace(QObject):
 
     @property
     def uuids_in_cache(self):
+
         return self._inventory.keys()
 
     def _update_cache(self, path, uuid, info, data):
@@ -834,6 +848,7 @@ class Workspace(QObject):
         return
 
     def close(self):
+        self._store_inventory()
         self._clean_cache()
 
     def idle(self):
@@ -905,6 +920,7 @@ class Workspace(QObject):
                 data = self._data[uuid] = update.data
                 LOG.info("{} {}: {:.01f}%".format(name, update.stage_desc, update.completion*100.0))
         # copy the data into an anonymous memmap
+        # FIXME: register a new Content entry with the metadatabase
         self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
         if allow_cache:
             self._update_cache(source_path, uuid, None, data)
@@ -931,7 +947,7 @@ class Workspace(QObject):
         pathname = self._preferred_cache_path(uuid)
         fp = open(pathname, 'wb+')
         mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
-        FIXME: register with content table
+        # FIXME: register with content table
         mm[:] = data[:]
         return mm
 
@@ -1085,22 +1101,6 @@ class Workspace(QObject):
         :return: sliceable object returning numpy arrays
         """
         pass
-
-    def asProbeDataSource(self, **kwargs):
-        """
-        Produce delegate used to match masks to data content.
-        :param kwargs:
-        :return: delegate object used by probe objects to access workspace content
-        """
-        return self  # FUTURE: revise this once we have more of an interface specification
-
-    def asLayerDataSource(self, uuid=None, **kwargs):
-        """
-        produce layer data source delegate to be handed to a LayerRep
-        :param kwargs:
-        :return:
-        """
-        return self  # FUTURE: revise this once we have more of an interface specification
 
 
 def main():

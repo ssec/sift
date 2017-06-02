@@ -99,7 +99,7 @@ def main():
             src_info = ahi_image_info(nc_file)
             if not os.path.exists(geos_file):
                 src_data = ahi_image_data(nc_file)
-                # print("### Source Data: Min (%f) | Max (%f)" % (src_data.min(), src_data.max()))
+                # print("### Resource Data: Min (%f) | Max (%f)" % (src_data.min(), src_data.max()))
                 create_ahi_geotiff(src_info, src_data, geos_file,
                                    compress=args.compress,
                                    predictor=args.predictor,

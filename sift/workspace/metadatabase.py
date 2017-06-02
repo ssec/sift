@@ -13,9 +13,9 @@ OVERVIEW
 
 The workspace caches content, which represents products, the native form of which resides in a file
 
-File : a file somewhere in the filesystem
- |_ Product* : product stored in a file
-     |_ Content* : workspace cache content corresponding to a product
+Resource : a file somewhere in the filesystem, or a resource on a remote system we can access
+ |_ Product* : product stored in a resource
+     |_ Content* : workspace cache content corresponding to a product, may be one of many available views (e.g. projections)
      |   |_ ContentKeyValue* : additional information on content
      |_ ProductKeyValue* : additional information on product
 
@@ -34,7 +34,11 @@ __docformat__ = 'reStructuredText'
 
 import os, sys
 import logging, unittest, argparse
+from datetime import datetime, timedelta
 from sift.common import INFO
+from functools import reduce
+from uuid import UUID
+import numpy as np
 
 from sqlalchemy import Column, Integer, String, UnicodeText, Unicode, ForeignKey, DateTime, Interval, PickleType, Float, create_engine
 from sqlalchemy.orm import Session, relationship, sessionmaker, backref
@@ -88,16 +92,17 @@ class ProxiedDictMixin(object):
 Base = declarative_base()
 
 
-class Source(Base):
+class Resource(Base):
     """
     held metadata regarding a file that we can access and import data into the workspace from
+    resources are external to the workspace, but the workspace can keep track of them in its database
     """
-    __tablename__ = 'sources'
+    __tablename__ = 'resources'
     # identity information
     id = Column(Integer, primary_key=True)
 
     # primary handler
-    format = Column(PickleType)  # class or callable which can pull this data into workspace from storage
+    format = Column(PickleType)  # classname, class or callable which can pull this data into workspace from storage
 
     # {scheme}://{path}/{name}?{query}, default is just an absolute path in filesystem
     scheme = Column(Unicode, nullable=True)  # uri scheme for the content (the part left of ://), assume file:// by default
@@ -107,15 +112,14 @@ class Source(Base):
     mtime = Column(DateTime)  # last observed mtime of the file, for change checking
     atime = Column(DateTime)  # last time this file was accessed by application
 
-    products = relationship("Product", backref=backref("source", cascade="all"))
+    products = relationship("Product", backref=backref("resource", cascade="all"))
 
     @property
     def uri(self):
         return os.path.join(self.path, self.name) if not self.scheme else "{}://{}/{}".format(self.scheme, self.path, self.name)
 
-    # def touch(self, session=None):
-    #     ismine, session = (False, session) if session is not None else
-    #     self.atime = datetime.utcnow()
+    def touch(self):
+        self.atime = datetime.utcnow()
 
 
 class Product(ProxiedDictMixin, Base):
@@ -132,21 +136,30 @@ class Product(ProxiedDictMixin, Base):
 
     # identity information
     id = Column(Integer, primary_key=True)
-    source_id = Column(Integer, ForeignKey(Source.id))
+    resource_id = Column(Integer, ForeignKey(Resource.id))
     # relationship: .source
-    uuid = Column(String, nullable=False, unique=True)  # UUID representing this data in SIFT, or None if not in cache
+    uuid_str = Column(String, nullable=False, unique=True)  # UUID representing this data in SIFT, or None if not in cache
+
+    @property
+    def uuid(self):
+        return UUID(self.uuid_str)
+
+    @uuid.setter
+    def uuid(self, uu):
+        self.uuid_str = str(uu)
 
     # primary handler
     kind = Column(PickleType)  # class or callable which can perform transformations on this data in workspace
 
     # cached metadata provided by the file format handler
     platform = Column(String)  # platform or satellite name e.g. "GOES-16", "Himawari-8"
-    identifier = Column(String)  # product identifier eg "B01", "B02"
+    short_name = Column(String)  # product identifier eg "B01", "B02"
+    standard_name = Column(String, nullable=True)
 
     # times
-    timeline = Column(DateTime)  # normalized instantaneous scheduled observation time e.g. 20170122T2310
-    start = Column(DateTime, nullable=True)  # actual observation time start
-    duration = Column(Interval, nullable=True)  # actual observation duration
+    display_time = Column(DateTime)  # normalized instantaneous scheduled observation time e.g. 20170122T2310
+    obs_time = Column(DateTime, nullable=True)  # actual observation time start
+    obs_duration = Column(Interval, nullable=True)  # actual observation duration
 
     # native resolution information - see Content for projection details at different LODs
     resolution = Column(Integer, nullable=True)  # meters max resolution, e.g. 500, 1000, 2000, 4000
@@ -161,9 +174,24 @@ class Product(ProxiedDictMixin, Base):
 
     # link to key-value further information
     # this provides dictionary style access to key-value pairs
-    info = relationship("ProductKeyValue", collection_class=attribute_mapped_collection('key'))
-    _proxied = association_proxy("info", "value",
+    kwinfo = relationship("ProductKeyValue", collection_class=attribute_mapped_collection('key'))
+    _proxied = association_proxy("kwinfo", "value",
                                  creator=lambda key, value: ProductKeyValue(key=key, value=value))
+
+    def _iter_info(self):
+        yield INFO.PLATFORM, self.platform
+        yield INFO.SHORT_NAME, self.short_name
+        yield INFO.STANDARD_NAME, self.standard_name
+        yield INFO.DISPLAY_TIME, self.display_time
+        yield from self.kwinfo.items()
+
+    @property
+    def info(self):
+        """
+        return an info dictionary
+        :return:
+        """
+        return dict(self._iter_info())
 
 
 class ProductKeyValue(Base):
@@ -187,12 +215,16 @@ class Content(ProxiedDictMixin, Base):
     a given product may have several Content for different projections
     additional information is stored in a key-value table addressable as content[key:str]
     """
+    _array = None  # when attached, this is a np.memmap
+
     __tablename__ = 'contents'
     id = Column(Integer, primary_key=True)
     product_id = Column(Integer, ForeignKey(Product.id))
 
     # handle overview versus detailed data
     lod = Column(Integer)  # power of 2 level of detail; 0 for coarse-resolution overview
+    LOD_OVERVIEW = 0
+
     resolution = Column(Integer)  # maximum resolution in meters for this representation of the dataset
 
     # time accounting, used to check if data needs to be re-imported to workspace, or whether data is LRU and can be removed from a crowded workspace
@@ -241,7 +273,7 @@ class Content(ProxiedDictMixin, Base):
 
     @property
     def is_overview(self):
-        return self.lod==0
+        return self.lod==self.LOD_OVERVIEW
 
     def __str__(self):
         product = "%s:%s.%s" % (self.product.source.name or '?', self.product.platform or '?', self.product.identifier or '?')
@@ -250,8 +282,28 @@ class Content(ProxiedDictMixin, Base):
         xyzcs = ' '.join(
             q for (q,p) in zip('XYZCS', (self.x_path, self.y_path, self.z_path, self.coverage_path, self.sparsity_path)) if p
         )
-        return "<product {product} content{isoverview} with path={path} dtype={dtype} {xyzcs}>".format(
-            product=product, isoverview=isoverview, path=self.path, dtype=dtype, xyzcs=xyzcs)
+        return "<{uuid} product {product} content{isoverview} with path={path} dtype={dtype} {xyzcs}>".format(
+            uuid=self.uuid, product=product, isoverview=isoverview, path=self.path, dtype=dtype, xyzcs=xyzcs)
+
+    @property
+    def shape(self):
+        rcl = reduce( lambda a,b: a + [b] if b else a, [self.rows, self.cols, self.levels], [])
+        return tuple(rcl)
+
+    @property
+    def data(self):
+        """
+        numpy array with the content
+        :return:
+        """
+        if self._array is not None:
+            return self._array
+        self._array = zult = np.memmap(self.path, mode='r', shape=self.shape, dtype=self.dtype or 'float32')
+        return zult
+
+    def close(self):
+        if self._array is not None:
+            self._array = None
 
 
 class ContentKeyValue(Base):
@@ -303,6 +355,11 @@ class Metadatabase(object):
         if self.session_factory is None:
             self.session_factory = sessionmaker(bind=self.engine)
         return self.session_factory()
+
+    #
+    # high-level functions
+    #
+
 
 
 # # ============================
@@ -361,14 +418,15 @@ class tests(unittest.TestCase):
         from uuid import uuid1
         uu = uuid1()
         when = datetime.utcnow()
-        f = Source(path='', name='foo.bar', mtime=when, atime=when, format=None)
-        p = Product(uuid=str(uu), source=f, platform='TEST', identifier='B00')
+        f = Resource(path='', name='foo.bar', mtime=when, atime=when, format=None)
+        p = Product(uuid_str=str(uu), resource=f, platform='TEST', short_name='B00')
         p['test_key'] = u'test_value'
         p['turkey'] = u'cobbler'
         s.add(f)
         s.add(p)
         s.commit()
-        q = s.query(Product).filter_by(source=f).first()
+        self.assertEqual(p.uuid, uu)
+        q = s.query(Product).filter_by(resource=f).first()
         self.assertEqual(q['test_key'], u'test_value')
         # self.assertEquals(q[INFO.UUID], q.uuid)
         self.assertEqual(q['turkey'], u'cobbler')

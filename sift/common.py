@@ -124,12 +124,12 @@ class INSTRUMENT(Enum):
     AMI = 'AMI'
 
     @classmethod
-    def from_value(cls, value_str):
+    def from_value(cls, value_str, unknown=UNKNOWN):
         """Convert external string to Enum"""
         for m in cls:
             if m.value == value_str:
                 return m
-        return INSTRUMENT.UNKNOWN
+        return value_str if unknown is None else unknown
 
 
 class PLATFORM(Enum):
@@ -140,12 +140,12 @@ class PLATFORM(Enum):
     GOES_17 = 'G17'
 
     @classmethod
-    def from_value(cls, value_str):
+    def from_value(cls, value_str, unknown=UNKNOWN):
         """Convert external string to Enum"""
         for m in cls:
             if m.value == value_str:
                 return m
-        return INSTRUMENT.UNKNOWN
+        return value_str if unknown is None else unknown
 
 
 class INFO(Enum):
@@ -153,7 +153,7 @@ class INFO(Enum):
     Standard keys for info dictionaries
     Note: some fields correspond to database fields in workspace.metadatabase !
     """
-
+    UNKNOWN = '???'
     PATHNAME = 'path'  # full path to the data file
     DATASET_NAME = 'dataset_name'  # logical name of the file (possibly human assigned)
     SHORT_NAME = 'short_name'  # CF short_name
@@ -185,6 +185,13 @@ class INFO(Enum):
     # unit string format func: lambda x, numeric=True, units=True: formatted string
     CENTRAL_WAVELENGTH = 'nominal_wavelength'
 
+    @classmethod
+    def from_value(cls, value_str, unknown=UNKNOWN):
+        """Convert external string to Enum"""
+        for m in cls:
+            if m.value == value_str:
+                return m
+        return value_str if unknown is None else unknown
 
 @jit(nb_types.UniTuple(int64, 2)(float64[:, :], float64[:, :]))
 def get_reference_points(img_cmesh, img_vbox):
