@@ -38,7 +38,6 @@ from datetime import datetime, timedelta
 from sift.common import INFO
 from functools import reduce
 from uuid import UUID
-import numpy as np
 
 from sqlalchemy import Column, Integer, String, UnicodeText, Unicode, ForeignKey, DateTime, Interval, PickleType, Float, create_engine
 from sqlalchemy.orm import Session, relationship, sessionmaker, backref
@@ -121,6 +120,12 @@ class Resource(Base):
     def touch(self):
         self.atime = datetime.utcnow()
 
+    def exists(self):
+        if self.scheme not in {None, 'file'}:
+            return True  # FUTURE: alternate tests for still-exists-ness
+        return os.path.exists(self.path)
+
+
 
 class Product(ProxiedDictMixin, Base):
     """
@@ -150,6 +155,7 @@ class Product(ProxiedDictMixin, Base):
 
     # primary handler
     kind = Column(PickleType)  # class or callable which can perform transformations on this data in workspace
+    atime = Column(DateTime)  # last time this file was accessed by application
 
     # cached metadata provided by the file format handler
     platform = Column(String)  # platform or satellite name e.g. "GOES-16", "Himawari-8"
@@ -178,20 +184,24 @@ class Product(ProxiedDictMixin, Base):
     _proxied = association_proxy("kwinfo", "value",
                                  creator=lambda key, value: ProductKeyValue(key=key, value=value))
 
-    def _iter_info(self):
-        yield INFO.PLATFORM, self.platform
-        yield INFO.SHORT_NAME, self.short_name
-        yield INFO.STANDARD_NAME, self.standard_name
-        yield INFO.DISPLAY_TIME, self.display_time
-        yield from self.kwinfo.items()
+    # def _iter_info(self):
+    #     yield INFO.PLATFORM, self.platform
+    #     yield INFO.SHORT_NAME, self.short_name
+    #     yield INFO.STANDARD_NAME, self.standard_name
+    #     yield INFO.DISPLAY_TIME, self.display_time
+    #     yield from self.kwinfo.items()
+    #
+    # @property
+    # def info(self):
+    #     """
+    #     return an info dictionary
+    #     :return:
+    #     """
+    #     return dict(self._iter_info())
 
-    @property
-    def info(self):
-        """
-        return an info dictionary
-        :return:
-        """
-        return dict(self._iter_info())
+    def touch(self, when=None):
+        self.atime = when = when or datetime.utcnow()
+        self.resource.touch(when)
 
 
 class ProductKeyValue(Base):
@@ -215,7 +225,7 @@ class Content(ProxiedDictMixin, Base):
     a given product may have several Content for different projections
     additional information is stored in a key-value table addressable as content[key:str]
     """
-    _array = None  # when attached, this is a np.memmap
+    # _array = None  # when attached, this is a np.memmap
 
     __tablename__ = 'contents'
     id = Column(Integer, primary_key=True)
@@ -285,25 +295,31 @@ class Content(ProxiedDictMixin, Base):
         return "<{uuid} product {product} content{isoverview} with path={path} dtype={dtype} {xyzcs}>".format(
             uuid=self.uuid, product=product, isoverview=isoverview, path=self.path, dtype=dtype, xyzcs=xyzcs)
 
+    def touch(self, when=None):
+        self.atime = when = when or datetime.utcnow()
+        self.product.touch(when)
+
     @property
     def shape(self):
         rcl = reduce( lambda a,b: a + [b] if b else a, [self.rows, self.cols, self.levels], [])
         return tuple(rcl)
 
-    @property
-    def data(self):
-        """
-        numpy array with the content
-        :return:
-        """
-        if self._array is not None:
-            return self._array
-        self._array = zult = np.memmap(self.path, mode='r', shape=self.shape, dtype=self.dtype or 'float32')
-        return zult
+    # this doesn't belong here, database routines only plz
+    # @property
+    # def data(self):
+    #     """
+    #     numpy array with the content
+    #     :return:
+    #     """
+    #     self.touch()
+    #     if self._array is not None:
+    #         return self._array
+    #     self._array = zult = np.memmap(self.path, mode='r', shape=self.shape, dtype=self.dtype or 'float32')
+    #     return zult
 
-    def close(self):
-        if self._array is not None:
-            self._array = None
+    # def close(self):
+    #     if self._array is not None:
+    #         self._array = None
 
 
 class ContentKeyValue(Base):
@@ -359,6 +375,7 @@ class Metadatabase(object):
     #
     # high-level functions
     #
+
 
 
 

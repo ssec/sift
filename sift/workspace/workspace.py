@@ -495,7 +495,7 @@ class Workspace(QObject):
             directory_path = str(self._tempdir)
             LOG.info('using temporary directory {}'.format(directory_path))
         self.cwd = directory_path = os.path.abspath(directory_path)
-        self._inventory_path = os.path.join(self.cwd, '_inventory.db')
+        self._inventory_path = self._ws_path('_inventory.db')
         if not os.path.isdir(directory_path):
             os.makedirs(directory_path)
             self._own_cwd = True
@@ -556,28 +556,38 @@ class Workspace(QObject):
         shape = tuple(x[1] for x in rcl_shape)
         return rcl, shape
 
+    def _ws_path(self, rel_path):
+        return self._ws_path(rel_path)
 
-    def _attach_content(self, c: mdb.Content, mode='r'):
+    def _attach_content(self, c: mdb.Content, mode='c'):
         """
         attach content arrays, for holding by workspace in _available
         :param c: Content entity from database
         :return: workspace_data_arrays instance
         """
         rcl, shape = self._rcl(c.rows, c.cols, c.levels)
-        data = np.memmap(os.path.join(self.cwd, c.path), dtype=c.dtype or np.float32, mode=mode, shape=shape)
-        y = np.memmap(os.path.join(self.cwd, c.y_path), dtype=c.dtype or np.float32, mode=mode, shape=shape) if c.y_path else None
-        x = np.memmap(os.path.join(self.cwd, c.x_path), dtype=c.dtype or np.float32, mode=mode, shape=shape) if c.x_path else None
-        z = np.memmap(os.path.join(self.cwd, c.z_path), dtype=c.dtype or np.float32, mode=mode, shape=shape) if c.z_path else None
+        data = np.memmap(self._ws_path(c.path), dtype=c.dtype or np.float32, mode=mode, shape=shape)
+        y = np.memmap(self._ws_path(c.y_path), dtype=c.dtype or np.float32, mode=mode, shape=shape) if c.y_path else None
+        x = np.memmap(self._ws_path(c.x_path), dtype=c.dtype or np.float32, mode=mode, shape=shape) if c.x_path else None
+        z = np.memmap(self._ws_path(c.z_path), dtype=c.dtype or np.float32, mode=mode, shape=shape) if c.z_path else None
 
         _, cshape = self._rcls(c.coverage_cols, c.coverage_cols, c.coverage_levels)
-        coverage = np.memmap(os.path.join(self.cwd, c.coverage_path), dtype=np.int8, mode=mode, shape=cshape) if c.coverage_path else None
+        coverage = np.memmap(self._ws_path(c.coverage_path), dtype=np.int8, mode=mode, shape=cshape) if c.coverage_path else None
         _, sshape = self._rcls(c.coverage_cols, c.coverage_cols, c.coverage_levels)
-        sparsity = np.memmap(os.path.join(self.cwd, c.sparsity_path), dtype=np.int8, mode=mode, shape=sshape) if c.sparsity_path else None
+        sparsity = np.memmap(self._ws_path(c.sparsity_path), dtype=np.int8, mode=mode, shape=sshape) if c.sparsity_path else None
 
         return workspace_data_arrays(rcl = rcl, data = data,
                                      y=y, x=x, z=z,
                                      coverage=coverage, sparsity=sparsity)
 
+    def _remove_content_files_from_workspace(self, c: mdb.Content ):
+        total = 0
+        for filename in [c.path, c.coverage_path, c.sparsity_path]:
+            pn = self._ws_path(filename)
+            if os.path.exists(pn):
+                os.remove(pn)
+                total += os.stat(pn).st_size
+        return total
 
     def _cached_arrays_for_content(self, c:mdb.Content):
         """
@@ -585,7 +595,8 @@ class Workspace(QObject):
         :param c: metadatabase Content object
         :return: workspace_content_arrays
         """
-        cache_entry = self._available.get(c.id, None)
+        c.touch()
+        cache_entry = self._available.get(c.id)
         if cache_entry is None:
             new_entry = self._attach_content(c)
             self._available[c.id] = cache_entry = new_entry
@@ -596,7 +607,7 @@ class Workspace(QObject):
     # often-used queries
     #
 
-    def _product_with_uuid(self, uuid):
+    def _product_with_uuid(self, uuid) -> mdb.Product:
         return self._S.query(mdb.Product).filter_by(uuid=uuid).first()
 
     def _content_ordered_by_lod(self, p:mdb.Product):
@@ -608,10 +619,10 @@ class Workspace(QObject):
         cs = tuple(self._S.query(mdb.Content).filter_by(product_id=p.id).order_by(mdb.Content.lod).all())
         return cs
 
-    def _product_overview_content(self, p:mdb.Product):
+    def _product_overview_content(self, p:mdb.Product) -> mdb.Content:
         return self._S.query(mdb.Content).filter_by(product_id=p.id).order_by(mdb.Content.lod).first()
 
-    def _product_native_content(self, p:mdb.Product):
+    def _product_native_content(self, p:mdb.Product) -> mdb.Content:
         return self._S.query(mdb.Content).filter_by(product_id=p.id).order_by(mdb.Content.lod.desc()).first()
 
     #
@@ -685,10 +696,12 @@ class Workspace(QObject):
             dsi_or_uuid = UUID(dsi_or_uuid)
         # look up the product for that uuid
         prod = self._product_with_uuid(dsi_or_uuid)
+        prod.touch()
+        self._S.commit()  # flush any pending updates to workspace db file
         if prod is None:
             return None
 
-        return ChainMap(prod, self._product_std_info(prod))
+        return ChainMap(prod, self._product_std_info(prod))  # any updates go to prod k-v table
 
 
 #----------------------------------------------------------------------
@@ -703,34 +716,38 @@ class Workspace(QObject):
         hits = self._S.query(mdb.Resource).filter_by(path=path).all()
         if not hits:
             return None
-        if len(hits)==1:
+        if len(hits)>=1:
+            if len(hits) > 1:
+                LOG.warning('more than one Resource found suitable, there can be only one')
             resource = hits[0]
             hits = self._S.query(mdb.Content).filter(
-                mdb.Content.lod==mdb.Content.LOD_OVERVIEW).filter(
                 mdb.Content.product_id==mdb.Product.id).filter(
-                mdb.Product.resource_id==resource.id).all()
-            if len(hits)==1:
-                content = hits[0]
-                return UUID(content.product.uuid), content.info,
+                mdb.Product.resource_id==resource.id).order_by(
+                mdb.Content.lod).all()
+            if len(hits)>=1:
+                content = hits[0]  # presumably this is closest to LOD_OVERVIEW
+                # if len(hits)>1:
+                #     LOG.warning('more than one Content found suitable, there can be only one')
+                cac = self._cached_arrays_for_content(content)
+                return content.product.uuid, content.product.info, cac.data
 
-        FIXME
-        key = self._key_for_path(path)
-        nfo = self._inventory.get(key, None)
-        if nfo is None:
-            return None
-        uuid, info, data_info = nfo
-        dfilename, dtype, shape = data_info
-        if dfilename is None:
-            LOG.debug("No data loaded from {}".format(path))
-            data = None
-        else:
-            dpath = os.path.join(self.cwd, dfilename)
-            if not os.path.exists(dpath):
-                del self._inventory[key]
-                self._store_inventory()
-                return None
-            data = np.memmap(dpath, dtype=dtype, mode='c', shape=shape)
-        return uuid, info, data
+        # key = self._key_for_path(path)
+        # nfo = self._inventory.get(key, None)
+        # if nfo is None:
+        #     return None
+        # uuid, info, data_info = nfo
+        # dfilename, dtype, shape = data_info
+        # if dfilename is None:
+        #     LOG.debug("No data loaded from {}".format(path))
+        #     data = None
+        # else:
+        #     dpath = self._ws_path(dfilename)
+        #     if not os.path.exists(dpath):
+        #         del self._inventory[key]
+        #         self._store_inventory()
+        #         return None
+        #     data = np.memmap(dpath, dtype=dtype, mode='c', shape=shape)
+        # return uuid, info, data
 
     @property
     def paths_in_cache(self):
@@ -739,82 +756,90 @@ class Workspace(QObject):
 
     @property
     def uuids_in_cache(self):
+        prods = self._S.query(mdb.Product).all()
+        return [p.uuid for p in prods]
 
-        return self._inventory.keys()
+    # def _update_cache(self, path, uuid, info, data):
+    #     """
+    #     add or update the cache and put it to disk
+    #     :param path: path to get key from
+    #     :param uuid: uuid the data's been assigned
+    #     :param info: dataset info dictionary
+    #     :param data: numpy.memmap backed by a file in the workspace
+    #     :return:
+    #     """
+    #     key = self._key_for_path(path)
+    #     prev_nfo = self._inventory.get(key, (uuid, None, (None, None, None)))
+    #
+    #     if info is None:
+    #         info = prev_nfo[1]
+    #
+    #     if data is None:
+    #         data_info = prev_nfo[2]
+    #     else:
+    #         data_info = (os.path.split(data.filename)[1], data.dtype, data.shape)
+    #
+    #     nfo = (uuid, info, data_info)
+    #     self._inventory[key] = nfo
+    #     self._store_inventory()
 
-    def _update_cache(self, path, uuid, info, data):
-        """
-        add or update the cache and put it to disk
-        :param path: path to get key from
-        :param uuid: uuid the data's been assigned
-        :param info: dataset info dictionary
-        :param data: numpy.memmap backed by a file in the workspace
-        :return:
-        """
-        FIXME
-        key = self._key_for_path(path)
-        prev_nfo = self._inventory.get(key, (uuid, None, (None, None, None)))
 
-        if info is None:
-            info = prev_nfo[1]
-
-        if data is None:
-            data_info = prev_nfo[2]
-        else:
-            data_info = (os.path.split(data.filename)[1], data.dtype, data.shape)
-
-        nfo = (uuid, info, data_info)
-        self._inventory[key] = nfo
-        self._store_inventory()
-
-    def remove_paths_from_cache(self, paths):
-        FIXME
-        keys = [self._key_for_path(path) for path in paths]
-        for key in keys:
-            entry = self._inventory.get(key, None)
-            if not entry:
-                continue
-            uuid,info,data_info = entry
-            filename, dtype, shape = data_info
-            path = os.path.join(self.cwd, filename)
-            try:
-                os.remove(path)
-                LOG.info('removed {} = {} from cache'.format(key[0], path))
-            except:
-                # this could happen if the file is open in windows
-                LOG.error('unable to remove {} from cache'.format(path))
-                continue
-            del self._inventory[key]
-        self._store_inventory()
-
-    def _inventory_check(self):
-        "return revised_inventory_dict, [(access-time, size, path, key), ...], total_size"
-        FIXME
-        cache = []
-        inv = dict(self._inventory)
-        total_size = 0
-        for key,nfo in self._inventory.items():
-            uuid,info,data_info = nfo
-            filename, dtype, shape = data_info
-            path = os.path.join(self.cwd, filename)
-            if os.path.exists(path):
-                st = os.stat(path)
-                cache.append((st.st_atime, st.st_size, path, key))
-                total_size += st.st_size
-            else:
-                LOG.info('removing stale {}'.format(key))
-                del inv[key]
-        # sort by atime
-        cache.sort()
-        return inv, cache, total_size
+    # def _inventory_check(self):
+    #     "return revised_inventory_dict, [(access-time, size, path, key), ...], total_size"
+    #     cache = []
+    #     inv = dict(self._inventory)
+    #     total_size = 0
+    #     for key,nfo in self._inventory.items():
+    #         uuid,info,data_info = nfo
+    #         filename, dtype, shape = data_info
+    #         path = self._ws_path(filename)
+    #         if os.path.exists(path):
+    #             st = os.stat(path)
+    #             cache.append((st.st_atime, st.st_size, path, key))
+    #             total_size += st.st_size
+    #         else:
+    #             LOG.info('removing stale {}'.format(key))
+    #             del inv[key]
+    #     # sort by atime
+    #     cache.sort()
+    #     return inv, cache, total_size
 
     def recently_used_cache_paths(self, n=32):
-        FIXME "replace this completely with product list"
-        inv, cache, total_size = self._inventory_check()
-        self._inventory = inv
-        self._store_inventory()
-        # get from most recently used end of list
-        return [q[3][0] for q in cache[-n:]]
+        return [p.resource.uri for p in self._S.query(mdb.Product).order_by(mdb.Product.atime.desc()).limit(n).all()]
+        # FIXME "replace this completely with product list"
+        # inv, cache, total_size = self._inventory_check()
+        # self._inventory = inv
+        # self._store_inventory()
+        # # get from most recently used end of list
+        # return [q[3][0] for q in cache[-n:]]
+
+    def _eject_resource_from_workspace(self, resource: mdb.Resource, defer_commit=False):
+        """
+        remove all resource contents from the database
+        if the resource original path no longer exists, also purge resource and products from database
+        :param resource: resource object we
+        :return: number of bytes freed from the workspace
+        """
+        total = 0
+        for prod in resource.products:
+            for con in prod.contents:
+                total += self._remove_content_files_from_workspace(con)
+                self._S.delete(con)
+
+        if not resource.exists():  # then purge the resource and its products as well
+           self._S.delete(resource)
+        if not defer_commit:
+            self._S.commit()
+        return total
+
+    def remove_all_workspace_content_for_resource_paths(self, paths):
+        total = 0
+        for path in paths:
+            rsr_hits = self._S.query(mdb.Resource).filter_by(path=path).all()
+            for rsr in rsr_hits:
+                total += self._eject_resource_from_workspace(rsr, defer_commit=True)
+        self._S.commit()
+        return total
 
     def _clean_cache(self):
         """
@@ -823,32 +848,20 @@ class Workspace(QObject):
         possibly include a workspace setting for max workspace size in bytes?
         :return:
         """
-        FIXME
         # get information on current cache contents
         LOG.info("cleaning cache")
         inv, cache, total_size = self._inventory_check()
         GB = 1024**3
         LOG.info("total cache size is {}GB of max {}GB".format(total_size/GB, self._max_size_gb))
         max_size = self._max_size_gb * GB
-        while total_size > max_size:
-            _, size, path, key = cache.pop(0)
-            LOG.debug('{} GB in {}'.format(path, size/GB))
-            try:
-                os.remove(path)
-                LOG.info('removed {} for {}GB'.format(path, size/GB))
-            except:
-                # this could happen if the file is open in windows
-                LOG.error('unable to remove {} from cache'.format(path))
-                continue
-            del inv[key]
-            total_size -= size
-        self._inventory = inv
-        self._store_inventory()
-        # FUTURE: check for orphan files in the cache
-        return
+        for res in self._S.query(mdb.Resource).order_by(mdb.Resource.atime).all():
+            if total_size < max_size:
+                break
+            total_size -= self._eject_resource_from_workspace(res)
+            # remove all content for lowest atimes until
 
     def close(self):
-        self._store_inventory()
+        self._S.commit()
         self._clean_cache()
 
     def idle(self):
@@ -937,7 +950,7 @@ class Workspace(QObject):
 
     def _preferred_cache_path(self, uuid):
         filename = str(uuid)
-        return os.path.join(self.cwd, filename)
+        return self._ws_path(filename)
 
     def _convert_to_memmap(self, uuid, data:np.ndarray):
         if isinstance(data, np.memmap):
@@ -999,12 +1012,14 @@ class Workspace(QObject):
         :param lod: desired level of detail to focus  (0 for overview)
         :return:
         """
-        FIXME
         if isinstance(dsi_or_uuid, str):
             dsi_or_uuid = UUID(dsi_or_uuid)
         prod = self._product_with_uuid(dsi_or_uuid)
-
-        return self._data.get(dsi_or_uuid, None)
+        prod.touch()
+        content = self._S.query(mdb.Content).filter_by(mdb.Content.product_id==prod.id).order_by(mdb.Content.lod.desc()).first()
+        content.touch()
+        self._S.commit()  # flush any pending updates to workspace db file
+        return self._cached_arrays_for_content(content)
 
     def _create_position_to_index_transform(self, dsi_or_uuid):
         info = self.get_info(dsi_or_uuid)

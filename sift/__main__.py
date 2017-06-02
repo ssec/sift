@@ -649,7 +649,7 @@ class Main(QtGui.QMainWindow):
         self.ui.animPlayPause.setChecked(new_state)
 
     def _remove_paths_from_cache(self, paths):
-        self.workspace.remove_paths_from_cache(paths)
+        self.workspace.remove_all_workspace_content_for_resource_paths(paths)
         self.update_recent_file_menu()
 
     def open_from_cache(self, *args, **kwargs):
