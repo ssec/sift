@@ -18,7 +18,7 @@ REQUIRES
 :license: GPLv3, see LICENSE for more details
 """
 from _weakref import ref
-from collections import MutableMapping
+from collections import ChainMap
 from itertools import chain
 from enum import Enum
 from sift.common import INFO, KIND
@@ -35,117 +35,27 @@ import argparse
 
 LOG = logging.getLogger(__name__)
 
-# class LayerStack(list):
-#     """
-#     A LayerStack includes
-#     - stacking of layers
-#     - reordering of layers
-#     - time-ordered grouping of similar layers
-#     - time sequence animation
-#     Layer types includes
-#     - background images
-#     - RGB imagery tiles from GeoTIFF or other
-#     - Imagery field tiles with color maps
-#     - markers and selections
-#     - geopolitical vector boundaries
-#
-#     Everything in LayerDoc should be serializable in order to load an identical configuration later.
-#     LayerDoc interacts with view classes to manage drawing plan and layer representations.
-#     Scripts and UI Controls can modify the LayerDoc, which propagates update signals to its dependencies
-#     Facets - LayerDocAsTimeSeries for instance, will be introduced as needed to manage complexity
-#     Multiple LayerDocs may be present, especially if we're copying content like color maps over
-#     """
-#
-#     _layerlist = None
-#
-#
-#     def __init__(self, document, init_layers=None):
-#         super(LayerStack, self).__init__()
-#         self._layerlist = list(init_layers or [])
-#
-#
-#     def __iter__(self):
-#         # FIXME: this is an animation test pattern
-#         if self.animating:
-#             todraw = self._layerlist[self.frame_number % len(self._layerlist)]
-#             todraw.z = 0
-#             yield todraw
-#             return
-#         for level,layer in enumerate(reversed(self._layerlist)):
-#             layer.z = float(level)
-#             yield layer
-#
-#
-#     def __getitem__(self, item):
-#         return self._layerlist[item]
-#
-#
-#     def __len__(self):
-#         return len(self._layerlist)
-#
-#
-#     def append(self, layer):
-#         self._layerlist.append(layer)
-#         # self.layerStackDidChangeOrder.emit(tuple(range(len(self))))
-#
-#
-#     def __delitem__(self, dex):
-#         order = list(range(len(self)))
-#         del self._layerlist[dex]
-#         del order[dex]
-#         # self.layerStackDidChangeOrder(tuple(order))
-#
-#
-#     def swap(self, adex, bdex):
-#         order = list(range(len(self)))
-#         order[bdex], order[adex] = adex, bdex
-#         new_list = [self._layerlist[dex] for dex in order]
-#         self._layerlist = new_list
-#         # self.layerStackDidChangeOrder.emit(tuple(order))
-#
-#
-#
-#     # @property
-#     # def top(self):
-#     #     return self._layerlist[0] if self._layerlist else None
-#     #
-#
-#     @property
-#     def listing(self):
-#         """
-#         return representation summary for layer list - name, icon, source, etc
-#         """
-#         for layer in self._layerlist:
-#             yield {'name': str(layer.name)}
-#
 
-
-
-class mixing(Enum):
+class Mixing(Enum):
     UNKNOWN = 0
     NORMAL = 1
     ADD = 2
     SUBTRACT = 3
 
 
-class DocLayer(MutableMapping):
-    """
-    Layer as represented within the document
-    Essentially: A helper representation of a layer and part of the public interface to the document.
-    Substitutes in for document layer information dictionaries initially,
-      but eventually dictionary interfaces will be limited to non-standard annotation keys.
-    Incrementally migrate functionality from Document into these classes as appropriate, to keep Document from getting too complicated.
-    Make sure that DocLayer classes remain serializable and long-term connected only to the document, not to UI elements or workspace.
+class DocLayer(ChainMap):
+    """Container for layer metadata
+    
+    Use dictionary-like access for metadata information.
     """
     _doc = None  # weakref to document that owns us
 
     def __init__(self, doc, *args, **kwargs):
         self._doc = ref(doc)
         # store of metadata that comes from the input content and does not change
-        self._definitive = dict()
-        # implied metadata that was derived from definitive metadata
-        self._implied_cache = dict()
-        self._definitive.update(dict(*args, **kwargs))
+        self._definitive = dict(*args, **kwargs)
+        self._user_modified = {}
+        super(DocLayer, self).__init__(self._user_modified, self._definitive)
 
     @property
     def parent(self):
@@ -169,7 +79,7 @@ class DocLayer(MutableMapping):
         UUID of the layer, which for basic layers is likely to be the UUID of the dataset in the workspace.
         :return:
         """
-        return self._definitive[INFO.UUID]
+        return self[INFO.UUID]
 
     @property
     def kind(self):
@@ -178,35 +88,38 @@ class DocLayer(MutableMapping):
          We may deprecate this eventually?
         :return:
         """
-        return self._definitive[INFO.KIND]
+        return self[INFO.KIND]
 
     @property
     def band(self):
-        return self._definitive.get(INFO.BAND, None)
+        return self.get(INFO.BAND)
 
     @property
     def instrument(self):
-        return self._definitive.get(INFO.INSTRUMENT, None)
+        return self.get(INFO.INSTRUMENT)
 
     @property
     def platform(self):
-        return self._definitive.get(INFO.PLATFORM, None)
+        return self.get(INFO.PLATFORM)
 
     @property
     def sched_time(self):
-        return self._definitive.get(INFO.SCHED_TIME, None)
+        return self.get(INFO.SCHED_TIME)
 
     @property
     def dataset_name(self):
-        return self._definitive[INFO.DATASET_NAME]
+        return self[INFO.DATASET_NAME]
 
     @property
     def display_name(self):
-        return self._implied_cache[INFO.DISPLAY_NAME]
+        return self[INFO.DISPLAY_NAME]
 
-    @display_name.setter
-    def display_name(self, value):
-        self._implied_cache[INFO.DISPLAY_NAME] = value
+    @property
+    def default_display_name(self):
+        for d in reversed(self.maps):
+            if INFO.DISPLAY_NAME in d:
+                return d[INFO.DISPLAY_NAME]
+        return None
 
     @property
     def is_valid(self):
@@ -230,33 +143,6 @@ class DocLayer(MutableMapping):
         """
         return True
 
-    def __getitem__(self, key):
-        if key not in self._definitive:
-            return self._implied_cache[key]
-        return self._definitive[key]
-
-    def __setitem__(self, key, value):
-        if key in self._definitive:
-            raise ValueError("Can't set value on definitive metadata: {}".format(key))
-        self._implied_cache[key] = value
-
-    def __delitem__(self, key):
-        if key in self._definitive:
-            raise ValueError("Can't delete definitive metadata: {}".format(key))
-        del self._implied_cache[key]
-
-    def update(self, *args, **kwds):
-        if args:
-            kwds.update(args[0])
-        for k, v in kwds.items():
-            self[k] = v
-
-    def __iter__(self):
-        return chain(iter(self._definitive), iter(self._implied_cache))
-
-    def __len__(self):
-        return len(self._definitive) + len(self._implied_cache)
-
 
 class DocBasicLayer(DocLayer):
     """
@@ -269,22 +155,11 @@ class DocCompositeLayer(DocLayer):
     """
     A layer which combines other layers, be they basic or composite themselves
     """
-    def __getitem__(self, key):
-        value = super(DocCompositeLayer, self).__getitem__(key)
-        # FIXME debug
-        if key == INFO.KIND:
-            assert(value == KIND.RGB)
-        return value
+
 
 def _concurring(*q):
-    if len(q)==0:
-        return None
-    elif len(q)==1:
-        return q[0]
-    for a,b in zip(q[:-1], q[1:]):
-        if a!=b:
-            return False
-    return q[0]
+    """Check that all provided inputs are the same"""
+    return q[0] if all(x == q[0] for x in q[1:]) else False
 
 
 class DocRGBLayer(DocCompositeLayer):
@@ -377,6 +252,59 @@ class DocRGBLayer(DocCompositeLayer):
         gst = lambda x: None if (x is None) else x.platform
         return _concurring(gst(self.r), gst(self.g), gst(self.b))
 
+    def _get_units_conversion(self):
+        def conv_func(x, inverse=False, deps=(self.r, self.g, self.b)):
+            if isinstance(x, np.ndarray):
+                # some sort of array
+                x_tmp = x.ravel()
+                assert x_tmp.size % len(deps) == 0
+                num_elems = x_tmp.size // len(deps)
+                new_vals = []
+                for i, dep in enumerate(deps):
+                    new_val = x_tmp[i * num_elems: (i + 1) * num_elems]
+                    if dep is not None:
+                        new_val = dep[INFO.UNIT_CONVERSION][1](new_val, inverse=inverse)
+                    new_vals.append(new_val)
+                res = np.array(new_vals).reshape(x.shape)
+                return res
+            else:
+                # Not sure this should ever happen (should always be at least 3
+                return x
+
+        def format_func(val, numeric=True, include_units=False):
+            return ", ".join("{}".format(v) if v is None else "{:0.03f}".format(v) for v in val)
+        return None, conv_func, format_func
+
+    def _default_display_time(self):
+        dep_info = [self.r, self.g, self.b]
+        valid_times = [nfo.get(INFO.DISPLAY_TIME, '<unknown time>') for nfo in dep_info if nfo is not None]
+        if len(valid_times) == 0:
+            display_time = '<unknown time>'
+        else:
+            display_time = valid_times[0] if len(valid_times) and all(t == valid_times[0] for t in valid_times[1:]) else '<multiple times>'
+
+        return display_time
+
+    def _default_display_name(self, display_time=None):
+        dep_info = [self.r, self.g, self.b]
+        if display_time is None:
+            display_time = self._default_display_time()
+
+        try:
+            names = []
+            for color, dep_layer in zip("RGB", dep_info):
+                if dep_layer is None:
+                    name = u"{}:---".format(color)
+                else:
+                    name = u"{}:{}".format(color, dep_layer[INFO.SHORT_NAME])
+                names.append(name)
+            name = u' '.join(names) + u' ' + display_time
+        except KeyError:
+            LOG.error('unable to create new name from {0!r:s}'.format(dep_info))
+            name = "-RGB-"
+
+        return name
+
     def update_metadata_from_dependencies(self):
         """
         recalculate origin and dimension information based on new upstream
@@ -384,8 +312,8 @@ class DocRGBLayer(DocCompositeLayer):
         """
         # FUTURE: resolve dictionary-style into attribute-style uses
         dep_info = [self.r, self.g, self.b]
-        display_time = self._doc()._guidebook._default_display_time(self)
-        name = self._doc()._guidebook._default_display_name(self, display_time=display_time)
+        display_time = self._default_display_time()
+        name = self._default_display_name(display_time=display_time)
         bands = [nfo.get(INFO.BAND) if nfo is not None else None for nfo in dep_info]
         insts = [nfo.get(INFO.INSTRUMENT) if nfo is not None else None for nfo in dep_info]
         plats = [nfo.get(INFO.PLATFORM) if nfo is not None else None for nfo in dep_info]
@@ -396,7 +324,7 @@ class DocRGBLayer(DocCompositeLayer):
             INFO.BAND: bands,
             INFO.INSTRUMENT: insts[0] if all(inst == insts[0] for inst in insts[1:]) else None,
             INFO.PLATFORM: plats[0] if all(plat == plats[0] for plat in plats[1:]) else None,
-            INFO.UNIT_CONVERSION: self._doc()._guidebook.units_conversion(self),
+            INFO.UNIT_CONVERSION: self._get_units_conversion(),
         }
 
         if self.r is None and self.g is None and self.b is None:

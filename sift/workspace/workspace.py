@@ -47,6 +47,7 @@ from sift.common import KIND, INFO, INSTRUMENT, PLATFORM
 from PyQt4.QtCore import QObject, pyqtSignal
 from sift.model.shapes import content_within_shape
 from sift.workspace.goesr_pug import PugL1bTools
+from sift.workspace.guidebook import ABI_AHI_Guidebook
 from shapely.geometry.polygon import LinearRing
 from rasterio import Affine
 from pyproj import Proj
@@ -71,6 +72,36 @@ TheWorkspace = None
 
 
 workspace_data_arrays = namedtuple('workspace_data_arrays', ('rcl', 'data', 'sparsity', 'coverage', 'y', 'x', 'z'))
+
+
+GUIDEBOOKS = {
+    PLATFORM.GOES_16: ABI_AHI_Guidebook,
+    PLATFORM.GOES_17: ABI_AHI_Guidebook,
+    PLATFORM.HIMAWARI_8: ABI_AHI_Guidebook,
+    PLATFORM.HIMAWARI_9: ABI_AHI_Guidebook,
+}
+
+
+def get_guidebook_class(layer_info):
+    platform = layer_info.get(INFO.PLATFORM)
+    return GUIDEBOOKS[platform]()
+
+
+def generate_guidebook_metadata(layer_info):
+    guidebook = get_guidebook_class(layer_info)
+    # also get info for this layer from the guidebook
+    gbinfo = guidebook.collect_info(layer_info)
+    layer_info.update(gbinfo)  # FUTURE: should guidebook be integrated into DocBasicLayer?
+
+    # add as visible to the front of the current set, and invisible to the rest of the available sets
+    layer_info[INFO.COLORMAP] = guidebook.default_colormap(layer_info)
+    layer_info[INFO.CLIM] = guidebook.climits(layer_info)
+    if INFO.DISPLAY_TIME not in layer_info:
+        layer_info[INFO.DISPLAY_TIME] = guidebook._default_display_time(layer_info)
+    if INFO.DISPLAY_NAME not in layer_info:
+        layer_info[INFO.DISPLAY_NAME] = guidebook._default_display_name(layer_info)
+
+    return layer_info
 
 
 class Importer(object):
@@ -144,6 +175,44 @@ class GeoTiffImporter(Importer):
             })
         return meta
 
+    def _check_geotiff_metadata(self, gtiff):
+        gtiff_meta = gtiff.GetMetadata()
+        # Sanitize metadata from the file to use SIFT's Enums
+        if "name" in gtiff_meta:
+            gtiff_meta[INFO.DATASET_NAME] = gtiff_meta.pop("name")
+        if "platform" in gtiff_meta:
+            plat = gtiff_meta.pop("platform")
+            gtiff_meta[INFO.PLATFORM] = PLATFORM.from_value(plat)
+            if gtiff_meta[INFO.PLATFORM] == PLATFORM.UNKNOWN:
+                LOG.warning("Unknown platform being loaded: {}".format(plat))
+        if "instrument" in gtiff_meta or "sensor" in gtiff_meta:
+            inst = gtiff_meta.pop("sensor", gtiff_meta.pop("instrument", None))
+            gtiff_meta[INFO.INSTRUMENT] = INSTRUMENT.from_value(inst)
+            if gtiff_meta[INFO.INSTRUMENT] == INSTRUMENT.UNKNOWN:
+                LOG.warning("Unknown instrument being loaded: {}".format(inst))
+        if "start_time" in gtiff_meta:
+            start_time = datetime.strptime(gtiff_meta["start_time"], "%Y-%m-%dT%H:%M:%SZ")
+            gtiff_meta[INFO.SCHED_TIME] = start_time
+            gtiff_meta[INFO.OBS_TIME] = start_time
+            if "end_time" in gtiff_meta:
+                end_time = datetime.strptime(gtiff_meta["end_time"], "%Y-%m-%dT%H:%M:%SZ")
+                gtiff_meta[INFO.OBS_DURATION] = end_time - start_time
+        if "valid_min" in gtiff_meta:
+            gtiff_meta["valid_min"] = float(gtiff_meta["valid_min"])
+        if "valid_max" in gtiff_meta:
+            gtiff_meta["valid_max"] = float(gtiff_meta["valid_max"])
+        if "standard_name" in gtiff_meta:
+            gtiff_meta[INFO.STANDARD_NAME] = gtiff_meta["standard_name"]
+        if "flag_values" in gtiff_meta:
+            gtiff_meta["flag_values"] = tuple(int(x) for x in gtiff_meta["flag_values"].split(','))
+        if "flag_masks" in gtiff_meta:
+            gtiff_meta["flag_masks"] = tuple(int(x) for x in gtiff_meta["flag_masks"].split(','))
+        if "flag_meanings" in gtiff_meta:
+            gtiff_meta["flag_meanings"] = gtiff_meta["flag_meanings"].split(' ')
+        if "units" in gtiff_meta:
+            gtiff_meta[INFO.UNITS] = gtiff_meta.pop('units')
+        return gtiff_meta
+
     def get_metadata(self, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
         if source_uri is not None:
             raise NotImplementedError("GeoTiffImporter cannot read from URIs yet")
@@ -173,45 +242,23 @@ class GeoTiffImporter(Importer):
 
         d[INFO.PATHNAME] = source_path
         band = gtiff.GetRasterBand(1)
-        d[INFO.SHAPE] = (band.YSize, band.XSize)
+        d[INFO.SHAPE] = rows, cols = (band.YSize, band.XSize)
 
-        gtiff_meta = gtiff.GetMetadata()
-        # Sanitize metadata from the file to use SIFT's Enums
-        if "name" in gtiff_meta:
-            d[INFO.DATASET_NAME] = gtiff_meta.pop("name")
-        if "platform" in gtiff_meta:
-            plat = gtiff_meta.pop("platform")
-            d[INFO.PLATFORM] = PLATFORM.from_value(plat)
-            if d[INFO.PLATFORM] == PLATFORM.UNKNOWN:
-                LOG.warning("Unknown platform being loaded: {}".format(plat))
-        if "instrument" in gtiff_meta or "sensor" in gtiff_meta:
-            inst = gtiff_meta.pop("sensor", gtiff_meta.pop("instrument", None))
-            d[INFO.INSTRUMENT] = INSTRUMENT.from_value(inst)
-            if d[INFO.INSTRUMENT] == INSTRUMENT.UNKNOWN:
-                LOG.warning("Unknown instrument being loaded: {}".format(inst))
-        if "start_time" in gtiff_meta:
-            start_time = datetime.strptime(gtiff_meta["start_time"], "%Y-%m-%dT%H:%M:%SZ")
-            d[INFO.SCHED_TIME] = start_time
-            d[INFO.OBS_TIME] = start_time
-            if "end_time" in gtiff_meta:
-                end_time = datetime.strptime(gtiff_meta["end_time"], "%Y-%m-%dT%H:%M:%SZ")
-                d[INFO.OBS_DURATION] = end_time - start_time
-        if "valid_min" in gtiff_meta:
-            gtiff_meta["valid_min"] = float(gtiff_meta["valid_min"])
-        if "valid_max" in gtiff_meta:
-            gtiff_meta["valid_max"] = float(gtiff_meta["valid_max"])
-        if "standard_name" in gtiff_meta:
-            gtiff_meta[INFO.STANDARD_NAME] = gtiff_meta["standard_name"]
-        if "flag_values" in gtiff_meta:
-            gtiff_meta["flag_values"] = tuple(int(x) for x in gtiff_meta["flag_values"].split(','))
-        if "flag_masks" in gtiff_meta:
-            gtiff_meta["flag_masks"] = tuple(int(x) for x in gtiff_meta["flag_masks"].split(','))
-        if "flag_meanings" in gtiff_meta:
-            gtiff_meta["flag_meanings"] = gtiff_meta["flag_meanings"].split(' ')
-        if "units" in gtiff_meta:
-            gtiff_meta[INFO.UNITS] = gtiff_meta.pop('units')
+        # Fix PROJ4 string if it needs an "+over" parameter
+        p = Proj(d[INFO.PROJ])
+        lon_l, lat_u = p(ox, oy, inverse=True)
+        lon_r, lat_b = p(ox + cw * cols, oy + ch * rows, inverse=True)
+        if "+over" not in d[INFO.PROJ] and lon_r < lon_l:
+            LOG.debug("Add '+over' to geotiff PROJ.4 because it seems to cross the anti-meridian")
+            d[INFO.PROJ] += " +over"
 
+        bandtype = gdal.GetDataTypeName(band.DataType)
+        if bandtype.lower() != 'float32':
+            LOG.warning('attempting to read geotiff files with non-float32 content')
+
+        gtiff_meta = self._check_geotiff_metadata(gtiff)
         d.update(gtiff_meta)
+        generate_guidebook_metadata(d)
         return d
 
     def __call__(self, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
@@ -225,21 +272,6 @@ class GeoTiffImporter(Importer):
         band = gtiff.GetRasterBand(1)  # FUTURE may be an assumption
         shape = rows, cols = band.YSize, band.XSize
         blockw, blockh = band.GetBlockSize()  # non-blocked files will report [band.XSize,1]
-
-        # Fix PROJ4 string if it needs an "+over" parameter
-        p = Proj(d[INFO.PROJ])
-        lon_l, lat_u = p(ox, oy, inverse=True)
-        lon_r, lat_b = p(ox + cw * cols, oy + ch * rows, inverse=True)
-        if "+over" not in d[INFO.PROJ] and lon_r < lon_l:
-            LOG.debug("Add '+over' to geotiff PROJ.4 because it seems to cross the anti-meridian")
-            d[INFO.PROJ] += " +over"
-
-        bandtype = gdal.GetDataTypeName(band.DataType)
-        if bandtype.lower() != 'float32':
-            LOG.warning('attempting to read geotiff files with non-float32 content')
-        # Full resolution shape
-        # d["shape"] = self.get_dataset_data(item, time_step).shape
-        d[INFO.SHAPE] = shape
 
         # shovel that data into the memmap incrementally
         # http://geoinformaticstutorial.blogspot.com/2012/09/reading-raster-data-with-python-and-gdal.html
@@ -349,8 +381,9 @@ class GoesRPUGImporter(Importer):
         d[INFO.CELL_WIDTH] = x[midxi+1] - x[midxi]
         d[INFO.CELL_HEIGHT] = y[midyi+1] - y[midyi]
 
-        shape = rows, cols = pug.shape
+        shape = pug.shape
         d[INFO.SHAPE] = shape
+        generate_guidebook_metadata(d)
         LOG.debug(repr(d))
         return d
 
@@ -386,12 +419,12 @@ class GoesRPUGImporter(Importer):
         img_data[:] = np.ma.fix_invalid(image, copy=False, fill_value=np.NAN)  # FIXME: expensive
 
         yield import_progress(uuid=dest_uuid,
-                             stages=1,
-                             current_stage=0,
-                             completion=1.0,
-                             stage_desc="GOES PUG data add to workspace",
-                             dataset_info=None,
-                             data=img_data)
+                              stages=1,
+                              current_stage=0,
+                              completion=1.0,
+                              stage_desc="GOES PUG data add to workspace",
+                              dataset_info=None,
+                              data=img_data)
 
 
 class Workspace(QObject):

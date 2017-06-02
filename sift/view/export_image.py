@@ -4,6 +4,7 @@ import logging
 
 from PyQt4 import QtCore, QtGui
 from PIL import Image, ImageDraw, ImageFont
+
 from sift.common import INFO
 from sift.ui import export_image_dialog_ui
 from sift.util import get_data_dir
@@ -244,7 +245,6 @@ class ExportImageHelper(QtCore.QObject):
         params = {}
         params['save_all'] = True
         if info['delay'] is None:
-            from sift.model.guidebook import INFO
             t = [self.doc[u][INFO.SCHED_TIME] for u, im in images]
             t_diff = [(t[i] - t[i - 1]).total_seconds() for i in range(1, len(t))]
             min_diff = float(min(t_diff))

@@ -31,13 +31,13 @@ from vispy.visuals.transforms import STTransform, MatrixTransform
 from vispy.visuals import MarkersVisual, marker_types, LineVisual
 from vispy.scene.visuals import Markers, Polygon, Compound, Line
 from vispy.geometry import Rect
-from sift.common import WORLD_EXTENT_BOX, DEFAULT_ANIMATION_DELAY, INFO, KIND, TOOL, DEFAULT_PROJECTION, COMPOSITE_TYPE
+from sift.common import DEFAULT_ANIMATION_DELAY, INFO, KIND, TOOL, prez
 # from sift.control.layer_list import LayerStackListViewModel
-from sift.view.LayerRep import NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer, CompositeLayer
+from sift.view.LayerRep import NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer
 from sift.view.MapWidget import SIFTMainMapCanvas
 from sift.view.Cameras import PanZoomProbeCamera
 from sift.view.Colormap import ALL_COLORMAPS
-from sift.model.document import prez, DocCompositeLayer, DocBasicLayer, DocRGBLayer, DocLayerStack
+from sift.model.document import DocLayerStack
 from sift.queue import TASK_DOING, TASK_PROGRESS
 from sift.view.ProbeGraphs import DEFAULT_POINT_PROBE
 from sift.view.transform import PROJ4Transform
@@ -47,7 +47,6 @@ from PyQt4.QtCore import QObject, pyqtSignal, Qt
 from PyQt4.QtGui import QCursor, QPixmap
 import numpy as np
 from uuid import UUID
-from pyproj import Proj
 
 import os
 import sys
@@ -803,7 +802,7 @@ class SceneGraphManager(QObject):
         if not layer.is_valid:
             LOG.info('unable to add an invalid layer, will try again later when layer changes')
             return
-        if isinstance(layer, DocRGBLayer):
+        if layer[INFO.KIND] == KIND.RGB:
             dep_uuids = r,g,b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
             overview_content = list(self.workspace.get_content(cuuid) for cuuid in dep_uuids)
             uuid = layer.uuid
@@ -840,7 +839,7 @@ class SceneGraphManager(QObject):
 
     def change_composite_layer(self, new_order:tuple, uuid:UUID, presentation:prez, changes:dict):
         layer = self.document[uuid]
-        if isinstance(layer, DocRGBLayer):
+        if layer[INFO.KIND] == KIND.RGB:
             if layer.uuid in self.image_elements:
                 if layer.is_valid:
                     # RGB selection has changed, rebuild the layer

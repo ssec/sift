@@ -80,6 +80,16 @@ vue = namedtuple('vue', ('b', 'l', 't', 'r', 'dy', 'dx'))  # combination of box 
 
 WORLD_EXTENT_BOX = box(b=-MAX_EXCURSION_Y, l=-MAX_EXCURSION_X, t=MAX_EXCURSION_Y, r=MAX_EXCURSION_X)
 
+# presentation information for a layer; z_order comes from the layerset
+prez = namedtuple('prez', [
+    'uuid',      # UUID: dataset in the document/workspace
+    'kind',      # what kind of layer it is
+    'visible',   # bool: whether it's visible or not
+    'a_order',   # int: None for non-animating, 0..n-1 what order to draw in during animation
+    'colormap',  # name or uuid: color map to use; name for default, uuid for user-specified
+    'climits',   # tuple: valid min and valid max used for color mapping normalization
+    'mixing'     # mixing mode constant
+])
 
 class TOOL(Enum):
     """Names for cursor tools.
