@@ -18,9 +18,6 @@ import logging, unittest
 
 LOG = logging.getLogger(__name__)
 
-def
-
-
 PATH_TEST_DATA = os.environ.get('TEST_DATA', os.path.expanduser("~/Data/test_files/thing.dat"))
 
 class tests(unittest.TestCase):
