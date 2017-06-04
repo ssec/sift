@@ -11,13 +11,20 @@ Incidentally used by manage adjacency matrix (DataMatrix).
 
 OVERVIEW
 
+Workspace
+of Products
+retrieved from Resources and
+represented by multidimensional Content
+each of which has data, coverage, and sparsity arrays in separate workspace flat files
+
 The workspace caches content, which represents products, the native form of which resides in a file
 
-Resource : a file somewhere in the filesystem, or a resource on a remote system we can access
+Resource : a file containing products, somewhere in the filesystem, or a resource on a remote system we can access (openDAP etc)
  |_ Product* : product stored in a resource
      |_ Content* : workspace cache content corresponding to a product, may be one of many available views (e.g. projections)
      |   |_ ContentKeyValue* : additional information on content
      |_ ProductKeyValue* : additional information on product
+     |_ SymbolKeyValue* : if product is derived from other products, symbol table for that expression is in this kv table
 
 A typical baseline product will have two content: and overview (lod==0) and a native resolution (lod>0)
 
@@ -283,7 +290,7 @@ class Content(ProxiedDictMixin, Base):
     xyz_dtype = Column(String, nullable=True)  # dtype of x,y,z arrays, default float32
     y_path = Column(String, nullable=True)  # if needed, y location cache path relative to workspace
     x_path = Column(String, nullable=True)  # if needed, x location cache path relative to workspace
-    z_path = Column(String, nullable=True)  # if needed, x location cache path relative to workspace
+    z_path = Column(String, nullable=True)  # if needed, z location cache path relative to workspace
 
     # link to key-value further information; primarily a hedge in case specific information has to be squirreled away for later consideration for main content table
     # this provides dictionary style access to key-value pairs

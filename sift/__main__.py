@@ -265,7 +265,7 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.change_tool(name)
 
     def update_recent_file_menu(self, *args, **kwargs):
-        paths = self.workspace.recently_used_cache_paths()
+        paths = self.workspace.recently_used_resource_paths()
         paths = self.document.sort_paths(paths)
         LOG.debug('recent files: {0!r:s}'.format(paths))
         self._recent_files_menu.clear()

@@ -32,17 +32,17 @@ NOTES
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-__author__ = 'rayg'
-__docformat__ = 'reStructuredText'
-
 import os, sys, re
 import logging, unittest, argparse
 import gdal, osr
 import numpy as np
 import shutil
+import contextlib as ctx
 from datetime import datetime
 from collections import namedtuple
 from uuid import UUID, uuid1 as uuidgen
+from functools import reduce
+import numba as nb
 from sift.common import KIND, INFO, INSTRUMENT, PLATFORM
 from PyQt4.QtCore import QObject, pyqtSignal
 from sift.model.shapes import content_within_shape
@@ -51,6 +51,7 @@ from sift.workspace.guidebook import ABI_AHI_Guidebook
 from shapely.geometry.polygon import LinearRing
 from rasterio import Affine
 from pyproj import Proj
+
 
 from sift.model.shapes import content_within_shape
 from .metadatabase import Metadatabase, Content, Product, Resource
@@ -69,9 +70,6 @@ import_progress = namedtuple('import_progress', ['uuid', 'stages', 'current_stag
 
 # first instance is main singleton instance; don't preclude the possibility of importing from another workspace later on
 TheWorkspace = None
-
-
-workspace_data_arrays = namedtuple('workspace_data_arrays', ('rcl', 'data', 'sparsity', 'coverage', 'y', 'x', 'z'))
 
 
 GUIDEBOOKS = {
@@ -102,6 +100,38 @@ def generate_guidebook_metadata(layer_info):
         layer_info[INFO.DISPLAY_NAME] = guidebook._default_display_name(layer_info)
 
     return layer_info
+
+# @ctx.contextmanager
+# def cwd(newcwd):
+#     "temporarily change directories"
+#     oldcwd = os.getcwd()
+#     os.chdir(newcwd)
+#     yield
+#     os.chdir(oldcwd)
+
+@nb.jit(nopython=True, nogil=True)
+def mask_from_coverage_sparsity_2d(mask, coverage, sparsity):
+    """
+    update a numpy.ma mask from coverage and sparsity arrays
+    Args:
+        mask: mutable array to be updated as a numpy.masked_array mask
+        coverage: coverage array to stretch across the mask
+        sparsity: sparsity array to repeat across the mask
+
+    Returns: numpy mask, where masked values are true
+
+    """
+    h,w = mask.shape
+    cov_rpt_y, cov_rpt_x = h // coverage.shape[0], w // coverage.shape[1]
+    spr_h, spr_w = sparsity.shape
+    for y in range(h):
+        for x in range(w):
+            mask[y, x] |= bool(0 == coverage[y // cov_rpt_y, x // cov_rpt_x] * sparsity[y % spr_h, x % spr_w])
+
+
+
+
+
 
 
 class Importer(object):
@@ -427,6 +457,110 @@ class GoesRPUGImporter(Importer):
                               data=img_data)
 
 
+class ActiveContent(QObject):
+    """
+    ActiveContent merges numpy.memmap arrays with their corresponding Content metadata
+    Purpose: make ActiveContent a drop-in replacement for numpy arrays
+    Workspace instantiates ActiveContent from metadatabase Content entries
+    """
+    _C = None  # my metadata
+    _wsd = None  # full path of workspace
+    _rcl = None
+    _y = None
+    _x = None
+    _z = None
+    _data = None
+    _coverage = None
+    _sparsity = None
+
+    def __init__(self, workspace_cwd: str, C: Content):
+        self._C = C
+        self._wsd = workspace_cwd
+        if workspace_cwd is None and C is None:
+            LOG.warning('test initialization of ActiveContent')
+            self._test_init()
+        else:
+            self._attach()
+
+    def _test_init(self):
+        data = np.ones((4, 12), dtype=np.float32)
+        data = np.cumsum(data, axis=0)
+        data = np.cumsum(data, axis=1)
+        self._data = data
+        self._sparsity = sp = np.zeros((2, 2), dtype=np.int8)
+        sp[1,1] = 1  # only 1/4 of dataset loaded
+        self._coverage = co = np.zeros((4, 1), dtype=np.int8)
+        co[2:4] = 1  # and of that, only the bottom half of the image
+
+    @staticmethod
+    def _rcls(r:int, c:int, l:int):
+        """
+        :param r: rows or None
+        :param c: columns or None
+        :param l: levels or None
+        :return: condensed tuple(string with 'rcl', 'rc', 'rl', dimension tuple corresponding to string)
+        """
+        rcl_shape = tuple(
+            (name, dimension) for (name, dimension) in zip('rcl', (r, c, l)) if dimension)
+        rcl = tuple(x[0] for x in rcl_shape)
+        shape = tuple(x[1] for x in rcl_shape)
+        return rcl, shape
+
+    @staticmethod
+    def multirepeat(a, r):
+
+
+    @property
+    def _repeated_coverage(self):
+        """
+        Returns: updated coverage array, repeated to match overall content shape
+        """
+        repeats = np.require(np.array(self._data.shape) / np.array(self._coverage.shape), dtype=np.int32)
+
+
+
+    @property
+    def _broadcast_sparsity(self):
+
+    def _sparsity_plus_coverage_mask(self):
+        """
+        merge sparsity and coverage mask to a standard maskedarray mask
+        :return:
+        """
+        np.repeat()
+
+    def _attach(self):
+        """
+        attach content arrays, for holding by workspace in _available
+        :param c: Content entity from database
+        :return: workspace_data_arrays instance
+        """
+        c = self._C
+        self._rcl, self._shape = rcl, shape = self._rcl(c.rows, c.cols, c.levels)
+        def mm(path, *args, **kwargs):
+            full_path = os.path.join(self._wsd, path)
+            if not os.access(full_path, os.R_OK):
+                LOG.warning("unable to find {}".format(full_path))
+                return None
+            return np.memmap(full_path, *args, **kwargs)
+
+        self._data = mm(c.path, dtype=c.dtype or np.float32, mode=mode, shape=shape)
+        self._y = mm(c.y_path, dtype=c.dtype or np.float32, mode=mode, shape=shape) if c.y_path else None
+        self._x = mm(c.x_path, dtype=c.dtype or np.float32, mode=mode, shape=shape) if c.x_path else None
+        self._z = mm(c.z_path, dtype=c.dtype or np.float32, mode=mode, shape=shape) if c.z_path else None
+
+        _, cshape = self._rcls(c.coverage_cols, c.coverage_cols, c.coverage_levels)
+        self._coverage = mm(c.coverage_path, dtype=np.int8, mode=mode, shape=cshape) if c.coverage_path else np.array([1])
+        _, sshape = self._rcls(c.coverage_cols, c.coverage_cols, c.coverage_levels)
+        self._sparsity = mm(c.sparsity_path, dtype=np.int8, mode=mode, shape=sshape) if c.sparsity_path else np.array([1])
+
+        return workspace_data_arrays(rcl = rcl, data = data,
+                                     y=y, x=x, z=z,
+                                     coverage=coverage, sparsity=sparsity)
+
+
+
+
 class Workspace(QObject):
     """
     Workspace is a singleton object which works with Datasets shall:
@@ -452,7 +586,7 @@ class Workspace(QObject):
     _available = None  # dictionary of {Content.id : workspace_data_arrays}
     _inventory = None  # metadatabase instance, sqlalchemy
     _inventory_path = None  # filename to store and load inventory information (simple cache)
-    _mdb_session = None  # MDB session
+    _S = None  # MDB session
     _tempdir = None  # TemporaryDirectory, if it's needed (i.e. a directory name was not given)
     _max_size_gb = None  # maximum size in gigabytes of flat files we cache in the workspace
     _queue = None
@@ -465,10 +599,6 @@ class Workspace(QObject):
     didDiscoverExternalDataset = pyqtSignal(dict)  # a new dataset was added to the workspace from an external agent
 
     IMPORT_CLASSES = [ GeoTiffImporter, GoesRPUGImporter ]
-
-    @property
-    def _S(self):
-        return self._mdb_session
 
     @staticmethod
     def defaultWorkspace():
@@ -519,7 +649,7 @@ class Workspace(QObject):
         self._inventory = md = Metadatabase('sqlite://' + self._inventory_path)
         if should_init:
             md.create_tables()
-        self._mdb_session = md.session()
+        self._S = md.session()
 
     def _init_inventory_existing_datasets(self):
         """
@@ -541,20 +671,6 @@ class Workspace(QObject):
     #
     #  data array handling
     #
-
-    @staticmethod
-    def _rcls(r:int, c:int, l:int):
-        """
-        :param r: rows or None
-        :param c: columns or None
-        :param l: levels or None
-        :return: condensed tuple(string with 'rcl', 'rc', 'rl', dimension tuple corresponding to string)
-        """
-        rcl_shape = tuple(
-            (name, dimension) for (name, dimension) in zip('rcl', (r, c, l)) if dimension)
-        rcl = tuple(x[0] for x in rcl_shape)
-        shape = tuple(x[1] for x in rcl_shape)
-        return rcl, shape
 
     def _ws_path(self, rel_path):
         return self._ws_path(rel_path)
@@ -721,8 +837,8 @@ class Workspace(QObject):
                 LOG.warning('more than one Resource found suitable, there can be only one')
             resource = hits[0]
             hits = self._S.query(Content).filter(
-                Content.product_id==Product.id).filter(
-                Product.resource_id==resource.id).order_by(
+                Content.product_id == Product.id).filter(
+                Product.resource_id == resource.id).order_by(
                 Content.lod).all()
             if len(hits)>=1:
                 content = hits[0]  # presumably this is closest to LOD_OVERVIEW
@@ -752,6 +868,7 @@ class Workspace(QObject):
     @property
     def paths_in_cache(self):
         # find non-overview non-auxiliary data files
+        # FIXME: also need to include coverage and sparsity paths
         return [x.path for x in self._S.query(Content).filter(Content.lod>0).all()]
 
     @property
@@ -804,7 +921,7 @@ class Workspace(QObject):
     #     cache.sort()
     #     return inv, cache, total_size
 
-    def recently_used_cache_paths(self, n=32):
+    def recently_used_resource_paths(self, n=32):
         return [p.resource.uri for p in self._S.query(Product).order_by(Product.atime.desc()).limit(n).all()]
         # FIXME "replace this completely with product list"
         # inv, cache, total_size = self._inventory_check()
