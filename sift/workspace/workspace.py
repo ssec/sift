@@ -53,7 +53,7 @@ from rasterio import Affine
 from pyproj import Proj
 
 from sift.model.shapes import content_within_shape
-import sift.workspace.metadatabase as mdb
+from .metadatabase import Metadatabase, Content, Product, Resource
 
 LOG = logging.getLogger(__name__)
 
@@ -516,7 +516,7 @@ class Workspace(QObject):
         :return:
         """
         should_init = os.path.exists(self._inventory_path)
-        self._inventory = md = mdb.Metadatabase('sqlite://' + self._inventory_path)
+        self._inventory = md = Metadatabase('sqlite://' + self._inventory_path)
         if should_init:
             md.create_tables()
         self._mdb_session = md.session()
@@ -559,7 +559,7 @@ class Workspace(QObject):
     def _ws_path(self, rel_path):
         return self._ws_path(rel_path)
 
-    def _attach_content(self, c: mdb.Content, mode='c'):
+    def _attach_content(self, c: Content, mode='c'):
         """
         attach content arrays, for holding by workspace in _available
         :param c: Content entity from database
@@ -580,7 +580,7 @@ class Workspace(QObject):
                                      y=y, x=x, z=z,
                                      coverage=coverage, sparsity=sparsity)
 
-    def _remove_content_files_from_workspace(self, c: mdb.Content ):
+    def _remove_content_files_from_workspace(self, c: Content ):
         total = 0
         for filename in [c.path, c.coverage_path, c.sparsity_path]:
             pn = self._ws_path(filename)
@@ -589,7 +589,7 @@ class Workspace(QObject):
                 total += os.stat(pn).st_size
         return total
 
-    def _cached_arrays_for_content(self, c:mdb.Content):
+    def _cached_arrays_for_content(self, c:Content):
         """
         attach cached data indicated in Content, unless it's been attached already and is in _available
         :param c: metadatabase Content object
@@ -607,23 +607,23 @@ class Workspace(QObject):
     # often-used queries
     #
 
-    def _product_with_uuid(self, uuid) -> mdb.Product:
-        return self._S.query(mdb.Product).filter_by(uuid=uuid).first()
+    def _product_with_uuid(self, uuid) -> Product:
+        return self._S.query(Product).filter_by(uuid=uuid).first()
 
-    def _content_ordered_by_lod(self, p:mdb.Product):
+    def _content_ordered_by_lod(self, p:Product):
         """
         return content entries ordered by ascending LOD, i.e. lowest (overview) to highest (native)
         :param p: Product
         :return: tuple of Content entries
         """
-        cs = tuple(self._S.query(mdb.Content).filter_by(product_id=p.id).order_by(mdb.Content.lod).all())
+        cs = tuple(self._S.query(Content).filter_by(product_id=p.id).order_by(Content.lod).all())
         return cs
 
-    def _product_overview_content(self, p:mdb.Product) -> mdb.Content:
-        return self._S.query(mdb.Content).filter_by(product_id=p.id).order_by(mdb.Content.lod).first()
+    def _product_overview_content(self, p:Product) -> Content:
+        return self._S.query(Content).filter_by(product_id=p.id).order_by(Content.lod).first()
 
-    def _product_native_content(self, p:mdb.Product) -> mdb.Content:
-        return self._S.query(mdb.Content).filter_by(product_id=p.id).order_by(mdb.Content.lod.desc()).first()
+    def _product_native_content(self, p:Product) -> Content:
+        return self._S.query(Content).filter_by(product_id=p.id).order_by(Content.lod.desc()).first()
 
     #
     # combining queries with data content
@@ -669,7 +669,7 @@ class Workspace(QObject):
     #     return (os.path.realpath(path), s.st_mtime, s.st_size)
 
     # @lru_cache
-    def _product_std_info(self, prod:mdb.Product):
+    def _product_std_info(self, prod:Product):
         nat = self._product_native_content(prod)
 
         std_info_dict = {
@@ -713,17 +713,17 @@ class Workspace(QObject):
         :param path: file we're checking
         :return: uuid, info, overview_content if the data is already available without import
         """
-        hits = self._S.query(mdb.Resource).filter_by(path=path).all()
+        hits = self._S.query(Resource).filter_by(path=path).all()
         if not hits:
             return None
         if len(hits)>=1:
             if len(hits) > 1:
                 LOG.warning('more than one Resource found suitable, there can be only one')
             resource = hits[0]
-            hits = self._S.query(mdb.Content).filter(
-                mdb.Content.product_id==mdb.Product.id).filter(
-                mdb.Product.resource_id==resource.id).order_by(
-                mdb.Content.lod).all()
+            hits = self._S.query(Content).filter(
+                Content.product_id==Product.id).filter(
+                Product.resource_id==resource.id).order_by(
+                Content.lod).all()
             if len(hits)>=1:
                 content = hits[0]  # presumably this is closest to LOD_OVERVIEW
                 # if len(hits)>1:
@@ -752,11 +752,11 @@ class Workspace(QObject):
     @property
     def paths_in_cache(self):
         # find non-overview non-auxiliary data files
-        return [x.path for x in self._S.query(mdb.Content).filter(mdb.Content.lod>0).all()]
+        return [x.path for x in self._S.query(Content).filter(Content.lod>0).all()]
 
     @property
     def uuids_in_cache(self):
-        prods = self._S.query(mdb.Product).all()
+        prods = self._S.query(Product).all()
         return [p.uuid for p in prods]
 
     # def _update_cache(self, path, uuid, info, data):
@@ -805,7 +805,7 @@ class Workspace(QObject):
     #     return inv, cache, total_size
 
     def recently_used_cache_paths(self, n=32):
-        return [p.resource.uri for p in self._S.query(mdb.Product).order_by(mdb.Product.atime.desc()).limit(n).all()]
+        return [p.resource.uri for p in self._S.query(Product).order_by(Product.atime.desc()).limit(n).all()]
         # FIXME "replace this completely with product list"
         # inv, cache, total_size = self._inventory_check()
         # self._inventory = inv
@@ -813,7 +813,7 @@ class Workspace(QObject):
         # # get from most recently used end of list
         # return [q[3][0] for q in cache[-n:]]
 
-    def _eject_resource_from_workspace(self, resource: mdb.Resource, defer_commit=False):
+    def _eject_resource_from_workspace(self, resource: Resource, defer_commit=False):
         """
         remove all resource contents from the database
         if the resource original path no longer exists, also purge resource and products from database
@@ -835,7 +835,7 @@ class Workspace(QObject):
     def remove_all_workspace_content_for_resource_paths(self, paths):
         total = 0
         for path in paths:
-            rsr_hits = self._S.query(mdb.Resource).filter_by(path=path).all()
+            rsr_hits = self._S.query(Resource).filter_by(path=path).all()
             for rsr in rsr_hits:
                 total += self._eject_resource_from_workspace(rsr, defer_commit=True)
         self._S.commit()
@@ -854,7 +854,7 @@ class Workspace(QObject):
         GB = 1024**3
         LOG.info("total cache size is {}GB of max {}GB".format(total_size/GB, self._max_size_gb))
         max_size = self._max_size_gb * GB
-        for res in self._S.query(mdb.Resource).order_by(mdb.Resource.atime).all():
+        for res in self._S.query(Resource).order_by(Resource.atime).all():
             if total_size < max_size:
                 break
             total_size -= self._eject_resource_from_workspace(res)
@@ -981,7 +981,6 @@ class Workspace(QObject):
         :param dsi: datasetinfo dictionary or UUID of a dataset
         :return: True if successfully deleted, False if not found
         """
-        FIXME
         if isinstance(dsi, dict):
             name = dsi[INFO.NAME]
         else:
@@ -1016,7 +1015,7 @@ class Workspace(QObject):
             dsi_or_uuid = UUID(dsi_or_uuid)
         prod = self._product_with_uuid(dsi_or_uuid)
         prod.touch()
-        content = self._S.query(mdb.Content).filter_by(mdb.Content.product_id==prod.id).order_by(mdb.Content.lod.desc()).first()
+        content = self._S.query(Content).filter_by(Content.product_id==prod.id).order_by(Content.lod.desc()).first()
         content.touch()
         self._S.commit()  # flush any pending updates to workspace db file
         return self._cached_arrays_for_content(content)

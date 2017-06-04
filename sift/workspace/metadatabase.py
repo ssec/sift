@@ -170,6 +170,11 @@ class Product(ProxiedDictMixin, Base):
     # native resolution information - see Content for projection details at different LODs
     resolution = Column(Integer, nullable=True)  # meters max resolution, e.g. 500, 1000, 2000, 4000
 
+    # derived / algebraic layers have a symbol table and an expression
+    # typically Content objects for algebraic layers cache calculation output
+    symbols = relationship("SymbolKeyValue", backref=backref("product", cascade="all"))
+    expression = Column(Unicode, nullable=True)
+
     # descriptive - move these to INFO keys
     # units = Column(Unicode, nullable=True)  # udunits compliant units, e.g. 'K'
     # label = Column(Unicode, nullable=True)  # "AHI Refl B11"
@@ -214,6 +219,15 @@ class ProductKeyValue(Base):
     # relationship: .product
     value = Column(PickleType)
 
+class SymbolKeyValue(Base):
+    """
+    derived layers have a symbol table which becomes namespace used by expression
+    """
+    __tablename__ = 'algebraic_symbol_key_values'
+    product_id = Column(ForeignKey(Product.id), primary_key=True)
+    key = Column(Unicode, primary_key=True)
+    # relationship: .product
+    value = Column(PickleType, nullable=True)  # UUID object typically
 
 class Content(ProxiedDictMixin, Base):
     """
