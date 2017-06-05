@@ -2,18 +2,28 @@
 # -*- coding: utf-8 -*-
 """
 workspace.py
-~~~~~~~~~~~~
+============
 
-PURPOSE
-Implement Workspace, a singleton object which manages large amounts of data
-- background loading, up to and including reprojection
-- providing memory-compatible, stride-able arrays
-- accepting data from external sources written in arbitrary languages
+OVERVIEW
+Implement Workspace, a singleton object which manages large amounts of data and caches local content in memory-compatible form
 
-REFERENCES
+Workspace
+  of Products
+    retrieved from Resources and
+    represented by multidimensional Content
+      each of which has data,
+      coverage, and
+      sparsity arrays in separate workspace flat files
 
+Workspace responsibilities include:
+- understanding projections and y, x, z coordinate systems
+- subsecting data within slicing or geospatial boundaries
+- caching useful arrays as secondary content
+- performing minimized on-demand calculations, e.g. algebraic layers, in the background
+- use Importers to bring content arrays into the workspace from external resources, also in the background
+- maintain a metadatabase of what products have in-workspace content, and what products are available from external resources
+- compose Collector, which keeps track of Products within Resources outside the workspace
 
-REQUIRES
 
 NOTES
     FUTURE import sequence:
@@ -29,7 +39,7 @@ NOTES
 
 
 :author: R.K.Garcia <rayg@ssec.wisc.edu>
-:copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
+:copyright: 2014-2017 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
 import argparse
@@ -38,6 +48,7 @@ import os
 import sys
 import unittest
 from uuid import UUID, uuid1 as uuidgen
+from typing import Mapping, Set, List
 
 import numba as nb
 import numpy as np
@@ -61,15 +72,6 @@ MIN_WORKSPACE_SIZE = 8
 # first instance is main singleton instance; don't preclude the possibility of importing from another workspace later on
 TheWorkspace = None
 
-
-
-# @ctx.contextmanager
-# def cwd(newcwd):
-#     "temporarily change directories"
-#     oldcwd = os.getcwd()
-#     os.chdir(newcwd)
-#     yield
-#     os.chdir(oldcwd)
 
 @nb.jit(nopython=True, nogil=True)
 def mask_from_coverage_sparsity_2d(mask: np.ndarray, coverage: np.ndarray, sparsity: np.ndarray):
@@ -140,6 +142,28 @@ class ActiveContent(QObject):
         shape = tuple(x[1] for x in rcl_shape)
         return rcl, shape
 
+    @classmethod
+    def can_attach(cls, wsd:str, c:Content):
+        """
+        Is this content available in the workspace?
+        Args:
+            wsd: workspace realpath
+            c: Content metadatabase entry
+
+        Returns:
+            bool
+        """
+        path = os.path.join(wsd, c.path)
+        return os.access(path, os.R_OK) and (os.stat(path).st_size > 0)
+
+    @property
+    def data(self):
+        """
+        Returns: content data (np.ndarray)
+        """
+        # FIXME: apply sparsity, coverage, and missing value masks
+        return self._data
+
     def _update_mask(self):
         """
         merge sparsity and coverage mask to a standard maskedarray mask
@@ -148,7 +172,8 @@ class ActiveContent(QObject):
         # FIXME: beware the race conditions with this
         # FIXME: it would be better to lazy-eval the mask, assuming coverage and sparsity << data
         if self._mask is None:
-            self._mask = mask = np.zeros_like(self._data, dtype=bool)
+            # self._mask = mask = np.zeros_like(self._data, dtype=bool)
+            self._mask = mask = ~np.isfinite(self._data)
         else:
             mask = self._mask
             mask[:] = False
@@ -202,10 +227,8 @@ class Workspace(QObject):
     _own_cwd = None  # whether or not we created the cwd - which is also whether or not we're allowed to destroy it
     _pool = None  # process pool that importers can use for background activities, if any
     _importers = None  # list of importers to consult when asked to start an import
-    _info = None
-    _data = None
-    _available = None  # dictionary of {Content.id : ActiveContent object}
-    _inventory = None  # metadatabase instance, sqlalchemy
+    _available: Mapping[int, ActiveContent] = None  # dictionary of {Content.id : ActiveContent object}
+    _inventory: Metadatabase = None  # metadatabase instance, sqlalchemy
     _inventory_path = None  # filename to store and load inventory information (simple cache)
     _S = None  # MDB session
     _tempdir = None  # TemporaryDirectory, if it's needed (i.e. a directory name was not given)
@@ -235,7 +258,6 @@ class Workspace(QObject):
         Initialize a new or attach an existing workspace, creating any necessary bookkeeping.
         """
         super(Workspace, self).__init__()
-
         self._max_size_gb = max_size_gb if max_size_gb is not None else DEFAULT_WORKSPACE_SIZE
         if self._max_size_gb < MIN_WORKSPACE_SIZE:
             self._max_size_gb = MIN_WORKSPACE_SIZE
@@ -254,8 +276,7 @@ class Workspace(QObject):
         else:
             self._own_cwd = False
             self._init_inventory_existing_datasets()
-        self._data = {}
-        self._info = {}
+        self._available = {}
         self._importers = [x() for x in self.IMPORT_CLASSES]
         global TheWorkspace  # singleton
         if TheWorkspace is None:
@@ -269,8 +290,18 @@ class Workspace(QObject):
         should_init = os.path.exists(self._inventory_path)
         self._inventory = md = Metadatabase('sqlite://' + self._inventory_path)
         if should_init:
+            LOG.debug('initializing database at {}'.format(self._inventory_path))
             md.create_tables()
         self._S = md.session()
+
+    def _purge_missing_content(self):
+        to_purge = []
+        for c in self._S.query(Content).all():
+            if not ActiveContent.can_attach(self.cwd, c):
+                LOG.warning("purging missing content {}".format(c.path))
+                to_purge.append(c)
+        [self._S.delete(c) for c in to_purge]
+        self._S.commit()
 
     def _init_inventory_existing_datasets(self):
         """
@@ -280,7 +311,8 @@ class Workspace(QObject):
         :return:
         """
         # attach the database, creating it if needed
-        return self._init_create_workspace()
+        self._init_create_workspace()
+        self._purge_missing_content()
 
     def _store_inventory(self):
         """
@@ -293,12 +325,11 @@ class Workspace(QObject):
     #  data array handling
     #
 
-    def _ws_path(self, rel_path):
-        return self._ws_path(rel_path)
-
     def _remove_content_files_from_workspace(self, c: Content ):
         total = 0
         for filename in [c.path, c.coverage_path, c.sparsity_path]:
+            if not filename:
+                continue
             pn = self._ws_path(filename)
             if os.path.exists(pn):
                 os.remove(pn)
@@ -327,22 +358,13 @@ class Workspace(QObject):
     #
 
     def _product_with_uuid(self, uuid) -> Product:
-        return self._S.query(Product).filter_by(uuid=uuid).first()
-
-    def _content_ordered_by_lod(self, p:Product):
-        """
-        return content entries ordered by ascending LOD, i.e. lowest (overview) to highest (native)
-        :param p: Product
-        :return: tuple of Content entries
-        """
-        cs = tuple(self._S.query(Content).filter_by(product_id=p.id).order_by(Content.lod).all())
-        return cs
+        return self._S.query(Product).filter_by(uuid_str=str(uuid)).first()
 
     def _product_overview_content(self, p:Product) -> Content:
-        return self._S.query(Content).filter_by(product_id=p.id).order_by(Content.lod).first()
+        return None if 0==len(p.content) else p.content[0]
 
     def _product_native_content(self, p:Product) -> Content:
-        return self._S.query(Content).filter_by(product_id=p.id).order_by(Content.lod.desc()).first()
+        return None if 0==len(p.content) else p.content[-1]  # highest LOD
 
     #
     # combining queries with data content
@@ -378,17 +400,8 @@ class Workspace(QObject):
             sz = sum(os.path.getsize(os.path.join(root, name)) for name in files)
             LOG.debug('%d bytes in %s' % (sz, root))
 
+        # FUTURE: check that every file has a Content that it belongs to; warn if not
         return total
-
-    # @staticmethod
-    # def _key_for_path(path):
-    #     if not os.path.exists(path):
-    #         return None
-    #     s = os.stat(path)
-    #     return (os.path.realpath(path), s.st_mtime, s.st_size)
-
-    # @lru_cache
-
 
 #----------------------------------------------------------------------
     def get_info(self, dsi_or_uuid, lod=None):
@@ -399,12 +412,13 @@ class Workspace(QObject):
         """
         if isinstance(dsi_or_uuid, str):
             dsi_or_uuid = UUID(dsi_or_uuid)
+        elif not isinstance(dsi_or_uuid, UUID):
+            dsi_or_uuid = dsi_or_uuid[INFO.UUID]
         # look up the product for that uuid
         prod = self._product_with_uuid(dsi_or_uuid)
         if not prod or not prod.content:  # then it hasn't been loaded
             return None
-        return prod.info
-
+        return prod.info  # mapping semantics for database fields, as well as key-value fields
 
     def _check_cache(self, path):
         """
@@ -419,99 +433,36 @@ class Workspace(QObject):
             if len(hits) > 1:
                 LOG.warning('more than one Resource found suitable, there can be only one')
             resource = hits[0]
-            hits = self._S.query(Content).filter(
+            hits = list(self._S.query(Content).filter(
                 Content.product_id == Product.id).filter(
                 Product.resource_id == resource.id).order_by(
-                Content.lod).all()
+                Content.lod).all())
             if len(hits)>=1:
                 content = hits[0]  # presumably this is closest to LOD_OVERVIEW
                 # if len(hits)>1:
                 #     LOG.warning('more than one Content found suitable, there can be only one')
                 cac = self._cached_arrays_for_content(content)
-                return content.product.uuid, content.product.info, cac.data
-
-        # key = self._key_for_path(path)
-        # nfo = self._inventory.get(key, None)
-        # if nfo is None:
-        #     return None
-        # uuid, info, data_info = nfo
-        # dfilename, dtype, shape = data_info
-        # if dfilename is None:
-        #     LOG.debug("No data loaded from {}".format(path))
-        #     data = None
-        # else:
-        #     dpath = self._ws_path(dfilename)
-        #     if not os.path.exists(dpath):
-        #         del self._inventory[key]
-        #         self._store_inventory()
-        #         return None
-        #     data = np.memmap(dpath, dtype=dtype, mode='c', shape=shape)
-        # return uuid, info, data
+                if not cac:
+                    LOG.error('unable to attach content')
+                    data = None
+                else:
+                    data = cac.data
+                return content.product.uuid, content.product.info, data
 
     @property
     def paths_in_cache(self):
         # find non-overview non-auxiliary data files
         # FIXME: also need to include coverage and sparsity paths
-        return [x.path for x in self._S.query(Content).filter(Content.lod>0).all()]
+        return [x.path for x in self._S.query(Content).all()]
 
     @property
     def uuids_in_cache(self):
         prods = self._S.query(Product).all()
         return [p.uuid for p in prods]
 
-    # def _update_cache(self, path, uuid, info, data):
-    #     """
-    #     add or update the cache and put it to disk
-    #     :param path: path to get key from
-    #     :param uuid: uuid the data's been assigned
-    #     :param info: dataset info dictionary
-    #     :param data: numpy.memmap backed by a file in the workspace
-    #     :return:
-    #     """
-    #     key = self._key_for_path(path)
-    #     prev_nfo = self._inventory.get(key, (uuid, None, (None, None, None)))
-    #
-    #     if info is None:
-    #         info = prev_nfo[1]
-    #
-    #     if data is None:
-    #         data_info = prev_nfo[2]
-    #     else:
-    #         data_info = (os.path.split(data.filename)[1], data.dtype, data.shape)
-    #
-    #     nfo = (uuid, info, data_info)
-    #     self._inventory[key] = nfo
-    #     self._store_inventory()
-
-
-    # def _inventory_check(self):
-    #     "return revised_inventory_dict, [(access-time, size, path, key), ...], total_size"
-    #     cache = []
-    #     inv = dict(self._inventory)
-    #     total_size = 0
-    #     for key,nfo in self._inventory.items():
-    #         uuid,info,data_info = nfo
-    #         filename, dtype, shape = data_info
-    #         path = self._ws_path(filename)
-    #         if os.path.exists(path):
-    #             st = os.stat(path)
-    #             cache.append((st.st_atime, st.st_size, path, key))
-    #             total_size += st.st_size
-    #         else:
-    #             LOG.info('removing stale {}'.format(key))
-    #             del inv[key]
-    #     # sort by atime
-    #     cache.sort()
-    #     return inv, cache, total_size
-
     def recently_used_resource_paths(self, n=32):
-        return [p.resource.uri for p in self._S.query(Product).order_by(Product.atime.desc()).limit(n).all()]
+        return list(p.resource.uri for p in self._S.query(Product).order_by(Product.atime.desc()).limit(n).all())
         # FIXME "replace this completely with product list"
-        # inv, cache, total_size = self._inventory_check()
-        # self._inventory = inv
-        # self._store_inventory()
-        # # get from most recently used end of list
-        # return [q[3][0] for q in cache[-n:]]
 
     def _eject_resource_from_workspace(self, resource: Resource, defer_commit=False):
         """
@@ -561,8 +512,8 @@ class Workspace(QObject):
             # remove all content for lowest atimes until
 
     def close(self):
-        self._S.commit()
         self._clean_cache()
+        self._S.commit()
 
     def idle(self):
         """
@@ -573,10 +524,29 @@ class Workspace(QObject):
         return False
 
     def get_metadata(self, uuid_or_path):
+        """
+        return metadata dictionary for a given product or the product being offered by a resource path (see get_info)
+        Args:
+            uuid_or_path: product uuid, or path to the resource path it lives in
+
+        Returns:
+            metadata (Mapping), metadata for the product at this path; FUTURE note more than one product may be in a single file
+        """
         if isinstance(uuid_or_path, UUID):
-            return self._info[uuid_or_path]
+            return self.get_info(uuid_or_path)  # get product metadata
         else:
-            return self._inventory[self._key_for_path(uuid_or_path)][1]
+            hits = list(self._S.query(Resource).filter_by(path=uuid_or_path).all())
+            if not hits:
+                return None
+            if len(hits) >= 1:
+                if len(hits) > 1:
+                    raise EnvironmentError('more than one Resource fits this path')
+                resource = hits[0]
+                if len(resource.product) >= 1:
+                    if len(resource.product) > 1:
+                        LOG.warning('more than one Product in this Resource, this query should be deprecated')
+                    prod = resource.product[0]
+                    return prod.info
 
     def import_image(self, source_path=None, source_uri=None, allow_cache=True):
         """

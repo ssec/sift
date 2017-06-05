@@ -6,18 +6,9 @@ metadatabase.py
 
 PURPOSE
 SQLAlchemy database tables of metadata used by Workspace to manage its local cache.
-Incidentally used by manage adjacency matrix (DataMatrix).
 
 
 OVERVIEW
-
-Workspace
-of Products
-retrieved from Resources and
-represented by multidimensional Content
-each of which has data, coverage, and sparsity arrays in separate workspace flat files
-
-The workspace caches content, which represents products, the native form of which resides in a file
 
 Resource : a file containing products, somewhere in the filesystem, or a resource on a remote system we can access (openDAP etc)
  |_ Product* : product stored in a resource
@@ -284,6 +275,9 @@ class Product(Base):
     @property
     def path(self):
         return self.resource.path
+
+    def can_be_activated_without_importing(self):
+        return len(self.content)>0
 
     INFO_TO_FIELD = {
         INFO.SHORT_NAME: 'name',
