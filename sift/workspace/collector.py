@@ -25,6 +25,7 @@ from abc import ABC, abstractmethod, abstractproperty
 from typing import Union, Set, List, Iterable
 from .metadatabase import Product, Metadatabase, Resource
 from sqlalchemy.orm import Session
+from .goesr_pug import PugL1bTools
 
 LOG = logging.getLogger(__name__)
 
@@ -36,6 +37,17 @@ class aHunter(ABC):
 
     def __init__(self, db: Metadatabase):
         self._DB = db
+
+    def product_for(self, realpath:str, fullname:str):
+        """
+        check database to see if a given path + product name
+        Args:
+            realpath:
+            fullname:
+
+        Returns:
+
+        """
 
     @abstractmethod
     def hunt_dir(self, S: Session, dir_path:str) -> int:
@@ -77,6 +89,42 @@ class aHunter(ABC):
         if found:
             S.commit()
 
+
+class GoesRHunter(aHunter):
+
+    def get_metadata(self, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
+
+        d = {}
+        # nc = nc4.Dataset(source_path)
+        pug = PugL1bTools(source_path)
+
+        d.update(self._metadata_for_abi_path(pug))
+        d[INFO.UUID] = dest_uuid
+        d[INFO.DATASET_NAME] = os.path.split(source_path)[-1]
+        d[INFO.PATHNAME] = source_path
+        d[INFO.KIND] = KIND.IMAGE
+
+        d[INFO.PROJ] = pug.proj4_string
+        # get nadir-meter-ish projection coordinate vectors to be used by proj4
+        y,x = pug.proj_y, pug.proj_x
+        d[INFO.ORIGIN_X] = x[0]
+        d[INFO.ORIGIN_Y] = y[0]
+
+        midyi, midxi = int(y.shape[0] / 2), int(x.shape[0] / 2)
+        # PUG states radiance at index [0,0] extends between coordinates [0,0] to [1,1] on a quadrille
+        # centers of pixels are therefore at +0.5, +0.5
+        # for a (e.g.) H x W image this means [H/2,W/2] coordinates are image center
+        # for now assume all scenes are even-dimensioned (e.g. 5424x5424)
+        # given that coordinates are evenly spaced in angular -> nadir-meters space,
+        # technically this should work with any two neighbor values
+        d[INFO.CELL_WIDTH] = x[midxi+1] - x[midxi]
+        d[INFO.CELL_HEIGHT] = y[midyi+1] - y[midyi]
+
+        shape = pug.shape
+        d[INFO.SHAPE] = shape
+        generate_guidebook_metadata(d)
+        LOG.debug(repr(d))
+        return d
 
 
 

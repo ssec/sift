@@ -112,9 +112,9 @@ class Resource(Base):
 
     # {scheme}://{path}/{name}?{query}, default is just an absolute path in filesystem
     scheme = Column(Unicode, nullable=True)  # uri scheme for the content (the part left of ://), assume file:// by default
-    path = Column(Unicode)  # directory or path component not including name
-    name = Column(Unicode)  # the name of the file or resource, incl suffix but not query
+    path = Column(Unicode)  # '/' separated real path
     query = Column(Unicode, nullable=True)  # query portion of a URI or URL, e.g. 'interval=1m&stride=2'
+
     mtime = Column(DateTime)  # last observed mtime of the file, for change checking
     atime = Column(DateTime)  # last time this file was accessed by application
 
@@ -122,10 +122,10 @@ class Resource(Base):
 
     @property
     def uri(self):
-        return os.path.join(self.path, self.name) if not self.scheme else "{}://{}/{}".format(self.scheme, self.path, self.name)
+        return self.path if (not self.scheme or self.scheme=='file') else "{}://{}/{}{}".format(self.scheme, self.path, self.name, '' if not self.query else '?' + self.query)
 
-    def touch(self):
-        self.atime = datetime.utcnow()
+    def touch(self, when=None):
+        self.atime = datetime.utcnow() if not when else when
 
     def exists(self):
         if self.scheme not in {None, 'file'}:
@@ -149,7 +149,7 @@ class Product(ProxiedDictMixin, Base):
     # identity information
     id = Column(Integer, primary_key=True)
     resource_id = Column(Integer, ForeignKey(Resource.id))
-    # relationship: .source
+    # relationship: .resource
     uuid_str = Column(String, nullable=False, unique=True)  # UUID representing this data in SIFT, or None if not in cache
 
     @property
@@ -165,22 +165,18 @@ class Product(ProxiedDictMixin, Base):
     atime = Column(DateTime)  # last time this file was accessed by application
 
     # cached metadata provided by the file format handler
-    platform = Column(String)  # platform or satellite name e.g. "GOES-16", "Himawari-8"
-    short_name = Column(String)  # product identifier eg "B01", "B02"
+    name = Column(String)  # product identifier eg "B01", "B02"  # resource + shortname should be sufficient to identify the data
+
+    platform = Column(String)  # platform or satellite name e.g. "GOES-16", "Himawari-8"; should match PLATFORM enum
     standard_name = Column(String, nullable=True)
 
     # times
     display_time = Column(DateTime)  # normalized instantaneous scheduled observation time e.g. 20170122T2310
-    obs_time = Column(DateTime, nullable=True)  # actual observation time start
-    obs_duration = Column(Interval, nullable=True)  # actual observation duration
+    obs_start = Column(DateTime)  # actual observation time start
+    obs_end = Column(DateTime)  # actual observation end time
 
     # native resolution information - see Content for projection details at different LODs
     resolution = Column(Integer, nullable=True)  # meters max resolution, e.g. 500, 1000, 2000, 4000
-
-    # derived / algebraic layers have a symbol table and an expression
-    # typically Content objects for algebraic layers cache calculation output
-    symbols = relationship("SymbolKeyValue", backref=backref("product", cascade="all"))
-    expression = Column(Unicode, nullable=True)
 
     # descriptive - move these to INFO keys
     # units = Column(Unicode, nullable=True)  # udunits compliant units, e.g. 'K'
@@ -196,25 +192,14 @@ class Product(ProxiedDictMixin, Base):
     _proxied = association_proxy("kwinfo", "value",
                                  creator=lambda key, value: ProductKeyValue(key=key, value=value))
 
-    # def _iter_info(self):
-    #     yield INFO.PLATFORM, self.platform
-    #     yield INFO.SHORT_NAME, self.short_name
-    #     yield INFO.STANDARD_NAME, self.standard_name
-    #     yield INFO.DISPLAY_TIME, self.display_time
-    #     yield from self.kwinfo.items()
-    #
-    # @property
-    # def info(self):
-    #     """
-    #     return an info dictionary
-    #     :return:
-    #     """
-    #     return dict(self._iter_info())
+    # derived / algebraic layers have a symbol table and an expression
+    # typically Content objects for algebraic layers cache calculation output
+    symbols = relationship("SymbolKeyValue", backref=backref("product", cascade="all"))
+    expression = Column(Unicode, nullable=True)
 
     def touch(self, when=None):
         self.atime = when = when or datetime.utcnow()
         self.resource.touch(when)
-
 
 class ProductKeyValue(Base):
     """
@@ -449,7 +434,7 @@ class tests(unittest.TestCase):
         pass
 
     def test_insert(self):
-        from datetime import datetime
+        from datetime import datetime, timedelta
         mdb = Metadatabase.instance('sqlite://')
         mdb.create_tables()
         s = mdb.session()
@@ -457,7 +442,7 @@ class tests(unittest.TestCase):
         uu = uuid1()
         when = datetime.utcnow()
         f = Resource(path='', name='foo.bar', mtime=when, atime=when, format=None)
-        p = Product(uuid_str=str(uu), resource=f, platform='TEST', short_name='B00')
+        p = Product(uuid_str=str(uu), resource=f, platform='TEST', name='B00', obs_start=when, obs_end=when+timedelta(minutes=5))
         p['test_key'] = u'test_value'
         p['turkey'] = u'cobbler'
         s.add(f)

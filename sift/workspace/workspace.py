@@ -80,6 +80,7 @@ def mask_from_coverage_sparsity_2d(mask: np.ndarray, coverage: np.ndarray, spars
         coverage (np.array) : coverage array to stretch across the mask
         sparsity (np.array) : sparsity array to repeat across the mask
     """
+    # FIXME: we should not be using this without slicing to the part of interest; else we can eat a whole lot of memory
     h,w = mask.shape
     cov_rpt_y, cov_rpt_x = h // coverage.shape[0], w // coverage.shape[1]
     spr_h, spr_w = sparsity.shape
@@ -106,6 +107,7 @@ class ActiveContent(QObject):
     _sparsity = None
 
     def __init__(self, workspace_cwd: str, C: Content):
+        super(ActiveContent, self).__init__()
         self._C = C
         self._wsd = workspace_cwd
         if workspace_cwd is None and C is None:
@@ -387,7 +389,7 @@ class Workspace(QObject):
         nat = self._product_native_content(prod)
 
         std_info_dict = {
-            INFO.NAME: prod.short_name,
+            INFO.NAME: prod.name,
             INFO.PATH: prod.uri,
             INFO.UUID: prod.uuid,
             INFO.PROJ: nat.proj4,
@@ -410,6 +412,8 @@ class Workspace(QObject):
             dsi_or_uuid = UUID(dsi_or_uuid)
         # look up the product for that uuid
         prod = self._product_with_uuid(dsi_or_uuid)
+        if not prod or not prod.contents:  # then it hasn't been loaded
+            return None
         prod.touch()
         self._S.commit()  # flush any pending updates to workspace db file
         if prod is None:
