@@ -388,44 +388,22 @@ class Workspace(QObject):
     #     return (os.path.realpath(path), s.st_mtime, s.st_size)
 
     # @lru_cache
-    def _product_std_info(self, prod:Product):
-        nat = self._product_native_content(prod)
 
-        std_info_dict = {
-            INFO.NAME: prod.name,
-            INFO.PATH: prod.uri,
-            INFO.UUID: prod.uuid,
-            INFO.PROJ: nat.proj4,
-            INFO.CELL_WIDTH: nat.cell_width,
-            INFO.CELL_HEIGHT: nat.cell_height,
-            INFO.ORIGIN_X: nat.origin_x,
-            INFO.ORIGIN_Y: nat.origin_y,
-        }
-        return std_info_dict
 
+#----------------------------------------------------------------------
     def get_info(self, dsi_or_uuid, lod=None):
         """
         :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
         :param lod: desired level of detail to focus
         :return:
         """
-        from collections import ChainMap
-
         if isinstance(dsi_or_uuid, str):
             dsi_or_uuid = UUID(dsi_or_uuid)
         # look up the product for that uuid
         prod = self._product_with_uuid(dsi_or_uuid)
-        if not prod or not prod.contents:  # then it hasn't been loaded
+        if not prod or not prod.content:  # then it hasn't been loaded
             return None
-        prod.touch()
-        self._S.commit()  # flush any pending updates to workspace db file
-        if prod is None:
-            return None
-
-        return ChainMap(prod, self._product_std_info(prod))  # any updates go to prod k-v table
-
-
-#----------------------------------------------------------------------
+        return prod.info
 
 
     def _check_cache(self, path):
@@ -543,8 +521,8 @@ class Workspace(QObject):
         :return: number of bytes freed from the workspace
         """
         total = 0
-        for prod in resource.products:
-            for con in prod.contents:
+        for prod in resource.product:
+            for con in prod.content:
                 total += self._remove_content_files_from_workspace(con)
                 self._S.delete(con)
 

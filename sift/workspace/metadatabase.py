@@ -45,6 +45,8 @@ from datetime import datetime, timedelta
 from sift.common import INFO
 from functools import reduce
 from uuid import UUID
+from collections import ChainMap
+from typing import Mapping
 
 from sqlalchemy import Column, Integer, String, UnicodeText, Unicode, ForeignKey, DateTime, Interval, PickleType, Float, create_engine
 from sqlalchemy.orm import Session, relationship, sessionmaker, backref
@@ -58,36 +60,36 @@ LOG = logging.getLogger(__name__)
 # ref   http://docs.sqlalchemy.org/en/latest/_modules/examples/vertical/dictlike.html
 #
 
-class ProxiedDictMixin(object):
-    """Adds obj[key] access to a mapped class.
-
-    This class basically proxies dictionary access to an attribute
-    called ``_proxied``.  The class which inherits this class
-    should have an attribute called ``_proxied`` which points to a dictionary.
-
-    """
-
-    def __len__(self):
-        return len(self._proxied)
-
-    def __iter__(self):
-        return iter(self._proxied)
-
-    def __getitem__(self, key):
-        # if key in INFO:
-        #     v = getattr(self, str(key), INFO)
-        #     if v is not INFO:
-        #         return v
-        return self._proxied[key]
-
-    def __contains__(self, key):
-        return key in self._proxied
-
-    def __setitem__(self, key, value):
-        self._proxied[key] = value
-
-    def __delitem__(self, key):
-        del self._proxied[key]
+# class ProxiedDictMixin(object):
+#     """Adds obj[key] access to a mapped class.
+#
+#     This class basically proxies dictionary access to an attribute
+#     called ``_proxied``.  The class which inherits this class
+#     should have an attribute called ``_proxied`` which points to a dictionary.
+#
+#     """
+#
+#     def __len__(self):
+#         return len(self._proxied)
+#
+#     def __iter__(self):
+#         return iter(self._proxied)
+#
+#     def __getitem__(self, key):
+#         # if key in INFO:
+#         #     v = getattr(self, str(key), INFO)
+#         #     if v is not INFO:
+#         #         return v
+#         return self._proxied[key]
+#
+#     def __contains__(self, key):
+#         return key in self._proxied
+#
+#     def __setitem__(self, key, value):
+#         self._proxied[key] = value
+#
+#     def __delitem__(self, key):
+#         del self._proxied[key]
 
 
 
@@ -118,7 +120,7 @@ class Resource(Base):
     mtime = Column(DateTime)  # last observed mtime of the file, for change checking
     atime = Column(DateTime)  # last time this file was accessed by application
 
-    products = relationship("Product", backref=backref("resource", cascade="all"))
+    product = relationship("Product", backref=backref("resource", cascade="all"))
 
     @property
     def uri(self):
@@ -133,8 +135,52 @@ class Resource(Base):
         return os.path.exists(self.path)
 
 
+class ChainRecordWithDict(Mapping):
+    """
+    allow Product database entries and key-value table to act as a coherent dictionary
+    """
+    def __init__(self, obj, field_keys, more):
+        self._obj, self._field_keys, self._more = obj, field_keys, more
 
-class Product(ProxiedDictMixin, Base):
+    def keys(self):
+        return set(self._more.keys()) + set(self._field_keys.keys)
+
+    def items(self):
+        for k in self.keys():
+            yield k, self[k]
+
+    def values(self):
+        for k in self.keys():
+            yield self[k]
+
+    def __len__(self):
+        return len(self.keys())
+
+    def __iter__(self):
+        yield from self.items()
+
+    def __contains__(self, item):
+        return item in self.keys()
+
+    def __getitem__(self, key):
+        if key in self._field_keys:
+            return self._obj.__dict__[key]
+        return self._more[key]
+
+    def __setitem__(self, key, value):
+        if key in self._field_keys:
+            self._obj.__dict__[key] = value
+            # setattr(self._obj, key, value)
+        else:
+            self._more[key] = value
+
+    def __delitem__(self, key):
+        if key in self._field_keys:
+            raise KeyError('cannot remove key {}'.format(key))
+        del self._more[key]
+
+
+class Product(Base):
     """
     Primary entity being tracked in metadatabase
     One or more StoredProduct are held in a single File
@@ -184,18 +230,64 @@ class Product(ProxiedDictMixin, Base):
     # description = Column(UnicodeText, nullable=True)
 
     # link to workspace cache files representing this data, not lod=0 is overview
-    contents = relationship("Content", backref=backref("product", cascade="all"))
+    content = relationship("Content", backref=backref("product", cascade="all"), order_by=lambda: Content.lod)
 
     # link to key-value further information
     # this provides dictionary style access to key-value pairs
-    kwinfo = relationship("ProductKeyValue", collection_class=attribute_mapped_collection('key'))
-    _proxied = association_proxy("kwinfo", "value",
+    _key_values = relationship("ProductKeyValue", collection_class=attribute_mapped_collection('key'))
+    _kwinfo = association_proxy("_key_values", "value",
                                  creator=lambda key, value: ProductKeyValue(key=key, value=value))
 
     # derived / algebraic layers have a symbol table and an expression
     # typically Content objects for algebraic layers cache calculation output
-    symbols = relationship("SymbolKeyValue", backref=backref("product", cascade="all"))
+    symbol = relationship("SymbolKeyValue", backref=backref("product", cascade="all"))
     expression = Column(Unicode, nullable=True)
+
+    info = None
+
+    def __init__(self, *args, **kwargs):
+        super(Product, self).__init__(*args, **kwargs)
+        self.info = ChainRecordWithDict(self, self.INFO_TO_FIELD, self._kwinfo)
+
+    @property
+    def proj4(self):
+        nat = self.content[-1] if len(self.content) else None
+        return nat.proj4 if nat else None
+
+    @property
+    def cell_height(self):
+        nat = self.content[-1] if len(self.content) else None
+        return nat.cell_height if nat else None
+
+    @property
+    def cell_width(self):
+        nat = self.content[-1] if len(self.content) else None
+        return nat.cell_width if nat else None
+
+    @property
+    def origin_x(self):
+        nat = self.content[-1] if len(self.content) else None
+        return nat.origin_x if nat else None
+
+    @property
+    def origin_y(self):
+        nat = self.content[-1] if len(self.content) else None
+        return nat.origin_y if nat else None
+
+    @property
+    def path(self):
+        return self.resource.path
+
+    INFO_TO_FIELD = {
+        INFO.SHORT_NAME: 'name',
+        INFO.PATHNAME: 'path',
+        INFO.UUID: 'uuid',
+        INFO.PROJ: 'proj4',
+        INFO.CELL_WIDTH: 'cell_width',
+        INFO.CELL_HEIGHT: 'cell_height',
+        INFO.ORIGIN_X: 'origin_x',
+        INFO.ORIGIN_Y: 'origin_y'
+    }
 
     def touch(self, when=None):
         self.atime = when = when or datetime.utcnow()
@@ -221,7 +313,7 @@ class SymbolKeyValue(Base):
     # relationship: .product
     value = Column(PickleType, nullable=True)  # UUID object typically
 
-class Content(ProxiedDictMixin, Base):
+class Content(Base):
     """
     represent flattened product data files in cache (i.e. cache content)
     typically memory-map ready data (np.memmap)
@@ -279,9 +371,26 @@ class Content(ProxiedDictMixin, Base):
 
     # link to key-value further information; primarily a hedge in case specific information has to be squirreled away for later consideration for main content table
     # this provides dictionary style access to key-value pairs
-    info = relationship("ContentKeyValue", collection_class=attribute_mapped_collection('key'))
-    _proxied = association_proxy("info", "value",
+    _key_values = relationship("ContentKeyValue", collection_class=attribute_mapped_collection('key'))
+    _kwinfo = association_proxy("_key_values", "value",
                                  creator=lambda key, value: ContentKeyValue(key=key, value=value))
+    info = None
+
+    INFO_TO_FIELD = {
+        INFO.CELL_HEIGHT: 'cell_height',
+        INFO.CELL_WIDTH: 'cell_width',
+        INFO.PROJ: 'proj4',
+        INFO.SHORT_NAME: 'name',
+        INFO.PATHNAME: 'path'
+    }
+
+    def __init__(self, *args, **kwargs):
+        super(Content, self).__init__(*args, **kwargs)
+        self.info = ChainRecordWithDict(self, self.INFO_TO_FIELD, self._kwinfo)
+
+    @property
+    def name(self):
+        return self.product.name
 
     @property
     def uuid(self):
@@ -443,16 +552,16 @@ class tests(unittest.TestCase):
         when = datetime.utcnow()
         f = Resource(path='/path/to/foo.bar', mtime=when, atime=when, format=None)
         p = Product(uuid_str=str(uu), resource=f, name='B00 Refl', obs_start=when, obs_end=when+timedelta(minutes=5))
-        p['test_key'] = u'test_value'
-        p['turkey'] = u'cobbler'
+        p.info['test_key'] = u'test_value'
+        p.info['turkey'] = u'cobbler'
         s.add(f)
         s.add(p)
         s.commit()
         self.assertEqual(p.uuid, uu)
         q = s.query(Product).filter_by(resource=f).first()
-        self.assertEqual(q['test_key'], u'test_value')
+        self.assertEqual(q.info['test_key'], u'test_value')
         # self.assertEquals(q[INFO.UUID], q.uuid)
-        self.assertEqual(q['turkey'], u'cobbler')
+        self.assertEqual(q.info['turkey'], p.info['turkey'])
 
 def _debug(type, value, tb):
     "enable with sys.excepthook = debug"
