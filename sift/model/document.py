@@ -478,9 +478,17 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             if p.uuid in uuids:
                 yield p
 
+    def prez_for_uuid(self, uuid, lset=None):
+        for p in self.prez_for_uuids((uuid,), lset=lset):
+            return p
+
     def colormap_for_uuids(self, uuids, lset=None):
         for p in self.prez_for_uuids(uuids, lset=lset):
             yield p.colormap
+
+    def colormap_for_uuid(self, uuid, lset=None):
+        for p in self.colormap_for_uuids((uuid,), lset=lset):
+            return p
 
     def valid_range_for_uuid(self, uuid):
         # Limit ourselves to what information
@@ -832,9 +840,13 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         L = self.current_layer_set
         for idx, pz, layer in self.current_layers_where(**query):
             new_pz = pz._replace(climits=clims)
-            nfo[layer.uuid] = new_pz
+            nfo[layer.uuid] = new_pz.climits
             L[idx] = new_pz
         self.didChangeColorLimits.emit(nfo)
+
+    def change_clims_for_siblings(self, uuid, clims):
+        uuids = self.channel_siblings(uuid)[0]
+        return self.change_clims_for_layers_where(clims, uuids=uuids)
 
     def flip_climits_for_layers(self, uuids=None):
         L = self.current_layer_set
@@ -846,7 +858,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         nfo = {}
         for uuid in uuids:
             for dex,pinfo in enumerate(L):
-                if pinfo.uuid==uuid:
+                if pinfo.uuid == uuid:
                     nfo[uuid] = pinfo.climits[::-1]
                     L[dex] = pinfo._replace(climits=nfo[uuid])
         self.didChangeColorLimits.emit(nfo)

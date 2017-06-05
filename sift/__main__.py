@@ -818,20 +818,6 @@ class Main(QtGui.QMainWindow):
 
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("t", self.scene_manager.next_tool))
 
-        class ColormapSlot(object):
-            def __init__(self, sgm, key='e'):
-                self.index = 0
-                self.key = key
-                self.sgm = sgm
-                self.colormaps = ALL_COLORMAPS.keys()
-
-            def __call__(self, key):
-                if key.text == self.key:
-                    self.sgm.set_colormap(self.colormaps[self.index])
-                    self.index = (self.index + 1) % len(self.colormaps)
-
-        self.scene_manager.main_canvas.events.key_release.connect(ColormapSlot(self.scene_manager))
-
     def updateLayerList(self):
         # self.ui.layers.add
         pass

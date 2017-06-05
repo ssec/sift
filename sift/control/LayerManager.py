@@ -122,8 +122,8 @@ class LayerSetsManager (QObject) :
         self.layer_sets.append(new_layer_set)
         layer_list_obj = new_layer_set.getLayerList()
         if self.set_behaviors is None :
-            self.set_behaviors = LayerStackTreeViewModel([layer_list_obj], self.document)
-        else :
+            self.set_behaviors = LayerStackTreeViewModel([layer_list_obj], self.document, parent=self.tab_widget)
+        else:
             self.set_behaviors.add_widget(layer_list_obj)
 
         # go to the tab we just created
@@ -131,6 +131,7 @@ class LayerSetsManager (QObject) :
 
     def getLayerStackListViewModel (self, ) :
         return self.set_behaviors
+
 
 class SingleLayerSetManager (QWidget) :
     """handles controls and data for a single layer list
