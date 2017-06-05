@@ -91,8 +91,8 @@ def mask_from_coverage_sparsity_2d(mask: np.ndarray, coverage: np.ndarray, spars
 
 class ActiveContent(QObject):
     """
-    ActiveContent merges numpy.memmap arrays with their corresponding Content metadata
-    Purpose: make ActiveContent a drop-in replacement for numpy arrays
+    ActiveContent composes numpy.memmap arrays with their corresponding Content metadata, and is owned by Workspace
+    Purpose: consolidate common operations on content, while factoring in things like sparsity, coverage, y, x, z arrays
     Workspace instantiates ActiveContent from metadatabase Content entries
     """
     _C = None  # my metadata
@@ -204,7 +204,7 @@ class Workspace(QObject):
     _importers = None  # list of importers to consult when asked to start an import
     _info = None
     _data = None
-    _available = None  # dictionary of {Content.id : workspace_data_arrays}
+    _available = None  # dictionary of {Content.id : ActiveContent object}
     _inventory = None  # metadatabase instance, sqlalchemy
     _inventory_path = None  # filename to store and load inventory information (simple cache)
     _S = None  # MDB session
@@ -304,6 +304,9 @@ class Workspace(QObject):
                 os.remove(pn)
                 total += os.stat(pn).st_size
         return total
+
+    def _attach_content(self, c: Content) -> ActiveContent:
+        return ActiveContent(self.cwd, c)
 
     def _cached_arrays_for_content(self, c:Content):
         """
@@ -726,6 +729,7 @@ class Workspace(QObject):
 
     def get_content(self, dsi_or_uuid, lod=None):
         """
+        By default, get the best-available (closest to native) np.ndarray-compatible view of the full dataset
         :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
         :param lod: desired level of detail to focus  (0 for overview)
         :return:

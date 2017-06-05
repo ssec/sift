@@ -161,22 +161,22 @@ class Product(ProxiedDictMixin, Base):
         self.uuid_str = str(uu)
 
     # primary handler
-    kind = Column(PickleType)  # class or callable which can perform transformations on this data in workspace
+    # kind = Column(PickleType)  # class or callable which can perform transformations on this data in workspace
     atime = Column(DateTime)  # last time this file was accessed by application
 
     # cached metadata provided by the file format handler
     name = Column(String)  # product identifier eg "B01", "B02"  # resource + shortname should be sufficient to identify the data
 
-    platform = Column(String)  # platform or satellite name e.g. "GOES-16", "Himawari-8"; should match PLATFORM enum
-    standard_name = Column(String, nullable=True)
-
+    # platform = Column(String)  # platform or satellite name e.g. "GOES-16", "Himawari-8"; should match PLATFORM enum
+    # standard_name = Column(String, nullable=True)
+    #
     # times
-    display_time = Column(DateTime)  # normalized instantaneous scheduled observation time e.g. 20170122T2310
+    # display_time = Column(DateTime)  # normalized instantaneous scheduled observation time e.g. 20170122T2310
     obs_start = Column(DateTime)  # actual observation time start
     obs_end = Column(DateTime)  # actual observation end time
 
     # native resolution information - see Content for projection details at different LODs
-    resolution = Column(Integer, nullable=True)  # meters max resolution, e.g. 500, 1000, 2000, 4000
+    # resolution = Column(Integer, nullable=True)  # meters max resolution, e.g. 500, 1000, 2000, 4000
 
     # descriptive - move these to INFO keys
     # units = Column(Unicode, nullable=True)  # udunits compliant units, e.g. 'K'
@@ -441,8 +441,8 @@ class tests(unittest.TestCase):
         from uuid import uuid1
         uu = uuid1()
         when = datetime.utcnow()
-        f = Resource(path='', name='foo.bar', mtime=when, atime=when, format=None)
-        p = Product(uuid_str=str(uu), resource=f, platform='TEST', name='B00', obs_start=when, obs_end=when+timedelta(minutes=5))
+        f = Resource(path='/path/to/foo.bar', mtime=when, atime=when, format=None)
+        p = Product(uuid_str=str(uu), resource=f, name='B00 Refl', obs_start=when, obs_end=when+timedelta(minutes=5))
         p['test_key'] = u'test_value'
         p['turkey'] = u'cobbler'
         s.add(f)
