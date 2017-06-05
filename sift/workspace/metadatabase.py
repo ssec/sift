@@ -103,7 +103,7 @@ class Resource(Base):
     held metadata regarding a file that we can access and import data into the workspace from
     resources are external to the workspace, but the workspace can keep track of them in its database
     """
-    __tablename__ = 'resources'
+    __tablename__ = 'resources_v0'
     # identity information
     id = Column(Integer, primary_key=True)
 
@@ -144,7 +144,7 @@ class Product(ProxiedDictMixin, Base):
     A StoredProduct's kind determines how its cached data is transformed to different representations for display
     additional information is stored in a key-value table addressable as product[key:str]
     """
-    __tablename__ = 'products'
+    __tablename__ = 'products_v0'
 
     # identity information
     id = Column(Integer, primary_key=True)
@@ -220,7 +220,7 @@ class ProductKeyValue(Base):
     """
     key-value pairs associated with a product
     """
-    __tablename__ = 'product_key_values'
+    __tablename__ = 'product_key_values_v0'
     product_id = Column(ForeignKey(Product.id), primary_key=True)
     key = Column(String, primary_key=True)
     # relationship: .product
@@ -230,7 +230,7 @@ class SymbolKeyValue(Base):
     """
     derived layers have a symbol table which becomes namespace used by expression
     """
-    __tablename__ = 'algebraic_symbol_key_values'
+    __tablename__ = 'algebraic_symbol_key_values_v0'
     product_id = Column(ForeignKey(Product.id), primary_key=True)
     key = Column(Unicode, primary_key=True)
     # relationship: .product
@@ -248,7 +248,7 @@ class Content(ProxiedDictMixin, Base):
     """
     # _array = None  # when attached, this is a np.memmap
 
-    __tablename__ = 'contents'
+    __tablename__ = 'contents_v0'
     id = Column(Integer, primary_key=True)
     product_id = Column(Integer, ForeignKey(Product.id))
 
@@ -267,8 +267,8 @@ class Content(ProxiedDictMixin, Base):
     path = Column(String, unique=True)  # relative to workspace, binary array of data
     rows, cols, levels = Column(Integer), Column(Integer, nullable=True), Column(Integer, nullable=True)
     dtype = Column(String, nullable=True)  # default float32; can be int16 in the future for scaled integer images for instance; should be a numpy type name
-    coeffs = Column(String, nullable=True)  # json for numpy array with polynomial coefficients for transforming native data to natural units (e.g. for scaled integers), c[0] + c[1]*x + c[2]*x**2 ...
-    values = Column(String, nullable=True)  # json for optional dict {int:string} lookup table for NaN flag fields (when dtype is float32 or float64) or integer values (when dtype is an int8/16/32/64)
+    # coeffs = Column(String, nullable=True)  # json for numpy array with polynomial coefficients for transforming native data to natural units (e.g. for scaled integers), c[0] + c[1]*x + c[2]*x**2 ...
+    # values = Column(String, nullable=True)  # json for optional dict {int:string} lookup table for NaN flag fields (when dtype is float32 or float64) or integer values (when dtype is an int8/16/32/64)
 
     # projection information for this representation of the data
     proj4 = Column(String, nullable=True)  # proj4 projection string for the data in this array, if one exists; else assume y=lat/x=lon
@@ -347,7 +347,7 @@ class ContentKeyValue(Base):
     """
     key-value pairs associated with a product
     """
-    __tablename__ = 'content_key_values'
+    __tablename__ = 'content_key_values_v0'
     product_id = Column(ForeignKey(Content.id), primary_key=True)
     key = Column(String, primary_key=True)
     value = Column(PickleType)
