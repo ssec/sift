@@ -395,7 +395,7 @@ class Workspace(QObject):
         """
         :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
         :param lod: desired level of detail to focus
-        :return:
+        :return: metadata access with mapping semantics
         """
         if isinstance(dsi_or_uuid, str):
             dsi_or_uuid = UUID(dsi_or_uuid)

@@ -243,11 +243,18 @@ class Product(Base):
     symbol = relationship("SymbolKeyValue", backref=backref("product", cascade="all"))
     expression = Column(Unicode, nullable=True)
 
-    info = None
+    _info = None  # database fields and key-value dictionary merged as one transparent mapping
 
     def __init__(self, *args, **kwargs):
         super(Product, self).__init__(*args, **kwargs)
-        self.info = ChainRecordWithDict(self, self.INFO_TO_FIELD, self._kwinfo)
+        self._info = ChainRecordWithDict(self, self.INFO_TO_FIELD, self._kwinfo)
+
+    @property
+    def info(self):
+        """
+        :return: mapping merging INFO-compatible database fields with key-value dictionary access pattern
+        """
+        return self._info
 
     @property
     def proj4(self):
@@ -374,7 +381,6 @@ class Content(Base):
     _key_values = relationship("ContentKeyValue", collection_class=attribute_mapped_collection('key'))
     _kwinfo = association_proxy("_key_values", "value",
                                  creator=lambda key, value: ContentKeyValue(key=key, value=value))
-    info = None
 
     INFO_TO_FIELD = {
         INFO.CELL_HEIGHT: 'cell_height',
@@ -384,9 +390,18 @@ class Content(Base):
         INFO.PATHNAME: 'path'
     }
 
+    _info = None  # database fields and key-value dictionary merged as one transparent mapping
+
     def __init__(self, *args, **kwargs):
-        super(Content, self).__init__(*args, **kwargs)
-        self.info = ChainRecordWithDict(self, self.INFO_TO_FIELD, self._kwinfo)
+        super(Product, self).__init__(*args, **kwargs)
+        self._info = ChainRecordWithDict(self, self.INFO_TO_FIELD, self._kwinfo)
+
+    @property
+    def info(self):
+        """
+        :return: mapping merging INFO-compatible database fields with key-value dictionary access pattern
+        """
+        return self._info
 
     @property
     def name(self):
