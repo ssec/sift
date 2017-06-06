@@ -38,16 +38,22 @@ class ChangeColormapDialog(QtGui.QDialog):
         self.ui.vmax_edit.setValidator(self._validator)
         self.ui.vmax_edit.setText('{:f}'.format(conv[1](self.valid_max)))
 
-        self.rejected.connect(self.reset)
-        apply_button = self.ui.buttons.button(QtGui.QDialogButtonBox.Apply)
-        self.ui.buttons.removeButton(apply_button)
-        self.ui.buttons.addButton(apply_button, QtGui.QDialogButtonBox.AcceptRole)
+        self.ui.buttons.clicked.connect(self._clicked)
+        self.ui.buttons.accepted.disconnect()
+        self.ui.buttons.rejected.disconnect()
 
         self.ui.cmap_combobox.currentIndexChanged.connect(self._cmap_changed)
         self.ui.vmin_slider.sliderReleased.connect(partial(self._slider_changed, is_max=False))
         self.ui.vmax_slider.sliderReleased.connect(partial(self._slider_changed, is_max=True))
         self.ui.vmin_edit.editingFinished.connect(partial(self._edit_changed, is_max=False))
         self.ui.vmax_edit.editingFinished.connect(partial(self._edit_changed, is_max=True))
+
+    def _clicked(self, button):
+        r = self.ui.buttons.buttonRole(button)
+        if r == self.ui.buttons.ResetRole:
+            self.reset()
+            return self.reject()
+        return self.accept()
 
     def reset(self):
         # rejecting (Cancel button) means reset previous settings

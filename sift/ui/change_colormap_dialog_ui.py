@@ -34,7 +34,7 @@ class Ui_changeColormapDialog(object):
         self.buttons = QtGui.QDialogButtonBox(changeColormapDialog)
         self.buttons.setGeometry(QtCore.QRect(30, 130, 311, 32))
         self.buttons.setOrientation(QtCore.Qt.Horizontal)
-        self.buttons.setStandardButtons(QtGui.QDialogButtonBox.Apply|QtGui.QDialogButtonBox.Cancel)
+        self.buttons.setStandardButtons(QtGui.QDialogButtonBox.Close|QtGui.QDialogButtonBox.Reset)
         self.buttons.setCenterButtons(False)
         self.buttons.setObjectName(_fromUtf8("buttons"))
         self.cmap_combobox = QtGui.QComboBox(changeColormapDialog)
