@@ -187,13 +187,17 @@ class GeoTiffImporter(aImporter):
             gtiff_meta[INFO.DATASET_NAME] = gtiff_meta.pop("name")
         if "platform" in gtiff_meta:
             plat = gtiff_meta.pop("platform")
-            gtiff_meta[INFO.PLATFORM] = PLATFORM.from_value(plat)
-            if gtiff_meta[INFO.PLATFORM] == PLATFORM.UNKNOWN:
+            try:
+                gtiff_meta[INFO.PLATFORM] = PLATFORM(plat)
+            except ValueError:
+                gtiff_meta[INFO.PLATFORM] = PLATFORM.UNKNOWN
                 LOG.warning("Unknown platform being loaded: {}".format(plat))
         if "instrument" in gtiff_meta or "sensor" in gtiff_meta:
             inst = gtiff_meta.pop("sensor", gtiff_meta.pop("instrument", None))
-            gtiff_meta[INFO.INSTRUMENT] = INSTRUMENT.from_value(inst)
-            if gtiff_meta[INFO.INSTRUMENT] == INSTRUMENT.UNKNOWN:
+            try:
+                gtiff_meta[INFO.INSTRUMENT] = INSTRUMENT(inst)
+            except ValueError:
+                gtiff_meta[INFO.INSTRUMENT] = INSTRUMENT.UNKNOWN
                 LOG.warning("Unknown instrument being loaded: {}".format(inst))
         if "start_time" in gtiff_meta:
             start_time = datetime.strptime(gtiff_meta["start_time"], "%Y-%m-%dT%H:%M:%SZ")

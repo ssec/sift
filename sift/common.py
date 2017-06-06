@@ -123,14 +123,6 @@ class INSTRUMENT(Enum):
     ABI = 'ABI'
     AMI = 'AMI'
 
-    @classmethod
-    def from_value(cls, value_str, unknown=UNKNOWN):
-        """Convert external string to Enum"""
-        for m in cls:
-            if m.value == value_str:
-                return m
-        return value_str if unknown is None else unknown
-
 
 class PLATFORM(Enum):
     UNKNOWN = '???'
@@ -138,14 +130,6 @@ class PLATFORM(Enum):
     HIMAWARI_9 = 'Himawari-9'
     GOES_16 = 'G16'
     GOES_17 = 'G17'
-
-    @classmethod
-    def from_value(cls, value_str, unknown=UNKNOWN):
-        """Convert external string to Enum"""
-        for m in cls:
-            if m.value == value_str:
-                return m
-        return value_str if unknown is None else unknown
 
 
 class INFO(Enum):
