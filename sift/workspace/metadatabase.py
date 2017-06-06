@@ -39,7 +39,7 @@ from uuid import UUID
 from collections import ChainMap
 from typing import Mapping
 
-from sqlalchemy import Column, Integer, String, UnicodeText, Unicode, ForeignKey, DateTime, Interval, PickleType, Float, create_engine
+from sqlalchemy import Table, Column, Integer, String, UnicodeText, Unicode, ForeignKey, DateTime, Interval, PickleType, Float, create_engine
 from sqlalchemy.orm import Session, relationship, sessionmaker, backref
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.collections import attribute_mapped_collection
@@ -90,6 +90,13 @@ LOG = logging.getLogger(__name__)
 
 Base = declarative_base()
 
+# resources can have multiple products in them
+# products may require multiple resourcse (e.g. separate GEO; tiled imagery)
+ProductsFromResources = Table('product_resource_assoc_v0', Base.metadata,
+                              Column('product_id', Integer, ForeignKey('products_v0.id')),
+                              Column('resource_id', Integer, ForeignKey('resources_v0.id')))
+
+
 
 class Resource(Base):
     """
@@ -111,7 +118,7 @@ class Resource(Base):
     mtime = Column(DateTime)  # last observed mtime of the file, for change checking
     atime = Column(DateTime)  # last time this file was accessed by application
 
-    product = relationship("Product", backref=backref("resource", cascade="all"))
+    product = relationship("Product", secondary=ProductsFromResources, backref="resource")
 
     @property
     def uri(self):
@@ -169,6 +176,7 @@ class ChainRecordWithDict(Mapping):
         if key in self._field_keys:
             raise KeyError('cannot remove key {}'.format(key))
         del self._more[key]
+
 
 
 class Product(Base):
@@ -274,7 +282,9 @@ class Product(Base):
 
     @property
     def path(self):
-        return self.resource.path
+        if len(self.resource) > 1:
+            LOG.warning('Product {} has more than one resource, path is ambiguous'.format(self.name))
+        return self.resource[0].path if len(self.resource)==1 else None
 
     def can_be_activated_without_importing(self):
         return len(self.content)>0
@@ -292,7 +302,7 @@ class Product(Base):
 
     def touch(self, when=None):
         self.atime = when = when or datetime.utcnow()
-        self.resource.touch(when)
+        [x.touch(when) for x in self.resource]
 
 class ProductKeyValue(Base):
     """
@@ -560,14 +570,16 @@ class tests(unittest.TestCase):
         uu = uuid1()
         when = datetime.utcnow()
         f = Resource(path='/path/to/foo.bar', mtime=when, atime=when, format=None)
-        p = Product(uuid_str=str(uu), resource=f, name='B00 Refl', obs_start=when, obs_end=when+timedelta(minutes=5))
+        p = Product(uuid_str=str(uu), name='B00 Refl', obs_start=when, obs_end=when+timedelta(minutes=5))
+        f.product.append(p)
         p.info['test_key'] = u'test_value'
         p.info['turkey'] = u'cobbler'
         s.add(f)
         s.add(p)
         s.commit()
         self.assertEqual(p.uuid, uu)
-        q = s.query(Product).filter_by(resource=f).first()
+        q = f.product[0]
+        # q = s.query(Product).filter_by(resource=f).first()
         self.assertEqual(q.info['test_key'], u'test_value')
         # self.assertEquals(q[INFO.UUID], q.uuid)
         self.assertEqual(q.info['turkey'], p.info['turkey'])
