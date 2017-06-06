@@ -226,7 +226,7 @@ class Workspace(QObject):
     cwd = None  # directory we work in
     _own_cwd = None  # whether or not we created the cwd - which is also whether or not we're allowed to destroy it
     _pool = None  # process pool that importers can use for background activities, if any
-    _importers = None  # list of importers to consult when asked to start an import
+    # _importers = None  # list of importers to consult when asked to start an import
     _available: Mapping[int, ActiveContent] = None  # dictionary of {Content.id : ActiveContent object}
     _inventory: Metadatabase = None  # metadatabase instance, sqlalchemy
     _inventory_path = None  # filename to store and load inventory information (simple cache)
@@ -242,7 +242,7 @@ class Workspace(QObject):
     didFinishImport = pyqtSignal(dict)  # all loading activities for a dataset have completed
     didDiscoverExternalDataset = pyqtSignal(dict)  # a new dataset was added to the workspace from an external agent
 
-    IMPORT_CLASSES = [GeoTiffImporter, GoesRPUGImporter]
+    _importers = [GeoTiffImporter, GoesRPUGImporter]
 
     @staticmethod
     def defaultWorkspace():
@@ -277,7 +277,7 @@ class Workspace(QObject):
             self._own_cwd = False
             self._init_inventory_existing_datasets()
         self._available = {}
-        self._importers = [x() for x in self.IMPORT_CLASSES]
+        self._importers = [x for x in self.IMPORT_CLASSES]
         global TheWorkspace  # singleton
         if TheWorkspace is None:
             TheWorkspace = self
@@ -571,6 +571,11 @@ class Workspace(QObject):
         # find the best importer
         for imp in self._importers:
             if imp.is_relevant(source_path=source_path):
+                impish = imp(source_path=source_path, database_session=self._inventory.session())
+                resources = impish.merge_resource()
+                products = impish.merge_products()
+
+
                 # gen = imp(self, self.cwd, uuid, source_path=source_path, cache_path=self._preferred_cache_path(uuid))
                 break
         else:

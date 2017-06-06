@@ -14,10 +14,10 @@ REQUIRES
 import os, sys
 import logging, unittest
 import re
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
 from datetime import datetime
-
+from typing import Sequence, Iterable
 import gdal
 import osr
 import numpy as np
@@ -26,6 +26,7 @@ from pyproj import Proj
 from sift.common import PLATFORM, INFO, INSTRUMENT, KIND
 from sift.workspace.goesr_pug import PugL1bTools
 from sift.workspace.guidebook import ABI_AHI_Guidebook
+from .metadatabase import Resource, Product, Content
 
 LOG = logging.getLogger(__name__)
 
@@ -68,33 +69,72 @@ def generate_guidebook_metadata(layer_info):
 
 class aImporter(ABC):
     """
-    Instances of this class are typically singletons owned by Workspace.
-    They're used to perform background activity for importing large input files.
+    Abstract Importer class creates or amends Resource, Product, Content entries in the metadatabase used by Workspace
+    Workspace uses these to do background loading of data
     """
-    def __init__(self, **kwargs):
-        super(aImporter, self).__init__()
+    _S = None   # database session
+    _cwd = None  # where content should be imported to within the workspace
 
-    @abstractmethod
-    def is_relevant(self, source_path=None, source_uri=None):
+    def __init__(self, workspace_cwd, database_session, **kwargs):
+        super(aImporter, self).__init__()
+        self._S = database_session
+        self._cwd = workspace_cwd
+
+    @abstractclassmethod
+    def is_relevant(cls, source_path=None, source_uri=None):
         """
         return True if this importer is capable of reading this URI.
         """
         return False
 
     @abstractmethod
-    def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
+    def merge_resources(self) -> Iterable[Resource]:
         """
-        Yield a series of import_status tuples updating status of the import.
-        Typically this is going to run on TheQueue when possible.
-        :param dest_cwd: destination directory to place flat files into, may be anywhere inside workspace.cwd
-        :param dest_uuid: uuid key to use in reference to this dataset at all LODs - may/not be used in file naming, but should be included in datasetinfo
-        :param source_uri: uri to load from
-        :param source_path: path to load from (alternative to source_uri)
-        :param cache_path: preferred cache path to place data into
-        :return: sequence of import_progress, the first and last of which must include data,
-                 inbetween updates typically will release data when stages complete and have None for dataset_info and data fields
+        Returns:
+            sequence of Resources found at the source, typically one resource per file
         """
-        raise NotImplementedError('subclass must implement')
+        return []
+
+    @abstractmethod
+    def merge_products(self) -> Iterable[Product]:
+        """
+        products available in the resource, adding any metadata entries for Products within the resource
+        this may be run by the metadata collection agent, or by the workspace!
+        Returns:
+            sequence of Products that could be turned into Content in the workspace
+        """
+        return []
+
+    @abstractmethod
+    def begin_import_products(self, workspace_cwd, *products):
+        """
+        background import of content from a series of products
+        if none are provided, all products resulting from merge_products should be imported
+        Args:
+            *products: sequence of products to import
+
+        Returns:
+            generator which yields status tuples as the content is imported
+        """
+        # FUTURE: this should be async def coroutine
+        return
+
+
+
+    # @abstractmethod
+    # def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, cache_path=None, database_session=None, **kwargs):
+    #     """
+    #     Yield a series of import_status tuples updating status of the import.
+    #     Typically this is going to run on TheQueue when possible.
+    #     :param dest_cwd: destination directory to place flat files into, may be anywhere inside workspace.cwd
+    #     :param dest_uuid: uuid key to use in reference to this dataset at all LODs - may/not be used in file naming, but should be included in datasetinfo
+    #     :param source_uri: uri to load from
+    #     :param source_path: path to load from (alternative to source_uri)
+    #     :param cache_path: preferred cache path to place data into
+    #     :return: sequence of import_progress, the first and last of which must include data,
+    #              inbetween updates typically will release data when stages complete and have None for dataset_info and data fields
+    #     """
+    #     raise NotImplementedError('subclass must implement')
 
 
 class GeoTiffImporter(aImporter):
@@ -104,6 +144,7 @@ class GeoTiffImporter(aImporter):
     def __init__(self, **kwargs):
         super(GeoTiffImporter, self).__init__()
 
+    @classmethod
     def is_relevant(self, source_path=None, source_uri=None):
         source = source_path or source_uri
         return True if (source.lower().endswith('.tif') or source.lower().endswith('.tiff')) else False
