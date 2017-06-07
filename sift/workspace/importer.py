@@ -22,6 +22,7 @@ import gdal
 import osr
 import numpy as np
 from pyproj import Proj
+from sqlalchemy.orm import Session
 
 from sift.common import PLATFORM, INFO, INSTRUMENT, KIND
 from sift.workspace.goesr_pug import PugL1bTools
@@ -72,8 +73,8 @@ class aImporter(ABC):
     Abstract Importer class creates or amends Resource, Product, Content entries in the metadatabase used by Workspace
     Workspace uses these to do background loading of data
     """
-    _S = None   # database session
-    _cwd = None  # where content should be imported to within the workspace
+    _S: Session = None   # database session
+    _cwd: str = None  # where content should be imported to within the workspace
 
     def __init__(self, workspace_cwd, database_session, **kwargs):
         super(aImporter, self).__init__()
@@ -106,7 +107,7 @@ class aImporter(ABC):
         return []
 
     @abstractmethod
-    def begin_import_products(self, workspace_cwd, *products):
+    def begin_import_products(self, *products):
         """
         background import of content from a series of products
         if none are provided, all products resulting from merge_products should be imported
@@ -141,8 +142,7 @@ class GeoTiffImporter(aImporter):
     """
     GeoTIFF data importer
     """
-    def __init__(self, **kwargs):
-        super(GeoTiffImporter, self).__init__()
+    _resource = None  # Resource object corresponding to our file
 
     @classmethod
     def is_relevant(self, source_path=None, source_uri=None):
@@ -180,7 +180,8 @@ class GeoTiffImporter(aImporter):
             })
         return meta
 
-    def _check_geotiff_metadata(self, gtiff):
+    @staticmethod
+    def _check_geotiff_metadata(gtiff):
         gtiff_meta = gtiff.GetMetadata()
         # Sanitize metadata from the file to use SIFT's Enums
         if "name" in gtiff_meta:
@@ -222,10 +223,11 @@ class GeoTiffImporter(aImporter):
             gtiff_meta[INFO.UNITS] = gtiff_meta.pop('units')
         return gtiff_meta
 
-    def get_metadata(self, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
+    @staticmethod
+    def get_metadata(dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
         if source_uri is not None:
             raise NotImplementedError("GeoTiffImporter cannot read from URIs yet")
-        d = self._metadata_for_path(source_path)
+        d = GeoTiffImporter._metadata_for_path(source_path)
         gtiff = gdal.Open(source_path)
 
         ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
@@ -265,10 +267,80 @@ class GeoTiffImporter(aImporter):
         if bandtype.lower() != 'float32':
             LOG.warning('attempting to read geotiff files with non-float32 content')
 
-        gtiff_meta = self._check_geotiff_metadata(gtiff)
+        gtiff_meta = GeoTiffImporter._check_geotiff_metadata(gtiff)
         d.update(gtiff_meta)
         generate_guidebook_metadata(d)
         return d
+
+    def __init__(self, geotiff_path, workspace_cwd, database_session, **kwargs):
+        super(GeoTiffImporter, self).__init__(workspace_cwd, database_session)
+        self.source_path = geotiff_path
+
+    def merge_resources(self) -> Iterable[Resource]:
+        """
+        Returns:
+            sequence of Resources found at the source, typically one resource per file
+        """
+        now = datetime.utcnow()
+        if self._resource is not None:
+            res = self._resource
+        else:
+            self._resource = res = self._S.query(Resource).filter(Resource.path == self.source_path).first()
+        if res is None:
+            LOG.debug('creating new Resource entry for {}'.format())
+            self._resource = res = Resource(
+                format=type(self),
+                path=self.source_path,
+                mtime=now,
+                atime=now,
+            )
+            self._S.add(res)
+        self._S.commit()
+        return [self._resource]
+
+    def merge_products(self) -> Iterable[Product]:
+        """
+        products available in the resource, adding any metadata entries for Products within the resource
+        this may be run by the metadata collection agent, or by the workspace!
+        Returns:
+            sequence of Products that could be turned into Content in the workspace
+        """
+        now = datetime.utcnow()
+        if self._resource is not None:
+            res = self._resource
+        else:
+            self._resource = res = self._S.query(Resource).filter(Resource.path == self.source_path).first()
+        if res is None:
+            return []
+
+        if len(res.product):
+            return res.product
+
+        # else probe the file and add product metadata, without importing content
+        from uuid import uuid1
+        uuid = uuid1()
+        meta = GeoTiffImporter.get_metadata(uuid, source_path=self.source_path)
+
+        prod = Product(
+            uuid_str = str(uuid),
+            atime = now,
+            obs_start = meta[INFO.OBS_TIME],
+            obs_end = meta[INFO.OBS_TIME] + meta[INFO.OBS_DURATION],
+        )
+        prod.info.update(meta)
+        self._S.add(prod)
+        self._S.commit()
+
+    def begin_import_products(self, *products):
+        source_path = self.source_path
+        if not products:
+            resource = self._S.query(Resource).filter(Resource.path==source_path).first()
+            products = list(resource.product)
+        if len(products)>1:
+            LOG.warning('only first product currently handled in geotiff loader')
+        prod = products[0]
+
+
 
     def __call__(self, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
         # yield successive levels of detail as we load

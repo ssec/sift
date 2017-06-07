@@ -36,7 +36,7 @@ from datetime import datetime, timedelta
 from sift.common import INFO
 from functools import reduce
 from uuid import UUID
-from collections import ChainMap
+from collections import ChainMap, MutableMapping
 from typing import Mapping
 
 from sqlalchemy import Table, Column, Integer, String, UnicodeText, Unicode, ForeignKey, DateTime, Interval, PickleType, Float, create_engine
@@ -133,7 +133,7 @@ class Resource(Base):
         return os.path.exists(self.path)
 
 
-class ChainRecordWithDict(Mapping):
+class ChainRecordWithDict(MutableMapping):
     """
     allow Product database entries and key-value table to act as a coherent dictionary
     """
@@ -577,12 +577,14 @@ class tests(unittest.TestCase):
         s.add(f)
         s.add(p)
         s.commit()
+        p.info.update({'key': 'value'})
         self.assertEqual(p.uuid, uu)
         q = f.product[0]
         # q = s.query(Product).filter_by(resource=f).first()
         self.assertEqual(q.info['test_key'], u'test_value')
         # self.assertEquals(q[INFO.UUID], q.uuid)
         self.assertEqual(q.info['turkey'], p.info['turkey'])
+        self.assertEqual(q.info['key'], p.info['key'])
 
 def _debug(type, value, tb):
     "enable with sys.excepthook = debug"
