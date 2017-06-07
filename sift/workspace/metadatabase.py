@@ -217,8 +217,8 @@ class Product(Base):
     #
     # times
     # display_time = Column(DateTime)  # normalized instantaneous scheduled observation time e.g. 20170122T2310
-    obs_start = Column(DateTime)  # actual observation time start
-    obs_end = Column(DateTime)  # actual observation end time
+    obs_time = Column(DateTime)  # actual observation time start
+    obs_duration = Column(Interval)  # duration of the observation
 
     # native resolution information - see Content for projection details at different LODs
     # resolution = Column(Integer, nullable=True)  # meters max resolution, e.g. 500, 1000, 2000, 4000
@@ -294,6 +294,8 @@ class Product(Base):
         INFO.PATHNAME: 'path',
         INFO.UUID: 'uuid',
         INFO.PROJ: 'proj4',
+        INFO.OBS_TIME: 'obs_time',
+        INFO.OBS_DURATION: 'obs_duration',
         INFO.CELL_WIDTH: 'cell_width',
         INFO.CELL_HEIGHT: 'cell_height',
         INFO.ORIGIN_X: 'origin_x',
@@ -570,7 +572,7 @@ class tests(unittest.TestCase):
         uu = uuid1()
         when = datetime.utcnow()
         f = Resource(path='/path/to/foo.bar', mtime=when, atime=when, format=None)
-        p = Product(uuid_str=str(uu), name='B00 Refl', obs_start=when, obs_end=when+timedelta(minutes=5))
+        p = Product(uuid_str=str(uu), name='B00 Refl', obs_time=when, obs_duration=timedelta(minutes=5))
         f.product.append(p)
         p.info['test_key'] = u'test_value'
         p.info['turkey'] = u'cobbler'

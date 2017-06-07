@@ -324,10 +324,8 @@ class GeoTiffImporter(aImporter):
         prod = Product(
             uuid_str = str(uuid),
             atime = now,
-            obs_start = meta[INFO.OBS_TIME],
-            obs_end = meta[INFO.OBS_TIME] + meta[INFO.OBS_DURATION],
         )
-        prod.info.update(meta)
+        prod.info.update(meta)  # sets fields like obs_duration and obs_time transparently
         self._S.add(prod)
         self._S.commit()
 
