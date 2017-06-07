@@ -17,7 +17,7 @@ import re
 from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
 from datetime import datetime
-from typing import Sequence, Iterable
+from typing import Sequence, Iterable, Generator, Mapping
 import gdal
 import osr
 import numpy as np
@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 
 from sift.common import PLATFORM, INFO, INSTRUMENT, KIND
 from sift.workspace.goesr_pug import PugL1bTools
-from sift.workspace.guidebook import ABI_AHI_Guidebook
+from sift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
 from .metadatabase import Resource, Product, Content
 
 LOG = logging.getLogger(__name__)
@@ -46,12 +46,12 @@ import_progress = namedtuple('import_progress', ['uuid', 'stages', 'current_stag
 # stage_desc:tuple(str), brief description of each of the stages we'll be doing
 
 
-def get_guidebook_class(layer_info):
+def get_guidebook_class(layer_info) -> Guidebook:
     platform = layer_info.get(INFO.PLATFORM)
     return GUIDEBOOKS[platform]()
 
 
-def generate_guidebook_metadata(layer_info):
+def generate_guidebook_metadata(layer_info) -> Mapping:
     guidebook = get_guidebook_class(layer_info)
     # also get info for this layer from the guidebook
     gbinfo = guidebook.collect_info(layer_info)
@@ -71,10 +71,10 @@ def generate_guidebook_metadata(layer_info):
 class aImporter(ABC):
     """
     Abstract Importer class creates or amends Resource, Product, Content entries in the metadatabase used by Workspace
-    Workspace uses these to do background loading of data
+    aImporter instances are backgrounded by the Workspace to bring Content into the workspace
     """
-    _S: Session = None   # database session
-    _cwd: str = None  # where content should be imported to within the workspace
+    _S: Session = None   # dedicated sqlalchemy database session to use during this import instance; revert if necessary, commit as appropriate
+    _cwd: str = None  # where content flat files should be imported to within the workspace, omit this from content path
 
     def __init__(self, workspace_cwd, database_session, **kwargs):
         super(aImporter, self).__init__()
@@ -82,7 +82,7 @@ class aImporter(ABC):
         self._cwd = workspace_cwd
 
     @abstractclassmethod
-    def is_relevant(cls, source_path=None, source_uri=None):
+    def is_relevant(cls, source_path=None, source_uri=None) -> bool:
         """
         return True if this importer is capable of reading this URI.
         """
@@ -107,7 +107,7 @@ class aImporter(ABC):
         return []
 
     @abstractmethod
-    def begin_import_products(self, *products):
+    def begin_import_products(self, *products) -> Generator[import_progress]:
         """
         background import of content from a series of products
         if none are provided, all products resulting from merge_products should be imported
