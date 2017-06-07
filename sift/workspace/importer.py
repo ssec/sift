@@ -332,41 +332,83 @@ class GeoTiffImporter(aImporter):
     def begin_import_products(self, *products):
         source_path = self.source_path
         if not products:
-            resource = self._S.query(Resource).filter(Resource.path==source_path).first()
-            products = list(resource.product)
+            products = list(self._S.query(Resource, Product).filter(
+                Resource.path==source_path).filter(
+                Product.resource_id==Resource.id).all())
+            assert(products)
         if len(products)>1:
             LOG.warning('only first product currently handled in geotiff loader')
         prod = products[0]
 
+        if prod.content:
+            LOG.warning('content was already available, skipping import')
+            return
 
+        now = datetime.utcnow()
 
-    def __call__(self, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
-        # yield successive levels of detail as we load
-        if source_uri is not None:
-            raise NotImplementedError("GeoTiffImporter cannot read from URIs yet")
         # Additional metadata that we've learned by loading the data
         gtiff = gdal.Open(source_path)
 
-        # FIXME: read this into a numpy.memmap backed by disk in the workspace
         band = gtiff.GetRasterBand(1)  # FUTURE may be an assumption
         shape = rows, cols = band.YSize, band.XSize
         blockw, blockh = band.GetBlockSize()  # non-blocked files will report [band.XSize,1]
 
+        data_filename = '{}.data'.format(prod.uuid)
+        data_path = os.path.join(self._cwd, data_filename)
+
+        coverage_filename = '{}.coverage'.format(prod.uuid)
+        coverage_path = os.path.join(self._cwd, coverage_filename)
+        # no sparsity map
+
         # shovel that data into the memmap incrementally
         # http://geoinformaticstutorial.blogspot.com/2012/09/reading-raster-data-with-python-and-gdal.html
-        fp = open(cache_path, 'wb+')
-        img_data = np.memmap(fp, dtype=np.float32, shape=shape, mode='w+')
+        img_data = np.memmap(data_path, dtype=np.float32, shape=shape, mode='w+')
+
         # load at an increment that matches the file's tile size if possible
         IDEAL_INCREMENT = 512.0
         increment = min(blockh * int(np.ceil(IDEAL_INCREMENT/blockh)), 2048)
+
+        # how many coverage states are we traversing during the load? for now let's go simple and have it be just image rows
+        # coverage_rows = int((rows + increment - 1) / increment) if we had an even increment but it's not guaranteed
+        cov_data = np.memmap(coverage_path, dtype=np.int8, shape=(rows,), mode='w+')
+        cov_data[:] = 0  # should not be needed except maybe in Windows?
+
+        # create and commit a Content entry pointing to where the content is in the workspace, even if coverage is empty
+        c = Content(
+            lod = 0,
+            resolution = int(min(prod.info[INFO.CELL_WIDTH], prod.info[INFO.CELL_HEIGHT])),
+            atime = now,
+            mtime = now,
+
+            # info about the data array memmap
+            path = data_filename,
+            rows = rows,
+            cols = cols,
+            levels = 0,
+            dtype = 'float32',
+
+            # info about the coverage array memmap, which in our case just tells what rows are ready
+            coverage_rows = rows,
+            coverage_cols = 1,
+            coverage_path = coverage_filename
+        )
+        # c.info.update(prod.info) would just make everything leak together so let's not do it
+        self._S.add(c)
+        prod.content.append(c)
+        self._S.commit()
+
+        # FIXME: yield initial status to announce content is available, even if it's empty
+
+        # now do the actual array filling from the geotiff file
         # FUTURE: consider explicit block loads using band.ReadBlock(x,y) once
         irow = 0
         while irow < rows:
             nrows = min(increment, rows-irow)
             row_data = band.ReadAsArray(0, irow, cols, nrows)
             img_data[irow:irow+nrows,:] = np.require(row_data, dtype=np.float32)
+            cov_data[irow:irow+nrows] = 1
             irow += increment
-            status = import_progress(uuid=dest_uuid,
+            status = import_progress(uuid=prod.uuid,
                                        stages=1,
                                        current_stage=0,
                                        completion=float(irow)/float(rows),
@@ -380,17 +422,20 @@ class GeoTiffImporter(aImporter):
         # normally we would place a numpy.memmap in the workspace with the content of the geotiff raster band/s here
 
         # single stage import with all the data for this simple case
-        zult = import_progress(uuid=dest_uuid,
+        zult = import_progress(uuid=prod.uuid,
                                stages=1,
                                current_stage=0,
                                completion=1.0,
                                stage_desc="done loading geotiff",
                                dataset_info=None,
                                data=img_data)
+
         yield zult
-        # further yields would logically add levels of detail with their own sampling values
-        # FIXME: provide example of multiple LOD loading and how datasetinfo dictionary/dictionaries look in that case
-        # note that once the coarse data is yielded, we may be operating in another thread - think about that for now?
+
+        # Finally, update content mtime and atime
+        c.atime = c.mtime = datetime.utcnow()
+        self._S.commit()
+
 
 
 # map .platform_id in PUG format files to SIFT platform enum
