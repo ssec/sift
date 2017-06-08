@@ -20,6 +20,7 @@ from datetime import datetime
 from typing import Sequence, Iterable, Generator, Mapping
 import gdal
 import osr
+import asyncio
 import numpy as np
 from pyproj import Proj
 from sqlalchemy.orm import Session
@@ -122,28 +123,84 @@ class aImporter(ABC):
 
 
 
-    # @abstractmethod
-    # def __call__(self, dest_workspace, dest_wd, dest_uuid, source_path=None, source_uri=None, cache_path=None, database_session=None, **kwargs):
-    #     """
-    #     Yield a series of import_status tuples updating status of the import.
-    #     Typically this is going to run on TheQueue when possible.
-    #     :param dest_cwd: destination directory to place flat files into, may be anywhere inside workspace.cwd
-    #     :param dest_uuid: uuid key to use in reference to this dataset at all LODs - may/not be used in file naming, but should be included in datasetinfo
-    #     :param source_uri: uri to load from
-    #     :param source_path: path to load from (alternative to source_uri)
-    #     :param cache_path: preferred cache path to place data into
-    #     :return: sequence of import_progress, the first and last of which must include data,
-    #              inbetween updates typically will release data when stages complete and have None for dataset_info and data fields
-    #     """
-    #     raise NotImplementedError('subclass must implement')
+class aSingleFileWithSingleProductImporter(aImporter):
+    """
+    simplification of importer that handles a single-file with a single product
+    """
+    source_path: str = None
+    _resource: Resource = None
+
+    def __init__(self, pug_path, workspace_cwd, database_session, **kwargs):
+        super(aSingleFileWithSingleProductImporter, self).__init__(workspace_cwd, database_session)
+        self.source_path = pug_path
+
+    def merge_resources(self) -> Iterable[Resource]:
+        """
+        Returns:
+            sequence of Resources found at the source, typically one resource per file
+        """
+        now = datetime.utcnow()
+        if self._resource is not None:
+            res = self._resource
+        else:
+            self._resource = res = self._S.query(Resource).filter(Resource.path == self.source_path).first()
+        if res is None:
+            LOG.debug('creating new Resource entry for {}'.format())
+            self._resource = res = Resource(
+                format=type(self),
+                path=self.source_path,
+                mtime=now,
+                atime=now,
+            )
+            self._S.add(res)
+        self._S.commit()
+        return [self._resource]
+
+    @abstractmethod
+    def product_metadata(self):
+        """
+        Returns:
+            info dictionary for the single product available
+        """
+        return {}
+
+    def merge_products(self) -> Iterable[Product]:
+        """
+        products available in the resource, adding any metadata entries for Products within the resource
+        this may be run by the metadata collection agent, or by the workspace!
+        Returns:
+            sequence of Products that could be turned into Content in the workspace
+        """
+        now = datetime.utcnow()
+        if self._resource is not None:
+            res = self._resource
+        else:
+            self._resource = res = self._S.query(Resource).filter(Resource.path == self.source_path).first()
+        if res is None:
+            return []
+
+        if len(res.product):
+            return res.product
+
+        # else probe the file and add product metadata, without importing content
+        from uuid import uuid1
+        uuid = uuid1()
+        meta = self.product_metadata()
+        meta[INFO.UUID] = uuid
+
+        prod = Product(
+            uuid_str = str(uuid),
+            atime = now,
+        )
+        prod.info.update(meta)  # sets fields like obs_duration and obs_time transparently
+        self._S.add(prod)
+        self._S.commit()
 
 
-class GeoTiffImporter(aImporter):
+class GeoTiffImporter(aSingleFileWithSingleProductImporter):
     """
     GeoTIFF data importer
     """
-    _resource = None  # Resource object corresponding to our file
-
     @classmethod
     def is_relevant(self, source_path=None, source_uri=None):
         source = source_path or source_uri
@@ -224,14 +281,13 @@ class GeoTiffImporter(aImporter):
         return gtiff_meta
 
     @staticmethod
-    def get_metadata(dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
+    def get_metadata(source_path=None, source_uri=None, **kwargs):
         if source_uri is not None:
             raise NotImplementedError("GeoTiffImporter cannot read from URIs yet")
         d = GeoTiffImporter._metadata_for_path(source_path)
         gtiff = gdal.Open(source_path)
 
         ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
-        d[INFO.UUID] = dest_uuid
         d[INFO.KIND] = KIND.IMAGE
         d[INFO.ORIGIN_X] = ox
         d[INFO.ORIGIN_Y] = oy
@@ -272,63 +328,10 @@ class GeoTiffImporter(aImporter):
         generate_guidebook_metadata(d)
         return d
 
-    def __init__(self, geotiff_path, workspace_cwd, database_session, **kwargs):
-        super(GeoTiffImporter, self).__init__(workspace_cwd, database_session)
-        self.source_path = geotiff_path
+    def product_metadata(self):
+        return GeoTiffImporter.get_metadata(self.source_path)
 
-    def merge_resources(self) -> Iterable[Resource]:
-        """
-        Returns:
-            sequence of Resources found at the source, typically one resource per file
-        """
-        now = datetime.utcnow()
-        if self._resource is not None:
-            res = self._resource
-        else:
-            self._resource = res = self._S.query(Resource).filter(Resource.path == self.source_path).first()
-        if res is None:
-            LOG.debug('creating new Resource entry for {}'.format())
-            self._resource = res = Resource(
-                format=type(self),
-                path=self.source_path,
-                mtime=now,
-                atime=now,
-            )
-            self._S.add(res)
-        self._S.commit()
-        return [self._resource]
-
-    def merge_products(self) -> Iterable[Product]:
-        """
-        products available in the resource, adding any metadata entries for Products within the resource
-        this may be run by the metadata collection agent, or by the workspace!
-        Returns:
-            sequence of Products that could be turned into Content in the workspace
-        """
-        now = datetime.utcnow()
-        if self._resource is not None:
-            res = self._resource
-        else:
-            self._resource = res = self._S.query(Resource).filter(Resource.path == self.source_path).first()
-        if res is None:
-            return []
-
-        if len(res.product):
-            return res.product
-
-        # else probe the file and add product metadata, without importing content
-        from uuid import uuid1
-        uuid = uuid1()
-        meta = GeoTiffImporter.get_metadata(uuid, source_path=self.source_path)
-
-        prod = Product(
-            uuid_str = str(uuid),
-            atime = now,
-        )
-        prod.info.update(meta)  # sets fields like obs_duration and obs_time transparently
-        self._S.add(prod)
-        self._S.commit()
-
+    # @asyncio.coroutine
     def begin_import_products(self, *products):
         source_path = self.source_path
         if not products:
@@ -395,6 +398,7 @@ class GeoTiffImporter(aImporter):
         # c.info.update(prod.info) would just make everything leak together so let's not do it
         self._S.add(c)
         prod.content.append(c)
+        prod.touch()
         self._S.commit()
 
         # FIXME: yield initial status to announce content is available, even if it's empty
@@ -448,12 +452,10 @@ PLATFORM_ID_TO_PLATFORM = {
 }
 
 
-class GoesRPUGImporter(aImporter):
+class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
     """
     Import from PUG format GOES-16 netCDF4 files
     """
-    def __init__(self, **kwargs):
-        super(GoesRPUGImporter, self).__init__()
 
     @staticmethod
     def _metadata_for_abi_path(abi):
@@ -467,11 +469,13 @@ class GoesRPUGImporter(aImporter):
             INFO.DISPLAY_NAME: abi.display_name
         }
 
-    def is_relevant(self, source_path=None, source_uri=None):
+    @classmethod
+    def is_relevant(cls, source_path=None, source_uri=None):
         source = source_path or source_uri
         return True if (source.lower().endswith('.nc') or source.lower().endswith('.nc4')) else False
 
-    def get_metadata(self, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
+    @staticmethod
+    def get_metadata(source_path=None, source_uri=None, **kwargs):
         # yield successive levels of detail as we load
         if source_uri is not None:
             raise NotImplementedError("GoesRPUGImporter cannot read from URIs yet")
@@ -484,8 +488,7 @@ class GoesRPUGImporter(aImporter):
         # nc = nc4.Dataset(source_path)
         pug = PugL1bTools(source_path)
 
-        d.update(self._metadata_for_abi_path(pug))
-        d[INFO.UUID] = dest_uuid
+        d.update(GoesRPUGImporter._metadata_for_abi_path(pug))
         d[INFO.DATASET_NAME] = os.path.split(source_path)[-1]
         d[INFO.PATHNAME] = source_path
         d[INFO.KIND] = KIND.IMAGE
@@ -512,8 +515,45 @@ class GoesRPUGImporter(aImporter):
         LOG.debug(repr(d))
         return d
 
-    def __call__(self, dest_uuid, source_path=None, source_uri=None, cache_path=None, **kwargs):
+    def __init__(self, pug_path, workspace_cwd, database_session, **kwargs):
+        super(GoesRPUGImporter, self).__init__(workspace_cwd, database_session)
+        self.source_path = pug_path
+
+    def product_metadata(self):
+        return GoesRPUGImporter.get_metadata(self.source_path)
+
+    # @asyncio.coroutine
+    def begin_import_products(self, *products):
+        source_path = self.source_path
+        if not products:
+            products = list(self._S.query(Resource, Product).filter(
+                Resource.path == source_path).filter(
+                Product.resource_id == Resource.id).all())
+            assert (products)
+        if len(products) > 1:
+            LOG.warning('only first product currently handled in pug loader')
+        prod = products[0]
+
+        if prod.content:
+            LOG.warning('content was already available, skipping import')
+            return
+
         pug = PugL1bTools(source_path)
+        rows, cols = shape = pug.shape
+
+        now = datetime.utcnow()
+
+        data_filename = '{}.data'.format(prod.uuid)
+        data_path = os.path.join(self._cwd, data_filename)
+
+        # coverage_filename = '{}.coverage'.format(prod.uuid)
+        # coverage_path = os.path.join(self._cwd, coverage_filename)
+        # no sparsity map
+
+        # shovel that data into the memmap incrementally
+        # http://geoinformaticstutorial.blogspot.com/2012/09/reading-raster-data-with-python-and-gdal.html
+        img_data = np.memmap(data_path, dtype=np.float32, shape=shape, mode='w+')
+
         LOG.info('converting radiance to %s' % pug.bt_or_refl)
         bt_or_refl, image, units = pug.convert_from_nc()  # FIXME expensive
         # overview_image = fixme  # FIXME, we need a properly navigated overview image here
@@ -539,18 +579,40 @@ class GoesRPUGImporter(aImporter):
 
         bandtype = np.float32
         LOG.info('caching PUG imagery in workspace %s' % cache_path)
-        fp = open(cache_path, 'wb+')
-        img_data = np.memmap(fp, dtype=np.float32, shape=pug.shape, mode='w+')
         img_data[:] = np.ma.fix_invalid(image, copy=False, fill_value=np.NAN)  # FIXME: expensive
 
-        yield import_progress(uuid=dest_uuid,
+        # create and commit a Content entry pointing to where the content is in the workspace, even if coverage is empty
+        c = Content(
+            lod = 0,
+            resolution = int(min(prod.info[INFO.CELL_WIDTH], prod.info[INFO.CELL_HEIGHT])),
+            atime = now,
+            mtime = now,
+
+            # info about the data array memmap
+            path = data_filename,
+            rows = rows,
+            cols = cols,
+            levels = 0,
+            dtype = 'float32',
+
+            # info about the coverage array memmap, which in our case just tells what rows are ready
+            # coverage_rows = rows,
+            # coverage_cols = 1,
+            # coverage_path = coverage_filename
+        )
+        # c.info.update(prod.info) would just make everything leak together so let's not do it
+        self._S.add(c)
+        prod.content.append(c)
+        prod.touch()
+        self._S.commit()
+
+        yield import_progress(uuid=prod.uuid,
                               stages=1,
                               current_stage=0,
                               completion=1.0,
                               stage_desc="GOES PUG data add to workspace",
                               dataset_info=None,
                               data=img_data)
-
 
 
 PATH_TEST_DATA = os.environ.get('TEST_DATA', os.path.expanduser("~/Data/test_files/thing.dat"))
