@@ -248,6 +248,9 @@ class Product(Base):
         super(Product, self).__init__(*args, **kwargs)
         self._info = ChainRecordWithDict(self, self.INFO_TO_FIELD, self._kwinfo)
 
+    def __repr__(self):
+        return "<Product '{}' @ {}~{}>".format(self.name, self.obs_time, self.obs_time + self.obs_duration)
+
     @property
     def info(self):
         """

@@ -665,6 +665,8 @@ class Workspace(QObject):
         prod = self._product_with_uuid(dsi_or_uuid)
         prod.touch()
         content = self._S.query(Content).filter_by(Content.product_id==prod.id).order_by(Content.lod.desc()).first()
+        if not content:
+            raise AssertionError('no content in workspace for {}, must re-import'.format(prod))
         content.touch()
         self._S.commit()  # flush any pending updates to workspace db file
         return self._cached_arrays_for_content(content)
