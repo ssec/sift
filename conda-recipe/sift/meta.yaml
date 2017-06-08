@@ -35,6 +35,9 @@ requirements:
     - gdal
     - pyqt <5
     - cython >=0.17 # [win]
+    # this is only needed because of a weird bug with netcdf4
+    # https://github.com/conda-forge/netcdf4-feedstock/issues/33
+    - cython >=0.19 # [unix]
 
   run:
     - python >=3.6
