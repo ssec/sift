@@ -82,6 +82,12 @@ class aImporter(ABC):
         self._S = database_session
         self._cwd = workspace_cwd
 
+    @staticmethod
+    def from_product(prod: Product, workspace_cwd, database_session, **kwargs) -> aImporter:
+        # FIXME: deal with products that need more than one resource
+        cls = prod.resource[0].format
+        return cls(prod.resource[0].path, workspace_cwd=workspace_cwd, database_session=database_session)
+
     @abstractclassmethod
     def is_relevant(cls, source_path=None, source_uri=None) -> bool:
         """

@@ -61,6 +61,7 @@ from sift.common import INFO
 from sift.model.shapes import content_within_shape
 from sift.workspace.importer import GeoTiffImporter, GoesRPUGImporter
 from .metadatabase import Metadatabase, Content, Product, Resource
+from .importer import aImporter
 
 LOG = logging.getLogger(__name__)
 
@@ -548,71 +549,44 @@ class Workspace(QObject):
                     prod = resource.product[0]
                     return prod.info
 
-    def import_image(self, source_path=None, source_uri=None, allow_cache=True):
+    def collect_product_metadata_for_paths(self, paths):
         """
         Start loading URI data into the workspace asynchronously.
 
-        :param source_path:
-        :return:
         """
-        if source_uri is not None and source_path is None:
-            raise NotImplementedError('URI load not yet supported')
+        # FUTURE: consider returning importers instead of products, since we can then re-use them to import the content instead of having to regenerate
+        for source_path in paths:
+            for imp in self._importers:
+                if imp.is_relevant(source_path=source_path):
+                    S = self._inventory.session()
+                    hauler = imp(source_path=source_path, database_session=S,
+                                 workspace_cwd=self.cwd)
+                    hauler.merge_resource()
+                    products = hauler.merge_products()
+                    yield from products
 
-        if allow_cache and source_path is not None:
-            nfo = self._check_cache(source_path)
-            if nfo is not None:
-                uuid, info, data = nfo
-                self._info[uuid] = info
-                self._data[uuid] = data
-                return info
-
-        uuid = uuidgen()
-
-        # find the best importer
-        for imp in self._importers:
-            if imp.is_relevant(source_path=source_path):
-                impish = imp(source_path=source_path, database_session=self._inventory.session())
-                resources = impish.merge_resource()
-                products = impish.merge_products()
-
-
-                # gen = imp(self, self.cwd, uuid, source_path=source_path, cache_path=self._preferred_cache_path(uuid))
-                break
-        else:
-            raise IOError("unable to import {}".format(source_path))
-
-        # Collect and cache metadata
-        # collect metadata before iterating because we need metadata as soon as possible
-        info = self._info[uuid] = imp.get_metadata(uuid, source_path=source_path)
-        # we haven't loaded the data yet (will do it asynchronously later)
-        self._data[uuid] = None
-        if allow_cache:
-            self._update_cache(source_path, uuid, info, None)
-        return info
-
-    def import_image_data(self, uuid, allow_cache=True):
-        metadata = self.get_metadata(uuid)
-        name = metadata[INFO.DATASET_NAME]
-        source_path = metadata[INFO.PATHNAME]
-
-        for imp in self._importers:
-            if imp.is_relevant(source_path=source_path):
-                break
-        else:
-            raise IOError("unable to import {}".format(source_path))
+    def import_product_content(self, uuid=None, prod=None, allow_cache=True):
+        S = self._inventory.session()
+        if prod is None and uuid is not None:
+            prod = self._product_with_uuid(uuid)
+        if len(prod.content):
+            LOG.info('product already has content available, are we updating it from external resource?')
+        truck = aImporter.from_product(prod, workspace_cwd=self.cwd, database_session=S)
+        metadata = prod.info
+        name = metadata[INFO.SHORT_NAME]
 
         # FIXME: for now, just iterate the incremental load. later we want to add this to TheQueue and update the UI as we get more data loaded
-        gen = imp(uuid, source_path=source_path, cache_path=self._preferred_cache_path(uuid))
+        gen = truck.begin_import_products(prod)
         for update in gen:
+            # we're now incrementally reading the input file
+            # data updates are coming back to us (eventually asynchronously)
+            # Content is in the metadatabase and being updated + committed, including sparsity and coverage arrays
             if update.data is not None:
-                data = self._data[uuid] = update.data
+                data = update.data
                 LOG.info("{} {}: {:.01f}%".format(name, update.stage_desc, update.completion*100.0))
-        # copy the data into an anonymous memmap
-        # FIXME: register a new Content entry with the metadatabase
-        self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
-        if allow_cache:
-            self._update_cache(source_path, uuid, None, data)
-        # TODO: schedule cache cleaning in background after a series of imports completes
+        # self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
+
+        # FIXME: distinguish overview from higher resolution LODs
         return data
 
     def create_composite(self, symbols:dict, relation:dict):
@@ -623,21 +597,20 @@ class Workspace(QObject):
         """
         raise NotImplementedError()
 
-    def _preferred_cache_path(self, uuid):
-        filename = str(uuid)
-        return self._ws_path(filename)
-
-    def _convert_to_memmap(self, uuid, data:np.ndarray):
-        if isinstance(data, np.memmap):
-            return data
-        # from tempfile import TemporaryFile
-        # fp = TemporaryFile()
-        pathname = self._preferred_cache_path(uuid)
-        fp = open(pathname, 'wb+')
-        mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
-        # FIXME: register with content table
-        mm[:] = data[:]
-        return mm
+    # def _preferred_cache_path(self, uuid):
+    #     filename = str(uuid)
+    #     return self._ws_path(filename)
+    #
+    # def _convert_to_memmap(self, uuid, data:np.ndarray):
+    #     if isinstance(data, np.memmap):
+    #         return data
+    #     # from tempfile import TemporaryFile
+    #     # fp = TemporaryFile()
+    #     pathname = self._preferred_cache_path(uuid)
+    #     fp = open(pathname, 'wb+')
+    #     mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
+    #     mm[:] = data[:]
+    #     return mm
 
     def _bgnd_remove(self, uuid):
         from sift.queue import TASK_DOING, TASK_PROGRESS

@@ -391,7 +391,13 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param path: file to open and add
         :return: overview (uuid:UUID, datasetinfo:dict, overviewdata:numpy.ndarray)
         """
-        info = self._workspace.import_image(source_path=path)
+        products = list(self._workspace.collect_product_metadata_for_paths([path]))
+        if not products:
+            raise ValueError('no products available in {}'.format(path))
+        if len(products) > 1:
+            LOG.warning('more than one product available at this path - FIXME')
+        info = products[0].info
+
         uuid = info[INFO.UUID]
         if uuid in self._layer_with_uuid:
             LOG.warning("layer with UUID {0:s} already in document?".format(uuid))
@@ -404,7 +410,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
 
         # FUTURE: Load this async, the slots for the below signal need to be OK with that
-        content = self._workspace.import_image_data(uuid)
+        content = self._workspace.import_product_content(uuid)
 
         # signal updates from the document
         self.didAddBasicLayer.emit(reordered_indices, dataset.uuid, presentation)
@@ -420,7 +426,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :return:
         """
         # Load all the metadata so we can sort the files
-        infos = [self._workspace.import_image(path) for path in paths]
+        # FIXME:
+        infos = self._workspace.collect_product_metadata_for_paths(paths)
 
         # Use the metadata to sort the paths
         paths = list(self.sort_datasets_into_load_order(infos))
