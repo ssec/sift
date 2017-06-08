@@ -201,6 +201,8 @@ class ABI_AHI_Guidebook(Guidebook):
             band_short_name = info.get(INFO.DATASET_NAME, '???')
         if INFO.SHORT_NAME not in info:
             z[INFO.SHORT_NAME] = band_short_name
+        else:
+            z[INFO.SHORT_NAME] = info[INFO.SHORT_NAME]
         if INFO.LONG_NAME not in info:
             z[INFO.LONG_NAME] = info.get(INFO.SHORT_NAME, z[INFO.SHORT_NAME])
 
@@ -208,7 +210,7 @@ class ABI_AHI_Guidebook(Guidebook):
             try:
                 z[INFO.STANDARD_NAME] = STANDARD_NAMES[info[INFO.PLATFORM]][info[INFO.INSTRUMENT]][info[INFO.BAND]]
             except KeyError:
-                z[INFO.STANDARD_NAME] = z.get(INFO.SHORT_NAME)
+                z[INFO.STANDARD_NAME] = "." + str(z.get(INFO.SHORT_NAME))
 
         # Only needed for backwards compatibility with originally supported geotiffs
         if INFO.UNITS not in info:
@@ -248,9 +250,14 @@ class ABI_AHI_Guidebook(Guidebook):
             return dsi["valid_min"], dsi["valid_max"]
         elif "flag_values" in dsi:
             return min(dsi["flag_values"]), max(dsi["flag_values"])
+        elif INFO.VALID_RANGE in dsi:
+            return dsi[INFO.VALID_RANGE]
         else:
             # some kind of default
             return 0., 255.
+
+    def valid_range(self, dsi):
+        return dsi.get(INFO.VALID_RANGE, dsi[INFO.CLIM])
 
     def default_colormap(self, dsi):
         return DEFAULT_COLORMAPS.get(dsi.get(INFO.STANDARD_NAME), DEFAULT_UNKNOWN)
@@ -259,9 +266,9 @@ class ABI_AHI_Guidebook(Guidebook):
         # FUTURE: This can be customized by the user
         when = ds_info.get(INFO.SCHED_TIME, ds_info.get(INFO.OBS_TIME))
         if when is None:
-            dtime = '--:--'
+            dtime = '--:--:--'
         else:
-            dtime = when.strftime('%Y-%m-%d %H:%M')
+            dtime = when.strftime('%Y-%m-%d %H:%M:%S')
         return dtime
 
     def _default_display_name(self, ds_info, display_time=None):
@@ -275,6 +282,8 @@ class ABI_AHI_Guidebook(Guidebook):
             label = 'Refl'
         elif label == 'toa_brightness_temperature':
             label = 'BT'
+        else:
+            label = ''
 
         if display_time is None:
             display_time = ds_info.get(INFO.DISPLAY_TIME, self._default_display_time(ds_info))

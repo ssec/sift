@@ -79,6 +79,7 @@ def generate_guidebook_metadata(layer_info):
     # add as visible to the front of the current set, and invisible to the rest of the available sets
     layer_info[INFO.COLORMAP] = guidebook.default_colormap(layer_info)
     layer_info[INFO.CLIM] = guidebook.climits(layer_info)
+    layer_info[INFO.VALID_RANGE] = guidebook.valid_range(layer_info)
     if INFO.DISPLAY_TIME not in layer_info:
         layer_info[INFO.DISPLAY_TIME] = guidebook._default_display_time(layer_info)
     if INFO.DISPLAY_NAME not in layer_info:
@@ -514,9 +515,9 @@ class Workspace(QObject):
     @staticmethod
     def _key_for_path(path):
         if not os.path.exists(path):
-            return None
+            return path, 0, 0
         s = os.stat(path)
-        return (os.path.realpath(path), s.st_mtime, s.st_size)
+        return os.path.realpath(path), s.st_mtime, s.st_size
 
     def _store_inventory(self):
         """
@@ -718,6 +719,12 @@ class Workspace(QObject):
         name = metadata[INFO.DATASET_NAME]
         source_path = metadata[INFO.PATHNAME]
 
+        if allow_cache and source_path is not None:
+            nfo = self._check_cache(source_path)
+            if nfo is not None and nfo[-1] is not None:
+                _, _, data = nfo
+                return data
+
         for imp in self._importers:
             if imp.is_relevant(source_path=source_path):
                 break
@@ -744,6 +751,74 @@ class Workspace(QObject):
         :param relation: dictionary with information on how the relation is calculated (FUTURE)
         """
         raise NotImplementedError()
+
+    def create_algebraic_composite(self, operations, namespace, info=None):
+        if not info:
+            info = {}
+
+        import ast
+        try:
+            ops_ast = ast.parse(operations, mode='exec')
+            ops = compile(ast.parse(operations, mode='exec'), '<string>', 'exec')
+            result_name = ops_ast.body[-1].targets[0].id
+        except SyntaxError:
+            raise ValueError("Invalid syntax or operations in algebraic layer")
+
+        uuid = uuidgen()
+        dep_metadata = {n: self.get_metadata(u) for n, u in namespace.items() if isinstance(u, UUID)}
+        md_list = list(dep_metadata.values())
+        if not all(x[INFO.PROJ] == md_list[0][INFO.PROJ] for x in md_list[1:]):
+            raise ValueError("Algebraic inputs must all be the same projection")
+
+        info[INFO.UUID] = uuid
+        for k in (INFO.PLATFORM, INFO.INSTRUMENT, INFO.SCHED_TIME,
+                  INFO.OBS_TIME, INFO.OBS_DURATION, INFO.SCENE):
+            if md_list[0].get(k) is None:
+                continue
+            if all(x.get(k) == md_list[0].get(k) for x in md_list[1:]):
+                info.setdefault(k, md_list[0][k])
+        info.setdefault(INFO.KIND, KIND.COMPOSITE)
+        info.setdefault(INFO.SHORT_NAME, '<unknown>')
+        info.setdefault(INFO.DATASET_NAME, info[INFO.SHORT_NAME])
+        info.setdefault(INFO.UNITS, '1')
+        info[INFO.PATHNAME] = '<algebraic layer: {} : {} : {}>'.format(info[INFO.DATASET_NAME], info[INFO.SCHED_TIME], str(info[INFO.UUID]))
+
+        # Get every combination of the valid mins and maxes
+        # See: https://stackoverflow.com/a/35608701/433202
+        names = list(dep_metadata.keys())
+        valid_combos = np.array(np.meshgrid(*tuple(dep_metadata[n][INFO.VALID_RANGE] for n in names))).reshape(len(names), -1)
+        valids_namespace = {n: valid_combos[idx] for idx, n in enumerate(names)}
+        content = {n: self.get_content(m[INFO.UUID]) for n, m in dep_metadata.items()}
+
+        # Get all content in the same shape
+        max_meta = max(dep_metadata.values(), key=lambda x: x[INFO.SHAPE])
+        for k in (INFO.PROJ, INFO.ORIGIN_X, INFO.ORIGIN_Y, INFO.CELL_WIDTH, INFO.CELL_HEIGHT):
+            info[k] = max_meta[k]
+        max_shape = max_meta[INFO.SHAPE]
+        for k, v in content.items():
+            if v.shape != max_shape:
+                f0 = int(max_shape[0] / v.shape[0])
+                f1 = int(max_shape[1] / v.shape[1])
+                v = np.ma.repeat(np.ma.repeat(v, f0, axis=0), f1, axis=1)
+                content[k] = v
+
+        # Run the code: code_object, no globals, copy of locals
+        exec(ops, None, valids_namespace)
+        if result_name not in valids_namespace:
+            raise RuntimeError("Unable to retrieve result '{}' from code execution".format(result_name))
+        info[INFO.VALID_RANGE] = (valids_namespace[result_name].min(), valids_namespace[result_name].max())
+        info[INFO.CLIM] = (valids_namespace[result_name].min(), valids_namespace[result_name].max())
+
+        exec(ops, None, content)
+        if result_name not in content:
+            raise RuntimeError("Unable to retrieve result '{}' from code execution".format(result_name))
+        info[INFO.SHAPE] = content[result_name].shape
+
+        info = generate_guidebook_metadata(info)
+        self._info[uuid] = info
+        self._data[uuid] = data = self._convert_to_memmap(str(uuid), content[result_name])
+        self._update_cache(info[INFO.PATHNAME], uuid, info, data)
+        return uuid, info, data
 
     def _preferred_cache_path(self, uuid):
         filename = str(uuid)

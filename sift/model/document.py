@@ -394,7 +394,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         info = self._workspace.import_image(source_path=path)
         uuid = info[INFO.UUID]
         if uuid in self._layer_with_uuid:
-            LOG.warning("layer with UUID {0:s} already in document?".format(uuid))
+            LOG.warning("layer with UUID {0} already in document?".format(uuid))
             content = self._workspace.get_content(uuid)
             return uuid, info, content
 
@@ -521,7 +521,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         zult = {}
         for uuid, pinf in uuids:
             lyr = self._layer_with_uuid[pinf.uuid]
-            if lyr[INFO.KIND] == KIND.IMAGE:
+            if lyr[INFO.KIND] in [KIND.IMAGE, KIND.COMPOSITE]:
                 value = self._workspace.get_content_point(pinf.uuid, xy_pos)
                 unit_info = lyr[INFO.UNIT_CONVERSION]
                 nc, xc = unit_info[1](np.array(pinf.climits))
@@ -845,7 +845,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.didChangeColorLimits.emit(nfo)
 
     def change_clims_for_siblings(self, uuid, clims):
-        uuids = self.channel_siblings(uuid)[0]
+        uuids = self.time_siblings(uuid)[0]
         return self.change_clims_for_layers_where(clims, uuids=uuids)
 
     def flip_climits_for_layers(self, uuids=None):
@@ -862,6 +862,33 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     nfo[uuid] = pinfo.climits[::-1]
                     L[dex] = pinfo._replace(climits=nfo[uuid])
         self.didChangeColorLimits.emit(nfo)
+
+    def create_algebraic_composite(self, operations, namespace, info=None, insert_before=0):
+        if info is None:
+            info = {}
+
+        short_name_to_ns_name = {self[u][INFO.SHORT_NAME]: k for k, u in namespace.items()}
+        namespace_siblings = {k: self.time_siblings(u)[0] for k, u in namespace.items()}
+        # go out of our way to make sure we make as many sibling layers as possible
+        # even if one or more time steps are missing
+        # NOTE: This does not handle if one product has a missing step and
+        # another has a different missing time step
+        time_master = max(namespace_siblings.values(), key=lambda v: len(v))
+        for idx in range(len(time_master)):
+            t = self[time_master[idx]][INFO.SCHED_TIME]
+            channel_siblings = [(self[u][INFO.SHORT_NAME], u) for u in self.channel_siblings(time_master[idx])[0]]
+            temp_namespace = {short_name_to_ns_name[sn]: u for sn, u in channel_siblings if sn in short_name_to_ns_name}
+            if len(temp_namespace) != len(namespace):
+                LOG.info("Missing some layers to create algebraic layer at {:%Y-%m-%d %H:%M:%S}".format(t))
+                continue
+            LOG.info("Creating algebraic layer '{}' for time {:%Y-%m-%d %H:%M:%S}".format(info.get(INFO.SHORT_NAME), self[time_master[idx]].get(INFO.SCHED_TIME)))
+
+            uuid, layer_info, data = self._workspace.create_algebraic_composite(operations, temp_namespace, info.copy())
+            self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, layer_info)
+            presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
+            if INFO.UNIT_CONVERSION not in dataset:
+                dataset[INFO.UNIT_CONVERSION] = units_conversion(dataset)
+            self.didAddCompositeLayer.emit(reordered_indices, dataset.uuid, presentation)
 
     def create_rgb_composite(self, r=None, g=None, b=None, clim=None, all_timesteps=True):
         """
@@ -972,7 +999,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.didChangeColorLimits.emit(changed)
 
     def _directory_of_layers(self, kind=KIND.IMAGE):
-        for x in [q for q in self._layer_with_uuid.values() if q.kind==kind]:
+        if not isinstance(kind, (list, tuple)):
+            kind = [kind]
+        for x in [q for q in self._layer_with_uuid.values() if q.kind in kind]:
             yield x.uuid, (x.platform, x.instrument, x.sched_time, x.band)
 
     def _rgb_layer_siblings_uuids(self, master_layer:DocRGBLayer):
@@ -1007,7 +1036,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """
         # FUTURE: consolidate/promote commonalities with loop_rgb_layers_following
         # build a directory of image layers to draw from
-        building_blocks = dict((key,uuid) for (uuid,key) in self._directory_of_layers(kind=KIND.IMAGE))
+        building_blocks = dict((key,uuid) for (uuid,key) in self._directory_of_layers(kind=[KIND.IMAGE, KIND.COMPOSITE]))
         plat, inst, band = master_layer.platform, master_layer.instrument, master_layer.band
         did_change = []
         for sibling in sibling_layers:
@@ -1051,7 +1080,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             return
 
         # build a directory of image layers to draw from
-        building_blocks = dict((key,uuid) for (uuid,key) in self._directory_of_layers(kind=KIND.IMAGE))
+        building_blocks = dict((key,uuid) for (uuid,key) in self._directory_of_layers(kind=[KIND.IMAGE, KIND.COMPOSITE]))
 
         # find the list of loaded timesteps
         loaded_timesteps = set(x.sched_time for x in self._layer_with_uuid.values())
@@ -1264,6 +1293,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def channel_siblings(self, uuid, sibling_infos=None):
         """
         filter document info to just dataset of the same channels
+        meaning all channels at a specific time, in alphabetical name order
         :param uuid: focus UUID we're trying to build around
         :param sibling_infos: dictionary of UUID -> Dataset Info to sort through
         :return: sorted list of sibling uuids in channel order
@@ -1273,8 +1303,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         it = sibling_infos.get(uuid, None)
         if it is None:
             return None
-        sibs = [(x[INFO.DATASET_NAME], x[INFO.UUID]) for x in
-                self._filter(sibling_infos.values(), it, {INFO.DATASET_NAME, INFO.STANDARD_NAME, INFO.SCENE, INFO.SCHED_TIME, INFO.INSTRUMENT, INFO.PLATFORM})]
+        sibs = [(x[INFO.SHORT_NAME], x[INFO.UUID]) for x in
+                self._filter(sibling_infos.values(), it, {INFO.SCENE, INFO.SCHED_TIME, INFO.INSTRUMENT, INFO.PLATFORM})]
         # then sort it by bands
         sibs.sort()
         offset = [i for i, x in enumerate(sibs) if x[1] == uuid]
@@ -1305,7 +1335,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if it is None:
             return [], 0
         sibs = [(x[INFO.SCHED_TIME], x[INFO.UUID]) for x in
-                self._filter(sibling_infos.values(), it, {INFO.SCENE, INFO.BAND, INFO.INSTRUMENT, INFO.PLATFORM})]
+                self._filter(sibling_infos.values(), it, {INFO.SHORT_NAME, INFO.STANDARD_NAME, INFO.SCENE, INFO.INSTRUMENT, INFO.PLATFORM})]
         # then sort it into time order
         sibs.sort()
         offset = [i for i,x in enumerate(sibs) if x[1]==uuid]

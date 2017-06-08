@@ -297,6 +297,7 @@ OTHER_COLORMAPS = OrderedDict([
     ('Red Transparency', red_trans),
     ('Green Transparency', green_trans),
     ('Blue Transparency', blue_trans),
+    ('grays', _colormaps['grays']),
 ])
 
 ALL_COLORMAPS = {}

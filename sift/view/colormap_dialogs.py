@@ -33,10 +33,10 @@ class ChangeColormapDialog(QtGui.QDialog):
         self._init_cmap_combo()
         self._init_vmin_slider()
         self.ui.vmin_edit.setValidator(self._validator)
-        self.ui.vmin_edit.setText('{:f}'.format(conv[1](self.valid_min)))
+        self.ui.vmin_edit.setText('{:f}'.format(conv[1](self._initial_clims[0])))
         self._init_vmax_slider()
         self.ui.vmax_edit.setValidator(self._validator)
-        self.ui.vmax_edit.setText('{:f}'.format(conv[1](self.valid_max)))
+        self.ui.vmax_edit.setText('{:f}'.format(conv[1](self._initial_clims[1])))
 
         self.ui.buttons.clicked.connect(self._clicked)
         self.ui.buttons.accepted.disconnect()

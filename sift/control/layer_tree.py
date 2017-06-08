@@ -53,39 +53,6 @@ LEFT_OFFSET = 28 if 'darwin' in sys.platform else 32
 TOP_OFFSET = 3
 
 
-class LayerContextMenu(QMenu):
-    def __init__(self, parent):
-        super(LayerContextMenu, self).__init__(parent)
-        self._change_cmap = self.addAction("Change Colormap")
-
-# def change_layer_colormap_menu(self, pos:QPoint, lbox:QTreeView, selected_uuids:list, *args):
-#     LOG.info('colormap menu requested for layer list')
-#     menu = QMenu()
-#     actions = {}
-#     current_colormaps = set(self.doc.colormap_for_uuids(selected_uuids))
-#     for cat, cat_colormaps in CATEGORIZED_COLORMAPS.items():
-#         submenu = QMenu(cat, parent=menu)
-#         for colormap in cat_colormaps.keys():
-#             action = submenu.addAction(colormap)
-#             actions[action] = colormap
-#             action.setCheckable(True)
-#             action.setChecked(colormap in current_colormaps)
-#         menu.addMenu(submenu)
-#     menu.addSeparator()
-#     flip_action = menu.addAction("Flip Color Limits")
-#     flip_action.setCheckable(True)
-#     flip_action.setChecked(any(self.doc.flipped_for_uuids(selected_uuids)))
-#     menu.addAction(flip_action)
-#     sel = menu.exec_(lbox.mapToGlobal(pos))
-#     if sel is flip_action:
-#         LOG.info("flipping color limits for sibling ids {0!r:s}".format(selected_uuids))
-#         self.doc.flip_climits_for_layers(uuids=selected_uuids)
-#     else:
-#         new_cmap = actions.get(sel, None)
-#         if new_cmap is not None:
-#             LOG.info("changing to colormap {0} for ids {1!r:s}".format(new_cmap, selected_uuids))
-#             self.doc.change_colormap_for_layers(name=new_cmap, uuids=selected_uuids)
-
 class LayerWidgetDelegate(QStyledItemDelegate):
     """
     set for a specific column, controls the rendering and editing of items in that column or row of a list or table
@@ -280,6 +247,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         self.doc = doc
         # self._column = [self._visibilityData, self._nameData]
         self.item_delegate = LayerWidgetDelegate(doc)
+        # FIXME: Reset colormap change dialog when layer set changes
 
         # for now, a copout by just having a refresh to the content when document changes
         doc.didReorderLayers.connect(self.refresh)
