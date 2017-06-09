@@ -61,13 +61,14 @@ from sift.common import INFO
 from sift.model.shapes import content_within_shape
 from sift.workspace.importer import GeoTiffImporter, GoesRPUGImporter
 from .metadatabase import Metadatabase, Content, Product, Resource
-from .importer import aImporter
+from .importer import aImporter, GeoTiffImporter, GoesRPUGImporter
 
 LOG = logging.getLogger(__name__)
 
 DEFAULT_WORKSPACE_SIZE = 256
 MIN_WORKSPACE_SIZE = 8
 
+IMPORT_CLASSES = [GeoTiffImporter, GoesRPUGImporter]
 
 
 # first instance is main singleton instance; don't preclude the possibility of importing from another workspace later on
@@ -271,14 +272,16 @@ class Workspace(QObject):
         self.cwd = directory_path = os.path.abspath(directory_path)
         self._inventory_path = os.path.join(self.cwd, '_inventory.db')
         if not os.path.isdir(directory_path):
+            LOG.info("creating new workspace at {}".format(directory_path))
             os.makedirs(directory_path)
             self._own_cwd = True
             self._init_create_workspace()
         else:
+            LOG.info("attaching pre-existing workspace at {}".format(directory_path))
             self._own_cwd = False
             self._init_inventory_existing_datasets()
         self._available = {}
-        self._importers = [x for x in self.IMPORT_CLASSES]
+        self._importers = [x for x in IMPORT_CLASSES]
         global TheWorkspace  # singleton
         if TheWorkspace is None:
             TheWorkspace = self
@@ -289,10 +292,12 @@ class Workspace(QObject):
         :return:
         """
         should_init = os.path.exists(self._inventory_path)
-        self._inventory = md = Metadatabase('sqlite://' + self._inventory_path)
+        dn,fn = os.path.split(self._inventory_path)
+        if not os.path.isdir(dn):
+            raise EnvironmentError("workspace directory {} does not exist".format(dn))
         if should_init:
             LOG.debug('initializing database at {}'.format(self._inventory_path))
-            md.create_tables()
+        self._inventory = md = Metadatabase('sqlite:///' + self._inventory_path, create_tables=should_init)
         self._S = md.session()
 
     def _purge_missing_content(self):
@@ -559,9 +564,9 @@ class Workspace(QObject):
             for imp in self._importers:
                 if imp.is_relevant(source_path=source_path):
                     S = self._inventory.session()
-                    hauler = imp(source_path=source_path, database_session=S,
+                    hauler = imp(source_path, database_session=S,
                                  workspace_cwd=self.cwd)
-                    hauler.merge_resource()
+                    hauler.merge_resources()
                     products = hauler.merge_products()
                     yield from products
 

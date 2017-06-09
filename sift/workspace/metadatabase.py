@@ -161,13 +161,16 @@ class ChainRecordWithDict(MutableMapping):
         return item in self.keys()
 
     def __getitem__(self, key):
-        if key in self._field_keys:
-            return self._obj.__dict__[key]
+        fieldname = self._field_keys.get(key)
+        if fieldname is not None:
+            return self._obj.__dict__[fieldname]
         return self._more[key]
 
     def __setitem__(self, key, value):
-        if key in self._field_keys:
-            self._obj.__dict__[key] = value
+        fieldname = self._field_keys.get(key)
+        if fieldname is not None:
+            # LOG.debug('assigning database field {}'.format(fieldname))
+            self._obj.__dict__[fieldname] = value
             # setattr(self._obj, key, value)
         else:
             self._more[key] = value
@@ -487,25 +490,25 @@ class Metadatabase(object):
         global _MDB
         if _MDB is not None:
             raise AssertionError('Metadatabase is a singleton and already exists')
+        self._MDB = self
         if uri:
             self.connect(uri, **kwargs)
 
     @staticmethod
-    def instance(*args):
+    def instance(*args, **kwargs):
         global _MDB
         if _MDB is None:
-            _MDB = Metadatabase(*args)
+            _MDB = Metadatabase(*args, **kwargs)
         return _MDB
 
-    def connect(self, uri, **kwargs):
+    def connect(self, uri, create_tables=False, **kwargs):
         assert(self.engine is None)
         assert(self.connection is None)
         self.engine = create_engine(uri, **kwargs)
         LOG.info('attaching database at {}'.format(uri))
+        if create_tables:
+            Base.metadata.create_all(self.engine)
         self.connection = self.engine.connect()
-
-    def create_tables(self):
-        Base.metadata.create_all(self.engine)
 
     def session(self):
         if self.session_factory is None:
@@ -569,12 +572,13 @@ class tests(unittest.TestCase):
 
     def test_insert(self):
         from datetime import datetime, timedelta
-        mdb = Metadatabase.instance('sqlite://')
-        mdb.create_tables()
+        mdb = Metadatabase('sqlite://', create_tables=True)
+        # mdb.create_tables()
         s = mdb.session()
         from uuid import uuid1
         uu = uuid1()
         when = datetime.utcnow()
+        nextwhen = when + timedelta(minutes=5)
         f = Resource(path='/path/to/foo.bar', mtime=when, atime=when, format=None)
         p = Product(uuid_str=str(uu), name='B00 Refl', obs_time=when, obs_duration=timedelta(minutes=5))
         f.product.append(p)
@@ -583,14 +587,16 @@ class tests(unittest.TestCase):
         s.add(f)
         s.add(p)
         s.commit()
-        p.info.update({'key': 'value'})
+        p.info.update({'key': 'value', INFO.OBS_TIME: nextwhen, INFO.OBS_DURATION: nextwhen + timedelta(seconds=15)})
         self.assertEqual(p.uuid, uu)
+        self.assertEqual(p.obs_time, nextwhen)
         q = f.product[0]
         # q = s.query(Product).filter_by(resource=f).first()
         self.assertEqual(q.info['test_key'], u'test_value')
         # self.assertEquals(q[INFO.UUID], q.uuid)
         self.assertEqual(q.info['turkey'], p.info['turkey'])
         self.assertEqual(q.info['key'], p.info['key'])
+        self.assertEqual(q.obs_time, nextwhen)
 
 def _debug(type, value, tb):
     "enable with sys.excepthook = debug"

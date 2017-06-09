@@ -136,9 +136,9 @@ class aSingleFileWithSingleProductImporter(aImporter):
     source_path: str = None
     _resource: Resource = None
 
-    def __init__(self, pug_path, workspace_cwd, database_session, **kwargs):
+    def __init__(self, source_path, workspace_cwd, database_session, **kwargs):
         super(aSingleFileWithSingleProductImporter, self).__init__(workspace_cwd, database_session)
-        self.source_path = pug_path
+        self.source_path = source_path
 
     def merge_resources(self) -> Iterable[Resource]:
         """
@@ -151,7 +151,7 @@ class aSingleFileWithSingleProductImporter(aImporter):
         else:
             self._resource = res = self._S.query(Resource).filter(Resource.path == self.source_path).first()
         if res is None:
-            LOG.debug('creating new Resource entry for {}'.format())
+            LOG.debug('creating new Resource entry for {}'.format(self.source_path))
             self._resource = res = Resource(
                 format=type(self),
                 path=self.source_path,
@@ -199,6 +199,7 @@ class aSingleFileWithSingleProductImporter(aImporter):
             atime = now,
         )
         prod.info.update(meta)  # sets fields like obs_duration and obs_time transparently
+        LOG.debug('new product: {}'.format(prod))
         self._S.add(prod)
         self._S.commit()
 
@@ -521,9 +522,9 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         LOG.debug(repr(d))
         return d
 
-    def __init__(self, pug_path, workspace_cwd, database_session, **kwargs):
-        super(GoesRPUGImporter, self).__init__(workspace_cwd, database_session)
-        self.source_path = pug_path
+    # def __init__(self, source_path, workspace_cwd, database_session, **kwargs):
+    #     super(GoesRPUGImporter, self).__init__(workspace_cwd, database_session)
+    #     self.source_path = source_path
 
     def product_metadata(self):
         return GoesRPUGImporter.get_metadata(self.source_path)
