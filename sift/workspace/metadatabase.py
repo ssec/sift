@@ -501,6 +501,7 @@ class Metadatabase(object):
         assert(self.engine is None)
         assert(self.connection is None)
         self.engine = create_engine(uri, **kwargs)
+        LOG.info('attaching database at {}'.format(uri))
         self.connection = self.engine.connect()
 
     def create_tables(self):

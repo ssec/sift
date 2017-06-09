@@ -82,8 +82,8 @@ class aImporter(ABC):
         self._S = database_session
         self._cwd = workspace_cwd
 
-    @staticmethod
-    def from_product(prod: Product, workspace_cwd, database_session, **kwargs) -> aImporter:
+    @classmethod
+    def from_product(cls, prod: Product, workspace_cwd, database_session, **kwargs):
         # FIXME: deal with products that need more than one resource
         cls = prod.resource[0].format
         return cls(prod.resource[0].path, workspace_cwd=workspace_cwd, database_session=database_session)
@@ -114,7 +114,7 @@ class aImporter(ABC):
         return []
 
     @abstractmethod
-    def begin_import_products(self, *products) -> Generator[import_progress]:
+    def begin_import_products(self, *products) -> Generator[import_progress, None, None]:
         """
         background import of content from a series of products
         if none are provided, all products resulting from merge_products should be imported

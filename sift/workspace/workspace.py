@@ -269,7 +269,7 @@ class Workspace(QObject):
             directory_path = str(self._tempdir)
             LOG.info('using temporary directory {}'.format(directory_path))
         self.cwd = directory_path = os.path.abspath(directory_path)
-        self._inventory_path = self._ws_path('_inventory.db')
+        self._inventory_path = os.path.join(self.cwd, '_inventory.db')
         if not os.path.isdir(directory_path):
             os.makedirs(directory_path)
             self._own_cwd = True
