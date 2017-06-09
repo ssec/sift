@@ -210,18 +210,18 @@ class Product(Base):
 
     # primary handler
     # kind = Column(PickleType)  # class or callable which can perform transformations on this data in workspace
-    atime = Column(DateTime)  # last time this file was accessed by application
+    atime = Column(DateTime, nullable=False)  # last time this file was accessed by application
 
     # cached metadata provided by the file format handler
-    name = Column(String)  # product identifier eg "B01", "B02"  # resource + shortname should be sufficient to identify the data
+    name = Column(String, nullable=False)  # product identifier eg "B01", "B02"  # resource + shortname should be sufficient to identify the data
 
     # platform = Column(String)  # platform or satellite name e.g. "GOES-16", "Himawari-8"; should match PLATFORM enum
     # standard_name = Column(String, nullable=True)
     #
     # times
     # display_time = Column(DateTime)  # normalized instantaneous scheduled observation time e.g. 20170122T2310
-    obs_time = Column(DateTime)  # actual observation time start
-    obs_duration = Column(Interval)  # duration of the observation
+    obs_time = Column(DateTime, nullable=False)  # actual observation time start
+    obs_duration = Column(Interval, nullable=False)  # duration of the observation
 
     # native resolution information - see Content for projection details at different LODs
     # resolution = Column(Integer, nullable=True)  # meters max resolution, e.g. 500, 1000, 2000, 4000
@@ -318,7 +318,7 @@ class ProductKeyValue(Base):
     """
     __tablename__ = 'product_key_values_v0'
     product_id = Column(ForeignKey(Product.id), primary_key=True)
-    key = Column(String, primary_key=True)
+    key = Column(PickleType, primary_key=True)  # FUTURE: can this be a string? for now need pickling of INFO/PLATFORM Enum
     # relationship: .product
     value = Column(PickleType)
 
@@ -470,7 +470,7 @@ class ContentKeyValue(Base):
     """
     __tablename__ = 'content_key_values_v0'
     product_id = Column(ForeignKey(Content.id), primary_key=True)
-    key = Column(String, primary_key=True)
+    key = Column(PickleType, primary_key=True)  # FUTURE: can this be a string?
     value = Column(PickleType)
 
 
@@ -580,7 +580,7 @@ class tests(unittest.TestCase):
         when = datetime.utcnow()
         nextwhen = when + timedelta(minutes=5)
         f = Resource(path='/path/to/foo.bar', mtime=when, atime=when, format=None)
-        p = Product(uuid_str=str(uu), name='B00 Refl', obs_time=when, obs_duration=timedelta(minutes=5))
+        p = Product(uuid_str=str(uu), atime=when, name='B00 Refl', obs_time=when, obs_duration=timedelta(minutes=5))
         f.product.append(p)
         p.info['test_key'] = u'test_value'
         p.info['turkey'] = u'cobbler'

@@ -426,8 +426,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :return:
         """
         # Load all the metadata so we can sort the files
-        # FIXME:
-        infos = self._workspace.collect_product_metadata_for_paths(paths)
+        infos = [x.info for x in self._workspace.collect_product_metadata_for_paths(paths)]
 
         # Use the metadata to sort the paths
         paths = list(self.sort_datasets_into_load_order(infos))
@@ -439,7 +438,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param paths: list of paths
         :return: list of paths
         """
-        infos = [self._workspace.get_metadata(path) for path in paths]
+        infos = [x.info for x in self._workspace.collect_product_metadata_for_paths(paths)]
         paths = list(reversed(self.sort_datasets_into_load_order(infos)))  # go from load order to display order by reversing
         return paths
 
@@ -463,7 +462,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         def _sort_key(info):
             return (info.get(INFO.DATASET_NAME),
-                    info.get(INFO.SCHED_TIME),
+                    info.get(INFO.OBS_TIME),
                     info.get(INFO.PATHNAME))
         order = sorted(infos, key=_sort_key, reverse=True)
         paths = riffraff + [info.get(INFO.PATHNAME) for info in order]

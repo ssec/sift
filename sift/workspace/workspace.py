@@ -463,11 +463,11 @@ class Workspace(QObject):
 
     @property
     def uuids_in_cache(self):
-        prods = self._S.query(Product).all()
-        return [p.uuid for p in prods]
+        contents_of_cache = self._S.query(Content).all()
+        return list(sorted(set(c.product.uuid for c in contents_of_cache)))
 
     def recently_used_resource_paths(self, n=32):
-        return list(p.resource.uri for p in self._S.query(Product).order_by(Product.atime.desc()).limit(n).all())
+        return list(p.path for p in self._S.query(Resource).order_by(Resource.atime.desc()).limit(n).all())
         # FIXME "replace this completely with product list"
 
     def _eject_resource_from_workspace(self, resource: Resource, defer_commit=False):

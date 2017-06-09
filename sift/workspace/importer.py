@@ -198,10 +198,14 @@ class aSingleFileWithSingleProductImporter(aImporter):
             uuid_str = str(uuid),
             atime = now,
         )
+        assert(INFO.OBS_TIME in meta)
+        assert(INFO.OBS_DURATION in meta)
         prod.info.update(meta)  # sets fields like obs_duration and obs_time transparently
+        assert(prod.info[INFO.OBS_TIME] is not None and prod.obs_time is not None)
         LOG.debug('new product: {}'.format(prod))
         self._S.add(prod)
         self._S.commit()
+        return [prod]
 
 
 class GeoTiffImporter(aSingleFileWithSingleProductImporter):
@@ -471,6 +475,8 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
             INFO.BAND: abi.band,
             INFO.INSTRUMENT: INSTRUMENT.ABI,
             INFO.SCHED_TIME: abi.sched_time,
+            INFO.OBS_TIME: abi.time_span[0],
+            INFO.OBS_DURATION: abi.time_span[1] - abi.time_span[0],
             INFO.DISPLAY_TIME: abi.display_time,
             INFO.SCENE: abi.scene_id,
             INFO.DISPLAY_NAME: abi.display_name
