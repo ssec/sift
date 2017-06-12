@@ -19,7 +19,7 @@ requirements:
   build:
     - python >=3.6
     - setuptools
-    - numpy >=1.11
+    - numpy >=1.12
     - matplotlib
     - scipy
     - numba >=0.30
@@ -41,7 +41,7 @@ requirements:
 
   run:
     - python >=3.6
-    - numpy >=1.11
+    - numpy >=1.12
     - matplotlib
     - scipy
     - numba >=0.30
