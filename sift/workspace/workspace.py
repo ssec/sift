@@ -611,8 +611,8 @@ class Workspace(QObject):
         for key,nfo in self._inventory.items():
             uuid,info,data_info = nfo
             filename, dtype, shape = data_info
-            path = os.path.join(self.cwd, filename)
-            if os.path.exists(path):
+            path = os.path.join(self.cwd, filename) if filename else None
+            if path and os.path.exists(path):
                 st = os.stat(path)
                 cache.append((st.st_atime, st.st_size, path, key))
                 total_size += st.st_size
