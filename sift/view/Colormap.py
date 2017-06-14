@@ -42,12 +42,18 @@ def generate_from_awips_cmap(cmap_file):
     lp = np.round(colors[1] * 255.)
     bpd = 1
     cn = 2
+    rds = (lp[0] - bp[0]) / bpd
+    gds = (lp[1] - bp[1]) / bpd
+    bds = (lp[2] - bp[2]) / bpd
     for c in colors[2:-1]:
      ep = 1.0 / bpd
      cc = np.round(c * 255.)
      rcs = cc[0] - lp[0]
      gcs = cc[1] - lp[1]
      bcs = cc[2] - lp[2]
+     rdsp = rds
+     gdsp = gds
+     bdsp = bds
      rds = (lp[0] - bp[0]) / bpd
      gds = (lp[1] - bp[1]) / bpd
      bds = (lp[2] - bp[2]) / bpd
@@ -59,6 +65,9 @@ def generate_from_awips_cmap(cmap_file):
       bpd += 1
       skp = 0
      elif (rcs*rds >= 0 and gcs*gds >= 0 and bcs*bds >= 0) and \
+      ((bpd >= 10 and (rds*rdsp != 0 or (rds*rdsp == 0 and max(abs(rds), abs(rdsp)) == 0)) and \
+       (gds*gdsp != 0 or (gds*gdsp == 0 and max(abs(gds), abs(gdsp)) == 0)) and \
+       (bds*bdsp != 0 or (bds*bdsp == 0 and max(abs(bds), abs(bdsp)) == 0))) or bpd < 10) and \
       ((abs(rcs) > np.ceil(abs(rds)+ep) and abs(res) < abs(rcs)) or (abs(rcs) < np.floor(abs(rds)-ep) and abs(res) > abs(rcs)) or \
        np.floor(abs(rds)-ep) <= abs(rcs) <= np.ceil(abs(rds)+ep)) and \
       ((abs(gcs) > np.ceil(abs(gds)+ep) and abs(ges) < abs(gcs)) or (abs(gcs) < np.floor(abs(gds)-ep) and abs(ges) > abs(gcs)) or \
@@ -301,42 +310,44 @@ vtrsb = Colormap(colors=_vtrsb_colors, controls=_vtrsb_control_points)
 _colorhcapeh10_control_points = (0.0, 0.1270772238514174, 0.25024437927663734, 0.3421309872922776, 0.4975562072336266, 0.6119257086999023, 0.7302052785923754, 0.8719452590420332, 1.0)
 _colorhcapeh10_colors = ('#4d3719', '#d7aa75', '#b3b3ff', '#5a5a99', '#ffff00', '#ff8270', '#ff0000', '#630066', '#ef00f4')
 colorhcapeh10 = Colormap(colors=_colorhcapeh10_colors, controls=_colorhcapeh10_control_points)
-_colorhlih10_control_points = (0.0, 0.09872922776148582, 0.17595307917888564, 0.2785923753665689, 0.4525904203323558, 0.5434995112414467, 0.6920821114369502, 0.804496578690127, 0.8807429130009775, 1.0)
-_colorhlih10_colors = ('#f80000', '#770000', '#636d00', '#e8ff00', '#7f8bfd', '#3e4478', '#ffbb8f', '#747c7b', '#3b2b0b', '#d7b482')
+_colorhlih10_control_points = (0.0, 0.09872922776148582, 0.17595307917888564, 0.2785923753665689, 0.4525904203323558, 0.5434995112414467, 0.6920821114369502, 0.7917888563049853, 0.8807429130009775, 1.0)
+_colorhlih10_colors = ('#f80000', '#770000', '#636d00', '#e8ff00', '#7f8bfd', '#3e4478', '#ffbb8f', '#7d898d', '#3b2b0b', '#d7b482')
 colorhlih10 = Colormap(colors=_colorhlih10_colors, controls=_colorhlih10_control_points)
 _colorhpw10h10_control_points = (0.0, 0.11632453567937438, 0.21407624633431085, 0.2883675464320626, 0.34701857282502446, 0.43206256109481916, 0.4555229716520039, 0.5356793743890518, 0.6275659824046921, 0.7047898338220919, 0.7497556207233627, 0.852394916911046, 1.0)
 _colorhpw10h10_colors = ('#3b2709', '#d9a675', '#9696fa', '#4f4f96', '#006363', '#73a427', '#92bf3a', '#ffff00', '#ff8263', '#962727', '#630063', '#ef00ef', '#fec7fe')
 colorhpw10h10 = Colormap(colors=_colorhpw10h10_colors, controls=_colorhpw10h10_control_points)
 _colorhpw8h10_control_points = (0.0, 0.093841642228739, 0.176930596285435, 0.23949169110459434, 0.2883675464320626, 0.3597262952101662, 0.3782991202346041, 0.4467253176930596, 0.5249266862170088, 0.5904203323558163, 0.6275659824046921, 0.7145650048875856, 0.8387096774193549, 0.8582600195503421, 0.9345063538611925, 1.0)
 _colorhpw8h10_colors = ('#422c0d', '#d9a675', '#9595f8', '#4f5095', '#006363', '#73a427', '#90be3b', '#ffff00', '#ff8263', '#952728', '#630063', '#ef00ef', '#ffc7ff', '#e1b3df', '#fe8265', '#962727')
-colorhpw8h10 = Colormap(colors=_colorhpw8h10_colors, controls=_colorhpw8h10_control_points)
-_ir_color_clouds_summer_control_points = (0.0, 0.48168050806057644, 0.48265754763067903, 0.5490962383976551, 0.646800195407914, 0.6951636541279922, 0.7625793844650708, 0.8236443575964827, 0.8847093307278945, 0.9574987787005373, 0.9960918417195896, 0.9970688812896922, 1.0)
+colorhpw8h10 = Colormap(colors=_colorhpw8h10_colors, controls=_colorhpw8h10_control_points)_ir_color_clouds_summer_control_points = (0.0, 0.48168050806057644, 0.48265754763067903, 0.5490962383976551, 0.646800195407914, 0.6951636541279922, 0.7625793844650708, 0.8236443575964827, 0.8847093307278945, 0.9574987787005373, 0.9960918417195896, 0.9970688812896922, 1.0)
 _ir_color_clouds_summer_colors = ('#000000', '#c1c1c1', '#00fcfd', '#000073', '#00ff00', '#ffff00', '#ff0000', '#000000', '#e6e6e6', '#7f007f', '#13daec', '#06ced4', '#000000')
-ir_color_clouds_summer = Colormap(colors=_ir_color_clouds_summer_colors, controls=_ir_color_clouds_summer_control_points)
-_ir_color_clouds_winter_control_points = (0.0, 0.48216902784562776, 0.48314606741573035, 0.5490962383976551, 0.646800195407914, 0.6951636541279922, 0.7625793844650708, 0.8236443575964827, 0.8847093307278945, 0.9574987787005373, 0.9960918417195896, 0.9970688812896922, 1.0)
-_ir_color_clouds_winter_colors = ('#000000', '#c1c1c1', '#00fafc', '#000073', '#00ff00', '#ffff00', '#ff0000', '#000000', '#e6e6e6', '#7f007f', '#13daec', '#06ced4', '#000000')
-ir_color_clouds_winter = Colormap(colors=_ir_color_clouds_winter_colors, controls=_ir_color_clouds_winter_control_points)
+ir_color_clouds_summer = FlippedColormap(colors=_ir_color_clouds_summer_colors, controls=_ir_color_clouds_summer_control_points)
+_ir_color_clouds_winter_control_points = (0.0, 0.12261846604787494, 0.48216902784562776, 0.48314606741573035, 0.5490962383976551, 0.646800195407914, 0.6951636541279922, 0.7625793844650708, 0.8236443575964827, 0.8847093307278945, 0.9574987787005373, 0.9960918417195896, 0.9970688812896922, 1.0)
+_ir_color_clouds_winter_colors = ('#000000', '#010101', '#c1c1c1', '#00fafc', '#000073', '#00ff00', '#ffff00', '#ff0000', '#000000', '#e6e6e6', '#7f007f', '#13daec', '#06ced4', '#000000')
+ir_color_clouds_winter = FlippedColormap(colors=_ir_color_clouds_winter_colors, controls=_ir_color_clouds_winter_control_points)
+_rainbow_11_bit_control_points = (0.0, 0.002442598925256473, 0.06497313141182218, 0.1270151441133366, 0.189057156814851, 0.25158768930141673, 0.31411822178798243, 0.3761602344894968, 0.4386907669760625, 0.5012212994626283, 0.563751831949194, 0.6257938446507083, 0.688324377137274, 0.7513434294088911, 0.8754274548119199, 1.0)
+_rainbow_11_bit_colors = ('#7e0000', '#000000', '#803e1e', '#ff0000', '#ff7e7e', '#ffff00', '#7eff7e', '#00ff00', '#007e7e', '#00ffff', '#7e7eff', '#0000ff', '#7e007e', '#ff00ff', '#ffffff', '#000000')
+rainbow_11_bit = FlippedColormap(colors=_rainbow_11_bit_colors, controls=_rainbow_11_bit_control_points)
 _wv_dry_yellow_control_points = (0.0, 0.21299462628236443, 0.3048363458720078, 0.4211040547142159, 0.48216902784562776, 0.6101612115290669, 0.701514411333659, 1.0)
 _wv_dry_yellow_colors = ('#000000', '#6c6c6c', '#ff0000', '#ffff00', '#000073', '#ffffff', '#438323', '#000000')
-wv_dry_yellow = Colormap(colors=_wv_dry_yellow_colors, controls=_wv_dry_yellow_control_points)
-_dust_and_moisture_split_window_control_points = (0.0, 0.0014655593551538837, 0.002442598925256473, 0.46555935515388375, 0.46653639472398634, 0.5002442598925256, 0.5339521250610649, 0.6170004885197851, 0.767953102100635, 0.8334147532975086, 1.0)
-_dust_and_moisture_split_window_colors = ('#000000', '#5f5f5f', '#824513', '#fddcb1', '#ffdeae', '#ffffff', '#0000ff', '#ffff00', '#ff0000', '#ff00ff', '#ff00ff')
+wv_dry_yellow = FlippedColormap(colors=_wv_dry_yellow_colors, controls=_wv_dry_yellow_control_points)
+_dust_and_moisture_split_window_control_points = (0.0, 0.0014655593551538837, 0.002442598925256473, 0.2994626282364436, 0.46555935515388375, 0.46653639472398634, 0.5002442598925256, 0.5339521250610649, 0.6170004885197851, 0.767953102100635, 0.8334147532975086, 1.0)
+_dust_and_moisture_split_window_colors = ('#000000', '#5f5f5f', '#824513', '#834614', '#fddcb1', '#ffdeae', '#ffffff', '#0000ff', '#ffff00', '#ff0000', '#ff00ff', '#ff00ff')
 dust_and_moisture_split_window = Colormap(colors=_dust_and_moisture_split_window_colors, controls=_dust_and_moisture_split_window_control_points)
-_enhancedhrainbowh11_control_points = (0.0, 0.002442598925256473, 0.06497313141182218, 0.1270151441133366, 0.31411822178798243, 0.37664875427454814, 0.5012212994626283, 0.688324377137274, 0.8754274548119199, 1.0)
-_enhancedhrainbowh11_colors = ('#7e0000', '#000000', '#803e1e', '#ff0000', '#7eff00', '#007e00', '#00ffff', '#7e007e', '#ffffff', '#000000')
-enhancedhrainbowh11 = Colormap(colors=_enhancedhrainbowh11_colors, controls=_enhancedhrainbowh11_control_points)
-_enhancedhrainbow_warmer_yellow_control_points = (0.0, 0.30685675492192804, 0.35030549898167007, 0.39341479972844534, 0.5234215885947047, 0.5668703326544468, 0.653428377460964, 0.7834351663272233, 0.9134419551934827, 1.0)
-_enhancedhrainbow_warmer_yellow_colors = ('#ffff00', '#000000', '#803e1f', '#ff0000', '#7fff00', '#007f00', '#00ffff', '#7f007f', '#ffffff', '#000000')
-enhancedhrainbow_warmer_yellow = Colormap(colors=_enhancedhrainbow_warmer_yellow_colors, controls=_enhancedhrainbow_warmer_yellow_control_points)
-_fire_detection_3p9_control_points = (0.0, 0.36590131900341966, 0.36687835857352225, 1.0)
-_fire_detection_3p9_colors = ('#ff0000', '#fffc00', '#141414', '#ffffff')
-fire_detection_3p9 = Colormap(colors=_fire_detection_3p9_colors, controls=_fire_detection_3p9_control_points)
-_ramsdis_ir_12bit_control_points = (0.0, 0.505982905982906, 0.5064713064713064, 0.5794871794871795, 0.5851037851037851, 0.5855921855921856, 0.6466422466422467, 0.702075702075702, 0.7074481074481075, 0.7711843711843712, 0.7746031746031746, 0.8412698412698413, 0.8417582417582418, 0.8844932844932845, 0.8901098901098901, 0.8905982905982905, 0.9455433455433455, 0.9516483516483516, 1.0)
-_ramsdis_ir_12bit_colors = ('#080808', '#ffffff', '#fdfd00', '#646400', '#8c6400', '#8e0000', '#f200f7', '#8b008c', '#005e90', '#05dcd0', '#0bf800', '#006f00', '#000000', '#d8d8d8', '#d8d8f6', '#0000f8', '#000066', '#f70077', '#010000')
+_enhancedhrainbowh11_control_points = (0.0, 0.002442598925256473, 0.06497313141182218, 0.1270151441133366, 0.252076209086468, 0.3146067415730337, 0.37664875427454814, 0.5012212994626283, 0.5642403517342452, 0.626770884220811, 0.6888128969223254, 0.7513434294088911, 0.8754274548119199, 1.0)
+_enhancedhrainbowh11_colors = ('#7e0000', '#000000', '#803e1e', '#ff0000', '#feff00', '#7efe00', '#007e00', '#00ffff', '#007efe', '#00007e', '#800080', '#ff00ff', '#ffffff', '#000000')
+enhancedhrainbowh11 = FlippedColormap(colors=_enhancedhrainbowh11_colors, controls=_enhancedhrainbowh11_control_points)
+_enhancedhrainbow_warmer_yellow_control_points = (0.0, 0.30685675492192804, 0.35030549898167007, 0.39341479972844534, 0.4803122878479294, 0.5237610319076714, 0.5668703326544468, 0.653428377460964, 0.6972165648336728, 0.7406653088934148, 0.7837746096401901, 0.8272233536999322, 0.9134419551934827, 1.0)
+_enhancedhrainbow_warmer_yellow_colors = ('#ffff00', '#000000', '#803e1f', '#ff0000', '#fdff00', '#7efd00', '#007f00', '#00ffff', '#007efd', '#01007f', '#800080', '#ff01ff', '#ffffff', '#000000')
+enhancedhrainbow_warmer_yellow = FlippedColormap(colors=_enhancedhrainbow_warmer_yellow_colors, controls=_enhancedhrainbow_warmer_yellow_control_points)
+_fire_detection_3.9_control_points = (0.0, 0.36590131900341966, 0.36687835857352225, 1.0)
+_fire_detection_3.9_colors = ('#ff0000', '#fffc00', '#141414', '#ffffff')
+fire_detection_3.9 = Colormap(colors=_fire_detection_3.9_colors, controls=_fire_detection_3.9_control_points)
+_ramsdis_ir_12bit_control_points = (0.0, 0.505982905982906, 0.5064713064713064, 0.5794871794871795, 0.5851037851037851, 0.5855921855921856, 0.6463980463980464, 0.6468864468864469, 0.702075702075702, 0.7074481074481075, 0.768986568986569, 0.7746031746031746, 0.7777777777777778, 0.7841269841269841, 0.7882783882783883, 0.7914529914529914, 0.7963369963369963, 0.8024420024420025, 0.8083028083028083, 0.8146520146520146, 0.819047619047619, 0.8219780219780219, 0.8268620268620268, 0.832967032967033, 0.8412698412698413, 0.8417582417582418, 0.8844932844932845, 0.8901098901098901, 0.8905982905982905, 0.9455433455433455, 0.9514041514041514, 0.9518925518925518, 1.0)
+_ramsdis_ir_12bit_colors = ('#080808', '#ffffff', '#fdfd00', '#646400', '#8c6400', '#8e0000', '#f1007b', '#f100f6', '#8b008c', '#005e90', '#00cad0', '#0bf800', '#0bf100', '#0ae200', '#09d900', '#08d200', '#07c700', '#06b900', '#05ac00', '#049e00', '#039400', '#028d00', '#018200', '#007500', '#006f00', '#000000', '#d8d8d8', '#d8d8f6', '#0000f8', '#000066', '#7b0076', '#f50076', '#010000')
 ramsdis_ir_12bit = Colormap(colors=_ramsdis_ir_12bit_colors, controls=_ramsdis_ir_12bit_control_points)
-_ramsdis_wv_12bit_control_points = (0.0, 0.0761904761904762, 0.07765567765567766, 0.07936507936507936, 0.3474969474969475, 0.34798534798534797, 0.39023199023199023, 0.3934065934065934, 0.43614163614163615, 0.43907203907203907, 0.4818070818070818, 0.4822954822954823, 0.48473748473748474, 0.6156288156288157, 0.6161172161172161, 0.64004884004884, 0.6405372405372405, 0.701098901098901, 0.7015873015873015, 0.7621489621489621, 0.7626373626373626, 0.8234432234432234, 0.8656898656898657, 0.8661782661782662, 0.8717948717948718, 0.8722832722832723, 0.884004884004884, 0.8844932844932845, 0.945054945054945, 0.9455433455433455, 1.0)
-_ramsdis_wv_12bit_colors = ('#050500', '#313100', '#181800', '#000000', '#c8c800', '#fd4a4a', '#211212', '#4b0000', '#e20000', '#ff7e00', '#4b0000', '#430606', '#222222', '#ffffff', '#6496c8', '#4d7eb1', '#000064', '#0000fe', '#006400', '#00fe00', '#640000', '#ffff00', '#8a8a35', '#ffffff', '#ffffff', '#636347', '#4e4e50', '#ffffff', '#4e4e33', '#000031', '#000031')
-ramsdis_wv_12bit = Colormap(colors=_ramsdis_wv_12bit_colors, controls=_ramsdis_wv_12bit_control_points)
+_ramsdis_wv_12bit_control_points = (0.0, 0.0761904761904762, 0.07765567765567766, 0.07936507936507936, 0.11282051282051282, 0.3474969474969475, 0.34798534798534797, 0.39023199023199023, 0.3934065934065934, 0.43614163614163615, 0.43907203907203907, 0.4818070818070818, 0.4822954822954823, 0.48473748473748474, 0.6156288156288157, 0.6161172161172161, 0.64004884004884, 0.6405372405372405, 0.701098901098901, 0.7015873015873015, 0.7621489621489621, 0.7626373626373626, 0.8234432234432234, 0.8656898656898657, 0.8661782661782662, 0.8717948717948718, 0.8722832722832723, 0.884004884004884, 0.8844932844932845, 0.945054945054945, 0.9455433455433455, 1.0)
+_ramsdis_wv_12bit_colors = ('#050500', '#313100', '#181800', '#000000', '#454500', '#c8c800', '#fd4a4a', '#211212', '#4b0000', '#e20000', '#ff7e00', '#4b0000', '#430606', '#222222', '#ffffff', '#6496c8', '#4d7eb1', '#000064', '#0000fe', '#006400', '#00fe00', '#640000', '#ffff00', '#8a8a35', '#ffffff', '#ffffff', '#636347', '#4e4e50', '#ffffff', '#4e4e33', '#000031', '#000031')
+ramsdis_wv_12bit = FlippedColormap(colors=_ramsdis_wv_12bit_colors, controls=_ramsdis_wv_12bit_control_points)
 
 white_trans = Colormap(colors=np.array([[0., 0., 0., 0.], [1., 1., 1., 1.]]))
 red_trans = Colormap(colors=np.array([[0., 0., 0., 0.], [1., 0., 0., 1.]]))
