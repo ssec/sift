@@ -706,6 +706,13 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
                  texture_shape=(DEFAULT_TEXTURE_HEIGHT, DEFAULT_TEXTURE_WIDTH),
                  wrap_lon=False,
                  cmap='viridis', method='tiled', clim='auto', interpolation='nearest', **kwargs):
+        # projection properties to be filled in later
+        self.cell_width = None
+        self.cell_height = None
+        self.origin_x = None
+        self.origin_y = None
+        self.shape = None
+
         if method != 'tiled':
             raise ValueError("Only 'tiled' method is currently supported")
         method = 'subdivide'

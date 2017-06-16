@@ -1124,7 +1124,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 sequence.append((when, new_layer.uuid))
 
         if force_color_limits:
-            pinfo, = self.prez_for_uuids(master.uuid)
+            pinfo = self.prez_for_uuid(master.uuid)
             self.change_rgbs_clims(pinfo.climits, (uu for _, uu in sequence))
 
         if make_contributing_layers_invisible:
