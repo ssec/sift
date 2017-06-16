@@ -30,8 +30,7 @@ The Windows installers end in `.exe`, Linux with `.tar.gz`, and Mac OSX with
 `.dmg`. See the sections below for details on installing SIFT for each
 operating system.
 
-Run on Windows
-**************
+### Run on Windows
 
 After executing the downloaded `.exe` installer follow the installation
 wizard to install SIFT. SIFT can then be run from the "SIFT" shortcut
@@ -39,8 +38,7 @@ in the start menu. By default SIFT caches files in a "Workspace" located
 at the user's `Documents/sift_workspace`. The installation wizard allows
 you to customize this location.
 
-Run on Linux
-************
+### Run on Linux
 
 The downloaded tarball `.tar.gz` can be extracted by running:
 
@@ -52,16 +50,14 @@ for available command line options.
 If SIFT will not start please ensure that the `LD_LIBRARY_PATH` environment
 variable is not set.
 
-Run on Mac
-**********
+### Run on Mac
 
 The downloaded DMG file can be extracted opened by double clicking on it.
 The available `.app` should then be moved to the appropriate `Applications`
 folder. Double clicking the `.app` icon from `Applications` will execute
 SIFT.
 
-Installing with Conda
-*********************
+### Installing with Conda
 
 SIFT can also be installed with the Anaconda/Conda package manager. Python
 3.6 is currently the only supported python environment. It can be installed by
