@@ -36,53 +36,57 @@ def generate_from_awips_cmap(cmap_file):
 
     colors = _get_awips_colors(cmap_file)
 
-    skp = 0
-    control_indexes = [0]
-    bp = np.round(colors[0] * 255.)
-    lp = np.round(colors[1] * 255.)
-    bpd = 1
-    cn = 2
-    rds = (lp[0] - bp[0]) / bpd
-    gds = (lp[1] - bp[1]) / bpd
-    bds = (lp[2] - bp[2]) / bpd
-    for c in colors[2:-1]:
-     ep = 1.0 / bpd
-     cc = np.round(c * 255.)
-     rcs = cc[0] - lp[0]
-     gcs = cc[1] - lp[1]
-     bcs = cc[2] - lp[2]
-     rdsp = rds
-     gdsp = gds
-     bdsp = bds
+    if len(colors) < 10:
+     control_indexes = range(len(colors))
+     cn = len(colors) - 1
+    else:
+     skp = 0
+     control_indexes = [0]
+     bp = np.round(colors[0] * 255.)
+     lp = np.round(colors[1] * 255.)
+     bpd = 1
+     cn = 2
      rds = (lp[0] - bp[0]) / bpd
      gds = (lp[1] - bp[1]) / bpd
      bds = (lp[2] - bp[2]) / bpd
-     cd = np.round(colors[cn+1] * 255.)
-     res = 0.5 * (cd[0] - lp[0])
-     ges = 0.5 * (cd[1] - lp[1])
-     bes = 0.5 * (cd[2] - lp[2])
-     if skp == 1:
-      bpd += 1
-      skp = 0
-     elif (rcs*rds >= 0 and gcs*gds >= 0 and bcs*bds >= 0) and \
-      ((bpd >= 10 and (rds*rdsp != 0 or (rds*rdsp == 0 and max(abs(rds), abs(rdsp)) == 0)) and \
-       (gds*gdsp != 0 or (gds*gdsp == 0 and max(abs(gds), abs(gdsp)) == 0)) and \
-       (bds*bdsp != 0 or (bds*bdsp == 0 and max(abs(bds), abs(bdsp)) == 0))) or bpd < 10) and \
-      ((abs(rcs) > np.ceil(abs(rds)+ep) and abs(res) < abs(rcs)) or (abs(rcs) < np.floor(abs(rds)-ep) and abs(res) > abs(rcs)) or \
-       np.floor(abs(rds)-ep) <= abs(rcs) <= np.ceil(abs(rds)+ep)) and \
-      ((abs(gcs) > np.ceil(abs(gds)+ep) and abs(ges) < abs(gcs)) or (abs(gcs) < np.floor(abs(gds)-ep) and abs(ges) > abs(gcs)) or \
-       np.floor(abs(gds)-ep) <= abs(gcs) <= np.ceil(abs(gds)+ep)) and \
-      ((abs(bcs) > np.ceil(abs(bds)+ep) and abs(bes) < abs(bcs)) or (abs(bcs) < np.floor(abs(bds)-ep) and abs(bes) > abs(bcs)) or \
-       np.floor(abs(bds)-ep) <= abs(bcs) <= np.ceil(abs(bds)+ep)):
-      bpd += 1
-     else:
-      control_indexes.append(cn-1)
-      bp = lp
-      bpd = 1
-      skp = 1
-     lp = cc
-     cn += 1
-    control_indexes.append(cn)
+     for c in colors[2:-1]:
+      ep = 1.0 / bpd
+      cc = np.round(c * 255.)
+      rcs = cc[0] - lp[0]
+      gcs = cc[1] - lp[1]
+      bcs = cc[2] - lp[2]
+      rdsp = rds
+      gdsp = gds
+      bdsp = bds
+      rds = (lp[0] - bp[0]) / bpd
+      gds = (lp[1] - bp[1]) / bpd
+      bds = (lp[2] - bp[2]) / bpd
+      cd = np.round(colors[cn+1] * 255.)
+      res = 0.5 * (cd[0] - lp[0])
+      ges = 0.5 * (cd[1] - lp[1])
+      bes = 0.5 * (cd[2] - lp[2])
+      if skp == 1:
+       bpd += 1
+       skp = 0
+      elif (rcs*rds >= 0 and gcs*gds >= 0 and bcs*bds >= 0) and \
+       ((bpd >= 10 and (rds*rdsp != 0 or (rds*rdsp == 0 and max(abs(rds), abs(rdsp)) == 0)) and \
+        (gds*gdsp != 0 or (gds*gdsp == 0 and max(abs(gds), abs(gdsp)) == 0)) and \
+        (bds*bdsp != 0 or (bds*bdsp == 0 and max(abs(bds), abs(bdsp)) == 0))) or bpd < 10) and \
+       ((abs(rcs) > np.ceil(abs(rds)+ep) and abs(res) < abs(rcs)) or (abs(rcs) < np.floor(abs(rds)-ep) and abs(res) > abs(rcs)) or \
+        np.floor(abs(rds)-ep) <= abs(rcs) <= np.ceil(abs(rds)+ep)) and \
+       ((abs(gcs) > np.ceil(abs(gds)+ep) and abs(ges) < abs(gcs)) or (abs(gcs) < np.floor(abs(gds)-ep) and abs(ges) > abs(gcs)) or \
+        np.floor(abs(gds)-ep) <= abs(gcs) <= np.ceil(abs(gds)+ep)) and \
+       ((abs(bcs) > np.ceil(abs(bds)+ep) and abs(bes) < abs(bcs)) or (abs(bcs) < np.floor(abs(bds)-ep) and abs(bes) > abs(bcs)) or \
+        np.floor(abs(bds)-ep) <= abs(bcs) <= np.ceil(abs(bds)+ep)):
+       bpd += 1
+      else:
+       control_indexes.append(cn-1)
+       bp = lp
+       bpd = 1
+       skp = 1
+      lp = cc
+      cn += 1
+     control_indexes.append(cn)
 
 #    changes = np.abs(np.diff(np.diff(colors, axis=0), axis=0))
 #    second_order_indexes = np.sort(list({0, colors.shape[0] - 1} |
@@ -162,6 +166,23 @@ class FlippedColormap(Colormap):
         colors = colors[::-1]
         controls = [1-x for x in controls][::-1]
         super().__init__(colors, controls=controls, **kwargs)
+
+
+class BlockedColormap(Colormap):
+    """Remove gradients from colormap.
+    """
+    def __init__(self, colors, controls, **kwargs):
+        colors_new = []
+        controls_new = []
+        for c in colors[:-1]:
+            colors_new.append(c)
+            colors_new.append(c)
+        colors_new.append(colors[-1])
+        controls_new.append(controls[0])
+        for c in controls[1:]:
+            controls_new.append(c-1.0/len(controls))
+            controls_new.append(c)
+        super().__init__(colors_new, controls=controls_new, **kwargs)
 
 
 # Hand made colormap for the CIRA IR Default colormap
@@ -295,12 +316,12 @@ _slc_wv_colors = ('#000000', '#995c35', '#3a3835', '#759285', '#166f4c', '#076a4
 slc_wv = FlippedColormap(colors=_slc_wv_colors, controls=_slc_wv_control_points)
 
 # TOWRS
-_actp_control_points = (0.0, 0.16666666666666666, 0.6666666666666666, 1.0)
-_actp_colors = ('#000000', '#00ffff', '#ff0000', '#000000')
-actp = Colormap(colors=_actp_colors, controls=_actp_control_points)
-_adp_control_points = (0.0, 0.375, 0.625, 1.0)
-_adp_colors = ('#000000', '#0000ff', '#ff0000', '#000000')
-adp = Colormap(colors=_adp_colors, controls=_adp_control_points)
+_actp_control_points = (0.0, 0.16666666666666666, 0.3333333333333333, 0.5, 0.6666666666666666, 0.8333333333333334, 1.0)
+_actp_colors = ('#000000', '#00ffff', '#00ff00', '#007f00', '#ff0000', '#ffffff', '#000000')
+actp = BlockedColormap(colors=_actp_colors, controls=_actp_control_points)
+_adp_control_points = (0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1.0)
+_adp_colors = ('#000000', '#000000', '#0000ff', '#0000ff', '#ff0000', '#ff0000', '#ffae17', '#ffae17', '#000000')
+adp = BlockedColormap(colors=_adp_colors, controls=_adp_control_points)
 _rrqpe_control_points = (0.0, 0.001669449081803005, 0.1652754590984975, 0.1686143572621035, 0.332220367278798, 0.335559265442404, 0.4991652754590985, 0.5025041736227045, 0.666110183639399, 0.669449081803005, 0.8330550918196995, 0.8363939899833055, 1.0)
 _rrqpe_colors = ('#000000', '#fd7efd', '#9a1a9a', '#7ecafd', '#1a679a', '#7efd7e', '#1a9a1a', '#fdfd7e', '#9a9a1a', '#fdca7e', '#9a671a', '#fd7e7e', '#9a1a1a')
 rrqpe = Colormap(colors=_rrqpe_colors, controls=_rrqpe_control_points)
@@ -318,7 +339,8 @@ _colorhpw10h10_colors = ('#3b2709', '#d9a675', '#9696fa', '#4f4f96', '#006363', 
 colorhpw10h10 = Colormap(colors=_colorhpw10h10_colors, controls=_colorhpw10h10_control_points)
 _colorhpw8h10_control_points = (0.0, 0.093841642228739, 0.176930596285435, 0.23949169110459434, 0.2883675464320626, 0.3597262952101662, 0.3782991202346041, 0.4467253176930596, 0.5249266862170088, 0.5904203323558163, 0.6275659824046921, 0.7145650048875856, 0.8387096774193549, 0.8582600195503421, 0.9345063538611925, 1.0)
 _colorhpw8h10_colors = ('#422c0d', '#d9a675', '#9595f8', '#4f5095', '#006363', '#73a427', '#90be3b', '#ffff00', '#ff8263', '#952728', '#630063', '#ef00ef', '#ffc7ff', '#e1b3df', '#fe8265', '#962727')
-colorhpw8h10 = Colormap(colors=_colorhpw8h10_colors, controls=_colorhpw8h10_control_points)_ir_color_clouds_summer_control_points = (0.0, 0.48168050806057644, 0.48265754763067903, 0.5490962383976551, 0.646800195407914, 0.6951636541279922, 0.7625793844650708, 0.8236443575964827, 0.8847093307278945, 0.9574987787005373, 0.9960918417195896, 0.9970688812896922, 1.0)
+colorhpw8h10 = Colormap(colors=_colorhpw8h10_colors, controls=_colorhpw8h10_control_points)
+_ir_color_clouds_summer_control_points = (0.0, 0.48168050806057644, 0.48265754763067903, 0.5490962383976551, 0.646800195407914, 0.6951636541279922, 0.7625793844650708, 0.8236443575964827, 0.8847093307278945, 0.9574987787005373, 0.9960918417195896, 0.9970688812896922, 1.0)
 _ir_color_clouds_summer_colors = ('#000000', '#c1c1c1', '#00fcfd', '#000073', '#00ff00', '#ffff00', '#ff0000', '#000000', '#e6e6e6', '#7f007f', '#13daec', '#06ced4', '#000000')
 ir_color_clouds_summer = FlippedColormap(colors=_ir_color_clouds_summer_colors, controls=_ir_color_clouds_summer_control_points)
 _ir_color_clouds_winter_control_points = (0.0, 0.12261846604787494, 0.48216902784562776, 0.48314606741573035, 0.5490962383976551, 0.646800195407914, 0.6951636541279922, 0.7625793844650708, 0.8236443575964827, 0.8847093307278945, 0.9574987787005373, 0.9960918417195896, 0.9970688812896922, 1.0)
@@ -339,12 +361,12 @@ enhancedhrainbowh11 = FlippedColormap(colors=_enhancedhrainbowh11_colors, contro
 _enhancedhrainbow_warmer_yellow_control_points = (0.0, 0.30685675492192804, 0.35030549898167007, 0.39341479972844534, 0.4803122878479294, 0.5237610319076714, 0.5668703326544468, 0.653428377460964, 0.6972165648336728, 0.7406653088934148, 0.7837746096401901, 0.8272233536999322, 0.9134419551934827, 1.0)
 _enhancedhrainbow_warmer_yellow_colors = ('#ffff00', '#000000', '#803e1f', '#ff0000', '#fdff00', '#7efd00', '#007f00', '#00ffff', '#007efd', '#01007f', '#800080', '#ff01ff', '#ffffff', '#000000')
 enhancedhrainbow_warmer_yellow = FlippedColormap(colors=_enhancedhrainbow_warmer_yellow_colors, controls=_enhancedhrainbow_warmer_yellow_control_points)
-_fire_detection_3.9_control_points = (0.0, 0.36590131900341966, 0.36687835857352225, 1.0)
-_fire_detection_3.9_colors = ('#ff0000', '#fffc00', '#141414', '#ffffff')
-fire_detection_3.9 = Colormap(colors=_fire_detection_3.9_colors, controls=_fire_detection_3.9_control_points)
+_fire_detection_3p9_control_points = (0.0, 0.36590131900341966, 0.36687835857352225, 1.0)
+_fire_detection_3p9_colors = ('#ff0000', '#fffc00', '#141414', '#ffffff')
+fire_detection_3p9 = FlippedColormap(colors=_fire_detection_3p9_colors, controls=_fire_detection_3p9_control_points)
 _ramsdis_ir_12bit_control_points = (0.0, 0.505982905982906, 0.5064713064713064, 0.5794871794871795, 0.5851037851037851, 0.5855921855921856, 0.6463980463980464, 0.6468864468864469, 0.702075702075702, 0.7074481074481075, 0.768986568986569, 0.7746031746031746, 0.7777777777777778, 0.7841269841269841, 0.7882783882783883, 0.7914529914529914, 0.7963369963369963, 0.8024420024420025, 0.8083028083028083, 0.8146520146520146, 0.819047619047619, 0.8219780219780219, 0.8268620268620268, 0.832967032967033, 0.8412698412698413, 0.8417582417582418, 0.8844932844932845, 0.8901098901098901, 0.8905982905982905, 0.9455433455433455, 0.9514041514041514, 0.9518925518925518, 1.0)
 _ramsdis_ir_12bit_colors = ('#080808', '#ffffff', '#fdfd00', '#646400', '#8c6400', '#8e0000', '#f1007b', '#f100f6', '#8b008c', '#005e90', '#00cad0', '#0bf800', '#0bf100', '#0ae200', '#09d900', '#08d200', '#07c700', '#06b900', '#05ac00', '#049e00', '#039400', '#028d00', '#018200', '#007500', '#006f00', '#000000', '#d8d8d8', '#d8d8f6', '#0000f8', '#000066', '#7b0076', '#f50076', '#010000')
-ramsdis_ir_12bit = Colormap(colors=_ramsdis_ir_12bit_colors, controls=_ramsdis_ir_12bit_control_points)
+ramsdis_ir_12bit = FlippedColormap(colors=_ramsdis_ir_12bit_colors, controls=_ramsdis_ir_12bit_control_points)
 _ramsdis_wv_12bit_control_points = (0.0, 0.0761904761904762, 0.07765567765567766, 0.07936507936507936, 0.11282051282051282, 0.3474969474969475, 0.34798534798534797, 0.39023199023199023, 0.3934065934065934, 0.43614163614163615, 0.43907203907203907, 0.4818070818070818, 0.4822954822954823, 0.48473748473748474, 0.6156288156288157, 0.6161172161172161, 0.64004884004884, 0.6405372405372405, 0.701098901098901, 0.7015873015873015, 0.7621489621489621, 0.7626373626373626, 0.8234432234432234, 0.8656898656898657, 0.8661782661782662, 0.8717948717948718, 0.8722832722832723, 0.884004884004884, 0.8844932844932845, 0.945054945054945, 0.9455433455433455, 1.0)
 _ramsdis_wv_12bit_colors = ('#050500', '#313100', '#181800', '#000000', '#454500', '#c8c800', '#fd4a4a', '#211212', '#4b0000', '#e20000', '#ff7e00', '#4b0000', '#430606', '#222222', '#ffffff', '#6496c8', '#4d7eb1', '#000064', '#0000fe', '#006400', '#00fe00', '#640000', '#ffff00', '#8a8a35', '#ffffff', '#ffffff', '#636347', '#4e4e50', '#ffffff', '#4e4e33', '#000031', '#000031')
 ramsdis_wv_12bit = FlippedColormap(colors=_ramsdis_wv_12bit_colors, controls=_ramsdis_wv_12bit_control_points)
