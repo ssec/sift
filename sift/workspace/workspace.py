@@ -291,14 +291,16 @@ class Workspace(QObject):
         initialize a previously empty workspace
         :return:
         """
-        should_init = os.path.exists(self._inventory_path)
+        should_init = not os.path.exists(self._inventory_path)
         dn,fn = os.path.split(self._inventory_path)
         if not os.path.isdir(dn):
             raise EnvironmentError("workspace directory {} does not exist".format(dn))
-        if should_init:
-            LOG.debug('initializing database at {}'.format(self._inventory_path))
+        LOG.info('{} database at {}'.format('initializing' if should_init else 'attaching', self._inventory_path))
         self._inventory = md = Metadatabase('sqlite:///' + self._inventory_path, create_tables=should_init)
         self._S = md.session()
+        if should_init:
+            assert(0 == self._S.query(Content).count())
+        LOG.info('done with init')
 
     def _purge_missing_content(self):
         to_purge = []
@@ -470,7 +472,7 @@ class Workspace(QObject):
         return list(p.path for p in self._S.query(Resource).order_by(Resource.atime.desc()).limit(n).all())
         # FIXME "replace this completely with product list"
 
-    def _eject_resource_from_workspace(self, resource: Resource, defer_commit=False):
+    def _purge_content_for_resource(self, resource: Resource, defer_commit=False):
         """
         remove all resource contents from the database
         if the resource original path no longer exists, also purge resource and products from database
@@ -494,7 +496,7 @@ class Workspace(QObject):
         for path in paths:
             rsr_hits = self._S.query(Resource).filter_by(path=path).all()
             for rsr in rsr_hits:
-                total += self._eject_resource_from_workspace(rsr, defer_commit=True)
+                total += self._purge_content_for_resource(rsr, defer_commit=True)
         self._S.commit()
         return total
 
@@ -507,14 +509,14 @@ class Workspace(QObject):
         """
         # get information on current cache contents
         LOG.info("cleaning cache")
-        inv, cache, total_size = self._inventory_check()
+        total_size = self._total_workspace_bytes()
         GB = 1024**3
         LOG.info("total cache size is {}GB of max {}GB".format(total_size/GB, self._max_size_gb))
         max_size = self._max_size_gb * GB
         for res in self._S.query(Resource).order_by(Resource.atime).all():
             if total_size < max_size:
                 break
-            total_size -= self._eject_resource_from_workspace(res)
+            total_size -= self._purge_content_for_resource(res)
             # remove all content for lowest atimes until
 
     def close(self):

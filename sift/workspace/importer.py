@@ -85,7 +85,11 @@ class aImporter(ABC):
     @classmethod
     def from_product(cls, prod: Product, workspace_cwd, database_session, **kwargs):
         # FIXME: deal with products that need more than one resource
-        cls = prod.resource[0].format
+        try:
+            cls = prod.resource[0].format
+        except IndexError:
+            LOG.error('no resources in {} {}'.format(repr(type(prod)), repr(prod)))
+            raise
         return cls(prod.resource[0].path, workspace_cwd=workspace_cwd, database_session=database_session)
 
     @abstractclassmethod
@@ -198,6 +202,7 @@ class aSingleFileWithSingleProductImporter(aImporter):
             uuid_str = str(uuid),
             atime = now,
         )
+        prod.resource.append(res)
         assert(INFO.OBS_TIME in meta)
         assert(INFO.OBS_DURATION in meta)
         prod.info.update(meta)  # sets fields like obs_duration and obs_time transparently

@@ -141,7 +141,7 @@ class ChainRecordWithDict(MutableMapping):
         self._obj, self._field_keys, self._more = obj, field_keys, more
 
     def keys(self):
-        return set(self._more.keys()) + set(self._field_keys.keys)
+        return set(self._more.keys()) | set(self._field_keys.keys())
 
     def items(self):
         for k in self.keys():
@@ -507,6 +507,7 @@ class Metadatabase(object):
         self.engine = create_engine(uri, **kwargs)
         LOG.info('attaching database at {}'.format(uri))
         if create_tables:
+            LOG.info("creating database tables")
             Base.metadata.create_all(self.engine)
         self.connection = self.engine.connect()
 

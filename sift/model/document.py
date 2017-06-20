@@ -397,8 +397,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if len(products) > 1:
             LOG.warning('more than one product available at this path - FIXME')
         info = products[0].info
+        uuid = products[0].uuid
 
-        uuid = info[INFO.UUID]
         if uuid in self._layer_with_uuid:
             LOG.warning("layer with UUID {0:s} already in document?".format(uuid))
             content = self._workspace.get_content(uuid)
