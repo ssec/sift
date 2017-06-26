@@ -563,6 +563,7 @@ class Workspace(QObject):
         """
         # FUTURE: consider returning importers instead of products, since we can then re-use them to import the content instead of having to regenerate
         for source_path in paths:
+            LOG.info('collecting metadata for {}'.format(source_path))
             for imp in self._importers:
                 if imp.is_relevant(source_path=source_path):
                     S = self._inventory.session()

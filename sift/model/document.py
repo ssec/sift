@@ -404,6 +404,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             content = self._workspace.get_content(uuid)
             return uuid, info, content
 
+        LOG.info('new layer info: {}'.format(repr(info)))
         self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, info)
         if INFO.UNIT_CONVERSION not in dataset:
             dataset[INFO.UNIT_CONVERSION] = units_conversion(dataset)
@@ -439,6 +440,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :return: list of paths
         """
         infos = [x.info for x in self._workspace.collect_product_metadata_for_paths(paths)]
+        LOG.info('path info for sorting: {}'.format(repr(infos)))
         paths = list(reversed(self.sort_datasets_into_load_order(infos)))  # go from load order to display order by reversing
         return paths
 
