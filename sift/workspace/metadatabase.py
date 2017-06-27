@@ -163,15 +163,18 @@ class ChainRecordWithDict(MutableMapping):
     def __getitem__(self, key):
         fieldname = self._field_keys.get(key)
         if fieldname is not None:
-            return self._obj.__dict__[fieldname]
+            return getattr(self._obj, fieldname.value)
         return self._more[key]
+
+    def __repr__(self):
+        return '<ChainRecordWithDict {}>'.format(repr(dict(iter(self))))
 
     def __setitem__(self, key, value):
         fieldname = self._field_keys.get(key)
         if fieldname is not None:
-            # LOG.debug('assigning database field {}'.format(fieldname))
-            self._obj.__dict__[fieldname] = value
-            # setattr(self._obj, key, value)
+            LOG.debug('assigning database field {}'.format(fieldname))
+            # self._obj.__dict__[fieldname] = value
+            setattr(self._obj, key.value, value)
         else:
             self._more[key] = value
 
@@ -249,16 +252,17 @@ class Product(Base):
 
     def __init__(self, *args, **kwargs):
         super(Product, self).__init__(*args, **kwargs)
-        self._info = ChainRecordWithDict(self, self.INFO_TO_FIELD, self._kwinfo)
 
     def __repr__(self):
-        return "<Product '{}' @ {}~{}>".format(self.name, self.obs_time, self.obs_time + self.obs_duration)
+        return "<Product '{}' @ {}~{} / {} keys>".format(self.name, self.obs_time, self.obs_time + self.obs_duration, len(self.info.keys()))
 
     @property
     def info(self):
         """
         :return: mapping merging INFO-compatible database fields with key-value dictionary access pattern
         """
+        if self._info is None:
+            self._info = ChainRecordWithDict(self, self.INFO_TO_FIELD, self._kwinfo)
         return self._info
 
     @property
@@ -397,6 +401,8 @@ class Content(Base):
     INFO_TO_FIELD = {
         INFO.CELL_HEIGHT: 'cell_height',
         INFO.CELL_WIDTH: 'cell_width',
+        INFO.ORIGIN_X: 'origin_x',
+        INFO.ORIGIN_Y: 'origin_y',
         INFO.PROJ: 'proj4',
         INFO.SHORT_NAME: 'name',
         INFO.PATHNAME: 'path'

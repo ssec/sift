@@ -439,7 +439,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param paths: list of paths
         :return: list of paths
         """
-        infos = [x.info for x in self._workspace.collect_product_metadata_for_paths(paths)]
+        products = list(self._workspace.collect_product_metadata_for_paths(paths))
+        LOG.debug('sorting products {} for paths {}'.format(repr(products), repr(paths)))
+        infos = [x.info for x in products]
         LOG.info('path info for sorting: {}'.format(repr(infos)))
         paths = list(reversed(self.sort_datasets_into_load_order(infos)))  # go from load order to display order by reversing
         return paths

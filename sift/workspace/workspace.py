@@ -564,14 +564,19 @@ class Workspace(QObject):
         # FUTURE: consider returning importers instead of products, since we can then re-use them to import the content instead of having to regenerate
         for source_path in paths:
             LOG.info('collecting metadata for {}'.format(source_path))
+            # FIXME: decide whether to update database if mtime of file is newer than mtime in database
             for imp in self._importers:
                 if imp.is_relevant(source_path=source_path):
-                    S = self._inventory.session()
-                    hauler = imp(source_path, database_session=S,
+                    import_session = self._inventory.session()
+                    hauler = imp(source_path, database_session=import_session,
                                  workspace_cwd=self.cwd)
                     hauler.merge_resources()
-                    products = hauler.merge_products()
-                    yield from products
+                    for prod in hauler.merge_products():
+                        # merge the product into our database session, since it may belong to import_session
+                        assert(prod is not None)
+                        zult = self._S.merge(prod)
+                        LOG.debug('yielding product metadata {}'.format(repr(zult)))
+                        yield zult
 
     def import_product_content(self, uuid=None, prod=None, allow_cache=True):
         S = self._inventory.session()

@@ -187,10 +187,13 @@ class aSingleFileWithSingleProductImporter(aImporter):
         else:
             self._resource = res = self._S.query(Resource).filter(Resource.path == self.source_path).first()
         if res is None:
+            LOG.debug('no resources for {}'.format(self.source_path))
             return []
 
         if len(res.product):
-            return res.product
+            zult = list(res.product)
+            LOG.debug('pre-existing products {}'.format(repr(zult)))
+            return zult
 
         # else probe the file and add product metadata, without importing content
         from uuid import uuid1
@@ -207,7 +210,7 @@ class aSingleFileWithSingleProductImporter(aImporter):
         assert(INFO.OBS_DURATION in meta)
         prod.info.update(meta)  # sets fields like obs_duration and obs_time transparently
         assert(prod.info[INFO.OBS_TIME] is not None and prod.obs_time is not None)
-        LOG.debug('new product: {}'.format(prod))
+        LOG.debug('new product: {}'.format(repr(prod)))
         self._S.add(prod)
         self._S.commit()
         return [prod]

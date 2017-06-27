@@ -266,6 +266,7 @@ class Main(QtGui.QMainWindow):
 
     def update_recent_file_menu(self, *args, **kwargs):
         paths = self.workspace.recently_used_resource_paths()
+        LOG.debug('recent paths: {}'.format(repr(paths)))
         paths = self.document.sort_paths(paths)
         LOG.debug('recent files: {0!r:s}'.format(paths))
         self._recent_files_menu.clear()
