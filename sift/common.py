@@ -169,13 +169,15 @@ class INFO(Enum):
     # unit string format func: lambda x, numeric=True, units=True: formatted string
     CENTRAL_WAVELENGTH = 'nominal_wavelength'
 
-    @classmethod
-    def from_value(cls, value_str, unknown=UNKNOWN):
-        """Convert external string to Enum"""
-        for m in cls:
-            if m.value == value_str:
-                return m
-        return value_str if unknown is None else unknown
+    def __lt__(self, other):
+        """
+        when using pickletype in sqlalchemy tables, a comparator is needed for enumerations
+        :param other:
+        :return:
+        """
+        if not isinstance(other, type(self)):
+            raise ValueError("cannot compare {} to {}".format(repr(self), repr(other)))
+        return self.value < other.value
 
 @jit(nb_types.UniTuple(int64, 2)(float64[:, :], float64[:, :]))
 def get_reference_points(img_cmesh, img_vbox):

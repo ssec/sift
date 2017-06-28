@@ -170,11 +170,12 @@ class ChainRecordWithDict(MutableMapping):
     def __getitem__(self, key):
         fieldname = self._field_keys.get(key)
         if fieldname is not None:
+            assert(isinstance(fieldname, str))
             return getattr(self._obj, fieldname)
         return self._more[key]
 
     def __repr__(self):
-        return '<ChainRecordWithDict {}>'.format(repr(dict(iter(self))))
+        return '<ChainRecordWithDict {}>'.format(repr(tuple(self.keys())))
 
     def __setitem__(self, key, value):
         fieldname = self._field_keys.get(key)  # INFO -> fieldname
@@ -277,31 +278,55 @@ class Product(Base):
         nat = self.content[-1] if len(self.content) else None
         return nat.proj4 if nat else None
 
+    @proj4.setter
+    def proj4(self, value):
+        LOG.error('DEPRECATED: setting proj4 on resource')
+
     @property
     def cell_height(self):
         nat = self.content[-1] if len(self.content) else None
         return nat.cell_height if nat else None
+
+    @cell_height.setter
+    def cell_height(self, value):
+        LOG.error('DEPRECATED: setting cell_height on resource')
 
     @property
     def cell_width(self):
         nat = self.content[-1] if len(self.content) else None
         return nat.cell_width if nat else None
 
+    @cell_width.setter
+    def cell_width(self, value):
+        LOG.error('DEPRECATED: setting cell_width on resource')
+
     @property
     def origin_x(self):
         nat = self.content[-1] if len(self.content) else None
         return nat.origin_x if nat else None
+
+    @origin_x.setter
+    def origin_x(self, value):
+        LOG.error('DEPRECATED: setting origin_x on resource')
 
     @property
     def origin_y(self):
         nat = self.content[-1] if len(self.content) else None
         return nat.origin_y if nat else None
 
+    @origin_y.setter
+    def origin_y(self, value):
+        LOG.error('DEPRECATED: setting origin_y on resource')
+
     @property
     def path(self):
-        if len(self.resource) > 1:
-            LOG.warning('Product {} has more than one resource, path is ambiguous'.format(self.name))
-        return self.resource[0].path if len(self.resource)==1 else None
+        # if len(self.resource) > 1:
+        #     LOG.warning('Product {} has more than one resource, path is ambiguous'.format(self.name))
+        return self.resource[0].path  # FIXME if len(self.resource)==1 else None
+
+    @path.setter
+    def path(self, value):
+        LOG.error('DEPRECATED: setting path on resource')
 
     def can_be_activated_without_importing(self):
         return len(self.content)>0
@@ -609,6 +634,7 @@ class tests(unittest.TestCase):
         # p.info['key'] = 'value'
         # p.obs_time = nextwhen
         s.commit()
+        self.assertIs(p.resource[0], f)
         self.assertEqual(p.uuid, uu)
         self.assertEqual(p.obs_time, nextwhen)
         q = f.product[0]

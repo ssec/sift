@@ -599,7 +599,6 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         # FUTURE and for some cases the sparsity array, if the data is interleaved (N/A for NetCDF imagery)
 
         bandtype = np.float32
-        LOG.info('caching PUG imagery in workspace %s' % cache_path)
         img_data[:] = np.ma.fix_invalid(image, copy=False, fill_value=np.NAN)  # FIXME: expensive
 
         # create and commit a Content entry pointing to where the content is in the workspace, even if coverage is empty

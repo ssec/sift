@@ -439,12 +439,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param paths: list of paths
         :return: list of paths
         """
-        products = list(self._workspace.collect_product_metadata_for_paths(paths))
-        LOG.debug('sorting products {} for paths {}'.format(repr(products), repr(paths)))
-        infos = [x.info for x in products]
-        LOG.info('path info for sorting: {}'.format(repr(infos)))
-        paths = list(reversed(self.sort_datasets_into_load_order(infos)))  # go from load order to display order by reversing
-        return paths
+        LOG.error("DEPRECATED: sort products, not files, since files may have multipe products")
+        return list(sorted(paths))
+        # products = list(self._workspace.collect_product_metadata_for_paths(paths))
+        # LOG.debug('sorting products {} for paths {}'.format(repr(products), repr(paths)))
+        # infos = [x.info for x in products]
+        # LOG.info('path info for sorting: {}'.format(repr(infos)))
+        # paths = list(reversed(self.sort_datasets_into_load_order(infos)))  # go from load order to display order by reversing
+        # return paths
 
     def sort_datasets_into_load_order(self, infos):
         """
@@ -455,6 +457,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param infos: iterable of info dictionaries
         :return: ordered list of path strings
         """
+
         # FIXME: It is not possible for a pathname to be considered "irrelevant"
         # riffraff = [path for path in paths if not nfo[path]]
         riffraff = []

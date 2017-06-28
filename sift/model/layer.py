@@ -50,12 +50,14 @@ class DocLayer(ChainMap):
     """
     _doc = None  # weakref to document that owns us
 
-    def __init__(self, doc, *args, **kwargs):
+    def __init__(self, doc, info, *args, **kwargs):
         self._doc = ref(doc)
         # store of metadata that comes from the input content and does not change
-        self._definitive = dict(*args, **kwargs)
+        # FIXME: review whether we can get by without copying this (is it harmless to do so?)
+        self._definitive = info  # definitive information provided by workspace, read-only from our perspective
+        self._additional = dict(*args, **kwargs)  # FUTURE: can we deprecate this?
         self._user_modified = {}
-        super(DocLayer, self).__init__(self._user_modified, self._definitive)
+        super(DocLayer, self).__init__(self._user_modified, self._additional, self._definitive)
 
     @property
     def parent(self):
