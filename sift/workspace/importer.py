@@ -561,6 +561,9 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
 
         pug = PugL1bTools(source_path)
         rows, cols = shape = pug.shape
+        cell_height, cell_width = pug.cell_size
+        origin_y, origin_x = pug.origin
+        proj4 = pug.proj4_string
 
         now = datetime.utcnow()
 
@@ -604,7 +607,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         # create and commit a Content entry pointing to where the content is in the workspace, even if coverage is empty
         c = Content(
             lod = 0,
-            resolution = int(min(prod.info[INFO.CELL_WIDTH], prod.info[INFO.CELL_HEIGHT])),
+            resolution = int(min(cell_width, cell_height)),
             atime = now,
             mtime = now,
 
@@ -612,8 +615,9 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
             path = data_filename,
             rows = rows,
             cols = cols,
-            levels = 0,
-            dtype = 'float32',
+            proj4 = proj4,
+            # levels = 0,
+            # dtype = 'float32',
 
             # info about the coverage array memmap, which in our case just tells what rows are ready
             # coverage_rows = rows,
