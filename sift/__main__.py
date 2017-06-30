@@ -464,6 +464,8 @@ class Main(QtGui.QMainWindow):
 
         if xy_pos is not None and state:
             lon, lat = xy_pos
+            lon = lon % 360 if lon > 0 else lon % -360 + 360
+            lon = lon - 360 if lon > 180 else lon
             lon_str = "{:.02f} {}".format(abs(lon), "W" if lon < 0 else "E")
             lat_str = "{:.02f} {}".format(abs(lat), "S" if lat < 0 else "N")
             self.ui.cursorProbeLocation.setText("Probe Location: {}, {}".format(lon_str, lat_str))
