@@ -257,6 +257,11 @@ class DocRGBLayer(DocCompositeLayer):
         gst = lambda x: None if (x is None) else x.platform
         return _concurring(gst(self.r), gst(self.g), gst(self.b), remove_none=True)
 
+    @property
+    def scene(self):
+        gst = lambda x: None if (x is None) else x[INFO.SCENE]
+        return _concurring(gst(self.r), gst(self.g), gst(self.b), remove_none=True)
+
     def _get_units_conversion(self):
         def conv_func(x, inverse=False, deps=(self.r, self.g, self.b)):
             if isinstance(x, np.ndarray):
@@ -334,6 +339,7 @@ class DocRGBLayer(DocCompositeLayer):
             INFO.BAND: self.band,
             INFO.INSTRUMENT: self.instrument,
             INFO.PLATFORM: self.platform,
+            INFO.SCENE: self.scene,
             INFO.UNIT_CONVERSION: self._get_units_conversion(),
         }
 

@@ -754,17 +754,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param bandwise: True if we want to change by band instead of time
         :return: UUID of new focus layer
         """
-        # get list of UUIDs in time order, plus index where the focus uuid is
-        layer = self._layer_with_uuid[uuid]
-        if isinstance(layer, DocRGBLayer):
-            sibs = self._rgb_layer_siblings_uuids(layer)
-            dex = sibs.index(uuid)
+        if bandwise:  # next or last band
+            consult_guide = self.channel_siblings
         else:
-            if bandwise:  # next or last band
-                consult_guide = self.channel_siblings
-            else:
-                consult_guide = self.time_siblings
-            sibs, dex = consult_guide(uuid)
+            consult_guide = self.time_siblings
+        sibs, dex = consult_guide(uuid)
         # LOG.debug('layer {0} family is +{1} of {2!r:s}'.format(uuid, dex, sibs))
         if not sibs:
             LOG.info('nothing to do in next_last_timestep')
