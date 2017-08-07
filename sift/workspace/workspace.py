@@ -75,7 +75,7 @@ IMPORT_CLASSES = [GeoTiffImporter, GoesRPUGImporter]
 TheWorkspace = None
 
 
-@nb.jit(nopython=True, nogil=True)
+@nb.jit(nogil=True)
 def mask_from_coverage_sparsity_2d(mask: np.ndarray, coverage: np.ndarray, sparsity: np.ndarray):
     """
     update a numpy.ma style mask from coverage and sparsity arrays
@@ -179,7 +179,9 @@ class ActiveContent(QObject):
         else:
             mask = self._mask
             mask[:] = False
-        mask_from_coverage_sparsity_2d(mask, self._coverage, self._sparsity)
+        present = np.array([[1]], dtype=np.int8)
+        LOG.warning('mask_from_coverage_sparsity needs inclusion')
+        # mask_from_coverage_sparsity_2d(mask, self._coverage or present, self._sparsity or present)
 
     def _attach(self, mode='c'):
         """
@@ -188,7 +190,7 @@ class ActiveContent(QObject):
         :return: workspace_data_arrays instance
         """
         c = self._C
-        self._rcl, self._shape = rcl, shape = self._rcl(c.rows, c.cols, c.levels)
+        self._rcl, self._shape = rcl, shape = self._rcls(c.rows, c.cols, c.levels)
         def mm(path, *args, **kwargs):
             full_path = os.path.join(self._wsd, path)
             if not os.access(full_path, os.R_OK):
@@ -381,7 +383,9 @@ class Workspace(QObject):
     def _overview_content_for_uuid(self, uuid):
         # FUTURE: do a compound query for this to get the Content entry
         prod = self._product_with_uuid(uuid)
+        assert(prod is not None)
         ovc = self._product_overview_content(prod)
+        assert(ovc is not None)
         arrays = self._cached_arrays_for_content(ovc)
         return arrays.data
 
@@ -509,7 +513,7 @@ class Workspace(QObject):
         """
         # get information on current cache contents
         LOG.info("cleaning cache")
-        total_size = self._total_workspace_bytes()
+        total_size = self._total_workspace_bytes
         GB = 1024**3
         LOG.info("total cache size is {}GB of max {}GB".format(total_size/GB, self._max_size_gb))
         max_size = self._max_size_gb * GB
@@ -590,17 +594,20 @@ class Workspace(QObject):
 
         # FIXME: for now, just iterate the incremental load. later we want to add this to TheQueue and update the UI as we get more data loaded
         gen = truck.begin_import_products(prod)
+        nupd = 0
         for update in gen:
+            nupd += 1
             # we're now incrementally reading the input file
             # data updates are coming back to us (eventually asynchronously)
             # Content is in the metadatabase and being updated + committed, including sparsity and coverage arrays
             if update.data is not None:
-                data = update.data
+                # data = update.data
                 LOG.info("{} {}: {:.01f}%".format(name, update.stage_desc, update.completion*100.0))
         # self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
-
-        # FIXME: distinguish overview from higher resolution LODs
-        return data
+        LOG.debug('received {} updates during import'.format(nupd))
+        # make an ActiveContent object from the Content, now that we've imported it
+        ac = self._overview_content_for_uuid(prod.uuid)
+        return ac.data
 
     def create_composite(self, symbols:dict, relation:dict):
         """
@@ -677,11 +684,13 @@ class Workspace(QObject):
             dsi_or_uuid = UUID(dsi_or_uuid)
         prod = self._product_with_uuid(dsi_or_uuid)
         prod.touch()
-        content = self._S.query(Content).filter_by(Content.product_id==prod.id).order_by(Content.lod.desc()).first()
+        content = self._S.query(Content).filter(Content.product_id==prod.id).order_by(Content.lod.desc()).first()
         if not content:
             raise AssertionError('no content in workspace for {}, must re-import'.format(prod))
         content.touch()
         self._S.commit()  # flush any pending updates to workspace db file
+
+        # FIXME: find the content for the requested LOD, then return its ActiveContent - or attach one
         return self._cached_arrays_for_content(content)
 
     def _create_position_to_index_transform(self, dsi_or_uuid):

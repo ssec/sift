@@ -443,7 +443,7 @@ class Content(Base):
     _info = None  # database fields and key-value dictionary merged as one transparent mapping
 
     def __init__(self, *args, **kwargs):
-        super(Product, self).__init__(*args, **kwargs)
+        super(Content, self).__init__(*args, **kwargs)
         self._info = ChainRecordWithDict(self, self.INFO_TO_FIELD, self._kwinfo)
 
     @property

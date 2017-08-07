@@ -401,8 +401,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         if uuid in self._layer_with_uuid:
             LOG.warning("layer with UUID {0:s} already in document?".format(uuid))
-            content = self._workspace.get_content(uuid)
-            return uuid, info, content
+            active_content_data = self._workspace.get_content(uuid)
+            return uuid, info, active_content_data
 
         LOG.info('new layer info: {}'.format(repr(info)))
         self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, info)
@@ -411,12 +411,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
 
         # FUTURE: Load this async, the slots for the below signal need to be OK with that
-        content = self._workspace.import_product_content(uuid)
+        active_content_data = self._workspace.import_product_content(uuid)
 
         # signal updates from the document
         self.didAddBasicLayer.emit(reordered_indices, dataset.uuid, presentation)
 
-        return uuid, dataset, content
+        return uuid, dataset, active_content_data
 
     def open_files(self, paths, insert_before=0):
         """

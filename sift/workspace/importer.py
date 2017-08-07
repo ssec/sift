@@ -551,6 +551,11 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
                 Resource.path == source_path).filter(
                 Product.resource_id == Resource.id).all())
             assert (products)
+        else:
+            # we need products belonging to our session
+            LOG.debug('querying products from imporer session')
+            # FUTURE: too much sqlalchemy leakage
+            products = [self._S.query(Product).filter_by(id=p.id).one() for p in products]
         if len(products) > 1:
             LOG.warning('only first product currently handled in pug loader')
         prod = products[0]
@@ -558,6 +563,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         if prod.content:
             LOG.warning('content was already available, skipping import')
             return
+
 
         pug = PugL1bTools(source_path)
         rows, cols = shape = pug.shape
@@ -617,18 +623,27 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
             cols = cols,
             proj4 = proj4,
             # levels = 0,
-            # dtype = 'float32',
+            dtype = 'float32',
 
             # info about the coverage array memmap, which in our case just tells what rows are ready
             # coverage_rows = rows,
             # coverage_cols = 1,
             # coverage_path = coverage_filename
+
+            cell_width = cell_width,
+            cell_height = cell_height,
+            origin_x = origin_x,
+            origin_y = origin_y,
+
+
         )
         # c.info.update(prod.info) would just make everything leak together so let's not do it
         self._S.add(c)
         prod.content.append(c)
         prod.touch()
         self._S.commit()
+
+        LOG.debug('data content is {}'.format(img_data))
 
         yield import_progress(uuid=prod.uuid,
                               stages=1,
