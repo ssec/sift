@@ -99,7 +99,7 @@ class ActiveContent(QObject):
     Purpose: consolidate common operations on content, while factoring in things like sparsity, coverage, y, x, z arrays
     Workspace instantiates ActiveContent from metadatabase Content entries
     """
-    _C = None  # my metadata
+    _cid = None  # Content.id database entry I belong to
     _wsd = None  # full path of workspace
     _rcl = None
     _y = None
@@ -112,13 +112,13 @@ class ActiveContent(QObject):
 
     def __init__(self, workspace_cwd: str, C: Content):
         super(ActiveContent, self).__init__()
-        self._C = C
+        self._cid = C.id
         self._wsd = workspace_cwd
         if workspace_cwd is None and C is None:
             LOG.warning('test initialization of ActiveContent')
             self._test_init()
         else:
-            self._attach()
+            self._attach(C)
 
     def _test_init(self):
         data = np.ones((4, 12), dtype=np.float32)
@@ -183,13 +183,12 @@ class ActiveContent(QObject):
         LOG.warning('mask_from_coverage_sparsity needs inclusion')
         # mask_from_coverage_sparsity_2d(mask, self._coverage or present, self._sparsity or present)
 
-    def _attach(self, mode='c'):
+    def _attach(self, c: Content, mode='c'):
         """
         attach content arrays, for holding by workspace in _available
         :param c: Content entity from database
         :return: workspace_data_arrays instance
         """
-        c = self._C
         self._rcl, self._shape = rcl, shape = self._rcls(c.rows, c.cols, c.levels)
         def mm(path, *args, **kwargs):
             full_path = os.path.join(self._wsd, path)
@@ -234,7 +233,6 @@ class Workspace(QObject):
     _available: Mapping[int, ActiveContent] = None  # dictionary of {Content.id : ActiveContent object}
     _inventory: Metadatabase = None  # metadatabase instance, sqlalchemy
     _inventory_path = None  # filename to store and load inventory information (simple cache)
-    _S = None  # MDB session
     _tempdir = None  # TemporaryDirectory, if it's needed (i.e. a directory name was not given)
     _max_size_gb = None  # maximum size in gigabytes of flat files we cache in the workspace
     _queue = None
@@ -247,6 +245,15 @@ class Workspace(QObject):
     didDiscoverExternalDataset = pyqtSignal(dict)  # a new dataset was added to the workspace from an external agent
 
     _importers = [GeoTiffImporter, GoesRPUGImporter]
+
+    @property
+    def _S(self):
+        """
+        use scoped_session registry of metadatabase to provide thread-local session object.
+        ref http://docs.sqlalchemy.org/en/latest/orm/contextual.html
+        Returns:
+        """
+        return self._inventory.session()
 
     @staticmethod
     def defaultWorkspace():
@@ -299,7 +306,6 @@ class Workspace(QObject):
             raise EnvironmentError("workspace directory {} does not exist".format(dn))
         LOG.info('{} database at {}'.format('initializing' if should_init else 'attaching', self._inventory_path))
         self._inventory = md = Metadatabase('sqlite:///' + self._inventory_path, create_tables=should_init)
-        self._S = md.session()
         if should_init:
             assert(0 == self._S.query(Content).count())
         LOG.info('done with init')
@@ -355,7 +361,7 @@ class Workspace(QObject):
         :param c: metadatabase Content object
         :return: workspace_content_arrays
         """
-        c.touch()
+        # c.touch()
         cache_entry = self._available.get(c.id)
         if cache_entry is None:
             new_entry = self._attach_content(c)
@@ -683,12 +689,12 @@ class Workspace(QObject):
         if isinstance(dsi_or_uuid, str):
             dsi_or_uuid = UUID(dsi_or_uuid)
         prod = self._product_with_uuid(dsi_or_uuid)
-        prod.touch()
+        # prod.touch()  TODO this causes a locking exception when run in a secondary thread. Keeping background operations lightweight makes sense however, so just review this
         content = self._S.query(Content).filter(Content.product_id==prod.id).order_by(Content.lod.desc()).first()
         if not content:
             raise AssertionError('no content in workspace for {}, must re-import'.format(prod))
-        content.touch()
-        self._S.commit()  # flush any pending updates to workspace db file
+        # content.touch()
+        # self._S.commit()  # flush any pending updates to workspace db file
 
         # FIXME: find the content for the requested LOD, then return its ActiveContent - or attach one
         active_content = self._cached_arrays_for_content(content)
