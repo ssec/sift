@@ -691,7 +691,8 @@ class Workspace(QObject):
         self._S.commit()  # flush any pending updates to workspace db file
 
         # FIXME: find the content for the requested LOD, then return its ActiveContent - or attach one
-        return self._cached_arrays_for_content(content)
+        active_content = self._cached_arrays_for_content(content)
+        return active_content.data
 
     def _create_position_to_index_transform(self, dsi_or_uuid):
         info = self.get_info(dsi_or_uuid)
