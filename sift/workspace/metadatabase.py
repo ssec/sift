@@ -40,7 +40,7 @@ from collections import ChainMap, MutableMapping, Iterable
 from typing import Mapping
 
 from sqlalchemy import Table, Column, Integer, String, UnicodeText, Unicode, ForeignKey, DateTime, Interval, PickleType, Float, create_engine
-from sqlalchemy.orm import Session, relationship, sessionmaker, backref
+from sqlalchemy.orm import Session, relationship, sessionmaker, backref, scoped_session
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.collections import attribute_mapped_collection
 from sqlalchemy.ext.associationproxy import association_proxy
@@ -551,7 +551,7 @@ class Metadatabase(object):
 
     def session(self):
         if self.session_factory is None:
-            self.session_factory = sessionmaker(bind=self.engine)
+            self.session_factory = scoped_session(sessionmaker(bind=self.engine))
         return self.session_factory()
 
     #
