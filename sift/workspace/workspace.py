@@ -253,7 +253,7 @@ class Workspace(QObject):
         ref http://docs.sqlalchemy.org/en/latest/orm/contextual.html
         Returns:
         """
-        return self._inventory.session()
+        return self._inventory.SessionRegistry
 
     @staticmethod
     def defaultWorkspace():
@@ -533,6 +533,13 @@ class Workspace(QObject):
         self._clean_cache()
         self._S.commit()
 
+    def bgnd_task_complete(self):
+        """
+        handle operations that should be done at the end of a threaded background task
+        """
+        self._S.commit()
+        self._S.remove()
+
     def idle(self):
         """
         Called periodically when application is idle. Does a clean-up tasks and returns True if more needs to be done later.
@@ -694,7 +701,7 @@ class Workspace(QObject):
         if not content:
             raise AssertionError('no content in workspace for {}, must re-import'.format(prod))
         # content.touch()
-        # self._S.commit()  # flush any pending updates to workspace db file
+        self._S.commit()  # flush any pending updates to workspace db file
 
         # FIXME: find the content for the requested LOD, then return its ActiveContent - or attach one
         active_content = self._cached_arrays_for_content(content)

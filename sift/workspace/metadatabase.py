@@ -548,10 +548,11 @@ class Metadatabase(object):
             LOG.info("creating database tables")
             Base.metadata.create_all(self.engine)
         self.connection = self.engine.connect()
+        # http://docs.sqlalchemy.org/en/latest/orm/contextual.html
+        self.session_factory = sessionmaker(bind=self.engine)
+        self.SessionRegistry = scoped_session(self.session_factory)  # thread-local session registry
 
     def session(self):
-        if self.session_factory is None:
-            self.session_factory = scoped_session(sessionmaker(bind=self.engine))
         return self.session_factory()
 
     #

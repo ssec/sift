@@ -1072,6 +1072,7 @@ class SceneGraphManager(QObject):
             tiles_info, vertices, tex_coords = child.retile(data, preferred_stride, tile_box)
             yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 1.0}
             self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)
+        self.workspace.bgnd_task_complete()  # FUTURE: consider a threading context manager for this??
 
     def _set_retiled(self, uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords):
         """Slot to take data from background thread and apply it to the layer living in the image layer.
