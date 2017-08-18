@@ -683,24 +683,6 @@ class Workspace(QObject):
                 pass
         return True
 
-    def get_info(self, dsi_or_uuid, lod=None):
-        """
-        :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
-        :param lod: desired level of detail to focus
-        :return:
-        """
-        if isinstance(dsi_or_uuid, str):
-            uuid = UUID(dsi_or_uuid)
-        elif isinstance(dsi_or_uuid, UUID):
-            uuid = dsi_or_uuid
-        else:
-            uuid = dsi_or_uuid[INFO.UUID]
-
-        # Product is standin for what previously was dataset information
-        # FUTURE: consider deprecation for this, in favor of non-KV interface?
-        prod = self._S.query(Product).filter_by(uuid_str=str(uuid)).first()
-        return prod
-
     def get_content(self, dsi_or_uuid, lod=None):
         """
         By default, get the best-available (closest to native) np.ndarray-compatible view of the full dataset
