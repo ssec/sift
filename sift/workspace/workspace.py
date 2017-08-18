@@ -486,13 +486,16 @@ class Workspace(QObject):
         return list(p.path for p in self._S.query(Resource).order_by(Resource.atime.desc()).limit(n).all())
         # FIXME "replace this completely with product list"
 
-    def _purge_content_for_resource(self, resource: Resource, defer_commit=False):
+    def _purge_content_for_resource(self, resource: Resource, session=None, defer_commit=False):
         """
         remove all resource contents from the database
         if the resource original path no longer exists, also purge resource and products from database
         :param resource: resource object we
         :return: number of bytes freed from the workspace
         """
+        if session is not None:
+            defer_commit = True
+        S = session or self._S
         total = 0
         for prod in resource.product:
             for con in prod.content:
@@ -522,16 +525,18 @@ class Workspace(QObject):
         :return:
         """
         # get information on current cache contents
+        S = self._inventory.session()
         LOG.info("cleaning cache")
         total_size = self._total_workspace_bytes
         GB = 1024**3
         LOG.info("total cache size is {}GB of max {}GB".format(total_size/GB, self._max_size_gb))
         max_size = self._max_size_gb * GB
-        for res in self._S.query(Resource).order_by(Resource.atime).all():
+        for res in S.query(Resource).order_by(Resource.atime).all():
             if total_size < max_size:
                 break
-            total_size -= self._purge_content_for_resource(res)
+            total_size -= self._purge_content_for_resource(res, session=S)
             # remove all content for lowest atimes until
+        S.commit()
 
     def close(self):
         self._clean_cache()
