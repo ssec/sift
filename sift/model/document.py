@@ -400,7 +400,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         uuid = products[0].uuid
 
         if uuid in self._layer_with_uuid:
-            LOG.warning("layer with UUID {0:s} already in document?".format(uuid))
+            LOG.warning("layer with UUID {} already in document?".format(uuid))
             active_content_data = self._workspace.get_content(uuid)
             return uuid, info, active_content_data
 

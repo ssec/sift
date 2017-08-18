@@ -118,7 +118,7 @@ class aImporter(ABC):
         return []
 
     @abstractmethod
-    def begin_import_products(self, *products) -> Generator[import_progress, None, None]:
+    def begin_import_products(self, *product_ids) -> Generator[import_progress, None, None]:
         """
         background import of content from a series of products
         if none are provided, all products resulting from merge_products should be imported
@@ -351,9 +351,11 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
         return GeoTiffImporter.get_metadata(self.source_path)
 
     # @asyncio.coroutine
-    def begin_import_products(self, *products):
+    def begin_import_products(self, *product_ids):  # FUTURE: allow product_ids to be uuids
         source_path = self.source_path
-        if not products:
+        if product_ids:
+            products = [self._S.query(Product).filter_by(id=anid).one() for anid in product_ids]
+        else:
             products = list(self._S.query(Resource, Product).filter(
                 Resource.path==source_path).filter(
                 Product.resource_id==Resource.id).all())
@@ -419,6 +421,7 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
         prod.content.append(c)
         prod.touch()
         self._S.commit()
+        self._S.flush()
 
         # FIXME: yield initial status to announce content is available, even if it's empty
 
@@ -479,7 +482,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
     @staticmethod
     def _metadata_for_abi_path(abi):
         return {
-            INFO.PLATFORM: PLATFORM_ID_TO_PLATFORM[abi.platform],  # e.g. G16
+            INFO.PLATFORM: PLATFORM_ID_TO_PLATFORM[abi.platform_id],  # e.g. G16
             INFO.BAND: abi.band,
             INFO.INSTRUMENT: INSTRUMENT.ABI,
             INFO.SCHED_TIME: abi.sched_time,
@@ -544,18 +547,16 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         return GoesRPUGImporter.get_metadata(self.source_path)
 
     # @asyncio.coroutine
-    def begin_import_products(self, *products):
+    def begin_import_products(self, *product_ids):
         source_path = self.source_path
-        if not products:
+        if product_ids:
+            products = [self._S.query(Product).filter_by(id=anid).one() for anid in product_ids]
+            assert(products)
+        else:
             products = list(self._S.query(Resource, Product).filter(
                 Resource.path == source_path).filter(
                 Product.resource_id == Resource.id).all())
             assert (products)
-        else:
-            # we need products belonging to our session
-            LOG.debug('querying products from imporer session')
-            # FUTURE: too much sqlalchemy leakage
-            products = [self._S.query(Product).filter_by(id=p.id).one() for p in products]
         if len(products) > 1:
             LOG.warning('only first product currently handled in pug loader')
         prod = products[0]

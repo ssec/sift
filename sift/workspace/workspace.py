@@ -376,11 +376,15 @@ class Workspace(QObject):
     def _product_with_uuid(self, uuid) -> Product:
         return self._S.query(Product).filter_by(uuid_str=str(uuid)).first()
 
-    def _product_overview_content(self, p:Product) -> Content:
-        return None if 0==len(p.content) else p.content[0]
+    def _product_overview_content(self, prod:Product=None, uuid:UUID=None) -> Content:
+        if prod is None and uuid is not None:
+            return self._S.query(Content).filter((Product.uuid_str==str(uuid)) & (Content.product_id==Product.id)).order_by(Content.lod).first()
+        return None if 0==len(prod.content) else prod.content[0]
 
-    def _product_native_content(self, p:Product) -> Content:
-        return None if 0==len(p.content) else p.content[-1]  # highest LOD
+    def _product_native_content(self, prod:Product = None, uuid:UUID=None) -> Content:
+        if prod is None and uuid is not None:
+            return self._S.query(Content).filter((Product.uuid_str==str(uuid)) & (Content.product_id==Product.id)).order_by(Content.lod.desc()).first()
+        return None if 0==len(prod.content) else prod.content[-1]  # highest LOD
 
     #
     # combining queries with data content
@@ -388,18 +392,18 @@ class Workspace(QObject):
 
     def _overview_content_for_uuid(self, uuid):
         # FUTURE: do a compound query for this to get the Content entry
-        prod = self._product_with_uuid(uuid)
-        assert(prod is not None)
-        ovc = self._product_overview_content(prod)
+        # prod = self._product_with_uuid(uuid)
+        # assert(prod is not None)
+        ovc = self._product_overview_content(uuid=uuid)
         assert(ovc is not None)
         arrays = self._cached_arrays_for_content(ovc)
         return arrays.data
 
     def _native_content_for_uuid(self, uuid):
         # FUTURE: do a compound query for this to get the Content entry
-        prod = self._product_with_uuid(uuid)
-        ovc = self._product_native_content(prod)
-        arrays = self._cached_arrays_for_content(ovc)
+        # prod = self._product_with_uuid(uuid)
+        nac = self._product_native_content(uuid=uuid)
+        arrays = self._cached_arrays_for_content(nac)
         return arrays.data
 
 
@@ -606,7 +610,7 @@ class Workspace(QObject):
         name = metadata[INFO.SHORT_NAME]
 
         # FIXME: for now, just iterate the incremental load. later we want to add this to TheQueue and update the UI as we get more data loaded
-        gen = truck.begin_import_products(prod)
+        gen = truck.begin_import_products(prod.id)
         nupd = 0
         for update in gen:
             nupd += 1
@@ -618,6 +622,9 @@ class Workspace(QObject):
                 LOG.info("{} {}: {:.01f}%".format(name, update.stage_desc, update.completion*100.0))
         # self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
         LOG.debug('received {} updates during import'.format(nupd))
+        del S
+        self._S.flush()  # FIXME is this needed?
+
         # make an ActiveContent object from the Content, now that we've imported it
         ac = self._overview_content_for_uuid(prod.uuid)
         return ac.data
