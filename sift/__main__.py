@@ -211,6 +211,7 @@ def _common_path_prefix_seq(paths):
 def _common_path_prefix(paths):
     "find the most common directory shared by a list of paths"
     paths = list(paths)
+    LOG.debug('looking for common path prefix for {}'.format(repr(paths)))
     if len(paths)==1:
         return os.path.split(paths[0])[0]
     return os.path.join(*_common_path_prefix_seq(paths))

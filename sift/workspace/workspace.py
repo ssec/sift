@@ -475,7 +475,7 @@ class Workspace(QObject):
     def paths_in_cache(self):
         # find non-overview non-auxiliary data files
         # FIXME: also need to include coverage and sparsity paths
-        return [x.path for x in self._S.query(Content).all()]
+        return [x.product.resource[0].path for x in self._S.query(Content).all()]
 
     @property
     def uuids_in_cache(self):
