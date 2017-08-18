@@ -353,20 +353,20 @@ class Workspace(QObject):
         return total
 
     def _attach_content(self, c: Content) -> ActiveContent:
-        return ActiveContent(self.cwd, c)
+        self._available[c.id] = zult = ActiveContent(self.cwd, c)
+        c.touch()
+        c.product.touch()
+        return zult
 
     def _cached_arrays_for_content(self, c:Content):
         """
         attach cached data indicated in Content, unless it's been attached already and is in _available
-        :param c: metadatabase Content object
+        touch the content and product in the database to appease the LRU gods
+        :param c: metadatabase Content object for session attached to current thread
         :return: workspace_content_arrays
         """
-        # c.touch()
         cache_entry = self._available.get(c.id)
-        if cache_entry is None:
-            new_entry = self._attach_content(c)
-            self._available[c.id] = cache_entry = new_entry
-        return cache_entry
+        return cache_entry or self._attach_content(c)
 
 
     #
@@ -690,8 +690,16 @@ class Workspace(QObject):
         :return:
         """
         if isinstance(dsi_or_uuid, str):
-            dsi_or_uuid = UUID(dsi_or_uuid)
-        return self._info.get(dsi_or_uuid, None)
+            uuid = UUID(dsi_or_uuid)
+        elif isinstance(dsi_or_uuid, UUID):
+            uuid = dsi_or_uuid
+        else:
+            uuid = dsi_or_uuid[INFO.UUID]
+
+        # Product is standin for what previously was dataset information
+        # FUTURE: consider deprecation for this, in favor of non-KV interface?
+        prod = self._S.query(Product).filter_by(uuid_str=str(uuid)).first()
+        return prod
 
     def get_content(self, dsi_or_uuid, lod=None):
         """
@@ -711,6 +719,7 @@ class Workspace(QObject):
         self._S.commit()  # flush any pending updates to workspace db file
 
         # FIXME: find the content for the requested LOD, then return its ActiveContent - or attach one
+        # for now, just work with assumption of one product one content
         active_content = self._cached_arrays_for_content(content)
         return active_content.data
 
