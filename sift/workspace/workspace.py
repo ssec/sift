@@ -49,6 +49,7 @@ import sys
 import unittest
 from uuid import UUID, uuid1 as uuidgen
 from typing import Mapping, Set, List
+from collections import Mapping as ReadOnlyMapping
 
 import numba as nb
 import numpy as np
@@ -73,6 +74,21 @@ IMPORT_CLASSES = [GeoTiffImporter, GoesRPUGImporter]
 
 # first instance is main singleton instance; don't preclude the possibility of importing from another workspace later on
 TheWorkspace = None
+
+
+class frozendict(ReadOnlyMapping):
+    def __init__(self, source):
+        self._D = dict(source)
+
+    def __getitem__(self, key):
+        return self._D[key]
+
+    def __iter__(self):
+        for k in self._D.keys():
+            yield k
+
+    def __len__(self):
+        return len(self._D)
 
 
 @nb.jit(nogil=True)
@@ -430,7 +446,7 @@ class Workspace(QObject):
         """
         :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
         :param lod: desired level of detail to focus
-        :return: metadata access with mapping semantics
+        :return: metadata access with mapping semantics, to be treated as read-only
         """
         if isinstance(dsi_or_uuid, str):
             dsi_or_uuid = UUID(dsi_or_uuid)
@@ -440,7 +456,7 @@ class Workspace(QObject):
         prod = self._product_with_uuid(dsi_or_uuid)
         if not prod or not prod.content:  # then it hasn't been loaded
             return None
-        return prod.info  # mapping semantics for database fields, as well as key-value fields
+        return frozendict(prod.info.items())  # mapping semantics for database fields, as well as key-value fields; flatten to one namespace and read-only
 
     def _check_cache(self, path):
         """
