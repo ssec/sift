@@ -711,15 +711,19 @@ class Workspace(QObject):
         :param lod: desired level of detail to focus  (0 for overview)
         :return:
         """
-        if isinstance(dsi_or_uuid, str):
-            dsi_or_uuid = UUID(dsi_or_uuid)
-        prod = self._product_with_uuid(dsi_or_uuid)
+        if isinstance(dsi_or_uuid, UUID):
+            uuid = dsi_or_uuid
+        elif isinstance(dsi_or_uuid, str):
+            uuid = UUID(dsi_or_uuid)
+        else:
+            uuid = dsi_or_uuid[INFO.UUID]
+        # prod = self._product_with_uuid(dsi_or_uuid)
         # prod.touch()  TODO this causes a locking exception when run in a secondary thread. Keeping background operations lightweight makes sense however, so just review this
-        content = self._S.query(Content).filter(Content.product_id==prod.id).order_by(Content.lod.desc()).first()
+        content = self._S.query(Content).filter((Product.uuid_str==str(uuid)) & (Content.product_id==Product.id)).order_by(Content.lod.desc()).first()
         if not content:
             raise AssertionError('no content in workspace for {}, must re-import'.format(prod))
         # content.touch()
-        self._S.commit()  # flush any pending updates to workspace db file
+        # self._S.commit()  # flush any pending updates to workspace db file
 
         # FIXME: find the content for the requested LOD, then return its ActiveContent - or attach one
         # for now, just work with assumption of one product one content
