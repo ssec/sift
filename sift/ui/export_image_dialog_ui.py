@@ -26,6 +26,11 @@ class Ui_ExportImageDialog(object):
     def setupUi(self, ExportImageDialog):
         ExportImageDialog.setObjectName(_fromUtf8("ExportImageDialog"))
         ExportImageDialog.resize(340, 360)
+        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(ExportImageDialog.sizePolicy().hasHeightForWidth())
+        ExportImageDialog.setSizePolicy(sizePolicy)
         ExportImageDialog.setStyleSheet(_fromUtf8(""))
         self.buttonBox = QtGui.QDialogButtonBox(ExportImageDialog)
         self.buttonBox.setEnabled(True)

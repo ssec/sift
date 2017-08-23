@@ -54,7 +54,7 @@ def create_geotiff(data, output_filename, proj4_str, geotransform, etype=gdal.GD
                    compress=None, predictor=None, tile=False,
                    blockxsize=None, blockysize=None,
                    quicklook=False, gcps=None,
-                   nodata=np.nan, **kwargs):
+                   nodata=np.nan, meta=None, **kwargs):
     """Function that creates a geotiff from the information provided.
     """
     log_level = logging.getLogger('').handlers[0].level or 0
@@ -133,6 +133,14 @@ def create_geotiff(data, output_filename, proj4_str, geotransform, etype=gdal.GD
         # Set No Data value
         if nodata is not None:
             gtiff_band.SetNoDataValue(nodata)
+
+    if meta is not None:
+        for k, v in meta.items():
+            if isinstance(v, (list, tuple, set, np.ndarray)):
+                v = ",".join((str(x) for x in v))
+            else:
+                v = str(v)
+            gtiff.SetMetadataItem(k, v)
 
     if quicklook:
         png_filename = output_filename.replace(os.path.splitext(output_filename)[1], ".png")
@@ -233,11 +241,11 @@ def ahi2gtiff(input_filename, output_filename):
     return create_ahi_geotiff(info, data, output_filename)
 
 
-def create_ahi_geotiff(info, data, output_filename, **kwargs):
+def create_ahi_geotiff(info, meta, data, output_filename, **kwargs):
     etype = gdal.GDT_Byte if data.dtype == np.uint8 else gdal.GDT_Float32
     # origin_x, cell_width, rotation_x, origin_y, rotation_y, cell_height
     geotransform = (info["origin_x"], info["cell_width"], 0, info["origin_y"], 0, info["cell_height"])
-    create_geotiff(data, output_filename, info["proj"], geotransform, etype=etype, **kwargs)
+    create_geotiff(data, output_filename, info["proj"], geotransform, etype=etype, meta=meta, **kwargs)
 
 
 def main():

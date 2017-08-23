@@ -152,6 +152,7 @@ class INFO(Enum):
     CELL_HEIGHT = 'cell_height'
     PROJ = 'proj4'
     CLIM = 'clim'  # (min,max) color map limits
+    VALID_RANGE = 'valid_range'
     SHAPE = 'shape' # (rows, columns) or (rows, columns, levels) data shape
     COLORMAP = 'colormap'  # name or UUID of a color map
     DISPLAY_TIME = 'display_time'  # typically from guidebook, used for labeling animation frame
@@ -227,7 +228,6 @@ def get_reference_points_image(img_dist, valid_mask):
     # Sort points by nearest to further from the 0,0 center of the canvas
     # Uses a cheap Pythagorean theorem by summing X + Y
     near_points = np.sum(np.abs(img_dist), axis=1)
-    print(near_points.shape, valid_mask.shape)
     near_points[~valid_mask] = np.inf
     near_points = near_points.argsort()
     ref_idx_1 = near_points[0]

@@ -14,22 +14,60 @@ can be run from Mac, Windows, and Linux.
 Data Access
 -----------
 
-Currently SIFT requires input data to be preprocessed. In the future this
-process will be included internally in the SIFT GUI. For now input data files
-are preprocessed by the development team at the SSEC. Please contact
-Jordan Gerth, Ray Garcia, or David Hoese to get access to this early release
-data set.
+SIFT currently accepts a limited number of input formats. It is able to load
+NetCDF4 L1B files for the GOES-16 ABI instrument. It will accept more input
+files in the future. Please contact Jordan Gerth, Ray Garcia, or David Hoese
+to get access to this early release data set.
 
-Run from Windows
-----------------
+Installation
+------------
 
-When installed via the `setup.exe` installer, SIFT can be run from the "SIFT"
-shortcut in the start menu. By default SIFT stores temporary and cache files
-in a "Workspace" located at the user's "Documents/sift_workspace".
+SIFT installers and bundles are available on the SIFT FTP location:
 
-Installing and Running from Linux or Mac
-----------------------------------------
+ftp://ftp.ssec.wisc.edu/pub/sift/dist
+    
+The Windows installers end in `.exe`, Linux with `.tar.gz`, and Mac OSX with
+`.dmg`. See the sections below for details on installing SIFT for each
+operating system.
 
-Currently running SIFT on Linux or Mac can be accomplished by installing the
-python software in an Anaconda environment on those platforms. For more
-details see the Wiki.
+### Run on Windows
+
+After executing the downloaded `.exe` installer follow the installation
+wizard to install SIFT. SIFT can then be run from the "SIFT" shortcut
+in the start menu. By default SIFT caches files in a "Workspace" located
+at the user's `Documents/sift_workspace`. The installation wizard allows
+you to customize this location.
+
+### Run on Linux
+
+The downloaded tarball `.tar.gz` can be extracted by running:
+
+    tar -xf SIFT_X.Y.Z.tar.gz
+    
+SIFT can then be run by executing the `SIFT/SIFT`. Run `SIFT/SIFT -h`
+for available command line options.
+
+If SIFT will not start please ensure that the `LD_LIBRARY_PATH` environment
+variable is not set.
+
+### Run on Mac
+
+The downloaded DMG file can be extracted opened by double clicking on it.
+The available `.app` should then be moved to the appropriate `Applications`
+folder. Double clicking the `.app` icon from `Applications` will execute
+SIFT.
+
+### Installing with Conda
+
+SIFT can also be installed with the Anaconda/Conda package manager. Python
+3.6 is currently the only supported python environment. It can be installed by
+running:
+
+    conda install -c http://larch.ssec.wisc.edu/channels/sift sift
+    
+And then run with:
+
+    python -m sift
+    
+The `-h` flag can be added for documentation on additional command line
+options.

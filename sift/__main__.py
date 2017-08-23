@@ -32,9 +32,9 @@ from sift.model.document import Document, DocLayer
 from sift.view.SceneGraphManager import SceneGraphManager
 from sift.view.ProbeGraphs import ProbeGraphManager, DEFAULT_POINT_PROBE
 from sift.view.export_image import ExportImageHelper
+from sift.view.create_algebraic import CreateAlgebraicDialog
 from sift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
 from sift.workspace import Workspace
-from sift.view.Colormap import ALL_COLORMAPS
 from sift import __version__
 
 from functools import partial
@@ -80,13 +80,13 @@ def test_layers(ws, doc, glob_pattern=None):
     return []
 
 
-class OpenCacheDialog(QtGui.QWidget):
+class OpenCacheDialog(QtGui.QDialog):
     _paths = None
     _opener = None
     _remover = None
 
-    def __init__(self):
-        super(OpenCacheDialog, self).__init__()
+    def __init__(self, parent):
+        super(OpenCacheDialog, self).__init__(parent)
         self.ui = open_cache_dialog_ui.Ui_openFromCacheDialog()
         self.ui.setupUi(self)
         self.ui.cacheListWidget.setSelectionMode(QtGui.QListWidget.ExtendedSelection)
@@ -97,12 +97,12 @@ class OpenCacheDialog(QtGui.QWidget):
         self._remover = remover
         self.ui.cacheListWidget.clear()
         if paths:
-            pfx = _common_path_prefix(paths)
+            # don't include <algebraic layer ...> type paths
+            pfx = _common_path_prefix([x for x in paths if x[0] != '<']) or ''
             self.ui.commonPathLabel.setText("Common prefix: " + pfx)
-            lpfx = len(pfx)
             self._paths = {}
             for path in paths:
-                key = path[lpfx:].strip(os.sep)
+                key = path.replace(pfx, '', 1).strip(os.sep)
                 li = QtGui.QListWidgetItem(key)
                 self.ui.cacheListWidget.addItem(li)
                 self._paths[key] = path
@@ -197,16 +197,15 @@ def _recursive_split(path):
     if len(fn):
         yield fn
 
+
 def _common_path_prefix_seq(paths):
     pathlists = [list(_recursive_split(path)) for path in paths]
     for component_list in zip(*pathlists):
-        pc = None
-        for pc1,pc2 in zip(component_list[:-1], component_list[1:]):
-            if pc1!=pc2:
-                return
-            else:
-                pc = pc1
-        yield pc
+        if all(c == component_list[0] for c in component_list[1:]):
+            yield component_list[0]
+        else:
+            break
+
 
 def _common_path_prefix(paths):
     "find the most common directory shared by a list of paths"
@@ -214,7 +213,11 @@ def _common_path_prefix(paths):
     LOG.debug('looking for common path prefix for {}'.format(repr(paths)))
     if len(paths)==1:
         return os.path.split(paths[0])[0]
-    return os.path.join(*_common_path_prefix_seq(paths))
+    parts = list(_common_path_prefix_seq(paths))
+    if parts:
+        return os.path.join(*parts)
+    else:
+        return None
 
 
 class Main(QtGui.QMainWindow):
@@ -244,7 +247,8 @@ class Main(QtGui.QMainWindow):
         self.document.animate_siblings_of_layer(uuid)
         # force the newest layer to be visible
         self.document.next_last_step(uuid)
-        self._last_open_dir = _common_path_prefix(paths)
+        # don't use <algebraic layer ...> type paths
+        self._last_open_dir = _common_path_prefix([x for x in paths if x[0] != '<']) or self._last_open_dir
         self.update_recent_file_menu()
 
     def dropEvent(self, event):
@@ -462,6 +466,8 @@ class Main(QtGui.QMainWindow):
 
         if xy_pos is not None and state:
             lon, lat = xy_pos
+            lon = lon % 360 if lon > 0 else lon % -360 + 360
+            lon = lon - 360 if lon > 180 else lon
             lon_str = "{:.02f} {}".format(abs(lon), "W" if lon < 0 else "E")
             lat_str = "{:.02f} {}".format(abs(lat), "S" if lat < 0 else "N")
             self.ui.cursorProbeLocation.setText("Probe Location: {}, {}".format(lon_str, lat_str))
@@ -656,7 +662,7 @@ class Main(QtGui.QMainWindow):
 
     def open_from_cache(self, *args, **kwargs):
         if not self._open_cache_dialog:
-            self._open_cache_dialog = OpenCacheDialog()
+            self._open_cache_dialog = OpenCacheDialog(self)
         paths = self.document.sort_paths(self.workspace.paths_in_cache)
         self._open_cache_dialog.activate(paths, self.open_paths, self._remove_paths_from_cache)
 
@@ -687,9 +693,17 @@ class Main(QtGui.QMainWindow):
         if len(uuids)<3:  # pad with None
             uuids = uuids + ([None] * (3 - len(uuids)))
         # Don't use non-basic layers as starting points for the new composite
-        uuids = [uuid if uuid is not None and self.document[uuid][INFO.KIND] == KIND.IMAGE else None for uuid in uuids]
+        uuids = [uuid if uuid is not None and self.document[uuid][INFO.KIND] in [KIND.IMAGE, KIND.COMPOSITE] else None for uuid in uuids]
         layer = self.document.create_rgb_composite(uuids[0], uuids[1], uuids[2])
         self.behaviorLayersList.select([layer.uuid])
+
+    def create_algebraic(self, action:QtGui.QAction=None, uuids=None, composite_type=COMPOSITE_TYPE.ARITHMETIC):
+        if uuids is None:
+            uuids = list(self.behaviorLayersList.current_selected_uuids())
+        dialog = CreateAlgebraicDialog(self.document, uuids, parent=self)
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
 
     def setup_menu(self):
         open_action = QtGui.QAction("&Open...", self)
@@ -750,7 +764,6 @@ class Main(QtGui.QMainWindow):
         toggle_vis.setShortcut('V')
         toggle_vis.triggered.connect(self.toggle_visibility_on_selected_layers)
 
-
         animate = QtGui.QAction("Animate", self)
         animate.setShortcut('A')
         animate.triggered.connect(partial(self.toggle_animation, action=animate))
@@ -783,6 +796,9 @@ class Main(QtGui.QMainWindow):
         composite.setShortcut('C')
         composite.triggered.connect(self.create_composite)
 
+        algebraic = QtGui.QAction("Create Algebraic", self)
+        algebraic.triggered.connect(self.create_algebraic)
+
         toggle_point = QtGui.QAction("Toggle Point Probe", self)
         toggle_point.setShortcut('X')
         toggle_point.triggered.connect(lambda: self.graphManager.toggle_point_probe(DEFAULT_POINT_PROBE))
@@ -794,6 +810,7 @@ class Main(QtGui.QMainWindow):
 
         layer_menu = menubar.addMenu('&Layer')
         layer_menu.addAction(composite)
+        layer_menu.addAction(algebraic)
 
         view_menu = menubar.addMenu('&View')
         view_menu.addAction(animate)
@@ -819,20 +836,6 @@ class Main(QtGui.QMainWindow):
             return tmp_cb
 
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("t", self.scene_manager.next_tool))
-
-        class ColormapSlot(object):
-            def __init__(self, sgm, key='e'):
-                self.index = 0
-                self.key = key
-                self.sgm = sgm
-                self.colormaps = ALL_COLORMAPS.keys()
-
-            def __call__(self, key):
-                if key.text == self.key:
-                    self.sgm.set_colormap(self.colormaps[self.index])
-                    self.index = (self.index + 1) % len(self.colormaps)
-
-        self.scene_manager.main_canvas.events.key_release.connect(ColormapSlot(self.scene_manager))
 
     def updateLayerList(self):
         # self.ui.layers.add

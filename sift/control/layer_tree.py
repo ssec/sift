@@ -40,6 +40,7 @@ from PyQt4.QtGui import QTreeView, QStyledItemDelegate, QAbstractItemView, QMenu
 from sift.model.document import Document
 from sift.common import INFO, KIND
 from sift.view.Colormap import ALL_COLORMAPS, CATEGORIZED_COLORMAPS
+from sift.view.colormap_dialogs import ChangeColormapDialog
 
 LOG = logging.getLogger(__name__)
 
@@ -50,6 +51,7 @@ CELL_HEIGHT = 36 if 'darwin' in sys.platform else 48
 CELL_WIDTH = 128 if 'darwin' in sys.platform else 160
 LEFT_OFFSET = 28 if 'darwin' in sys.platform else 32
 TOP_OFFSET = 3
+
 
 class LayerWidgetDelegate(QStyledItemDelegate):
     """
@@ -232,19 +234,20 @@ class LayerStackTreeViewModel(QAbstractItemModel):
     # signals
     uuidSelectionChanged = pyqtSignal(tuple,)  # the list is a list of the currently selected UUIDs
 
-    def __init__(self, widgets:list, doc:Document):
+    def __init__(self, widgets:list, doc:Document, parent=None):
         """
         Connect one or more table views to the document via this model.
         :param widgets: list of TableViews to wire up
         :param doc: document to communicate with
         :return:
         """
-        super(LayerStackTreeViewModel, self).__init__()
+        super(LayerStackTreeViewModel, self).__init__(parent)
 
         self.widgets = [ ]
         self.doc = doc
         # self._column = [self._visibilityData, self._nameData]
         self.item_delegate = LayerWidgetDelegate(doc)
+        # FIXME: Reset colormap change dialog when layer set changes
 
         # for now, a copout by just having a refresh to the content when document changes
         doc.didReorderLayers.connect(self.refresh)
@@ -394,67 +397,67 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         #         del self._last_equalizer_values[k]
         self.refresh()
 
-    def change_layer_colormap_menu(self, pos:QPoint, lbox:QTreeView, selected_uuids:list, *args):
-        LOG.info('colormap menu requested for layer list')
-        menu = QMenu()
-        actions = {}
-        current_colormaps = set(self.doc.colormap_for_uuids(selected_uuids))
-        for cat, cat_colormaps in CATEGORIZED_COLORMAPS.items():
-            submenu = QMenu(cat, parent=menu)
-            for colormap in cat_colormaps.keys():
-                action = submenu.addAction(colormap)
-                actions[action] = colormap
-                action.setCheckable(True)
-                action.setChecked(colormap in current_colormaps)
-            menu.addMenu(submenu)
-        menu.addSeparator()
-        flip_action = menu.addAction("Flip Color Limits")
-        flip_action.setCheckable(True)
-        flip_action.setChecked(any(self.doc.flipped_for_uuids(selected_uuids)))
-        menu.addAction(flip_action)
-        sel = menu.exec_(lbox.mapToGlobal(pos))
-        if sel is flip_action:
-            LOG.info("flipping color limits for sibling ids {0!r:s}".format(selected_uuids))
-            self.doc.flip_climits_for_layers(uuids=selected_uuids)
-        else:
-            new_cmap = actions.get(sel, None)
-            if new_cmap is not None:
-                LOG.info("changing to colormap {0} for ids {1!r:s}".format(new_cmap, selected_uuids))
-                self.doc.change_colormap_for_layers(name=new_cmap, uuids=selected_uuids)
+    def change_layer_colormap_menu(self, menu, lbox:QTreeView, selected_uuids:list, *args):
+        def _show_change_colormap_dialog(action):
+            d = ChangeColormapDialog(self.doc, selected_uuids[0], parent=lbox)
+            d.show()
+            d.raise_()
+            d.activateWindow()
+        action = menu.addAction('Change Colormap...')
+        return {action: _show_change_colormap_dialog}
 
-    def composite_layer_menu(self, pos:QPoint, lbox:QTreeView, selected_uuids:list, *args):
+    def composite_layer_menu(self, menu, lbox:QTreeView, selected_uuids:list, *args):
         """
         provide common options for RGB or other composite layers, eventually with option to go to a compositing dialog
 
         """
-        LOG.info('compositing menu requested for layer list')
-        menu = QMenu()
         actions = {}
-        if len(selected_uuids) != 3:
-            # FIXME: check that all three are basic layers!
-            LOG.warning('need 3 layers to create a composite')
-            return
-        # combos = [x.upper() for x in [a+b+c for a in ['r', 'g', 'b'] for b in ['r', 'g', 'b'] for c in ['r','g','b']] if 'r' in x and 'g' in x and 'b' in x]
-        for rgb in ['RGB', 'RBG', 'GRB', 'GBR', 'BRG', 'BGR']:
-            action = menu.addAction(rgb)
+        requests = {}
+        if len(selected_uuids) > 3 or \
+                any(self.doc[u][INFO.KIND] not in [KIND.IMAGE, KIND.COMPOSITE] for u in selected_uuids):
+            LOG.warning('Need 3 image layers to create a composite')
+            return {}
+
+        def _make_rgb_composite(action, requests=requests):
+            request = requests.get(action, None)
+            if request is not None:
+                LOG.debug('RGB creation using {0!r:s}'.format(request))
+                self.doc.create_rgb_composite(**request)
+
+        rgb_menu = QMenu("Create RGB From Selections...", menu)
+        for rgb in sorted(set(x[:len(selected_uuids)] for x in ['RGB', 'RBG', 'GRB', 'GBR', 'BRG', 'BGR']), reverse=True):
+            # Only include the number of channels selected
+            rgb = rgb[:len(selected_uuids)]
+            action = rgb_menu.addAction(rgb)
             request = dict((channel.lower(), uuid) for (channel,uuid) in zip(rgb, selected_uuids))
-            actions[action] = request
-        sel = menu.exec_(lbox.mapToGlobal(pos))
-        request = actions.get(sel, None)
-        if request is not None:
-            LOG.debug('RGB creation using {0!r:s}'.format(request))
-            self.doc.create_rgb_composite(**request)
+            actions[action] = _make_rgb_composite
+            requests[action] = request
+        menu.addMenu(rgb_menu)
+        return actions
 
     def menu(self, pos: QPoint, *args):
         lbox = self.current_set_listbox
-        # XXX: Normally we would create the menu and actions before hand but since we are checking the actions based
-        # on selection we can't. Then we would use an ActionGroup and make it exclusive
         selected_uuids = list(self.current_selected_uuids(lbox))
         LOG.debug("selected UUID set is {0!r:s}".format(selected_uuids))
+        menu = QMenu()
+        actions = {}
         if len(selected_uuids) == 1:
-            return self.change_layer_colormap_menu(pos, lbox, selected_uuids, *args)
-        elif len(selected_uuids) > 1:
-            return self.composite_layer_menu(pos, lbox, selected_uuids, *args)
+            if self.doc[selected_uuids[0]][INFO.KIND] in [KIND.IMAGE, KIND.COMPOSITE]:
+                actions.update(self.change_layer_colormap_menu(menu, lbox, selected_uuids, *args))
+        if 0 < len(selected_uuids) <= 3:
+            actions.update(self.composite_layer_menu(menu, lbox, selected_uuids, *args))
+
+        if not actions:
+            action = menu.addAction("No actions available for this layer")
+            action.setEnabled(False)
+
+        sel = menu.exec_(lbox.mapToGlobal(pos))
+        if sel is None:
+            return
+        elif sel in actions:
+            return actions[sel](sel)
+        else:
+            LOG.debug("Unimplemented menu option '{}'".format(sel.text()))
 
     def columnCount(self, QModelIndex_parent=None, *args, **kwargs):
         return 1

@@ -122,8 +122,8 @@ class LayerSetsManager (QObject) :
         self.layer_sets.append(new_layer_set)
         layer_list_obj = new_layer_set.getLayerList()
         if self.set_behaviors is None :
-            self.set_behaviors = LayerStackTreeViewModel([layer_list_obj], self.document)
-        else :
+            self.set_behaviors = LayerStackTreeViewModel([layer_list_obj], self.document, parent=self.tab_widget)
+        else:
             self.set_behaviors.add_widget(layer_list_obj)
 
         # go to the tab we just created
@@ -131,6 +131,7 @@ class LayerSetsManager (QObject) :
 
     def getLayerStackListViewModel (self, ) :
         return self.set_behaviors
+
 
 class SingleLayerSetManager (QWidget) :
     """handles controls and data for a single layer list
@@ -306,7 +307,7 @@ class SingleLayerInfoPane (QWidget) :
                     unit_info = self.document[this_prez.uuid][INFO.UNIT_CONVERSION]
                     new_clims = unit_info[1](new_clims, inverse=False)
                     try:
-                        if layer_info[INFO.KIND] == KIND.IMAGE:
+                        if layer_info[INFO.KIND] in [KIND.IMAGE, KIND.COMPOSITE]:
                             min_str = layer_info[INFO.UNIT_CONVERSION][2](new_clims[0], include_units=False)
                             max_str = layer_info[INFO.UNIT_CONVERSION][2](new_clims[1])
                             new_clims = '{} ~ {}'.format(min_str, max_str)

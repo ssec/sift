@@ -834,8 +834,9 @@ class SceneGraphManager(QObject):
             element.determine_reference_points()
             self.update()
             return True
-        else:
-            raise ValueError("Unknown or unimplemented composite type")
+        elif layer[INFO.KIND] == KIND.COMPOSITE:
+            # algebraic layer
+            return self.add_basic_layer(new_order, uuid, p)
 
     def change_composite_layer(self, new_order:tuple, uuid:UUID, presentation:prez, changes:dict):
         layer = self.document[uuid]

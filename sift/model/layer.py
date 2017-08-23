@@ -159,9 +159,14 @@ class DocCompositeLayer(DocLayer):
     """
 
 
-def _concurring(*q):
+def _concurring(*q, remove_none=False):
     """Check that all provided inputs are the same"""
-    return q[0] if all(x == q[0] for x in q[1:]) else False
+    if remove_none:
+        q = [x for x in q if x is not None]
+    if q:
+        return q[0] if all(x == q[0] for x in q[1:]) else False
+    else:
+        return False
 
 
 class DocRGBLayer(DocCompositeLayer):
@@ -242,17 +247,22 @@ class DocRGBLayer(DocCompositeLayer):
     @property
     def sched_time(self):
         gst = lambda x: None if (x is None) else x.sched_time
-        return _concurring(gst(self.r), gst(self.g), gst(self.b))
+        return _concurring(gst(self.r), gst(self.g), gst(self.b), remove_none=True)
 
     @property
     def instrument(self):
         gst = lambda x: None if (x is None) else x.instrument
-        return _concurring(gst(self.r), gst(self.g), gst(self.b))
+        return _concurring(gst(self.r), gst(self.g), gst(self.b), remove_none=True)
 
     @property
     def platform(self):
         gst = lambda x: None if (x is None) else x.platform
-        return _concurring(gst(self.r), gst(self.g), gst(self.b))
+        return _concurring(gst(self.r), gst(self.g), gst(self.b), remove_none=True)
+
+    @property
+    def scene(self):
+        gst = lambda x: None if (x is None) else x[INFO.SCENE]
+        return _concurring(gst(self.r), gst(self.g), gst(self.b), remove_none=True)
 
     def _get_units_conversion(self):
         def conv_func(x, inverse=False, deps=(self.r, self.g, self.b)):
@@ -287,11 +297,8 @@ class DocRGBLayer(DocCompositeLayer):
 
         return display_time
 
-    def _default_display_name(self, display_time=None):
+    def _default_short_name(self):
         dep_info = [self.r, self.g, self.b]
-        if display_time is None:
-            display_time = self._default_display_time()
-
         try:
             names = []
             for color, dep_layer in zip("RGB", dep_info):
@@ -300,12 +307,20 @@ class DocRGBLayer(DocCompositeLayer):
                 else:
                     name = u"{}:{}".format(color, dep_layer[INFO.SHORT_NAME])
                 names.append(name)
-            name = u' '.join(names) + u' ' + display_time
+            name = u' '.join(names)
         except KeyError:
             LOG.error('unable to create new name from {0!r:s}'.format(dep_info))
             name = "-RGB-"
 
         return name
+
+    def _default_display_name(self, short_name=None, display_time=None):
+        if display_time is None:
+            display_time = self._default_display_time()
+        if short_name is None:
+            short_name = self._default_short_name()
+
+        return short_name + u' ' + display_time
 
     def update_metadata_from_dependencies(self):
         """
@@ -315,17 +330,18 @@ class DocRGBLayer(DocCompositeLayer):
         # FUTURE: resolve dictionary-style into attribute-style uses
         dep_info = [self.r, self.g, self.b]
         display_time = self._default_display_time()
-        name = self._default_display_name(display_time=display_time)
-        bands = [nfo.get(INFO.BAND) if nfo is not None else None for nfo in dep_info]
-        insts = [nfo.get(INFO.INSTRUMENT) if nfo is not None else None for nfo in dep_info]
-        plats = [nfo.get(INFO.PLATFORM) if nfo is not None else None for nfo in dep_info]
+        short_name = self._default_short_name()
+        name = self._default_display_name(short_name=short_name, display_time=display_time)
         ds_info = {
-            INFO.DATASET_NAME: name,
+            INFO.DATASET_NAME: short_name,
+            INFO.SHORT_NAME: short_name,
             INFO.DISPLAY_NAME: name,
             INFO.DISPLAY_TIME: display_time,
-            INFO.BAND: bands,
-            INFO.INSTRUMENT: insts[0] if all(inst == insts[0] for inst in insts[1:]) else None,
-            INFO.PLATFORM: plats[0] if all(plat == plats[0] for plat in plats[1:]) else None,
+            INFO.SCHED_TIME: self.sched_time,
+            INFO.BAND: self.band,
+            INFO.INSTRUMENT: self.instrument,
+            INFO.PLATFORM: self.platform,
+            INFO.SCENE: self.scene,
             INFO.UNIT_CONVERSION: self._get_units_conversion(),
         }
 
