@@ -88,6 +88,7 @@ prez = namedtuple('prez', [
     'a_order',   # int: None for non-animating, 0..n-1 what order to draw in during animation
     'colormap',  # name or uuid: color map to use; name for default, uuid for user-specified
     'climits',   # tuple: valid min and valid max used for color mapping normalization
+    'gamma',     # float: valid (0 to 5) for gamma correction (default should be 1.0)
     'mixing'     # mixing mode constant
 ])
 

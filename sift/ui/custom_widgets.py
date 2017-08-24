@@ -1,4 +1,4 @@
-from PyQt4.QtGui import QComboBox, QSlider
+from PyQt4.QtGui import QComboBox, QSlider, QDoubleSpinBox
 from PyQt4.QtCore import Qt
 
 
@@ -30,3 +30,15 @@ class QNoScrollSlider(QSlider):
             ev.ignore()
         else:
             super(QNoScrollSlider, self).wheelEvent(ev)
+
+
+class QNoScrollDoubleSpinBox(QDoubleSpinBox):
+    def __init__(self, *args, **kwargs):
+        super(QNoScrollDoubleSpinBox, self).__init__(*args, **kwargs)
+        self.setFocusPolicy(Qt.StrongFocus)
+
+    def wheelEvent(self, ev):
+        if not self.hasFocus():
+            ev.ignore()
+        else:
+            super(QNoScrollDoubleSpinBox, self).wheelEvent(ev)

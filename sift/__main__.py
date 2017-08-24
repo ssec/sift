@@ -596,8 +596,9 @@ class Main(QtGui.QMainWindow):
         # self.queue.add('test', test_task(), 'test000')
         # self.ui.layers
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
-        self.document.didChangeColormap.connect(self.scene_manager.change_layers_colormap)
-        self.document.didChangeColorLimits.connect(self.scene_manager.change_layers_color_limits)
+        # self.document.didChangeColormap.connect(self.scene_manager.change_layers_colormap)
+        # self.document.didChangeColorLimits.connect(self.scene_manager.change_layers_color_limits)
+        # self.document.didChangeGamma.connect(self.scene_manager.change_layers_gamma)
         self.document.didSwitchLayerSet.connect(self.animation_reset_by_layer_set_switch)
 
         self.document.didChangeLayerVisibility.connect(self.update_frame_time_to_top_visible)
@@ -625,7 +626,7 @@ class Main(QtGui.QMainWindow):
         zap = lambda *args: self.graphManager.update_point_probe(DEFAULT_POINT_PROBE)
         self.document.didAddBasicLayer.connect(zap)
         self.document.didAddCompositeLayer.connect(zap)
-        # FIXME: These were added as a simple fix to update the proble value on layer changes, but this should really
+        # FIXME: These were added as a simple fix to update the probe value on layer changes, but this should really
         #        have its own manager-like object
         def _blackhole(*args, **kwargs):
             return self.update_point_probe_text(DEFAULT_POINT_PROBE)

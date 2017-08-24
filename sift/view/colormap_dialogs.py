@@ -28,6 +28,8 @@ class ChangeColormapDialog(QtGui.QDialog):
         self._current_cmap = self._initial_cmap
         self._initial_clims = prez.climits
         self._current_clims = self._initial_clims
+        self._initial_gamma = prez.gamma
+        self._current_gamma = self._initial_gamma
 
         self._validator = QtGui.QDoubleValidator()
         self._init_cmap_combo()
@@ -37,6 +39,7 @@ class ChangeColormapDialog(QtGui.QDialog):
         self._init_vmax_slider()
         self.ui.vmax_edit.setValidator(self._validator)
         self.ui.vmax_edit.setText('{:f}'.format(conv[1](self._initial_clims[1])))
+        self.ui.gammaSpinBox.setValue(self._initial_gamma)
 
         self.ui.buttons.clicked.connect(self._clicked)
         self.ui.buttons.accepted.disconnect()
@@ -47,6 +50,7 @@ class ChangeColormapDialog(QtGui.QDialog):
         self.ui.vmax_slider.sliderReleased.connect(partial(self._slider_changed, is_max=True))
         self.ui.vmin_edit.editingFinished.connect(partial(self._edit_changed, is_max=False))
         self.ui.vmax_edit.editingFinished.connect(partial(self._edit_changed, is_max=True))
+        self.ui.gammaSpinBox.valueChanged.connect(self._gamma_changed)
 
     def _clicked(self, button):
         r = self.ui.buttons.buttonRole(button)
@@ -59,6 +63,7 @@ class ChangeColormapDialog(QtGui.QDialog):
         # rejecting (Cancel button) means reset previous settings
         self.doc.change_colormap_for_layers(self._initial_cmap, (self.uuid,))
         self.doc.change_clims_for_siblings(self.uuid, self._initial_clims)
+        self.doc.change_gamma_for_siblings(self.uuid, self._initial_gamma)
 
     def _cmap_changed(self, index):
         cmap_str = self.ui.cmap_combobox.itemData(index)
@@ -120,3 +125,7 @@ class ChangeColormapDialog(QtGui.QDialog):
         self.ui.vmax_slider.setRange(0, self._slider_steps)
         slider_val = self._create_slider_value(current_vmax)
         self.ui.vmax_slider.setSliderPosition(min(slider_val, 32767))
+
+    def _gamma_changed(self, val):
+        self._current_gamma = val
+        self.doc.change_gamma_for_siblings(self.uuid, self._current_gamma)
