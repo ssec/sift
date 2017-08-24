@@ -63,7 +63,7 @@ from sift.common import INFO, KIND
 from sift.model.shapes import content_within_shape
 from sift.workspace.importer import GeoTiffImporter, GoesRPUGImporter
 from .metadatabase import Metadatabase, Content, Product, Resource
-from .importer import aImporter, GeoTiffImporter, GoesRPUGImporter
+from .importer import aImporter, GeoTiffImporter, GoesRPUGImporter, generate_guidebook_metadata
 
 LOG = logging.getLogger(__name__)
 
@@ -93,23 +93,6 @@ class frozendict(ReadOnlyMapping):
 
     def __repr__(self):
         return "frozendict({" + ", ".join("{}: {}".format(repr(k), repr(v)) for (k,v) in self.items()) + "})"
-
-def generate_guidebook_metadata(layer_info):
-    guidebook = get_guidebook_class(layer_info)
-    # also get info for this layer from the guidebook
-    gbinfo = guidebook.collect_info(layer_info)
-    layer_info.update(gbinfo)  # FUTURE: should guidebook be integrated into DocBasicLayer?
-
-    # add as visible to the front of the current set, and invisible to the rest of the available sets
-    layer_info[INFO.COLORMAP] = guidebook.default_colormap(layer_info)
-    layer_info[INFO.CLIM] = guidebook.climits(layer_info)
-    layer_info[INFO.VALID_RANGE] = guidebook.valid_range(layer_info)
-    if INFO.DISPLAY_TIME not in layer_info:
-        layer_info[INFO.DISPLAY_TIME] = guidebook._default_display_time(layer_info)
-    if INFO.DISPLAY_NAME not in layer_info:
-        layer_info[INFO.DISPLAY_NAME] = guidebook._default_display_name(layer_info)
-
-    return layer_info
 
 
 @nb.jit(nogil=True)
@@ -469,6 +452,7 @@ class Workspace(QObject):
         :param lod: desired level of detail to focus
         :return: metadata access with mapping semantics, to be treated as read-only
         """
+        # FUTURE deprecate this
         if isinstance(dsi_or_uuid, str):
             dsi_or_uuid = UUID(dsi_or_uuid)
         elif not isinstance(dsi_or_uuid, UUID):
@@ -477,7 +461,15 @@ class Workspace(QObject):
         prod = self._product_with_uuid(dsi_or_uuid)
         if not prod or not prod.content:  # then it hasn't been loaded
             return None
-        return frozendict(prod.info.items())  # mapping semantics for database fields, as well as key-value fields; flatten to one namespace and read-only
+        # native_content = self._product_native_content(uuid=dsi_or_uuid)
+        nfo = prod.info
+        # if native_content is not None:
+        #     # FUTURE: this is especially awful
+        #     # old model was that product == content and shares a UUID with the layer
+        #     # if content is available, we want to provide native content metadata along with the product metadata
+        #     from collections import ChainMap
+        #     nfo = ChainMap(native_content.info, nfo)
+        return frozendict(nfo.items())  # mapping semantics for database fields, as well as key-value fields; flatten to one namespace and read-only
 
     def _check_cache(self, path):
         """
@@ -640,6 +632,8 @@ class Workspace(QObject):
                         zult = self._S.merge(prod)
                         LOG.debug('yielding product metadata {}'.format(repr(zult)))
                         yield zult
+                    import_session.flush()
+                    del import_session
 
     def import_product_content(self, uuid=None, prod=None, allow_cache=True):
         S = self._inventory.session()
@@ -664,6 +658,8 @@ class Workspace(QObject):
                 LOG.info("{} {}: {:.01f}%".format(name, update.stage_desc, update.completion*100.0))
         # self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
         LOG.debug('received {} updates during import'.format(nupd))
+        S.commit()
+        S.flush()
         del S
         self._S.flush()  # FIXME is this needed?
 
@@ -866,7 +862,7 @@ class Workspace(QObject):
         # prod.touch()  TODO this causes a locking exception when run in a secondary thread. Keeping background operations lightweight makes sense however, so just review this
         content = self._S.query(Content).filter((Product.uuid_str==str(uuid)) & (Content.product_id==Product.id)).order_by(Content.lod.desc()).first()
         if not content:
-            raise AssertionError('no content in workspace for {}, must re-import'.format(prod))
+            raise AssertionError('no content in workspace for {}, must re-import'.format(uuid))
         # content.touch()
         # self._S.commit()  # flush any pending updates to workspace db file
 

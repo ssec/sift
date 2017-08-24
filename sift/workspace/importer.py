@@ -61,13 +61,13 @@ def generate_guidebook_metadata(layer_info) -> Mapping:
     # add as visible to the front of the current set, and invisible to the rest of the available sets
     layer_info[INFO.COLORMAP] = guidebook.default_colormap(layer_info)
     layer_info[INFO.CLIM] = guidebook.climits(layer_info)
+    layer_info[INFO.VALID_RANGE] = guidebook.valid_range(layer_info)
     if INFO.DISPLAY_TIME not in layer_info:
         layer_info[INFO.DISPLAY_TIME] = guidebook._default_display_time(layer_info)
     if INFO.DISPLAY_NAME not in layer_info:
         layer_info[INFO.DISPLAY_NAME] = guidebook._default_display_name(layer_info)
 
     return layer_info
-
 
 class aImporter(ABC):
     """
@@ -163,7 +163,6 @@ class aSingleFileWithSingleProductImporter(aImporter):
                 atime=now,
             )
             self._S.add(res)
-        self._S.commit()
         return [self._resource]
 
     @abstractmethod
@@ -419,9 +418,9 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
         # c.info.update(prod.info) would just make everything leak together so let's not do it
         self._S.add(c)
         prod.content.append(c)
-        prod.touch()
+        # prod.touch()
         self._S.commit()
-        self._S.flush()
+        # self._S.flush()
 
         # FIXME: yield initial status to announce content is available, even if it's empty
 
@@ -460,7 +459,7 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
 
         # Finally, update content mtime and atime
         c.atime = c.mtime = datetime.utcnow()
-        self._S.commit()
+        # self._S.commit()
 
 
 
@@ -523,15 +522,17 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         d[INFO.ORIGIN_X] = x[0]
         d[INFO.ORIGIN_Y] = y[0]
 
-        midyi, midxi = int(y.shape[0] / 2), int(x.shape[0] / 2)
+        # midyi, midxi = int(y.shape[0] / 2), int(x.shape[0] / 2)
         # PUG states radiance at index [0,0] extends between coordinates [0,0] to [1,1] on a quadrille
         # centers of pixels are therefore at +0.5, +0.5
         # for a (e.g.) H x W image this means [H/2,W/2] coordinates are image center
         # for now assume all scenes are even-dimensioned (e.g. 5424x5424)
         # given that coordinates are evenly spaced in angular -> nadir-meters space,
         # technically this should work with any two neighbor values
-        d[INFO.CELL_WIDTH] = x[midxi+1] - x[midxi]
-        d[INFO.CELL_HEIGHT] = y[midyi+1] - y[midyi]
+        # d[INFO.CELL_WIDTH] = x[midxi+1] - x[midxi]
+        # d[INFO.CELL_HEIGHT] = y[midyi+1] - y[midyi]
+        cell_size = pug.cell_size
+        d[INFO.CELL_HEIGHT], d[INFO.CELL_WIDTH] = cell_size
 
         shape = pug.shape
         d[INFO.SHAPE] = shape
@@ -641,7 +642,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         # c.info.update(prod.info) would just make everything leak together so let's not do it
         self._S.add(c)
         prod.content.append(c)
-        prod.touch()
+        # prod.touch()
         self._S.commit()
 
         LOG.debug('data content is {}'.format(img_data))
