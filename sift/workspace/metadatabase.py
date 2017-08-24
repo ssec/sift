@@ -261,6 +261,34 @@ class Product(Base):
     def __init__(self, *args, **kwargs):
         super(Product, self).__init__(*args, **kwargs)
 
+    @classmethod
+    def _separate_fields_and_keys(cls, mapping):
+        fields = {}
+        keyvalues = {}
+        valset = set(cls.INFO_TO_FIELD.values())
+        for k,v in mapping.items():
+            f = cls.INFO_TO_FIELD.get(k)
+            if f is not None:
+                fields[f] = v
+            elif k in valset:
+                fields[k] = v
+            else:
+                keyvalues[k] = v
+        return fields, keyvalues
+
+    @classmethod
+    def from_info(cls, mapping, only_fields=False):
+        """
+        create a Product using info INFO dictionary items and arbitrary key-values
+        :param mapping: dictionary of product metadata
+        :return: Product object
+        """
+        fields, keyvalues = cls._separate_fields_and_keys(mapping)
+        p = cls(**fields)
+        if not only_fields:
+            p.info.update(keyvalues)
+        return p
+
     def __repr__(self):
         return "<Product '{}' @ {}~{} / {} keys>".format(self.name, self.obs_time, self.obs_time + self.obs_duration, len(self.info.keys()))
 
@@ -446,11 +474,41 @@ class Content(Base):
         super(Content, self).__init__(*args, **kwargs)
         self._info = ChainRecordWithDict(self, self.INFO_TO_FIELD, self._kwinfo)
 
+    @classmethod
+    def _separate_fields_and_keys(cls, mapping):
+        fields = {}
+        keyvalues = {}
+        valset = set(cls.INFO_TO_FIELD.values())
+        for k,v in mapping.items():
+            f = cls.INFO_TO_FIELD.get(k)
+            if f is not None:
+                fields[f] = v
+            elif k in valset:
+                fields[k] = v
+            else:
+                keyvalues[k] = v
+        return fields, keyvalues
+
+    @classmethod
+    def from_info(cls, mapping, only_fields=False):
+        """
+        create a Product using info INFO dictionary items and arbitrary key-values
+        :param mapping: dictionary of product metadata
+        :return: Product object
+        """
+        fields, keyvalues = cls._separate_fields_and_keys(mapping)
+        p = cls(**fields)
+        if not only_fields:
+            p.info.update(keyvalues)
+        return p
+
     @property
     def info(self):
         """
         :return: mapping merging INFO-compatible database fields with key-value dictionary access pattern
         """
+        if self._info is None:
+            self._info = ChainRecordWithDict(self, self.INFO_TO_FIELD, self._kwinfo)
         return self._info
 
     @property

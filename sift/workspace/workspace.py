@@ -47,6 +47,7 @@ import logging
 import os
 import sys
 import unittest
+from datetime import datetime
 from uuid import UUID, uuid1 as uuidgen
 from typing import Mapping, Set, List
 from collections import Mapping as ReadOnlyMapping
@@ -58,7 +59,7 @@ from pyproj import Proj
 from rasterio import Affine
 from shapely.geometry.polygon import LinearRing
 
-from sift.common import INFO
+from sift.common import INFO, KIND
 from sift.model.shapes import content_within_shape
 from sift.workspace.importer import GeoTiffImporter, GoesRPUGImporter
 from .metadatabase import Metadatabase, Content, Product, Resource
@@ -89,6 +90,9 @@ class frozendict(ReadOnlyMapping):
 
     def __len__(self):
         return len(self._D)
+
+    def __repr__(self):
+        return "frozendict({" + ", ".join("{}: {}".format(repr(k), repr(v)) for (k,v) in self.items()) + "})"
 
 def generate_guidebook_metadata(layer_info):
     guidebook = get_guidebook_class(layer_info)
@@ -723,7 +727,13 @@ class Workspace(QObject):
         # Get every combination of the valid mins and maxes
         # See: https://stackoverflow.com/a/35608701/433202
         names = list(dep_metadata.keys())
-        valid_combos = np.array(np.meshgrid(*tuple(dep_metadata[n][INFO.VALID_RANGE] for n in names))).reshape(len(names), -1)
+        try:
+            valid_combos = np.array(np.meshgrid(*tuple(dep_metadata[n][INFO.VALID_RANGE] for n in names))).reshape(len(names), -1)
+        except KeyError:
+            badboys = [n for n in names if INFO.VALID_RANGE not in dep_metadata[n]]
+            LOG.error("missing VALID_RANGE for: {}".format(repr([dep_metadata[n][INFO.DISPLAY_NAME] for n in badboys])))
+            LOG.error("witness sample: {}".format(repr(dep_metadata[badboys[0]])))
+            raise
         valids_namespace = {n: valid_combos[idx] for idx, n in enumerate(names)}
         content = {n: self.get_content(m[INFO.UUID]) for n, m in dep_metadata.items()}
 
@@ -752,25 +762,61 @@ class Workspace(QObject):
         info[INFO.SHAPE] = content[result_name].shape
 
         info = generate_guidebook_metadata(info)
-        self._info[uuid] = info
-        self._data[uuid] = data = self._convert_to_memmap(str(uuid), content[result_name])
-        self._update_cache(info[INFO.PATHNAME], uuid, info, data)
+
+        uuid, info, data = self._create_product_from_array(info, content[result_name])
         return uuid, info, data
 
-    def _preferred_cache_path(self, uuid):
-        filename = str(uuid)
-        return os.path.join(self.cwd, filename)
+    def _create_product_from_array(self, info, data, namespace=None, codeblock=None):
+        """
+        update metadatabase to include Product and Content entries for this new dataset we've calculated
+        this allows the calculated data to reside in the workspace
+        then return the "official" versions consistent with workspace product/content database
+        Args:
+            info: mapping of key-value metadata for new product
+            data: ndarray with content to store, typically 2D float32
+            namespace: {variable: uuid, } for calculation of this data
+            codeblock: text, code to run to recalculate this data within namespace
 
-    def _convert_to_memmap(self, uuid, data:np.ndarray):
-        if isinstance(data, np.memmap):
-            return data
-        # from tempfile import TemporaryFile
-        # fp = TemporaryFile()
-        pathname = self._preferred_cache_path(uuid)
-        fp = open(pathname, 'wb+')
-        mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
-        mm[:] = data[:]
-        return mm
+        Returns:
+            uuid, info, data: uuid of the new product, its official read-only metadata, and cached content ndarray
+        """
+        S = self._inventory.session()
+        if INFO.UUID not in info:
+            raise ValueError('currently require an INFO.UUID be included in product')
+        P = Product.from_info(info)
+        uuid = P.uuid
+        # FUTURE: add expression and namespace information, which would require additional parameters
+        ws_filename = '{}.data'.format(str(uuid))
+        ws_path = os.path.join(self.cwd, ws_filename)
+        with open(ws_path, 'wb+') as fp:
+            mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
+            mm[:] = data[:]
+
+        now = datetime.utcnow()
+        parms = dict(info)
+        parms.update(dict(
+            lod = 0,
+            path = ws_filename,
+            dtype = str(data.dtype),
+            proj4 = info[INFO.PROJ],
+            atime = now,
+            mtime = now,
+        ))
+        rcls = dict(zip( ('rows','cols','levels'), data.shape) )
+        parms.update(rcls)
+
+        C = Content.from_info(parms, only_fields=True)
+        P.content.append(C)
+
+        # FUTURE: do we identify a Resource to go with this? Probably not
+        S.add(P)
+        S.add(C)
+        S.commit()
+        S.flush()
+        # activate the content we just loaded into the workspace
+        active_data = self._overview_content_for_uuid(uuid)
+        prod = self._product_with_uuid(uuid)
+        return uuid, prod.info, active_data
 
     def _bgnd_remove(self, uuid):
         from sift.queue import TASK_DOING, TASK_PROGRESS
