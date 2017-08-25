@@ -391,6 +391,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param path: file to open and add
         :return: overview (uuid:UUID, datasetinfo:dict, overviewdata:numpy.ndarray)
         """
+        # collect product and resource information but don't yet import content
         products = list(self._workspace.collect_product_metadata_for_paths([path]))
         if not products:
             raise ValueError('no products available in {}'.format(path))
@@ -398,11 +399,19 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             LOG.warning('more than one product available at this path - FIXME')
         info = products[0].info
         uuid = products[0].uuid
+        assert(info is not None)
 
         if uuid in self._layer_with_uuid:
             LOG.warning("layer with UUID {} already in document?".format(uuid))
             active_content_data = self._workspace.get_content(uuid)
             return uuid, info, active_content_data
+
+        # FUTURE: Load this async, the slots for the below signal need to be OK with that
+        active_content_data = self._workspace.import_product_content(uuid)
+        # updated metadata with content information (most importantly nav information)
+        info = self._workspace.get_info(uuid)
+        assert(info is not None)
+        LOG.info('cell_width: {}'.format(repr(info[INFO.CELL_WIDTH])))
 
         LOG.info('new layer info: {}'.format(repr(info)))
         self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, info)
@@ -410,8 +419,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             dataset[INFO.UNIT_CONVERSION] = units_conversion(dataset)
         presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
 
-        # FUTURE: Load this async, the slots for the below signal need to be OK with that
-        active_content_data = self._workspace.import_product_content(uuid)
 
         # signal updates from the document
         self.didAddBasicLayer.emit(reordered_indices, dataset.uuid, presentation)

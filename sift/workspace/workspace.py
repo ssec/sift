@@ -78,8 +78,8 @@ TheWorkspace = None
 
 
 class frozendict(ReadOnlyMapping):
-    def __init__(self, source):
-        self._D = dict(source)
+    def __init__(self, source=None):
+        self._D = dict(source) if source else {}
 
     def __getitem__(self, key):
         return self._D[key]
@@ -445,6 +445,9 @@ class Workspace(QObject):
         # FUTURE: check that every file has a Content that it belongs to; warn if not
         return total
 
+    def _all_product_uuids(self):
+        return [q.uuid for q in self._S.query(Product).all()]
+
 #----------------------------------------------------------------------
     def get_info(self, dsi_or_uuid, lod=None):
         """
@@ -452,24 +455,31 @@ class Workspace(QObject):
         :param lod: desired level of detail to focus
         :return: metadata access with mapping semantics, to be treated as read-only
         """
+        from collections import ChainMap
         # FUTURE deprecate this
         if isinstance(dsi_or_uuid, str):
-            dsi_or_uuid = UUID(dsi_or_uuid)
+            uuid = UUID(dsi_or_uuid)
         elif not isinstance(dsi_or_uuid, UUID):
-            dsi_or_uuid = dsi_or_uuid[INFO.UUID]
+            uuid = dsi_or_uuid[INFO.UUID]
+        else:
+            uuid = dsi_or_uuid
         # look up the product for that uuid
-        prod = self._product_with_uuid(dsi_or_uuid)
-        if not prod or not prod.content:  # then it hasn't been loaded
+        prod = self._product_with_uuid(uuid)
+        if not prod:  # then it hasn't had its metadata scraped
+            LOG.error('no info available for UUID {}'.format(dsi_or_uuid))
+            LOG.error("known products: {}".format(repr(self._all_product_uuids())))
             return None
-        # native_content = self._product_native_content(uuid=dsi_or_uuid)
-        nfo = prod.info
-        # if native_content is not None:
-        #     # FUTURE: this is especially awful
-        #     # old model was that product == content and shares a UUID with the layer
-        #     # if content is available, we want to provide native content metadata along with the product metadata
-        #     from collections import ChainMap
-        #     nfo = ChainMap(native_content.info, nfo)
-        return frozendict(nfo.items())  # mapping semantics for database fields, as well as key-value fields; flatten to one namespace and read-only
+        native_content = self._product_native_content(uuid=dsi_or_uuid)
+
+        if native_content is not None:
+            # FUTURE: this is especially saddening; upgrade to finer grained query and/or deprecate .get_info
+            # once upon a time...
+            # our old model was that product == content and shares a UUID with the layer
+            # if content is available, we want to provide native content metadata along with the product metadata
+            # specifically a lot of client code assumes that resource == product == content and that singular navigation (e.g. cell_size) is norm
+            assert(native_content.info[INFO.CELL_WIDTH] is not None)  # FIXME DEBUG
+            return ChainMap(frozendict(), native_content.info, prod.info)
+        return frozendict(prod.info)  # mapping semantics for database fields, as well as key-value fields; flatten to one namespace and read-only
 
     def _check_cache(self, path):
         """
@@ -616,13 +626,14 @@ class Workspace(QObject):
         Start loading URI data into the workspace asynchronously.
 
         """
+        self._S.flush()
         # FUTURE: consider returning importers instead of products, since we can then re-use them to import the content instead of having to regenerate
+        import_session = self._S
         for source_path in paths:
             LOG.info('collecting metadata for {}'.format(source_path))
             # FIXME: decide whether to update database if mtime of file is newer than mtime in database
             for imp in self._importers:
                 if imp.is_relevant(source_path=source_path):
-                    import_session = self._inventory.session()
                     hauler = imp(source_path, database_session=import_session,
                                  workspace_cwd=self.cwd)
                     hauler.merge_resources()
@@ -632,11 +643,11 @@ class Workspace(QObject):
                         zult = self._S.merge(prod)
                         LOG.debug('yielding product metadata {}'.format(repr(zult)))
                         yield zult
-                    import_session.flush()
-                    del import_session
+        import_session.commit()
+        import_session.flush()
 
     def import_product_content(self, uuid=None, prod=None, allow_cache=True):
-        S = self._inventory.session()
+        S = self._S
         if prod is None and uuid is not None:
             prod = self._product_with_uuid(uuid)
         if len(prod.content):
@@ -660,8 +671,6 @@ class Workspace(QObject):
         LOG.debug('received {} updates during import'.format(nupd))
         S.commit()
         S.flush()
-        del S
-        self._S.flush()  # FIXME is this needed?
 
         # make an ActiveContent object from the Content, now that we've imported it
         ac = self._overview_content_for_uuid(prod.uuid)
