@@ -881,7 +881,13 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if info is None:
             info = {}
 
-        short_name_to_ns_name = {self[u][INFO.SHORT_NAME]: k for k, u in namespace.items()}
+        # Map a UUID's short name to the variable name in the namespace
+        # Keep track of multiple ns variables being the same UUID
+        short_name_to_ns_name = {}
+        for k, u in namespace.items():
+            sname = self[u][INFO.SHORT_NAME]
+            short_name_to_ns_name.setdefault(sname, []).append(k)
+
         namespace_siblings = {k: self.time_siblings(u)[0] for k, u in namespace.items()}
         # go out of our way to make sure we make as many sibling layers as possible
         # even if one or more time steps are missing
@@ -891,7 +897,13 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for idx in range(len(time_master)):
             t = self[time_master[idx]][INFO.SCHED_TIME]
             channel_siblings = [(self[u][INFO.SHORT_NAME], u) for u in self.channel_siblings(time_master[idx])[0]]
-            temp_namespace = {short_name_to_ns_name[sn]: u for sn, u in channel_siblings if sn in short_name_to_ns_name}
+            temp_namespace = {}
+            for sn, u in channel_siblings:
+                if sn not in short_name_to_ns_name:
+                    continue
+                # set each ns variable to this UUID
+                for ns_name in short_name_to_ns_name[sn]:
+                    temp_namespace[ns_name] = u
             if len(temp_namespace) != len(namespace):
                 LOG.info("Missing some layers to create algebraic layer at {:%Y-%m-%d %H:%M:%S}".format(t))
                 continue
