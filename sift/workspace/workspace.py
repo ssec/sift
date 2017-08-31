@@ -800,15 +800,17 @@ class Workspace(QObject):
         now = datetime.utcnow()
         parms = dict(info)
         parms.update(dict(
-            lod = 0,
+            lod = Content.LOD_OVERVIEW,
             path = ws_filename,
             dtype = str(data.dtype),
             proj4 = info[INFO.PROJ],
             atime = now,
             mtime = now,
+            resolution = min(info[INFO.CELL_WIDTH], info[INFO.CELL_HEIGHT])
         ))
         rcls = dict(zip( ('rows','cols','levels'), data.shape) )
         parms.update(rcls)
+        LOG.debug("about to create Content with this: {}".format(repr(parms)))
 
         C = Content.from_info(parms, only_fields=True)
         P.content.append(C)

@@ -162,7 +162,7 @@ class ChainRecordWithDict(MutableMapping):
         return len(self.keys())
 
     def __iter__(self):
-        yield from self.items()
+        yield from self.keys()
 
     def __contains__(self, item):
         return item in self.keys()
@@ -266,11 +266,15 @@ class Product(Base):
         fields = {}
         keyvalues = {}
         valset = set(cls.INFO_TO_FIELD.values())
+        columns = set(cls.__table__.columns.keys())
         for k,v in mapping.items():
             f = cls.INFO_TO_FIELD.get(k)
             if f is not None:
                 fields[f] = v
             elif k in valset:
+                LOG.warning("key {} corresponds to a database field when standard key is available; this code may not be intended".format(k))
+                fields[k] = v
+            elif k in columns:
                 fields[k] = v
             else:
                 keyvalues[k] = v
@@ -284,7 +288,13 @@ class Product(Base):
         :return: Product object
         """
         fields, keyvalues = cls._separate_fields_and_keys(mapping)
-        p = cls(**fields)
+        LOG.debug("fields to import: {}".format(repr(fields)))
+        LOG.debug("key-value pairs to {}: {}".format('IGNORE' if only_fields else 'import', repr(keyvalues)))
+        try:
+            p = cls(**fields)
+        except AttributeError:
+            LOG.error("unable to initialize Product from info: {}".format(repr(fields)))
+            raise
         if not only_fields:
             p.info.update(keyvalues)
         return p
@@ -479,15 +489,31 @@ class Content(Base):
         fields = {}
         keyvalues = {}
         valset = set(cls.INFO_TO_FIELD.values())
+        columns = set(cls.__table__.columns.keys())
         for k,v in mapping.items():
             f = cls.INFO_TO_FIELD.get(k)
             if f is not None:
                 fields[f] = v
             elif k in valset:
+                LOG.warning("key {} corresponds to a database field when standard key is available; this code may not be intended".format(k))
+                fields[k] = v
+            elif k in columns:
                 fields[k] = v
             else:
                 keyvalues[k] = v
         return fields, keyvalues
+
+    # @classmethod
+    # def _patch_info_fields(cls, d):
+    #     if 'lod' not in d:
+    #         d['lod'] = Content.LOD_OVERVIEW
+    #     if ('resolution' not in d) and ('cell_width' in d and 'cell_height' in d):
+    #         d['resolution'] = min(d['cell_width'], d['cell_height'])
+    #     now = datetime.utcnow()
+    #     if 'atime' not in d:
+    #         d['atime'] = now
+    #     if 'mtime' not in d:
+    #         d['mtime'] = now
 
     @classmethod
     def from_info(cls, mapping, only_fields=False):
@@ -497,7 +523,14 @@ class Content(Base):
         :return: Product object
         """
         fields, keyvalues = cls._separate_fields_and_keys(mapping)
-        p = cls(**fields)
+        # cls._patch_info_fields(fields)
+        LOG.debug("fields to import: {}".format(repr(fields)))
+        LOG.debug("key-value pairs to {}: {}".format('IGNORE' if only_fields else 'import', repr(keyvalues)))
+        try:
+            p = cls(**fields)
+        except AttributeError:
+            LOG.error("unable to initialize Content from info: {}".format(repr(fields)))
+            raise
         if not only_fields:
             p.info.update(keyvalues)
         return p
