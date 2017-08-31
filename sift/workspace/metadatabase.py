@@ -474,7 +474,6 @@ class Content(Base):
         INFO.ORIGIN_X: 'origin_x',
         INFO.ORIGIN_Y: 'origin_y',
         INFO.PROJ: 'proj4',
-        INFO.SHORT_NAME: 'name',
         INFO.PATHNAME: 'path'
     }
 
