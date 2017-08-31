@@ -272,7 +272,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
     didSwitchLayerSet = pyqtSignal(int, DocLayerStack, tuple)  # new layerset number typically 0..3, list of prez tuples representing new display order, new animation order
     didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
-    didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
+    didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: (vmin, vmax), ...} for all changed layers
+    didChangeGamma = pyqtSignal(dict)  # dict of {uuid: gamma float, ...} for all changed layers
     didChangeComposition = pyqtSignal(tuple, UUID, prez, dict)  # new-layer-order, changed-layer, change-info: composite channels were reassigned or polynomial altered
     didCalculateLayerEqualizerValues = pyqtSignal(dict)  # dict of {uuid: (value, normalized_value_within_clim)} for equalizer display
     didChangeProjection = pyqtSignal(str, dict)  # name of projection, dict of projection information
@@ -366,6 +367,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """
         if cmap is None:
             cmap = info.get(INFO.COLORMAP)
+        gamma = 1.
+        if isinstance(info, DocRGBLayer):
+            gamma = (1.,) * 3
+        elif hasattr(info, 'l'):
+            gamma = (1.,) * len(info.l)
 
         p = prez(uuid=info[INFO.UUID],
                  kind=info[INFO.KIND],
@@ -373,6 +379,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                  a_order=None,
                  colormap=cmap,
                  climits=info[INFO.CLIM],
+                 gamma=gamma,
                  mixing=Mixing.NORMAL)
 
         q = p._replace(visible=False)  # make it available but not visible in other layer sets
@@ -877,11 +884,30 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     L[dex] = pinfo._replace(climits=nfo[uuid])
         self.didChangeColorLimits.emit(nfo)
 
+    def change_gamma_for_layers_where(self, gamma, **query):
+        nfo = {}
+        L = self.current_layer_set
+        for idx, pz, layer in self.current_layers_where(**query):
+            new_pz = pz._replace(gamma=gamma)
+            nfo[layer.uuid] = new_pz.gamma
+            L[idx] = new_pz
+        self.didChangeGamma.emit(nfo)
+
+    def change_gamma_for_siblings(self, uuid, gamma):
+        uuids = self.time_siblings(uuid)[0]
+        return self.change_gamma_for_layers_where(gamma, uuids=uuids)
+
     def create_algebraic_composite(self, operations, namespace, info=None, insert_before=0):
         if info is None:
             info = {}
 
-        short_name_to_ns_name = {self[u][INFO.SHORT_NAME]: k for k, u in namespace.items()}
+        # Map a UUID's short name to the variable name in the namespace
+        # Keep track of multiple ns variables being the same UUID
+        short_name_to_ns_name = {}
+        for k, u in namespace.items():
+            sname = self[u][INFO.SHORT_NAME]
+            short_name_to_ns_name.setdefault(sname, []).append(k)
+
         namespace_siblings = {k: self.time_siblings(u)[0] for k, u in namespace.items()}
         # go out of our way to make sure we make as many sibling layers as possible
         # even if one or more time steps are missing
@@ -891,7 +917,13 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for idx in range(len(time_master)):
             t = self[time_master[idx]][INFO.SCHED_TIME]
             channel_siblings = [(self[u][INFO.SHORT_NAME], u) for u in self.channel_siblings(time_master[idx])[0]]
-            temp_namespace = {short_name_to_ns_name[sn]: u for sn, u in channel_siblings if sn in short_name_to_ns_name}
+            temp_namespace = {}
+            for sn, u in channel_siblings:
+                if sn not in short_name_to_ns_name:
+                    continue
+                # set each ns variable to this UUID
+                for ns_name in short_name_to_ns_name[sn]:
+                    temp_namespace[ns_name] = u
             if len(temp_namespace) != len(namespace):
                 LOG.info("Missing some layers to create algebraic layer at {:%Y-%m-%d %H:%M:%S}".format(t))
                 continue
@@ -1349,7 +1381,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if it is None:
             return [], 0
         sibs = [(x[INFO.SCHED_TIME], x[INFO.UUID]) for x in
-                self._filter(sibling_infos.values(), it, {INFO.SHORT_NAME, INFO.STANDARD_NAME, INFO.SCENE, INFO.INSTRUMENT, INFO.PLATFORM})]
+                self._filter(sibling_infos.values(), it, {INFO.SHORT_NAME, INFO.STANDARD_NAME, INFO.SCENE, INFO.INSTRUMENT, INFO.PLATFORM, INFO.KIND})]
         # then sort it into time order
         sibs.sort()
         offset = [i for i,x in enumerate(sibs) if x[1]==uuid]

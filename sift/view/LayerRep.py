@@ -154,6 +154,7 @@ _texture_lookup = """
             val.r = clamp(val.r, $vmax, $vmin);
         }
         val.r = (val.r-$vmin)/($vmax-$vmin);
+        val.r = pow(val.r, $gamma);
         val.g = val.r;
         val.b = val.r;
 
@@ -251,7 +252,8 @@ class TiledGeolocatedImageVisual(ImageVisual):
                  tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH),
                  texture_shape=(DEFAULT_TEXTURE_HEIGHT, DEFAULT_TEXTURE_WIDTH),
                  wrap_lon=False, projection=DEFAULT_PROJECTION,
-                 cmap='viridis', method='tiled', clim='auto', interpolation='nearest', **kwargs):
+                 cmap='viridis', method='tiled', clim='auto', gamma=1.,
+                 interpolation='nearest', **kwargs):
         if method != 'tiled':
             raise ValueError("Only 'tiled' method is currently supported")
         method = 'subdivide'
@@ -364,6 +366,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         # self._build_interpolation()
         self._data_lookup_fn = None
 
+        self.gamma = gamma
         self.clim = clim if clim != 'auto' else (np.nanmin(data), np.nanmax(data))
         self.cmap = cmap
 
@@ -372,6 +375,16 @@ class TiledGeolocatedImageVisual(ImageVisual):
         # self.transform = PROJ4Transform(projection, inverse=True)
 
         self.freeze()
+
+    @property
+    def gamma(self):
+        return self._gamma
+
+    @gamma.setter
+    def gamma(self, gamma):
+        self._gamma = gamma if gamma is not None else 1.
+        self._need_clim_update = True
+        self.update()
 
     @property
     def clim(self):
@@ -644,6 +657,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
     def _set_clim_vars(self):
         self._data_lookup_fn["vmin"] = self._clim[0]
         self._data_lookup_fn["vmax"] = self._clim[1]
+        self._data_lookup_fn["gamma"] = self._gamma
         self._need_clim_update = False
 
     def _prepare_draw(self, view):
@@ -689,6 +703,7 @@ _rgb_texture_lookup = """
             val.r = clamp(val.r, $vmax, $vmin);
         }
         val.r = (val.r-$vmin)/($vmax-$vmin);
+        val.r = pow(val.r, $gamma);
         val.g = val.r;
         val.b = val.r;
 
@@ -705,7 +720,8 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
                  tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH),
                  texture_shape=(DEFAULT_TEXTURE_HEIGHT, DEFAULT_TEXTURE_WIDTH),
                  wrap_lon=False,
-                 cmap='viridis', method='tiled', clim='auto', interpolation='nearest', **kwargs):
+                 cmap='viridis', method='tiled', clim='auto', gamma=None,
+                 interpolation='nearest', **kwargs):
         # projection properties to be filled in later
         self.cell_width = None
         self.cell_height = None
@@ -842,6 +858,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
             cm = cmap[idx]
             _cmap.append(cm)
         self.clim = _clim
+        self.gamma = gamma if gamma is not None else (1.,) * self.num_channels
         self.cmap = _cmap[0]
 
         self.overview_info = None
@@ -919,6 +936,18 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         self._set_vertex_tiles(nfo["vertex_coordinates"], nfo["texture_coordinates"])
 
     @property
+    def gamma(self):
+        return self._gamma
+
+    @gamma.setter
+    def gamma(self, gamma):
+        assert isinstance(gamma, (tuple, list))
+        assert len(gamma) == self.num_channels
+        self._gamma = tuple(x if x is not None else 1. for x in gamma)
+        self._need_clim_update = True
+        self.update()
+
+    @property
     def clim(self):
         return (self._clim if isinstance(self._clim, string_types) else
                 tuple(self._clim))
@@ -944,6 +973,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         for idx, lookup_fn in enumerate(self._data_lookup_fns):
             lookup_fn["vmin"] = self._clim[idx, 0]
             lookup_fn["vmax"] = self._clim[idx, 1]
+            lookup_fn["gamma"] = self._gamma[idx]
             self._need_clim_update = False
 
     def _build_color_transform(self):

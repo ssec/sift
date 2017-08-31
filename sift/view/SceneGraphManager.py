@@ -742,7 +742,7 @@ class SceneGraphManager(QObject):
         self.colormaps[name] = colormap
 
     def set_color_limits(self, clims, uuid=None):
-        """Swap the Color limits of a layer so that the color map is flipped.
+        """Update the color limits for the specified UUID
         """
         uuids = uuid
         if uuid is None:
@@ -755,6 +755,18 @@ class SceneGraphManager(QObject):
             if element is not None:
                 self.image_elements[uuid].clim = clims
 
+    def set_gamma(self, gamma, uuid):
+        uuids = uuid
+        if uuid is None:
+            uuids = self.image_elements.keys()
+        elif not isinstance(uuid, (list, tuple)):
+            uuids = [uuid]
+
+        for uuid in uuids:
+            element = self.image_elements.get(uuid, None)
+            if element is not None:
+                self.image_elements[uuid].gamma = gamma
+
     def change_layers_colormap(self, change_dict):
         for uuid,cmapid in change_dict.items():
             LOG.info('changing {} to colormap {}'.format(uuid, cmapid))
@@ -764,6 +776,11 @@ class SceneGraphManager(QObject):
         for uuid, clims in change_dict.items():
             LOG.info('changing {} to color limits {}'.format(uuid, clims))
             self.set_color_limits(clims, uuid)
+
+    def change_layers_gamma(self, change_dict):
+        for uuid, gamma in change_dict.items():
+            LOG.info('changing {} to gamma {}'.format(uuid, gamma))
+            self.set_gamma(gamma, uuid)
 
     def add_basic_layer(self, new_order:tuple, uuid:UUID, p:prez):
         layer = self.document[uuid]
@@ -780,6 +797,7 @@ class SceneGraphManager(QObject):
             layer[INFO.CELL_HEIGHT],
             name=str(uuid),
             clim=layer[INFO.CLIM],
+            gamma=p.gamma,
             interpolation='nearest',
             method='tiled',
             cmap=self._find_colormap(p.colormap),
@@ -815,6 +833,7 @@ class SceneGraphManager(QObject):
                 layer[INFO.CELL_HEIGHT],
                 name=str(uuid),
                 clim=layer[INFO.CLIM],
+                gamma=p.gamma,
                 interpolation='nearest',
                 method='tiled',
                 cmap=self._find_colormap("grays"),
@@ -932,6 +951,7 @@ class SceneGraphManager(QObject):
         document.didReorderAnimation.connect(self._rebuild_frame_order)
         document.didChangeComposition.connect(self.change_composite_layer)
         document.didChangeColorLimits.connect(self.change_layers_color_limits)
+        document.didChangeGamma.connect(self.change_layers_gamma)
 
     def set_frame_number(self, frame_number=None):
         self.layer_set.next_frame(None, frame_number)

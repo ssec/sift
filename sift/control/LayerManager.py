@@ -419,6 +419,7 @@ class RGBLayerConfigPane(QWidget):
     _sliders = None  # sliders in r,g,b order; cache
     _edits = None
     _valid_ranges = None # tuples of each layer's c-limits
+    _gamma_boxes = None # tuple of each layer's gamma spin boxes
     _uuids = None  # [r-uuid, g, b]; used for conversion purposes
 
     def __init__(self, ui, parent, document):
@@ -456,6 +457,8 @@ class RGBLayerConfigPane(QWidget):
          for rgb, x in zip(('b', 'g', 'r'), (self.ui.editMinBlue, self.ui.editMinGreen, self.ui.editMinRed))]
         [x.editingFinished.connect(partial(self._edit_changed, line_edit=x, color=rgb, is_max=True))
          for rgb, x in zip(('b', 'g', 'r'), (self.ui.editMaxBlue, self.ui.editMaxGreen, self.ui.editMaxRed))]
+        [x.valueChanged.connect(self._gamma_changed)
+         for rgb, x in zip(('b', 'g', 'r'), (self.ui.redGammaSpinBox, self.ui.greenGammaSpinBox, self.ui.blueGammaSpinBox))]
 
     @property
     def rgb(self):
@@ -484,6 +487,20 @@ class RGBLayerConfigPane(QWidget):
                 (self.ui.editMinBlue, self.ui.editMaxBlue),
             ]
         return self._edits
+
+    @property
+    def gamma_boxes(self):
+        if self._gamma_boxes is None:
+            self._gamma_boxes = (
+                self.ui.redGammaSpinBox,
+                self.ui.greenGammaSpinBox,
+                self.ui.blueGammaSpinBox,
+            )
+        return self._gamma_boxes
+
+    def _gamma_changed(self, value):
+        gamma = tuple(x.value() for x in self.gamma_boxes)
+        self.document_ref().change_gamma_for_siblings(self.active_layer_ref().uuid, gamma)
 
     def _combo_changed(self, index, combo:QComboBox=None, color=None):
         """
@@ -628,6 +645,8 @@ class RGBLayerConfigPane(QWidget):
             for edit in self.line_edits:
                 edit[0].setDisabled(True)
                 edit[1].setDisabled(True)
+            for sbox in self.gamma_boxes:
+                sbox.setDisabled(True)
             # Hide the widget if possible
             self.hide()
             return
@@ -641,6 +660,8 @@ class RGBLayerConfigPane(QWidget):
             for edit in self.line_edits:
                 edit[0].setDisabled(False)
                 edit[1].setDisabled(False)
+            for sbox in self.gamma_boxes:
+                sbox.setDisabled(False)
 
         for widget in self.rgb:
             # block signals so an existing RGB layer doesn't get overwritten with new layer selections
@@ -653,6 +674,7 @@ class RGBLayerConfigPane(QWidget):
         self._set_combos_to_layer_names()
         self._select_layers_for(layer)
         self._set_minmax_sliders(layer)
+        self._set_gamma_boxes(layer)
 
         for widget in self.rgb:
             # block signals so an existing RGB layer doesn't get overwritten with new layer selections
@@ -738,3 +760,12 @@ class RGBLayerConfigPane(QWidget):
             uuid_string = str(uuid)
             for widget in self.rgb:
                 widget.addItem(layer_name, uuid_string)
+
+    def _set_gamma_boxes(self, layer=None):
+        if isinstance(layer, DocRGBLayer):
+            prez, = self.document_ref().prez_for_uuids([layer.uuid])
+            for idx, sbox in enumerate(self.gamma_boxes):
+                sbox.setValue(prez.gamma[idx])
+        else:
+            for idx, sbox in enumerate(self.gamma_boxes):
+                sbox.setValue(1.)

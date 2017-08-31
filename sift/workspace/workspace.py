@@ -758,8 +758,8 @@ class Workspace(QObject):
         exec(ops, None, valids_namespace)
         if result_name not in valids_namespace:
             raise RuntimeError("Unable to retrieve result '{}' from code execution".format(result_name))
-        info[INFO.VALID_RANGE] = (valids_namespace[result_name].min(), valids_namespace[result_name].max())
-        info[INFO.CLIM] = (valids_namespace[result_name].min(), valids_namespace[result_name].max())
+        info[INFO.VALID_RANGE] = (np.nanmin(valids_namespace[result_name]), np.nanmax(valids_namespace[result_name]))
+        info[INFO.CLIM] = (np.nanmin(valids_namespace[result_name]), np.nanmax(valids_namespace[result_name]))
 
         exec(ops, None, content)
         if result_name not in content:

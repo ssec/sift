@@ -631,16 +631,7 @@
    </attribute>
    <widget class="QWidget" name="dockWidgetContents">
     <layout class="QVBoxLayout" name="verticalLayout_4">
-     <property name="leftMargin">
-      <number>0</number>
-     </property>
-     <property name="topMargin">
-      <number>0</number>
-     </property>
-     <property name="rightMargin">
-      <number>0</number>
-     </property>
-     <property name="bottomMargin">
+     <property name="margin">
       <number>0</number>
      </property>
      <item>
@@ -652,18 +643,18 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>0</y>
-          <width>272</width>
-          <height>477</height>
+          <y>-89</y>
+          <width>259</width>
+          <height>524</height>
          </rect>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_33">
          <item>
-          <widget class="QGroupBox" name="groupBox_3">
+          <widget class="QGroupBox" name="redGroupBox">
            <property name="title">
             <string>Red</string>
            </property>
-           <layout class="QVBoxLayout" name="verticalLayout_32">
+           <layout class="QVBoxLayout" name="verticalLayout_6">
             <item>
              <widget class="QNoScrollComboBox" name="comboRed">
               <property name="toolTip">
@@ -678,6 +669,12 @@
              <layout class="QHBoxLayout" name="horizontalLayout_3">
               <item>
                <widget class="QNoScrollSlider" name="slideMinRed">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
                 <property name="toolTip">
                  <string>value at 0% red</string>
                 </property>
@@ -746,15 +743,42 @@
               </item>
              </layout>
             </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_5">
+              <item>
+               <widget class="QLabel" name="redGammaLabel">
+                <property name="text">
+                 <string>Gamma: </string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QNoScrollDoubleSpinBox" name="redGammaSpinBox">
+                <property name="decimals">
+                 <number>1</number>
+                </property>
+                <property name="maximum">
+                 <double>5.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>0.100000000000000</double>
+                </property>
+                <property name="value">
+                 <double>1.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
            </layout>
           </widget>
          </item>
          <item>
-          <widget class="QGroupBox" name="groupBox_5">
+          <widget class="QGroupBox" name="greenGroupBox">
            <property name="title">
             <string>Green</string>
            </property>
-           <layout class="QVBoxLayout" name="verticalLayout_31">
+           <layout class="QVBoxLayout" name="verticalLayout_7">
             <item>
              <widget class="QNoScrollComboBox" name="comboGreen">
               <property name="sizePolicy">
@@ -849,15 +873,42 @@
               </item>
              </layout>
             </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_6">
+              <item>
+               <widget class="QLabel" name="greenGammaLabel">
+                <property name="text">
+                 <string>Gamma: </string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QNoScrollDoubleSpinBox" name="greenGammaSpinBox">
+                <property name="decimals">
+                 <number>1</number>
+                </property>
+                <property name="maximum">
+                 <double>5.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>0.100000000000000</double>
+                </property>
+                <property name="value">
+                 <double>1.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
            </layout>
           </widget>
          </item>
          <item>
-          <widget class="QGroupBox" name="groupBox_4">
+          <widget class="QGroupBox" name="blueGroupBox">
            <property name="title">
             <string>Blue</string>
            </property>
-           <layout class="QVBoxLayout" name="verticalLayout_30">
+           <layout class="QVBoxLayout" name="verticalLayout_8">
             <item>
              <widget class="QNoScrollComboBox" name="comboBlue">
               <property name="sizePolicy">
@@ -952,6 +1003,33 @@
               </item>
              </layout>
             </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_7">
+              <item>
+               <widget class="QLabel" name="blueGammaLabel">
+                <property name="text">
+                 <string>Gamma: </string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QNoScrollDoubleSpinBox" name="blueGammaSpinBox">
+                <property name="decimals">
+                 <number>1</number>
+                </property>
+                <property name="maximum">
+                 <double>5.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>0.100000000000000</double>
+                </property>
+                <property name="value">
+                 <double>1.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
            </layout>
           </widget>
          </item>
@@ -972,6 +1050,11 @@
   <customwidget>
    <class>QNoScrollSlider</class>
    <extends>QSlider</extends>
+   <header>sift.ui.custom_widgets</header>
+  </customwidget>
+  <customwidget>
+   <class>QNoScrollDoubleSpinBox</class>
+   <extends>QDoubleSpinBox</extends>
    <header>sift.ui.custom_widgets</header>
   </customwidget>
  </customwidgets>

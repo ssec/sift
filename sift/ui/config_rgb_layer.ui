@@ -6,32 +6,28 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>403</width>
-    <height>352</height>
+    <width>421</width>
+    <height>447</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <widget class="QWidget" name="verticalLayoutWidget">
-   <property name="geometry">
-    <rect>
-     <x>9</x>
-     <y>9</y>
-     <width>381</width>
-     <height>311</height>
-    </rect>
-   </property>
-   <layout class="QVBoxLayout" name="verticalLayout">
-    <item>
-     <widget class="QLabel" name="label">
-      <property name="text">
-       <string>RGB Layer Channels and Ranges</string>
-      </property>
-     </widget>
-    </item>
-    <item>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QGroupBox" name="groupBox_3">
+     <property name="title">
+      <string>Red</string>
+     </property>
      <widget class="QComboBox" name="comboRed">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>20</y>
+        <width>380</width>
+        <height>26</height>
+       </rect>
+      </property>
       <property name="toolTip">
        <string>Red</string>
       </property>
@@ -39,9 +35,15 @@
        <string>Red channel</string>
       </property>
      </widget>
-    </item>
-    <item>
      <widget class="QSlider" name="slideMinRed">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>50</y>
+        <width>380</width>
+        <height>22</height>
+       </rect>
+      </property>
       <property name="maximum">
        <number>32767</number>
       </property>
@@ -49,9 +51,15 @@
        <enum>Qt::Horizontal</enum>
       </property>
      </widget>
-    </item>
-    <item>
      <widget class="QSlider" name="slideMaxRed">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>80</y>
+        <width>380</width>
+        <height>22</height>
+       </rect>
+      </property>
       <property name="maximum">
        <number>32767</number>
       </property>
@@ -59,9 +67,52 @@
        <enum>Qt::Horizontal</enum>
       </property>
      </widget>
-    </item>
-    <item>
+     <widget class="QDoubleSpinBox" name="redGammaSpinBox">
+      <property name="geometry">
+       <rect>
+        <x>70</x>
+        <y>110</y>
+        <width>62</width>
+        <height>24</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLabel" name="redGammaLabel">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>110</y>
+        <width>56</width>
+        <height>24</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Gamma: </string>
+      </property>
+     </widget>
+     <zorder>comboRed</zorder>
+     <zorder>slideMinRed</zorder>
+     <zorder>slideMaxRed</zorder>
+     <zorder>redGammaSpinBox</zorder>
+     <zorder>redGammaLabel</zorder>
+     <zorder>groupBox_2</zorder>
+     <zorder>groupBox</zorder>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="groupBox_2">
+     <property name="title">
+      <string>Green</string>
+     </property>
      <widget class="QComboBox" name="comboGreen">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>20</y>
+        <width>380</width>
+        <height>26</height>
+       </rect>
+      </property>
       <property name="toolTip">
        <string>Green</string>
       </property>
@@ -69,9 +120,15 @@
        <string>Green channel</string>
       </property>
      </widget>
-    </item>
-    <item>
      <widget class="QSlider" name="slideMinGreen">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>50</y>
+        <width>380</width>
+        <height>22</height>
+       </rect>
+      </property>
       <property name="maximum">
        <number>32767</number>
       </property>
@@ -79,9 +136,15 @@
        <enum>Qt::Horizontal</enum>
       </property>
      </widget>
-    </item>
-    <item>
      <widget class="QSlider" name="slideMaxGreen">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>80</y>
+        <width>380</width>
+        <height>22</height>
+       </rect>
+      </property>
       <property name="maximum">
        <number>32767</number>
       </property>
@@ -89,9 +152,52 @@
        <enum>Qt::Horizontal</enum>
       </property>
      </widget>
-    </item>
-    <item>
+     <widget class="QLabel" name="greenGammaLabel">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>110</y>
+        <width>56</width>
+        <height>24</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Gamma: </string>
+      </property>
+     </widget>
+     <widget class="QDoubleSpinBox" name="greenGammaSpinBox">
+      <property name="geometry">
+       <rect>
+        <x>70</x>
+        <y>110</y>
+        <width>62</width>
+        <height>24</height>
+       </rect>
+      </property>
+     </widget>
+     <zorder>comboGreen</zorder>
+     <zorder>slideMinGreen</zorder>
+     <zorder>slideMaxGreen</zorder>
+     <zorder>groupBox_3</zorder>
+     <zorder>groupBox_3</zorder>
+     <zorder>greenGammaLabel</zorder>
+     <zorder>greenGammaSpinBox</zorder>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="groupBox">
+     <property name="title">
+      <string>Blue</string>
+     </property>
      <widget class="QComboBox" name="comboBlue">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>20</y>
+        <width>380</width>
+        <height>26</height>
+       </rect>
+      </property>
       <property name="toolTip">
        <string>Blue</string>
       </property>
@@ -99,19 +205,15 @@
        <string>Blue channel</string>
       </property>
      </widget>
-    </item>
-    <item>
-     <widget class="QSlider" name="slideMinBlue">
-      <property name="maximum">
-       <number>32767</number>
-      </property>
-      <property name="orientation">
-       <enum>Qt::Horizontal</enum>
-      </property>
-     </widget>
-    </item>
-    <item>
      <widget class="QSlider" name="slideMaxBlue">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>80</y>
+        <width>380</width>
+        <height>22</height>
+       </rect>
+      </property>
       <property name="maximum">
        <number>32767</number>
       </property>
@@ -119,9 +221,54 @@
        <enum>Qt::Horizontal</enum>
       </property>
      </widget>
-    </item>
-   </layout>
-  </widget>
+     <widget class="QSlider" name="slideMinBlue">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>50</y>
+        <width>380</width>
+        <height>22</height>
+       </rect>
+      </property>
+      <property name="maximum">
+       <number>32767</number>
+      </property>
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+     </widget>
+     <widget class="QLabel" name="blueGammaLabel">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>110</y>
+        <width>56</width>
+        <height>24</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Gamma: </string>
+      </property>
+     </widget>
+     <widget class="QDoubleSpinBox" name="blueGammaSpinBox">
+      <property name="geometry">
+       <rect>
+        <x>70</x>
+        <y>110</y>
+        <width>62</width>
+        <height>24</height>
+       </rect>
+      </property>
+     </widget>
+     <zorder>comboBlue</zorder>
+     <zorder>slideMaxBlue</zorder>
+     <zorder>slideMinBlue</zorder>
+     <zorder>groupBox_3</zorder>
+     <zorder>blueGammaLabel</zorder>
+     <zorder>blueGammaSpinBox</zorder>
+    </widget>
+   </item>
+  </layout>
  </widget>
  <resources/>
  <connections/>
