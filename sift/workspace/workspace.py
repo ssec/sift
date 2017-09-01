@@ -327,17 +327,19 @@ class Workspace(QObject):
         LOG.info('{} database at {}'.format('initializing' if should_init else 'attaching', self._inventory_path))
         self._inventory = md = Metadatabase('sqlite:///' + self._inventory_path, create_tables=should_init)
         if should_init:
-            assert(0 == self._S.query(Content).count())
+            with self._inventory as s:
+                assert(0 == s.query(Content).count())
         LOG.info('done with init')
 
     def _purge_missing_content(self):
         to_purge = []
-        for c in self._S.query(Content).all():
+        s = self._S
+        for c in s.query(Content).all():
             if not ActiveContent.can_attach(self.cwd, c):
                 LOG.warning("purging missing content {}".format(c.path))
                 to_purge.append(c)
-        [self._S.delete(c) for c in to_purge]
-        self._S.commit()
+        [s.delete(c) for c in to_purge]
+        s.commit()
 
     def _init_inventory_existing_datasets(self):
         """
@@ -393,17 +395,17 @@ class Workspace(QObject):
     # often-used queries
     #
 
-    def _product_with_uuid(self, uuid) -> Product:
-        return self._S.query(Product).filter_by(uuid_str=str(uuid)).first()
+    def _product_with_uuid(self, session, uuid) -> Product:
+        return session.query(Product).filter_by(uuid_str=str(uuid)).first()
 
-    def _product_overview_content(self, prod:Product=None, uuid:UUID=None) -> Content:
+    def _product_overview_content(self, session, prod:Product=None, uuid:UUID=None) -> Content:
         if prod is None and uuid is not None:
-            return self._S.query(Content).filter((Product.uuid_str==str(uuid)) & (Content.product_id==Product.id)).order_by(Content.lod).first()
+            return session.query(Content).filter((Product.uuid_str==str(uuid)) & (Content.product_id==Product.id)).order_by(Content.lod).first()
         return None if 0==len(prod.content) else prod.content[0]
 
-    def _product_native_content(self, prod:Product = None, uuid:UUID=None) -> Content:
+    def _product_native_content(self, session, prod:Product = None, uuid:UUID=None) -> Content:
         if prod is None and uuid is not None:
-            return self._S.query(Content).filter((Product.uuid_str==str(uuid)) & (Content.product_id==Product.id)).order_by(Content.lod.desc()).first()
+            return session.query(Content).filter((Product.uuid_str==str(uuid)) & (Content.product_id==Product.id)).order_by(Content.lod.desc()).first()
         return None if 0==len(prod.content) else prod.content[-1]  # highest LOD
 
     #
@@ -414,17 +416,19 @@ class Workspace(QObject):
         # FUTURE: do a compound query for this to get the Content entry
         # prod = self._product_with_uuid(uuid)
         # assert(prod is not None)
-        ovc = self._product_overview_content(uuid=uuid)
-        assert(ovc is not None)
-        arrays = self._cached_arrays_for_content(ovc)
-        return arrays.data
+        with self._inventory as s:
+            ovc = self._product_overview_content(s, uuid=uuid)
+            assert(ovc is not None)
+            arrays = self._cached_arrays_for_content(ovc)
+            return arrays.data
 
     def _native_content_for_uuid(self, uuid):
         # FUTURE: do a compound query for this to get the Content entry
         # prod = self._product_with_uuid(uuid)
-        nac = self._product_native_content(uuid=uuid)
-        arrays = self._cached_arrays_for_content(nac)
-        return arrays.data
+        with self._inventory as s:
+            nac = self._product_native_content(s, uuid=uuid)
+            arrays = self._cached_arrays_for_content(nac)
+            return arrays.data
 
 
     #
@@ -446,7 +450,8 @@ class Workspace(QObject):
         return total
 
     def _all_product_uuids(self):
-        return [q.uuid for q in self._S.query(Product).all()]
+        with self._inventory as s:
+            return [q.uuid for q in s.query(Product).all()]
 
 #----------------------------------------------------------------------
     def get_info(self, dsi_or_uuid, lod=None):
@@ -463,23 +468,24 @@ class Workspace(QObject):
             uuid = dsi_or_uuid[INFO.UUID]
         else:
             uuid = dsi_or_uuid
-        # look up the product for that uuid
-        prod = self._product_with_uuid(uuid)
-        if not prod:  # then it hasn't had its metadata scraped
-            LOG.error('no info available for UUID {}'.format(dsi_or_uuid))
-            LOG.error("known products: {}".format(repr(self._all_product_uuids())))
-            return None
-        native_content = self._product_native_content(uuid=dsi_or_uuid)
+        with self._inventory as s:
+            # look up the product for that uuid
+            prod = self._product_with_uuid(s, uuid)
+            if not prod:  # then it hasn't had its metadata scraped
+                LOG.error('no info available for UUID {}'.format(dsi_or_uuid))
+                LOG.error("known products: {}".format(repr(self._all_product_uuids())))
+                return None
+            native_content = self._product_native_content(s, uuid=dsi_or_uuid)
 
-        if native_content is not None:
-            # FUTURE: this is especially saddening; upgrade to finer grained query and/or deprecate .get_info
-            # once upon a time...
-            # our old model was that product == content and shares a UUID with the layer
-            # if content is available, we want to provide native content metadata along with the product metadata
-            # specifically a lot of client code assumes that resource == product == content and that singular navigation (e.g. cell_size) is norm
-            assert(native_content.info[INFO.CELL_WIDTH] is not None)  # FIXME DEBUG
-            return ChainMap(frozendict(), native_content.info, prod.info)
-        return frozendict(prod.info)  # mapping semantics for database fields, as well as key-value fields; flatten to one namespace and read-only
+            if native_content is not None:
+                # FUTURE: this is especially saddening; upgrade to finer grained query and/or deprecate .get_info
+                # once upon a time...
+                # our old model was that product == content and shares a UUID with the layer
+                # if content is available, we want to provide native content metadata along with the product metadata
+                # specifically a lot of client code assumes that resource == product == content and that singular navigation (e.g. cell_size) is norm
+                assert(native_content.info[INFO.CELL_WIDTH] is not None)  # FIXME DEBUG
+                return frozendict(ChainMap(frozendict(native_content.info), frozendict(prod.info)))
+            return frozendict(prod.info)  # mapping semantics for database fields, as well as key-value fields; flatten to one namespace and read-only
 
     def _check_cache(self, path):
         """
@@ -487,43 +493,47 @@ class Workspace(QObject):
         :param path: file we're checking
         :return: uuid, info, overview_content if the data is already available without import
         """
-        hits = self._S.query(Resource).filter_by(path=path).all()
-        if not hits:
-            return None
-        if len(hits)>=1:
-            if len(hits) > 1:
-                LOG.warning('more than one Resource found suitable, there can be only one')
-            resource = hits[0]
-            hits = list(self._S.query(Content).filter(
-                Content.product_id == Product.id).filter(
-                Product.resource_id == resource.id).order_by(
-                Content.lod).all())
+        with self._inventory as s:
+            hits = s.query(Resource).filter_by(path=path).all()
+            if not hits:
+                return None
             if len(hits)>=1:
-                content = hits[0]  # presumably this is closest to LOD_OVERVIEW
-                # if len(hits)>1:
-                #     LOG.warning('more than one Content found suitable, there can be only one')
-                cac = self._cached_arrays_for_content(content)
-                if not cac:
-                    LOG.error('unable to attach content')
-                    data = None
-                else:
-                    data = cac.data
-                return content.product.uuid, content.product.info, data
+                if len(hits) > 1:
+                    LOG.warning('more than one Resource found suitable, there can be only one')
+                resource = hits[0]
+                hits = list(s.query(Content).filter(
+                    Content.product_id == Product.id).filter(
+                    Product.resource_id == resource.id).order_by(
+                    Content.lod).all())
+                if len(hits)>=1:
+                    content = hits[0]  # presumably this is closest to LOD_OVERVIEW
+                    # if len(hits)>1:
+                    #     LOG.warning('more than one Content found suitable, there can be only one')
+                    cac = self._cached_arrays_for_content(content)
+                    if not cac:
+                        LOG.error('unable to attach content')
+                        data = None
+                    else:
+                        data = cac.data
+                    return content.product.uuid, content.product.info, data
 
     @property
     def paths_in_cache(self):
         # find non-overview non-auxiliary data files
         # FIXME: also need to include coverage and sparsity paths
-        return [x.product.resource[0].path for x in self._S.query(Content).all()]
+        with self._inventory as s:
+            return [x.product.resource[0].path for x in s.query(Content).all()]
 
     @property
     def uuids_in_cache(self):
-        contents_of_cache = self._S.query(Content).all()
-        return list(sorted(set(c.product.uuid for c in contents_of_cache)))
+        with self._inventory as s:
+            contents_of_cache = s.query(Content).all()
+            return list(sorted(set(c.product.uuid for c in contents_of_cache)))
 
     def recently_used_resource_paths(self, n=32):
-        return list(p.path for p in self._S.query(Resource).order_by(Resource.atime.desc()).limit(n).all())
-        # FIXME "replace this completely with product list"
+        with self._inventory as s:
+            return list(p.path for p in s.query(Resource).order_by(Resource.atime.desc()).limit(n).all())
+            # FIXME "replace this completely with product list"
 
     def _purge_content_for_resource(self, resource: Resource, session=None, defer_commit=False):
         """
@@ -539,21 +549,21 @@ class Workspace(QObject):
         for prod in resource.product:
             for con in prod.content:
                 total += self._remove_content_files_from_workspace(con)
-                self._S.delete(con)
+                S.delete(con)
 
         if not resource.exists():  # then purge the resource and its products as well
-           self._S.delete(resource)
+           S.delete(resource)
         if not defer_commit:
-            self._S.commit()
+            S.commit()
         return total
 
     def remove_all_workspace_content_for_resource_paths(self, paths):
         total = 0
-        for path in paths:
-            rsr_hits = self._S.query(Resource).filter_by(path=path).all()
-            for rsr in rsr_hits:
-                total += self._purge_content_for_resource(rsr, defer_commit=True)
-        self._S.commit()
+        with self._inventory as s:
+            for path in paths:
+                rsr_hits = s.query(Resource).filter_by(path=path).all()
+                for rsr in rsr_hits:
+                    total += self._purge_content_for_resource(rsr, defer_commit=True)
         return total
 
     def _clean_cache(self):
@@ -608,18 +618,19 @@ class Workspace(QObject):
         if isinstance(uuid_or_path, UUID):
             return self.get_info(uuid_or_path)  # get product metadata
         else:
-            hits = list(self._S.query(Resource).filter_by(path=uuid_or_path).all())
-            if not hits:
-                return None
-            if len(hits) >= 1:
-                if len(hits) > 1:
-                    raise EnvironmentError('more than one Resource fits this path')
-                resource = hits[0]
-                if len(resource.product) >= 1:
-                    if len(resource.product) > 1:
-                        LOG.warning('more than one Product in this Resource, this query should be deprecated')
-                    prod = resource.product[0]
-                    return prod.info
+            with self._inventory as s:
+                hits = list(s.query(Resource).filter_by(path=uuid_or_path).all())
+                if not hits:
+                    return None
+                if len(hits) >= 1:
+                    if len(hits) > 1:
+                        raise EnvironmentError('more than one Resource fits this path')
+                    resource = hits[0]
+                    if len(resource.product) >= 1:
+                        if len(resource.product) > 1:
+                            LOG.warning('more than one Product in this Resource, this query should be deprecated')
+                        prod = resource.product[0]
+                        return prod.info
 
     def collect_product_metadata_for_paths(self, paths):
         """
@@ -649,7 +660,7 @@ class Workspace(QObject):
     def import_product_content(self, uuid=None, prod=None, allow_cache=True):
         S = self._S
         if prod is None and uuid is not None:
-            prod = self._product_with_uuid(uuid)
+            prod = self._product_with_uuid(S, uuid)
         if len(prod.content):
             LOG.info('product already has content available, are we updating it from external resource?')
         truck = aImporter.from_product(prod, workspace_cwd=self.cwd, database_session=S)
@@ -822,7 +833,7 @@ class Workspace(QObject):
         S.flush()
         # activate the content we just loaded into the workspace
         active_data = self._overview_content_for_uuid(uuid)
-        prod = self._product_with_uuid(uuid)
+        prod = self._product_with_uuid(S, uuid)
         return uuid, prod.info, active_data
 
     def _bgnd_remove(self, uuid):
@@ -871,16 +882,17 @@ class Workspace(QObject):
             uuid = dsi_or_uuid[INFO.UUID]
         # prod = self._product_with_uuid(dsi_or_uuid)
         # prod.touch()  TODO this causes a locking exception when run in a secondary thread. Keeping background operations lightweight makes sense however, so just review this
-        content = self._S.query(Content).filter((Product.uuid_str==str(uuid)) & (Content.product_id==Product.id)).order_by(Content.lod.desc()).first()
-        if not content:
-            raise AssertionError('no content in workspace for {}, must re-import'.format(uuid))
-        # content.touch()
-        # self._S.commit()  # flush any pending updates to workspace db file
+        with self._inventory as s:
+            content = s.query(Content).filter((Product.uuid_str==str(uuid)) & (Content.product_id==Product.id)).order_by(Content.lod.desc()).first()
+            if not content:
+                raise AssertionError('no content in workspace for {}, must re-import'.format(uuid))
+            # content.touch()
+            # self._S.commit()  # flush any pending updates to workspace db file
 
-        # FIXME: find the content for the requested LOD, then return its ActiveContent - or attach one
-        # for now, just work with assumption of one product one content
-        active_content = self._cached_arrays_for_content(content)
-        return active_content.data
+            # FIXME: find the content for the requested LOD, then return its ActiveContent - or attach one
+            # for now, just work with assumption of one product one content
+            active_content = self._cached_arrays_for_content(content)
+            return active_content.data
 
     def _create_position_to_index_transform(self, dsi_or_uuid):
         info = self.get_info(dsi_or_uuid)

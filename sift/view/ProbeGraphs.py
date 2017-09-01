@@ -109,7 +109,7 @@ class ProbeGraphManager (QObject) :
 
         # hang on to the workspace and document
         self.workspace = workspace
-        self.document  = document
+        self.document = document
         self.queue = queue
 
         # hang on to the tab widget
@@ -290,6 +290,7 @@ class ProbeGraphManager (QObject) :
 
         currentName = self.graphs[self.selected_graph_index].getName()
         self.didChangeTab.emit((currentName,))
+
 
 class ProbeGraphDisplay (object) :
     """The ProbeGraphDisplay controls one tab of the Area Probe Graphs.
@@ -573,7 +574,7 @@ class ProbeGraphDisplay (object) :
 
             # plot a histogram
             yield {TASK_DOING: 'Probe Plot: Creating histogram plot', TASK_PROGRESS: 0.25}
-            self.plotHistogram (data_polygon, title, x_point)
+            self.plotHistogram(data_polygon, title, x_point)
 
         # if we are plotting x vs y and have x, y, and a polygon
         elif plot_versus and x_uuid is not None and y_uuid is not None and polygon is not None :

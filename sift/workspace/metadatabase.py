@@ -645,6 +645,17 @@ class Metadatabase(object):
     def session(self):
         return self.session_factory()
 
+    def __enter__(self):
+        return self.SessionRegistry()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        s = self.SessionRegistry()
+        if exc_val is not None:
+            s.rollback()
+        else:
+            s.commit()
+        s.close()
+
     #
     # high-level functions
     #
