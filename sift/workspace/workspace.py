@@ -710,6 +710,8 @@ class Workspace(QObject):
     #     mm[:] = data[:]
     #     return mm
     def create_algebraic_composite(self, operations, namespace, info=None):
+        from functools import reduce
+        from datetime import timedelta
         if not info:
             info = {}
 
@@ -771,7 +773,7 @@ class Workspace(QObject):
             raise RuntimeError("Unable to retrieve result '{}' from code execution".format(result_name))
         info[INFO.VALID_RANGE] = (np.nanmin(valids_namespace[result_name]), np.nanmax(valids_namespace[result_name]))
         info[INFO.CLIM] = (np.nanmin(valids_namespace[result_name]), np.nanmax(valids_namespace[result_name]))
-
+        info[INFO.OBS_DURATION] = reduce(min, [x.get(INFO.OBS_DURATION, timedelta(seconds=0)) for x in md_list])
         exec(ops, None, content)
         if result_name not in content:
             raise RuntimeError("Unable to retrieve result '{}' from code execution".format(result_name))
@@ -796,10 +798,15 @@ class Workspace(QObject):
         Returns:
             uuid, info, data: uuid of the new product, its official read-only metadata, and cached content ndarray
         """
-        S = self._inventory.session()
         if INFO.UUID not in info:
             raise ValueError('currently require an INFO.UUID be included in product')
-        P = Product.from_info(info)
+        parms = dict(info)
+        now = datetime.utcnow()
+        parms.update(dict(
+            atime = now,
+            mtime = now,
+        ))
+        P = Product.from_info(parms)
         uuid = P.uuid
         # FUTURE: add expression and namespace information, which would require additional parameters
         ws_filename = '{}.data'.format(str(uuid))
@@ -809,14 +816,11 @@ class Workspace(QObject):
             mm[:] = data[:]
 
         now = datetime.utcnow()
-        parms = dict(info)
         parms.update(dict(
             lod = Content.LOD_OVERVIEW,
             path = ws_filename,
             dtype = str(data.dtype),
             proj4 = info[INFO.PROJ],
-            atime = now,
-            mtime = now,
             resolution = min(info[INFO.CELL_WIDTH], info[INFO.CELL_HEIGHT])
         ))
         rcls = dict(zip( ('rows','cols','levels'), data.shape) )
@@ -825,12 +829,13 @@ class Workspace(QObject):
 
         C = Content.from_info(parms, only_fields=True)
         P.content.append(C)
-
         # FUTURE: do we identify a Resource to go with this? Probably not
-        S.add(P)
-        S.add(C)
-        S.commit()
-        S.flush()
+
+        # transaction with the metadatabase to add the product and content
+        with self._inventory as S:
+            S.add(P)
+            S.add(C)
+
         # activate the content we just loaded into the workspace
         active_data = self._overview_content_for_uuid(uuid)
         prod = self._product_with_uuid(S, uuid)
