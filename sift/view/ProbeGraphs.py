@@ -590,7 +590,7 @@ class ProbeGraphDisplay (object) :
             y_conv_func = self.document[y_uuid][INFO.UNIT_CONVERSION][1]
             hires_data = hires_conv_func(hires_data)
             yield {TASK_DOING: 'Probe Plot: Collecting polygon data (layer 2)...', TASK_PROGRESS: 0.15}
-            if hires_uuid is x_uuid:
+            if hires_uuid == x_uuid:
                 # the hires data was from the X UUID
                 data1 = hires_data
                 data2 = self.workspace.get_content_coordinate_mask(y_uuid, hires_coord_mask)
