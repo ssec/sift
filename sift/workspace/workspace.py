@@ -333,13 +333,12 @@ class Workspace(QObject):
 
     def _purge_missing_content(self):
         to_purge = []
-        s = self._S
-        for c in s.query(Content).all():
-            if not ActiveContent.can_attach(self.cwd, c):
-                LOG.warning("purging missing content {}".format(c.path))
-                to_purge.append(c)
-        [s.delete(c) for c in to_purge]
-        s.commit()
+        with self._inventory as s:
+            for c in s.query(Content).all():
+                if not ActiveContent.can_attach(self.cwd, c):
+                    LOG.warning("purging missing content {}".format(c.path))
+                    to_purge.append(c)
+            [s.delete(c) for c in to_purge]
 
     def _init_inventory_existing_datasets(self):
         """
@@ -535,7 +534,7 @@ class Workspace(QObject):
             return list(p.path for p in s.query(Resource).order_by(Resource.atime.desc()).limit(n).all())
             # FIXME "replace this completely with product list"
 
-    def _purge_content_for_resource(self, resource: Resource, session=None, defer_commit=False):
+    def _purge_content_for_resource(self, resource: Resource, session, defer_commit=False):
         """
         remove all resource contents from the database
         if the resource original path no longer exists, also purge resource and products from database
@@ -544,7 +543,7 @@ class Workspace(QObject):
         """
         if session is not None:
             defer_commit = True
-        S = session or self._S
+        S = session  # or self._S
         total = 0
         for prod in resource.product:
             for con in prod.content:
@@ -574,29 +573,29 @@ class Workspace(QObject):
         :return:
         """
         # get information on current cache contents
-        S = self._inventory.session()
-        LOG.info("cleaning cache")
-        total_size = self._total_workspace_bytes
-        GB = 1024**3
-        LOG.info("total cache size is {}GB of max {}GB".format(total_size/GB, self._max_size_gb))
-        max_size = self._max_size_gb * GB
-        for res in S.query(Resource).order_by(Resource.atime).all():
-            if total_size < max_size:
-                break
-            total_size -= self._purge_content_for_resource(res, session=S)
-            # remove all content for lowest atimes until
-        S.commit()
+        with self._inventory as S:
+            LOG.info("cleaning cache")
+            total_size = self._total_workspace_bytes
+            GB = 1024**3
+            LOG.info("total cache size is {}GB of max {}GB".format(total_size/GB, self._max_size_gb))
+            max_size = self._max_size_gb * GB
+            for res in S.query(Resource).order_by(Resource.atime).all():
+                if total_size < max_size:
+                    break
+                total_size -= self._purge_content_for_resource(res, session=S)
+                # remove all content for lowest atimes until
 
     def close(self):
         self._clean_cache()
-        self._S.commit()
+        # self._S.commit()
 
     def bgnd_task_complete(self):
         """
         handle operations that should be done at the end of a threaded background task
         """
-        self._S.commit()
-        self._S.remove()
+        pass
+        # self._S.commit()
+        # self._S.remove()
 
     def idle(self):
         """
@@ -635,56 +634,60 @@ class Workspace(QObject):
     def collect_product_metadata_for_paths(self, paths):
         """
         Start loading URI data into the workspace asynchronously.
+        return sequence of read-only info dictionaries
 
         """
-        self._S.flush()
-        # FUTURE: consider returning importers instead of products, since we can then re-use them to import the content instead of having to regenerate
-        import_session = self._S
-        for source_path in paths:
-            LOG.info('collecting metadata for {}'.format(source_path))
-            # FIXME: decide whether to update database if mtime of file is newer than mtime in database
-            for imp in self._importers:
-                if imp.is_relevant(source_path=source_path):
-                    hauler = imp(source_path, database_session=import_session,
-                                 workspace_cwd=self.cwd)
-                    hauler.merge_resources()
-                    for prod in hauler.merge_products():
-                        # merge the product into our database session, since it may belong to import_session
-                        assert(prod is not None)
-                        zult = self._S.merge(prod)
-                        LOG.debug('yielding product metadata {}'.format(repr(zult)))
-                        yield zult
-        import_session.commit()
-        import_session.flush()
+        # self._S.flush()
+        with self._inventory as import_session:
+            # FUTURE: consider returning importers instead of products, since we can then re-use them to import the content instead of having to regenerate
+            # import_session = self._S
+            for source_path in paths:
+                LOG.info('collecting metadata for {}'.format(source_path))
+                # FIXME: decide whether to update database if mtime of file is newer than mtime in database
+                for imp in self._importers:
+                    if imp.is_relevant(source_path=source_path):
+                        hauler = imp(source_path, database_session=import_session,
+                                     workspace_cwd=self.cwd)
+                        hauler.merge_resources()
+                        for prod in hauler.merge_products():
+                            assert(prod is not None)
+                            # merge the product into our database session, since it may belong to import_session
+                            zult = frozendict(prod.info)  # self._S.merge(prod)
+                            LOG.debug('yielding product metadata {}'.format(repr(zult)))
+                            yield zult
+        # import_session.commit()
+        # import_session.flush()
 
     def import_product_content(self, uuid=None, prod=None, allow_cache=True):
-        S = self._S
-        if prod is None and uuid is not None:
-            prod = self._product_with_uuid(S, uuid)
-        if len(prod.content):
-            LOG.info('product already has content available, are we updating it from external resource?')
-        truck = aImporter.from_product(prod, workspace_cwd=self.cwd, database_session=S)
-        metadata = prod.info
-        name = metadata[INFO.SHORT_NAME]
+        with self._inventory as S:
+            # S = self._S
+            if prod is None and uuid is not None:
+                prod = self._product_with_uuid(S, uuid)
+            if len(prod.content):
+                LOG.info('product already has content available, are we updating it from external resource?')
+            truck = aImporter.from_product(prod, workspace_cwd=self.cwd, database_session=S)
+            metadata = prod.info
+            name = metadata[INFO.SHORT_NAME]
 
-        # FIXME: for now, just iterate the incremental load. later we want to add this to TheQueue and update the UI as we get more data loaded
-        gen = truck.begin_import_products(prod.id)
-        nupd = 0
-        for update in gen:
-            nupd += 1
-            # we're now incrementally reading the input file
-            # data updates are coming back to us (eventually asynchronously)
-            # Content is in the metadatabase and being updated + committed, including sparsity and coverage arrays
-            if update.data is not None:
-                # data = update.data
-                LOG.info("{} {}: {:.01f}%".format(name, update.stage_desc, update.completion*100.0))
-        # self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
-        LOG.debug('received {} updates during import'.format(nupd))
-        S.commit()
-        S.flush()
+            # FIXME: for now, just iterate the incremental load. later we want to add this to TheQueue and update the UI as we get more data loaded
+            gen = truck.begin_import_products(prod.id)
+            nupd = 0
+            for update in gen:
+                nupd += 1
+                # we're now incrementally reading the input file
+                # data updates are coming back to us (eventually asynchronously)
+                # Content is in the metadatabase and being updated + committed, including sparsity and coverage arrays
+                if update.data is not None:
+                    # data = update.data
+                    LOG.info("{} {}: {:.01f}%".format(name, update.stage_desc, update.completion*100.0))
+            # self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
+            LOG.debug('received {} updates during import'.format(nupd))
+            uuid = prod.uuid
+        # S.commit()
+        # S.flush()
 
         # make an ActiveContent object from the Content, now that we've imported it
-        ac = self._overview_content_for_uuid(prod.uuid)
+        ac = self._overview_content_for_uuid(uuid)
         return ac.data
 
     def create_composite(self, symbols:dict, relation:dict):

@@ -404,9 +404,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             raise ValueError('no products available in {}'.format(path))
         if len(products) > 1:
             LOG.warning('more than one product available at this path - FIXME')
-        info = products[0].info
-        uuid = products[0].uuid
+        info = products[0]
         assert(info is not None)
+        uuid = info[INFO.UUID]
 
         if uuid in self._layer_with_uuid:
             LOG.warning("layer with UUID {} already in document?".format(uuid))
@@ -426,7 +426,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             dataset[INFO.UNIT_CONVERSION] = units_conversion(dataset)
         presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
 
-
         # signal updates from the document
         self.didAddBasicLayer.emit(reordered_indices, dataset.uuid, presentation)
 
@@ -441,7 +440,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :return:
         """
         # Load all the metadata so we can sort the files
-        infos = [x.info for x in self._workspace.collect_product_metadata_for_paths(paths)]
+        infos = list(self._workspace.collect_product_metadata_for_paths(paths))
 
         # Use the metadata to sort the paths
         paths = list(self.sort_datasets_into_load_order(infos))
