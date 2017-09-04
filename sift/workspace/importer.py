@@ -207,8 +207,9 @@ class aSingleFileWithSingleProductImporter(aImporter):
         prod.resource.append(res)
         assert(INFO.OBS_TIME in meta)
         assert(INFO.OBS_DURATION in meta)
-        prod.info.update(meta)  # sets fields like obs_duration and obs_time transparently
+        prod.update(meta)  # sets fields like obs_duration and obs_time transparently
         assert(prod.info[INFO.OBS_TIME] is not None and prod.obs_time is not None)
+        assert(prod.info[INFO.VALID_RANGE] is not None)
         LOG.debug('new product: {}'.format(repr(prod)))
         self._S.add(prod)
         self._S.commit()
@@ -399,7 +400,7 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
         # create and commit a Content entry pointing to where the content is in the workspace, even if coverage is empty
         c = Content(
             lod = 0,
-            resolution = int(min(prod.info[INFO.CELL_WIDTH], prod.info[INFO.CELL_HEIGHT])),
+            resolution = int(min(abs(prod.info[INFO.CELL_WIDTH]), abs(prod.info[INFO.CELL_HEIGHT]))),
             atime = now,
             mtime = now,
 
@@ -498,7 +499,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         return True if (source.lower().endswith('.nc') or source.lower().endswith('.nc4')) else False
 
     @staticmethod
-    def get_metadata(source_path=None, source_uri=None, **kwargs):
+    def get_metadata(source_path=None, source_uri=None, pug=None, **kwargs):
         # yield successive levels of detail as we load
         if source_uri is not None:
             raise NotImplementedError("GoesRPUGImporter cannot read from URIs yet")
@@ -509,7 +510,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
 
         d = {}
         # nc = nc4.Dataset(source_path)
-        pug = PugL1bTools(source_path)
+        pug = pug or PugL1bTools(source_path)
 
         d.update(GoesRPUGImporter._metadata_for_abi_path(pug))
         d[INFO.DATASET_NAME] = os.path.split(source_path)[-1]
@@ -566,7 +567,6 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
             LOG.warning('content was already available, skipping import')
             return
 
-
         pug = PugL1bTools(source_path)
         rows, cols = shape = pug.shape
         cell_height, cell_width = pug.cell_size
@@ -615,7 +615,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         # create and commit a Content entry pointing to where the content is in the workspace, even if coverage is empty
         c = Content(
             lod = 0,
-            resolution = int(min(cell_width, cell_height)),
+            resolution = int(min(abs(cell_width), abs(cell_height))),
             atime = now,
             mtime = now,
 
@@ -636,8 +636,6 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
             cell_height = cell_height,
             origin_x = origin_x,
             origin_y = origin_y,
-
-
         )
         # c.info.update(prod.info) would just make everything leak together so let's not do it
         self._S.add(c)

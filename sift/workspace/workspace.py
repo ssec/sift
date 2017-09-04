@@ -483,7 +483,7 @@ class Workspace(QObject):
                 # if content is available, we want to provide native content metadata along with the product metadata
                 # specifically a lot of client code assumes that resource == product == content and that singular navigation (e.g. cell_size) is norm
                 assert(native_content.info[INFO.CELL_WIDTH] is not None)  # FIXME DEBUG
-                return frozendict(ChainMap(frozendict(native_content.info), frozendict(prod.info)))
+                return frozendict(ChainMap(native_content.info, prod.info))
             return frozendict(prod.info)  # mapping semantics for database fields, as well as key-value fields; flatten to one namespace and read-only
 
     def _check_cache(self, path):
@@ -520,8 +520,13 @@ class Workspace(QObject):
     def paths_in_cache(self):
         # find non-overview non-auxiliary data files
         # FIXME: also need to include coverage and sparsity paths
+        zult = []
         with self._inventory as s:
-            return [x.product.resource[0].path for x in s.query(Content).all()]
+            for c in s.query(Content).all():
+                p = c.product
+                if len(p.resource) > 0:  # algebraic products do not belong to a resource!
+                    zult.append(p.resource[0].path)
+        return zult
 
     @property
     def uuids_in_cache(self):
@@ -840,9 +845,9 @@ class Workspace(QObject):
             S.add(C)
 
         # activate the content we just loaded into the workspace
-        active_data = self._overview_content_for_uuid(uuid)
-        prod = self._product_with_uuid(S, uuid)
-        return uuid, prod.info, active_data
+        overview_data = self._overview_content_for_uuid(uuid)
+        # prod = self._product_with_uuid(S, uuid)
+        return uuid, self.get_info(uuid), overview_data
 
     def _bgnd_remove(self, uuid):
         from sift.queue import TASK_DOING, TASK_PROGRESS

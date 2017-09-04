@@ -311,6 +311,19 @@ class Product(Base):
             self._info = ChainRecordWithDict(self, self.INFO_TO_FIELD, self._kwinfo)
         return self._info
 
+    def update(self, d, only_keyvalues=False):
+        """
+        update metadata, optionally only permitting key-values to be updated instead of established database fields
+        :param d: mapping of combined database fields and key-values (using INFO keys where possible)
+        :param only_keyvalues: true if only key-value attributes should be updated
+        :return:
+        """
+        if only_keyvalues:
+            fields, keys = self._separate_fields_and_keys(d)
+            self._kwinfo.update(d)
+        else:
+            self.info.update(d)
+
     @property
     def proj4(self):
         nat = self.content[-1] if len(self.content) else None
@@ -542,6 +555,19 @@ class Content(Base):
         if self._info is None:
             self._info = ChainRecordWithDict(self, self.INFO_TO_FIELD, self._kwinfo)
         return self._info
+
+    def update(self, d, only_keyvalues=False):
+        """
+        update metadata, optionally only permitting key-values to be updated instead of established database fields
+        :param d: mapping of combined database fields and key-values (using INFO keys where possible)
+        :param only_keyvalues: true if only key-value attributes should be updated
+        :return:
+        """
+        if only_keyvalues:
+            fields, keys = self._separate_fields_and_keys(d)
+            self._kwinfo.update(d)
+        else:
+            self.info.update(d)
 
     @property
     def name(self):
