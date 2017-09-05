@@ -311,7 +311,7 @@ class Product(Base):
             self._info = ChainRecordWithDict(self, self.INFO_TO_FIELD, self._kwinfo)
         return self._info
 
-    def update(self, d, only_keyvalues=False):
+    def update(self, d, only_keyvalues=False, only_fields=False):
         """
         update metadata, optionally only permitting key-values to be updated instead of established database fields
         :param d: mapping of combined database fields and key-values (using INFO keys where possible)
@@ -319,8 +319,11 @@ class Product(Base):
         :return:
         """
         if only_keyvalues:
-            fields, keys = self._separate_fields_and_keys(d)
-            self._kwinfo.update(d)
+            _, keys = self._separate_fields_and_keys(d)
+            self._kwinfo.update(keys)
+        elif only_fields:
+            fields, _ = self._separate_fields_and_keys(d)
+            self.info.update(fields)
         else:
             self.info.update(d)
 
@@ -556,7 +559,7 @@ class Content(Base):
             self._info = ChainRecordWithDict(self, self.INFO_TO_FIELD, self._kwinfo)
         return self._info
 
-    def update(self, d, only_keyvalues=False):
+    def update(self, d, only_keyvalues=False, only_fields=False):
         """
         update metadata, optionally only permitting key-values to be updated instead of established database fields
         :param d: mapping of combined database fields and key-values (using INFO keys where possible)
@@ -564,8 +567,11 @@ class Content(Base):
         :return:
         """
         if only_keyvalues:
-            fields, keys = self._separate_fields_and_keys(d)
-            self._kwinfo.update(d)
+            _, keys = self._separate_fields_and_keys(d)
+            self._kwinfo.update(keys)
+        elif only_fields:
+            fields, _ = self._separate_fields_and_keys(d)
+            self.info.update(fields)
         else:
             self.info.update(d)
 

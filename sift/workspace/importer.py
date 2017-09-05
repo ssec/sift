@@ -16,7 +16,7 @@ import logging, unittest
 import re
 from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Sequence, Iterable, Generator, Mapping
 import gdal
 import osr
@@ -32,6 +32,7 @@ from .metadatabase import Resource, Product, Content
 
 LOG = logging.getLogger(__name__)
 
+DEFAULT_GTIFF_OBS_DURATION = timedelta(seconds=60)
 
 GUIDEBOOKS = {
     PLATFORM.GOES_16: ABI_AHI_Guidebook,
@@ -216,6 +217,7 @@ class aSingleFileWithSingleProductImporter(aImporter):
         return [prod]
 
 
+
 class GeoTiffImporter(aSingleFileWithSingleProductImporter):
     """
     GeoTIFF data importer
@@ -252,6 +254,7 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
                 INFO.INSTRUMENT: INSTRUMENT.AHI,
                 INFO.SCHED_TIME: when,
                 INFO.OBS_TIME: when,
+                INFO.OBS_DURATION: DEFAULT_GTIFF_OBS_DURATION,
                 INFO.SCENE: scene,
             })
         return meta
@@ -308,6 +311,8 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
 
         ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
         d[INFO.KIND] = KIND.IMAGE
+
+        # FUTURE: this is Content metadata and not Product metadata:
         d[INFO.ORIGIN_X] = ox
         d[INFO.ORIGIN_Y] = oy
         d[INFO.CELL_WIDTH] = cw
@@ -345,6 +350,7 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
         gtiff_meta = GeoTiffImporter._check_geotiff_metadata(gtiff)
         d.update(gtiff_meta)
         generate_guidebook_metadata(d)
+        LOG.debug("GeoTIFF metadata for {}: {}".format(source_path, repr(d)))
         return d
 
     def product_metadata(self):
@@ -365,10 +371,14 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
         prod = products[0]
 
         if prod.content:
-            LOG.warning('content was already available, skipping import')
+            LOG.info('content is already available, skipping import')
             return
 
         now = datetime.utcnow()
+
+        # re-collect the metadata, which should be separated between Product vs Content metadata in the FUTURE
+        # principally we're not allowed to store ORIGIN_ or CELL_ metadata in the Product
+        info = GeoTiffImporter.get_metadata(source_path)
 
         # Additional metadata that we've learned by loading the data
         gtiff = gdal.Open(source_path)
@@ -397,10 +407,13 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
         cov_data = np.memmap(coverage_path, dtype=np.int8, shape=(rows,), mode='w+')
         cov_data[:] = 0  # should not be needed except maybe in Windows?
 
+        # LOG.debug("keys in geotiff product: {}".format(repr(list(prod.info.keys()))))
+        LOG.debug("cell size in geotiff product: {} x {}".format(prod.info[INFO.CELL_HEIGHT], prod.info[INFO.CELL_WIDTH]))
+
         # create and commit a Content entry pointing to where the content is in the workspace, even if coverage is empty
         c = Content(
             lod = 0,
-            resolution = int(min(abs(prod.info[INFO.CELL_WIDTH]), abs(prod.info[INFO.CELL_HEIGHT]))),
+            resolution = int(min(abs(info[INFO.CELL_WIDTH]), abs(info[INFO.CELL_HEIGHT]))),
             atime = now,
             mtime = now,
 
@@ -411,6 +424,12 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
             levels = 0,
             dtype = 'float32',
 
+            cell_width = info[INFO.CELL_WIDTH],
+            cell_height = info[INFO.CELL_HEIGHT],
+            origin_x = info[INFO.ORIGIN_X],
+            origin_y = info[INFO.ORIGIN_Y],
+            proj4 = info[INFO.PROJ],
+
             # info about the coverage array memmap, which in our case just tells what rows are ready
             coverage_rows = rows,
             coverage_cols = 1,
@@ -419,9 +438,7 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
         # c.info.update(prod.info) would just make everything leak together so let's not do it
         self._S.add(c)
         prod.content.append(c)
-        # prod.touch()
         self._S.commit()
-        # self._S.flush()
 
         # FIXME: yield initial status to announce content is available, even if it's empty
 
@@ -517,6 +534,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         d[INFO.PATHNAME] = source_path
         d[INFO.KIND] = KIND.IMAGE
 
+        # FUTURE: this is Content metadata and not Product metadata:
         d[INFO.PROJ] = pug.proj4_string
         # get nadir-meter-ish projection coordinate vectors to be used by proj4
         y,x = pug.proj_y, pug.proj_x

@@ -452,7 +452,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param paths: list of paths
         :return: list of paths
         """
-        LOG.error("DEPRECATED: sort products, not files, since files may have multipe products")
+        LOG.info("DEPRECATED: sort products, not files, since files may have multiple products")
         return list(sorted(paths))
         # products = list(self._workspace.collect_product_metadata_for_paths(paths))
         # LOG.debug('sorting products {} for paths {}'.format(repr(products), repr(paths)))
