@@ -643,8 +643,6 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         # prod.touch()
         self._S.commit()
 
-        LOG.debug('data content is {}'.format(img_data))
-
         yield import_progress(uuid=prod.uuid,
                               stages=1,
                               current_stage=0,
