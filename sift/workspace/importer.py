@@ -26,7 +26,7 @@ from pyproj import Proj
 from sqlalchemy.orm import Session
 
 from sift.common import PLATFORM, INFO, INSTRUMENT, KIND
-from sift.workspace.goesr_pug import PugL1bTools
+from sift.workspace.goesr_pug import PugFile
 from sift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
 from .metadatabase import Resource, Product, Content
 
@@ -516,6 +516,20 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         return True if (source.lower().endswith('.nc') or source.lower().endswith('.nc4')) else False
 
     @staticmethod
+    def pug_factory(source_path):
+        dn,fn = os.path.split(source_path)
+        is_netcdf = (fn.lower().endswith('.nc') or fn.lower().endswith('.nc4'))
+        if not is_netcdf:
+            raise ValueError("PUG loader requires files ending in .nc or .nc4: {}".format(repr(source_path)))
+        return PugFile.attach(source_path)
+        # if 'L1b' in fn:
+        #     LOG.debug('attaching {} as PUG L1b'.format(source_path))
+        #     return PugL1bTools(source_path)
+        # else:
+        #     LOG.debug('attaching {} as PUG CMI'.format(source_path))
+        #     return PugCmiTools(source_path)
+
+    @staticmethod
     def get_metadata(source_path=None, source_uri=None, pug=None, **kwargs):
         # yield successive levels of detail as we load
         if source_uri is not None:
@@ -527,7 +541,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
 
         d = {}
         # nc = nc4.Dataset(source_path)
-        pug = pug or PugL1bTools(source_path)
+        pug = pug or GoesRPUGImporter.pug_factory(source_path)
 
         d.update(GoesRPUGImporter._metadata_for_abi_path(pug))
         d[INFO.DATASET_NAME] = os.path.split(source_path)[-1]
@@ -585,7 +599,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
             LOG.warning('content was already available, skipping import')
             return
 
-        pug = PugL1bTools(source_path)
+        pug = GoesRPUGImporter.pug_factory(source_path)
         rows, cols = shape = pug.shape
         cell_height, cell_width = pug.cell_size
         origin_y, origin_x = pug.origin
@@ -605,7 +619,8 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         img_data = np.memmap(data_path, dtype=np.float32, shape=shape, mode='w+')
 
         LOG.info('converting radiance to %s' % pug.bt_or_refl)
-        bt_or_refl, image, units = pug.convert_from_nc()  # FIXME expensive
+        image = pug.bt if 'bt'==pug.bt_or_refl else pug.refl
+        # bt_or_refl, image, units = pug.convert_from_nc()  # FIXME expensive
         # overview_image = fixme  # FIXME, we need a properly navigated overview image here
 
         # we got some metadata, let's yield progress
