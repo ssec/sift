@@ -558,7 +558,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 if np.isnan(new_value):
                     zult[pinf.uuid] = None
                 else:
-                    bar_width = (np.clip(new_value, nc, xc) - nc) / (xc - nc)
+                    if xc == nc:
+                        bar_width = 0
+                    else:
+                        bar_width = (np.clip(new_value, nc, xc) - nc) / (xc - nc)
                     zult[pinf.uuid] = (new_value, bar_width, unit_info[2](new_value, numeric=False))
             elif lyr[INFO.KIND] == KIND.RGB:
                 # We can show a valid RGB
