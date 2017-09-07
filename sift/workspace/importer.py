@@ -500,17 +500,17 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
     """
 
     @staticmethod
-    def _metadata_for_abi_path(abi):
+    def _basic_pug_metadata(pug):
         return {
-            INFO.PLATFORM: PLATFORM_ID_TO_PLATFORM[abi.platform_id],  # e.g. G16
-            INFO.BAND: abi.band,
-            INFO.INSTRUMENT: INSTRUMENT.ABI,
-            INFO.SCHED_TIME: abi.sched_time,
-            INFO.OBS_TIME: abi.time_span[0],
-            INFO.OBS_DURATION: abi.time_span[1] - abi.time_span[0],
-            INFO.DISPLAY_TIME: abi.display_time,
-            INFO.SCENE: abi.scene_id,
-            INFO.DISPLAY_NAME: abi.display_name
+            INFO.PLATFORM: PLATFORM_ID_TO_PLATFORM[pug.platform_id],  # e.g. G16, H8
+            INFO.BAND: pug.band,
+            INFO.INSTRUMENT: INSTRUMENT.AHI if 'Himawari' in pug.get('instrument_type', "ABI") else INSTRUMENT.ABI,
+            INFO.SCHED_TIME: pug.sched_time,
+            INFO.OBS_TIME: pug.time_span[0],
+            INFO.OBS_DURATION: pug.time_span[1] - pug.time_span[0],
+            INFO.DISPLAY_TIME: pug.display_time,
+            INFO.SCENE: pug.scene_id,
+            INFO.DISPLAY_NAME: pug.display_name
         }
 
     @classmethod
@@ -546,7 +546,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         # nc = nc4.Dataset(source_path)
         pug = pug or GoesRPUGImporter.pug_factory(source_path)
 
-        d.update(GoesRPUGImporter._metadata_for_abi_path(pug))
+        d.update(GoesRPUGImporter._basic_pug_metadata(pug))
         d[INFO.DATASET_NAME] = os.path.split(source_path)[-1]
         d[INFO.PATHNAME] = source_path
         d[INFO.KIND] = KIND.IMAGE
