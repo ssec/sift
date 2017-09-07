@@ -280,22 +280,32 @@ class SingleLayerInfoPane (QWidget) :
                     shared_info[INFO.INSTRUMENT] = "" if shared_info[INFO.INSTRUMENT] != new_inst else new_inst
 
                 # band
-                new_band = str(layer_info[INFO.BAND]) if INFO.BAND in layer_info else ""
-                if INFO.BAND not in shared_info :
+                new_band = layer_info.get(INFO.BAND)
+                if isinstance(new_band, (tuple, list)):
+                    new_band = "(" + ", ".join([str(x) if x is not None else '---' for x in new_band]) + ")"
+                else:
+                    new_band = str(new_band) if new_band is not None else '---'
+                if INFO.BAND not in shared_info:
                     shared_info[INFO.BAND] = new_band
-                else :
-                    shared_info[INFO.BAND] = "" if shared_info[INFO.BAND] != new_band else new_band
+                else:
+                    shared_info[INFO.BAND] = "---" if shared_info[INFO.BAND] != new_band else new_band
 
                 # wavelength
-                wl = "{:0.2f} µm".format(layer_info[INFO.CENTRAL_WAVELENGTH]) if layer_info.get(INFO.CENTRAL_WAVELENGTH) is not None else ""
+                wl = layer_info.get(INFO.CENTRAL_WAVELENGTH)
+                fmt = "{:0.2f} µm"
+                if isinstance(wl, (tuple, list)):
+                    wl = [fmt.format(x) if x is not None else '---' for x in wl]
+                    wl = "(" + ", ".join(wl) + ")"
+                else:
+                    wl = fmt.format(wl) if wl is not None else '---'
                 if INFO.CENTRAL_WAVELENGTH not in shared_info:
                     shared_info[INFO.CENTRAL_WAVELENGTH] = wl
                 else:
-                    shared_info[INFO.CENTRAL_WAVELENGTH] = "" if shared_info[INFO.CENTRAL_WAVELENGTH] != wl else wl
+                    shared_info[INFO.CENTRAL_WAVELENGTH] = "---" if shared_info[INFO.CENTRAL_WAVELENGTH] != wl else wl
 
                 # colormap
                 new_cmap = this_prez.colormap if this_prez is not None else ""
-                if "colormap" not in shared_info :
+                if "colormap" not in shared_info:
                     shared_info["colormap"] = new_cmap
                 else :
                     shared_info["colormap"] = "" if shared_info["colormap"] != new_cmap else new_cmap

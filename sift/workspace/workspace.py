@@ -887,7 +887,9 @@ class Workspace(QObject):
         :param lod: desired level of detail to focus  (0 for overview)
         :return:
         """
-        if isinstance(dsi_or_uuid, UUID):
+        if dsi_or_uuid is None:
+            return None
+        elif isinstance(dsi_or_uuid, UUID):
             uuid = dsi_or_uuid
         elif isinstance(dsi_or_uuid, str):
             uuid = UUID(dsi_or_uuid)

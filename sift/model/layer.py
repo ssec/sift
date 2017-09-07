@@ -242,7 +242,12 @@ class DocRGBLayer(DocCompositeLayer):
     @property
     def band(self):
         gb = lambda l: None if (l is None) else l.band
-        return (gb(self.r), gb(self.g), gb(self.b))
+        return gb(self.r), gb(self.g), gb(self.b)
+
+    @property
+    def central_wavelength(self):
+        gb = lambda l: None if (l is None) else l.get(INFO.CENTRAL_WAVELENGTH)
+        return gb(self.r), gb(self.g), gb(self.b)
 
     @property
     def sched_time(self):
@@ -339,6 +344,7 @@ class DocRGBLayer(DocCompositeLayer):
             INFO.DISPLAY_TIME: display_time,
             INFO.SCHED_TIME: self.sched_time,
             INFO.BAND: self.band,
+            INFO.CENTRAL_WAVELENGTH: self.central_wavelength,
             INFO.INSTRUMENT: self.instrument,
             INFO.PLATFORM: self.platform,
             INFO.SCENE: self.scene,
