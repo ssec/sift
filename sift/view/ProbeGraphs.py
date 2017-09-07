@@ -135,6 +135,7 @@ class ProbeGraphManager (QObject) :
         self.document.didReorderLayers.connect(self.handleLayersChanged)
         self.document.didChangeLayerName.connect(self.handleLayersChanged)
         self.document.didAddBasicLayer.connect(self.handleLayersChanged)
+        self.document.didAddCompositeLayer.connect(self.handleLayersChanged)
         self.document.willPurgeLayer.connect(self.handleLayersChanged)
         self.document.didSwitchLayerSet.connect(self.handleLayersChanged)
 
@@ -182,7 +183,7 @@ class ProbeGraphManager (QObject) :
         # go to the tab we just created
         self.tab_widget_object.setCurrentIndex(tab_index)
 
-    def handleLayersChanged (self) :
+    def handleLayersChanged(self):
         """Used when the document signals that something about the layers has changed
         """
 
