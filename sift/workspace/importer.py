@@ -487,7 +487,10 @@ PLATFORM_ID_TO_PLATFORM = {
     'G17': PLATFORM.GOES_17,
     # hsd2nc export of AHI data as PUG format
     'Himawari-8': PLATFORM.HIMAWARI_8,
-    'Himawari-9': PLATFORM.HIMAWARI_9
+    'Himawari-9': PLATFORM.HIMAWARI_9,
+    # axi2cmi export as PUG, more consistent with other uses
+    'H8': PLATFORM.HIMAWARI_8,
+    'H9': PLATFORM.HIMAWARI_9
 }
 
 
