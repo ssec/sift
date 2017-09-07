@@ -504,7 +504,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         return {
             INFO.PLATFORM: PLATFORM_ID_TO_PLATFORM[pug.platform_id],  # e.g. G16, H8
             INFO.BAND: pug.band,
-            INFO.INSTRUMENT: INSTRUMENT.AHI if 'Himawari' in pug.get('instrument_type', "ABI") else INSTRUMENT.ABI,
+            INFO.INSTRUMENT: INSTRUMENT.AHI if 'Himawari' in pug.instrument_type else INSTRUMENT.ABI,
             INFO.SCHED_TIME: pug.sched_time,
             INFO.OBS_TIME: pug.time_span[0],
             INFO.OBS_DURATION: pug.time_span[1] - pug.time_span[0],
