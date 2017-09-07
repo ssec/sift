@@ -51,7 +51,7 @@ SIFT_CHANNEL_PATH: (default '/var/apache/larch/htdocs/channels/sift')
 SIFT_FTP_HOST: (default 'meelo')
     Server that has permission to upload to the SSEC FTP server.
 
-SIFT_FTP_HOST_PATH: (default '~/repos/git/CSPOV/dist') Where on the FTP host
+SIFT_FTP_HOST_PATH: (default '~/repos/git/sift/dist') Where on the FTP host
     should all-in-one installers be placed before being uploaded to the FTP
     server.
 
@@ -81,7 +81,7 @@ CHANNEL_HOST = os.environ.get("SIFT_CHANNEL_HOST", "larch")
 CHANNEL_PATH = os.environ.get("SIFT_CHANNEL_PATH", "/var/apache/larch/htdocs/channels/sift")
 # server that is allowed to add to FTP site
 FTP_HOST = os.environ.get("SIFT_FTP_HOST", "meelo")
-FTP_HOST_PATH = os.environ.get("SIFT_FTP_HOST_PATH", "repos/git/CSPOV/dist")
+FTP_HOST_PATH = os.environ.get("SIFT_FTP_HOST_PATH", "repos/git/sift/dist")
 FTP_PATH = os.environ.get("SIFT_FTP_PATH", "pub/sift/dist")
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 DIST_DIR = os.path.join(SCRIPT_DIR, 'dist')
