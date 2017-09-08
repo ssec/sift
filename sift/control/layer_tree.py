@@ -562,10 +562,9 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         return flags
 
     def hasIndex(self, row, col, QModelIndex_parent=None, *args, **kwargs):
-        if QModelIndex_parent is not None:
+        if QModelIndex_parent.isValid() or col != 0:
             # then look up whether this layer has child layers, e.g. for RGB or algebraic
-            return False  # FIXME
-        if col != 0:
+            # actually: current layer list ignores RGB/algebraic child layers
             return False
         return (row >=0 and row < len(self.doc))
 
@@ -576,29 +575,10 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         return 0
 
     def index(self, row, column, parent):
-        # if parent is not None:
-        #     LOG.debug('parent is %s' % parent)
-        #     return QModelIndex()
-        # if not self.hasIndex(row, column, parent):
-        #     return QModelIndex()
-
-        return self.createIndex(row, column, parent)
-        # return super(LayerStackTreeViewModel, self).index(row, column, parent)
-        # return QModelIndex()
-        # FIXME
-        # if not self.hasIndex(row, column, parent):
-        #     return QModelIndex()
-        #
-        # if not parent.isValid():
-        #     parentItem = self.rootItem
-        # else:
-        #     parentItem = parent.internalPointer()
-        #
-        # childItem = parentItem.child(row)
-        # if childItem:
-        #     return self.createIndex(row, column, childItem)
-        # else:
-        #     return QModelIndex()
+        if self.hasIndex(row, column, parent):
+            return self.createIndex(row, column, parent)
+        else:
+            return QModelIndex()
 
     def parent(self, index=None):
         return QModelIndex()
