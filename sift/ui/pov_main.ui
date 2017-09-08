@@ -599,6 +599,28 @@
       <verstretch>0</verstretch>
      </sizepolicy>
     </property>
+    <layout class="QGridLayout" name="gridLayout">
+     <property name="margin">
+      <number>0</number>
+     </property>
+     <item row="0" column="0">
+      <widget class="QScrollArea" name="layerDetailsScrollArea">
+       <property name="widgetResizable">
+        <bool>true</bool>
+       </property>
+       <widget class="QWidget" name="layerDetailsContents">
+        <property name="geometry">
+         <rect>
+          <x>0</x>
+          <y>0</y>
+          <width>182</width>
+          <height>76</height>
+         </rect>
+        </property>
+       </widget>
+      </widget>
+     </item>
+    </layout>
    </widget>
   </widget>
   <widget class="QDockWidget" name="rgbConfigPane">
@@ -643,8 +665,8 @@
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>-89</y>
-          <width>259</width>
+          <y>0</y>
+          <width>225</width>
           <height>524</height>
          </rect>
         </property>

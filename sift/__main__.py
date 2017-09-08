@@ -566,7 +566,7 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.main_canvas.transforms.changed.connect(partial(start_wrapper, self.scheduler))
 
         # convey action between document and layer list view
-        self.layerSetsManager = LayerSetsManager(self.ui, self.ui.layerSetTabs, self.ui.layerInfoContents, self.document)
+        self.layerSetsManager = LayerSetsManager(self.ui, self.ui.layerSetTabs, self.ui.layerDetailsContents, self.document)
         self.behaviorLayersList = self.layerSetsManager.getLayerStackListViewModel()
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
             top_uuids = list(self.document.current_visible_layer_uuids)

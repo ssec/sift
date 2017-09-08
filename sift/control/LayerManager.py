@@ -18,20 +18,23 @@ __docformat__ = 'reStructuredText'
 
 import logging
 from PyQt4.QtCore import SIGNAL, QObject, Qt, pyqtSignal
-from PyQt4.QtGui import QWidget, QListView, QComboBox, QSlider, QTreeView, QGridLayout, QVBoxLayout, QLabel, QLineEdit, QScrollArea, QLayout, QTextDocument, QDoubleValidator
+from PyQt4.QtGui import (QWidget, QListView, QComboBox, QSlider, QTreeView,
+                         QGridLayout, QVBoxLayout, QLabel, QLineEdit,
+                         QScrollArea, QLayout, QTextDocument,
+                         QDoubleValidator, QTextEdit, QFont, QSizePolicy)
 from PyQt4.QtWebKit import QWebView
 from weakref import ref
 from sift.common import INFO, KIND
 from sift.control.layer_tree import LayerStackTreeViewModel
 from sift.model.layer import DocLayer, DocBasicLayer, DocCompositeLayer, DocRGBLayer
-import sift.ui.config_rgb_layer_ui as config_rgb_layer_ui
 import numpy as np
 from sift.view.Colormap import ALL_COLORMAPS
 from uuid import UUID
 
 LOG = logging.getLogger(__name__)
 
-class LayerSetsManager (QObject) :
+
+class LayerSetsManager(QObject):
     """This is the controller object that manages the extended functionality of the layer sets.
     """
 
@@ -175,7 +178,7 @@ class SingleLayerInfoPane (QWidget) :
     colormap_text = None
     clims_text = None
 
-    def __init__(self, parent, document) :
+    def __init__(self, parent, document):
         """build our info display
         """
         super(SingleLayerInfoPane, self).__init__(parent)
@@ -184,15 +187,32 @@ class SingleLayerInfoPane (QWidget) :
 
         # build our layer detail info display controls
         self.name_text = QLabel("")
+        self.name_text.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.time_text = QLabel("")
+        self.time_text.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.instrument_text = QLabel("")
+        self.instrument_text.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.band_text = QLabel("")
+        self.band_text.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.wavelength_text = QLabel("")
+        self.wavelength_text.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.colormap_text = QLabel("")
+        self.colormap_text.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.clims_text = QLabel("")
+        self.clims_text.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.cmap_vis = QWebView()
         self.cmap_vis.setFixedSize(3 * 100, 30)
         self.cmap_vis.page().mainFrame().setScrollBarPolicy(Qt.Vertical, Qt.ScrollBarAlwaysOff)
+        self.composite_details = QLabel("Composite Details")
+        self.composite_details.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        f = QFont()
+        f.setUnderline(True)
+        self.composite_details.setFont(f)
+        self.composite_codeblock = QTextEdit()
+        self.composite_codeblock.setReadOnly(True)
+        self.composite_codeblock.setMinimumSize(3 * 100, 100)
+        self.composite_codeblock.setDisabled(True)
+        self.composite_codeblock.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
 
         # set the layout
         # Note: add in a grid is (widget, row#, col#) or (widget, row#, col#, row_span, col_span)
@@ -205,6 +225,8 @@ class SingleLayerInfoPane (QWidget) :
         layout.addWidget(self.colormap_text,   6, 1)
         layout.addWidget(self.clims_text,      7, 1)
         layout.addWidget(self.cmap_vis, 8, 1)
+        layout.addWidget(self.composite_details, 9, 1)
+        layout.addWidget(self.composite_codeblock, 10, 1)
         # self.setLayout(layout)  # was parent.setLayout
         parent.setLayout(layout)  # FIXME how is this correct??
 
@@ -230,7 +252,7 @@ class SingleLayerInfoPane (QWidget) :
                 self.show()
 
         # clear the list if we got None
-        if selected_UUID_list is None or len(selected_UUID_list) <= 0 :
+        if selected_UUID_list is None or len(selected_UUID_list) <= 0:
             # set the various text displays
             self.name_text.setText("Name: ")
             self.time_text.setText("Time: ")
@@ -240,12 +262,11 @@ class SingleLayerInfoPane (QWidget) :
             self.colormap_text.setText("Colormap: ")
             self.clims_text.setText("Color Limits: ")
             self.cmap_vis.setHtml("")
-
-        # otherwise display information on the selected layer(s)
-        else :
-
+            self.composite_codeblock.setText("")
+        else:
+            # otherwise display information on the selected layer(s)
             # figure out the info shared between all the layers currently selected
-            shared_info = { }
+            shared_info = {}
             presentation_info = self.document.current_layer_set
             for layer_uuid in selected_UUID_list :
 
@@ -350,43 +371,16 @@ class SingleLayerInfoPane (QWidget) :
                 else:
                     shared_info["colormap"] = None if shared_info["colormap"] != cmap else cmap
 
-            #print("*** layer info: " + str(layer_info))
-            # *** layer info: {
-            # <INFO.INSTRUMENT: 'instrument'>: <INSTRUMENT.AHI: 'AHI'>,
-            # <INFO.PROJ: 'proj4_string'>: '+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs ',
-            # <INFO.SCHED_TIME: 'timeline'>: datetime.datetime(2015, 8, 24, 19, 0),
-            # <INFO.ORIGIN_X: 'origin_x'>: 6614709.252,
-            # <INFO.DISPLAY_TIME: 'display_time'>: '2015-08-24 19:00',
-            # <INFO.CLIM: 'clim'>: (-0.012, 1.192),
-            # <INFO.CELL_HEIGHT: 'cell_height'>: -1000.0,
-            # <INFO.UUID: 'uuid'>: UUID('5f547fae-7c26-11e5-bece-28cfe915d94b'),
-            # <INFO.NAME: 'name'>: 'AHI B01 Refl 2015-08-24 19:00',
-            # <INFO.UUID: 'uuid'>: UUID('5f547fae-7c26-11e5-bece-28cfe915d94b'),
-            # <INFO.CELL_WIDTH: 'cell_width'>: 1000.0,
-            # <INFO.KIND: 'kind'>: <KIND.IMAGE: 1>,
-            # <INFO.SHAPE: 'shape'>: (30993, 18096),
-            # <INFO.SPACECRAFT: 'spacecraft'>: 'Himawari-8',
-            # <INFO.BAND: 'band'>: 1,
-            # <INFO.PATHNAME: 'pathname'>: './test_data/ahi 2015_08_24_236 1900/HS_H08_20150824_1900_B01_FLDK_R20.merc.tif',
-            # <INFO.SCENE: 'scene'>: 'FLDK',
-            # <INFO.ORIGIN_Y: 'origin_y'>: 15496570.74,
-            # <INFO.DISPLAY_NAME: 'display_name'>: 'AHI B01 Refl 2015-08-24 19:00'}
-
-            #print ("*** layer presentation info: " + str(this_prez))
-            # *** layer presentation info: [
-            # prez(uuid=UUID('728da4de-7c26-11e5-bac8-28cfe915d94b'),
-            #   kind=<KIND.IMAGE: 1>,
-            #   visible=True,
-            #   a_order=None,
-            #   colormap='Square Root (Vis Default)',
-            #   climits=(-0.012, 1.192), mixing=<mixing.NORMAL: 1>),
-            # prez(uuid=UUID('5f547fae-7c26-11e5-bece-28cfe915d94b'),
-            #   kind=<KIND.IMAGE: 1>,
-            #   visible=True,
-            #   a_order=None,
-            #   colormap='Square Root (Vis Default)',
-            #   climits=(-0.012, 1.192),
-            #   mixing=<mixing.NORMAL: 1>)]
+                ns, codeblock = self.document.get_algebraic_namespace(layer_uuid)
+                if codeblock:
+                    ns_str = "\n".join(["# {} = {}".format(name, self.document[uuid][INFO.SHORT_NAME]) for name, uuid in ns.items()])
+                    codeblock_str = ns_str + '\n\n' + codeblock
+                else:
+                    codeblock_str = ''
+                if 'codeblock' not in shared_info:
+                    shared_info['codeblock'] = codeblock_str
+                else:
+                    shared_info['codeblock'] = '' if shared_info['codeblock'] != codeblock_str else codeblock_str
 
             # set the various text displays
             temp_name = shared_info[INFO.DISPLAY_NAME] if INFO.DISPLAY_NAME in shared_info else ""
@@ -403,6 +397,8 @@ class SingleLayerInfoPane (QWidget) :
             self.colormap_text.setText("Colormap: " + temp_cmap)
             temp_clims = shared_info["climits"] if "climits" in shared_info else ""
             self.clims_text.setText("Color Limits: " + temp_clims)
+            self.composite_codeblock.setText(shared_info['codeblock'])
+
 
             # format colormap
             if shared_info.get("colormap", None) is None:

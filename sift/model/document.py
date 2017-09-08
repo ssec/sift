@@ -1246,6 +1246,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             return nfo
         return None
 
+    def get_algebraic_namespace(self, uuid):
+        return self._workspace.get_algebraic_namespace(uuid)
+
     def __getitem__(self, layer_uuid):
         """
         return layer with the given UUID

@@ -281,7 +281,7 @@ class Product(Base):
         return fields, keyvalues
 
     @classmethod
-    def from_info(cls, mapping, only_fields=False):
+    def from_info(cls, mapping, symbols=None, codeblock=None, only_fields=False):
         """
         create a Product using info INFO dictionary items and arbitrary key-values
         :param mapping: dictionary of product metadata
@@ -297,6 +297,12 @@ class Product(Base):
             raise
         if not only_fields:
             p.info.update(keyvalues)
+        if symbols:
+            for k, v in symbols.items():
+                p.symbol.append(SymbolKeyValue(key=k, value=v))
+        if codeblock:
+            p.expression = codeblock
+
         return p
 
     def __repr__(self):

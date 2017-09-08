@@ -486,6 +486,13 @@ class Workspace(QObject):
                 return frozendict(ChainMap(native_content.info, prod.info))
             return frozendict(prod.info)  # mapping semantics for database fields, as well as key-value fields; flatten to one namespace and read-only
 
+    def get_algebraic_namespace(self, uuid):
+        with self._inventory as s:
+            prod = self._product_with_uuid(s, uuid)
+            symbols = {x.key: x.value for x in prod.symbol}
+            code = prod.expression
+        return symbols, code
+
     def _check_cache(self, path):
         """
         FIXME: does not work if more than one product inside a path
@@ -789,7 +796,9 @@ class Workspace(QObject):
 
         info = generate_guidebook_metadata(info)
 
-        uuid, info, data = self._create_product_from_array(info, content[result_name])
+        uuid, info, data = self._create_product_from_array(info, content[result_name],
+                                                           namespace=namespace,
+                                                           codeblock=operations)
         return uuid, info, data
 
     def _create_product_from_array(self, info, data, namespace=None, codeblock=None):
@@ -814,7 +823,7 @@ class Workspace(QObject):
             atime = now,
             mtime = now,
         ))
-        P = Product.from_info(parms)
+        P = Product.from_info(parms, symbols=namespace, codeblock=codeblock)
         uuid = P.uuid
         # FUTURE: add expression and namespace information, which would require additional parameters
         ws_filename = '{}.data'.format(str(uuid))
