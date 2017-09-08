@@ -234,7 +234,7 @@ class LayerSet(object):
             if o not in self._layers:
                 LOG.error('set_layer_order cannot deal with unknown layer {}'.format(o))
                 return
-        self._layer_order = layer_order
+        self._layer_order = list(layer_order)
         self.update_layers_z()
 
     @property
