@@ -607,7 +607,7 @@ class Workspace(QObject):
         total = 0
         for uuid in uuids:
             with self._inventory as s:
-                prod = s.query(Product).filter_by(uuid_str=str(uuid))
+                prod = s.query(Product).filter_by(uuid_str=str(uuid)).first()
                 for con in prod.content:
                     if con.id in self._available:
                         LOG.warning("purging active content; may not free up disk until layers are removed")
