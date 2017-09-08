@@ -719,8 +719,14 @@ class Workspace(QObject):
             # S = self._S
             if prod is None and uuid is not None:
                 prod = self._product_with_uuid(S, uuid)
+
             if len(prod.content):
-                LOG.info('product already has content available, are we updating it from external resource?')
+                LOG.info('product already has content available, using that rather than re-importing')
+                ovc = self._product_overview_content(S, uuid=uuid)
+                assert (ovc is not None)
+                arrays = self._cached_arrays_for_content(ovc)
+                return arrays.data
+
             truck = aImporter.from_product(prod, workspace_cwd=self.cwd, database_session=S)
             metadata = prod.info
             name = metadata[INFO.SHORT_NAME]
