@@ -367,10 +367,15 @@ class Workspace(QObject):
         for filename in [c.path, c.coverage_path, c.sparsity_path]:
             if not filename:
                 continue
-            pn = self._ws_path(filename)
+            pn = os.path.join(self.cwd, filename)
             if os.path.exists(pn):
-                os.remove(pn)
+                LOG.debug('removing {}'.format(pn))
                 total += os.stat(pn).st_size
+                try:
+                    os.remove(pn)
+                except FileNotFoundError as user_intrusion_likely:
+                    LOG.warning("could not remove {} - file not found; continuing".format(pn))
+
         return total
 
     def _attach_content(self, c: Content) -> ActiveContent:
