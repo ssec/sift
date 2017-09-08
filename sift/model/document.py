@@ -413,6 +413,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             active_content_data = self._workspace.get_content(uuid)
             return uuid, info, active_content_data
 
+        return self.activate_product_uuid_as_new_layer(uuid, insert_before=insert_before)
+
+    def activate_product_uuid_as_new_layer(self, uuid: UUID, insert_before=0):
         # FUTURE: Load this async, the slots for the below signal need to be OK with that
         active_content_data = self._workspace.import_product_content(uuid)
         # updated metadata with content information (most importantly nav information)

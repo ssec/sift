@@ -251,6 +251,18 @@ class Main(QtGui.QMainWindow):
         self._last_open_dir = _common_path_prefix([x for x in paths if x[0] != '<']) or self._last_open_dir
         self.update_recent_file_menu()
 
+    def activate_products_by_uuid(self, uuids):
+        uuids = list(uuids)
+        for uuid in uuids:
+            self.document.activate_product_uuid_as_new_layer(uuid)
+        uuid = uuids[-1]
+        self.behaviorLayersList.select([uuid])
+        # set the animation based on the last added (topmost) layer
+        self.document.animate_siblings_of_layer(uuid)
+        # force the newest layer to be visible
+        self.document.next_last_step(uuid)
+        # don't use <algebraic layer ...> type paths
+
     def dropEvent(self, event):
         LOG.debug('drop event on mainwindow')
         mime = event.mimeData()
@@ -664,8 +676,26 @@ class Main(QtGui.QMainWindow):
     def open_from_cache(self, *args, **kwargs):
         if not self._open_cache_dialog:
             self._open_cache_dialog = OpenCacheDialog(self)
-        paths = self.document.sort_paths(self.workspace.paths_in_cache)
-        self._open_cache_dialog.activate(paths, self.open_paths, self._remove_paths_from_cache)
+        name_to_uuid = self.workspace.product_names_available_in_cache
+        resource_names_for_uuids = list(name_to_uuid.keys())
+        paths = self.document.sort_paths(resource_names_for_uuids)
+
+        def _activate_products_for_names(names):
+            names = list(names)
+            LOG.debug("names to re-activate: {}".format(repr(names)))
+            uuids = [name_to_uuid[path] for path in names]
+            LOG.info('activating cached products with uuids: {}'.format(repr(uuids)))
+            self.activate_products_by_uuid(uuids)
+
+        def _purge_content_for_names(names):
+            names = list(names)
+            LOG.debug("names to purge: {}".format(repr(names)))
+            uuids = [name_to_uuid[path] for path in names]
+            LOG.info('removing cached products with uuids: {}'.format(repr(uuids)))
+            self.workspace.purge_content_for_product_uuids(uuids)
+            self.update_recent_file_menu()
+
+        self._open_cache_dialog.activate(paths, _activate_products_for_names, _purge_content_for_names)
 
     def open_glob(self, *args, **kwargs):
         text, ok = QtGui.QInputDialog.getText(self, 'Open Glob Pattern',

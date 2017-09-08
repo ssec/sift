@@ -524,15 +524,32 @@ class Workspace(QObject):
                     return content.product.uuid, content.product.info, data
 
     @property
-    def paths_in_cache(self):
+    def product_names_available_in_cache(self):
+        """
+        Returns: dictionary of {resource or product name: UUID,...}
+        typically used for add-from-cachce dialog
+        FUTURE:
+        """
         # find non-overview non-auxiliary data files
-        # FIXME: also need to include coverage and sparsity paths
-        zult = []
+        # FIXME: also need to include coverage and sparsity paths?? really?
+        zult = {}
+        product_ids_taken_care_of = set()
         with self._inventory as s:
             for c in s.query(Content).all():
                 p = c.product
+                if p.id in product_ids_taken_care_of:
+                    continue
+                product_ids_taken_care_of.add(p.id)
                 if len(p.resource) > 0:  # algebraic products do not belong to a resource!
-                    zult.append(p.resource[0].path)
+                    zult[p.resource[0].path] = p.uuid
+                else:
+                    name = str(p.name)
+                    q = 0
+                    while name in zult:
+                        LOG.info("product name '{}' is non-unique!")
+                        q += 1
+                        name = '{} ({})'.format(p.name, q)
+                    zult[name] = p.uuid  # FIXME: this is not guaranteed to be unique as keys go
         return zult
 
     @property
@@ -563,7 +580,7 @@ class Workspace(QObject):
                 S.delete(con)
 
         if not resource.exists():  # then purge the resource and its products as well
-           S.delete(resource)
+            S.delete(resource)
         if not defer_commit:
             S.commit()
         return total
@@ -575,6 +592,27 @@ class Workspace(QObject):
                 rsr_hits = s.query(Resource).filter_by(path=path).all()
                 for rsr in rsr_hits:
                     total += self._purge_content_for_resource(rsr, defer_commit=True)
+        return total
+
+    def purge_content_for_product_uuids(self, uuids):
+        """
+        given one or more product uuids, purge the Content from the cache
+        Note: this does not purge any ActiveContent that may still be using the files, but the files will be gone
+        Args:
+            uuids:
+
+        Returns:
+
+        """
+        total = 0
+        for uuid in uuids:
+            with self._inventory as s:
+                prod = s.query(Product).filter_by(uuid_str=str(uuid))
+                for con in prod.content:
+                    if con.id in self._available:
+                        LOG.warning("purging active content; may not free up disk until layers are removed")
+                    total += self._remove_content_files_from_workspace(con)
+                    s.delete(con)
         return total
 
     def _clean_cache(self):
