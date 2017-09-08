@@ -338,6 +338,7 @@ class Workspace(QObject):
                 if not ActiveContent.can_attach(self.cwd, c):
                     LOG.warning("purging missing content {}".format(c.path))
                     to_purge.append(c)
+            LOG.warning("{} content entities no longer present in cache - will remove from database".format(len(to_purge)))
             [s.delete(c) for c in to_purge]
 
     def _init_inventory_existing_datasets(self):
