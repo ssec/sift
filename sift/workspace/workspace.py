@@ -373,7 +373,7 @@ class Workspace(QObject):
                 total += os.stat(pn).st_size
         return total
 
-    def _attach_content(self, c: Content) -> ActiveContent:
+    def _activate_content(self, c: Content) -> ActiveContent:
         self._available[c.id] = zult = ActiveContent(self.cwd, c)
         c.touch()
         c.product.touch()
@@ -387,7 +387,11 @@ class Workspace(QObject):
         :return: workspace_content_arrays
         """
         cache_entry = self._available.get(c.id)
-        return cache_entry or self._attach_content(c)
+        return cache_entry or self._activate_content(c)
+
+    def _deactivate_content_for_product(self, p:Product):
+        for c in p.content:
+            self._available.pop(c.id, None)
 
 
     #
@@ -861,12 +865,8 @@ class Workspace(QObject):
     def _bgnd_remove(self, uuid):
         from sift.queue import TASK_DOING, TASK_PROGRESS
         yield {TASK_DOING: 'purging memory', TASK_PROGRESS: 0.5}
-        if uuid in self._info:
-            del self._info[uuid]
-            zult = True
-        if uuid in self._data:
-            del self._data[uuid]
-            zult = True
+        with self._inventory as s:
+            self._deactivate_content_for_product(self._product_with_uuid(s, uuid))
         yield {TASK_DOING: 'purging memory', TASK_PROGRESS: 1.0}
 
     def remove(self, dsi):
