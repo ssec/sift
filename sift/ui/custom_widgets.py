@@ -1,5 +1,6 @@
 from PyQt4.QtGui import QComboBox, QSlider, QDoubleSpinBox
 from PyQt4.QtCore import Qt
+from PyQt4.QtWebKit import QWebView
 
 
 class QNoScrollComboBox(QComboBox):
@@ -42,3 +43,15 @@ class QNoScrollDoubleSpinBox(QDoubleSpinBox):
             ev.ignore()
         else:
             super(QNoScrollDoubleSpinBox, self).wheelEvent(ev)
+
+
+class QNoScrollWebView(QWebView):
+    def __init__(self, *args, **kwargs):
+        super(QNoScrollWebView, self).__init__(*args, **kwargs)
+        self.setFocusPolicy(Qt.StrongFocus)
+
+    def wheelEvent(self, ev):
+        if not self.hasFocus():
+            ev.ignore()
+        else:
+            super(QNoScrollWebView, self).wheelEvent(ev)

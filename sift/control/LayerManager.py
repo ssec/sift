@@ -22,11 +22,11 @@ from PyQt4.QtGui import (QWidget, QListView, QComboBox, QSlider, QTreeView,
                          QGridLayout, QVBoxLayout, QLabel, QLineEdit,
                          QScrollArea, QLayout, QTextDocument,
                          QDoubleValidator, QTextEdit, QFont, QSizePolicy)
-from PyQt4.QtWebKit import QWebView
 from weakref import ref
 from sift.common import INFO, KIND
 from sift.control.layer_tree import LayerStackTreeViewModel
 from sift.model.layer import DocLayer, DocBasicLayer, DocCompositeLayer, DocRGBLayer
+from sift.ui.custom_widgets import QNoScrollWebView
 import numpy as np
 from sift.view.Colormap import ALL_COLORMAPS
 from uuid import UUID
@@ -200,7 +200,7 @@ class SingleLayerInfoPane (QWidget) :
         self.colormap_text.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.clims_text = QLabel("")
         self.clims_text.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.cmap_vis = QWebView()
+        self.cmap_vis = QNoScrollWebView()
         self.cmap_vis.setFixedSize(3 * 100, 30)
         self.cmap_vis.page().mainFrame().setScrollBarPolicy(Qt.Vertical, Qt.ScrollBarAlwaysOff)
         self.composite_details = QLabel("Composite Details")
