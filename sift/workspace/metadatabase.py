@@ -247,7 +247,7 @@ class Product(Base):
 
     # link to key-value further information
     # this provides dictionary style access to key-value pairs
-    _key_values = relationship("ProductKeyValue", collection_class=attribute_mapped_collection('key'))
+    _key_values = relationship("ProductKeyValue", collection_class=attribute_mapped_collection('key'), cascade="all, delete-orphan")
     _kwinfo = association_proxy("_key_values", "value",
                                  creator=lambda key, value: ProductKeyValue(key=key, value=value))
 
@@ -486,7 +486,7 @@ class Content(Base):
 
     # link to key-value further information; primarily a hedge in case specific information has to be squirreled away for later consideration for main content table
     # this provides dictionary style access to key-value pairs
-    _key_values = relationship("ContentKeyValue", collection_class=attribute_mapped_collection('key'))
+    _key_values = relationship("ContentKeyValue", collection_class=attribute_mapped_collection('key'), cascade="all, delete-orphan")
     _kwinfo = association_proxy("_key_values", "value",
                                  creator=lambda key, value: ContentKeyValue(key=key, value=value))
 

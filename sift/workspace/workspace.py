@@ -332,6 +332,10 @@ class Workspace(QObject):
         LOG.info('done with init')
 
     def _purge_missing_content(self):
+        """
+        remove Content entries that no longer correspond to files in the cache directory
+        """
+        LOG.debug("purging Content no longer available in the cache")
         to_purge = []
         with self._inventory as s:
             for c in s.query(Content).all():
@@ -346,6 +350,31 @@ class Workspace(QObject):
                     LOG.warning("orphaned content {}??, removing".format(c.path))
                 s.delete(c)
 
+    def _purge_inaccessible_resources(self):
+        """
+        remove Resources that are no longer accessible
+        """
+        LOG.debug("purging any resources that are no longer accessible")
+        with self._inventory as s:
+            for r in s.query(Resource).all():
+                if not r.exists():
+                    LOG.info("resource {} no longer exists, purging from database")
+                    for p in r.product:
+                        p.resource.remove(r)
+                s.delete(r)
+
+    def _purge_orphan_products(self):
+        """
+        remove products from database that have no cached Content, and no Resource we can re-import from
+        """
+        LOG.debug("purging Products no longer recoverable by re-importing from Resources, and having no Content representation in cache")
+        with self._inventory as s:
+            for p in s.query(Product).all():
+                if len(p.content)==0 and len(p.resource)==0:
+                    LOG.info("discarding orphaned product {}".format(repr(p)))
+                    s.delete(p)
+
+
     def _init_inventory_existing_datasets(self):
         """
         Do an inventory of an pre-existing workspace
@@ -356,6 +385,8 @@ class Workspace(QObject):
         # attach the database, creating it if needed
         self._init_create_workspace()
         self._purge_missing_content()
+        self._purge_inaccessible_resources()
+        self._purge_orphan_products()
 
     def _store_inventory(self):
         """
