@@ -1256,12 +1256,24 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """
         return layer with the given UUID
         """
-        if isinstance(layer_uuid, UUID):
-            return self._layer_with_uuid[layer_uuid]
-        else:
+        if layer_uuid is None:
+            raise KeyError("Key 'None' does not exist in document or workspace")
+        elif not isinstance(layer_uuid, UUID):
             raise ValueError('document[UUID] required, %r was used' % type(layer_uuid))
-            # LOG.error('DEPRECATED usage document[index:int] -> DocLayerStack[index]; arg type is %r' % type(row_or_uuid))
-            # return self.current_layer_set[row_or_uuid]
+
+        if layer_uuid in self._layer_with_uuid:
+            return self._layer_with_uuid[layer_uuid]
+
+        # check the workspace for information
+        try:
+            LOG.debug("Checking workspace for information on inactive product")
+            info = self._workspace.get_info(layer_uuid)
+        except KeyError:
+            info = None
+
+        if info is None:
+            raise KeyError("Key '{}' does not exist in document or workspace".format(layer_uuid))
+        return info
 
     def reorder_by_indices(self, new_order, uuids=None, layer_set_index=None):
         """given a new layer order, replace the current layer set

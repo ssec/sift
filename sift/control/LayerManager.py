@@ -373,7 +373,16 @@ class SingleLayerInfoPane (QWidget) :
 
                 ns, codeblock = self.document.get_algebraic_namespace(layer_uuid)
                 if codeblock:
-                    ns_str = "\n".join(["# {} = {}".format(name, self.document[uuid][INFO.SHORT_NAME]) for name, uuid in ns.items()])
+                    short_names = []
+                    for name, uuid in ns.items():
+                        try:
+                            dep_info = self.document[uuid]
+                            short_name = dep_info.get(INFO.SHORT_NAME, '<Unknown>')
+                        except KeyError:
+                            LOG.debug("Layer '{}' not found in document".format(uuid))
+                            short_name = '<Unknown>'
+                        short_names.append("# {} = {}".format(name, short_name))
+                    ns_str = "\n".join(short_names)
                     codeblock_str = ns_str + '\n\n' + codeblock
                 else:
                     codeblock_str = ''
