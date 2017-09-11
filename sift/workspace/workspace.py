@@ -339,7 +339,12 @@ class Workspace(QObject):
                     LOG.warning("purging missing content {}".format(c.path))
                     to_purge.append(c)
             LOG.warning("{} content entities no longer present in cache - will remove from database".format(len(to_purge)))
-            [s.delete(c) for c in to_purge]
+            for c in to_purge:
+                try:
+                    c.product.content.remove(c)
+                except AttributeError as no_product:
+                    LOG.warning("orphaned content {}??, removing".format(c.path))
+                s.delete(c)
 
     def _init_inventory_existing_datasets(self):
         """
@@ -618,10 +623,13 @@ class Workspace(QObject):
         for uuid in uuids:
             with self._inventory as s:
                 prod = s.query(Product).filter_by(uuid_str=str(uuid)).first()
-                for con in prod.content:
+                conterminate = list(prod.content)
+                for con in conterminate:
                     if con.id in self._available:
-                        LOG.warning("purging active content; may not free up disk until layers are removed")
+                        LOG.warning("will not purge active content!")
+                        continue
                     total += self._remove_content_files_from_workspace(con)
+                    prod.content.remove(con)
                     s.delete(con)
         return total
 
