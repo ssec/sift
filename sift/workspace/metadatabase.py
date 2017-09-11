@@ -253,7 +253,7 @@ class Product(Base):
 
     # derived / algebraic layers have a symbol table and an expression
     # typically Content objects for algebraic layers cache calculation output
-    symbol = relationship("SymbolKeyValue", backref=backref("product", cascade="all"))
+    symbol = relationship("SymbolKeyValue", backref=backref("product", cascade="all, delete-orphan"))
     expression = Column(Unicode, nullable=True)
 
     _info = None  # database fields and key-value dictionary merged as one transparent mapping
