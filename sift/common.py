@@ -177,9 +177,38 @@ class INFO(Enum):
         :param other:
         :return:
         """
-        if not isinstance(other, type(self)):
-            raise ValueError("cannot compare {} to {}".format(repr(self), repr(other)))
-        return self.value < other.value
+        if isinstance(other, str):
+            return self.value < other
+        elif isinstance(other, type(self)):
+            return self.value < other.value
+        raise ValueError("cannot compare {} < {}".format(repr(self), repr(other)))
+
+    def __gt__(self, other):
+        """
+        when using pickletype in sqlalchemy tables, a comparator is needed for enumerations
+        :param other:
+        :return:
+        """
+        if isinstance(other, str):
+            return self.value > other
+        elif isinstance(other, type(self)):
+            return self.value > other.value
+        raise ValueError("cannot compare {} > {}".format(repr(self), repr(other)))
+
+    def __hash__(self):
+        return hash(self.value)
+
+    def __eq__(self, other):
+        """
+        when using pickletype in sqlalchemy tables, a comparator is needed for enumerations
+        :param other:
+        :return:
+        """
+        if isinstance(other, str):
+            return self.value == other
+        elif isinstance(other, type(self)):
+            return self.value == other.value
+        raise ValueError("cannot compare {} == {}".format(repr(self), repr(other)))
 
 @jit(nb_types.UniTuple(int64, 2)(float64[:, :], float64[:, :]))
 def get_reference_points(img_cmesh, img_vbox):
