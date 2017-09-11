@@ -502,8 +502,13 @@ class Workspace(QObject):
             return frozendict(prod.info)  # mapping semantics for database fields, as well as key-value fields; flatten to one namespace and read-only
 
     def get_algebraic_namespace(self, uuid):
+        if uuid is None:
+            return {}, ""
+
         with self._inventory as s:
             prod = self._product_with_uuid(s, uuid)
+            if prod is None:
+                return {}, ""
             symbols = {x.key: x.value for x in prod.symbol}
             code = prod.expression
         return symbols, code
