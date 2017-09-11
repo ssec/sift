@@ -243,7 +243,7 @@ class Product(Base):
     # description = Column(UnicodeText, nullable=True)
 
     # link to workspace cache files representing this data, not lod=0 is overview
-    content = relationship("Content", backref=backref("product", cascade="all"), order_by=lambda: Content.lod)
+    content = relationship("Content", backref=backref("product"), cascade="all", order_by=lambda: Content.lod)
 
     # link to key-value further information
     # this provides dictionary style access to key-value pairs
@@ -253,7 +253,7 @@ class Product(Base):
 
     # derived / algebraic layers have a symbol table and an expression
     # typically Content objects for algebraic layers cache calculation output
-    symbol = relationship("SymbolKeyValue", backref=backref("product", cascade="all, delete-orphan"))
+    symbol = relationship("SymbolKeyValue", backref=backref("product"), cascade="all, delete-orphan")
     expression = Column(Unicode, nullable=True)
 
     _info = None  # database fields and key-value dictionary merged as one transparent mapping

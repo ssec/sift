@@ -342,7 +342,7 @@ class Workspace(QObject):
                 if not ActiveContent.can_attach(self.cwd, c):
                     LOG.warning("purging missing content {}".format(c.path))
                     to_purge.append(c)
-            LOG.warning("{} content entities no longer present in cache - will remove from database".format(len(to_purge)))
+            LOG.debug("{} content entities no longer present in cache - will remove from database".format(len(to_purge)))
             for c in to_purge:
                 try:
                     c.product.content.remove(c)
@@ -666,7 +666,7 @@ class Workspace(QObject):
                         continue
                     total += self._remove_content_files_from_workspace(con)
                     prod.content.remove(con)
-                    s.delete(con)
+                    # s.delete(con)
         return total
 
     def _clean_cache(self):
