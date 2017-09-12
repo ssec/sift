@@ -253,6 +253,8 @@ class Main(QtGui.QMainWindow):
 
     def activate_products_by_uuid(self, uuids):
         uuids = list(uuids)
+        if not uuids:
+            return
         for uuid in uuids:
             self.document.activate_product_uuid_as_new_layer(uuid)
         uuid = uuids[-1]

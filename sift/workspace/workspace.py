@@ -670,7 +670,7 @@ class Workspace(QObject):
                         continue
                     total += self._remove_content_files_from_workspace(con)
                     prod.content.remove(con)
-                    # s.delete(con)
+                    s.delete(con)
         return total
 
     def _clean_cache(self):
