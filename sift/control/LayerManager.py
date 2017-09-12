@@ -63,23 +63,14 @@ class LayerSetsManager(QObject):
         # hang on to the various widgets for later
         self.tab_widget = tab_view_widget
 
-        # FIXME: we need a manager object which decides whether to show info pane or config pane
         self.layer_info_pane = SingleLayerInfoPane(layer_info_widget, document)
         self.rgb_config_pane = RGBLayerConfigPane(ui, layer_info_widget, document)
 
-        # self.layer_info_pane.show()
-        # self.rgb_config_pane.show()
-        layout = QVBoxLayout()
-        layer_info_widget.setLayout(layout)
-        layout.addChildWidget(self.layer_info_pane)
-        layout.addChildWidget(self.rgb_config_pane)
-
-        if tab_view_widget.count() > 1 :
+        if tab_view_widget.count() > 1:
             LOG.warning("Unexpected number of tabs present at start up in the layer list set pane.")
 
         # set up our layer sets and make the first one
-        self.layer_sets = [ ]
-
+        self.layer_sets = []
         self.max_tab_number = 1
         self.set_up_tab(0, do_increment_tab_number=False)
         self.set_behaviors.uuidSelectionChanged.connect(self.layer_info_pane.update_display)
@@ -166,7 +157,8 @@ class SingleLayerSetManager (QWidget) :
 
         return self.my_layer_list
 
-class SingleLayerInfoPane (QWidget) :
+
+class SingleLayerInfoPane(QObject):
     """shows details about one layer that is selected in the list
     """
 
@@ -227,32 +219,23 @@ class SingleLayerInfoPane (QWidget) :
         layout.addWidget(self.cmap_vis, 8, 1)
         layout.addWidget(self.composite_details, 9, 1)
         layout.addWidget(self.composite_codeblock, 10, 1)
-        # self.setLayout(layout)  # was parent.setLayout
-        parent.setLayout(layout)  # FIXME how is this correct??
-
-        # TODO put the informational text into an area with scroll bars so it won't force the sidebar size minimum
+        parent.setLayout(layout)
 
         # clear out the display
         self.update_display()
 
-    def update_display (self, selected_UUID_list=None) :
+    def update_display(self, selected_uuid_list=None):
         """update the information being displayed to match the given UUID(s)
 
         If the uuid list parameter is None, clear out the information instead
         """
-        if selected_UUID_list is not None and len(selected_UUID_list)==1:
-            layer_uuid, = list(selected_UUID_list)
+        if selected_uuid_list is not None and len(selected_uuid_list)==1:
+            layer_uuid, = list(selected_uuid_list)
             layer_info = self.document[layer_uuid]
             is_rgb = isinstance(layer_info, DocRGBLayer)
-            if is_rgb:
-                LOG.debug('hiding basic info display')
-                self.hide()
-            else:
-                LOG.debug('showing basic info display')
-                self.show()
 
         # clear the list if we got None
-        if selected_UUID_list is None or len(selected_UUID_list) <= 0:
+        if selected_uuid_list is None or len(selected_uuid_list) <= 0:
             # set the various text displays
             self.name_text.setText("Name: ")
             self.time_text.setText("Time: ")
@@ -268,7 +251,7 @@ class SingleLayerInfoPane (QWidget) :
             # figure out the info shared between all the layers currently selected
             shared_info = {}
             presentation_info = self.document.current_layer_set
-            for layer_uuid in selected_UUID_list :
+            for layer_uuid in selected_uuid_list:
 
                 layer_info = self.document.get_info(uuid=layer_uuid)
 
@@ -408,7 +391,6 @@ class SingleLayerInfoPane (QWidget) :
             self.clims_text.setText("Color Limits: " + temp_clims)
             self.composite_codeblock.setText(shared_info['codeblock'])
 
-
             # format colormap
             if shared_info.get("colormap", None) is None:
                 self.cmap_vis.setHtml("")
@@ -419,9 +401,9 @@ class SingleLayerInfoPane (QWidget) :
 
 RGBA2IDX = dict(r=0, g=1, b=2, a=3)
 
-class RGBLayerConfigPane(QWidget):
-    """
-    Configures RGB channel selection and ranges on behalf of document.
+
+class RGBLayerConfigPane(QObject):
+    """Configures RGB channel selection and ranges on behalf of document.
     Document in turn generates update signals which cause the SceneGraph to refresh.
     """
     document_ref = None  # weakref to document
@@ -662,8 +644,6 @@ class RGBLayerConfigPane(QWidget):
                 edit[1].setDisabled(True)
             for sbox in self.gamma_boxes:
                 sbox.setDisabled(True)
-            # Hide the widget if possible
-            self.hide()
             return
         else:
             # re-enable all the widgets
@@ -694,8 +674,6 @@ class RGBLayerConfigPane(QWidget):
         for widget in self.rgb:
             # block signals so an existing RGB layer doesn't get overwritten with new layer selections
             widget.blockSignals(False)
-
-        self.show()
 
     def _set_minmax_slider(self, color:str, layer, clims=None, valid_range=None):
         idx = RGBA2IDX[color]
