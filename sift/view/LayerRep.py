@@ -546,6 +546,11 @@ class TiledGeolocatedImageVisual(ImageVisual):
         # The image mesh of only valid "viewable" projected coordinates
         img_vbox = self.calc.image_mesh[valid_mask]
 
+        if not img_cmesh[:, 0].size or not img_cmesh[:, 0].size:
+            self._viewable_mesh_mask = None
+            self._ref1, self._ref2 = None, None
+            return
+
         x_cmin, x_cmax = img_cmesh[:, 0].min(), img_cmesh[:, 0].max()
         y_cmin, y_cmax = img_cmesh[:, 1].min(), img_cmesh[:, 1].max()
         center_x = (x_cmax - x_cmin) / 2. + x_cmin
