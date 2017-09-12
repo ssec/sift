@@ -432,6 +432,8 @@ class Workspace(QObject):
         return cache_entry or self._activate_content(c)
 
     def _deactivate_content_for_product(self, p:Product):
+        if p is None:
+            return
         for c in p.content:
             self._available.pop(c.id, None)
 
