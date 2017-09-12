@@ -35,10 +35,10 @@ class ChangeColormapDialog(QtGui.QDialog):
         self._init_cmap_combo()
         self._init_vmin_slider()
         self.ui.vmin_edit.setValidator(self._validator)
-        self.ui.vmin_edit.setText('{:f}'.format(conv[1](self._initial_clims[0])))
+        self.ui.vmin_edit.setText('{:0.03f}'.format(conv[1](self._initial_clims[0])))
         self._init_vmax_slider()
         self.ui.vmax_edit.setValidator(self._validator)
-        self.ui.vmax_edit.setText('{:f}'.format(conv[1](self._initial_clims[1])))
+        self.ui.vmax_edit.setText('{:0.03f}'.format(conv[1](self._initial_clims[1])))
         self.ui.gammaSpinBox.setValue(self._initial_gamma)
 
         self.ui.buttons.clicked.connect(self._clicked)
@@ -84,7 +84,7 @@ class ChangeColormapDialog(QtGui.QDialog):
         val = self._get_slider_value(slider.value())
         LOG.debug('slider %s %s => %f' % (self.uuid, 'max' if is_max else 'min', val))
         display_val = self.doc[self.uuid][INFO.UNIT_CONVERSION][1](val)
-        edit.setText('%f' % display_val)
+        edit.setText('{:0.03f}'.format(display_val))
         return self._set_new_clims(val, is_max)
 
     def _edit_changed(self, is_max=True):
