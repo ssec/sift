@@ -578,7 +578,7 @@ class Workspace(QObject):
     def product_names_available_in_cache(self):
         """
         Returns: dictionary of {resource or product name: UUID,...}
-        typically used for add-from-cachce dialog
+        typically used for add-from-cache dialog
         FUTURE:
         """
         # find non-overview non-auxiliary data files
@@ -591,15 +591,19 @@ class Workspace(QObject):
                 if p.id in product_ids_taken_care_of:
                     continue
                 product_ids_taken_care_of.add(p.id)
+                # LOG.debug("{} derives from {} resources".format(p.name, len(p.resource)))
                 if len(p.resource) > 0:  # algebraic products do not belong to a resource!
                     zult[p.resource[0].path] = p.uuid
                 else:
-                    name = str(p.name)
+                    nfo = p.info
+                    base = str(nfo[INFO.DISPLAY_NAME])
+                    if base in zult and nfo[INFO.DISPLAY_TIME] not in base:
+                        base += ' ' + str(nfo[INFO.DISPLAY_TIME])
+                    name = base
                     q = 0
                     while name in zult:
-                        LOG.info("product name '{}' is non-unique!")
                         q += 1
-                        name = '{} ({})'.format(p.name, q)
+                        name = '{} ({})'.format(base, q)
                     zult[name] = p.uuid  # FIXME: this is not guaranteed to be unique as keys go
         return zult
 
