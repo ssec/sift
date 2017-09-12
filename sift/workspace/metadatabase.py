@@ -130,7 +130,10 @@ class Resource(Base):
     def exists(self):
         if self.scheme not in {None, 'file'}:
             return True  # FUTURE: alternate tests for still-exists-ness
-        return os.path.exists(self.path)
+        if os.path.exists(self.path):
+            return True
+        LOG.info('path {} no longer exists'.format(self.path))
+        return False
 
 
 class ChainRecordWithDict(MutableMapping):

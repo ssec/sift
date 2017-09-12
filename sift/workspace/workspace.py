@@ -359,9 +359,9 @@ class Workspace(QObject):
             for r in s.query(Resource).all():
                 if not r.exists():
                     LOG.info("resource {} no longer exists, purging from database")
-                    for p in r.product:
-                        p.resource.remove(r)
-                s.delete(r)
+                    # for p in r.product:
+                    #     p.resource.remove(r)
+                    s.delete(r)
 
     def _purge_orphan_products(self):
         """
