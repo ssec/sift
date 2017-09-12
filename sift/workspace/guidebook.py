@@ -287,8 +287,8 @@ class ABI_AHI_Guidebook(Guidebook):
 
         if display_time is None:
             display_time = ds_info.get(INFO.DISPLAY_TIME, self._default_display_time(ds_info))
-        name = "{inst} {name} {standard_name} {dtime}".format(
-            inst=inst.value, name=name, standard_name=label, dtime=display_time)
+        name = "{sat} {inst} {name} {standard_name} {dtime}".format(
+            sat=sat.value, inst=inst.value, name=name, standard_name=label, dtime=display_time)
         return name
 
 
