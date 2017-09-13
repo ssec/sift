@@ -1159,7 +1159,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             r = building_blocks.get((plat, inst, step, rband), None)
             g = building_blocks.get((plat, inst, step, gband), None)
             b = building_blocks.get((plat, inst, step, bband), None)
-            if r and g and b:
+            if r or g or b:
                 to_build.append((step,r,g,b))
                 to_make_invisible.extend([r,g,b])
                 LOG.info('will build RGB from r=%s g=%s b=%s' % (r,g,b))
