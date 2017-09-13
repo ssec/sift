@@ -343,7 +343,7 @@ class Product(Base):
 
     @proj4.setter
     def proj4(self, value):
-        LOG.error('DEPRECATED: setting proj4 on resource')
+        LOG.debug('DEPRECATED: setting proj4 on resource')
 
     @property
     def cell_height(self):
@@ -352,7 +352,7 @@ class Product(Base):
 
     @cell_height.setter
     def cell_height(self, value):
-        LOG.error('DEPRECATED: setting cell_height on resource')
+        LOG.debug('DEPRECATED: setting cell_height on resource')
 
     @property
     def cell_width(self):
@@ -361,7 +361,7 @@ class Product(Base):
 
     @cell_width.setter
     def cell_width(self, value):
-        LOG.error('DEPRECATED: setting cell_width on resource')
+        LOG.debug('DEPRECATED: setting cell_width on resource')
 
     @property
     def origin_x(self):
@@ -370,7 +370,7 @@ class Product(Base):
 
     @origin_x.setter
     def origin_x(self, value):
-        LOG.error('DEPRECATED: setting origin_x on resource')
+        LOG.debug('DEPRECATED: setting origin_x on resource')
 
     @property
     def origin_y(self):
@@ -379,7 +379,7 @@ class Product(Base):
 
     @origin_y.setter
     def origin_y(self, value):
-        LOG.error('DEPRECATED: setting origin_y on resource')
+        LOG.debug('DEPRECATED: setting origin_y on resource')
 
     @property
     def path(self):
@@ -389,7 +389,7 @@ class Product(Base):
 
     @path.setter
     def path(self, value):
-        LOG.error('DEPRECATED: setting path on resource')
+        LOG.debug('DEPRECATED: setting path on resource')
 
     def can_be_activated_without_importing(self):
         return len(self.content)>0
