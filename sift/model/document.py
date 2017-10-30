@@ -416,6 +416,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         return self.activate_product_uuid_as_new_layer(uuid, insert_before=insert_before)
 
     def activate_product_uuid_as_new_layer(self, uuid: UUID, insert_before=0):
+        if uuid in self._layer_with_uuid:
+            LOG.debug("Layer already loaded: {}".format(uuid))
+            active_content_data = self._workspace.import_product_content(uuid)
+            return uuid, self[uuid], active_content_data
+
         # FUTURE: Load this async, the slots for the below signal need to be OK with that
         active_content_data = self._workspace.import_product_content(uuid)
         # updated metadata with content information (most importantly nav information)
