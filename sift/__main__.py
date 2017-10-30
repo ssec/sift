@@ -499,13 +499,27 @@ class Main(QtGui.QMainWindow):
 
             if data_point is None:
                 data_str = "N/A"
+                layer_str = "N/A"
             else:
-                unit_info = self.document[uuid][INFO.UNIT_CONVERSION]
+                info = self.document[uuid]
+                unit_info = info[INFO.UNIT_CONVERSION]
                 data_point = unit_info[1](data_point)
                 data_str = unit_info[2](data_point, numeric=False)
+                if info.get(INFO.CENTRAL_WAVELENGTH):
+                    wl = info[INFO.CENTRAL_WAVELENGTH]
+                    if wl < 4.1:
+                        wl_str = "{:0.02f} µm".format(wl)
+                    else:
+                        wl_str = "{:0.01f} µm".format(wl)
+                    layer_str = "{}, {}".format(info[INFO.SHORT_NAME],
+                                                wl_str)
+                else:
+                    layer_str = info[INFO.SHORT_NAME]
         else:
             data_str = "N/A"
+            layer_str = "N/A"
         self.ui.cursorProbeText.setText("Probe Value: {} ".format(data_str))
+        self.ui.cursorProbeLayer.setText("Current Layer: {}".format(layer_str))
 
     def __init__(self, workspace_dir=None, workspace_size=None, glob_pattern=None, border_shapefile=None, center=None):
         super(Main, self).__init__()
