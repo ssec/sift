@@ -7,10 +7,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 from sift.common import INFO
 from sift.ui import export_image_dialog_ui
-from sift.util import get_data_dir
+from sift.util import get_package_data_dir
 
 LOG = logging.getLogger(__name__)
-DATA_DIR = get_data_dir()
+DATA_DIR = get_package_data_dir()
 
 
 def _default_directory():

@@ -36,6 +36,8 @@ from sift.view.create_algebraic import CreateAlgebraicDialog
 from sift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
 from sift.workspace import Workspace
 from sift import __version__
+from sift.util import (WORKSPACE_DB_DIR,
+                       DOCUMENT_SETTINGS_DIR)
 
 from functools import partial
 
@@ -521,7 +523,7 @@ class Main(QtGui.QMainWindow):
         self.ui.cursorProbeText.setText("Probe Value: {} ".format(data_str))
         self.ui.cursorProbeLayer.setText("Current Layer: {}".format(layer_str))
 
-    def __init__(self, workspace_dir=None, workspace_size=None, glob_pattern=None, border_shapefile=None, center=None):
+    def __init__(self, config_dir=None, cache_dir=None, cache_size=None, glob_pattern=None, border_shapefile=None, center=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
@@ -541,7 +543,7 @@ class Main(QtGui.QMainWindow):
         self.queue.didMakeProgress.connect(self.update_progress_bar)
 
         # create manager and helper classes
-        self.workspace = Workspace(workspace_dir, max_size_gb=workspace_size, queue=self.queue)
+        self.workspace = Workspace(cache_dir, max_size_gb=cache_size, queue=self.queue)
         self.document = doc = Document(self.workspace)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
                                                border_shapefile=border_shapefile,
@@ -889,19 +891,32 @@ class Main(QtGui.QMainWindow):
         pass
 
 
-def main():
-    if "win" in sys.platform:
-        # Windows AND Mac/OSX
-        default_workspace = os.path.expanduser(os.path.join("~", "Documents", "sift_workspace"))
+def set_default_geometry(window, desktop=0):
+    screen = QtGui.QApplication.desktop()
+    screen_geometry = screen.screenGeometry(desktop)
+    # TODO: Remove platform specific code
+    if 'darwin' not in sys.platform:
+        w, h = screen_geometry.width() - 400, screen_geometry.height() - 300
+        window.setGeometry(200, 150, w, h)
     else:
-        default_workspace = os.path.expanduser(os.path.join("~", "sift_workspace"))
+        size = window.size()
+        w, h = size.width(), size.height()
+        center = screen_geometry.center()
+        screen_x, screen_y = center.x(), center.y()
+        window.move(int(screen_x - w / 2.), int(screen_y - h / 2.))
 
+
+def main():
     import argparse
     parser = argparse.ArgumentParser(description="Run CSPOV")
-    parser.add_argument("-w", "--workspace", default=default_workspace,
-                        help="Specify workspace base directory")
+    parser.add_argument("-w", "--workspace",
+                        help="(DEPRECATED) Specify workspace base directory")
+    parser.add_argument("--cache-dir", default=WORKSPACE_DB_DIR,
+                        help="Specify cache directory")
+    parser.add_argument("--config-dir", default=DOCUMENT_SETTINGS_DIR,
+                        help="Specify config directory")
     parser.add_argument("-s", "--space", default=256, type=int,
-                        help="Specify max amount of data to hold in workspace in Gigabytes")
+                        help="Specify max amount of data to hold in workspace cache in Gigabytes")
     parser.add_argument("--border-shapefile", default=None,
                         help="Specify alternative coastline/border shapefile")
     parser.add_argument("--glob-pattern", default=os.environ.get("TIFF_GLOB", None),
@@ -915,40 +930,31 @@ def main():
     args = parser.parse_args()
 
     levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
-    level=levels[min(3, args.verbosity)]
+    level = levels[min(3, args.verbosity)]
     logging.basicConfig(level=level)
     # FIXME: This is needed because shapely 1.5.11 sucks
     logging.getLogger().setLevel(level)
     # logging.getLogger('vispy').setLevel(level)
 
-    if not os.path.exists(args.workspace):
-        LOG.info("Creating SIFT Workspace: %s", args.workspace)
-        os.makedirs(args.workspace)
-    else:
-        LOG.info("Using SIFT Workspace: %s", args.workspace)
+    if args.workspace:
+        # TODO: Figure out backwards compatible stuff
+        LOG.warning("'--workspace' is deprecated, use '--cache-dir'")
+        args.config_dir = args.workspace
+        args.cache_dir = (args.workspace, args.workspace)
 
+    LOG.info("Using configuration directory: %s", args.config_dir)
+    LOG.info("Using cache directory: %s", args.cache_dir)
     app.create()
-    # app = QApplication(sys.argv)
     window = Main(
-        workspace_dir=args.workspace,
-        workspace_size=args.space,
+        cache_dir=args.cache_dir,
+        config_dir=args.config_dir,
+        cache_size=args.space,
         glob_pattern=args.glob_pattern,
         border_shapefile=args.border_shapefile,
         center=args.center,
     )
-    screen = QtGui.QApplication.desktop()
-    screen_geometry = screen.screenGeometry(args.desktop)
-    if 'darwin' not in sys.platform:
-        w, h = screen_geometry.width() - 400, screen_geometry.height() - 300
-        window.setGeometry(200, 150, w, h)
-    else:
-        size = window.size()
-        w, h = size.width(), size.height()
-        center = screen_geometry.center()
-        screen_x, screen_y = center.x(), center.y()
-        window.move(int(screen_x - w / 2.), int(screen_y - h / 2.))
 
-
+    set_default_geometry(window, desktop=args.desktop)
     window.show()
     # bring window to front
     window.raise_()

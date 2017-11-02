@@ -298,8 +298,18 @@ class Workspace(QObject):
             self._tempdir = tempfile.TemporaryDirectory()
             directory_path = str(self._tempdir)
             LOG.info('using temporary directory {}'.format(directory_path))
-        self.cwd = directory_path = os.path.abspath(directory_path)
+
+        # HACK: handle old workspace command line flag
+        if isinstance(directory_path, (list, tuple)):
+            self.cache_dir = cache_path = os.path.abspath(directory_path[1])
+            self.cwd = directory_path = os.path.abspath(directory_path[0])
+        else:
+            self.cwd = directory_path = os.path.abspath(directory_path)
+            self.cache_dir = cache_path = os.path.join(self.cwd, 'data_cache')
         self._inventory_path = os.path.join(self.cwd, '_inventory.db')
+        if not os.path.isdir(cache_path):
+            LOG.info("creating new workspace cache at {}".format(cache_path))
+            os.makedirs(cache_path)
         if not os.path.isdir(directory_path):
             LOG.info("creating new workspace at {}".format(directory_path))
             os.makedirs(directory_path)
@@ -309,6 +319,7 @@ class Workspace(QObject):
             LOG.info("attaching pre-existing workspace at {}".format(directory_path))
             self._own_cwd = False
             self._init_inventory_existing_datasets()
+
         self._available = {}
         self._importers = [x for x in IMPORT_CLASSES]
         global TheWorkspace  # singleton
@@ -325,7 +336,7 @@ class Workspace(QObject):
         if not os.path.isdir(dn):
             raise EnvironmentError("workspace directory {} does not exist".format(dn))
         LOG.info('{} database at {}'.format('initializing' if should_init else 'attaching', self._inventory_path))
-        self._inventory = md = Metadatabase('sqlite:///' + self._inventory_path, create_tables=should_init)
+        self._inventory = Metadatabase('sqlite:///' + self._inventory_path, create_tables=should_init)
         if should_init:
             with self._inventory as s:
                 assert(0 == s.query(Content).count())
@@ -339,7 +350,7 @@ class Workspace(QObject):
         to_purge = []
         with self._inventory as s:
             for c in s.query(Content).all():
-                if not ActiveContent.can_attach(self.cwd, c):
+                if not ActiveContent.can_attach(self.cache_dir, c):
                     LOG.warning("purging missing content {}".format(c.path))
                     to_purge.append(c)
             LOG.debug("{} content entities no longer present in cache - will remove from database".format(len(to_purge)))
@@ -404,7 +415,7 @@ class Workspace(QObject):
         for filename in [c.path, c.coverage_path, c.sparsity_path]:
             if not filename:
                 continue
-            pn = os.path.join(self.cwd, filename)
+            pn = os.path.join(self.cache_dir, filename)
             if os.path.exists(pn):
                 LOG.debug('removing {}'.format(pn))
                 total += os.stat(pn).st_size
@@ -416,7 +427,7 @@ class Workspace(QObject):
         return total
 
     def _activate_content(self, c: Content) -> ActiveContent:
-        self._available[c.id] = zult = ActiveContent(self.cwd, c)
+        self._available[c.id] = zult = ActiveContent(self.cache_dir, c)
         c.touch()
         c.product.touch()
         return zult
@@ -489,7 +500,7 @@ class Workspace(QObject):
         :return:
         """
         total = 0
-        for root, dirs, files in os.walk(self.cwd):
+        for root, dirs, files in os.walk(self.cache_dir):
             sz = sum(os.path.getsize(os.path.join(root, name)) for name in files)
             LOG.debug('%d bytes in %s' % (sz, root))
 
@@ -757,7 +768,7 @@ class Workspace(QObject):
                 for imp in self._importers:
                     if imp.is_relevant(source_path=source_path):
                         hauler = imp(source_path, database_session=import_session,
-                                     workspace_cwd=self.cwd)
+                                     workspace_cwd=self.cache_dir)
                         hauler.merge_resources()
                         for prod in hauler.merge_products():
                             assert(prod is not None)
@@ -781,7 +792,7 @@ class Workspace(QObject):
                 arrays = self._cached_arrays_for_content(ovc)
                 return arrays.data
 
-            truck = aImporter.from_product(prod, workspace_cwd=self.cwd, database_session=S)
+            truck = aImporter.from_product(prod, workspace_cwd=self.cache_dir, database_session=S)
             metadata = prod.info
             name = metadata[INFO.SHORT_NAME]
 
@@ -931,7 +942,7 @@ class Workspace(QObject):
         uuid = P.uuid
         # FUTURE: add expression and namespace information, which would require additional parameters
         ws_filename = '{}.data'.format(str(uuid))
-        ws_path = os.path.join(self.cwd, ws_filename)
+        ws_path = os.path.join(self.cache_dir, ws_filename)
         with open(ws_path, 'wb+') as fp:
             mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
             mm[:] = data[:]
