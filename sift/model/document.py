@@ -70,6 +70,7 @@ import numpy as np
 from weakref import ref
 
 from sift.common import KIND, INFO, prez
+from sift.view.Colormap import ALL_COLORMAPS
 from PyQt4.QtCore import QObject, pyqtSignal
 
 
@@ -284,6 +285,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self._workspace = workspace
         self._layer_sets = [DocLayerStack(self)] + [None] * (layer_set_count - 1)
         self._layer_with_uuid = {}
+        # FIXME: Copy?
+        self.colormaps = ALL_COLORMAPS
         self.available_projections = OrderedDict((
             ('Mercator', {
                 'proj4_str': '+proj=merc +datum=WGS84 +ellps=WGS84 +over',
@@ -332,6 +335,15 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.default_projection = 'LCC (CONUS)'
         self.current_projection = self.default_projection
         # TODO: connect signals from workspace to slots including update_dataset_info
+
+    def update_colormaps(self, new_colormaps):
+        self.colormaps.update(new_colormaps)
+
+    def find_colormap(self, colormap):
+        if isinstance(colormap, str) and colormap in self.colormaps:
+            colormap = self.colormaps[colormap]
+        print(colormap)
+        return colormap
 
     def projection_info(self, projection_name=None):
         return self.available_projections[projection_name or self.current_projection]
@@ -832,6 +844,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for uuid in uuids:
             for dex,pinfo in enumerate(L):
                 if pinfo.uuid==uuid:
+                    print("Switching a colormap!")
                     L[dex] = pinfo._replace(colormap=name)
                     nfo[uuid] = name
         self.didChangeColormap.emit(nfo)

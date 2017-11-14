@@ -399,8 +399,6 @@ class SceneGraphManager(QObject):
 
         self.image_elements = {}
         self.composite_element_dependencies = {}
-        self.colormaps = {}
-        self.colormaps.update(ALL_COLORMAPS)
         self.layer_set = LayerSet(self, frame_change_cb=self.frame_changed)
         self._current_tool = None
 
@@ -721,13 +719,8 @@ class SceneGraphManager(QObject):
         idx = (idx + 1) % len(tool_names)
         self.change_tool(tool_names[idx])
 
-    def _find_colormap(self, colormap):
-        if isinstance(colormap, str) and colormap in self.colormaps:
-            colormap = self.colormaps[colormap]
-        return colormap
-
     def set_colormap(self, colormap, uuid=None):
-        colormap = self._find_colormap(colormap)
+        colormap = self.document.find_colormap(colormap)
 
         uuids = uuid
         if uuid is None:
@@ -737,9 +730,6 @@ class SceneGraphManager(QObject):
 
         for uuid in uuids:
             self.image_elements[uuid].cmap = colormap
-
-    def add_colormap(self, name:str, colormap):
-        self.colormaps[name] = colormap
 
     def set_color_limits(self, clims, uuid=None):
         """Update the color limits for the specified UUID
@@ -800,7 +790,7 @@ class SceneGraphManager(QObject):
             gamma=p.gamma,
             interpolation='nearest',
             method='tiled',
-            cmap=self._find_colormap(p.colormap),
+            cmap=self.document.find_colormap(p.colormap),
             double=False,
             texture_shape=DEFAULT_TEXTURE_SHAPE,
             wrap_lon=False,
@@ -836,7 +826,7 @@ class SceneGraphManager(QObject):
                 gamma=p.gamma,
                 interpolation='nearest',
                 method='tiled',
-                cmap=self._find_colormap("grays"),
+                cmap=self.document.find_colormap("grays"),
                 double=False,
                 texture_shape=DEFAULT_TEXTURE_SHAPE,
                 wrap_lon=False,

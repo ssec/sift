@@ -33,6 +33,10 @@ from uuid import UUID
 
 LOG = logging.getLogger(__name__)
 
+from sift.ui.GradientControl import GradientControl
+
+from sift.view.Colormap import ALL_COLORMAPS
+
 
 class LayerSetsManager(QObject):
     """This is the controller object that manages the extended functionality of the layer sets.
@@ -170,6 +174,8 @@ class SingleLayerInfoPane(QObject):
     colormap_text = None
     clims_text = None
 
+    GCOpen = False
+
     def __init__(self, parent, document):
         """build our info display
         """
@@ -193,6 +199,8 @@ class SingleLayerInfoPane(QObject):
         self.clims_text = QLabel("")
         self.clims_text.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.cmap_vis = QNoScrollWebView()
+        #self.cmap_vis.selectionChanged.connect(self.openGradientWidget)
+        self.cmap_vis.selectionChanged.connect(self.openGradientWidget)
         self.cmap_vis.setFixedSize(3 * 100, 30)
         self.cmap_vis.page().mainFrame().setScrollBarPolicy(Qt.Vertical, Qt.ScrollBarAlwaysOff)
         self.composite_details = QLabel("Composite Details")
@@ -223,6 +231,23 @@ class SingleLayerInfoPane(QObject):
 
         # clear out the display
         self.update_display()
+
+    def openGradientWidget(self):
+
+        print("Here we go...")
+        print(str(self.cmap_vis.whatsThis()))
+
+        #gc = GradientControl(self.document, self.parent())
+
+        #for map in ALL_COLORMAPS:
+        #    if ALL_COLORMAPS[map].colors:
+        #        gc.importGradients(map, ALL_COLORMAPS[map].colors.hex, ALL_COLORMAPS[map].colors.value)
+        #
+        #       print("Imported Gradient!")
+
+        #gc.show()
+
+
 
     def update_display(self, selected_uuid_list=None):
         """update the information being displayed to match the given UUID(s)
