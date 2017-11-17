@@ -12,6 +12,7 @@ Directory Constants:
  -
 """
 import os
+import sys
 import appdirs
 
 APPLICATION_AUTHOR = "CIMSS-SSEC"
@@ -26,3 +27,17 @@ WORKSPACE_DB_DIR = os.path.join(USER_CACHE_DIR, 'workspace')
 DOCUMENT_SETTINGS_DIR = os.path.join(USER_CONFIG_DIR, 'settings')
 # FUTURE: Is there Document data versus Document configuration?
 
+
+def _desktop_directory():
+    try:
+        if sys.platform.startswith('win'):
+            import appdirs
+            # https://msdn.microsoft.com/en-us/library/windows/desktop/bb762494(v=vs.85).aspx
+            return appdirs._get_win_folder('CSIDL_DESKTOPDIRECTORY')
+        else:
+            return os.path.join(os.path.expanduser('~'), 'Desktop')
+    except (KeyError, ValueError):
+        return os.getcwd()
+
+
+USER_DESKTOP_DIRECTORY = _desktop_directory()

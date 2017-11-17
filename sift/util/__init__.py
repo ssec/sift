@@ -4,7 +4,8 @@
 import os
 import sys
 from sift.util.default_paths import (WORKSPACE_DB_DIR,
-                                     DOCUMENT_SETTINGS_DIR)
+                                     DOCUMENT_SETTINGS_DIR,
+                                     USER_DESKTOP_DIRECTORY)
 
 
 def get_package_data_dir():

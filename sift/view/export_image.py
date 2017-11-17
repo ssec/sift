@@ -1,5 +1,4 @@
 import os
-import sys
 import logging
 
 from PyQt4 import QtCore, QtGui
@@ -7,20 +6,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 from sift.common import INFO
 from sift.ui import export_image_dialog_ui
-from sift.util import get_package_data_dir
+from sift.util import get_package_data_dir, USER_DESKTOP_DIRECTORY
 
 LOG = logging.getLogger(__name__)
 DATA_DIR = get_package_data_dir()
-
-
-def _default_directory():
-    try:
-        if sys.platform.startswith('win'):
-            return os.path.join(os.environ['USERPROFILE'], 'Desktop')
-        else:
-            return os.path.join(os.path.expanduser('~'), 'Desktop')
-    except (KeyError, ValueError):
-        return os.getcwd()
 
 
 class ExportImageDialog(QtGui.QDialog):
@@ -45,7 +34,7 @@ class ExportImageDialog(QtGui.QDialog):
         self.ui.saveAsLineEdit.textChanged.connect(self._validate_filename)
         self.ui.saveAsButton.clicked.connect(self._show_file_dialog)
 
-        self._last_dir = _default_directory()
+        self._last_dir = USER_DESKTOP_DIRECTORY
         self.ui.saveAsLineEdit.setText(os.path.join(self._last_dir, self.default_filename))
         self._validate_filename()
 

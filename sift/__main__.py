@@ -937,7 +937,6 @@ def main():
     # logging.getLogger('vispy').setLevel(level)
 
     if args.workspace:
-        # TODO: Figure out backwards compatible stuff
         LOG.warning("'--workspace' is deprecated, use '--cache-dir'")
         args.config_dir = args.workspace
         args.cache_dir = (args.workspace, args.workspace)
