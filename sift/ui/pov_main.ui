@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1397</width>
+    <width>1463</width>
     <height>800</height>
    </rect>
   </property>
@@ -463,7 +463,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1397</width>
+     <width>1463</width>
      <height>22</height>
     </rect>
    </property>
@@ -587,7 +587,7 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>194</width>
+          <width>182</width>
           <height>76</height>
          </rect>
         </property>
@@ -1031,6 +1031,79 @@
          </item>
         </layout>
        </widget>
+      </widget>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+  <widget class="QDockWidget" name="timelinePane">
+   <property name="floating">
+    <bool>true</bool>
+   </property>
+   <property name="features">
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
+   </property>
+   <property name="windowTitle">
+    <string>TImeline</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>8</number>
+   </attribute>
+   <widget class="QWidget" name="dockWidgetContents_2">
+    <layout class="QVBoxLayout" name="verticalLayout_9">
+     <item>
+      <widget class="QGroupBox" name="timelineToolGroup">
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>12</height>
+        </size>
+       </property>
+       <property name="baseSize">
+        <size>
+         <width>0</width>
+         <height>12</height>
+        </size>
+       </property>
+       <property name="title">
+        <string/>
+       </property>
+       <widget class="QCheckBox" name="timelineShowOnlyActive">
+        <property name="geometry">
+         <rect>
+          <x>10</x>
+          <y>10</y>
+          <width>85</width>
+          <height>18</height>
+         </rect>
+        </property>
+        <property name="text">
+         <string>Show ActiveOnly</string>
+        </property>
+       </widget>
+       <widget class="QSlider" name="timelineTimeResolution">
+        <property name="geometry">
+         <rect>
+          <x>20</x>
+          <y>20</y>
+          <width>160</width>
+          <height>22</height>
+         </rect>
+        </property>
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+       </widget>
+      </widget>
+     </item>
+     <item>
+      <widget class="QGraphicsView" name="timelineView">
+       <property name="minimumSize">
+        <size>
+         <width>64</width>
+         <height>12</height>
+        </size>
+       </property>
       </widget>
      </item>
     </layout>
