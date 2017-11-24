@@ -1,10 +1,13 @@
 #!/usr/bin/env python
-import sys
+import sys, time
 from PyQt4.QtGui import *
 from PyQt4.QtCore import *
+from PyQt4.QtOpenGL import QGLWidget
+from random import randint, shuffle
 
 # http://pyqt.sourceforge.net/Docs/PyQt4/modules.html
 #from PyQt4.QtWidgets import *
+# ref https://ralsina.me/stories/BBS53.html
 
 class DemoScene(QGraphicsScene):
 
@@ -20,12 +23,6 @@ class MainWindow(QMainWindow):
         super(MainWindow, self).__init__(*args, **kwargs)
         # self.windowTitleChanged.connect(self.onWindowTitleChange)
         self.setWindowTitle("timeline0")
-
-        self._scene = scene
-        gfx = self._gfx = QGraphicsView(scene, parent=self)
-        # label = QLabel("och!")
-        # label.setAlignment(Qt.AlignCenter)
-        self.setCentralWidget(gfx)
 
         toolbar = QToolBar("och")
         toolbar.setIconSize(QSize(20,20))
@@ -52,11 +49,149 @@ class MainWindow(QMainWindow):
         file_menu.addMenu("Do not push")
 #        file_menu.addAction()
 
+        self._scene = scene
+        gfx = self._gfx = QGraphicsView(scene, parent=self)
+        # label = QLabel("och!")
+        # label.setAlignment(Qt.AlignCenter)
+        self.setCentralWidget(gfx)
+        gfx.setViewport(QGLWidget())
+
+        # populate fills the scene with interesting stuff.
+        self.populate()
+
+        # Make it bigger
+        self.setWindowState(Qt.WindowMaximized)
+
+        # Well... it's going to have an animation, ok?
+
+        # So, I set a timer to 1 second
+        self.animator=QTimer()
+
+        # And when it triggers, it calls the animate method
+        self.animator.timeout.connect(self.animate)
+
+        # And I animate it once manually.
+        self.animate()
+
+
+    def animate(self):
+
+        # Just a list with 60 positions
+        self.animations = [None] * 60  # list(range(0, 60))
+
+        # This is the only "hard" part
+        # Given an item, and where you want it to be
+        # it moves it there, smoothly, in one second.
+        def animate_to(t, item, x, y, angle):
+            # The QGraphicsItemAnimation class is used to
+            # animate an item in specific ways
+            animation = QGraphicsItemAnimation()
+
+            # You create a timeline (in this case, it is 1 second long
+            timeline = QTimeLine(1000)
+
+            # And it has 100 steps
+            timeline.setFrameRange(0, 100)
+
+            # I want that, at time t, the item be at point x,y
+            animation.setPosAt(t, QPointF(x, y))
+
+            # And it should be rotated at angle "angle"
+            animation.setRotationAt(t, angle)
+
+            # It should animate this specific item
+            animation.setItem(item)
+
+            # And the whole animation is this long, and has
+            # this many steps as I set in timeline.
+            animation.setTimeLine(timeline)
+
+            # Here is the animation, use it.
+            return animation
+
+        # Ok, I confess it, this part is a mess, but... a little
+        # mistery is good for you. Read this carefully, and tell
+        # me if you can do it better. Or try to something nicer!
+
+        offsets = list(range(6))
+        shuffle(offsets)
+
+        # Some items, animate with purpose
+        h1, h2 = map(int, '%02d' % time.localtime().tm_hour)
+        h1 += offsets[0] * 10
+        h2 += offsets[1] * 10
+        self.animations[h1] = animate_to(0.2, self.digits[h1], -40, 0, 0)
+        self.animations[h2] = animate_to(0.2, self.digits[h2], 50, 0, 0)
+
+        m1, m2 = map(int, '%02d' % time.localtime().tm_min)
+        m1 += offsets[2] * 10
+        m2 += offsets[3] * 10
+        self.animations[m1] = animate_to(0.2, self.digits[m1], 230, 0, 0)
+        self.animations[m2] = animate_to(0.2, self.digits[m2], 320, 0, 0)
+
+        s1, s2 = map(int, '%02d' % time.localtime().tm_sec)
+        s1 += offsets[4] * 10
+        s2 += offsets[5] * 10
+        self.animations[s1] = animate_to(0.2, self.digits[s1], 500, 0, 0)
+        self.animations[s2] = animate_to(0.2, self.digits[s2], 590, 0, 0)
+
+        # Other items, animate randomly
+        for i in range(len(self.animations)):
+            l = self.digits[i]
+            if i in [h1, h2, m1, m2, s1, s2]:
+                l.setOpacity(1)
+                continue
+            l.setOpacity(.3)
+            self.animations[i] = animate_to(1, l, randint(0, 500), randint(0, 300), randint(0, 0))
+
+        [animation.timeLine().start() for animation in self.animations]
+
+        self.animator.start(1000)
+
     def onMyToolBarButtonClick(self, s):
         print("click", s)
 
     # def onWindowTitleChange(self, s):
     #     print(s)
+
+    def populate(self):
+        self.digits=[]
+        self.animations=[]
+
+        # This is just a nice font, use any font you like, or none
+        font=QFont('White Rabbit')
+        font.setPointSize(120)
+
+
+        # Create three ":" and place them in our scene
+        self.dot1=QGraphicsTextItem(':')  # from QtGui
+        self.dot1.setFont(font)
+        self.dot1.setPos(140,0)
+        self._scene.addItem(self.dot1)
+        self.dot2=QGraphicsTextItem(':')
+        self.dot2.setFont(font)
+        self.dot2.setPos(410,0)
+        self._scene.addItem(self.dot2)
+
+        # Create 6 sets of 0-9 digits
+        for i in range(60):
+            l = QGraphicsTextItem(str(i%10))
+            l.setFont(font)
+            # The zvalue is what controls what appears "on top" of what.
+            # Send them to "the bottom" of the scene.
+            l.setZValue(-100)
+
+            # Place them anywhere
+            l.setPos(randint(0,500),randint(150,300))
+
+            # Make them semi-transparent
+            l.setOpacity(.3)
+
+            # Put them in the scene
+            self._scene.addItem(l)
+
+            # Keep a reference for internal purposes
+            self.digits.append(l)
 
 
 app = QApplication(sys.argv)
