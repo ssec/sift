@@ -2,7 +2,7 @@
 import sys, time
 from PyQt4.QtGui import *
 from PyQt4.QtCore import *
-from PyQt4.QtOpenGL import QGLWidget
+from PyQt4.QtOpenGL import QGLWidget, QGLFormat, QGL
 from random import randint, shuffle
 
 # http://pyqt.sourceforge.net/Docs/PyQt4/modules.html
@@ -50,11 +50,18 @@ class MainWindow(QMainWindow):
 #        file_menu.addAction()
 
         self._scene = scene
-        gfx = self._gfx = QGraphicsView(scene, parent=self)
+        gfx = self._gfx = QGraphicsView(self)
         # label = QLabel("och!")
         # label.setAlignment(Qt.AlignCenter)
+
+        # ref https://doc.qt.io/archives/qq/qq26-openglcanvas.html
         self.setCentralWidget(gfx)
-        gfx.setViewport(QGLWidget())
+        fmt = QGLFormat(QGL.SampleBuffers)
+        wdgt = QGLWidget(fmt)
+        assert(wdgt.isValid())
+        gfx.setViewport(wdgt)
+        gfx.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
+        gfx.setScene(scene)
 
         # populate fills the scene with interesting stuff.
         self.populate()
