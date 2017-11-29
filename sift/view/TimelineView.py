@@ -122,10 +122,30 @@ class QFramesInTracksScene(QGraphicsScene):
     includes a TimelineCoordTransform time-to-X coordinate transform used for generating screen coordinates.
     """
     _coords: TimelineCoordTransform = None
+    _track_pen_brush = None, None
+    _frame_pen_brush = None, None
+
 
     def __init__(self):
         super(QFramesInTracksScene, self).__init__()
         self._coords = TimelineCoordTransform()
+        pen = QPen()
+        pen.setWidthF(4.0)
+        pen.setColor(Qt.black)
+        # pen.setCapStyle(Qt.RoundCap)
+        pen.setJoinStyle(Qt.RoundJoin)
+        brush = QBrush()
+        brush.setColor(Qt.blue)
+        brush.setStyle(Qt.SolidPattern)
+        self._frame_pen_brush = pen, brush
+        pen = QPen(pen)
+        pen.setWidthF(2.0)
+        pen.setColor(Qt.blue)
+        brush = QBrush(brush)
+        brush.setColor(Qt.gray)
+        self._track_pen_brush = pen, brush
+
+
 
     @property
     def coords(self):
@@ -133,11 +153,11 @@ class QFramesInTracksScene(QGraphicsScene):
 
     @property
     def default_track_pen_brush(self) -> Tuple[Optional[QPen], Optional[QBrush]]:
-        return None, None
+        return self._track_pen_brush
 
     @property
     def default_frame_pen_brush(self) -> Tuple[Optional[QPen], Optional[QBrush]]:
-        return None, None
+        return self._frame_pen_brush
 
 
 
@@ -179,8 +199,10 @@ class QTrackItem(QGraphicsRectItem):
         self._min, self._max = min, max
         pen, brush = scene.default_track_pen_brush
         if pen:
+            LOG.debug('setting pen')
             self.setPen(pen)
         if brush:
+            LOG.debug('setting brush')
             self.setBrush(brush)
         scene.addItem(self)
 
@@ -254,8 +276,10 @@ class QFrameItem(QGraphicsRectItem):
         self._doc_uuid = document_uuid
         pen, brush = track.default_frame_pen_brush
         if pen:
+            LOG.debug('setting pen')
             self.setPen(pen)
         if brush:
+            LOG.debug('setting brush')
             self.setBrush(brush)
         self.setParentItem(track)
 
