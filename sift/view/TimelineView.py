@@ -27,7 +27,7 @@ import os, sys
 import logging, unittest
 from uuid import UUID
 from collections import namedtuple
-from typing import Tuple
+from typing import Tuple, Optional
 from enum import Enum
 from datetime import datetime, timedelta
 from PyQt4.QtCore import QObject, QRectF, Qt
@@ -80,7 +80,7 @@ class TimelineCoordTransform(QObject):
         self._time_unit = time_unit
         self._track_height = track_height
 
-    def calc_time_duration(self, scene_x: float, scene_w: float) -> Tuple[datetime, timedelta]:
+    def calc_time_duration(self, scene_x: [float, None], scene_w: [float, None]) -> Tuple[Optional[datetime], Optional[timedelta]]:
         """
         calculate time and duration given scene X coordinate and width (from QRectF typically)
         Args:
@@ -91,9 +91,12 @@ class TimelineCoordTransform(QObject):
             (start time, time width)
 
         """
-        return self._time_base + (self._time_unit * scene_x), self._time_unit * scene_w
+        return self._time_base + (self._time_unit * scene_x) if (scene_x is not None) else None, self._time_unit * scene_w
 
-    def calc_rect(self, ztd: ztdtup=None, z:int=None, t: datetime=None, d: timedelta=None) -> [QRectF, None]:
+    def calc_scene_width(self, d: timedelta):
+        return self._time_unit * d
+
+    def calc_scene_rect(self, ztd: ztdtup=None, z:int=None, t: datetime=None, d: timedelta=None) -> [QRectF, None]:
         """
         calculate scene coordinates given time and Z
         Args:
@@ -128,6 +131,15 @@ class QFramesInTracksScene(QGraphicsScene):
     def coords(self):
         return self._coords
 
+    @property
+    def default_track_pen_brush(self) -> Tuple[Optional[QPen], Optional[QBrush]]:
+        return None, None
+
+    @property
+    def default_frame_pen_brush(self) -> Tuple[Optional[QPen], Optional[QBrush]]:
+        return None, None
+
+
 
 
 class QTrackItem(QGraphicsRectItem):
@@ -147,11 +159,14 @@ class QTrackItem(QGraphicsRectItem):
     _colormap: [QGradient, QImage] = None
     _min: float = None
     _max: float = None
+    _left_pad: timedelta = timedelta(hours=1)
+    _right_pad: timedelta = timedelta(minutes=5)
 
     def __init__(self, scene: QFramesInTracksScene, z: int,
                  title: str, subtitle: str = None, icon: QIcon = None,
                  tooltip: str = None, color: QColor = None, selected: bool = False,
                  colormap: [QGradient, QImage] = None, min: float = None, max: float = None):
+        super(QTrackItem, self).__init__()
         self._scene = scene
         self._z = z
         self._title = title
@@ -162,21 +177,35 @@ class QTrackItem(QGraphicsRectItem):
         self._selected = selected
         self._colormap = colormap
         self._min, self._max = min, max
+        pen, brush = scene.default_track_pen_brush
+        if pen:
+            self.setPen(pen)
+        if brush:
+            self.setBrush(brush)
+        scene.addItem(self)
+
+    @property
+    def default_frame_pen_brush(self):
+        return self._scene.default_frame_pen_brush
+
+    def update_time_range_from_children(self):
+        extent = self.childrenBoundingRect()
+        LOG.debug("track bounds left={} top={} width={} height={}".format(extent.left(), extent.top(), extent.width(), extent.height()))
+        tx, dx = extent.left(), extent.width()
+        t, d = self._scene.coords.calc_time_duration(tx, dx)
+        rect = self._scene.coords.calc_scene_rect(z=self._z, t=t - self._left_pad, d=d + self._left_pad + self._right_pad)
+        self.setRect(rect)
 
 
-    def calc_frame_rect_in_timeline(self, ztd: ztdtup=None, z:int=0, t: datetime=None, d: timedelta=None):
+    def calc_frame_rect_in_track(self, ztd: ztdtup=None, z:int=0, t: datetime=None, d: timedelta=None):
         """
         calculate frame rect within scene
         Returns: QRectF
         """
         if ztd is None:
             ztd = ztdtup(z, t, d)
-        return self._scene.coords.calc_rect(z=ztd.z, t=ztd.t, d=ztd.d)
+        return self._scene.coords.calc_scene_rect(ztd)
 
-    def calc_timeline_rect_in_scene(self, ztd: ztdtup=None, z:int=0, t: datetime=None, d: timedelta=None):
-        """
-
-        """
 
 class QFrameItem(QGraphicsRectItem):
     """
@@ -212,8 +241,7 @@ class QFrameItem(QGraphicsRectItem):
             document_uuid: UUID of document representation (backed by composition/presentation of other content); may be None
         """
         super(QFrameItem, self).__init__()
-        self.setParentItem(track)
-        rect = track.calc_frame_rect_in_timeline(t=start, d=duration)
+        rect = track.calc_frame_rect_in_track(t=start, d=duration)
         if rect is not None:
             self.setRect(rect)
         self._state = state
@@ -224,7 +252,12 @@ class QFrameItem(QGraphicsRectItem):
         self._thumb = thumb
         self._ws_uuid = workspace_uuid
         self._doc_uuid = document_uuid
-        # FIXME: set painter to make curved outline corners
+        pen, brush = track.default_frame_pen_brush
+        if pen:
+            self.setPen(pen)
+        if brush:
+            self.setBrush(brush)
+        self.setParentItem(track)
 
 
 class TestWindow(QMainWindow):
@@ -295,7 +328,29 @@ class TestWindow(QMainWindow):
 
 
 def _test_populate(scene: QFramesInTracksScene):
-    pass
+    """
+    test populate a scene
+    Args:
+        scene: scene to populate
+
+    Returns: collection of items placed in scene, such that they can remain retained (else they drop out of scene)
+    """
+    from uuid import uuid1 as uuidgen
+    once = datetime.utcnow()
+    wuuid = uuidgen()
+    min15 = timedelta(minutes=5)
+    abitrack = QTrackItem(scene, 0, "G21 ABI B99 BT", "test track", None, "peremptorily cromulent", None)
+    # scene.addItem(abitrack)  # done in init
+    frame1 = QFrameItem(abitrack, TimelineFrameState.AVAILABLE, once+min15, min15, "frame1", "fulldiskimus", workspace_uuid=wuuid)
+    abitrack.update_time_range_from_children()
+    # scene.addItem(frame1)  # done in init
+    blabla = QGraphicsTextItem('abcdcba')
+    font = QFont('White Rabbit')
+    blabla.setFont(font)
+    blabla.setPos(140, 100)
+    scene.addItem(blabla)
+    return [abitrack, frame1, blabla]
+
 
 class tests(unittest.TestCase):
     def setUp(self):
@@ -322,7 +377,7 @@ def main():
     app = QApplication(sys.argv)
 
     scene = QFramesInTracksScene()
-    _test_populate(scene)
+    stuff_not_to_lose = _test_populate(scene)
     window = TestWindow(scene)
     window.show()
     window.setFocus()
