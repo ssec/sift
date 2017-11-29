@@ -29,8 +29,9 @@ from uuid import UUID
 from collections import namedtuple
 from enum import Enum
 from datetime import datetime, timedelta
-from PyQt4.QtCore import QObject, QRectF
+from PyQt4.QtCore import QObject, QRectF, Qt
 from PyQt4.QtGui import *
+from PyQt4.QtOpenGL import QGLWidget, QGLFormat, QGL
 
 LOG = logging.getLogger(__name__)
 
@@ -93,6 +94,58 @@ class TimelineCoordTransform(QObject):
         return QRectF(aleft, atop, awidth, aheight)
 
 
+class QFramesInTimelinesScene(QGraphicsScene):
+    """
+    QGraphicsScene collecting QTimelineItems collecting QFrameItems.
+    includes a TimelineCoordTransform time-to-X coordinate transform used for generating screen coordinates.
+    """
+    _coords: TimelineCoordTransform = None
+
+    def __init__(self, test_pattern=False):
+        super(QFramesInTimelinesScene, self).__init__()
+        self._coords = TimelineCoordTransform()
+
+    @property
+    def coords(self):
+        return self._coords
+
+    def calc_frame_rect(self, ztd: ztdtup=None, z:int=0, t: datetime=None, d: timedelta=None):
+        raise NotImplementedError("FIXME") # FIXME
+
+
+class QTimelineItem(QGraphicsRectItem):
+    """
+    A Group of Frames corresponding to a timeline
+    This allows drag and drop of timelines to be easier
+
+    """
+    # ref: http://doc.qt.io/qt-4.8/qgraphicsitemgroup.html
+    _scene: QFramesInTimelinesScene = None
+    _z: int = None
+    _title: str = None
+    _subtitle: str = None
+    _icon: QImage = None   # e.g. whether it's algebraic or RGB
+    _tooltip: str = None
+    _color: QColor = None
+    _selected: bool = False
+    _colormap: [QGradient, QImage] = None
+    _min: float = None
+    _max: float = None
+
+    def calc_frame_rect_in_timeline(self, ztd: ztdtup=None, z:int=0, t: datetime=None, d: timedelta=None):
+        """
+        calculate frame rect within scene
+        Returns: QRectF
+        """
+        if ztd is None:
+            ztd = ztdtup(z, t, d)
+        return self._scene.calc_rect(z=ztd.z, t=ztd.t, d=ztd.d)
+
+    def calc_timeline_rect_in_scene(self, ztd: ztdtup=None, z:int=0, t: datetime=None, d: timedelta=None):
+        """
+
+        """
+
 class QFrameItem(QGraphicsRectItem):
     """
     QGraphicsView representation of a data frame, with a start and end time relative to the scene.
@@ -132,58 +185,6 @@ class QFrameItem(QGraphicsRectItem):
         # FIXME: set painter to make curved outline corners
 
 
-class QTimelineItem(QGraphicsRectItem):
-    """
-    A Group of Frames corresponding to a timeline
-    This allows drag and drop of timelines to be easier
-
-    """
-    # ref: http://doc.qt.io/qt-4.8/qgraphicsitemgroup.html
-    _scene: QFramesInTimelinesScene = None
-    _z: int = None
-    _title: str = None
-    _subtitle: str = None
-    _icon: QImage = None   # e.g. whether it's algebraic or RGB
-    _tooltip: str = None
-    _color: QColor = None
-    _selected: bool = False
-    _colormap: [QGradient, QImage] = None
-    _min: float = None
-    _max: float = None
-
-    def calc_frame_rect_in_timeline(self, ztd: ztdtup=None, z:int=0, t: datetime=None, d: timedelta=None):
-        """
-        calculate frame rect within scene
-        Returns: QRectF
-        """
-        if ztd is None:
-            ztd = ztdtup(z, t, d)
-        return self._scene.calc_rect(z=ztd.z, t=ztd.t, d=ztd.d)
-
-    def calc_timeline_rect_in_scene(self, ztd: ztdtup=None, z:int=0, t: datetime=None, d: timedelta=None):
-        """
-
-        """
-
-
-
-class QFramesInTimelinesScene(QGraphicsScene):
-    """
-    QGraphicsScene collecting QTimelineItems collecting QFrameItems.
-    includes a TimelineCoordTransform time-to-X coordinate transform used for generating screen coordinates.
-    """
-    _coords: TimelineCoordTransform = None
-
-    def __init__(self, test_pattern=False):
-        super(QFramesInTimelinesScene, self).__init__()
-        self._coords = TimelineCoordTransform()
-
-    @property
-    def coords(self):
-        return self._coords
-
-    def calc_frame_rect(self, ztd: ztdtup=None, z:int=0, t: datetime=None, d: timedelta=None):
-        raise NotImplementedError("FIXME") # FIXME
 
 
 
@@ -193,6 +194,71 @@ class tests(unittest.TestCase):
 
     def test_something(self):
         pass
+
+class TestWindow(QMainWindow):
+    _scene = None
+    _gfx = None
+
+    def __init__(self, scene, *args, **kwargs):
+        super(TestWindow, self).__init__(*args, **kwargs)
+        # self.windowTitleChanged.connect(self.onWindowTitleChange)
+        self.setWindowTitle("timeline unit test")
+
+        # toolbar = QToolBar("och")
+        # toolbar.setIconSize(QSize(20,20))
+        # self.addToolBar(toolbar)
+
+        # button_action = QAction(QIcon("balance.png"), "ochtuse", self)
+        # button_action.setStatusTip("och, just do something")
+        # button_action.triggered.connect(self.onMyToolBarButtonClick)
+        # button_action.setCheckable(True)
+        # # button_action.setShortcut(QKeySequence("Ctrl+p"))
+        # # button_action.setShortcut(QKeySequence(Qt.CTRL + Qt.Key_P))
+        # button_action.setShortcut(QKeySequence.Print)
+        # toolbar.addAction(button_action)
+        # toolbar.addWidget(QLabel("OCH"))
+        # toolbar.addWidget(QCheckBox())
+
+        self.setStatusBar(QStatusBar(self))
+
+        menu = self.menuBar()
+
+        file_menu = menu.addMenu("&File")
+        # file_menu.addAction(button_action)
+        # file_menu.addSeparator()
+        file_menu.addMenu("Do not push")
+#        file_menu.addAction()
+
+        self._scene = scene
+        gfx = self._gfx = QGraphicsView(self)
+        # label = QLabel("och!")
+        # label.setAlignment(Qt.AlignCenter)
+
+        # ref https://doc.qt.io/archives/qq/qq26-openglcanvas.html
+        self.setCentralWidget(gfx)
+        fmt = QGLFormat(QGL.SampleBuffers)
+        wdgt = QGLWidget(fmt)
+        assert(wdgt.isValid())
+        gfx.setViewport(wdgt)
+        gfx.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
+        gfx.setScene(scene)
+
+        # populate fills the scene with interesting stuff.
+        # self.populate()
+
+        # Make it bigger
+        self.setWindowState(Qt.WindowMaximized)
+
+        # Well... it's going to have an animation, ok?
+
+        # So, I set a timer to 1 second
+        # self.animator=QTimer()
+
+        # And when it triggers, it calls the animate method
+        # self.animator.timeout.connect(self.animate)
+
+        # And I animate it once manually.
+        # self.animate()
 
 
 def _debug(type, value, tb):
@@ -207,31 +273,15 @@ def _debug(type, value, tb):
 
 
 def main():
-    import argparse
-    parser = argparse.ArgumentParser(
-        description="PURPOSE",
-        epilog="",
-        fromfile_prefix_chars='@')
-    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG')
-    parser.add_argument('-d', '--debug', dest='debug', action='store_true',
-                        help="enable interactive PDB debugger on exception")
-    parser.add_argument('inputs', nargs='*',
-                        help="input files to process")
-    args = parser.parse_args()
+    logging.basicConfig(level=logging.DEBUG)
 
-    levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
-    logging.basicConfig(level=levels[min(3, args.verbosity)])
+    app = QApplication(sys.argv)
 
-    if args.debug:
-        sys.excepthook = _debug
+    scene = QFramesInTimelinesScene(test_pattern=True)
+    window = TestWindow(scene)
+    window.show()
 
-    if not args.inputs:
-        unittest.main()
-        return 0
-
-    for pn in args.inputs:
-        pass
+    app.exec_()
 
     return 0
 
