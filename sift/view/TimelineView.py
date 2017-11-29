@@ -27,6 +27,7 @@ import os, sys
 import logging, unittest
 from uuid import UUID
 from collections import namedtuple
+from typing import Tuple
 from enum import Enum
 from datetime import datetime, timedelta
 from PyQt4.QtCore import QObject, QRectF, Qt
@@ -62,17 +63,35 @@ class TimelineCoordTransform(QObject):
     QFrameItems coordinates are relative to their QTimelineItem parent and (for now) are z=0
         When we have expandable RGB timelines this will change
     """
-    _base: datetime = None
-    _per_pixel: timedelta = None
-    _timeline_height: float = None
+    _time_base: datetime = None
+    _time_unit: timedelta = None
+    _track_height: float = None
 
-    def __init__(self, time_base: datetime = None, pixel_time_width: timedelta = timedelta(seconds=1), timeline_height=DEFAULT_TIMELINE_HEIGHT):
+    def __init__(self, time_base: datetime = None, time_unit: timedelta = timedelta(seconds=1), track_height=DEFAULT_TIMELINE_HEIGHT):
+        """
+
+        Args:
+            time_base: "zero" value of time; defaults to now UTC as this is somewhat arbitrary
+            time_unit: time width corresponding to delta-X=1.0, defaults to 1.0s
+            track_height: pixels high to display individual ttracks
+        """
         super(TimelineCoordTransform, self).__init__()
-        self._base = time_base
-        self._per_pixel = pixel_time_width
-        self._timeline_height = timeline_height
+        self._time_base = time_base or datetime.utcnow()
+        self._time_unit = time_unit
+        self._track_height = track_height
 
+    def calc_time_duration(self, scene_x: float, scene_w: float) -> Tuple[datetime, timedelta]:
+        """
+        calculate time and duration given scene X coordinate and width (from QRectF typically)
+        Args:
+            scene_x: x position relative to scene
+            scene_w: width within scene
 
+        Returns:
+            (start time, time width)
+
+        """
+        return self._time_base + (self._time_unit * scene_x), self._time_unit * scene_w
 
     def calc_rect(self, ztd: ztdtup=None, z:int=None, t: datetime=None, d: timedelta=None) -> [QRectF, None]:
         """
@@ -81,56 +100,69 @@ class TimelineCoordTransform(QObject):
             ztd: z,time,duration tuple
         Returns: QRectF relative to parent (typically either scene or timeline), None if no base or scale is known
         """
-        if self._base is None or self._per_pixel is None:
+        if self._time_base is None or self._time_unit is None:
             LOG.warning("cannot calculate timeline rectangle without a base")
             return None
         if ztd is None:
             ztd = ztdtup(z, t, d)
         assert(ztd.z >= 0)
-        atop = float(ztd.z) * self._timeline_height
-        aheight = self._timeline_height
-        aleft = (ztd.t - self._base) / self._per_pixel
-        awidth = ztd.d / self._per_pixel
+        atop = float(ztd.z) * self._track_height
+        aheight = self._track_height
+        aleft = (ztd.t - self._time_base) / self._time_unit
+        awidth = ztd.d / self._time_unit
         return QRectF(aleft, atop, awidth, aheight)
 
 
-class QFramesInTimelinesScene(QGraphicsScene):
+class QFramesInTracksScene(QGraphicsScene):
     """
     QGraphicsScene collecting QTimelineItems collecting QFrameItems.
     includes a TimelineCoordTransform time-to-X coordinate transform used for generating screen coordinates.
     """
     _coords: TimelineCoordTransform = None
 
-    def __init__(self, test_pattern=False):
-        super(QFramesInTimelinesScene, self).__init__()
+    def __init__(self):
+        super(QFramesInTracksScene, self).__init__()
         self._coords = TimelineCoordTransform()
 
     @property
     def coords(self):
         return self._coords
 
-    def calc_frame_rect(self, ztd: ztdtup=None, z:int=0, t: datetime=None, d: timedelta=None):
-        raise NotImplementedError("FIXME") # FIXME
 
 
-class QTimelineItem(QGraphicsRectItem):
+class QTrackItem(QGraphicsRectItem):
     """
     A Group of Frames corresponding to a timeline
     This allows drag and drop of timelines to be easier
 
     """
-    # ref: http://doc.qt.io/qt-4.8/qgraphicsitemgroup.html
-    _scene: QFramesInTimelinesScene = None
+    _scene: QFramesInTracksScene = None
     _z: int = None
     _title: str = None
     _subtitle: str = None
-    _icon: QImage = None   # e.g. whether it's algebraic or RGB
+    _icon: QIcon = None   # e.g. whether it's algebraic or RGB
     _tooltip: str = None
     _color: QColor = None
     _selected: bool = False
     _colormap: [QGradient, QImage] = None
     _min: float = None
     _max: float = None
+
+    def __init__(self, scene: QFramesInTracksScene, z: int,
+                 title: str, subtitle: str = None, icon: QIcon = None,
+                 tooltip: str = None, color: QColor = None, selected: bool = False,
+                 colormap: [QGradient, QImage] = None, min: float = None, max: float = None):
+        self._scene = scene
+        self._z = z
+        self._title = title
+        self._subtitle = subtitle
+        self._icon = icon
+        self._tooltip = tooltip
+        self._color = color
+        self._selected = selected
+        self._colormap = colormap
+        self._min, self._max = min, max
+
 
     def calc_frame_rect_in_timeline(self, ztd: ztdtup=None, z:int=0, t: datetime=None, d: timedelta=None):
         """
@@ -139,7 +171,7 @@ class QTimelineItem(QGraphicsRectItem):
         """
         if ztd is None:
             ztd = ztdtup(z, t, d)
-        return self._scene.calc_rect(z=ztd.z, t=ztd.t, d=ztd.d)
+        return self._scene.coords.calc_rect(z=ztd.z, t=ztd.t, d=ztd.d)
 
     def calc_timeline_rect_in_scene(self, ztd: ztdtup=None, z:int=0, t: datetime=None, d: timedelta=None):
         """
@@ -152,6 +184,7 @@ class QFrameItem(QGraphicsRectItem):
     Essentially a frame sprite
     """
     _state: TimelineFrameState = None
+    _track: QTrackItem = None
     # some frames are in-document, some are in-workspace, some are both
     _ws_uuid: UUID = None
     _doc_uuid: UUID = None
@@ -159,15 +192,16 @@ class QFrameItem(QGraphicsRectItem):
     _duration: timedelta = None
     _title: str = None
     _subtitle: str = None
+    _thumb: QImage = None
 
-    def __init__(self, timeline: QTimelineItem,
+    def __init__(self, track: QTrackItem,
                  state: TimelineFrameState, start: datetime, duration: timedelta,
                  title: str, subtitle: str=None, thumb=None,
                  workspace_uuid=None, document_uuid=None):
         """
         create a frame representation and add it to a timeline
         Args:
-            timeline: which timeline to add it to
+            track: which timeline to add it to
             state: initial state
             start: frame start time
             duration: frame duration
@@ -178,28 +212,26 @@ class QFrameItem(QGraphicsRectItem):
             document_uuid: UUID of document representation (backed by composition/presentation of other content); may be None
         """
         super(QFrameItem, self).__init__()
-        self.setParentItem(timeline)
-        rect = timeline.calc_frame_rect_in_timeline(t=start, d=duration)
+        self.setParentItem(track)
+        rect = track.calc_frame_rect_in_timeline(t=start, d=duration)
         if rect is not None:
             self.setRect(rect)
+        self._state = state
+        self._start = start
+        self._duration = duration
+        self._title = title
+        self._subtitle = subtitle
+        self._thumb = thumb
+        self._ws_uuid = workspace_uuid
+        self._doc_uuid = document_uuid
         # FIXME: set painter to make curved outline corners
 
-
-
-
-
-class tests(unittest.TestCase):
-    def setUp(self):
-        pass
-
-    def test_something(self):
-        pass
 
 class TestWindow(QMainWindow):
     _scene = None
     _gfx = None
 
-    def __init__(self, scene, *args, **kwargs):
+    def __init__(self, scene: QFramesInTracksScene, *args, **kwargs):
         super(TestWindow, self).__init__(*args, **kwargs)
         # self.windowTitleChanged.connect(self.onWindowTitleChange)
         self.setWindowTitle("timeline unit test")
@@ -241,13 +273,14 @@ class TestWindow(QMainWindow):
         assert(wdgt.isValid())
         gfx.setViewport(wdgt)
         gfx.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
+        scene.setSceneRect(QRectF(0,0, 800, 600))
         gfx.setScene(scene)
 
         # populate fills the scene with interesting stuff.
         # self.populate()
 
         # Make it bigger
-        self.setWindowState(Qt.WindowMaximized)
+        # self.setWindowState(Qt.WindowMaximized)
 
         # Well... it's going to have an animation, ok?
 
@@ -259,6 +292,17 @@ class TestWindow(QMainWindow):
 
         # And I animate it once manually.
         # self.animate()
+
+
+def _test_populate(scene: QFramesInTracksScene):
+    pass
+
+class tests(unittest.TestCase):
+    def setUp(self):
+        pass
+
+    def test_something(self):
+        pass
 
 
 def _debug(type, value, tb):
@@ -277,9 +321,11 @@ def main():
 
     app = QApplication(sys.argv)
 
-    scene = QFramesInTimelinesScene(test_pattern=True)
+    scene = QFramesInTracksScene()
+    _test_populate(scene)
     window = TestWindow(scene)
     window.show()
+    window.setFocus()
 
     app.exec_()
 
