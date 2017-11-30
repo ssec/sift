@@ -836,10 +836,15 @@ class Main(QtGui.QMainWindow):
         toggle_point.setShortcut('X')
         toggle_point.triggered.connect(lambda: self.graphManager.toggle_point_probe(DEFAULT_POINT_PROBE))
 
+        open_gradient = QtGui.QAction("Toggle Gradient Editor", self)
+        open_gradient.setShortcut("Ctrl+E")
+        open_gradient.triggered.connect(lambda: self.document.openGradientWidget())
+
         edit_menu = menubar.addMenu('&Edit')
         edit_menu.addAction(remove)
         edit_menu.addAction(clear)
         edit_menu.addAction(toggle_point)
+        edit_menu.addAction(open_gradient)
 
         layer_menu = menubar.addMenu('&Layer')
         layer_menu.addAction(composite)

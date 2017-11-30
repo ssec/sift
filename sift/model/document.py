@@ -56,6 +56,7 @@ between subsystems. Document rarely deals directly with content.
 :license: GPLv3, see LICENSE for more details
 """
 from sift.model.layer import Mixing, DocLayer, DocBasicLayer, DocRGBLayer
+from sift.ui.GradientControl import GradientControl
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -359,6 +360,15 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 self.current_projection,
                 self.projection_info(self.current_projection)
             )
+
+    gc = None
+
+    def openGradientWidget(self):
+        print("Opening..")
+
+        self.gc = GradientControl(self)
+        self.gc.show()
+        print("Done!")
 
     def current_projection_index(self):
         return list(self.available_projections.keys()).index(self.current_projection)

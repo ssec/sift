@@ -1,5 +1,5 @@
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtGui
+from PyQt4 import QtGui, QtCore
 import json
 import os
 import math
@@ -78,6 +78,7 @@ class GradientControl(QtGui.QDialog):
 
         self.updateListWidget()
 
+
         l.addWidget(self.ImportButton, 0, 0)
         l.addWidget(self.sqrt, 1, 2)
         l.addWidget(self.ColorBar, 2, 1)
@@ -87,6 +88,16 @@ class GradientControl(QtGui.QDialog):
         l.addWidget(self.ExportButton, 2, 2)
         l.addWidget(self.DeleteButton, 3, 0)
         l.addWidget(self.UpdateMapButton, 2, 0)
+
+        for map in ALL_COLORMAPS:
+            if ALL_COLORMAPS[map].colors and (hasattr(ALL_COLORMAPS[map], "_controls")):
+                self.importGradients(map, ALL_COLORMAPS[map].colors.hex, ALL_COLORMAPS[map]._controls)
+
+                print("Imported Gradient!")
+            else:
+                print("Skipping: " + map)
+                print("Type: " + str(type(ALL_COLORMAPS[map])))
+
 
     def updateButtonClick(self):
         self.autoImportData[self.List.item(self.List.currentRow()).text()] = self.ColorBar.saveState()
@@ -111,7 +122,7 @@ class GradientControl(QtGui.QDialog):
             print(ALL_COLORMAPS[item].colors.hex)
             print(numpy.array(hex))
             print("\n")
-            print(ALL_COLORMAPS[item].colors.value)
+            print(ALL_COLORMAPS[item]._controls)
             print(floats)
             print("\n")
             try:
