@@ -438,6 +438,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         return self.activate_product_uuid_as_new_layer(uuid, insert_before=insert_before)
 
     def activate_product_uuid_as_new_layer(self, uuid: UUID, insert_before=0):
+        if uuid in self._layer_with_uuid:
+            LOG.debug("Layer already loaded: {}".format(uuid))
+            active_content_data = self._workspace.import_product_content(uuid)
+            return uuid, self[uuid], active_content_data
+
         # FUTURE: Load this async, the slots for the below signal need to be OK with that
         active_content_data = self._workspace.import_product_content(uuid)
         # updated metadata with content information (most importantly nav information)
@@ -557,6 +562,62 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             default_clim = self._layer_with_uuid[p.uuid][INFO.CLIM]
             yield ((p.climits[1] - p.climits[0]) > 0) != ((default_clim[1] - default_clim[0]) > 0)
 
+    def _get_equalizer_values_image(self, lyr, pinf, xy_pos):
+        value = self._workspace.get_content_point(pinf.uuid, xy_pos)
+        unit_info = lyr[INFO.UNIT_CONVERSION]
+        nc, xc = unit_info[1](np.array(pinf.climits))
+        # calculate normalized bar width relative to its current clim
+        new_value = unit_info[1](value)
+        if nc > xc:  # sometimes clim is swapped to reverse color scale
+            nc, xc = xc, nc
+        if np.isnan(new_value):
+            return None
+        else:
+            if xc == nc:
+                bar_width = 0
+            else:
+                bar_width = (np.clip(new_value, nc, xc) - nc) / (xc - nc)
+            return new_value, bar_width, unit_info[2](new_value, numeric=False)
+
+    def _get_equalizer_values_rgb(self, lyr, pinf, xy_pos):
+        # We can show a valid RGB
+        # Get 3 values for each channel
+        # XXX: Better place for this?
+        def _sci_to_rgb(v, cmin, cmax):
+            if np.isnan(v):
+                return None
+
+            if cmin == cmax:
+                return 0
+            elif cmin > cmax:
+                if v > cmin:
+                    v = cmin
+                elif v < cmax:
+                    v = cmax
+            else:
+                if v < cmin:
+                    v = cmin
+                elif v > cmax:
+                    v = cmax
+
+            return int(round(abs(v - cmin) / abs(cmax - cmin) * 255.))
+        values = []
+        for dep_lyr, clims in zip(lyr.l[:3], pinf.climits):
+            if dep_lyr is None:
+                values.append(None)
+            elif clims is None or clims[0] is None:
+                values.append(None)
+            else:
+                value = self._workspace.get_content_point(dep_lyr[INFO.UUID], xy_pos)
+                values.append(_sci_to_rgb(value, clims[0], clims[1]))
+
+        nc = 0
+        xc = 255
+        bar_widths = [(np.clip(value, nc, xc) - nc) / (xc - nc) for value in values if value is not None]
+        bar_width = np.mean(bar_widths) if len(bar_widths) > 0 else 0
+        values = ",".join(["{:3d}".format(v if v is not None else 0) for v in values])
+        return values, bar_width, values
+
     def update_equalizer_values(self, probe_name, state, xy_pos, uuids=None):
         """user has clicked on a point probe; determine relative and absolute values for all document image layers
         """
@@ -571,61 +632,15 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             uuids = [(pinf.uuid, pinf) for pinf in self.prez_for_uuids(uuids)]
         zult = {}
         for uuid, pinf in uuids:
-            lyr = self._layer_with_uuid[pinf.uuid]
-            if lyr[INFO.KIND] in [KIND.IMAGE, KIND.COMPOSITE]:
-                value = self._workspace.get_content_point(pinf.uuid, xy_pos)
-                unit_info = lyr[INFO.UNIT_CONVERSION]
-                nc, xc = unit_info[1](np.array(pinf.climits))
-                # calculate normalized bar width relative to its current clim
-                new_value = unit_info[1](value)
-                if nc > xc:  # sometimes clim is swapped to reverse color scale
-                    nc, xc = xc, nc
-                if np.isnan(new_value):
-                    zult[pinf.uuid] = None
-                else:
-                    if xc == nc:
-                        bar_width = 0
-                    else:
-                        bar_width = (np.clip(new_value, nc, xc) - nc) / (xc - nc)
-                    zult[pinf.uuid] = (new_value, bar_width, unit_info[2](new_value, numeric=False))
-            elif lyr[INFO.KIND] == KIND.RGB:
-                # We can show a valid RGB
-                # Get 3 values for each channel
-                # XXX: Better place for this?
-                def _sci_to_rgb(v, cmin, cmax):
-                    if np.isnan(v):
-                        return None
-
-                    if cmin == cmax:
-                        return 0
-                    elif cmin > cmax:
-                        if v > cmin:
-                            v = cmin
-                        elif v < cmax:
-                            v = cmax
-                    else:
-                        if v < cmin:
-                            v = cmin
-                        elif v > cmax:
-                            v = cmax
-
-                    return int(round(abs(v - cmin) / abs(cmax - cmin) * 255.))
-                values = []
-                for dep_lyr, clims in zip(lyr.l[:3], pinf.climits):
-                    if dep_lyr is None:
-                        values.append(None)
-                    elif clims is None or clims[0] is None:
-                        values.append(None)
-                    else:
-                        value = self._workspace.get_content_point(dep_lyr[INFO.UUID], xy_pos)
-                        values.append(_sci_to_rgb(value, clims[0], clims[1]))
-
-                nc = 0
-                xc = 255
-                bar_widths = [(np.clip(value, nc, xc) - nc) / (xc - nc) for value in values if value is not None]
-                bar_width = np.mean(bar_widths) if len(bar_widths) > 0 else 0
-                values = ",".join(["{:3d}".format(v if v is not None else 0) for v in values])
-                zult[pinf.uuid] = (values, bar_width, values)
+            try:
+                lyr = self._layer_with_uuid[pinf.uuid]
+                if lyr[INFO.KIND] in [KIND.IMAGE, KIND.COMPOSITE]:
+                    zult[pinf.uuid] = self._get_equalizer_values_image(lyr, pinf, xy_pos)
+                elif lyr[INFO.KIND] == KIND.RGB:
+                    zult[pinf.uuid] = self._get_equalizer_values_rgb(lyr, pinf, xy_pos)
+            except ValueError:
+                LOG.warning("Could not get equalizer values for {}".format(uuid))
+                zult[pinf.uuid] = (0, 0, 0)
 
         self.didCalculateLayerEqualizerValues.emit(zult)  # is picked up by layer list model to update display
 

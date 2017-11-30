@@ -41,7 +41,7 @@ from sift.model.document import DocLayerStack
 from sift.queue import TASK_DOING, TASK_PROGRESS
 from sift.view.ProbeGraphs import DEFAULT_POINT_PROBE
 from sift.view.transform import PROJ4Transform
-from sift.util import get_data_dir
+from sift.util import get_package_data_dir
 
 from PyQt4.QtCore import QObject, pyqtSignal, Qt
 from PyQt4.QtGui import QCursor, QPixmap
@@ -53,7 +53,7 @@ import sys
 import logging
 
 LOG = logging.getLogger(__name__)
-DATA_DIR = get_data_dir()
+DATA_DIR = get_package_data_dir()
 DEFAULT_SHAPE_FILE = os.path.join(DATA_DIR, 'ne_50m_admin_0_countries', 'ne_50m_admin_0_countries.shp')
 DEFAULT_STATES_SHAPE_FILE = os.path.join(DATA_DIR, 'ne_50m_admin_1_states_provinces_lakes', 'ne_50m_admin_1_states_provinces_lakes.shp')
 DEFAULT_TEXTURE_SHAPE = (4, 16)
