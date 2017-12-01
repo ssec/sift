@@ -866,7 +866,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             layer = self._layer_with_uuid[p.uuid]
             if (kinds is not None) and (layer.kind not in kinds):
                 continue
-            if (bands is not None) and (layer.band not in bands):
+            if (bands is not None) and (layer[INFO.BAND] not in bands):
                 continue
             yield (idx, p, layer)
 
@@ -1068,7 +1068,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if not isinstance(kind, (list, tuple)):
             kind = [kind]
         for x in [q for q in self._layer_with_uuid.values() if q.kind in kind]:
-            yield x.uuid, (x.platform, x.instrument, x.sched_time, x.band)
+            yield x.uuid, x.sched_time, x.product_family_key
 
     def _rgb_layer_siblings_uuids(self, master_layer:DocRGBLayer):
         """
@@ -1077,19 +1077,13 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :return: list of uuids, including master layer itself
         """
         siblings = []
-        master_subkey = master_layer.platform, master_layer.instrument, master_layer.band
-        for (uuid,key) in self._directory_of_layers(kind=KIND.RGB):
-            subkey = (key[0], key[1], key[3])
-            if subkey==master_subkey:
-                siblings.append((key[2], uuid))
+        master_famkey = master_layer.product_family_key
+        for uuid, sched_time, sibling_key in self._directory_of_layers(kind=KIND.RGB):
+            if sibling_key == master_famkey:
+                siblings.append((sched_time, uuid))
         siblings.sort()
         LOG.debug('found RGB siblings %s' % repr(siblings))
         return [uu for time,uu in siblings]
-
-    # def _propagate_clims_to_rgb_similars(self, master_layer:DocRGBLayer, clims:tuple, inclusive=True):
-    #     to_update = [x for x in self._rgb_layer_siblings(master_layer) if x != master_layer.uuid]
-    #     LOG.debug('updating %d RGB layer clims' % len(to_update))
-    #     self.change_rgb_clims(clims, to_update)
 
     def _propagate_matched_rgb_components(self, master_layer, sibling_layers):
         """
@@ -1102,8 +1096,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """
         # FUTURE: consolidate/promote commonalities with loop_rgb_layers_following
         # build a directory of image layers to draw from
-        building_blocks = dict((key,uuid) for (uuid,key) in self._directory_of_layers(kind=[KIND.IMAGE, KIND.COMPOSITE]))
-        plat, inst, band = master_layer.platform, master_layer.instrument, master_layer.band
+        building_blocks = dict(((sched_time, key), uuid) for uuid, sched_time, key in self._directory_of_layers(kind=[KIND.IMAGE, KIND.COMPOSITE]))
+        master_famkeys = master_layer.product_family_keys()
         did_change = []
         for sibling in sibling_layers:
             if isinstance(sibling, UUID):
@@ -1111,10 +1105,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             if sibling.uuid == master_layer.uuid:
                 continue
             change_these = {}
-            for mb,sb,b in zip(band, sibling.band, 'rgb'):
-                if mb==sb:
+            for mk, sk, b in zip(master_famkeys, sibling.product_family_keys(), 'rgb'):
+                if mk == sk:
                     continue
-                key_we_want = (plat, inst, sibling.sched_time, mb)
+                key_we_want = (sibling.sched_time, mk)
                 new_uuid = building_blocks.get(key_we_want, None)
                 change_these[b] = self._layer_with_uuid[new_uuid]
             if not change_these:
@@ -1146,7 +1140,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             return
 
         # build a directory of image layers to draw from
-        building_blocks = dict((key,uuid) for (uuid,key) in self._directory_of_layers(kind=[KIND.IMAGE, KIND.COMPOSITE]))
+        building_blocks = dict(((sched_time, key), uuid) for uuid, sched_time, key in self._directory_of_layers(kind=[KIND.IMAGE, KIND.COMPOSITE]))
+        already_have = dict(((sched_time, key), uuid) for uuid, sched_time, key in self._directory_of_layers(kind=KIND.RGB))
 
         # find the list of loaded timesteps
         loaded_timesteps = set(x.sched_time for x in self._layer_with_uuid.values())
@@ -1157,41 +1152,38 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         sequence = [(master.sched_time, master.uuid)]
 
         # build a directory of RGB layers we already have
-        already_have = dict((key,uuid) for (uuid,key) in self._directory_of_layers(kind=KIND.RGB))
         to_build, to_make_invisible = [], []
         # figure out what layers we can build matching pattern, using building blocks
-        rband, gband, bband = master.band[:3]
-        plat, inst, sched_time = master.platform, master.instrument, master.sched_time
+        master_famkeys = master.product_family_keys()
         for step in loaded_timesteps:
-            if step==sched_time:
+            if step == master.sched_time:
                 continue
-            preexisting_layer_uuid = already_have.get((plat, inst, step, master.band), None)
+            preexisting_layer_uuid = already_have.get((step, master.product_family_key), None)
             if preexisting_layer_uuid:
                 sequence.append((step, preexisting_layer_uuid))
                 continue
             LOG.debug('assessing %s' % step)
             # look for the bands
-            r = building_blocks.get((plat, inst, step, rband), None)
-            g = building_blocks.get((plat, inst, step, gband), None)
-            b = building_blocks.get((plat, inst, step, bband), None)
+            r = building_blocks.get((step, master_famkeys[0]), None)
+            g = building_blocks.get((step, master_famkeys[1]), None)
+            b = building_blocks.get((step, master_famkeys[2]), None)
             if r or g or b:
-                to_build.append((step,r,g,b))
-                to_make_invisible.extend([r,g,b])
-                LOG.info('will build RGB from r=%s g=%s b=%s' % (r,g,b))
+                to_build.append((step, r, g, b))
+                to_make_invisible.extend([r, g, b])
+                LOG.info('will build RGB from r=%s g=%s b=%s' % (r, g, b))
             else:
                 LOG.info("no complete RGB could be made for %s" % step)
 
         # build new RGB layers
         if create_additional_layers:
             LOG.info('creating %d additional RGB layers from loaded image layers' % len(to_build))
-            for (when,r,g,b) in to_build:
-                # rl,gl,bl = self._layer_with_uuid[r], self._layer_with_uuid[g], self._layer_with_uuid[b]
+            for when, r, g, b in to_build:
                 new_layer = self.create_rgb_composite(r, g, b)
                 sequence.append((when, new_layer.uuid))
 
         if force_color_limits:
             pinfo = self.prez_for_uuid(master.uuid)
-            self.change_rgbs_clims(pinfo.climits, (uu for _, uu in sequence))
+            self.change_rgbs_clims(pinfo.climits, list(uu for _, uu in sequence))
 
         if make_contributing_layers_invisible:
             buhbye = set(to_make_invisible)
