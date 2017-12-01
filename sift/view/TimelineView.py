@@ -12,7 +12,24 @@ Assume X coordinate corresponds to seconds, apply transforms as needed
 - Timelines can be dragged and dropped to change their Z order, similar to layer list but including multiple Frames
 - Frames represent individual visible dataset/image
 - Frames may exist in the application only as metadata and can be in multiple states depending on user direction:
--
+
+# ACTIONS to support
+- drag a track up or down the z order
+- pop a context menu for a track or a frame
+- tool tips for frames or 
+- change display state of frame, represented by color
+- allow one or more tracks to be selected 
+- allow one or more frames to be selected
+- scroll left and right to follow playback animation in background
+- display movable and live-updated time cursor, including highlighting borders of frames under time cursor
+- display time axis with actual dates and times, including click-to-place 
+- permit dragging of colorbars between layers
+- permit dragging of colorbars off an external palette
+- allow selection of tracks and frames using metadata matching
+- allow disable/enable of frames 
+- allow circulation of z-order using up/down arrow keys
+- allow sorting of tracks based on metadata characteristics
+- 
 
 REFERENCES
 http://pyqt.sourceforge.net/Docs/PyQt4/qgraphicsscene.html#details
