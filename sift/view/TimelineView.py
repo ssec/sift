@@ -27,7 +27,7 @@ import os, sys
 import logging, unittest
 from uuid import UUID
 from collections import namedtuple
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Mapping
 from enum import Enum
 from datetime import datetime, timedelta
 from PyQt4.QtCore import QObject, QRectF, Qt
@@ -151,6 +151,12 @@ class QFramesInTracksScene(QGraphicsScene):
     def coords(self):
         return self._coords
 
+    def select_tracks_by_metadata(self, key, value):
+        raise NotImplementedError("NYI")
+        
+    def select_frames_by_metadata(self, key, value):
+        raise NotImplementedError("NYI")
+
     @property
     def default_track_pen_brush(self) -> Tuple[Optional[QPen], Optional[QBrush]]:
         return self._track_pen_brush
@@ -158,21 +164,19 @@ class QFramesInTracksScene(QGraphicsScene):
     @property
     def default_frame_pen_brush(self) -> Tuple[Optional[QPen], Optional[QBrush]]:
         return self._frame_pen_brush
-
-
-
+        
+    
 
 class QTrackItem(QGraphicsRectItem):
-    """
-    A Group of Frames corresponding to a timeline
+    """ A group of Frames corresponding to a timeline
     This allows drag and drop of timelines to be easier
-
     """
     _scene: QFramesInTracksScene = None
     _z: int = None
     _title: str = None
     _subtitle: str = None
     _icon: QIcon = None   # e.g. whether it's algebraic or RGB
+    _metadata: Mapping = None  # arbitrary key-value store for selecting by metadata; in our case this often includes item family for seleciton
     _tooltip: str = None
     _color: QColor = None
     _selected: bool = False
@@ -183,7 +187,7 @@ class QTrackItem(QGraphicsRectItem):
     _right_pad: timedelta = timedelta(minutes=5)
 
     def __init__(self, scene: QFramesInTracksScene, z: int,
-                 title: str, subtitle: str = None, icon: QIcon = None,
+                 title: str, subtitle: str = None, icon: QIcon = None, metadata: dict = None,
                  tooltip: str = None, color: QColor = None, selected: bool = False,
                  colormap: [QGradient, QImage] = None, min: float = None, max: float = None):
         super(QTrackItem, self).__init__()
@@ -192,6 +196,7 @@ class QTrackItem(QGraphicsRectItem):
         self._title = title
         self._subtitle = subtitle
         self._icon = icon
+        self._metadata = metadata or {}
         self._tooltip = tooltip
         self._color = color
         self._selected = selected
@@ -230,7 +235,8 @@ class QTrackItem(QGraphicsRectItem):
 
 
 class QFrameItem(QGraphicsRectItem):
-    """
+    """A Frame
+    For SIFT use, this corresponds to a single Product or single composite of multiple Products (e.g. RGB composite)
     QGraphicsView representation of a data frame, with a start and end time relative to the scene.
     Essentially a frame sprite
     """
@@ -244,13 +250,13 @@ class QFrameItem(QGraphicsRectItem):
     _title: str = None
     _subtitle: str = None
     _thumb: QImage = None
+    _metadata: Mapping = None
 
     def __init__(self, track: QTrackItem,
                  state: TimelineFrameState, start: datetime, duration: timedelta,
-                 title: str, subtitle: str=None, thumb=None,
+                 title: str, subtitle: str=None, thumb: QImage=None, metaedata: Mapping = None, 
                  workspace_uuid=None, document_uuid=None):
-        """
-        create a frame representation and add it to a timeline
+        """create a frame representation and add it to a timeline
         Args:
             track: which timeline to add it to
             state: initial state
@@ -272,6 +278,7 @@ class QFrameItem(QGraphicsRectItem):
         self._title = title
         self._subtitle = subtitle
         self._thumb = thumb
+        self._metadata = metadata
         self._ws_uuid = workspace_uuid
         self._doc_uuid = document_uuid
         pen, brush = track.default_frame_pen_brush
