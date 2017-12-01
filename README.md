@@ -6,7 +6,7 @@ support scientists during forecaster training events. It provides a graphical
 interface for visualization and basic analysis of geostationary satellite data.
 
 The Project Wiki and Git repository can be accessed at
-https://gitlab.ssec.wisc.edu/rayg/CSPOV/wikis/home.
+https://gitlab.ssec.wisc.edu/SIFT/sift/wikis/home.
 
 SIFT is built on open source technologies like Python, OpenGL, and PyQt4. It
 can be run from Mac, Windows, and Linux.
