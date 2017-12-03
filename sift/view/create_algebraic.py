@@ -94,10 +94,28 @@ class CreateAlgebraicDialog(QtGui.QDialog):
         for idx, combo in enumerate(self.layer_combos):
             combo.setDisabled(idx >= num_layers)
 
+        self._validate()
+
     def _validate(self, *args, **kwargs):
+        # TODO: If it has the same name, raise exception
         valid_name = bool(self.ui.layer_name_edit.text())
+
+        # Check that layer choices are valid
+        valid_choices = True
+        if self.ui.operations_text.isEnabled():
+            # is custom operation
+            if all(x.itemData(x.currentIndex()) is None for x in self.layer_combos):
+                valid_choices = False
+        else:
+            operation = self.ui.operation_combo.currentText()
+            op_formula, num_layers = PRESET_OPERATIONS.get(operation, (None, 3))
+            for idx, c in enumerate(self.layer_combos):
+                if idx < num_layers and c.itemData(c.currentIndex()) is None:
+                    valid_choices = False
+                    break
+
         ok_button = self.ui.buttons.button(QtGui.QDialogButtonBox.Ok)
-        if valid_name:
+        if valid_name and valid_choices:
             ok_button.setDisabled(False)
         else:
             ok_button.setDisabled(True)
@@ -107,11 +125,19 @@ class CreateAlgebraicDialog(QtGui.QDialog):
             c.addItem(short_name, uuid)
             if select_uuid and short_name == select_uuid:
                 c.setCurrentIndex(idx)
+        c.addItem("<None>", None)
 
     def _create_algebraic(self):
         new_name = self.ui.layer_name_edit.text()
         namespace = {}
         for name, combo in self.layer_combos_names:
+            if not combo.isEnabled():
+                # operation doesn't use it
+                continue
+            data = combo.itemData(combo.currentIndex())
+            if data is None:
+                # custom operation doesn't use it
+                continue
             namespace[name] = combo.itemData(combo.currentIndex())
         operations = self.ui.operations_text.toPlainText()
         info = {
