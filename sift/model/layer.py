@@ -60,6 +60,11 @@ class DocLayer(ChainMap):
         super(DocLayer, self).__init__(self._user_modified, self._additional, self._definitive)
 
     @property
+    def product_family_key(self):
+        """Unique key for this layer and its group of siblings"""
+        return self.platform, self.instrument, self.dataset_name
+
+    @property
     def parent(self):
         """
         parent layer, if any
@@ -181,12 +186,15 @@ class DocRGBLayer(DocCompositeLayer):
     @property
     def r(self):
         return self.l[0]
+
     @property
     def g(self):
         return self.l[1]
+
     @property
     def b(self):
         return self.l[2]
+
     @property
     def a(self):
         return self.l[3]
@@ -194,15 +202,27 @@ class DocRGBLayer(DocCompositeLayer):
     @r.setter
     def r(self, x):
         self.l[0] = x
+
     @g.setter
     def g(self, x):
         self.l[1] = x
+
     @b.setter
     def b(self, x):
         self.l[2] = x
+
     @a.setter
     def a(self, x):
         self.l[3] = x
+
+    def dep_info(self, key, include_alpha=False):
+        max_idx = 4 if include_alpha else 3
+        return [x.get(key) for x in self.l[:max_idx]]
+
+    def product_family_keys(self, include_alpha=False):
+        max_idx = 4 if include_alpha else 3
+        gb = lambda l: None if (l is None) else l.product_family_key
+        return [gb(x) for x in self.l[:max_idx]]
 
     @property
     def has_deps(self):
@@ -378,10 +398,11 @@ class DocRGBLayer(DocCompositeLayer):
                 ds_info[INFO.CLIM] = tuple((existing or upclim(upstream)) for (existing,upstream) in zip(old_clim, dep_info))
 
         self.update(ds_info)
-        if not self.shared_projections:
-            LOG.warning("RGB dependency layers don't share the same projection")
-        if not self.shared_origin:
-            LOG.warning("RGB dependency layers don't share the same origin")
+        if self.has_deps:
+            if not self.shared_projections:
+                LOG.warning("RGB dependency layers don't share the same projection")
+            if not self.shared_origin:
+                LOG.warning("RGB dependency layers don't share the same origin")
 
         return ds_info
 

@@ -32,9 +32,11 @@ def _get_awips_colors(cmap_file):
     return colors
 
 
-def generate_from_awips_cmap(cmap_file):
+def generate_from_awips_cmap(cmap_file, flip=False):
 
     colors = _get_awips_colors(cmap_file)
+    if flip:
+        colors = colors[::-1]
 
     if len(colors) < 10:
      control_indexes = range(len(colors))

@@ -739,7 +739,6 @@ class RGBLayerConfigPane(QObject):
         # non_rgb_kinds = [k for k in KIND if k != KIND.RGB]
 
         # clear out the current lists
-        layer_list = list(doc.layers_where(is_valid=True, in_type_set=non_rgb_classes))
         for widget in self.rgb:
             widget.clear()
             widget.addItem('None', '')
