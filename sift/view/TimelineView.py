@@ -161,8 +161,8 @@ class QFramesInTracksScene(QGraphicsScene):
         brush = QBrush(brush)
         brush.setColor(Qt.gray)
         self._track_pen_brush = pen, brush
-
-
+        # by default, show extent
+        self.setSceneRect(None)
 
     @property
     def coords(self):
@@ -271,7 +271,7 @@ class QFrameItem(QGraphicsRectItem):
 
     def __init__(self, track: QTrackItem,
                  state: TimelineFrameState, start: datetime, duration: timedelta,
-                 title: str, subtitle: str=None, thumb: QImage=None, metaedata: Mapping = None, 
+                 title: str, subtitle: str=None, thumb: QImage=None, metadata: Mapping = None,
                  workspace_uuid=None, document_uuid=None):
         """create a frame representation and add it to a timeline
         Args:
