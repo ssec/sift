@@ -32,7 +32,8 @@ Assume X coordinate corresponds to seconds, apply transforms as needed
 - 
 
 REFERENCES
-http://pyqt.sourceforge.net/Docs/PyQt4/qgraphicsscene.html#details
+http://pyqt.sourceforge.net/Docs/PyQt4/qgraphicsscene.html
+http://doc.qt.io/qt-4.8/qgraphicsview.html
 
 REQUIRES
 
@@ -165,7 +166,7 @@ class QFramesInTracksScene(QGraphicsScene):
         # self.setSceneRect(None)
 
     @property
-    def coords(self):
+    def coords(self) -> TimelineCoordTransform:
         return self._coords
 
     def select_tracks_by_metadata(self, key, value):
