@@ -162,7 +162,7 @@ class QFramesInTracksScene(QGraphicsScene):
         brush.setColor(Qt.gray)
         self._track_pen_brush = pen, brush
         # by default, show extent
-        self.setSceneRect(None)
+        # self.setSceneRect(None)
 
     @property
     def coords(self):
