@@ -360,7 +360,7 @@ class SingleLayerInfoPane(QObject):
                     for name, uuid in ns.items():
                         try:
                             dep_info = self.document[uuid]
-                            short_name = dep_info.get(INFO.SHORT_NAME, '<Unknown>')
+                            short_name = dep_info.get(INFO.SHORT_NAME, '<N/A>')
                         except KeyError:
                             LOG.debug("Layer '{}' not found in document".format(uuid))
                             short_name = '<Unknown>'
