@@ -5,6 +5,7 @@
 Timeline View using QGraphicsView and its kin
 Assume X coordinate corresponds to seconds, apply transforms as needed
 
+
 # FUNCTION
 - display a Scene of Timelines of Frames
 - View is scrollable in time (screen X) and level (screen Y), compressible in time
@@ -29,13 +30,23 @@ Assume X coordinate corresponds to seconds, apply transforms as needed
 - allow disable/enable of frames 
 - allow circulation of z-order using up/down arrow keys
 - allow sorting of tracks based on metadata characteristics
-- 
 
-REFERENCES
+# CONCEPTS and VOCABULARY with respect to SIFT
+A timeline Frame represents a Product in the Workspace
+A timeline Track in the timeline represents a time series of related Products
+The Scene represents a combination of the Metadatabase and (to a lesser extent) the active Document
+Stepping into wider application-wide scope:
+Products may or may not have Content cached in the workspace
+ActiveContent in the workspace is being used to feed the SceneGraph by the SceneGraphManager
+The Workspace has a Metadatabase of Resource, Product and Content metadata
+The Document holds user intent, including EngineRules for producing Product Content
+The Engine performs operations on the Workspace and its Metadatabase to maintain implicit Product Content
+
+# REFERENCES
 http://pyqt.sourceforge.net/Docs/PyQt4/qgraphicsscene.html
 http://doc.qt.io/qt-4.8/qgraphicsview.html
+http://doc.qt.io/qt-4.8/qgraphicsitemgroup.html
 
-REQUIRES
 
 :author: R.K.Garcia <rkgarcia@wisc.edu>
 :copyright: 2017 by University of Wisconsin Regents, see AUTHORS for more details
@@ -138,6 +149,7 @@ class QFramesInTracksScene(QGraphicsScene):
     """
     QGraphicsScene collecting QTimelineItems collecting QFrameItems.
     includes a TimelineCoordTransform time-to-X coordinate transform used for generating screen coordinates.
+
     """
     _coords: TimelineCoordTransform = None
     _track_pen_brush = None, None
@@ -182,7 +194,19 @@ class QFramesInTracksScene(QGraphicsScene):
     @property
     def default_frame_pen_brush(self) -> Tuple[Optional[QPen], Optional[QBrush]]:
         return self._frame_pen_brush
-        
+    
+    def drawBackground(self, painter: QPainter, invalidated_region: QRectF):
+        super(QFramesInTracksScene, self).drawBackground(painter, invalidated_region)
+
+    def _align_tracks_to_scene_rect(self, rect: QRectF):
+        """Move track labels to left edge of """
+        pass
+
+    def sceneRectChanged(self, new_rect: QRectF):
+        self._align_tracks_to_scene_rect(new_rect)
+        super(QFramesInTracksScene, self).sceneRectChanged(new_rect)
+
+
     
 
 class QTrackItem(QGraphicsRectItem):
@@ -203,6 +227,11 @@ class QTrackItem(QGraphicsRectItem):
     _max: float = None
     _left_pad: timedelta = timedelta(hours=1)
     _right_pad: timedelta = timedelta(minutes=5)
+    _gi_title : QGraphicsTextItem = None
+    _gi_subtitle : QGraphicsTextItem = None
+    _gi_icon : QGraphicsPixmapItem = None
+    _gi_colormap : QGraphicsPixmapItem = None
+
 
     def __init__(self, scene: QFramesInTracksScene, z: int,
                  title: str, subtitle: str = None, icon: QIcon = None, metadata: dict = None,
@@ -227,7 +256,21 @@ class QTrackItem(QGraphicsRectItem):
         if brush:
             LOG.debug('setting brush')
             self.setBrush(brush)
+        self._add_decorations()
         scene.addItem(self)
+
+    def _add_decorations(self):
+        """Add decor sub-items to self
+        title, subtitle, icon, colormap
+        """
+        scene = self._scene
+        if self._title:
+            self._gi_title = it = scene.addSimpleText(self._title)
+            it.setParentItem(self)
+        if self._subtitle:
+            self._gi_subtitle = it = scene.addSimpleText(self._subtitle)
+            it.setParentItem(self)
+
 
     @property
     def default_frame_pen_brush(self):
@@ -267,13 +310,13 @@ class QFrameItem(QGraphicsRectItem):
     _duration: timedelta = None
     _title: str = None
     _subtitle: str = None
-    _thumb: QImage = None
+    _thumb: QPixmap = None
     _metadata: Mapping = None
 
     def __init__(self, track: QTrackItem,
                  state: TimelineFrameState, start: datetime, duration: timedelta,
-                 title: str, subtitle: str=None, thumb: QImage=None, metadata: Mapping = None,
-                 workspace_uuid=None, document_uuid=None):
+                 title: str, subtitle: str = None, thumb: QPixmap = None, metadata: Mapping = None,
+                 workspace_uuid: UUID = None, document_uuid: UUID = None):
         """create a frame representation and add it to a timeline
         Args:
             track: which timeline to add it to
@@ -307,6 +350,14 @@ class QFrameItem(QGraphicsRectItem):
             LOG.debug('setting brush')
             self.setBrush(brush)
         self.setParentItem(track)
+
+
+class QFramesInTracksView(QGraphicsView):
+    """Adds Track- and Frame-specific actions and signals to QGraphicsView"""
+
+    def __init__(self, *args, **kwargs):
+        super(QFramesInTracksView, self).__init__(*args, **kwargs)
+
 
 
 class TestWindow(QMainWindow):
@@ -344,7 +395,7 @@ class TestWindow(QMainWindow):
 #        file_menu.addAction()
 
         self._scene = scene
-        gfx = self._gfx = QGraphicsView(self)
+        gfx = self._gfx = QFramesInTracksView(self)
         # label = QLabel("och!")
         # label.setAlignment(Qt.AlignCenter)
 
