@@ -484,11 +484,11 @@ class Main(QtGui.QMainWindow):
             lon, lat = xy_pos
             lon = lon % 360 if lon > 0 else lon % -360 + 360
             lon = lon - 360 if lon > 180 else lon
-            lon_str = "{:.02f} {}".format(abs(lon), "W" if lon < 0 else "E")
-            lat_str = "{:.02f} {}".format(abs(lat), "S" if lat < 0 else "N")
-            self.ui.cursorProbeLocation.setText("Probe Location: {}, {}".format(lon_str, lat_str))
+            lon_str = "{:>6.02f} {}".format(abs(lon), "W" if lon < 0 else "E")
+            lat_str = "{:>6.02f} {}".format(abs(lat), "S" if lat < 0 else "N")
+            probe_loc = "{}, {}".format(lon_str, lat_str)
         else:
-            self.ui.cursorProbeLocation.setText("Probe Location: N/A")
+            probe_loc = "{:>6s}  , {:>6s}  ".format("N/A", "N/A")
 
         if animating:
             data_str = "<animating>"
@@ -520,8 +520,8 @@ class Main(QtGui.QMainWindow):
         else:
             data_str = "N/A"
             layer_str = "N/A"
-        self.ui.cursorProbeText.setText("Probe Value: {} ".format(data_str))
-        self.ui.cursorProbeLayer.setText("Current Layer: {}".format(layer_str))
+        self.ui.cursorProbeLayer.setText(layer_str)
+        self.ui.cursorProbeText.setText("{} ({})".format(data_str, probe_loc))
 
     def __init__(self, config_dir=None, cache_dir=None, cache_size=None, glob_pattern=None, border_shapefile=None, center=None):
         super(Main, self).__init__()
