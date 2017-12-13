@@ -56,8 +56,9 @@ import os, sys
 import logging, unittest
 from uuid import UUID
 from collections import namedtuple
-from typing import Tuple, Optional, Mapping
+from typing import Tuple, Optional, Mapping, List, Any, Callable
 from enum import Enum
+from abc import ABC, abstractproperty, abstractmethod
 from datetime import datetime, timedelta
 from PyQt4.QtCore import QObject, QRectF, Qt
 from PyQt4.QtGui import *
@@ -152,13 +153,16 @@ class QFramesInTracksScene(QGraphicsScene):
 
     """
     _coords: TimelineCoordTransform = None
+    _track_items: Mapping[UUID, QGraphicsItem] = None  # retain QTrackItem objects lest they disappear; also bookkeeping
+    _frame_items: Mapping[UUID, QGraphicsItem] = None  # likewise for QFrameItems
     _track_pen_brush = None, None
     _frame_pen_brush = None, None
-
 
     def __init__(self):
         super(QFramesInTracksScene, self).__init__()
         self._coords = TimelineCoordTransform()
+        self._track_items = {}
+        self._frame_items = {}
         pen = QPen()
         pen.setWidthF(4.0)
         pen.setColor(Qt.black)
@@ -205,6 +209,49 @@ class QFramesInTracksScene(QGraphicsScene):
     def sceneRectChanged(self, new_rect: QRectF):
         self._align_tracks_to_scene_rect(new_rect)
         super(QFramesInTracksScene, self).sceneRectChanged(new_rect)
+
+    #
+    # internal mid-level update commands
+    #
+
+    def _add_track_with_frames(self, track, *frames):
+        raise NotImplementedError("NYI")  # FIXME
+
+    def _del_track(self, track):
+        raise NotImplementedError("NYI")  # FIXME
+
+    #
+    # delegate functions to implement for document and workspace
+    # FUTURE: decide if we really need a delegate ABC to compose;
+    # for now simpler is better and Scene is already delegate/model-like
+    #
+
+    def may_rearrange_track_z_order(self, track_uuid_list: List[UUID]) -> [Callable[bool], None]:
+        """Determine whether tracks can be rearranged
+        Optionally: reflect any such changes on other parts of the application
+
+        Args:
+            track_uuid_list: new track UUID arrangement in top to bottom order
+
+        Returns: None if rearrange is not permitted,
+        else a callable that can be used to commit the change in the document
+        callable(True) commits change; callable(False) aborts change
+        Only one callable is valid at a time
+        """
+        LOG.warning("using base class may_rearrange_track_z_order which does nothing")
+        return lambda b: None
+
+    def menu_for_track(self, track_uuid: UUID, frame_uuid: UUID = None) -> [QMenu, None]:
+        """QMenu to use as context menu for a given track, optionally with frame if mouse was over that frame"""
+        LOG.warning("using base class menu_for_track which does nothing")
+        return None
+
+    @abstractmethod
+    def populate(self):
+        """Populate scene with tracks and frames
+        Does not add new items for tracks and frames already present
+        """
+
 
 
     
