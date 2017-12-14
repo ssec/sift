@@ -55,7 +55,7 @@ http://doc.qt.io/qt-4.8/qgraphicsitemgroup.html
 import os, sys
 import logging, unittest
 from uuid import UUID
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 from typing import Tuple, Optional, Mapping, List, Any, Callable, Set
 from enum import Enum
 from abc import ABC, abstractproperty, abstractmethod
@@ -153,159 +153,7 @@ class TimelineCoordTransform(QObject):
         return QRectF(aleft, atop, awidth, aheight)
 
 
-class QFramesInTracksScene(QGraphicsScene):
-    """
-    QGraphicsScene collecting QTimelineItems collecting QFrameItems.
-    includes a TimelineCoordTransform time-to-X coordinate transform used for generating screen coordinates.
 
-    """
-    _coords: TimelineCoordTransform = None
-    _track_items: Mapping[UUID, QGraphicsItem] = None  # retain QTrackItem objects lest they disappear; also bookkeeping
-    _frame_items: Mapping[UUID, QGraphicsItem] = None  # likewise for QFrameItems
-    _track_pen_brush = None, None
-    _frame_pen_brush = None, None
-
-    def __init__(self):
-        super(QFramesInTracksScene, self).__init__()
-        self._coords = TimelineCoordTransform()
-        self._track_items = {}
-        self._frame_items = {}
-        pen = QPen()
-        pen.setWidthF(4.0)
-        pen.setColor(Qt.black)
-        # pen.setCapStyle(Qt.RoundCap)
-        pen.setJoinStyle(Qt.RoundJoin)
-        brush = QBrush()
-        brush.setColor(Qt.blue)
-        brush.setStyle(Qt.SolidPattern)
-        self._frame_pen_brush = pen, brush
-        pen = QPen(pen)
-        pen.setWidthF(2.0)
-        pen.setColor(Qt.blue)
-        brush = QBrush(brush)
-        brush.setColor(Qt.gray)
-        self._track_pen_brush = pen, brush
-        # by default, show extent
-        # self.setSceneRect(None)
-
-    @property
-    def coords(self) -> TimelineCoordTransform:
-        return self._coords
-
-    def select_tracks_by_metadata(self, key, value):
-        raise NotImplementedError("NYI")
-        
-    def select_frames_by_metadata(self, key, value):
-        raise NotImplementedError("NYI")
-
-    @property
-    def default_track_pen_brush(self) -> Tuple[Optional[QPen], Optional[QBrush]]:
-        return self._track_pen_brush
-
-    @property
-    def default_frame_pen_brush(self) -> Tuple[Optional[QPen], Optional[QBrush]]:
-        return self._frame_pen_brush
-    
-    def drawBackground(self, painter: QPainter, invalidated_region: QRectF):
-        super(QFramesInTracksScene, self).drawBackground(painter, invalidated_region)
-
-    def _align_tracks_to_scene_rect(self, rect: QRectF):
-        """Move track labels to left edge of """
-        pass
-
-    def sceneRectChanged(self, new_rect: QRectF):
-        self._align_tracks_to_scene_rect(new_rect)
-        super(QFramesInTracksScene, self).sceneRectChanged(new_rect)
-
-    #
-    # internal mid-level update commands
-    #
-
-    def _add_track_with_frames(self, track, *frames):
-        raise NotImplementedError("NYI")  # FIXME
-
-    def _del_track(self, track):
-        raise NotImplementedError("NYI")  # FIXME
-
-    def _change_frame_state(self, frame: UUID, new_state: TimelineFrameState):
-        """Change the displayed state of a frame and queue a visual refresh
-        """
-        raise NotImplementedError("NYI")  # FIXME
-
-    def _change_track_state(self, track: UUID, new_state: TimelineTrackState):
-        """Change the displayed state of a track and queue a visual refresh
-        """
-        raise NotImplementedError("NYI")  # FIXME
-
-
-    #
-    # high-level signals to hook to other parts of application
-    #
-    didSelectTracksAndFrames = pyqtSignal(dict)  # dictionary of track UUID to set of frame UUIDs, may be empty
-    didChangeTrackOrder = pyqtSignal(list)  # list of track UUIDs from top to bottom
-    didMoveCursorToTime = pyqtSignal(datetime, timedelta)  # instantaneous or time-range cursor move occurred
-    didRequestStateChangeForFrame = pyqtSignal(UUID, TimelineFrameState)  # user requests a state change for a given frame
-    didCopyColormapBetweenTracks = pyqtSignal(UUID, UUID)  # from-track and to-track
-
-    #
-    # delegate functions to implement for document and workspace
-    # these are typically called by view or scene control logic, e.g. to decide menu to display or progress of a drag operation
-    # FUTURE: decide if we actually need a delegate ABC to compose
-    # for now simpler is better and Scene is already delegate/model-like
-    #
-
-    def may_rearrange_track_z_order(self, track_uuid_list: List[UUID]) -> [Callable[bool], None]:
-        """Determine whether tracks can be rearranged and provide a commit/abort function if so
-        Optionally: reflect any such changes on other parts of the application
-
-        Args:
-            track_uuid_list: new track UUID arrangement in top to bottom order
-
-        Returns: None if rearrange is not permitted,
-        else a callable that can be used to commit the change in the document
-        callable(True) commits change; callable(False) aborts change
-        Only one callable is valid at a time
-        """
-        LOG.warning("using base class may_rearrange_track_z_order which does nothing")
-        return lambda b: None
-
-    def uuid_for_track_item(self, track_item) -> UUID:
-        return track_item.uuid
-
-    def uuid_for_frame_item(self, frame_item) -> UUID:
-        return frame_item.uuid
-
-    def tracks_in_same_family(self, track: UUID) -> Set[UUID]:
-        """inform the view on which tracks are closely related to the given track
-        typically this is used to stylistically highlight related tracks during a drag operation
-        """
-        return set()
-
-    def may_reassign_color_map(self, from_track: UUID, to_track: UUID) -> [Callable[bool], None]:
-        """User is dragging a color map around, determine if drop is permitted and provide a commit/abort function if so
-        """
-        LOG.warning("using base class may_reassign_color_map which does nothing")
-        return lambda b: None
-
-    def menu_for_track(self, track_uuid: UUID, frame_uuid: UUID = None) -> [QMenu, None]:
-        """Generate QMenu to use as context menu for a given track, optionally with frame if mouse was over that frame"""
-        LOG.warning("using base class menu_for_track which does nothing")
-        return None
-
-    def update(self, changed_track_uuids: [Set, None] = None, changed_frame_uuids: [Set, None] = None):
-        """Populate or update scene, making sure all
-        Does not add new items for tracks and frames already present
-        Parameters act as hints
-        """
-        pass
-
-
-
-
-
-
-
-    
 
 class QTrackItem(QGraphicsRectItem):
     """ A group of Frames corresponding to a timeline
@@ -448,6 +296,206 @@ class QFrameItem(QGraphicsRectItem):
             LOG.debug('setting brush')
             self.setBrush(brush)
         self.setParentItem(track)
+
+
+class QTimeRulerItem(QGraphicsRectItem):
+    """A ruler object showing the time dimension, an instance of which is at the top, bottom, or both ends of the Scene"""
+
+    def __init__(self):
+        super(QTimeRulerItem, self).__init__()
+
+
+class QFramesInTracksScene(QGraphicsScene):
+    """
+    QGraphicsScene collecting QTimelineItems collecting QFrameItems.
+    includes a TimelineCoordTransform time-to-X coordinate transform used for generating screen coordinates.
+
+    """
+    # coordinate transform between track Z order and time to scene float x,y,w,h
+    _coords: TimelineCoordTransform = None
+
+    # rulers at top and/or bottom of scene
+    _top_ruler_item: QTimeRulerItem = None
+    _bottom_ruler_item: QTimeRulerItem = None
+    _ruler_tick_interval: timedelta = None
+
+    # cursor information
+    _cursor_time: datetime = None
+    _cursor_duration: timedelta = None
+
+    # content representing document / workspace / scenegraph
+    _track_items: Mapping[UUID, QTrackItem] = None  # retain QTrackItem objects lest they disappear; also bookkeeping
+    _frame_items: Mapping[UUID, QFrameItem] = None  # likewise for QFrameItems
+
+    # styling settings
+    _track_pen_brush = None, None
+    _frame_pen_brush = None, None
+
+    # _frame_states_allowed = None  # allow filtering of frames and tracks for thinned views
+
+    def __init__(self):
+        super(QFramesInTracksScene, self).__init__()
+        self._coords = TimelineCoordTransform()
+        self._track_items = {}
+        self._frame_items = {}
+        pen = QPen()
+        pen.setWidthF(4.0)
+        pen.setColor(Qt.black)
+        # pen.setCapStyle(Qt.RoundCap)
+        pen.setJoinStyle(Qt.RoundJoin)
+        brush = QBrush()
+        brush.setColor(Qt.blue)
+        brush.setStyle(Qt.SolidPattern)
+        self._frame_pen_brush = pen, brush
+        pen = QPen(pen)
+        pen.setWidthF(2.0)
+        pen.setColor(Qt.blue)
+        brush = QBrush(brush)
+        brush.setColor(Qt.gray)
+        self._track_pen_brush = pen, brush
+        # by default, show extent
+        # self.setSceneRect(None)
+
+    @property
+    def coords(self) -> TimelineCoordTransform:
+        return self._coords
+
+    #
+    # drawing and arranging QGraphicsItems
+    #
+
+    @property
+    def default_track_pen_brush(self) -> Tuple[Optional[QPen], Optional[QBrush]]:
+        return self._track_pen_brush
+
+    @property
+    def default_frame_pen_brush(self) -> Tuple[Optional[QPen], Optional[QBrush]]:
+        return self._frame_pen_brush
+
+    def drawBackground(self, painter: QPainter, invalidated_region: QRectF):
+        super(QFramesInTracksScene, self).drawBackground(painter, invalidated_region)
+
+    def _update_rulers_to_extents(self, tick_interval: timedelta=None):
+        """Revise ruler size and internal tick items and labels to match scene extents"""
+
+    def _update_cursor_in_rulers(self):
+        """Update ruler contents to show current cursor position and duration
+        """
+
+    def _align_tracks_to_scene_rect(self, rect: QRectF, immediate_refresh: bool = True):
+        """Move track labels to left edge """
+        pass
+
+    def sceneRectChanged(self, new_rect: QRectF):
+        self._align_tracks_to_scene_rect(new_rect, False)
+        super(QFramesInTracksScene, self).sceneRectChanged(new_rect)
+
+    #
+    #
+    #
+
+    def visible_tracks_frames(self, view: QGraphicsView = None) -> Mapping[UUID, List[UUID]]:
+        """return OrderedDict with UUID keys for tracks and list values of frames, for tracks and frames visible on in view"""
+        raise NotImplementedError("NYI")  # FIXME
+
+    def visible_time_range(self, view: QGraphicsView = None):
+        """return visible time range for the view in question"""
+        raise NotImplementedError("NYI")  # FIXME
+
+    #
+    # internal mid-level update commands
+    #
+
+    def _add_track_with_frames(self, track, *frames):
+        raise NotImplementedError("NYI")  # FIXME
+
+    def _del_track(self, track):
+        raise NotImplementedError("NYI")  # FIXME
+
+    def _change_frame_state(self, frame: UUID, new_state: TimelineFrameState):
+        """Change the displayed state of a frame and queue a visual refresh
+        """
+        raise NotImplementedError("NYI")  # FIXME
+
+    def _change_track_state(self, track: UUID, new_state: TimelineTrackState):
+        """Change the displayed state of a track and queue a visual refresh
+        """
+        raise NotImplementedError("NYI")  # FIXME
+
+    def _move_cursor(self, when: datetime, duration: timedelta = None, animating_over: timedelta = None):
+        """Move visible cursor to a new time
+        optionally animating the transition over a time interval starting from now"""
+        raise NotImplementedError("NYI")  # FIXME
+
+    # def select_tracks_by_metadata(self, key, value):
+    #     raise NotImplementedError("NYI")
+    #
+    # def select_frames_by_metadata(self, key, value):
+    #     raise NotImplementedError("NYI")
+
+    #
+    # high-level signals from scene to hook to other parts of application
+    #
+    didSelectTracksAndFrames = pyqtSignal(dict)  # dictionary of track UUID to set of frame UUIDs, may be empty
+    didChangeTrackOrder = pyqtSignal(list)  # list of track UUIDs from top to bottom
+    didMoveCursorToTime = pyqtSignal(datetime, timedelta)  # instantaneous or time-range cursor move occurred
+    didRequestStateChangeForFrame = pyqtSignal(UUID,
+                                               TimelineFrameState)  # user requests a state change for a given frame
+    didCopyColormapBetweenTracks = pyqtSignal(UUID, UUID)  # from-track and to-track
+    didChangeVisibleAreaForView = pyqtSignal(QGraphicsView, datetime,
+                                             timedelta)  # note: multiple views can share one scene
+
+    #
+    # delegate functions to implement for document and workspace
+    # these are typically called by view or scene control logic, e.g. to decide menu to display or progress of a drag operation
+    # FUTURE: decide if we actually need a delegate ABC to compose
+    # for now simpler is better and Scene is already delegate/model-like
+    #
+
+    def may_rearrange_track_z_order(self, track_uuid_list: List[UUID]) -> [Callable[bool], None]:
+        """Determine whether tracks can be rearranged and provide a commit/abort function if so
+        Optionally: reflect any such changes on other parts of the application
+
+        Args:
+            track_uuid_list: new track UUID arrangement in top to bottom order
+
+        Returns: None if rearrange is not permitted,
+        else a callable that can be used to commit the change in the document
+        callable(True) commits change; callable(False) aborts change
+        Only one callable is valid at a time
+        """
+        LOG.warning("using base class may_rearrange_track_z_order which does nothing")
+        return lambda b: None
+
+    def uuid_for_track_item(self, track_item) -> UUID:
+        return track_item.uuid
+
+    def uuid_for_frame_item(self, frame_item) -> UUID:
+        return frame_item.uuid
+
+    def tracks_in_same_family(self, track: UUID) -> Set[UUID]:
+        """inform the view on which tracks are closely related to the given track
+        typically this is used to stylistically highlight related tracks during a drag operation
+        """
+        return set()
+
+    def may_reassign_color_map(self, from_track: UUID, to_track: UUID) -> [Callable[bool], None]:
+        """User is dragging a color map around, determine if drop is permitted and provide a commit/abort function if so
+        """
+        LOG.warning("using base class may_reassign_color_map which does nothing")
+        return lambda b: None
+
+    def menu_for_track(self, track_uuid: UUID, frame_uuid: UUID = None) -> [QMenu, None]:
+        """Generate QMenu to use as context menu for a given track, optionally with frame if mouse was over that frame"""
+        LOG.warning("using base class menu_for_track which does nothing")
+        return None
+
+    def update(self, changed_track_uuids: [Set, None] = None, changed_frame_uuids: [Set, None] = None):
+        """Populate or update scene, making sure all
+        Does not add new items for tracks and frames already present
+        Parameters act as hints
+        """
+        pass
 
 
 class QFramesInTracksView(QGraphicsView):
