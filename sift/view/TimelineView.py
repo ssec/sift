@@ -56,11 +56,11 @@ import os, sys
 import logging, unittest
 from uuid import UUID
 from collections import namedtuple
-from typing import Tuple, Optional, Mapping, List, Any, Callable
+from typing import Tuple, Optional, Mapping, List, Any, Callable, Set
 from enum import Enum
 from abc import ABC, abstractproperty, abstractmethod
 from datetime import datetime, timedelta
-from PyQt4.QtCore import QObject, QRectF, Qt
+from PyQt4.QtCore import QObject, QRectF, Qt, pyqtSignal
 from PyQt4.QtGui import *
 from PyQt4.QtOpenGL import QGLWidget, QGLFormat, QGL
 
@@ -69,6 +69,9 @@ LOG = logging.getLogger(__name__)
 # PATH_TEST_DATA = os.environ.get('TEST_DATA', os.path.expanduser("~/Data/test_files/thing.dat"))
 
 class TimelineFrameState(Enum):
+    """Displayed state of frames, corresponds to a color or style.
+    Typically combines information from Workspace and Scenegraph, does not correspond to selection.
+    """
     UNKNOWN = 0
     AVAILABLE = 1  # can be imported from native resources but has not been
     IMPORTED = 2  # imported into workspace
@@ -76,6 +79,10 @@ class TimelineFrameState(Enum):
     ACTIVE = 4  # both ready to go into VRAM (or already resident), and participating in the application scene graph, possibly as part of an animation
     VISIBLE = 5  # active, and currently on-screen for user to view
 
+class TimelineTrackState(Enum):
+    UNKNOWN = 0
+    DISABLED = 1
+    ENABLED = 2
 
 DEFAULT_TIMELINE_HEIGHT = 48
 
@@ -220,14 +227,35 @@ class QFramesInTracksScene(QGraphicsScene):
     def _del_track(self, track):
         raise NotImplementedError("NYI")  # FIXME
 
+    def _change_frame_state(self, frame: UUID, new_state: TimelineFrameState):
+        """Change the displayed state of a frame and queue a visual refresh
+        """
+        raise NotImplementedError("NYI")  # FIXME
+
+    def _change_track_state(self, track: UUID, new_state: TimelineTrackState):
+        """Change the displayed state of a track and queue a visual refresh
+        """
+        raise NotImplementedError("NYI")  # FIXME
+
+
+    #
+    # high-level signals to hook to other parts of application
+    #
+    didSelectTracksAndFrames = pyqtSignal(dict)  # dictionary of track UUID to set of frame UUIDs, may be empty
+    didChangeTrackOrder = pyqtSignal(list)  # list of track UUIDs from top to bottom
+    didMoveCursorToTime = pyqtSignal(datetime, timedelta)  # instantaneous or time-range cursor move occurred
+    didRequestStateChangeForFrame = pyqtSignal(UUID, TimelineFrameState)  # user requests a state change for a given frame
+    didCopyColormapBetweenTracks = pyqtSignal(UUID, UUID)  # from-track and to-track
+
     #
     # delegate functions to implement for document and workspace
-    # FUTURE: decide if we really need a delegate ABC to compose;
+    # these are typically called by view or scene control logic, e.g. to decide menu to display or progress of a drag operation
+    # FUTURE: decide if we actually need a delegate ABC to compose
     # for now simpler is better and Scene is already delegate/model-like
     #
 
     def may_rearrange_track_z_order(self, track_uuid_list: List[UUID]) -> [Callable[bool], None]:
-        """Determine whether tracks can be rearranged
+        """Determine whether tracks can be rearranged and provide a commit/abort function if so
         Optionally: reflect any such changes on other parts of the application
 
         Args:
@@ -241,16 +269,39 @@ class QFramesInTracksScene(QGraphicsScene):
         LOG.warning("using base class may_rearrange_track_z_order which does nothing")
         return lambda b: None
 
+    def uuid_for_track_item(self, track_item) -> UUID:
+        return track_item.uuid
+
+    def uuid_for_frame_item(self, frame_item) -> UUID:
+        return frame_item.uuid
+
+    def tracks_in_same_family(self, track: UUID) -> Set[UUID]:
+        """inform the view on which tracks are closely related to the given track
+        typically this is used to stylistically highlight related tracks during a drag operation
+        """
+        return set()
+
+    def may_reassign_color_map(self, from_track: UUID, to_track: UUID) -> [Callable[bool], None]:
+        """User is dragging a color map around, determine if drop is permitted and provide a commit/abort function if so
+        """
+        LOG.warning("using base class may_reassign_color_map which does nothing")
+        return lambda b: None
+
     def menu_for_track(self, track_uuid: UUID, frame_uuid: UUID = None) -> [QMenu, None]:
-        """QMenu to use as context menu for a given track, optionally with frame if mouse was over that frame"""
+        """Generate QMenu to use as context menu for a given track, optionally with frame if mouse was over that frame"""
         LOG.warning("using base class menu_for_track which does nothing")
         return None
 
-    @abstractmethod
-    def populate(self):
-        """Populate scene with tracks and frames
+    def update(self, changed_track_uuids: [Set, None] = None, changed_frame_uuids: [Set, None] = None):
+        """Populate or update scene, making sure all
         Does not add new items for tracks and frames already present
+        Parameters act as hints
         """
+        pass
+
+
+
+
 
 
 
