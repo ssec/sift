@@ -159,7 +159,7 @@ class QTrackItem(QGraphicsRectItem):
     """ A group of Frames corresponding to a timeline
     This allows drag and drop of timelines to be easier
     """
-    _scene: QFramesInTracksScene = None
+    _scene = None
     _z: int = None
     _title: str = None
     _subtitle: str = None
@@ -179,7 +179,7 @@ class QTrackItem(QGraphicsRectItem):
     _gi_colormap : QGraphicsPixmapItem = None
 
 
-    def __init__(self, scene: QFramesInTracksScene, z: int,
+    def __init__(self, scene, z: int,
                  title: str, subtitle: str = None, icon: QIcon = None, metadata: dict = None,
                  tooltip: str = None, color: QColor = None, selected: bool = False,
                  colormap: [QGradient, QImage] = None, min: float = None, max: float = None):
@@ -384,6 +384,7 @@ class QFramesInTracksScene(QGraphicsScene):
 
     def _align_tracks_to_scene_rect(self, rect: QRectF, immediate_refresh: bool = True):
         """Move track labels to left edge """
+        # FUTURE: okay, how do we deal with more than one view?
         pass
 
     def sceneRectChanged(self, new_rect: QRectF):
