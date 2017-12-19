@@ -57,6 +57,7 @@ between subsystems. Document rarely deals directly with content.
 """
 from sift.model.layer import Mixing, DocLayer, DocBasicLayer, DocRGBLayer
 from sift.ui.GradientControl import GradientControl
+from sift.util.default_paths import DOCUMENT_SETTINGS_DIR
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -69,10 +70,15 @@ from collections import MutableSequence, OrderedDict
 from uuid import UUID
 import numpy as np
 from weakref import ref
+import os
+import ast
 
 from sift.common import KIND, INFO, prez
-from sift.view.Colormap import ALL_COLORMAPS
+from sift.view.Colormap import ALL_COLORMAPS, USER_COLORMAPS
 from PyQt4.QtCore import QObject, pyqtSignal
+
+from colormap import rgb2hex
+from vispy.color.colormap import Colormap, BaseColormap, _mix_simple, _colormaps
 
 
 LOG = logging.getLogger(__name__)
@@ -281,13 +287,15 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didChangeProjection = pyqtSignal(str, dict)  # name of projection, dict of projection information
     # didChangeShapeLayer = pyqtSignal(dict)
 
-    def __init__(self, workspace, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
+    def __init__(self, workspace, config_dir=DOCUMENT_SETTINGS_DIR, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
         super(Document, self).__init__(**kwargs)
         self._workspace = workspace
+        self._config_dir = config_dir
         self._layer_sets = [DocLayerStack(self)] + [None] * (layer_set_count - 1)
         self._layer_with_uuid = {}
         # FIXME: Copy?
         self.colormaps = ALL_COLORMAPS
+        self.usermaps = USER_COLORMAPS
         self.available_projections = OrderedDict((
             ('Mercator', {
                 'proj4_str': '+proj=merc +datum=WGS84 +ellps=WGS84 +over',
@@ -337,6 +345,52 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.current_projection = self.default_projection
         # TODO: connect signals from workspace to slots including update_dataset_info
 
+        # TODO: Load gradients and input into usermaps
+
+        # Create directory if it does not exist
+        filepath = os.path.join(DOCUMENT_SETTINGS_DIR, 'colormaps')
+        if not os.path.exists(filepath):
+            os.makedirs(filepath)
+
+
+        qtData = {}
+        for subdir, dirs, files in os.walk(filepath):
+            for file in files:
+                nfp = subdir + os.sep + file
+                try:
+                    file = open(nfp, "r")
+                    toImport = ast.literal_eval(file.read())
+                    qtData.update(toImport)
+                except:
+                    print("Error reading from file")
+
+
+        for item in qtData.keys():
+            pointList = item["ticks"]
+            floats = []
+            hex = []
+            for point in pointList:
+                floats.append(point[0])
+                rgb = point[1]
+                hexCode = rgb2hex(rgb[0], rgb[1], rgb[2])
+                hex.append(hexCode)
+
+            for i in range(len(floats)):
+                for k in range(len(floats) - 1, i, -1):
+                    if (floats[k] < floats[k - 1]):
+                        self.bubbleSortSwap(floats, k, k - 1)
+                        self.bubbleSortSwap(hex, k, k - 1)
+
+            try:
+                toAdd = Colormap(colors=hex, controls=floats)
+                print(hex)
+                print(floats)
+                print(toAdd)
+                self.usermaps.update(toAdd)
+            except:
+                print("Error creating or setting colormap")
+
+
     def update_colormaps(self, new_colormaps):
         self.colormaps.update(new_colormaps)
 
@@ -361,14 +415,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 self.projection_info(self.current_projection)
             )
 
-    gc = None
 
-    def openGradientWidget(self):
-        print("Opening..")
-
-        self.gc = GradientControl(self)
-        self.gc.show()
-        print("Done!")
+    def updateColorMaps(self, colorMap):
+        print("Received update call..")
 
     def current_projection_index(self):
         return list(self.available_projections.keys()).index(self.current_projection)

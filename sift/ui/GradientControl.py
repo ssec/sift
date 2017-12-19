@@ -10,9 +10,6 @@ import ast
 from colormap import rgb2hex
 from vispy.color.colormap import Colormap, BaseColormap, _mix_simple, _colormaps
 
-import sift
-from sift.view.Colormap import ALL_COLORMAPS
-import sift.view.colormap_dialogs as colord
 
 
 class GradientControl(QtGui.QDialog):
@@ -25,21 +22,8 @@ class GradientControl(QtGui.QDialog):
         self.doc = doc
         self.gData = {}
         self.autoImportData = {}
-        self.INTERNAL_ALL_COLORMAPS = ALL_COLORMAPS
-
-
-        try:
-            f = open('data.json', 'x+')
-            print("No file found, continuing")
-        except FileExistsError:
-            if os.stat("data.json").st_size != 0:
-                try:
-                    self.gData = json.loads(open('data.json').read())
-                    print("Loaded data from data.json")
-                except:
-                    print("Error reading json file")
-            else:
-                print("Empty json file found.")
+        self.ALL_COLORMAPS = self.doc.colormaps
+        self.USER_MAPS = self.doc.usermaps
 
         self.ColorBar = pg.GradientWidget(orientation='bottom')
         self.ColorBar.hide()
@@ -76,6 +60,7 @@ class GradientControl(QtGui.QDialog):
         self.UpdateMapButton = QtGui.QPushButton("Update SIFT Map")
         self.UpdateMapButton.clicked.connect(self.updateButtonClick)
 
+
         self.updateListWidget()
 
 
@@ -89,21 +74,22 @@ class GradientControl(QtGui.QDialog):
         l.addWidget(self.DeleteButton, 3, 0)
         l.addWidget(self.UpdateMapButton, 2, 0)
 
-        for map in ALL_COLORMAPS:
-            if ALL_COLORMAPS[map].colors and (hasattr(ALL_COLORMAPS[map], "_controls")):
-                self.importGradients(map, ALL_COLORMAPS[map].colors.hex, ALL_COLORMAPS[map]._controls)
+        for map in self.ALL_COLORMAPS:
+            if self.ALL_COLORMAPS[map].colors and (hasattr(self.ALL_COLORMAPS[map], "_controls")):
+                self.importGradients(map, self.ALL_COLORMAPS[map].colors.hex, self.ALL_COLORMAPS[map]._controls)
 
-                print("Imported Gradient!")
-            else:
-                print("Skipping: " + map)
-                print("Type: " + str(type(ALL_COLORMAPS[map])))
+        for map in self.USER_MAPS:
+            if self.USER_MAPS[map].colors and (hasattr(self.USER_MAPS[map], "_controls")):
+                self.importGradients(map, self.USER_MAPS[map].colors.hex, self.USER_MAPS[map]._controls)
+
+                #print("Imported Gradient!")
 
 
-    def updateButtonClick(self):
+    def updateButtonClickOld(self):
         self.autoImportData[self.List.item(self.List.currentRow()).text()] = self.ColorBar.saveState()
 
         for item in self.autoImportData.keys():
-            print("Doing " + item)
+            #print("Doing " + item)
             pointList = self.autoImportData[item]["ticks"]
             floats = []
             hex = []
@@ -119,15 +105,15 @@ class GradientControl(QtGui.QDialog):
                         self.bubbleSortSwap(floats, k, k - 1)
                         self.bubbleSortSwap(hex, k, k - 1)
 
-            print(ALL_COLORMAPS[item].colors.hex)
+            print(self.ALL_COLORMAPS[item].colors.hex)
             print(numpy.array(hex))
             print("\n")
-            print(ALL_COLORMAPS[item]._controls)
+            print(self.ALL_COLORMAPS[item]._controls)
             print(floats)
             print("\n")
             try:
                 toAdd = Colormap(colors=hex, controls=floats)
-                ALL_COLORMAPS[item] = toAdd
+                self.ALL_COLORMAPS[item] = toAdd
             except:
                 print("Error creating or setting colormap")
             #try:
@@ -137,10 +123,41 @@ class GradientControl(QtGui.QDialog):
             #    print("Error updating gradient!")
             #    print(e)
 
-        self.doc.update_colormaps(ALL_COLORMAPS)
+        self.doc.update_colormaps(self.ALL_COLORMAPS)
 
         print(self.List.item(self.List.currentRow()).text())
         self.doc.change_colormap_for_layers(self.List.item(self.List.currentRow()).text())
+
+    def updateButtonClick(self):
+        item = self.ColorBar.saveState()
+
+        pointList = item["ticks"]
+        floats = []
+        hex = []
+        for point in pointList:
+            floats.append(point[0])
+            rgb = point[1]
+            hexCode = rgb2hex(rgb[0], rgb[1], rgb[2])
+            hex.append(hexCode)
+
+        for i in range(len(floats)):
+            for k in range(len(floats) - 1, i, -1):
+                if (floats[k] < floats[k - 1]):
+                    self.bubbleSortSwap(floats, k, k - 1)
+                    self.bubbleSortSwap(hex, k, k - 1)
+
+        try:
+            toAdd = Colormap(colors=hex, controls=floats)
+            print(hex)
+            print(floats)
+            print(toAdd)
+        except:
+            print("Error creating or setting colormap")
+
+        #self.doc.update_colormaps(ALL_COLORMAPS)
+
+        print(self.List.item(self.List.currentRow()).text())
+        #self.doc.change_colormap_for_layers(self.List.item(self.List.currentRow()).text())
 
     def bubbleSortSwap(self, A, x, y):
         tmp = A[x]
@@ -324,6 +341,9 @@ class GradientControl(QtGui.QDialog):
         for key in self.gData.keys():
             self.List.addItem(key)
 
+
+        #TODO make a divider between custom and autoimport
+
         for key2 in self.autoImportData.keys():
             self.List.addItem(key2)
 
@@ -349,6 +369,9 @@ class GradientControl(QtGui.QDialog):
             self.SaveButton.hide()
             self.sqrt.hide()
         else:
+            hideUpdate = False
+            for j in SelectedThings:
+                print(j.text())
             self.ColorBar.show()
             self.SaveButton.show()
             self.sqrt.show()

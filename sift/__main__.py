@@ -49,6 +49,9 @@ import os
 import sys
 import logging
 
+import ast
+from sift.ui.GradientControl import GradientControl
+
 
 LOG = logging.getLogger(__name__)
 PROGRESS_BAR_MAX = 1000
@@ -854,7 +857,7 @@ class Main(QtGui.QMainWindow):
 
         open_gradient = QtGui.QAction("Toggle Gradient Editor", self)
         open_gradient.setShortcut("Ctrl+E")
-        open_gradient.triggered.connect(lambda: self.document.openGradientWidget())
+        open_gradient.triggered.connect(lambda: self.openGradientWidget())
 
         edit_menu = menubar.addMenu('&Edit')
         edit_menu.addAction(remove)
@@ -894,6 +897,37 @@ class Main(QtGui.QMainWindow):
     def updateLayerList(self):
         # self.ui.layers.add
         pass
+
+
+    gc = None
+
+    def openGradientWidget(self):
+        print("Opening..")
+
+        path = self.document._config_dir
+
+        print(path)
+
+        file_path = os.path.join(path, 'colormaps')
+
+        if not os.path.exists(file_path):
+            os.makedirs(file_path)
+
+        self.gc = GradientControl(doc=self.document)
+
+        print(os.listdir(file_path))
+
+        fileList = os.listdir(file_path)
+
+        for file in fileList:
+            openFile = open(file, "r")
+            toImport = ast.literal_eval(openFile.read())
+            self.gc.gData.update(toImport)
+            self.gc.saveData()
+
+        self.gc.show()
+        self.gc.updateListWidget()
+        print("Done!")
 
 
 def set_default_geometry(window, desktop=0):

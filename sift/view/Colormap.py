@@ -462,6 +462,8 @@ ALL_COLORMAPS.update(TOWRS_COLORMAPS)
 ALL_COLORMAPS.update(OTHER_COLORMAPS)
 
 
+USER_COLORMAPS = {}
+
 #del ALL_COLORMAPS["cubehelix"]
 #del ALL_COLORMAPS["single_hue"]
 #del ALL_COLORMAPS["hsl"]
