@@ -160,6 +160,7 @@ class QTrackItem(QGraphicsRectItem):
     This allows drag and drop of timelines to be easier
     """
     _scene = None
+    _uuid : UUID = None
     _z: int = None
     _title: str = None
     _subtitle: str = None
@@ -179,12 +180,13 @@ class QTrackItem(QGraphicsRectItem):
     _gi_colormap : QGraphicsPixmapItem = None
 
 
-    def __init__(self, scene, z: int,
+    def __init__(self, scene, uuid: UUID, z: int,
                  title: str, subtitle: str = None, icon: QIcon = None, metadata: dict = None,
                  tooltip: str = None, color: QColor = None, selected: bool = False,
                  colormap: [QGradient, QImage] = None, min: float = None, max: float = None):
         super(QTrackItem, self).__init__()
         self._scene = scene
+        self._uuid = uuid
         self._z = z
         self._title = title
         self._subtitle = subtitle
@@ -204,6 +206,10 @@ class QTrackItem(QGraphicsRectItem):
             self.setBrush(brush)
         self._add_decorations()
         scene.addItem(self)
+
+    @property
+    def uuid(self):
+        return self._uuid
 
     def _add_decorations(self):
         """Add decor sub-items to self
@@ -249,9 +255,7 @@ class QFrameItem(QGraphicsRectItem):
     """
     _state: TimelineFrameState = None
     _track: QTrackItem = None
-    # some frames are in-document, some are in-workspace, some are both
-    _ws_uuid: UUID = None
-    _doc_uuid: UUID = None
+    _uuid: UUID = None
     _start: datetime = None
     _duration: timedelta = None
     _title: str = None
@@ -259,10 +263,10 @@ class QFrameItem(QGraphicsRectItem):
     _thumb: QPixmap = None
     _metadata: Mapping = None
 
-    def __init__(self, track: QTrackItem,
-                 state: TimelineFrameState, start: datetime, duration: timedelta,
-                 title: str, subtitle: str = None, thumb: QPixmap = None, metadata: Mapping = None,
-                 workspace_uuid: UUID = None, document_uuid: UUID = None):
+    def __init__(self, track: QTrackItem, uuid: UUID,
+                 start: datetime, duration: timedelta, state: TimelineFrameState,
+                 title: str, subtitle: str = None, thumb: QPixmap = None,
+                 metadata: Mapping[str, Any] = None):
         """create a frame representation and add it to a timeline
         Args:
             track: which timeline to add it to
@@ -272,8 +276,7 @@ class QFrameItem(QGraphicsRectItem):
             title: title of frame
             subtitle: subtitle (below title, optional)
             thumb: thumbnail image (via pillow), optional, may not be displayed if space is not available
-            workspace_uuid: UUID of workspace representation (backed by content or simply metadata); may be None
-            document_uuid: UUID of document representation (backed by composition/presentation of other content); may be None
+            uuid: UUID of workspace representation
         """
         super(QFrameItem, self).__init__()
         rect = track.calc_frame_rect_in_track(t=start, d=duration)
@@ -286,8 +289,7 @@ class QFrameItem(QGraphicsRectItem):
         self._subtitle = subtitle
         self._thumb = thumb
         self._metadata = metadata
-        self._ws_uuid = workspace_uuid
-        self._doc_uuid = document_uuid
+        self._uuid = uuid
         pen, brush = track.default_frame_pen_brush
         if pen:
             LOG.debug('setting pen')
@@ -296,6 +298,11 @@ class QFrameItem(QGraphicsRectItem):
             LOG.debug('setting brush')
             self.setBrush(brush)
         self.setParentItem(track)
+
+    @property
+    def uuid(self):
+        return self._uuid
+
 
 
 class QTimeRulerItem(QGraphicsRectItem):
@@ -407,8 +414,20 @@ class QFramesInTracksScene(QGraphicsScene):
     # internal mid-level update commands
     #
 
-    def _add_track_with_frames(self, track, *frames):
-        raise NotImplementedError("NYI")  # FIXME
+    def add_track_frames(self, track: QTrackItem, *frames):
+        """Add track and optional frames to scene storage, to ensure they are retained
+        Asserts that if frame or track for the given UUID is already known, that the same item is being used
+        """
+        assert(isinstance(track, QTrackItem))
+        if track.uuid in self._track_items:
+            assert(track is self._track_items[track.uuid])
+        else:
+            self._track_items[track.uuid] = track
+        for frame in frames:
+            if frame.uuid in self._frame_items:
+                assert(frame is self._frame_items[frame.uuid])
+            else:
+                self._frame_items[frame.uuid] = frame
 
     def _del_track(self, track):
         raise NotImplementedError("NYI")  # FIXME
@@ -443,7 +462,8 @@ class QFramesInTracksScene(QGraphicsScene):
     didRequestStateChangeForFrame = pyqtSignal(UUID,
                                                TimelineFrameState)  # user requests a state change for a given frame
     didCopyColormapBetweenTracks = pyqtSignal(UUID, UUID)  # from-track and to-track
-    didChangeVisibleAreaForView = pyqtSignal(QGraphicsView, datetime,
+    didChangeVisibleAreaForView = pyqtSignal(QGraphicsView,
+                                             datetime,
                                              timedelta)  # note: multiple views can share one scene
 
     #
@@ -452,6 +472,13 @@ class QFramesInTracksScene(QGraphicsScene):
     # FUTURE: decide if we actually need a delegate ABC to compose
     # for now simpler is better and Scene is already delegate/model-like
     #
+
+    def get(self, uuid: UUID) -> [QTrackItem, QFrameItem, None]:
+        z = self._track_items.get(uuid, None)
+        if z is not None:
+            return z
+        z = self._frame_items.get(uuid, None)
+        return z
 
     def may_rearrange_track_z_order(self, track_uuid_list: List[UUID]) -> [Callable[bool], None]:
         """Determine whether tracks can be rearranged and provide a commit/abort function if so
@@ -466,13 +493,7 @@ class QFramesInTracksScene(QGraphicsScene):
         Only one callable is valid at a time
         """
         LOG.warning("using base class may_rearrange_track_z_order which does nothing")
-        return lambda b: None
-
-    def uuid_for_track_item(self, track_item) -> UUID:
-        return track_item.uuid
-
-    def uuid_for_frame_item(self, frame_item) -> UUID:
-        return frame_item.uuid
+        return lambda commit: None
 
     def tracks_in_same_family(self, track: UUID) -> Set[UUID]:
         """inform the view on which tracks are closely related to the given track
@@ -486,17 +507,18 @@ class QFramesInTracksScene(QGraphicsScene):
         LOG.warning("using base class may_reassign_color_map which does nothing")
         return lambda b: None
 
-    def menu_for_track(self, track_uuid: UUID, frame_uuid: UUID = None) -> [QMenu, None]:
+    def menu_for_track_frame(self, track_uuid: UUID, frame_uuid: UUID = None) -> [QMenu, None]:
         """Generate QMenu to use as context menu for a given track, optionally with frame if mouse was over that frame"""
-        LOG.warning("using base class menu_for_track which does nothing")
+        LOG.warning("using base class menu_for_track_frame which does nothing")
         return None
 
-    def update(self, changed_track_uuids: [Set, None] = None, changed_frame_uuids: [Set, None] = None):
-        """Populate or update scene, making sure all
+    def update(self, changed_track_uuids: [Set, None] = None, changed_frame_uuids: [Set, None] = None) -> int:
+        """Populate or update scene, returning number of items changed in scene
         Does not add new items for tracks and frames already present
-        Parameters act as hints
+        Parameters serve only as hints
         """
-        pass
+        LOG.warning("using base class update which does nothing")
+        return 0
 
 
 class QFramesInTracksView(QGraphicsView):
@@ -573,30 +595,34 @@ class TestWindow(QMainWindow):
         # And I animate it once manually.
         # self.animate()
 
+class TestScene(QFramesInTracksScene):
+    _did_populate = False
 
-def _test_populate(scene: QFramesInTracksScene):
-    """
-    test populate a scene
-    Args:
-        scene: scene to populate
+    def __init__(self):
+        super(TestScene, self).__init__()
 
-    Returns: collection of items placed in scene, such that they can remain retained (else they drop out of scene)
-    """
-    from uuid import uuid1 as uuidgen
-    once = datetime.utcnow()
-    wuuid = uuidgen()
-    min15 = timedelta(minutes=5)
-    abitrack = QTrackItem(scene, 0, "G21 ABI B99 BT", "test track", None, "peremptorily cromulent", None)
-    # scene.addItem(abitrack)  # done in init
-    frame1 = QFrameItem(abitrack, TimelineFrameState.AVAILABLE, once+min15, min15, "frame1", "fulldiskimus", workspace_uuid=wuuid)
-    abitrack.update_time_range_from_children()
-    # scene.addItem(frame1)  # done in init
-    blabla = QGraphicsTextItem('abcdcba')
-    font = QFont('White Rabbit')
-    blabla.setFont(font)
-    blabla.setPos(140, 100)
-    scene.addItem(blabla)
-    return [abitrack, frame1, blabla]
+    def update(self, changed_track_uuids: [Set, None] = None, changed_frame_uuids: [Set, None] = None) -> int:
+        if self._did_populate:
+            return 0
+        self._test_populate()
+
+    def _test_populate(self):
+        from uuid import uuid1 as uuidgen
+        once = datetime.utcnow()
+        tuuid = uuidgen()
+        fuuid = uuidgen()
+        min15 = timedelta(minutes=5)
+        abitrack = QTrackItem(self, tuuid, 0, "G21 ABI B99 BT", "test track", tooltip="peremptorily cromulent")
+        # scene.addItem(abitrack)  # done in init
+        frame1 = QFrameItem(abitrack, fuuid, once + min15, min15, TimelineFrameState.AVAILABLE, "frame1", "fulldiskimus")
+        abitrack.update_time_range_from_children()
+        # scene.addItem(frame1)  # done in init
+        blabla = QGraphicsTextItem('abcdcba')
+        font = QFont('White Rabbit')
+        blabla.setFont(font)
+        blabla.setPos(140, 100)
+        self.addItem(blabla)
+        self.content = [abitrack, frame1, blabla]
 
 
 class tests(unittest.TestCase):
