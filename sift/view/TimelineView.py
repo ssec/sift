@@ -453,7 +453,7 @@ class QFramesInTracksScene(QGraphicsScene):
     # for now simpler is better and Scene is already delegate/model-like
     #
 
-    def may_rearrange_track_z_order(self, track_uuid_list: List[UUID]) -> [Callable[bool], None]:
+    def may_rearrange_track_z_order(self, track_uuid_list: List[UUID]) -> Optional[Callable[[bool], None]]:
         """Determine whether tracks can be rearranged and provide a commit/abort function if so
         Optionally: reflect any such changes on other parts of the application
 
@@ -480,13 +480,13 @@ class QFramesInTracksScene(QGraphicsScene):
         """
         return set()
 
-    def may_reassign_color_map(self, from_track: UUID, to_track: UUID) -> [Callable[bool], None]:
+    def may_reassign_color_map(self, from_track: UUID, to_track: UUID) -> Optional[Callable[[bool], None]]:
         """User is dragging a color map around, determine if drop is permitted and provide a commit/abort function if so
         """
         LOG.warning("using base class may_reassign_color_map which does nothing")
         return lambda b: None
 
-    def menu_for_track(self, track_uuid: UUID, frame_uuid: UUID = None) -> [QMenu, None]:
+    def menu_for_track(self, track_uuid: UUID, frame_uuid: UUID = None) -> Optional[QMenu]:
         """Generate QMenu to use as context menu for a given track, optionally with frame if mouse was over that frame"""
         LOG.warning("using base class menu_for_track which does nothing")
         return None
