@@ -37,8 +37,10 @@ from sift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
 from sift.workspace import Workspace
 from sift import __version__
 from sift.util import (WORKSPACE_DB_DIR,
-                       DOCUMENT_SETTINGS_DIR)
+                       DOCUMENT_SETTINGS_DIR,
+                       get_package_data_dir)
 
+from glob import glob
 from functools import partial
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
@@ -944,6 +946,12 @@ def main():
     LOG.info("Using configuration directory: %s", args.config_dir)
     LOG.info("Using cache directory: %s", args.cache_dir)
     app.create()
+
+    # Add our own fonts to Qt windowing system
+    font_pattern = os.path.join(get_package_data_dir(), 'fonts', '*')
+    for fn in glob(font_pattern):
+        QtGui.QFontDatabase.addApplicationFont(fn)
+
     window = Main(
         cache_dir=args.cache_dir,
         config_dir=args.config_dir,
