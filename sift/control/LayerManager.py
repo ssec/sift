@@ -720,7 +720,7 @@ class RGBLayerConfigPane(QObject):
                     widget.setCurrentIndex(0)
                 else:
                     dex = widget.findData(str(slayer.uuid))
-                    if dex<=0:
+                    if dex <= 0:
                         widget.setCurrentIndex(0)
                         LOG.error('layer %s not available to be selected' % repr(slayer))
                     else:
@@ -743,15 +743,20 @@ class RGBLayerConfigPane(QObject):
             widget.clear()
             widget.addItem('None', '')
 
+        available_info = {}
+        available_short_names = []
+        # use DATASET_NAME as unique group identifier
+        for layer in doc.layers_where(is_valid=True, in_type_set=non_rgb_classes):
+            # use the UUID as a representative when talking to the document
+            available_info.setdefault(layer[INFO.SHORT_NAME],
+                                      layer[INFO.UUID])
+            available_short_names.append(layer[INFO.SHORT_NAME])
+
         # fill up our lists of layers
-        for layer_prez in doc.layers_where(is_valid=True, in_type_set=non_rgb_classes):
-            uuid = layer_prez.uuid
-            layer = doc[layer_prez.uuid]
-            layer_name = layer[INFO.DISPLAY_NAME]
-            LOG.debug('adding layer %s to RGB combo selectors' % layer_name)
+        for idx, (short_name, uuid) in enumerate(available_info.items()):
             uuid_string = str(uuid)
             for widget in self.rgb:
-                widget.addItem(layer_name, uuid_string)
+                widget.addItem(short_name, uuid_string)
 
     def _set_gamma_boxes(self, layer=None):
         if isinstance(layer, DocRGBLayer):
