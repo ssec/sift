@@ -403,11 +403,13 @@ class QFramesInTracksScene(QGraphicsScene):
     #
 
     def visible_tracks_frames(self, view: QGraphicsView = None) -> Mapping[UUID, List[UUID]]:
-        """return OrderedDict with UUID keys for tracks and list values of frames, for tracks and frames visible on in view"""
+        """return OrderedDict with UUID keys for tracks and list values of frames, for tracks and frames visible on in view
+        """
         raise NotImplementedError("NYI")  # FIXME
 
     def visible_time_range(self, view: QGraphicsView = None):
-        """return visible time range for the view in question"""
+        """return visible time range for the view in question
+        """
         raise NotImplementedError("NYI")  # FIXME
 
     #
@@ -469,8 +471,8 @@ class QFramesInTracksScene(QGraphicsScene):
     #
     # delegate functions to implement for document and workspace
     # these are typically called by view or scene control logic, e.g. to decide menu to display or progress of a drag operation
-    # FUTURE: decide if we actually need a delegate ABC to compose
-    # for now simpler is better and Scene is already delegate/model-like
+    # FUTURE: decide if we actually need a delegate ABC to compose, rather than subclass overrides
+    # for now simpler is better and Scene is already delegate/model-like so let's not over-indirect
     #
 
     def get(self, uuid: UUID) -> [QTrackItem, QFrameItem, None]:
@@ -499,6 +501,7 @@ class QFramesInTracksScene(QGraphicsScene):
         """inform the view on which tracks are closely related to the given track
         typically this is used to stylistically highlight related tracks during a drag operation
         """
+        LOG.warning("using base class tracks_in_same_family which does nothing")
         return set()
 
     def may_reassign_color_map(self, from_track: UUID, to_track: UUID) -> Optional[Callable[[bool], None]]:
