@@ -48,9 +48,12 @@ The Document holds user intent, including EngineRules for producing Product Cont
 The Engine performs operations on the Workspace and its Metadatabase to maintain implicit Product Content
 
 # REFERENCES
+http://doc.qt.io/archives/qt-4.8/examples-graphicsview.html
+http://doc.qt.io/archives/qt-4.8/qt-graphicsview-diagramscene-example.html
 http://pyqt.sourceforge.net/Docs/PyQt4/qgraphicsscene.html
 http://doc.qt.io/qt-4.8/qgraphicsview.html
 http://doc.qt.io/qt-4.8/qgraphicsitemgroup.html
+http://pyqt.sourceforge.net/Docs/PyQt4/qgraphicsitem.html
 http://doc.qt.io/qt-5/qtwidgets-graphicsview-dragdroprobot-example.html
 http://pyqt.sourceforge.net/Docs/PyQt4/qgraphicsobject.html
 
@@ -200,13 +203,13 @@ class QTrackItem(QGraphicsObject):
         self._selected = selected
         self._colormap = colormap
         self._min, self._max = min, max
-        pen, brush = scene.default_track_pen_brush
-        if pen:
-            LOG.debug('setting pen')
-            self.setPen(pen)
-        if brush:
-            LOG.debug('setting brush')
-            self.setBrush(brush)
+        # pen, brush = scene.default_track_pen_brush
+        # if pen:
+        #     LOG.debug('setting pen')
+        #     self.setPen(pen)
+        # if brush:
+        #     LOG.debug('setting brush')
+        #     self.setBrush(brush)
         self._add_decorations()
         scene.addItem(self)
         self.setAcceptDrops(True)
@@ -310,13 +313,13 @@ class QFrameItem(QGraphicsObject):
         self._thumb = thumb
         self._metadata = metadata
         self._uuid = uuid
-        pen, brush = track.default_frame_pen_brush
-        if pen:
-            LOG.debug('setting pen')
-            self.setPen(pen)
-        if brush:
-            LOG.debug('setting brush')
-            self.setBrush(brush)
+        # pen, brush = track.default_frame_pen_brush
+        # if pen:
+        #     LOG.debug('setting pen')
+        #     self.setPen(pen)
+        # if brush:
+        #     LOG.debug('setting brush')
+        #     self.setBrush(brush)
         self.setParentItem(track)
         self.setAcceptDrops(True)
 
@@ -692,8 +695,8 @@ def main():
 
     app = QApplication(sys.argv)
 
-    scene = QFramesInTracksScene()
-    stuff_not_to_lose = _test_populate(scene)
+    scene = TestScene()
+    scene._test_populate()
     window = TestWindow(scene)
     window.show()
     window.setFocus()
