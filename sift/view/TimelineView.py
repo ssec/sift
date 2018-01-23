@@ -5,7 +5,6 @@
 Timeline View using QGraphicsView and its kin
 Assume X coordinate corresponds to seconds, apply transforms as needed
 
-
 # FUNCTION
 - display a Scene of Timelines of Frames
 - View is scrollable in time (screen X) and level (screen Y), compressible in time
@@ -17,19 +16,25 @@ Assume X coordinate corresponds to seconds, apply transforms as needed
 # ACTIONS to support
 - drag a track up or down the z order
 - pop a context menu for a track or a frame
-- tool tips for frames or 
-- change display state of frame, represented by color
+- tool tips for frames or tracks
+- change display state of frame, represented by color (see TimelineFrameState)
 - allow one or more tracks to be selected 
 - allow one or more frames to be selected
 - scroll left and right to follow playback animation in background
-- display movable and live-updated time cursor, including highlighting borders of frames under time cursor
-- display time axis with actual dates and times, including click-to-place 
+- display time axis with actual dates and times, including click-to-place
+- scroll vertically (when more tracks than can be shown in View)
+- display movable and live-updated time cursor (playhead), including highlighting borders of frames under time cursor
+- signal playhead movement to external agencies
+- jump playhead to arbitrary time, optionally using left-right arrow keys
+    + when track/s or frames selected, jump to next/last frame transition within the selection
+    + when no tracks selected, consider all available frames (may require document help)
+- change horizontal seconds-per-pixel (generally done with an external slider or mouse alt-drag on time scale)
 - permit dragging of colorbars between layers
 - permit dragging of colorbars off an external palette
 - allow selection of tracks and frames using metadata matching
-- allow disable/enable of frames 
 - allow circulation of z-order using up/down arrow keys
 - allow sorting of tracks based on metadata characteristics
+- future: nested tracks, e.g. for RGB or Algebraic
 
 # CONCEPTS and VOCABULARY with respect to SIFT
 A timeline Frame represents a Product in the Workspace
@@ -46,7 +51,8 @@ The Engine performs operations on the Workspace and its Metadatabase to maintain
 http://pyqt.sourceforge.net/Docs/PyQt4/qgraphicsscene.html
 http://doc.qt.io/qt-4.8/qgraphicsview.html
 http://doc.qt.io/qt-4.8/qgraphicsitemgroup.html
-
+http://doc.qt.io/qt-5/qtwidgets-graphicsview-dragdroprobot-example.html
+http://pyqt.sourceforge.net/Docs/PyQt4/qgraphicsobject.html
 
 :author: R.K.Garcia <rkgarcia@wisc.edu>
 :copyright: 2017 by University of Wisconsin Regents, see AUTHORS for more details
@@ -153,9 +159,7 @@ class TimelineCoordTransform(QObject):
         return QRectF(aleft, atop, awidth, aheight)
 
 
-
-
-class QTrackItem(QGraphicsRectItem):
+class QTrackItem(QGraphicsObject):
     """ A group of Frames corresponding to a timeline
     This allows drag and drop of timelines to be easier
     """
@@ -178,7 +182,6 @@ class QTrackItem(QGraphicsRectItem):
     _gi_subtitle : QGraphicsTextItem = None
     _gi_icon : QGraphicsPixmapItem = None
     _gi_colormap : QGraphicsPixmapItem = None
-
 
     def __init__(self, scene, uuid: UUID, z: int,
                  title: str, subtitle: str = None, icon: QIcon = None, metadata: dict = None,
@@ -206,6 +209,7 @@ class QTrackItem(QGraphicsRectItem):
             self.setBrush(brush)
         self._add_decorations()
         scene.addItem(self)
+        self.setAcceptDrops(True)
 
     @property
     def uuid(self):
@@ -223,6 +227,22 @@ class QTrackItem(QGraphicsRectItem):
             self._gi_subtitle = it = scene.addSimpleText(self._subtitle)
             it.setParentItem(self)
 
+    # painting and boundaries
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget=None):
+        super(QFrameItem, self).paint(painter, option, widget)
+
+    def boundingRect(self) -> QRectF:
+        return super(QFrameItem, self).boundingRect()
+
+    # handle drag and drop
+    def dragEnterEvent(self, event: QGraphicsSceneDragDropEvent):
+        event.setAccepted(False)
+
+    def dragLeaveEvent(self, event: QGraphicsSceneDragDropEvent):
+        event.setAccepted(False)
+
+    def dropEvent(self, event: QGraphicsSceneDragDropEvent):
+        event.setAccepted(False)
 
     @property
     def default_frame_pen_brush(self):
@@ -247,7 +267,7 @@ class QTrackItem(QGraphicsRectItem):
         return self._scene.coords.calc_scene_rect(ztd)
 
 
-class QFrameItem(QGraphicsRectItem):
+class QFrameItem(QGraphicsObject):
     """A Frame
     For SIFT use, this corresponds to a single Product or single composite of multiple Products (e.g. RGB composite)
     QGraphicsView representation of a data frame, with a start and end time relative to the scene.
@@ -298,11 +318,31 @@ class QFrameItem(QGraphicsRectItem):
             LOG.debug('setting brush')
             self.setBrush(brush)
         self.setParentItem(track)
+        self.setAcceptDrops(True)
 
     @property
     def uuid(self):
         return self._uuid
 
+    # painting and boundaries
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget=None):
+        painter.begin(self)
+
+        painter.end()
+        # super(QFrameItem, self).paint(painter, option, widget)
+
+    def boundingRect(self) -> QRectF:
+        return super(QFrameItem, self).boundingRect()
+
+    # handle drag and drop
+    def dragEnterEvent(self, event: QGraphicsSceneDragDropEvent):
+        event.setAccepted(False)
+
+    def dragLeaveEvent(self, event: QGraphicsSceneDragDropEvent):
+        event.setAccepted(False)
+
+    def dropEvent(self, event: QGraphicsSceneDragDropEvent):
+        event.setAccepted(False)
 
 
 class QTimeRulerItem(QGraphicsRectItem):
