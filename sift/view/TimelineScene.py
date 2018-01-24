@@ -265,3 +265,10 @@ class TestScene(QFramesInTracksScene):
         blabla.setPos(140, 100)
         self.addItem(blabla)
         self.content = [abitrack, frame1, blabla]
+
+
+class QFramesInTracksView(QGraphicsView):
+    """Adds Track- and Frame-specific actions and signals to QGraphicsView"""
+
+    def __init__(self, *args, **kwargs):
+        super(QFramesInTracksView, self).__init__(*args, **kwargs)

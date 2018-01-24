@@ -283,19 +283,13 @@ class QTimeRulerItem(QGraphicsRectItem):
         super(QTimeRulerItem, self).__init__()
 
 
-class QFramesInTracksView(QGraphicsView):
-    """Adds Track- and Frame-specific actions and signals to QGraphicsView"""
-
-    def __init__(self, *args, **kwargs):
-        super(QFramesInTracksView, self).__init__(*args, **kwargs)
-
-
-
 class TestWindow(QMainWindow):
     _scene = None
     _gfx = None
 
     def __init__(self, scene, *args, **kwargs):
+        from sift.view.TimelineScene import QFramesInTracksView
+
         super(TestWindow, self).__init__(*args, **kwargs)
         # self.windowTitleChanged.connect(self.onWindowTitleChange)
         self.setWindowTitle("timeline unit test")
