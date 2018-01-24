@@ -11,9 +11,11 @@ import logging, unittest
 from collections import namedtuple
 from datetime import datetime, timedelta
 from enum import Enum
+import pickle as pkl
 from typing import Tuple, Optional
 
-from PyQt4.QtCore import QObject, QRectF
+from PyQt4.QtCore import QObject, QRectF, QByteArray
+from PyQt4.QtGui import QGraphicsSceneDragDropEvent
 
 LOG = logging.getLogger(__name__)
 
@@ -21,6 +23,13 @@ LOG = logging.getLogger(__name__)
 DEFAULT_TRACK_HEIGHT = 48
 DEFAULT_FRAME_HEIGHT = 42
 DEFAULT_FRAME_CORNER_RADIUS = 8
+
+# drag and drop mimetypes
+MIMETYPE_TIMELINE_COLORMAP = 'application/sift.timeline.colormap'
+MIMETYPE_TIMELINE_TRACK = 'application/sift.timeline.track'
+
+mimed_track = namedtuple("mimed_track", ('uuid'))
+mimed_colormap = namedtuple("mimed_colormap", ("pixmap"))
 
 class TimelineFrameState(Enum):
     """Displayed state of frames, corresponds to a color or style.
@@ -32,7 +41,6 @@ class TimelineFrameState(Enum):
     READY = 3  # available as a memory map, but may not be fully resident in RAM or VRAM
     ACTIVE = 4  # both ready to go into VRAM (or already resident), and participating in the application scene graph, possibly as part of an animation
     VISIBLE = 5  # active, and currently on-screen for user to view
-
 
 class TimelineTrackState(Enum):
     UNKNOWN = 0
@@ -115,3 +123,16 @@ class TimelineCoordTransform(QObject):
         if d is None:
             return x, None
         return x, d / self._time_unit
+
+# utility functions allowing python objects (usually a dictionary in our case) to pass thru drag and drop serialization
+def recv_mime(event: QGraphicsSceneDragDropEvent, mimetype: str):
+    mime = event.mimeData()
+    if not mime.hasFormat(mimetype):
+        return None
+    event.setAccepted(True)
+    obj = pkl.loads(mime.data(mimetype).data())
+    return obj
+
+def send_mime(event: QGraphicsSceneDragDropEvent, mimetype: str, obj):
+    qb = QByteArray(pkl.dumps(obj, protocol=pkl.HIGHEST_PROTOCOL))
+    event.setData(mimetype, qb)

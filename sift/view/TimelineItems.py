@@ -57,6 +57,7 @@ http://pyqt.sourceforge.net/Docs/PyQt4/qgraphicsitem.html
 http://doc.qt.io/qt-5/qtwidgets-graphicsview-dragdroprobot-example.html
 http://pyqt.sourceforge.net/Docs/PyQt4/qgraphicsobject.html
 http://pyqt.sourceforge.net/Docs/PyQt4/qpainter.html
+https://stackoverflow.com/questions/4216139/python-object-in-qmimedata
 
 :author: R.K.Garcia <rkgarcia@wisc.edu>
 :copyright: 2017 by University of Wisconsin Regents, see AUTHORS for more details
@@ -65,17 +66,18 @@ http://pyqt.sourceforge.net/Docs/PyQt4/qpainter.html
 import sys
 import logging, unittest
 from uuid import UUID
+import pickle as pkl
 from typing import Mapping, Any
 from datetime import datetime, timedelta
+from typing import Set
 from PyQt4.QtCore import QRectF, Qt
 from PyQt4.QtGui import *
 from PyQt4.QtOpenGL import QGLWidget, QGLFormat, QGL
 
-from sift.view.TimelineCommon import TimelineFrameState, ztdtup, DEFAULT_FRAME_CORNER_RADIUS, DEFAULT_TRACK_HEIGHT, DEFAULT_FRAME_HEIGHT
+from sift.view.TimelineCommon import *
 
 LOG = logging.getLogger(__name__)
 
-# PATH_TEST_DATA = os.environ.get('TEST_DATA', os.path.expanduser("~/Data/test_files/thing.dat"))
 
 class QTrackItem(QGraphicsObject):
     """ A group of Frames corresponding to a timeline
@@ -94,6 +96,7 @@ class QTrackItem(QGraphicsObject):
     _colormap: [QGradient, QImage] = None
     _min: float = None
     _max: float = None
+    _dragging : bool = False   # whether or not a drag is in progress across this item
     _left_pad: timedelta = timedelta(hours=1)  # space to left of first frame which we reserve for labels etc
     _right_pad: timedelta = timedelta(minutes=5)  # space to right of last frame we reserve for track closing etc
     # position in scene coordinates is determined by _z level and starting time of first frame, minus _left_pad
@@ -139,9 +142,14 @@ class QTrackItem(QGraphicsObject):
     def scene(self):
         return self._scene
 
+    @property
+    def default_frame_pen_brush(self):
+        return self._scene.default_frame_pen_brush
+
     def _add_decorations(self):
         """Add decor sub-items to self
         title, subtitle, icon, colormap
+        these are placed left of the local origin inside the _left_pad area
         """
         scene = self._scene
         if self._title:
@@ -150,8 +158,21 @@ class QTrackItem(QGraphicsObject):
         if self._subtitle:
             self._gi_subtitle = it = scene.addSimpleText(self._subtitle)
             it.setParentItem(self)
+        # FUTURE: add draggable color-map pixmap
+
+    # commands to cause item updates and then propagate back to the scene
+
+    def set_colormap(self, cmap: mimed_colormap):
+        """Inform scene that the user wants all tracks in our family to use this colormap
+        """
+        LOG.warning("set colormap from dragged colormap not yet implemented")
+
+    def insert_track_before(self, track: mimed_track):
+        """Inform scene that user wants a dragged scene moved to before us in the z-order"""
+        LOG.warning("reorder tracks usingdragged track not yet implemented")
 
     # painting and boundaries
+
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget=None):
         super(QTrackItem, self).paint(painter, option, widget)
 
@@ -161,25 +182,45 @@ class QTrackItem(QGraphicsObject):
         return self._bounds
 
     # handle clicking
+
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
+        LOG.debug("QTrackItem mouse-down")
         super(QTrackItem, self).mousePressEvent()
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent):
+        LOG.debug("QTrackItem mouse-up")
         super(QTrackItem, self).mouseReleaseEvent()
 
     # handle drag and drop
+
     def dragEnterEvent(self, event: QGraphicsSceneDragDropEvent):
-        event.setAccepted(False)
+        self._dragging = True
+
+        # test the content being dragged to see if it's compatible; if so, accept event
+        mime = event.mimeData()
+        if mime.hasFormat(MIMETYPE_TIMELINE_COLORMAP):
+            event.setAccepted(True)
+        elif mime.hasFormat(MIMETYPE_TIMELINE_TRACK):
+            # FIXME: implement animated re-arrange of tracks
+            event.setAccepted(True)
+        else:
+            event.setAccepted(False)
 
     def dragLeaveEvent(self, event: QGraphicsSceneDragDropEvent):
-        event.setAccepted(False)
+        self._dragging = False
 
     def dropEvent(self, event: QGraphicsSceneDragDropEvent):
+        colormap = recv_mime(event, MIMETYPE_TIMELINE_COLORMAP)
+        if colormap is not None:
+            self.set_colormap(colormap)
+            return
+        new_track_before = recv_mime(event, MIMETYPE_TIMELINE_TRACK)
+        if new_track_before is not None:
+            self.insert_track_before(new_track_before)
+        content = pkl.loads(event.mimeData().data())
         event.setAccepted(False)
 
-    @property
-    def default_frame_pen_brush(self):
-        return self._scene.default_frame_pen_brush
+    # working with Frames as sub-items, updating and syncing position and extents
 
     def _iter_frame_children(self):
         children = self.childItems()
@@ -205,6 +246,8 @@ class QTrackItem(QGraphicsObject):
 
     def update_pos_and_bounds(self):
         """Update position and bounds of the Track to reflect current TimelineCoordTransform, encapsulating frames owned
+        Note that the local x=0.0 corresponds to the time of the first frame in the track
+        This is also the center of rotation or animation "handle" (e.g. for track dragging)
         """
         # starting time and duration of the track, computed from frames owned
         t, d = self.time_extent_of_frames
@@ -214,8 +257,8 @@ class QTrackItem(QGraphicsObject):
         left, width = self._scene.coords.calc_pixel_x_pos(t - self._left_pad, d + self._left_pad + self._right_pad)
         # set track position, assuming we want origin coordinate of track item to be centered vertically within item
         self.setPos(left, top + DEFAULT_TRACK_HEIGHT / 2)
-        # bounds relative to position in scene
-        self._bounds = QRectF(0.0, -DEFAULT_TRACK_HEIGHT / 2, width, DEFAULT_TRACK_HEIGHT)
+        # bounds relative to position in scene, left_pad space to left of local origin (x<0), frames and right-pad at x>=0
+        self._bounds = QRectF(-self.left_pad, -DEFAULT_TRACK_HEIGHT / 2, width, DEFAULT_TRACK_HEIGHT)
         return self._bounds
 
     def update_frame_positions(self):
@@ -226,7 +269,7 @@ class QTrackItem(QGraphicsObject):
             if isinstance(child, QFrameItem):
                 # y relative to track is 0
                 # calculate absolute x position in scene
-                x = self._scene.coords.calc_pixel_x_pos(child.t + self._left_pad)
+                x = self._scene.coords.calc_pixel_x_pos(child.t)
                 child.setPos(x - myx, 0.0)
 
 
@@ -327,9 +370,11 @@ class QFrameItem(QGraphicsItem):
 
     # handle clicking
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
+        LOG.debug("QFrameItem mouse-down")
         super(QFrameItem, self).mousePressEvent()
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent):
+        LOG.debug("QFrameItem mouse-up")
         super(QFrameItem, self).mouseReleaseEvent()
 
 
