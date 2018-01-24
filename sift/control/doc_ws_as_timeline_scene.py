@@ -15,7 +15,7 @@ from uuid import UUID
 from typing import Tuple, Optional, Mapping, List, Any, Callable, Set
 from PyQt4.QtGui import QMenu
 
-from sift.view.TimelineView import QTrackItem, QFrameItem
+from sift.view.TimelineItems import QTrackItem, QFrameItem
 from sift.view.TimelineScene import QFramesInTracksScene
 from sift.workspace import Workspace
 from sift.model.document import Document

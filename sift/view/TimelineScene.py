@@ -20,7 +20,7 @@ from PyQt4.QtCore import QRectF, Qt, pyqtSignal
 from PyQt4.QtGui import QGraphicsScene, QPen, QBrush, QPainter, QGraphicsView, QMenu, QGraphicsTextItem, QFont
 
 from sift.view.TimelineCommon import TimelineFrameState, TimelineTrackState, TimelineCoordTransform
-from sift.view.TimelineView import QTimeRulerItem, QTrackItem, QFrameItem
+from sift.view.TimelineItems import QTimeRulerItem, QTrackItem, QFrameItem
 
 LOG = logging.getLogger(__name__)
 
