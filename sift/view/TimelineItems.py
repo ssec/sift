@@ -56,6 +56,7 @@ http://doc.qt.io/qt-4.8/qgraphicsitemgroup.html
 http://pyqt.sourceforge.net/Docs/PyQt4/qgraphicsitem.html
 http://doc.qt.io/qt-5/qtwidgets-graphicsview-dragdroprobot-example.html
 http://pyqt.sourceforge.net/Docs/PyQt4/qgraphicsobject.html
+http://pyqt.sourceforge.net/Docs/PyQt4/qpainter.html
 
 :author: R.K.Garcia <rkgarcia@wisc.edu>
 :copyright: 2017 by University of Wisconsin Regents, see AUTHORS for more details
@@ -66,11 +67,11 @@ import logging, unittest
 from uuid import UUID
 from typing import Mapping, Any
 from datetime import datetime, timedelta
-from PyQt4.QtCore import QRectF
+from PyQt4.QtCore import QRectF, Qt
 from PyQt4.QtGui import *
 from PyQt4.QtOpenGL import QGLWidget, QGLFormat, QGL
 
-from sift.view.TimelineCommon import TimelineFrameState, ztdtup
+from sift.view.TimelineCommon import TimelineFrameState, ztdtup, DEFAULT_FRAME_CORNER_RADIUS, DEFAULT_TRACK_HEIGHT, DEFAULT_FRAME_HEIGHT
 
 LOG = logging.getLogger(__name__)
 
@@ -82,7 +83,7 @@ class QTrackItem(QGraphicsObject):
     """
     _scene = None
     _uuid : UUID = None
-    _z: int = None
+    _z: int = None  # our track number as displayed, 0 being highest on screen, with larger Z going downward
     _title: str = None
     _subtitle: str = None
     _icon: QIcon = None   # e.g. whether it's algebraic or RGB
@@ -93,8 +94,10 @@ class QTrackItem(QGraphicsObject):
     _colormap: [QGradient, QImage] = None
     _min: float = None
     _max: float = None
-    _left_pad: timedelta = timedelta(hours=1)
-    _right_pad: timedelta = timedelta(minutes=5)
+    _left_pad: timedelta = timedelta(hours=1)  # space to left of first frame which we reserve for labels etc
+    _right_pad: timedelta = timedelta(minutes=5)  # space to right of last frame we reserve for track closing etc
+    # position in scene coordinates is determined by _z level and starting time of first frame, minus _left_pad
+    _bounds: QRectF = None  # bounds of the track in scene coordinates, assuming 0,0 corresponds to vertical center of left edge of frame representation
     _gi_title : QGraphicsTextItem = None
     _gi_subtitle : QGraphicsTextItem = None
     _gi_icon : QGraphicsPixmapItem = None
@@ -132,6 +135,10 @@ class QTrackItem(QGraphicsObject):
     def uuid(self):
         return self._uuid
 
+    @property
+    def scene(self):
+        return self._scene
+
     def _add_decorations(self):
         """Add decor sub-items to self
         title, subtitle, icon, colormap
@@ -149,7 +156,9 @@ class QTrackItem(QGraphicsObject):
         super(QTrackItem, self).paint(painter, option, widget)
 
     def boundingRect(self) -> QRectF:
-        return super(QTrackItem, self).boundingRect()
+        if self._bounds is None:
+            return self.update_bounds()
+        return self._bounds
 
     # handle clicking
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
@@ -172,26 +181,56 @@ class QTrackItem(QGraphicsObject):
     def default_frame_pen_brush(self):
         return self._scene.default_frame_pen_brush
 
-    def update_time_range_from_children(self):
-        extent = self.childrenBoundingRect()
-        LOG.debug("track bounds left={} top={} width={} height={}".format(extent.left(), extent.top(), extent.width(), extent.height()))
-        tx, dx = extent.left(), extent.width()
-        t, d = self._scene.coords.calc_time_duration(tx, dx)
-        rect = self._scene.coords.calc_scene_rect(z=self._z, t=t - self._left_pad, d=d + self._left_pad + self._right_pad)
-        self.setRect(rect)
+    def _iter_frame_children(self):
+        children = self.childItems()
+        for child in children:
+            if isinstance(child, QFrameItem):
+                yield child
 
-
-    def calc_frame_rect_in_track(self, ztd: ztdtup =None, z:int=0, t: datetime=None, d: timedelta=None):
+    @property
+    def time_extent_of_frames(self):
+        """start time and duration of the frames held by the track
         """
-        calculate frame rect within scene
-        Returns: QRectF
+        s, e = None, None
+        for child in self._iter_frame_children():
+            # y relative to track is 0
+            # calculate absolute x position in scene
+            t,d = child.td
+            s = t if (s is None) else min(t, s)
+            e = (t + d) if (e is None) else max(e, t + d)
+        if e is None:
+            LOG.info("empty track cannot determine its horizontal extent")
+            return None, None
+        return s, e - s
+
+    def update_pos_and_bounds(self):
+        """Update position and bounds of the Track to reflect current TimelineCoordTransform, encapsulating frames owned
         """
-        if ztd is None:
-            ztd = ztdtup(z, t, d)
-        return self._scene.coords.calc_scene_rect(ztd)
+        # starting time and duration of the track, computed from frames owned
+        t, d = self.time_extent_of_frames
+        # scene y coordinate of upper left corner
+        top = self._z * DEFAULT_TRACK_HEIGHT
+        # convert track extent to scene coordinates using current transform
+        left, width = self._scene.coords.calc_pixel_x_pos(t - self._left_pad, d + self._left_pad + self._right_pad)
+        # set track position, assuming we want origin coordinate of track item to be centered vertically within item
+        self.setPos(left, top + DEFAULT_TRACK_HEIGHT / 2)
+        # bounds relative to position in scene
+        self._bounds = QRectF(0.0, -DEFAULT_TRACK_HEIGHT / 2, width, DEFAULT_TRACK_HEIGHT)
+        return self._bounds
+
+    def update_frame_positions(self):
+        """Update frames' origins relative to self after TimelineCoordTransform has changed scale
+        """
+        myx = self.pos().x()  # my x coordinate relative to scene
+        for child in self._iter_frame_children():
+            if isinstance(child, QFrameItem):
+                # y relative to track is 0
+                # calculate absolute x position in scene
+                x = self._scene.coords.calc_pixel_x_pos(child.t + self._left_pad)
+                child.setPos(x - myx, 0.0)
 
 
-class QFrameItem(QGraphicsObject):
+class QFrameItem(QGraphicsItem):
     """A Frame
     For SIFT use, this corresponds to a single Product or single composite of multiple Products (e.g. RGB composite)
     QGraphicsView representation of a data frame, with a start and end time relative to the scene.
@@ -223,9 +262,6 @@ class QFrameItem(QGraphicsObject):
             uuid: UUID of workspace representation
         """
         super(QFrameItem, self).__init__()
-        rect = track.calc_frame_rect_in_track(t=start, d=duration)
-        if rect is not None:
-            self.setRect(rect)
         self._state = state
         self._start = start
         self._duration = duration
@@ -242,31 +278,52 @@ class QFrameItem(QGraphicsObject):
         #     LOG.debug('setting brush')
         #     self.setBrush(brush)
         self.setParentItem(track)
-        self.setAcceptDrops(True)
+        # self.setAcceptDrops(True)
 
     @property
     def uuid(self):
         return self._uuid
 
-    # painting and boundaries
-    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget=None):
-        painter.begin(self)
+    @property
+    def t(self):
+        return self._start
 
-        painter.end()
+    @property
+    def d(self):
+        return self._duration
+
+    @property
+    def td(self):
+        return self._start, self._duration
+
+    # painting and boundaries
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget=None) -> None:
+        pen, brush = self._track.default_frame_pen_brush
+        rect = self.boundingRect()
+        painter.setBrush(brush)
+        painter.setPen(pen)
+        painter.drawRoundedRect(rect, DEFAULT_FRAME_CORNER_RADIUS, DEFAULT_FRAME_CORNER_RADIUS, Qt.RelativeSize)
+
         # super(QFrameItem, self).paint(painter, option, widget)
 
     def boundingRect(self) -> QRectF:
-        return super(QFrameItem, self).boundingRect()
+        """return relative bounding rectangle, given position is set by Track parent as needed
+        """
+        left = 0.0
+        top = - DEFAULT_FRAME_HEIGHT / 2
+        height = DEFAULT_FRAME_HEIGHT
+        width = self._track.scene.coords.calc_pixel_duration(self._duration)
+        return QRectF(left, top, width, height)
 
-    # handle drag and drop
-    def dragEnterEvent(self, event: QGraphicsSceneDragDropEvent):
-        event.setAccepted(False)
-
-    def dragLeaveEvent(self, event: QGraphicsSceneDragDropEvent):
-        event.setAccepted(False)
-
-    def dropEvent(self, event: QGraphicsSceneDragDropEvent):
-        event.setAccepted(False)
+    # # handle drag and drop
+    # def dragEnterEvent(self, event: QGraphicsSceneDragDropEvent):
+    #     event.setAccepted(False)
+    #
+    # def dragLeaveEvent(self, event: QGraphicsSceneDragDropEvent):
+    #     event.setAccepted(False)
+    #
+    # def dropEvent(self, event: QGraphicsSceneDragDropEvent):
+    #     event.setAccepted(False)
 
     # handle clicking
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):

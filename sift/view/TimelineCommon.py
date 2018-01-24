@@ -18,8 +18,9 @@ from PyQt4.QtCore import QObject, QRectF
 LOG = logging.getLogger(__name__)
 
 
-DEFAULT_TIMELINE_HEIGHT = 48
-
+DEFAULT_TRACK_HEIGHT = 48
+DEFAULT_FRAME_HEIGHT = 42
+DEFAULT_FRAME_CORNER_RADIUS = 8
 
 class TimelineFrameState(Enum):
     """Displayed state of frames, corresponds to a color or style.
@@ -58,7 +59,7 @@ class TimelineCoordTransform(QObject):
     _time_unit: timedelta = None
     _track_height: float = None
 
-    def __init__(self, time_base: datetime = None, time_unit: timedelta = timedelta(seconds=1), track_height=DEFAULT_TIMELINE_HEIGHT):
+    def __init__(self, time_base: datetime = None, time_unit: timedelta = timedelta(seconds=1), track_height=DEFAULT_TRACK_HEIGHT):
         """
 
         Args:
@@ -106,4 +107,11 @@ class TimelineCoordTransform(QObject):
         awidth = ztd.d / self._time_unit
         return QRectF(aleft, atop, awidth, aheight)
 
+    def calc_pixel_duration(self, d: timedelta):
+        return d / self._time_unit
 
+    def calc_pixel_x_pos(self, t: datetime, d: timedelta = None):
+        x = (t - self._time_base) / self._time_unit
+        if d is None:
+            return x, None
+        return x, d / self._time_unit
