@@ -12,15 +12,19 @@ REQUIRES
 :license: GPLv3, see LICENSE for more details
 """
 import logging
+import sys
+import unittest
 from datetime import datetime, timedelta
 from typing import Tuple, Optional, Mapping, List, Callable, Set
 from uuid import UUID
 
 from PyQt4.QtCore import QRectF, Qt, pyqtSignal
-from PyQt4.QtGui import QGraphicsScene, QPen, QBrush, QPainter, QGraphicsView, QMenu, QGraphicsTextItem, QFont
+from PyQt4.QtGui import QGraphicsScene, QPen, QBrush, QPainter, QGraphicsView, QMenu, QGraphicsTextItem, QFont, \
+    QMainWindow, QStatusBar, QApplication
+from PyQt4.QtOpenGL import QGLFormat, QGL, QGLWidget
 
 from sift.view.TimelineCommon import TimelineFrameState, TimelineTrackState, TimelineCoordTransform
-from sift.view.TimelineItems import QTimeRulerItem, QTrackItem, QFrameItem
+from sift.view.TimelineItems import QTrackItem, QFrameItem, QTimeRulerItem
 
 LOG = logging.getLogger(__name__)
 
@@ -254,10 +258,11 @@ class TestScene(QFramesInTracksScene):
         tuuid = uuidgen()
         fuuid = uuidgen()
         min15 = timedelta(minutes=5)
-        abitrack = QTrackItem(self, tuuid, 0, "G21 ABI B99 BT", "test track", tooltip="peremptorily cromulent")
+        abitrack = QTrackItem(self, self.coords, tuuid, 0, "G21 ABI B99 BT", "test track", tooltip="peremptorily cromulent")
         # scene.addItem(abitrack)  # done in init
-        frame1 = QFrameItem(abitrack, fuuid, once + min15, min15, TimelineFrameState.AVAILABLE, "frame1", "fulldiskimus")
-        abitrack.update_time_range_from_children()
+        frame1 = QFrameItem(abitrack, self.coords, fuuid, once + min15, min15, TimelineFrameState.AVAILABLE, "frame1", "fulldiskimus")
+        abitrack.update_pos_and_bounds()
+        abitrack.update_frame_positions()
         # scene.addItem(frame1)  # done in init
         blabla = QGraphicsTextItem('abcdcba')
         font = QFont('White Rabbit')
@@ -272,3 +277,111 @@ class QFramesInTracksView(QGraphicsView):
 
     def __init__(self, *args, **kwargs):
         super(QFramesInTracksView, self).__init__(*args, **kwargs)
+
+
+class TestWindow(QMainWindow):
+    _scene = None
+    _gfx = None
+
+    def __init__(self, scene, *args, **kwargs):
+        from sift.view.TimelineScene import QFramesInTracksView
+
+        super(TestWindow, self).__init__(*args, **kwargs)
+        # self.windowTitleChanged.connect(self.onWindowTitleChange)
+        self.setWindowTitle("timeline unit test")
+
+        # toolbar = QToolBar("och")
+        # toolbar.setIconSize(QSize(20,20))
+        # self.addToolBar(toolbar)
+
+        # button_action = QAction(QIcon("balance.png"), "ochtuse", self)
+        # button_action.setStatusTip("och, just do something")
+        # button_action.triggered.connect(self.onMyToolBarButtonClick)
+        # button_action.setCheckable(True)
+        # # button_action.setShortcut(QKeySequence("Ctrl+p"))
+        # # button_action.setShortcut(QKeySequence(Qt.CTRL + Qt.Key_P))
+        # button_action.setShortcut(QKeySequence.Print)
+        # toolbar.addAction(button_action)
+        # toolbar.addWidget(QLabel("OCH"))
+        # toolbar.addWidget(QCheckBox())
+
+        self.setStatusBar(QStatusBar(self))
+
+        menu = self.menuBar()
+
+        file_menu = menu.addMenu("&File")
+        # file_menu.addAction(button_action)
+        # file_menu.addSeparator()
+        file_menu.addMenu("Do not push")
+#        file_menu.addAction()
+
+        self._scene = scene
+        gfx = self._gfx = QFramesInTracksView(self)
+        # label = QLabel("och!")
+        # label.setAlignment(Qt.AlignCenter)
+
+        # ref https://doc.qt.io/archives/qq/qq26-openglcanvas.html
+        self.setCentralWidget(gfx)
+        fmt = QGLFormat(QGL.SampleBuffers)
+        wdgt = QGLWidget(fmt)
+        assert(wdgt.isValid())
+        gfx.setViewport(wdgt)
+        gfx.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
+        scene.setSceneRect(QRectF(0,0, 800, 600))
+        gfx.setScene(scene)
+
+        # populate fills the scene with interesting stuff.
+        # self.populate()
+
+        # Make it bigger
+        # self.setWindowState(Qt.WindowMaximized)
+
+        # Well... it's going to have an animation, ok?
+
+        # So, I set a timer to 1 second
+        # self.animator=QTimer()
+
+        # And when it triggers, it calls the animate method
+        # self.animator.timeout.connect(self.animate)
+
+        # And I animate it once manually.
+        # self.animate()
+
+
+class tests(unittest.TestCase):
+    def setUp(self):
+        pass
+
+    def test_something(self):
+        pass
+
+
+def _debug(type, value, tb):
+    "enable with sys.excepthook = debug"
+    if not sys.stdin.isatty():
+        sys.__excepthook__(type, value, tb)
+    else:
+        import traceback, pdb
+        traceback.print_exception(type, value, tb)
+        # …then start the debugger in post-mortem mode.
+        pdb.post_mortem(tb)  # more “modern”
+
+
+def main():
+    from sift.view.TimelineScene import TestScene
+    logging.basicConfig(level=logging.DEBUG)
+
+    app = QApplication(sys.argv)
+
+    scene = TestScene()
+    scene._test_populate()
+    window = TestWindow(scene)
+    window.show()
+    window.setFocus()
+
+    app.exec_()
+
+    return 0
+
+if __name__ == '__main__':
+    sys.exit(main())

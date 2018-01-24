@@ -63,16 +63,10 @@ https://stackoverflow.com/questions/4216139/python-object-in-qmimedata
 :copyright: 2017 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-import sys
-import logging, unittest
 from uuid import UUID
-import pickle as pkl
 from typing import Mapping, Any
-from datetime import datetime, timedelta
-from typing import Set
-from PyQt4.QtCore import QRectF, Qt
+from PyQt4.QtCore import Qt
 from PyQt4.QtGui import *
-from PyQt4.QtOpenGL import QGLWidget, QGLFormat, QGL
 
 from sift.view.TimelineCommon import *
 
@@ -84,6 +78,7 @@ class QTrackItem(QGraphicsObject):
     This allows drag and drop of timelines to be easier
     """
     _scene = None
+    _scale: TimelineCoordTransform = None
     _uuid : UUID = None
     _z: int = None  # our track number as displayed, 0 being highest on screen, with larger Z going downward
     _title: str = None
@@ -106,12 +101,13 @@ class QTrackItem(QGraphicsObject):
     _gi_icon : QGraphicsPixmapItem = None
     _gi_colormap : QGraphicsPixmapItem = None
 
-    def __init__(self, scene, uuid: UUID, z: int,
+    def __init__(self, scene, scale: TimelineCoordTransform, uuid: UUID, z: int,
                  title: str, subtitle: str = None, icon: QIcon = None, metadata: dict = None,
                  tooltip: str = None, color: QColor = None, selected: bool = False,
                  colormap: [QGradient, QImage] = None, min: float = None, max: float = None):
         super(QTrackItem, self).__init__()
         self._scene = scene
+        self._scale = scale
         self._uuid = uuid
         self._z = z
         self._title = title
@@ -178,7 +174,7 @@ class QTrackItem(QGraphicsObject):
 
     def boundingRect(self) -> QRectF:
         if self._bounds is None:
-            return self.update_bounds()
+            return self.update_pos_and_bounds()
         return self._bounds
 
     # handle clicking
@@ -254,11 +250,12 @@ class QTrackItem(QGraphicsObject):
         # scene y coordinate of upper left corner
         top = self._z * DEFAULT_TRACK_HEIGHT
         # convert track extent to scene coordinates using current transform
-        left, width = self._scene.coords.calc_pixel_x_pos(t - self._left_pad, d + self._left_pad + self._right_pad)
+        frames_left, frames_width = self._scale.calc_pixel_x_pos(t, d)
+        track_left, track_width = self._scale.calc_pixel_x_pos(t - self._left_pad, d + self._left_pad + self._right_pad)
         # set track position, assuming we want origin coordinate of track item to be centered vertically within item
-        self.setPos(left, top + DEFAULT_TRACK_HEIGHT / 2)
+        self.setPos(frames_left, top + DEFAULT_TRACK_HEIGHT / 2)
         # bounds relative to position in scene, left_pad space to left of local origin (x<0), frames and right-pad at x>=0
-        self._bounds = QRectF(-self.left_pad, -DEFAULT_TRACK_HEIGHT / 2, width, DEFAULT_TRACK_HEIGHT)
+        self._bounds = QRectF(track_left - frames_left, -DEFAULT_TRACK_HEIGHT / 2, track_width, DEFAULT_TRACK_HEIGHT)
         return self._bounds
 
     def update_frame_positions(self):
@@ -269,7 +266,7 @@ class QTrackItem(QGraphicsObject):
             if isinstance(child, QFrameItem):
                 # y relative to track is 0
                 # calculate absolute x position in scene
-                x = self._scene.coords.calc_pixel_x_pos(child.t)
+                x, _ = self._scale.calc_pixel_x_pos(child.t)
                 child.setPos(x - myx, 0.0)
 
 
@@ -281,6 +278,7 @@ class QFrameItem(QGraphicsItem):
     """
     _state: TimelineFrameState = None
     _track: QTrackItem = None
+    _scale: TimelineCoordTransform = None
     _uuid: UUID = None
     _start: datetime = None
     _duration: timedelta = None
@@ -289,7 +287,7 @@ class QFrameItem(QGraphicsItem):
     _thumb: QPixmap = None
     _metadata: Mapping = None
 
-    def __init__(self, track: QTrackItem, uuid: UUID,
+    def __init__(self, track: QTrackItem, scale: TimelineCoordTransform, uuid: UUID,
                  start: datetime, duration: timedelta, state: TimelineFrameState,
                  title: str, subtitle: str = None, thumb: QPixmap = None,
                  metadata: Mapping[str, Any] = None):
@@ -305,7 +303,9 @@ class QFrameItem(QGraphicsItem):
             uuid: UUID of workspace representation
         """
         super(QFrameItem, self).__init__()
+        self._track = track
         self._state = state
+        self._scale = scale
         self._start = start
         self._duration = duration
         self._title = title
@@ -355,7 +355,8 @@ class QFrameItem(QGraphicsItem):
         left = 0.0
         top = - DEFAULT_FRAME_HEIGHT / 2
         height = DEFAULT_FRAME_HEIGHT
-        width = self._track.scene.coords.calc_pixel_duration(self._duration)
+        width = self._scale.calc_pixel_duration(self._duration)
+        LOG.debug("width for {} is {} scene pixels".format(self._duration, width))
         return QRectF(left, top, width, height)
 
     # # handle drag and drop
@@ -384,111 +385,3 @@ class QTimeRulerItem(QGraphicsRectItem):
     def __init__(self):
         super(QTimeRulerItem, self).__init__()
 
-
-class TestWindow(QMainWindow):
-    _scene = None
-    _gfx = None
-
-    def __init__(self, scene, *args, **kwargs):
-        from sift.view.TimelineScene import QFramesInTracksView
-
-        super(TestWindow, self).__init__(*args, **kwargs)
-        # self.windowTitleChanged.connect(self.onWindowTitleChange)
-        self.setWindowTitle("timeline unit test")
-
-        # toolbar = QToolBar("och")
-        # toolbar.setIconSize(QSize(20,20))
-        # self.addToolBar(toolbar)
-
-        # button_action = QAction(QIcon("balance.png"), "ochtuse", self)
-        # button_action.setStatusTip("och, just do something")
-        # button_action.triggered.connect(self.onMyToolBarButtonClick)
-        # button_action.setCheckable(True)
-        # # button_action.setShortcut(QKeySequence("Ctrl+p"))
-        # # button_action.setShortcut(QKeySequence(Qt.CTRL + Qt.Key_P))
-        # button_action.setShortcut(QKeySequence.Print)
-        # toolbar.addAction(button_action)
-        # toolbar.addWidget(QLabel("OCH"))
-        # toolbar.addWidget(QCheckBox())
-
-        self.setStatusBar(QStatusBar(self))
-
-        menu = self.menuBar()
-
-        file_menu = menu.addMenu("&File")
-        # file_menu.addAction(button_action)
-        # file_menu.addSeparator()
-        file_menu.addMenu("Do not push")
-#        file_menu.addAction()
-
-        self._scene = scene
-        gfx = self._gfx = QFramesInTracksView(self)
-        # label = QLabel("och!")
-        # label.setAlignment(Qt.AlignCenter)
-
-        # ref https://doc.qt.io/archives/qq/qq26-openglcanvas.html
-        self.setCentralWidget(gfx)
-        fmt = QGLFormat(QGL.SampleBuffers)
-        wdgt = QGLWidget(fmt)
-        assert(wdgt.isValid())
-        gfx.setViewport(wdgt)
-        gfx.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
-        scene.setSceneRect(QRectF(0,0, 800, 600))
-        gfx.setScene(scene)
-
-        # populate fills the scene with interesting stuff.
-        # self.populate()
-
-        # Make it bigger
-        # self.setWindowState(Qt.WindowMaximized)
-
-        # Well... it's going to have an animation, ok?
-
-        # So, I set a timer to 1 second
-        # self.animator=QTimer()
-
-        # And when it triggers, it calls the animate method
-        # self.animator.timeout.connect(self.animate)
-
-        # And I animate it once manually.
-        # self.animate()
-
-
-class tests(unittest.TestCase):
-    def setUp(self):
-        pass
-
-    def test_something(self):
-        pass
-
-
-def _debug(type, value, tb):
-    "enable with sys.excepthook = debug"
-    if not sys.stdin.isatty():
-        sys.__excepthook__(type, value, tb)
-    else:
-        import traceback, pdb
-        traceback.print_exception(type, value, tb)
-        # …then start the debugger in post-mortem mode.
-        pdb.post_mortem(tb)  # more “modern”
-
-
-def main():
-    from sift.view.TimelineScene import TestScene
-    logging.basicConfig(level=logging.DEBUG)
-
-    app = QApplication(sys.argv)
-
-    scene = TestScene()
-    scene._test_populate()
-    window = TestWindow(scene)
-    window.show()
-    window.setFocus()
-
-    app.exec_()
-
-    return 0
-
-
-if __name__ == '__main__':
-    sys.exit(main())
