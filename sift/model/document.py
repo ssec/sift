@@ -352,7 +352,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if not os.path.exists(filepath):
             os.makedirs(filepath)
 
-
+        print("FP: " + filepath)
         qtData = {}
         for subdir, dirs, files in os.walk(filepath):
             for file in files:
@@ -416,8 +416,21 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             )
 
 
-    def updateColorMaps(self, colorMap):
+    def updateGCColorMap(self, colorMap, name):
         print("Received update call..")
+        self.usermaps[name] = colorMap
+        print(colorMap)
+
+        filepath = os.path.join(DOCUMENT_SETTINGS_DIR, 'colormaps')
+
+        try:
+            print("FP: " + filepath + "/" + name + ".txt")
+            iFile = open(filepath + "/" + name + ".txt", 'w')
+            iFile.write(str(colorMap))
+            iFile.close()
+        except Exception as e:
+            print(e)
+
 
     def current_projection_index(self):
         return list(self.available_projections.keys()).index(self.current_projection)

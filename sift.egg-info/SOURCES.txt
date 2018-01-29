@@ -5,7 +5,6 @@ sift/__init__.py
 sift/__main__.py
 sift/common.py
 sift/queue.py
-sift/util.py
 sift/version.py
 sift.egg-info/PKG-INFO
 sift.egg-info/SOURCES.txt
@@ -59,6 +58,7 @@ sift/tests/qtlistmodel-duganchen.py
 sift/tests/simple0.py
 sift/tests/simple1.py
 sift/tests/simple2.py
+sift/ui/GradientControl.py
 sift/ui/__init__.py
 sift/ui/change_colormap_dialog.ui
 sift/ui/change_colormap_dialog_ui.py
@@ -73,6 +73,8 @@ sift/ui/open_cache_dialog.ui
 sift/ui/open_cache_dialog_ui.py
 sift/ui/pov_main.ui
 sift/ui/pov_main_ui.py
+sift/util/__init__.py
+sift/util/default_paths.py
 sift/view/Cameras.py
 sift/view/Colormap.py
 sift/view/GLTileMapStackWidget.py
