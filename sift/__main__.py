@@ -904,29 +904,9 @@ class Main(QtGui.QMainWindow):
     def openGradientWidget(self):
         print("Opening..")
 
-        path = self.document._config_dir
-
-        print(path)
-
-        file_path = os.path.join(path, 'colormaps')
-
-        if not os.path.exists(file_path):
-            os.makedirs(file_path)
-
         self.gc = GradientControl(doc=self.document)
 
-        print(os.listdir(file_path))
-
-        fileList = os.listdir(file_path)
-
-        for file in fileList:
-            openFile = open(file, "r")
-            toImport = ast.literal_eval(openFile.read())
-            self.gc.gData.update(toImport)
-            self.gc.saveData()
-
         self.gc.show()
-        self.gc.updateListWidget()
         print("Done!")
 
 

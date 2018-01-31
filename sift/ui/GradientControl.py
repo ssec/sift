@@ -63,6 +63,8 @@ class GradientControl(QtGui.QDialog):
         #self.UpdateMapButton.clicked.connect(self.updateButtonClick)
 
 
+        print(self.USER_MAPS)
+
         self.updateListWidget()
 
 
@@ -84,6 +86,7 @@ class GradientControl(QtGui.QDialog):
         for map in self.USER_MAPS:
             if self.USER_MAPS[map].colors and (hasattr(self.USER_MAPS[map], "_controls")):
                 self.importGradients(map, self.USER_MAPS[map].colors.hex, self.USER_MAPS[map]._controls, True)
+
 
                 #print("Imported Gradient!")
 
@@ -117,8 +120,9 @@ class GradientControl(QtGui.QDialog):
             try:
                 toAdd = Colormap(colors=hex, controls=floats)
                 self.ALL_COLORMAPS[item] = toAdd
-            except:
+            except Exception as e:
                 print("Error creating or setting colormap")
+                print(e)
             #try:
             #    toAdd = Colormap(colors=hex, controls=floats)
             #    ALL_COLORMAPS[item] = toAdd
@@ -130,37 +134,6 @@ class GradientControl(QtGui.QDialog):
 
         print(self.List.item(self.List.currentRow()).text())
         self.doc.change_colormap_for_layers(self.List.item(self.List.currentRow()).text())
-
-#    def updateButtonClick(self):
-#        item = self.ColorBar.saveState()
-#
-#        pointList = item["ticks"]
-#        floats = []
-#        hex = []
-#        for point in pointList:
-#            floats.append(point[0])
-#            rgb = point[1]
-#            hexCode = rgb2hex(rgb[0], rgb[1], rgb[2])
-#            hex.append(hexCode)
-#
-#        for i in range(len(floats)):
-#            for k in range(len(floats) - 1, i, -1):
-#                if (floats[k] < floats[k - 1]):
-#                    self.bubbleSortSwap(floats, k, k - 1)
-#                    self.bubbleSortSwap(hex, k, k - 1)
-#
-#        try:
-#            toAdd = Colormap(colors=hex, controls=floats)
-#            print(hex)
-#            print(floats)
-#            print(toAdd)
-#        except:
-#            print("Error creating or setting colormap")
-#
-#        #self.doc.update_colormaps(ALL_COLORMAPS)
-#
-#        print(self.List.item(self.List.currentRow()).text())
-#        #self.doc.change_colormap_for_layers(self.List.item(self.List.currentRow()).text())
 
     def updateButtonClick(self):
         print("Time to clone")
@@ -232,7 +205,7 @@ class GradientControl(QtGui.QDialog):
             #self.saveData()
             #self.p.close()
         self.updateListWidget()
-        self.saveNewMap(self.ColorBar.saveState, SaveName)
+        self.saveNewMap(self.ColorBar.saveState(), SaveName)
 
     def saveNewMap(self, UpdatedMap, name):
         self.doc.updateGCColorMap(UpdatedMap, name)
@@ -437,7 +410,7 @@ class GradientControl(QtGui.QDialog):
 
     def exportButtonClick(self):
         selectedGradients = self.getSelected()
-        fname, _ = QtGui.QFileDialog.getSaveFileName(None, 'Save As', 'Export.txt')
+        fname = QtGui.QFileDialog.getSaveFileName(None, 'Save As', 'Export.txt')
         toExport = set()
         for index in selectedGradients:
             toExport.add(index.text())
@@ -445,8 +418,9 @@ class GradientControl(QtGui.QDialog):
         try:
             file = open(fname, 'w')
             file.write(str(done))
-        except:
+        except Exception as e:
             print("Error opening or writing!")
+            print(e)
 
 
 def main():

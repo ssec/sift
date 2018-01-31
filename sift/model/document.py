@@ -358,15 +358,19 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             for file in files:
                 nfp = subdir + os.sep + file
                 try:
-                    file = open(nfp, "r")
-                    toImport = ast.literal_eval(file.read())
-                    qtData.update(toImport)
-                except:
+                    ifile = open(nfp, "r")
+                    toImport = ast.literal_eval(ifile.read())
+                    qtData[file.split(".")[0]] = toImport
+                except Exception as e:
                     print("Error reading from file")
+                    print(e)
 
-
+        print("OK")
+        print(qtData)
         for item in qtData.keys():
-            pointList = item["ticks"]
+            print(item)
+            pointList = qtData[item]["ticks"]
+            print(pointList)
             floats = []
             hex = []
             for point in pointList:
@@ -386,11 +390,17 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 print(hex)
                 print(floats)
                 print(toAdd)
-                self.usermaps.update(toAdd)
-            except:
+                #self.usermaps.update(toAdd)
+                self.usermaps[item] = toAdd
+            except Exception as e:
                 print("Error creating or setting colormap")
+                print(e)
 
 
+    def bubbleSortSwap(self, A, x, y):
+        tmp = A[x]
+        A[x] = A[y]
+        A[y] = tmp
     def update_colormaps(self, new_colormaps):
         self.colormaps.update(new_colormaps)
 
