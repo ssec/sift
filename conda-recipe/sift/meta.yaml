@@ -37,6 +37,7 @@ requirements:
     - sqlalchemy
     - pyqt <5
     - appdirs
+    - pyyaml
     - cython >=0.17 # [win]
     # this is only needed because of a weird bug with netcdf4
     # https://github.com/conda-forge/netcdf4-feedstock/issues/33
@@ -62,6 +63,7 @@ requirements:
     - sqlalchemy
     - pyqt <5
     - appdirs
+    - pyyaml
 
 test:
   commands:

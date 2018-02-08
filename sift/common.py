@@ -170,6 +170,9 @@ class INFO(Enum):
     # unit numeric conversion func: lambda x, inverse=False: convert-to-units
     # unit string format func: lambda x, numeric=True, units=True: formatted string
     CENTRAL_WAVELENGTH = 'nominal_wavelength'
+    FAMILY = 'family'
+    # only in family info dictionaries:
+    DISPLAY_FAMILY = 'display_family'
 
     def __lt__(self, other):
         """

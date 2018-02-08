@@ -175,13 +175,13 @@ def _concurring(*q, remove_none=False):
 
 
 class DocRGBLayer(DocCompositeLayer):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, doc, recipe, info, *args, **kwargs):
         self.l = [None, None, None, None]  # RGBA upstream layers
         self.n = [None, None, None, None]  # RGBA minimum value from upstream layers
         self.x = [None, None, None, None]  # RGBA maximum value from upstream layers
-        if len(args) and isinstance(args, dict):
-            args[0].setdefault(INFO.KIND, KIND.RGB)
-        super().__init__(*args, **kwargs)
+        self.recipe = recipe
+        info.setdefault(INFO.KIND, KIND.RGB)
+        super().__init__(doc, info, *args, **kwargs)
 
     @property
     def r(self):
@@ -251,9 +251,15 @@ class DocRGBLayer(DocCompositeLayer):
         return shared_x and shared_y
 
     @property
+    def recipe_layers_match(self):
+        def _get_family(layer):
+            return layer[INFO.FAMILY] if layer else None
+        return [_get_family(x) == self.recipe.input_ids[idx] for idx, x in enumerate(self.l[:3])]
+
+    @property
     def is_valid(self):
         return self.has_deps and self.shared_projections and \
-               self.shared_origin
+               self.shared_origin and self.recipe_layers_match
 
     @property
     def is_flat_field(self):
@@ -369,6 +375,8 @@ class DocRGBLayer(DocCompositeLayer):
             INFO.PLATFORM: self.platform,
             INFO.SCENE: self.scene,
             INFO.UNIT_CONVERSION: self._get_units_conversion(),
+            INFO.UNITS: None,
+            INFO.VALID_RANGE: [d[INFO.VALID_RANGE] if d else (None, None) for d in dep_info],
         }
 
         if self.r is None and self.g is None and self.b is None:

@@ -832,7 +832,7 @@ class SceneGraphManager(QObject):
                 layer[INFO.CELL_WIDTH],
                 layer[INFO.CELL_HEIGHT],
                 name=str(uuid),
-                clim=layer[INFO.CLIM],
+                clim=p.climits,
                 gamma=p.gamma,
                 interpolation='nearest',
                 method='tiled',
@@ -857,7 +857,14 @@ class SceneGraphManager(QObject):
             # algebraic layer
             return self.add_basic_layer(new_order, uuid, p)
 
-    def change_composite_layer(self, new_order:tuple, uuid:UUID, presentation:prez, changes:dict):
+    def change_composite_layers(self, new_order:tuple, uuid_list:list, presentations:list):
+        for uuid, presentation in zip(uuid_list, presentations):
+            self.change_composite_layer(None, uuid, presentation)
+        # set the order after we've updated and created all the new layers
+        if new_order:
+            self.layer_set.set_layer_order(new_order)
+
+    def change_composite_layer(self, new_order:tuple, uuid:UUID, presentation:prez):
         layer = self.document[uuid]
         if layer[INFO.KIND] == KIND.RGB:
             if layer.uuid in self.image_elements:
@@ -874,7 +881,8 @@ class SceneGraphManager(QObject):
                                       origin_x=layer[INFO.ORIGIN_X],
                                       origin_y=layer[INFO.ORIGIN_Y])
                     elem.init_overview(overview_content)
-                    elem.clim = layer[INFO.CLIM]
+                    elem.clim = presentation.climits
+                    elem.gamma = presentation.gamma
                     self.on_view_change(None)
                     elem.determine_reference_points()
                 else:
@@ -950,6 +958,7 @@ class SceneGraphManager(QObject):
         document.didChangeLayerVisibility.connect(self.change_layers_visibility)
         document.didReorderAnimation.connect(self._rebuild_frame_order)
         document.didChangeComposition.connect(self.change_composite_layer)
+        document.didChangeCompositions.connect(self.change_composite_layers)
         document.didChangeColorLimits.connect(self.change_layers_color_limits)
         document.didChangeGamma.connect(self.change_layers_gamma)
 
