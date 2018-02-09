@@ -1059,10 +1059,16 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             recipe.input_ids[idx] = new_comp_family
         self.update_rgb_composite_layers(recipe, rgba=set(rgba.keys()))
 
-    def _uuids_for_recipe(self, recipe):
+    def _uuids_for_recipe(self, recipe, valid_only=True):
+        prez_uuids = self.current_layer_uuid_order
         for inst_key, time_layers in self._recipe_layers[recipe.name].items():
             for t, rgb_layer in time_layers.items():
-                yield rgb_layer[INFO.UUID]
+                u = rgb_layer[INFO.UUID]
+                if not valid_only:
+                    yield u
+                elif u in prez_uuids:
+                    # only provide UUIDs if the layer is valid and presentable
+                    yield u
 
     def change_rgb_recipe_prez(self, recipe, climits=None, gamma=None, uuids=None):
         if uuids is None:
@@ -1090,6 +1096,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """
         # find all the layer combinations
         changed_uuids = []
+        prez_uuids = self.current_layer_uuid_order
         for t, sat, inst, r, g, b in self._composite_layers(recipe, times=times, rgba=rgba):
             inst_key = (sat, inst)
             # (sat, inst) -> {time -> layer}
@@ -1109,10 +1116,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 rgb_layer = layers[t] = DocRGBLayer(self, recipe, ds_info)
                 self._layer_with_uuid[uuid] = rgb_layer
                 layers[t].update_metadata_from_dependencies()
-                presentation, reordered_indices = self._insert_layer_with_info(rgb_layer)
+                # maybe we shouldn't add the family until the layers are set
                 self._add_layer_family(rgb_layer)
                 LOG.info('generating incomplete (invalid) composite for user to configure')
-                self.didAddCompositeLayer.emit(reordered_indices, uuid, presentation)
+                # maybe we shouldn't send this out for invalid layers
             else:
                 rgb_layer = layers[t]
 
@@ -1128,10 +1135,26 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             # update the component layers and tell which ones changed
             changed = self._change_rgb_component_layer(rgb_layer,
                                                        **changed_components)
-            # check recipes color limits
-            if not recipe.read_only and changed:
+
+            # check recipes color limits and update them
+            # but only if this RGB layer matches the layers the recipe has
+            if not recipe.read_only and changed and rgb_layer.recipe_layers_match:
                 def_limits = {comp: rgb_layer[INFO.CLIM][idx] for idx, comp in enumerate('rgb') if comp in changed}
                 recipe.set_default_color_limits(**def_limits)
+
+            # only tell other components about this layer if it is valid
+            should_show = rgb_layer.is_valid or rgb_layer.recipe_layers_match
+            if rgb_layer[INFO.UUID] not in prez_uuids:
+                if should_show:
+                    presentation, reordered_indices = self._insert_layer_with_info(rgb_layer)
+                    self.didAddCompositeLayer.emit(reordered_indices, rgb_layer[INFO.UUID], presentation)
+                else:
+                    continue
+            elif not should_show:
+                # is being shown, but shouldn't be
+                self.remove_layer_prez(rgb_layer[INFO.UUID], purge=False)
+                continue
+
             if rgb_layer is not None:
                 changed_uuids.append(rgb_layer[INFO.UUID])
 
@@ -1176,9 +1199,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         b_layers = _component_generator(recipe.input_ids[2], 'b')
         instruments = r_layers.keys() | g_layers.keys() | b_layers.keys()
         for inst_key in instruments:
+            # any new times plus existing times if RGBs already exist
             rgb_times = r_layers.setdefault(inst_key, {}).keys() | \
                         g_layers.setdefault(inst_key, {}).keys() | \
-                        b_layers.setdefault(inst_key, {}).keys()
+                        b_layers.setdefault(inst_key, {}).keys() | \
+                        self._recipe_layers[recipe.name].setdefault(inst_key, {}).keys()
             if times:
                 rgb_times &= times
             # time order doesn't really matter
@@ -1210,9 +1235,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             return
         # identify siblings before we make any changes!
         changed = []
-        # prez, = self.prez_for_uuids([layer.uuid])
         clims = list(layer[INFO.CLIM])
-        # prez_clims = list(prez.climits)
         for k, v in rgba.items():
             # assert(k in 'rgba')
             idx = 'rgba'.index(k)
@@ -1221,7 +1244,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             changed.append(k)
             setattr(layer, k, v)
             clims[idx] = None  # causes update_metadata to pull in upstream clim values
-            # prez_clims[idx] = None
         if not changed:
             return changed
         # force an update of clims for components that changed
@@ -1372,7 +1394,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     return True
         return False
 
-    def remove_layer_prez(self, row_or_uuid, count:int=1):
+    def remove_layer_prez(self, row_or_uuid, count:int=1, purge=True):
         """
         remove the presentation of a given layer/s in the current set
         :param row: which current layer set row to remove
@@ -1402,14 +1424,15 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     self._change_rgb_component_layer(parent_layer, **{channel_name: None})
 
         # Purge this layer if we can
-        for uuid in uuids:
-            if not self.is_using(uuid):
-                LOG.info('purging layer {}, no longer in use'.format(uuid))
-                self.willPurgeLayer.emit(uuid)
-                # remove from our bookkeeping
-                del self._layer_with_uuid[uuid]
-                # remove from workspace
-                self._workspace.remove(uuid)
+        if purge:
+            for uuid in uuids:
+                if not self.is_using(uuid):
+                    LOG.info('purging layer {}, no longer in use'.format(uuid))
+                    self.willPurgeLayer.emit(uuid)
+                    # remove from our bookkeeping
+                    del self._layer_with_uuid[uuid]
+                    # remove from workspace
+                    self._workspace.remove(uuid)
 
     def channel_siblings(self, uuid, sibling_infos=None):
         """

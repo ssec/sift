@@ -280,7 +280,7 @@ class RGBLayerConfigPane(QObject):
             # block signals so an existing RGB layer doesn't get overwritten with new layer selections
             widget.blockSignals(False)
 
-    def _set_minmax_slider(self, color:str, family:str, clims=None):
+    def _set_minmax_slider(self, color:str, family:tuple, clims=None):
         idx = RGBA2IDX[color]
         slider = self.sliders[idx]
         editn, editx = self.line_edits[idx]

@@ -254,7 +254,7 @@ class DocRGBLayer(DocCompositeLayer):
     def recipe_layers_match(self):
         def _get_family(layer):
             return layer[INFO.FAMILY] if layer else None
-        return [_get_family(x) == self.recipe.input_ids[idx] for idx, x in enumerate(self.l[:3])]
+        return all([_get_family(x) == self.recipe.input_ids[idx] for idx, x in enumerate(self.l[:3])])
 
     @property
     def is_valid(self):
