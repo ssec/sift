@@ -1413,15 +1413,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         del self.current_layer_set[row:row+count]
         self.didRemoveLayers.emit(tuple(clo), uuids, row, count)
         # Remove this layer from any RGBs it is a part of
-        # FIXME: This is really ugly just to remove the layer from an RGB
         for uuid in uuids:
             layer = self._layer_with_uuid[uuid]
-            for pinfo in self.current_layer_set:
-                parent_layer = self._layer_with_uuid[pinfo.uuid]
-                if isinstance(parent_layer, DocRGBLayer) and layer in parent_layer.l:
-                    # remove this layer from this RGB layer
-                    channel_name = "rgba"[parent_layer.l.index(layer)]
-                    self._change_rgb_component_layer(parent_layer, **{channel_name: None})
+            self.sync_composite_layer_prereqs([layer[INFO.SCHED_TIME]])
 
         # Purge this layer if we can
         if purge:
