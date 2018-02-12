@@ -79,14 +79,18 @@ class GradientControl(QtGui.QDialog):
         l.addWidget(self.DeleteButton, 2, 0)
         #l.addWidget(self.UpdateMapButton, 2, 0)
 
-        for map in self.ALL_COLORMAPS:
-            if self.ALL_COLORMAPS[map].colors and (hasattr(self.ALL_COLORMAPS[map], "_controls")):
-                self.importGradients(map, self.ALL_COLORMAPS[map].colors.hex, self.ALL_COLORMAPS[map]._controls, False)
+
 
         for map in self.USER_MAPS:
+            print(map)
+            print(self.USER_MAPS[map])
             if self.USER_MAPS[map].colors and (hasattr(self.USER_MAPS[map], "_controls")):
                 self.importGradients(map, self.USER_MAPS[map].colors.hex, self.USER_MAPS[map]._controls, True)
 
+        for map in self.ALL_COLORMAPS:
+            if self.ALL_COLORMAPS[map].colors and (hasattr(self.ALL_COLORMAPS[map], "_controls")):
+                if map not in self.USER_MAPS:
+                    self.importGradients(map, self.ALL_COLORMAPS[map].colors.hex, self.ALL_COLORMAPS[map]._controls, False)
 
                 #print("Imported Gradient!")
 
@@ -121,7 +125,7 @@ class GradientControl(QtGui.QDialog):
                 toAdd = Colormap(colors=hex, controls=floats)
                 self.ALL_COLORMAPS[item] = toAdd
             except Exception as e:
-                print("Error creating or setting colormap")
+                print("Error creating or setting colormap 1")
                 print(e)
             #try:
             #    toAdd = Colormap(colors=hex, controls=floats)
@@ -204,7 +208,7 @@ class GradientControl(QtGui.QDialog):
             self.gData[SaveName] = self.ColorBar.saveState()
             #self.saveData()
             #self.p.close()
-        self.updateListWidget()
+        self.updateListWidget(SaveName)
         self.saveNewMap(self.ColorBar.saveState(), SaveName)
 
     def saveNewMap(self, UpdatedMap, name):
@@ -235,7 +239,7 @@ class GradientControl(QtGui.QDialog):
                 for impItem in toImport.keys():
                     self.saveNewMap(toImport[impItem], impItem)
 
-                self.updateListWidget()
+                self.updateListWidget(impItem)
             except:
                 print("Error opening file or reading!")
             print("Done")
@@ -288,8 +292,9 @@ class GradientControl(QtGui.QDialog):
                             for key in data:
                                 newWidget.addTick(key, QtGui.QColor(data[key]), True)
                             self.gData[newName[0]] = newWidget.saveState()
+                            self.saveNewMap(newWidget.saveState(), newName[0])
                             self.saveData()
-                            self.updateListWidget()
+                            self.updateListWidget(newName[0])
 
 
                     except:
@@ -305,7 +310,7 @@ class GradientControl(QtGui.QDialog):
             newWidget = pg.GradientWidget()
             newWidget.hide()
             for key in data:
-                newWidget.addTick(key, QtGui.QColor(data[key]), True)
+                newWidget.addTick(key, QtGui.QColor(data[key]), movable=editable)
             #self.gData[name] = newWidget.saveState()
 
             if editable:
@@ -322,38 +327,55 @@ class GradientControl(QtGui.QDialog):
     def closeButtonClick(self):
         self.done(0)
 
-    def updateListWidget(self):
+    def updateListWidget(self, toShow = None):
+        # TODO Show selected widget
         self.List.clear()
         self.ExportButton.hide()
         self.DeleteButton.hide()
 
+        totalCount = 0
+        corVal = 0
         for key2 in self.autoImportData.keys():
             self.List.addItem(key2)
+            totalCount = totalCount + 1
+            if toShow is not None and key2 == toShow:
+                corVal = totalCount
 
         self.List.addItem("----------------------------- Below Are Custom ColorMaps -----------------------------")
+        totalCount = totalCount + 1
 
         for key in self.gData.keys():
             self.List.addItem(key)
+            totalCount = totalCount + 1
+            if toShow is not None and key == toShow:
+                corVal = totalCount
 
-
+        if toShow is not None:
+            self.List.setCurrentRow(corVal, QtGui.QItemSelectionModel.Select)
 
 
     def updateColorBar(self):
+        self.DeleteButton.show()
+        self.sqrt.show()
+        self.CloneButton.show()
+        self.SaveButton.show()
         self.ExportButton.show()
         self.ColorBar.show()
-        self.DeleteButton.show()
         self.sqrt.setCheckState(0)
 
         if self.List.item(self.List.currentRow()).text() in self.gData.keys():
             NewBar = self.gData[self.List.item(self.List.currentRow()).text()]
+            #TODO change this
             self.ColorBar.restoreState(NewBar)
-
 
         if self.List.item(self.List.currentRow()).text() in self.autoImportData.keys():
             NewBar = self.autoImportData[self.List.item(self.List.currentRow()).text()]
+            #TODO change this
             self.ColorBar.restoreState(NewBar)
 
         SelectedThings = self.getSelected()
+
+        print(SelectedThings)
 
         if len(SelectedThings) > 1:
             self.ColorBar.hide()
@@ -372,8 +394,17 @@ class GradientControl(QtGui.QDialog):
 
         if showDel is True:
             self.DeleteButton.show()
+            self.sqrt.show()
         else:
             self.DeleteButton.hide()
+            self.sqrt.hide()
+
+        if SelectedThings[0].text() == "----------------------------- Below Are Custom ColorMaps -----------------------------":
+            self.DeleteButton.hide()
+            self.sqrt.hide()
+            self.CloneButton.hide()
+            self.SaveButton.hide()
+            self.ExportButton.hide()
 
     def sqrtAction(self):
         if self.sqrt.isChecked() == True:
@@ -405,6 +436,7 @@ class GradientControl(QtGui.QDialog):
         if reply == QtGui.QMessageBox.Yes:
             for index in selectedGradients:
                 del self.gData[index.text()]
+                self.doc.removeGCColorMap(index.text())
             self.updateListWidget()
             self.saveData()
 
@@ -414,7 +446,16 @@ class GradientControl(QtGui.QDialog):
         toExport = set()
         for index in selectedGradients:
             toExport.add(index.text())
-        done = {k: self.gData[k] for k in self.gData.keys() & toExport}
+        #done = {k: self.gData[k] for k in self.gData.keys() & toExport}
+        done = {}
+
+        for k in self.gData.keys():
+            if k in toExport:
+                done[k] = self.gData[k]
+
+        for k in self.autoImportData.keys():
+            if k in toExport:
+                done[k] = self.autoImportData[k]
         try:
             file = open(fname, 'w')
             file.write(str(done))

@@ -72,6 +72,7 @@ import numpy as np
 from weakref import ref
 import os
 import ast
+import json
 
 from sift.common import KIND, INFO, prez
 from sift.view.Colormap import ALL_COLORMAPS, USER_COLORMAPS
@@ -385,16 +386,21 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                         self.bubbleSortSwap(floats, k, k - 1)
                         self.bubbleSortSwap(hex, k, k - 1)
 
+            floats[0] = 0
+            floats[-1] = 1
+
             try:
-                toAdd = Colormap(colors=hex, controls=floats)
                 print(hex)
                 print(floats)
+                toAdd = Colormap(colors=hex, controls=floats)
                 print(toAdd)
-                #self.usermaps.update(toAdd)
+                self.colormaps[item] = toAdd
                 self.usermaps[item] = toAdd
             except Exception as e:
-                print("Error creating or setting colormap")
+                print("Error creating or setting colormap 2")
                 print(e)
+
+
 
 
     def bubbleSortSwap(self, A, x, y):
@@ -428,7 +434,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def updateGCColorMap(self, colorMap, name):
         print("Received update call..")
-        self.usermaps[name] = colorMap
         print(colorMap)
 
         filepath = os.path.join(DOCUMENT_SETTINGS_DIR, 'colormaps')
@@ -436,10 +441,57 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         try:
             print("FP: " + filepath + "/" + name + ".txt")
             iFile = open(filepath + "/" + name + ".txt", 'w')
-            iFile.write(str(colorMap))
+            #iFile.write(str(colorMap))
+            iFile.write(json.dumps(colorMap, indent=2, sort_keys=True))
             iFile.close()
         except Exception as e:
             print(e)
+
+        pointList = colorMap["ticks"]
+        print(pointList)
+        floats = []
+        hex = []
+        for point in pointList:
+            floats.append(point[0])
+            rgb = point[1]
+            hexCode = rgb2hex(rgb[0], rgb[1], rgb[2])
+            hex.append(hexCode)
+
+        for i in range(len(floats)):
+            for k in range(len(floats) - 1, i, -1):
+                if (floats[k] < floats[k - 1]):
+                    self.bubbleSortSwap(floats, k, k - 1)
+                    self.bubbleSortSwap(hex, k, k - 1)
+
+        floats[0] = 0
+        floats[-1] = 1
+
+        try:
+            print(hex)
+            print(floats)
+            toAdd = Colormap(colors=hex, controls=floats)
+            print(toAdd)
+            self.colormaps[name] = toAdd
+            self.usermaps[name] = toAdd
+        except Exception as e:
+            print("Error creating or setting colormap 2")
+            print(e)
+
+
+    def removeGCColorMap(self, name):
+        print("Got remove request")
+
+        filepath = os.path.join(DOCUMENT_SETTINGS_DIR, 'colormaps')
+
+        print("FP: " + filepath + "/" + name + ".txt")
+        try:
+            os.remove(filepath + "/" + name + ".txt")
+        except OSError:
+            pass
+
+        del self.colormaps[name]
+        del self.usermaps[name]
+
 
 
     def current_projection_index(self):

@@ -472,10 +472,6 @@ USER_COLORMAPS = {}
 
 
 
-for map in ALL_COLORMAPS:
-    print(map)
-    print("\n")
-
 CATEGORIZED_COLORMAPS = OrderedDict([
     ("Visible", VIS_COLORMAPS),
     ("IR", IR_COLORMAPS),
