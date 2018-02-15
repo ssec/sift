@@ -32,7 +32,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
     _md: Metadatabase = None
     _doc: Document = None
 
-    def __init__(self, ws: Workspace, mdb: Metadatabase, doc: (Document, None) = None, *args, **kwargs):
+    def __init__(self, ws: Workspace, mdb: Metadatabase, doc: Document, *args, **kwargs):
         """
         Args:
             ws (Workspace): owns cached and computed data
@@ -41,7 +41,12 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         """
         super(SiftDocumentAsFramesInTracks, self).__init__(*args, **kwargs)
         self._ws, self._mdb, self._doc = ws, mdb, doc
-        
+        self._connect_signals()
+
+    def _connect_signals(self):
+        """Connect document, workspace, signals in order to invalidate and update scene representation
+        """
+        pass
 
     def get(self, uuid: UUID) -> [QTrackItem, QFrameItem, None]:
         z = self._track_items.get(uuid, None)

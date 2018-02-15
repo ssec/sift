@@ -88,7 +88,7 @@ class QTrackItem(QGraphicsObject):
     _tooltip: str = None
     _color: QColor = None
     _selected: bool = False
-    _colormap: [QGradient, QImage] = None
+    _colormap: [QGradient, QImage, QPixmap] = None
     _min: float = None
     _max: float = None
     _dragging : bool = False   # whether or not a drag is in progress across this item
@@ -372,11 +372,11 @@ class QFrameItem(QGraphicsItem):
     # handle clicking
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
         LOG.debug("QFrameItem mouse-down")
-        super(QFrameItem, self).mousePressEvent()
+        return super(QFrameItem, self).mousePressEvent(event)
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent):
         LOG.debug("QFrameItem mouse-up")
-        super(QFrameItem, self).mouseReleaseEvent()
+        return super(QFrameItem, self).mouseReleaseEvent(event)
 
 
 class QTimeRulerItem(QGraphicsRectItem):

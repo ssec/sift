@@ -37,10 +37,11 @@ class TimelineFrameState(Enum):
     """
     UNKNOWN = 0
     AVAILABLE = 1  # can be imported from native resources but has not been
-    IMPORTED = 2  # imported into workspace
-    READY = 3  # available as a memory map, but may not be fully resident in RAM or VRAM
-    ACTIVE = 4  # both ready to go into VRAM (or already resident), and participating in the application scene graph, possibly as part of an animation
-    VISIBLE = 5  # active, and currently on-screen for user to view
+    ARRIVING = 2  # importer is bringing data into workspace
+    CACHED = 3  # imported into workspace but not available as content in memory
+    READY = 4  # available as a memory map, but may not be fully resident in RAM or VRAM
+    ACTIVE = 5  # both ready to go into VRAM (or already resident), and participating in the application scene graph, possibly as part of an animation
+    VISIBLE = 6  # active, and currently on-screen for user to view
 
 class TimelineTrackState(Enum):
     UNKNOWN = 0
