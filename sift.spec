@@ -29,22 +29,6 @@ if is_win:
 
 # Add missing shared libraries
 binaries = []
-if is_linux:
-    # shapely 1.5.17 hates me
-    lib_dir = sys.executable.replace(os.path.join("bin", "python"), "lib")
-    binaries += [(os.path.join(lib_dir, 'libgeos_c.so'), '')]
-    binaries += [(os.path.join(lib_dir, 'libgeos.so'), '')]
-    binaries += [(os.path.join(lib_dir, 'libmkl_*.so'), '')]
-elif is_darwin:
-    lib_dir = sys.executable.replace(os.path.join("bin", "python"), "lib")
-    binaries += [(os.path.join(lib_dir, 'libgeos_c.dylib'), '')]
-    binaries += [(os.path.join(lib_dir, 'libgeos.dylib'), '')]
-    binaries += [(os.path.join(lib_dir, 'libmkl_*.dylib'), '')]
-elif is_win:
-    lib_dir = sys.executable.replace("python.exe", os.path.join("Library", "bin"))
-    binaries += [(os.path.join(lib_dir, 'geos_c.dll'), '')]
-    binaries += [(os.path.join(lib_dir, 'geos.dll'), '')]
-    binaries += [(os.path.join(lib_dir, 'mkl_*.dll'), '')]
 
 a = Analysis([main_script_pathname],
              pathex=[_script_base],

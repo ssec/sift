@@ -422,6 +422,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             request = requests.get(action, None)
             if request is not None:
                 LOG.debug('RGB creation using {0!r:s}'.format(request))
+                # FIXME: This should happen in conjunction with the RGB behavior
                 self.doc.create_rgb_composite(**request)
 
         rgb_menu = QMenu("Create RGB From Selections...", menu)

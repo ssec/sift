@@ -28,7 +28,9 @@ QtGui = app_object.backend_module.QtGui
 
 import sift.ui.open_cache_dialog_ui as open_cache_dialog_ui
 from sift.control.LayerManager import LayerSetsManager
+from sift.control.rgb_behaviors import UserModifiesRGBLayers
 from sift.model.document import Document, DocLayer
+from sift.view.rgb_config import RGBLayerConfigPane
 from sift.view.SceneGraphManager import SceneGraphManager
 from sift.view.ProbeGraphs import ProbeGraphManager, DEFAULT_POINT_PROBE
 from sift.view.export_image import ExportImageHelper
@@ -37,8 +39,10 @@ from sift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
 from sift.workspace import Workspace
 from sift import __version__
 from sift.util import (WORKSPACE_DB_DIR,
-                       DOCUMENT_SETTINGS_DIR)
+                       DOCUMENT_SETTINGS_DIR,
+                       get_package_data_dir)
 
+from glob import glob
 from functools import partial
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
@@ -444,22 +448,6 @@ class Main(QtGui.QMainWindow):
     #         self.animation_slider_jump_frame(None)
     #         self.behaviorLayersList.select([info[INFO.UUID]])
 
-    def _user_set_rgb_layer(self, uuid:UUID, rgba:str, selected:DocLayer):
-        """
-        handle signal from layer info panel which says that an RGB layer selected a new layer as channel
-        :param layer: layer being edited
-        :param rgba: char from 'rgba'
-        :param selected: layer to replace, causing scene graph element to be rebuilt
-        :return:
-        """
-        # we could just modify the layer and emit the document signal, but preference is to have document generate its own signals.
-        layer = self.document[uuid]
-        self.document.change_rgb_component_layer(layer, **{rgba:selected})
-
-    def _user_set_rgb_range(self, uuid:UUID, rgba:str, lo:float, hi:float):
-        layer = self.document[uuid]
-        self.document.set_rgb_range(layer, rgba, lo, hi)
-
     def _refresh_probe_results(self, *args):
         arg1 = args[0]
         if isinstance(arg1, dict):
@@ -484,11 +472,11 @@ class Main(QtGui.QMainWindow):
             lon, lat = xy_pos
             lon = lon % 360 if lon > 0 else lon % -360 + 360
             lon = lon - 360 if lon > 180 else lon
-            lon_str = "{:.02f} {}".format(abs(lon), "W" if lon < 0 else "E")
-            lat_str = "{:.02f} {}".format(abs(lat), "S" if lat < 0 else "N")
-            self.ui.cursorProbeLocation.setText("Probe Location: {}, {}".format(lon_str, lat_str))
+            lon_str = "{:>6.02f} {}".format(abs(lon), "W" if lon < 0 else "E")
+            lat_str = "{:>6.02f} {}".format(abs(lat), "S" if lat < 0 else "N")
+            probe_loc = "{}, {}".format(lon_str, lat_str)
         else:
-            self.ui.cursorProbeLocation.setText("Probe Location: N/A")
+            probe_loc = "{:>6s}  , {:>6s}  ".format("N/A", "N/A")
 
         if animating:
             data_str = "<animating>"
@@ -520,8 +508,8 @@ class Main(QtGui.QMainWindow):
         else:
             data_str = "N/A"
             layer_str = "N/A"
-        self.ui.cursorProbeText.setText("Probe Value: {} ".format(data_str))
-        self.ui.cursorProbeLayer.setText("Current Layer: {}".format(layer_str))
+        self.ui.cursorProbeLayer.setText(layer_str)
+        self.ui.cursorProbeText.setText("{} ({})".format(data_str, probe_loc))
 
     def __init__(self, config_dir=None, cache_dir=None, cache_size=None, glob_pattern=None, border_shapefile=None, center=None):
         super(Main, self).__init__()
@@ -544,7 +532,7 @@ class Main(QtGui.QMainWindow):
 
         # create manager and helper classes
         self.workspace = Workspace(cache_dir, max_size_gb=cache_size, queue=self.queue)
-        self.document = doc = Document(self.workspace)
+        self.document = doc = Document(self.workspace, config_dir=config_dir)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
                                                border_shapefile=border_shapefile,
                                                center=center,
@@ -596,7 +584,12 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.main_canvas.transforms.changed.connect(partial(start_wrapper, self.scheduler))
 
         # convey action between document and layer list view
-        self.layerSetsManager = LayerSetsManager(self.ui, self.ui.layerSetTabs, self.ui.layerDetailsContents, self.document)
+        self.layerSetsManager = LayerSetsManager(self.ui.layerSetTabs, self.ui.layerDetailsContents, self.document)
+        self.rgb_config_pane = RGBLayerConfigPane(self.ui, self.ui.layerSetTabs)
+        self.user_rgb_behavior = UserModifiesRGBLayers(self.document,
+                                                       self.rgb_config_pane,
+                                                       self.layerSetsManager,
+                                                       parent=self)
         self.behaviorLayersList = self.layerSetsManager.getLayerStackListViewModel()
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
             top_uuids = list(self.document.current_visible_layer_uuids)
@@ -619,18 +612,11 @@ class Main(QtGui.QMainWindow):
 
         self.scene_manager.newProbePolygon.connect(update_probe_polygon)
 
-        # setup RGB configuration : FIXME clean this up into a behavior
-        self.layerSetsManager.didChangeRGBLayerComponentRange.connect(self._user_set_rgb_range)
-        self.layerSetsManager.didChangeRGBLayerSelection.connect(self._user_set_rgb_layer)
+        # setup RGB configuration
         self.document.didChangeComposition.connect(lambda *args: self._refresh_probe_results(*args[1:]))
         self.document.didChangeColorLimits.connect(self._refresh_probe_results)
 
-        # self.queue.add('test', test_task(), 'test000')
-        # self.ui.layers
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
-        # self.document.didChangeColormap.connect(self.scene_manager.change_layers_colormap)
-        # self.document.didChangeColorLimits.connect(self.scene_manager.change_layers_color_limits)
-        # self.document.didChangeGamma.connect(self.scene_manager.change_layers_gamma)
         self.document.didSwitchLayerSet.connect(self.animation_reset_by_layer_set_switch)
 
         self.document.didChangeLayerVisibility.connect(self.update_frame_time_to_top_visible)
@@ -733,19 +719,6 @@ class Main(QtGui.QMainWindow):
         LOG.info("Clearing polygon with name '%s'", removed_name)
         self.scene_manager.remove_polygon(removed_name)
 
-    def create_composite(self, action:QtGui.QAction=None, uuids=[], composite_type=COMPOSITE_TYPE.RGB):
-        if composite_type not in [COMPOSITE_TYPE.RGB]:
-            raise ValueError("Unknown or unimplemented composite type: %s" % (composite_type,))
-        if len(uuids) == 0:
-            # get the layers to composite from current selection
-            uuids = list(self.behaviorLayersList.current_selected_uuids())
-        if len(uuids)<3:  # pad with None
-            uuids = uuids + ([None] * (3 - len(uuids)))
-        # Don't use non-basic layers as starting points for the new composite
-        uuids = [uuid if uuid is not None and self.document[uuid][INFO.KIND] in [KIND.IMAGE, KIND.COMPOSITE] else None for uuid in uuids]
-        layer = self.document.create_rgb_composite(uuids[0], uuids[1], uuids[2])
-        self.behaviorLayersList.select([layer.uuid])
-
     def create_algebraic(self, action:QtGui.QAction=None, uuids=None, composite_type=COMPOSITE_TYPE.ARITHMETIC):
         if uuids is None:
             uuids = list(self.behaviorLayersList.current_selected_uuids())
@@ -843,7 +816,7 @@ class Main(QtGui.QMainWindow):
 
         composite = QtGui.QAction("Create Composite", self)
         composite.setShortcut('C')
-        composite.triggered.connect(self.create_composite)
+        composite.triggered.connect(self.user_rgb_behavior.create_rgb)
 
         algebraic = QtGui.QAction("Create Algebraic", self)
         algebraic.triggered.connect(self.create_algebraic)
@@ -944,6 +917,12 @@ def main():
     LOG.info("Using configuration directory: %s", args.config_dir)
     LOG.info("Using cache directory: %s", args.cache_dir)
     app.create()
+
+    # Add our own fonts to Qt windowing system
+    font_pattern = os.path.join(get_package_data_dir(), 'fonts', '*')
+    for fn in glob(font_pattern):
+        QtGui.QFontDatabase.addApplicationFont(fn)
+
     window = Main(
         cache_dir=args.cache_dir,
         config_dir=args.config_dir,
