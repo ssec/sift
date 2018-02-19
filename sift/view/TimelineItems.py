@@ -135,6 +135,14 @@ class QTrackItem(QGraphicsObject):
         return self._uuid
 
     @property
+    def z(self):
+        return self._z
+
+    @z.setter
+    def z(self, new_z: int):
+        self._z = new_z
+
+    @property
     def scene(self):
         return self._scene
 
@@ -181,11 +189,11 @@ class QTrackItem(QGraphicsObject):
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
         LOG.debug("QTrackItem mouse-down")
-        super(QTrackItem, self).mousePressEvent()
+        return super(QTrackItem, self).mousePressEvent(event)
 
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent):
         LOG.debug("QTrackItem mouse-up")
-        super(QTrackItem, self).mouseReleaseEvent()
+        return super(QTrackItem, self).mouseReleaseEvent(event)
 
     # handle drag and drop
 
@@ -219,7 +227,8 @@ class QTrackItem(QGraphicsObject):
     # working with Frames as sub-items, updating and syncing position and extents
 
     def _iter_frame_children(self):
-        children = self.childItems()
+        children = tuple(self.childItems())
+        LOG.debug("{} children".format(len(children)))
         for child in children:
             if isinstance(child, QFrameItem):
                 yield child
@@ -338,6 +347,20 @@ class QFrameItem(QGraphicsItem):
     @property
     def td(self):
         return self._start, self._duration
+
+    @property
+    def track(self):
+        return self._track
+
+    @property
+    def state(self):
+        return self._state
+
+    @state.setter
+    def state(self, new_state):
+        if new_state != self._state:
+            self._state = new_state
+            self.update()
 
     # painting and boundaries
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget=None) -> None:

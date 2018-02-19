@@ -15,7 +15,7 @@ import logging
 import sys
 import unittest
 from datetime import datetime, timedelta
-from typing import Tuple, Optional, Mapping, List, Callable, Set
+from typing import Tuple, Optional, Mapping, List, Callable, Set, Iterable
 from uuid import UUID
 
 from PyQt4.QtCore import QRectF, Qt, pyqtSignal
@@ -35,6 +35,9 @@ class QFramesInTracksScene(QGraphicsScene):
     includes a TimelineCoordTransform time-to-X coordinate transform used for generating screen coordinates.
 
     """
+    # minimum level to populate scene with (e.g. user may only want to see CACHED or higher)
+    _min_state: TimelineFrameState = TimelineFrameState.AVAILABLE
+
     # coordinate transform between track Z order and time to scene float x,y,w,h
     _coords: TimelineCoordTransform = None
 
@@ -129,11 +132,20 @@ class QFramesInTracksScene(QGraphicsScene):
         """
         raise NotImplementedError("NYI")  # FIXME
 
+    @property
+    def min_visible_state(self):
+        return self._min_state
+
+    @min_visible_state.setter
+    def min_visible_state(self, new_state: TimelineFrameState):
+        self._min_state = new_state
+        self.update()
+
     #
     # internal mid-level update commands
     #
 
-    def add_track_frames(self, track: QTrackItem, *frames):
+    def add_frames_to_track(self, track: QTrackItem, *frames):
         """Add track and optional frames to scene storage, to ensure they are retained
         Asserts that if frame or track for the given UUID is already known, that the same item is being used
         """
@@ -141,8 +153,10 @@ class QFramesInTracksScene(QGraphicsScene):
         if track.uuid in self._track_items:
             assert(track is self._track_items[track.uuid])
         else:
-            self._track_items[track.uuid] = track
+            raise AssertionError("need to insert_track_with_zorder before adding frames")
+            # self._track_items[track.uuid] = track
         for frame in frames:
+            assert(isinstance(frame, QFrameItem))
             if frame.uuid in self._frame_items:
                 assert(frame is self._frame_items[frame.uuid])
             else:
@@ -165,6 +179,79 @@ class QFramesInTracksScene(QGraphicsScene):
         """Move visible cursor to a new time
         optionally animating the transition over a time interval starting from now"""
         raise NotImplementedError("NYI")  # FIXME
+
+    #
+    # consistency checks
+    #
+
+    def _is_self_consistent(self):
+        # check track z-order consistency
+        zult = True
+        try:
+            list(self._current_tracks_order)
+        except:
+            LOG.error("internal track z-order consistency check failed")
+            zult = False
+        # check frames-in-tracks
+        for frm in self._frame_items.values():
+            if frm.track.uuid not in self._track_items:
+                LOG.error("frame {} belongs to an unknown track {}".format(frm.uuid, frm.track.uuid))
+                zult = False
+        return zult
+
+    #
+    # track management
+    #
+
+    @property
+    def _current_tracks_order(self):
+        L = dict((trk.z, trk) for trk in self._track_items.values())
+        n = max(L.keys())
+        if len(L) != n:
+            raise AssertionError("inconsistency in z-order of tracks; expected {} but have {}".format(n, len(L)))
+        for q in range(n):
+            yield L[q]  # raises if we're missing a track
+
+    @property
+    def _current_tracks_uuid_order(self):
+        for trk in self._current_tracks_order:
+            yield trk.uuid
+
+    @property
+    def _track_count(self):
+        return len(self._track_items)
+
+    def set_all_tracks_zorder(self, order: Iterable[UUID]):
+        changed = []
+        for z,uuid in enumerate(order):
+            trk = self._track_items.get(uuid)
+            if trk is None:
+                raise ValueError("track UUID {} not found in set_track_order offset {}".format(uuid, z))
+            if trk.z == z:
+                continue
+            trk.z = z
+            changed.append(trk)
+        if changed:
+            self.update()
+
+    def insert_track_with_zorder(self, trk: QTrackItem, insert_before_z=None):
+        changed = [trk]
+        if insert_before_z is None:
+            insert_before_z = self._track_count
+        if trk.uuid not in self._track_items:
+            trk.z = insert_before_z
+            self._track_items[trk.uuid] = trk
+        LOG.debug("inserting track {} at z offset {}".format(trk.uuid, insert_before_z))
+        for z, atrk in enumerate(self._current_tracks_order):
+            assert(atrk.z == z)
+            if atrk is trk:
+                trk.z = insert_before_z
+            elif z >= insert_before_z:
+                atrk.z += 1
+                changed.append(atrk)
+        self.update()
+
+
 
     # def select_tracks_by_metadata(self, key, value):
     #     raise NotImplementedError("NYI")
@@ -191,6 +278,11 @@ class QFramesInTracksScene(QGraphicsScene):
     # FUTURE: decide if we actually need a delegate ABC to compose, rather than subclass overrides
     # for now simpler is better and Scene is already delegate/model-like so let's not over-indirect
     #
+
+    def iterate_track_info(self, start_z: int = 0, stop_z: Optional[int] = None):
+        """Yield series of track information tuples which will be used to generate/update QTrackItems
+        """
+
 
     def get(self, uuid: UUID) -> [QTrackItem, QFrameItem, None]:
         z = self._track_items.get(uuid, None)
