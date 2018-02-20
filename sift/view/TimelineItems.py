@@ -228,7 +228,7 @@ class QTrackItem(QGraphicsObject):
 
     def _iter_frame_children(self):
         children = tuple(self.childItems())
-        LOG.debug("{} children".format(len(children)))
+        # LOG.debug("{} children".format(len(children)))
         for child in children:
             if isinstance(child, QFrameItem):
                 yield child
@@ -238,12 +238,14 @@ class QTrackItem(QGraphicsObject):
         """start time and duration of the frames held by the track
         """
         s, e = None, None
-        for child in self._iter_frame_children():
+        for child in self.childItems():
             # y relative to track is 0
             # calculate absolute x position in scene
-            t,d = child.td
-            s = t if (s is None) else min(t, s)
-            e = (t + d) if (e is None) else max(e, t + d)
+            if hasattr(child, 'td'):
+                assert (child.uuid != self.uuid)
+                t,d = child.td
+                s = t if (s is None) else min(t, s)
+                e = (t + d) if (e is None) else max(e, t + d)
         if e is None:
             LOG.info("empty track cannot determine its horizontal extent")
             return None, None
