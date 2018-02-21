@@ -16,6 +16,7 @@ import sys
 import unittest
 from datetime import datetime, timedelta
 from typing import Tuple, Optional, Mapping, List, Callable, Set, Iterable
+from abc import ABC, abstractmethod, abstractproperty
 from uuid import UUID
 
 from PyQt4.QtCore import QRectF, Qt, pyqtSignal
@@ -353,14 +354,15 @@ class TestScene(QFramesInTracksScene):
         abitrack = QTrackItem(self, self.coords, tuuid, 0, "G21 ABI B99 BT", "test track", tooltip="peremptorily cromulent")
         # scene.addItem(abitrack)  # done in init
         frame1 = QFrameItem(abitrack, self.coords, fuuid, once + min15, min15, TimelineFrameState.AVAILABLE, "frame1", "fulldiskimus")
-        abitrack.update_pos_and_bounds()
+        abitrack.update_pos_bounds()
         abitrack.update_frame_positions()
         # scene.addItem(frame1)  # done in init
-        blabla = QGraphicsTextItem('abcdcba')
-        font = QFont('White Rabbit')
-        blabla.setFont(font)
-        blabla.setPos(140, 100)
-        self.addItem(blabla)
+        # blabla = QGraphicsTextItem('abcdcba')
+        # font = QFont('White Rabbit')
+        # blabla.setFont(font)
+        # blabla.setPos(140, 100)
+        # self.addItem(blabla)
+        blabla=None
         self.content = [abitrack, frame1, blabla]
 
 

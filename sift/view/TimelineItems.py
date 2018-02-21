@@ -65,6 +65,7 @@ https://stackoverflow.com/questions/4216139/python-object-in-qmimedata
 """
 from uuid import UUID
 from typing import Mapping, Any
+from weakref import ref
 from PyQt4.QtCore import Qt
 from PyQt4.QtGui import *
 
@@ -77,9 +78,10 @@ class QTrackItem(QGraphicsObject):
     """ A group of Frames corresponding to a timeline
     This allows drag and drop of timelines to be easier
     """
-    _scene = None
+    frames = None  # Iterable[QFrameItem], maintained privately between track and frame
+    _scene = None  # weakref to scene
     _scale: TimelineCoordTransform = None
-    _uuid : UUID = None
+    _uuid: UUID = None
     _z: int = None  # our track number as displayed, 0 being highest on screen, with larger Z going downward
     _title: str = None
     _subtitle: str = None
@@ -91,22 +93,23 @@ class QTrackItem(QGraphicsObject):
     _colormap: [QGradient, QImage, QPixmap] = None
     _min: float = None
     _max: float = None
-    _dragging : bool = False   # whether or not a drag is in progress across this item
+    _dragging: bool = False   # whether or not a drag is in progress across this item
     _left_pad: timedelta = timedelta(hours=1)  # space to left of first frame which we reserve for labels etc
     _right_pad: timedelta = timedelta(minutes=5)  # space to right of last frame we reserve for track closing etc
     # position in scene coordinates is determined by _z level and starting time of first frame, minus _left_pad
-    _bounds: QRectF = None  # bounds of the track in scene coordinates, assuming 0,0 corresponds to vertical center of left edge of frame representation
-    _gi_title : QGraphicsTextItem = None
-    _gi_subtitle : QGraphicsTextItem = None
-    _gi_icon : QGraphicsPixmapItem = None
-    _gi_colormap : QGraphicsPixmapItem = None
+    _bounds: QRectF = QRectF()  # bounds of the track in scene coordinates, assuming 0,0 corresponds to vertical center of left edge of frame representation
+    _gi_title: QGraphicsTextItem = None
+    _gi_subtitle: QGraphicsTextItem = None
+    _gi_icon: QGraphicsPixmapItem = None
+    _gi_colormap: QGraphicsPixmapItem = None
 
     def __init__(self, scene, scale: TimelineCoordTransform, uuid: UUID, z: int,
                  title: str, subtitle: str = None, icon: QIcon = None, metadata: dict = None,
                  tooltip: str = None, color: QColor = None, selected: bool = False,
                  colormap: [QGradient, QImage] = None, min: float = None, max: float = None):
         super(QTrackItem, self).__init__()
-        self._scene = scene
+        self.frames = []
+        self._scene = ref(scene)
         self._scale = scale
         self._uuid = uuid
         self._z = z
@@ -126,6 +129,7 @@ class QTrackItem(QGraphicsObject):
         # if brush:
         #     LOG.debug('setting brush')
         #     self.setBrush(brush)
+        self.update_pos_bounds()
         self._add_decorations()
         scene.addItem(self)
         self.setAcceptDrops(True)
@@ -144,18 +148,18 @@ class QTrackItem(QGraphicsObject):
 
     @property
     def scene(self):
-        return self._scene
+        return self._scene()
 
     @property
     def default_frame_pen_brush(self):
-        return self._scene.default_frame_pen_brush
+        return self.scene.default_frame_pen_brush
 
     def _add_decorations(self):
         """Add decor sub-items to self
         title, subtitle, icon, colormap
         these are placed left of the local origin inside the _left_pad area
         """
-        scene = self._scene
+        scene = self.scene
         if self._title:
             self._gi_title = it = scene.addSimpleText(self._title)
             it.setParentItem(self)
@@ -180,10 +184,10 @@ class QTrackItem(QGraphicsObject):
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget=None):
         super(QTrackItem, self).paint(painter, option, widget)
 
-    def boundingRect(self) -> QRectF:
-        if self._bounds is None:
-            return self.update_pos_and_bounds()
-        return self._bounds
+    # def boundingRect(self) -> QRectF:
+    #     if self._bounds is None:
+    #         return self.update_pos_and_bounds()
+    #     return self._bounds
 
     # handle clicking
 
@@ -227,61 +231,68 @@ class QTrackItem(QGraphicsObject):
     # working with Frames as sub-items, updating and syncing position and extents
 
     def _iter_frame_children(self):
-        children = tuple(self.childItems())
-        # LOG.debug("{} children".format(len(children)))
-        for child in children:
-            if isinstance(child, QFrameItem):
-                yield child
+        return list(self.frames)
+        # children = tuple(self.childItems())
+        # # LOG.debug("{} children".format(len(children)))
+        # for child in children:
+        #     if isinstance(child, QFrameItem):
+        #         yield child
 
-    @property
     def time_extent_of_frames(self):
         """start time and duration of the frames held by the track
         """
         s, e = None, None
-        for child in self.childItems():
+        for child in self._iter_frame_children():
             # y relative to track is 0
             # calculate absolute x position in scene
-            if hasattr(child, 'td'):
-                assert (child.uuid != self.uuid)
-                t,d = child.td
-                s = t if (s is None) else min(t, s)
-                e = (t + d) if (e is None) else max(e, t + d)
+            # assert (child.uuid != self.uuid)
+            t,d = child.td
+            s = t if (s is None) else min(t, s)
+            e = (t + d) if (e is None) else max(e, t + d)
         if e is None:
             LOG.info("empty track cannot determine its horizontal extent")
             return None, None
         return s, e - s
 
-    def update_pos_and_bounds(self):
+    def update_pos_bounds(self):
         """Update position and bounds of the Track to reflect current TimelineCoordTransform, encapsulating frames owned
         Note that the local x=0.0 corresponds to the time of the first frame in the track
         This is also the center of rotation or animation "handle" (e.g. for track dragging)
         """
         # starting time and duration of the track, computed from frames owned
-        t, d = self.time_extent_of_frames
+        t, d = self.time_extent_of_frames()
+        if (t is None) or (d is None):
+            LOG.debug("no frames contained, cannot adjust size or location of QTrackItem")
+            return
         # scene y coordinate of upper left corner
         top = self._z * DEFAULT_TRACK_HEIGHT
         # convert track extent to scene coordinates using current transform
         frames_left, frames_width = self._scale.calc_pixel_x_pos(t, d)
         track_left, track_width = self._scale.calc_pixel_x_pos(t - self._left_pad, d + self._left_pad + self._right_pad)
         # set track position, assuming we want origin coordinate of track item to be centered vertically within item
+        self.prepareGeometryChange()
         self.setPos(frames_left, top + DEFAULT_TRACK_HEIGHT / 2)
         # bounds relative to position in scene, left_pad space to left of local origin (x<0), frames and right-pad at x>=0
         self._bounds = QRectF(track_left - frames_left, -DEFAULT_TRACK_HEIGHT / 2, track_width, DEFAULT_TRACK_HEIGHT)
-        return self._bounds
 
-    def update_frame_positions(self):
+    def update_frame_positions(self, *frames):
         """Update frames' origins relative to self after TimelineCoordTransform has changed scale
         """
         myx = self.pos().x()  # my x coordinate relative to scene
-        for child in self._iter_frame_children():
-            if isinstance(child, QFrameItem):
-                # y relative to track is 0
-                # calculate absolute x position in scene
-                x, _ = self._scale.calc_pixel_x_pos(child.t)
-                child.setPos(x - myx, 0.0)
+        frames = tuple(frames) or self._iter_frame_children()
+        for frame in frames:
+            # y relative to track is 0
+            # calculate absolute x position in scene
+            x, _ = self._scale.calc_pixel_x_pos(frame.t)
+            frame.prepareGeometryChange()
+            frame.setPos(x - myx, 0.0)
+
+    def boundingRect(self):
+        LOG.debug("track boundingRect")
+        return self._bounds
 
 
-class QFrameItem(QGraphicsItem):
+class QFrameItem(QGraphicsObject):
     """A Frame
     For SIFT use, this corresponds to a single Product or single composite of multiple Products (e.g. RGB composite)
     QGraphicsView representation of a data frame, with a start and end time relative to the scene.
@@ -297,6 +308,7 @@ class QFrameItem(QGraphicsItem):
     _subtitle: str = None
     _thumb: QPixmap = None
     _metadata: Mapping = None
+    _bounds: QRectF = QRectF()
 
     def __init__(self, track: QTrackItem, scale: TimelineCoordTransform, uuid: UUID,
                  start: datetime, duration: timedelta, state: TimelineFrameState,
@@ -314,7 +326,7 @@ class QFrameItem(QGraphicsItem):
             uuid: UUID of workspace representation
         """
         super(QFrameItem, self).__init__()
-        self._track = track
+        self._track = ref(track)
         self._state = state
         self._scale = scale
         self._start = start
@@ -324,14 +336,18 @@ class QFrameItem(QGraphicsItem):
         self._thumb = thumb
         self._metadata = metadata
         self._uuid = uuid
-        # pen, brush = track.default_frame_pen_brush
+        # self._pen, self._brush = track.default_frame_pen_brush
         # if pen:
         #     LOG.debug('setting pen')
         #     self.setPen(pen)
         # if brush:
         #     LOG.debug('setting brush')
         #     self.setBrush(brush)
+        track.frames.append(self)
         self.setParentItem(track)
+        self.update_bounds()
+        track.update_pos_bounds()
+        track.update_frame_positions()
         # self.setAcceptDrops(True)
 
     @property
@@ -352,7 +368,7 @@ class QFrameItem(QGraphicsItem):
 
     @property
     def track(self):
-        return self._track
+        return self._track()
 
     @property
     def state(self):
@@ -365,24 +381,33 @@ class QFrameItem(QGraphicsItem):
             self.update()
 
     # painting and boundaries
+
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget=None) -> None:
-        pen, brush = self._track.default_frame_pen_brush
+        pen, brush = self.track.default_frame_pen_brush
         rect = self.boundingRect()
         painter.setBrush(brush)
         painter.setPen(pen)
         painter.drawRoundedRect(rect, DEFAULT_FRAME_CORNER_RADIUS, DEFAULT_FRAME_CORNER_RADIUS, Qt.RelativeSize)
-
         # super(QFrameItem, self).paint(painter, option, widget)
 
     def boundingRect(self) -> QRectF:
         """return relative bounding rectangle, given position is set by Track parent as needed
+        """
+        LOG.debug("frame boundingRect")
+        return self._bounds
+
+    # internal recalculation / realignment
+
+    def update_bounds(self):
+        """set size and width based on current scaling
+        position is controlled by the track, since we have to be track-relative
         """
         left = 0.0
         top = - DEFAULT_FRAME_HEIGHT / 2
         height = DEFAULT_FRAME_HEIGHT
         width = self._scale.calc_pixel_duration(self._duration)
         LOG.debug("width for {} is {} scene pixels".format(self._duration, width))
-        return QRectF(left, top, width, height)
+        self._bounds = QRectF(left, top, width, height)
 
     # # handle drag and drop
     # def dragEnterEvent(self, event: QGraphicsSceneDragDropEvent):
