@@ -338,6 +338,7 @@ class QFramesInTracksScene(QGraphicsScene):
 class TestScene(QFramesInTracksScene):
     _did_populate = False
 
+
     def __init__(self):
         super(TestScene, self).__init__()
 
@@ -349,14 +350,15 @@ class TestScene(QFramesInTracksScene):
     def _test_populate(self):
         from uuid import uuid1 as uuidgen
         once = datetime.utcnow()
-        tuuid = uuidgen()
-        fuuid = uuidgen()
-        min15 = timedelta(minutes=5)
-        abitrack = QTrackItem(self, self.coords, tuuid, 0, "G21 ABI B99 BT", "test track", tooltip="peremptorily cromulent")
+        mm = lambda m: timedelta(minutes=m)
+        track0 = QTrackItem(self, self.coords, uuidgen(), 0, "G21 ABI B99 BT", "test track", tooltip="peremptorily cromulent")
         # scene.addItem(abitrack)  # done in init
-        frame1 = QFrameItem(abitrack, self.coords, fuuid, once + min15, min15, TimelineFrameState.AVAILABLE, "frame1", "fulldiskimus")
-        abitrack.update_pos_bounds()
-        abitrack.update_frame_positions()
+        frame01 = QFrameItem(track0, self.coords, uuidgen(), once + mm(5), mm(5), TimelineFrameState.AVAILABLE, "abi1", "fulldiskimus")
+        track1 = QTrackItem(self, self.coords, uuidgen(), 1, "H11 AHI B99 Rad", "second test track", tooltip="nominally cromulent")
+        track11 = QFrameItem(track0, self.coords, uuidgen(), once + mm(6), mm(1), TimelineFrameState.READY, "ahi1", "JP04")
+        for track in [track0, track1]:
+            track.update_pos_bounds()
+            track.update_frame_positions()
         # scene.addItem(frame1)  # done in init
         # blabla = QGraphicsTextItem('abcdcba')
         # font = QFont('White Rabbit')
@@ -364,7 +366,7 @@ class TestScene(QFramesInTracksScene):
         # blabla.setPos(140, 100)
         # self.addItem(blabla)
         blabla=None
-        self.content = [abitrack, frame1, blabla]
+        self.content = [track0, frame01, blabla]
 
 
 class QFramesInTracksView(QGraphicsView):
