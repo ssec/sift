@@ -165,9 +165,11 @@ class QTrackItem(QGraphicsObject):
         if self._title:
             self._gi_title = it = scene.addSimpleText(self._title)
             it.setParentItem(self)
+            it.setPos(GFXC.track_title_pos)
         if self._subtitle:
             self._gi_subtitle = it = scene.addSimpleText(self._subtitle)
             it.setParentItem(self)
+            it.setPos(GFXC.track_subtitle_pos)
         # FUTURE: add draggable color-map pixmap
 
     # commands to cause item updates and then propagate back to the scene
@@ -188,15 +190,12 @@ class QTrackItem(QGraphicsObject):
         # _wtf_recursion()
         pen, brush = self._scene().default_track_pen_brush
         rect = self.boundingRect()
+        painter.setRenderHint(QPainter.Antialiasing)
         painter.setBrush(brush)
         painter.setPen(pen)
 
         # draw outer boundary
         painter.drawRoundedRect(rect, GFXC.track_corner_radius, GFXC.track_corner_radius, Qt.RelativeSize)
-
-        # draw title / subtitle
-
-        # draw colormap
 
 
     def boundingRect(self) -> QRectF:
@@ -281,15 +280,14 @@ class QTrackItem(QGraphicsObject):
             LOG.debug("no frames contained, cannot adjust size or location of QTrackItem")
             return
         # scene y coordinate of upper left corner
-        top = self._z * GFXC.track_height
         # convert track extent to scene coordinates using current transform
         frames_left, frames_width = self._scale.calc_pixel_x_pos(t, d)
         track_left, track_width = self._scale.calc_pixel_x_pos(t - self._left_pad, d + self._left_pad + self._right_pad)
         # set track position, assuming we want origin coordinate of track item to be centered vertically within item
-        self.prepareGeometryChange()
-        self.setPos(frames_left, top + GFXC.track_height / 2)
         # bounds relative to position in scene, left_pad space to left of local origin (x<0), frames and right-pad at x>=0
+        self.prepareGeometryChange()
         self._bounds = QRectF(track_left - frames_left, -GFXC.track_height / 2, track_width, GFXC.track_height)
+        self.setPos(frames_left, (0.5 + self.z) * GFXC.track_height)
 
     def update_frame_positions(self, *frames):
         """Update frames' origins relative to self after TimelineCoordTransform has changed scale
@@ -398,6 +396,7 @@ class QFrameItem(QGraphicsObject):
         rect = self.boundingRect()
         painter.setBrush(brush)
         painter.setPen(pen)
+        painter.setRenderHint(QPainter.Antialiasing)
         painter.drawRoundedRect(rect, GFXC.frame_corner_radius, GFXC.frame_corner_radius, Qt.RelativeSize)
         # super(QFrameItem, self).paint(painter, option, widget)
 

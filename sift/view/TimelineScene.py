@@ -355,7 +355,7 @@ class TestScene(QFramesInTracksScene):
         # scene.addItem(abitrack)  # done in init
         frame01 = QFrameItem(track0, self.coords, uuidgen(), once + mm(5), mm(5), TimelineFrameState.AVAILABLE, "abi1", "fulldiskimus")
         track1 = QTrackItem(self, self.coords, uuidgen(), 1, "H11 AHI B99 Rad", "second test track", tooltip="nominally cromulent")
-        track11 = QFrameItem(track0, self.coords, uuidgen(), once + mm(6), mm(1), TimelineFrameState.READY, "ahi1", "JP04")
+        frame11 = QFrameItem(track1, self.coords, uuidgen(), once + mm(6), mm(1), TimelineFrameState.READY, "ahi1", "JP04")
         for track in [track0, track1]:
             track.update_pos_bounds()
             track.update_frame_positions()
@@ -366,7 +366,7 @@ class TestScene(QFramesInTracksScene):
         # blabla.setPos(140, 100)
         # self.addItem(blabla)
         blabla=None
-        self.content = [track0, frame01, blabla]
+        self.content = [track0, frame01, track1, frame11]
 
 
 class QFramesInTracksView(QGraphicsView):

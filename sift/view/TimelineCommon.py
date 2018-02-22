@@ -14,7 +14,7 @@ from enum import Enum
 import pickle as pkl
 from typing import Tuple, Optional
 
-from PyQt4.QtCore import QObject, QRectF, QByteArray
+from PyQt4.QtCore import QObject, QRectF, QByteArray, QPointF
 from PyQt4.QtGui import QGraphicsSceneDragDropEvent
 
 LOG = logging.getLogger(__name__)
@@ -22,9 +22,12 @@ LOG = logging.getLogger(__name__)
 
 class TimelineGraphicsConfig(object):
     track_height = 64
-    track_corner_radius = 5
+    track_corner_radius = 15
+    track_title_pos = QPointF(3.0, 3.0)
+    track_subtitle_pos = QPointF(3.0, 18.0)
     frame_height = 56
-    frame_corner_radius = 5
+    frame_corner_radius = 9
+    frame_title_pos = QPointF(2.0, 2.0)
 
 # graphics constants in setting up items and painting
 GFXC = TimelineGraphicsConfig()
