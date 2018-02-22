@@ -184,14 +184,20 @@ class QTrackItem(QGraphicsObject):
     # painting and boundaries
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget=None):
-        LOG.debug("QTrackItem.paint")
-        _wtf_recursion()
+        # LOG.debug("QTrackItem.paint")
+        # _wtf_recursion()
         pen, brush = self._scene().default_track_pen_brush
         rect = self.boundingRect()
         painter.setBrush(brush)
         painter.setPen(pen)
-        painter.drawRoundedRect(rect, DEFAULT_FRAME_CORNER_RADIUS, DEFAULT_FRAME_CORNER_RADIUS, Qt.RelativeSize)
-        # super(QTrackItem, self).paint(painter, option, widget)
+
+        # draw outer boundary
+        painter.drawRoundedRect(rect, GFXC.track_corner_radius, GFXC.track_corner_radius, Qt.RelativeSize)
+
+        # draw title / subtitle
+
+        # draw colormap
+
 
     def boundingRect(self) -> QRectF:
     #     if self._bounds is None:
@@ -275,15 +281,15 @@ class QTrackItem(QGraphicsObject):
             LOG.debug("no frames contained, cannot adjust size or location of QTrackItem")
             return
         # scene y coordinate of upper left corner
-        top = self._z * DEFAULT_TRACK_HEIGHT
+        top = self._z * GFXC.track_height
         # convert track extent to scene coordinates using current transform
         frames_left, frames_width = self._scale.calc_pixel_x_pos(t, d)
         track_left, track_width = self._scale.calc_pixel_x_pos(t - self._left_pad, d + self._left_pad + self._right_pad)
         # set track position, assuming we want origin coordinate of track item to be centered vertically within item
         self.prepareGeometryChange()
-        self.setPos(frames_left, top + DEFAULT_TRACK_HEIGHT / 2)
+        self.setPos(frames_left, top + GFXC.track_height / 2)
         # bounds relative to position in scene, left_pad space to left of local origin (x<0), frames and right-pad at x>=0
-        self._bounds = QRectF(track_left - frames_left, -DEFAULT_TRACK_HEIGHT / 2, track_width, DEFAULT_TRACK_HEIGHT)
+        self._bounds = QRectF(track_left - frames_left, -GFXC.track_height / 2, track_width, GFXC.track_height)
 
     def update_frame_positions(self, *frames):
         """Update frames' origins relative to self after TimelineCoordTransform has changed scale
@@ -387,12 +393,12 @@ class QFrameItem(QGraphicsObject):
     # painting and boundaries
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget=None) -> None:
-        LOG.debug("QFrameItem.paint")
+        # LOG.debug("QFrameItem.paint")
         pen, brush = self._track().default_frame_pen_brush
         rect = self.boundingRect()
         painter.setBrush(brush)
         painter.setPen(pen)
-        painter.drawRoundedRect(rect, DEFAULT_FRAME_CORNER_RADIUS, DEFAULT_FRAME_CORNER_RADIUS, Qt.RelativeSize)
+        painter.drawRoundedRect(rect, GFXC.frame_corner_radius, GFXC.frame_corner_radius, Qt.RelativeSize)
         # super(QFrameItem, self).paint(painter, option, widget)
 
     def boundingRect(self) -> QRectF:
@@ -410,8 +416,8 @@ class QFrameItem(QGraphicsObject):
         position is controlled by the track, since we have to be track-relative
         """
         left = 0.0
-        top = - DEFAULT_FRAME_HEIGHT / 2
-        height = DEFAULT_FRAME_HEIGHT
+        top = - GFXC.frame_height / 2
+        height = GFXC.frame_height
         width = self._scale.calc_pixel_duration(self._duration)
         LOG.debug("width for {} is {} scene pixels".format(self._duration, width))
         old_bounds = self._bounds

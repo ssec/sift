@@ -20,9 +20,14 @@ from PyQt4.QtGui import QGraphicsSceneDragDropEvent
 LOG = logging.getLogger(__name__)
 
 
-DEFAULT_TRACK_HEIGHT = 48
-DEFAULT_FRAME_HEIGHT = 42
-DEFAULT_FRAME_CORNER_RADIUS = 8
+class TimelineGraphicsConfig(object):
+    track_height = 64
+    track_corner_radius = 5
+    frame_height = 56
+    frame_corner_radius = 5
+
+# graphics constants in setting up items and painting
+GFXC = TimelineGraphicsConfig()
 
 # drag and drop mimetypes
 MIMETYPE_TIMELINE_COLORMAP = 'application/sift.timeline.colormap'
@@ -52,7 +57,6 @@ class TimelineTrackState(Enum):
 ztdtup = namedtuple("ztdtup", ('z', 't', 'd'))  # z level > 0 ascending downward, start time: datetime, duration: timedelta
 
 
-
 class TimelineCoordTransform(QObject):
     """
     configurable transformations between time and display space, typically a tool used by scene/timeline/frame
@@ -68,7 +72,7 @@ class TimelineCoordTransform(QObject):
     _time_unit: timedelta = None
     _track_height: float = None
 
-    def __init__(self, time_base: datetime = None, time_unit: timedelta = timedelta(seconds=1), track_height=DEFAULT_TRACK_HEIGHT):
+    def __init__(self, time_base: datetime = None, time_unit: timedelta = timedelta(seconds=1), track_height=None):
         """
 
         Args:
@@ -79,7 +83,7 @@ class TimelineCoordTransform(QObject):
         super(TimelineCoordTransform, self).__init__()
         self._time_base = time_base or datetime.utcnow()
         self._time_unit = time_unit
-        self._track_height = track_height
+        self._track_height = track_height or GFXC.track_height
 
     def calc_time_duration(self, scene_x: [float, None], scene_w: [float, None]) -> Tuple[Optional[datetime], Optional[timedelta]]:
         """

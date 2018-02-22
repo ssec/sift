@@ -441,6 +441,8 @@ class TestWindow(QMainWindow):
 
         # And I animate it once manually.
         # self.animate()
+        self.show()
+        self.activateWindow()
 
 
 class tests(unittest.TestCase):
