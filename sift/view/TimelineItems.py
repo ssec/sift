@@ -100,8 +100,6 @@ class QTrackItem(QGraphicsObject):
     _min: float = None
     _max: float = None
     _dragging: bool = False   # whether or not a drag is in progress across this item
-    _left_pad: timedelta = timedelta(hours=1)  # space to left of first frame which we reserve for labels etc
-    _right_pad: timedelta = timedelta(minutes=5)  # space to right of last frame we reserve for track closing etc
     # position in scene coordinates is determined by _z level and starting time of first frame, minus _left_pad
     _bounds: QRectF = QRectF()  # bounds of the track in scene coordinates, assuming 0,0 corresponds to vertical center of left edge of frame representation
     _gi_title: QGraphicsTextItem = None
@@ -128,15 +126,8 @@ class QTrackItem(QGraphicsObject):
         self._selected = selected
         self._colormap = colormap
         self._min, self._max = min, max
-        # pen, brush = scene.default_track_pen_brush
-        # if pen:
-        #     LOG.debug('setting pen')
-        #     self.setPen(pen)
-        # if brush:
-        #     LOG.debug('setting brush')
-        #     self.setBrush(brush)
         self.update_pos_bounds()
-        self._add_decorations()
+        self._update_decorations()
         scene.addItem(self)
         self.setAcceptDrops(True)
 
@@ -156,18 +147,18 @@ class QTrackItem(QGraphicsObject):
     def default_frame_pen_brush(self):
         return self._scene().default_frame_pen_brush
 
-    def _add_decorations(self):
+    def _update_decorations(self):
         """Add decor sub-items to self
         title, subtitle, icon, colormap
         these are placed left of the local origin inside the _left_pad area
         """
         scene = self._scene()
         if self._title:
-            self._gi_title = it = scene.addSimpleText(self._title)
+            self._gi_title = it = self._gi_title or scene.addSimpleText(self._title)
             it.setParentItem(self)
             it.setPos(GFXC.track_title_pos)
         if self._subtitle:
-            self._gi_subtitle = it = scene.addSimpleText(self._subtitle)
+            self._gi_subtitle = it = self._gi_subtitle or scene.addSimpleText(self._subtitle)
             it.setParentItem(self)
             it.setPos(GFXC.track_subtitle_pos)
         # FUTURE: add draggable color-map pixmap
@@ -279,15 +270,19 @@ class QTrackItem(QGraphicsObject):
         if (t is None) or (d is None):
             LOG.debug("no frames contained, cannot adjust size or location of QTrackItem")
             return
+        LOG.debug("time extent of frames in track {} is {} +{}".format(self._title, t, d))
         # scene y coordinate of upper left corner
         # convert track extent to scene coordinates using current transform
         frames_left, frames_width = self._scale.calc_pixel_x_pos(t, d)
-        track_left, track_width = self._scale.calc_pixel_x_pos(t - self._left_pad, d + self._left_pad + self._right_pad)
+        # track_left, track_width = self._scale.calc_pixel_x_pos(t - GFXC.track_left_pad, d + GFXC.track_left_pad + GFXC.track_right_pad)
         # set track position, assuming we want origin coordinate of track item to be centered vertically within item
         # bounds relative to position in scene, left_pad space to left of local origin (x<0), frames and right-pad at x>=0
         self.prepareGeometryChange()
-        self._bounds = QRectF(track_left - frames_left, -GFXC.track_height / 2, track_width, GFXC.track_height)
+        self._bounds = QRectF(-GFXC.track_left_pad, -GFXC.track_height / 2, frames_width + GFXC.track_left_pad + GFXC.track_right_pad, GFXC.track_height)
+        LOG.debug("new track bounds: {}".format(self._bounds))
+        # origin is at the start of the first frame contained. padding extends into negative x
         self.setPos(frames_left, (0.5 + self.z) * GFXC.track_height)
+        self._update_decorations()
 
     def update_frame_positions(self, *frames):
         """Update frames' origins relative to self after TimelineCoordTransform has changed scale

@@ -21,13 +21,16 @@ LOG = logging.getLogger(__name__)
 
 
 class TimelineGraphicsConfig(object):
-    track_height = 64
-    track_corner_radius = 15
-    track_title_pos = QPointF(3.0, 3.0)
-    track_subtitle_pos = QPointF(3.0, 18.0)
-    frame_height = 56
-    frame_corner_radius = 9
-    frame_title_pos = QPointF(2.0, 2.0)
+    track_height: float = 64.0
+    track_corner_radius: float = 15.0
+    track_left_pad: float = 128.0  # scene pixels space to left of first frame which we reserve for labels etc
+    track_right_pad: float = 16.0  # scene pixels space to right of last frame we reserve for track closing etc
+    track_title_pos: QPointF  = QPointF(3.0-128.0, -25.0)  # scene pixel offset relative to vertical centerline and start of first frame
+    track_subtitle_pos: QPointF = QPointF(3.0-128.0, -13.0)
+    frame_height: float = 56.0
+    frame_corner_radius: float = 9.0
+    frame_title_pos: QPointF = QPointF(2.0, 2.0)
+
 
 # graphics constants in setting up items and painting
 GFXC = TimelineGraphicsConfig()

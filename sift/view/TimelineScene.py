@@ -424,6 +424,8 @@ class TestWindow(QMainWindow):
         assert(wdgt.isValid())
         gfx.setViewport(wdgt)
         gfx.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
+        gfx.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        gfx.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scene.setSceneRect(QRectF(0,0, 800, 600))
         gfx.setScene(scene)
 
@@ -444,7 +446,7 @@ class TestWindow(QMainWindow):
         # And I animate it once manually.
         # self.animate()
         self.show()
-        self.activateWindow()
+        self.raise_()
 
 
 class tests(unittest.TestCase):
