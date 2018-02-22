@@ -67,7 +67,7 @@ class QFramesInTracksScene(QGraphicsScene):
         self._track_items = {}
         self._frame_items = {}
         pen = QPen()
-        pen.setWidthF(4.0)
+        pen.setWidthF(1.25)
         pen.setColor(Qt.black)
         # pen.setCapStyle(Qt.RoundCap)
         pen.setJoinStyle(Qt.RoundJoin)
@@ -76,7 +76,8 @@ class QFramesInTracksScene(QGraphicsScene):
         brush.setStyle(Qt.SolidPattern)
         self._frame_pen_brush = pen, brush
         pen = QPen(pen)
-        pen.setWidthF(2.0)
+        pen.setWidthF(3.5)
+        pen.setJoinStyle(Qt.RoundJoin)
         pen.setColor(Qt.blue)
         brush = QBrush(brush)
         brush.setColor(Qt.gray)

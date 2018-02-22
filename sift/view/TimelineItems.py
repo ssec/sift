@@ -74,6 +74,12 @@ from sift.view.TimelineCommon import *
 LOG = logging.getLogger(__name__)
 
 
+def _wtf_recursion():
+    from inspect import getouterframes, currentframe
+    level = len(getouterframes(currentframe()))
+    LOG.debug("frame boundingRect depth {}".format(level))
+
+
 class QTrackItem(QGraphicsObject):
     """ A group of Frames corresponding to a timeline
     This allows drag and drop of timelines to be easier
@@ -146,19 +152,16 @@ class QTrackItem(QGraphicsObject):
     def z(self, new_z: int):
         self._z = new_z
 
-    def scene(self):
-        return self._scene()
-
     @property
     def default_frame_pen_brush(self):
-        return self.scene().default_frame_pen_brush
+        return self._scene().default_frame_pen_brush
 
     def _add_decorations(self):
         """Add decor sub-items to self
         title, subtitle, icon, colormap
         these are placed left of the local origin inside the _left_pad area
         """
-        scene = self.scene()
+        scene = self._scene()
         if self._title:
             self._gi_title = it = scene.addSimpleText(self._title)
             it.setParentItem(self)
@@ -176,12 +179,19 @@ class QTrackItem(QGraphicsObject):
 
     def insert_track_before(self, track: mimed_track):
         """Inform scene that user wants a dragged scene moved to before us in the z-order"""
-        LOG.warning("reorder tracks usingdragged track not yet implemented")
+        LOG.warning("reorder tracks using dragged track not yet implemented")
 
     # painting and boundaries
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget=None):
-        super(QTrackItem, self).paint(painter, option, widget)
+        LOG.debug("QTrackItem.paint")
+        _wtf_recursion()
+        pen, brush = self._scene().default_track_pen_brush
+        rect = self.boundingRect()
+        painter.setBrush(brush)
+        painter.setPen(pen)
+        painter.drawRoundedRect(rect, DEFAULT_FRAME_CORNER_RADIUS, DEFAULT_FRAME_CORNER_RADIUS, Qt.RelativeSize)
+        # super(QTrackItem, self).paint(painter, option, widget)
 
     def boundingRect(self) -> QRectF:
     #     if self._bounds is None:
@@ -215,6 +225,7 @@ class QTrackItem(QGraphicsObject):
 
     def dragLeaveEvent(self, event: QGraphicsSceneDragDropEvent):
         self._dragging = False
+        event.setAccepted(False)
 
     def dropEvent(self, event: QGraphicsSceneDragDropEvent):
         colormap = recv_mime(event, MIMETYPE_TIMELINE_COLORMAP)
@@ -237,7 +248,7 @@ class QTrackItem(QGraphicsObject):
         #     if isinstance(child, QFrameItem):
         #         yield child
 
-    def time_extent_of_frames(self):
+    def _time_extent_of_frames(self):
         """start time and duration of the frames held by the track
         """
         s, e = None, None
@@ -259,7 +270,7 @@ class QTrackItem(QGraphicsObject):
         This is also the center of rotation or animation "handle" (e.g. for track dragging)
         """
         # starting time and duration of the track, computed from frames owned
-        t, d = self.time_extent_of_frames()
+        t, d = self._time_extent_of_frames()
         if (t is None) or (d is None):
             LOG.debug("no frames contained, cannot adjust size or location of QTrackItem")
             return
@@ -350,27 +361,25 @@ class QFrameItem(QGraphicsObject):
         return self._uuid
 
     @property
-    def t(self):
+    def t(self) -> datetime:
+        """Start time of frame"""
         return self._start
 
     @property
-    def d(self):
+    def d(self) -> timedelta:
+        """Duration of frame"""
         return self._duration
 
     @property
-    def td(self):
+    def td(self) -> Tuple[datetime, timedelta]:
         return self._start, self._duration
-
-    @property
-    def track(self):
-        return self._track()
 
     @property
     def state(self):
         return self._state
 
     @state.setter
-    def state(self, new_state):
+    def state(self, new_state: TimelineFrameState):
         if new_state != self._state:
             self._state = new_state
             self.update()
@@ -378,7 +387,8 @@ class QFrameItem(QGraphicsObject):
     # painting and boundaries
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget=None) -> None:
-        pen, brush = self.track.default_frame_pen_brush
+        LOG.debug("QFrameItem.paint")
+        pen, brush = self._track().default_frame_pen_brush
         rect = self.boundingRect()
         painter.setBrush(brush)
         painter.setPen(pen)
@@ -388,7 +398,9 @@ class QFrameItem(QGraphicsObject):
     def boundingRect(self) -> QRectF:
         """return relative bounding rectangle, given position is set by Track parent as needed
         """
-        LOG.debug("frame boundingRect")
+        # from inspect import getouterframes, currentframe
+        # level = len(getouterframes(currentframe()))
+        # LOG.debug("frame boundingRect depth {}".format(level))
         return self._bounds
 
     # internal recalculation / realignment
