@@ -146,20 +146,19 @@ class QTrackItem(QGraphicsObject):
     def z(self, new_z: int):
         self._z = new_z
 
-    @property
     def scene(self):
         return self._scene()
 
     @property
     def default_frame_pen_brush(self):
-        return self.scene.default_frame_pen_brush
+        return self.scene().default_frame_pen_brush
 
     def _add_decorations(self):
         """Add decor sub-items to self
         title, subtitle, icon, colormap
         these are placed left of the local origin inside the _left_pad area
         """
-        scene = self.scene
+        scene = self.scene()
         if self._title:
             self._gi_title = it = scene.addSimpleText(self._title)
             it.setParentItem(self)
@@ -184,12 +183,12 @@ class QTrackItem(QGraphicsObject):
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget=None):
         super(QTrackItem, self).paint(painter, option, widget)
 
-    # def boundingRect(self) -> QRectF:
+    def boundingRect(self) -> QRectF:
     #     if self._bounds is None:
     #         return self.update_pos_and_bounds()
-    #     return self._bounds
+        return self._bounds
 
-    # handle clicking
+    # click events / drag departures
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
         LOG.debug("QTrackItem mouse-down")
@@ -199,7 +198,7 @@ class QTrackItem(QGraphicsObject):
         LOG.debug("QTrackItem mouse-up")
         return super(QTrackItem, self).mouseReleaseEvent(event)
 
-    # handle drag and drop
+    # handle drag and drop arrivals
 
     def dragEnterEvent(self, event: QGraphicsSceneDragDropEvent):
         self._dragging = True
@@ -287,10 +286,6 @@ class QTrackItem(QGraphicsObject):
             frame.prepareGeometryChange()
             frame.setPos(x - myx, 0.0)
 
-    def boundingRect(self):
-        LOG.debug("track boundingRect")
-        return self._bounds
-
 
 class QFrameItem(QGraphicsObject):
     """A Frame
@@ -299,7 +294,7 @@ class QFrameItem(QGraphicsObject):
     Essentially a frame sprite
     """
     _state: TimelineFrameState = None
-    _track: QTrackItem = None
+    _track = None  # weakref to track we belong to
     _scale: TimelineCoordTransform = None
     _uuid: UUID = None
     _start: datetime = None
@@ -407,7 +402,11 @@ class QFrameItem(QGraphicsObject):
         height = DEFAULT_FRAME_HEIGHT
         width = self._scale.calc_pixel_duration(self._duration)
         LOG.debug("width for {} is {} scene pixels".format(self._duration, width))
-        self._bounds = QRectF(left, top, width, height)
+        old_bounds = self._bounds
+        new_bounds = QRectF(left, top, width, height)
+        if (old_bounds is None) or (new_bounds != old_bounds):
+            self.prepareGeometryChange()
+            self._bounds = new_bounds
 
     # # handle drag and drop
     # def dragEnterEvent(self, event: QGraphicsSceneDragDropEvent):
