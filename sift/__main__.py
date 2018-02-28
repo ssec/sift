@@ -47,7 +47,7 @@ from functools import partial
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from sift.ui.pov_main_ui import Ui_MainWindow
-from sift.common import INFO, KIND, TOOL, COMPOSITE_TYPE
+from sift.common import INFO, KIND, TOOL, COMPOSITE_TYPE, get_font_size
 
 import os
 import sys
@@ -515,6 +515,13 @@ class Main(QtGui.QMainWindow):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+
+        # hack some font sizes until we migrate to PyQt5 and handle it better
+        # was 14 on osx
+        font = QtGui.QFont('Andale Mono', get_font_size(8))
+        self.ui.cursorProbeLayer.setFont(font)
+        self.ui.cursorProbeText.setFont(font)
+
         self.setWindowTitle(self.windowTitle().replace("|X.X.X|", __version__))
         self.tabifyDockWidget(self.ui.layersPane, self.ui.areaProbePane)
         self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.rgbConfigPane)

@@ -32,6 +32,20 @@ from pyproj import Proj
 
 LOG = logging.getLogger(__name__)
 
+
+# HACK: Get a font size that looks good on this platform
+def get_font_size(pref_size):
+    # win/linux = 7
+    # osx = 12
+    if sys.platform.startswith('win'):
+        factor = 1.
+    elif 'darwin' in sys.platform:
+        factor = 1.7
+    else:
+        factor = 1.
+
+    return round(pref_size * factor)
+
 # if sys.platform.startswith("win"):
 PREFERRED_SCREEN_TO_TEXTURE_RATIO = 1.0  # screenpx:texturepx that we want to keep, ideally, by striding
 # else:
