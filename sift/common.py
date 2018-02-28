@@ -40,11 +40,11 @@ def get_font_size(pref_size):
     if sys.platform.startswith('win'):
         factor = 1.
     elif 'darwin' in sys.platform:
-        factor = 1.7
+        factor = 1.714
     else:
         factor = 1.
 
-    return round(pref_size * factor)
+    return pref_size * factor
 
 # if sys.platform.startswith("win"):
 PREFERRED_SCREEN_TO_TEXTURE_RATIO = 1.0  # screenpx:texturepx that we want to keep, ideally, by striding
