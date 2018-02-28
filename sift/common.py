@@ -35,21 +35,22 @@ LOG = logging.getLogger(__name__)
 
 # HACK: Get a font size that looks good on this platform
 def get_font_size(pref_size):
-    # win/linux = 7
+    # win = 7
     # osx = 12
-    if sys.platform.startswith('win'):
+    env_factor = os.getenv("SIFT_FONT_FACTOR", None)
+    if env_factor is not None:
+        factor = float(env_factor)
+    elif sys.platform.startswith('win'):
         factor = 1.
     elif 'darwin' in sys.platform:
         factor = 1.714
     else:
-        factor = 1.
+        factor = 1.3
 
     return pref_size * factor
 
-# if sys.platform.startswith("win"):
+
 PREFERRED_SCREEN_TO_TEXTURE_RATIO = 1.0  # screenpx:texturepx that we want to keep, ideally, by striding
-# else:
-#     PREFERRED_SCREEN_TO_TEXTURE_RATIO = 0.5  # screenpx:texturepx that we want to keep, ideally, by striding
 
 # http://home.online.no/~sigurdhu/WGS84_Eng.html
 
