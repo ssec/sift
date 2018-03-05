@@ -72,7 +72,7 @@ class GradientControl(QtGui.QDialog):
         l.addWidget(self.ImportButton, 0, 0)
         l.addWidget(self.SaveButton, 0, 2)
         l.addWidget(self.sqrt, 1, 2)
-        l.addWidget(self.ColorBar, 2, 1)
+        l.addWidget(self.ColorBar, 4, 1)
         l.addWidget(self.CloneButton, 1, 0)
         l.addWidget(self.List, 1, 1,3,1)
         l.addWidget(self.CloseButton, 6, 2)
@@ -240,90 +240,26 @@ class GradientControl(QtGui.QDialog):
         self.doc.updateGCColorMap(UpdatedMap, name)
 
     def importButtonClick(self):
+        print("Starting File")
+        fname = QtGui.QFileDialog.getOpenFileName(None, 'Get File', 'Export.txt')
+        try:
+            file = open(fname, "r")
+            toImport = ast.literal_eval(file.read())
 
-        reply2 = QtGui.QMessageBox()
-        reply2.setWindowTitle("File or Arrays?")
-        reply2.setText("Would you like to import from a file or from point + color arrays?")
-        reply2.setStandardButtons(QtGui.QMessageBox.Yes | QtGui.QMessageBox.No | QtGui.QMessageBox.Cancel)
-        buttonY = reply2.button(QtGui.QMessageBox.Yes)
-        buttonY.setText('File')
-        buttonN = reply2.button(QtGui.QMessageBox.No)
-        buttonN.setText('Arrays')
+            for impItem in toImport.keys():
+                if impItem in self.autoImportData.keys():
+                    QtGui.QMessageBox.information(self, "Error",
+                                                  "You cannot save a gradient with the same name as one of the internal gradients.")
 
-        reply2.exec_()
+            for impItem in toImport.keys():
+                self.saveNewMap(toImport[impItem], impItem)
 
-        if reply2.clickedButton() == buttonY:
-            print("Starting File")
-            fname = QtGui.QFileDialog.getOpenFileName(None, 'Get File', 'Export.txt')
-            try:
-                file = open(fname, "r")
-                toImport = ast.literal_eval(file.read())
+            self.gData.update(toImport)
 
-                self.gData.update(toImport)
-
-                for impItem in toImport.keys():
-                    self.saveNewMap(toImport[impItem], impItem)
-
-                self.updateListWidget(impItem)
-            except:
-                print("Error opening file or reading!")
-            print("Done")
-        elif reply2.clickedButton() == buttonN:
-            print("Going")
-            pointArray = QtGui.QInputDialog.getText(self, self.tr("Input Points"),
-                                                    self.tr("Point Array:"), QtGui.QLineEdit.Normal)
-
-            if pointArray[0]:
-                colorArray = QtGui.QInputDialog.getText(self, self.tr("Input Hex Colors"),
-                                                        self.tr("Color Array:"), QtGui.QLineEdit.Normal)
-
-                if colorArray[0]:
-                    try:
-                        points_values = pointArray[0]
-
-                        points_values = points_values.replace('(', '')
-                        points_values = points_values.replace(')', '')
-                        points_values = points_values.replace('[', '')
-                        points_values = points_values.replace(']', '')
-                        points_values = points_values.replace('{', '')
-                        points_values = points_values.replace('}', '')
-                        points_values = points_values.split(',')
-
-                        points_values = [float(i) for i in points_values]
-
-                        colors_values = colorArray[0]
-
-                        colors_values = colors_values.replace('(', '')
-                        colors_values = colors_values.replace(')', '')
-                        colors_values = colors_values.replace('[', '')
-                        colors_values = colors_values.replace(']', '')
-                        colors_values = colors_values.replace('{', '')
-                        colors_values = colors_values.replace('}', '')
-                        colors_values = colors_values.replace('\'', '')
-                        colors_values = colors_values.replace(' ', '')
-                        colors_values = colors_values.split(',')
-
-                        data = {}
-
-                        for i in range(len(points_values)):
-                            data[points_values[i]] = colors_values[i]
-
-                        newName = QtGui.QInputDialog.getText(self, self.tr("Input ColorBar Name"),
-                                                             self.tr("Name:"), QtGui.QLineEdit.Normal)
-
-                        if newName[0]:
-                            newWidget = pg.GradientWidget()
-                            newWidget.hide()
-                            for key in data:
-                                newWidget.addTick(key, QtGui.QColor(data[key]), True)
-                            self.gData[newName[0]] = newWidget.saveState()
-                            self.saveNewMap(newWidget.saveState(), newName[0])
-                            #self.saveData()
-                            self.updateListWidget(newName[0])
-
-
-                    except:
-                        QtGui.QMessageBox.information(self, "Error", "Error loading the arrays!")
+            self.updateListWidget(impItem)
+        except:
+            print("Error opening file or reading!")
+        print("Done")
 
     def importGradients(self, name, hex, floats, editable):
         try:
@@ -353,7 +289,6 @@ class GradientControl(QtGui.QDialog):
         self.done(0)
 
     def updateListWidget(self, toShow = None):
-        # TODO Show selected widget
         self.List.clear()
         self.ExportButton.hide()
         self.DeleteButton.hide()
@@ -390,12 +325,10 @@ class GradientControl(QtGui.QDialog):
 
         if self.List.item(self.List.currentRow()).text() in self.gData.keys():
             NewBar = self.gData[self.List.item(self.List.currentRow()).text()]
-            #TODO change this
             self.ColorBar.restoreState(NewBar)
 
         if self.List.item(self.List.currentRow()).text() in self.autoImportData.keys():
             NewBar = self.autoImportData[self.List.item(self.List.currentRow()).text()]
-            #TODO change this
             self.ColorBar.restoreState(NewBar)
 
         SelectedThings = self.getSelected()
@@ -403,11 +336,14 @@ class GradientControl(QtGui.QDialog):
         print(SelectedThings)
 
         if len(SelectedThings) > 1:
-            self.ColorBar.hide()
             self.SaveButton.hide()
             self.sqrt.hide()
+
+            tickList = self.ColorBar.listTicks()
+            for tick in tickList:
+                self.ColorBar.removeTick(tick[0])
+
         else:
-            self.ColorBar.show()
             self.SaveButton.show()
             self.sqrt.show()
 
@@ -426,12 +362,16 @@ class GradientControl(QtGui.QDialog):
             self.sqrt.hide()
             self.SaveButton.hide()
 
-        if SelectedThings[0].text() == "----------------------------- Below Are Custom ColorMaps -----------------------------":
+        if len(SelectedThings) > 0 and SelectedThings[0].text() == "----------------------------- Below Are Custom ColorMaps -----------------------------":
             self.DeleteButton.hide()
             self.sqrt.hide()
             self.CloneButton.hide()
             self.SaveButton.hide()
             self.ExportButton.hide()
+
+            tickList = self.ColorBar.listTicks()
+            for tick in tickList:
+                self.ColorBar.removeTick(tick[0])
 
     def sqrtAction(self):
         if self.sqrt.isChecked() == True:
