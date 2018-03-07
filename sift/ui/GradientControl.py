@@ -26,10 +26,14 @@ class GradientControl(QtGui.QDialog):
         self.USER_MAPS = self.doc.usermaps
 
         self.ColorBar = pg.GradientWidget(orientation='bottom')
-        self.ColorBar.hide()
+        tickList = self.ColorBar.listTicks()
+        for tick in tickList:
+            self.ColorBar.removeTick(tick[0])
+        self.ColorBar.setEnabled(False)
 
         self.CloneButton = QtGui.QPushButton("Clone Gradient")
         self.CloneButton.clicked.connect(self.cloneGradient)
+        self.CloneButton.setEnabled(False)
 
         self.ImportButton = QtGui.QPushButton("Import Gradient")
         self.ImportButton.clicked.connect(self.importButtonClick)
@@ -42,6 +46,7 @@ class GradientControl(QtGui.QDialog):
         # Create SQRT Button and Related Functions
         self.sqrt = QtGui.QCheckBox("SQRT")
         self.sqrt.stateChanged.connect(self.sqrtAction)
+        self.sqrt.setEnabled(False)
 
         self.CloseButton = QtGui.QPushButton("Close")
         self.CloseButton.clicked.connect(self.closeButtonClick)
@@ -49,15 +54,16 @@ class GradientControl(QtGui.QDialog):
         # Create Delete Button and Related Functions
         self.DeleteButton = QtGui.QPushButton("Delete Gradient")
         self.DeleteButton.clicked.connect(self.deleteButtonClick)
-        self.DeleteButton.hide()
+        self.DeleteButton.setEnabled(False)
 
         # Create Export Button and Related Functions
         self.ExportButton = QtGui.QPushButton("Export Gradient")
         self.ExportButton.clicked.connect(self.exportButtonClick)
-        self.ExportButton.hide()
+        self.ExportButton.setEnabled(False)
 
         self.SaveButton = QtGui.QPushButton("Save Gradient")
         self.SaveButton.clicked.connect(self.saveButtonClick)
+        self.SaveButton.setEnabled(False)
 
         # Create Update Map Button & Related Functions
         #self.UpdateMapButton = QtGui.QPushButton("Clone Gradient")
@@ -92,6 +98,9 @@ class GradientControl(QtGui.QDialog):
                     self.importGradients(map, self.ALL_COLORMAPS[map].colors.hex, self.ALL_COLORMAPS[map]._controls, False)
 
                 #print("Imported Gradient!")
+
+
+
 
 
     def updateButtonClickOld(self):
@@ -290,8 +299,6 @@ class GradientControl(QtGui.QDialog):
 
     def updateListWidget(self, toShow = None):
         self.List.clear()
-        self.ExportButton.hide()
-        self.DeleteButton.hide()
 
         totalCount = 0
         corVal = 0
@@ -315,12 +322,6 @@ class GradientControl(QtGui.QDialog):
 
 
     def updateColorBar(self):
-        self.DeleteButton.show()
-        self.sqrt.show()
-        self.CloneButton.show()
-        self.SaveButton.show()
-        self.ExportButton.show()
-        self.ColorBar.show()
         self.sqrt.setCheckState(0)
 
         if self.List.item(self.List.currentRow()).text() in self.gData.keys():
@@ -336,16 +337,23 @@ class GradientControl(QtGui.QDialog):
         print(SelectedThings)
 
         if len(SelectedThings) > 1:
-            self.SaveButton.hide()
-            self.sqrt.hide()
-
+            self.SaveButton.setEnabled(False)
+            self.sqrt.setEnabled(False)
+            self.CloneButton.setEnabled(False)
             tickList = self.ColorBar.listTicks()
+            print(tickList)
+            print("did2")
             for tick in tickList:
                 self.ColorBar.removeTick(tick[0])
-
-        else:
-            self.SaveButton.show()
-            self.sqrt.show()
+            self.ColorBar.setEnabled(False)
+            print("DISABLING")
+        elif len(SelectedThings) == 1:
+            #self.SaveButton.show()
+            #self.sqrt.show()
+            self.SaveButton.setEnabled(True)
+            self.sqrt.setEnabled(True)
+            self.CloneButton.setEnabled(True)
+            self.ColorBar.setEnabled(True)
 
         showDel = True
         for thing in SelectedThings:
@@ -353,25 +361,37 @@ class GradientControl(QtGui.QDialog):
             if thing.text() in self.autoImportData.keys():
                 showDel = False
 
-        if showDel is True:
-            self.DeleteButton.show()
-            self.sqrt.show()
-            self.SaveButton.show()
-        else:
-            self.DeleteButton.hide()
-            self.sqrt.hide()
-            self.SaveButton.hide()
+        if showDel is False:
+            self.DeleteButton.setEnabled(False)
+            self.sqrt.setEnabled(False)
+            self.SaveButton.setEnabled(False)
 
         if len(SelectedThings) > 0 and SelectedThings[0].text() == "----------------------------- Below Are Custom ColorMaps -----------------------------":
-            self.DeleteButton.hide()
-            self.sqrt.hide()
-            self.CloneButton.hide()
-            self.SaveButton.hide()
-            self.ExportButton.hide()
+            self.DeleteButton.setEnabled(False)
+            self.sqrt.setEnabled(False)
+            self.CloneButton.setEnabled(False)
+            self.SaveButton.setEnabled(False)
+            self.ExportButton.setEnabled(False)
 
             tickList = self.ColorBar.listTicks()
+            print(tickList)
+            print("did")
             for tick in tickList:
                 self.ColorBar.removeTick(tick[0])
+            self.ColorBar.setEnabled(False)
+
+
+        elif len(SelectedThings) == 1 and showDel is True:
+            self.ColorBar.setEnabled(True)
+            self.DeleteButton.setEnabled(True)
+            self.sqrt.setEnabled(True)
+            self.CloneButton.setEnabled(True)
+            self.SaveButton.setEnabled(True)
+            self.ExportButton.setEnabled(True)
+
+        elif len(SelectedThings) == 1 and showDel is False:
+            self.CloneButton.setEnabled(True)
+            self.ExportButton.setEnabled(True)
 
     def sqrtAction(self):
         if self.sqrt.isChecked() == True:
