@@ -22,7 +22,14 @@ __docformat__ = 'reStructuredText'
 
 from uuid import UUID
 from vispy import app
+import asyncio
+from quamash import QEventLoop, QThreadExecutor
+
 app_object = app.use_app('pyqt4')
+loop = QEventLoop(app_object)
+asyncio.set_event_loop(loop)  # NEW must set the event loop
+
+
 QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
 
