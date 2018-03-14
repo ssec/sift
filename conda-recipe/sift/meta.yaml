@@ -42,6 +42,7 @@ requirements:
     # this is only needed because of a weird bug with netcdf4
     # https://github.com/conda-forge/netcdf4-feedstock/issues/33
     - cython >=0.19 # [unix]
+    - quamash
 
   run:
     - python >=3.6
@@ -64,6 +65,7 @@ requirements:
     - pyqt <5
     - appdirs
     - pyyaml
+    - quamash
 
 test:
   commands:
