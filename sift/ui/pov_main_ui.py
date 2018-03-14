@@ -95,7 +95,7 @@ class Ui_MainWindow(object):
         sizePolicy.setHeightForWidth(self.cursorProbeText.sizePolicy().hasHeightForWidth())
         self.cursorProbeText.setSizePolicy(sizePolicy)
         self.cursorProbeText.setMinimumSize(QtCore.QSize(250, 0))
-        self.cursorProbeText.setMaximumSize(QtCore.QSize(256, 16777215))
+        self.cursorProbeText.setMaximumSize(QtCore.QSize(16777215, 16777215))
         font = QtGui.QFont()
         font.setFamily(_fromUtf8("Andale Mono"))
         font.setPointSize(14)

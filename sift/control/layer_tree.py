@@ -38,8 +38,7 @@ import pickle as pkl
 from PyQt4.QtCore import QAbstractItemModel, QAbstractListModel, Qt, QSize, QModelIndex, QPoint, QMimeData, pyqtSignal, QRect
 from PyQt4.QtGui import QTreeView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyle, QColor, QFont, QStyleOptionViewItem, QItemSelection, QItemSelectionModel, QPen
 from sift.model.document import Document
-from sift.common import INFO, KIND
-from sift.view.Colormap import ALL_COLORMAPS, CATEGORIZED_COLORMAPS
+from sift.common import INFO, KIND, get_font_size
 from sift.view.colormap_dialogs import ChangeColormapDialog
 
 LOG = logging.getLogger(__name__)
@@ -67,7 +66,9 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     def __init__(self, doc:Document, *args, **kwargs):
         super(LayerWidgetDelegate, self).__init__(*args, **kwargs)
         self._doc = doc
-        self.font = QFont('Andale Mono', 12) if 'darwin' in sys.platform else QFont('Andale Mono', 7)
+        fsize = get_font_size(7)
+        self.font = QFont('Andale Mono')
+        self.font.setPointSizeF(fsize)
 
     def sizeHint(self, option:QStyleOptionViewItem, index:QModelIndex):
         pz = self.layer_prez(index.row())

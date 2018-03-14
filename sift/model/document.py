@@ -315,25 +315,25 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 'default_width': 20.,  # degrees from left edge to right edge
                 'default_height': 20.,  # degrees from bottom edge to top edge
             }),
-            ('GOES-R East', {
+            ('GOES East', {
                 'proj4_str': '+proj=geos +lon_0=-75 +h=35786023.0 +a=6378137.0 +b=6356752.31414 +sweep=x +units=m',
                 'default_center': (-75, 13.5),  # lon, lat center point (Guam)
                 'default_width': 20.,  # degrees from left edge to right edge
                 'default_height': 20.,  # degrees from bottom edge to top edge
             }),
-            ('GOES-R Test', {
+            ('GOES Test', {
                 'proj4_str': '+proj=geos +lon_0=-89.5 +h=35786023.0 +a=6378137.0 +b=6356752.31414 +sweep=x +units=m',
                 'default_center': (-89.5, 13.5),  # lon, lat center point (Guam)
                 'default_width': 20.,  # degrees from left edge to right edge
                 'default_height': 20.,  # degrees from bottom edge to top edge
             }),
-            ('GOES-R Central', {
+            ('GOES Central', {
                 'proj4_str': '+proj=geos +lon_0=-105 +h=35786023.0 +a=6378137.0 +b=6356752.31414 +sweep=x +units=m',
                 'default_center': (-105, 13.5),  # lon, lat center point (Guam)
                 'default_width': 20.,  # degrees from left edge to right edge
                 'default_height': 20.,  # degrees from bottom edge to top edge
             }),
-            ('GOES-R West', {
+            ('GOES West', {
                 'proj4_str': '+proj=geos +lon_0=-137 +h=35786023.0 +a=6378137.0 +b=6356752.31414 +sweep=x +units=m',
                 'default_center': (-137, 13.5),  # lon, lat center point (Guam)
                 'default_width': 20.,  # degrees from left edge to right edge
