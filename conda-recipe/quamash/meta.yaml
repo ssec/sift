@@ -1,0 +1,43 @@
+{% set name = "Quamash" %}
+{% set version = "0.6.0" %}
+{% set file_ext = "tar.gz" %}
+{% set hash_type = "sha256" %}
+{% set hash_value = "59fc4267194446b225eebd1d1b5f1b0ca5f57e461b9aecd63d6faf08ebab7c07" %}
+
+package:
+  name: '{{ name|lower }}'
+  version: '{{ version }}'
+
+source:
+  fn: '{{ name }}-{{ version }}.{{ file_ext }}'
+  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.{{ file_ext }}
+  '{{ hash_type }}': '{{ hash_value }}'
+
+build:
+  number: 0
+#  script: 'python setup.py install '
+
+requirements:
+  host:
+    - python 
+    - pyqt
+  run:
+    - python 
+    - pyqt
+
+test:
+  imports:
+    - quamash
+
+about:
+  home: https://pypi.python.org/pypi/Quamash
+  license: MIT License
+  license_family: BSD
+  license_file: ''
+  summary: async code support within PyQt event loop
+  description: "Implementation of the PEP 3156 Event-Loop with Qt."
+  doc_url: ''
+  dev_url: ''
+
+extra:
+  recipe-maintainers: ''
