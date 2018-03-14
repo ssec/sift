@@ -385,6 +385,14 @@ class Workspace(QObject):
                     LOG.info("discarding orphaned product {}".format(repr(p)))
                     s.delete(p)
 
+    def _migrate_metadata(self):
+        """Replace legacy metadata uses with new uses."""
+        with self._inventory as s:
+            for p in s.query(Product).all():
+                # NOTE: Can be remove after 0.9.x releases are done (0.10.x or 1.0)
+                if os.path.splitext(p.info[INFO.DATASET_NAME])[1] and p.info[INFO.BAND]:
+                    LOG.info("rewriting DATASET_NAME to new style using band: {}".format(repr(p)))
+                    p.update({INFO.DATASET_NAME: 'B{:02d}'.format(p.info[INFO.BAND])})
 
     def _init_inventory_existing_datasets(self):
         """
@@ -398,6 +406,7 @@ class Workspace(QObject):
         self._purge_missing_content()
         self._purge_inaccessible_resources()
         self._purge_orphan_products()
+        self._migrate_metadata()
 
     def _store_inventory(self):
         """
@@ -502,9 +511,9 @@ class Workspace(QObject):
         total = 0
         for root, dirs, files in os.walk(self.cache_dir):
             sz = sum(os.path.getsize(os.path.join(root, name)) for name in files)
+            total += sz
             LOG.debug('%d bytes in %s' % (sz, root))
 
-        # FUTURE: check that every file has a Content that it belongs to; warn if not
         return total
 
     def _all_product_uuids(self):
@@ -839,9 +848,53 @@ class Workspace(QObject):
     #     mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
     #     mm[:] = data[:]
     #     return mm
-    def create_algebraic_composite(self, operations, namespace, info=None):
-        from functools import reduce
+
+    def _get_composite_metadata(self, info, md_list, composite_array):
+        """Combine composite dependency metadata in a logical way.
+
+        Args:
+            info: initial metadata for the composite
+            md_list: list of metadata dictionaries for each input
+            composite_array: array representing the final data values of the
+                             composite for valid min/max calculations
+
+        Returns: dict of overall metadata (same as `info`)
+
+        """
+        if not all(x[INFO.PROJ] == md_list[0][INFO.PROJ] for x in md_list[1:]):
+            raise ValueError("Algebraic inputs must all be the same projection")
+
+        uuid = uuidgen()
+        info[INFO.UUID] = uuid
+        for k in (INFO.PLATFORM, INFO.INSTRUMENT, INFO.SCENE):
+            if md_list[0].get(k) is None:
+                continue
+            if all(x.get(k) == md_list[0].get(k) for x in md_list[1:]):
+                info.setdefault(k, md_list[0][k])
+        info.setdefault(INFO.KIND, KIND.COMPOSITE)
+        info.setdefault(INFO.SHORT_NAME, '<unknown>')
+        info.setdefault(INFO.DATASET_NAME, info[INFO.SHORT_NAME])
+        info.setdefault(INFO.UNITS, '1')
+
+        max_meta = max(md_list, key=lambda x: x[INFO.SHAPE])
+        for k in (INFO.PROJ, INFO.ORIGIN_X, INFO.ORIGIN_Y, INFO.CELL_WIDTH, INFO.CELL_HEIGHT, INFO.SHAPE):
+            info[k] = max_meta[k]
+
+        info[INFO.VALID_RANGE] = (np.nanmin(composite_array), np.nanmax(composite_array))
+        info[INFO.CLIM] = (np.nanmin(composite_array), np.nanmax(composite_array))
+        info[INFO.OBS_TIME] = min([x[INFO.OBS_TIME] for x in md_list])
+        info[INFO.SCHED_TIME] = min([x[INFO.SCHED_TIME] for x in md_list])
+        # get the overall observation time
         from datetime import timedelta
+        info[INFO.OBS_DURATION] = max([
+            x[INFO.OBS_TIME] + x.get(INFO.OBS_DURATION, timedelta(seconds=0)) for x in md_list]) - info[INFO.OBS_TIME]
+
+        info[INFO.PATHNAME] = '<algebraic layer: {} : {} : {}>'.format(
+            info[INFO.DATASET_NAME], info[INFO.SCHED_TIME], str(info[INFO.UUID]))
+
+        return info
+
+    def create_algebraic_composite(self, operations, namespace, info=None):
         if not info:
             info = {}
 
@@ -853,24 +906,7 @@ class Workspace(QObject):
         except SyntaxError:
             raise ValueError("Invalid syntax or operations in algebraic layer")
 
-        uuid = uuidgen()
         dep_metadata = {n: self.get_metadata(u) for n, u in namespace.items() if isinstance(u, UUID)}
-        md_list = list(dep_metadata.values())
-        if not all(x[INFO.PROJ] == md_list[0][INFO.PROJ] for x in md_list[1:]):
-            raise ValueError("Algebraic inputs must all be the same projection")
-
-        info[INFO.UUID] = uuid
-        for k in (INFO.PLATFORM, INFO.INSTRUMENT, INFO.SCHED_TIME,
-                  INFO.OBS_TIME, INFO.OBS_DURATION, INFO.SCENE):
-            if md_list[0].get(k) is None:
-                continue
-            if all(x.get(k) == md_list[0].get(k) for x in md_list[1:]):
-                info.setdefault(k, md_list[0][k])
-        info.setdefault(INFO.KIND, KIND.COMPOSITE)
-        info.setdefault(INFO.SHORT_NAME, '<unknown>')
-        info.setdefault(INFO.DATASET_NAME, info[INFO.SHORT_NAME])
-        info.setdefault(INFO.UNITS, '1')
-        info[INFO.PATHNAME] = '<algebraic layer: {} : {} : {}>'.format(info[INFO.DATASET_NAME], info[INFO.SCHED_TIME], str(info[INFO.UUID]))
 
         # Get every combination of the valid mins and maxes
         # See: https://stackoverflow.com/a/35608701/433202
@@ -886,10 +922,7 @@ class Workspace(QObject):
         content = {n: self.get_content(m[INFO.UUID]) for n, m in dep_metadata.items()}
 
         # Get all content in the same shape
-        max_meta = max(dep_metadata.values(), key=lambda x: x[INFO.SHAPE])
-        for k in (INFO.PROJ, INFO.ORIGIN_X, INFO.ORIGIN_Y, INFO.CELL_WIDTH, INFO.CELL_HEIGHT):
-            info[k] = max_meta[k]
-        max_shape = max_meta[INFO.SHAPE]
+        max_shape = max(x[INFO.SHAPE] for x in dep_metadata.values())
         for k, v in content.items():
             if v.shape != max_shape:
                 f0 = int(max_shape[0] / v.shape[0])
@@ -901,13 +934,15 @@ class Workspace(QObject):
         exec(ops, None, valids_namespace)
         if result_name not in valids_namespace:
             raise RuntimeError("Unable to retrieve result '{}' from code execution".format(result_name))
-        info[INFO.VALID_RANGE] = (np.nanmin(valids_namespace[result_name]), np.nanmax(valids_namespace[result_name]))
-        info[INFO.CLIM] = (np.nanmin(valids_namespace[result_name]), np.nanmax(valids_namespace[result_name]))
-        info[INFO.OBS_DURATION] = reduce(min, [x.get(INFO.OBS_DURATION, timedelta(seconds=0)) for x in md_list])
+
         exec(ops, None, content)
         if result_name not in content:
             raise RuntimeError("Unable to retrieve result '{}' from code execution".format(result_name))
-        info[INFO.SHAPE] = content[result_name].shape
+        info = self._get_composite_metadata(info, list(dep_metadata.values()), valids_namespace[result_name])
+        # update the shape
+        # NOTE: This doesn't work if the code changes the shape of the array
+        # Need to update geolocation information too
+        # info[INFO.SHAPE] = content[result_name].shape
 
         info = generate_guidebook_metadata(info)
 
@@ -935,8 +970,8 @@ class Workspace(QObject):
         parms = dict(info)
         now = datetime.utcnow()
         parms.update(dict(
-            atime = now,
-            mtime = now,
+            atime=now,
+            mtime=now,
         ))
         P = Product.from_info(parms, symbols=namespace, codeblock=codeblock)
         uuid = P.uuid
@@ -947,15 +982,14 @@ class Workspace(QObject):
             mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
             mm[:] = data[:]
 
-        now = datetime.utcnow()
         parms.update(dict(
-            lod = Content.LOD_OVERVIEW,
-            path = ws_filename,
-            dtype = str(data.dtype),
-            proj4 = info[INFO.PROJ],
-            resolution = min(info[INFO.CELL_WIDTH], info[INFO.CELL_HEIGHT])
+            lod=Content.LOD_OVERVIEW,
+            path=ws_filename,
+            dtype=str(data.dtype),
+            proj4=info[INFO.PROJ],
+            resolution=min(info[INFO.CELL_WIDTH], info[INFO.CELL_HEIGHT])
         ))
-        rcls = dict(zip( ('rows','cols','levels'), data.shape) )
+        rcls = dict(zip(('rows', 'cols', 'levels'), data.shape))
         parms.update(rcls)
         LOG.debug("about to create Content with this: {}".format(repr(parms)))
 

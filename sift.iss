@@ -3,7 +3,7 @@
 
 [Setup]
 AppName=SIFT
-AppVersion=0.9.4
+AppVersion=0.9.5a4
 DefaultDirName={pf}\SIFT
 DefaultGroupName=SIFT
 Compression=lzma2
@@ -22,8 +22,8 @@ Name: workspace; Description: "Create default workspace directory: {userdocs}\si
 
 [Icons]
 Name: "{group}\SIFT"; Filename: "{app}\bin\SIFT.exe"
-Name: "{group}\Bug Tracker"; Filename: "https://gitlab.ssec.wisc.edu/rayg/CSPOV/issues"
-Name: "{group}\Wiki"; Filename: "https://gitlab.ssec.wisc.edu/rayg/CSPOV/wikis/home"
+Name: "{group}\Bug Tracker"; Filename: "https://gitlab.ssec.wisc.edu/SIFT/sift/issues"
+Name: "{group}\Wiki"; Filename: "https://gitlab.ssec.wisc.edu/SIFT/sift/wikis/home"
 Name: "{group}\Open Workspace"; Filename: "{userdocs}\sift_workspace"
 Name: "{group}\Uninstall SIFT"; Filename: "{uninstallexe}"
 

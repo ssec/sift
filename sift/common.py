@@ -32,10 +32,25 @@ from pyproj import Proj
 
 LOG = logging.getLogger(__name__)
 
-# if sys.platform.startswith("win"):
+
+# HACK: Get a font size that looks good on this platform
+def get_font_size(pref_size):
+    # win = 7
+    # osx = 12
+    env_factor = os.getenv("SIFT_FONT_FACTOR", None)
+    if env_factor is not None:
+        factor = float(env_factor)
+    elif sys.platform.startswith('win'):
+        factor = 1.
+    elif 'darwin' in sys.platform:
+        factor = 1.714
+    else:
+        factor = 1.3
+
+    return pref_size * factor
+
+
 PREFERRED_SCREEN_TO_TEXTURE_RATIO = 1.0  # screenpx:texturepx that we want to keep, ideally, by striding
-# else:
-#     PREFERRED_SCREEN_TO_TEXTURE_RATIO = 0.5  # screenpx:texturepx that we want to keep, ideally, by striding
 
 # http://home.online.no/~sigurdhu/WGS84_Eng.html
 
@@ -170,6 +185,9 @@ class INFO(Enum):
     # unit numeric conversion func: lambda x, inverse=False: convert-to-units
     # unit string format func: lambda x, numeric=True, units=True: formatted string
     CENTRAL_WAVELENGTH = 'nominal_wavelength'
+    FAMILY = 'family'
+    # only in family info dictionaries:
+    DISPLAY_FAMILY = 'display_family'
 
     def __lt__(self, other):
         """

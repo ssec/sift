@@ -504,6 +504,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         return {
             INFO.PLATFORM: PLATFORM_ID_TO_PLATFORM[pug.platform_id],  # e.g. G16, H8
             INFO.BAND: pug.band,
+            INFO.DATASET_NAME: 'B{:02d}'.format(pug.band),
             INFO.INSTRUMENT: INSTRUMENT.AHI if 'Himawari' in pug.instrument_type else INSTRUMENT.ABI,
             INFO.SCHED_TIME: pug.sched_time,
             INFO.OBS_TIME: pug.time_span[0],
@@ -547,7 +548,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         pug = pug or GoesRPUGImporter.pug_factory(source_path)
 
         d.update(GoesRPUGImporter._basic_pug_metadata(pug))
-        d[INFO.DATASET_NAME] = os.path.split(source_path)[-1]
+        # d[INFO.DATASET_NAME] = os.path.split(source_path)[-1]
         d[INFO.PATHNAME] = source_path
         d[INFO.KIND] = KIND.IMAGE
 
