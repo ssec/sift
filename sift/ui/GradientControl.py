@@ -279,6 +279,11 @@ class GradientControl(QtGui.QDialog):
 
             newWidget = pg.GradientWidget()
             newWidget.hide()
+
+            tickList = newWidget.listTicks()
+            for tick in tickList:
+                newWidget.removeTick(tick[0])
+
             for key in data:
                 newWidget.addTick(key, QtGui.QColor(data[key]), movable=editable)
             #self.gData[name] = newWidget.saveState()

@@ -360,7 +360,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self._families = defaultdict(list)
         # TODO: connect signals from workspace to slots including update_dataset_info
 
-        # TODO: Load gradients and input into usermaps
 
         # Create directory if it does not exist
         filepath = os.path.join(DOCUMENT_SETTINGS_DIR, 'colormaps')
@@ -421,8 +420,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         tmp = A[x]
         A[x] = A[y]
         A[y] = tmp
-    def update_colormaps(self, new_colormaps):
-        self.colormaps.update(new_colormaps)
 
     def find_colormap(self, colormap):
         if isinstance(colormap, str) and colormap in self.colormaps:
@@ -490,6 +487,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         except Exception as e:
             print("Error creating or setting colormap 2")
             print(e)
+
+
+        #TODO live update map
+
+        self.change_colormap_for_layers(name)
 
 
     def removeGCColorMap(self, name):
