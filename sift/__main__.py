@@ -881,15 +881,12 @@ class Main(QtGui.QMainWindow):
         pass
 
 
+    # Open Gradient Widget
     gc = None
-
     def openGradientWidget(self):
-        print("Opening..")
-
         self.gc = GradientControl(doc=self.document)
 
         self.gc.show()
-        print("Done!")
 
 
 def set_default_geometry(window, desktop=0):

@@ -366,7 +366,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if not os.path.exists(filepath):
             os.makedirs(filepath)
 
-        print("FP: " + filepath)
+        # Import data
         qtData = {}
         for subdir, dirs, files in os.walk(filepath):
             for file in files:
@@ -379,12 +379,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     print("Error reading from file")
                     print(e)
 
-        print("OK")
-        print(qtData)
         for item in qtData.keys():
-            print(item)
             pointList = qtData[item]["ticks"]
-            print(pointList)
             floats = []
             hex = []
             for point in pointList:
@@ -403,8 +399,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             floats[-1] = 1
 
             try:
-                print(hex)
-                print(floats)
                 toAdd = Colormap(colors=hex, controls=floats)
                 print(toAdd)
                 self.colormaps[item] = toAdd
@@ -416,6 +410,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
 
 
+    # Helper function for bubble sort
     def bubbleSortSwap(self, A, x, y):
         tmp = A[x]
         A[x] = A[y]
@@ -443,8 +438,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             )
 
 
+    # Update new gradient into save location
     def updateGCColorMap(self, colorMap, name):
-        print("Received update call..")
         print(colorMap)
 
         filepath = os.path.join(DOCUMENT_SETTINGS_DIR, 'colormaps')
@@ -452,14 +447,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         try:
             print("FP: " + filepath + "/" + name + ".txt")
             iFile = open(filepath + "/" + name + ".txt", 'w')
-            #iFile.write(str(colorMap))
             iFile.write(json.dumps(colorMap, indent=2, sort_keys=True))
             iFile.close()
         except Exception as e:
             print(e)
 
         pointList = colorMap["ticks"]
-        print(pointList)
         floats = []
         hex = []
         for point in pointList:
@@ -488,14 +481,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             print("Error creating or setting colormap 2")
             print(e)
 
-
-        #TODO live update map
-
+        # Update live map
         self.change_colormap_for_layers(name)
 
 
+    # Remove gradient from save location (on delete)
     def removeGCColorMap(self, name):
-        print("Got remove request")
 
         filepath = os.path.join(DOCUMENT_SETTINGS_DIR, 'colormaps')
 
