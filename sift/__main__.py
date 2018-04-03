@@ -93,6 +93,15 @@ def test_layers(ws, doc, glob_pattern=None):
     return []
 
 
+async def do_test_cycle(txt: QtGui.QWidget):
+    from asyncio import sleep
+    n = 0
+    while True:
+        txt.setText(str(n))
+        await sleep(1)
+        n += 1
+
+
 class OpenCacheDialog(QtGui.QDialog):
     _paths = None
     _opener = None
@@ -587,6 +596,9 @@ class Main(QtGui.QMainWindow):
         for uuid, ds_info, full_data in test_layers(self.workspace, self.document, glob_pattern=glob_pattern):
             # this now fires off a document modification cascade resulting in a new layer going up
             pass
+
+        # quamash async test pattern updates a control once a second
+        # loop.create_task(do_test_cycle(self.ui.cursorProbeText))
 
         # Interaction Setup
         self.setup_key_releases()
