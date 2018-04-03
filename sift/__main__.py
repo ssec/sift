@@ -26,7 +26,7 @@ import asyncio
 from quamash import QEventLoop, QThreadExecutor
 
 app_object = app.use_app('pyqt4')
-loop = QEventLoop(app_object)
+loop = QEventLoop(app_object.native)
 asyncio.set_event_loop(loop)  # NEW must set the event loop
 
 
@@ -952,7 +952,8 @@ def main():
     window.show()
     # bring window to front
     window.raise_()
-    app.run()
+    loop.run_forever()
+    # app.run()
 
 if __name__ == '__main__':
     sys.exit(main())
