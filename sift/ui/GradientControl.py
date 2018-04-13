@@ -1,15 +1,10 @@
 import pyqtgraph as pg
 from PyQt4 import QtGui, QtCore
 import json
-import os
 import math
-import numpy
-# from ipywidgets import *
-# from tkinter import *
-import ast
-from colormap import rgb2hex
-from vispy.color.colormap import Colormap, BaseColormap, _mix_simple, _colormaps
+import logging
 
+LOG = logging.getLogger(__name__)
 
 
 class GradientControl(QtGui.QDialog):
@@ -69,31 +64,29 @@ class GradientControl(QtGui.QDialog):
         self.SaveButton.clicked.connect(self.saveButtonClick)
         self.SaveButton.setEnabled(False)
 
-
         # Add widgets to their respective spots in the UI grid
         l.addWidget(self.ImportButton, 0, 0)
         l.addWidget(self.SaveButton, 0, 2)
         l.addWidget(self.sqrt, 1, 2)
         l.addWidget(self.ColorBar, 4, 1)
         l.addWidget(self.CloneButton, 1, 0)
-        l.addWidget(self.List, 1, 1,3,1)
+        l.addWidget(self.List, 1, 1, 3, 1)
         l.addWidget(self.CloseButton, 6, 2)
         l.addWidget(self.ExportButton, 2, 2)
         l.addWidget(self.DeleteButton, 2, 0)
 
-
-
         # Import custom colormaps
-        for map in self.USER_MAPS:
-            if self.USER_MAPS[map].colors and (hasattr(self.USER_MAPS[map], "_controls")):
-                self.importGradients(map, self.USER_MAPS[map].colors.hex, self.USER_MAPS[map]._controls, True)
-
+        for cmap in self.USER_MAPS:
+            if self.USER_MAPS[cmap].colors and (hasattr(self.USER_MAPS[cmap], "_controls")):
+                self.importGradients(cmap, self.USER_MAPS[cmap].colors.hex, self.USER_MAPS[cmap]._controls, True)
 
         # Import internal colormaps
-        for map in self.ALL_COLORMAPS:
-            if self.ALL_COLORMAPS[map].colors and (hasattr(self.ALL_COLORMAPS[map], "_controls")):
-                if map not in self.USER_MAPS:
-                    self.importGradients(map, self.ALL_COLORMAPS[map].colors.hex, self.ALL_COLORMAPS[map]._controls, False)
+        for cmap in self.ALL_COLORMAPS:
+            if cmap in self.USER_MAPS:
+                continue
+            if self.ALL_COLORMAPS[cmap].colors and (hasattr(self.ALL_COLORMAPS[cmap], "_controls")):
+                self.importGradients(cmap, self.ALL_COLORMAPS[cmap].colors.hex, self.ALL_COLORMAPS[cmap]._controls,
+                                     False)
 
     # Save Custom Gradient
     def saveButtonClick(self):
@@ -101,66 +94,35 @@ class GradientControl(QtGui.QDialog):
         self.gData[name] = self.ColorBar.saveState()
         self.saveNewMap(self.ColorBar.saveState(), name)
 
-
-    # Clone existing gradient, make UI box
+    # Clone existing gradient
     def cloneGradient(self):
-        self.p = QtGui.QWidget()
-        self.p.setWindowTitle('Save Gradient As:')
-        self.p.textbox = QtGui.QLineEdit(self.p)
-        self.p.textbox.move(20, 20)
-        self.p.textbox.resize(280, 40)
-        self.p.resize(320, 150)
-        button = QtGui.QPushButton('Save', self.p)
-        button.move(20, 80)
-        button.clicked.connect(self.cloneGradient2)
-        self.p.setWindowModality(QtCore.Qt.WindowModal)
-        self.p.show()
+        text, ok = QtGui.QInputDialog.getText(self, 'Clone Gradient', 'Enter gradient name:')
 
-    # Clone existing gradient, clone the gradient
-    def cloneGradient2(self):
-        SaveName = self.p.textbox.text()
-        if SaveName in self.gData.keys():
-            overwrite_msg = "There is already a save with this name. Would you like to Overwrite?"
-            reply = QtGui.QMessageBox.question(self, 'Message',
-                                               overwrite_msg, QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
+        if ok:
+            SaveName = str(text)
+            if SaveName in self.gData:
+                overwrite_msg = "There is already a save with this name. Would you like to Overwrite?"
+                reply = QtGui.QMessageBox.question(self, 'Message',
+                                                   overwrite_msg, QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
 
-            if reply == QtGui.QMessageBox.Yes:
-                if SaveName in self.autoImportData.keys():
+                if reply == QtGui.QMessageBox.Yes:
+                    if SaveName in self.autoImportData:
+                        QtGui.QMessageBox.information(self, "Error",
+                                                      "You cannot save a gradient with the same name as one of the internal gradients.")
+                        reply.close()
+                        return
+
+                    self.gData[SaveName] = self.ColorBar.saveState()
+            else:
+
+                if SaveName in self.autoImportData:
                     QtGui.QMessageBox.information(self, "Error",
                                                   "You cannot save a gradient with the same name as one of the internal gradients.")
-                    self.p.close()
-                    reply.done(1)
                     return
 
                 self.gData[SaveName] = self.ColorBar.saveState()
-                self.p.close()
-        else:
-
-            if SaveName in self.autoImportData.keys():
-                QtGui.QMessageBox.information(self, "Error",
-                                              "You cannot save a gradient with the same name as one of the internal gradients.")
-                self.p.close()
-                return
-
-            self.gData[SaveName] = self.ColorBar.saveState()
-        self.updateListWidget(SaveName)
-        self.saveNewMap(self.ColorBar.saveState(), SaveName)
-        self.p.close()
-
-
-    # Return list of selected gradients
-    def getSelected(self):
-        toReturn = []
-
-        ListCount = self.List.count()
-
-        index = 0
-        while index < ListCount:
-            if (self.List.item(index).isSelected()):
-                toReturn.append(self.List.item(index))
-            index = index + 1
-
-        return toReturn
+            self.updateListWidget(SaveName)
+            self.saveNewMap(self.ColorBar.saveState(), SaveName)
 
     # Determine if an internal gradient is selected, returns boolean
     def toRemoveDelete(self):
@@ -171,7 +133,7 @@ class GradientControl(QtGui.QDialog):
         index = 0
         while index < ListCount:
             if (self.List.item(index).isSelected()):
-                if self.List.item(index).text() in self.autoImportData.keys():
+                if self.List.item(index).text() in self.autoImportData:
                     toReturn = True
             index = index + 1
 
@@ -185,23 +147,23 @@ class GradientControl(QtGui.QDialog):
     def importButtonClick(self):
         fname = QtGui.QFileDialog.getOpenFileName(None, 'Get File', 'Export.txt')
         try:
-            file = open(fname, "r")
-            toImport = ast.literal_eval(file.read())
+            ifile = open(fname, "r")
+            toImport = json.loads(ifile.read())
 
-            for impItem in toImport.keys():
-                if impItem in self.autoImportData.keys():
+            for impItem in toImport:
+                if impItem in self.autoImportData:
                     QtGui.QMessageBox.information(self, "Error",
                                                   "You cannot save a gradient with the same name as one of the internal gradients.")
                     return
 
-            for impItem in toImport.keys():
+            for impItem in toImport:
                 self.saveNewMap(toImport[impItem], impItem)
 
             self.gData.update(toImport)
 
             self.updateListWidget(impItem)
-        except:
-            print("Error opening file or reading!")
+        except IOError:
+            LOG.error("Error opening file or reading!")
 
     # Import a gradient into either the internal or custom gradient lists
     def importGradients(self, name, hex, floats, editable):
@@ -228,29 +190,31 @@ class GradientControl(QtGui.QDialog):
 
             self.updateListWidget()
 
-        except Exception as e:
-            print(e)
+        except AssertionError as e:
+            LOG.error(e)
 
     # Close the widget
     def closeButtonClick(self):
-        self.done(0)
+        self.close()
 
     # Update list widget with new gradient list
-    def updateListWidget(self, toShow = None):
+    def updateListWidget(self, toShow=None):
         self.List.clear()
 
         totalCount = 0
         corVal = 0
-        for key2 in self.autoImportData.keys():
+        for key2 in self.autoImportData:
             self.List.addItem(key2)
             totalCount = totalCount + 1
             if toShow is not None and key2 == toShow:
                 corVal = totalCount
 
         self.List.addItem("----------------------------- Below Are Custom ColorMaps -----------------------------")
+        barrier_item = self.List.item(totalCount)
+        barrier_item.setFlags(QtCore.Qt.NoItemFlags)
         totalCount = totalCount + 1
 
-        for key in self.gData.keys():
+        for key in self.gData:
             self.List.addItem(key)
             totalCount = totalCount + 1
             if toShow is not None and key == toShow:
@@ -259,22 +223,26 @@ class GradientControl(QtGui.QDialog):
         if toShow is not None:
             self.List.setCurrentRow(corVal, QtGui.QItemSelectionModel.Select)
 
-
     # Update the colorbar with the newly selected gradient
     def updateColorBar(self):
-        self.sqrt.setCheckState(0)
+        self.sqrt.setCheckState(False)
 
-        if self.List.item(self.List.currentRow()).text() in self.gData.keys():
+        if self.List.item(self.List.currentRow()).text() in self.gData:
             NewBar = self.gData[self.List.item(self.List.currentRow()).text()]
             self.ColorBar.restoreState(NewBar)
 
-        if self.List.item(self.List.currentRow()).text() in self.autoImportData.keys():
+        if self.List.item(self.List.currentRow()).text() in self.autoImportData:
             NewBar = self.autoImportData[self.List.item(self.List.currentRow()).text()]
             self.ColorBar.restoreState(NewBar)
 
-        SelectedThings = self.getSelected()
+        SelectedThings = self.List.selectedItems()
 
         # Bunch of functions determing which buttons to enable / disable
+
+        showDel = True
+        for thing in SelectedThings:
+            if thing.text() in self.autoImportData:
+                showDel = False
 
         if len(SelectedThings) > 1:
             self.SaveButton.setEnabled(False)
@@ -285,53 +253,26 @@ class GradientControl(QtGui.QDialog):
             for tick in tickList:
                 self.ColorBar.removeTick(tick[0])
             self.ColorBar.setEnabled(False)
-        elif len(SelectedThings) == 1:
-            self.SaveButton.setEnabled(True)
-            self.sqrt.setEnabled(True)
-            self.CloneButton.setEnabled(True)
-            self.ColorBar.setEnabled(True)
-
-        showDel = True
-        for thing in SelectedThings:
-            print(thing.text())
-            if thing.text() in self.autoImportData.keys():
-                showDel = False
-
-        # Disable buttons if internal gradient is selected
-        if showDel is False:
-            self.DeleteButton.setEnabled(False)
-            self.sqrt.setEnabled(False)
-            self.SaveButton.setEnabled(False)
-
-        # Disable buttons if divider is selected
-        if len(SelectedThings) > 0 and SelectedThings[0].text() == "----------------------------- Below Are Custom ColorMaps -----------------------------":
-            self.DeleteButton.setEnabled(False)
-            self.sqrt.setEnabled(False)
-            self.CloneButton.setEnabled(False)
-            self.SaveButton.setEnabled(False)
-            self.ExportButton.setEnabled(False)
-
-            # Clear colorbar
-            tickList = self.ColorBar.listTicks()
-            for tick in tickList:
-                self.ColorBar.removeTick(tick[0])
-            self.ColorBar.setEnabled(False)
-
-        elif len(SelectedThings) == 1 and showDel is True:
+        elif len(SelectedThings) == 1 and showDel:
             self.ColorBar.setEnabled(True)
             self.DeleteButton.setEnabled(True)
             self.sqrt.setEnabled(True)
             self.CloneButton.setEnabled(True)
             self.SaveButton.setEnabled(True)
             self.ExportButton.setEnabled(True)
-
-        elif len(SelectedThings) == 1 and showDel is False:
+        elif len(SelectedThings) == 1 and not showDel:
             self.CloneButton.setEnabled(True)
             self.ExportButton.setEnabled(True)
+            self.DeleteButton.setEnabled(False)
+            self.sqrt.setEnabled(False)
+            self.SaveButton.setEnabled(False)
+
+        if not showDel:
+            self.DeleteButton.setEnabled(False)
 
     # If square root button is checked/unchecked, modify the ticks as such
     def sqrtAction(self):
-        if self.sqrt.isChecked() == True:
+        if self.sqrt.isChecked():
             tickList = self.ColorBar.listTicks()
             for tick in tickList:
                 self.ColorBar.setTickValue(tick[0], math.sqrt(self.ColorBar.tickValue(tick[0])))
@@ -344,16 +285,13 @@ class GradientControl(QtGui.QDialog):
     def deleteButtonClick(self):
         block = self.toRemoveDelete()
         if block is True:
-            QtGui.QMessageBox.information(self, "Please Unselect Gradient(s)", "You have a \"native\" gradient selected. Please "
-                                                                               "unselect it before deleting.")
+            # This shouldn't happen
+            QtGui.QMessageBox.information(self, "Error: Can not delete internal gradients.")
             return
 
-        selectedGradients = self.getSelected()
-        toPrint = ""
-        for index in selectedGradients:
-            toPrint = toPrint + index.text() + ", "
+        selectedGradients = self.List.selectedItems()
 
-        toPrint = toPrint[:-2]
+        toPrint = ",".join([x.text() for x in selectedGradients])
 
         delete_msg = "Please confirm you want to delete the Gradient(s): " + toPrint
         reply = QtGui.QMessageBox.question(self, 'Message',
@@ -366,26 +304,25 @@ class GradientControl(QtGui.QDialog):
 
     # Export gradient(s)
     def exportButtonClick(self):
-        selectedGradients = self.getSelected()
-        fname = QtGui.QFileDialog.getSaveFileName(None, 'Save As', 'Export.txt')
+        selectedGradients = self.List.selectedItems()
+        fname = QtGui.QFileDialog.getSaveFileName(None, 'Save As', 'Export.json')
         toExport = set()
         for index in selectedGradients:
             toExport.add(index.text())
         done = {}
 
-        for k in self.gData.keys():
+        for k in self.gData:
             if k in toExport:
                 done[k] = self.gData[k]
 
-        for k in self.autoImportData.keys():
+        for k in self.autoImportData:
             if k in toExport:
                 done[k] = self.autoImportData[k]
         try:
             file = open(fname, 'w')
             file.write(str(done))
-        except Exception as e:
-            print("Error opening or writing!")
-            print(e)
+        except IOException:
+            LOG.error("Error opening or writing!")
 
 
 def main():

@@ -56,8 +56,6 @@ between subsystems. Document rarely deals directly with content.
 :license: GPLv3, see LICENSE for more details
 """
 from sift.model.layer import Mixing, DocLayer, DocBasicLayer, DocRGBLayer,DocCompositeLayer
-from sift.ui.GradientControl import GradientControl
-from sift.util.default_paths import DOCUMENT_SETTINGS_DIR
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -301,7 +299,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             os.makedirs(self.config_dir)
 
         self._workspace = workspace
-        self._config_dir = config_dir
         self._layer_sets = [DocLayerStack(self)] + [None] * (layer_set_count - 1)
         self._layer_with_uuid = {}
         # FIXME: Copy?
@@ -362,64 +359,40 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
 
         # Create directory if it does not exist
-        filepath = os.path.join(DOCUMENT_SETTINGS_DIR, 'colormaps')
+        filepath = os.path.join(self.config_dir, 'colormaps')
         if not os.path.exists(filepath):
             os.makedirs(filepath)
 
         # Import data
         qtData = {}
         for subdir, dirs, files in os.walk(filepath):
-            for file in files:
-                nfp = subdir + os.sep + file
+            for ToImportFile in files:
+                nfp = os.path.join(subdir, ToImportFile)
                 try:
+                    if os.path.splitext(ToImportFile)[1] != ".json":
+                        continue
                     ifile = open(nfp, "r")
-                    toImport = ast.literal_eval(ifile.read())
-                    qtData[file.split(".")[0]] = toImport
-                except Exception as e:
-                    print("Error reading from file")
-                    print(e)
+                    toImport = json.loads(ifile.read())
+                    qtData[os.path.splitext(ToImportFile)[0]] = toImport
+                except IOError:
+                    LOG.error("Error importing gradient")
+                    raise
+                except ValueError:
+                    raise
 
-        for item in qtData.keys():
-            pointList = qtData[item]["ticks"]
-            floats = []
-            hex = []
-            for point in pointList:
-                floats.append(point[0])
-                rgb = point[1]
-                hexCode = rgb2hex(rgb[0], rgb[1], rgb[2])
-                hex.append(hexCode)
+        for item in qtData:
+            self.add_to_maps(qtData[item], item)
 
-            for i in range(len(floats)):
-                for k in range(len(floats) - 1, i, -1):
-                    if (floats[k] < floats[k - 1]):
-                        self.bubbleSortSwap(floats, k, k - 1)
-                        self.bubbleSortSwap(hex, k, k - 1)
-
-            floats[0] = 0
-            floats[-1] = 1
-
-            try:
-                toAdd = Colormap(colors=hex, controls=floats)
-                print(toAdd)
-                self.colormaps[item] = toAdd
-                self.usermaps[item] = toAdd
-            except Exception as e:
-                print("Error creating or setting colormap 2")
-                print(e)
-
-
-
+    def add_vispy_gradient(self, item):
+        return "a"
 
     # Helper function for bubble sort
     def bubbleSortSwap(self, A, x, y):
-        tmp = A[x]
-        A[x] = A[y]
-        A[y] = tmp
+        A[x], A[y] = A[y], A[x]
 
     def find_colormap(self, colormap):
         if isinstance(colormap, str) and colormap in self.colormaps:
             colormap = self.colormaps[colormap]
-        print(colormap)
         return colormap
 
     def projection_info(self, projection_name=None):
@@ -438,48 +411,52 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             )
 
 
-    # Update new gradient into save location
-    def updateGCColorMap(self, colorMap, name):
-        print(colorMap)
 
-        filepath = os.path.join(DOCUMENT_SETTINGS_DIR, 'colormaps')
-
-        try:
-            print("FP: " + filepath + "/" + name + ".txt")
-            iFile = open(filepath + "/" + name + ".txt", 'w')
-            iFile.write(json.dumps(colorMap, indent=2, sort_keys=True))
-            iFile.close()
-        except Exception as e:
-            print(e)
-
-        pointList = colorMap["ticks"]
+    def add_to_maps(self, colorItem, name):
+        pointList = colorItem["ticks"]
         floats = []
-        hex = []
+        hexes = []
         for point in pointList:
             floats.append(point[0])
             rgb = point[1]
             hexCode = rgb2hex(rgb[0], rgb[1], rgb[2])
-            hex.append(hexCode)
+            hexes.append(hexCode)
 
-        for i in range(len(floats)):
-            for k in range(len(floats) - 1, i, -1):
-                if (floats[k] < floats[k - 1]):
-                    self.bubbleSortSwap(floats, k, k - 1)
-                    self.bubbleSortSwap(hex, k, k - 1)
+        floats, hexes = zip(*sorted(zip(floats, hexes)))
 
-        floats[0] = 0
-        floats[-1] = 1
+        floats = list(floats)
+        hexes = list(hexes)
+
+        if floats[0] != 0:
+            floats = [0] + floats
+            hexes = [hexes[0]] + hexes
+        if floats[-1] != 1:
+            floats.append(1)
+            hexes.append(hexes[-1])
+
+        #floats[0] = 0
+        #floats[-1] = 1
 
         try:
-            print(hex)
-            print(floats)
-            toAdd = Colormap(colors=hex, controls=floats)
-            print(toAdd)
+            toAdd = Colormap(colors=hexes, controls=floats)
             self.colormaps[name] = toAdd
             self.usermaps[name] = toAdd
-        except Exception as e:
-            print("Error creating or setting colormap 2")
-            print(e)
+        except AssertionError:
+            LOG.error("Error creating or setting colormap")
+            raise
+
+    # Update new gradient into save location
+    def updateGCColorMap(self, colorMap, name):
+        filepath = os.path.join(self.config_dir, 'colormaps')
+
+        try:
+            iFile = open(filepath + "/" + name + ".json", 'w')
+            iFile.write(json.dumps(colorMap, indent=2, sort_keys=True))
+            iFile.close()
+        except IOError:
+            LOG.error("Error saving gradient")
+
+        self.add_to_maps(colorMap, name)
 
         # Update live map
         self.change_colormap_for_layers(name)
@@ -487,12 +464,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     # Remove gradient from save location (on delete)
     def removeGCColorMap(self, name):
-
-        filepath = os.path.join(DOCUMENT_SETTINGS_DIR, 'colormaps')
-
-        print("FP: " + filepath + "/" + name + ".txt")
         try:
-            os.remove(filepath + "/" + name + ".txt")
+            os.remove(os.path.join(self.config_dir, 'colormaps', name + '.json'))
         except OSError:
             pass
 

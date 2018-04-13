@@ -180,7 +180,6 @@ class SingleLayerInfoPane(QObject):
         self.cmap_vis = QNoScrollWebView()
         self.cmap_vis.setFixedSize(3 * 100, 30)
         self.cmap_vis.page().mainFrame().setScrollBarPolicy(Qt.Vertical, Qt.ScrollBarAlwaysOff)
-        #self.cmap_vis.selectionChanged.connect(self.openGradientWidget)
         self.composite_details = QLabel("Composite Details")
         self.composite_details.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         f = QFont()
@@ -209,14 +208,6 @@ class SingleLayerInfoPane(QObject):
 
         # clear out the display
         self.update_display()
-
-    def openGradientWidget(self):
-
-        print("Here we go...")
-        print(str(self.cmap_vis.whatsThis()))
-
-        gc = GradientControl(self.document, self.parent())
-        gc.show()
 
 
 

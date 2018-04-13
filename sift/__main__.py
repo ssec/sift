@@ -235,6 +235,7 @@ class Main(QtGui.QMainWindow):
     _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
     _open_cache_dialog = None
     _screenshot_dialog = None
+    _geditor = None # Gradient editor widget
 
     def interactive_open_files(self, *args, files=None, **kwargs):
         self.scene_manager.layer_set.animating = False
@@ -839,7 +840,7 @@ class Main(QtGui.QMainWindow):
 
         open_gradient = QtGui.QAction("Toggle Gradient Editor", self)
         open_gradient.setShortcut("Ctrl+E")
-        open_gradient.triggered.connect(lambda: self.openGradientWidget())
+        open_gradient.triggered.connect(self.openGradientWidget)
 
         edit_menu = menubar.addMenu('&Edit')
         edit_menu.addAction(remove)
@@ -880,13 +881,9 @@ class Main(QtGui.QMainWindow):
         # self.ui.layers.add
         pass
 
-
-    # Open Gradient Widget
-    gc = None
     def openGradientWidget(self):
-        self.gc = GradientControl(doc=self.document)
-
-        self.gc.show()
+        self._geditor = GradientControl(doc=self.document)
+        self._geditor.show()
 
 
 def set_default_geometry(window, desktop=0):
