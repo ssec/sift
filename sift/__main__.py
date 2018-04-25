@@ -882,7 +882,9 @@ class Main(QtGui.QMainWindow):
         pass
 
     def openGradientWidget(self):
-        self._geditor = GradientControl(doc=self.document)
+        if self._geditor is None:
+            self._geditor = GradientControl(doc=self.document)
+
         self._geditor.show()
 
 
