@@ -464,14 +464,6 @@ ALL_COLORMAPS.update(OTHER_COLORMAPS)
 
 USER_COLORMAPS = {}
 
-#del ALL_COLORMAPS["cubehelix"]
-#del ALL_COLORMAPS["single_hue"]
-#del ALL_COLORMAPS["hsl"]
-#del ALL_COLORMAPS["husl"]
-#del ALL_COLORMAPS["diverging"]
-
-
-
 CATEGORIZED_COLORMAPS = OrderedDict([
     ("Visible", VIS_COLORMAPS),
     ("IR", IR_COLORMAPS),

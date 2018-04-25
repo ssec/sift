@@ -70,7 +70,6 @@ from uuid import UUID, uuid1 as uuidgen
 import numpy as np
 from weakref import ref
 import os
-import ast
 import json
 
 from sift.common import KIND, INFO, prez
@@ -80,7 +79,7 @@ from sift.view.Colormap import ALL_COLORMAPS, USER_COLORMAPS
 from PyQt4.QtCore import QObject, pyqtSignal
 
 from colormap import rgb2hex
-from vispy.color.colormap import Colormap, BaseColormap, _mix_simple, _colormaps
+from vispy.color.colormap import Colormap
 
 
 LOG = logging.getLogger(__name__)
@@ -383,12 +382,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for item in qtData:
             self.add_to_maps(qtData[item], item)
 
-    def add_vispy_gradient(self, item):
-        return "a"
-
-    # Helper function for bubble sort
-    def bubbleSortSwap(self, A, x, y):
-        A[x], A[y] = A[y], A[x]
 
     def find_colormap(self, colormap):
         if isinstance(colormap, str) and colormap in self.colormaps:

@@ -68,8 +68,6 @@ class ChangeColormapDialog(QtGui.QDialog):
     def _cmap_changed(self, index):
         cmap_str = self.ui.cmap_combobox.itemData(index)
         self._current_cmap = str(cmap_str)
-        print(str(cmap_str))
-        print(str(self.uuid))
         self.doc.change_colormap_for_layers(self._current_cmap, (self.uuid,))
 
     def _set_new_clims(self, val, is_max):

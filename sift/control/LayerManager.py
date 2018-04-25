@@ -29,8 +29,6 @@ from sift.view.Colormap import ALL_COLORMAPS
 
 LOG = logging.getLogger(__name__)
 
-from sift.ui.GradientControl import GradientControl
-
 from sift.view.Colormap import ALL_COLORMAPS
 
 
