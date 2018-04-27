@@ -427,9 +427,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             floats.append(1)
             hexes.append(hexes[-1])
 
-        #floats[0] = 0
-        #floats[-1] = 1
-
         try:
             toAdd = Colormap(colors=hexes, controls=floats)
             self.colormaps[name] = toAdd
