@@ -55,12 +55,11 @@ between subsystems. Document rarely deals directly with content.
 :copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-from sift.model.layer import Mixing, DocLayer, DocBasicLayer, DocRGBLayer, DocCompositeLayer
+from sift.model.layer import Mixing, DocLayer, DocBasicLayer, DocRGBLayer,DocCompositeLayer
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import os
 import sys
 import logging
 import unittest
@@ -70,11 +69,17 @@ from itertools import groupby, chain
 from uuid import UUID, uuid1 as uuidgen
 import numpy as np
 from weakref import ref
+import os
+import json
 
 from sift.common import KIND, INFO, prez
 from sift.util.default_paths import DOCUMENT_SETTINGS_DIR
 from sift.model.composite_recipes import RecipeManager, CompositeRecipe
+from sift.view.Colormap import ALL_COLORMAPS, USER_COLORMAPS
 from PyQt4.QtCore import QObject, pyqtSignal
+
+from colormap import rgb2hex
+from vispy.color.colormap import Colormap
 
 
 LOG = logging.getLogger(__name__)
@@ -295,6 +300,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self._workspace = workspace
         self._layer_sets = [DocLayerStack(self)] + [None] * (layer_set_count - 1)
         self._layer_with_uuid = {}
+        # FIXME: Copy?
+        self.colormaps = ALL_COLORMAPS
+        self.usermaps = USER_COLORMAPS
         self.available_projections = OrderedDict((
             ('Mercator', {
                 'proj4_str': '+proj=merc +datum=WGS84 +ellps=WGS84 +over',
@@ -348,6 +356,38 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self._families = defaultdict(list)
         # TODO: connect signals from workspace to slots including update_dataset_info
 
+
+        # Create directory if it does not exist
+        filepath = os.path.join(self.config_dir, 'colormaps')
+        if not os.path.exists(filepath):
+            os.makedirs(filepath)
+
+        # Import data
+        qtData = {}
+        for subdir, dirs, files in os.walk(filepath):
+            for ToImportFile in files:
+                nfp = os.path.join(subdir, ToImportFile)
+                try:
+                    if os.path.splitext(ToImportFile)[1] != ".json":
+                        continue
+                    ifile = open(nfp, "r")
+                    toImport = json.loads(ifile.read())
+                    qtData[os.path.splitext(ToImportFile)[0]] = toImport
+                except IOError:
+                    LOG.error("Error importing gradient")
+                    raise
+                except ValueError:
+                    raise
+
+        for item in qtData:
+            self.add_to_maps(qtData[item], item)
+
+
+    def find_colormap(self, colormap):
+        if isinstance(colormap, str) and colormap in self.colormaps:
+            colormap = self.colormaps[colormap]
+        return colormap
+
     def projection_info(self, projection_name=None):
         return self.available_projections[projection_name or self.current_projection]
 
@@ -362,6 +402,67 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 self.current_projection,
                 self.projection_info(self.current_projection)
             )
+
+
+
+    def add_to_maps(self, colorItem, name):
+        pointList = colorItem["ticks"]
+        floats = []
+        hexes = []
+        for point in pointList:
+            floats.append(point[0])
+            rgb = point[1]
+            hexCode = rgb2hex(rgb[0], rgb[1], rgb[2])
+            hexes.append(hexCode)
+
+        floats, hexes = zip(*sorted(zip(floats, hexes)))
+
+        floats = list(floats)
+        hexes = list(hexes)
+
+        if floats[0] != 0:
+            floats = [0] + floats
+            hexes = [hexes[0]] + hexes
+        if floats[-1] != 1:
+            floats.append(1)
+            hexes.append(hexes[-1])
+
+        try:
+            toAdd = Colormap(colors=hexes, controls=floats)
+            self.colormaps[name] = toAdd
+            self.usermaps[name] = toAdd
+        except AssertionError:
+            LOG.error("Error creating or setting colormap")
+            raise
+
+    # Update new gradient into save location
+    def updateGCColorMap(self, colorMap, name):
+        filepath = os.path.join(self.config_dir, 'colormaps')
+
+        try:
+            iFile = open(os.path.join(filepath, name + '.json'), 'w')
+            iFile.write(json.dumps(colorMap, indent=2, sort_keys=True))
+            iFile.close()
+        except IOError:
+            LOG.error("Error saving gradient")
+
+        self.add_to_maps(colorMap, name)
+
+        # Update live map
+        self.change_colormap_for_layers(name)
+
+
+    # Remove gradient from save location (on delete)
+    def removeGCColorMap(self, name):
+        try:
+            os.remove(os.path.join(self.config_dir, 'colormaps', name + '.json'))
+        except OSError:
+            pass
+
+        del self.colormaps[name]
+        del self.usermaps[name]
+
+
 
     def current_projection_index(self):
         return list(self.available_projections.keys()).index(self.current_projection)

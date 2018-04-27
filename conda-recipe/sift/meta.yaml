@@ -35,6 +35,8 @@ requirements:
     - pyshp
     - shapely
     - sqlalchemy
+    - pyqtgraph
+    - colormap
     - pyqt <5
     - appdirs
     - pyyaml
@@ -59,6 +61,8 @@ requirements:
     - h5py
     - pillow
     - pyshp
+    - pyqtgraph
+    - colormap
     - shapely
     - sqlalchemy
     - pyqt <5
