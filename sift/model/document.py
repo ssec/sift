@@ -254,6 +254,7 @@ class DocLayerStack(MutableSequence):
 
 class DocumentAsContextBase(object):
     """Base class for high-level document context objects
+    When used as a context object, defers modifications and signals until exit!
     """
     doc = None
     mdb = None
@@ -402,6 +403,27 @@ class DocumentAsRecipeCollection(DocumentAsContextBase):
         raise NotImplementedError()
 
 
+class DocumentAsAnimationSequence(DocumentAsContextBase):
+    """Document as sequence of product frames that appear and disappear when animated at a multiple of real-time
+    """
+    def __enter__(self):
+        raise NotImplementedError()
+
+    def iterate(self, multiple_of_realtime:float, start:datetime=None, stop:datetime=None):
+        """Yield series of (wall-seconds-offset, [back-to-front-list-of-product-uuids])
+        """
+        return
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_val is not None:
+            # abort code
+            pass
+        else:
+            # commit code
+            pass
+        raise NotImplementedError()
+
+
 class Document(QObject):  # base class is rightmost, mixins left of that
     """
     Document has one or more LayerSets choosable by the user (one at a time) as currentLayerSet
@@ -444,6 +466,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     as_styled_families: DocumentAsStyledFamilies = None
     as_resource_pools: DocumentAsResourcePools = None
     as_recipe_collection: DocumentAsRecipeCollection = None
+    as_animation_sequence: DocumentAsAnimationSequence = None
     as_region_probes: DocumentAsRegionProbes = None
 
 
@@ -460,6 +483,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.as_styled_families= DocumentAsStyledFamilies(self, workspace.metadatabase, workspace)
         self.as_resource_pools = DocumentAsResourcePools(self, workspace.metadatabase, workspace)
         self.as_recipe_collection = DocumentAsRecipeCollection(self, workspace.metadatabase, workspace)
+        self.as_animation_sequence = DocumentAsAnimationSequence(self, workspace.metadatabase, workspace)
         self.as_region_probes = DocumentAsRegionProbes(self, workspace.metadatabase, workspace)
 
         self._workspace = workspace
