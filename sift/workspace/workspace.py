@@ -275,6 +275,10 @@ class Workspace(QObject):
         """
         return self._inventory.SessionRegistry
 
+    @property
+    def metadatabase(self):
+        return self._inventory
+
     @staticmethod
     def defaultWorkspace():
         """

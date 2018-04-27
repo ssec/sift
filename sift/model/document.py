@@ -250,6 +250,158 @@ class DocLayerStack(MutableSequence):
             self._store[idx] = self._store[idx]._replace(a_order=nth)
 
 
+# FUTURE: move these into separate modules
+
+class DocumentAsContextBase(object):
+    """Base class for high-level document context objects
+    """
+    doc = None
+    mdb = None
+    ws = None
+
+
+    def __init__(self, doc, mdb, ws):
+        self.doc = doc
+        self.mdb = mdb
+        self.ws = ws
+
+
+    def __enter__(self):
+        pass
+
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_val is not None:
+            # abort code
+            raise exc_val
+        else:
+            # commit code
+            pass
+
+
+# class DocumentAsContext(DocumentAsContextBase):
+#     def __enter__(self):
+#         raise NotImplementedError()
+#
+#     def __exit__(self, exc_type, exc_val, exc_tb):
+#         if exc_val is not None:
+#             # abort code
+#             pass
+#         else:
+#             # commit code
+#             pass
+#         raise NotImplementedError()
+
+
+class DocumentAsLayerStack(DocumentAsContextBase):
+    """ Represent the document as a list of current layers
+    As we transition to timeline model, this stops representing products and starts being a track stack
+    """
+
+    def __enter__(self):
+        raise NotImplementedError()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_val is not None:
+            # abort code
+            pass
+        else:
+            # commit code
+            pass
+        raise NotImplementedError()
+
+
+class DocumentAsTrackStack(DocumentAsContextBase):
+    def __enter__(self):
+        raise NotImplementedError()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_val is not None:
+            # abort code
+            pass
+        else:
+            # commit code
+            pass
+        raise NotImplementedError()
+
+
+class DocumentAsRegionProbes(DocumentAsContextBase):
+    """Document is probed over a variety of regions
+    """
+    def __enter__(self):
+        raise NotImplementedError()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_val is not None:
+            # abort code
+            pass
+        else:
+            # commit code
+            pass
+        raise NotImplementedError()
+
+
+class DocumentAsStyledFamilies(DocumentAsContextBase):
+    """Document is composed of products falling into families, each represented onscreen with a style
+
+    """
+    def __enter__(self):
+        raise NotImplementedError()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_val is not None:
+            # abort code
+            pass
+        else:
+            # commit code
+            pass
+        raise NotImplementedError()
+
+
+class DocumentAsResourcePools(DocumentAsContextBase):
+    """Document allows user to specify files and directory systems to search for Resources, Products, Content
+    """
+    def __enter__(self):
+        raise NotImplementedError()
+
+    @property
+    def search_paths(self):
+        raise NotImplementedError()
+
+    @search_paths.setter
+    def search_paths(self, list_of_paths):
+        raise NotImplementedError()
+
+    def add_search_path(self, dirname):
+        raise NotImplementedError()
+
+    def interactive_open(self, *file_paths):
+        raise NotImplementedError()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_val is not None:
+            # abort code
+            pass
+        else:
+            # commit code
+            pass
+        raise NotImplementedError()
+
+
+class DocumentAsRecipeCollection(DocumentAsContextBase):
+    def __enter__(self):
+        raise NotImplementedError()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_val is not None:
+            # abort code
+            pass
+        else:
+            # commit code
+            pass
+        raise NotImplementedError()
+
+
 class Document(QObject):  # base class is rightmost, mixins left of that
     """
     Document has one or more LayerSets choosable by the user (one at a time) as currentLayerSet
@@ -285,12 +437,30 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # didChangeShapeLayer = pyqtSignal(dict)
     didAddFamily = pyqtSignal(tuple, dict)  # name of the newly added family and dict of family info
 
+
+    # high-level contexts providing purposed access to low-level document and its storage, as well as MDB and WS
+    as_layer_stack: DocumentAsLayerStack = None
+    as_track_stack: DocumentAsTrackStack = None
+    as_styled_families: DocumentAsStyledFamilies = None
+    as_resource_pools: DocumentAsResourcePools = None
+    as_recipe_collection: DocumentAsRecipeCollection = None
+    as_region_probes: DocumentAsRegionProbes = None
+
+
     def __init__(self, workspace, config_dir=DOCUMENT_SETTINGS_DIR, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
         super(Document, self).__init__(**kwargs)
         self.config_dir = config_dir
         if not os.path.isdir(self.config_dir):
             LOG.info("Creating settings directory {}".format(self.config_dir))
             os.makedirs(self.config_dir)
+
+        # high level context managers provide access patterns for use-case based behaviors
+        self.as_layer_stack = DocumentAsLayerStack(self, workspace.metadatabase, workspace)
+        self.as_track_stack = DocumentAsTrackStack(self, workspace.metadatabase, workspace)
+        self.as_styled_families= DocumentAsStyledFamilies(self, workspace.metadatabase, workspace)
+        self.as_resource_pools = DocumentAsResourcePools(self, workspace.metadatabase, workspace)
+        self.as_recipe_collection = DocumentAsRecipeCollection(self, workspace.metadatabase, workspace)
+        self.as_region_probes = DocumentAsRegionProbes(self, workspace.metadatabase, workspace)
 
         self._workspace = workspace
         self._layer_sets = [DocLayerStack(self)] + [None] * (layer_set_count - 1)

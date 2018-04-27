@@ -24,6 +24,13 @@ from sift.workspace.metadatabase import Metadatabase
 
 LOG = logging.getLogger(__name__)
 
+def mdb_products_as_tracks(mdb: Metadatabase) -> dict:
+    """Yield dictionary
+    """
+    with mdb as S:
+
+
+
 
 class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
     """ represent SIFT Workspace and Document as frames in tracks
