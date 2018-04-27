@@ -29,9 +29,6 @@ from sift.view.Colormap import ALL_COLORMAPS
 
 LOG = logging.getLogger(__name__)
 
-from sift.view.Colormap import ALL_COLORMAPS
-
-
 class LayerSetsManager(QObject):
     """This is the controller object that manages the extended functionality of the layer sets.
     """
@@ -150,8 +147,6 @@ class SingleLayerInfoPane(QObject):
     band_text = None
     colormap_text = None
     clims_text = None
-
-    GCOpen = False
 
     def __init__(self, parent, document):
         """build our info display

@@ -443,7 +443,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         filepath = os.path.join(self.config_dir, 'colormaps')
 
         try:
-            iFile = open(filepath + "/" + name + ".json", 'w')
+            iFile = open(os.path.join(filepath, name + '.json'), 'w')
             iFile.write(json.dumps(colorMap, indent=2, sort_keys=True))
             iFile.close()
         except IOError:
