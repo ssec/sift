@@ -29,6 +29,7 @@ from sift.view.Colormap import ALL_COLORMAPS
 
 LOG = logging.getLogger(__name__)
 
+
 class LayerSetsManager(QObject):
     """This is the controller object that manages the extended functionality of the layer sets.
     """
@@ -201,8 +202,6 @@ class SingleLayerInfoPane(QObject):
 
         # clear out the display
         self.update_display()
-
-
 
     def update_display(self, selected_uuid_list=None):
         """update the information being displayed to match the given UUID(s)
