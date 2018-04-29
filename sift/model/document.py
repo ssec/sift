@@ -69,6 +69,7 @@ from collections import MutableSequence, OrderedDict, defaultdict
 from itertools import groupby, chain
 from uuid import UUID, uuid1 as uuidgen
 from datetime import datetime, timedelta
+import typing as ty
 import numpy as np
 from weakref import ref
 
@@ -415,6 +416,25 @@ class DocumentAsAnimationSequence(DocumentAsContextBase):
         """
         return
 
+    @property
+    def playhead_time(self) -> datetime:
+        raise NotImplementedError()
+
+    @playhead_time.setter
+    def playhead_time(self, when: datetime):
+        raise NotImplementedError()
+
+    @property
+    def playback_time_range(self) -> ty.Tuple[datetime, datetime]:
+        raise NotImplementedError()
+
+    @playback_time_range.setter
+    def playback_time_range(self, start_end: ty.Tuple[datetime, datetime]):
+        # set document playback time range
+        # if we're in a with-clause, defer signals until outermost exit
+        # if we're not in a with-clause, raise ContextNeededForEditing exception
+        raise NotImplementedError()
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_val is not None:
             # abort code
@@ -423,6 +443,82 @@ class DocumentAsAnimationSequence(DocumentAsContextBase):
             # commit code
             pass
         raise NotImplementedError()
+
+
+class ProductDataArrayProxy(object):
+    """
+    As-pythonic-as-possible dataset proxy for SIFT content.
+    Hides document, metadatabase, and workspace accesses into something less scattered.
+    Intended to evolve toward being usable within a user-accessible friendly namespace.
+    Also intended to provide a stable API behind which we can add incremental compatibility with dask/xarray.
+
+    Metadata keys are accessible by .info dictionary-style, or by query
+    Data are accessible by .data, or numpy bracket semantics
+    """
+
+    def __init__(self, context, uuid: UUID):
+        self._ctx = context
+        self._uuid = uuid
+
+    def data(self, field=None):
+        """Return an xarray-like entity
+        """
+
+    @property
+    def info(self):
+        """Return dictionary-like metadata dictionary
+        """
+
+
+class DocumentAsProductArrayCollection(DocumentAsContextBase):
+    """Document as MeasurementDatasetProxy object collection
+    merges WS, MDB, and Doc
+    """
+    _proxies = None
+
+    def __init__(self, *args, **kwargs):
+        super(DocumentAsProductArrayCollection, self).__init__(*args, **kwargs)
+        self._proxies = {}
+
+    def __getitem__(self, product_uuid: UUID) -> ProductDataArrayProxy:
+
+        it = self._proxies.get(product_uuid, None)
+        if it is not None:
+            return it
+
+        not_in_doc = False
+        not_in_ws = False
+        try:
+            self.doc[product_uuid]
+        except KeyError:
+            not_in_doc = True
+        nfo = self.ws.get_info(product_uuid)
+        if nfo is None:
+            not_in_ws = True
+
+        if not_in_doc and not_in_ws:
+            raise KeyError("UUID {} is unknown".format(product_uuid))
+
+        self._proxies[product_uuid] = it = ProductDataArrayProxy(self, product_uuid)
+        return it
+
+    def __enter__(self):
+        raise NotImplementedError()
+
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_val is not None:
+            # abort code
+            pass
+        else:
+            # commit code
+            pass
+        raise NotImplementedError()
+
+
+# TimelineDataArrayProxy  # multiple products as a timeline, i.e. a time dimension is added representing all the products on the same timeline
+# FUTURE: class DatasetAsTimelineArrayCollection(DocumentAsContextBase):
+
 
 
 class Document(QObject):  # base class is rightmost, mixins left of that
