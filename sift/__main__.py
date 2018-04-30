@@ -258,12 +258,26 @@ class Main(QtGui.QMainWindow):
                                                    ';;'.join(['GOES-R netCDF or Merc GTIFF (*.nc *.nc4 *.tiff *.tif)']))
         self.open_paths(files)
 
-    def open_paths(self, paths):
-        paths = list(paths)
-        if not paths:
-            return
-        for uuid, _, _ in self.document.open_files(paths):
-            pass
+    def _bgnd_open_paths(self, paths, uuid_list):
+        """Background task runs on a secondary thread
+        """
+        nfiles = len(paths)
+        for dex,path in enumerate(paths):
+            for uuid, _, _ in self.document.open_files([path]):
+                uuid_list.append(uuid)
+                yield {TASK_DOING: 'imported {}'.format(path), TASK_PROGRESS: float(dex) / float(len(paths))}
+
+    def _bgnd_open_paths_finish(self, isok: bool, uuid_list):
+        """Main thread finalization after background imports are done
+        :param isok: whether _bgnd_open_paths ran without exception
+        :param uuid_list: list of UUIDs it generated
+        :return:
+        """
+        if not uuid_list:
+            raise ValueError("no UUIDs provided by background open in _bgnd_open_paths_when_done")
+        if not isok:
+            raise ValueError("background open did not succeed")
+        uuid = uuid_list[-1]
         self.behaviorLayersList.select([uuid])
         # set the animation based on the last added (topmost) layer
         self.document.animate_siblings_of_layer(uuid)
@@ -272,6 +286,15 @@ class Main(QtGui.QMainWindow):
         # don't use <algebraic layer ...> type paths
         self._last_open_dir = _common_path_prefix([x for x in paths if x[0] != '<']) or self._last_open_dir
         self.update_recent_file_menu()
+
+    def open_paths(self, paths):
+        paths = list(paths)
+        if not paths:
+            return
+        uli = []
+        bop = partial(self._bgnd_open_paths, uuid_list=uli)
+        bopf = partial(self._bgnd_open_paths_finish, uuid_list=uli)
+        self.queue.add(bop(paths), and_then=bopf)
 
     def activate_products_by_uuid(self, uuids):
         uuids = list(uuids)

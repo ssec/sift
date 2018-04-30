@@ -44,6 +44,7 @@ class Worker(QThread):
     depth = 0
 
     workerDidMakeProgress = pyqtSignal(int, list)  # worker id, sequence of dictionaries listing update information to be propagated to view
+    workerDidCompleteTask = pyqtSignal(int, bool)  # id(task), ok: False if exception occurred else True
 
     def __init__(self, myid:int):
         super(Worker, self).__init__()
@@ -70,12 +71,15 @@ class Worker(QThread):
     def run(self):
         while len(self.queue)>0:
             task = self.queue.pop(0)
+            ok = True
             try:
                 for status in task:
                     self._did_progress(status)
             except Exception:
                 LOG.error("Background task failed")
                 LOG.debug("Background task exception: ", exc_info=True)
+                ok = False
+            self.workerDidCompleteTask.emit(id(task), ok)
         self.depth = 0
         self._did_progress(None)
 
@@ -91,6 +95,7 @@ class TaskQueue(QObject):
     workers = None  # thread pool for background activity
     _interactive_round_robin = 0  # swaps between 0 and 1 for interactive tasks
     _last_status = None  # list of last status reports for different workers
+    _completion_futures = None  # dictionary of id(task) : completion(bool)
 
     didMakeProgress = pyqtSignal(list)  # sequence of dictionaries listing update information to be propagated to view
     # started : inherited
@@ -101,11 +106,13 @@ class TaskQueue(QObject):
         super(TaskQueue, self).__init__()
         self._interactive_round_robin = 0
         self.process_pool = process_pool
+        self._completion_futures = {}
         self._last_status = []
         self.workers = []
         for id in range(3):
             worker = Worker(id)
             worker.workerDidMakeProgress.connect(self._did_progress)
+            worker.workerDidCompleteTask.connect(self._did_complete_task)
             self.workers.append(worker)
             self._last_status.append(None)
 
@@ -121,7 +128,7 @@ class TaskQueue(QObject):
     def remaining(self):
         return sum([len(x.queue) for x in self.workers])
 
-    def add(self, key, task_iterable, description, interactive=False, use_process_pool=False, use_thread_pool=False):
+    def add(self, key, task_iterable, description, interactive=False, and_then=None, use_process_pool=False, use_thread_pool=False):
         """
         Add an iterable task which will yield progress information dictionaries.
 
@@ -141,6 +148,8 @@ class TaskQueue(QObject):
             self._interactive_round_robin %= 2
         else:
             wdex = 2
+        if callable(and_then):
+            self._completion_futures[id(task_iterable)] = and_then
         self.workers[wdex].add(key, task_iterable)
 
     def _did_progress(self, worker_id, worker_status):
@@ -163,6 +172,11 @@ class TaskQueue(QObject):
         # otherwise this is a notification that we're finally at full idle
         self.didMakeProgress.emit([{TASK_DOING: '', TASK_PROGRESS: 0.0}])
         # FUTURE: consider one progress bar per worker
+
+    def _did_complete_task(self, id_of_task: int, succeeded: bool):
+        todo = self._completion_futures.pop(id_of_task, None)
+        if callable(todo):
+            todo(succeeded)
 
     def progress_ratio(self, current_progress=None):
         depth = self.depth
