@@ -261,11 +261,13 @@ class Main(QtGui.QMainWindow):
     def _bgnd_open_paths(self, paths, uuid_list):
         """Background task runs on a secondary thread
         """
-        nfiles = len(paths)
+        npaths = len(paths)
+        LOG.info("opening {} paths in background".format(npaths))
         for dex,path in enumerate(paths):
+            yield {TASK_DOING: 'Open {}/{}'.format(dex+1, npaths), TASK_PROGRESS: float(dex+1) / float(npaths+1)}
             for uuid, _, _ in self.document.open_files([path]):
                 uuid_list.append(uuid)
-                yield {TASK_DOING: 'imported {}'.format(path), TASK_PROGRESS: float(dex) / float(len(paths))}
+        yield {TASK_DOING: 'imported {} files'.format(npaths), TASK_PROGRESS: 1.0}
 
     def _bgnd_open_paths_finish(self, isok: bool, uuid_list):
         """Main thread finalization after background imports are done
