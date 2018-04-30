@@ -154,38 +154,51 @@ class INFO(Enum):
     Note: some fields correspond to database fields in workspace.metadatabase !
     """
     UNKNOWN = '???'
-    PATHNAME = 'path'  # full path to the data file
+    PATHNAME = 'path'  # full path to the resource that the file came from. DEPRECATED, since datasets may not have one-to-one pathname mapping
+
+    # CF content
+    SHORT_NAME = 'cf_short_name'  # CF short_name
+    LONG_NAME = 'cf_long_name'  # CF long_name
+    STANDARD_NAME = 'cf_standard_name'  # CF compliant standard_name (when possible)
+    UNITS = 'cf_units'  # CF compliant (udunits compliant) units string, original data units
+
+    # SIFT bookkeeping
     DATASET_NAME = 'dataset_name'  # logical name of the file (possibly human assigned)
-    SHORT_NAME = 'short_name'  # CF short_name
-    LONG_NAME = 'long_name'  # CF long_name
-    STANDARD_NAME = 'standard_name'  # CF compliant standard_name (when possible)
-    UNITS = 'units'  # CF compliant (udunits compliant) units string, original data units
     KIND = 'kind'  # KIND enumeration on what kind of layer this makes
     UUID = 'uuid'  # UUID assigned on import, which follows the layer around the system
+    FAMILY = 'family'  # tuple representing data family, all of which get a shared colormap/ranges
+    TRACK = 'track'  # what timeline track this data falls into, typically built as family + tuple(scene)
+
+    # projection information
     ORIGIN_X = 'origin_x'
     ORIGIN_Y = 'origin_y'
     CELL_WIDTH = 'cell_width'
     CELL_HEIGHT = 'cell_height'
     PROJ = 'proj4'
+
+    # colormap amd data range
     CLIM = 'clim'  # (min,max) color map limits
     VALID_RANGE = 'valid_range'
     SHAPE = 'shape' # (rows, columns) or (rows, columns, levels) data shape
     COLORMAP = 'colormap'  # name or UUID of a color map
-    DISPLAY_TIME = 'display_time'  # typically from guidebook, used for labeling animation frame
-    # Previously in the GUIDE Enum:
-    PLATFORM = 'platform' # full standard name of spacecraft
+
     SCHED_TIME = 'timeline'  # scheduled time for observation
     OBS_TIME = 'obstime'  # actual time for observation
     OBS_DURATION = 'obsduration'  # time from start of observation to end of observation
+
+    # instrument and scene information
+    PLATFORM = 'platform' # full standard name of spacecraft
     BAND = 'band'  # band number (multispectral instruments)
     SCENE = 'scene'  # standard scene identifier string for instrument, e.g. FLDK
     INSTRUMENT = 'instrument'  # INSTRUMENT enumeration, or string with full standard name
+
+    # human-friendly conventions
     DISPLAY_NAME = 'display_name'  # preferred name in the layer list
+    DISPLAY_TIME = 'display_time'  # typically from guidebook, used for labeling animation frame
     UNIT_CONVERSION = 'unit_conversion'  # (preferred CF units, convert_func, format_func)
     # unit numeric conversion func: lambda x, inverse=False: convert-to-units
     # unit string format func: lambda x, numeric=True, units=True: formatted string
     CENTRAL_WAVELENGTH = 'nominal_wavelength'
-    FAMILY = 'family'
     # only in family info dictionaries:
     DISPLAY_FAMILY = 'display_family'
 
