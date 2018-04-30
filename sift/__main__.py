@@ -283,9 +283,6 @@ class Main(QtGui.QMainWindow):
         self.document.animate_siblings_of_layer(uuid)
         # force the newest layer to be visible
         self.document.next_last_step(uuid)
-        # don't use <algebraic layer ...> type paths
-        self._last_open_dir = _common_path_prefix([x for x in paths if x[0] != '<']) or self._last_open_dir
-        self.update_recent_file_menu()
 
     def open_paths(self, paths):
         paths = list(paths)
@@ -295,6 +292,9 @@ class Main(QtGui.QMainWindow):
         bop = partial(self._bgnd_open_paths, uuid_list=uli)
         bopf = partial(self._bgnd_open_paths_finish, uuid_list=uli)
         self.queue.add("load_files", bop(paths), "Open {} files".format(len(paths)), and_then=bopf)
+        # don't use <algebraic layer ...> type paths
+        self._last_open_dir = _common_path_prefix([x for x in paths if x[0] != '<']) or self._last_open_dir
+        self.update_recent_file_menu()
 
     def activate_products_by_uuid(self, uuids):
         uuids = list(uuids)
