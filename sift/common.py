@@ -157,10 +157,10 @@ class INFO(Enum):
     PATHNAME = 'path'  # full path to the resource that the file came from. DEPRECATED, since datasets may not have one-to-one pathname mapping
 
     # CF content
-    SHORT_NAME = 'cf_short_name'  # CF short_name
-    LONG_NAME = 'cf_long_name'  # CF long_name
-    STANDARD_NAME = 'cf_standard_name'  # CF compliant standard_name (when possible)
-    UNITS = 'cf_units'  # CF compliant (udunits compliant) units string, original data units
+    SHORT_NAME = 'short_name'  # CF short_name
+    LONG_NAME = 'long_name'  # CF long_name
+    STANDARD_NAME = 'standard_name'  # CF compliant standard_name (when possible)
+    UNITS = 'units'  # CF compliant (udunits compliant) units string, original data units
 
     # SIFT bookkeeping
     DATASET_NAME = 'dataset_name'  # logical name of the file (possibly human assigned)

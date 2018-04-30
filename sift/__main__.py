@@ -294,7 +294,7 @@ class Main(QtGui.QMainWindow):
         uli = []
         bop = partial(self._bgnd_open_paths, uuid_list=uli)
         bopf = partial(self._bgnd_open_paths_finish, uuid_list=uli)
-        self.queue.add(bop(paths), and_then=bopf)
+        self.queue.add("load_files", bop(paths), "Open {} files".format(len(paths)), and_then=bopf)
 
     def activate_products_by_uuid(self, uuids):
         uuids = list(uuids)
