@@ -520,7 +520,6 @@ class DocumentAsProductArrayCollection(DocumentAsContextBase):
 # FUTURE: class DatasetAsTimelineArrayCollection(DocumentAsContextBase):
 
 
-
 class Document(QObject):  # base class is rightmost, mixins left of that
     """
     Document has one or more LayerSets choosable by the user (one at a time) as currentLayerSet

@@ -18,7 +18,7 @@ from PyQt4.QtGui import QMenu
 from sift.view.TimelineItems import QTrackItem, QFrameItem
 from sift.view.TimelineScene import QFramesInTracksScene
 from sift.workspace import Workspace
-from sift.model.document import Document
+from sift.model.document import Document, DocumentAsTrackStack
 from sift.workspace.metadatabase import Metadatabase
 
 
@@ -34,12 +34,19 @@ def mdb_products_as_tracks(mdb: Metadatabase) -> dict:
 
 class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
     """ represent SIFT Workspace and Document as frames in tracks
+    preferably, we use doc.as_track_stack high level interface to query doc+mdb+ws
     """
-    _ws: Workspace = None
-    _md: Metadatabase = None
     _doc: Document = None
+    _ws: Workspace = None
+    _mdb: Metadatabase = None
 
-    def __init__(self, ws: Workspace, mdb: Metadatabase, doc: Document, *args, **kwargs):
+    @property
+    def _dats(self):
+        """Document as track stack
+        """
+        return self._doc.as_track_stack
+
+    def __init__(self, doc: Document, mdb: Metadatabase, ws: Workspace, *args, **kwargs):
         """
         Args:
             ws (Workspace): owns cached and computed data
