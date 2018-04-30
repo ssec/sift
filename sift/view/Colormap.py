@@ -246,6 +246,7 @@ _rain_rate_control_points = (0.0, 0.5215686274509804, 0.6, 0.6470588235294118, 0
 _rain_rate_colors = ('#000000', '#c7c7c7', '#00ffff', '#0000ff', '#00ff00', '#ffff00', '#ff9500', '#e20000', '#f00000', '#ff00ff', '#ffffff')
 rain_rate = Colormap(colors=_rain_rate_colors, controls=_rain_rate_control_points)
 
+
 _color11new_control_points = (0.0, 0.0024425989252564728,
  0.064484611626770882, 0.12701514411333659, 0.189057156814851,
  0.25158768930141673, 0.31411822178798243, 0.37616023448949681,
@@ -459,6 +460,9 @@ ALL_COLORMAPS.update(SKIN_TEMP_COLORMAPS)
 ALL_COLORMAPS.update(WV_COLORMAPS)
 ALL_COLORMAPS.update(TOWRS_COLORMAPS)
 ALL_COLORMAPS.update(OTHER_COLORMAPS)
+
+
+USER_COLORMAPS = {}
 
 CATEGORIZED_COLORMAPS = OrderedDict([
     ("Visible", VIS_COLORMAPS),

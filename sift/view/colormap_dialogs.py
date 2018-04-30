@@ -3,7 +3,7 @@ from functools import partial
 from uuid import UUID
 from PyQt4 import QtGui, QtCore
 from sift.common import INFO
-from sift.view.Colormap import CATEGORIZED_COLORMAPS
+from sift.view.Colormap import ALL_COLORMAPS
 from sift.ui.change_colormap_dialog_ui import Ui_changeColormapDialog
 
 LOG = logging.getLogger(__name__)
@@ -99,13 +99,10 @@ class ChangeColormapDialog(QtGui.QDialog):
         return self._set_new_clims(val, is_max)
 
     def _init_cmap_combo(self):
-        idx = 0
-        for cat, cat_colormaps in CATEGORIZED_COLORMAPS.items():
-            for colormap in cat_colormaps.keys():
-                self.ui.cmap_combobox.addItem(colormap, colormap)
-                if colormap == self._initial_cmap:
-                    self.ui.cmap_combobox.setCurrentIndex(idx)
-                idx += 1
+        for idx, colormap in enumerate(self.doc.colormaps.keys()):
+            self.ui.cmap_combobox.addItem(colormap, colormap)
+            if colormap == self._initial_cmap:
+                self.ui.cmap_combobox.setCurrentIndex(idx)
 
     def _get_slider_value(self, slider_val):
         return (slider_val / self._slider_steps) * (self.valid_max - self.valid_min) + self.valid_min

@@ -60,6 +60,9 @@ import os
 import sys
 import logging
 
+import ast
+from sift.ui.GradientControl import GradientControl
+
 
 LOG = logging.getLogger(__name__)
 PROGRESS_BAR_MAX = 1000
@@ -248,6 +251,7 @@ class Main(QtGui.QMainWindow):
     _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
     _open_cache_dialog = None
     _screenshot_dialog = None
+    _geditor = None # Gradient editor widget
 
     def interactive_open_files(self, *args, files=None, **kwargs):
         self.scene_manager.layer_set.animating = False
@@ -878,10 +882,15 @@ class Main(QtGui.QMainWindow):
         toggle_point.setShortcut('X')
         toggle_point.triggered.connect(lambda: self.graphManager.toggle_point_probe(DEFAULT_POINT_PROBE))
 
+        open_gradient = QtGui.QAction("Toggle Gradient Editor", self)
+        open_gradient.setShortcut("Ctrl+E")
+        open_gradient.triggered.connect(self.openGradientWidget)
+
         edit_menu = menubar.addMenu('&Edit')
         edit_menu.addAction(remove)
         edit_menu.addAction(clear)
         edit_menu.addAction(toggle_point)
+        edit_menu.addAction(open_gradient)
 
         layer_menu = menubar.addMenu('&Layer')
         layer_menu.addAction(composite)
@@ -915,6 +924,12 @@ class Main(QtGui.QMainWindow):
     def updateLayerList(self):
         # self.ui.layers.add
         pass
+
+    def openGradientWidget(self):
+        if self._geditor is None:
+            self._geditor = GradientControl(doc=self.document)
+
+        self._geditor.show()
 
 
 def set_default_geometry(window, desktop=0):
