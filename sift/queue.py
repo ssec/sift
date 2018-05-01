@@ -72,14 +72,14 @@ class Worker(QThread):
     def run(self):
         while len(self.queue)>0:
             key, task = self.queue.popitem(last=False)
-            LOG.debug('starting background work on {}'.format(key))
+            # LOG.debug('starting background work on {}'.format(key))
             ok = True
             try:
                 for status in task:
                     self._did_progress(status)
             except Exception:
-                LOG.error("Background task failed")
-                LOG.debug("Background task exception: ", exc_info=True)
+                # LOG.error("Background task failed")
+                LOG.error("Background task exception: ", exc_info=True)
                 ok = False
             self.workerDidCompleteTask.emit(key, ok)
         self.depth = 0
@@ -176,13 +176,13 @@ class TaskQueue(QObject):
         # FUTURE: consider one progress bar per worker
 
     def _did_complete_task(self, task_key: str, succeeded: bool):
-        LOG.debug("background task complete!")
+        # LOG.debug("background task complete!")
         todo = self._completion_futures.pop(task_key, None)
         if callable(todo):
             LOG.debug("completed task {}, and_then we do this...".format(succeeded))
             todo(succeeded)
-        else:
-            LOG.debug("nothing further to do <{}>".format(repr(todo)))
+        # else:
+        #     LOG.debug("nothing further to do <{}>".format(repr(todo)))
 
     def progress_ratio(self, current_progress=None):
         depth = self.depth
