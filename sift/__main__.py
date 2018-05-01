@@ -735,8 +735,18 @@ class Main(QtGui.QMainWindow):
         timer.start(60000)
 
     def _timer_collect_resources(self):
-        self.queue.add('resource_find', self._resource_collector.bgnd_look_for_new_files(), "look for new or modified files", interactive=False)
-        self.queue.add("resource_collect", self._resource_collector.bgnd_merge_new_file_metadata_into_mdb(), "add metadata for newly found files", interactive=False)
+        if self._resource_collector:
+            LOG.debug("launching background resource search")
+            self.queue.add('resource_find', self._resource_collector.bgnd_look_for_new_files(), "look for new or modified files",
+                           and_then=self._finish_collecting_resources, interactive=False)
+
+    def _finish_collecting_resources(self, previous_stage_ok:bool = True):
+        ntodo = self._resource_collector.has_pending_files
+        if ntodo:
+            LOG.debug("{} new resources to collect metadata from".format(ntodo))
+            self.queue.add("resource_collect", self._resource_collector.bgnd_merge_new_file_metadata_into_mdb(), "add metadata for newly found files", interactive=False)
+        else:
+            LOG.debug("no resources to collect, skipping followup task")
 
     def closeEvent(self, event, *args, **kwargs):
         LOG.debug('main window closing')
@@ -996,7 +1006,8 @@ def main():
 
     levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
     level = levels[min(3, args.verbosity)]
-    logging.basicConfig(level=level)
+    logging.basicConfig(level=level, datefmt='%H:%M:%S',
+                        format='%(levelname)s %(asctime)s %(module)s:%(funcName)s:L%(lineno)d %(message)s')
     # FIXME: This is needed because shapely 1.5.11 sucks
     logging.getLogger().setLevel(level)
     # logging.getLogger('vispy').setLevel(level)

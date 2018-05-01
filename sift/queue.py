@@ -24,6 +24,7 @@ __docformat__ = 'reStructuredText'
 
 import os, sys
 import logging, unittest, argparse
+from collections import OrderedDict
 from PyQt4.QtCore import QObject, pyqtSignal, QThread
 
 LOG = logging.getLogger(__name__)
@@ -44,18 +45,18 @@ class Worker(QThread):
     depth = 0
 
     workerDidMakeProgress = pyqtSignal(int, list)  # worker id, sequence of dictionaries listing update information to be propagated to view
-    workerDidCompleteTask = pyqtSignal(int, bool)  # id(task), ok: False if exception occurred else True
+    workerDidCompleteTask = pyqtSignal(str, bool)  # task-key, ok: False if exception occurred else True
 
     def __init__(self, myid:int):
         super(Worker, self).__init__()
-        self.queue = []
+        self.queue = OrderedDict()
         self.depth = 0
         self.id = myid
 
     def add(self, key, task_iterable):
         # FUTURE: replace queued task if key matches
-        self.queue.append(task_iterable)
-        self.depth += 1
+        self.queue[key] = task_iterable
+        self.depth = len(self.queue)
         self.start()
 
     def _did_progress(self, task_status):
@@ -70,7 +71,8 @@ class Worker(QThread):
 
     def run(self):
         while len(self.queue)>0:
-            task = self.queue.pop(0)
+            key, task = self.queue.popitem(last=False)
+            LOG.debug('starting background work on {}'.format(key))
             ok = True
             try:
                 for status in task:
@@ -79,7 +81,7 @@ class Worker(QThread):
                 LOG.error("Background task failed")
                 LOG.debug("Background task exception: ", exc_info=True)
                 ok = False
-            self.workerDidCompleteTask.emit(id(task), ok)
+            self.workerDidCompleteTask.emit(key, ok)
         self.depth = 0
         self._did_progress(None)
 
@@ -149,7 +151,7 @@ class TaskQueue(QObject):
         else:
             wdex = 2
         if callable(and_then):
-            self._completion_futures[id(task_iterable)] = and_then
+            self._completion_futures[key] = and_then
         self.workers[wdex].add(key, task_iterable)
 
     def _did_progress(self, worker_id, worker_status):
@@ -173,10 +175,14 @@ class TaskQueue(QObject):
         self.didMakeProgress.emit([{TASK_DOING: '', TASK_PROGRESS: 0.0}])
         # FUTURE: consider one progress bar per worker
 
-    def _did_complete_task(self, id_of_task: int, succeeded: bool):
-        todo = self._completion_futures.pop(id_of_task, None)
+    def _did_complete_task(self, task_key: str, succeeded: bool):
+        LOG.debug("background task complete!")
+        todo = self._completion_futures.pop(task_key, None)
         if callable(todo):
+            LOG.debug("completed task {}, and_then we do this...".format(succeeded))
             todo(succeeded)
+        else:
+            LOG.debug("nothing further to do <{}>".format(repr(todo)))
 
     def progress_ratio(self, current_progress=None):
         depth = self.depth

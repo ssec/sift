@@ -71,6 +71,8 @@ class ResourceSearchPathCollector(QObject):
         self._paths = list(new_paths)
         self._flush_dirs(removed)
         self._schedule_walk_dirs(added)
+        LOG.debug('old search directories removed: {}'.format(':'.join(sorted(removed))))
+        LOG.debug('new search directories added: {}'.format(':'.join(sorted(added))))
 
     def _flush_dirs(self, dirs: Iterable[str]):
         pass
@@ -80,24 +82,29 @@ class ResourceSearchPathCollector(QObject):
 
     @property
     def has_pending_files(self):
-        return len(self._scheduled_files) > 0
+        return len(self._scheduled_files)
+
+    def __bool__(self):
+        return len(self._paths) > 0
 
     def _skim(self, last_checked: int = 0, dirs: Iterable[str] = None):
         """skim directories for new mtimes
         """
+        skipped_dirs = 0
         for rawpath in (dirs or self._paths):
-            path = os.path.realpath(rawpath)
+            path = os.path.abspath(rawpath)
             if not os.path.isdir(path):
                 LOG.warning("{} is not a directory".format(path))
                 continue
             for dirpath, dirnames, filenames in os.walk(path):
                 if self._is_posix and (os.stat(dirpath).st_mtime < last_checked):
-                    LOG.debug("skipping files in {} due to POSIX directory mtime".format(dirpath))
+                    skipped_dirs += 1
                     continue
                 for filename in filenames:
                     filepath = os.path.join(dirpath, filename)
                     if os.path.isfile(filepath) and (os.stat(filepath).st_mtime >= last_checked):
                         yield filepath
+        LOG.debug("skipped files in {} dirs due to POSIX directory mtime".format(skipped_dirs))
 
     def _touch(self):
         mtime = 0
@@ -121,15 +128,18 @@ class ResourceSearchPathCollector(QObject):
     def look_for_new_files(self):
         if len(self._scheduled_dirs):
             new_dirs, self._scheduled_dirs = self._scheduled_dirs, []
+            LOG.debug('giving special attention to new search paths {}'.format(':'.join(new_dirs)))
             new_files = list(self._skim(0, new_dirs))
+            LOG.debug('found {} files in new search paths'.format(len(new_files)))
             self._scheduled_files += new_files
         when = self._touch()
         new_files = list(self._skim(when))
         if new_files:
-            LOG.info('found {} new files to skim metadata for'.format(len(new_files)))
+            LOG.info('found {} additional files to skim metadata for, for a total of {}'.format(len(new_files), len(self._scheduled_files)))
             self._scheduled_files += new_files
 
     def bgnd_look_for_new_files(self):
+        LOG.debug("searching for files in search path {}".format(':'.join(self._paths)))
         yield {TASK_DOING: 'skimming', TASK_PROGRESS: 0.5}
         self.look_for_new_files()
         yield {TASK_DOING: 'skimming', TASK_PROGRESS: 1.0}
@@ -137,13 +147,16 @@ class ResourceSearchPathCollector(QObject):
     def bgnd_merge_new_file_metadata_into_mdb(self):
         todo, self._scheduled_files = self._scheduled_files, []
         ntodo = len(todo)
+        LOG.debug('collecting metadata from {} potential new files'.format(ntodo))
         redex = dict((name, dex) for (dex, name) in enumerate(todo))
-        yield {TASK_DOING: 'merging metadata 0/{}'.format(ntodo), TASK_PROGRESS: 0.0}
+        yield {TASK_DOING: 'collecting metadata 0/{}'.format(ntodo), TASK_PROGRESS: 0.0}
         for product_info in self._ws.collect_product_metadata_for_paths(todo):
             path = product_info.get(INFO.PATHNAME, None)
             dex = redex.get(path, 0.0)
-            yield {TASK_DOING: 'merging metadata {}/{}'.format(dex+1, ntodo), TASK_PROGRESS: float(dex)/float(ntodo)}
-        yield {TASK_DOING: 'merging metadata done', TASK_PROGRESS: 1.0}
+            status = {TASK_DOING: 'collecting metadata {}/{}'.format(dex+1, ntodo), TASK_PROGRESS: float(dex)/float(ntodo)}
+            LOG.debug(repr(status))
+            yield status
+        yield {TASK_DOING: 'collecting metadata done', TASK_PROGRESS: 1.0}
 
 
 def _debug(type, value, tb):
@@ -172,7 +185,8 @@ def main():
     args = parser.parse_args()
 
     levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
-    logging.basicConfig(level=levels[min(3, args.verbosity)])
+    logging.basicConfig(level=levels[min(3, args.verbosity)], datefmt='%Y-%m-%dT%H:%M:%S',
+                        format='%(levelname)s %(asctime)s %(module)s:%(funcName)s:L%(lineno)d %(message)s')
 
     if args.debug:
         sys.excepthook = _debug
