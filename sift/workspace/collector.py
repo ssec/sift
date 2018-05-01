@@ -53,6 +53,7 @@ class ResourceSearchPathCollector(QObject):
     _dir_mtimes: Mapping[str, datetime] = None
     _timestamp_path: str = None  # path which tracks the last time we skimmed the paths
     _is_posix: bool = None
+    _scheduled_dirs: List[str] = None
     _scheduled_files: List[str] = None
 
     @property
@@ -65,6 +66,8 @@ class ResourceSearchPathCollector(QObject):
         ol = set(self._paths)
         removed = ol - nu
         added = nu - ol
+        self._scheduled_dirs = []
+        self._scheduled_files = []
         self._paths = list(new_paths)
         self._flush_dirs(removed)
         self._schedule_walk_dirs(added)
@@ -73,16 +76,16 @@ class ResourceSearchPathCollector(QObject):
         pass
 
     def _schedule_walk_dirs(self, dirs: Iterable[str]):
-        pass
+        self._scheduled_dirs += list(dirs)
 
     @property
     def has_pending_files(self):
         return len(self._scheduled_files) > 0
 
-    def _skim(self, last_checked: int = None):
+    def _skim(self, last_checked: int = 0, dirs: Iterable[str] = None):
         """skim directories for new mtimes
         """
-        for rawpath in self._paths:
+        for rawpath in (dirs or self._paths):
             path = os.path.realpath(rawpath)
             if not os.path.isdir(path):
                 LOG.warning("{} is not a directory".format(path))
@@ -116,6 +119,10 @@ class ResourceSearchPathCollector(QObject):
         self._is_posix = sys.platform in {'linux', 'darwin'}
 
     def look_for_new_files(self):
+        if len(self._scheduled_dirs):
+            new_dirs, self._scheduled_dirs = self._scheduled_dirs, []
+            new_files = list(self._skim(0, new_dirs))
+            self._scheduled_files += new_files
         when = self._touch()
         new_files = list(self._skim(when))
         if new_files:
@@ -178,10 +185,15 @@ def main():
     collector = ResourceSearchPathCollector(ws)
     collector.paths = list(args.inputs)
 
-    collector.look_for_new_files()
-    if collector.has_pending_files:
-        for progress in collector.bgnd_merge_new_file_metadata_into_mdb():
-            LOG.debug(repr(progress))
+    from time import sleep
+    for i in range(3):
+        if i > 0:
+            sleep(5)
+        LOG.info("poll #{}".format(i+1))
+        collector.look_for_new_files()
+        if collector.has_pending_files:
+            for progress in collector.bgnd_merge_new_file_metadata_into_mdb():
+                LOG.debug(repr(progress))
 
     return 0
 
