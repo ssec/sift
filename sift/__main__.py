@@ -44,6 +44,7 @@ from sift.view.export_image import ExportImageHelper
 from sift.view.create_algebraic import CreateAlgebraicDialog
 from sift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
 from sift.workspace import Workspace
+from sift.workspace.collector import ResourceSearchPathCollector
 from sift import __version__
 from sift.util import (WORKSPACE_DB_DIR,
                        DOCUMENT_SETTINGS_DIR,
@@ -252,6 +253,8 @@ class Main(QtGui.QMainWindow):
     _open_cache_dialog = None
     _screenshot_dialog = None
     _geditor = None # Gradient editor widget
+    _resource_collector: ResourceSearchPathCollector = None
+    _resource_collector_timer: QtCore.QTimer = None
 
     def interactive_open_files(self, *args, files=None, **kwargs):
         self.scene_manager.layer_set.animating = False
@@ -297,7 +300,7 @@ class Main(QtGui.QMainWindow):
         uli = []
         bop = partial(self._bgnd_open_paths, uuid_list=uli)
         bopf = partial(self._bgnd_open_paths_finish, uuid_list=uli)
-        self.queue.add("load_files", bop(paths), "Open {} files".format(len(paths)), and_then=bopf)
+        self.queue.add("load_files", bop(paths), "Open {} files".format(len(paths)), and_then=bopf, interactive=False)
         # don't use <algebraic layer ...> type paths
         self._last_open_dir = _common_path_prefix([x for x in paths if x[0] != '<']) or self._last_open_dir
         self.update_recent_file_menu()
@@ -556,7 +559,7 @@ class Main(QtGui.QMainWindow):
         self.ui.cursorProbeLayer.setText(layer_str)
         self.ui.cursorProbeText.setText("{} ({})".format(data_str, probe_loc))
 
-    def __init__(self, config_dir=None, cache_dir=None, cache_size=None, glob_pattern=None, border_shapefile=None, center=None):
+    def __init__(self, config_dir=None, cache_dir=None, cache_size=None, glob_pattern=None, search_paths=None, border_shapefile=None, center=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
@@ -721,6 +724,19 @@ class Main(QtGui.QMainWindow):
         # Set the projection based on the document's default
         self.document.change_projection()
         self.ui.projectionComboBox.setCurrentIndex(self.document.current_projection_index())
+
+        # if search paths are provided on the command line,
+        self._resource_collector = collector = ResourceSearchPathCollector(self.workspace)
+        collector.paths = search_paths or []
+        # periodically launch a background scan
+        self._resource_collector_timer = timer = QtCore.QTimer()
+        self._timer_collect_resources()
+        timer.timeout.connect(self._timer_collect_resources)
+        timer.start(60000)
+
+    def _timer_collect_resources(self):
+        self.queue.add('resource_find', self._resource_collector.bgnd_look_for_new_files(), "look for new or modified files", interactive=False)
+        self.queue.add("resource_collect", self._resource_collector.bgnd_merge_new_file_metadata_into_mdb(), "add metadata for newly found files", interactive=False)
 
     def closeEvent(self, event, *args, **kwargs):
         LOG.debug('main window closing')
@@ -947,6 +963,12 @@ def set_default_geometry(window, desktop=0):
         window.move(int(screen_x - w / 2.), int(screen_y - h / 2.))
 
 
+def _search_paths(arglist):
+    for arg in arglist:
+        for subpath in arg.split(':'):
+            yield subpath
+
+
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Run CSPOV")
@@ -962,6 +984,8 @@ def main():
                         help="Specify alternative coastline/border shapefile")
     parser.add_argument("--glob-pattern", default=os.environ.get("TIFF_GLOB", None),
                         help="Specify glob pattern for input images")
+    parser.add_argument('-p', '--path', dest='paths', action="append",
+                        help='directory to search for data [MULTIPLE ALLOWED]')
     parser.add_argument("-c", "--center", nargs=2, type=float,
                         help="Specify center longitude and latitude for camera")
     parser.add_argument("--desktop", type=int, default=0,
@@ -991,11 +1015,15 @@ def main():
     for fn in glob(font_pattern):
         QtGui.QFontDatabase.addApplicationFont(fn)
 
+    data_search_paths = [] if not args.paths else list(_search_paths(args.paths))
+    LOG.info("will search {} for new data periodically".format(repr(data_search_paths)))
+
     window = Main(
         cache_dir=args.cache_dir,
         config_dir=args.config_dir,
         cache_size=args.space,
         glob_pattern=args.glob_pattern,
+        search_paths = data_search_paths,
         border_shapefile=args.border_shapefile,
         center=args.center,
     )
