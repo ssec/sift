@@ -354,7 +354,7 @@ class Main(QtGui.QMainWindow):
 
     def update_progress_bar(self, status_info, *args, **kwargs):
         active = status_info[0] if len(status_info)>0 else None
-        LOG.debug('{0!r:s}'.format(status_info))
+        # LOG.debug('{0!r:s}'.format(status_info))
         val = active[TASK_PROGRESS] if active else 0.0
         txt = active[TASK_DOING] if active else ''
         val = self.queue.progress_ratio(val)

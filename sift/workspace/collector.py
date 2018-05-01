@@ -154,7 +154,7 @@ class ResourceSearchPathCollector(QObject):
             path = product_info.get(INFO.PATHNAME, None)
             dex = redex.get(path, 0.0)
             status = {TASK_DOING: 'collecting metadata {}/{}'.format(dex+1, ntodo), TASK_PROGRESS: float(dex)/float(ntodo)}
-            LOG.debug(repr(status))
+            # LOG.debug(repr(status))
             yield status
         yield {TASK_DOING: 'collecting metadata done', TASK_PROGRESS: 1.0}
 
