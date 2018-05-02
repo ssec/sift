@@ -853,8 +853,13 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def _family_for_layer(self, uuid_or_layer):
         if isinstance(uuid_or_layer, UUID):
             uuid_or_layer = self[uuid_or_layer]
+        if INFO.FAMILY in uuid_or_layer:
+            LOG.debug('using pre-existing family {}'.format(uuid_or_layer[INFO.FAMILY]))
+            return uuid_or_layer[INFO.FAMILY]
+        # kind:pointofreference:measurement:wavelength
         kind = uuid_or_layer[INFO.KIND]
-        category = uuid_or_layer.get(INFO.STANDARD_NAME)
+        refpoint = 'unknown'  # FUTURE: geo/leo
+        measurement = uuid_or_layer.get(INFO.STANDARD_NAME)
         if uuid_or_layer.get('recipe'):
             # RGB
             subcat = uuid_or_layer['recipe'].name
@@ -864,8 +869,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         else:
             # higher level product or algebraic layer
             subcat = uuid_or_layer[INFO.DATASET_NAME]
-        # NOTE: Qt can't handle python Enums so we convert to the name first
-        return kind.name, category, subcat
+        return "{}:{}:{}:{}".format(kind.name, refpoint, measurement, subcat)
 
     def _add_layer_family(self, layer):
         family = layer[INFO.FAMILY]
@@ -890,13 +894,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         family_rep = self[self._families[family][0]]
 
         # convert family subcategory to displayable name
-        if isinstance(family[2], UUID):
-            # RGB Recipes, this needs more thinking
-            display_family = family_rep[INFO.SHORT_NAME]
-        elif not isinstance(family[2], str):
-            display_family = "{:.02f} µm".format(family[2])
-        else:
-            display_family = family[2]
+        # if isinstance(family[2], UUID):
+        #     # RGB Recipes, this needs more thinking
+        #     display_family = family_rep[INFO.SHORT_NAME]
+        # elif not isinstance(family[2], str):
+        #     display_family = "{:.02f} µm".format(family[2])
+        # else:
+        #     display_family = family[2]
+        display_family = str(family)
 
         # NOTE: For RGBs the SHORT_NAME will update as the RGB changes
         return {

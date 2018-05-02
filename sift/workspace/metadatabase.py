@@ -206,7 +206,7 @@ class Product(Base):
     A StoredProduct's kind determines how its cached data is transformed to different representations for display
     additional information is stored in a key-value table addressable as product[key:str]
     """
-    __tablename__ = 'products_v0'
+    __tablename__ = 'products_v1'
 
     # identity information
     id = Column(Integer, primary_key=True)
@@ -229,18 +229,22 @@ class Product(Base):
     # cached metadata provided by the file format handler
     name = Column(String, nullable=False)  # product identifier eg "B01", "B02"  # resource + shortname should be sufficient to identify the data
 
-    family = Column(Unicode, nullable=False)  # colon-separated family name, typically instrument:measurement:band, e.g. AHI:refl:11µ
+    # presentation is consistent within a family
+    # family::category determines track, which should represent a product sequence in time
+    family = Column(Unicode, nullable=False)  # colon-separated family identifier, typically kind:pointofreference:measurement:wavelength, e.g. image:geo:refl:11µ
                                               #  with <> used for generated content.
-    scene = Column(Unicode, nullable=False)  # colon-separated platform and scene name, e.g. G16:CONUS
+    category = Column(Unicode, nullable=False)  # colon-separated platform, instrument and scene name, typically platform:instrument:scene e.g. G16:ABI:CONUS
 
     @property
     def track(self):
-        return self.family + '::' + self.scene
+        """track is family::category
+        """
+        return self.family + '::' + self.category
 
     @track.setter
     def track(self, new_track):
-        fam, scn = new_track.split("::")
-        self.family, self.scene = fam, scn
+        fam, ctg = new_track.split("::")
+        self.family, self.category = fam, ctg
 
     # platform = Column(String)  # platform or satellite name e.g. "GOES-16", "Himawari-8"; should match PLATFORM enum
     # standard_name = Column(String, nullable=True)
