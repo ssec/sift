@@ -166,8 +166,10 @@ class INFO(Enum):
     DATASET_NAME = 'dataset_name'  # logical name of the file (possibly human assigned)
     KIND = 'kind'  # KIND enumeration on what kind of layer this makes
     UUID = 'uuid'  # UUID assigned on import, which follows the layer around the system
-    FAMILY = 'family'  # tuple representing data family, all of which get a shared colormap/ranges
-    TRACK = 'track'  # what timeline track this data falls into, typically built as family + tuple(scene)
+
+    # track determiner is family::scene; presentation is determined by family
+    FAMILY = 'family'  # tuple representing data family, typically instrument:measurement:wavelength but may vary by data content
+    SCENE = 'scene'  # platform:target typically but may vary by data content
 
     # projection information
     ORIGIN_X = 'origin_x'

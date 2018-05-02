@@ -229,6 +229,19 @@ class Product(Base):
     # cached metadata provided by the file format handler
     name = Column(String, nullable=False)  # product identifier eg "B01", "B02"  # resource + shortname should be sufficient to identify the data
 
+    family = Column(Unicode, nullable=False)  # colon-separated family name, typically instrument:measurement:band, e.g. AHI:refl:11µ
+                                              #  with <> used for generated content.
+    scene = Column(Unicode, nullable=False)  # colon-separated platform and scene name, e.g. G16:CONUS
+
+    @property
+    def track(self):
+        return self.family + '::' + self.scene
+
+    @track.setter
+    def track(self, new_track):
+        fam, scn = new_track.split("::")
+        self.family, self.scene = fam, scn
+
     # platform = Column(String)  # platform or satellite name e.g. "GOES-16", "Himawari-8"; should match PLATFORM enum
     # standard_name = Column(String, nullable=True)
     #
@@ -404,7 +417,9 @@ class Product(Base):
         INFO.CELL_WIDTH: 'cell_width',
         INFO.CELL_HEIGHT: 'cell_height',
         INFO.ORIGIN_X: 'origin_x',
-        INFO.ORIGIN_Y: 'origin_y'
+        INFO.ORIGIN_Y: 'origin_y',
+        INFO.FAMILY: 'family',
+        INFO.SCENE: 'scene'
     }
 
     def touch(self, when=None):
