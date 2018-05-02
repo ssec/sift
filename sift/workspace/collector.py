@@ -101,6 +101,8 @@ class ResourceSearchPathCollector(QObject):
                     skipped_dirs += 1
                     continue
                 for filename in filenames:
+                    if filename.startswith('.'):
+                        continue  # dammit Apple, ._*.nc files ...
                     filepath = os.path.join(dirpath, filename)
                     if os.path.isfile(filepath) and (os.stat(filepath).st_mtime >= last_checked):
                         yield filepath

@@ -93,8 +93,8 @@ Base = declarative_base()
 # resources can have multiple products in them
 # products may require multiple resourcse (e.g. separate GEO; tiled imagery)
 ProductsFromResources = Table('product_resource_assoc_v0', Base.metadata,
-                              Column('product_id', Integer, ForeignKey('products_v0.id')),
-                              Column('resource_id', Integer, ForeignKey('resources_v0.id')))
+                              Column('product_id', Integer, ForeignKey('products_v1.id')),
+                              Column('resource_id', Integer, ForeignKey('resources_v1.id')))
 
 
 
@@ -103,7 +103,7 @@ class Resource(Base):
     held metadata regarding a file that we can access and import data into the workspace from
     resources are external to the workspace, but the workspace can keep track of them in its database
     """
-    __tablename__ = 'resources_v0'
+    __tablename__ = 'resources_v1'
     # identity information
     id = Column(Integer, primary_key=True)
 
@@ -423,7 +423,7 @@ class Product(Base):
         INFO.ORIGIN_X: 'origin_x',
         INFO.ORIGIN_Y: 'origin_y',
         INFO.FAMILY: 'family',
-        INFO.SCENE: 'scene'
+        INFO.CATEGORY: 'category'
     }
 
     def touch(self, when=None):
@@ -434,7 +434,7 @@ class ProductKeyValue(Base):
     """
     key-value pairs associated with a product
     """
-    __tablename__ = 'product_key_values_v0'
+    __tablename__ = 'product_key_values_v1'
     product_id = Column(ForeignKey(Product.id), primary_key=True)
     key = Column(PickleType, primary_key=True)  # FUTURE: can this be a string? for now need pickling of INFO/PLATFORM Enum
     # relationship: .product
@@ -444,7 +444,7 @@ class SymbolKeyValue(Base):
     """
     derived layers have a symbol table which becomes namespace used by expression
     """
-    __tablename__ = 'algebraic_symbol_key_values_v0'
+    __tablename__ = 'algebraic_symbol_key_values_v1'
     product_id = Column(ForeignKey(Product.id), primary_key=True)
     key = Column(Unicode, primary_key=True)
     # relationship: .product
@@ -462,7 +462,7 @@ class Content(Base):
     """
     # _array = None  # when attached, this is a np.memmap
 
-    __tablename__ = 'contents_v0'
+    __tablename__ = 'contents_v1'
     id = Column(Integer, primary_key=True)
     product_id = Column(Integer, ForeignKey(Product.id))
 
@@ -656,7 +656,7 @@ class ContentKeyValue(Base):
     """
     key-value pairs associated with a product
     """
-    __tablename__ = 'content_key_values_v0'
+    __tablename__ = 'content_key_values_v1'
     product_id = Column(ForeignKey(Content.id), primary_key=True)
     key = Column(PickleType, primary_key=True)  # FUTURE: can this be a string?
     value = Column(PickleType)

@@ -558,7 +558,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didCalculateLayerEqualizerValues = pyqtSignal(dict)  # dict of {uuid: (value, normalized_value_within_clim)} for equalizer display
     didChangeProjection = pyqtSignal(str, dict)  # name of projection, dict of projection information
     # didChangeShapeLayer = pyqtSignal(dict)
-    didAddFamily = pyqtSignal(tuple, dict)  # name of the newly added family and dict of family info
+    didAddFamily = pyqtSignal(str, dict)  # name of the newly added family and dict of family info
 
 
     # high-level contexts providing purposed access to low-level document and its storage, as well as MDB and WS

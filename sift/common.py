@@ -167,9 +167,9 @@ class INFO(Enum):
     KIND = 'kind'  # KIND enumeration on what kind of layer this makes
     UUID = 'uuid'  # UUID assigned on import, which follows the layer around the system
 
-    # track determiner is family::scene; presentation is determined by family
+    # track determiner is family::category; presentation is determined by family
     FAMILY = 'family'  # string representing data family, typically instrument:measurement:wavelength but may vary by data content
-    SCENE = 'scene'  # string with platform:instrument:target typically but may vary by data content
+    CATEGORY = 'category'  # string with platform:instrument:target typically but may vary by data content
 
     # projection information
     ORIGIN_X = 'origin_x'

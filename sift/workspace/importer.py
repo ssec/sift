@@ -511,7 +511,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
             INFO.OBS_DURATION: pug.time_span[1] - pug.time_span[0],
             INFO.DISPLAY_TIME: pug.display_time,
             INFO.SCENE: pug.scene_id,
-            INFO.DISPLAY_NAME: pug.display_name
+            INFO.DISPLAY_NAME: pug.display_name,
         }
 
     @classmethod
@@ -574,6 +574,10 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         shape = pug.shape
         d[INFO.SHAPE] = shape
         generate_guidebook_metadata(d)
+
+        d[INFO.FAMILY] = '{}:{}:{}µm:{}'.format(KIND.IMAGE.name, 'geo', d[INFO.STANDARD_NAME], d[INFO.CENTRAL_WAVELENGTH]) # kind:pointofreference:measurement:wavelength
+        d[INFO.CATEGORY] = '{}:{}:{}'.format(d[INFO.PLATFORM].name, d[INFO.INSTRUMENT].name, d[INFO.SCENE])  # platform:instrument:scene
+
         LOG.debug(repr(d))
         return d
 
