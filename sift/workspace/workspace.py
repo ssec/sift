@@ -854,12 +854,14 @@ class Workspace(QObject):
     #     return mm
 
     @staticmethod
-    def _merge_family_or_category(md_list, key):
+    def _merge_famcat_strings(md_list, key, suffix=None):
         zult = []
         splatter = [md[key].split(':') for md in md_list]
         for pieces in zip(*splatter):
             uniq = set(pieces)
             zult.append(','.join(sorted(uniq)))
+        if suffix:
+            zult.append(suffix)
         return ':'.join(zult)
 
     def _get_composite_metadata(self, info, md_list, composite_array):
@@ -906,8 +908,8 @@ class Workspace(QObject):
             info[INFO.DATASET_NAME], info[INFO.SCHED_TIME], str(info[INFO.UUID]))
 
         # generate family and category names
-        info[INFO.FAMILY] = family = self._merge_family_or_category(md_list, INFO.FAMILY)
-        info[INFO.CATEGORY] = category = self._merge_family_or_category(md_list, INFO.CATEGORY)
+        info[INFO.FAMILY] = family = self._merge_famcat_strings(md_list, INFO.FAMILY, suffix=info.get(INFO.SHORT_NAME))
+        info[INFO.CATEGORY] = category = self._merge_famcat_strings(md_list, INFO.CATEGORY)
         LOG.debug("algebraic track will be {}::{}".format(family,category))
 
         return info
