@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <!-- TOWRdocs Header
+         Aerosol detection, experimental color map, ADP.cmap.
+    -->
+    <!-- TOWRdocs Description
+         This experimental  color map is a modification of the baseline. It is intended to depict 
+         3 operationally relevant paramenters: smoke, dust, and dust+smoke. It reduces the parameters  
+         and color combinations shown in the baseline color legend when ADP products are displayed.
+         Aerosol is defined in the algorithm Product User Guidance as the presence of either dust or smoke.
+         The baseline color map contains several combinations of aerosol, dust, and smoke (e.g. 
+         "Aerosol+smoke"), which appear redundant. Some pixel combinations are repeated, for example, to
+         assign a single pixel color where the baseline colormap has two different pixels assigned for
+         a category that can be combined, such as dust,  and aerosol plus dust.  
+
+         The aerosol detection product contains the fields Aerosol, Smoke, and Dust. The goes-r plugin
+         ingests these fields as a bitset, in the order of Aerosol, Dust, and Smoke (0=none detected, 1
+         = detected).  These are assigned the physicalElement of ADP, which is the styleRule parameter
+         in the styleRules file for GOES-R Level 2 products where this colormap is referenced in this
+         repository. The dataMapping entries in the style rule file refer to the pixels in this colormap.
+
+     -->
+    <!-- TOWRdocs Status
+         New experimental color map, modified from the baseline ADP color map. This colormap file has the 
+         same name as the baseline aerosol detection colormap, ADP.cmap. 
+    -->
+    <!-- TOWRdocs POC
+         Lee Byerle
+    -->
+<colorMap>
+<!--Clear or Aerosol bit not included since redundant w/Dust or Smoke -->
+    <color r="0.0" g="0.0" b="0.0" a="0.0" />
+    <color r="0.0" g="0.0" b="0.0" a="0.0" />
+<!--A + Dust -->
+    <color r="0.0" g="0.0" b="1.0" a="1.0" />
+    <color r="0.0" g="0.0" b="1.0" a="1.0" />
+<!--A + Smoke -->
+    <color r="1.0" g="0.0" b="0.0" a="1.0" />
+    <color r="1.0" g="0.0" b="0.0" a="1.0" />
+<!--S + Dust -->
+    <color a="1.0" b="0.09019608" g="0.6862745" r="1.0"/>
+    <color a="1.0" b="0.09019608" g="0.6862745" r="1.0"/>
+<!--No Data -->
+    <color r="0.0" g="0.0" b="0.0" a="0.0" />
+</colorMap>
