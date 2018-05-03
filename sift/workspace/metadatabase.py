@@ -92,7 +92,7 @@ Base = declarative_base()
 
 # resources can have multiple products in them
 # products may require multiple resourcse (e.g. separate GEO; tiled imagery)
-ProductsFromResources = Table('product_resource_assoc_v0', Base.metadata,
+ProductsFromResources = Table('product_resource_assoc_v1', Base.metadata,
                               Column('product_id', Integer, ForeignKey('products_v1.id')),
                               Column('resource_id', Integer, ForeignKey('resources_v1.id')))
 
