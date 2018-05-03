@@ -16,6 +16,8 @@ from vispy.visuals.shaders import Function, Variable
 from vispy.visuals.shaders.expression import TextExpression
 
 
+# FIXME: This is the wrong usage of TextExpression. See if we can switch to
+#        doing what vispy math/constants.glsl does and how #define uses it
 class MacroExpression(TextExpression):
     macro_regex = re.compile(r'^#define\s+(?P<name>\w+)\s+(?P<expression>[^\s]+)')
 
@@ -27,7 +29,7 @@ class MacroExpression(TextExpression):
         self._name = match_dict['name']
         super(MacroExpression, self).__init__(text)
 
-    def definition(self, names):
+    def definition(self, names, version=None, shader=None):
         return self.text
 
     @property
