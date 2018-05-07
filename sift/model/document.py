@@ -901,7 +901,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         #     display_family = "{:.02f} µm".format(family[2])
         # else:
         #     display_family = family[2]
-        display_family = str(family)
+        family_name_components = family.split(':')
+        display_family = family_rep[INFO.SHORT_NAME] + ' ' + ' '.join(reversed(family_name_components))
+        # display_family = str(family)
 
         # NOTE: For RGBs the SHORT_NAME will update as the RGB changes
         return {

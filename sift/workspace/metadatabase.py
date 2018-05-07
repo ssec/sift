@@ -92,7 +92,8 @@ Base = declarative_base()
 
 # resources can have multiple products in them
 # products may require multiple resourcse (e.g. separate GEO; tiled imagery)
-ProductsFromResources = Table('product_resource_assoc_v1', Base.metadata,
+PRODUCTS_FROM_RESOURCES_TABLE_NAME = 'product_resource_assoc_v1'
+ProductsFromResources = Table(PRODUCTS_FROM_RESOURCES_TABLE_NAME, Base.metadata,
                               Column('product_id', Integer, ForeignKey('products_v1.id')),
                               Column('resource_id', Integer, ForeignKey('resources_v1.id')))
 
@@ -689,12 +690,25 @@ class Metadatabase(object):
             _MDB = Metadatabase(*args, **kwargs)
         return _MDB
 
+    def _all_tables_present(self):
+        from sqlalchemy.engine.reflection import Inspector
+        inspector = Inspector.from_engine(self.engine)
+        all_tables = set(inspector.get_table_names())
+        zult = True
+        for table_name in (Resource.__tablename__, Product.__tablename__,
+                           ProductKeyValue.__tablename__, SymbolKeyValue.__tablename__,
+                           Content.__tablename__, ContentKeyValue.__tablename__, PRODUCTS_FROM_RESOURCES_TABLE_NAME):
+            present = table_name in all_tables
+            LOG.debug("table {} {} present in database".format(table_name, "is" if present else "is not"))
+            zult = False if not present else zult
+        return zult
+
     def connect(self, uri, create_tables=False, **kwargs):
         assert(self.engine is None)
         assert(self.connection is None)
         self.engine = create_engine(uri, **kwargs)
         LOG.info('attaching database at {}'.format(uri))
-        if create_tables:
+        if create_tables or not self._all_tables_present():
             LOG.info("creating database tables")
             Base.metadata.create_all(self.engine)
         self.connection = self.engine.connect()

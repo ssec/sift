@@ -3,6 +3,7 @@
 """UI objects for configuring RGB layers."""
 
 import logging
+from typing import List, Tuple, Optional, Mapping
 from functools import partial
 from uuid import UUID
 
@@ -12,7 +13,7 @@ from PyQt4.QtGui import QDoubleValidator, QComboBox, QLineEdit
 from sift.common import INFO, KIND
 
 LOG = logging.getLogger(__name__)
-RGBA2IDX = dict(r=0, g=1, b=2, a=3)
+RGBA2IDX: Mapping[str, int] = dict(r=0, g=1, b=2, a=3)
 
 
 class RGBLayerConfigPane(QObject):
@@ -29,7 +30,7 @@ class RGBLayerConfigPane(QObject):
     _rgb = None  # combo boxes in r,g,b order; cache
     _sliders = None  # sliders in r,g,b order; cache
     _edits = None
-    _valid_ranges = None # tuples of each component's c-limits
+    _valid_ranges: List[Tuple[float, float]] = None # tuples of each component's c-limits
     _gamma_boxes = None # tuple of each component's gamma spin boxes
 
     def __init__(self, ui, parent):
@@ -126,10 +127,10 @@ class RGBLayerConfigPane(QObject):
 
     def _combo_changed(self, index, combo:QComboBox=None, color=None):
         family = combo.itemData(index)
-        if family:
-            family = tuple(family)
-        else:
-            family = None
+        # if family:
+        #     family = tuple(family)
+        # else:
+        #     family = None
 
         LOG.debug("RGB: user selected %s for %s" % (family, color))
         # reset slider position to min and max for layer
@@ -218,7 +219,7 @@ class RGBLayerConfigPane(QObject):
         n, x = self._update_line_edits(color, val if not is_max else None, val if is_max else None)
         self._signal_color_changing_range(color, n, x)
 
-    def _edit_changed(self, line_edit:QLineEdit=None, color:str=None, is_max:bool=False):
+    def _edit_changed(self, line_edit: QLineEdit, color: str, is_max: bool):
         """
         update relevant slider value, propagate to the document
         :param line_edit: field that got a new value
@@ -280,10 +281,12 @@ class RGBLayerConfigPane(QObject):
             # block signals so an existing RGB layer doesn't get overwritten with new layer selections
             widget.blockSignals(False)
 
-    def _set_minmax_slider(self, color:str, family:tuple, clims=None):
+    def _set_minmax_slider(self, color: str, family: str, clims: Optional[Tuple[float, float]]=None):
         idx = RGBA2IDX[color]
         slider = self.sliders[idx]
         editn, editx = self.line_edits[idx]
+        if family not in self._families:
+            LOG.debug("Could not find {} in families {}".format(repr(family), repr(list(sorted(self._families.keys())))))
         if clims is None or clims == (None, None) or \
                 family not in self._families:
             self._valid_ranges[idx] = None
@@ -318,7 +321,7 @@ class RGBLayerConfigPane(QObject):
                     widget.setCurrentIndex(0)
                 else:
                     # Qt can't handle item data being tuples
-                    dex = widget.findData(list(family_name))
+                    dex = widget.findData(family_name)
                     if dex <= 0:
                         widget.setCurrentIndex(0)
                         LOG.error("Layer family '%s' not available to be selected" % (family_name,))
@@ -350,12 +353,14 @@ class RGBLayerConfigPane(QObject):
         for widget, selected_family in zip(self.rgb, current_families):
             if not selected_family:
                 widget.setCurrentIndex(0)
-            else:
-                selected_family = tuple(selected_family)  # Qt item data is lists (see below)
+            # else:
+                # selected_family = selected_family  # Qt item data is lists (see below)
             for idx, (family_name, family_info) in enumerate(sorted(self._families.items(), key=lambda x: x[1][INFO.DISPLAY_FAMILY])):
                 # Qt can't handle tuples as
-                widget.addItem(family_info[INFO.DISPLAY_FAMILY], list(family_name))
-                sanity_check = widget.findData(list(family_name))
+                display_name = family_info[INFO.DISPLAY_FAMILY]
+                LOG.debug('adding to widget family {} as "{}"'.format(family_name, display_name))
+                widget.addItem(display_name, family_name)
+                sanity_check = widget.findData(family_name)
                 if family_name == selected_family:
                     # None is 0 so add 1 to index
                     widget.setCurrentIndex(idx + 1)
