@@ -374,6 +374,14 @@ class QFramesInTracksView(QGraphicsView):
 
     def __init__(self, *args, **kwargs):
         super(QFramesInTracksView, self).__init__(*args, **kwargs)
+        fmt = QGLFormat(QGL.SampleBuffers)
+        wdgt = QGLWidget(fmt)
+        assert(wdgt.isValid())
+        self.setViewport(wdgt)
+        self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setRenderHints(QPainter.Antialiasing)
 
 
 class TestWindow(QMainWindow):
@@ -419,13 +427,7 @@ class TestWindow(QMainWindow):
 
         # ref https://doc.qt.io/archives/qq/qq26-openglcanvas.html
         self.setCentralWidget(gfx)
-        fmt = QGLFormat(QGL.SampleBuffers)
-        wdgt = QGLWidget(fmt)
-        assert(wdgt.isValid())
-        gfx.setViewport(wdgt)
-        gfx.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
-        gfx.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
-        gfx.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+
         scene.setSceneRect(QRectF(0,0, 800, 600))
         gfx.setScene(scene)
 
