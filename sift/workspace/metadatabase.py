@@ -719,7 +719,7 @@ class Metadatabase(object):
     def session(self):
         return self.session_factory()
 
-    def __enter__(self):
+    def __enter__(self) -> Session:
         return self.SessionRegistry()
 
     def __exit__(self, exc_type, exc_val, exc_tb):

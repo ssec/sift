@@ -68,12 +68,13 @@ from collections import MutableSequence, OrderedDict, defaultdict
 from itertools import groupby, chain
 from uuid import UUID, uuid1 as uuidgen
 from datetime import datetime, timedelta
-import typing as ty
+import typing as T
 import numpy as np
 from weakref import ref
 import os
 import json
 
+from sift.workspace.metadatabase import Product
 from sift.common import KIND, INFO, prez
 from sift.util.default_paths import DOCUMENT_SETTINGS_DIR
 from sift.model.composite_recipes import RecipeManager, CompositeRecipe
@@ -320,18 +321,113 @@ class DocumentAsLayerStack(DocumentAsContextBase):
 
 
 class DocumentAsTrackStack(DocumentAsContextBase):
+    """
+    Work with document as tracks, named by family::category, e.g. IMAGE:geo:toa_reflectance:0.47µm::GOES-16:ABI:CONUS
+    Document as trackstack
+    zorder >=0 implies active track, i.e. one user has selected as participating in this document
+    zorder <0 implies available but inactive track, i.e. metadata / resource / content are unrealized currently
+    """
+
+    _actions: T.List[T.Callable] = None  # only available when used as a context manager
+
+    @property
+    def _families(self) -> T.Iterable[T.Tuple[int, str]]:
+        """Yield (zorder, family-name) in high to low order
+        """
+        raise NotImplementedError("FIXME")
+
+    @property
+    def _active_families(self) -> T.Iterable[T.Tuple[int, str]]:
+        for z, f in self._families:
+            if z < 0:
+                break
+            yield z, f
+
+    @property
+    def playhead_time(self) -> T.Optional[datetime]:
+        """current document playhead time, or None if animating
+        """
+
+    def track_order_at_time(self, when:datetime = None,
+                            only_active=False,
+                            include_products=True
+                            ) -> T.Iterable[T.Tuple[int, str, T.Optional[Product]]]:
+        """List of tracks from highest Z order to lowest, at a given time;
+        (zorder, track) pairs are returned, with zorder>=0 being "part of the document" and <0 being "available but nothing activated"
+        include_products implies (zorder, track, product-or-None) tuples be yielded; otherwise tracks without products are not yielded
+        Inactive tracks can be filtered by stopping iteration when zorder<0
+        tracks are returned as track-name strings
+        Product instances are readonly metadatabase entries
+        defaults to current document time
+        """
+        if when is None:
+            when = self.doc.playhead_time
+        if when is None:
+            raise RuntimeError("unknown time for iterating track order, animation likely in progress")
+        with self.mdb as s:
+            que = s.query(Product).filter((Product.obs_time < when) and ((Product.obs_time + Product.obs_duration) <= when))
+            if only_active:
+                famtab = dict((x[1], x[0]) for x in self._active_families)
+                active_families = set(famtab.keys())
+                que = s.filter((Product.family + '::' + Product.category) in active_families)
+            else:
+                famtab = dict((x[1], x[0]) for x in self._families)
+            prods = list(que.all())
+            # sort into z order according to document
+            if include_products:
+                zult = [(famtab[p.track], p.track, p) for p in prods]
+            else:
+                zult = [(famtab[p.track], p.track) for p in prods]
+            zult.sort(reverse=True)
+            return zult
+
+    @property
+    def available_track_order(self) -> T.Iterable[T.Tuple[int, str]]:
+        """All the names of the tracks, from highest zorder to lowest
+
+        """
+
+
+    @property
+    def _deferring(self):
+        "Am I a deferred-action context or an immediate context helper"
+        return self._actions is not None
+
+    class TrackInfo(T.NamedTuple):
+        uuid: UUID
+        display_name: str
+        family: str
+        category: str
+        kind: KIND
+        presentation: prez  # colorbar, ranges, gammas, etc
+        start: datetime  # overall start time for available frames in metadata
+        duration: timedelta  # overall duration for available frames
+        frames: T.List[Product]
+
+    def __init__(self, *args, as_readwrite_context=False, **kwargs):
+        super(DocumentAsTrackStack, self).__init__(*args, **kwargs)
+        if as_readwrite_context:
+            self._actions = []
+
     def __enter__(self):
-        raise NotImplementedError()
+        # set up a copy with deferred action until we're done
+        return DocumentAsTrackStack(doc=self.doc, mdb=self.mdb, ws=self.ws, as_readwrite_context=True)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_val is not None:
             # abort code
-            pass
+            LOG.error("write to DocumentAsTrackStack via read-write context caused an exception")
+            raise exc_val
         else:
             # commit code
-            pass
-        raise NotImplementedError()
+            while self._actions:
+                action = self._actions.pop(0)
+                action()
 
+    def products_in_time_range(self, start: datetime, duration: timedelta, only_active=False) -> T.Sequence[TrackInfo]:
+        """Iterate track information in topmost to bottom-most order
+        only_active implies excluding tracks that are inactive (nothing imported or potentially visible)
+        """
 
 class DocumentAsRegionProbes(DocumentAsContextBase):
     """Document is probed over a variety of regions
@@ -430,11 +526,11 @@ class DocumentAsAnimationSequence(DocumentAsContextBase):
         raise NotImplementedError()
 
     @property
-    def playback_time_range(self) -> ty.Tuple[datetime, datetime]:
+    def playback_time_range(self) -> T.Tuple[datetime, datetime]:
         raise NotImplementedError()
 
     @playback_time_range.setter
-    def playback_time_range(self, start_end: ty.Tuple[datetime, datetime]):
+    def playback_time_range(self, start_end: T.Tuple[datetime, datetime]):
         # set document playback time range
         # if we're in a with-clause, defer signals until outermost exit
         # if we're not in a with-clause, raise ContextNeededForEditing exception
