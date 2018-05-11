@@ -69,6 +69,7 @@ from itertools import groupby, chain
 from uuid import UUID, uuid1 as uuidgen
 from datetime import datetime, timedelta
 import typing as T
+import enum
 import numpy as np
 from weakref import ref
 import os
@@ -330,6 +331,17 @@ class DocumentAsTrackStack(DocumentAsContextBase):
 
     _actions: T.List[T.Callable] = None  # only available when used as a context manager
 
+    class TrackInfo(T.NamedTuple):
+        uuid: UUID
+        display_name: str
+        family: str
+        category: str
+        kind: KIND
+        presentation: prez  # colorbar, ranges, gammas, etc
+        start: datetime  # overall start time for available frames in metadata
+        duration: timedelta  # overall duration for available frames
+        frames: T.List[Product]
+
     @property
     def _families(self) -> T.Iterable[T.Tuple[int, str]]:
         """Yield (zorder, family-name) in high to low order
@@ -392,17 +404,6 @@ class DocumentAsTrackStack(DocumentAsContextBase):
     def _deferring(self):
         "Am I a deferred-action context or an immediate context helper"
         return self._actions is not None
-
-    class TrackInfo(T.NamedTuple):
-        uuid: UUID
-        display_name: str
-        family: str
-        category: str
-        kind: KIND
-        presentation: prez  # colorbar, ranges, gammas, etc
-        start: datetime  # overall start time for available frames in metadata
-        duration: timedelta  # overall duration for available frames
-        frames: T.List[Product]
 
     def __init__(self, *args, as_readwrite_context=False, **kwargs):
         super(DocumentAsTrackStack, self).__init__(*args, **kwargs)
@@ -621,7 +622,36 @@ class DocumentAsProductArrayCollection(DocumentAsContextBase):
 # FUTURE: class DatasetAsTimelineArrayCollection(DocumentAsContextBase):
 
 
+
 class Document(QObject):  # base class is rightmost, mixins left of that
+    """Document stores user intent
+    Document is a set of tracks in a Z order, with Z>=0 for "active" tracks the user is working with
+    Tracks with Z-order <0 are inactive, but may be displayed in the timeline as potentials for the user to drag to active
+    Document has a playhead, a playback time range, an active timeline display range
+    Tracks and frames (aka Products) can have state information set
+    """
+    _workspace = None
+
+    # timeline model
+    _track_order: T.List[T.Tuple[int, str]] = None  # (zorder, family-name) with higher z above lower z; z<0 should not occur
+
+    # playback
+    _playhead_time: datetime = None  # current playhead time, None if animating
+    _playback_per_second: timedelta = timedelta(seconds=60.0)  # animation time increment per wall-second
+
+    # playback time range, if not None is a subset of overall timeline
+    _playback_start: datetime = None
+    _playback_duration: timedelta = None
+
+    # overall visible range of the active data
+    _timeline_start: datetime = None
+    _timeline_duration: timedelta = None
+
+    # user-directed overrides on tracks and frames (products)
+    _track_state: T.Mapping[str, dict] = None
+    _product_state: T.Mapping[UUID, dict] = None
+
+    # DEPRECATION in progress: layer sets
     """
     Document has one or more LayerSets choosable by the user (one at a time) as currentLayerSet
     LayerSets configure animation order, visibility, enhancements and linear combinations
@@ -629,10 +659,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     Document has Probes, which operate on the currentLayerSet
     Probes have spatial areas (point probes, shaped areas)
     Probe areas are translated into localized data masks against the workspace raw data content
-
     """
     current_set_index = 0
-    _workspace = None
     _layer_sets = None  # list(DocLayerSet(prez, ...) or None)
     _layer_with_uuid = None  # dict(uuid:Doc____Layer)
 

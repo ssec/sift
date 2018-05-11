@@ -21,6 +21,7 @@ numba
 from collections import namedtuple
 import numpy as np
 from enum import Enum
+import typing as T
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -106,6 +107,18 @@ prez = namedtuple('prez', [
     'gamma',     # float: valid (0 to 5) for gamma correction (default should be 1.0)
     'mixing'     # mixing mode constant
 ])
+
+class STATE(Enum):
+    """State for products in workspace
+    """
+    UNKNOWN = 0
+    POTENTIAL = 1  # product is available as a resource and could be imported or calculated
+    ARRIVING = 2  # import or calculation in progress
+    CACHED = 3  # stable in workspace cache
+    READY = 5  # attached and can page in memory, as well as participating in document
+    DANGLING = -1  # cached in workspace but no resource behind it
+    # PURGE = -2  # scheduled for purging -- eventually
+
 
 class TOOL(Enum):
     """Names for cursor tools.
