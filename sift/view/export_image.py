@@ -2,7 +2,7 @@ import os
 import logging
 
 from PyQt4 import QtCore, QtGui
-from PIL import Image, ImageDraw, ImageFont
+import imageio
 
 from sift.common import INFO
 from sift.ui import export_image_dialog_ui
@@ -287,20 +287,8 @@ class ExportImageHelper(QtCore.QObject):
             LOG.error("Number of frames does not equal number of filenames")
             return
 
-        images = [(u, Image.fromarray(x)) for u, x in img_arrays]
-        if info['include_footer']:
-            banner_text = [self.doc[u][INFO.DATASET_NAME] if u else "" for u, im in images]
-            images = [(u, self._add_screenshot_footer(im, bt, font_size=info['font_size'])) for (u, im), bt in zip(images, banner_text)]
+        writer = imageio.get_writer(filenames[0])
+        for x in img_arrays:
+            writer.append_data(x[1])
 
-        if filenames[0].endswith('.gif') and len(images) > 1:
-            params = self._get_animation_parameters(info, images)
-            filenames = filenames[:1]
-            images = images[:1]
-        else:
-            params = {}
-
-        for fn, (u, new_img) in zip(filenames, images):
-            LOG.info("Saving screenshot to '{}'".format(fn))
-            LOG.debug("File save parameters: {}".format(params))
-            new_img.save(fn, **params)
-
+        writer.close()
