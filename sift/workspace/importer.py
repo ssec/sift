@@ -576,8 +576,8 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         generate_guidebook_metadata(d)
 
         d[INFO.FAMILY] = '{}:{}:{}:{}µm'.format(KIND.IMAGE.name, 'geo', d[INFO.STANDARD_NAME], d[INFO.CENTRAL_WAVELENGTH]) # kind:pointofreference:measurement:wavelength
-        d[INFO.CATEGORY] = '{}:{}:{}'.format(d[INFO.PLATFORM].name, d[INFO.INSTRUMENT].name, d[INFO.SCENE])  # platform:instrument:scene
-
+        d[INFO.CATEGORY] = 'NOAA-PUG:{}:{}:{}'.format(d[INFO.PLATFORM].name, d[INFO.INSTRUMENT].name, d[INFO.SCENE])  # system:platform:instrument:target
+        d[INFO.SERIAL] = pug.time_span[0].strftime("%Y%m%dT%H%M%S")
         LOG.debug(repr(d))
         return d
 

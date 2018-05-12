@@ -33,7 +33,7 @@ __docformat__ = 'reStructuredText'
 import os, sys
 import logging, unittest, argparse
 from datetime import datetime, timedelta
-from sift.common import INFO
+from sift.common import INFO, FCS_SEP
 from functools import reduce
 from uuid import UUID
 from collections import ChainMap, MutableMapping, Iterable
@@ -232,15 +232,17 @@ class Product(Base):
 
     # presentation is consistent within a family
     # family::category determines track, which should represent a product sequence in time
+    # family::category::serial is effectively a product unique identifier
     family = Column(Unicode, nullable=False)  # colon-separated family identifier, typically kind:pointofreference:measurement:wavelength, e.g. image:geo:refl:11µ
                                               #  with <> used for generated content.
-    category = Column(Unicode, nullable=False)  # colon-separated platform, instrument and scene name, typically platform:instrument:scene e.g. G16:ABI:CONUS
+    category = Column(Unicode, nullable=False)  # colon-separated processing-system, platform, instrument and scene name, typically system:platform:instrument:target e.g. NOAA-PUG:GOES-16:ABI:CONUS
+    serial = Column(Unicode, nullable=False)  # serial number within family and category; typically time-related; use ISO8601 times please
 
     @property
     def track(self):
         """track is family::category
         """
-        return self.family + '::' + self.category
+        return self.family + FCS_SEP + self.category
 
     @track.setter
     def track(self, new_track):
@@ -424,7 +426,8 @@ class Product(Base):
         INFO.ORIGIN_X: 'origin_x',
         INFO.ORIGIN_Y: 'origin_y',
         INFO.FAMILY: 'family',
-        INFO.CATEGORY: 'category'
+        INFO.CATEGORY: 'category',
+        INFO.SERIAL: 'serial'
     }
 
     def touch(self, when=None):

@@ -76,7 +76,7 @@ import os
 import json
 
 from sift.workspace.metadatabase import Product
-from sift.common import KIND, INFO, prez, span
+from sift.common import KIND, INFO, prez, span, FCS_SEP
 from sift.util.default_paths import DOCUMENT_SETTINGS_DIR
 from sift.model.composite_recipes import RecipeManager, CompositeRecipe
 from sift.view.Colormap import ALL_COLORMAPS, USER_COLORMAPS
@@ -381,7 +381,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
             if only_active:
                 famtab = dict((x[1], x[0]) for x in self._active_families)
                 active_families = set(famtab.keys())
-                que = s.filter((Product.family + '::' + Product.category) in active_families)
+                que = s.filter((Product.family + FCS_SEP + Product.category) in active_families)
             else:
                 famtab = dict((x[1], x[0]) for x in self._families)
             prods = list(que.all())

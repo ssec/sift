@@ -34,6 +34,8 @@ from pyproj import Proj
 
 LOG = logging.getLogger(__name__)
 
+# separator for family::category::serial representation of product identity
+FCS_SEP = '::'
 
 # HACK: Get a font size that looks good on this platform
 def get_font_size(pref_size):
@@ -192,8 +194,10 @@ class INFO(Enum):
     UUID = 'uuid'  # UUID assigned on import, which follows the layer around the system
 
     # track determiner is family::category; presentation is determined by family
+    # family::category::serial is a unique identifier equivalent to conventional make-model-serialnumber
     FAMILY = 'family'  # string representing data family, typically instrument:measurement:wavelength but may vary by data content
     CATEGORY = 'category'  # string with platform:instrument:target typically but may vary by data content
+    SERIAL = 'serial'  # serial number
 
     # projection information
     ORIGIN_X = 'origin_x'

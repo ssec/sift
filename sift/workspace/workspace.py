@@ -910,7 +910,8 @@ class Workspace(QObject):
         # generate family and category names
         info[INFO.FAMILY] = family = self._merge_famcat_strings(md_list, INFO.FAMILY, suffix=info.get(INFO.SHORT_NAME))
         info[INFO.CATEGORY] = category = self._merge_famcat_strings(md_list, INFO.CATEGORY)
-        LOG.debug("algebraic track will be {}::{}".format(family,category))
+        info[INFO.SERIAL] = serial = self._merge_famcat_strings(md_list, INFO.SERIAL)
+        LOG.debug("algebraic product will be {}::{}::{}".format(family,category,serial))
 
         return info
 
