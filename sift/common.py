@@ -27,6 +27,7 @@ __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
 import os, sys
+from datetime import datetime, timedelta
 import logging, unittest, argparse
 from numba import jit, float64, int64, uint64, boolean, types as nb_types
 from pyproj import Proj
@@ -93,6 +94,16 @@ rez = namedtuple('rez', ('dy', 'dx'))  # world km / pixel distance
 pnt = namedtuple('pnt', ('y', 'x'))
 geo = namedtuple('geo', ('n', 'e'))  # lat N, lon E
 vue = namedtuple('vue', ('b', 'l', 't', 'r', 'dy', 'dx'))  # combination of box + rez
+
+
+class span(T.NamedTuple):
+    s: datetime
+    d: timedelta
+
+    @property
+    def e(self):
+        return self.s + self.d
+
 
 WORLD_EXTENT_BOX = box(b=-MAX_EXCURSION_Y, l=-MAX_EXCURSION_X, t=MAX_EXCURSION_Y, r=MAX_EXCURSION_X)
 

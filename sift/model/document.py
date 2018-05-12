@@ -76,7 +76,7 @@ import os
 import json
 
 from sift.workspace.metadatabase import Product
-from sift.common import KIND, INFO, prez
+from sift.common import KIND, INFO, prez, span
 from sift.util.default_paths import DOCUMENT_SETTINGS_DIR
 from sift.model.composite_recipes import RecipeManager, CompositeRecipe
 from sift.view.Colormap import ALL_COLORMAPS, USER_COLORMAPS
@@ -635,21 +635,24 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # timeline model
     _track_order: T.List[T.Tuple[int, str]] = None  # (zorder, family-name) with higher z above lower z; z<0 should not occur
 
+    # overall visible range of the active data
+    _timeline_span: span = None
+
     # playback
     _playhead_time: datetime = None  # current playhead time, None if animating
     _playback_per_second: timedelta = timedelta(seconds=60.0)  # animation time increment per wall-second
 
     # playback time range, if not None is a subset of overall timeline
-    _playback_start: datetime = None
-    _playback_duration: timedelta = None
-
-    # overall visible range of the active data
-    _timeline_start: datetime = None
-    _timeline_duration: timedelta = None
+    _playback_span: span = None
 
     # user-directed overrides on tracks and frames (products)
     _track_state: T.Mapping[str, dict] = None
     _product_state: T.Mapping[UUID, dict] = None
+
+    # Maps of family names to their document recipes
+    _family_presentation: T.Mapping[str, prez] = None
+    _family_composition: T.Mapping[str, CompositeRecipe] = None  # using multiple products to present RGBA
+    _family_calculation: T.Mapping[str, object] = None  # algebraic combinations of multiple products
 
     # DEPRECATION in progress: layer sets
     """
