@@ -36,6 +36,8 @@ LOG = logging.getLogger(__name__)
 
 # separator for family::category::serial representation of product identity
 FCS_SEP = '::'
+# standard N/A string used in FCS
+NOT_AVAILABLE = FCS_NA = 'N/A'
 
 # HACK: Get a font size that looks good on this platform
 def get_font_size(pref_size):
