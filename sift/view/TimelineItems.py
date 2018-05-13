@@ -87,7 +87,7 @@ class QTrackItem(QGraphicsObject):
     frames = None  # Iterable[QFrameItem], maintained privately between track and frame
     _scene = None  # weakref to scene
     _scale: TimelineCoordTransform = None
-    _uuid: UUID = None
+    _id: str = None  # tracks are family::category, e.g. IMAGE:geo:toa_reflectance:11µm::GOESR-PUG:GOES-16:ABI:CONUS
     _z: int = None  # our track number as displayed, 0 being highest on screen, with larger Z going downward
     _title: str = None
     _subtitle: str = None
@@ -107,15 +107,15 @@ class QTrackItem(QGraphicsObject):
     _gi_icon: QGraphicsPixmapItem = None
     _gi_colormap: QGraphicsPixmapItem = None
 
-    def __init__(self, scene, scale: TimelineCoordTransform, uuid: UUID, z: int,
+    def __init__(self, scene, scale: TimelineCoordTransform, track: str, z: int,
                  title: str, subtitle: str = None, icon: QIcon = None, metadata: dict = None,
                  tooltip: str = None, color: QColor = None, selected: bool = False,
                  colormap: [QGradient, QImage] = None, min: float = None, max: float = None):
         super(QTrackItem, self).__init__()
         self.frames = []
-        self._scene = ref(scene)
+        self._scene = ref(scene) if scene else None
         self._scale = scale
-        self._uuid = uuid
+        self._id = track
         self._z = z
         self._title = title
         self._subtitle = subtitle
@@ -128,15 +128,28 @@ class QTrackItem(QGraphicsObject):
         self._min, self._max = min, max
         self.update_pos_bounds()
         self._update_decorations()
-        scene.addItem(self)
+        scene.addTrack(self)
         self.setAcceptDrops(True)
 
-    @property
-    def uuid(self):
-        return self._uuid
+    def addFrame(self, frame):
+        self.scene.addFrame(frame)
+        self.frames.append(frame)
+        self.addItem(frame)
 
     @property
-    def z(self):
+    def scene(self):
+        return self._scene()
+
+    @scene.setter
+    def scene(self, s):
+        self._scene = ref(s)
+
+    @property
+    def track(self) -> str:
+        return self._id
+
+    @property
+    def z(self) -> int:
         return self._z
 
     @z.setter
@@ -274,6 +287,7 @@ class QTrackItem(QGraphicsObject):
         # scene y coordinate of upper left corner
         # convert track extent to scene coordinates using current transform
         frames_left, frames_width = self._scale.calc_pixel_x_pos(t, d)
+        screen_track_center_y = self._scale.calc_track_pixel_y_center(self.z)
         # track_left, track_width = self._scale.calc_pixel_x_pos(t - GFXC.track_left_pad, d + GFXC.track_left_pad + GFXC.track_right_pad)
         # set track position, assuming we want origin coordinate of track item to be centered vertically within item
         # bounds relative to position in scene, left_pad space to left of local origin (x<0), frames and right-pad at x>=0
@@ -281,7 +295,7 @@ class QTrackItem(QGraphicsObject):
         self._bounds = QRectF(-GFXC.track_left_pad, -GFXC.track_height / 2, frames_width + GFXC.track_left_pad + GFXC.track_right_pad, GFXC.track_height)
         LOG.debug("new track bounds: {}".format(self._bounds))
         # origin is at the start of the first frame contained. padding extends into negative x
-        self.setPos(frames_left, (0.5 + self.z) * GFXC.track_height)
+        self.setPos(frames_left, screen_track_center_y)
         self._update_decorations()
 
     def update_frame_positions(self, *frames):

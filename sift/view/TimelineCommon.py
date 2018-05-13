@@ -12,14 +12,14 @@ from collections import namedtuple
 from datetime import datetime, timedelta
 from enum import Enum
 import pickle as pkl
-from typing import Tuple, Optional
+from typing import Tuple, Optional, NamedTuple, Any
 
 from PyQt4.QtCore import QObject, QRectF, QByteArray, QPointF
 from PyQt4.QtGui import QGraphicsSceneDragDropEvent
 
 LOG = logging.getLogger(__name__)
 
-
+# @dataclass
 class TimelineGraphicsConfig(object):
     track_height: float = 64.0
     track_corner_radius: float = 15.0
@@ -39,8 +39,20 @@ GFXC = TimelineGraphicsConfig()
 MIMETYPE_TIMELINE_COLORMAP = 'application/sift.timeline.colormap'
 MIMETYPE_TIMELINE_TRACK = 'application/sift.timeline.track'
 
-mimed_track = namedtuple("mimed_track", ('uuid'))
-mimed_colormap = namedtuple("mimed_colormap", ("pixmap"))
+
+class mimed_track(NamedTuple):
+    track: str
+
+
+class mimed_colormap(NamedTuple):
+    colormap: Any
+
+
+class ztdtup(NamedTuple):
+    z: int
+    t: datetime
+    d: timedelta
+
 
 class TimelineFrameState(Enum):
     """Displayed state of frames, corresponds to a color or style.
@@ -54,13 +66,11 @@ class TimelineFrameState(Enum):
     ACTIVE = 5  # both ready to go into VRAM (or already resident), and participating in the application scene graph, possibly as part of an animation
     VISIBLE = 6  # active, and currently on-screen for user to view
 
+
 class TimelineTrackState(Enum):
     UNKNOWN = 0
     DISABLED = 1
     ENABLED = 2
-
-
-ztdtup = namedtuple("ztdtup", ('z', 't', 'd'))  # z level > 0 ascending downward, start time: datetime, duration: timedelta
 
 
 class TimelineCoordTransform(QObject):
@@ -77,6 +87,25 @@ class TimelineCoordTransform(QObject):
     _time_base: datetime = None
     _time_unit: timedelta = None
     _track_height: float = None
+    _max_z: int = 0  # the highest z value of the active tracks, may change. typically z>=0 for active tracks
+
+    @property
+    def max_z(self) -> int:
+        return self._max_z
+
+    @max_z.setter
+    def max_z(self, mz:int):
+        self._max_z = mz
+
+    @property
+    def settings(self) -> ztdtup:
+        return ztdtup(self._max_z, self._time_base, self._time_unit)
+
+    @settings.setter
+    def settings(self, new_settings: ztdtup):
+        self._max_z = new_settings.z
+        self._time_base = new_settings.t
+        self._time_unit = new_settings.d
 
     def __init__(self, time_base: datetime = None, time_unit: timedelta = timedelta(seconds=1), track_height=None):
         """
@@ -107,6 +136,11 @@ class TimelineCoordTransform(QObject):
     def calc_scene_width(self, d: timedelta):
         return self._time_unit * d
 
+    def calc_track_pixel_y_center(self, z:int):
+        """normalize based on max_z such that max_z..-bignum becomes 0..bignum going downward on the screen
+        """
+        return self._track_height * float(self._max_z - z)
+
     def calc_scene_rect(self, ztd: ztdtup=None, z:int=None, t: datetime=None, d: timedelta=None) -> [QRectF, None]:
         """
         calculate scene coordinates given time and Z
@@ -119,8 +153,7 @@ class TimelineCoordTransform(QObject):
             return None
         if ztd is None:
             ztd = ztdtup(z, t, d)
-        assert(ztd.z >= 0)
-        atop = float(ztd.z) * self._track_height
+        atop = float(self._max_z - ztd.z) * self._track_height
         aheight = self._track_height
         aleft = (ztd.t - self._time_base) / self._time_unit
         awidth = ztd.d / self._time_unit
@@ -135,6 +168,7 @@ class TimelineCoordTransform(QObject):
             return x, None
         return x, d / self._time_unit
 
+
 # utility functions allowing python objects (usually a dictionary in our case) to pass thru drag and drop serialization
 def recv_mime(event: QGraphicsSceneDragDropEvent, mimetype: str):
     mime = event.mimeData()
@@ -143,6 +177,7 @@ def recv_mime(event: QGraphicsSceneDragDropEvent, mimetype: str):
     event.setAccepted(True)
     obj = pkl.loads(mime.data(mimetype).data())
     return obj
+
 
 def send_mime(event: QGraphicsSceneDragDropEvent, mimetype: str, obj):
     qb = QByteArray(pkl.dumps(obj, protocol=pkl.HIGHEST_PROTOCOL))

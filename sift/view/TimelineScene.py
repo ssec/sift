@@ -15,7 +15,7 @@ import logging
 import sys
 import unittest
 from datetime import datetime, timedelta
-from typing import Tuple, Optional, Mapping, List, Callable, Set, Iterable
+from typing import Tuple, Optional, Mapping, List, Callable, Set, Iterable, Sequence
 from abc import ABC, abstractmethod, abstractproperty
 from uuid import UUID
 
@@ -52,7 +52,7 @@ class QFramesInTracksScene(QGraphicsScene):
     _cursor_duration: timedelta = None
 
     # content representing document / workspace / scenegraph
-    _track_items: Mapping[UUID, QTrackItem] = None  # retain QTrackItem objects lest they disappear; also bookkeeping
+    _track_items: Mapping[str, QTrackItem] = None  # retain QTrackItem objects lest they disappear; also bookkeeping
     _frame_items: Mapping[UUID, QFrameItem] = None  # likewise for QFrameItems
 
     # styling settings
@@ -89,6 +89,20 @@ class QFramesInTracksScene(QGraphicsScene):
     def coords(self) -> TimelineCoordTransform:
         return self._coords
 
+    def addTrack(self, track: QTrackItem):
+        """
+        """
+        if track.track in self._track_items:
+            LOG.error("track {} was already present in scene".format(track.track))
+        self._track_items[track.track] = track
+        self.addItem(track)
+        self._verify_z_contiguity()
+
+    def addFrame(self, frame:QFrameItem):
+        if frame.uuid in self._frame_items:
+            LOG.error("frame {} was already present in scene".format(frame.uuid))
+        self._frame_items[frame.uuid] = frame
+
     #
     # drawing and arranging QGraphicsItems
     #
@@ -120,10 +134,6 @@ class QFramesInTracksScene(QGraphicsScene):
         self._align_tracks_to_scene_rect(new_rect, False)
         super(QFramesInTracksScene, self).sceneRectChanged(new_rect)
 
-    #
-    #
-    #
-
     def visible_tracks_frames(self, view: QGraphicsView = None) -> Mapping[UUID, List[UUID]]:
         """return OrderedDict with UUID keys for tracks and list values of frames, for tracks and frames visible on in view
         """
@@ -147,21 +157,25 @@ class QFramesInTracksScene(QGraphicsScene):
     # internal mid-level update commands
     #
 
-    def add_frames_to_track(self, track: QTrackItem, *frames):
+    def add_frames_to_track(self, track: [QTrackItem, str], paranoid=True, *frames):
         """Add track and optional frames to scene storage, to ensure they are retained
         Asserts that if frame or track for the given UUID is already known, that the same item is being used
         """
-        assert(isinstance(track, QTrackItem))
-        if track.uuid in self._track_items:
-            assert(track is self._track_items[track.uuid])
-        else:
-            raise AssertionError("need to insert_track_with_zorder before adding frames")
-            # self._track_items[track.uuid] = track
+        if isinstance(track, str):
+            track = self._track_items[track]
+        if paranoid:
+            assert(isinstance(track, QTrackItem))
+            if track.track in self._track_items:
+                assert(track is self._track_items[track.track])
+            else:
+                raise AssertionError("need to insert_track_with_zorder before adding frames")
+                # self._track_items[track.uuid] = track
         for frame in frames:
             assert(isinstance(frame, QFrameItem))
-            if frame.uuid in self._frame_items:
-                assert(frame is self._frame_items[frame.uuid])
-            else:
+            existing = self._frame_items.get(frame.uuid)
+            if paranoid:
+                assert((existing is None) or (existing is frame))
+            if existing is None:
                 self._frame_items[frame.uuid] = frame
 
     def _del_track(self, track):
@@ -172,7 +186,7 @@ class QFramesInTracksScene(QGraphicsScene):
         """
         raise NotImplementedError("NYI")  # FIXME
 
-    def _change_track_state(self, track: UUID, new_state: TimelineTrackState):
+    def _change_track_state(self, track: str, new_state: TimelineTrackState):
         """Change the displayed state of a track and queue a visual refresh
         """
         raise NotImplementedError("NYI")  # FIXME
@@ -181,25 +195,6 @@ class QFramesInTracksScene(QGraphicsScene):
         """Move visible cursor to a new time
         optionally animating the transition over a time interval starting from now"""
         raise NotImplementedError("NYI")  # FIXME
-
-    #
-    # consistency checks
-    #
-
-    def _is_self_consistent(self):
-        # check track z-order consistency
-        zult = True
-        try:
-            list(self._current_tracks_order)
-        except:
-            LOG.error("internal track z-order consistency check failed")
-            zult = False
-        # check frames-in-tracks
-        for frm in self._frame_items.values():
-            if frm.track.uuid not in self._track_items:
-                LOG.error("frame {} belongs to an unknown track {}".format(frm.uuid, frm.track.uuid))
-                zult = False
-        return zult
 
     #
     # track management
@@ -220,38 +215,140 @@ class QFramesInTracksScene(QGraphicsScene):
             yield trk.uuid
 
     @property
+    def _track_order(self) -> Mapping[int, QTrackItem]:
+        return dict((q.z, q) for q in self._track_items)
+
+    @property
     def _track_count(self):
         return len(self._track_items)
 
-    def set_all_tracks_zorder(self, order: Iterable[UUID]):
+    @property
+    def _track_max_z(self):
+        return max(tuple(self._track_order.keys()))
+
+    def _verify_z_contiguity(self):
+        zord = self._track_order
+        zx, zn = max(zord.keys()), min(zord.keys())
+        ntracks = zx - zn + 1
+        if ntracks != len(self._track_items) or ntracks != len(zord):
+            readout = '\n'.join('{}: {}'.format(trk.z, trk.track) for trk in self._track_items.values())
+            LOG.error("continuity check failed:\n" + readout)
+            raise AssertionError("logic error: tracks are not contiguous in z-order")
+
+    def set_tracks_zorder_by_name(self, order: Iterable[Tuple[str, int]]):
         changed = []
-        for z,uuid in enumerate(order):
-            trk = self._track_items.get(uuid)
+        for track, z in order:
+            trk = self._track_items.get(track)
             if trk is None:
-                raise ValueError("track UUID {} not found in set_track_order offset {}".format(uuid, z))
+                raise ValueError("track {} not found in set_track_order offset {}".format( track, z))
             if trk.z == z:
                 continue
             trk.z = z
             changed.append(trk)
         if changed:
             self.update()
+        self._verify_z_contiguity()
 
-    def insert_track_with_zorder(self, trk: QTrackItem, insert_before_z=None):
-        changed = [trk]
-        if insert_before_z is None:
-            insert_before_z = self._track_count
-        if trk.uuid not in self._track_items:
-            trk.z = insert_before_z
-            self._track_items[trk.uuid] = trk
-        LOG.debug("inserting track {} at z offset {}".format(trk.uuid, insert_before_z))
-        for z, atrk in enumerate(self._current_tracks_order):
-            assert(atrk.z == z)
-            if atrk is trk:
-                trk.z = insert_before_z
-            elif z >= insert_before_z:
-                atrk.z += 1
-                changed.append(atrk)
+    def propagate_max_z(self, new_max_z: int = None):
+        if new_max_z is None:
+            new_max_z = self._track_max_z
+        self._coords.max_z = new_max_z
+
+    def _shift_zorders_to_close(self, removing_at_z: int,
+                                subject: QTrackItem = None,
+                                zord: Mapping[int, QTrackItem] = None) -> List[QTrackItem]:
+        changed = []
+        if zord is None:
+            zord = self._track_order
+        if removing_at_z >= 0:
+            # shift everything above downward
+            downward = list(track for (z, track) in zord.items() if (z >= removing_at_z) and (track is not subject))
+            for bub in downward:
+                bub.z -= 1
+                changed.append(bub)
+        elif removing_at_z < 0:
+            # shift everything below upward
+            upward = list(track for (z, track) in zord.items() if (z < removing_at_z) and (track is not subject))
+            # land above existing track
+            for bub in upward:
+                bub.z += 1
+                changed.append(bub)
+        return changed
+
+    def _shift_zorders_to_open(self, inserting_above_z: int,
+                               subject: QTrackItem = None,
+                               zord: Mapping[int, QTrackItem] = None) -> Tuple[List[QTrackItem], int]:
+        """open up a z-order to move or insert a track
+        for zorder >=0 we bubble everything above upward and place new layer at trkz+1; for zorder<0 we bubble everything downward
+        """
+        changed = []
+        if zord is None:
+            zord = self._track_order
+        if not zord:
+            return [], inserting_above_z
+        if inserting_above_z not in zord:
+            if inserting_above_z >= 0:
+                return [], max(zord.keys()) + 1
+            else:
+                return [], min(zord.keys()) - 1
+
+        if inserting_above_z >= 0:
+            upward = list(track for (z, track) in zord.items() if (z > inserting_above_z) and (track is not subject))
+            # land above existing track, but we have to return a new z order above the existing track at desired z
+            for bub in upward:
+                bub.z += 2
+                changed.append(bub)
+            inserting_above_z += 1
+        else:
+            downward = list(track for (z,track) in zord.items() if (z <= inserting_above_z) and (track is not subject))
+            for bub in downward:
+                bub.z -= 1
+                changed.append(bub)
+        return changed, inserting_above_z
+
+    def insert_track(self, trk: QTrackItem) -> Sequence[QTrackItem]:
+        """Insert a track, if necessary displacing z orders such that old track at same z order is beneath
+        return list of any QTrackItems that had to have their zorder changed
+        """
+        # zord = self._track_order
+        # if trk.z not in zord:
+        #     if (trk.track in set(zord.values())) and (trk is not self._track_items[trk.track]):
+        #         raise AssertionError("remove track {} before replacing it with a new one".format(trk.track))
+        #     if trk.z >= 0:  # nudge it to the contiguous top
+        #         LOG.debug("placing {} at top of stack", trk.track)
+        #         trk.z = self._track_max_z + 1
+        #     else:
+        #         LOG.debug("placing {} at bottom of stack", trk.track)
+        #         trk.z = min(zord.keys()) - 1
+        #     self._track_items[trk.track] = trk
+        #     return [trk]
+        assert(trk not in list(self._track_items.values()))
+        changed, final_z = self._shift_zorders_to_open(trk.z)
+        trk.z = final_z
+        LOG.info("placing {} at zorder {}".format(trk.track, final_z))
+        self._track_items[trk.track] = trk
+        self.addItem(trk)
+        trk.scene = self
+        self._verify_z_contiguity()
+        self.propagate_max_z()
         self.update()
+        return changed
+
+    def move_track(self, trk: QTrackItem, new_z: int) -> Sequence[QTrackItem]:
+        """Change track z-order after it's been inserted
+        return list of tracks that had their z-order shifted
+        """
+        assert(trk in self._track_items.values())
+        assert(trk is self._track_items[trk.track])
+        closing_changes = self._shift_zorders_to_close(trk.z, subject=trk)
+        opening_changes, new_z = self._shift_zorders_to_open(new_z, subject=trk)
+        trk.z = new_z
+        all_changes = set(closing_changes) | set(opening_changes)
+        LOG.info("shifting {} to zorder {} after moving z of {} tracks".format(trk.track, new_z, len(all_changes)))
+        self._verify_z_contiguity()
+        self.propagate_max_z()
+        self.update()
+        return [trk] + list(all_changes)
 
 
 
@@ -285,12 +382,11 @@ class QFramesInTracksScene(QGraphicsScene):
         """Yield series of track information tuples which will be used to generate/update QTrackItems
         """
 
-
-    def get(self, uuid: UUID) -> [QTrackItem, QFrameItem, None]:
-        z = self._track_items.get(uuid, None)
-        if z is not None:
-            return z
-        z = self._frame_items.get(uuid, None)
+    def get(self, item: [UUID, str]) -> [QTrackItem, QFrameItem, None]:
+        if isinstance(item, UUID):
+            z = self._frame_items.get(item)
+        elif isinstance(item, str):
+            z = self._track_items.get(item)
         return z
 
     def may_rearrange_track_z_order(self, track_uuid_list: List[UUID]) -> Optional[Callable[[bool], None]]:
@@ -338,9 +434,9 @@ class QFramesInTracksScene(QGraphicsScene):
 class TestScene(QFramesInTracksScene):
     _did_populate = False
 
-
-    def __init__(self):
-        super(TestScene, self).__init__()
+    def __init__(self, *args, **kwargs):
+        super(TestScene, self).__init__(*args, **kwargs)
+        # assert(hasattr(self, '_track_order'))
 
     def update(self, changed_track_uuids: [Set, None] = None, changed_frame_uuids: [Set, None] = None) -> int:
         if self._did_populate:
@@ -351,11 +447,17 @@ class TestScene(QFramesInTracksScene):
         from uuid import uuid1 as uuidgen
         once = datetime.utcnow()
         mm = lambda m: timedelta(minutes=m)
-        track0 = QTrackItem(self, self.coords, uuidgen(), 0, "G21 ABI B99 BT", "test track", tooltip="peremptorily cromulent")
+        # assert(hasattr(self, '_track_order'))
+
+        track0 = QTrackItem(self, self.coords, 'IMAGE:test::timeline:GOES-21:QBI:mars', 1, "G21 QBI B99 BT", "test track", tooltip="peremptorily cromulent")
         # scene.addItem(abitrack)  # done in init
         frame01 = QFrameItem(track0, self.coords, uuidgen(), once + mm(5), mm(5), TimelineFrameState.AVAILABLE, "abi1", "fulldiskimus")
-        track1 = QTrackItem(self, self.coords, uuidgen(), 1, "H11 AHI B99 Rad", "second test track", tooltip="nominally cromulent")
+        track1 = QTrackItem(self, self.coords, 'IMAGE:test::timeline:Himawari-11:AHI:mars', 0, "H11 AHI B99 Rad", "second test track", tooltip="nominally cromulent")
         frame11 = QFrameItem(track1, self.coords, uuidgen(), once + mm(6), mm(1), TimelineFrameState.READY, "ahi1", "JP04")
+        # self.insert_track(track0)
+        # self.insert_track(track1)
+        # assert(hasattr(self, '_propagate_max_z'))
+        self.propagate_max_z()
         for track in [track0, track1]:
             track.update_pos_bounds()
             track.update_frame_positions()
@@ -389,7 +491,6 @@ class TestWindow(QMainWindow):
     _gfx = None
 
     def __init__(self, scene, *args, **kwargs):
-        from sift.view.TimelineScene import QFramesInTracksView
 
         super(TestWindow, self).__init__(*args, **kwargs)
         # self.windowTitleChanged.connect(self.onWindowTitleChange)

@@ -2,8 +2,7 @@
 # -*- coding: utf-8 -*-
 """Implement QGraphicsScene for Document and Workspace, as a delegate to TimelineView
 
-This module is the boundary where Metadatabase/Workspace Product/Content information is translated to Track/Frame.
-
+This QGraphicsScene represents document.as_track_stack, passing operations back to the document
 
 :author: R.K.Garcia <rkgarcia@wisc.edu>
 :copyright: 2017-2018 by University of Wisconsin Regents, see AUTHORS for more details
@@ -24,29 +23,19 @@ from sift.workspace.metadatabase import Metadatabase
 
 LOG = logging.getLogger(__name__)
 
-def mdb_products_as_tracks(mdb: Metadatabase) -> dict:
-    """Yield dictionary
-    """
-    with mdb as S:
-
-
-
 
 class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
     """ represent SIFT Workspace and Document as frames in tracks
     preferably, we use doc.as_track_stack high level interface to query doc+mdb+ws
     """
-    _doc: Document = None
-    _ws: Workspace = None
-    _mdb: Metadatabase = None
+    _doc: DocumentAsTrackStack = None
 
-    @property
-    def _dats(self):
-        """Document as track stack
-        """
-        return self._doc.as_track_stack
+    # GraphicsItems we own
+    _frames: Mapping[UUID, QFrameItem] = None
+    _tracks: Mapping[str, QFrameItem] = None
+    # _other: Mapping[]
 
-    def __init__(self, doc: Document, mdb: Metadatabase, ws: Workspace, *args, **kwargs):
+    def __init__(self, doc: Document, *args, **kwargs):
         """
         Args:
             ws (Workspace): owns cached and computed data
@@ -54,13 +43,23 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
             doc (Document): owns user selections and constructions
         """
         super(SiftDocumentAsFramesInTracks, self).__init__(*args, **kwargs)
-        self._ws, self._mdb, self._doc = ws, mdb, doc
-        self._connect_signals()
+        self._doc = doc.as_track_stack
+        self._connect_signals(doc)
 
-    def _connect_signals(self):
+    def _invalidate(self):
+        """document state has changed, re-consult document and update our display
+        """
+
+    def _connect_signals(self, doc:Document):
         """Connect document, workspace, signals in order to invalidate and update scene representation
         """
-        pass
+        # FUTURE: more fine-grained response than just invalidating and redrawing
+        doc.didAddBasicLayer.connect(self._invalidate)
+        doc.didAddCompositeLayer.connect(self._invalidate)
+        doc.didChangeLayerVisibility.connect(self._invalidate)
+        doc.didChangeLayerName.connect(self._invalidate)
+        doc.didReorderLayers.connect(self._invalidate)
+        doc.didChangeComposition.connect(self._invalidate)
 
     def get(self, uuid: UUID) -> [QTrackItem, QFrameItem, None]:
         z = self._track_items.get(uuid, None)
@@ -69,12 +68,12 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         z = self._frame_items.get(uuid, None)
         return z
 
-    def may_rearrange_track_z_order(self, track_uuid_list: List[UUID]) -> Optional[Callable[[bool], None]]:
+    def may_rearrange_track_z_order(self, track_list: List[str]) -> Optional[Callable[[bool], None]]:
         """Determine whether tracks can be rearranged and provide a commit/abort function if so
         Optionally: reflect any such changes on other parts of the application
 
         Args:
-            track_uuid_list: new track UUID arrangement in top to bottom order
+            track_list: new track name arrangement in top to bottom order
 
         Returns: None if rearrange is not permitted,
         else a callable that can be used to commit the change in the document
@@ -97,13 +96,13 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         LOG.warning("using base class may_reassign_color_map which does nothing")
         return lambda b: None
 
-    def menu_for_track(self, track_uuid: UUID, frame_uuid: UUID = None) -> Optional[QMenu]:
+    def menu_for_track(self, track: UUID, frame_uuid: UUID = None) -> Optional[QMenu]:
         """Generate QMenu to use as context menu for a given track, optionally with frame if mouse was over that frame"""
         LOG.warning("using base class menu_for_track which does nothing")
 
         return None
 
-    def update(self, changed_track_uuids: [Set, None] = None, changed_frame_uuids: [Set, None] = None) -> int:
+    def update(self, changed_tracks: [Set, None] = None, changed_frame_uuids: [Set, None] = None) -> int:
         """Populate or update scene, returning number of items changed in scene
         Does not add new items for tracks and frames already present
         Parameters serve only as hints
