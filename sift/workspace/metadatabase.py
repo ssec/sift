@@ -245,9 +245,18 @@ class Product(Base):
         return self.family + FCS_SEP + self.category
 
     @track.setter
-    def track(self, new_track):
+    def track(self, new_track: str):
         fam, ctg = new_track.split("::")
         self.family, self.category = fam, ctg
+
+    @property
+    def ident(self):
+        return self.family + FCS_SEP + self.category + FCS_SEP + self.serial
+
+    @ident.setter
+    def ident(self, new_ident: str):
+        fam, ctg, ser = new_ident.split("::")
+        self.family, self.category, self.serial = fam, ctg, ser
 
     # platform = Column(String)  # platform or satellite name e.g. "GOES-16", "Himawari-8"; should match PLATFORM enum
     # standard_name = Column(String, nullable=True)

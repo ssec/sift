@@ -48,7 +48,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
     def _update_tracks_frames(self):
         """populate QTrackItems and QFrameItems, filling any gaps and removing as needed
         """
-        for z, trk in self._doc.enumerate_tracks():
+        for z, trk in self._doc.enumerate_tracks_frames():
             for frm in trk.frames:
                 pass  # FIXME
 

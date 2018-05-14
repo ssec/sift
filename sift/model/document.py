@@ -336,9 +336,11 @@ class FrameInfo(T.NamedTuple):
 class TrackInfo(T.NamedTuple):
     track: str  # family::category
     presentation: prez  # colorbar, ranges, gammas, etc
-    when: span
-    frames: T.List[FrameInfo]
-    state: flags
+    when: span  # available time-span of the data
+    state: flags  # any status or special flags set on the track, according to document / workspace
+    primary: str  # primary label for UI
+    secondary: str  # secondary label
+    frames: T.List[FrameInfo]  # list of frames within specified time span
 
 
 class DocumentAsTrackStack(DocumentAsContextBase):
@@ -370,6 +372,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
     @playback_span.setter
     def playback_span(self, when: span):
         self.doc.playback_span = when
+        # FIXME: signal
 
     def track_order_at_time(self, when:datetime = None,
                             only_active=False,
@@ -412,22 +415,24 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 break
             yield z, track
 
-    def enumerate_tracks(self, only_active: bool = False, when: span = None) -> T.Iterable[TrackInfo]:
+    def enumerate_tracks_frames(self, only_active: bool = False, when: span = None) -> T.Iterable[TrackInfo]:
         """enumerate tracks as TrackInfo and FrameInfo structures for timeline use, in top-Z to bottom-Z order
         """
         if when is None:  # default to the document's span
             when = self.doc.timeline_span
+        when_e = when.e
         with self.mdb as s:
-            for z, track in self.doc.track_order.enumerate():
+            for z, track in self.doc.track_order.enumerate():  # enumerates from high Z to low Z
                 if only_active and (z < 0):
                     break
-                fam, cat = track.split(FCS_SEP)
+                fam, ctg = track.split(FCS_SEP)
                 LOG.debug("yielding TrackInfo and FrameInfos for {}".format(track))
                 frames = []
-                que = s.query(Product).filter((Product.family == fam) and (Product.category == cat))
+                fam_nfo = self.doc.family_info(fam)
+                que = s.query(Product).filter((Product.family == fam) and (Product.category == ctg))
                 for prod in que.all():
                     prod_e = prod.obs_time + prod.obs_duration
-                    if (prod_e <= when.t) or (prod.obs_time >= when.e):
+                    if (prod_e <= when.s) or (prod.obs_time >= when_e):
                         # does not intersect our desired span, skip it
                         continue
                     nfo = prod.info
@@ -440,17 +445,27 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                         # thumb=
                     )
                     frames.append(fin)
+                frames.sort(key=lambda x: x.when.s)
+                track_span = span.from_s_e(frames[0].when.s, frames[-1].when.e) if frames else None
                 trk = TrackInfo(
                     track=track,
-
+                    presentation=self.doc.family_presentation.get(track),
+                    when=track_span,
                     frames=frames,
+                    state=flags(),  # FIXME
+                    primary=fam_nfo[INFO.DISPLAY_FAMILY],
+                    secondary=' '.join(reversed(ctg.split(FCS_SEP)))
                 )
                 yield z, trk
 
     def lock_track_to_frame(self, track: str, frame: UUID = None):
         """ User
         """
-        self.doc.track_frame_locks[track] = frame
+        if frame is None:
+            if frame in self.doc.track_frame_locks:
+                del self.doc.track_frame_locks[frame]
+        else:
+            self.doc.track_frame_locks[track] = frame
 
         # FIXME: signal, since this will cause effects on animation and potentially static display order
         # this needs to invalidate the current display and any animation

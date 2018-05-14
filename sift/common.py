@@ -103,12 +103,16 @@ vue = namedtuple('vue', ('b', 'l', 't', 'r', 'dy', 'dx'))  # combination of box 
 
 
 class span(T.NamedTuple):
-    s: datetime
-    d: timedelta
+    s: datetime  # start
+    d: timedelta  # duration
 
     @property
     def e(self):
         return self.s + self.d
+
+    @staticmethod
+    def from_s_e(s: datetime, e: datetime):
+        return span(s, e-s) if (s is not None) and (e is not None) else None
 
 
 class flags(set):
