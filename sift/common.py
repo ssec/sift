@@ -111,6 +111,12 @@ class span(T.NamedTuple):
         return self.s + self.d
 
 
+class flags(set):
+    """A set of enumerated flags which may ultimately be represented as a bitfield, but observing set interface
+    """
+    pass
+
+
 WORLD_EXTENT_BOX = box(b=-MAX_EXCURSION_Y, l=-MAX_EXCURSION_X, t=MAX_EXCURSION_Y, r=MAX_EXCURSION_X)
 
 # presentation information for a layer; z_order comes from the layerset

@@ -30,11 +30,6 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
     """
     _doc: DocumentAsTrackStack = None
 
-    # GraphicsItems we own
-    _frames: Mapping[UUID, QFrameItem] = None
-    _tracks: Mapping[str, QFrameItem] = None
-    # _other: Mapping[]
-
     def __init__(self, doc: Document, *args, **kwargs):
         """
         Args:
@@ -43,12 +38,20 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
             doc (Document): owns user selections and constructions
         """
         super(SiftDocumentAsFramesInTracks, self).__init__(*args, **kwargs)
-        self._doc = doc.as_track_stack
-        self._connect_signals(doc)
+        self._doc = doc.as_track_stack  # we should be limiting our interaction to this context
+        self._connect_signals(doc)  # but the main doc is still the signaling hub
 
     def _invalidate(self):
         """document state has changed, re-consult document and update our display
         """
+
+    def _update_tracks_frames(self):
+        """populate QTrackItems and QFrameItems, filling any gaps and removing as needed
+        """
+        for z, trk in self._doc.enumerate_tracks():
+            for frm in trk.frames:
+                pass  # FIXME
+
 
     def _connect_signals(self, doc:Document):
         """Connect document, workspace, signals in order to invalidate and update scene representation

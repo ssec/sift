@@ -76,7 +76,7 @@ import os
 import json
 
 from sift.workspace.metadatabase import Product
-from sift.common import KIND, INFO, prez, span, FCS_SEP
+from sift.common import KIND, INFO, prez, span, FCS_SEP, ZList, flags
 from sift.util.default_paths import DOCUMENT_SETTINGS_DIR
 from sift.model.composite_recipes import RecipeManager, CompositeRecipe
 from sift.view.Colormap import ALL_COLORMAPS, USER_COLORMAPS
@@ -321,44 +321,55 @@ class DocumentAsLayerStack(DocumentAsContextBase):
         raise NotImplementedError()
 
 
-class DocumentAsTrackStack(DocumentAsContextBase):
+class FrameInfo(T.NamedTuple):
+    """Represent a data Product as information to display as a frame on timeline
     """
-    Work with document as tracks, named by family::category, e.g. IMAGE:geo:toa_reflectance:0.47µm::GOES-16:ABI:CONUS
-    Document as trackstack
+    uuid: UUID
+    ident: str  # family::category::serial
+    when: span  # time and duration of this frame
+    state: flags  # logical state for timeline to display with color and glyphs
+    primary: str  # primary description for timeline, e.g. "G16 ABI B06"
+    secondary: str  # secondary description, typically time information
+    # thumb: QImage  # thumbnail image to embed in timeline item
+
+
+class TrackInfo(T.NamedTuple):
+    track: str  # family::category
+    presentation: prez  # colorbar, ranges, gammas, etc
+    when: span
+    frames: T.List[FrameInfo]
+    state: flags
+
+
+class DocumentAsTrackStack(DocumentAsContextBase):
+    """Work with document as tracks, named by family::category, e.g. IMAGE:geo:toa_reflectance:0.47µm::GOES-16:ABI:CONUS
+    This is primarily used by timeline QGraphicsScene bridge, which displays metadatabase + document + workspace content
     zorder >=0 implies active track, i.e. one user has selected as participating in this document
     zorder <0 implies available but inactive track, i.e. metadata / resource / content are unrealized currently
     """
 
     _actions: T.List[T.Callable] = None  # only available when used as a context manager
-
-    class TrackInfo(T.NamedTuple):
-        uuid: UUID
-        display_name: str
-        family: str
-        category: str
-        kind: KIND
-        presentation: prez  # colorbar, ranges, gammas, etc
-        start: datetime  # overall start time for available frames in metadata
-        duration: timedelta  # overall duration for available frames
-        frames: T.List[Product]
-
-    @property
-    def _families(self) -> T.Iterable[T.Tuple[int, str]]:
-        """Yield (zorder, family-name) in high to low order
-        """
-        raise NotImplementedError("FIXME")
-
-    @property
-    def _active_families(self) -> T.Iterable[T.Tuple[int, str]]:
-        for z, f in self._families:
-            if z < 0:
-                break
-            yield z, f
+    animating: bool = False
 
     @property
     def playhead_time(self) -> T.Optional[datetime]:
         """current document playhead time, or None if animating
         """
+        return self.doc.playhead_time if not self.animating else None
+
+    @playhead_time.setter
+    def playhead_time(self, t: datetime):
+        """Update the document's playhead time and trigger any necessary signals
+        """
+        self.doc.playhead_time = t
+
+    @property
+    def playback_span(self):
+        return self.doc.playback_span
+
+    @playback_span.setter
+    def playback_span(self, when: span):
+        self.doc.playback_span = when
 
     def track_order_at_time(self, when:datetime = None,
                             only_active=False,
@@ -393,17 +404,62 @@ class DocumentAsTrackStack(DocumentAsContextBase):
             zult.sort(reverse=True)
             return zult
 
-    @property
-    def available_track_order(self) -> T.Iterable[T.Tuple[int, str]]:
+    def enumerate_track_names(self, only_active=False) -> T.Iterable[T.Tuple[int, str]]:
         """All the names of the tracks, from highest zorder to lowest
-
         """
+        for z, track in self.doc.track_order.enumerate():
+            if only_active and z < 0:
+                break
+            yield z, track
 
+    def enumerate_tracks(self, only_active: bool = False, when: span = None) -> T.Iterable[TrackInfo]:
+        """enumerate tracks as TrackInfo and FrameInfo structures for timeline use, in top-Z to bottom-Z order
+        """
+        if when is None:  # default to the document's span
+            when = self.doc.timeline_span
+        with self.mdb as s:
+            for z, track in self.doc.track_order.enumerate():
+                if only_active and (z < 0):
+                    break
+                fam, cat = track.split(FCS_SEP)
+                LOG.debug("yielding TrackInfo and FrameInfos for {}".format(track))
+                frames = []
+                que = s.query(Product).filter((Product.family == fam) and (Product.category == cat))
+                for prod in que.all():
+                    prod_e = prod.obs_time + prod.obs_duration
+                    if (prod_e <= when.t) or (prod.obs_time >= when.e):
+                        # does not intersect our desired span, skip it
+                        continue
+                    nfo = prod.info
+                    fin = FrameInfo(
+                        ident=prod.family + FCS_SEP + prod.category + FCS_SEP + prod.serial,
+                        when=span(prod.obs_time, prod.obs_duration),
+                        state=self.doc.product_state.get(prod.uuid) or flags(),
+                        primary=nfo[INFO.DISPLAY_NAME],
+                        secondary=nfo[INFO.DISPLAY_TIME],  # prod.obs_time.strftime("%Y-%m-%d %H:%M:%S")
+                        # thumb=
+                    )
+                    frames.append(fin)
+                trk = TrackInfo(
+                    track=track,
 
-    @property
-    def _deferring(self):
-        "Am I a deferred-action context or an immediate context helper"
-        return self._actions is not None
+                    frames=frames,
+                )
+                yield z, trk
+
+    def lock_track_to_frame(self, track: str, frame: UUID = None):
+        """ User
+        """
+        self.doc.track_frame_locks[track] = frame
+
+        # FIXME: signal, since this will cause effects on animation and potentially static display order
+        # this needs to invalidate the current display and any animation
+        self.doc.didChangeLayerVisibility.emit({frame: True})
+
+    # @property
+    # def _deferring(self):
+    #     "Am I a deferred-action context or an immediate context helper"
+    #     return self._actions is not None
 
     def __init__(self, *args, as_readwrite_context=False, **kwargs):
         super(DocumentAsTrackStack, self).__init__(*args, **kwargs)
@@ -425,10 +481,6 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 action = self._actions.pop(0)
                 action()
 
-    def products_in_time_range(self, start: datetime, duration: timedelta, only_active=False) -> T.Sequence[TrackInfo]:
-        """Iterate track information in topmost to bottom-most order
-        only_active implies excluding tracks that are inactive (nothing imported or potentially visible)
-        """
 
 class DocumentAsRegionProbes(DocumentAsContextBase):
     """Document is probed over a variety of regions
@@ -513,7 +565,7 @@ class DocumentAsAnimationSequence(DocumentAsContextBase):
     def __enter__(self):
         raise NotImplementedError()
 
-    def iterate(self, multiple_of_realtime:float, start:datetime=None, stop:datetime=None):
+    def iterate(self, multiple_of_realtime:float = None, start:datetime=None, stop:datetime=None) -> T.Sequence[T.Tuple[float, T.List[UUID]]]:
         """Yield series of (wall-seconds-offset, [back-to-front-list-of-product-uuids])
         """
         return
@@ -629,30 +681,38 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     Tracks with Z-order <0 are inactive, but may be displayed in the timeline as potentials for the user to drag to active
     Document has a playhead, a playback time range, an active timeline display range
     Tracks and frames (aka Products) can have state information set
+
+    This is the low-level "internal" interface that acts as a signaling hub.
+    Direct access to the document is being deprecated.
+    Most direct access patterns should be migrated to using a contextual view of the document,
+    in order to reduce abstraction leakage and permit the document storage to evolve.
     """
     _workspace = None
 
-    # timeline model
-    _track_order: T.List[T.Tuple[int, str]] = None  # (zorder, family-name) with higher z above lower z; z<0 should not occur
+    # timeline the user has specified:
+    track_order: ZList = None  # (zorder, family-name) with higher z above lower z; z<0 should not occur
 
     # overall visible range of the active data
-    _timeline_span: span = None
+    timeline_span: span = None
 
-    # playback
-    _playhead_time: datetime = None  # current playhead time, None if animating
-    _playback_per_second: timedelta = timedelta(seconds=60.0)  # animation time increment per wall-second
+    # playback information
+    playhead_time: datetime = None  # document stored playhead time
+    playback_per_sec: float = 60.0  # data time increment per wall-second
 
     # playback time range, if not None is a subset of overall timeline
-    _playback_span: span = None
+    playback_span: span = None
 
     # user-directed overrides on tracks and frames (products)
-    _track_state: T.Mapping[str, dict] = None
-    _product_state: T.Mapping[UUID, dict] = None
+    track_state: T.Mapping[str, flags] = None
+    product_state: T.Mapping[UUID, flags] = None
+
+    # user can lock tracks to a single frame throughout
+    track_frame_locks: T.Mapping[str, UUID] = None
 
     # Maps of family names to their document recipes
-    _family_presentation: T.Mapping[str, prez] = None
-    _family_composition: T.Mapping[str, CompositeRecipe] = None  # using multiple products to present RGBA
-    _family_calculation: T.Mapping[str, object] = None  # algebraic combinations of multiple products
+    family_presentation: T.Mapping[str, prez] = None
+    family_composition: T.Mapping[str, CompositeRecipe] = None  # using multiple products to present RGBA
+    family_calculation: T.Mapping[str, object] = None  # algebraic combinations of multiple products
 
     # DEPRECATION in progress: layer sets
     """

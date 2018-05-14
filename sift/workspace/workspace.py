@@ -47,10 +47,11 @@ import logging
 import os
 import sys
 import unittest
+import enum
 from datetime import datetime
 from uuid import UUID, uuid1 as uuidgen
 from typing import Mapping, Set, List
-from collections import Mapping as ReadOnlyMapping
+from collections import Mapping as ReadOnlyMapping, defaultdict
 
 import numba as nb
 import numpy as np
@@ -59,7 +60,7 @@ from pyproj import Proj
 from rasterio import Affine
 from shapely.geometry.polygon import LinearRing
 
-from sift.common import INFO, KIND
+from sift.common import INFO, KIND, flags
 from sift.model.shapes import content_within_shape
 from sift.workspace.importer import GeoTiffImporter, GoesRPUGImporter
 from .metadatabase import Metadatabase, Content, Product, Resource
@@ -230,6 +231,12 @@ class ActiveContent(QObject):
         self._update_mask()
 
 
+class WorkspaceState(enum.Enum):
+    ARRIVING = 1  # being imported or calculated
+    CACHED = 2  # stable on disk
+    ATTACHED = 4  # attached to memory
+
+
 class Workspace(QObject):
     """
     Workspace is a singleton object which works with Datasets shall:
@@ -258,13 +265,39 @@ class Workspace(QObject):
     _queue = None
 
     # signals
-    didStartImport = pyqtSignal(dict)  # a dataset started importing; generated after overview level of detail is available
-    didMakeImportProgress = pyqtSignal(dict)
+    # didStartImport = pyqtSignal(dict)  # a dataset started importing; generated after overview level of detail is available
+    # didMakeImportProgress = pyqtSignal(dict)
     didUpdateDataset = pyqtSignal(dict)  # partial completion of a dataset import, new datasetinfo dict is released
-    didFinishImport = pyqtSignal(dict)  # all loading activities for a dataset have completed
-    didDiscoverExternalDataset = pyqtSignal(dict)  # a new dataset was added to the workspace from an external agent
+    # didFinishImport = pyqtSignal(dict)  # all loading activities for a dataset have completed
+    # didDiscoverExternalDataset = pyqtSignal(dict)  # a new dataset was added to the workspace from an external agent
+    didChangeProductState = pyqtSignal(UUID, flags)  # a product changed state, e.g. an importer started working on it
 
     _importers = [GeoTiffImporter, GoesRPUGImporter]
+
+    _state: Mapping[UUID, flags] = None
+
+    def set_product_state_flag(self, uuid: UUID, flag):
+        """primarily used by Importers to signal work in progress
+        """
+        state = self._state[uuid]
+        state.add(flag)
+        self.didChangeProductState.emit(uuid, state)
+
+    def clear_product_state_flag(self, uuid: UUID, flag):
+        state = self._state[uuid]
+        state.remove(flag)
+        self.didChangeProductState.emit(uuid, state)
+
+    def product_state(self, uuid: UUID) -> flags:
+        state = flags(self._state[uuid])
+        # add any derived information
+        if uuid in self._available:
+            state.add(WorkspaceState.ATTACHED)
+        with self._inventory as s:
+            ncontent = s.query(Content).filter_by(uuid=uuid).count()
+        if ncontent > 0:
+            state.add(WorkspaceState.CACHED)
+        return state
 
     @property
     def _S(self):
@@ -326,6 +359,7 @@ class Workspace(QObject):
 
         self._available = {}
         self._importers = [x for x in IMPORT_CLASSES]
+        self._state = defaultdict(flags)
         global TheWorkspace  # singleton
         if TheWorkspace is None:
             TheWorkspace = self
@@ -605,7 +639,6 @@ class Workspace(QObject):
         """
         Returns: dictionary of {resource or product name: UUID,...}
         typically used for add-from-cache dialog
-        FUTURE:
         """
         # find non-overview non-auxiliary data files
         # FIXME: also need to include coverage and sparsity paths?? really?
@@ -798,6 +831,8 @@ class Workspace(QObject):
             if prod is None and uuid is not None:
                 prod = self._product_with_uuid(S, uuid)
 
+            self.set_product_state_flag(prod.uuid, WorkspaceState.ARRIVING)
+
             if len(prod.content):
                 LOG.info('product already has content available, using that rather than re-importing')
                 ovc = self._product_overview_content(S, uuid=uuid)
@@ -823,6 +858,7 @@ class Workspace(QObject):
             # self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
             LOG.debug('received {} updates during import'.format(nupd))
             uuid = prod.uuid
+            self.clear_product_state_flag(prod.uuid, WorkspaceState.ARRIVING)
         # S.commit()
         # S.flush()
 

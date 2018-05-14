@@ -36,8 +36,8 @@ class QFramesInTracksScene(QGraphicsScene):
     includes a TimelineCoordTransform time-to-X coordinate transform used for generating screen coordinates.
 
     """
-    # minimum level to populate scene with (e.g. user may only want to see CACHED or higher)
-    _min_state: TimelineFrameState = TimelineFrameState.AVAILABLE
+    # whether to show tracks with zorder < 0, i.e. tracks not immediately part of document
+    _active_only: bool = False
 
     # coordinate transform between track Z order and time to scene float x,y,w,h
     _coords: TimelineCoordTransform = None
@@ -144,14 +144,6 @@ class QFramesInTracksScene(QGraphicsScene):
         """
         raise NotImplementedError("NYI")  # FIXME
 
-    @property
-    def min_visible_state(self):
-        return self._min_state
-
-    @min_visible_state.setter
-    def min_visible_state(self, new_state: TimelineFrameState):
-        self._min_state = new_state
-        self.update()
 
     #
     # internal mid-level update commands
