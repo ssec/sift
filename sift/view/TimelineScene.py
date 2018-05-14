@@ -200,23 +200,23 @@ class QFramesInTracksScene(QGraphicsScene):
     # track management
     #
 
-    @property
-    def _current_tracks_order(self):
-        L = dict((trk.z, trk) for trk in self._track_items.values())
-        n = max(L.keys())
-        if len(L) != n:
-            raise AssertionError("inconsistency in z-order of tracks; expected {} but have {}".format(n, len(L)))
-        for q in range(n):
-            yield L[q]  # raises if we're missing a track
-
-    @property
-    def _current_tracks_uuid_order(self):
-        for trk in self._current_tracks_order:
-            yield trk.uuid
+    # @property
+    # def _current_tracks_order(self):
+    #     L = dict((trk.z, trk) for trk in self._track_items.values())
+    #     n = max(L.keys())
+    #     if len(L) != n:
+    #         raise AssertionError("inconsistency in z-order of tracks; expected {} but have {}".format(n, len(L)))
+    #     for q in range(n):
+    #         yield L[q]  # raises if we're missing a track
+    #
+    # @property
+    # def _current_tracks_uuid_order(self):
+    #     for trk in self._current_tracks_order:
+    #         yield trk.uuid
 
     @property
     def _track_order(self) -> Mapping[int, QTrackItem]:
-        return dict((q.z, q) for q in self._track_items)
+        return dict((q.z, q) for q in self._track_items.values())
 
     @property
     def _track_count(self):
@@ -252,6 +252,7 @@ class QFramesInTracksScene(QGraphicsScene):
     def propagate_max_z(self, new_max_z: int = None):
         if new_max_z is None:
             new_max_z = self._track_max_z
+        LOG.debug('max_z propagating as {}'.format(new_max_z))
         self._coords.max_z = new_max_z
 
     def _shift_zorders_to_close(self, removing_at_z: int,
@@ -572,7 +573,6 @@ def _debug(type, value, tb):
 
 
 def main():
-    from sift.view.TimelineScene import TestScene
     logging.basicConfig(level=logging.DEBUG)
 
     app = QApplication(sys.argv)

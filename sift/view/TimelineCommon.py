@@ -139,7 +139,7 @@ class TimelineCoordTransform(QObject):
     def calc_track_pixel_y_center(self, z:int):
         """normalize based on max_z such that max_z..-bignum becomes 0..bignum going downward on the screen
         """
-        return self._track_height * float(self._max_z - z)
+        return self._track_height * (0.5 + float(self._max_z - z))
 
     def calc_scene_rect(self, ztd: ztdtup=None, z:int=None, t: datetime=None, d: timedelta=None) -> [QRectF, None]:
         """

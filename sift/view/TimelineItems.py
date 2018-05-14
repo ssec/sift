@@ -295,6 +295,7 @@ class QTrackItem(QGraphicsObject):
         self._bounds = QRectF(-GFXC.track_left_pad, -GFXC.track_height / 2, frames_width + GFXC.track_left_pad + GFXC.track_right_pad, GFXC.track_height)
         LOG.debug("new track bounds: {}".format(self._bounds))
         # origin is at the start of the first frame contained. padding extends into negative x
+        LOG.debug("track centerline placed at {},{}".format(frames_left, screen_track_center_y))
         self.setPos(frames_left, screen_track_center_y)
         self._update_decorations()
 
