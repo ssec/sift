@@ -437,7 +437,8 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                         continue
                     nfo = prod.info
                     fin = FrameInfo(
-                        ident=prod.family + FCS_SEP + prod.category + FCS_SEP + prod.serial,
+                        uuid=prod.uuid,
+                        ident=prod.ident,
                         when=span(prod.obs_time, prod.obs_duration),
                         state=self.doc.product_state.get(prod.uuid) or flags(),
                         primary=nfo[INFO.DISPLAY_NAME],
@@ -470,6 +471,12 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         # FIXME: signal, since this will cause effects on animation and potentially static display order
         # this needs to invalidate the current display and any animation
         self.doc.didChangeLayerVisibility.emit({frame: True})
+
+    # def move_track(self, track: str, atop_z: int):
+    #     self.doc.track_order.move(atop_z, track)
+
+    # def reorder_tracks(self, new_order: T.Iterable[T.Tuple[int, str]]):
+
 
     # @property
     # def _deferring(self):

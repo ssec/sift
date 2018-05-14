@@ -800,7 +800,12 @@ class ZList(MutableSequence):
         for q, v in enumerate(self._content):
             yield z - q, v
 
-    def insert(self, z, val):
+    def index(self, val):
+        ldex = self._content.index(val)
+        z = self._zmax - ldex
+        return z
+
+    def insert(self, z: int, val):
         if len(self._content) == 0:
             self._zmax = -1 if (z < 0) else 0
             self._content.append(val)
@@ -814,6 +819,38 @@ class ZList(MutableSequence):
             return
         ldex = max(0, self._zmax - z)
         self._content.insert(ldex, val)
+
+    def _split(self):
+        zmp1 = self._zmax + 1
+        return self._content[:zmp1], self._content[zmp1:]
+
+    def move(self, to_z: int, val):
+        old_z = self.index(val)
+        sign = lambda x: -1 if x < 0 else 1
+        changing_sides = sign(old_z) != sign(to_z)
+        LOG.debug("old_z={}".format(old_z))
+        if old_z == to_z:
+            return
+        elif old_z > to_z:  # moving it downward, so
+            if sign(old_z) != sign(to_z):  # we're moving it from positive to negative, so max_z goes down
+                self.insert(to_z, val)
+                del self[old_z]
+            elif to_z >= 0:
+                self.insert(to_z, val)  # will cause max_z to go up along with the z of everything above new val location
+                del self[old_z + 1]
+            else:
+                self.insert(to_z, val)
+                del self[old_z]
+        else:  # old_z < atop_z, moving up in the world
+            if sign(old_z) != sign(to_z):  # we're moving it from negative to positive, so max_z goes up
+                self.insert(to_z, val)
+                del self[old_z]
+            elif to_z >= 0:  # max_z will go up but old_z does not get displaced
+                self.insert(to_z, val)
+                del self[old_z]
+            else:  # everything beneath has its z go down one
+                self.insert(to_z, val)
+                del self[old_z - 1]
 
     def __init__(self, zmax:int = None, content: Iterable[Any] = None):
         super(ZList, self).__init__()
