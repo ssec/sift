@@ -6,13 +6,11 @@
 :license: GPLv3, see LICENSE for more details
 """
 
-import os, sys
-import logging, unittest
-from collections import namedtuple
+import logging
 from datetime import datetime, timedelta
 from enum import Enum
 import pickle as pkl
-from typing import Tuple, Optional, NamedTuple, Any, MutableSequence, Iterable
+from typing import Tuple, Optional, NamedTuple, Any
 
 from PyQt4.QtCore import QObject, QRectF, QByteArray, QPointF
 from PyQt4.QtGui import QGraphicsSceneDragDropEvent
@@ -184,106 +182,3 @@ def send_mime(event: QGraphicsSceneDragDropEvent, mimetype: str, obj):
     event.setData(mimetype, qb)
 
 
-class ZList(MutableSequence):
-    """List indexed from high Z to low Z
-    For z-ordered tracks, we want to have
-    - contiguous Z order values from high to low (negative)
-    - elements assigned negative stay negative, likewise with positive (negative Z order has meaning)
-    - no Z value is repeated
-    - insertions are correctly handled
-    - append also works, by default arriving as most-negative z-order
-    - assignment off either end gets snapped to the contiguous next value
-    """
-    _zmax: int = 0  # z-index of the first member of _content
-    _content: list
-
-    @property
-    def min_max(self) -> Tuple[int, int]:
-        return (self._zmax + 1 - len(self), self._zmax) if len(self) else (None, None)
-
-    @property
-    def top_z(self) -> Optional[int]:
-        return self._zmax if len(self) else None
-
-    @property
-    def bottom_z(self) -> Optional[int]:
-        return self._zmax + 1 - len(self) if len(self) else None
-
-    def __contains__(self, z) -> bool:
-        n, x = self.min_max
-        return False if (n is None) or (x is None) or (z < n) or (z > x) else True
-
-    def prepend(self, val):
-        self._zmax += 1
-        self._content.insert(0, val)
-
-    def append(self, val):
-        self._content.append(val)
-
-    def enumerate(self) -> Iterable[Tuple[int, Any]]:
-        z = self._zmax
-        for q, v in enumerate(self._content):
-            yield z - q, v
-
-    def insert(self, z, val):
-        if len(self._content) == 0:
-            self._zmax = -1 if (z < 0) else 0
-            self._content.append(val)
-            return
-        if z not in self:
-            if z >= 0:
-                self._zmax += 1
-                self._content.insert(0, val)
-            else:
-                self._content.append(val)
-            return
-        ldex = max(0, self._zmax - z)
-        self._content.insert(ldex, val)
-
-    def __init__(self, zmax:int = None, content: Iterable[Any] = None):
-        super(ZList, self).__init__()
-        if zmax is not None:
-            self._zmax = zmax
-        self._content = list(content) if content is not None else []
-
-    def __len__(self) -> int:
-        return len(self._content)
-
-    def __setitem__(self, z, val):
-        ldex = self._zmax - z
-        if ldex < 0:
-            self._content.insert(0, val)
-            self._zmax += 1
-        elif ldex >= len(self._content):
-            self._content.append(val)
-        else:
-            self._content[ldex] = val
-
-    def __getitem__(self, z) -> Any:
-        ldex = self._zmax - z
-        if ldex < 0 or ldex >= len(self._content):
-            raise IndexError("Z={} not in ZList".format(z))
-        return self._content[ldex]
-
-    def __delitem__(self, z):
-        if z not in self:
-            raise IndexError("Z={} not in ZList".format(z))
-        ldex = self._zmax - z
-        if z>=0:
-            self._zmax -= 1
-        del self._content[ldex]
-
-    def __repr__(self) -> str:
-        return 'ZList({}, {})'.format(self._zmax, repr(self._content))
-
-    def __eq__(self, other) -> bool:
-        return isinstance(other, ZList) and other._zmax == self._zmax and other._content == self._content
-
-    def to_dict(self, inverse=False) -> dict:
-        if not inverse:
-            return dict(self.enumerate())
-        else:
-            zult = dict((b,a) for (a,b) in self.enumerate())
-            if len(zult) != len(self._content):
-                raise RuntimeWarning("ZList.to_dict inverse did not have fully unique keys")
-            return zult
