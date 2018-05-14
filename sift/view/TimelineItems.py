@@ -136,13 +136,13 @@ class QTrackItem(QGraphicsObject):
         self.frames.append(frame)
         self.addItem(frame)
 
-    @property
-    def scene(self):
-        return self._scene()
-
-    @scene.setter
-    def scene(self, s):
-        self._scene = ref(s)
+    # @property
+    # def scene(self):
+    #     return self._scene()
+    #
+    # @scene.setter
+    # def scene(self, s):
+    #     self._scene = ref(s)
 
     @property
     def track(self) -> str:

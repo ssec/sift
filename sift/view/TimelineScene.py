@@ -307,33 +307,34 @@ class QFramesInTracksScene(QGraphicsScene):
                 changed.append(bub)
         return changed, inserting_above_z
 
-    def insert_track(self, trk: QTrackItem) -> Sequence[QTrackItem]:
-        """Insert a track, if necessary displacing z orders such that old track at same z order is beneath
-        return list of any QTrackItems that had to have their zorder changed
-        """
-        # zord = self._track_order
-        # if trk.z not in zord:
-        #     if (trk.track in set(zord.values())) and (trk is not self._track_items[trk.track]):
-        #         raise AssertionError("remove track {} before replacing it with a new one".format(trk.track))
-        #     if trk.z >= 0:  # nudge it to the contiguous top
-        #         LOG.debug("placing {} at top of stack", trk.track)
-        #         trk.z = self._track_max_z + 1
-        #     else:
-        #         LOG.debug("placing {} at bottom of stack", trk.track)
-        #         trk.z = min(zord.keys()) - 1
-        #     self._track_items[trk.track] = trk
-        #     return [trk]
-        assert(trk not in list(self._track_items.values()))
-        changed, final_z = self._shift_zorders_to_open(trk.z)
-        trk.z = final_z
-        LOG.info("placing {} at zorder {}".format(trk.track, final_z))
-        self._track_items[trk.track] = trk
-        self.addItem(trk)
-        trk.scene = self
-        self._verify_z_contiguity()
-        self.propagate_max_z()
-        self.update()
-        return changed
+    # REMOVED since QTrackItem and QFrameItem cannot be created without a scene
+    # def insert_track(self, trk: QTrackItem) -> Sequence[QTrackItem]:
+    #     """Insert a track, if necessary displacing z orders such that old track at same z order is beneath
+    #     return list of any QTrackItems that had to have their zorder changed
+    #     """
+    #     # zord = self._track_order
+    #     # if trk.z not in zord:
+    #     #     if (trk.track in set(zord.values())) and (trk is not self._track_items[trk.track]):
+    #     #         raise AssertionError("remove track {} before replacing it with a new one".format(trk.track))
+    #     #     if trk.z >= 0:  # nudge it to the contiguous top
+    #     #         LOG.debug("placing {} at top of stack", trk.track)
+    #     #         trk.z = self._track_max_z + 1
+    #     #     else:
+    #     #         LOG.debug("placing {} at bottom of stack", trk.track)
+    #     #         trk.z = min(zord.keys()) - 1
+    #     #     self._track_items[trk.track] = trk
+    #     #     return [trk]
+    #     assert(trk not in list(self._track_items.values()))
+    #     changed, final_z = self._shift_zorders_to_open(trk.z)
+    #     trk.z = final_z
+    #     LOG.info("placing {} at zorder {}".format(trk.track, final_z))
+    #     self._track_items[trk.track] = trk
+    #     self.addItem(trk)
+    #     trk.scene = self
+    #     self._verify_z_contiguity()
+    #     self.propagate_max_z()
+    #     self.update()
+    #     return changed
 
     def move_track(self, trk: QTrackItem, new_z: int) -> Sequence[QTrackItem]:
         """Change track z-order after it's been inserted
