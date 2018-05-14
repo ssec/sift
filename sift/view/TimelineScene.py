@@ -214,6 +214,8 @@ class QFramesInTracksScene(QGraphicsScene):
     #     for trk in self._current_tracks_order:
     #         yield trk.uuid
 
+    # FUTURE: look at handling z-order hijinks with a sift.common.ZList and removing .z from QTrackItem
+
     @property
     def _track_order(self) -> Mapping[int, QTrackItem]:
         return dict((q.z, q) for q in self._track_items.values())
@@ -248,6 +250,10 @@ class QFramesInTracksScene(QGraphicsScene):
         if changed:
             self.update()
         self._verify_z_contiguity()
+
+    def tracks_zorder_by_name(self) -> Iterable[Tuple[str, int]]:
+        for trk in self._track_items.values():
+            yield trk.track, trk.z
 
     def propagate_max_z(self, new_max_z: int = None):
         if new_max_z is None:
