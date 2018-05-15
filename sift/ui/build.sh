@@ -1,3 +1,5 @@
 #!/bin/bash
-pyuic4 pov_main.ui >pov_main_ui.py
-pyuic4 open_cache_dialog.ui >open_cache_dialog_ui.py
+set -ex
+for fn in *.ui; do 
+  pyuic4 ${fn} >${fn//.ui}_ui.py
+done

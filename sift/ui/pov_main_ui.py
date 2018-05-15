@@ -494,6 +494,20 @@ class Ui_MainWindow(object):
         self.verticalLayout_4.addWidget(self.scrollArea)
         self.rgbConfigPane.setWidget(self.dockWidgetContents)
         MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.rgbConfigPane)
+        self.timelinePane = QtGui.QDockWidget(MainWindow)
+        self.timelinePane.setMinimumSize(QtCore.QSize(128, 32))
+        self.timelinePane.setBaseSize(QtCore.QSize(0, 32))
+        self.timelinePane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable|QtGui.QDockWidget.DockWidgetMovable|QtGui.QDockWidget.DockWidgetVerticalTitleBar)
+        self.timelinePane.setObjectName(_fromUtf8("timelinePane"))
+        self.dockWidgetContents_2 = QtGui.QWidget()
+        self.dockWidgetContents_2.setObjectName(_fromUtf8("dockWidgetContents_2"))
+        self.verticalLayout_9 = QtGui.QVBoxLayout(self.dockWidgetContents_2)
+        self.verticalLayout_9.setObjectName(_fromUtf8("verticalLayout_9"))
+        self.timelineView = QtGui.QGraphicsView(self.dockWidgetContents_2)
+        self.timelineView.setObjectName(_fromUtf8("timelineView"))
+        self.verticalLayout_9.addWidget(self.timelineView)
+        self.timelinePane.setWidget(self.dockWidgetContents_2)
+        MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(8), self.timelinePane)
 
         self.retranslateUi(MainWindow)
         self.probeTabWidget.setCurrentIndex(0)
@@ -552,5 +566,6 @@ class Ui_MainWindow(object):
         self.slideMinBlue.setToolTip(_translate("MainWindow", "value at 0% blue", None))
         self.slideMaxBlue.setToolTip(_translate("MainWindow", "value at 100% blue", None))
         self.blueGammaLabel.setText(_translate("MainWindow", "Gamma: ", None))
+        self.timelinePane.setWindowTitle(_translate("MainWindow", "Timeline", None))
 
 from sift.ui.custom_widgets import QNoScrollComboBox, QNoScrollDoubleSpinBox, QNoScrollSlider

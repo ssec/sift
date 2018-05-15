@@ -11,7 +11,7 @@ This QGraphicsScene represents document.as_track_stack, passing operations back 
 import os, sys
 import logging, unittest
 from uuid import UUID
-from typing import Tuple, Optional, Mapping, List, Any, Callable, Set
+from typing import Tuple, Optional, Mapping, List, Any, Callable, Set, Iterable
 from PyQt4.QtGui import QMenu
 
 from sift.view.TimelineItems import QTrackItem, QFrameItem
@@ -26,7 +26,9 @@ LOG = logging.getLogger(__name__)
 
 class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
     """ represent SIFT Workspace and Document as frames in tracks
-    preferably, we use doc.as_track_stack high level interface to query doc+mdb+ws
+    Timeline QGraphicsScene uses doc.as_track_stack high level interface to query doc+mdb+ws
+    Allow GUI manipulation to be passed thru to the document state and vice versa,
+    including handling inquiries about the legality of operations like drag-n-drops
     """
     _doc: DocumentAsTrackStack = None
 
@@ -56,15 +58,27 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
     def _sync_frame(self, qfi: QFrameItem, frm: FrameInfo):
         qfi.state = frm.state
 
+    def _purge_orphan_tracks_frames(self, tracks: Iterable[str], frames: Iterable[UUID]):
+        """Remove QTrackItem and QFrameItem instances that no longer correspond to document content
+        """
+        LOG.debug("purging {} orphan tracks and {} orphan frames from timeline scene".format(len(tracks), len(frames)))
+        for frid in frames:
+            self.removeItem()
+        self._frame_items = dict((k, v) for (k,v) in self._frame_items.items() if k not in frames)
+        self._track_items = dict((k, v) for (k,v) in self._track_items.items() if k not in tracks)
+
     def _sync_tracks_frames(self):
         """populate QTrackItems and QFrameItems, filling any gaps and removing as needed
         """
         new_tracks = []
         new_frames = []
+        orphan_tracks = set(self._track_items.keys())
+        orphan_frames = set(self._frame_items.keys())
         for z, trk in self._doc.enumerate_tracks_frames():
             qti = self._track_items.get(trk.track)
             if qti is not None:
                 self._sync_track(qti, z, trk)
+                orphan_tracks.remove(trk.track)
             else:
                 qti = self._create_track(z, trk)
                 new_tracks.append(qti)
@@ -72,8 +86,10 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
                 qfi = self._frame_items.get(frm.uuid)
                 if qfi is not None:
                     self._sync_frame(qfi, frm)
+                    orphan_frames.remove(qfi.uuid)
                 else:
                     new_frames.append(self._create_frame(qti, frm))
+        self._purge_orphan_tracks_frames(orphan_tracks, orphan_frames)
         self.propagate_max_z()
         for track in new_tracks:
             track.update_pos_bounds()
@@ -95,12 +111,12 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         doc.didReorderLayers.connect(self._invalidate)
         doc.didChangeComposition.connect(self._invalidate)
 
-    def get(self, uuid: UUID) -> [QTrackItem, QFrameItem, None]:
-        z = self._track_items.get(uuid, None)
-        if z is not None:
-            return z
-        z = self._frame_items.get(uuid, None)
-        return z
+    # def get(self, uuid: UUID) -> [QTrackItem, QFrameItem, None]:
+    #     z = self._track_items.get(uuid, None)
+    #     if z is not None:
+    #         return z
+    #     z = self._frame_items.get(uuid, None)
+    #     return z
 
     def may_rearrange_track_z_order(self, track_list: List[str]) -> Optional[Callable[[bool], None]]:
         """Determine whether tracks can be rearranged and provide a commit/abort function if so

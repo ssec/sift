@@ -2,8 +2,7 @@
 
 # Form implementation generated from reading ui file 'open_cache_dialog.ui'
 #
-# Created: Mon Mar 13 16:02:43 2017
-#      by: PyQt4 UI code generator 4.10.4
+# Created by: PyQt4 UI code generator 4.11.4
 #
 # WARNING! All changes made in this file will be lost!
 
