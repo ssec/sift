@@ -86,7 +86,10 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
                 qfi = self._frame_items.get(frm.uuid)
                 if qfi is not None:
                     self._sync_frame(qfi, frm)
-                    orphan_frames.remove(qfi.uuid)
+                    try:
+                        orphan_frames.remove(qfi.uuid)
+                    except KeyError:
+                        LOG.warning("frame {} <{}> found but not originally present??".format(frm.ident, frm.uuid))
                 else:
                     new_frames.append(self._create_frame(qti, frm))
         self._purge_orphan_tracks_frames(orphan_tracks, orphan_frames)
@@ -137,7 +140,6 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         """inform the view on which tracks are closely related to the given track
         typically this is used to stylistically highlight related active tracks during a drag or presentation editing operation
         """
-        LOG.warning("using base class tracks_in_same_family which does nothing")
         return set(self._doc.tracks_in_family(track, only_active=True))
 
     def may_reassign_color_map(self, from_track: UUID, to_track: UUID) -> Optional[Callable[[bool], None]]:
@@ -157,8 +159,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         Does not add new items for tracks and frames already present
         Parameters serve only as hints
         """
-        LOG.warning("using base class update which does nothing")
-        return 0
+        self._invalidate()
 
 
 

@@ -36,7 +36,8 @@ QtGui = app_object.backend_module.QtGui
 import sift.ui.open_cache_dialog_ui as open_cache_dialog_ui
 from sift.control.LayerManager import LayerSetsManager
 from sift.control.rgb_behaviors import UserModifiesRGBLayers
-from sift.model.document import Document, DocLayer
+from sift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
+from sift.model.document import Document
 from sift.view.rgb_config import RGBLayerConfigPane
 from sift.view.SceneGraphManager import SceneGraphManager
 from sift.view.ProbeGraphs import ProbeGraphManager, DEFAULT_POINT_PROBE
@@ -255,6 +256,7 @@ class Main(QtGui.QMainWindow):
     _geditor = None # Gradient editor widget
     _resource_collector: ResourceSearchPathCollector = None
     _resource_collector_timer: QtCore.QTimer = None
+    _timeline_scene: SiftDocumentAsFramesInTracks = None
 
     def interactive_open_files(self, *args, files=None, **kwargs):
         self.scene_manager.layer_set.animating = False
@@ -559,6 +561,27 @@ class Main(QtGui.QMainWindow):
         self.ui.cursorProbeLayer.setText(layer_str)
         self.ui.cursorProbeText.setText("{} ({})".format(data_str, probe_loc))
 
+    def _init_timeline(self, doc: Document):
+        gv = self.ui.timelineView
+
+        # set up the widget itself
+        from PyQt4.QtOpenGL import QGLFormat, QGL, QGLWidget
+        fmt = QGLFormat(QGL.SampleBuffers)
+        wdgt = QGLWidget(fmt)
+        assert(wdgt.isValid())
+        gv.setViewport(wdgt)
+        gv.setViewportUpdateMode(QtGui.QGraphicsView.FullViewportUpdate)
+        gv.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
+        gv.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        gv.setRenderHints(QtGui.QPainter.Antialiasing)
+
+        # connect up the scene
+        doc.sync_potential_tracks_from_metadata()
+        LOG.debug("Potential tracks: {}".format(repr(doc.track_order)))
+        self._timeline_scene = SiftDocumentAsFramesInTracks(doc)
+        gv.setScene(self._timeline_scene)
+        self._timeline_scene.update()
+
     def __init__(self, config_dir=None, cache_dir=None, cache_size=None, glob_pattern=None, search_paths=None, border_shapefile=None, center=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
@@ -733,6 +756,9 @@ class Main(QtGui.QMainWindow):
         self._timer_collect_resources()
         timer.timeout.connect(self._timer_collect_resources)
         timer.start(60000)
+
+        # set up timeline
+        self._init_timeline(doc)
 
     def _timer_collect_resources(self):
         if self._resource_collector:

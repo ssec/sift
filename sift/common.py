@@ -792,7 +792,11 @@ class ZList(MutableSequence):
         self._zmax += 1
         self._content.insert(0, val)
 
-    def append(self, val):
+    def append(self, val, start_negative: bool = False, not_if_present: bool = False):
+        if start_negative and 0 == len(self._content):
+            self._zmax = -1
+        if not_if_present and (val in self._content):
+            return
         self._content.append(val)
 
     def enumerate(self) -> Iterable[Tuple[int, Any]]:

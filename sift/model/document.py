@@ -428,7 +428,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 fam, ctg = track.split(FCS_SEP)
                 LOG.debug("yielding TrackInfo and FrameInfos for {}".format(track))
                 frames = []
-                fam_nfo = self.doc.family_info(fam)
+                # fam_nfo = self.doc.family_info(fam)
                 que = s.query(Product).filter((Product.family == fam) and (Product.category == ctg))
                 for prod in que.all():
                     prod_e = prod.obs_time + prod.obs_duration
@@ -454,7 +454,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                     when=track_span,
                     frames=frames,
                     state=flags(),  # FIXME
-                    primary=fam_nfo[INFO.DISPLAY_FAMILY],
+                    primary=' '.join(reversed(fam.split(FCS_SEP))),  #fam_nfo[INFO.DISPLAY_FAMILY],
                     secondary=' '.join(reversed(ctg.split(FCS_SEP)))
                 )
                 yield z, trk
@@ -862,8 +862,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self._recipe_layers = {}
         # HACK: This should probably be part of the metadata database in the future
         self._families = defaultdict(list)
-        # TODO: connect signals from workspace to slots including update_dataset_info
-
 
         # Create directory if it does not exist
         filepath = os.path.join(self.config_dir, 'colormaps')
@@ -890,6 +888,51 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for item in qtData:
             self.add_to_maps(qtData[item], item)
 
+        # timeline document storage setup with initial track order and time range
+        self.product_state = defaultdict(flags)
+        self.track_state = defaultdict(flags)
+        self.track_order = ZList()
+        self.track_frame_locks = {}
+        self.family_calculation = {}
+        self.family_composition = {}
+        self.family_presentation = {}
+        # scan available metadata for initial state
+        # FIXME: refresh this once background scan finishes
+        self.timeline_span = self.playback_span = self.potential_product_span()
+        self.sync_potential_tracks_from_metadata()
+
+    def potential_product_span(self) -> span:
+        with self._workspace.metadatabase as S:
+            all_times = list(S.query(Product.obs_time, Product.obs_duration).distinct())
+        if not all_times:
+            LOG.warning("no data available, using default time span")
+            nau = datetime.utcnow()
+            sixh = timedelta(hours=6)
+            return span(nau - sixh, sixh * 2)
+        starts = [s for (s, d) in all_times]
+        ends = [(s + d) for (s, d) in all_times]
+        s = min(starts)
+        e = max(ends)
+        return span(s, e - s)
+
+    def potential_tracks(self) -> T.Sequence[str]:
+        """List the names of available tracks according to the metadatabase
+        """
+        with self._workspace.metadatabase as S:
+            return list(f + FCS_SEP + c for (f, c) in S.query(Product.family, Product.category).distinct())
+
+    def sync_potential_tracks_from_metadata(self):
+        """Survey metadatabase for potential tracks
+        """
+        all_tracks = self.potential_tracks()
+        all_tracks.sort()
+        old_track_count = len(self.track_order)
+        for track in all_tracks:
+            self.track_order.append(track, start_negative=True, not_if_present=True)
+        new_track_count = len(self.track_order)
+        if old_track_count != new_track_count:
+            LOG.info("went from {} available tracks to {}".format(old_track_count, new_track_count))
+            # FIXME signal to refresh timeline
 
     def find_colormap(self, colormap):
         if isinstance(colormap, str) and colormap in self.colormaps:
@@ -910,8 +953,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 self.current_projection,
                 self.projection_info(self.current_projection)
             )
-
-
 
     def add_to_maps(self, colorItem, name):
         pointList = colorItem["ticks"]
