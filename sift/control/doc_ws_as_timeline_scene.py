@@ -117,12 +117,12 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         LOG.warning("using base class may_rearrange_track_z_order which does nothing")
         return lambda commit: None
 
-    def tracks_in_same_family(self, track: UUID) -> Set[UUID]:
+    def tracks_in_same_family(self, track: str) -> Set[str]:
         """inform the view on which tracks are closely related to the given track
-        typically this is used to stylistically highlight related tracks during a drag operation
+        typically this is used to stylistically highlight related active tracks during a drag or presentation editing operation
         """
         LOG.warning("using base class tracks_in_same_family which does nothing")
-        return set()
+        return set(self._doc.tracks_in_family(track, only_active=True))
 
     def may_reassign_color_map(self, from_track: UUID, to_track: UUID) -> Optional[Callable[[bool], None]]:
         """User is dragging a color map around, determine if drop is permitted and provide a commit/abort function if so

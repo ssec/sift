@@ -477,6 +477,15 @@ class DocumentAsTrackStack(DocumentAsContextBase):
 
     # def reorder_tracks(self, new_order: T.Iterable[T.Tuple[int, str]]):
 
+    def tracks_in_family(self, family: str, only_active: bool = True) -> T.Sequence[str]:
+        """ yield track names in document that share a common family
+        """
+        for z, track in self.doc.track_order.enumerate():
+            if only_active and z < 0:
+                break
+            tfam = track.split(FCS_SEP)[0]
+            if tfam == family:
+                yield track
 
     # @property
     # def _deferring(self):
