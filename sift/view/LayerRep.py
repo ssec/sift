@@ -1179,34 +1179,58 @@ class NEShapefileLinesVisual(ShapefileLinesVisual):
 NEShapefileLines = create_visual_node(NEShapefileLinesVisual)
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="PURPOSE",
-        epilog="",
-        fromfile_prefix_chars='@')
-    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG')
-    # http://docs.python.org/2.7/library/argparse.html#nargs
-    # parser.add_argument('--stuff', nargs='5', dest='my_stuff',
-    #                    help="one or more random things")
-    parser.add_argument('pos_args', nargs='*',
-                        help="positional arguments don't have the '-' prefix")
-    args = parser.parse_args()
+from vispy.visuals import IsocurveVisual
+from vispy.visuals.isocurve import _HAS_SKI, isocurve
+if _HAS_SKI:
+    from vispy.visuals.isocurve import find_contours
 
 
-    levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
-    logging.basicConfig(level=levels[min(3, args.verbosity)])
+class DynamicIsocurveVisual(IsocurveVisual):
+    """IsocurveVisual that can use precomputed paths."""
 
-    if not args.pos_args:
-        unittest.main()
-        return 0
+    def _compute_iso_line(self):
+        """ compute LineVisual vertices, connects and color-index
+        """
+        level_index = []
+        connects = []
+        verts = []
 
-    for pn in args.pos_args:
-        pass
+        # calculate which level are within data range
+        # this works for now and the existing examples, but should be tested
+        # thoroughly also with the data-sanity check in set_data-function
+        choice = np.nonzero((self.levels > self._data.min()) &
+                            (self._levels < self._data.max()))
+        levels_to_calc = np.array(self.levels)[choice]
 
-    return 0
+        # save minimum level index
+        self._level_min = choice[0][0]
+
+        for level in levels_to_calc:
+            # if we use skimage isoline algorithm we need to add half a
+            # pixel in both (x,y) dimensions because isolines are aligned to
+            # pixel centers
+            if _HAS_SKI:
+                contours = find_contours(self._data, level,
+                                         positive_orientation='high')
+                v, c = self._get_verts_and_connect(contours)
+                # swap row, column to column, row (x, y)
+                v[:, [0, 1]] = v[:, [1, 0]]
+                v += np.array([0.5, 0.5])
+            else:
+                paths = isocurve(self._data.astype(float).T, level,
+                                 extend_to_edge=True, connected=True)
+                v, c = self._get_verts_and_connect(paths)
+
+            # normalize vertexes based on shape
+            v[:, 0] /= self._data.shape[1]
+            v[:, 1] /= self._data.shape[0]
+            level_index.append(v.shape[0])
+            connects.append(np.hstack((c, [False])))
+            verts.append(v)
+
+        self._li = np.hstack(level_index)
+        self._connect = np.hstack(connects)
+        self._verts = np.vstack(verts)
 
 
-if __name__ == '__main__':
-    sys.exit(main())
-
+DynamicIsocurve = create_visual_node(DynamicIsocurveVisual)
