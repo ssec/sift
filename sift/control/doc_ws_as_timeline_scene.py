@@ -17,7 +17,7 @@ from PyQt4.QtGui import QMenu
 from sift.view.TimelineItems import QTrackItem, QFrameItem
 from sift.view.TimelineScene import QFramesInTracksScene
 from sift.workspace import Workspace
-from sift.model.document import Document, DocumentAsTrackStack
+from sift.model.document import Document, DocumentAsTrackStack, FrameInfo, TrackInfo
 from sift.workspace.metadatabase import Metadatabase
 
 
@@ -41,17 +41,48 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         self._doc = doc.as_track_stack  # we should be limiting our interaction to this context
         self._connect_signals(doc)  # but the main doc is still the signaling hub
 
+    def _sync_track(self, qti: QTrackItem, z:int, trk: TrackInfo):
+        qti.z, old_z = z, qti.z
+        qti.state = trk.state
+
+    def _create_track(self, z: int, trk: TrackInfo) -> QTrackItem:
+        qti = QTrackItem(self, self.coords, trk.track, z, trk.primary, trk.secondary)
+        return qti
+
+    def _create_frame(self, qti: QTrackItem, frm: FrameInfo) -> QFrameItem:
+        qfi = QFrameItem(qti, self.coords, frm.uuid, frm.when.s, frm.when.d, frm.state, frm.primary, frm.secondary)
+        return qfi
+
+    def _sync_frame(self, qfi: QFrameItem, frm: FrameInfo):
+        qfi.state = frm.state
+
+    def _sync_tracks_frames(self):
+        """populate QTrackItems and QFrameItems, filling any gaps and removing as needed
+        """
+        new_tracks = []
+        new_frames = []
+        for z, trk in self._doc.enumerate_tracks_frames():
+            qti = self._track_items.get(trk.track)
+            if qti is not None:
+                self._sync_track(qti, z, trk)
+            else:
+                qti = self._create_track(z, trk)
+                new_tracks.append(qti)
+            for frm in trk.frames:
+                qfi = self._frame_items.get(frm.uuid)
+                if qfi is not None:
+                    self._sync_frame(qfi, frm)
+                else:
+                    new_frames.append(self._create_frame(qti, frm))
+        self.propagate_max_z()
+        for track in new_tracks:
+            track.update_pos_bounds()
+            track.update_frame_positions()
+
     def _invalidate(self):
         """document state has changed, re-consult document and update our display
         """
-
-    def _update_tracks_frames(self):
-        """populate QTrackItems and QFrameItems, filling any gaps and removing as needed
-        """
-        for z, trk in self._doc.enumerate_tracks_frames():
-            for frm in trk.frames:
-                pass  # FIXME
-
+        self._sync_tracks_frames()
 
     def _connect_signals(self, doc:Document):
         """Connect document, workspace, signals in order to invalidate and update scene representation

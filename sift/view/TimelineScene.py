@@ -15,13 +15,13 @@ import logging
 import sys
 import unittest
 from datetime import datetime, timedelta
-from typing import Tuple, Optional, Mapping, List, Callable, Set, Iterable, Sequence
+from typing import Tuple, Optional, Mapping, List, Callable, Set, Iterable, Sequence, Any
 from abc import ABC, abstractmethod, abstractproperty
 from uuid import UUID
 
 from PyQt4.QtCore import QRectF, Qt, pyqtSignal
 from PyQt4.QtGui import QGraphicsScene, QPen, QBrush, QPainter, QGraphicsView, QMenu, QGraphicsTextItem, QFont, \
-    QMainWindow, QStatusBar, QApplication
+    QMainWindow, QStatusBar, QApplication, QGraphicsItem, QGraphicsItemAnimation
 from PyQt4.QtOpenGL import QGLFormat, QGL, QGLWidget
 
 from sift.view.TimelineCommon import TimelineFrameState, TimelineTrackState, TimelineCoordTransform
@@ -54,6 +54,7 @@ class QFramesInTracksScene(QGraphicsScene):
     # content representing document / workspace / scenegraph
     _track_items: Mapping[str, QTrackItem] = None  # retain QTrackItem objects lest they disappear; also bookkeeping
     _frame_items: Mapping[UUID, QFrameItem] = None  # likewise for QFrameItems
+    _decor_items: Mapping[Any, QGraphicsItem] = None  # decoration items
 
     # styling settings
     _track_pen_brush = None, None
@@ -90,7 +91,8 @@ class QFramesInTracksScene(QGraphicsScene):
         return self._coords
 
     def addTrack(self, track: QTrackItem):
-        """
+        """Called by QTrackItem constructor
+        We need to maintain references to Q*Items, Qt will not do it for us
         """
         if track.track in self._track_items:
             LOG.error("track {} was already present in scene".format(track.track))
@@ -99,6 +101,9 @@ class QFramesInTracksScene(QGraphicsScene):
         self._verify_z_contiguity()
 
     def addFrame(self, frame:QFrameItem):
+        """Called by QTrackItem at QFrameItem's constructor-time
+        We need to maintain references to Q*Items, Qt will not do it for us
+        """
         if frame.uuid in self._frame_items:
             LOG.error("frame {} was already present in scene".format(frame.uuid))
         self._frame_items[frame.uuid] = frame

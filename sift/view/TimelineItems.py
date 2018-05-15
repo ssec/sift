@@ -69,6 +69,7 @@ from weakref import ref
 from PyQt4.QtCore import Qt
 from PyQt4.QtGui import *
 
+from sift.common import flags
 from sift.view.TimelineCommon import *
 
 LOG = logging.getLogger(__name__)
@@ -132,9 +133,8 @@ class QTrackItem(QGraphicsObject):
         self.setAcceptDrops(True)
 
     def addFrame(self, frame):
-        self.scene.addFrame(frame)
+        self._scene().addFrame(frame)
         self.frames.append(frame)
-        self.addItem(frame)
 
     # @property
     # def scene(self):
@@ -147,6 +147,10 @@ class QTrackItem(QGraphicsObject):
     @property
     def track(self) -> str:
         return self._id
+
+    @property
+    def scene_(self):  # can't use just .scene due to Qt C++ scene()
+        return self._scene()
 
     @property
     def z(self) -> int:
@@ -331,7 +335,7 @@ class QFrameItem(QGraphicsObject):
     _bounds: QRectF = QRectF()
 
     def __init__(self, track: QTrackItem, scale: TimelineCoordTransform, uuid: UUID,
-                 start: datetime, duration: timedelta, state: TimelineFrameState,
+                 start: datetime, duration: timedelta, state: flags,
                  title: str, subtitle: str = None, thumb: QPixmap = None,
                  metadata: Mapping[str, Any] = None):
         """create a frame representation and add it to a timeline
@@ -363,7 +367,7 @@ class QFrameItem(QGraphicsObject):
         # if brush:
         #     LOG.debug('setting brush')
         #     self.setBrush(brush)
-        track.frames.append(self)
+        track.addFrame(self)
         self.setParentItem(track)
         self.update_bounds()
         track.update_pos_bounds()
