@@ -62,7 +62,6 @@ from shapely.geometry.polygon import LinearRing
 
 from sift.common import INFO, KIND, flags
 from sift.model.shapes import content_within_shape
-from sift.workspace.importer import GeoTiffImporter, GoesRPUGImporter
 from .metadatabase import Metadatabase, Content, Product, Resource
 from .importer import aImporter, GeoTiffImporter, GoesRPUGImporter, generate_guidebook_metadata
 

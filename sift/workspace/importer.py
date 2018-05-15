@@ -24,6 +24,7 @@ import asyncio
 import numpy as np
 from pyproj import Proj
 from sqlalchemy.orm import Session
+from satpy import Scene
 
 from sift.common import PLATFORM, INFO, INSTRUMENT, KIND
 from sift.workspace.goesr_pug import PugFile
@@ -69,6 +70,7 @@ def generate_guidebook_metadata(layer_info) -> Mapping:
         layer_info[INFO.DISPLAY_NAME] = guidebook._default_display_name(layer_info)
 
     return layer_info
+
 
 class aImporter(ABC):
     """
@@ -131,7 +133,6 @@ class aImporter(ABC):
         """
         # FUTURE: this should be async def coroutine
         return
-
 
 
 class aSingleFileWithSingleProductImporter(aImporter):
@@ -691,6 +692,148 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
                               stage_desc="GOES PUG data add to workspace",
                               dataset_info=None,
                               data=img_data)
+
+
+class SatPyImporter(aImporter):
+    """Generic SatPy importer"""
+
+    def __init__(self, source_path, workspace_cwd, database_session, **kwargs):
+        super(SatPyImporter, self).__init__(workspace_cwd, database_session)
+        reader = kwargs.pop('reader', None)
+        if reader is None:
+            raise NotImplementedError("Can't automatically determine reader.")
+        if not isinstance(source_path, (list, tuple)):
+            source_path = [source_path]
+
+        if len(source_path) > 1:
+            raise NotImplementedError("SatPy importer does not currently "
+                                      "support reading more than one file "
+                                      "at a time.")
+        self.filenames = source_path
+        self.reader = reader
+        self.scene = Scene(reader=self.reader,
+                           filenames=self.filenames)
+        self._resources = []
+        # DatasetID filters
+        self.product_filters = {}
+        for k in ['resolution', 'calibration', 'level']:
+            if k in kwargs:
+                self.product_filters[k] = kwargs.pop(k)
+
+    @classmethod
+    def is_relevant(cls, source_path=None, source_uri=None):
+        # this importer should only be used if specifically requested
+        return False
+
+    def merge_resources(self):
+        if len(self._resources) == len(self.filenames):
+            return self._resources
+
+        resources = self._S.query(Resource).filter(
+            Resource.path.in_(self.filenames)).all()
+        if len(resources) == len(self.filenames):
+            self._resources = resources
+            return self._resources
+
+        now = datetime.utcnow()
+        res_dict = {r.path: r for r in self._resources}
+        for fn in self.filenames:
+            if fn in res_dict:
+                continue
+
+            res = Resource(
+                format=type(self),
+                path=fn,
+                mtime=now,
+                atime=now,
+            )
+            self._S.add(res)
+            res_dict[fn] = res
+
+        self._resources = res_dict.values()
+        return self._resources
+
+    @abstractmethod
+    def product_metadata(self):
+        # TODO
+        return {}
+
+    def merge_products(self):
+        resources = self.merge_resources()
+        if resources is None:
+            LOG.debug('no resources for {}'.format(self.filenames))
+            return []
+
+        # FIXME: This doesn't work for multiple files to one product
+        res = resources[0]
+        products = list(res.product)
+        if products:
+            LOG.debug('pre-existing products {}'.format(repr(products)))
+            return products
+
+        from uuid import uuid1
+        uuid = uuid1()
+        scn = self.load_all_datasets()
+        products = []
+        for ds in scn:
+            meta = ds.attrs
+            meta[INFO.UUID] = uuid
+            now = datetime.utcnow()
+            prod = Product(
+                uuid_str=str(uuid),
+                atime=now,
+            )
+            prod.resource.append(res)
+
+            assert(INFO.OBS_TIME in meta)
+            assert(INFO.OBS_DURATION in meta)
+            prod.update(meta)  # sets fields like obs_duration and obs_time transparently
+            assert(prod.info[INFO.OBS_TIME] is not None and prod.obs_time is not None)
+            assert(prod.info[INFO.VALID_RANGE] is not None)
+            LOG.debug('new product: {}'.format(repr(prod)))
+            self._S.add(prod)
+            self._S.commit()
+            products.append(prod)
+        return products
+
+    def load_all_datasets(self):
+        from pyresample.geometry import AreaDefinition
+        scn = Scene(reader=self.reader, filenames=self.filenames)
+        scn.load(['t'], level=100)  # scn.available_dataset_ids())
+        # copy satpy metadata keys to SIFT keys
+        for ds in scn:
+            start_time = ds.attrs['start_time']
+            ds.attrs[INFO.OBS_TIME] = start_time
+            ds.attrs[INFO.SCHED_TIME] = start_time
+            duration = start_time - ds.attrs.get('end_time', start_time)
+            if duration.total_seconds() == 0:
+                duration = timedelta(minutes=60)
+            ds.attrs[INFO.OBS_DURATION] = duration
+
+            # area to sift keys
+            area = ds.attrs['area']
+            if not isinstance(area, AreaDefinition):
+                raise NotImplementedError("Only AreaDefinition datasets can "
+                                          "be loaded at this time.")
+
+            ds.attrs[INFO.KIND] = KIND.IMAGE if self.reader != 'grib' else \
+                KIND.CONTOUR
+            ds.attrs[INFO.PROJ] = area.proj4_string
+            ds.attrs[INFO.ORIGIN_X] = area.area_extent[0]
+            ds.attrs[INFO.ORIGIN_Y] = area.area_extent[3]
+            ds.attrs[INFO.CELL_HEIGHT] = -abs(area.pixel_size_y)
+            ds.attrs[INFO.CELL_WIDTH] = area.pixel_size_x
+
+        return scn
+
+
+
+
+
+
+
+
+
 
 
 PATH_TEST_DATA = os.environ.get('TEST_DATA', os.path.expanduser("~/Data/test_files/thing.dat"))
