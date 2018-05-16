@@ -18,7 +18,7 @@ from PyQt4.QtGui import QGraphicsSceneDragDropEvent
 LOG = logging.getLogger(__name__)
 
 # @dataclass
-class TimelineGraphicsConfig(object):
+class GraphicsConfig(object):
     track_height: float = 64.0
     track_corner_radius: float = 15.0
     track_left_pad: float = 128.0  # scene pixels space to left of first frame which we reserve for labels etc
@@ -31,7 +31,7 @@ class TimelineGraphicsConfig(object):
 
 
 # graphics constants in setting up items and painting
-GFXC = TimelineGraphicsConfig()
+GFXC = GraphicsConfig()
 
 # drag and drop mimetypes
 MIMETYPE_TIMELINE_COLORMAP = 'application/sift.timeline.colormap'
@@ -52,26 +52,23 @@ class ztdtup(NamedTuple):
     d: timedelta
 
 
-class TimelineFrameState(Enum):
-    """Displayed state of frames, corresponds to a color or style.
+class VisualState(Enum):
+    """Visual states of frames and tracks, corresponds to a color or style.
+    They're collected in flags() objects.
+    Derived from Document / Workspace / SceneGraph states.
     Typically combines information from Workspace and Scenegraph, does not correspond to selection.
+    by default, display greyed-out potential frame
     """
-    UNKNOWN = 0
-    AVAILABLE = 1  # can be imported from native resources but has not been
-    ARRIVING = 2  # importer is bringing data into workspace
-    CACHED = 3  # imported into workspace but not available as content in memory
-    READY = 4  # available as a memory map, but may not be fully resident in RAM or VRAM
-    ACTIVE = 5  # both ready to go into VRAM (or already resident), and participating in the application scene graph, possibly as part of an animation
-    VISIBLE = 6  # active, and currently on-screen for user to view
+    ERROR = 1  # error red
+    WARNING = 2  # warning yellow
+    DISABLED = 4  # greyed-out and muted, may not even display decoration; signifies user turned it off
+    BUSY = 8  # when WorkspaceState.ARRIVING, show barberpole animation or at least diagonal hatch
+    READY = 16  # regular coloration - typically when WorkspaceState.CACHED
+    LOCKED = 32  # indicate the frame is locked across is entire track
+    RELEVANT = 64  # highlight that this (typically track) may be affected with the operation you have inflight
 
 
-class TimelineTrackState(Enum):
-    UNKNOWN = 0
-    DISABLED = 1
-    ENABLED = 2
-
-
-class TimelineCoordTransform(QObject):
+class CoordTransform(QObject):
     """
     configurable transformations between time and display space, typically a tool used by scene/timeline/frame
     typically one instance per scene!
@@ -113,7 +110,7 @@ class TimelineCoordTransform(QObject):
             time_unit: time width corresponding to delta-X=1.0, defaults to 1.0s
             track_height: pixels high to display individual ttracks
         """
-        super(TimelineCoordTransform, self).__init__()
+        super(CoordTransform, self).__init__()
         self._time_base = time_base or datetime.utcnow()
         self._time_unit = time_unit
         self._track_height = track_height or GFXC.track_height

@@ -87,7 +87,7 @@ class QTrackItem(QGraphicsObject):
     """
     frames = None  # Iterable[QFrameItem], maintained privately between track and frame
     _scene = None  # weakref to scene
-    _scale: TimelineCoordTransform = None
+    _scale: CoordTransform = None
     _id: str = None  # tracks are family::category, e.g. IMAGE:geo:toa_reflectance:11µm::GOESR-PUG:GOES-16:ABI:CONUS
     _z: int = None  # our track number as displayed, 0 being highest on screen, with larger Z going downward
     _title: str = None
@@ -95,7 +95,7 @@ class QTrackItem(QGraphicsObject):
     _icon: QIcon = None   # e.g. whether it's algebraic or RGB
     _metadata: Mapping = None  # arbitrary key-value store for selecting by metadata; in our case this often includes item family for seleciton
     _tooltip: str = None
-    _color: QColor = None
+    _state: flags = None  # VisualState flags determine how it's being presented
     _selected: bool = False
     _colormap: [QGradient, QImage, QPixmap] = None
     _min: float = None
@@ -108,10 +108,12 @@ class QTrackItem(QGraphicsObject):
     _gi_icon: QGraphicsPixmapItem = None
     _gi_colormap: QGraphicsPixmapItem = None
 
-    def __init__(self, scene, scale: TimelineCoordTransform, track: str, z: int,
+    def __init__(self, scene, scale: CoordTransform, track: str, z: int,
                  title: str, subtitle: str = None, icon: QIcon = None, metadata: dict = None,
-                 tooltip: str = None, color: QColor = None, selected: bool = False,
+                 tooltip: str = None, state: flags = None, selected: bool = False,
                  colormap: [QGradient, QImage] = None, min: float = None, max: float = None):
+        """Create a track and connect it to its Scene
+        """
         super(QTrackItem, self).__init__()
         self.frames = []
         self._scene = ref(scene) if scene else None
@@ -123,17 +125,17 @@ class QTrackItem(QGraphicsObject):
         self._icon = icon
         self._metadata = metadata or {}
         self._tooltip = tooltip
-        self._color = color
+        self._state = flags(state)
         self._selected = selected
         self._colormap = colormap
         self._min, self._max = min, max
         self.update_pos_bounds()
         self._update_decorations()
-        scene.addTrack(self)
+        scene.add_track(self)
         self.setAcceptDrops(True)
 
     def addFrame(self, frame):
-        self._scene().addFrame(frame)
+        self._scene().add_frame(frame)
         self.frames.append(frame)
 
     # @property
@@ -322,9 +324,9 @@ class QFrameItem(QGraphicsObject):
     QGraphicsView representation of a data frame, with a start and end time relative to the scene.
     Essentially a frame sprite
     """
-    _state: TimelineFrameState = None
+    _state: flags = None
     _track = None  # weakref to track we belong to
-    _scale: TimelineCoordTransform = None
+    _scale: CoordTransform = None
     _uuid: UUID = None
     _start: datetime = None
     _duration: timedelta = None
@@ -334,11 +336,11 @@ class QFrameItem(QGraphicsObject):
     _metadata: Mapping = None
     _bounds: QRectF = QRectF()
 
-    def __init__(self, track: QTrackItem, scale: TimelineCoordTransform, uuid: UUID,
+    def __init__(self, track: QTrackItem, scale: CoordTransform, uuid: UUID,
                  start: datetime, duration: timedelta, state: flags,
                  title: str, subtitle: str = None, thumb: QPixmap = None,
                  metadata: Mapping[str, Any] = None):
-        """create a frame representation and add it to a timeline
+        """create a frame representation and add it to a timeline track within a scene
         Args:
             track: which timeline to add it to
             state: initial state
@@ -351,7 +353,7 @@ class QFrameItem(QGraphicsObject):
         """
         super(QFrameItem, self).__init__()
         self._track = ref(track)
-        self._state = state
+        self._state = flags(state)
         self._scale = scale
         self._start = start
         self._duration = duration
@@ -367,7 +369,7 @@ class QFrameItem(QGraphicsObject):
         # if brush:
         #     LOG.debug('setting brush')
         #     self.setBrush(brush)
-        track.addFrame(self)
+        track.addFrame(self)  # adds to track, which in turn adds to scene
         self.setParentItem(track)
         self.update_bounds()
         track.update_pos_bounds()
@@ -397,7 +399,7 @@ class QFrameItem(QGraphicsObject):
         return self._state
 
     @state.setter
-    def state(self, new_state: TimelineFrameState):
+    def state(self, new_state: VisualState):
         if new_state != self._state:
             self._state = new_state
             self.update()

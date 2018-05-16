@@ -24,7 +24,8 @@ from PyQt4.QtGui import QGraphicsScene, QPen, QBrush, QPainter, QGraphicsView, Q
     QMainWindow, QStatusBar, QApplication, QGraphicsItem, QGraphicsItemAnimation
 from PyQt4.QtOpenGL import QGLFormat, QGL, QGLWidget
 
-from sift.view.TimelineCommon import TimelineFrameState, TimelineTrackState, TimelineCoordTransform
+from sift.common import flags, span
+from sift.view.TimelineCommon import VisualState, TimelineTrackState, CoordTransform
 from sift.view.TimelineItems import QTrackItem, QFrameItem, QTimeRulerItem
 
 LOG = logging.getLogger(__name__)
@@ -34,15 +35,16 @@ class QFramesInTracksScene(QGraphicsScene):
     """
     QGraphicsScene collecting QTimelineItems collecting QFrameItems.
     includes a TimelineCoordTransform time-to-X coordinate transform used for generating screen coordinates.
-
     """
     # whether to show tracks with zorder < 0, i.e. tracks not immediately part of document
+    # many users will prefer to show only active tracks on the document,
+    # only showing everything when they want to drag or otherwise activate potential tracks waiting in the wings
     _active_only: bool = False
 
     # coordinate transform between track Z order and time to scene float x,y,w,h
-    _coords: TimelineCoordTransform = None
+    _coords: CoordTransform = None
 
-    # rulers at top and/or bottom of scene
+    # rulers at top and/or bottom of scene; QGraphicsItems have to be retained in python to avoid confusing Qt
     _top_ruler_item: QTimeRulerItem = None
     _bottom_ruler_item: QTimeRulerItem = None
     _ruler_tick_interval: timedelta = None
@@ -64,7 +66,7 @@ class QFramesInTracksScene(QGraphicsScene):
 
     def __init__(self):
         super(QFramesInTracksScene, self).__init__()
-        self._coords = TimelineCoordTransform()
+        self._coords = CoordTransform()
         self._track_items = {}
         self._frame_items = {}
         pen = QPen()
@@ -87,10 +89,10 @@ class QFramesInTracksScene(QGraphicsScene):
         # self.setSceneRect(None)
 
     @property
-    def coords(self) -> TimelineCoordTransform:
+    def coords(self) -> CoordTransform:
         return self._coords
 
-    def addTrack(self, track: QTrackItem):
+    def add_track(self, track: QTrackItem):
         """Called by QTrackItem constructor
         We need to maintain references to Q*Items, Qt will not do it for us
         """
@@ -100,7 +102,7 @@ class QFramesInTracksScene(QGraphicsScene):
         self.addItem(track)
         self._verify_z_contiguity()
 
-    def addFrame(self, frame:QFrameItem):
+    def add_frame(self, frame:QFrameItem):
         """Called by QTrackItem at QFrameItem's constructor-time
         We need to maintain references to Q*Items, Qt will not do it for us
         """
@@ -178,12 +180,12 @@ class QFramesInTracksScene(QGraphicsScene):
     def _del_track(self, track):
         raise NotImplementedError("NYI")  # FIXME
 
-    def _change_frame_state(self, frame: UUID, new_state: TimelineFrameState):
+    def _change_frame_state(self, frame: UUID, new_state: flags):
         """Change the displayed state of a frame and queue a visual refresh
         """
         raise NotImplementedError("NYI")  # FIXME
 
-    def _change_track_state(self, track: str, new_state: TimelineTrackState):
+    def _change_track_state(self, track: str, new_state: flags):
         """Change the displayed state of a track and queue a visual refresh
         """
         raise NotImplementedError("NYI")  # FIXME
@@ -366,12 +368,12 @@ class QFramesInTracksScene(QGraphicsScene):
     #
     # high-level signals from scene to hook to other parts of application
     #
-    didSelectTracksAndFrames = pyqtSignal(dict)  # dictionary of track UUID to set of frame UUIDs, may be empty
+    didSelectTracksAndFrames = pyqtSignal(set, set)  # track names and frame uuids respectively
     didChangeTrackOrder = pyqtSignal(list)  # list of track UUIDs from top to bottom
-    didMoveCursorToTime = pyqtSignal(datetime, timedelta)  # instantaneous or time-range cursor move occurred
-    didRequestStateChangeForFrame = pyqtSignal(UUID,
-                                               TimelineFrameState)  # user requests a state change for a given frame
-    didCopyColormapBetweenTracks = pyqtSignal(UUID, UUID)  # from-track and to-track
+    didMovePlayheadToTime = pyqtSignal(datetime, timedelta)  # instantaneous or time-range cursor move occurred
+    didRequestActivation = pyqtSignal(dict, dict)  # user requests activation/deactivation of tracks {trackname: bool} and frames {uuid: bool}
+    didCopyPresentationBetweenTracks = pyqtSignal(str, str)  # from-track and to-track
+    didChangePlaybackSpan = pyqtSignal(span)  # overall playback span had one or both of its ends moved
     didChangeVisibleAreaForView = pyqtSignal(QGraphicsView,
                                              datetime,
                                              timedelta)  # note: multiple views can share one scene
@@ -456,9 +458,9 @@ class TestScene(QFramesInTracksScene):
 
         track0 = QTrackItem(self, self.coords, 'IMAGE:test::timeline:GOES-21:QBI:mars', 1, "G21 QBI B99 BT", "test track", tooltip="peremptorily cromulent")
         # scene.addItem(abitrack)  # done in init
-        frame01 = QFrameItem(track0, self.coords, uuidgen(), once + mm(5), mm(5), TimelineFrameState.AVAILABLE, "abi1", "fulldiskimus")
+        frame01 = QFrameItem(track0, self.coords, uuidgen(), once + mm(5), mm(5), flags(VisualState.AVAILABLE), "abi1", "fulldiskimus")
         track1 = QTrackItem(self, self.coords, 'IMAGE:test::timeline:Himawari-11:AHI:mars', 0, "H11 AHI B99 Rad", "second test track", tooltip="nominally cromulent")
-        frame11 = QFrameItem(track1, self.coords, uuidgen(), once + mm(6), mm(1), TimelineFrameState.READY, "ahi1", "JP04")
+        frame11 = QFrameItem(track1, self.coords, uuidgen(), once + mm(6), mm(1), flags(VisualState.READY), "ahi1", "JP04")
         # self.insert_track(track0)
         # self.insert_track(track1)
         # assert(hasattr(self, '_propagate_max_z'))

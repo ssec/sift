@@ -217,7 +217,6 @@ class aSingleFileWithSingleProductImporter(aImporter):
         return [prod]
 
 
-
 class GeoTiffImporter(aSingleFileWithSingleProductImporter):
     """
     GeoTIFF data importer
