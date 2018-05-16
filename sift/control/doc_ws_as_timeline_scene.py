@@ -98,7 +98,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
             track.update_pos_bounds()
             track.update_frame_positions()
 
-    def _invalidate(self):
+    def _invalidate(self, *args, **kwargs):
         """document state has changed, re-consult document and update our display
         """
         self._sync_tracks_frames()
@@ -113,6 +113,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         doc.didChangeLayerName.connect(self._invalidate)
         doc.didReorderLayers.connect(self._invalidate)
         doc.didChangeComposition.connect(self._invalidate)
+        doc.didReorderTracks.connect(self._invalidate)
 
     # def get(self, uuid: UUID) -> [QTrackItem, QFrameItem, None]:
     #     z = self._track_items.get(uuid, None)

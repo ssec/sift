@@ -759,6 +759,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     _layer_with_uuid = None  # dict(uuid:Doc____Layer)
 
     # signals
+    # Clarification: Layer interfaces migrate to layer meaning "current active products under the playhead"
     didAddBasicLayer = pyqtSignal(tuple, UUID, prez)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
     didAddCompositeLayer = pyqtSignal(tuple, UUID, prez)  # comp layer is derived from multiple basic layers and has its own UUID
     didRemoveLayers = pyqtSignal(tuple, list, int, int)  # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
@@ -777,17 +778,23 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didChangeProjection = pyqtSignal(str, dict)  # name of projection, dict of projection information
     # didChangeShapeLayer = pyqtSignal(dict)
     didAddFamily = pyqtSignal(str, dict)  # name of the newly added family and dict of family info
-
+    didReorderTracks = pyqtSignal(set, set)  # added track names, removed track names
 
     # high-level contexts providing purposed access to low-level document and its storage, as well as MDB and WS
+    # layer display shows active products under the playhead
     as_layer_stack: DocumentAsLayerStack = None
+    # track display shows all available products according to metadatabase; some tracks are active, i.e. they have are allowed to present as part of document
     as_track_stack: DocumentAsTrackStack = None
+    # presentation migrates from being layer-owned to being family-owned
     as_styled_families: DocumentAsStyledFamilies = None
+    # metadata is collected from resource pools, which can be local directories or remote URIs
     as_resource_pools: DocumentAsResourcePools = None
+    # presentation, calculation, and composition recipes are part of the document
     as_recipe_collection: DocumentAsRecipeCollection = None
+    # SceneGraphManager needs a plan on how to present and animate product content
     as_animation_sequence: DocumentAsAnimationSequence = None
+    # content gets probes applied across points and regions
     as_region_probes: DocumentAsRegionProbes = None
-
 
     def __init__(self, workspace, config_dir=DOCUMENT_SETTINGS_DIR, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
         super(Document, self).__init__(**kwargs)
@@ -915,24 +922,27 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         e = max(ends)
         return span(s, e - s)
 
-    def potential_tracks(self) -> T.Sequence[str]:
-        """List the names of available tracks according to the metadatabase
+    def potential_tracks(self) -> T.Iterable[str]:
+        """List the names of available tracks (both active and potential) according to the metadatabase
         """
         with self._workspace.metadatabase as S:
-            return list(f + FCS_SEP + c for (f, c) in S.query(Product.family, Product.category).distinct())
+            return ((f + FCS_SEP + c) for (f, c) in S.query(Product.family, Product.category).distinct())
 
     def sync_potential_tracks_from_metadata(self):
-        """Survey metadatabase for potential tracks
+        """update track_order to include any newly available tracks
         """
-        all_tracks = self.potential_tracks()
+        all_tracks = list(self.potential_tracks())
         all_tracks.sort()
-        old_track_count = len(self.track_order)
+        old_tracks = set(name for z, name in self.track_order.enumerate())
         for track in all_tracks:
             self.track_order.append(track, start_negative=True, not_if_present=True)
-        new_track_count = len(self.track_order)
-        if old_track_count != new_track_count:
-            LOG.info("went from {} available tracks to {}".format(old_track_count, new_track_count))
-            # FIXME signal to refresh timeline
+        for dismissed in old_tracks - set(all_tracks):
+            LOG.debug("removing track {} from track_order".format(dismissed))
+            self.track_order.remove(dismissed)
+        new_tracks = set(name for z, name in self.track_order.enumerate())
+        if old_tracks != new_tracks:
+            LOG.info("went from {} available tracks to {}".format(len(old_tracks), len(new_tracks)))
+            self.didReorderTracks.emit(new_tracks - old_tracks, old_tracks - new_tracks)
 
     def find_colormap(self, colormap):
         if isinstance(colormap, str) and colormap in self.colormaps:
