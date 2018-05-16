@@ -154,26 +154,26 @@ class QFramesInTracksScene(QGraphicsScene):
     # internal mid-level update commands
     #
 
-    def add_frames_to_track(self, track: [QTrackItem, str], paranoid=True, *frames):
-        """Add track and optional frames to scene storage, to ensure they are retained
-        Asserts that if frame or track for the given UUID is already known, that the same item is being used
-        """
-        if isinstance(track, str):
-            track = self._track_items[track]
-        if paranoid:
-            assert(isinstance(track, QTrackItem))
-            if track.track in self._track_items:
-                assert(track is self._track_items[track.track])
-            else:
-                raise AssertionError("need to insert_track_with_zorder before adding frames")
-                # self._track_items[track.uuid] = track
-        for frame in frames:
-            assert(isinstance(frame, QFrameItem))
-            existing = self._frame_items.get(frame.uuid)
-            if paranoid:
-                assert((existing is None) or (existing is frame))
-            if existing is None:
-                self._frame_items[frame.uuid] = frame
+    # def add_frames_to_track(self, track: [QTrackItem, str], paranoid=True, *frames):
+    #     """Add track and optional frames to scene storage, to ensure they are retained
+    #     Asserts that if frame or track for the given UUID is already known, that the same item is being used
+    #     """
+    #     if isinstance(track, str):
+    #         track = self._track_items[track]
+    #     if paranoid:
+    #         assert(isinstance(track, QTrackItem))
+    #         if track.track in self._track_items:
+    #             assert(track is self._track_items[track.track])
+    #         else:
+    #             raise AssertionError("need to insert_track_with_zorder before adding frames")
+    #             # self._track_items[track.uuid] = track
+    #     for frame in frames:
+    #         assert(isinstance(frame, QFrameItem))
+    #         existing = self._frame_items.get(frame.uuid)
+    #         if paranoid:
+    #             assert((existing is None) or (existing is frame))
+    #         if existing is None:
+    #             self._frame_items[frame.uuid] = frame
 
     def _del_track(self, track):
         raise NotImplementedError("NYI")  # FIXME

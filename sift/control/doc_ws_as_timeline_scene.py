@@ -82,7 +82,11 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
             else:
                 qti = self._create_track(z, trk)
                 new_tracks.append(qti)
+            _first = True
             for frm in trk.frames:
+                if _first:  # debug
+                    _first = False
+                    LOG.debug("track {} frame {}".format(trk, frm))
                 qfi = self._frame_items.get(frm.uuid)
                 if qfi is not None:
                     self._sync_frame(qfi, frm)

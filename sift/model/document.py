@@ -374,41 +374,42 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         self.doc.playback_span = when
         # FIXME: signal
 
-    def track_order_at_time(self, when:datetime = None,
-                            only_active=False,
-                            include_products=True
-                            ) -> T.Iterable[T.Tuple[int, str, T.Optional[Product]]]:
-        """List of tracks from highest Z order to lowest, at a given time;
-        (zorder, track) pairs are returned, with zorder>=0 being "part of the document" and <0 being "available but nothing activated"
-        include_products implies (zorder, track, product-or-None) tuples be yielded; otherwise tracks without products are not yielded
-        Inactive tracks can be filtered by stopping iteration when zorder<0
-        tracks are returned as track-name strings
-        Product instances are readonly metadatabase entries
-        defaults to current document time
-        """
-        if when is None:
-            when = self.doc.playhead_time
-        if when is None:
-            raise RuntimeError("unknown time for iterating track order, animation likely in progress")
-        with self.mdb as s:
-            que = s.query(Product).filter((Product.obs_time < when) and ((Product.obs_time + Product.obs_duration) <= when))
-            if only_active:
-                famtab = dict((x[1], x[0]) for x in self._active_families)
-                active_families = set(famtab.keys())
-                que = s.filter((Product.family + FCS_SEP + Product.category) in active_families)
-            else:
-                famtab = dict((x[1], x[0]) for x in self._families)
-            prods = list(que.all())
-            # sort into z order according to document
-            if include_products:
-                zult = [(famtab[p.track], p.track, p) for p in prods]
-            else:
-                zult = [(famtab[p.track], p.track) for p in prods]
-            zult.sort(reverse=True)
-            return zult
+    # def track_order_at_time(self, when:datetime = None,
+    #                         only_active=False,
+    #                         include_products=True
+    #                         ) -> T.Iterable[T.Tuple[int, str, T.Optional[Product]]]:
+    #     """List of tracks from highest Z order to lowest, at a given time;
+    #     (zorder, track) pairs are returned, with zorder>=0 being "part of the document" and <0 being "available but nothing activated"
+    #     include_products implies (zorder, track, product-or-None) tuples be yielded; otherwise tracks without products are not yielded
+    #     Inactive tracks can be filtered by stopping iteration when zorder<0
+    #     tracks are returned as track-name strings
+    #     Product instances are readonly metadatabase entries
+    #     defaults to current document time
+    #     """
+    #     if when is None:
+    #         when = self.doc.playhead_time
+    #     if when is None:
+    #         raise RuntimeError("unknown time for iterating track order, animation likely in progress")
+    #     with self.mdb as s:
+    #         que = s.query(Product).filter((Product.obs_time < when) and ((Product.obs_time + Product.obs_duration) <= when))
+    #         if only_active:
+    #             famtab = dict((track, z) for (z, track) in self.doc.track_order.enumerate() if z>=0)
+    #             active_families = set(famtab.keys())
+    #             que = s.filter((Product.family + FCS_SEP + Product.category) in active_families)
+    #         else:
+    #             famtab = dict((track, z) for (z, track) in self.doc.track_order.enumerate())
+    #         prods = list(que.all())
+    #         # sort into z order according to document
+    #         if include_products:
+    #             zult = [(famtab[p.track], p.track, p) for p in prods]
+    #         else:
+    #             zult = [(famtab[p.track], p.track) for p in prods]
+    #         zult.sort(reverse=True)
+    #         return zult
 
     def enumerate_track_names(self, only_active=False) -> T.Iterable[T.Tuple[int, str]]:
         """All the names of the tracks, from highest zorder to lowest
+        z>=0 implies an active track in the document, <0 implies potentials that have products either cached or potential
         """
         for z, track in self.doc.track_order.enumerate():
             if only_active and z < 0:
