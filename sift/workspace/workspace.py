@@ -48,9 +48,9 @@ import os
 import sys
 import unittest
 import enum
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import UUID, uuid1 as uuidgen
-from typing import Mapping, Set, List
+from typing import Mapping, Set, List, Iterable, Generator
 from collections import Mapping as ReadOnlyMapping, defaultdict
 
 import numba as nb
@@ -797,10 +797,12 @@ class Workspace(QObject):
                         prod = resource.product[0]
                         return prod.info
 
-    def collect_product_metadata_for_paths(self, paths):
+    def collect_product_metadata_for_paths(self, paths: list) -> Generator[frozendict, None, None]:
         """
         Start loading URI data into the workspace asynchronously.
         return sequence of read-only info dictionaries
+
+        NOTE: If
 
         """
         # self._S.flush()
@@ -809,6 +811,8 @@ class Workspace(QObject):
             # import_session = self._S
             for source_path in paths:
                 LOG.info('collecting metadata for {}'.format(source_path))
+                # FIXME: Check if importer only accepts one path at a time
+                #        Maybe sort importers by single files versus multiple files and doing single files first?
                 # FIXME: decide whether to update database if mtime of file is newer than mtime in database
                 for imp in self._importers:
                     if imp.is_relevant(source_path=source_path):
@@ -935,7 +939,6 @@ class Workspace(QObject):
         info[INFO.OBS_TIME] = min([x[INFO.OBS_TIME] for x in md_list])
         info[INFO.SCHED_TIME] = min([x[INFO.SCHED_TIME] for x in md_list])
         # get the overall observation time
-        from datetime import timedelta
         info[INFO.OBS_DURATION] = max([
             x[INFO.OBS_TIME] + x.get(INFO.OBS_DURATION, timedelta(seconds=0)) for x in md_list]) - info[INFO.OBS_TIME]
 

@@ -265,16 +265,26 @@ class Main(QtGui.QMainWindow):
                                                    ';;'.join(['GOES-R netCDF or Merc GTIFF (*.nc *.nc4 *.tiff *.tif)']))
         self.open_paths(files)
 
+    def open_satpy_files(self, *args, **kwargs):
+        self.scene_manager.layer_set.animating = False
+        # http://pyqt.sourceforge.net/Docs/PyQt4/qfiledialog.html#getOpenFileNames
+        files = QtGui.QFileDialog.getOpenFileNames(self,
+                                                   "Select one or more files to open",
+                                                   self._last_open_dir or os.getenv("HOME"))
+        LOG.debug('open files with satpy {}'.format(files))
+        self.scene_manager.layer_set.animating = False
+        self.open_paths(files)
+
     def _bgnd_open_paths(self, paths, uuid_list):
         """Background task runs on a secondary thread
         """
-        npaths = len(paths)
-        LOG.info("opening {} paths in background".format(npaths))
-        for dex,path in enumerate(paths):
-            yield {TASK_DOING: 'Open {}/{}'.format(dex+1, npaths), TASK_PROGRESS: float(dex+1) / float(npaths+1)}
-            for uuid, _, _ in self.document.open_files([path]):
-                uuid_list.append(uuid)
-        yield {TASK_DOING: 'imported {} files'.format(npaths), TASK_PROGRESS: 1.0}
+        LOG.info("opening products from {} paths in background".format(
+            len(paths)))
+        for dex, (uuid, _, _, num_prods) in enumerate(self.document.open_files(paths)):
+            yield {TASK_DOING: 'Open {}/{}'.format(dex+1, num_prods),
+                   TASK_PROGRESS: float(dex+1) / float(num_prods+1)}
+            uuid_list.append(uuid)
+        yield {TASK_DOING: 'imported {} products'.format(num_prods), TASK_PROGRESS: 1.0}
 
     def _bgnd_open_paths_finish(self, isok: bool, uuid_list):
         """Main thread finalization after background imports are done
