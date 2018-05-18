@@ -33,6 +33,12 @@ from .metadatabase import Resource, Product, Content
 
 LOG = logging.getLogger(__name__)
 
+try:
+    from satpy import Scene
+except ImportError:
+    LOG.warning("SatPy is not installed and will not be used for importing.")
+    Scene = None
+
 DEFAULT_GTIFF_OBS_DURATION = timedelta(seconds=60)
 
 GUIDEBOOKS = {
@@ -146,6 +152,10 @@ class aSingleFileWithSingleProductImporter(aImporter):
         super(aSingleFileWithSingleProductImporter, self).__init__(workspace_cwd, database_session)
         self.source_path = source_path
 
+    @property
+    def num_products(self):
+        return 1
+
     def merge_resources(self) -> Iterable[Resource]:
         """
         Returns:
@@ -216,7 +226,6 @@ class aSingleFileWithSingleProductImporter(aImporter):
         self._S.add(prod)
         self._S.commit()
         return [prod]
-
 
 
 class GeoTiffImporter(aSingleFileWithSingleProductImporter):
@@ -709,6 +718,9 @@ class SatPyImporter(aImporter):
             raise NotImplementedError("SatPy importer does not currently "
                                       "support reading more than one file "
                                       "at a time.")
+        if Scene is None:
+            raise ImportError("SatPy is not available and can't be used as "
+                              "an importer")
         self.filenames = source_path
         self.reader = reader
         self.scene = Scene(reader=self.reader,
@@ -719,6 +731,8 @@ class SatPyImporter(aImporter):
         for k in ['resolution', 'calibration', 'level']:
             if k in kwargs:
                 self.product_filters[k] = kwargs.pop(k)
+
+        self.scn = Scene(reader=self.reader, filenames=self.filenames)
 
     @classmethod
     def is_relevant(cls, source_path=None, source_uri=None):
@@ -796,12 +810,17 @@ class SatPyImporter(aImporter):
             products.append(prod)
         return products
 
-    def load_all_datasets(self):
+    @property
+    def num_products(self) -> int:
+        # WARNING: This could provide radiances and higher level products
+        #          which SIFT probably shouldn't care about
+        return len(self.scn.available_dataset_ids())
+
+    def load_all_datasets(self) -> Scene:
         from pyresample.geometry import AreaDefinition
-        scn = Scene(reader=self.reader, filenames=self.filenames)
-        scn.load(['t'], level=100)  # scn.available_dataset_ids())
+        self.scn.load(['t'], level=100)  # scn.available_dataset_ids())
         # copy satpy metadata keys to SIFT keys
-        for ds in scn:
+        for ds in self.scn:
             start_time = ds.attrs['start_time']
             ds.attrs[INFO.OBS_TIME] = start_time
             ds.attrs[INFO.SCHED_TIME] = start_time
@@ -810,21 +829,64 @@ class SatPyImporter(aImporter):
                 duration = timedelta(minutes=60)
             ds.attrs[INFO.OBS_DURATION] = duration
 
+            # Handle GRIB platform/instrument
+            ds.attrs[INFO.INSTRUMENT] = ds.attrs.get('sensor')
+            ds.attrs[INFO.PLATFORM] = ds.attrs.get('platform_name')
+            if 'centreDescription' in ds.attrs and \
+                    ds.attrs[INFO.INSTRUMENT] == 'unknown':
+                description = ds.attrs['centreDescription']
+                if ds.attrs.get(INFO.PLATFORM) is None:
+                    ds.attrs[INFO.PLATFORM] = 'NWP'
+                if 'NCEP' in description:
+                    ds.attrs[INFO.INSTRUMENT] = 'GFS'
+            if ds.attrs[INFO.INSTRUMENT] == 'GFS':
+                ds.attrs[INFO.INSTRUMENT] = INSTRUMENT.GFS
+            if ds.attrs[INFO.PLATFORM] == 'NWP':
+                ds.attrs[INFO.PLATFORM] = PLATFORM.NWP
+
             # area to sift keys
             area = ds.attrs['area']
             if not isinstance(area, AreaDefinition):
                 raise NotImplementedError("Only AreaDefinition datasets can "
                                           "be loaded at this time.")
 
-            ds.attrs[INFO.KIND] = KIND.IMAGE if self.reader != 'grib' else \
-                KIND.CONTOUR
+            # ds.attrs[INFO.KIND] = KIND.IMAGE if self.reader != 'grib' else \
+            #     KIND.CONTOUR
+            ds.attrs[INFO.KIND] = KIND.IMAGE
             ds.attrs[INFO.PROJ] = area.proj4_string
             ds.attrs[INFO.ORIGIN_X] = area.area_extent[0]
             ds.attrs[INFO.ORIGIN_Y] = area.area_extent[3]
             ds.attrs[INFO.CELL_HEIGHT] = -abs(area.pixel_size_y)
             ds.attrs[INFO.CELL_WIDTH] = area.pixel_size_x
 
-        return scn
+        return self.scn
+
+    def begin_import_products(self, *product_ids) -> Generator[import_progress, None, None]:
+        if product_ids:
+            products = [self._S.query(Product).filter_by(id=anid).one() for anid in product_ids]
+            assert products
+        else:
+            products = list(self._S.query(Resource, Product).filter(
+                Resource.path.in_(self.filenames)).filter(
+                Product.resource_id == Resource.id).all())
+            assert products
+
+        scn_by_uuid = {ds.attrs[INFO.UUID]: ds for ds in self.scn}
+        for idx, prod in enumerate(products):
+            dataset = scn_by_uuid[prod.uuid]
+            img_data = dataset.compute().values
+            if prod.content:
+                LOG.warning('content was already available, skipping import')
+                continue
+
+            yield import_progress(uuid=prod.uuid,
+                                  stages=1,
+                                  current_stage=0,
+                                  completion=(idx + 1) / len(products),
+                                  stage_desc="SatPy data add to workspace",
+                                  dataset_info=None,
+                                  data=img_data)
+
 
 
 

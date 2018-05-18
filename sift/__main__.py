@@ -70,30 +70,13 @@ PROGRESS_BAR_MAX = 1000
 STATUS_BAR_DURATION = 2000  # ms
 
 
-def test_layers_from_directory(ws, doc, layer_tiff_glob, range_txt=None):
-    """
-    TIFF_GLOB='/Users/keoni/Data/CSPOV/2015_07_14_195/00?0/HS*_B03_*merc.tif' VERBOSITY=3 python -m sift
-    :param model:
-    :param view:
-    :param layer_tiff_glob:
-    :return:
-    """
-    from glob import glob
-    range = None
-    if range_txt:
-        import re
-        range = tuple(map(float, re.findall(r'[\.0-9]+', range_txt)))
-    for tif in glob(layer_tiff_glob):
-        # doc.addFullGlobMercatorColormappedFloatImageLayer(tif, range=range)
-        # uuid, info, overview_data = ws.import_image(tif)
-        uuid, info, overview_data = doc.open_file(tif)
-        LOG.info('loaded uuid {} from {}'.format(uuid, tif))
-        yield uuid, info, overview_data
+def test_layers_from_directory(doc, layer_tiff_glob):
+    return doc.open_file(glob(layer_tiff_glob))
 
 
-def test_layers(ws, doc, glob_pattern=None):
+def test_layers(doc, glob_pattern=None):
     if glob_pattern:
-        return test_layers_from_directory(ws, doc, glob_pattern, os.environ.get('RANGE', None))
+        return test_layers_from_directory(doc, glob_pattern)
     return []
 
 
@@ -280,11 +263,10 @@ class Main(QtGui.QMainWindow):
         """
         LOG.info("opening products from {} paths in background".format(
             len(paths)))
-        for dex, (uuid, _, _, num_prods) in enumerate(self.document.open_files(paths)):
-            yield {TASK_DOING: 'Open {}/{}'.format(dex+1, num_prods),
-                   TASK_PROGRESS: float(dex+1) / float(num_prods+1)}
-            uuid_list.append(uuid)
-        yield {TASK_DOING: 'imported {} products'.format(num_prods), TASK_PROGRESS: 1.0}
+        for progress in self.document.import_files(paths):
+            yield progress
+            uuid_list.append(progress['uuid'])
+        yield {TASK_DOING: 'products loaded from paths', TASK_PROGRESS: 1.0}
 
     def _bgnd_open_paths_finish(self, isok: bool, uuid_list):
         """Main thread finalization after background imports are done
@@ -635,9 +617,7 @@ class Main(QtGui.QMainWindow):
             pane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable |
                              QtGui.QDockWidget.DockWidgetMovable)
 
-        for uuid, ds_info, full_data in test_layers(self.workspace, self.document, glob_pattern=glob_pattern):
-            # this now fires off a document modification cascade resulting in a new layer going up
-            pass
+        test_layers(self.document, glob_pattern=glob_pattern)
 
         # quamash async test pattern updates a control once a second
         # loop.create_task(do_test_cycle(self.ui.cursorProbeText))

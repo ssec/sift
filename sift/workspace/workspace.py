@@ -50,7 +50,7 @@ import unittest
 import enum
 from datetime import datetime, timedelta
 from uuid import UUID, uuid1 as uuidgen
-from typing import Mapping, Set, List, Iterable, Generator
+from typing import Mapping, Set, List, Iterable, Generator, Tuple
 from collections import Mapping as ReadOnlyMapping, defaultdict
 
 import numba as nb
@@ -797,7 +797,7 @@ class Workspace(QObject):
                         prod = resource.product[0]
                         return prod.info
 
-    def collect_product_metadata_for_paths(self, paths: list) -> Generator[frozendict, None, None]:
+    def collect_product_metadata_for_paths(self, paths: list) -> Generator[Tuple[int, frozendict], None, None]:
         """
         Start loading URI data into the workspace asynchronously.
         return sequence of read-only info dictionaries
@@ -805,28 +805,33 @@ class Workspace(QObject):
         NOTE: If
 
         """
-        # self._S.flush()
         with self._inventory as import_session:
             # FUTURE: consider returning importers instead of products, since we can then re-use them to import the content instead of having to regenerate
             # import_session = self._S
+            importers = []
+            num_products = 0
             for source_path in paths:
                 LOG.info('collecting metadata for {}'.format(source_path))
                 # FIXME: Check if importer only accepts one path at a time
                 #        Maybe sort importers by single files versus multiple files and doing single files first?
                 # FIXME: decide whether to update database if mtime of file is newer than mtime in database
+                # Collect all the importers we are going to use and count
+                # how many products each expects to return
                 for imp in self._importers:
                     if imp.is_relevant(source_path=source_path):
                         hauler = imp(source_path, database_session=import_session,
                                      workspace_cwd=self.cache_dir)
                         hauler.merge_resources()
-                        for prod in hauler.merge_products():
-                            assert(prod is not None)
-                            # merge the product into our database session, since it may belong to import_session
-                            zult = frozendict(prod.info)  # self._S.merge(prod)
-                            LOG.debug('yielding product metadata for {}'.format(zult.get(INFO.DISPLAY_NAME, '?? unknown name ??')))
-                            yield zult
-        # import_session.commit()
-        # import_session.flush()
+                        importers.append(hauler)
+                        num_products += hauler.num_products
+
+            for hauler in importers:
+                for prod in hauler.merge_products():
+                    assert(prod is not None)
+                    # merge the product into our database session, since it may belong to import_session
+                    zult = frozendict(prod.info)  # self._S.merge(prod)
+                    LOG.debug('yielding product metadata for {}'.format(zult.get(INFO.DISPLAY_NAME, '?? unknown name ??')))
+                    yield num_products, zult
 
     def import_product_content(self, uuid=None, prod=None, allow_cache=True):
         with self._inventory as S:

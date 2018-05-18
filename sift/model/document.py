@@ -80,6 +80,7 @@ from sift.common import KIND, INFO, prez, span, FCS_SEP, ZList, flags
 from sift.util.default_paths import DOCUMENT_SETTINGS_DIR
 from sift.model.composite_recipes import RecipeManager, CompositeRecipe
 from sift.view.Colormap import ALL_COLORMAPS, USER_COLORMAPS
+from sift.queue import TASK_PROGRESS, TASK_DOING
 from PyQt4.QtCore import QObject, pyqtSignal
 
 from colormap import rgb2hex
@@ -1022,7 +1023,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param path: file to open and add
         :return: overview (uuid:UUID, datasetinfo:dict, overviewdata:numpy.ndarray)
         """
-        return list(self.open_files([path], insert_before=insert_before))[0][:3]
+        import warnings
+        warnings.warn("'open_file' is deprecated, use 'open_files' instead.",
+                      DeprecationWarning)
+        return list(self.import_files([path], insert_before=insert_before))
 
     def activate_product_uuid_as_new_layer(self, uuid: UUID, insert_before=0):
         if uuid in self._layer_with_uuid:
@@ -1118,37 +1122,50 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             INFO.DISPLAY_FAMILY: display_family,
         }
 
-    def open_files(self, paths, insert_before=0):
-        """
-        sort paths into preferred load order
-        open files in order, yielding uuid, info, overview_content
+    def import_files(self, paths, insert_before=0, **importer_kwargs) -> dict:
+        """Load product metadata and content from provided file paths.
+        
         :param paths: paths to open
         :param insert_before: where to insert them in layer list
         :return:
+        
         """
+        # TODO: Iterate over metadata import yielding progress then load content
         # Load all the metadata so we can sort the files
         paths = self.sort_paths(paths)
         # assume metadata collection is in the most user-friendly order
         infos = self._workspace.collect_product_metadata_for_paths(paths)
-        # it is best for the progress bar if we know how many things
-        # we're returning
-        infos = list(infos)
+        uuids = []
+        total_products = 0
+        for dex, (num_prods, info) in enumerate(infos):
+            assert info is not None
+            yield {
+                TASK_DOING: 'Collecting metadata {}/{}'.format(dex + 1, num_prods),
+                TASK_PROGRESS: float(dex + 1) / float(num_prods),
+                'uuid': info[INFO.UUID],
+                'num_products': num_prods,
+            }
+            # redundant but also more explicit than depending on num_prods
+            total_products = num_prods
+            uuids.append(info[INFO.UUID])
+
+        if not total_products:
+            raise ValueError('no products available in {}'.format(paths))
 
         # collect product and resource information but don't yet import content
-        num_products = len(infos)
-        for info in infos:
-            assert(info is not None)
-            uuid = info[INFO.UUID]
-
+        for dex, uuid in enumerate(uuids):
             if uuid in self._layer_with_uuid:
                 LOG.warning("layer with UUID {} already in document?".format(uuid))
-                active_content_data = self._workspace.get_content(uuid)
-                yield uuid, info, active_content_data, num_products
+                self._workspace.get_content(uuid)
+            else:
+                self.activate_product_uuid_as_new_layer(uuid, insert_before=insert_before)
 
-            uuid, info, active_content_data = self.activate_product_uuid_as_new_layer(uuid, insert_before=insert_before)
-            yield uuid, info, active_content_data, num_products
-        if not num_products:
-            raise ValueError('no products available in {}'.format(paths))
+            yield {
+                TASK_DOING: 'Loading content {}/{}'.format(dex + 1, total_products),
+                TASK_PROGRESS: float(dex + 1) / float(total_products),
+                'uuid': uuid,
+                'num_products': total_products,
+            }
 
     def sort_paths(self, paths):
         """
