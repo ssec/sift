@@ -156,11 +156,35 @@ def geos_init(proj_dict):
     return proj_dict
 
 
+def latlong_init(proj_dict):
+    if 'over' in proj_dict:
+        # proj_dict['offset'] = '360.'
+        proj_dict['offset'] = '0.'
+    else:
+        proj_dict['offset'] = '0.'
+    return proj_dict
+
+
 # proj_name -> (proj_init, map_ellps, map_spher, imap_ellps, imap_spher)
 # where 'map' is lon/lat to X/Y
 # and 'imap' is X/Y to lon/lat
 # WARNING: Need double {{ }} for functions for string formatting to work properly
 PROJECTIONS = {
+    'latlong': (
+        latlong_init,
+        """vec4 latlong_map(vec4 pos) {{
+            return vec4(pos.x + {offset}, y, pos.z, pos.w);
+        }}""",
+        """vec4 latlong_map(vec4 pos) {{
+            return vec4(pos.x + {offset}, y, pos.z, pos.w);
+        }}""",
+        """vec4 latlong_imap(vec4 pos) {{
+            return pos;
+        }}""",
+        """vec4 latlong_imap(vec4 pos) {{
+            return pos;
+        }}""",
+    ),
     'merc': (
         merc_init,
         """vec4 merc_map_e(vec4 pos) {{
@@ -551,7 +575,11 @@ class PROJ4Transform(BaseTransform):
             Coordinates to map.
         """
         m = np.empty(coords.shape)
-        m[:, 0], m[:, 1] = self.proj(coords[:, 0], coords[:, 1], inverse=self._proj4_inverse)
+        if self.proj.is_latlong():
+            m[:, 0] = coords[:, 0]
+            m[:, 1] = coords[:, 1]
+        else:
+            m[:, 0], m[:, 1] = self.proj(coords[:, 0], coords[:, 1], inverse=self._proj4_inverse)
         m[:, 2:] = coords[:, 2:]
         return m
 
@@ -565,7 +593,11 @@ class PROJ4Transform(BaseTransform):
             Coordinates to inverse map.
         """
         m = np.empty(coords.shape)
-        m[:, 0], m[:, 1] = self.proj(coords[:, 0], coords[:, 1], inverse=not self._proj4_inverse)
+        if self.proj.is_latlong():
+            m[:, 0] = coords[:, 0]
+            m[:, 1] = coords[:, 1]
+        else:
+            m[:, 0], m[:, 1] = self.proj(coords[:, 0], coords[:, 1], inverse=not self._proj4_inverse)
         m[:, 2:] = coords[:, 2:]
         return m
 
