@@ -35,11 +35,14 @@ LOG = logging.getLogger(__name__)
 
 try:
     from satpy import Scene
+    from satpy.dataset import DatasetID
 except ImportError:
     LOG.warning("SatPy is not installed and will not be used for importing.")
     Scene = None
+    DatasetID = None
 
 DEFAULT_GTIFF_OBS_DURATION = timedelta(seconds=60)
+DEFAULT_GUIDEBOOK = ABI_AHI_Guidebook
 
 GUIDEBOOKS = {
     PLATFORM.GOES_16: ABI_AHI_Guidebook,
@@ -57,7 +60,7 @@ import_progress = namedtuple('import_progress', ['uuid', 'stages', 'current_stag
 
 def get_guidebook_class(layer_info) -> Guidebook:
     platform = layer_info.get(INFO.PLATFORM)
-    return GUIDEBOOKS[platform]()
+    return GUIDEBOOKS.get(platform, DEFAULT_GUIDEBOOK)()
 
 
 def generate_guidebook_metadata(layer_info) -> Mapping:
@@ -99,7 +102,7 @@ class aImporter(ABC):
         except IndexError:
             LOG.error('no resources in {} {}'.format(repr(type(prod)), repr(prod)))
             raise
-        return cls(prod.resource[0].path, workspace_cwd=workspace_cwd, database_session=database_session)
+        return cls(prod.resource[0].path, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
 
     @abstractclassmethod
     def is_relevant(cls, source_path=None, source_uri=None) -> bool:
@@ -767,28 +770,23 @@ class SatPyImporter(aImporter):
         self._resources = res_dict.values()
         return self._resources
 
-    @abstractmethod
-    def product_metadata(self):
-        # TODO
-        return {}
-
     def merge_products(self):
         resources = self.merge_resources()
         if resources is None:
             LOG.debug('no resources for {}'.format(self.filenames))
-            return []
+            return
 
         # FIXME: This doesn't work for multiple files to one product
-        res = resources[0]
+        res = list(resources)[0]
         products = list(res.product)
         if products:
             LOG.debug('pre-existing products {}'.format(repr(products)))
-            return products
+            yield from products
+            return
 
         from uuid import uuid1
         uuid = uuid1()
         scn = self.load_all_datasets()
-        products = []
         for ds in scn:
             meta = ds.attrs
             meta[INFO.UUID] = uuid
@@ -807,17 +805,16 @@ class SatPyImporter(aImporter):
             LOG.debug('new product: {}'.format(repr(prod)))
             self._S.add(prod)
             self._S.commit()
-            products.append(prod)
-        return products
+            yield prod
 
     @property
     def num_products(self) -> int:
         # WARNING: This could provide radiances and higher level products
         #          which SIFT probably shouldn't care about
-        return len(self.scn.available_dataset_ids())
+        return 1
+        # return len(self.scn.available_dataset_ids())
 
     def load_all_datasets(self) -> Scene:
-        from pyresample.geometry import AreaDefinition
         self.scn.load(['t'], level=100)  # scn.available_dataset_ids())
         # copy satpy metadata keys to SIFT keys
         for ds in self.scn:
@@ -830,6 +827,10 @@ class SatPyImporter(aImporter):
             ds.attrs[INFO.OBS_DURATION] = duration
 
             # Handle GRIB platform/instrument
+            ds.attrs[INFO.KIND] = kind = KIND.IMAGE
+            # ds.attrs[INFO.KIND] = KIND.IMAGE if self.reader != 'grib' else \
+            #     KIND.CONTOUR
+            # FIXME: GRIB files should actually be contours (decide by the platform maybe?)
             ds.attrs[INFO.INSTRUMENT] = ds.attrs.get('sensor')
             ds.attrs[INFO.PLATFORM] = ds.attrs.get('platform_name')
             if 'centreDescription' in ds.attrs and \
@@ -839,29 +840,83 @@ class SatPyImporter(aImporter):
                     ds.attrs[INFO.PLATFORM] = 'NWP'
                 if 'NCEP' in description:
                     ds.attrs[INFO.INSTRUMENT] = 'GFS'
-            if ds.attrs[INFO.INSTRUMENT] == 'GFS':
+            if ds.attrs[INFO.INSTRUMENT] in ['GFS', 'unknown']:
                 ds.attrs[INFO.INSTRUMENT] = INSTRUMENT.GFS
-            if ds.attrs[INFO.PLATFORM] == 'NWP':
+            if ds.attrs[INFO.PLATFORM] in ['NWP', 'unknown']:
                 ds.attrs[INFO.PLATFORM] = PLATFORM.NWP
+            ds.attrs.setdefault(INFO.STANDARD_NAME, ds.attrs.get('standard_name'))
+            if 'wavelength' in ds.attrs:
+                ds.attrs.setdefault(INFO.CENTRAL_WAVELENGTH,
+                                    ds.attrs['wavelength'])
 
-            # area to sift keys
-            area = ds.attrs['area']
-            if not isinstance(area, AreaDefinition):
-                raise NotImplementedError("Only AreaDefinition datasets can "
-                                          "be loaded at this time.")
+            # Resolve anything else needed by SIFT
+            id_str = ":".join(str(v) for v in DatasetID.from_dict(ds.attrs))
+            ds.attrs[INFO.DATASET_NAME] = id_str
+            ds.attrs[INFO.BAND] = 0
+            ds.attrs[INFO.SHORT_NAME] = ds.attrs['name']
+            if ds.attrs.get('level') is not None:
+                ds.attrs[INFO.SHORT_NAME] = "{} @ {}hPa".format(ds.attrs['name'], ds.attrs['level'])
+            ds.attrs[INFO.SHAPE] = ds.shape
+            generate_guidebook_metadata(ds.attrs)
 
-            # ds.attrs[INFO.KIND] = KIND.IMAGE if self.reader != 'grib' else \
-            #     KIND.CONTOUR
-            ds.attrs[INFO.KIND] = KIND.IMAGE
-            ds.attrs[INFO.PROJ] = area.proj4_string
-            ds.attrs[INFO.ORIGIN_X] = area.area_extent[0]
-            ds.attrs[INFO.ORIGIN_Y] = area.area_extent[3]
-            ds.attrs[INFO.CELL_HEIGHT] = -abs(area.pixel_size_y)
-            ds.attrs[INFO.CELL_WIDTH] = area.pixel_size_x
+            # Generate FAMILY and CATEGORY
+            if 'model_time' in ds.attrs:
+                model_time = ds.attrs['model_time'].isoformat()
+                cat_id = model_time + ':' + id_str
+            else:
+                model_time = None
+                cat_id = id_str
+            ds.attrs[INFO.SCENE] = hash(ds.attrs['area'])
+            ds.attrs[INFO.FAMILY] = '{}:{}:{}'.format(
+                kind.name, ds.attrs[INFO.STANDARD_NAME], id_str)
+            ds.attrs[INFO.CATEGORY] = 'SatPy:{}:{}:{}:{}'.format(
+                ds.attrs[INFO.PLATFORM].name, ds.attrs[INFO.INSTRUMENT].name,
+                ds.attrs[INFO.SCENE], cat_id)  # system:platform:instrument:target
+            # TODO: Include level or something else in addition to time?
+            #       Probably need to include the model run time (prefix id_str?)
+            start_str = ds.attrs['start_time'].isoformat()
+            ds.attrs[INFO.SERIAL] = start_str if model_time is None else model_time + ":" + start_str
 
         return self.scn
 
+    def _area_to_sift_attrs(self, area):
+        """Area to sift keys"""
+        from pyresample.geometry import AreaDefinition
+        if not isinstance(area, AreaDefinition):
+            raise NotImplementedError("Only AreaDefinition datasets can "
+                                      "be loaded at this time.")
+
+        half_pixel_x = abs(area.pixel_size_x) / 2.
+        half_pixel_y = abs(area.pixel_size_y) / 2.
+
+        # HACK: We don't currently support eqc but we know it is just lon/lat grid
+        if '+proj=eqc' in area.proj4_string:
+            proj = Proj(area.proj4_string)
+            proj4_string = "+proj=latlong"
+            origin_x, origin_y = proj(area.area_extent[0], area.area_extent[3], inverse=True)
+            pixel_size_x = abs(proj(area.pixel_size_x, 0, inverse=True)[0])
+            pixel_size_y = -abs(proj(0, area.pixel_size_y, inverse=True)[1])
+            origin_x += pixel_size_x / 2.
+            origin_y += pixel_size_y / 2.  # pixel size y should be negative
+            return {
+                INFO.PROJ: proj4_string,
+                INFO.ORIGIN_X: origin_x,
+                INFO.ORIGIN_Y: origin_y,
+                INFO.CELL_HEIGHT: pixel_size_y,
+                INFO.CELL_WIDTH: pixel_size_x,
+            }
+
+        return {
+            INFO.PROJ: area.proj4_string,
+            INFO.ORIGIN_X: area.area_extent[0] + half_pixel_x,
+            INFO.ORIGIN_Y: area.area_extent[3] - half_pixel_y,
+            INFO.CELL_HEIGHT: -abs(area.pixel_size_y),
+            INFO.CELL_WIDTH: area.pixel_size_x,
+        }
+
     def begin_import_products(self, *product_ids) -> Generator[import_progress, None, None]:
+        import dask.array as da
+
         if product_ids:
             products = [self._S.query(Product).filter_by(id=anid).one() for anid in product_ids]
             assert products
@@ -871,13 +926,59 @@ class SatPyImporter(aImporter):
                 Product.resource_id == Resource.id).all())
             assert products
 
-        scn_by_uuid = {ds.attrs[INFO.UUID]: ds for ds in self.scn}
-        for idx, prod in enumerate(products):
-            dataset = scn_by_uuid[prod.uuid]
-            img_data = dataset.compute().values
+        # FIXME: Don't recreate the importer every time we want to load data
+        dataset_ids = [DatasetID.from_dict(prod.info) for prod in products]
+        self.scn.load(dataset_ids)
+        for idx, (prod, ds_id) in enumerate(zip(products, dataset_ids)):
+            dataset = self.scn[ds_id]
+            shape = dataset.shape
             if prod.content:
                 LOG.warning('content was already available, skipping import')
                 continue
+
+            data_filename = '{}.data'.format(prod.uuid)
+            data_path = os.path.join(self._cwd, data_filename)
+
+            # shovel that data into the memmap incrementally
+            img_data = np.memmap(data_path, dtype=np.float32, shape=shape, mode='w+')
+            da.store(dataset.data, img_data)
+
+            now = datetime.utcnow()
+            area_info = self._area_to_sift_attrs(dataset.attrs['area'])
+            cell_width = area_info[INFO.CELL_WIDTH]
+            cell_height = area_info[INFO.CELL_HEIGHT]
+            proj4 = area_info[INFO.PROJ]
+            origin_x = area_info[INFO.ORIGIN_X]
+            origin_y = area_info[INFO.ORIGIN_Y]
+            c = Content(
+                lod=0,
+                resolution=int(min(abs(cell_width), abs(cell_height))),
+                atime=now,
+                mtime=now,
+
+                # info about the data array memmap
+                path=data_filename,
+                rows=shape[0],
+                cols=shape[1],
+                proj4=proj4,
+                # levels = 0,
+                dtype='float32',
+
+                # info about the coverage array memmap, which in our case just tells what rows are ready
+                # coverage_rows = rows,
+                # coverage_cols = 1,
+                # coverage_path = coverage_filename
+
+                cell_width=cell_width,
+                cell_height=cell_height,
+                origin_x=origin_x,
+                origin_y=origin_y,
+            )
+            # c.info.update(prod.info) would just make everything leak together so let's not do it
+            self._S.add(c)
+            prod.content.append(c)
+            # prod.touch()
+            self._S.commit()
 
             yield import_progress(uuid=prod.uuid,
                                   stages=1,

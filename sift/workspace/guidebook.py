@@ -250,6 +250,8 @@ class ABI_AHI_Guidebook(Guidebook):
             return dsi["valid_min"], dsi["valid_max"]
         elif "flag_values" in dsi:
             return min(dsi["flag_values"]), max(dsi["flag_values"])
+        elif "valid_range" in dsi:
+            return dsi['valid_range']
         elif INFO.VALID_RANGE in dsi:
             return dsi[INFO.VALID_RANGE]
         else:

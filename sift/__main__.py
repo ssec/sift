@@ -242,10 +242,17 @@ class Main(QtGui.QMainWindow):
     def interactive_open_files(self, *args, files=None, **kwargs):
         self.scene_manager.layer_set.animating = False
         # http://pyqt.sourceforge.net/Docs/PyQt4/qfiledialog.html#getOpenFileNames
+        filename_filters = [
+            'All files (*.*)',
+            'GOES-16 NetCDF (*.nc *.nc4)',
+            'Mercator GTIFF (*.tiff *.tif)',
+            'NWP GRIB2 (*.grib2)',
+        ]
+        filter_str = ';;'.join(filename_filters)
         files = QtGui.QFileDialog.getOpenFileNames(self,
                                                    "Select one or more files to open",
                                                    self._last_open_dir or os.getenv("HOME"),
-                                                   ';;'.join(['GOES-R netCDF or Merc GTIFF (*.nc *.nc4 *.tiff *.tif)']))
+                                                   filter_str)
         self.open_paths(files)
 
     def open_satpy_files(self, *args, **kwargs):
@@ -258,12 +265,12 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.layer_set.animating = False
         self.open_paths(files)
 
-    def _bgnd_open_paths(self, paths, uuid_list):
+    def _bgnd_open_paths(self, paths, uuid_list, **importer_kwargs):
         """Background task runs on a secondary thread
         """
         LOG.info("opening products from {} paths in background".format(
             len(paths)))
-        for progress in self.document.import_files(paths):
+        for progress in self.document.import_files(paths, **importer_kwargs):
             yield progress
             uuid_list.append(progress['uuid'])
         yield {TASK_DOING: 'products loaded from paths', TASK_PROGRESS: 1.0}
@@ -285,12 +292,15 @@ class Main(QtGui.QMainWindow):
         # force the newest layer to be visible
         self.document.next_last_step(uuid)
 
-    def open_paths(self, paths):
+    def open_paths(self, paths, **importer_kwargs):
+        importer_kwargs = {
+            'reader': 'grib',
+        }
         paths = list(paths)
         if not paths:
             return
         uli = []
-        bop = partial(self._bgnd_open_paths, uuid_list=uli)
+        bop = partial(self._bgnd_open_paths, uuid_list=uli, **importer_kwargs)
         bopf = partial(self._bgnd_open_paths_finish, uuid_list=uli)
         self.queue.add("load_files", bop(paths), "Open {} files".format(len(paths)), and_then=bopf, interactive=False)
         # don't use <algebraic layer ...> type paths

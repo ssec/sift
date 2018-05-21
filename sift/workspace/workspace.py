@@ -63,7 +63,7 @@ from shapely.geometry.polygon import LinearRing
 from sift.common import INFO, KIND, flags
 from sift.model.shapes import content_within_shape
 from .metadatabase import Metadatabase, Content, Product, Resource
-from .importer import aImporter, GeoTiffImporter, GoesRPUGImporter, generate_guidebook_metadata
+from .importer import aImporter, GeoTiffImporter, GoesRPUGImporter, SatPyImporter, generate_guidebook_metadata
 
 LOG = logging.getLogger(__name__)
 
@@ -797,7 +797,7 @@ class Workspace(QObject):
                         prod = resource.product[0]
                         return prod.info
 
-    def collect_product_metadata_for_paths(self, paths: list) -> Generator[Tuple[int, frozendict], None, None]:
+    def collect_product_metadata_for_paths(self, paths: list, **importer_kwargs) -> Generator[Tuple[int, frozendict], None, None]:
         """
         Start loading URI data into the workspace asynchronously.
         return sequence of read-only info dictionaries
@@ -810,6 +810,11 @@ class Workspace(QObject):
             # import_session = self._S
             importers = []
             num_products = 0
+            remaining_paths = []
+            if 'reader' in importer_kwargs:
+                # skip importer guessing and go straight to satpy importer
+                paths, remaining_paths = [], paths
+
             for source_path in paths:
                 LOG.info('collecting metadata for {}'.format(source_path))
                 # FIXME: Check if importer only accepts one path at a time
@@ -819,11 +824,31 @@ class Workspace(QObject):
                 # how many products each expects to return
                 for imp in self._importers:
                     if imp.is_relevant(source_path=source_path):
-                        hauler = imp(source_path, database_session=import_session,
-                                     workspace_cwd=self.cache_dir)
+                        hauler = imp(source_path,
+                                     database_session=import_session,
+                                     workspace_cwd=self.cache_dir,
+                                     **importer_kwargs)
                         hauler.merge_resources()
                         importers.append(hauler)
                         num_products += hauler.num_products
+                        break
+                else:
+                    remaining_paths.append(source_path)
+
+            # Pass remaining paths to SatPy importer and see what happens
+            if remaining_paths:
+                if 'reader' not in importer_kwargs:
+                    raise NotImplementedError("Reader discovery is not "
+                                              "currently implemented in "
+                                              "the satpy importer.")
+                imp = SatPyImporter
+                hauler = imp(remaining_paths,
+                             database_session=import_session,
+                             workspace_cwd=self.cache_dir,
+                             **importer_kwargs)
+                hauler.merge_resources()
+                importers.append(hauler)
+                num_products += hauler.num_products
 
             for hauler in importers:
                 for prod in hauler.merge_products():
@@ -833,7 +858,7 @@ class Workspace(QObject):
                     LOG.debug('yielding product metadata for {}'.format(zult.get(INFO.DISPLAY_NAME, '?? unknown name ??')))
                     yield num_products, zult
 
-    def import_product_content(self, uuid=None, prod=None, allow_cache=True):
+    def import_product_content(self, uuid=None, prod=None, allow_cache=True, **importer_kwargs):
         with self._inventory as S:
             # S = self._S
             if prod is None and uuid is not None:
@@ -848,7 +873,7 @@ class Workspace(QObject):
                 arrays = self._cached_arrays_for_content(ovc)
                 return arrays.data
 
-            truck = aImporter.from_product(prod, workspace_cwd=self.cache_dir, database_session=S)
+            truck = aImporter.from_product(prod, workspace_cwd=self.cache_dir, database_session=S, **importer_kwargs)
             metadata = prod.info
             name = metadata[INFO.SHORT_NAME]
 
@@ -1156,7 +1181,10 @@ class Workspace(QObject):
         if info is None:
             return None, None
         # Assume `xy_pos` is lon/lat value
-        x, y = Proj(info[INFO.PROJ])(*xy_pos)
+        if '+proj=latlong' in info[INFO.PROJ]:
+            x, y = xy_pos[:2]
+        else:
+            x, y = Proj(info[INFO.PROJ])(*xy_pos)
         col = (x - info[INFO.ORIGIN_X]) / info[INFO.CELL_WIDTH]
         row = (y - info[INFO.ORIGIN_Y]) / info[INFO.CELL_HEIGHT]
         return np.int64(np.round(row)), np.int64(np.round(col))

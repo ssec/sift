@@ -1028,14 +1028,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                       DeprecationWarning)
         return list(self.import_files([path], insert_before=insert_before))
 
-    def activate_product_uuid_as_new_layer(self, uuid: UUID, insert_before=0):
+    def activate_product_uuid_as_new_layer(self, uuid: UUID, insert_before=0, **importer_kwargs):
         if uuid in self._layer_with_uuid:
             LOG.debug("Layer already loaded: {}".format(uuid))
-            active_content_data = self._workspace.import_product_content(uuid)
+            active_content_data = self._workspace.import_product_content(uuid, **importer_kwargs)
             return uuid, self[uuid], active_content_data
 
         # FUTURE: Load this async, the slots for the below signal need to be OK with that
-        active_content_data = self._workspace.import_product_content(uuid)
+        active_content_data = self._workspace.import_product_content(uuid, **importer_kwargs)
         # updated metadata with content information (most importantly nav information)
         info = self._workspace.get_info(uuid)
         assert(info is not None)
@@ -1130,11 +1130,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :return:
         
         """
-        # TODO: Iterate over metadata import yielding progress then load content
         # Load all the metadata so we can sort the files
         paths = self.sort_paths(paths)
         # assume metadata collection is in the most user-friendly order
-        infos = self._workspace.collect_product_metadata_for_paths(paths)
+        infos = self._workspace.collect_product_metadata_for_paths(
+            paths, **importer_kwargs)
         uuids = []
         total_products = 0
         for dex, (num_prods, info) in enumerate(infos):
@@ -1158,7 +1158,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 LOG.warning("layer with UUID {} already in document?".format(uuid))
                 self._workspace.get_content(uuid)
             else:
-                self.activate_product_uuid_as_new_layer(uuid, insert_before=insert_before)
+                self.activate_product_uuid_as_new_layer(uuid, insert_before=insert_before, **importer_kwargs)
 
             yield {
                 TASK_DOING: 'Loading content {}/{}'.format(dex + 1, total_products),
