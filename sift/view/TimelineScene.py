@@ -122,6 +122,20 @@ class QFramesInTracksScene(QGraphicsScene):
     def default_frame_pen_brush(self) -> Tuple[Optional[QPen], Optional[QBrush]]:
         return self._frame_pen_brush
 
+    @property
+    def timeline_span(self) -> span:
+        if hasattr(self, '_demo_time_span'):
+            return self._demo_time_span
+        t = datetime.utcnow()
+        hh = timedelta(minutes=30)
+        dts = self._demo_time_span = span(t - hh, hh * 2)
+        LOG.warning("using demo timespan on document")
+        return dts
+
+    @property
+    def playback_span(self) -> span:
+        return self.timeline_span
+
     def drawBackground(self, painter: QPainter, invalidated_region: QRectF):
         super(QFramesInTracksScene, self).drawBackground(painter, invalidated_region)
 
@@ -450,17 +464,25 @@ class TestScene(QFramesInTracksScene):
             return 0
         self._test_populate()
 
+    @property
+    def timeline_span(self) -> span:
+        return self._span
+
     def _test_populate(self):
         from uuid import uuid1 as uuidgen
         once = datetime.utcnow()
         mm = lambda m: timedelta(minutes=m)
         # assert(hasattr(self, '_track_order'))
-
-        track0 = QTrackItem(self, self.coords, 'IMAGE:test::timeline:GOES-21:QBI:mars', 1, "G21 QBI B99 BT", "test track", tooltip="peremptorily cromulent")
+        self._span = span(once - mm(10), mm(30))
+        track0 = QTrackItem(self, self.coords, 'IMAGE:test::timeline:GOES-21:QBI:mars', 1,
+                            "G21 QBI B99 BT", "test track", tooltip="peremptorily cromulent")
         # scene.addItem(abitrack)  # done in init
-        frame01 = QFrameItem(track0, self.coords, uuidgen(), once + mm(5), mm(5), flags(VisualState.AVAILABLE), "abi1", "fulldiskimus")
-        track1 = QTrackItem(self, self.coords, 'IMAGE:test::timeline:Himawari-11:AHI:mars', 0, "H11 AHI B99 Rad", "second test track", tooltip="nominally cromulent")
-        frame11 = QFrameItem(track1, self.coords, uuidgen(), once + mm(6), mm(1), flags(VisualState.READY), "ahi1", "JP04")
+        frame01 = QFrameItem(track0, self.coords, uuidgen(), once + mm(5), mm(5),
+                             flags([VisualState.BUSY]), "abi1", "fulldiskimus")
+        track1 = QTrackItem(self, self.coords, 'IMAGE:test::timeline:Himawari-11:AHI:mars', 0,
+                            "H11 AHI B99 Rad", "second test track", tooltip="nominally cromulent")
+        frame11 = QFrameItem(track1, self.coords, uuidgen(), once + mm(6), mm(1),
+                             flags([VisualState.READY]), "ahi1", "JP04")
         # self.insert_track(track0)
         # self.insert_track(track1)
         # assert(hasattr(self, '_propagate_max_z'))

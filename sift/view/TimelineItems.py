@@ -289,7 +289,7 @@ class QTrackItem(QGraphicsObject):
         if (t is None) or (d is None):
             LOG.debug("no frames contained, cannot adjust size or location of QTrackItem")
             return
-        LOG.debug("time extent of frames in track {} is {} +{}".format(self._title, t, d))
+        LOG.debug("time extent of frames in track '{}/{}' is {} +{}".format(self._title, self._subtitle, t, d))
         # scene y coordinate of upper left corner
         # convert track extent to scene coordinates using current transform
         frames_left, frames_width = self._scale.calc_pixel_x_pos(t, d)

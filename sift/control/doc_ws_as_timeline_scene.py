@@ -14,6 +14,7 @@ from uuid import UUID
 from typing import Tuple, Optional, Mapping, List, Any, Callable, Set, Iterable
 from PyQt4.QtGui import QMenu
 
+from sift.common import span
 from sift.view.TimelineItems import QTrackItem, QFrameItem
 from sift.view.TimelineScene import QFramesInTracksScene
 from sift.workspace import Workspace
@@ -42,6 +43,10 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         super(SiftDocumentAsFramesInTracks, self).__init__(*args, **kwargs)
         self._doc = doc.as_track_stack  # we should be limiting our interaction to this context
         self._connect_signals(doc)  # but the main doc is still the signaling hub
+
+    @property
+    def timeline_span(self) -> span:
+        return self._doc.timeline_span
 
     def _sync_track(self, qti: QTrackItem, z:int, trk: TrackInfo):
         qti.z, old_z = z, qti.z
@@ -74,6 +79,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         new_frames = []
         orphan_tracks = set(self._track_items.keys())
         orphan_frames = set(self._frame_items.keys())
+        LOG.debug("current timeline scene population: {} frames in {} tracks".format(len(orphan_frames), len(orphan_tracks)))
         for z, trk in self._doc.enumerate_tracks_frames():
             qti = self._track_items.get(trk.track)
             if qti is not None:
@@ -83,19 +89,21 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
                 qti = self._create_track(z, trk)
                 new_tracks.append(qti)
             _first = True
+            LOG.debug("track {} z={} has {} frames".format(trk.track, z, len(trk.frames)))
             for frm in trk.frames:
                 if _first:  # debug
                     _first = False
-                    LOG.debug("track {} frame {}".format(trk, frm))
+                    LOG.debug("track {} frame {}".format(trk.track, frm))
                 qfi = self._frame_items.get(frm.uuid)
                 if qfi is not None:
                     self._sync_frame(qfi, frm)
                     try:
                         orphan_frames.remove(qfi.uuid)
                     except KeyError:
-                        LOG.warning("frame {} <{}> found but not originally present??".format(frm.ident, frm.uuid))
+                        LOG.warning("frame {} <{}> found but not originally present in collection {}".format(frm.ident, frm.uuid, orphan_frames))
                 else:
                     new_frames.append(self._create_frame(qti, frm))
+        LOG.debug("added {} tracks and {} frames to timeline scene".format(len(new_tracks), len(new_frames)))
         self._purge_orphan_tracks_frames(orphan_tracks, orphan_frames)
         self.propagate_max_z()
         for track in new_tracks:

@@ -366,13 +366,17 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         self.doc.playhead_time = t
 
     @property
-    def playback_span(self):
+    def playback_span(self) -> span:
         return self.doc.playback_span
 
     @playback_span.setter
     def playback_span(self, when: span):
         self.doc.playback_span = when
         # FIXME: signal
+
+    @property
+    def timeline_span(self) -> span:
+        return self.doc.timeline_span
 
     # def track_order_at_time(self, when:datetime = None,
     #                         only_active=False,
