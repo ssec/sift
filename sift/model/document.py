@@ -906,15 +906,15 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.family_presentation = {}
 
         # scan available metadata for initial state
-        # FIXME: refresh this once background scan finishes
-        # self.timeline_span = self.playback_span = self.potential_product_span()
-        # self.sync_potential_tracks_from_metadata()
+        # FIXME: refresh this once background scan finishes and new products are found
+        self.timeline_span = self.playback_span = self.potential_product_span()
+        self.sync_potential_tracks_from_metadata()
 
     def potential_product_span(self) -> span:
         with self._workspace.metadatabase as S:
             all_times = list(S.query(Product.obs_time, Product.obs_duration).distinct())
         if not all_times:
-            LOG.warning("no data available, using default time span")
+            LOG.info("no data available, using default time span of now ±6h")
             nau = datetime.utcnow()
             sixh = timedelta(hours=6)
             return span(nau - sixh, sixh * 2)
@@ -924,11 +924,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         e = max(ends)
         return span(s, e - s)
 
-    def potential_tracks(self) -> T.Iterable[str]:
+    def potential_tracks(self) -> T.List[str]:
         """List the names of available tracks (both active and potential) according to the metadatabase
         """
         with self._workspace.metadatabase as S:
-            return ((f + FCS_SEP + c) for (f, c) in S.query(Product.family, Product.category).distinct())
+            return list((f + FCS_SEP + c) for (f, c) in S.query(Product.family, Product.category).distinct())
 
     def sync_potential_tracks_from_metadata(self):
         """update track_order to include any newly available tracks

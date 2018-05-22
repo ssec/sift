@@ -758,7 +758,9 @@ class Main(QtGui.QMainWindow):
         timer.start(60000)
 
         # set up timeline
-        # self._init_timeline(doc)  FIXME
+        LOG.info("potential tracks already in database: {}".format(repr(doc.potential_tracks())))
+        self._init_timeline(doc)
+        # FIXME: make sure sync of metadata signals sync of document potentials and track display
 
     def _timer_collect_resources(self):
         if self._resource_collector:

@@ -125,7 +125,7 @@ class QTrackItem(QGraphicsObject):
         self._icon = icon
         self._metadata = metadata or {}
         self._tooltip = tooltip
-        self._state = flags(state)
+        self._state = flags(state or [])
         self._selected = selected
         self._colormap = colormap
         self._min, self._max = min, max
