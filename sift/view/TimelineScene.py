@@ -25,7 +25,7 @@ from PyQt4.QtGui import QGraphicsScene, QPen, QBrush, QPainter, QGraphicsView, Q
 from PyQt4.QtOpenGL import QGLFormat, QGL, QGLWidget
 
 from sift.common import flags, span
-from sift.view.TimelineCommon import VisualState, TimelineTrackState, CoordTransform
+from sift.view.TimelineCommon import VisualState, CoordTransform
 from sift.view.TimelineItems import QTrackItem, QFrameItem, QTimeRulerItem
 
 LOG = logging.getLogger(__name__)

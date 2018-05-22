@@ -309,7 +309,7 @@ class Workspace(QObject):
         return self._inventory.SessionRegistry
 
     @property
-    def metadatabase(self):
+    def metadatabase(self) -> Metadatabase:
         return self._inventory
 
     @staticmethod
