@@ -820,7 +820,7 @@ class Workspace(QObject):
                             assert(prod is not None)
                             # merge the product into our database session, since it may belong to import_session
                             zult = frozendict(prod.info)  # self._S.merge(prod)
-                            LOG.debug('yielding product metadata for {}'.format(zult.get(INFO.DISPLAY_NAME, '?? unknown name ??')))
+                            # LOG.debug('yielding product metadata for {}'.format(zult.get(INFO.DISPLAY_NAME, '?? unknown name ??')))
                             yield zult
         # import_session.commit()
         # import_session.flush()

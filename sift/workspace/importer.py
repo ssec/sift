@@ -192,7 +192,7 @@ class aSingleFileWithSingleProductImporter(aImporter):
 
         if len(res.product):
             zult = list(res.product)
-            LOG.debug('pre-existing products {}'.format(repr(zult)))
+            # LOG.debug('pre-existing products {}'.format(repr(zult)))
             return zult
 
         # else probe the file and add product metadata, without importing content

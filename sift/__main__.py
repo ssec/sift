@@ -758,7 +758,7 @@ class Main(QtGui.QMainWindow):
         timer.start(60000)
 
         # set up timeline
-        self._init_timeline(doc)
+        # self._init_timeline(doc)  FIXME
 
     def _timer_collect_resources(self):
         if self._resource_collector:

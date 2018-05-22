@@ -904,10 +904,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.family_calculation = {}
         self.family_composition = {}
         self.family_presentation = {}
+
         # scan available metadata for initial state
         # FIXME: refresh this once background scan finishes
-        self.timeline_span = self.playback_span = self.potential_product_span()
-        self.sync_potential_tracks_from_metadata()
+        # self.timeline_span = self.playback_span = self.potential_product_span()
+        # self.sync_potential_tracks_from_metadata()
 
     def potential_product_span(self) -> span:
         with self._workspace.metadatabase as S:
