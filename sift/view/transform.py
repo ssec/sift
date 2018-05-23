@@ -102,7 +102,7 @@ def lcc_init(proj_dict):
             sinphi = np.sin(proj_dict['phi2'])
             proj_dict['n'] = np.log(m1 / pj_msfn_py(sinphi, np.cos(proj_dict['phi2']), proj_dict['es']))
             proj_dict['n'] /= np.log(ml1 / pj_tsfn_py(proj_dict['phi2'], sinphi, proj_dict['e']))
-        proj_dict['c'] = proj_dict['rho0'] = m1 * pow(ml1, -proj_dict['n'])
+        proj_dict['c'] = proj_dict['rho0'] = m1 * pow(ml1, -proj_dict['n']) / proj_dict['n']
         proj_dict['rho0'] *= 0. if abs(abs(proj_dict['phi0']) - M_HALFPI) < 1e-10 else \
             pow(pj_tsfn_py(proj_dict['phi0'], np.sin(proj_dict['phi0']), proj_dict['e']), proj_dict['n'])
     else:
@@ -115,7 +115,6 @@ def lcc_init(proj_dict):
         proj_dict['rho0'] = 0. if abs(abs(proj_dict['phi0']) - M_HALFPI) < 1e-10 else \
             proj_dict['c'] * pow(np.tan(M_FORTPI + 0.5 * proj_dict['phi0']), -proj_dict['n'])
     proj_dict['ellips'] = 'true' if proj_dict['ellips'] else 'false'
-
     return proj_dict
 
 
@@ -157,22 +156,21 @@ def geos_init(proj_dict):
 def stere_init(proj_dict):
     # Calculate phits
     phits = abs(np.radians(proj_dict['lat_ts']) if 'lat_ts' in proj_dict else M_HALFPI)
-    k0 = 1
     # Determine mode
     if abs(np.radians(proj_dict['lat_0']) - M_HALFPI) < 1e-10:
-        # Assign "mode" in proj_dict to be GLSL for specific case (make sure to handle C-code case fallthrough). 0 = n_pole, 1 = s_pole
+        # Assign "mode" in proj_dict to be GLSL for specific case (make sure to handle C-code case fallthrough):
+        # 0 = n_pole, 1 = s_pole.
         proj_dict['mode'] = 1 if proj_dict['lat_0'] < 0 else 0
-        # k0 is used without being defined...
         if proj_dict['a'] != proj_dict['b']:
             # ellipsoid
             e = proj_dict['e']
             if abs(phits - M_HALFPI) < 1e-10:
-                proj_dict['akm1'] = 2. * k0 / np.sqrt((1+e)**(1+e) * (1-e)**(1-e))
+                proj_dict['akm1'] = 2. / np.sqrt((1+e)**(1+e) * (1-e)**(1-e))
             else:
                 proj_dict['akm1'] = np.cos(phits) / (pj_tsfn_py(phits, np.sin(phits), e) * np.sqrt(1. - (np.sin(phits)*e)**2))
         else:
             # sphere
-            proj_dict['akm1'] = np.cos(phits) / np.tan(M_FORTPI - .5 * phits) if abs(phits - M_HALFPI) >= 1e-10 else 2. * k0
+            proj_dict['akm1'] = np.cos(phits) / np.tan(M_FORTPI - .5 * phits) if abs(phits - M_HALFPI) >= 1e-10 else 2.
     else:
         # If EQUIT or OBLIQ mode:
         raise NotImplementedError("This projection mode is not supported yet.")
@@ -263,20 +261,20 @@ PROJECTIONS = {
                 }}
                 if ({ellips}) {{
                     phi = pj_phi2(pow(rho / {c}, 1. / {n}), {e});
-                    if (phi == HUGE_VAL) {{
-                        return vec4(1. / 0., 1. / 0., pos.z, pos.w);
-                    }}
+                    //if (phi == HUGE_VAL) {{
+                    //    return vec4(1. / 0., 1. / 0., pos.z, pos.w);
+                    //}}
                 }} else {{
                     phi = 2. * atan(pow({c} / rho, 1. / {n})) - M_HALFPI;
                 }}
                 // atan2 in C
                 lambda = atan(x, y) / {n};
             }} else {{
-                lamdba = 0;
+                lambda = 0.;
                 phi = {n} > 0. ? M_HALFPI : - M_HALFPI;
             }}
             {over}
-            return vec4(lambda, phi, pos.z, pos.w);
+            return vec4(degrees(lambda) + {lon_0}, degrees(phi), pos.z, pos.w);
         }}""",
         None,
     ),
@@ -388,7 +386,7 @@ PROJECTIONS = {
             float y = pos.y / {a};
             float phi = radians(y);
             float lambda = radians(x);
-            float tp = -sqrt(pow(x,2) + pow(y,2)) / {akm1};
+            float tp = -hypot(x,y) / {akm1};
             float phi_l = M_HALFPI - 2. * atan(tp);
             float sinphi = 0.;
             int i = 8;
@@ -402,10 +400,9 @@ PROJECTIONS = {
                     if ({mode} == 1) {{
                         phi = -phi;
                     }}
-                    lambda = degrees((x == 0. && y == 0.) ? 0. : atan(x, y)) + {lon_0};
-                    phi = degrees(phi);
+                    lambda = (x == 0. && y == 0.) ? 0. : atan(x, y);
                     {over}
-                    return vec4(lambda, phi, pos.z, pos.w);
+                    return vec4(degrees(lambda) + {lon_0}, degrees(phi), pos.z, pos.w);
                 }}
             }}
             return vec4(1. / 0., 1. / 0., pos.z, pos.w);
@@ -425,10 +422,9 @@ PROJECTIONS = {
             else {{
                 phi = asin({mode} == 1 ? -cosc : cosc);
             }}
-            lambda = degrees((x == 0. && y == 0.) ? 0. : atan(x, y)) + {lon_0};
-            phi = degrees(phi);
+            lambda = (x == 0. && y == 0.) ? 0. : atan(x, y);
             {over}
-            return vec4(lambda, phi, pos.z, pos.w);
+            return vec4(degrees(lambda) + {lon_0}, degrees(phi), pos.z, pos.w);
         }}""",
     ),
 }
