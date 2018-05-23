@@ -67,6 +67,7 @@ class VisualState(Enum):
     READY = 16  # regular coloration - typically when WorkspaceState.CACHED
     LOCKED = 32  # indicate the frame is locked across is entire track
     RELEVANT = 64  # highlight that this (typically track) may be affected with the operation you have inflight
+    SELECTED = 128  # track or frame is selected by user
 
 
 class CoordTransform(QObject):

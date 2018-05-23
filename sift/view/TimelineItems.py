@@ -118,7 +118,6 @@ class QTrackItem(QGraphicsObject):
     _metadata: Mapping = None  # arbitrary key-value store for selecting by metadata; in our case this often includes item family for seleciton
     _tooltip: str = None
     _state: flags = None  # VisualState flags determine how it's being presented
-    _selected: bool = False
     _colormap: [QGradient, QImage, QPixmap] = None
     _min: float = None
     _max: float = None
@@ -132,8 +131,8 @@ class QTrackItem(QGraphicsObject):
 
     def __init__(self, scene, scale: CoordTransform, track: str, z: int,
                  title: str, subtitle: str = None, icon: QIcon = None, metadata: dict = None,
-                 tooltip: str = None, state: flags = None, selected: bool = False,
-                 colormap: [QGradient, QImage] = None, min: float = None, max: float = None):
+                 tooltip: str = None, state: flags = None, colormap: [QGradient, QImage] = None,
+                 min: float = None, max: float = None):
         """Create a track and connect it to its Scene
         """
         super(QTrackItem, self).__init__()
@@ -148,7 +147,6 @@ class QTrackItem(QGraphicsObject):
         self._metadata = metadata or {}
         self._tooltip = tooltip
         self._state = flags(state or [])
-        self._selected = selected
         self._colormap = colormap
         self._min, self._max = min, max
         self.update_pos_bounds()
