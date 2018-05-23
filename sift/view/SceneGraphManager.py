@@ -509,6 +509,9 @@ class SceneGraphManager(QObject):
     def create_test_image(self):
         proj4_str = os.getenv("SIFT_DEBUG_IMAGE_PROJ", None)
 
+        if proj4_str is None:
+            return
+
         shape = (2000, 2000)
         fake_data = np.zeros(shape, np.float32) + 0.5
         fake_data[:5, :] = 1.

@@ -157,7 +157,7 @@ def stere_init(proj_dict):
     # Calculate phits
     phits = abs(np.radians(proj_dict['lat_ts']) if 'lat_ts' in proj_dict else M_HALFPI)
     # Determine mode
-    if abs(np.radians(proj_dict['lat_0']) - M_HALFPI) < 1e-10:
+    if abs(abs(np.radians(proj_dict['lat_0'])) - M_HALFPI) < 1e-10:
         # Assign "mode" in proj_dict to be GLSL for specific case (make sure to handle C-code case fallthrough):
         # 0 = n_pole, 1 = s_pole.
         proj_dict['mode'] = 1 if proj_dict['lat_0'] < 0 else 0
