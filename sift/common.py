@@ -114,6 +114,9 @@ class span(T.NamedTuple):
     def from_s_e(s: datetime, e: datetime):
         return span(s, e-s) if (s is not None) and (e is not None) else None
 
+    @property
+    def is_instantaneous(self):
+        return timedelta(seconds=0) == self.d
 
 class flags(set):
     """A set of enumerated flags which may ultimately be represented as a bitfield, but observing set interface

@@ -367,7 +367,9 @@ class DocumentAsTrackStack(DocumentAsContextBase):
 
     @property
     def playback_span(self) -> span:
-        return self.doc.playback_span
+        pbs = self.doc.playback_span
+        if not pbs or pbs.is_instantaneous:
+            return self.timeline_span
 
     @playback_span.setter
     def playback_span(self, when: span):
@@ -376,7 +378,18 @@ class DocumentAsTrackStack(DocumentAsContextBase):
 
     @property
     def timeline_span(self) -> span:
-        return self.doc.timeline_span
+        """Document preferred time-span (user-specified or from a default)
+        :return:
+        """
+        dts = self.doc.timeline_span  # first, check for user intent
+        if not dts or dts.is_instantaneous:
+            LOG.info("document timeline span is not set, using metadata extents")
+            dts = self.doc.potential_product_span()
+        if not dts or dts.is_instantaneous:
+            LOG.info("insufficient metadata, using 12h around current time due to no available timespan")
+            sh = timedelta(hours=6)
+            dts = span(datetime.utcnow() - sh, sh * 2)
+        return dts
 
     @property
     def top_z(self) -> int:
@@ -427,8 +440,8 @@ class DocumentAsTrackStack(DocumentAsContextBase):
     def enumerate_tracks_frames(self, only_active: bool = False, when: span = None) -> T.Iterable[TrackInfo]:
         """enumerate tracks as TrackInfo and FrameInfo structures for timeline use, in top-Z to bottom-Z order
         """
-        if when is None:  # default to the document's span
-            when = self.doc.timeline_span
+        if when is None:  # default to the document's span, either explicit (user-specified) or implicit
+            when = self.timeline_span
         when_e = when.e
         with self.mdb as s:
             for z, track in self.doc.track_order.items():  # enumerates from high Z to low Z
@@ -718,7 +731,6 @@ class DocumentAsProductArrayCollection(DocumentAsContextBase):
 # FUTURE: class DatasetAsTimelineArrayCollection(DocumentAsContextBase):
 
 
-
 class Document(QObject):  # base class is rightmost, mixins left of that
     """Document stores user intent
     Document is a set of tracks in a Z order, with Z>=0 for "active" tracks the user is working with
@@ -736,7 +748,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # timeline the user has specified:
     track_order: ZList = None  # (zorder, family-name) with higher z above lower z; z<0 should not occur
 
-    # overall visible range of the active data
+    # overall visible range of the active data if specified by user, else None means assume use the product timespan from metadatabase
     timeline_span: span = None
 
     # playback information
@@ -919,17 +931,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         # scan available metadata for initial state
         # FIXME: refresh this once background scan finishes and new products are found
-        self.timeline_span = self.playback_span = self.potential_product_span()
+        # self.timeline_span = self.playback_span = self.potential_product_span()
         self.sync_potential_tracks_from_metadata()
 
-    def potential_product_span(self) -> span:
+    def potential_product_span(self) -> T.Optional[span]:
         with self._workspace.metadatabase as S:
             all_times = list(S.query(Product.obs_time, Product.obs_duration).distinct())
         if not all_times:
-            LOG.info("no data available, using default time span of now ±6h")
-            nau = datetime.utcnow()
-            sixh = timedelta(hours=6)
-            return span(nau - sixh, sixh * 2)
+            return None
         starts = [s for (s, d) in all_times]
         ends = [(s + d) for (s, d) in all_times]
         s = min(starts)

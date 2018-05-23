@@ -234,12 +234,12 @@ class QFramesInTracksScene(QGraphicsScene):
         return dict((q.z, q) for q in self._track_items.values())
 
     @property
-    def _track_count(self):
+    def _track_count(self) -> int:
         return len(self._track_items)
 
     @property
-    def _track_max_z(self):
-        return max(tuple(self._track_order.keys()))
+    def _track_max_z(self) -> int:
+        return max(tuple(self._track_order.keys()) or (-1,))
 
     def _verify_z_contiguity(self):
         zord = self._track_order
