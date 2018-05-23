@@ -451,7 +451,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 LOG.debug("yielding TrackInfo and FrameInfos for {}".format(track))
                 frames = []
                 # fam_nfo = self.doc.family_info(fam)
-                que = s.query(Product).filter((Product.family == fam) and (Product.category == ctg))
+                que = s.query(Product).filter((Product.family == fam) & (Product.category == ctg))
                 for prod in que.all():
                     prod_e = prod.obs_time + prod.obs_duration
                     if (prod_e <= when.s) or (prod.obs_time >= when_e):
@@ -471,6 +471,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 if not frames:
                     LOG.warning("track {} with no frames - skipping (missing files or resources?)".format(track))
                     continue
+                LOG.debug("found {} frames for track {}".format(len(frames), track))
                 frames.sort(key=lambda x: x.when.s)
                 track_span = span.from_s_e(frames[0].when.s, frames[-1].when.e) if frames else None
                 trk = TrackInfo(
