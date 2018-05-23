@@ -154,6 +154,31 @@ def geos_init(proj_dict):
     return proj_dict
 
 
+def stere_init(proj_dict):
+    # Calculate phits
+    phits = abs(np.radians(proj_dict['lat_ts']) if 'lat_ts' in proj_dict else M_HALFPI)
+    k0 = 1
+    # Determine mode
+    if abs(np.radians(proj_dict['lat_0']) - M_HALFPI) < 1e-10:
+        # Assign "mode" in proj_dict to be GLSL for specific case (make sure to handle C-code case fallthrough). 0 = n_pole, 1 = s_pole
+        proj_dict['mode'] = 1 if proj_dict['lat_0'] < 0 else 0
+        # k0 is used without being defined...
+        if proj_dict['a'] != proj_dict['b']:
+            # ellipsoid
+            e = proj_dict['e']
+            if abs(phits - M_HALFPI) < 1e-10:
+                proj_dict['akm1'] = 2. * k0 / np.sqrt((1+e)**(1+e) * (1-e)**(1-e))
+            else:
+                proj_dict['akm1'] = np.cos(phits) / (pj_tsfn_py(phits, np.sin(phits), e) * np.sqrt(1. - (np.sin(phits)*e)**2))
+        else:
+            # sphere
+            proj_dict['akm1'] = np.cos(phits) / np.tan(M_FORTPI - .5 * phits) if abs(phits - M_HALFPI) >= 1e-10 else 2. * k0
+    else:
+        # If EQUIT or OBLIQ mode:
+        raise NotImplementedError("This projection mode is not supported yet.")
+    return proj_dict
+
+
 # proj_name -> (proj_init, map_ellps, map_spher, imap_ellps, imap_spher)
 # where 'map' is lon/lat to X/Y
 # and 'imap' is X/Y to lon/lat
@@ -321,6 +346,91 @@ PROJECTIONS = {
         }}""",
         None, #"""vec4 geos_imap_s(vec4 pos) {{ }}""",
     ),
+    'stere': (
+        stere_init,
+        """vec4 stere_map_e(vec4 pos) {{
+            float lambda = radians(pos.x - {lon_0});
+            {over}
+            float phi = radians(pos.y);
+            float coslam = cos(lambda);
+            float sinlam = sin(lambda);
+            float sinphi = sin(phi);
+            if ({mode} == 1) {{
+                phi = -phi;
+                coslam = - coslam;
+                sinphi = -sinphi;
+            }}
+            float x = {akm1} * pj_tsfn(phi, sinphi, {e});
+            float y = {a} * -x * coslam;
+            x = {a} * x * sinlam;
+            return vec4(x, y, pos.z, pos.w);
+        }}""",
+        """vec4 stere_map_s(vec4 pos) {{
+            float lambda = radians(pos.x - {lon_0});
+            {over}
+            float phi = radians(pos.y);
+            float coslam = cos(lambda);
+            float sinlam = sin(lambda);
+            if ({mode} == 0) {{
+                coslam = - coslam;
+                phi = -phi;
+            }}
+            if (abs(phi - M_HALFPI) < 1.e-8) {{
+                return vec4(1. / 0., 1. / 0., pos.z, pos.w);
+            }}
+            float y = {akm1} * tan(M_FORTPI + .5 * phi)
+            float x = {a} * sinlam * y;
+            y = {a} * coslam * y;
+            return vec4(x, y, pos.z, pos.w);
+        }}""",
+        """vec4 stere_imap_e(vec4 pos) {{
+            float x = pos.x / {a};
+            float y = pos.y / {a};
+            float phi = radians(y);
+            float lambda = radians(x);
+            float tp = -sqrt(pow(x,2) + pow(y,2)) / {akm1};
+            float phi_l = M_HALFPI - 2. * atan(tp);
+            float sinphi = 0.;
+            int i = 8;
+            if ({mode} == 0) {{
+                y = -y;
+            }}
+            for (i; i-- > 0; phi_l = phi) {{
+                sinphi = {e} * sin(phi_l);
+                phi = 2. * atan(tp * pow((1. + sinphi) / (1. - sinphi), -.5 * {e})) + M_HALFPI;
+                if (abs(phi_l - phi) < 1.e-10) {{
+                    if ({mode} == 1) {{
+                        phi = -phi;
+                    }}
+                    lambda = degrees((x == 0. && y == 0.) ? 0. : atan(x, y)) + {lon_0};
+                    phi = degrees(phi);
+                    {over}
+                    return vec4(lambda, phi, pos.z, pos.w);
+                }}
+            }}
+            return vec4(1. / 0., 1. / 0., pos.z, pos.w);
+        }}""",
+        """vec4 stere_imap_s(vec4 pos) {{
+            float x = pos.x / {a};
+            float y = pos.y / {a};
+            float rh = hypot(x, y);
+            float cosc = cos(2. * atan(rh, {akm1}));
+            float lambda = 0;
+            if ({mode} == 0) {{
+                y = -y;
+            }}
+            if (abs(rh) < 1.e-10) {{
+                phi = {lat_0};
+            }}
+            else {{
+                phi = asin({mode} == 1 ? -cosc : cosc);
+            }}
+            lambda = degrees((x == 0. && y == 0.) ? 0. : atan(x, y)) + {lon_0};
+            phi = degrees(phi);
+            {over}
+            return vec4(lambda, phi, pos.z, pos.w);
+        }}""",
+    ),
 }
 PROJECTIONS['lcc'] = (lcc_init,
                       PROJECTIONS['lcc'][1],
@@ -434,7 +544,7 @@ class PROJ4Transform(BaseTransform):
         self.proj4_str = proj4_str
         self.proj = Proj(proj4_str)
         self._proj4_inverse = inverse
-        proj_dict = self.proj_dict(proj4_str)
+        proj_dict = self.create_proj_dict(proj4_str)
 
         # Get the specific functions for this projection
         proj_funcs = PROJECTIONS[proj_dict['proj']]
@@ -485,7 +595,7 @@ class PROJ4Transform(BaseTransform):
 
         # print(self._shader_map.compile())
 
-    def proj_dict(self, proj_str):
+    def create_proj_dict(self, proj_str):
         d = tuple(x.replace("+", "").split("=") for x in proj_str.split(" "))
         d = dict((x[0], x[1] if len(x) > 1 else 'true') for x in d)
 
