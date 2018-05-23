@@ -155,19 +155,19 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         """
         return set(self._doc.tracks_in_family(track, only_active=True))
 
-    def may_reassign_color_map(self, from_track: UUID, to_track: UUID) -> Optional[Callable[[bool], None]]:
+    def may_reassign_color_map(self, from_track: str, to_track: str) -> Optional[Callable[[bool], None]]:
         """User is dragging a color map around, determine if drop is permitted and provide a commit/abort function if so
         """
         LOG.warning("using base class may_reassign_color_map which does nothing")
         return lambda b: None
 
-    def menu_for_track(self, track: UUID, frame_uuid: UUID = None) -> Optional[QMenu]:
+    def menu_for_track(self, track: str, frame: Optional[UUID] = None) -> Optional[QMenu]:
         """Generate QMenu to use as context menu for a given track, optionally with frame if mouse was over that frame"""
         LOG.warning("using base class menu_for_track which does nothing")
 
         return None
 
-    def update(self, changed_tracks: [Set, None] = None, changed_frame_uuids: [Set, None] = None) -> int:
+    def update(self, changed_tracks: [Set[str], None] = None, changed_frame_uuids: [Set[UUID], None] = None) -> int:
         """Populate or update scene, returning number of items changed in scene
         Does not add new items for tracks and frames already present
         Parameters serve only as hints

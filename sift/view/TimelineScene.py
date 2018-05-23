@@ -35,7 +35,10 @@ class QFramesInTracksScene(QGraphicsScene):
     """
     QGraphicsScene collecting QTimelineItems collecting QFrameItems.
     includes a TimelineCoordTransform time-to-X coordinate transform used for generating screen coordinates.
+
+    This is a "generic" Timeline scene which should be subclassed to a form that uses your specific model.
     """
+
     # whether to show tracks with zorder < 0, i.e. tracks not immediately part of document
     # many users will prefer to show only active tracks on the document,
     # only showing everything when they want to drag or otherwise activate potential tracks waiting in the wings
@@ -371,8 +374,6 @@ class QFramesInTracksScene(QGraphicsScene):
         self.update()
         return [trk] + list(all_changes)
 
-
-
     # def select_tracks_by_metadata(self, key, value):
     #     raise NotImplementedError("NYI")
     #
@@ -392,7 +393,6 @@ class QFramesInTracksScene(QGraphicsScene):
                                              datetime,
                                              timedelta)  # note: multiple views can share one scene
 
-    #
     # delegate functions to implement for document and workspace
     # these are typically called by view or scene control logic, e.g. to decide menu to display or progress of a drag operation
     # FUTURE: decide if we actually need a delegate ABC to compose, rather than subclass overrides
@@ -425,25 +425,25 @@ class QFramesInTracksScene(QGraphicsScene):
         LOG.warning("using base class may_rearrange_track_z_order which does nothing")
         return lambda commit: None
 
-    def tracks_in_same_family(self, track: UUID) -> Set[UUID]:
+    def tracks_in_same_family(self, track: str) -> Set[str]:
         """inform the view on which tracks are closely related to the given track
         typically this is used to stylistically highlight related tracks during a drag operation
         """
         LOG.warning("using base class tracks_in_same_family which does nothing")
         return set()
 
-    def may_reassign_color_map(self, from_track: UUID, to_track: UUID) -> Optional[Callable[[bool], None]]:
+    def may_reassign_color_map(self, from_track: str, to_track: str) -> Optional[Callable[[bool], None]]:
         """User is dragging a color map around, determine if drop is permitted and provide a commit/abort function if so
         """
         LOG.warning("using base class may_reassign_color_map which does nothing")
         return lambda b: None
 
-    def menu_for_track(self, track_uuid: UUID, frame_uuid: UUID = None) -> Optional[QMenu]:
+    def menu_for_track(self, track: str, frame: Optional[UUID] = None) -> Optional[QMenu]:
         """Generate QMenu to use as context menu for a given track, optionally with frame if mouse was over that frame"""
         LOG.warning("using base class menu_for_track which does nothing")
         return None
 
-    def update(self, changed_track_uuids: [Set, None] = None, changed_frame_uuids: [Set, None] = None) -> int:
+    def update(self, changed_tracks: [Set[str], None] = None, changed_frame_uuids: [Set[UUID], None] = None) -> int:
         """Populate or update scene, returning number of items changed in scene
         Does not add new items for tracks and frames already present
         Parameters serve only as hints
@@ -459,7 +459,7 @@ class TestScene(QFramesInTracksScene):
         super(TestScene, self).__init__(*args, **kwargs)
         # assert(hasattr(self, '_track_order'))
 
-    def update(self, changed_track_uuids: [Set, None] = None, changed_frame_uuids: [Set, None] = None) -> int:
+    def update(self, changed_tracks: [Set[str], None] = None, changed_frame_uuids: [Set[UUID], None] = None) -> int:
         if self._did_populate:
             return 0
         self._test_populate()
