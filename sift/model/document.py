@@ -378,6 +378,10 @@ class DocumentAsTrackStack(DocumentAsContextBase):
     def timeline_span(self) -> span:
         return self.doc.timeline_span
 
+    @property
+    def top_z(self) -> int:
+        return self.doc.track_order.top_z
+
     # def track_order_at_time(self, when:datetime = None,
     #                         only_active=False,
     #                         include_products=True
@@ -415,7 +419,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         """All the names of the tracks, from highest zorder to lowest
         z>=0 implies an active track in the document, <0 implies potentials that have products either cached or potential
         """
-        for z, track in self.doc.track_order.enumerate():
+        for z, track in self.doc.track_order.items():
             if only_active and z < 0:
                 break
             yield z, track
@@ -427,7 +431,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
             when = self.doc.timeline_span
         when_e = when.e
         with self.mdb as s:
-            for z, track in self.doc.track_order.enumerate():  # enumerates from high Z to low Z
+            for z, track in self.doc.track_order.items():  # enumerates from high Z to low Z
                 if only_active and (z < 0):
                     break
                 fam, ctg = track.split(FCS_SEP)
@@ -451,6 +455,9 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                         # thumb=
                     )
                     frames.append(fin)
+                if not frames:
+                    LOG.warning("track {} with no frames - skipping (missing files or resources?)".format(track))
+                    continue
                 frames.sort(key=lambda x: x.when.s)
                 track_span = span.from_s_e(frames[0].when.s, frames[-1].when.e) if frames else None
                 trk = TrackInfo(
@@ -474,6 +481,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
             self.doc.track_frame_locks[track] = frame
 
         # FIXME: signal, since this will cause effects on animation and potentially static display order
+        # also may want to set some state flags on the track?
         # this needs to invalidate the current display and any animation
         self.doc.didChangeLayerVisibility.emit({frame: True})
 
@@ -485,7 +493,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
     def tracks_in_family(self, family: str, only_active: bool = True) -> T.Sequence[str]:
         """ yield track names in document that share a common family
         """
-        for z, track in self.doc.track_order.enumerate():
+        for z, track in self.doc.track_order.items():
             if only_active and z < 0:
                 break
             tfam = track.split(FCS_SEP)[0]
@@ -939,13 +947,13 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """
         all_tracks = list(self.potential_tracks())
         all_tracks.sort()
-        old_tracks = set(name for z, name in self.track_order.enumerate())
+        old_tracks = set(name for z, name in self.track_order.items())
         for track in all_tracks:
             self.track_order.append(track, start_negative=True, not_if_present=True)
         for dismissed in old_tracks - set(all_tracks):
             LOG.debug("removing track {} from track_order".format(dismissed))
             self.track_order.remove(dismissed)
-        new_tracks = set(name for z, name in self.track_order.enumerate())
+        new_tracks = set(name for z, name in self.track_order.items())
         if old_tracks != new_tracks:
             LOG.info("went from {} available tracks to {}".format(len(old_tracks), len(new_tracks)))
             self.didReorderTracks.emit(new_tracks - old_tracks, old_tracks - new_tracks)

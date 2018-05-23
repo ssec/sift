@@ -799,7 +799,7 @@ class ZList(MutableSequence):
             return
         self._content.append(val)
 
-    def enumerate(self) -> Iterable[Tuple[int, Any]]:
+    def items(self) -> Iterable[Tuple[int, Any]]:
         z = self._zmax
         for q, v in enumerate(self._content):
             yield z - q, v
@@ -808,6 +808,12 @@ class ZList(MutableSequence):
         ldex = self._content.index(val)
         z = self._zmax - ldex
         return z
+
+    def keys(self):
+        yield from range(self._zmax, self._zmax - len(self._content), -1)
+
+    def values(self):
+        yield from iter(self._content)
 
     def insert(self, z: int, val):
         """insert a value such that it lands at index z
@@ -877,9 +883,9 @@ class ZList(MutableSequence):
 
     def to_dict(self, inverse=False) -> dict:
         if not inverse:
-            return dict(self.enumerate())
+            return dict(self.items())
         else:
-            zult = dict((b,a) for (a,b) in self.enumerate())
+            zult = dict((b,a) for (a,b) in self.items())
             if len(zult) != len(self._content):
                 raise RuntimeWarning("ZList.to_dict inverse did not have fully unique keys")
             return zult

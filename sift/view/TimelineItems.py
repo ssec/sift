@@ -205,7 +205,7 @@ class QTrackItem(QGraphicsObject):
         painter.setPen(pen)
 
         # draw outer boundary
-        painter.drawRoundedRect(rect, GFXC.track_corner_radius, GFXC.track_corner_radius, Qt.RelativeSize)
+        painter.drawRoundedRect(rect, GFXC.track_corner_radius1, GFXC.track_corner_radius2, Qt.RelativeSize)
 
 
     def boundingRect(self) -> QRectF:

@@ -20,7 +20,8 @@ LOG = logging.getLogger(__name__)
 # @dataclass
 class GraphicsConfig(object):
     track_height: float = 64.0
-    track_corner_radius: float = 15.0
+    track_corner_radius1: float = 9.0
+    track_corner_radius2: float = 15.0
     track_left_pad: float = 128.0  # scene pixels space to left of first frame which we reserve for labels etc
     track_right_pad: float = 16.0  # scene pixels space to right of last frame we reserve for track closing etc
     track_title_pos: QPointF  = QPointF(3.0-128.0, -25.0)  # scene pixel offset relative to vertical centerline and start of first frame
@@ -54,7 +55,7 @@ class ztdtup(NamedTuple):
 
 class VisualState(Enum):
     """Visual states of frames and tracks, corresponds to a color or style.
-    They're collected in flags() objects.
+    They're collected in flags() objects which behaves like a set()
     Derived from Document / Workspace / SceneGraph states.
     Typically combines information from Workspace and Scenegraph, does not correspond to selection.
     by default, display greyed-out potential frame
