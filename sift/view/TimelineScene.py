@@ -438,8 +438,9 @@ class QFramesInTracksScene(QGraphicsScene):
         LOG.warning("using base class may_reassign_color_map which does nothing")
         return lambda b: None
 
-    def menu_for_track(self, track: str, frame: Optional[UUID] = None) -> Optional[QMenu]:
-        """Generate QMenu to use as context menu for a given track, optionally with frame if mouse was over that frame"""
+    def menu_for_track(self, track: str, frame: Optional[UUID] = None) -> Optional[Tuple[QMenu, Mapping[Any, Callable]]]:
+        """Generate QMenu and action LUT to use as context menu for a given track, optionally with frame if mouse was over that frame
+        """
         LOG.warning("using base class menu_for_track which does nothing")
         return None
 

@@ -161,10 +161,9 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         LOG.warning("using base class may_reassign_color_map which does nothing")
         return lambda b: None
 
-    def menu_for_track(self, track: str, frame: Optional[UUID] = None) -> Optional[QMenu]:
+    def menu_for_track(self, track: str, frame: Optional[UUID] = None) -> Optional[Tuple[QMenu, Mapping[Any, Callable]]]:
         """Generate QMenu to use as context menu for a given track, optionally with frame if mouse was over that frame"""
-        LOG.warning("using base class menu_for_track which does nothing")
-
+        LOG.warning("using stub menu_for_track with track {} and frame {}, but this still does nothing".format(track, frame))
         return None
 
     def update(self, changed_tracks: [Set[str], None] = None, changed_frame_uuids: [Set[UUID], None] = None) -> int:

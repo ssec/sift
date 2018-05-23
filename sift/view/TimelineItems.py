@@ -81,6 +81,28 @@ def _wtf_recursion():
     LOG.debug("frame boundingRect depth {}".format(level))
 
 
+def _perform_context_menu(event, scene, track, frame) -> bool:
+    """Custom context menu handler shared by QTrackItem and QFrameItem
+    return true if the menu fully activated and did something
+    """
+    qm = scene.menu_for_track(track, frame)
+    if qm is not None:
+        pos = event.pos()
+        wdgt = event.widget()
+        menu, lut = qm
+        if not lut or not menu:
+            LOG.warning("scene menu generator returned nothing to do")
+            return False
+        event.accept()
+        sel = menu.exec_(wdgt.mapToGlobal(pos))
+        todo = lut.get(sel)
+        if callable(todo):
+            todo(scene=scene, track=track, frame=frame)
+            return True
+        else:
+            return False
+
+
 class QTrackItem(QGraphicsObject):
     """ A group of Frames corresponding to a timeline
     This allows drag and drop of timelines to be easier
@@ -88,7 +110,7 @@ class QTrackItem(QGraphicsObject):
     frames = None  # Iterable[QFrameItem], maintained privately between track and frame
     _scene = None  # weakref to scene
     _scale: CoordTransform = None
-    _id: str = None  # tracks are family::category, e.g. IMAGE:geo:toa_reflectance:11µm::GOESR-PUG:GOES-16:ABI:CONUS
+    _track: str = None  # tracks are family::category, e.g. IMAGE:geo:toa_reflectance:11µm::GOESR-PUG:GOES-16:ABI:CONUS
     _z: int = None  # our track number as displayed, 0 being highest on screen, with larger Z going downward
     _title: str = None
     _subtitle: str = None
@@ -118,7 +140,7 @@ class QTrackItem(QGraphicsObject):
         self.frames = []
         self._scene = ref(scene) if scene else None
         self._scale = scale
-        self._id = track
+        self._track = track
         self._z = z
         self._title = title
         self._subtitle = subtitle
@@ -148,7 +170,7 @@ class QTrackItem(QGraphicsObject):
 
     @property
     def track(self) -> str:
-        return self._id
+        return self._track
 
     @property
     def scene_(self):  # can't use just .scene due to Qt C++ scene()
@@ -222,6 +244,10 @@ class QTrackItem(QGraphicsObject):
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent):
         LOG.debug("QTrackItem mouse-up")
         return super(QTrackItem, self).mouseReleaseEvent(event)
+
+    def contextMenuEvent(self, event: QGraphicsSceneContextMenuEvent):
+        if not _perform_context_menu(event, self.scene_, self._track, None):
+            return super(QTrackItem, self).contextMenuEvent(event)
 
     # handle drag and drop arrivals
 
@@ -377,6 +403,16 @@ class QFrameItem(QGraphicsObject):
         # self.setAcceptDrops(True)
 
     @property
+    def scene_(self):
+        trk = self._track()
+        return trk.scene_
+
+    @property
+    def track(self):
+        trk = self._track()
+        return trk.track
+
+    @property
     def uuid(self):
         return self._uuid
 
@@ -459,6 +495,14 @@ class QFrameItem(QGraphicsObject):
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent):
         LOG.debug("QFrameItem mouse-up")
         return super(QFrameItem, self).mouseReleaseEvent(event)
+
+    def contextMenuEvent(self, event: QGraphicsSceneContextMenuEvent):
+        LOG.debug("contextMenuEvent")
+        trk = self._track()
+        track = trk.track
+        scene = trk.scene_
+        if not _perform_context_menu(event, scene, track, self._uuid):
+            return super(QFrameItem, self).contextMenuEvent(event)
 
 
 class QTimeRulerItem(QGraphicsRectItem):
