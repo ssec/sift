@@ -291,37 +291,59 @@ PROJECTIONS = {
     'geos': (
         geos_init,
         """vec4 geos_map_e(vec4 pos) {{
-            float lambda = radians(pos.x - {lon_0});
+            float lambda, phi, r, Vx, Vy, Vz, tmp, x, y;
+            lambda = radians(pos.x - {lon_0});
             {over}
-            float phi = atan({radius_p2} * tan(radians(pos.y)));
-            float r = {radius_p} / hypot({radius_p} * cos(phi), sin(phi));
-            float Vx = r * cos(lambda) * cos(phi);
-            float Vy = r * sin(lambda) * cos(phi);
-            float Vz = r * sin(phi);
-
+            phi = atan({radius_p2} * tan(radians(pos.y)));
+            r = {radius_p} / hypot({radius_p} * cos(phi), sin(phi));
+            Vx = r * cos(lambda) * cos(phi);
+            Vy = r * sin(lambda) * cos(phi);
+            Vz = r * sin(phi);
+        
             // TODO: Best way to 'discard' a vertex
             if ((({radius_g} - Vx) * Vx - Vy * Vy - Vz * Vz * {radius_p_inv2}) < 0.) {{
                return vec4(1. / 0., 1. / 0., pos.z, pos.w);
             }}
-
-            float tmp = {radius_g} - Vx;
-
+        
+            tmp = {radius_g} - Vx;
+        
             if ({flip_axis}) {{
-                lambda = {radius_g_1} * atan(Vy / hypot(Vz, tmp));
-                phi = {radius_g_1} * atan(Vz / tmp);
+                x = {radius_g_1} * atan(Vy / hypot(Vz, tmp));
+                y = {radius_g_1} * atan(Vz / tmp);
             }} else {{
-                lambda = {radius_g_1} * atan(Vy / tmp);
-                phi = {radius_g_1} * atan(Vz / hypot(Vy, tmp));
+                x = {radius_g_1} * atan(Vy / tmp);
+                y = {radius_g_1} * atan(Vz / hypot(Vy, tmp));
             }}
-
-            return vec4(lambda * {a}, phi * {a}, pos.z, pos.w);
+            return vec4(x * {a}, y * {a}, pos.z, pos.w);
         }}""",
-        None, #"""vec4 geos_map_s(vec4 pos) {{ }}""",
+        """vec4 geos_map_s(vec4 pos) {{
+            float lambda, phi, Vx, Vy, Vz, tmp, x, y;
+            lambda = radians(pos.x - {lon_0});
+            {over}
+            phi = radians(pos.y);
+            Vx = cos(lambda) * cos(phi);
+            Vy = sin(lambda) * cos(phi);
+            Vz = sin(phi);
+            // TODO: Best way to 'discard' a vertex
+            if ((({radius_g} - Vx) * Vx - Vy * Vy - Vz * Vz * {radius_p_inv2}) < 0.) {{
+               return vec4(1. / 0., 1. / 0., pos.z, pos.w);
+            }}
+            tmp = {radius_g} - Vx;
+            if ({flip_axis}) {{
+                x = {a} * {radius_g_1} * atan(Vy / hypot(Vz, tmp));
+                y = {a} * {radius_g_1} * atan(Vz / tmp);
+            }}
+            else {{
+                x = {a} * {radius_g_1} * atan(Vy / tmp);
+                y = {a} * {radius_g_1} * atan(Vz / hypot(Vy, tmp));
+            }}
+            return vec4(x, y, pos.z, pos.w);
+        }}""",
         """vec4 geos_imap_e(vec4 pos) {{
             float a, b, k, det, x, y, Vx, Vy, Vz, lambda, phi;
             x = pos.x / {a};
             y = pos.y / {a};
-
+        
             Vx = -1.0;
             if ({flip_axis}) {{
                 Vz = tan(y / {radius_g_1});
@@ -330,7 +352,7 @@ PROJECTIONS = {
                 Vy = tan(x / {radius_g_1});
                 Vz = tan(y / {radius_g_1}) * hypot(1.0, Vy);
             }}
-
+        
             a = Vz / {radius_p};
             a = Vy * Vy + a * a + Vx * Vx;
             b = 2 * {radius_g} * Vx;
@@ -339,12 +361,12 @@ PROJECTIONS = {
                 // FIXME
                 return vec4(1. / 0., 1. / 0., pos.z, pos.w);
             }}
-
+        
             k = (-b - sqrt(det)) / (2. * a);
             Vx = {radius_g} + k * Vx;
             Vy *= k;
             Vz *= k;
-
+        
             // atan2 in C
             lambda = atan(Vy, Vx);
             {over}
@@ -352,33 +374,62 @@ PROJECTIONS = {
             phi = atan({radius_p_inv2} * tan(phi));
             return vec4(degrees(lambda) + {lon_0}, degrees(phi), pos.z, pos.w);
         }}""",
-        None, #"""vec4 geos_imap_s(vec4 pos) {{ }}""",
+        """vec4 geos_imap_s(vec4 pos) {{
+            float x, y, Vx, Vy, Vz, a, b, k, det, lambda, phi;
+            x = pos.x / {a};
+            y = pos.y / {a};
+            Vx = -1.;
+            if ({flip_axis}) {{
+                Vz = tan(y / ({radius_g} - 1.));
+                Vy = tan(x / ({radius_g} - 1.)) * sqrt(1. + Vz * Vz);
+            }}
+            else {{
+                Vy = tan(x / ({radius_g} - 1.));
+                Vz = tan(y / ({radius_g} - 1.)) * sqrt(1. + Vy * Vy);
+            }}
+            a = Vy * Vy + Vz * Vz + Vx * Vx;
+            b = 2 * {radius_g} * Vx;
+            det = b * b - 4 * a * {C};
+            if (det < 0.) {{
+                return vec4(1. / 0., 1. / 0., pos.z, pos.w);
+            }}
+            k = (-b - sqrt(det)) / (2 * a);
+            Vx = {radius_g} + k * Vx;
+            Vy *= k;
+            Vz *= k;
+            lambda = atan(Vy, Vx);
+            {over}
+            phi = atan(Vz * cos(lambda) / Vx);
+            return vec4(degrees(lambda) + {lon_0}, degrees(phi), pos.z, pos.w);
+        }}""",
     ),
     'stere': (
         stere_init,
         """vec4 stere_map_e(vec4 pos) {{
-            float lambda = radians(pos.x - {lon_0});
+            float lambda, phi, coslam, sinlam, sinphi, x, y;
+            lambda = radians(pos.x - {lon_0});
             {over}
-            float phi = radians(pos.y);
-            float coslam = cos(lambda);
-            float sinlam = sin(lambda);
-            float sinphi = sin(phi);
+            phi = radians(pos.y);
+            coslam = cos(lambda);
+            sinlam = sin(lambda);
+            sinphi = sin(phi);
             if ({mode} == 1) {{
                 phi = -phi;
                 coslam = - coslam;
                 sinphi = -sinphi;
             }}
-            float x = {akm1} * pj_tsfn(phi, sinphi, {e});
-            float y = {a} * -x * coslam;
-            x = {a} * x * sinlam;
+            x = {akm1} * pj_tsfn(phi, sinphi, {e});
+            y = {a} * -x * coslam;
+            x *= {a} * sinlam;
             return vec4(x, y, pos.z, pos.w);
         }}""",
         """vec4 stere_map_s(vec4 pos) {{
-            float lambda = radians(pos.x - {lon_0});
+            float lambda, phi, coslam, sinlam, x, y;
+            lambda = radians(pos.x - {lon_0});
             {over}
-            float phi = radians(pos.y);
-            float coslam = cos(lambda);
-            float sinlam = sin(lambda);
+            phi = radians(pos.y);
+            coslam = cos(lambda);
+            sinlam = sin(lambda);
             if ({mode} == 0) {{
                 coslam = - coslam;
                 phi = - phi;
@@ -386,24 +437,24 @@ PROJECTIONS = {
             if (abs(phi - M_HALFPI) < 1.e-8) {{
                 return vec4(1. / 0., 1. / 0., pos.z, pos.w);
             }}
-            float y = {akm1} * tan(M_FORTPI + .5 * phi);
-            float x = {a} * sinlam * y;
-            y = {a} * coslam * y;
+            y = {akm1} * tan(M_FORTPI + .5 * phi);
+            x = {a} * sinlam * y;
+            y *= {a} * coslam;
             return vec4(x, y, pos.z, pos.w);
         }}""",
         """vec4 stere_imap_e(vec4 pos) {{
-            float x = pos.x / {a};
-            float y = pos.y / {a};
-            float phi = radians(y);
-            float lambda = radians(x);
-            float tp = -hypot(x,y) / {akm1};
-            float phi_l = M_HALFPI - 2. * atan(tp);
-            float sinphi = 0.;
-            int i = 8;
+            float x, y, phi, lambda, tp, phi_l, sinphi;
+            x = pos.x / {a};
+            y = pos.y / {a};
+            phi = radians(y);
+            lambda = radians(x);
+            tp = -hypot(x,y) / {akm1};
+            phi_l = M_HALFPI - 2. * atan(tp);
+            sinphi = 0.;
             if ({mode} == 0) {{
                 y = -y;
             }}
-            for (i; i-- > 0; phi_l = phi) {{
+            for (int i = 8; i-- > 0; phi_l = phi) {{
                 sinphi = {e} * sin(phi_l);
                 phi = 2. * atan(tp * pow((1. + sinphi) / (1. - sinphi), -.5 * {e})) + M_HALFPI;
                 if (abs(phi_l - phi) < 1.e-10) {{
@@ -418,21 +469,22 @@ PROJECTIONS = {
             return vec4(1. / 0., 1. / 0., pos.z, pos.w);
         }}""",
         """vec4 stere_imap_s(vec4 pos) {{
-            float x = pos.x / {a};
-            float y = pos.y / {a};
-            float rh = hypot(x, y);
-            float cosc = cos(2. * atan(rh, {akm1}));
-            float phi = 0;
+            float x, y, rh, cosc, phi, lambda;
+            x = pos.x / {a};
+            y = pos.y / {a};
+            rh = hypot(x, y);
+            cosc = cos(2. * atan(rh / {akm1}));
+            phi = 0;
             if ({mode} == 0) {{
                 y = -y;
             }}
             if (abs(rh) < 1.e-10) {{
-                phi = {lat_0};
+                phi = radians({lat_0});
             }}
             else {{
                 phi = asin({mode} == 1 ? -cosc : cosc);
             }}
-            float lambda = (x == 0. && y == 0.) ? 0. : atan(x, y);
+            lambda = (x == 0. && y == 0.) ? 0. : atan(x, y);
             {over}
             return vec4(degrees(lambda) + {lon_0}, degrees(phi), pos.z, pos.w);
         }}""",
