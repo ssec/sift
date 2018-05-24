@@ -347,6 +347,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 'default_width': 20.,  # degrees from left edge to right edge
                 'default_height': 20.,  # degrees from bottom edge to top edge
             }),
+            ('Polar (Alaska)', {
+                'proj4_str': '+proj=stere +datum=WGS84 +ellps=WGS84 +lat_0=90 +lat_ts=60.0 +lon_0=-150 +units=m +over',
+                'default_center': (-150., 61.2),  # lon, lat center point (Anchorage)
+                'default_width': 20.,  # degrees from left edge to right edge
+                'default_height': 20.,  # degrees from bottom edge to top edge
+            }),
         ))
         self.default_projection = 'LCC (CONUS)'
         self.current_projection = self.default_projection
