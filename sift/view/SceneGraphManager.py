@@ -494,6 +494,8 @@ class SceneGraphManager(QObject):
         self.latlon_grid = self._init_latlon_grid_layer(color=self._color_choices[self._latlon_grid_color_idx])
         self.latlon_grid.transform = STTransform(translate=(0, 0, 45))
 
+        self.create_test_image()
+
         # Make the camera center on Guam
         # center = (144.8, 13.5)
         center = center or proj_info["default_center"]
@@ -502,6 +504,42 @@ class SceneGraphManager(QObject):
         ll_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] - width, center[1] - height)])[0][:2]
         ur_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] + width, center[1] + height)])[0][:2]
         self.main_view.camera.rect = Rect(ll_xy, (ur_xy[0] - ll_xy[0], ur_xy[1] - ll_xy[1]))
+
+    def create_test_image(self):
+        proj4_str = os.getenv("SIFT_DEBUG_IMAGE_PROJ", None)
+        if proj4_str is None:
+            return
+        shape = (2000, 2000)
+        fake_data = np.zeros(shape, np.float32) + 0.5
+        fake_data[:5, :] = 1.
+        fake_data[-5:, :] = 1.
+        fake_data[:, :5] = 1.
+        fake_data[:, -5:] = 1.
+        cell_size = 1000
+        origin_x = -shape[1] / 2. * cell_size
+        origin_y = shape[0] / 2. * cell_size
+
+        image = TiledGeolocatedImage(
+            fake_data,
+            origin_x,
+            origin_y,
+            cell_size,
+            cell_size,
+            name="Test Image",
+            clim=(0., 1.),
+            gamma=1.,
+            interpolation='nearest',
+            method='tiled',
+            cmap=self.document.find_colormap('grays'),
+            double=False,
+            texture_shape=DEFAULT_TEXTURE_SHAPE,
+            wrap_lon=False,
+            parent=self.main_map,
+            projection=proj4_str,
+        )
+        image.transform = PROJ4Transform(proj4_str, inverse=True)
+        image.transform *= STTransform(translate=(0, 0, -50.0))
+        self._test_img = image
 
     def set_projection(self, projection_name, proj_info, center=None):
         self.main_map.transform = PROJ4Transform(proj_info['proj4_str'])
