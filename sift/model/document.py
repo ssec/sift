@@ -353,12 +353,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 'default_width': 20.,  # degrees from left edge to right edge
                 'default_height': 20.,  # degrees from bottom edge to top edge
             }),
-            ('Equirectangular', {
-                'proj4_str': '+proj=eqc +a=6371229 +b=6371229 +over',
-                'default_center': (0., 0.),  # lon, lat center point (Guam)
-                'default_width': 20.,  # degrees from left edge to right edge
-                'default_height': 20.,  # degrees from bottom edge to top edge
-            }),
         ))
         self.default_projection = 'LCC (CONUS)'
         self.current_projection = self.default_projection
