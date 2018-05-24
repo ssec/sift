@@ -77,6 +77,8 @@ import json
 
 from sift.workspace.metadatabase import Product
 from sift.common import KIND, INFO, prez, span, FCS_SEP, ZList, flags
+from sift.queue import TASK_DOING, TASK_PROGRESS, TaskQueue
+from sift.workspace import Workspace
 from sift.util.default_paths import DOCUMENT_SETTINGS_DIR
 from sift.model.composite_recipes import RecipeManager, CompositeRecipe
 from sift.view.Colormap import ALL_COLORMAPS, USER_COLORMAPS
@@ -268,17 +270,26 @@ class DocumentAsContextBase(object):
     doc = None
     mdb = None
     ws = None
-
+    _finally_queue = None
 
     def __init__(self, doc, mdb, ws):
         self.doc = doc
         self.mdb = mdb
         self.ws = ws
 
+    def _finally(self, fn: T.Callable, *args, **kwargs):
+        """Defer a call until context close, if a context is active; else do immediately
+        """
+        from functools import partial
+        if args or kwargs:
+            fn = partial(fn, *args, **kwargs)
+        if self._finally_queue is not None:
+            self._finally_queue.append(fn)
+        else:
+            fn()
 
     def __enter__(self):
-        pass
-
+        self._finally_queue = []
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_val is not None:
@@ -286,7 +297,13 @@ class DocumentAsContextBase(object):
             raise exc_val
         else:
             # commit code
-            pass
+            elfin, self._finally_queue = self._finally_queue, None
+            while True:
+                todo = elfin.pop(0, None)
+                if todo:
+                    todo()
+                else:
+                    break
 
 
 # class DocumentAsContext(DocumentAsContextBase):
@@ -499,8 +516,87 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         # this needs to invalidate the current display and any animation
         self.doc.didChangeLayerVisibility.emit({frame: True})
 
-    # def move_track(self, track: str, atop_z: int):
-    #     self.doc.track_order.move(atop_z, track)
+    def activate_frames(self, frame: UUID, *more_frames: T.Iterable[UUID]) -> T.Sequence[UUID]:
+        """Activate one or more frames in the document, as directed by the timeline widgets
+        :returns sequence of UUIDs actually activated
+        """
+        queue: TaskQueue = self.doc.queue
+        frames = [frame] + list(*more_frames)
+
+        def _bgnd_ensure_content_loaded(ws=self.ws, frames=frames):
+            ntot = len(frames)
+            for nth, frame in enumerate(frames):
+                ws.import_product_content(frame)
+                yield {TASK_DOING: "importing {}/{}".format(nth+1, ntot), TASK_PROGRESS: float(nth)/float(ntot)}
+
+        def _then_show_frames_in_document(doc = self.doc, frames = frames):
+            return
+            # ensure that the track these frames belongs to is activated itself
+            # update the timeline view states of these frames to show them as active as well
+            # generate their presentations if needed
+            # regenerate the animation plan and refresh the screen
+
+
+        queue.add("activate frames " + repr(frames), _bgnd_ensure_content_loaded(), "activate {} frames".format(len(frames)),
+                  interactive=False, and_then=_then_show_frames_in_document)
+
+    def _products_in_track(self, track: str, during: span = None) -> T.List[UUID]:
+        fam, ctg = track.split(FCS_SEP)
+        if during is None:
+            with self.mdb as S:
+                return [UUID(x) for x in S.query(Product.uuid_str).filter(Product.family == fam & Product.category == ctg).all()]
+        else:
+            start, end = during.s, during.e
+            with self.mdb as S:
+                return [UUID(x) for x in S.query(Product.uuid_str).filter(
+                    (Product.family == fam) & (Product.category == ctg) &
+                    ~((Product.obs_time > end) | ((Product.obs_time + Product.obs_duration) < start))).all()]
+
+    def deactivate_frames(self, frame: UUID, *more_frames: T.Iterable[UUID]) -> T.Sequence[UUID]:
+        """Activate one or more frames in the document, as directed by the timeline widgets
+        """
+
+    def deactivate_track(self, track: str):
+        LOG.info("deactivate_track {}".format(track))
+        # time_range: span = self.timeline_span
+        pit = self._products_in_track(track)
+        if pit:
+            self.deactivate_frames(*pit)
+        # refresh state of track itself
+
+        # refresh timeline display and layer list
+        # defer any signals if there's a context in progress
+        self._finally(self.doc.didReorderTracks.emit, set(), {track})
+
+    def activate_track(self, track: str):
+        """Activate a track, nudging all frames in the active time range into active state
+        """
+        # time_range: span = self.timeline_span
+        pit = self._products_in_track(track)
+        if pit:
+            self.activate_frames(*pit)
+        # refresh state of track itself
+
+        # send a refresh to the timeline display and layer list
+        self._finally(self.doc.didReorderTracks.emit, {track}, set())
+        LOG.info("activate_track {}".format(track))
+
+    # def activate_track_time_range(self, track: str, when: span, activate: bool=True):
+    #     pass
+    #
+    # def disable_track(self, track:str):
+    #     pass
+
+    def move_track(self, track: str, to_z: int):
+        was_inactive = self.doc.track_order.move(to_z, track) < 0
+        is_inactive = to_z < 0
+        if was_inactive ^ is_inactive:  # then state changed
+            if is_inactive:
+                LOG.debug('deactivating track {}'.format(track))
+                self.deactivate_track(track)
+            else:
+                LOG.debug('activating track {}'.format(track))
+                self.activate_track(track)
 
     # def reorder_tracks(self, new_order: T.Iterable[T.Tuple[int, str]]):
 
@@ -744,7 +840,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     Most direct access patterns should be migrated to using a contextual view of the document,
     in order to reduce abstraction leakage and permit the document storage to evolve.
     """
-    _workspace = None
+    config_dir: str = None
+    queue: TaskQueue = None
+    _workspace: Workspace = None
+
 
     # timeline the user has specified:
     track_order: ZList = None  # (zorder, family-name) with higher z above lower z; z<0 should not occur
@@ -822,9 +921,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # content gets probes applied across points and regions
     as_region_probes: DocumentAsRegionProbes = None
 
-    def __init__(self, workspace, config_dir=DOCUMENT_SETTINGS_DIR, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
+    def __init__(self, workspace, queue, config_dir=DOCUMENT_SETTINGS_DIR, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
         super(Document, self).__init__(**kwargs)
         self.config_dir = config_dir
+        self.queue = queue
         if not os.path.isdir(self.config_dir):
             LOG.info("Creating settings directory {}".format(self.config_dir))
             os.makedirs(self.config_dir)

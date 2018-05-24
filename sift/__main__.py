@@ -612,7 +612,7 @@ class Main(QtGui.QMainWindow):
 
         # create manager and helper classes
         self.workspace = Workspace(cache_dir, max_size_gb=cache_size, queue=self.queue)
-        self.document = doc = Document(self.workspace, config_dir=config_dir)
+        self.document = doc = Document(self.workspace, config_dir=config_dir, queue=self.queue)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
                                                border_shapefile=border_shapefile,
                                                center=center,
