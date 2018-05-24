@@ -349,7 +349,13 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             }),
             ('Polar (Alaska)', {
                 'proj4_str': '+proj=stere +datum=WGS84 +ellps=WGS84 +lat_0=90 +lat_ts=60.0 +lon_0=-150 +units=m +over',
-                'default_center': (-150., 61.2),  # lon, lat center point (Guam)
+                'default_center': (-150., 61.2),  # lon, lat center point (Anchorage)
+                'default_width': 20.,  # degrees from left edge to right edge
+                'default_height': 20.,  # degrees from bottom edge to top edge
+            }),
+            ('Equirectangular', {
+                'proj4_str': '+proj=eqc +a=6371229 +b=6371229 +over',
+                'default_center': (0., 0.),  # lon, lat center point (Guam)
                 'default_width': 20.,  # degrees from left edge to right edge
                 'default_height': 20.,  # degrees from bottom edge to top edge
             }),

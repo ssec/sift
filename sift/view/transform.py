@@ -149,7 +149,6 @@ def geos_init(proj_dict):
         proj_dict['radius_p_inv2'] = proj_dict['rone_es']
     else:
         proj_dict['radius_p'] = proj_dict['radius_p2'] = proj_dict['radius_p_inv2'] = 1.0
-
     return proj_dict
 
 
@@ -174,6 +173,17 @@ def stere_init(proj_dict):
     else:
         # If EQUIT or OBLIQ mode:
         raise NotImplementedError("This projection mode is not supported yet.")
+    return proj_dict
+
+
+def eqc_init(proj_dict):
+    proj_dict.setdefault('lat_0', 0.)
+    proj_dict.setdefault('lat_ts', proj_dict['lat_0'])
+    proj_dict['rc'] = np.cos(np.radians(proj_dict['lat_ts']))
+    if (proj_dict['rc'] <= 0.):
+        raise ValueError("PROJ.4 'lat_ts' parameter must be in range (-PI/2,PI/2)")
+    proj_dict['phi0'] = np.radians(proj_dict['lat_0'])
+    proj_dict['es'] = 0.
     return proj_dict
 
 
@@ -371,12 +381,12 @@ PROJECTIONS = {
             float sinlam = sin(lambda);
             if ({mode} == 0) {{
                 coslam = - coslam;
-                phi = -phi;
+                phi = - phi;
             }}
             if (abs(phi - M_HALFPI) < 1.e-8) {{
                 return vec4(1. / 0., 1. / 0., pos.z, pos.w);
             }}
-            float y = {akm1} * tan(M_FORTPI + .5 * phi)
+            float y = {akm1} * tan(M_FORTPI + .5 * phi);
             float x = {a} * sinlam * y;
             y = {a} * coslam * y;
             return vec4(x, y, pos.z, pos.w);
@@ -412,7 +422,7 @@ PROJECTIONS = {
             float y = pos.y / {a};
             float rh = hypot(x, y);
             float cosc = cos(2. * atan(rh, {akm1}));
-            float lambda = 0;
+            float phi = 0;
             if ({mode} == 0) {{
                 y = -y;
             }}
@@ -422,9 +432,31 @@ PROJECTIONS = {
             else {{
                 phi = asin({mode} == 1 ? -cosc : cosc);
             }}
-            lambda = (x == 0. && y == 0.) ? 0. : atan(x, y);
+            float lambda = (x == 0. && y == 0.) ? 0. : atan(x, y);
             {over}
             return vec4(degrees(lambda) + {lon_0}, degrees(phi), pos.z, pos.w);
+        }}""",
+    ),
+    'eqc': (
+        eqc_init,
+            None,
+            """vec4 eqc_map_s(vec4 pos) {{
+            {es};
+            float lambda = radians(pos.x);
+            {over}
+            float phi = radians(pos.y);
+            float x = {a} * {rc} * lambda;
+            float y = {a} * (phi - {phi0});
+            return vec4(x, y, pos.z, pos.w);
+        }}""",
+        None,
+        """vec4 eqc_imap_s(vec4 pos) {{
+            float x = pos.x / {a};
+            float y = pos.y / {a};
+            float lambda = x / {rc};
+            {over}
+            float phi = y + {phi0};
+            return vec4(degrees(lambda), degrees(phi), pos.z, pos.w);
         }}""",
     ),
 }
