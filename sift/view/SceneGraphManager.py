@@ -32,12 +32,11 @@ from vispy.visuals import MarkersVisual, marker_types, LineVisual
 from vispy.scene.visuals import Markers, Polygon, Compound, Line
 from vispy.geometry import Rect
 from sift.common import DEFAULT_ANIMATION_DELAY, INFO, KIND, TOOL, prez
-# from sift.control.layer_list import LayerStackListViewModel
-from sift.view.LayerRep import NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer
+from sift.view.LayerRep import (NEShapefileLines, TiledGeolocatedImage,
+                                RGBCompositeLayer, PrecomputedIsocurve)
 from sift.view.MapWidget import SIFTMainMapCanvas
 from sift.view.Cameras import PanZoomProbeCamera
-from sift.view.Colormap import ALL_COLORMAPS
-from sift.model.document import DocLayerStack
+from sift.model.document import DocLayerStack, DocBasicLayer
 from sift.queue import TASK_DOING, TASK_PROGRESS
 from sift.view.ProbeGraphs import DEFAULT_POINT_PROBE
 from sift.view.transform import PROJ4Transform
@@ -772,13 +771,34 @@ class SceneGraphManager(QObject):
             LOG.info('changing {} to gamma {}'.format(uuid, gamma))
             self.set_gamma(gamma, uuid)
 
+    def add_contour_layer(self, layer:DocBasicLayer, p:prez, overview_content:np.ndarray):
+        verts = overview_content[:, :2]
+        connects = overview_content[:, 2].astype(np.bool)
+        level_indexes = overview_content[:, 3]
+        level_indexes = level_indexes[~np.isnan(level_indexes)].astype(np.int)
+        levels = layer["contour_levels"]
+        contour_visual = PrecomputedIsocurve((verts, connects, level_indexes),
+                                             levels, p.colormap,
+                                             clim=p.climits,
+                                             parent=self.main_map)
+        contour_visual.transform = PROJ4Transform(layer[INFO.PROJ], inverse=True)
+        contour_visual.transform *= STTransform(translate=(0, 0, -50.0))
+        self.image_elements[layer[INFO.UUID]] = contour_visual
+        self.layer_set.add_layer(contour_visual)
+        # image.determine_reference_points()
+        self.on_view_change(None)
+
     def add_basic_layer(self, new_order:tuple, uuid:UUID, p:prez):
         layer = self.document[uuid]
         # create a new layer in the imagelist
         if not layer.is_valid:
             LOG.warning('unable to add an invalid layer, will try again later when layer changes')
             return
-        overview_content = self.workspace.get_content(layer.uuid)
+
+        overview_content = self.workspace.get_content(layer.uuid, kind=layer[INFO.KIND])
+        if layer[INFO.KIND] == KIND.CONTOUR:
+            return self.add_contour_layer(layer, p, overview_content)
+
         image = TiledGeolocatedImage(
             overview_content,
             layer[INFO.ORIGIN_X],
@@ -1059,7 +1079,7 @@ class SceneGraphManager(QObject):
 
         def _assess_if_active(uuid):
             element = self.image_elements.get(uuid, None)
-            if element is not None:
+            if element is not None and hasattr(element, 'assess'):
                 _assess(uuid, element)
 
         for uuid in current_visible_layers:

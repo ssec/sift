@@ -243,7 +243,8 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.layer_set.animating = False
         # http://pyqt.sourceforge.net/Docs/PyQt4/qfiledialog.html#getOpenFileNames
         filename_filters = [
-            'All files (*.*)',
+            # 'All files (*.*)',
+            'All supported files (*.nc *.nc4 *.tiff *.tif)',
             'GOES-16 NetCDF (*.nc *.nc4)',
             'Mercator GTIFF (*.tiff *.tif)',
             'NWP GRIB2 (*.grib2)',

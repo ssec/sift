@@ -17,7 +17,7 @@ import re
 from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
 from datetime import datetime, timedelta
-from typing import Sequence, Iterable, Generator, Mapping
+from typing import Sequence, Iterable, Generator, Mapping, Tuple
 import gdal
 import osr
 import asyncio
@@ -40,6 +40,11 @@ except ImportError:
     LOG.warning("SatPy is not installed and will not be used for importing.")
     Scene = None
     DatasetID = None
+
+try:
+    from skimage.measure import find_contours
+except ImportError:
+    find_contours = None
 
 DEFAULT_GTIFF_OBS_DURATION = timedelta(seconds=60)
 DEFAULT_GUIDEBOOK = ABI_AHI_Guidebook
@@ -400,7 +405,7 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
         shape = rows, cols = band.YSize, band.XSize
         blockw, blockh = band.GetBlockSize()  # non-blocked files will report [band.XSize,1]
 
-        data_filename = '{}.data'.format(prod.uuid)
+        data_filename = '{}.image'.format(prod.uuid)
         data_path = os.path.join(self._cwd, data_filename)
 
         coverage_filename = '{}.coverage'.format(prod.uuid)
@@ -628,7 +633,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
 
         now = datetime.utcnow()
 
-        data_filename = '{}.data'.format(prod.uuid)
+        data_filename = '{}.image'.format(prod.uuid)
         data_path = os.path.join(self._cwd, data_filename)
 
         # coverage_filename = '{}.coverage'.format(prod.uuid)
@@ -738,6 +743,21 @@ class SatPyImporter(aImporter):
         self.scn = Scene(reader=self.reader, filenames=self.filenames)
 
     @classmethod
+    def from_product(cls, prod: Product, workspace_cwd, database_session, **kwargs):
+        # this overrides the base class because we assume that the product
+        # has kwargs that we want
+        # NOTE: The kwargs are currently provided by the caller in
+        # workspace.py so this isn't needed right now
+        # FIXME: deal with products that need more than one resource
+        try:
+            cls = prod.resource[0].format
+        except IndexError:
+            LOG.error('no resources in {} {}'.format(repr(type(prod)), repr(prod)))
+            raise
+        kwargs.update(prod.info)
+        return cls(prod.resource[0].path, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
+
+    @classmethod
     def is_relevant(cls, source_path=None, source_uri=None):
         # this importer should only be used if specifically requested
         return False
@@ -827,10 +847,8 @@ class SatPyImporter(aImporter):
             ds.attrs[INFO.OBS_DURATION] = duration
 
             # Handle GRIB platform/instrument
-            ds.attrs[INFO.KIND] = kind = KIND.IMAGE
-            # ds.attrs[INFO.KIND] = KIND.IMAGE if self.reader != 'grib' else \
-            #     KIND.CONTOUR
-            # FIXME: GRIB files should actually be contours (decide by the platform maybe?)
+            ds.attrs[INFO.KIND] = KIND.IMAGE if self.reader != 'grib' else \
+                KIND.CONTOUR
             ds.attrs[INFO.INSTRUMENT] = ds.attrs.get('sensor')
             ds.attrs[INFO.PLATFORM] = ds.attrs.get('platform_name')
             if 'centreDescription' in ds.attrs and \
@@ -852,12 +870,23 @@ class SatPyImporter(aImporter):
             # Resolve anything else needed by SIFT
             id_str = ":".join(str(v) for v in DatasetID.from_dict(ds.attrs))
             ds.attrs[INFO.DATASET_NAME] = id_str
+            model_time = ds.attrs.get('model_time')
+            if model_time is not None:
+                ds.attrs[INFO.DATASET_NAME] += " " + model_time.isoformat()
             ds.attrs[INFO.BAND] = 0
             ds.attrs[INFO.SHORT_NAME] = ds.attrs['name']
             if ds.attrs.get('level') is not None:
-                ds.attrs[INFO.SHORT_NAME] = "{} @ {}hPa".format(ds.attrs['name'], ds.attrs['level'])
+                ds.attrs[INFO.SHORT_NAME] = "{} @ {}hPa ({})".format(
+                    ds.attrs['name'], ds.attrs['level'],
+                    ds.attrs['model_time'].isoformat(" "))
             ds.attrs[INFO.SHAPE] = ds.shape
             generate_guidebook_metadata(ds.attrs)
+            if ds.attrs[INFO.KIND] == KIND.CONTOUR:
+                # FIXME: Make these based on standard_name
+                vmin, vmax = ds.attrs[INFO.VALID_RANGE]
+                offset = (vmax - vmin) * 0.02  # 2% of the range
+                ds.attrs['contour_levels'] = list(np.linspace(
+                    vmin + offset, vmax - offset, 5))
 
             # Generate FAMILY and CATEGORY
             if 'model_time' in ds.attrs:
@@ -868,7 +897,7 @@ class SatPyImporter(aImporter):
                 cat_id = id_str
             ds.attrs[INFO.SCENE] = hash(ds.attrs['area'])
             ds.attrs[INFO.FAMILY] = '{}:{}:{}'.format(
-                kind.name, ds.attrs[INFO.STANDARD_NAME], id_str)
+                ds.attrs[INFO.KIND].name, ds.attrs[INFO.STANDARD_NAME], id_str)
             ds.attrs[INFO.CATEGORY] = 'SatPy:{}:{}:{}:{}'.format(
                 ds.attrs[INFO.PLATFORM].name, ds.attrs[INFO.INSTRUMENT].name,
                 ds.attrs[INFO.SCENE], cat_id)  # system:platform:instrument:target
@@ -929,19 +958,15 @@ class SatPyImporter(aImporter):
         # FIXME: Don't recreate the importer every time we want to load data
         dataset_ids = [DatasetID.from_dict(prod.info) for prod in products]
         self.scn.load(dataset_ids)
+        num_stages = len(products)
         for idx, (prod, ds_id) in enumerate(zip(products, dataset_ids)):
             dataset = self.scn[ds_id]
             shape = dataset.shape
+            num_contents = 1 if prod.info[INFO.KIND] == KIND.IMAGE else 2
+
             if prod.content:
                 LOG.warning('content was already available, skipping import')
                 continue
-
-            data_filename = '{}.data'.format(prod.uuid)
-            data_path = os.path.join(self._cwd, data_filename)
-
-            # shovel that data into the memmap incrementally
-            img_data = np.memmap(data_path, dtype=np.float32, shape=shape, mode='w+')
-            da.store(dataset.data, img_data)
 
             now = datetime.utcnow()
             area_info = self._area_to_sift_attrs(dataset.attrs['area'])
@@ -950,6 +975,26 @@ class SatPyImporter(aImporter):
             proj4 = area_info[INFO.PROJ]
             origin_x = area_info[INFO.ORIGIN_X]
             origin_y = area_info[INFO.ORIGIN_Y]
+            data = dataset.data
+
+            # Handle building contours for data from 0 to 360 longitude
+            antimeridian = 179.999
+            if '+proj=latlong' not in proj4:
+                # the x coordinate for the antimeridian in this projection
+                antimeridian = Proj(proj4)(antimeridian, 0)[0]
+            am_index = int(np.ceil((antimeridian - origin_x) / cell_width))
+            if prod.info[INFO.KIND] == KIND.CONTOUR and 0 < am_index < shape[1]:
+                # if we have data from 0 to 360 longitude, we want -180 to 360
+                data = da.concatenate((data[:, am_index:], data), axis=1)
+                shape = data.shape
+                origin_x -= am_index * cell_width
+
+            # shovel that data into the memmap incrementally
+            data_filename = '{}.image'.format(prod.uuid)
+            data_path = os.path.join(self._cwd, data_filename)
+            img_data = np.memmap(data_path, dtype=np.float32, shape=shape, mode='w+')
+            da.store(data, img_data)
+
             c = Content(
                 lod=0,
                 resolution=int(min(abs(cell_width), abs(cell_height))),
@@ -974,6 +1019,7 @@ class SatPyImporter(aImporter):
                 origin_x=origin_x,
                 origin_y=origin_y,
             )
+            c.info[INFO.KIND] = KIND.IMAGE
             # c.info.update(prod.info) would just make everything leak together so let's not do it
             self._S.add(c)
             prod.content.append(c)
@@ -981,22 +1027,115 @@ class SatPyImporter(aImporter):
             self._S.commit()
 
             yield import_progress(uuid=prod.uuid,
-                                  stages=1,
-                                  current_stage=0,
-                                  completion=(idx + 1) / len(products),
-                                  stage_desc="SatPy data add to workspace",
+                                  stages=num_stages,
+                                  current_stage=idx,
+                                  completion=1. / num_contents,
+                                  stage_desc="SatPy image data add to workspace",
                                   dataset_info=None,
                                   data=img_data)
 
+            if num_contents == 1:
+                continue
 
+            if find_contours is None:
+                raise RuntimeError("Can't create contours without 'skimage' "
+                                   "package installed.")
 
+            # XXX: Should/could 'lod' be used for different contour level data?
+            levels = prod.info['contour_levels']
+            data_filename = '{}.contour'.format(prod.uuid)
+            data_path = os.path.join(self._cwd, data_filename)
+            try:
+                contour_data = self._compute_contours(
+                        img_data, prod.info[INFO.VALID_RANGE][0],
+                        prod.info[INFO.VALID_RANGE][1], levels)
+            except ValueError:
+                LOG.warning("Could not compute contour levels for '{}'".format(prod.uuid))
+                LOG.debug("Contour error: ", exc_info=True)
+                continue
 
+            contour_data[:, 0] *= cell_width
+            contour_data[:, 0] += origin_x
+            contour_data[:, 1] *= cell_height
+            contour_data[:, 1] += origin_y
+            contour_data.tofile(data_path)
+            c = Content(
+                lod=0,
+                resolution=int(min(abs(cell_width), abs(cell_height))),
+                atime=now,
+                mtime=now,
 
+                # info about the data array memmap
+                path=data_filename,
+                rows=contour_data.shape[0],  # number of vertices
+                cols=contour_data.shape[1],  # col (x), row (y), "connect", num_points_for_level
+                proj4=proj4,
+                # levels = 0,
+                dtype='float32',
 
+                cell_width=cell_width,
+                cell_height=cell_height,
+                origin_x=origin_x,
+                origin_y=origin_y,
+            )
+            c.info[INFO.KIND] = KIND.CONTOUR
+            # c.info["level_index"] = level_indexes
+            self._S.add(c)
+            prod.content.append(c)
+            self._S.commit()
 
+            completion = 2. / num_contents
+            yield import_progress(uuid=prod.uuid,
+                                  stages=num_stages,
+                                  current_stage=idx,
+                                  completion=completion,
+                                  stage_desc="SatPy contour data add to workspace",
+                                  dataset_info=None,
+                                  data=img_data)
 
+    def _get_verts_and_connect(self, paths):
+        """ retrieve vertices and connects from given paths-list
+        """
+        # THIS METHOD WAS COPIED FROM VISPY
+        verts = np.vstack(paths)
+        gaps = np.add.accumulate(np.array([len(x) for x in paths])) - 1
+        connect = np.ones(gaps[-1], dtype=bool)
+        connect[gaps[:-1]] = False
+        return verts, connect
 
+    def _compute_contours(self, img_data: np.ndarray,
+                          vmin: float, vmax: float,
+                          levels: list) -> np.ndarray:
+        all_levels = []
+        level_indexes = []
+        for level in levels:
+            if level < vmin or level > vmax:
+                continue
 
+            contours = find_contours(img_data, level,
+                                     positive_orientation='high')
+            if not contours:
+                LOG.debug("No contours found for level: {}".format(level))
+                continue
+            v, c = self._get_verts_and_connect(contours)
+            # swap row, column to column, row (x, y)
+            v[:, [0, 1]] = v[:, [1, 0]]
+            v += np.array([0.5, 0.5])
+            v[:, 0] = np.where(np.isnan(v[:, 0]), 0, v[:, 0])
+
+            # HACK: Store float vertices, boolean, and index arrays together in one float array
+            this_level = np.empty((v.shape[0],), np.float32)
+            this_level[:] = np.nan
+            this_level[-1] = v.shape[0]
+            level_indexes.append(v.shape[0])
+            c = np.concatenate((c, [False])).astype(np.float32)
+            # level_data = np.concatenate((v, c[:, None]), axis=1)
+            level_data = np.concatenate((v, c[:, None], this_level[:, None]), axis=1)
+            all_levels.append(level_data)
+
+        if not all_levels:
+            raise ValueError("No valid contour levels")
+        return np.concatenate(all_levels).astype(np.float32)
 
 
 PATH_TEST_DATA = os.environ.get('TEST_DATA', os.path.expanduser("~/Data/test_files/thing.dat"))

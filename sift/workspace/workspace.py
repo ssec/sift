@@ -502,21 +502,29 @@ class Workspace(QObject):
     def _product_with_uuid(self, session, uuid) -> Product:
         return session.query(Product).filter_by(uuid_str=str(uuid)).first()
 
-    def _product_overview_content(self, session, prod:Product=None, uuid:UUID=None) -> Content:
+    def _product_overview_content(self, session, prod:Product=None, uuid:UUID=None, kind:KIND=KIND.IMAGE) -> Content:
         if prod is None and uuid is not None:
-            return session.query(Content).filter((Product.uuid_str==str(uuid)) & (Content.product_id==Product.id)).order_by(Content.lod).first()
-        return None if 0==len(prod.content) else prod.content[0]
+            contents = session.query(Content).filter((Product.uuid_str==str(uuid)) & (Content.product_id==Product.id)).order_by(Content.lod).all()
+            contents = [c for c in contents if c.info.get(INFO.KIND, KIND.IMAGE) == kind]
+            return contents[0]
+        contents = [c for c in prod.content if c.info.get(INFO.KIND, KIND.IMAGE)]
+        return None if 0 == len(contents) else contents[0]
 
-    def _product_native_content(self, session, prod:Product = None, uuid:UUID=None) -> Content:
+    def _product_native_content(self, session, prod:Product = None, uuid:UUID=None, kind:KIND=KIND.IMAGE) -> Content:
+        # NOTE: This assumes the last Content object is the best resolution
+        #       but it is untested
         if prod is None and uuid is not None:
-            return session.query(Content).filter((Product.uuid_str==str(uuid)) & (Content.product_id==Product.id)).order_by(Content.lod.desc()).first()
-        return None if 0==len(prod.content) else prod.content[-1]  # highest LOD
+            contents = session.query(Content).filter((Product.uuid_str==str(uuid)) & (Content.product_id==Product.id)).order_by(Content.lod.desc()).all()
+            contents = [c for c in contents if c.info.get(INFO.KIND, KIND.IMAGE) == kind]
+            return contents[-1]
+        contents = [c for c in prod.content if c.info.get(INFO.KIND, KIND.IMAGE)]
+        return None if 0 == len(contents) else contents[-1]
 
     #
     # combining queries with data content
     #
 
-    def _overview_content_for_uuid(self, uuid):
+    def _overview_content_for_uuid(self, uuid, kind=KIND.IMAGE):
         # FUTURE: do a compound query for this to get the Content entry
         # prod = self._product_with_uuid(uuid)
         # assert(prod is not None)
@@ -579,7 +587,8 @@ class Workspace(QObject):
                 LOG.error('no info available for UUID {}'.format(dsi_or_uuid))
                 LOG.error("known products: {}".format(repr(self._all_product_uuids())))
                 return None
-            native_content = self._product_native_content(s, uuid=dsi_or_uuid)
+            kind = prod.info[INFO.KIND]
+            native_content = self._product_native_content(s, kind=kind, uuid=dsi_or_uuid)
 
             if native_content is not None:
                 # FUTURE: this is especially saddening; upgrade to finer grained query and/or deprecate .get_info
@@ -865,10 +874,11 @@ class Workspace(QObject):
                 prod = self._product_with_uuid(S, uuid)
 
             self.set_product_state_flag(prod.uuid, WorkspaceState.ARRIVING)
+            default_prod_kind = prod.info[INFO.KIND]
 
             if len(prod.content):
                 LOG.info('product already has content available, using that rather than re-importing')
-                ovc = self._product_overview_content(S, uuid=uuid)
+                ovc = self._product_overview_content(S, uuid=uuid, kind=default_prod_kind)
                 assert (ovc is not None)
                 arrays = self._cached_arrays_for_content(ovc)
                 return arrays.data
@@ -896,7 +906,7 @@ class Workspace(QObject):
         # S.flush()
 
         # make an ActiveContent object from the Content, now that we've imported it
-        ac = self._overview_content_for_uuid(uuid)
+        ac = self._overview_content_for_uuid(uuid, kind=default_prod_kind)
         return ac.data
 
     def create_composite(self, symbols:dict, relation:dict):
@@ -1065,7 +1075,7 @@ class Workspace(QObject):
         P = Product.from_info(parms, symbols=namespace, codeblock=codeblock)
         uuid = P.uuid
         # FUTURE: add expression and namespace information, which would require additional parameters
-        ws_filename = '{}.data'.format(str(uuid))
+        ws_filename = '{}.image'.format(str(uuid))
         ws_path = os.path.join(self.cache_dir, ws_filename)
         with open(ws_path, 'wb+') as fp:
             mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
@@ -1123,7 +1133,7 @@ class Workspace(QObject):
                 pass
         return True
 
-    def get_content(self, dsi_or_uuid, lod=None):
+    def get_content(self, dsi_or_uuid, lod=None, kind=KIND.IMAGE):
         """
         By default, get the best-available (closest to native) np.ndarray-compatible view of the full dataset
         :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
@@ -1141,7 +1151,11 @@ class Workspace(QObject):
         # prod = self._product_with_uuid(dsi_or_uuid)
         # prod.touch()  TODO this causes a locking exception when run in a secondary thread. Keeping background operations lightweight makes sense however, so just review this
         with self._inventory as s:
-            content = s.query(Content).filter((Product.uuid_str==str(uuid)) & (Content.product_id==Product.id)).order_by(Content.lod.desc()).first()
+            content = s.query(Content).filter((Product.uuid_str==str(uuid)) & (Content.product_id==Product.id)).order_by(Content.lod.desc()).all()
+            content = [x for x in content if x.info.get(INFO.KIND, KIND.IMAGE) == kind]
+            if len(content) != 1:
+                LOG.warning("More than one matching Content object for '{}'".format(dsi_or_uuid))
+            content = content[0]
             if not content:
                 raise AssertionError('no content in workspace for {}, must re-import'.format(uuid))
             # content.touch()
