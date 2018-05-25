@@ -1,5 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# This file is part of SIFT.
+#
+# SIFT is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# SIFT is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with SIFT.  If not, see <http://www.gnu.org/licenses/>.
 """Setuptools installation script for the SIFT python package.
 
 To install from source run the following command::
@@ -153,13 +167,21 @@ class BumpCommand(Command):
 
         print("To push git changes to remote, run:\n    git push --follow-tags")
 
+
 setup(
     name='sift',
     version=version_str,
-    description="Satellite Information Familiarization Tool for mercator geotiff files",
+    description="Satellite Information Familiarization Tool",
     author='R.K.Garcia, University of Wisconsin - Madison Space Science & Engineering Center',
     author_email='rkgarcia@wisc.edu',
-    url='https://www.ssec.wisc.edu/',
+    url='https://gitlab.ssec.wisc.edu/SIFT/sift',
+    classifiers=["Development Status :: 5 - Production/Stable",
+                 "Intended Audience :: Science/Research",
+                 "License :: OSI Approved :: GNU General Public License v3 " +
+                 "or later (GPLv3+)",
+                 "Operating System :: OS Independent",
+                 "Programming Language :: Python",
+                 "Topic :: Scientific/Engineering"],
     zip_safe=False,
     include_package_data=True,
     install_requires=['numpy', 'pillow', 'scipy', 'numba', 'vispy>0.4.0',
@@ -167,6 +189,7 @@ setup(
                       'pyshp', 'shapely', 'rasterio', 'goesr', 'sqlalchemy',
                       'goesr', 'appdirs', 'pyyaml', 'pyqtgraph', 'colormap',
                       ],
+    python_requires='>=3.6',
     extras_require=extras_require,
     packages=find_packages(),
     #entry_points={},
