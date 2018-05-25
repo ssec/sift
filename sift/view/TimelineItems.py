@@ -87,14 +87,14 @@ def _perform_context_menu(event, scene, track, frame) -> bool:
     """
     qm = scene.menu_for_track(track, frame)
     if qm is not None:
-        pos = event.pos()
-        wdgt = event.widget()
+        # pos: QPointF = event.pos()
+        # wdgt = event.widget()
         menu, lut = qm
         if not lut or not menu:
             LOG.warning("scene menu generator returned nothing to do")
             return False
         event.accept()
-        sel = menu.exec_(wdgt.mapToGlobal(pos))
+        sel = menu.exec_(event.screenPos())  # wdgt.mapToGlobal(pos.toPoint()))
         todo = lut.get(sel)
         if callable(todo):
             todo(scene=scene, track=track, frame=frame)
@@ -244,6 +244,7 @@ class QTrackItem(QGraphicsObject):
         return super(QTrackItem, self).mouseReleaseEvent(event)
 
     def contextMenuEvent(self, event: QGraphicsSceneContextMenuEvent):
+        # pos = self.mapToScene(event.pos())
         if not _perform_context_menu(event, self.scene_, self._track, None):
             return super(QTrackItem, self).contextMenuEvent(event)
 

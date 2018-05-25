@@ -163,8 +163,29 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
 
     def menu_for_track(self, track: str, frame: Optional[UUID] = None) -> Optional[Tuple[QMenu, Mapping[Any, Callable]]]:
         """Generate QMenu to use as context menu for a given track, optionally with frame if mouse was over that frame"""
-        LOG.warning("using stub menu_for_track with track {} and frame {}, but this still does nothing".format(track, frame))
-        return None
+        LOG.debug("generating menu with track {} and frame {}".format(track, frame))
+        from functools import partial
+        menu = QMenu()
+        actions = {}
+        if frame:
+
+            def _activate(*args, **kwargs):
+                self._doc.activate_frames(frame)
+
+            def _deactivate(*args, **kwargs):
+                self._doc.deactivate_frames(frame)
+
+        else:
+
+            def _activate(*args, **kwargs):
+                self._doc.activate_track(track)
+
+            def _deactivate(*args, **kwargs):
+                self._doc.deactivate_track(track)
+
+        actions[menu.addAction("Activate")] = _activate
+        actions[menu.addAction("Deactivate")] = _deactivate
+        return menu, actions
 
     def update(self, changed_tracks: [Set[str], None] = None, changed_frame_uuids: [Set[UUID], None] = None) -> int:
         """Populate or update scene, returning number of items changed in scene
