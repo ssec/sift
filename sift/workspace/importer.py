@@ -876,9 +876,8 @@ class SatPyImporter(aImporter):
             ds.attrs[INFO.BAND] = 0
             ds.attrs[INFO.SHORT_NAME] = ds.attrs['name']
             if ds.attrs.get('level') is not None:
-                ds.attrs[INFO.SHORT_NAME] = "{} @ {}hPa ({})".format(
-                    ds.attrs['name'], ds.attrs['level'],
-                    ds.attrs['model_time'].isoformat(" "))
+                ds.attrs[INFO.SHORT_NAME] = "{} @ {}hPa".format(
+                    ds.attrs['name'], ds.attrs['level'])
             ds.attrs[INFO.SHAPE] = ds.shape
             generate_guidebook_metadata(ds.attrs)
             if ds.attrs[INFO.KIND] == KIND.CONTOUR:
@@ -917,23 +916,6 @@ class SatPyImporter(aImporter):
 
         half_pixel_x = abs(area.pixel_size_x) / 2.
         half_pixel_y = abs(area.pixel_size_y) / 2.
-
-        # HACK: We don't currently support eqc but we know it is just lon/lat grid
-        if '+proj=eqc' in area.proj4_string:
-            proj = Proj(area.proj4_string)
-            proj4_string = "+proj=latlong"
-            origin_x, origin_y = proj(area.area_extent[0], area.area_extent[3], inverse=True)
-            pixel_size_x = abs(proj(area.pixel_size_x, 0, inverse=True)[0])
-            pixel_size_y = -abs(proj(0, area.pixel_size_y, inverse=True)[1])
-            origin_x += pixel_size_x / 2.
-            origin_y += pixel_size_y / 2.  # pixel size y should be negative
-            return {
-                INFO.PROJ: proj4_string,
-                INFO.ORIGIN_X: origin_x,
-                INFO.ORIGIN_Y: origin_y,
-                INFO.CELL_HEIGHT: pixel_size_y,
-                INFO.CELL_WIDTH: pixel_size_x,
-            }
 
         return {
             INFO.PROJ: area.proj4_string,

@@ -65,6 +65,8 @@ DEFAULT_COLORMAPS = {
     'toa_bidirectional_reflectance': DEFAULT_VIS,
     'toa_brightness_temperature': DEFAULT_IR,
     'height_at_cloud_top': 'Cloud Top Height',
+    'air_temperature': DEFAULT_IR,
+    'relative_humidity': DEFAULT_IR,
     # 'thermodynamic_phase_of_cloud_water_particles_at_cloud_top': 'Cloud Phase',
 }
 
@@ -269,6 +271,11 @@ class ABI_AHI_Guidebook(Guidebook):
         when = ds_info.get(INFO.SCHED_TIME, ds_info.get(INFO.OBS_TIME))
         if when is None:
             dtime = '--:--:--'
+        elif 'model_time' in ds_info:
+            dtime = "{}Z +{}h".format(
+                ds_info['model_time'].strftime('%Y-%m-%d %H:%M'),
+                when.strftime('%H')
+            )
         else:
             dtime = when.strftime('%Y-%m-%d %H:%M:%S')
         return dtime

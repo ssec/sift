@@ -550,7 +550,8 @@ class SceneGraphManager(QObject):
         ur_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] + width, center[1] + height)])[0][:2]
         self.main_view.camera.rect = Rect(ll_xy, (ur_xy[0] - ll_xy[0], ur_xy[1] - ll_xy[1]))
         for img in self.image_elements.values():
-            img.determine_reference_points()
+            if hasattr(img, 'determine_reference_points'):
+                img.determine_reference_points()
         self.on_view_change(None)
 
     def _init_latlon_grid_layer(self, color=None, resolution=5.):
@@ -815,10 +816,12 @@ class SceneGraphManager(QObject):
         level_indexes = overview_content[:, 3]
         level_indexes = level_indexes[~np.isnan(level_indexes)].astype(np.int)
         levels = layer["contour_levels"]
+        cmap = self.document.find_colormap(p.colormap)
         contour_visual = PrecomputedIsocurve((verts, connects, level_indexes),
-                                             levels, p.colormap,
+                                             levels, cmap,
                                              clim=p.climits,
-                                             parent=self.main_map)
+                                             parent=self.main_map,
+                                             name=str(layer[INFO.UUID]))
         contour_visual.transform = PROJ4Transform(layer[INFO.PROJ], inverse=True)
         contour_visual.transform *= STTransform(translate=(0, 0, -50.0))
         self.image_elements[layer[INFO.UUID]] = contour_visual
