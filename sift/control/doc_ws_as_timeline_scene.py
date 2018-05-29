@@ -162,9 +162,9 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         return lambda b: None
 
     def menu_for_track(self, track: str, frame: Optional[UUID] = None) -> Optional[Tuple[QMenu, Mapping[Any, Callable]]]:
-        """Generate QMenu to use as context menu for a given track, optionally with frame if mouse was over that frame"""
+        """Generate QMenu to use as context menu for a given track, optionally with frame if mouse was over that frame
+        """
         LOG.debug("generating menu with track {} and frame {}".format(track, frame))
-        from functools import partial
         menu = QMenu()
         actions = {}
         if frame:

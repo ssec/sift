@@ -324,6 +324,7 @@ class DocumentAsLayerStack(DocumentAsContextBase):
     """ Represent the document as a list of current layers
     As we transition to timeline model, this stops representing products and starts being a track stack
     """
+    _all_active: bool = False  # whether to represent all active products in document timespan, or just the ones under the playhead
 
     def __enter__(self):
         raise NotImplementedError()
@@ -336,6 +337,27 @@ class DocumentAsLayerStack(DocumentAsContextBase):
             # commit code
             pass
         raise NotImplementedError()
+
+    def uuid_for_current_layer(self, layer_index: int) -> UUID:
+        """given layer index from 0, return UUID of product
+        """
+        raise NotImplementedError()
+
+    @property
+    def current_layer_uuid_order(self):
+        """ the current active products in top-to-bottom order
+        """
+        if self._all_active:
+            # yield all active products in track order, but decline to rearrange
+            raise NotImplementedError()
+        else:
+            # yield the active products under the current playhead
+            raise NotImplementedError()
+
+    def prez_for_uuid(self, uuid: UUID) -> prez:
+        """presentation settings for the product uuid
+        """
+        self.mdb
 
 
 class FrameInfo(T.NamedTuple):
@@ -1245,6 +1267,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def _family_for_layer(self, uuid_or_layer):
         if isinstance(uuid_or_layer, UUID):
+            with self._workspace.metadatabase as s:
+                fam = s.query(Product.family).filter_by(uuid_str=str(uuid_or_layer)).first()
+            if fam:
+                return fam
             uuid_or_layer = self[uuid_or_layer]
         if INFO.FAMILY in uuid_or_layer:
             LOG.debug('using pre-existing family {}'.format(uuid_or_layer[INFO.FAMILY]))
