@@ -1,4 +1,5 @@
-from PyQt4.QtGui import QComboBox, QSlider, QDoubleSpinBox
+from PyQt4.QtGui import QComboBox, QSlider, QDoubleSpinBox, QWizardPage
+from PyQt4 import QtGui
 from PyQt4.QtCore import Qt
 from PyQt4.QtWebKit import QWebView
 
@@ -55,3 +56,38 @@ class QNoScrollWebView(QWebView):
             ev.ignore()
         else:
             super(QNoScrollWebView, self).wheelEvent(ev)
+
+
+class AnyWizardPage(QWizardPage):
+    """QWizardPage where at least some list items have to be checked.
+
+    This requires the user to connect the checked signals for items to
+    this classes `isComplete` method.
+
+    """
+
+    child_types = (QtGui.QListWidget, QtGui.QTableWidget)
+
+    def __init__(self, *args, **kwargs):
+        self.important_children = kwargs.pop("important_children", [])
+        super(AnyWizardPage, self).__init__(*args, **kwargs)
+
+    def isComplete(self):
+        children = self.important_children or self.findChildren(self.child_types)
+        for child_widget in children:
+            if isinstance(child_widget, QtGui.QListWidget):
+                count = child_widget.count()
+                get_item = child_widget.item
+            else:
+                count = child_widget.rowCount()
+                get_item = lambda row: child_widget.item(row, 0)
+            for item_idx in range(count):
+                item = get_item(item_idx)
+                if item.checkState():
+                    break
+            else:
+                return False
+        return True
+
+    def completeChangedSlot(self, *args, **kwargs):
+        self.completeChanged.emit()
