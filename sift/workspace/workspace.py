@@ -850,14 +850,24 @@ class Workspace(QObject):
                     raise NotImplementedError("Reader discovery is not "
                                               "currently implemented in "
                                               "the satpy importer.")
-                imp = SatPyImporter
-                hauler = imp(remaining_paths,
-                             database_session=import_session,
-                             workspace_cwd=self.cache_dir,
-                             **importer_kwargs)
-                hauler.merge_resources()
-                importers.append(hauler)
-                num_products += hauler.num_products
+                if 'scenes' in importer_kwargs:
+                    # another component already created the satpy scenes, use those
+                    scenes = importer_kwargs.pop('scenes')
+                else:
+                    scenes = [(paths, None)]
+                if isinstance(scenes, dict):
+                    scenes = scenes.items()
+                for paths, scene in scenes:
+                    imp = SatPyImporter
+                    these_kwargs = importer_kwargs.copy()
+                    these_kwargs['scene'] = scene
+                    hauler = imp(paths,
+                                 database_session=import_session,
+                                 workspace_cwd=self.cache_dir,
+                                 **these_kwargs)
+                    hauler.merge_resources()
+                    importers.append(hauler)
+                    num_products += hauler.num_products
 
             for hauler in importers:
                 for prod in hauler.merge_products():

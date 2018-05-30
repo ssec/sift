@@ -38,7 +38,7 @@ class OpenFileWizard(QtGui.QWizard):
         self._filenames = set()
         self._selected_files = []
         # tuple(filenames) -> scene object
-        self._scenes = {}
+        self.scenes = {}
         self.selected_ids = []
 
         self.ui = Ui_openFileWizard()
@@ -123,11 +123,11 @@ class OpenFileWizard(QtGui.QWizard):
             these_files = tuple(sorted([fn]))
             # TODO: We need to be able to figure out how many paths go to each
             #       Scene (add to satpy as utility function)
-            if these_files in self._scenes:
+            if these_files in self.scenes:
                 continue
             reader = self.ui.readerComboBox.currentText()
             scn = Scene(reader=reader, filenames=these_files)
-            self._scenes[these_files] = scn
+            self.scenes[these_files] = scn
             all_available_products.update(scn.available_dataset_ids())
 
         # update the widgets
@@ -241,7 +241,9 @@ class OpenFileWizard(QtGui.QWizard):
 
         selected_text = []
         selected_ids = []
-        id_format = "Name: {name:<20s}   |   Level: {level:>8s}"
+        id_format = "| {name:<20s} | {level:>8s} |"
+        header_format = "| {name:<20s} | {level:>8s} |"
+        header_line = "|-{0:-^20s}-|-{0:-^8s}-|".format('-')
         for item_idx in range(self.ui.selectIDTable.rowCount()):
             name_item = self.ui.selectIDTable.item(item_idx, 0)
             level_item = self.ui.selectIDTable.item(item_idx, 1)
@@ -259,7 +261,9 @@ class OpenFileWizard(QtGui.QWizard):
         summary_text = """Products to be loaded: {}
 
 """.format(len(selected_ids))
-        summary_text += "\n".join(selected_text)
+
+        header = header_format.format(name="Name", level="Level")
+        summary_text += "\n".join([header, header_line] + selected_text)
         self.ui.productSummaryText.setText(summary_text)
 
     def add_file(self):

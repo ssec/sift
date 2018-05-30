@@ -729,18 +729,22 @@ class SatPyImporter(aImporter):
         if Scene is None:
             raise ImportError("SatPy is not available and can't be used as "
                               "an importer")
-        self.filenames = source_path
+        self.filenames = list(source_path)
         self.reader = reader
-        self.scene = Scene(reader=self.reader,
-                           filenames=self.filenames)
+        if 'scene' in kwargs:
+            self.scn = kwargs['scene']
+        else:
+            self.scn = Scene(reader=self.reader,
+                               filenames=self.filenames)
         self._resources = []
         # DatasetID filters
         self.product_filters = {}
         for k in ['resolution', 'calibration', 'level']:
             if k in kwargs:
                 self.product_filters[k] = kwargs.pop(k)
-
-        self.scn = Scene(reader=self.reader, filenames=self.filenames)
+        # NOTE: product_filters don't do anything if the dataset_ids aren't
+        #       specified since we are using all available dataset ids
+        self.dataset_ids = sorted(kwargs.get('dataset_ids', self.scn.available_dataset_ids()))
 
     @classmethod
     def from_product(cls, prod: Product, workspace_cwd, database_session, **kwargs):
@@ -754,7 +758,10 @@ class SatPyImporter(aImporter):
         except IndexError:
             LOG.error('no resources in {} {}'.format(repr(type(prod)), repr(prod)))
             raise
-        kwargs.update(prod.info)
+        kwargs.pop('reader', None)
+        kwargs.pop('scenes', None)
+        kwargs.pop('scene', None)
+        kwargs['dataset_ids'] = [DatasetID.from_dict(prod.info)]
         return cls(prod.resource[0].path, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
 
     @classmethod
@@ -797,18 +804,29 @@ class SatPyImporter(aImporter):
             return
 
         # FIXME: This doesn't work for multiple files to one product
-        res = list(resources)[0]
+        resources = list(resources)
+        if len(resources) > 1:
+            raise NotImplementedError("Products created from more than one "
+                                      "file are not currently supported.")
+        res = resources[0]
         products = list(res.product)
-        if products:
+        if products and len(products) == len(self.dataset_ids):
             LOG.debug('pre-existing products {}'.format(repr(products)))
             yield from products
             return
 
         from uuid import uuid1
-        uuid = uuid1()
         scn = self.load_all_datasets()
-        for ds in scn:
+        existing_ids = {DatasetID.from_dict(prod.info): prod for prod in products}
+        for ds_id, ds in scn.datasets.items():
+            # don't recreate a Product for one we already have
+            if ds_id in existing_ids:
+                yield existing_ids[ds_id]
+                continue
+
+            existing_ids.get(ds_id, None)
             meta = ds.attrs
+            uuid = uuid1()
             meta[INFO.UUID] = uuid
             now = datetime.utcnow()
             prod = Product(
@@ -831,11 +849,10 @@ class SatPyImporter(aImporter):
     def num_products(self) -> int:
         # WARNING: This could provide radiances and higher level products
         #          which SIFT probably shouldn't care about
-        return 1
-        # return len(self.scn.available_dataset_ids())
+        return len(self.dataset_ids)
 
     def load_all_datasets(self) -> Scene:
-        self.scn.load(['t'], level=100)  # scn.available_dataset_ids())
+        self.scn.load(self.dataset_ids, **self.product_filters)
         # copy satpy metadata keys to SIFT keys
         for ds in self.scn:
             start_time = ds.attrs['start_time']

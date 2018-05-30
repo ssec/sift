@@ -247,23 +247,13 @@ class Main(QtGui.QMainWindow):
             'All supported files (*.nc *.nc4 *.tiff *.tif)',
             'GOES-16 NetCDF (*.nc *.nc4)',
             'Mercator GTIFF (*.tiff *.tif)',
-            'NWP GRIB2 (*.grib2)',
+            # 'NWP GRIB2 (*.grib2)',
         ]
         filter_str = ';;'.join(filename_filters)
         files = QtGui.QFileDialog.getOpenFileNames(self,
                                                    "Select one or more files to open",
                                                    self._last_open_dir or os.getenv("HOME"),
                                                    filter_str)
-        self.open_paths(files)
-
-    def open_satpy_files(self, *args, **kwargs):
-        self.scene_manager.layer_set.animating = False
-        # http://pyqt.sourceforge.net/Docs/PyQt4/qfiledialog.html#getOpenFileNames
-        files = QtGui.QFileDialog.getOpenFileNames(self,
-                                                   "Select one or more files to open",
-                                                   self._last_open_dir or os.getenv("HOME"))
-        LOG.debug('open files with satpy {}'.format(files))
-        self.scene_manager.layer_set.animating = False
         self.open_paths(files)
 
     def _bgnd_open_paths(self, paths, uuid_list, **importer_kwargs):
@@ -294,9 +284,6 @@ class Main(QtGui.QMainWindow):
         self.document.next_last_step(uuid)
 
     def open_paths(self, paths, **importer_kwargs):
-        importer_kwargs = {
-            'reader': 'grib',
-        }
         paths = list(paths)
         if not paths:
             return
@@ -793,6 +780,23 @@ class Main(QtGui.QMainWindow):
             paths = list(glob(text))
             self.open_paths(paths)
 
+    def open_wizard(self, *args, **kwargs):
+        from sift.view.open_file_wizard import OpenFileWizard
+        wizard_dialog = OpenFileWizard(base_dir=self._last_open_dir, parent=self)
+        if wizard_dialog.exec_():
+            LOG.info("Loading products from open wizard...")
+            scenes = wizard_dialog.scenes
+            reader = list(list(scenes.values())[0].readers.keys())[0]
+            importer_kwargs = {
+                'reader': reader,
+                'scenes': scenes,
+                'dataset_ids': wizard_dialog.selected_ids,
+            }
+            self.open_paths(wizard_dialog._selected_files,
+                            **importer_kwargs)
+        else:
+            LOG.debug("Wizard closed, nothing to load")
+
     def remove_region_polygon(self, action:QtGui.QAction=None, *args):
         if self.scene_manager.has_pending_polygon():
             self.scene_manager.clear_pending_polygon()
@@ -828,11 +832,16 @@ class Main(QtGui.QMainWindow):
         open_glob_action.setShortcut("Ctrl+Shift+O")
         open_glob_action.triggered.connect(self.open_glob)
 
+        open_wizard_action = QtGui.QAction("Open File Wizard...", self)
+        open_wizard_action.setShortcut("Ctrl+Alt+O")
+        open_wizard_action.triggered.connect(self.open_wizard)
+
         menubar = self.ui.menubar
         file_menu = menubar.addMenu('&File')
         file_menu.addAction(open_action)
         file_menu.addAction(open_cache_action)
         file_menu.addAction(open_glob_action)
+        file_menu.addAction(open_wizard_action)
         self._recent_files_menu = file_menu.addMenu('Open Recent')
 
         screenshot_action = QtGui.QAction("Export Image", self)
