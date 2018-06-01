@@ -105,9 +105,12 @@ class OpenFileWizard(QtGui.QWizard):
     def _connect_product_select_complete(self):
         current_idx = self.ui.selectByTabWidget.currentIndex()
         if current_idx == 0:
+            self.ui.productSelectionPage.important_children = [
+                self.ui.selectByNameList, self.ui.selectByLevelList]
             self._connect_next_button_signals(self.ui.selectByNameList, self.ui.productSelectionPage)
             self._connect_next_button_signals(self.ui.selectByLevelList, self.ui.productSelectionPage)
         elif current_idx == 1:
+            self.ui.productSelectionPage.important_children = [self.ui.selectIDTable]
             self._connect_next_button_signals(self.ui.selectIDTable, self.ui.productSelectionPage)
 
     def _init_product_select_page(self):
@@ -149,12 +152,11 @@ class OpenFileWizard(QtGui.QWizard):
             item = QtGui.QTableWidgetItem(pretty_name)
             item.setData(QtCore.Qt.UserRole, ds_id.name)
             item.setFlags((item.flags() ^ QtCore.Qt.ItemIsEditable) | QtCore.Qt.ItemIsUserCheckable)
-            item.setCheckState(QtCore.Qt.Checked)
+            item.setCheckState(QtCore.Qt.Unchecked)
             self.ui.selectIDTable.setItem(idx, 0, item)
             item = QtGui.QTableWidgetItem(pretty_level)
             item.setData(QtCore.Qt.UserRole, ds_id.level)
             item.setFlags((item.flags() ^ QtCore.Qt.ItemIsEditable) | QtCore.Qt.ItemIsUserCheckable)
-            # item.setCheckState(QtCore.Qt.Checked)
             self.ui.selectIDTable.setItem(idx, 1, item)
 
         # Update the per-property lists
@@ -163,14 +165,14 @@ class OpenFileWizard(QtGui.QWizard):
             item = QtGui.QListWidgetItem(pretty_name)
             item.setData(QtCore.Qt.UserRole, name)
             item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable)
-            item.setCheckState(QtCore.Qt.Checked)
+            item.setCheckState(QtCore.Qt.Unchecked)
             self.ui.selectByNameList.addItem(item)
         levels = sorted(properties['level'])
         for level, pretty_level in levels:
             item = QtGui.QListWidgetItem(pretty_level)
             item.setData(QtCore.Qt.UserRole, level)
             item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable)
-            item.setCheckState(QtCore.Qt.Checked)
+            item.setCheckState(QtCore.Qt.Unchecked)
             self.ui.selectByLevelList.addItem(item)
 
         self._connect_product_select_complete()
