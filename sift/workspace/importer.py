@@ -24,7 +24,6 @@ import asyncio
 import numpy as np
 from pyproj import Proj
 from sqlalchemy.orm import Session
-from satpy import Scene
 
 from sift.common import PLATFORM, INFO, INSTRUMENT, KIND
 from sift.workspace.goesr_pug import PugFile
@@ -68,6 +67,66 @@ def get_guidebook_class(layer_info) -> Guidebook:
     return GUIDEBOOKS.get(platform, DEFAULT_GUIDEBOOK)()
 
 
+def get_contour_increments(layer_info):
+    standard_name = layer_info[INFO.STANDARD_NAME]
+    units = layer_info[INFO.UNITS]
+    increments = {
+        'air_temperature': [5., 2.5, 1., 0.5, 0.1],
+        'relative_humidity': [15., 10., 5., 2., 1.],
+        'eastward_wind': [15., 10., 5., 2., 1.],
+        'northward_wind': [15., 10., 5., 2., 1.],
+        'geopotential_height': [100., 50., 25., 10., 5.],
+    }
+
+    unit_increments = {
+        'K': [5., 2.5, 1., 0.5, 0.1],
+        '%': [15., 10., 5., 2., 1.],
+    }
+
+    contour_increments = increments.get(standard_name)
+    if contour_increments is None:
+        contour_increments = unit_increments.get(units)
+
+        # def _in_group(wg, grp):
+        #     return round(wg / grp) * grp >= grp
+        # contour_increments = [5., 2.5, 1., 0.5, 0.1]
+        # vmin, vmax = layer_info[INFO.VALID_RANGE]
+        # width_guess = vmax - vmin
+        # if _in_group(width_guess, 10000.):
+        #     contour_increments = [x * 100. for x in contour_increments]
+        # elif _in_group(width_guess, 1000.):
+        #     contour_increments = [x * 50. for x in contour_increments]
+        # elif _in_group(width_guess, 100.):
+        #     contour_increments = [x * 10. for x in contour_increments]
+        # elif _in_group(width_guess, 10.):
+        #     contour_increments = [x * 1. for x in contour_increments]
+    if contour_increments is None:
+        LOG.warning("Unknown contour data type ({}, {}), guessing at contour "
+                    "levels...".format(standard_name, units))
+        return [1000., 500., 200., 100., 50.]
+
+    LOG.debug("Contour increments for ({}, {}): {}".format(
+        standard_name, units, contour_increments))
+    return contour_increments
+
+
+def get_contour_levels(vmin, vmax, increments):
+    levels = []
+    for idx, inc in enumerate(increments):
+        vmin_round = np.ceil(vmin / inc) * inc
+        vmax_round = np.ceil(vmax / inc) * inc
+        inc_levels = np.arange(vmin_round, vmax_round, inc)
+        # round to the highest increment or modulo operations will be wrong
+        inc_levels = np.round(inc_levels / increments[-1]) * increments[-1]
+        if idx > 0:
+            mask = np.logical_or.reduce([
+                np.isclose(inc_levels % i, 0) for i in increments[:idx]])
+            inc_levels = inc_levels[~mask]
+        levels.append(inc_levels)
+
+    return levels
+
+
 def generate_guidebook_metadata(layer_info) -> Mapping:
     guidebook = get_guidebook_class(layer_info)
     # also get info for this layer from the guidebook
@@ -82,6 +141,13 @@ def generate_guidebook_metadata(layer_info) -> Mapping:
         layer_info[INFO.DISPLAY_TIME] = guidebook._default_display_time(layer_info)
     if INFO.DISPLAY_NAME not in layer_info:
         layer_info[INFO.DISPLAY_NAME] = guidebook._default_display_name(layer_info)
+
+    if 'level' in layer_info:
+        # calculate contour_levels and zoom levels
+        increments = get_contour_increments(layer_info)
+        vmin, vmax = layer_info[INFO.VALID_RANGE]
+        contour_levels = get_contour_levels(vmin, vmax, increments)
+        layer_info['contour_levels'] = contour_levels
 
     return layer_info
 
@@ -109,7 +175,8 @@ class aImporter(ABC):
             raise
         return cls(prod.resource[0].path, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
 
-    @abstractclassmethod
+    @classmethod
+    @abstractmethod
     def is_relevant(cls, source_path=None, source_uri=None) -> bool:
         """
         return True if this importer is capable of reading this URI.
@@ -810,14 +877,16 @@ class SatPyImporter(aImporter):
                                       "file are not currently supported.")
         res = resources[0]
         products = list(res.product)
-        if products and len(products) == len(self.dataset_ids):
+        existing_ids = {DatasetID.from_dict(prod.info): prod for prod in products}
+        existing_prods = {x: existing_ids[x] for x in self.dataset_ids if x in existing_ids}
+        if products and len(existing_prods) == len(self.dataset_ids):
+            products = existing_prods.values()
             LOG.debug('pre-existing products {}'.format(repr(products)))
             yield from products
             return
 
         from uuid import uuid1
         scn = self.load_all_datasets()
-        existing_ids = {DatasetID.from_dict(prod.info): prod for prod in products}
         for ds_id, ds in scn.datasets.items():
             # don't recreate a Product for one we already have
             if ds_id in existing_ids:
@@ -897,12 +966,6 @@ class SatPyImporter(aImporter):
                     ds.attrs['name'], ds.attrs['level'])
             ds.attrs[INFO.SHAPE] = ds.shape
             generate_guidebook_metadata(ds.attrs)
-            if ds.attrs[INFO.KIND] == KIND.CONTOUR:
-                # FIXME: Make these based on standard_name
-                vmin, vmax = ds.attrs[INFO.VALID_RANGE]
-                offset = (vmax - vmin) * 0.02  # 2% of the range
-                ds.attrs['contour_levels'] = list(np.linspace(
-                    vmin + offset, vmax - offset, 5))
 
             # Generate FAMILY and CATEGORY
             if 'model_time' in ds.attrs:
@@ -913,7 +976,8 @@ class SatPyImporter(aImporter):
                 cat_id = id_str
             ds.attrs[INFO.SCENE] = hash(ds.attrs['area'])
             ds.attrs[INFO.FAMILY] = '{}:{}:{}'.format(
-                ds.attrs[INFO.KIND].name, ds.attrs[INFO.STANDARD_NAME], id_str)
+                ds.attrs[INFO.KIND].name, ds.attrs[INFO.STANDARD_NAME],
+                ds.attrs[INFO.SHORT_NAME])
             ds.attrs[INFO.CATEGORY] = 'SatPy:{}:{}:{}:{}'.format(
                 ds.attrs[INFO.PLATFORM].name, ds.attrs[INFO.INSTRUMENT].name,
                 ds.attrs[INFO.SCENE], cat_id)  # system:platform:instrument:target
@@ -1041,7 +1105,7 @@ class SatPyImporter(aImporter):
                                    "package installed.")
 
             # XXX: Should/could 'lod' be used for different contour level data?
-            levels = prod.info['contour_levels']
+            levels = [x for y in prod.info['contour_levels'] for x in y]
             data_filename = '{}.contour'.format(prod.uuid)
             data_path = os.path.join(self._cwd, data_filename)
             try:

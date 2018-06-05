@@ -1193,6 +1193,18 @@ class PrecomputedIsocurveVisual(IsocurveVisual):
         self._verts = data[0]
         self._level_min = 0
 
+    @property
+    def clim(self):
+        return self._clim
+
+    @clim.setter
+    def clim(self, val):
+        assert len(val) == 2
+        self._clim = val
+        self._need_level_update = True
+        self._need_color_update = True
+        self.update()
+
     def _compute_iso_line(self):
         """ compute LineVisual vertices, connects and color-index
         """

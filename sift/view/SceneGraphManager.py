@@ -767,7 +767,11 @@ class SceneGraphManager(QObject):
             uuids = [uuid]
 
         for uuid in uuids:
-            self.image_elements[uuid].cmap = colormap
+            layer = self.image_elements[uuid]
+            if isinstance(layer, TiledGeolocatedImage):
+                self.image_elements[uuid].cmap = colormap
+            else:
+                self.image_elements[uuid].color = colormap
 
     def set_color_limits(self, clims, uuid=None):
         """Update the color limits for the specified UUID
@@ -792,7 +796,7 @@ class SceneGraphManager(QObject):
 
         for uuid in uuids:
             element = self.image_elements.get(uuid, None)
-            if element is not None:
+            if element is not None and hasattr(element, 'gamma'):
                 self.image_elements[uuid].gamma = gamma
 
     def change_layers_colormap(self, change_dict):
@@ -814,8 +818,26 @@ class SceneGraphManager(QObject):
         verts = overview_content[:, :2]
         connects = overview_content[:, 2].astype(np.bool)
         level_indexes = overview_content[:, 3]
-        level_indexes = level_indexes[~np.isnan(level_indexes)].astype(np.int)
+        level_indexes2 = level_indexes[~np.isnan(level_indexes)].astype(np.int)
         levels = layer["contour_levels"]
+        # num_zoom_levels = len(levels)
+        # num_levels_per_zlevel = [len(x) for x in levels]
+        zoom_level = 2
+        zoom_level_size = []
+        prev_size = 0
+        for c_levels in levels:
+            curr_size = len(c_levels)
+            zoom_level_size.append(level_indexes2[prev_size:prev_size + curr_size].sum())
+            prev_size += curr_size
+        # start_idx = sum(zoom_level_size[:zoom_level])
+        start_idx = 0
+        end_idx = start_idx + sum(zoom_level_size[:zoom_level + 1])
+        verts = verts[start_idx:end_idx]
+        connects = connects[start_idx:end_idx]
+        level_indexes = level_indexes[start_idx:end_idx]
+        level_indexes = level_indexes[~np.isnan(level_indexes)].astype(np.int)
+        levels = [x for y in levels[:zoom_level + 1] for x in y]
+
         cmap = self.document.find_colormap(p.colormap)
         contour_visual = PrecomputedIsocurve((verts, connects, level_indexes),
                                              levels, cmap,

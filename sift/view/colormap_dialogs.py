@@ -2,8 +2,7 @@ import logging
 from functools import partial
 from uuid import UUID
 from PyQt4 import QtGui, QtCore
-from sift.common import INFO
-from sift.view.Colormap import ALL_COLORMAPS
+from sift.common import INFO, KIND
 from sift.ui.change_colormap_dialog_ui import Ui_changeColormapDialog
 
 LOG = logging.getLogger(__name__)
@@ -50,7 +49,11 @@ class ChangeColormapDialog(QtGui.QDialog):
         self.ui.vmax_slider.sliderReleased.connect(partial(self._slider_changed, is_max=True))
         self.ui.vmin_edit.editingFinished.connect(partial(self._edit_changed, is_max=False))
         self.ui.vmax_edit.editingFinished.connect(partial(self._edit_changed, is_max=True))
-        self.ui.gammaSpinBox.valueChanged.connect(self._gamma_changed)
+
+        if layer[INFO.KIND] in [KIND.CONTOUR]:
+            self.ui.gammaSpinBox.setDisabled(True)
+        else:
+            self.ui.gammaSpinBox.valueChanged.connect(self._gamma_changed)
 
     def _clicked(self, button):
         r = self.ui.buttons.buttonRole(button)
