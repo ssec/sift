@@ -818,29 +818,12 @@ class SceneGraphManager(QObject):
         verts = overview_content[:, :2]
         connects = overview_content[:, 2].astype(np.bool)
         level_indexes = overview_content[:, 3]
-        level_indexes2 = level_indexes[~np.isnan(level_indexes)].astype(np.int)
-        levels = layer["contour_levels"]
-        # num_zoom_levels = len(levels)
-        # num_levels_per_zlevel = [len(x) for x in levels]
-        zoom_level = 2
-        zoom_level_size = []
-        prev_size = 0
-        for c_levels in levels:
-            curr_size = len(c_levels)
-            zoom_level_size.append(level_indexes2[prev_size:prev_size + curr_size].sum())
-            prev_size += curr_size
-        # start_idx = sum(zoom_level_size[:zoom_level])
-        start_idx = 0
-        end_idx = start_idx + sum(zoom_level_size[:zoom_level + 1])
-        verts = verts[start_idx:end_idx]
-        connects = connects[start_idx:end_idx]
-        level_indexes = level_indexes[start_idx:end_idx]
         level_indexes = level_indexes[~np.isnan(level_indexes)].astype(np.int)
-        levels = [x for y in levels[:zoom_level + 1] for x in y]
-
+        levels = layer["contour_levels"]
         cmap = self.document.find_colormap(p.colormap)
-        contour_visual = PrecomputedIsocurve((verts, connects, level_indexes),
-                                             levels, cmap,
+
+        contour_visual = PrecomputedIsocurve(verts, connects, level_indexes,
+                                             levels=levels, color_lev=cmap,
                                              clim=p.climits,
                                              parent=self.main_map,
                                              name=str(layer[INFO.UUID]))
@@ -1126,6 +1109,74 @@ class SceneGraphManager(QObject):
 
         self.update()
 
+    def _assess_contour(self, uuid, child):
+        """Calculate shown portion of image and image units per pixel
+
+        This method utilizes a precomputed "mesh" of relatively evenly
+        spaced points over the entire image space. This mesh is transformed
+        to the canvas space (-1 to 1 user-viewed space) to figure out which
+        portions of the image are currently being viewed and which portions
+        can actually be projected on the viewed projection.
+
+        While the result of the chosen method may not always be completely
+        accurate, it should work for all possible viewing cases.
+        """
+        # in contour coordinate space, the extents of the canvas
+        canvas_extents = child.transforms.get_transform().imap([
+            [-1., -1.],
+            [0., 0.],
+            [1., 1.],
+            [-1., 1.],
+            [1., -1.]
+        ])[:, :2]
+        canvas_size = child.canvas.size
+        print(canvas_size)
+        print(self.main_canvas.size)
+        # valid projection coordinates
+        canvas_extents = canvas_extents[(canvas_extents[:, 0] <= 1e30) & (canvas_extents[:, 1] <= 1e30), :]
+        if not canvas_extents.size:
+            print("Can't determine current view box, using lowest contour resolution")
+            zoom_level = 0
+        else:
+            min_x = canvas_extents[:, 0].min()
+            max_x = canvas_extents[:, 0].max()
+            min_y = canvas_extents[:, 1].min()
+            max_y = canvas_extents[:, 1].max()
+            pixel_ratio = max((max_x - min_x) / canvas_size[0], (max_y - min_y) / canvas_size[1])
+            print(pixel_ratio)
+
+            if pixel_ratio > 10000:
+                child.zoom_level = 0
+            elif pixel_ratio > 5000:
+                child.zoom_level = 1
+            elif pixel_ratio > 3000:
+                child.zoom_level = 2
+            elif pixel_ratio > 1000:
+                child.zoom_level = 3
+            else:
+                child.zoom_level = 4
+
+        return
+        if self._viewable_mesh_mask is None:
+            raise ValueError("Image '%s' is not viewable in this projection" % (self.name,))
+
+        # Image points transformed to canvas coordinates
+        img_cmesh = self.transforms.get_transform().map(self.calc.image_mesh)
+        # The image mesh projected to canvas coordinates (valid only)
+        img_cmesh = img_cmesh[self._viewable_mesh_mask]
+        # The image mesh of only valid "viewable" projected coordinates
+        img_vbox = self.calc.image_mesh[self._viewable_mesh_mask]
+
+        ref_idx_1, ref_idx_2 = get_reference_points(img_cmesh, img_vbox)
+        dx, dy = calc_pixel_size(img_cmesh[(self._ref1, self._ref2), :],
+                                 img_vbox[(self._ref1, self._ref2), :],
+                                 self.canvas.size)
+        view_extents = self.calc.calc_view_extents(img_cmesh[ref_idx_1], img_vbox[ref_idx_1], self.canvas.size, dx, dy)
+        # ll_corner, ur_corner = self.transforms.get_transform().imap([(-1, -1, 1), (1, 1, 1)])
+        # print("Old method: ", ll_corner, ur_corner, "dy: %f" % ((ur_corner[1] - ll_corner[1]) / self.canvas.size[1]), "dx: %f" % ((ur_corner[0] - ll_corner[0]) / self.canvas.size[0]))
+        # print("View Box: ", view_box)
+        return vue(*view_extents, dx=dx, dy=dy)
+
     def on_view_change(self, scheduler):
         """Simple event handler for when we need to reassess image layers.
         """
@@ -1144,6 +1195,8 @@ class SceneGraphManager(QObject):
             element = self.image_elements.get(uuid, None)
             if element is not None and hasattr(element, 'assess'):
                 _assess(uuid, element)
+            elif element is not None and isinstance(element, PrecomputedIsocurve):
+                self._assess_contour(uuid, element)
 
         for uuid in current_visible_layers:
             _assess_if_active(uuid)

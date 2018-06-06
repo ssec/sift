@@ -1185,13 +1185,45 @@ from vispy.visuals import IsocurveVisual
 class PrecomputedIsocurveVisual(IsocurveVisual):
     """IsocurveVisual that can use precomputed paths."""
 
-    def __init__(self, data, *args, **kwargs):
-        super(PrecomputedIsocurveVisual, self).__init__(None, *args, **kwargs)
+    def __init__(self, verts, connects, level_indexes, levels, **kwargs):
+        num_zoom_levels = len(levels)
+        num_levels_per_zlevel = [len(x) for x in levels]
+        self._zoom_level_indexes = [
+            level_indexes[:sum(num_levels_per_zlevel[:z_level + 1])]
+            for z_level in range(num_zoom_levels)]
+        self._zoom_level_size = [sum(z_level_indexes) for z_level_indexes in self._zoom_level_indexes]
+
+        self._all_verts = []
+        self._all_connects = []
+        self._all_levels = []
+        self._zoom_level = -1
+        for zoom_level in range(num_zoom_levels):
+            end_idx = self._zoom_level_size[zoom_level]
+            self._all_verts.append(verts[:end_idx])
+            self._all_connects.append(connects[:end_idx])
+            self._all_levels.append([x for y in levels[:zoom_level + 1] for x in y])
+
+        super(PrecomputedIsocurveVisual, self).__init__(data=None, levels=levels,
+                                                        **kwargs)
+
         self._data = True
-        self._li = data[2]
-        self._connect = data[1]
-        self._verts = data[0]
         self._level_min = 0
+        self.zoom_level = kwargs.pop("zoom_level", 0)
+
+    @property
+    def zoom_level(self):
+        return self._zoom_level
+
+    @zoom_level.setter
+    def zoom_level(self, val):
+        if val == self._zoom_level:
+            return
+        self._zoom_level = val
+        self._li = self._zoom_level_indexes[self._zoom_level]
+        self._connect = self._all_connects[self._zoom_level]
+        self._verts = self._all_verts[self._zoom_level]
+        # this will trigger all of the recomputation
+        self.levels = self._all_levels[self._zoom_level]
 
     @property
     def clim(self):
