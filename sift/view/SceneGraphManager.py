@@ -27,7 +27,7 @@ __author__ = 'davidh'
 from vispy import app
 from vispy import scene
 from vispy.util.keys import SHIFT
-from vispy.visuals.transforms import STTransform, MatrixTransform
+from vispy.visuals.transforms import STTransform, MatrixTransform, ChainTransform
 from vispy.visuals import MarkersVisual, marker_types, LineVisual
 from vispy.scene.visuals import Markers, Polygon, Compound, Line
 from vispy.geometry import Rect
@@ -256,8 +256,11 @@ class LayerSet(object):
 
     def update_layers_z(self):
         for z_level, uuid in enumerate(self._layer_order):
-            # assume ChainTransform where the last transform is STTransform for Z level
-            self._layers[uuid].transform.transforms[-1].translate = (0, 0, 0-int(z_level))
+            transform = self._layers[uuid].transform
+            if isinstance(transform, ChainTransform):
+                # assume ChainTransform where the last transform is STTransform for Z level
+                transform = transform.transforms[-1]
+            transform.translate = (0, 0, 0-int(z_level))
             self._layers[uuid].order = len(self._layer_order) - int(z_level)
         # Need to tell the scene to recalculate the drawing order (HACK, but it works)
         # FIXME: This should probably be accomplished by overriding the right method from the Node or Visual class
@@ -342,6 +345,84 @@ class LayerSet(object):
         if self._frame_change_cb is not None and lfo:
             uuid = self._frame_order[self._frame_number]
             self._frame_change_cb((self._frame_number, lfo, self._animating, uuid))
+
+
+class ContourGroupNode(scene.Node):
+    """VisPy scene graph node managing multiple visuals.
+
+    This Node handles view changes and representing different "zoom" levels
+    in the data that is provided to its child widgets.
+
+    """
+
+    @staticmethod
+    def visible_first(children):
+        invisible_children = []
+        for c in children:
+            if c.visible:
+                yield c
+            else:
+                invisible_children.append(c)
+        for c in invisible_children:
+            yield c
+
+    def on_view_change(self):
+        zoom_level = None
+        for child in self.visible_first(self.children):
+            if isinstance(child, PrecomputedIsocurve):
+                if zoom_level is None:
+                    zoom_level = self._assess_contour(child)
+                # child handles an unchanged zoom_level
+                child.zoom_level = zoom_level
+            else:
+                raise NotImplementedError("Don't know how to assess "
+                                          "non-contour layer")
+
+    def _assess_contour(self, child):
+        """Calculate shown portion of image and image units per pixel
+
+        This method utilizes a precomputed "mesh" of relatively evenly
+        spaced points over the entire image space. This mesh is transformed
+        to the canvas space (-1 to 1 user-viewed space) to figure out which
+        portions of the image are currently being viewed and which portions
+        can actually be projected on the viewed projection.
+
+        While the result of the chosen method may not always be completely
+        accurate, it should work for all possible viewing cases.
+        """
+        # in contour coordinate space, the extents of the canvas
+        canvas_extents = child.transforms.get_transform().imap([
+            [-1., -1.],
+            [0., 0.],
+            [1., 1.],
+            [-1., 1.],
+            [1., -1.]
+        ])[:, :2]
+        canvas_size = self.canvas.size
+        # valid projection coordinates
+        canvas_extents = canvas_extents[(canvas_extents[:, 0] <= 1e30) & (canvas_extents[:, 1] <= 1e30), :]
+        if not canvas_extents.size:
+            LOG.warning("Can't determine current view box, using lowest contour resolution")
+            zoom_level = 0
+        else:
+            min_x = canvas_extents[:, 0].min()
+            max_x = canvas_extents[:, 0].max()
+            min_y = canvas_extents[:, 1].min()
+            max_y = canvas_extents[:, 1].max()
+            pixel_ratio = max((max_x - min_x) / canvas_size[0], (max_y - min_y) / canvas_size[1])
+
+            if pixel_ratio > 10000:
+                zoom_level = 0
+            elif pixel_ratio > 5000:
+                zoom_level = 1
+            elif pixel_ratio > 3000:
+                zoom_level = 2
+            elif pixel_ratio > 1000:
+                zoom_level = 3
+            else:
+                zoom_level = 4
+
+        return zoom_level
 
 
 class SceneGraphManager(QObject):
@@ -483,6 +564,7 @@ class SceneGraphManager(QObject):
         proj_info = self.document.projection_info()
         self.main_map = MainMap(name="MainMap", parent=self.main_map_parent)
         self.main_map.transform = PROJ4Transform(proj_info['proj4_str'])
+        self.proxy_nodes = {}
 
         self._borders_color_idx = 0
         self.borders = NEShapefileLines(self.border_shapefile, double=True, color=self._color_choices[self._borders_color_idx], parent=self.main_map)
@@ -822,16 +904,21 @@ class SceneGraphManager(QObject):
         levels = layer["contour_levels"]
         cmap = self.document.find_colormap(p.colormap)
 
+        proj4_str = layer[INFO.PROJ]
+        parent = self.proxy_nodes.get(proj4_str)
+        if parent is None:
+            parent = ContourGroupNode(parent=self.main_map)
+            parent.transform = PROJ4Transform(layer[INFO.PROJ], inverse=True)
+            self.proxy_nodes[proj4_str] = parent
+
         contour_visual = PrecomputedIsocurve(verts, connects, level_indexes,
                                              levels=levels, color_lev=cmap,
                                              clim=p.climits,
-                                             parent=self.main_map,
+                                             parent=parent,
                                              name=str(layer[INFO.UUID]))
-        contour_visual.transform = PROJ4Transform(layer[INFO.PROJ], inverse=True)
         contour_visual.transform *= STTransform(translate=(0, 0, -50.0))
         self.image_elements[layer[INFO.UUID]] = contour_visual
         self.layer_set.add_layer(contour_visual)
-        # image.determine_reference_points()
         self.on_view_change(None)
 
     def add_basic_layer(self, new_order:tuple, uuid:UUID, p:prez):
@@ -1109,74 +1196,6 @@ class SceneGraphManager(QObject):
 
         self.update()
 
-    def _assess_contour(self, uuid, child):
-        """Calculate shown portion of image and image units per pixel
-
-        This method utilizes a precomputed "mesh" of relatively evenly
-        spaced points over the entire image space. This mesh is transformed
-        to the canvas space (-1 to 1 user-viewed space) to figure out which
-        portions of the image are currently being viewed and which portions
-        can actually be projected on the viewed projection.
-
-        While the result of the chosen method may not always be completely
-        accurate, it should work for all possible viewing cases.
-        """
-        # in contour coordinate space, the extents of the canvas
-        canvas_extents = child.transforms.get_transform().imap([
-            [-1., -1.],
-            [0., 0.],
-            [1., 1.],
-            [-1., 1.],
-            [1., -1.]
-        ])[:, :2]
-        canvas_size = child.canvas.size
-        print(canvas_size)
-        print(self.main_canvas.size)
-        # valid projection coordinates
-        canvas_extents = canvas_extents[(canvas_extents[:, 0] <= 1e30) & (canvas_extents[:, 1] <= 1e30), :]
-        if not canvas_extents.size:
-            print("Can't determine current view box, using lowest contour resolution")
-            zoom_level = 0
-        else:
-            min_x = canvas_extents[:, 0].min()
-            max_x = canvas_extents[:, 0].max()
-            min_y = canvas_extents[:, 1].min()
-            max_y = canvas_extents[:, 1].max()
-            pixel_ratio = max((max_x - min_x) / canvas_size[0], (max_y - min_y) / canvas_size[1])
-            print(pixel_ratio)
-
-            if pixel_ratio > 10000:
-                child.zoom_level = 0
-            elif pixel_ratio > 5000:
-                child.zoom_level = 1
-            elif pixel_ratio > 3000:
-                child.zoom_level = 2
-            elif pixel_ratio > 1000:
-                child.zoom_level = 3
-            else:
-                child.zoom_level = 4
-
-        return
-        if self._viewable_mesh_mask is None:
-            raise ValueError("Image '%s' is not viewable in this projection" % (self.name,))
-
-        # Image points transformed to canvas coordinates
-        img_cmesh = self.transforms.get_transform().map(self.calc.image_mesh)
-        # The image mesh projected to canvas coordinates (valid only)
-        img_cmesh = img_cmesh[self._viewable_mesh_mask]
-        # The image mesh of only valid "viewable" projected coordinates
-        img_vbox = self.calc.image_mesh[self._viewable_mesh_mask]
-
-        ref_idx_1, ref_idx_2 = get_reference_points(img_cmesh, img_vbox)
-        dx, dy = calc_pixel_size(img_cmesh[(self._ref1, self._ref2), :],
-                                 img_vbox[(self._ref1, self._ref2), :],
-                                 self.canvas.size)
-        view_extents = self.calc.calc_view_extents(img_cmesh[ref_idx_1], img_vbox[ref_idx_1], self.canvas.size, dx, dy)
-        # ll_corner, ur_corner = self.transforms.get_transform().imap([(-1, -1, 1), (1, 1, 1)])
-        # print("Old method: ", ll_corner, ur_corner, "dy: %f" % ((ur_corner[1] - ll_corner[1]) / self.canvas.size[1]), "dx: %f" % ((ur_corner[0] - ll_corner[0]) / self.canvas.size[0]))
-        # print("View Box: ", view_box)
-        return vue(*view_extents, dx=dx, dy=dy)
-
     def on_view_change(self, scheduler):
         """Simple event handler for when we need to reassess image layers.
         """
@@ -1195,11 +1214,13 @@ class SceneGraphManager(QObject):
             element = self.image_elements.get(uuid, None)
             if element is not None and hasattr(element, 'assess'):
                 _assess(uuid, element)
-            elif element is not None and isinstance(element, PrecomputedIsocurve):
-                self._assess_contour(uuid, element)
 
         for uuid in current_visible_layers:
             _assess_if_active(uuid)
+        # update contours
+        for node in self.proxy_nodes.values():
+            node.on_view_change()
+        # update invisible layers
         for uuid in current_invisible_layers:
             _assess_if_active(uuid)
 
