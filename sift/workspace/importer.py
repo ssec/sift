@@ -103,7 +103,7 @@ def get_contour_increments(layer_info):
     if contour_increments is None:
         LOG.warning("Unknown contour data type ({}, {}), guessing at contour "
                     "levels...".format(standard_name, units))
-        return [1000., 500., 200., 100., 50.]
+        return [5000., 1000., 500., 200., 100.]
 
     LOG.debug("Contour increments for ({}, {}): {}".format(
         standard_name, units, contour_increments))
