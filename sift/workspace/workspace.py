@@ -50,8 +50,8 @@ import unittest
 import enum
 from datetime import datetime, timedelta
 from uuid import UUID, uuid1 as uuidgen
-from typing import Mapping, Set, List, Iterable, Generator, Tuple
-from collections import Mapping as ReadOnlyMapping, defaultdict
+from typing import Mapping, Set, List, Iterable, Generator, Tuple, Dict
+from collections import Mapping as ReadOnlyMapping, defaultdict, OrderedDict
 
 import numba as nb
 import numpy as np
@@ -665,10 +665,10 @@ class Workspace(QObject):
             contents_of_cache = s.query(Content).all()
             return list(sorted(set(c.product.uuid for c in contents_of_cache)))
 
-    def recently_used_resource_paths(self, n=32):
+    def recently_used_products(self, n=32) -> Dict[UUID, str]:
         with self._inventory as s:
-            return list(p.path for p in s.query(Resource).order_by(Resource.atime.desc()).limit(n).all())
-            # FIXME "replace this completely with product list"
+            return OrderedDict((p.uuid, p.info[INFO.DISPLAY_NAME])
+                               for p in s.query(Product).order_by(Product.atime.desc()).limit(n).all())
 
     def _purge_content_for_resource(self, resource: Resource, session, defer_commit=False):
         """

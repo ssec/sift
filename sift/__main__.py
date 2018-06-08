@@ -321,17 +321,15 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.change_tool(name)
 
     def update_recent_file_menu(self, *args, **kwargs):
-        paths = self.workspace.recently_used_resource_paths()
-        LOG.debug('recent paths: {}'.format(repr(paths)))
-        paths = self.document.sort_paths(paths)
-        LOG.debug('recent files: {0!r:s}'.format(paths))
+        uuid_to_name = self.workspace.recently_used_products()
+        LOG.debug('recent uuids: {}'.format(repr(uuid_to_name.keys())))
         self._recent_files_menu.clear()
-        for path in paths:
-            def openit(*args, path=path, **kwargs):
-                LOG.debug('open recent file {}'.format(path))
+        for uuid, p_name in uuid_to_name.items():
+            def openit(checked=False, uuid=uuid):
+                LOG.debug('open recent product {}'.format(uuid))
                 self.scene_manager.layer_set.animating = False
-                self.document.open_file(path)
-            open_action = QtGui.QAction(os.path.split(path)[1], self)
+                self.activate_products_by_uuid([uuid])
+            open_action = QtGui.QAction(p_name, self)
             open_action.triggered.connect(openit)
             self._recent_files_menu.addAction(open_action)
 
