@@ -645,33 +645,18 @@ class Workspace(QObject):
     @property
     def product_names_available_in_cache(self):
         """
-        Returns: dictionary of {resource or product name: UUID,...}
+        Returns: dictionary of {UUID: product name,...}
         typically used for add-from-cache dialog
         """
         # find non-overview non-auxiliary data files
         # FIXME: also need to include coverage and sparsity paths?? really?
         zult = {}
-        product_ids_taken_care_of = set()
         with self._inventory as s:
             for c in s.query(Content).all():
                 p = c.product
-                if p.id in product_ids_taken_care_of:
+                if p.id in zult:
                     continue
-                product_ids_taken_care_of.add(p.id)
-                # LOG.debug("{} derives from {} resources".format(p.name, len(p.resource)))
-                if len(p.resource) > 0:  # algebraic products do not belong to a resource!
-                    zult[p.resource[0].path] = p.uuid
-                else:
-                    nfo = p.info
-                    base = str(nfo[INFO.DISPLAY_NAME])
-                    if base in zult and nfo[INFO.DISPLAY_TIME] not in base:
-                        base += ' ' + str(nfo[INFO.DISPLAY_TIME])
-                    name = base
-                    q = 0
-                    while name in zult:
-                        q += 1
-                        name = '{} ({})'.format(base, q)
-                    zult[name] = p.uuid  # FIXME: this is not guaranteed to be unique as keys go
+                zult[p.uuid] = p.info[INFO.DISPLAY_NAME]
         return zult
 
     @property

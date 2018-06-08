@@ -90,52 +90,45 @@ async def do_test_cycle(txt: QtGui.QWidget):
 
 
 class OpenCacheDialog(QtGui.QDialog):
-    _paths = None
     _opener = None
     _remover = None
 
-    def __init__(self, parent):
+    def __init__(self, parent, opener, remover):
         super(OpenCacheDialog, self).__init__(parent)
         self.ui = open_cache_dialog_ui.Ui_openFromCacheDialog()
         self.ui.setupUi(self)
         self.ui.cacheListWidget.setSelectionMode(QtGui.QListWidget.ExtendedSelection)
         self.ui.removeFromCacheButton.clicked.connect(self._do_remove)
-
-    def activate(self, paths, opener, remover):
         self._opener = opener
         self._remover = remover
+
+    def activate(self, uuid_to_name):
         self.ui.cacheListWidget.clear()
-        if paths:
-            # don't include <algebraic layer ...> type paths
-            pfx = _common_path_prefix([x for x in paths if x[0] != '<']) or ''
-            self.ui.commonPathLabel.setText("Common prefix: " + pfx)
-            self._paths = {}
-            for path in paths:
-                key = path.replace(pfx, '', 1).strip(os.sep)
-                li = QtGui.QListWidgetItem(key)
-                self.ui.cacheListWidget.addItem(li)
-                self._paths[key] = path
+        sorted_items = sorted(uuid_to_name.items(),
+                              key=lambda x: x[1])
+        for uuid, name in sorted_items:
+            li = QtGui.QListWidgetItem(name)
+            li.setData(QtCore.Qt.UserRole, uuid)
+            self.ui.cacheListWidget.addItem(li)
         self.show()
 
     def _do_remove(self, *args, **kwargs):
-        items = list(self.ui.cacheListWidget.selectedItems())
-        to_remove = [self._paths[x.text()] for x in items]
-        for item in items:
+        to_remove = []
+        for item in self.ui.cacheListWidget.selectedItems():
+            to_remove.append(item.data(QtCore.Qt.UserRole))
             self.ui.cacheListWidget.removeItemWidget(item)
         self._remover(to_remove)
         self.hide()
-        self._doc = self._ws = self._opener = self._paths = None
 
     def accept(self, *args, **kwargs):
         self.hide()
-        to_open = [self._paths[x.text()] for x in self.ui.cacheListWidget.selectedItems()]
+        to_open = [item.data(QtCore.Qt.UserRole)
+                   for item in self.ui.cacheListWidget.selectedItems()]
         LOG.info("opening from cache: " + repr(to_open))
         self._opener(to_open)
-        self._doc = self._ws = self._opener = self._paths = None
 
     def reject(self, *args, **kwargs):
         self.hide()
-        self._doc = self._ws = self._opener = self._paths = None
 
 
 class AnimationSpeedPopupWindow(QtGui.QWidget):
@@ -749,28 +742,22 @@ class Main(QtGui.QMainWindow):
         self.update_recent_file_menu()
 
     def open_from_cache(self, *args, **kwargs):
-        if not self._open_cache_dialog:
-            self._open_cache_dialog = OpenCacheDialog(self)
-        name_to_uuid = self.workspace.product_names_available_in_cache
-        resource_names_for_uuids = list(name_to_uuid.keys())
-        paths = self.document.sort_paths(resource_names_for_uuids)
-
-        def _activate_products_for_names(names):
-            names = list(names)
-            LOG.debug("names to re-activate: {}".format(repr(names)))
-            uuids = [name_to_uuid[path] for path in names]
+        def _activate_products_for_names(uuids):
             LOG.info('activating cached products with uuids: {}'.format(repr(uuids)))
             self.activate_products_by_uuid(uuids)
 
-        def _purge_content_for_names(names):
-            names = list(names)
-            LOG.debug("names to purge: {}".format(repr(names)))
-            uuids = [name_to_uuid[path] for path in names]
+        def _purge_content_for_names(uuids):
             LOG.info('removing cached products with uuids: {}'.format(repr(uuids)))
             self.workspace.purge_content_for_product_uuids(uuids)
             self.update_recent_file_menu()
 
-        self._open_cache_dialog.activate(paths, _activate_products_for_names, _purge_content_for_names)
+        if not self._open_cache_dialog:
+            self._open_cache_dialog = OpenCacheDialog(self,
+                                                      _activate_products_for_names,
+                                                      _purge_content_for_names)
+
+        uuid_to_name = self.workspace.product_names_available_in_cache
+        self._open_cache_dialog.activate(uuid_to_name)
 
     def open_glob(self, *args, **kwargs):
         text, ok = QtGui.QInputDialog.getText(self, 'Open Glob Pattern',
