@@ -167,6 +167,7 @@ class KIND(Enum):
     SHAPE = 3
     RGB = 4
     COMPOSITE = 5
+    CONTOUR = 6
 
 
 class COMPOSITE_TYPE(Enum):
@@ -181,6 +182,7 @@ class INSTRUMENT(Enum):
     AHI = 'AHI'
     ABI = 'ABI'
     AMI = 'AMI'
+    GFS = 'GFS'
 
 
 class PLATFORM(Enum):
@@ -189,6 +191,7 @@ class PLATFORM(Enum):
     HIMAWARI_9 = 'Himawari-9'
     GOES_16 = 'G16'
     GOES_17 = 'G17'
+    NWP = 'NWP'
 
 
 class INFO(Enum):

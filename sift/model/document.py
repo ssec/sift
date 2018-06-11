@@ -82,6 +82,7 @@ from sift.workspace import Workspace
 from sift.util.default_paths import DOCUMENT_SETTINGS_DIR
 from sift.model.composite_recipes import RecipeManager, CompositeRecipe
 from sift.view.Colormap import ALL_COLORMAPS, USER_COLORMAPS
+from sift.queue import TASK_PROGRESS, TASK_DOING
 from PyQt4.QtCore import QObject, pyqtSignal
 
 from colormap import rgb2hex
@@ -988,6 +989,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 'default_width': 20.,  # degrees from left edge to right edge
                 'default_height': 20.,  # degrees from bottom edge to top edge
             }),
+            ('Polar (Alaska)', {
+                'proj4_str': '+proj=stere +datum=WGS84 +ellps=WGS84 +lat_0=90 +lat_ts=60.0 +lon_0=-150 +units=m +over',
+                'default_center': (-150., 61.2),  # lon, lat center point (Anchorage)
+                'default_width': 20.,  # degrees from left edge to right edge
+                'default_height': 20.,  # degrees from bottom edge to top edge
+            }),
         ))
         self.default_projection = 'LCC (CONUS)'
         self.current_projection = self.default_projection
@@ -1197,31 +1204,19 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param path: file to open and add
         :return: overview (uuid:UUID, datasetinfo:dict, overviewdata:numpy.ndarray)
         """
-        # collect product and resource information but don't yet import content
-        products = list(self._workspace.collect_product_metadata_for_paths([path]))
-        if not products:
-            raise ValueError('no products available in {}'.format(path))
-        if len(products) > 1:
-            LOG.warning('more than one product available at this path - FIXME')
-        info = products[0]
-        assert(info is not None)
-        uuid = info[INFO.UUID]
+        import warnings
+        warnings.warn("'open_file' is deprecated, use 'open_files' instead.",
+                      DeprecationWarning)
+        return list(self.import_files([path], insert_before=insert_before))
 
-        if uuid in self._layer_with_uuid:
-            LOG.warning("layer with UUID {} already in document?".format(uuid))
-            active_content_data = self._workspace.get_content(uuid)
-            return uuid, info, active_content_data
-
-        return self.activate_product_uuid_as_new_layer(uuid, insert_before=insert_before)
-
-    def activate_product_uuid_as_new_layer(self, uuid: UUID, insert_before=0):
+    def activate_product_uuid_as_new_layer(self, uuid: UUID, insert_before=0, **importer_kwargs):
         if uuid in self._layer_with_uuid:
             LOG.debug("Layer already loaded: {}".format(uuid))
-            active_content_data = self._workspace.import_product_content(uuid)
+            active_content_data = self._workspace.import_product_content(uuid, **importer_kwargs)
             return uuid, self[uuid], active_content_data
 
         # FUTURE: Load this async, the slots for the below signal need to be OK with that
-        active_content_data = self._workspace.import_product_content(uuid)
+        active_content_data = self._workspace.import_product_content(uuid, **importer_kwargs)
         # updated metadata with content information (most importantly nav information)
         info = self._workspace.get_info(uuid)
         assert(info is not None)
@@ -1308,21 +1303,50 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             INFO.DISPLAY_FAMILY: display_family,
         }
 
-    def open_files(self, paths, insert_before=0):
-        """
-        sort paths into preferred load order
-        open files in order, yielding uuid, info, overview_content
+    def import_files(self, paths, insert_before=0, **importer_kwargs) -> dict:
+        """Load product metadata and content from provided file paths.
+        
         :param paths: paths to open
         :param insert_before: where to insert them in layer list
         :return:
+        
         """
         # Load all the metadata so we can sort the files
-        infos = list(self._workspace.collect_product_metadata_for_paths(paths))
+        paths = self.sort_paths(paths)
+        # assume metadata collection is in the most user-friendly order
+        infos = self._workspace.collect_product_metadata_for_paths(
+            paths, **importer_kwargs)
+        uuids = []
+        total_products = 0
+        for dex, (num_prods, info) in enumerate(infos):
+            assert info is not None
+            yield {
+                TASK_DOING: 'Collecting metadata {}/{}'.format(dex + 1, num_prods),
+                TASK_PROGRESS: float(dex + 1) / float(num_prods),
+                'uuid': info[INFO.UUID],
+                'num_products': num_prods,
+            }
+            # redundant but also more explicit than depending on num_prods
+            total_products = num_prods
+            uuids.append(info[INFO.UUID])
 
-        # Use the metadata to sort the paths
-        paths = list(self.sort_datasets_into_load_order(infos))
-        for path in paths:
-            yield self.open_file(path, insert_before)
+        if not total_products:
+            raise ValueError('no products available in {}'.format(paths))
+
+        # collect product and resource information but don't yet import content
+        for dex, uuid in enumerate(uuids):
+            if uuid in self._layer_with_uuid:
+                LOG.warning("layer with UUID {} already in document?".format(uuid))
+                self._workspace.get_content(uuid)
+            else:
+                self.activate_product_uuid_as_new_layer(uuid, insert_before=insert_before, **importer_kwargs)
+
+            yield {
+                TASK_DOING: 'Loading content {}/{}'.format(dex + 1, total_products),
+                TASK_PROGRESS: float(dex + 1) / float(total_products),
+                'uuid': uuid,
+                'num_products': total_products,
+            }
 
     def sort_paths(self, paths):
         """
@@ -1330,7 +1354,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :return: list of paths
         """
         LOG.info("DEPRECATED: sort products, not files, since files may have multiple products")
-        return list(sorted(paths))
+        return list(sorted(paths, key=lambda p: os.path.basename(p)))
         # products = list(self._workspace.collect_product_metadata_for_paths(paths))
         # LOG.debug('sorting products {} for paths {}'.format(repr(products), repr(paths)))
         # infos = [x.info for x in products]
@@ -1338,33 +1362,33 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # paths = list(reversed(self.sort_datasets_into_load_order(infos)))  # go from load order to display order by reversing
         # return paths
 
-    def sort_datasets_into_load_order(self, infos):
-        """
-        given a list of paths, sort them into order, assuming layers are added at top of layer list
-        first: unknown paths
-        outer order: descending band number
-        inner order: descending time step
-        :param infos: iterable of info dictionaries
-        :return: ordered list of path strings
-        """
-
-        # FIXME: It is not possible for a pathname to be considered "irrelevant"
-        # riffraff = [path for path in paths if not nfo[path]]
-        riffraff = []
-        # ahi = [nfo[path] for path in paths if nfo[path]]
-        # names = [path for path in paths if nfo[path]]
-        # bands = [x.get(INFO.BAND, None) for x in ahi]
-        # times = [x.get(INFO.SCHED_TIME, None) for x in ahi]
-        # order = [(band, time, path) for band,time,path in zip(bands,times,names)]
-
-        def _sort_key(info):
-            return (info.get(INFO.DATASET_NAME),
-                    info.get(INFO.OBS_TIME),
-                    info.get(INFO.PATHNAME))
-        order = sorted(infos, key=_sort_key, reverse=True)
-        paths = riffraff + [info.get(INFO.PATHNAME) for info in order]
-        LOG.debug(paths)
-        return paths
+    # def sort_datasets_into_load_order(self, infos):
+    #     """
+    #     given a list of paths, sort them into order, assuming layers are added at top of layer list
+    #     first: unknown paths
+    #     outer order: descending band number
+    #     inner order: descending time step
+    #     :param infos: iterable of info dictionaries
+    #     :return: ordered list of path strings
+    #     """
+    #
+    #     # FIXME: It is not possible for a pathname to be considered "irrelevant"
+    #     # riffraff = [path for path in paths if not nfo[path]]
+    #     riffraff = []
+    #     # ahi = [nfo[path] for path in paths if nfo[path]]
+    #     # names = [path for path in paths if nfo[path]]
+    #     # bands = [x.get(INFO.BAND, None) for x in ahi]
+    #     # times = [x.get(INFO.SCHED_TIME, None) for x in ahi]
+    #     # order = [(band, time, path) for band,time,path in zip(bands,times,names)]
+    #
+    #     def _sort_key(info):
+    #         return (info.get(INFO.DATASET_NAME),
+    #                 info.get(INFO.OBS_TIME),
+    #                 info.get(INFO.PATHNAME))
+    #     order = sorted(infos, key=_sort_key, reverse=True)
+    #     paths = riffraff + [info.get(INFO.PATHNAME) for info in order]
+    #     LOG.debug(paths)
+    #     return paths
 
     def time_label_for_uuid(self, uuid):
         """used to update animation display when a new frame is shown
