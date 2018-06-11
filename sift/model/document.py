@@ -455,6 +455,29 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 break
             yield z, track
 
+    def frame_info_for_product(self, prod: Product=None, uuid: UUID=None, when_overlaps: span=None) -> T.Optional[FrameInfo]:
+        """Generate info struct needed for timeline representation, optionally returning None if outside timespan of interest
+        """
+        if prod is None:
+            with self.mdb as S:  # this is a potential performance toilet, but OK to use sparsely
+                prod = S.query(Product).filter_by(uuid_str=str(uuid)).first()
+                return self.frame_info_for_product(prod=prod, when_overlaps=when_overlaps)
+        prod_e = prod.obs_time + prod.obs_duration
+        if (when_overlaps is not None) and ((prod_e <= when_overlaps.s) or (prod.obs_time >= when_overlaps.e)):
+            # does not intersect our desired span, skip it
+            return None
+        nfo = prod.info
+        fin = FrameInfo(
+            uuid=prod.uuid,
+            ident=prod.ident,
+            when=span(prod.obs_time, prod.obs_duration),
+            state=self.doc.product_state.get(prod.uuid) or flags(),
+            primary=nfo[INFO.DISPLAY_NAME],
+            secondary=nfo[INFO.DISPLAY_TIME],  # prod.obs_time.strftime("%Y-%m-%d %H:%M:%S")
+            # thumb=
+        )
+        return fin
+
     def enumerate_tracks_frames(self, only_active: bool = False, when: span = None) -> T.Iterable[TrackInfo]:
         """enumerate tracks as TrackInfo and FrameInfo structures for timeline use, in top-Z to bottom-Z order
         """
@@ -471,21 +494,9 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 # fam_nfo = self.doc.family_info(fam)
                 que = s.query(Product).filter((Product.family == fam) & (Product.category == ctg))
                 for prod in que.all():
-                    prod_e = prod.obs_time + prod.obs_duration
-                    if (prod_e <= when.s) or (prod.obs_time >= when_e):
-                        # does not intersect our desired span, skip it
-                        continue
-                    nfo = prod.info
-                    fin = FrameInfo(
-                        uuid=prod.uuid,
-                        ident=prod.ident,
-                        when=span(prod.obs_time, prod.obs_duration),
-                        state=self.doc.product_state.get(prod.uuid) or flags(),
-                        primary=nfo[INFO.DISPLAY_NAME],
-                        secondary=nfo[INFO.DISPLAY_TIME],  # prod.obs_time.strftime("%Y-%m-%d %H:%M:%S")
-                        # thumb=
-                    )
-                    frames.append(fin)
+                    frm = self.frame_info_for_product(prod, when_overlaps=when)
+                    if frm is not None:
+                        frames.append(frm)
                 if not frames:
                     LOG.warning("track {} with no frames - skipping (missing files or resources?)".format(track))
                     continue
@@ -523,6 +534,8 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         """
         queue: TaskQueue = self.doc.queue
         frames = [frame] + list(*more_frames)
+        if len(frames) > 0:   # FIXME DEBUG 1
+            frames = list(reversed(self.doc.sort_product_uuids(frames)))
 
         def _bgnd_ensure_content_loaded(ws=self.ws, frames=frames):
             ntot = len(frames)
@@ -531,6 +544,8 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 yield {TASK_DOING: "importing {}/{}".format(nth+1, ntot), TASK_PROGRESS: float(nth)/float(ntot)}
 
         def _then_show_frames_in_document(doc = self.doc, frames = frames):
+            # FIXME: less arbitrary activation order
+            [self.doc.activate_product_uuid_as_new_layer(frame) for frame in frames]
             return
             # ensure that the track these frames belongs to is activated itself
             # update the timeline view states of these frames to show them as active as well
@@ -1361,6 +1376,15 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # LOG.info('path info for sorting: {}'.format(repr(infos)))
         # paths = list(reversed(self.sort_datasets_into_load_order(infos)))  # go from load order to display order by reversing
         # return paths
+
+    def sort_product_uuids(self, uuids: T.Iterable[UUID]) -> T.List[UUID]:
+        uuidset=set(str(x) for x in uuids)
+        with self._workspace.metadatabase as S:
+            zult = [x.uuid for x in S.query(Product)
+                                     .filter(Product.uuid_str.in_(uuidset))
+                                     .order_by(Product.family, Product.category, Product.serial)
+                                     .all()]
+        return zult
 
     # def sort_datasets_into_load_order(self, infos):
     #     """

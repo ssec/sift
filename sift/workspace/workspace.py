@@ -810,7 +810,7 @@ class Workspace(QObject):
                 paths, remaining_paths = [], paths
 
             for source_path in paths:
-                LOG.info('collecting metadata for {}'.format(source_path))
+                # LOG.info('collecting metadata for {}'.format(source_path))
                 # FIXME: Check if importer only accepts one path at a time
                 #        Maybe sort importers by single files versus multiple files and doing single files first?
                 # FIXME: decide whether to update database if mtime of file is newer than mtime in database
@@ -859,7 +859,7 @@ class Workspace(QObject):
                     assert(prod is not None)
                     # merge the product into our database session, since it may belong to import_session
                     zult = frozendict(prod.info)  # self._S.merge(prod)
-                    LOG.debug('yielding product metadata for {}'.format(zult.get(INFO.DISPLAY_NAME, '?? unknown name ??')))
+                    # LOG.debug('yielding product metadata for {}'.format(zult.get(INFO.DISPLAY_NAME, '?? unknown name ??')))
                     yield num_products, zult
 
     def import_product_content(self, uuid=None, prod=None, allow_cache=True, **importer_kwargs):
