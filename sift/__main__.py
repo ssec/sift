@@ -24,6 +24,7 @@ from uuid import UUID
 from vispy import app
 import asyncio
 from quamash import QEventLoop, QThreadExecutor
+from collections import OrderedDict
 
 app_object = app.use_app('pyqt4')
 loop = QEventLoop(app_object.native)
@@ -105,8 +106,10 @@ class OpenCacheDialog(QtGui.QDialog):
 
     def activate(self, uuid_to_name):
         self.ui.cacheListWidget.clear()
-        sorted_items = sorted(uuid_to_name.items(),
-                              key=lambda x: x[1])
+        # assume uuid_to_name is already an OrderedDict:
+        sorted_items = uuid_to_name.items()
+        # sorted_items = sorted(uuid_to_name.items(),
+        #                       key=lambda x: x[1])
         for uuid, name in sorted_items:
             li = QtGui.QListWidgetItem(name)
             li.setData(QtCore.Qt.UserRole, uuid)
@@ -783,7 +786,9 @@ class Main(QtGui.QMainWindow):
                                                       _purge_content_for_names)
 
         uuid_to_name = self.workspace.product_names_available_in_cache
-        self._open_cache_dialog.activate(uuid_to_name)
+        ordered_uuids = self.document.sort_product_uuids(uuid_to_name.keys())
+        ordered_uuid_to_name = OrderedDict([(u, uuid_to_name[u]) for u in ordered_uuids])
+        self._open_cache_dialog.activate(ordered_uuid_to_name)
 
     def open_glob(self, *args, **kwargs):
         text, ok = QtGui.QInputDialog.getText(self, 'Open Glob Pattern',

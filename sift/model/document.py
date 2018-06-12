@@ -74,6 +74,7 @@ import numpy as np
 from weakref import ref
 import os
 import json
+import warnings
 
 from sift.workspace.metadatabase import Product
 from sift.common import KIND, INFO, prez, span, FCS_SEP, ZList, flags
@@ -534,7 +535,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         """
         queue: TaskQueue = self.doc.queue
         frames = [frame] + list(*more_frames)
-        if len(frames) > 0:   # FIXME DEBUG 1
+        if len(frames) > 1:
             frames = list(reversed(self.doc.sort_product_uuids(frames)))
 
         def _bgnd_ensure_content_loaded(ws=self.ws, frames=frames):
@@ -1327,7 +1328,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         
         """
         # Load all the metadata so we can sort the files
-        paths = self.sort_paths(paths)
         # assume metadata collection is in the most user-friendly order
         infos = self._workspace.collect_product_metadata_for_paths(
             paths, **importer_kwargs)
@@ -1347,6 +1347,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         if not total_products:
             raise ValueError('no products available in {}'.format(paths))
+
+        # reverse list since we always insert a top layer
+        uuids = list(reversed(self.sort_product_uuids(uuids)))
 
         # collect product and resource information but don't yet import content
         for dex, uuid in enumerate(uuids):
@@ -1368,7 +1371,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param paths: list of paths
         :return: list of paths
         """
-        LOG.info("DEPRECATED: sort products, not files, since files may have multiple products")
+        warnings.warn("sort_paths is deprecated in favor of sort_product_uuids, since more than one product may reside in a resource", DeprecationWarning)
         return list(sorted(paths, key=lambda p: os.path.basename(p)))
         # products = list(self._workspace.collect_product_metadata_for_paths(paths))
         # LOG.debug('sorting products {} for paths {}'.format(repr(products), repr(paths)))
@@ -1380,11 +1383,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def sort_product_uuids(self, uuids: T.Iterable[UUID]) -> T.List[UUID]:
         uuidset=set(str(x) for x in uuids)
         with self._workspace.metadatabase as S:
-            zult = [x.uuid for x in S.query(Product)
-                                     .filter(Product.uuid_str.in_(uuidset))
-                                     .order_by(Product.family, Product.category, Product.serial)
-                                     .all()]
-        return zult
+            zult = [(x.uuid, x.ident) for x in S.query(Product)
+                                                .filter(Product.uuid_str.in_(uuidset))
+                                                .order_by(Product.family, Product.category, Product.serial)
+                                                .all()]
+        LOG.debug("sorted products: {}".format(repr(zult)))
+        return [u for u,_ in zult]
 
     # def sort_datasets_into_load_order(self, infos):
     #     """
