@@ -733,11 +733,13 @@ class DocumentAsRecipeCollection(DocumentAsContextBase):
 class AnimationStep(T.NamedTuple):
     """Animation sequence used by SGM is a series of AnimationSteps, obtained from doc.as_animation_sequence
     SGM uses them to signal other subsystems on playback progress
+    A change of presentation for one or more families does not invalidate an animation plan
     """
+    plan_id: T.Any  # a unique per generated plan, used for cache validation purposes
     # how many wall microseconds this frame occurs at and lasts
     offset: int
     duration: int  # 0 if undetermined / infinite
-    # back-to-front list of products to present during this timestep, along with their corresponding metadata
+    # back-to-front list of products to present during this timestep
     uuids: T.Tuple[UUID]
     # corresponding family, to reduce SGM need for queries
     families: T.Tuple[str]
@@ -752,10 +754,22 @@ class DocumentAsAnimationSequence(DocumentAsContextBase):
     Used principally by SGM and playback slider control (timeline has its own interface)
     """
 
+    @property
+    def plan_id(self) -> T.Any:
+        """The plan id is just a hashable unique (compare with "is") saying what the current valid plan is, to allow SGM/others to cache
+        """
+
     def animation_plan(self, multiple_of_realtime:float = None, start:datetime=None, stop:datetime=None) -> T.Sequence[AnimationStep]:
         """Yield series of AnimationStep
+        May result in a new plan_id being the valid plan
         """
         return []
+
+    # @property
+    # def prez_id(self) -> T.Any:
+    #     """An immutable hashable unique which changes when any presentation in the document changes
+    #     :return:
+    #     """
 
     @property
     def family_presentation(self) -> T.Mapping[str, prez]:
