@@ -1382,6 +1382,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def sort_product_uuids(self, uuids: T.Iterable[UUID]) -> T.List[UUID]:
         uuidset=set(str(x) for x in uuids)
+        if not uuidset:
+            return []
         with self._workspace.metadatabase as S:
             zult = [(x.uuid, x.ident) for x in S.query(Product)
                                                 .filter(Product.uuid_str.in_(uuidset))
