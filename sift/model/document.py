@@ -730,19 +730,68 @@ class DocumentAsRecipeCollection(DocumentAsContextBase):
         raise NotImplementedError()
 
 
+class AnimationStep(T.NamedTuple):
+    """Animation sequence used by SGM is a series of AnimationSteps, obtained from doc.as_animation_sequence
+    SGM uses them to signal other subsystems on playback progress
+    A change of presentation for one or more families does not invalidate an animation plan
+    """
+    plan_id: T.Any  # a unique per generated plan, used for cache validation purposes
+    # how many wall microseconds this frame occurs at and lasts
+    offset: int
+    duration: int  # 0 if undetermined / infinite
+    # back-to-front list of products to present during this timestep
+    uuids: T.Tuple[UUID]
+    # corresponding family, to reduce SGM need for queries
+    families: T.Tuple[str]
+    # primary kind for displaying the data
+    kinds: T.Tuple[KIND]
+    # data time span this step represents
+    data_span: span
+
+
 class DocumentAsAnimationSequence(DocumentAsContextBase):
     """Document as sequence of product frames that appear and disappear when animated at a multiple of real-time
+    Used principally by SGM and playback slider control (timeline has its own interface)
     """
-    def __enter__(self):
-        raise NotImplementedError()
-
-    def iterate(self, multiple_of_realtime:float = None, start:datetime=None, stop:datetime=None) -> T.Sequence[T.Tuple[float, T.List[UUID]]]:
-        """Yield series of (wall-seconds-offset, [back-to-front-list-of-product-uuids])
-        """
-        return
 
     @property
-    def playhead_time(self) -> datetime:
+    def plan_id(self) -> T.Any:
+        """The plan id is just a hashable unique (compare with "is") saying what the current valid plan is, to allow SGM/others to cache
+        """
+
+    def animation_plan(self, multiple_of_realtime:float = None, start:datetime=None, stop:datetime=None) -> T.Sequence[AnimationStep]:
+        """Yield series of AnimationStep
+        May result in a new plan_id being the valid plan
+        """
+        return []
+
+    # @property
+    # def prez_id(self) -> T.Any:
+    #     """An immutable hashable unique which changes when any presentation in the document changes
+    #     :return:
+    #     """
+
+    @property
+    def family_presentation(self) -> T.Mapping[str, prez]:
+        """Mapping of families to their presentation tuples, guaranteed to include at least the families participating in the animation
+        """
+        return dict(self.doc.family_presentation)
+
+    @property
+    def playback_per_sec(self) -> timedelta:
+        """The number of data seconds per wall second of playback
+        """
+        return self.doc.playback_per_sec
+
+    @property
+    def playhead_step(self) -> AnimationStep:
+        """AnimationStep under the current playhead
+        """
+
+    @property
+    def playhead_time(self) -> T.Optional[datetime]:
+        """ playhead time, or None if animating
+        """
         raise NotImplementedError()
 
     @playhead_time.setter
@@ -750,23 +799,14 @@ class DocumentAsAnimationSequence(DocumentAsContextBase):
         raise NotImplementedError()
 
     @property
-    def playback_time_range(self) -> T.Tuple[datetime, datetime]:
+    def playback_time_range(self) -> span:
         raise NotImplementedError()
 
     @playback_time_range.setter
-    def playback_time_range(self, start_end: T.Tuple[datetime, datetime]):
+    def playback_time_range(self, start_end: span):
         # set document playback time range
         # if we're in a with-clause, defer signals until outermost exit
         # if we're not in a with-clause, raise ContextNeededForEditing exception
-        raise NotImplementedError()
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_val is not None:
-            # abort code
-            pass
-        else:
-            # commit code
-            pass
         raise NotImplementedError()
 
 
@@ -870,7 +910,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     # playback information
     playhead_time: datetime = None  # document stored playhead time
-    playback_per_sec: float = 60.0  # data time increment per wall-second
+    playback_per_sec: timedelta = timedelta(seconds=60.0)  # data time increment per wall-second
 
     # playback time range, if not None is a subset of overall timeline
     playback_span: span = None
