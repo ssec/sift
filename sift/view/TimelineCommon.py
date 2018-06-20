@@ -63,12 +63,16 @@ class VisualState(Enum):
     """
     ERROR = 1  # error red
     WARNING = 2  # warning yellow
+
     DISABLED = 4  # greyed-out and muted, may not even display decoration; signifies user turned it off
     BUSY = 8  # when WorkspaceState.ARRIVING, show barberpole animation or at least diagonal hatch
-    READY = 16  # regular coloration - typically when WorkspaceState.CACHED
-    LOCKED = 32  # indicate the frame is locked across is entire track
-    RELEVANT = 64  # highlight that this (typically track) may be affected with the operation you have inflight
-    SELECTED = 128  # track or frame is selected by user
+    AVAILABLE = 16  # done arriving, now resides in cache but is not necessarily loaded
+    READY = 32  # regular coloration - typically when WorkspaceState.CACHED
+    HIGHLIGHT = 64  # frame is being shown on the screen at this moment in time
+
+    LOCKED = 128  # indicate the frame is locked across is entire track
+    RELEVANT = 256  # highlight that this (typically track) may be affected with the operation you have inflight
+    SELECTED = 512  # track or frame is selected by user
 
 
 class CoordTransform(QObject):

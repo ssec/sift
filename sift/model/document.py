@@ -75,9 +75,10 @@ from weakref import ref
 import os
 import json
 import warnings
+from sqlalchemy.orm import Session
 
 from sift.workspace.metadatabase import Product
-from sift.common import KIND, INFO, prez, span, FCS_SEP, ZList, flags
+from sift.common import KIND, INFO, prez, span, FCS_SEP, ZList, flags, STATE
 from sift.queue import TASK_DOING, TASK_PROGRESS, TaskQueue
 from sift.workspace import Workspace
 from sift.util.default_paths import DOCUMENT_SETTINGS_DIR
@@ -456,7 +457,33 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 break
             yield z, track
 
-    def frame_info_for_product(self, prod: Product=None, uuid: UUID=None, when_overlaps: span=None) -> T.Optional[FrameInfo]:
+    # def product_state(self, *product_uuids: T.Iterable[UUID]) -> T.Iterable[flags]:
+    #     """Merge document and workspace state information on a given sequence of products
+    #     """
+    #     uuids = list(product_uuids)
+    #     warnings.warn("old-model query of product states, this is a crutch")
+    #     # FIXME: implement using new model
+    #     cls = self.doc.current_layer_set
+    #     ready_uuids = {x.uuid for x in cls}
+    #     if not uuids:
+    #         uuids = list(ready_uuids)
+    #     for uuid in uuids:
+    #         s = set()
+    #         if uuid in ready_uuids:
+    #             s.add(STATE.READY)
+    #         # merge state from workspace
+    #         s.update(self.ws.product_state(uuid))
+    #         yield s
+
+    def product_state(self, uuid:UUID, session:Session = None) -> flags:
+        """Merge document state with workspace state
+        """
+        s = flags()
+        s.update(self.ws.product_state(uuid, session=session))
+        # s.update(self.doc.product_state.get(prod.uuid) or flags())
+        return s
+
+    def frame_info_for_product(self, prod: Product=None, uuid: UUID=None, when_overlaps: span=None, session: Session=None) -> T.Optional[FrameInfo]:
         """Generate info struct needed for timeline representation, optionally returning None if outside timespan of interest
         """
         if prod is None:
@@ -475,7 +502,8 @@ class DocumentAsTrackStack(DocumentAsContextBase):
             uuid=prod.uuid,
             ident=prod.ident,
             when=span(prod.obs_time, prod.obs_duration),
-            state=self.doc.product_state.get(prod.uuid) or flags(),
+            # FIXME: new model old model
+            state=self.product_state(prod.uuid, session=session),
             primary=dn,
             secondary=dt,  # prod.obs_time.strftime("%Y-%m-%d %H:%M:%S")
             # thumb=
@@ -498,7 +526,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 # fam_nfo = self.doc.family_info(fam)
                 que = s.query(Product).filter((Product.family == fam) & (Product.category == ctg))
                 for prod in que.all():
-                    frm = self.frame_info_for_product(prod, when_overlaps=when)
+                    frm = self.frame_info_for_product(prod, when_overlaps=when, session=s)
                     if frm is not None:
                         frames.append(frm)
                 if not frames:
@@ -544,18 +572,18 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         def _bgnd_ensure_content_loaded(ws=self.ws, frames=frames):
             ntot = len(frames)
             for nth, frame in enumerate(frames):
-                ws.import_product_content(frame)
                 yield {TASK_DOING: "importing {}/{}".format(nth+1, ntot), TASK_PROGRESS: float(nth)/float(ntot)}
+                ws.import_product_content(frame)
 
         def _then_show_frames_in_document(doc = self.doc, frames = frames):
-            # FIXME: less arbitrary activation order
+            """finally-do-this section back on UI thread
+            """
             [self.doc.activate_product_uuid_as_new_layer(frame) for frame in frames]
             return
             # ensure that the track these frames belongs to is activated itself
             # update the timeline view states of these frames to show them as active as well
             # generate their presentations if needed
             # regenerate the animation plan and refresh the screen
-
 
         queue.add("activate frames " + repr(frames), _bgnd_ensure_content_loaded(), "activate {} frames".format(len(frames)),
                   interactive=False, and_then=_then_show_frames_in_document)

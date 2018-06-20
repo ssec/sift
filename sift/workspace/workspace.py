@@ -59,8 +59,9 @@ from PyQt4.QtCore import QObject, pyqtSignal
 from pyproj import Proj
 from rasterio import Affine
 from shapely.geometry.polygon import LinearRing
+from sqlalchemy.orm import Session
 
-from sift.common import INFO, KIND, flags
+from sift.common import INFO, KIND, flags, STATE
 from sift.model.shapes import content_within_shape
 from .metadatabase import Metadatabase, Content, Product, Resource
 from .importer import aImporter, GeoTiffImporter, GoesRPUGImporter, SatPyImporter, generate_guidebook_metadata
@@ -230,12 +231,6 @@ class ActiveContent(QObject):
         self._update_mask()
 
 
-class WorkspaceState(enum.Enum):
-    ARRIVING = 1  # being imported or calculated
-    CACHED = 2  # stable on disk
-    ATTACHED = 4  # attached to memory
-
-
 class Workspace(QObject):
     """
     Workspace is a singleton object which works with Datasets shall:
@@ -287,15 +282,18 @@ class Workspace(QObject):
         state.remove(flag)
         self.didChangeProductState.emit(uuid, state)
 
-    def product_state(self, uuid: UUID) -> flags:
+    def product_state(self, uuid: UUID, session:Session=None) -> flags:
         state = flags(self._state[uuid])
         # add any derived information
         if uuid in self._available:
-            state.add(WorkspaceState.ATTACHED)
-        with self._inventory as s:
-            ncontent = s.query(Content).filter_by(uuid=uuid).count()
+            state.add(STATE.ATTACHED)
+        if session is None:
+            with self._inventory as s:
+                ncontent = s.query(Content).filter_by(uuid=uuid).count()
+        else:
+            ncontent = session.query(Content).filter_by(uuid=uuid).count()
         if ncontent > 0:
-            state.add(WorkspaceState.CACHED)
+            state.add(STATE.CACHED)
         return state
 
     @property
@@ -868,7 +866,7 @@ class Workspace(QObject):
             if prod is None and uuid is not None:
                 prod = self._product_with_uuid(S, uuid)
 
-            self.set_product_state_flag(prod.uuid, WorkspaceState.ARRIVING)
+            self.set_product_state_flag(prod.uuid, STATE.ARRIVING)
             default_prod_kind = prod.info[INFO.KIND]
 
             if len(prod.content):
@@ -896,7 +894,7 @@ class Workspace(QObject):
             # self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
             LOG.debug('received {} updates during import'.format(nupd))
             uuid = prod.uuid
-            self.clear_product_state_flag(prod.uuid, WorkspaceState.ARRIVING)
+            self.clear_product_state_flag(prod.uuid, STATE.ARRIVING)
         # S.commit()
         # S.flush()
 

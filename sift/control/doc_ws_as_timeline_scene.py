@@ -14,7 +14,8 @@ from uuid import UUID
 from typing import Tuple, Optional, Mapping, List, Any, Callable, Set, Iterable
 from PyQt4.QtGui import QMenu
 
-from sift.common import span
+from sift.common import span, STATE, flags
+from sift.view.TimelineCommon import VisualState
 from sift.view.TimelineItems import QTrackItem, QFrameItem
 from sift.view.TimelineScene import QFramesInTracksScene
 from sift.workspace import Workspace
@@ -23,6 +24,25 @@ from sift.workspace.metadatabase import Metadatabase
 
 
 LOG = logging.getLogger(__name__)
+
+
+# since timeline view is interface-independent of sift.common, we translate
+DOC_STATE_TO_VISUAL_STATE = {
+    STATE.POTENTIAL: set(),
+    STATE.ARRIVING: {VisualState.BUSY},
+    STATE.CACHED: {VisualState.AVAILABLE},
+    STATE.ATTACHED: {VisualState.READY},
+    STATE.ONSCREEN: {VisualState.HIGHLIGHT},
+    STATE.UNKNOWN: {VisualState.ERROR},
+    STATE.DANGLING: {VisualState.WARNING},
+}
+
+
+def _translate_to_visual_state(s: flags) -> flags:
+    f = flags()
+    for x in s:
+        f.update(DOC_STATE_TO_VISUAL_STATE.get(x) or set())
+    return f
 
 
 class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
@@ -51,17 +71,20 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
     def _sync_track(self, qti: QTrackItem, z:int, trk: TrackInfo):
         qti.z, old_z = z, qti.z
         qti.state = trk.state
+        qti.update()
 
     def _create_track(self, z: int, trk: TrackInfo) -> QTrackItem:
         qti = QTrackItem(self, self.coords, trk.track, z, trk.primary, trk.secondary)
         return qti
 
     def _create_frame(self, qti: QTrackItem, frm: FrameInfo) -> QFrameItem:
-        qfi = QFrameItem(qti, self.coords, frm.uuid, frm.when.s, frm.when.d, frm.state, frm.primary, frm.secondary)
+        qfi = QFrameItem(qti, self.coords, frm.uuid, frm.when.s, frm.when.d, _translate_to_visual_state(frm.state),
+                         frm.primary, frm.secondary)
         return qfi
 
     def _sync_frame(self, qfi: QFrameItem, frm: FrameInfo):
-        qfi.state = frm.state
+        qfi.state = _translate_to_visual_state(frm.state)
+        qfi.update()
 
     def _purge_orphan_tracks_frames(self, tracks: Iterable[str], frames: Iterable[UUID]):
         """Remove QTrackItem and QFrameItem instances that no longer correspond to document content

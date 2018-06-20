@@ -139,13 +139,14 @@ prez = namedtuple('prez', [
 ])
 
 class STATE(Enum):
-    """State for products in workspace
+    """State for products in document
     """
     UNKNOWN = 0
     POTENTIAL = 1  # product is available as a resource and could be imported or calculated
     ARRIVING = 2  # import or calculation in progress
     CACHED = 3  # stable in workspace cache
-    READY = 5  # attached and can page in memory, as well as participating in document
+    ATTACHED = 5  # attached and can page in memory, as well as participating in document
+    ONSCREEN = 6  # actually being displayed at this moment
     DANGLING = -1  # cached in workspace but no resource behind it
     # PURGE = -2  # scheduled for purging -- eventually
 
