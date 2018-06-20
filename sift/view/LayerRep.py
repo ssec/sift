@@ -21,7 +21,7 @@ REQUIRES
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-import os
+
 import sys
 import logging
 import unittest
@@ -30,28 +30,22 @@ import argparse
 import shapefile
 
 from vispy.scene.visuals import create_visual_node
-from vispy.visuals import LineVisual, ImageVisual, CompoundVisual, Visual
+from vispy.visuals import LineVisual, ImageVisual
 from vispy.ext.six import string_types
 import numpy as np
 from datetime import datetime
 
 from sift.common import (
-    DEFAULT_X_PIXEL_SIZE,
-    DEFAULT_Y_PIXEL_SIZE,
-    DEFAULT_ORIGIN_X,
-    DEFAULT_ORIGIN_Y,
     DEFAULT_PROJECTION,
     DEFAULT_TILE_HEIGHT,
     DEFAULT_TILE_WIDTH,
     DEFAULT_TEXTURE_HEIGHT,
     DEFAULT_TEXTURE_WIDTH,
     TESS_LEVEL,
-    C_EQ,
     box, pnt, rez, vue,
     TileCalculator,
     calc_pixel_size,
     get_reference_points,
-    get_reference_points_image,
     )
 from sift.view.Program import TextureAtlas2D, Texture2D
 # The below imports are needed because we subclassed the ImageVisual
@@ -70,6 +64,12 @@ LOG = logging.getLogger(__name__)
 # these values can get large when zoomed way in
 CANVAS_EPSILON = 1e5
 # CANVAS_EPSILON = 1e30
+
+
+class ArrayProxy(object):
+    def __init__(self, ndim, shape):
+        self.ndim = ndim
+        self.shape = shape
 
 
 VERT_SHADER = """
@@ -341,7 +341,6 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self._need_texture_upload = True
         self._need_vertex_update = True
         self._need_colortransform_update = True
-        self._need_clim_update = True
         self._need_interpolation_update = True
         self._texture = TextureAtlas2D(self.texture_shape, tile_shape=self.tile_shape,
                                        interpolation=texture_interpolation,
@@ -368,6 +367,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
 
         self.gamma = gamma
         self.clim = clim if clim != 'auto' else (np.nanmin(data), np.nanmax(data))
+        self._texture_LUT = None
         self.cmap = cmap
 
         self.overview_info = None
@@ -383,28 +383,28 @@ class TiledGeolocatedImageVisual(ImageVisual):
     @gamma.setter
     def gamma(self, gamma):
         self._gamma = gamma if gamma is not None else 1.
-        self._need_clim_update = True
+        self._need_texture_upload = True
         self.update()
 
-    @property
-    def clim(self):
-        return (self._clim if isinstance(self._clim, string_types) else
-                tuple(self._clim))
-
-    @clim.setter
-    def clim(self, clim):
-        if isinstance(clim, string_types):
-            if clim != 'auto':
-                raise ValueError('clim must be "auto" if a string')
-        else:
-            clim = np.array(clim, float)
-            if clim.shape != (2,):
-                raise ValueError('clim must have two elements')
-        self._clim = clim
-        # FIXME: Is this supposed to be assigned to something?:
-        self._data_lookup_fn
-        self._need_clim_update = True
-        self.update()
+    # @property
+    # def clim(self):
+    #     return (self._clim if isinstance(self._clim, string_types) else
+    #             tuple(self._clim))
+    #
+    # @clim.setter
+    # def clim(self, clim):
+    #     if isinstance(clim, string_types):
+    #         if clim != 'auto':
+    #             raise ValueError('clim must be "auto" if a string')
+    #     else:
+    #         clim = np.array(clim, float)
+    #         if clim.shape != (2,):
+    #             raise ValueError('clim must have two elements')
+    #     self._clim = clim
+    #     # FIXME: Is this supposed to be assigned to something?:
+    #     self._data_lookup_fn
+    #     self._need_clim_update = True
+    #     self.update()
 
     @property
     def size(self):
@@ -415,6 +415,9 @@ class TiledGeolocatedImageVisual(ImageVisual):
         """Create and add a low resolution version of the data that is always
         shown behind the higher resolution image tiles.
         """
+        # FUTURE: Actually use this data attribute. For now let the base
+        #         think there is data (not None)
+        self._data = ArrayProxy(self.ndim, self.shape)
         self.overview_info = nfo = {}
         y_slice, x_slice = self.calc.overview_stride
         nfo["data"] = data[y_slice, x_slice]
@@ -645,44 +648,44 @@ class TiledGeolocatedImageVisual(ImageVisual):
         raise NotImplementedError("This image subclass does not support the 'set_data' method")
 
     def _build_texture(self):
-        raise NotImplementedError("_build_texture is not implemented in this subclass, use the 2-step process of '_build_texture_tiles' and '_set_texture_tiles'")
+        # _build_texture should not be used in this class, use the 2-step
+        # process of '_build_texture_tiles' and '_set_texture_tiles'
+        self._set_clim_vars()
+        self._need_texture_upload = False
 
-    def _build_vertex_data(self, transforms):
-        raise NotImplementedError("_build_vertex_data is not implemented in this subclass, use the 2-step process of '_build_vertex_tiles' and '_set_vertex_tiles'")
-
-    def _build_color_transform(self):
-        if self.ndim == 2 or self.shape[2] == 1:
-            fun = FunctionChain(None, [Function(_c2l),
-                                       Function(self._cmap.glsl_map)])
-        else:
-            fun = Function(_null_color_transform)
-        self.shared_program.frag['color_transform'] = fun
-        self._need_colortransform_update = False
+    def _build_vertex_data(self):
+        # _build_vertex_data should not be used in this class, use the 2-step
+        # process of '_build_vertex_tiles' and '_set_vertex_tiles'
+        return
 
     def _set_clim_vars(self):
         self._data_lookup_fn["vmin"] = self._clim[0]
         self._data_lookup_fn["vmax"] = self._clim[1]
         self._data_lookup_fn["gamma"] = self._gamma
-        self._need_clim_update = False
+        # self._need_texture_upload = True
 
-    def _prepare_draw(self, view):
-        if self._need_interpolation_update:
-            self._build_interpolation()
+    # def _prepare_draw(self, view):
+    #     if self._data is None:
+    #         return False
+    #
+    #     if self._need_interpolation_update:
+    #         self._build_interpolation()
+    #
+    #     if self._need_texture_upload:
+    #         self._build_texture()
+    #
+    #     if self._need_colortransform_update:
+    #         # FIXME: This uses the ndim and shape from self
+    #         self.shared_program.frag['color_transform'] = \
+    #             _build_color_transform(self, self.cmap)
+    #         self._need_colortransform_update = False
+    #
+    #     if self._need_vertex_update:
+    #         self._build_vertex_data()
+    #
+    #     if view._need_method_update:
+    #         self._update_method(view)
 
-        # if self._need_texture_upload:
-        #     self._build_texture()
-
-        if self._need_clim_update:
-            self._set_clim_vars()
-
-        if self._need_colortransform_update:
-            self._build_color_transform()
-
-        # if self._need_vertex_update:
-        #     self._build_vertex_data()
-
-        if view._need_method_update:
-            self._update_method(view)
 
 TiledGeolocatedImage = create_visual_node(TiledGeolocatedImageVisual)
 
@@ -809,7 +812,6 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         self._need_texture_upload = True
         self._need_vertex_update = True
         self._need_colortransform_update = True
-        self._need_clim_update = True
         self._need_interpolation_update = True
         self._textures = [TextureAtlas2D(self.texture_shape, tile_shape=self.tile_shape,
                                          interpolation=texture_interpolation,
@@ -863,6 +865,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
             cm = cmap[idx]
             _cmap.append(cm)
         self.clim = _clim
+        self._texture_LUT = None
         self.gamma = gamma if gamma is not None else (1.,) * self.num_channels
         self.cmap = _cmap[0]
 
@@ -915,6 +918,9 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         """Create and add a low resolution version of the data that is always
         shown behind the higher resolution image tiles.
         """
+        # FUTURE: Actually use this data attribute. For now let the base
+        #         think there is data (not None)
+        self._data = ArrayProxy(self.ndim, self.shape)
         self.overview_info = nfo = {}
         y_slice, x_slice = self.calc.overview_stride
         # Update kwargs to reflect the new spatial resolution of the overview image
@@ -949,7 +955,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         assert isinstance(gamma, (tuple, list))
         assert len(gamma) == self.num_channels
         self._gamma = tuple(x if x is not None else 1. for x in gamma)
-        self._need_clim_update = True
+        self._need_texture_upload = True
         self.update()
 
     @property
@@ -971,7 +977,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
             elif clim.shape == (2,):
                 clim = np.array([clim, clim, clim], float)
         self._clim = clim
-        self._need_clim_update = True
+        self._need_texture_upload = True
         self.update()
 
     def _set_clim_vars(self):
@@ -979,7 +985,6 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
             lookup_fn["vmin"] = self._clim[idx, 0]
             lookup_fn["vmax"] = self._clim[idx, 1]
             lookup_fn["gamma"] = self._gamma[idx]
-            self._need_clim_update = False
 
     def _build_color_transform(self):
         if self.ndim == 2 or self.shape[2] == 1:
@@ -1174,34 +1179,68 @@ class NEShapefileLinesVisual(ShapefileLinesVisual):
 NEShapefileLines = create_visual_node(NEShapefileLinesVisual)
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="PURPOSE",
-        epilog="",
-        fromfile_prefix_chars='@')
-    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG')
-    # http://docs.python.org/2.7/library/argparse.html#nargs
-    # parser.add_argument('--stuff', nargs='5', dest='my_stuff',
-    #                    help="one or more random things")
-    parser.add_argument('pos_args', nargs='*',
-                        help="positional arguments don't have the '-' prefix")
-    args = parser.parse_args()
+from vispy.visuals import IsocurveVisual
 
 
-    levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
-    logging.basicConfig(level=levels[min(3, args.verbosity)])
+class PrecomputedIsocurveVisual(IsocurveVisual):
+    """IsocurveVisual that can use precomputed paths."""
 
-    if not args.pos_args:
-        unittest.main()
-        return 0
+    def __init__(self, verts, connects, level_indexes, levels, **kwargs):
+        num_zoom_levels = len(levels)
+        num_levels_per_zlevel = [len(x) for x in levels]
+        self._zoom_level_indexes = [
+            level_indexes[:sum(num_levels_per_zlevel[:z_level + 1])]
+            for z_level in range(num_zoom_levels)]
+        self._zoom_level_size = [sum(z_level_indexes) for z_level_indexes in self._zoom_level_indexes]
 
-    for pn in args.pos_args:
-        pass
+        self._all_verts = []
+        self._all_connects = []
+        self._all_levels = []
+        self._zoom_level = -1
+        for zoom_level in range(num_zoom_levels):
+            end_idx = self._zoom_level_size[zoom_level]
+            self._all_verts.append(verts[:end_idx])
+            self._all_connects.append(connects[:end_idx])
+            self._all_levels.append([x for y in levels[:zoom_level + 1] for x in y])
 
-    return 0
+        super(PrecomputedIsocurveVisual, self).__init__(data=None, levels=levels,
+                                                        **kwargs)
+
+        self._data = True
+        self._level_min = 0
+        self.zoom_level = kwargs.pop("zoom_level", 0)
+
+    @property
+    def zoom_level(self):
+        return self._zoom_level
+
+    @zoom_level.setter
+    def zoom_level(self, val):
+        if val == self._zoom_level:
+            return
+        self._zoom_level = val
+        self._li = self._zoom_level_indexes[self._zoom_level]
+        self._connect = self._all_connects[self._zoom_level]
+        self._verts = self._all_verts[self._zoom_level]
+        # this will trigger all of the recomputation
+        self.levels = self._all_levels[self._zoom_level]
+
+    @property
+    def clim(self):
+        return self._clim
+
+    @clim.setter
+    def clim(self, val):
+        assert len(val) == 2
+        self._clim = val
+        self._need_level_update = True
+        self._need_color_update = True
+        self.update()
+
+    def _compute_iso_line(self):
+        """ compute LineVisual vertices, connects and color-index
+        """
+        return
 
 
-if __name__ == '__main__':
-    sys.exit(main())
-
+PrecomputedIsocurve = create_visual_node(PrecomputedIsocurveVisual)

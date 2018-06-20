@@ -74,6 +74,7 @@ import numpy as np
 from weakref import ref
 import os
 import json
+import warnings
 
 from sift.workspace.metadatabase import Product
 from sift.common import KIND, INFO, prez, span, FCS_SEP, ZList, flags
@@ -82,6 +83,7 @@ from sift.workspace import Workspace
 from sift.util.default_paths import DOCUMENT_SETTINGS_DIR
 from sift.model.composite_recipes import RecipeManager, CompositeRecipe
 from sift.view.Colormap import ALL_COLORMAPS, USER_COLORMAPS
+from sift.queue import TASK_PROGRESS, TASK_DOING
 from PyQt4.QtCore import QObject, pyqtSignal
 
 from colormap import rgb2hex
@@ -476,6 +478,29 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 break
             yield z, track
 
+    def frame_info_for_product(self, prod: Product=None, uuid: UUID=None, when_overlaps: span=None) -> T.Optional[FrameInfo]:
+        """Generate info struct needed for timeline representation, optionally returning None if outside timespan of interest
+        """
+        if prod is None:
+            with self.mdb as S:  # this is a potential performance toilet, but OK to use sparsely
+                prod = S.query(Product).filter_by(uuid_str=str(uuid)).first()
+                return self.frame_info_for_product(prod=prod, when_overlaps=when_overlaps)
+        prod_e = prod.obs_time + prod.obs_duration
+        if (when_overlaps is not None) and ((prod_e <= when_overlaps.s) or (prod.obs_time >= when_overlaps.e)):
+            # does not intersect our desired span, skip it
+            return None
+        nfo = prod.info
+        fin = FrameInfo(
+            uuid=prod.uuid,
+            ident=prod.ident,
+            when=span(prod.obs_time, prod.obs_duration),
+            state=self.doc.product_state.get(prod.uuid) or flags(),
+            primary=nfo[INFO.DISPLAY_NAME],
+            secondary=nfo[INFO.DISPLAY_TIME],  # prod.obs_time.strftime("%Y-%m-%d %H:%M:%S")
+            # thumb=
+        )
+        return fin
+
     def enumerate_tracks_frames(self, only_active: bool = False, when: span = None) -> T.Iterable[TrackInfo]:
         """enumerate tracks as TrackInfo and FrameInfo structures for timeline use, in top-Z to bottom-Z order
         """
@@ -492,21 +517,9 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 # fam_nfo = self.doc.family_info(fam)
                 que = s.query(Product).filter((Product.family == fam) & (Product.category == ctg))
                 for prod in que.all():
-                    prod_e = prod.obs_time + prod.obs_duration
-                    if (prod_e <= when.s) or (prod.obs_time >= when_e):
-                        # does not intersect our desired span, skip it
-                        continue
-                    nfo = prod.info
-                    fin = FrameInfo(
-                        uuid=prod.uuid,
-                        ident=prod.ident,
-                        when=span(prod.obs_time, prod.obs_duration),
-                        state=self.doc.product_state.get(prod.uuid) or flags(),
-                        primary=nfo[INFO.DISPLAY_NAME],
-                        secondary=nfo[INFO.DISPLAY_TIME],  # prod.obs_time.strftime("%Y-%m-%d %H:%M:%S")
-                        # thumb=
-                    )
-                    frames.append(fin)
+                    frm = self.frame_info_for_product(prod, when_overlaps=when)
+                    if frm is not None:
+                        frames.append(frm)
                 if not frames:
                     LOG.warning("track {} with no frames - skipping (missing files or resources?)".format(track))
                     continue
@@ -544,6 +557,8 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         """
         queue: TaskQueue = self.doc.queue
         frames = [frame] + list(*more_frames)
+        if len(frames) > 1:
+            frames = list(reversed(self.doc.sort_product_uuids(frames)))
 
         def _bgnd_ensure_content_loaded(ws=self.ws, frames=frames):
             ntot = len(frames)
@@ -552,6 +567,8 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 yield {TASK_DOING: "importing {}/{}".format(nth+1, ntot), TASK_PROGRESS: float(nth)/float(ntot)}
 
         def _then_show_frames_in_document(doc = self.doc, frames = frames):
+            # FIXME: less arbitrary activation order
+            [self.doc.activate_product_uuid_as_new_layer(frame) for frame in frames]
             return
             # ensure that the track these frames belongs to is activated itself
             # update the timeline view states of these frames to show them as active as well
@@ -735,19 +752,68 @@ class DocumentAsRecipeCollection(DocumentAsContextBase):
         raise NotImplementedError()
 
 
+class AnimationStep(T.NamedTuple):
+    """Animation sequence used by SGM is a series of AnimationSteps, obtained from doc.as_animation_sequence
+    SGM uses them to signal other subsystems on playback progress
+    A change of presentation for one or more families does not invalidate an animation plan
+    """
+    plan_id: T.Any  # a unique per generated plan, used for cache validation purposes
+    # how many wall microseconds this frame occurs at and lasts
+    offset: int
+    duration: int  # 0 if undetermined / infinite
+    # back-to-front list of products to present during this timestep
+    uuids: T.Tuple[UUID]
+    # corresponding family, to reduce SGM need for queries
+    families: T.Tuple[str]
+    # primary kind for displaying the data
+    kinds: T.Tuple[KIND]
+    # data time span this step represents
+    data_span: span
+
+
 class DocumentAsAnimationSequence(DocumentAsContextBase):
     """Document as sequence of product frames that appear and disappear when animated at a multiple of real-time
+    Used principally by SGM and playback slider control (timeline has its own interface)
     """
-    def __enter__(self):
-        raise NotImplementedError()
-
-    def iterate(self, multiple_of_realtime:float = None, start:datetime=None, stop:datetime=None) -> T.Sequence[T.Tuple[float, T.List[UUID]]]:
-        """Yield series of (wall-seconds-offset, [back-to-front-list-of-product-uuids])
-        """
-        return
 
     @property
-    def playhead_time(self) -> datetime:
+    def plan_id(self) -> T.Any:
+        """The plan id is just a hashable unique (compare with "is") saying what the current valid plan is, to allow SGM/others to cache
+        """
+
+    def animation_plan(self, multiple_of_realtime:float = None, start:datetime=None, stop:datetime=None) -> T.Sequence[AnimationStep]:
+        """Yield series of AnimationStep
+        May result in a new plan_id being the valid plan
+        """
+        return []
+
+    # @property
+    # def prez_id(self) -> T.Any:
+    #     """An immutable hashable unique which changes when any presentation in the document changes
+    #     :return:
+    #     """
+
+    @property
+    def family_presentation(self) -> T.Mapping[str, prez]:
+        """Mapping of families to their presentation tuples, guaranteed to include at least the families participating in the animation
+        """
+        return dict(self.doc.family_presentation)
+
+    @property
+    def playback_per_sec(self) -> timedelta:
+        """The number of data seconds per wall second of playback
+        """
+        return self.doc.playback_per_sec
+
+    @property
+    def playhead_step(self) -> AnimationStep:
+        """AnimationStep under the current playhead
+        """
+
+    @property
+    def playhead_time(self) -> T.Optional[datetime]:
+        """ playhead time, or None if animating
+        """
         raise NotImplementedError()
 
     @playhead_time.setter
@@ -755,23 +821,14 @@ class DocumentAsAnimationSequence(DocumentAsContextBase):
         raise NotImplementedError()
 
     @property
-    def playback_time_range(self) -> T.Tuple[datetime, datetime]:
+    def playback_time_range(self) -> span:
         raise NotImplementedError()
 
     @playback_time_range.setter
-    def playback_time_range(self, start_end: T.Tuple[datetime, datetime]):
+    def playback_time_range(self, start_end: span):
         # set document playback time range
         # if we're in a with-clause, defer signals until outermost exit
         # if we're not in a with-clause, raise ContextNeededForEditing exception
-        raise NotImplementedError()
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_val is not None:
-            # abort code
-            pass
-        else:
-            # commit code
-            pass
         raise NotImplementedError()
 
 
@@ -875,7 +932,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     # playback information
     playhead_time: datetime = None  # document stored playhead time
-    playback_per_sec: float = 60.0  # data time increment per wall-second
+    playback_per_sec: timedelta = timedelta(seconds=60.0)  # data time increment per wall-second
 
     # playback time range, if not None is a subset of overall timeline
     playback_span: span = None
@@ -1007,6 +1064,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             ('GOES West', {
                 'proj4_str': '+proj=geos +lon_0=-137 +h=35786023.0 +a=6378137.0 +b=6356752.31414 +sweep=x +units=m',
                 'default_center': (-137, 13.5),  # lon, lat center point (Guam)
+                'default_width': 20.,  # degrees from left edge to right edge
+                'default_height': 20.,  # degrees from bottom edge to top edge
+            }),
+            ('Polar (Alaska)', {
+                'proj4_str': '+proj=stere +datum=WGS84 +ellps=WGS84 +lat_0=90 +lat_ts=60.0 +lon_0=-150 +units=m +over',
+                'default_center': (-150., 61.2),  # lon, lat center point (Anchorage)
                 'default_width': 20.,  # degrees from left edge to right edge
                 'default_height': 20.,  # degrees from bottom edge to top edge
             }),
@@ -1219,31 +1282,19 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param path: file to open and add
         :return: overview (uuid:UUID, datasetinfo:dict, overviewdata:numpy.ndarray)
         """
-        # collect product and resource information but don't yet import content
-        products = list(self._workspace.collect_product_metadata_for_paths([path]))
-        if not products:
-            raise ValueError('no products available in {}'.format(path))
-        if len(products) > 1:
-            LOG.warning('more than one product available at this path - FIXME')
-        info = products[0]
-        assert(info is not None)
-        uuid = info[INFO.UUID]
+        import warnings
+        warnings.warn("'open_file' is deprecated, use 'open_files' instead.",
+                      DeprecationWarning)
+        return list(self.import_files([path], insert_before=insert_before))
 
-        if uuid in self._layer_with_uuid:
-            LOG.warning("layer with UUID {} already in document?".format(uuid))
-            active_content_data = self._workspace.get_content(uuid)
-            return uuid, info, active_content_data
-
-        return self.activate_product_uuid_as_new_layer(uuid, insert_before=insert_before)
-
-    def activate_product_uuid_as_new_layer(self, uuid: UUID, insert_before=0):
+    def activate_product_uuid_as_new_layer(self, uuid: UUID, insert_before=0, **importer_kwargs):
         if uuid in self._layer_with_uuid:
             LOG.debug("Layer already loaded: {}".format(uuid))
-            active_content_data = self._workspace.import_product_content(uuid)
+            active_content_data = self._workspace.import_product_content(uuid, **importer_kwargs)
             return uuid, self[uuid], active_content_data
 
         # FUTURE: Load this async, the slots for the below signal need to be OK with that
-        active_content_data = self._workspace.import_product_content(uuid)
+        active_content_data = self._workspace.import_product_content(uuid, **importer_kwargs)
         # updated metadata with content information (most importantly nav information)
         info = self._workspace.get_info(uuid)
         assert(info is not None)
@@ -1334,29 +1385,60 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             INFO.DISPLAY_FAMILY: display_family,
         }
 
-    def open_files(self, paths, insert_before=0):
-        """
-        sort paths into preferred load order
-        open files in order, yielding uuid, info, overview_content
+    def import_files(self, paths, insert_before=0, **importer_kwargs) -> dict:
+        """Load product metadata and content from provided file paths.
+        
         :param paths: paths to open
         :param insert_before: where to insert them in layer list
         :return:
+        
         """
         # Load all the metadata so we can sort the files
-        infos = list(self._workspace.collect_product_metadata_for_paths(paths))
+        # assume metadata collection is in the most user-friendly order
+        infos = self._workspace.collect_product_metadata_for_paths(
+            paths, **importer_kwargs)
+        uuids = []
+        total_products = 0
+        for dex, (num_prods, info) in enumerate(infos):
+            assert info is not None
+            yield {
+                TASK_DOING: 'Collecting metadata {}/{}'.format(dex + 1, num_prods),
+                TASK_PROGRESS: float(dex + 1) / float(num_prods),
+                'uuid': info[INFO.UUID],
+                'num_products': num_prods,
+            }
+            # redundant but also more explicit than depending on num_prods
+            total_products = num_prods
+            uuids.append(info[INFO.UUID])
 
-        # Use the metadata to sort the paths
-        paths = list(self.sort_datasets_into_load_order(infos))
-        for path in paths:
-            yield self.open_file(path, insert_before)
+        if not total_products:
+            raise ValueError('no products available in {}'.format(paths))
+
+        # reverse list since we always insert a top layer
+        uuids = list(reversed(self.sort_product_uuids(uuids)))
+
+        # collect product and resource information but don't yet import content
+        for dex, uuid in enumerate(uuids):
+            if uuid in self._layer_with_uuid:
+                LOG.warning("layer with UUID {} already in document?".format(uuid))
+                self._workspace.get_content(uuid)
+            else:
+                self.activate_product_uuid_as_new_layer(uuid, insert_before=insert_before, **importer_kwargs)
+
+            yield {
+                TASK_DOING: 'Loading content {}/{}'.format(dex + 1, total_products),
+                TASK_PROGRESS: float(dex + 1) / float(total_products),
+                'uuid': uuid,
+                'num_products': total_products,
+            }
 
     def sort_paths(self, paths):
         """
         :param paths: list of paths
         :return: list of paths
         """
-        LOG.info("DEPRECATED: sort products, not files, since files may have multiple products")
-        return list(sorted(paths))
+        warnings.warn("sort_paths is deprecated in favor of sort_product_uuids, since more than one product may reside in a resource", DeprecationWarning)
+        return list(sorted(paths, key=lambda p: os.path.basename(p)))
         # products = list(self._workspace.collect_product_metadata_for_paths(paths))
         # LOG.debug('sorting products {} for paths {}'.format(repr(products), repr(paths)))
         # infos = [x.info for x in products]
@@ -1364,33 +1446,45 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # paths = list(reversed(self.sort_datasets_into_load_order(infos)))  # go from load order to display order by reversing
         # return paths
 
-    def sort_datasets_into_load_order(self, infos):
-        """
-        given a list of paths, sort them into order, assuming layers are added at top of layer list
-        first: unknown paths
-        outer order: descending band number
-        inner order: descending time step
-        :param infos: iterable of info dictionaries
-        :return: ordered list of path strings
-        """
+    def sort_product_uuids(self, uuids: T.Iterable[UUID]) -> T.List[UUID]:
+        uuidset=set(str(x) for x in uuids)
+        if not uuidset:
+            return []
+        with self._workspace.metadatabase as S:
+            zult = [(x.uuid, x.ident) for x in S.query(Product)
+                                                .filter(Product.uuid_str.in_(uuidset))
+                                                .order_by(Product.family, Product.category, Product.serial)
+                                                .all()]
+        LOG.debug("sorted products: {}".format(repr(zult)))
+        return [u for u,_ in zult]
 
-        # FIXME: It is not possible for a pathname to be considered "irrelevant"
-        # riffraff = [path for path in paths if not nfo[path]]
-        riffraff = []
-        # ahi = [nfo[path] for path in paths if nfo[path]]
-        # names = [path for path in paths if nfo[path]]
-        # bands = [x.get(INFO.BAND, None) for x in ahi]
-        # times = [x.get(INFO.SCHED_TIME, None) for x in ahi]
-        # order = [(band, time, path) for band,time,path in zip(bands,times,names)]
-
-        def _sort_key(info):
-            return (info.get(INFO.DATASET_NAME),
-                    info.get(INFO.OBS_TIME),
-                    info.get(INFO.PATHNAME))
-        order = sorted(infos, key=_sort_key, reverse=True)
-        paths = riffraff + [info.get(INFO.PATHNAME) for info in order]
-        LOG.debug(paths)
-        return paths
+    # def sort_datasets_into_load_order(self, infos):
+    #     """
+    #     given a list of paths, sort them into order, assuming layers are added at top of layer list
+    #     first: unknown paths
+    #     outer order: descending band number
+    #     inner order: descending time step
+    #     :param infos: iterable of info dictionaries
+    #     :return: ordered list of path strings
+    #     """
+    #
+    #     # FIXME: It is not possible for a pathname to be considered "irrelevant"
+    #     # riffraff = [path for path in paths if not nfo[path]]
+    #     riffraff = []
+    #     # ahi = [nfo[path] for path in paths if nfo[path]]
+    #     # names = [path for path in paths if nfo[path]]
+    #     # bands = [x.get(INFO.BAND, None) for x in ahi]
+    #     # times = [x.get(INFO.SCHED_TIME, None) for x in ahi]
+    #     # order = [(band, time, path) for band,time,path in zip(bands,times,names)]
+    #
+    #     def _sort_key(info):
+    #         return (info.get(INFO.DATASET_NAME),
+    #                 info.get(INFO.OBS_TIME),
+    #                 info.get(INFO.PATHNAME))
+    #     order = sorted(infos, key=_sort_key, reverse=True)
+    #     paths = riffraff + [info.get(INFO.PATHNAME) for info in order]
+    #     LOG.debug(paths)
+    #     return paths
 
     def time_label_for_uuid(self, uuid):
         """used to update animation display when a new frame is shown

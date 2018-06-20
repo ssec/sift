@@ -24,6 +24,7 @@ from uuid import UUID
 from vispy import app
 import asyncio
 from quamash import QEventLoop, QThreadExecutor
+from collections import OrderedDict
 
 app_object = app.use_app('pyqt4')
 loop = QEventLoop(app_object.native)
@@ -71,30 +72,13 @@ PROGRESS_BAR_MAX = 1000
 STATUS_BAR_DURATION = 2000  # ms
 
 
-def test_layers_from_directory(ws, doc, layer_tiff_glob, range_txt=None):
-    """
-    TIFF_GLOB='/Users/keoni/Data/CSPOV/2015_07_14_195/00?0/HS*_B03_*merc.tif' VERBOSITY=3 python -m sift
-    :param model:
-    :param view:
-    :param layer_tiff_glob:
-    :return:
-    """
-    from glob import glob
-    range = None
-    if range_txt:
-        import re
-        range = tuple(map(float, re.findall(r'[\.0-9]+', range_txt)))
-    for tif in glob(layer_tiff_glob):
-        # doc.addFullGlobMercatorColormappedFloatImageLayer(tif, range=range)
-        # uuid, info, overview_data = ws.import_image(tif)
-        uuid, info, overview_data = doc.open_file(tif)
-        LOG.info('loaded uuid {} from {}'.format(uuid, tif))
-        yield uuid, info, overview_data
+def test_layers_from_directory(doc, layer_tiff_glob):
+    return doc.open_file(glob(layer_tiff_glob))
 
 
-def test_layers(ws, doc, glob_pattern=None):
+def test_layers(doc, glob_pattern=None):
     if glob_pattern:
-        return test_layers_from_directory(ws, doc, glob_pattern, os.environ.get('RANGE', None))
+        return test_layers_from_directory(doc, glob_pattern)
     return []
 
 
@@ -108,52 +92,47 @@ async def do_test_cycle(txt: QtGui.QWidget):
 
 
 class OpenCacheDialog(QtGui.QDialog):
-    _paths = None
     _opener = None
     _remover = None
 
-    def __init__(self, parent):
+    def __init__(self, parent, opener, remover):
         super(OpenCacheDialog, self).__init__(parent)
         self.ui = open_cache_dialog_ui.Ui_openFromCacheDialog()
         self.ui.setupUi(self)
         self.ui.cacheListWidget.setSelectionMode(QtGui.QListWidget.ExtendedSelection)
         self.ui.removeFromCacheButton.clicked.connect(self._do_remove)
-
-    def activate(self, paths, opener, remover):
         self._opener = opener
         self._remover = remover
+
+    def activate(self, uuid_to_name):
         self.ui.cacheListWidget.clear()
-        if paths:
-            # don't include <algebraic layer ...> type paths
-            pfx = _common_path_prefix([x for x in paths if x[0] != '<']) or ''
-            self.ui.commonPathLabel.setText("Common prefix: " + pfx)
-            self._paths = {}
-            for path in paths:
-                key = path.replace(pfx, '', 1).strip(os.sep)
-                li = QtGui.QListWidgetItem(key)
-                self.ui.cacheListWidget.addItem(li)
-                self._paths[key] = path
+        # assume uuid_to_name is already an OrderedDict:
+        sorted_items = uuid_to_name.items()
+        # sorted_items = sorted(uuid_to_name.items(),
+        #                       key=lambda x: x[1])
+        for uuid, name in sorted_items:
+            li = QtGui.QListWidgetItem(name)
+            li.setData(QtCore.Qt.UserRole, uuid)
+            self.ui.cacheListWidget.addItem(li)
         self.show()
 
     def _do_remove(self, *args, **kwargs):
-        items = list(self.ui.cacheListWidget.selectedItems())
-        to_remove = [self._paths[x.text()] for x in items]
-        for item in items:
+        to_remove = []
+        for item in self.ui.cacheListWidget.selectedItems():
+            to_remove.append(item.data(QtCore.Qt.UserRole))
             self.ui.cacheListWidget.removeItemWidget(item)
         self._remover(to_remove)
         self.hide()
-        self._doc = self._ws = self._opener = self._paths = None
 
     def accept(self, *args, **kwargs):
         self.hide()
-        to_open = [self._paths[x.text()] for x in self.ui.cacheListWidget.selectedItems()]
+        to_open = [item.data(QtCore.Qt.UserRole)
+                   for item in self.ui.cacheListWidget.selectedItems()]
         LOG.info("opening from cache: " + repr(to_open))
         self._opener(to_open)
-        self._doc = self._ws = self._opener = self._paths = None
 
     def reject(self, *args, **kwargs):
         self.hide()
-        self._doc = self._ws = self._opener = self._paths = None
 
 
 class AnimationSpeedPopupWindow(QtGui.QWidget):
@@ -261,22 +240,29 @@ class Main(QtGui.QMainWindow):
     def interactive_open_files(self, *args, files=None, **kwargs):
         self.scene_manager.layer_set.animating = False
         # http://pyqt.sourceforge.net/Docs/PyQt4/qfiledialog.html#getOpenFileNames
+        filename_filters = [
+            # 'All files (*.*)',
+            'All supported files (*.nc *.nc4 *.tiff *.tif)',
+            'GOES-16 NetCDF (*.nc *.nc4)',
+            'Mercator GTIFF (*.tiff *.tif)',
+            # 'NWP GRIB2 (*.grib2)',
+        ]
+        filter_str = ';;'.join(filename_filters)
         files = QtGui.QFileDialog.getOpenFileNames(self,
                                                    "Select one or more files to open",
                                                    self._last_open_dir or os.getenv("HOME"),
-                                                   ';;'.join(['GOES-R netCDF or Merc GTIFF (*.nc *.nc4 *.tiff *.tif)']))
+                                                   filter_str)
         self.open_paths(files)
 
-    def _bgnd_open_paths(self, paths, uuid_list):
+    def _bgnd_open_paths(self, paths, uuid_list, **importer_kwargs):
         """Background task runs on a secondary thread
         """
-        npaths = len(paths)
-        LOG.info("opening {} paths in background".format(npaths))
-        for dex,path in enumerate(paths):
-            yield {TASK_DOING: 'Open {}/{}'.format(dex+1, npaths), TASK_PROGRESS: float(dex+1) / float(npaths+1)}
-            for uuid, _, _ in self.document.open_files([path]):
-                uuid_list.append(uuid)
-        yield {TASK_DOING: 'imported {} files'.format(npaths), TASK_PROGRESS: 1.0}
+        LOG.info("opening products from {} paths in background".format(
+            len(paths)))
+        for progress in self.document.import_files(paths, **importer_kwargs):
+            yield progress
+            uuid_list.append(progress['uuid'])
+        yield {TASK_DOING: 'products loaded from paths', TASK_PROGRESS: 1.0}
 
     def _bgnd_open_paths_finish(self, isok: bool, uuid_list):
         """Main thread finalization after background imports are done
@@ -295,12 +281,12 @@ class Main(QtGui.QMainWindow):
         # force the newest layer to be visible
         self.document.next_last_step(uuid)
 
-    def open_paths(self, paths):
+    def open_paths(self, paths, **importer_kwargs):
         paths = list(paths)
         if not paths:
             return
         uli = []
-        bop = partial(self._bgnd_open_paths, uuid_list=uli)
+        bop = partial(self._bgnd_open_paths, uuid_list=uli, **importer_kwargs)
         bopf = partial(self._bgnd_open_paths_finish, uuid_list=uli)
         self.queue.add("load_files", bop(paths), "Open {} files".format(len(paths)), and_then=bopf, interactive=False)
         # don't use <algebraic layer ...> type paths
@@ -340,17 +326,15 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.change_tool(name)
 
     def update_recent_file_menu(self, *args, **kwargs):
-        paths = self.workspace.recently_used_resource_paths()
-        LOG.debug('recent paths: {}'.format(repr(paths)))
-        paths = self.document.sort_paths(paths)
-        LOG.debug('recent files: {0!r:s}'.format(paths))
+        uuid_to_name = self.workspace.recently_used_products()
+        LOG.debug('recent uuids: {}'.format(repr(uuid_to_name.keys())))
         self._recent_files_menu.clear()
-        for path in paths:
-            def openit(*args, path=path, **kwargs):
-                LOG.debug('open recent file {}'.format(path))
+        for uuid, p_name in uuid_to_name.items():
+            def openit(checked=False, uuid=uuid):
+                LOG.debug('open recent product {}'.format(uuid))
                 self.scene_manager.layer_set.animating = False
-                self.document.open_file(path)
-            open_action = QtGui.QAction(os.path.split(path)[1], self)
+                self.activate_products_by_uuid([uuid])
+            open_action = QtGui.QAction(p_name, self)
             open_action.triggered.connect(openit)
             self._recent_files_menu.addAction(open_action)
 
@@ -648,9 +632,7 @@ class Main(QtGui.QMainWindow):
             pane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable |
                              QtGui.QDockWidget.DockWidgetMovable)
 
-        for uuid, ds_info, full_data in test_layers(self.workspace, self.document, glob_pattern=glob_pattern):
-            # this now fires off a document modification cascade resulting in a new layer going up
-            pass
+        test_layers(self.document, glob_pattern=glob_pattern)
 
         # quamash async test pattern updates a control once a second
         # loop.create_task(do_test_cycle(self.ui.cursorProbeText))
@@ -789,28 +771,24 @@ class Main(QtGui.QMainWindow):
         self.update_recent_file_menu()
 
     def open_from_cache(self, *args, **kwargs):
-        if not self._open_cache_dialog:
-            self._open_cache_dialog = OpenCacheDialog(self)
-        name_to_uuid = self.workspace.product_names_available_in_cache
-        resource_names_for_uuids = list(name_to_uuid.keys())
-        paths = self.document.sort_paths(resource_names_for_uuids)
-
-        def _activate_products_for_names(names):
-            names = list(names)
-            LOG.debug("names to re-activate: {}".format(repr(names)))
-            uuids = [name_to_uuid[path] for path in names]
+        def _activate_products_for_names(uuids):
             LOG.info('activating cached products with uuids: {}'.format(repr(uuids)))
             self.activate_products_by_uuid(uuids)
 
-        def _purge_content_for_names(names):
-            names = list(names)
-            LOG.debug("names to purge: {}".format(repr(names)))
-            uuids = [name_to_uuid[path] for path in names]
+        def _purge_content_for_names(uuids):
             LOG.info('removing cached products with uuids: {}'.format(repr(uuids)))
             self.workspace.purge_content_for_product_uuids(uuids)
             self.update_recent_file_menu()
 
-        self._open_cache_dialog.activate(paths, _activate_products_for_names, _purge_content_for_names)
+        if not self._open_cache_dialog:
+            self._open_cache_dialog = OpenCacheDialog(self,
+                                                      _activate_products_for_names,
+                                                      _purge_content_for_names)
+
+        uuid_to_name = self.workspace.product_names_available_in_cache
+        ordered_uuids = self.document.sort_product_uuids(uuid_to_name.keys())
+        ordered_uuid_to_name = OrderedDict([(u, uuid_to_name[u]) for u in ordered_uuids])
+        self._open_cache_dialog.activate(ordered_uuid_to_name)
 
     def open_glob(self, *args, **kwargs):
         text, ok = QtGui.QInputDialog.getText(self, 'Open Glob Pattern',
@@ -819,6 +797,23 @@ class Main(QtGui.QMainWindow):
         if ok:
             paths = list(glob(text))
             self.open_paths(paths)
+
+    def open_wizard(self, *args, **kwargs):
+        from sift.view.open_file_wizard import OpenFileWizard
+        wizard_dialog = OpenFileWizard(base_dir=self._last_open_dir, parent=self)
+        if wizard_dialog.exec_():
+            LOG.info("Loading products from open wizard...")
+            scenes = wizard_dialog.scenes
+            reader = list(list(scenes.values())[0].readers.keys())[0]
+            importer_kwargs = {
+                'reader': reader,
+                'scenes': scenes,
+                'dataset_ids': wizard_dialog.selected_ids,
+            }
+            self.open_paths(wizard_dialog._selected_files,
+                            **importer_kwargs)
+        else:
+            LOG.debug("Wizard closed, nothing to load")
 
     def remove_region_polygon(self, action:QtGui.QAction=None, *args):
         if self.scene_manager.has_pending_polygon():
@@ -855,11 +850,16 @@ class Main(QtGui.QMainWindow):
         open_glob_action.setShortcut("Ctrl+Shift+O")
         open_glob_action.triggered.connect(self.open_glob)
 
+        open_wizard_action = QtGui.QAction("Open File Wizard...", self)
+        open_wizard_action.setShortcut("Ctrl+Alt+O")
+        open_wizard_action.triggered.connect(self.open_wizard)
+
         menubar = self.ui.menubar
         file_menu = menubar.addMenu('&File')
         file_menu.addAction(open_action)
         file_menu.addAction(open_cache_action)
         file_menu.addAction(open_glob_action)
+        file_menu.addAction(open_wizard_action)
         self._recent_files_menu = file_menu.addMenu('Open Recent')
 
         screenshot_action = QtGui.QAction("Export Image", self)

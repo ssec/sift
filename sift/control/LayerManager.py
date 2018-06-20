@@ -300,11 +300,11 @@ class SingleLayerInfoPane(QObject):
                     unit_info = self.document[this_prez.uuid][INFO.UNIT_CONVERSION]
                     new_clims = unit_info[1](new_clims, inverse=False)
                     try:
-                        if layer_info[INFO.KIND] in [KIND.IMAGE, KIND.COMPOSITE]:
+                        if layer_info[INFO.KIND] in [KIND.IMAGE, KIND.COMPOSITE, KIND.CONTOUR]:
                             min_str = layer_info[INFO.UNIT_CONVERSION][2](new_clims[0], include_units=False)
                             max_str = layer_info[INFO.UNIT_CONVERSION][2](new_clims[1])
                             new_clims = '{} ~ {}'.format(min_str, max_str)
-                        else:
+                        elif layer_info[INFO.KIND] in [KIND.RGB]:
                             # FUTURE: Other layer types
                             deps = (layer_info.r, layer_info.g, layer_info.b)
 
@@ -318,6 +318,8 @@ class SingleLayerInfoPane(QObject):
                                 max_str = dep[INFO.UNIT_CONVERSION][2](new_clims[i][1])
                                 tmp_clims.append('{} ~ {}'.format(min_str, max_str))
                             new_clims = ", ".join(tmp_clims)
+                        else:
+                            new_clims = "N/A"
                     except TypeError as err:
                         LOG.warning("unable to format color limit: %r" % (new_clims,), exc_info=True)
                         new_clims = "N/A"

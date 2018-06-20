@@ -46,13 +46,6 @@
     </layout>
    </item>
    <item>
-    <widget class="QLabel" name="commonPathLabel">
-     <property name="text">
-      <string>/</string>
-     </property>
-    </widget>
-   </item>
-   <item>
     <widget class="QListWidget" name="cacheListWidget">
      <property name="minimumSize">
       <size>

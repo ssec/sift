@@ -444,10 +444,13 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         menu = QMenu()
         actions = {}
         if len(selected_uuids) == 1:
-            if self.doc[selected_uuids[0]][INFO.KIND] in [KIND.IMAGE, KIND.COMPOSITE]:
+            if self.doc[selected_uuids[0]][INFO.KIND] in [KIND.IMAGE, KIND.COMPOSITE, KIND.CONTOUR]:
                 actions.update(self.change_layer_colormap_menu(menu, lbox, selected_uuids, *args))
         if 0 < len(selected_uuids) <= 3:
-            actions.update(self.composite_layer_menu(menu, lbox, selected_uuids, *args))
+            if all(self.doc[u][INFO.KIND] in [KIND.IMAGE, KIND.COMPOSITE]
+                   for u in selected_uuids):
+                actions.update(self.composite_layer_menu(
+                    menu, lbox, selected_uuids, *args))
 
         if not actions:
             action = menu.addAction("No actions available for this layer")

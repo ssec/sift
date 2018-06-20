@@ -16,6 +16,8 @@ from vispy.visuals.shaders import Function, Variable
 from vispy.visuals.shaders.expression import TextExpression
 
 
+# FIXME: This is the wrong usage of TextExpression. See if we can switch to
+#        doing what vispy math/constants.glsl does and how #define uses it
 class MacroExpression(TextExpression):
     macro_regex = re.compile(r'^#define\s+(?P<name>\w+)\s+(?P<expression>[^\s]+)')
 
@@ -27,7 +29,7 @@ class MacroExpression(TextExpression):
         self._name = match_dict['name']
         super(MacroExpression, self).__init__(text)
 
-    def definition(self, names):
+    def definition(self, names, version=None, shader=None):
         return self.text
 
     @property
@@ -102,7 +104,7 @@ def lcc_init(proj_dict):
             sinphi = np.sin(proj_dict['phi2'])
             proj_dict['n'] = np.log(m1 / pj_msfn_py(sinphi, np.cos(proj_dict['phi2']), proj_dict['es']))
             proj_dict['n'] /= np.log(ml1 / pj_tsfn_py(proj_dict['phi2'], sinphi, proj_dict['e']))
-        proj_dict['c'] = proj_dict['rho0'] = m1 * pow(ml1, -proj_dict['n'])
+        proj_dict['c'] = proj_dict['rho0'] = m1 * pow(ml1, -proj_dict['n']) / proj_dict['n']
         proj_dict['rho0'] *= 0. if abs(abs(proj_dict['phi0']) - M_HALFPI) < 1e-10 else \
             pow(pj_tsfn_py(proj_dict['phi0'], np.sin(proj_dict['phi0']), proj_dict['e']), proj_dict['n'])
     else:
@@ -115,7 +117,6 @@ def lcc_init(proj_dict):
         proj_dict['rho0'] = 0. if abs(abs(proj_dict['phi0']) - M_HALFPI) < 1e-10 else \
             proj_dict['c'] * pow(np.tan(M_FORTPI + 0.5 * proj_dict['phi0']), -proj_dict['n'])
     proj_dict['ellips'] = 'true' if proj_dict['ellips'] else 'false'
-
     return proj_dict
 
 
@@ -150,7 +151,50 @@ def geos_init(proj_dict):
         proj_dict['radius_p_inv2'] = proj_dict['rone_es']
     else:
         proj_dict['radius_p'] = proj_dict['radius_p2'] = proj_dict['radius_p_inv2'] = 1.0
+    return proj_dict
 
+
+def stere_init(proj_dict):
+    # Calculate phits
+    phits = abs(np.radians(proj_dict['lat_ts']) if 'lat_ts' in proj_dict else M_HALFPI)
+    # Determine mode
+    if abs(abs(np.radians(proj_dict['lat_0'])) - M_HALFPI) < 1e-10:
+        # Assign "mode" in proj_dict to be GLSL for specific case (make sure to handle C-code case fallthrough):
+        # 0 = n_pole, 1 = s_pole.
+        proj_dict['mode'] = 1 if proj_dict['lat_0'] < 0 else 0
+        if proj_dict['a'] != proj_dict['b']:
+            # ellipsoid
+            e = proj_dict['e']
+            if abs(phits - M_HALFPI) < 1e-10:
+                proj_dict['akm1'] = 2. / np.sqrt((1+e)**(1+e) * (1-e)**(1-e))
+            else:
+                proj_dict['akm1'] = np.cos(phits) / (pj_tsfn_py(phits, np.sin(phits), e) * np.sqrt(1. - (np.sin(phits)*e)**2))
+        else:
+            # sphere
+            proj_dict['akm1'] = np.cos(phits) / np.tan(M_FORTPI - .5 * phits) if abs(phits - M_HALFPI) >= 1e-10 else 2.
+    else:
+        # If EQUIT or OBLIQ mode:
+        raise NotImplementedError("This projection mode is not supported yet.")
+    return proj_dict
+
+
+def eqc_init(proj_dict):
+    proj_dict.setdefault('lat_0', 0.)
+    proj_dict.setdefault('lat_ts', proj_dict['lat_0'])
+    proj_dict['rc'] = np.cos(np.radians(proj_dict['lat_ts']))
+    if (proj_dict['rc'] <= 0.):
+        raise ValueError("PROJ.4 'lat_ts' parameter must be in range (-PI/2,PI/2)")
+    proj_dict['phi0'] = np.radians(proj_dict['lat_0'])
+    proj_dict['es'] = 0.
+    return proj_dict
+
+
+def latlong_init(proj_dict):
+    if 'over' in proj_dict:
+        # proj_dict['offset'] = '360.'
+        proj_dict['offset'] = '0.'
+    else:
+        proj_dict['offset'] = '0.'
     return proj_dict
 
 
@@ -159,6 +203,21 @@ def geos_init(proj_dict):
 # and 'imap' is X/Y to lon/lat
 # WARNING: Need double {{ }} for functions for string formatting to work properly
 PROJECTIONS = {
+    'latlong': (
+        latlong_init,
+        """vec4 latlong_map(vec4 pos) {{
+            return vec4(pos.x + {offset}, y, pos.z, pos.w);
+        }}""",
+        """vec4 latlong_map(vec4 pos) {{
+            return vec4(pos.x + {offset}, y, pos.z, pos.w);
+        }}""",
+        """vec4 latlong_imap(vec4 pos) {{
+            return pos;
+        }}""",
+        """vec4 latlong_imap(vec4 pos) {{
+            return pos;
+        }}""",
+    ),
     'merc': (
         merc_init,
         """vec4 merc_map_e(vec4 pos) {{
@@ -238,57 +297,79 @@ PROJECTIONS = {
                 }}
                 if ({ellips}) {{
                     phi = pj_phi2(pow(rho / {c}, 1. / {n}), {e});
-                    if (phi == HUGE_VAL) {{
-                        return vec4(1. / 0., 1. / 0., pos.z, pos.w);
-                    }}
+                    //if (phi == HUGE_VAL) {{
+                    //    return vec4(1. / 0., 1. / 0., pos.z, pos.w);
+                    //}}
                 }} else {{
                     phi = 2. * atan(pow({c} / rho, 1. / {n})) - M_HALFPI;
                 }}
                 // atan2 in C
                 lambda = atan(x, y) / {n};
             }} else {{
-                lamdba = 0;
+                lambda = 0.;
                 phi = {n} > 0. ? M_HALFPI : - M_HALFPI;
             }}
             {over}
-            return vec4(lambda, phi, pos.z, pos.w);
+            return vec4(degrees(lambda) + {lon_0}, degrees(phi), pos.z, pos.w);
         }}""",
         None,
     ),
     'geos': (
         geos_init,
         """vec4 geos_map_e(vec4 pos) {{
-            float lambda = radians(pos.x - {lon_0});
+            float lambda, phi, r, Vx, Vy, Vz, tmp, x, y;
+            lambda = radians(pos.x - {lon_0});
             {over}
-            float phi = atan({radius_p2} * tan(radians(pos.y)));
-            float r = {radius_p} / hypot({radius_p} * cos(phi), sin(phi));
-            float Vx = r * cos(lambda) * cos(phi);
-            float Vy = r * sin(lambda) * cos(phi);
-            float Vz = r * sin(phi);
-
+            phi = atan({radius_p2} * tan(radians(pos.y)));
+            r = {radius_p} / hypot({radius_p} * cos(phi), sin(phi));
+            Vx = r * cos(lambda) * cos(phi);
+            Vy = r * sin(lambda) * cos(phi);
+            Vz = r * sin(phi);
+        
             // TODO: Best way to 'discard' a vertex
             if ((({radius_g} - Vx) * Vx - Vy * Vy - Vz * Vz * {radius_p_inv2}) < 0.) {{
                return vec4(1. / 0., 1. / 0., pos.z, pos.w);
             }}
-
-            float tmp = {radius_g} - Vx;
-
+        
+            tmp = {radius_g} - Vx;
+        
             if ({flip_axis}) {{
-                lambda = {radius_g_1} * atan(Vy / hypot(Vz, tmp));
-                phi = {radius_g_1} * atan(Vz / tmp);
+                x = {radius_g_1} * atan(Vy / hypot(Vz, tmp));
+                y = {radius_g_1} * atan(Vz / tmp);
             }} else {{
-                lambda = {radius_g_1} * atan(Vy / tmp);
-                phi = {radius_g_1} * atan(Vz / hypot(Vy, tmp));
+                x = {radius_g_1} * atan(Vy / tmp);
+                y = {radius_g_1} * atan(Vz / hypot(Vy, tmp));
             }}
-
-            return vec4(lambda * {a}, phi * {a}, pos.z, pos.w);
+            return vec4(x * {a}, y * {a}, pos.z, pos.w);
         }}""",
-        None, #"""vec4 geos_map_s(vec4 pos) {{ }}""",
+        """vec4 geos_map_s(vec4 pos) {{
+            float lambda, phi, Vx, Vy, Vz, tmp, x, y;
+            lambda = radians(pos.x - {lon_0});
+            {over}
+            phi = radians(pos.y);
+            Vx = cos(lambda) * cos(phi);
+            Vy = sin(lambda) * cos(phi);
+            Vz = sin(phi);
+            // TODO: Best way to 'discard' a vertex
+            if ((({radius_g} - Vx) * Vx - Vy * Vy - Vz * Vz * {radius_p_inv2}) < 0.) {{
+               return vec4(1. / 0., 1. / 0., pos.z, pos.w);
+            }}
+            tmp = {radius_g} - Vx;
+            if ({flip_axis}) {{
+                x = {a} * {radius_g_1} * atan(Vy / hypot(Vz, tmp));
+                y = {a} * {radius_g_1} * atan(Vz / tmp);
+            }}
+            else {{
+                x = {a} * {radius_g_1} * atan(Vy / tmp);
+                y = {a} * {radius_g_1} * atan(Vz / hypot(Vy, tmp));
+            }}
+            return vec4(x, y, pos.z, pos.w);
+        }}""",
         """vec4 geos_imap_e(vec4 pos) {{
             float a, b, k, det, x, y, Vx, Vy, Vz, lambda, phi;
             x = pos.x / {a};
             y = pos.y / {a};
-
+        
             Vx = -1.0;
             if ({flip_axis}) {{
                 Vz = tan(y / {radius_g_1});
@@ -297,7 +378,7 @@ PROJECTIONS = {
                 Vy = tan(x / {radius_g_1});
                 Vz = tan(y / {radius_g_1}) * hypot(1.0, Vy);
             }}
-
+        
             a = Vz / {radius_p};
             a = Vy * Vy + a * a + Vx * Vx;
             b = 2 * {radius_g} * Vx;
@@ -306,12 +387,12 @@ PROJECTIONS = {
                 // FIXME
                 return vec4(1. / 0., 1. / 0., pos.z, pos.w);
             }}
-
+        
             k = (-b - sqrt(det)) / (2. * a);
             Vx = {radius_g} + k * Vx;
             Vy *= k;
             Vz *= k;
-
+        
             // atan2 in C
             lambda = atan(Vy, Vx);
             {over}
@@ -319,7 +400,142 @@ PROJECTIONS = {
             phi = atan({radius_p_inv2} * tan(phi));
             return vec4(degrees(lambda) + {lon_0}, degrees(phi), pos.z, pos.w);
         }}""",
-        None, #"""vec4 geos_imap_s(vec4 pos) {{ }}""",
+        """vec4 geos_imap_s(vec4 pos) {{
+            float x, y, Vx, Vy, Vz, a, b, k, det, lambda, phi;
+            x = pos.x / {a};
+            y = pos.y / {a};
+            Vx = -1.;
+            if ({flip_axis}) {{
+                Vz = tan(y / ({radius_g} - 1.));
+                Vy = tan(x / ({radius_g} - 1.)) * sqrt(1. + Vz * Vz);
+            }}
+            else {{
+                Vy = tan(x / ({radius_g} - 1.));
+                Vz = tan(y / ({radius_g} - 1.)) * sqrt(1. + Vy * Vy);
+            }}
+            a = Vy * Vy + Vz * Vz + Vx * Vx;
+            b = 2 * {radius_g} * Vx;
+            det = b * b - 4 * a * {C};
+            if (det < 0.) {{
+                return vec4(1. / 0., 1. / 0., pos.z, pos.w);
+            }}
+            k = (-b - sqrt(det)) / (2 * a);
+            Vx = {radius_g} + k * Vx;
+            Vy *= k;
+            Vz *= k;
+            lambda = atan(Vy, Vx);
+            {over}
+            phi = atan(Vz * cos(lambda) / Vx);
+            return vec4(degrees(lambda) + {lon_0}, degrees(phi), pos.z, pos.w);
+        }}""",
+    ),
+    'stere': (
+        stere_init,
+        """vec4 stere_map_e(vec4 pos) {{
+            float lambda, phi, coslam, sinlam, sinphi, x, y;
+            lambda = radians(pos.x - {lon_0});
+            {over}
+            phi = radians(pos.y);
+            coslam = cos(lambda);
+            sinlam = sin(lambda);
+            sinphi = sin(phi);
+            if ({mode} == 1) {{
+                phi = -phi;
+                coslam = - coslam;
+                sinphi = -sinphi;
+            }}
+            x = {akm1} * pj_tsfn(phi, sinphi, {e});
+            y = {a} * -x * coslam;
+            x *= {a} * sinlam;
+            return vec4(x, y, pos.z, pos.w);
+        }}""",
+        """vec4 stere_map_s(vec4 pos) {{
+            float lambda, phi, coslam, sinlam, x, y;
+            lambda = radians(pos.x - {lon_0});
+            {over}
+            phi = radians(pos.y);
+            coslam = cos(lambda);
+            sinlam = sin(lambda);
+            if ({mode} == 0) {{
+                coslam = - coslam;
+                phi = - phi;
+            }}
+            if (abs(phi - M_HALFPI) < 1.e-8) {{
+                return vec4(1. / 0., 1. / 0., pos.z, pos.w);
+            }}
+            y = {akm1} * tan(M_FORTPI + .5 * phi);
+            x = {a} * sinlam * y;
+            y *= {a} * coslam;
+            return vec4(x, y, pos.z, pos.w);
+        }}""",
+        """vec4 stere_imap_e(vec4 pos) {{
+            float x, y, phi, lambda, tp, phi_l, sinphi;
+            x = pos.x / {a};
+            y = pos.y / {a};
+            phi = radians(y);
+            lambda = radians(x);
+            tp = -hypot(x,y) / {akm1};
+            phi_l = M_HALFPI - 2. * atan(tp);
+            sinphi = 0.;
+            if ({mode} == 0) {{
+                y = -y;
+            }}
+            for (int i = 8; i-- > 0; phi_l = phi) {{
+                sinphi = {e} * sin(phi_l);
+                phi = 2. * atan(tp * pow((1. + sinphi) / (1. - sinphi), -.5 * {e})) + M_HALFPI;
+                if (abs(phi_l - phi) < 1.e-10) {{
+                    if ({mode} == 1) {{
+                        phi = -phi;
+                    }}
+                    lambda = (x == 0. && y == 0.) ? 0. : atan(x, y);
+                    {over}
+                    return vec4(degrees(lambda) + {lon_0}, degrees(phi), pos.z, pos.w);
+                }}
+            }}
+            return vec4(1. / 0., 1. / 0., pos.z, pos.w);
+        }}""",
+        """vec4 stere_imap_s(vec4 pos) {{
+            float x, y, rh, cosc, phi, lambda;
+            x = pos.x / {a};
+            y = pos.y / {a};
+            rh = hypot(x, y);
+            cosc = cos(2. * atan(rh / {akm1}));
+            phi = 0;
+            if ({mode} == 0) {{
+                y = -y;
+            }}
+            if (abs(rh) < 1.e-10) {{
+                phi = radians({lat_0});
+            }}
+            else {{
+                phi = asin({mode} == 1 ? -cosc : cosc);
+            }}
+            lambda = (x == 0. && y == 0.) ? 0. : atan(x, y);
+            {over}
+            return vec4(degrees(lambda) + {lon_0}, degrees(phi), pos.z, pos.w);
+        }}""",
+    ),
+    'eqc': (
+        eqc_init,
+            None,
+            """vec4 eqc_map_s(vec4 pos) {{
+            {es};
+            float lambda = radians(pos.x);
+            {over}
+            float phi = radians(pos.y);
+            float x = {a} * {rc} * lambda;
+            float y = {a} * (phi - {phi0});
+            return vec4(x, y, pos.z, pos.w);
+        }}""",
+        None,
+        """vec4 eqc_imap_s(vec4 pos) {{
+            float x = pos.x / {a};
+            float y = pos.y / {a};
+            float lambda = x / {rc};
+            {over}
+            float phi = y + {phi0};
+            return vec4(degrees(lambda), degrees(phi), pos.z, pos.w);
+        }}""",
     ),
 }
 PROJECTIONS['lcc'] = (lcc_init,
@@ -434,7 +650,7 @@ class PROJ4Transform(BaseTransform):
         self.proj4_str = proj4_str
         self.proj = Proj(proj4_str)
         self._proj4_inverse = inverse
-        proj_dict = self.proj_dict(proj4_str)
+        proj_dict = self.create_proj_dict(proj4_str)
 
         # Get the specific functions for this projection
         proj_funcs = PROJECTIONS[proj_dict['proj']]
@@ -485,7 +701,7 @@ class PROJ4Transform(BaseTransform):
 
         # print(self._shader_map.compile())
 
-    def proj_dict(self, proj_str):
+    def create_proj_dict(self, proj_str):
         d = tuple(x.replace("+", "").split("=") for x in proj_str.split(" "))
         d = dict((x[0], x[1] if len(x) > 1 else 'true') for x in d)
 
@@ -549,7 +765,11 @@ class PROJ4Transform(BaseTransform):
             Coordinates to map.
         """
         m = np.empty(coords.shape)
-        m[:, 0], m[:, 1] = self.proj(coords[:, 0], coords[:, 1], inverse=self._proj4_inverse)
+        if self.proj.is_latlong():
+            m[:, 0] = coords[:, 0]
+            m[:, 1] = coords[:, 1]
+        else:
+            m[:, 0], m[:, 1] = self.proj(coords[:, 0], coords[:, 1], inverse=self._proj4_inverse)
         m[:, 2:] = coords[:, 2:]
         return m
 
@@ -563,7 +783,11 @@ class PROJ4Transform(BaseTransform):
             Coordinates to inverse map.
         """
         m = np.empty(coords.shape)
-        m[:, 0], m[:, 1] = self.proj(coords[:, 0], coords[:, 1], inverse=not self._proj4_inverse)
+        if self.proj.is_latlong():
+            m[:, 0] = coords[:, 0]
+            m[:, 1] = coords[:, 1]
+        else:
+            m[:, 0], m[:, 1] = self.proj(coords[:, 0], coords[:, 1], inverse=not self._proj4_inverse)
         m[:, 2:] = coords[:, 2:]
         return m
 

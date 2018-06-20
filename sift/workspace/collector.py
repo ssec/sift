@@ -39,7 +39,7 @@ class _workspace_test_proxy(object):
     def collect_product_metadata_for_paths(self, paths):
         LOG.debug("import metadata for files: {}".format(repr(paths)))
         for path in paths:
-            yield {INFO.PATHNAME: path}
+            yield 1, {INFO.PATHNAME: path}
 
 
 class ResourceSearchPathCollector(QObject):
@@ -147,12 +147,13 @@ class ResourceSearchPathCollector(QObject):
         yield {TASK_DOING: 'skimming', TASK_PROGRESS: 1.0}
 
     def bgnd_merge_new_file_metadata_into_mdb(self):
+        # FIXME: Don't depend on paths as the "how many products will we have"
         todo, self._scheduled_files = self._scheduled_files, []
         ntodo = len(todo)
         LOG.debug('collecting metadata from {} potential new files'.format(ntodo))
         redex = dict((name, dex) for (dex, name) in enumerate(todo))
         yield {TASK_DOING: 'collecting metadata 0/{}'.format(ntodo), TASK_PROGRESS: 0.0}
-        for product_info in self._ws.collect_product_metadata_for_paths(todo):
+        for num_prods, product_info in self._ws.collect_product_metadata_for_paths(todo):
             path = product_info.get(INFO.PATHNAME, None)
             dex = redex.get(path, 0.0)
             status = {TASK_DOING: 'collecting metadata {}/{}'.format(dex+1, ntodo), TASK_PROGRESS: float(dex)/float(ntodo)}
