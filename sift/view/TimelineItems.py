@@ -150,6 +150,7 @@ class QTrackItem(QGraphicsObject):
         self._colormap = colormap
         self._min, self._max = min, max
         self.setToolTip(tooltip or title)
+        self.setFlag(QGraphicsItem.ItemClipsChildrenToShape, enabled=True)
         self.update_pos_bounds()
         self._update_decorations()
         scene.add_track(self)
@@ -361,6 +362,9 @@ class QFrameItem(QGraphicsObject):
     _thumb: QPixmap = None
     _metadata: Mapping = None
     _bounds: QRectF = QRectF()
+    # decorations
+    _gi_title = None
+    _gi_subtitle = None
 
     def __init__(self, track: QTrackItem, scale: CoordTransform, uuid: UUID,
                  start: datetime, duration: timedelta, state: flags,
@@ -401,7 +405,27 @@ class QFrameItem(QGraphicsObject):
         self.update_bounds()
         track.update_pos_bounds()
         track.update_frame_positions()
+        self.setFlag(QGraphicsItem.ItemClipsChildrenToShape, enabled=True)
+        self._update_decorations()
         # self.setAcceptDrops(True)
+
+    def _update_decorations(self):
+        """Add decor sub-items to self
+        title, subtitle, icon, colormap
+        these are placed left of the local origin inside the _left_pad area
+        """
+        scene = self.scene_
+        if self._title:
+            self._gi_title = it = self._gi_title or scene.addSimpleText(self._title)
+            it.setParentItem(self)
+            it.setPos(GFXC.frame_title_pos)
+        if self._subtitle:
+            self._gi_subtitle = it = self._gi_subtitle or scene.addSimpleText(self._subtitle)
+            it.setParentItem(self)
+            it.setPos(GFXC.frame_subtitle_pos)
+        # FUTURE: add draggable color-map pixmap
+
+
 
     @property
     def scene_(self):

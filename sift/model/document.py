@@ -468,13 +468,16 @@ class DocumentAsTrackStack(DocumentAsContextBase):
             # does not intersect our desired span, skip it
             return None
         nfo = prod.info
+        # DISPLAY_NAME has DISPLAY_TIME as part of it, FIXME: stop that
+        dt = nfo[INFO.DISPLAY_TIME]
+        dn = nfo[INFO.DISPLAY_NAME].replace(dt, '').strip()
         fin = FrameInfo(
             uuid=prod.uuid,
             ident=prod.ident,
             when=span(prod.obs_time, prod.obs_duration),
             state=self.doc.product_state.get(prod.uuid) or flags(),
-            primary=nfo[INFO.DISPLAY_NAME],
-            secondary=nfo[INFO.DISPLAY_TIME],  # prod.obs_time.strftime("%Y-%m-%d %H:%M:%S")
+            primary=dn,
+            secondary=dt,  # prod.obs_time.strftime("%Y-%m-%d %H:%M:%S")
             # thumb=
         )
         return fin
