@@ -149,6 +149,7 @@ class QTrackItem(QGraphicsObject):
         self._state = flags(state or [])
         self._colormap = colormap
         self._min, self._max = min, max
+        self.setToolTip(tooltip or title)
         self.update_pos_bounds()
         self._update_decorations()
         scene.add_track(self)
@@ -387,6 +388,7 @@ class QFrameItem(QGraphicsObject):
         self._thumb = thumb
         self._metadata = metadata
         self._uuid = uuid
+        self.setToolTip(title)
         # self._pen, self._brush = track.default_frame_pen_brush
         # if pen:
         #     LOG.debug('setting pen')
