@@ -475,15 +475,15 @@ class DocumentAsTrackStack(DocumentAsContextBase):
     #         s.update(self.ws.product_state(uuid))
     #         yield s
 
-    def product_state(self, uuid:UUID, session:Session = None) -> flags:
+    def product_state(self, uuid:UUID) -> flags:
         """Merge document state with workspace state
         """
         s = flags()
-        s.update(self.ws.product_state(uuid, session=session))
+        s.update(self.ws.product_state(uuid))
         # s.update(self.doc.product_state.get(prod.uuid) or flags())
         return s
 
-    def frame_info_for_product(self, prod: Product=None, uuid: UUID=None, when_overlaps: span=None, session: Session=None) -> T.Optional[FrameInfo]:
+    def frame_info_for_product(self, prod: Product=None, uuid: UUID=None, when_overlaps: span=None) -> T.Optional[FrameInfo]:
         """Generate info struct needed for timeline representation, optionally returning None if outside timespan of interest
         """
         if prod is None:
@@ -503,7 +503,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
             ident=prod.ident,
             when=span(prod.obs_time, prod.obs_duration),
             # FIXME: new model old model
-            state=self.product_state(prod.uuid, session=session),
+            state=self.product_state(prod.uuid),
             primary=dn,
             secondary=dt,  # prod.obs_time.strftime("%Y-%m-%d %H:%M:%S")
             # thumb=
@@ -526,7 +526,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 # fam_nfo = self.doc.family_info(fam)
                 que = s.query(Product).filter((Product.family == fam) & (Product.category == ctg))
                 for prod in que.all():
-                    frm = self.frame_info_for_product(prod, when_overlaps=when, session=s)
+                    frm = self.frame_info_for_product(prod, when_overlaps=when)
                     if frm is not None:
                         frames.append(frm)
                 if not frames:

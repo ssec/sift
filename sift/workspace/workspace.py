@@ -282,16 +282,13 @@ class Workspace(QObject):
         state.remove(flag)
         self.didChangeProductState.emit(uuid, state)
 
-    def product_state(self, uuid: UUID, session:Session=None) -> flags:
+    def product_state(self, uuid: UUID) -> flags:
         state = flags(self._state[uuid])
         # add any derived information
         if uuid in self._available:
             state.add(STATE.ATTACHED)
-        if session is None:
-            with self._inventory as s:
-                ncontent = s.query(Content).filter_by(uuid=uuid).count()
-        else:
-            ncontent = session.query(Content).filter_by(uuid=uuid).count()
+        with self._inventory as s:
+            ncontent = s.query(Content).filter_by(uuid=uuid).count()
         if ncontent > 0:
             state.add(STATE.CACHED)
         return state
