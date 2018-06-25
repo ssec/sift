@@ -149,7 +149,7 @@ class QTrackItem(QGraphicsObject):
         self._state = flags(state or [])
         self._colormap = colormap
         self._min, self._max = min, max
-        self.setToolTip(tooltip or title)
+        self.setToolTip(tooltip or "{}\n{}".format(title, subtitle))
         self.setFlag(QGraphicsItem.ItemClipsChildrenToShape, enabled=True)
         self.update_pos_bounds()
         self._update_decorations()
@@ -392,7 +392,7 @@ class QFrameItem(QGraphicsObject):
         self._thumb = thumb
         self._metadata = metadata
         self._uuid = uuid
-        self.setToolTip(title)
+        self.setToolTip("{}\n{}".format(title, subtitle))
         # self._pen, self._brush = track.default_frame_pen_brush
         # if pen:
         #     LOG.debug('setting pen')
