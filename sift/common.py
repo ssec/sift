@@ -881,6 +881,14 @@ class ZList(MutableSequence):
             self._zmax -= 1
         del self._content[ldex]
 
+    def merge_subst(self, new_values: Iterable[Tuple[int, Any]]):
+        """batch merge of substitutions
+        raises IndexError if any of them is outside current range
+        """
+        for z,q in new_values:
+            ldex = self._zmax - z
+            self._content[ldex] = q
+
     def __repr__(self) -> str:
         return 'ZList({}, {})'.format(self._zmax, repr(self._content))
 
