@@ -142,12 +142,13 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         """
         self._sync_tracks_frames()
 
-    def _sync_frame_with_uuid(self, uuid: UUID, frm: Optional[FrameInfo]=None):
+    def _sync_and_update_frame(self, uuid: UUID, frm: Optional[FrameInfo]=None):
         qfi = self._frame_items.get(uuid)
         if qfi is not None:
             if frm is None:
                 frm = self._doc.frame_info_for_product(uuid=uuid)
             self._sync_frame(qfi, frm)
+            qfi.update()
             return qfi
         else:  # FUTURE: create the frame and if necessary the track
             return None
@@ -156,11 +157,11 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         self._doc.sync_available_tracks()
 
     def _update_product_name(self, uuid: UUID, name: str):
-        self._sync_frame_with_uuid(uuid)
+        self._sync_and_update_frame(uuid)
 
     def _update_visibility_for_products(self, uuid_vis: Mapping[UUID, bool]):
         # set the corresponding display state for these products
-        all_frame_items = [self._sync_frame_with_uuid(uuid) for uuid in uuid_vis.keys()]
+        all_frame_items = [self._sync_and_update_frame(uuid) for uuid in uuid_vis.keys()]
         if None in all_frame_items:
             LOG.debug("a frame did not exist to update, have to refresh everything")
             self._invalidate()
@@ -176,19 +177,41 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         """Connect document, workspace, signals in order to invalidate and update scene representation
         """
         # FUTURE: more fine-grained response than just invalidating and redrawing
-        doc.didAddBasicLayer.connect(self._invalidate)
-        doc.didAddCompositeLayer.connect(self._invalidate)
+        def refresh_with_new_product(order, uuid, presentation, ts=self):
+            LOG.debug("new layer added to document, refreshing timeline for product {}".format(str(uuid)))
+            if ts._sync_and_update_frame(uuid) is None:
+                LOG.info("no corresponding frame glyph, re-syncing timeline")
+                ts.sync_available_tracks()
+                ts.update()
+        doc.didAddBasicLayer.connect(refresh_with_new_product)
+        doc.didAddCompositeLayer.connect(refresh_with_new_product)
+
         doc.didChangeLayerVisibility.connect(self._update_visibility_for_products)
-        doc.didChangeLayerName.connect(self._invalidate)
+
+        def refresh_product_new_name(uuid, name, ts=self):
+            if None == ts._sync_and_update_frame(uuid):
+                LOG.warning("no corresponding frame glyph after rename??; re-syncing timeline")
+                ts.sync_available_tracks()
+                ts.update()
+        doc.didChangeLayerName.connect(refresh_product_new_name)
+
+        # def refresh_track_order(self, added_tracks, removed_tracks, ts=self):
+        #     pass
+        # doc.didReorderTracks.connect(refresh_track_order)
+
         # doc.didReorderLayers.connect(self._reorder_tracks_given_layer_order)
-        doc.didChangeComposition.connect(self._invalidate)
-        doc.didReorderTracks.connect(self._invalidate)
+        # doc.didChangeComposition.connect(self._invalidate)
 
         def refresh(changed_uuids, ts=self, *args, **kwargs):
             LOG.debug("updating timeline for {} changed products".format(len(changed_uuids)))
             ts.sync_available_tracks()
             ts.update(changed_frame_uuids=changed_uuids)
         ws.didUpdateProductsMetadata.connect(refresh)
+
+        def refresh_product(uuid, state, *args, **kwargs):
+            LOG.debug('updating frame state {} in timeline'.format(str(uuid)))
+            self._sync_and_update_frame(uuid)
+        ws.didChangeProductState.connect(refresh_product)
 
     # def get(self, uuid: UUID) -> [QTrackItem, QFrameItem, None]:
     #     z = self._track_items.get(uuid, None)
@@ -258,7 +281,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         acted = False
         if changed_frame_uuids is not None:
             changed_frame_uuids = list(changed_frame_uuids)
-            all_frame_items = [self._sync_frame_with_uuid(uuid) for uuid in changed_frame_uuids]
+            all_frame_items = [self._sync_and_update_frame(uuid) for uuid in changed_frame_uuids]
             if None in all_frame_items:
                 LOG.debug("new frames, resorting to invalidate")
                 self._invalidate()

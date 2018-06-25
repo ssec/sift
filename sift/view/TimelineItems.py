@@ -463,13 +463,22 @@ class QFrameItem(QGraphicsObject):
     def state(self, new_state: VisualState):
         if new_state != self._state:
             self._state = new_state
-            self.update()
 
     # painting and boundaries
 
+    @property
+    def pen_brush(self) -> Tuple[QPen, QBrush]:
+        """Pen and brush to use, based on VisualState
+        """
+        pen, brush = self._track().default_frame_pen_brush
+        s = self._state
+        if VisualState.READY in s:
+            brush = QBrush(Qt.green, Qt.SolidPattern)
+        return pen, brush
+
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget=None) -> None:
         # LOG.debug("QFrameItem.paint")
-        pen, brush = self._track().default_frame_pen_brush
+        pen, brush = self.pen_brush
         rect = self.boundingRect()
         painter.setBrush(brush)
         painter.setPen(pen)
