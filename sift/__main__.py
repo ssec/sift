@@ -23,12 +23,14 @@ __docformat__ = 'reStructuredText'
 from uuid import UUID
 from vispy import app
 import asyncio
+from PyQt4 import QtGui
 from quamash import QEventLoop, QThreadExecutor
 from collections import OrderedDict
 
 app_object = app.use_app('pyqt4')
-loop = QEventLoop(app_object.native)
-asyncio.set_event_loop(loop)  # NEW must set the event loop
+APP: QtGui.QApplication = app_object.native
+LOOP = QEventLoop(APP)
+asyncio.set_event_loop(LOOP)  # NEW must set the event loop
 
 
 QtCore = app_object.backend_module.QtCore
@@ -564,6 +566,7 @@ class Main(QtGui.QMainWindow):
         LOG.debug("Potential tracks: {}".format(repr(doc.track_order)))
         self._timeline_scene = SiftDocumentAsFramesInTracks(doc)
         gv.setScene(self._timeline_scene)
+        APP.aboutToQuit.connect(self._timeline_scene.clear)
         self._timeline_scene.update()
 
     def __init__(self, config_dir=None, cache_dir=None, cache_size=None, glob_pattern=None, search_paths=None, border_shapefile=None, center=None):
@@ -1071,7 +1074,7 @@ def main():
     window.show()
     # bring window to front
     window.raise_()
-    loop.run_forever()
+    LOOP.run_forever()
     # app.run()
 
 if __name__ == '__main__':

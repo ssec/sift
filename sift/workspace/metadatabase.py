@@ -739,15 +739,21 @@ class Metadatabase(object):
         return ses
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        # fetch the active session, typically zero or one active per thread
         s = self.SessionRegistry()
-        if exc_val is not None:
-            s.rollback()
-        else:
-            s.commit()
         self.session_nesting[id(s)] -= 1
         if self.session_nesting[id(s)] <= 0:
+            if s.dirty:
+                if exc_val is not None:
+                    s.rollback()
+                else:
+                    s.commit()
             s.close()
             del self.session_nesting[id(s)]
+        else:  # we're in a nested context for this session
+            if exc_val is not None:  # propagate the exception to the outermost session context
+                LOG.warning('propagating database exception to outermost context')
+                raise exc_val
 
     #
     # high-level functions
