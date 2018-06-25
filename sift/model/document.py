@@ -663,6 +663,10 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         self.doc.sync_potential_tracks_from_metadata()
         new_tracks = set(self.doc.track_order.values())
         LOG.debug("added these tracks: {}".format(repr(list(sorted(new_tracks - old_tracks)))))
+        # FIXME: make sure that tracks with active products are moved up to the active z-levels (>=0)
+        # that will require making sure that the z-order matches the layer list order and vice versa
+        # delay that transition until we're fully over to a track-centric model, since layer-centric
+        # model can have products from multiple tracks stacked in random z order
 
     # @property
     # def _deferring(self):
