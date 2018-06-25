@@ -41,6 +41,12 @@ class _workspace_test_proxy(object):
         for path in paths:
             yield 1, {INFO.PATHNAME: path}
 
+    class _emitsy(object):
+        def emit(self, stuff):
+            print("==> " + repr(stuff))
+
+    didUpdateProductsMetadata = _emitsy()
+
 
 class ResourceSearchPathCollector(QObject):
     """Given a set of search paths,
@@ -153,13 +159,19 @@ class ResourceSearchPathCollector(QObject):
         LOG.debug('collecting metadata from {} potential new files'.format(ntodo))
         redex = dict((name, dex) for (dex, name) in enumerate(todo))
         yield {TASK_DOING: 'collecting metadata 0/{}'.format(ntodo), TASK_PROGRESS: 0.0}
+        changed_uuids = set()
         for num_prods, product_info in self._ws.collect_product_metadata_for_paths(todo):
             path = product_info.get(INFO.PATHNAME, None)
             dex = redex.get(path, 0.0)
             status = {TASK_DOING: 'collecting metadata {}/{}'.format(dex+1, ntodo), TASK_PROGRESS: float(dex)/float(ntodo)}
             # LOG.debug(repr(status))
+            changed_uuids.add(product_info[INFO.UUID])
             yield status
         yield {TASK_DOING: 'collecting metadata done', TASK_PROGRESS: 1.0}
+        if changed_uuids:
+            LOG.debug('{} changed UUIDs, signaling product updates'.format(len(changed_uuids)))
+            # FUTURE: decide whether signals for metadatabase should belong to metadatabase
+            self._ws.didUpdateProductsMetadata.emit(changed_uuids)
 
 
 def _debug(type, value, tb):

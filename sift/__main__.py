@@ -547,7 +547,7 @@ class Main(QtGui.QMainWindow):
         self.ui.cursorProbeLayer.setText(layer_str)
         self.ui.cursorProbeText.setText("{} ({})".format(data_str, probe_loc))
 
-    def _init_timeline(self, doc: Document):
+    def _init_timeline(self, doc: Document, ws: Workspace):
         gv = self.ui.timelineView
 
         # set up the widget itself
@@ -564,9 +564,10 @@ class Main(QtGui.QMainWindow):
         # connect up the scene
         doc.sync_potential_tracks_from_metadata()
         LOG.debug("Potential tracks: {}".format(repr(doc.track_order)))
-        self._timeline_scene = SiftDocumentAsFramesInTracks(doc)
+        self._timeline_scene = SiftDocumentAsFramesInTracks(doc, self.workspace)
         gv.setScene(self._timeline_scene)
         APP.aboutToQuit.connect(self._timeline_scene.clear)
+
         self._timeline_scene.update()
 
     def __init__(self, config_dir=None, cache_dir=None, cache_size=None, glob_pattern=None, search_paths=None, border_shapefile=None, center=None):
@@ -744,7 +745,7 @@ class Main(QtGui.QMainWindow):
 
         # set up timeline
         LOG.info("potential tracks already in database: {}".format(repr(doc.potential_tracks())))
-        self._init_timeline(doc)
+        self._init_timeline(doc, self.workspace)
         # FIXME: make sure sync of metadata signals sync of document potentials and track display
 
     def _timer_collect_resources(self):

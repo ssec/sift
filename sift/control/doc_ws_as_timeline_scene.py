@@ -53,7 +53,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
     """
     _doc: DocumentAsTrackStack = None
 
-    def __init__(self, doc: Document, *args, **kwargs):
+    def __init__(self, doc: Document, ws: Workspace, *args, **kwargs):
         """
         Args:
             ws (Workspace): owns cached and computed data
@@ -62,7 +62,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         """
         super(SiftDocumentAsFramesInTracks, self).__init__(*args, **kwargs)
         self._doc = doc.as_track_stack  # we should be limiting our interaction to this context
-        self._connect_signals(doc)  # but the main doc is still the signaling hub
+        self._connect_signals(doc, ws)  # but the main doc is still the signaling hub
 
     @property
     def timeline_span(self) -> span:
@@ -71,7 +71,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
     def _sync_track(self, qti: QTrackItem, z:int, trk: TrackInfo):
         qti.z, old_z = z, qti.z
         qti.state = trk.state
-        qti.update()
+        # qti.update()
 
     def _create_track(self, z: int, trk: TrackInfo) -> QTrackItem:
         qti = QTrackItem(self, self.coords, trk.track, z, trk.primary, trk.secondary)
@@ -84,7 +84,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
 
     def _sync_frame(self, qfi: QFrameItem, frm: FrameInfo):
         qfi.state = _translate_to_visual_state(frm.state)
-        qfi.update()
+        # qfi.update()
 
     def _purge_orphan_tracks_frames(self, tracks: Iterable[str], frames: Iterable[UUID]):
         """Remove QTrackItem and QFrameItem instances that no longer correspond to document content
@@ -133,23 +133,31 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
             track.update_pos_bounds()
             track.update_frame_positions()
 
+
     def _invalidate(self, *args, **kwargs):
         """document state has changed, re-consult document and update our display
         """
         self._sync_tracks_frames()
 
-    def _sync_frame_with_uuid(self, uuid: UUID):
+    def _sync_frame_with_uuid(self, uuid: UUID, frm: Optional[FrameInfo]=None):
         qfi = self._frame_items.get(uuid)
         if qfi is not None:
-            frm = self._doc.frame_info_for_product(uuid=uuid)
+            if frm is None:
+                frm = self._doc.frame_info_for_product(uuid=uuid)
             self._sync_frame(qfi, frm)
+            return qfi
+        else:  # FUTURE: create the frame and if necessary the track
+            return None
 
     def _update_product_name(self, uuid: UUID, name: str):
         self._sync_frame_with_uuid(uuid)
 
     def _update_visibility_for_products(self, uuid_vis: Mapping[UUID, bool]):
         # set the corresponding display state for these products
-        [self._sync_frame_with_uuid(uuid) for uuid in uuid_vis.keys()]
+        all_frame_items = [self._sync_frame_with_uuid(uuid) for uuid in uuid_vis.keys()]
+        if None in all_frame_items:
+            LOG.debug("a frame did not exist to update, have to refresh everything")
+            self._invalidate()
         # LOG.warning("UNIMPLEMENTED: update display state for {} layers".format(len(uuid_vis)))
 
 
@@ -158,7 +166,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
     #     # .as_layer_list should have updated the document track order for us a didReorderTracks
     #     self._invalidate()
 
-    def _connect_signals(self, doc:Document):
+    def _connect_signals(self, doc: Document, ws: Workspace):
         """Connect document, workspace, signals in order to invalidate and update scene representation
         """
         # FUTURE: more fine-grained response than just invalidating and redrawing
@@ -169,6 +177,11 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         # doc.didReorderLayers.connect(self._reorder_tracks_given_layer_order)
         doc.didChangeComposition.connect(self._invalidate)
         doc.didReorderTracks.connect(self._invalidate)
+
+        def refresh(changed_uuids, ts=self, *args, **kwargs):
+            LOG.debug("updating timeline for {} changed products".format(len(changed_uuids)))
+            ts.update(changed_frame_uuids=changed_uuids)
+        ws.didUpdateProductsMetadata.connect(refresh)
 
     # def get(self, uuid: UUID) -> [QTrackItem, QFrameItem, None]:
     #     z = self._track_items.get(uuid, None)
@@ -230,17 +243,23 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         actions[menu.addAction("Deactivate")] = _deactivate
         return menu, actions
 
-    def update(self, changed_tracks: Optional[Iterable[str]]=None, changed_frame_uuids: Optional[Iterable[UUID]]=None) -> int:
+    def update(self, changed_tracks: Optional[Iterable[str]]=None, changed_frame_uuids: Optional[Iterable[UUID]]=None):
         """Populate or update scene, returning number of items changed in scene
         Does not add new items for tracks and frames already present
         Parameters serve only as hints
         """
         acted = False
-        if changed_frame_uuids:
-            [self._sync_frame_with_uuid(uuid) for uuid in changed_frame_uuids]
+        if changed_frame_uuids is not None:
+            changed_frame_uuids = list(changed_frame_uuids)
+            all_frame_items = [self._sync_frame_with_uuid(uuid) for uuid in changed_frame_uuids]
+            if None in all_frame_items:
+                LOG.debug("new frames, resorting to invalidate")
+                self._invalidate()
+                return
+            LOG.debug("done updating {} products in timeline".format(len(changed_frame_uuids)))
             acted = True
-        if changed_tracks:
-            LOG.warning("NOT IMPLEMENTED: selectively updating tracks in timeline")
+        if changed_tracks is not None:
+            LOG.warning("NOT IMPLEMENTED: selectively updating {} tracks in timeline".format(len(list(changed_tracks))))
         if not acted:
             self._invalidate()
 

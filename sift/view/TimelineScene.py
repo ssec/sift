@@ -452,7 +452,7 @@ class QFramesInTracksScene(QGraphicsScene):
         LOG.warning("using base class menu_for_track which does nothing")
         return None
 
-    def update(self, changed_tracks: [Set[str], None] = None, changed_frame_uuids: [Set[UUID], None] = None) -> int:
+    def update(self, changed_tracks: [Set[str], None] = None, changed_frame_uuids: [Set[UUID], None] = None):
         """Populate or update scene, returning number of items changed in scene
         Does not add new items for tracks and frames already present
         Parameters serve only as hints

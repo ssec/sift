@@ -261,7 +261,7 @@ class Workspace(QObject):
     # signals
     # didStartImport = pyqtSignal(dict)  # a dataset started importing; generated after overview level of detail is available
     # didMakeImportProgress = pyqtSignal(dict)
-    didUpdateDataset = pyqtSignal(dict)  # partial completion of a dataset import, new datasetinfo dict is released
+    didUpdateProductsMetadata = pyqtSignal(set)  # set of UUIDs with changes to their metadata
     # didFinishImport = pyqtSignal(dict)  # all loading activities for a dataset have completed
     # didDiscoverExternalDataset = pyqtSignal(dict)  # a new dataset was added to the workspace from an external agent
     didChangeProductState = pyqtSignal(UUID, flags)  # a product changed state, e.g. an importer started working on it
