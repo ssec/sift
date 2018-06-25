@@ -457,7 +457,7 @@ class QFramesInTracksScene(QGraphicsScene):
         Does not add new items for tracks and frames already present
         Parameters serve only as hints
         """
-        super(QFramesInTracksScene, self).update()
+        # super(QFramesInTracksScene, self).update()
         return 0
 
 

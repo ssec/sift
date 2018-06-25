@@ -658,6 +658,12 @@ class DocumentAsTrackStack(DocumentAsContextBase):
             if tfam == family:
                 yield track
 
+    def sync_available_tracks(self):
+        old_tracks = set(self.doc.track_order.values())
+        self.doc.sync_potential_tracks_from_metadata()
+        new_tracks = set(self.doc.track_order.values())
+        LOG.debug("added these tracks: {}".format(repr(list(sorted(new_tracks - old_tracks)))))
+
     # @property
     # def _deferring(self):
     #     "Am I a deferred-action context or an immediate context helper"

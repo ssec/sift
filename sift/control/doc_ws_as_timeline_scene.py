@@ -103,6 +103,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         orphan_tracks = set(self._track_items.keys())
         orphan_frames = set(self._frame_items.keys())
         LOG.debug("current timeline scene population: {} frames in {} tracks".format(len(orphan_frames), len(orphan_tracks)))
+        iters = 0
         for z, trk in self._doc.enumerate_tracks_frames():
             qti = self._track_items.get(trk.track)
             if qti is not None:
@@ -114,6 +115,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
             _first = True
             LOG.debug("track {} z={} has {} frames".format(trk.track, z, len(trk.frames)))
             for frm in trk.frames:
+                iters += 1
                 if _first:  # debug
                     _first = False
                     LOG.debug("track {} frame {}".format(trk.track, frm))
@@ -126,12 +128,13 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
                         LOG.warning("frame {} <{}> found but not originally present in collection {}".format(frm.ident, frm.uuid, orphan_frames))
                 else:
                     new_frames.append(self._create_frame(qti, frm))
-        LOG.debug("added {} tracks and {} frames to timeline scene".format(len(new_tracks), len(new_frames)))
+        LOG.debug("added {} tracks and {} frames to timeline scene after {} iterations".format(len(new_tracks), len(new_frames), iters))
         self._purge_orphan_tracks_frames(orphan_tracks, orphan_frames)
         self.propagate_max_z()
         for track in new_tracks:
             track.update_pos_bounds()
             track.update_frame_positions()
+        super(SiftDocumentAsFramesInTracks, self).update()
 
 
     def _invalidate(self, *args, **kwargs):
@@ -148,6 +151,9 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
             return qfi
         else:  # FUTURE: create the frame and if necessary the track
             return None
+
+    def sync_available_tracks(self):
+        self._doc.sync_available_tracks()
 
     def _update_product_name(self, uuid: UUID, name: str):
         self._sync_frame_with_uuid(uuid)
@@ -180,6 +186,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
 
         def refresh(changed_uuids, ts=self, *args, **kwargs):
             LOG.debug("updating timeline for {} changed products".format(len(changed_uuids)))
+            ts.sync_available_tracks()
             ts.update(changed_frame_uuids=changed_uuids)
         ws.didUpdateProductsMetadata.connect(refresh)
 
