@@ -586,6 +586,7 @@ class Main(QtGui.QMainWindow):
         self.setWindowTitle(self.windowTitle().replace("|X.X.X|", __version__))
         self.tabifyDockWidget(self.ui.layersPane, self.ui.areaProbePane)
         self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.rgbConfigPane)
+        self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.timelinePane)
 
         # self.tabifyDockWidget(self.ui.rgbConfigPane, self.ui.layerDetailsPane)
         # Make the layer list and layer details shown
@@ -746,6 +747,7 @@ class Main(QtGui.QMainWindow):
         # set up timeline
         LOG.info("potential tracks already in database: {}".format(repr(doc.potential_tracks())))
         self._init_timeline(doc, self.workspace)
+
         # FIXME: make sure sync of metadata signals sync of document potentials and track display
 
     def _timer_collect_resources(self):
