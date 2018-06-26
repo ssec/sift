@@ -600,6 +600,10 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                     (Product.family == fam) & (Product.category == ctg) &
                     ~((Product.obs_time > end) | ((Product.obs_time + Product.obs_duration) < start))).all()]
 
+    def _products_in_tracks(self, tracks: T.Iterable[str], during: span=None) -> T.Iterable[UUID]:
+        for track in tracks:
+            yield from self._products_in_track(track, during)
+
     def deactivate_frames(self, frame: UUID, *more_frames: T.Iterable[UUID]) -> T.Sequence[UUID]:
         """Activate one or more frames in the document, as directed by the timeline widgets
         """
