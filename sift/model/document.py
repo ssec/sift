@@ -327,6 +327,7 @@ class DocumentAsLayerStack(DocumentAsContextBase):
     """ Represent the document as a list of current layers
     As we transition to timeline model, this stops representing products and starts being a track stack
     """
+    _all_active: bool = False  # whether to represent all active products in document timespan, or just the ones under the playhead
 
     def __enter__(self):
         raise NotImplementedError()
@@ -339,6 +340,66 @@ class DocumentAsLayerStack(DocumentAsContextBase):
             # commit code
             pass
         raise NotImplementedError()
+
+    def uuid_for_current_layer(self, layer_index: int) -> UUID:
+        """given layer index from 0==top_z, return UUID of product
+        """
+        raise NotImplementedError()
+
+    @property
+    def current_layer_uuid_order(self):
+        """ the current active products in top-to-bottom order
+        """
+        if self._all_active:
+            # yield all active products in track order, but decline to rearrange
+            raise NotImplementedError()
+        else:
+            # yield the active products under the current playhead
+            raise NotImplementedError()
+
+    def prez_for_uuid(self, uuid: UUID) -> prez:
+        """presentation settings for the product uuid
+        """
+        return self.doc.family_presentation[self.doc.family_for_product_or_layer(uuid)]
+
+    def __len__(self):
+        """Return active track count
+        """
+        return self.doc.track_order.top_z + 1
+
+    def _product_info_under_playhead_for_family(self, family: str) -> T.Mapping:
+        """Return the product info dictionary for
+        """
+        raise NotImplementedError("need to consult mdb to get product info dictionary under playhead")
+
+    def get_info(self, dex: [int, UUID]):
+        """return info dictionary with top z-order at 0, going downward
+        """
+        if isinstance(dex, UUID):
+            warnings.warn("DocumentAsLayerStack.get_info should not be accepting UUIDs", DeprecationWarning)
+            with self.mdb as S:
+                prod = S.query(Product).filter_by(uuid_str=str(dex)).first()
+                return prod.info
+        z = self.doc.track_order.top_z - dex
+        fam = self.doc.track_order[z]
+        prod_info = self._product_info_under_playhead_for_family(fam)
+        return prod_info
+
+    # FUTURE: allow re-ordering of inactive tracks?
+
+    def reorder_by_indices(self, order: T.Iterable[int]):
+        """Re-order active (z>=0) document families with new order
+        input order is expected to be listbox-like indices, i.e. order 0 is topmost z
+        """
+        order = list(order)
+        assert(len(order) == len(self))  # specified all active families
+        lut = self.doc.track_order.to_dict()
+        topz = self.doc.track_order.top_z
+        zs = [topz - x for x in order]
+        vals = [lut[z] for z in zs]
+        new_zs = [topz - x for x in range(len(order))]
+        self.doc.track_order.merge_subst(zip(new_zs, vals))
+        self.doc.didReorderTracks.emit(set(), set())
 
 
 class FrameInfo(T.NamedTuple):
@@ -1328,7 +1389,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if INFO.UNIT_CONVERSION not in dataset:
             dataset[INFO.UNIT_CONVERSION] = units_conversion(dataset)
         if INFO.FAMILY not in dataset:
-            dataset[INFO.FAMILY] = self._family_for_layer(dataset)
+            dataset[INFO.FAMILY] = self.family_for_product_or_layer(dataset)
         presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
 
         # signal updates from the document
@@ -1339,8 +1400,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         return uuid, dataset, active_content_data
 
-    def _family_for_layer(self, uuid_or_layer):
+    def family_for_product_or_layer(self, uuid_or_layer):
         if isinstance(uuid_or_layer, UUID):
+            with self._workspace.metadatabase as s:
+                fam = s.query(Product.family).filter_by(uuid_str=str(uuid_or_layer)).first()
+            if fam:
+                return fam
             uuid_or_layer = self[uuid_or_layer]
         if INFO.FAMILY in uuid_or_layer:
             LOG.debug('using pre-existing family {}'.format(uuid_or_layer[INFO.FAMILY]))
@@ -1943,7 +2008,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             if INFO.UNIT_CONVERSION not in dataset:
                 dataset[INFO.UNIT_CONVERSION] = units_conversion(dataset)
             if INFO.FAMILY not in dataset:
-                dataset[INFO.FAMILY] = self._family_for_layer(dataset)
+                dataset[INFO.FAMILY] = self.family_for_product_or_layer(dataset)
             self._add_layer_family(dataset)
             self.didAddCompositeLayer.emit(reordered_indices, dataset.uuid, presentation)
 
@@ -2041,7 +2106,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     "recipe": recipe,
                 }
                 # better place for this?
-                ds_info[INFO.FAMILY] = self._family_for_layer(ds_info)
+                ds_info[INFO.FAMILY] = self.family_for_product_or_layer(ds_info)
                 LOG.debug("Creating new RGB layer for recipe '{}'".format(recipe.name))
                 rgb_layer = layers[t] = DocRGBLayer(self, recipe, ds_info)
                 self._layer_with_uuid[uuid] = rgb_layer
