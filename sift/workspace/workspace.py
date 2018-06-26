@@ -62,6 +62,7 @@ from shapely.geometry.polygon import LinearRing
 from sqlalchemy.orm import Session
 
 from sift.common import INFO, KIND, flags, STATE
+from sift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
 from sift.model.shapes import content_within_shape
 from .metadatabase import Metadatabase, Content, Product, Resource
 from .importer import aImporter, GeoTiffImporter, GoesRPUGImporter, SatPyImporter, generate_guidebook_metadata
@@ -320,6 +321,7 @@ class Workspace(QObject):
         Initialize a new or attach an existing workspace, creating any necessary bookkeeping.
         """
         super(Workspace, self).__init__()
+        self._queue = queue
         self._max_size_gb = max_size_gb if max_size_gb is not None else DEFAULT_WORKSPACE_SIZE
         if self._max_size_gb < MIN_WORKSPACE_SIZE:
             self._max_size_gb = MIN_WORKSPACE_SIZE
@@ -426,6 +428,26 @@ class Workspace(QObject):
                     LOG.info("rewriting DATASET_NAME to new style using band: {}".format(repr(p)))
                     p.update({INFO.DATASET_NAME: 'B{:02d}'.format(p.info[INFO.BAND])})
 
+    def _bgnd_startup_purge(self):
+        ntot = 5
+        n = 1
+        yield {TASK_DOING: "DB pruning cache entries".format(n, ntot), TASK_PROGRESS: float(n) / float(ntot)}
+        self._purge_missing_content()
+        n += 1
+        yield {TASK_DOING: "DB pruning stale resources".format(n, ntot), TASK_PROGRESS: float(n) / float(ntot)}
+        self._purge_inaccessible_resources()
+        n += 1
+        yield {TASK_DOING: "DB pruning orphan products".format(n, ntot), TASK_PROGRESS: float(n) / float(ntot)}
+        self._purge_orphan_products()
+        n += 1
+        yield {TASK_DOING: "DB migrating metadata".format(n, ntot), TASK_PROGRESS: float(n) / float(ntot)}
+        self._migrate_metadata()
+        n += 1
+        yield {TASK_DOING: "DB ready".format(n, ntot), TASK_PROGRESS: float(n) / float(ntot)}
+
+    def _then_refresh_mdb_customers(self, *args, **kwargs):
+        self.didUpdateProductsMetadata.emit(set())
+
     def _init_inventory_existing_datasets(self):
         """
         Do an inventory of an pre-existing workspace
@@ -435,10 +457,8 @@ class Workspace(QObject):
         """
         # attach the database, creating it if needed
         self._init_create_workspace()
-        self._purge_missing_content()
-        self._purge_inaccessible_resources()
-        self._purge_orphan_products()
-        self._migrate_metadata()
+        self._queue.add("database cleanup", self._bgnd_startup_purge(), "database cleanup",
+                  interactive=False, and_then=self._then_refresh_mdb_customers)
 
     def _store_inventory(self):
         """
