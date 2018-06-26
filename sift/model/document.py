@@ -323,6 +323,25 @@ class DocumentAsContextBase(object):
 #         raise NotImplementedError()
 
 
+###################################################################################################################
+
+
+class LayerInfo(T.NamedTuple):
+    uuid: UUID
+    time_label: str
+    presentation: prez
+    f_convert: T.Callable
+    f_format: T.Callable
+
+    @property
+    def colormap(self):
+        return self.presentation.colormap
+
+    @property
+    def climits(self):
+        return self.presentation.climits
+
+
 class DocumentAsLayerStack(DocumentAsContextBase):
     """ Represent the document as a list of current layers
     As we transition to timeline model, this stops representing products and starts being a track stack
@@ -341,10 +360,26 @@ class DocumentAsLayerStack(DocumentAsContextBase):
             pass
         raise NotImplementedError()
 
+    @property
+    def current_layer_set(self) -> DocLayerStack:
+        warnings.warn("this compatibility interface changes for full timeline model", DeprecationWarning)
+        return self.doc.current_layer_set
+
     def uuid_for_current_layer(self, layer_index: int) -> UUID:
         """given layer index from 0==top_z, return UUID of product
         """
-        raise NotImplementedError()
+        warnings.warn("this compatibility interface is currently not implemented", DeprecationWarning)
+        return self.doc.uuid_for_current_layer(layer_index)
+
+    def _layer_info_for_uuid(self, uuid) -> LayerInfo:
+        with self.mdb as s:
+            prod = s.query(Product).filter_by(uuid_str=str(uuid)).first()
+            nfo = prod.info
+            return LayerInfo(uuid=uuid,
+                             time_label=nfo.get(INFO.DISPLAY_TIME, '--:--'),
+                             presentation=self.doc.family_presentation[prod.family],
+                             f_convert=nfo.get(INFO.UNIT_CONVERSION)[1],
+                             f_format=nfo.get(INFO.UNIT_CONVERSION)[2])
 
     @property
     def current_layer_uuid_order(self):
@@ -361,6 +396,50 @@ class DocumentAsLayerStack(DocumentAsContextBase):
         """presentation settings for the product uuid
         """
         return self.doc.family_presentation[self.doc.family_for_product_or_layer(uuid)]
+
+    def time_label_for_uuid(self, uuid):
+        """used to update animation display when a new frame is shown
+        """
+        if not uuid:
+            return "YYYY-MM-DD HH:MM"
+        return self._layer_info_for_uuid(uuid).time_label
+
+    def prez_for_uuids(self, uuids, lset=None):
+        for uuid in uuids:
+            yield self.prez_for_uuid(uuid)
+        # if lset is None:
+        #     lset = self.current_layer_set
+        # for p in lset:
+        #     if p.uuid in uuids:
+        #         yield p
+
+    def colormap_for_uuids(self, uuids, lset=None):
+        for p in self.prez_for_uuids(uuids, lset=lset):
+            yield p.colormap
+
+    def colormap_for_uuid(self, uuid, lset=None):
+        for p in self.colormap_for_uuids((uuid,), lset=lset):
+            return p
+
+    def valid_range_for_uuid(self, uuid):
+        # Limit ourselves to what information
+        # in the future valid range may be different than the default CLIMs
+        return self._layer_info_for_uuid(uuid).climits
+        # return self[uuid][INFO.CLIM]
+
+    def convert_value(self, uuid, x, inverse=False):
+        return self._layer_info_for_uuid(uuid).f_convert(x, inverse=inverse)
+        # return self[uuid][INFO.UNIT_CONVERSION][1](x, inverse=inverse)
+
+    def format_value(self, uuid, x, numeric=True, units=True):
+        return self._layer_info_for_uuid(uuid).f_format(x, numeric=numeric, units=units)
+        # return self[uuid][INFO.UNIT_CONVERSION][2](x, numeric=numeric, units=units)
+
+    def flipped_for_uuids(self, uuids, lset=None):
+        for p in self.prez_for_uuids(uuids, lset=lset):
+            default_clim = p.climits
+            # default_clim = self._layer_with_uuid[p.uuid][INFO.CLIM]
+            yield ((p.climits[1] - p.climits[0]) > 0) != ((default_clim[1] - default_clim[0]) > 0)
 
     def __len__(self):
         """Return active track count
@@ -385,6 +464,13 @@ class DocumentAsLayerStack(DocumentAsContextBase):
         prod_info = self._product_info_under_playhead_for_family(fam)
         return prod_info
 
+    def __getitem__(self, uuid: UUID):
+        if not isinstance(uuid, UUID):
+            raise ValueError("need a UUID here")
+        with self.mdb as S:
+            prod = S.query(Product).filter_by(uuid_str=str(uuid)).first()
+            return prod.info
+
     # FUTURE: allow re-ordering of inactive tracks?
 
     def reorder_by_indices(self, order: T.Iterable[int]):
@@ -400,6 +486,9 @@ class DocumentAsLayerStack(DocumentAsContextBase):
         new_zs = [topz - x for x in range(len(order))]
         self.doc.track_order.merge_subst(zip(new_zs, vals))
         self.doc.didReorderTracks.emit(set(), set())
+
+
+###################################################################################################################
 
 
 class FrameInfo(T.NamedTuple):
@@ -759,6 +848,9 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 action()
 
 
+###################################################################################################################
+
+
 class DocumentAsRegionProbes(DocumentAsContextBase):
     """Document is probed over a variety of regions
     """
@@ -773,6 +865,9 @@ class DocumentAsRegionProbes(DocumentAsContextBase):
             # commit code
             pass
         raise NotImplementedError()
+
+
+###################################################################################################################
 
 
 class DocumentAsStyledFamilies(DocumentAsContextBase):
@@ -790,6 +885,9 @@ class DocumentAsStyledFamilies(DocumentAsContextBase):
             # commit code
             pass
         raise NotImplementedError()
+
+
+###################################################################################################################
 
 
 class DocumentAsResourcePools(DocumentAsContextBase):
@@ -822,6 +920,9 @@ class DocumentAsResourcePools(DocumentAsContextBase):
         raise NotImplementedError()
 
 
+###################################################################################################################
+
+
 class DocumentAsRecipeCollection(DocumentAsContextBase):
     def __enter__(self):
         raise NotImplementedError()
@@ -834,6 +935,9 @@ class DocumentAsRecipeCollection(DocumentAsContextBase):
             # commit code
             pass
         raise NotImplementedError()
+
+
+###################################################################################################################
 
 
 class AnimationStep(T.NamedTuple):
@@ -916,6 +1020,9 @@ class DocumentAsAnimationSequence(DocumentAsContextBase):
         raise NotImplementedError()
 
 
+###################################################################################################################
+
+
 class ProductDataArrayProxy(object):
     """
     As-pythonic-as-possible dataset proxy for SIFT content.
@@ -987,8 +1094,7 @@ class DocumentAsProductArrayCollection(DocumentAsContextBase):
         raise NotImplementedError()
 
 
-# TimelineDataArrayProxy  # multiple products as a timeline, i.e. a time dimension is added representing all the products on the same timeline
-# FUTURE: class DatasetAsTimelineArrayCollection(DocumentAsContextBase):
+###################################################################################################################
 
 
 class Document(QObject):  # base class is rightmost, mixins left of that
