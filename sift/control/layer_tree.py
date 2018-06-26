@@ -37,7 +37,7 @@ import logging, sys, os
 import pickle as pkl
 from PyQt4.QtCore import QAbstractItemModel, QAbstractListModel, Qt, QSize, QModelIndex, QPoint, QMimeData, pyqtSignal, QRect
 from PyQt4.QtGui import QTreeView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyle, QColor, QFont, QStyleOptionViewItem, QItemSelection, QItemSelectionModel, QPen
-from sift.model.document import Document, DocumentAsLayerStack
+from sift.model.document import Document
 from sift.common import INFO, KIND, get_font_size
 from sift.view.colormap_dialogs import ChangeColormapDialog
 
@@ -227,7 +227,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         http://doc.qt.io/qt-5/qtwidgets-itemviews-simpletreemodel-example.html
     """
     widgets = None
-    doc: DocumentAsLayerStack = None
+    doc = None
     item_delegate = None
     _last_equalizer_values = {}
     _mimetype = 'application/vnd.row.list'
@@ -245,16 +245,11 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         super(LayerStackTreeViewModel, self).__init__(parent)
 
         self.widgets = [ ]
-        self.doc = doc.as_layer_stack
+        self.doc = doc
         # self._column = [self._visibilityData, self._nameData]
         self.item_delegate = LayerWidgetDelegate(doc)
         # FIXME: Reset colormap change dialog when layer set changes
-        self._connect_signals(doc)
-        # set up each of the widgets
-        for widget in widgets:
-            self._init_widget(widget)
 
-    def _connect_signals(self, doc: Document):
         # for now, a copout by just having a refresh to the content when document changes
         doc.didReorderLayers.connect(self.refresh)
         doc.didRemoveLayers.connect(self.drop_layers_just_removed)
@@ -268,7 +263,12 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         doc.didSwitchLayerSet.connect(self.refresh)
         doc.didReorderAnimation.connect(self.refresh)
         doc.didCalculateLayerEqualizerValues.connect(self.update_equalizer)
+
         # self.setSupportedDragActions(Qt.MoveAction)
+
+        # set up each of the widgets
+        for widget in widgets:
+            self._init_widget(widget)
 
     # TODO, this wrapper is probably not needed, possibly remove later
     def add_widget(self, listbox:QTreeView):
