@@ -542,7 +542,7 @@ class SceneGraphManager(QObject):
         self.main_view = self.main_canvas.central_widget.add_view()
 
         # Camera Setup
-        self.pz_camera = PanZoomProbeCamera(name=TOOL.PAN_ZOOM, aspect=1, pan_limits=(-1., -1., 1., 1.), zoom_limits=(0.0015, 0.0015))
+        self.pz_camera = PanZoomProbeCamera(name=TOOL.PAN_ZOOM.name, aspect=1, pan_limits=(-1., -1., 1., 1.), zoom_limits=(0.0015, 0.0015))
         self.main_view.camera = self.pz_camera
         self.main_view.camera.flip = (False, False, False)
         # self.main_view.events.mouse_press.connect(self.on_mouse_press_point, after=list(self.main_view.events.mouse_press.callbacks))

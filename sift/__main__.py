@@ -646,7 +646,7 @@ class Main(QtGui.QMainWindow):
             """Simple wrapper around a timers start method so we can accept but ignore the event provided
             """
             timer.start()
-        self.scene_manager.main_canvas.transforms.changed.connect(partial(start_wrapper, self.scheduler))
+        self.scene_manager.main_view.scene.transform.changed.connect(partial(start_wrapper, self.scheduler))
 
         # convey action between document and layer list view
         self.layerSetsManager = LayerSetsManager(self.ui.layerSetTabs, self.ui.layerDetailsContents, self.document)
