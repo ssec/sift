@@ -102,6 +102,7 @@ class ChangeColormapDialog(QtGui.QDialog):
         return self._set_new_clims(val, is_max)
 
     def _init_cmap_combo(self):
+        # FIXME: We should do this by colormap category
         for idx, colormap in enumerate(self.doc.colormaps.keys()):
             self.ui.cmap_combobox.addItem(colormap, colormap)
             if colormap == self._initial_cmap:

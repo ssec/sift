@@ -1,28 +1,18 @@
 #!/usr/bin/env python
 # -*- coding, utf-8 -*-
+"""Colormap objects and utilities.
 """
-.py
-~~~
 
-PURPOSE
+from vispy.color.colormap import (Colormap, BaseColormap, _mix_simple,
+                                  _colormaps, _default_controls)
 
-
-REFERENCES
-
-
-REQUIRES
-
-
-,author: R.K.Garcia <rayg@ssec.wisc.edu>
-,copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
-,license: GPLv3, see LICENSE for more details
-"""
-__docformat__ = 'reStructuredText'
-__author__ = 'cphillips'
-
-from vispy.color.colormap import Colormap, BaseColormap, _mix_simple, _colormaps
-from collections import OrderedDict
+import os
+import json
+import logging
 import numpy as np
+from collections import OrderedDict
+
+LOG = logging.getLogger(__name__)
 
 
 def _get_awips_colors(cmap_file):
@@ -187,6 +177,37 @@ class BlockedColormap(Colormap):
             controls_new.append(c)
         super().__init__(colors_new, controls=controls_new, **kwargs)
 
+
+class AWIPSColormap(Colormap):
+    def __init__(self, awips_file, flipped=False, interpolation='linear'):
+        colors = _get_awips_colors(awips_file)
+        controls = _default_controls(len(colors))
+        if flipped:
+            controls = controls[::-1]
+        super(AWIPSColormap, self).__init__(colors, controls=controls,
+                                            interpolation=interpolation)
+
+
+class PyQtGraphColormap(Colormap):
+    def __init__(self, json_file_or_pqg_cmap, **kwargs):
+        if isinstance(json_file_or_pqg_cmap, str):
+            import json
+            file_data = json.load(open(json_file_or_pqg_cmap, 'r'))
+        else:
+            file_data = json_file_or_pqg_cmap
+        controls, rgb_colors = self._convert_pyqtgraph_to_vispy(file_data)
+        super(PyQtGraphColormap, self).__init__(colors=rgb_colors, controls=controls)
+
+    def _convert_pyqtgraph_to_vispy(self, color_item):
+        points = color_item["ticks"]
+        # make sure end points are 0 and 1
+        if points[0][0] != 0:
+            points = [[0, points[0][1]]] + points
+        if points[-1][0] != 1:
+            points.append([1, points[-1][1]])
+        controls, rgb_colors = zip(*sorted(points))
+        rgb_colors = np.array(rgb_colors) / 255.
+        return controls, rgb_colors
 
 # Hand made colormap for the CIRA IR Default colormap
 # The XML file from AWIPS doesn't separate things very well or in a way that can be easily automated
@@ -380,6 +401,21 @@ red_trans = Colormap(colors=np.array([[0., 0., 0., 0.], [1., 0., 0., 1.]]))
 green_trans = Colormap(colors=np.array([[0., 0., 0., 0.], [0., 1., 0., 1.]]))
 blue_trans = Colormap(colors=np.array([[0., 0., 0., 0.], [0., 0., 1., 1.]]))
 
+
+class LazyColormap(object):
+    def __init__(self, cmap_class, cmap_file, **kwargs):
+        self.cmap_class = cmap_class
+        self.cmap_file = cmap_file
+        self.kwargs = kwargs
+        assert os.path.isfile(self.cmap_file)
+
+    def load(self):
+        LOG.debug("Loading colormap from file: {}".format(self.cmap_file))
+        return self.cmap_class(self.cmap_file, **self.kwargs)
+
+prob_severe = LazyColormap(AWIPSColormap, '/Users/davidh/repos/git/sift/sift/data/colormaps/OAX/prob_severe.cmap')
+
+
 VIS_COLORMAPS = OrderedDict([
     ('CA (Low Light Vis)', ca_low_light_vis),
     ('Linear', linear),
@@ -449,22 +485,12 @@ OTHER_COLORMAPS = OrderedDict([
     ('Green Transparency', green_trans),
     ('Blue Transparency', blue_trans),
     ('grays', _colormaps['grays']),
+    ('Prob Severe', prob_severe),
 ])
 
-ALL_COLORMAPS = {}
-ALL_COLORMAPS.update(_colormaps)  # vispy's colormaps
-ALL_COLORMAPS.update(VIS_COLORMAPS)
-ALL_COLORMAPS.update(IR_COLORMAPS)
-ALL_COLORMAPS.update(LIFTED_INDEX_COLORMAPS)
-ALL_COLORMAPS.update(PRECIP_COLORMAPS)
-ALL_COLORMAPS.update(SKIN_TEMP_COLORMAPS)
-ALL_COLORMAPS.update(WV_COLORMAPS)
-ALL_COLORMAPS.update(TOWRS_COLORMAPS)
-ALL_COLORMAPS.update(OTHER_COLORMAPS)
-
-
-USER_COLORMAPS = {}
-
+USER_COLORMAPS = OrderedDict()
+USER_CATEGORY = 'User'
+useable_vispy_cmaps = {k: v for k, v in _colormaps.items() if isinstance(v, BaseColormap)}
 CATEGORIZED_COLORMAPS = OrderedDict([
     ("Visible", VIS_COLORMAPS),
     ("IR", IR_COLORMAPS),
@@ -474,8 +500,164 @@ CATEGORIZED_COLORMAPS = OrderedDict([
     ("Water Vapor", WV_COLORMAPS),
     ("TOWR-S", TOWRS_COLORMAPS),
     ("Other", OTHER_COLORMAPS),
+    ("VisPy", useable_vispy_cmaps),
+    (USER_CATEGORY, USER_COLORMAPS),
 ])
 
 DEFAULT_UNKNOWN = "grays"
 DEFAULT_VIS = "Square Root (Vis Default)"
 DEFAULT_IR = "Rainbow (IR Default)"
+
+
+class ColormapManager(OrderedDict):
+
+    colormap_classes = {
+        '.json': PyQtGraphColormap,
+        '.cmap': AWIPSColormap,
+    }
+
+    # only these files can be overwritten
+    writeable_extensions = ['.json']
+
+    def __init__(self, categories=None):
+        super(ColormapManager, self).__init__()
+        # ColormapManager stores things a single level dictionary
+        # cmap_name -> Colormap object
+        # _category_dict stores them as cat_name -> {cmap_name -> Colormap}
+        self._category_dict = OrderedDict()
+        self._writeable_cmaps = set()
+
+        if isinstance(categories, dict):
+            categories = categories.items()
+        for item in categories:
+            if isinstance(item, str):
+                # must be the name of a category
+                self._category_dict[item] = []
+                continue
+            # must be a dictionary key -> val
+            key, val = item
+            if isinstance(val, (LazyColormap, BaseColormap)):
+                raise ValueError("ColormapManager expects dictionary of "
+                                 "categories, not colormaps.")
+            self._category_dict[key] = list(val.keys())
+            for k, v in val.items():
+                assert isinstance(v, (LazyColormap, BaseColormap))
+                super(ColormapManager, self).__setitem__(k, v)
+
+    def iter_colormaps(self, writeable_first=True):
+        all_cmaps = [(self.is_writeable_colormap(name), name) for name in self]
+        all_cmaps = sorted(all_cmaps, reverse=writeable_first)  # writeable first
+        for editable, cmap in all_cmaps:
+            try:
+                cmap_obj = self[cmap]
+            except KeyError:
+                # couldn't load a lazy colormap
+                continue
+            # check for _controls in vispy colormaps, can't use in gradient
+            # editor otherwise
+            if cmap_obj.colors and hasattr(cmap_obj, "_controls"):
+                yield cmap
+
+    def _files_for_dir(self, base_dir, recursive=True):
+        for subdir, dirs, files in os.walk(base_dir):
+            for file_to_import in files:
+                nfp = os.path.join(subdir, file_to_import)
+                file_stem, file_ext = os.path.splitext(file_to_import)
+                yield nfp, file_stem, file_ext
+            if not recursive:
+                break
+
+    def import_colormaps(self, base_dir_or_files, read_only=False, recursive=True):
+        added_colormaps = []
+        if not isinstance(base_dir_or_files, (list, tuple)):
+            files = self._files_for_dir(
+                base_dir_or_files, recursive=recursive)
+        else:
+            files = [
+                (pathname, *os.path.splitext(os.path.basename(pathname)))
+                for pathname in base_dir_or_files]
+
+        for pathname, file_stem, file_ext in files:
+            if file_ext not in self.colormap_classes:
+                continue
+            read_only = read_only or file_ext not in self.writeable_extensions
+            try:
+                cmap_class = self.colormap_classes[file_ext]
+                self.add_colormap(file_stem, LazyColormap(cmap_class, pathname),
+                                  read_only=read_only)
+                added_colormaps.append(file_stem)
+            except (ValueError, IOError):
+                LOG.error("Error importing colormap: {}".format(pathname))
+                raise
+        return added_colormaps
+
+    def is_writeable_colormap(self, name):
+        return name in self._writeable_cmaps
+
+    def user_colormaps(self):
+        return self.get_category(USER_CATEGORY, [])
+
+    def iter_categories(self):
+        """Generate category -> iterable of colormap names."""
+        for cat, cmap_list in self._category_dict.items():
+            yield cat, cmap_list
+
+    def get_category(self, cat_name, default=None):
+        return self._category_dict.get(cat_name, default)
+
+    def add_category(self, name, ignore_exist=False):
+        if not ignore_exist and name in self._category_dict:
+            raise ValueError("Category '{}' already exists".format(name))
+        self._category_dict.setdefault(name, [])
+
+    def add_colormap(self, name, colormap, category=USER_CATEGORY,
+                     read_only=True):
+        assert isinstance(colormap, (LazyColormap, BaseColormap))
+        self._category_dict.setdefault(category, []).append(name)
+        if not read_only:
+            self._writeable_cmaps.add(name)
+        super(ColormapManager, self).__setitem__(name, colormap)
+
+    def get_colormap(self, cmap_name, category=None):
+        if category is not None:
+            return self[category][cmap_name]
+
+        for cat, cat_dict in self.items():
+            if cmap_name in cat_dict:
+                val = cat_dict[cmap_name]
+                self._cmap_cache[cmap_name] = val
+                return val
+        raise KeyError("No colormap named '{}'".format(cmap_name))
+
+    def __getitem__(self, key):
+        val = super(ColormapManager, self).__getitem__(key)
+        if isinstance(val, LazyColormap):
+            try:
+                val = val.load()
+            except (ValueError, IOError, KeyError):
+                LOG.error("Could not load colormap '{}' from file "
+                          "'{}'".format(key, val.cmap_file))
+                raise KeyError("Failed to load lazy colormap '{}'".format(key))
+            super(ColormapManager, self).__setitem__(key, val)
+        return val
+
+    def get(self, key, default=None):
+        # need to override this otherwise `get` never calls `__getitem__`
+        if key in self:
+            return self[key]
+        else:
+            return default
+
+    def __setitem__(self, key, value):
+        self.add_colormap(key, value)
+
+    def __delitem__(self, key):
+        super(ColormapManager, self).__delitem__(key)
+        for cat_name, cat_list in self._category_dict.items():
+            try:
+                cat_list.remove(key)
+            except ValueError:
+                continue
+
+
+COLORMAP_MANAGER = ColormapManager(CATEGORIZED_COLORMAPS)

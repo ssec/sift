@@ -82,11 +82,10 @@ from sift.queue import TASK_DOING, TASK_PROGRESS, TaskQueue
 from sift.workspace import Workspace
 from sift.util.default_paths import DOCUMENT_SETTINGS_DIR
 from sift.model.composite_recipes import RecipeManager, CompositeRecipe
-from sift.view.Colormap import ALL_COLORMAPS, USER_COLORMAPS
+from sift.view.Colormap import COLORMAP_MANAGER, PyQtGraphColormap
 from sift.queue import TASK_PROGRESS, TASK_DOING
 from PyQt4.QtCore import QObject, pyqtSignal
 
-from colormap import rgb2hex
 from vispy.color.colormap import Colormap
 
 
@@ -998,9 +997,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self._workspace = workspace
         self._layer_sets = [DocLayerStack(self)] + [None] * (layer_set_count - 1)
         self._layer_with_uuid = {}
-        # FIXME: Copy?
-        self.colormaps = ALL_COLORMAPS
-        self.usermaps = USER_COLORMAPS
+        self.colormaps = COLORMAP_MANAGER
         self.available_projections = OrderedDict((
             ('Mercator', {
                 'proj4_str': '+proj=merc +datum=WGS84 +ellps=WGS84 +over',
@@ -1060,29 +1057,16 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self._families = defaultdict(list)
 
         # Create directory if it does not exist
-        filepath = os.path.join(self.config_dir, 'colormaps')
-        if not os.path.exists(filepath):
-            os.makedirs(filepath)
-
-        # Import data
-        qtData = {}
-        for subdir, dirs, files in os.walk(filepath):
-            for ToImportFile in files:
-                nfp = os.path.join(subdir, ToImportFile)
-                try:
-                    if os.path.splitext(ToImportFile)[1] != ".json":
-                        continue
-                    ifile = open(nfp, "r")
-                    toImport = json.loads(ifile.read())
-                    qtData[os.path.splitext(ToImportFile)[0]] = toImport
-                except IOError:
-                    LOG.error("Error importing gradient")
-                    raise
-                except ValueError:
-                    raise
-
-        for item in qtData:
-            self.add_to_maps(qtData[item], item)
+        cmap_base_dir = os.path.join(self.config_dir, 'colormaps')
+        read_cmap_dir = os.path.join(cmap_base_dir, 'site')  # read-only
+        write_cmap_dir = os.path.join(cmap_base_dir, 'user')  # writeable
+        self.read_cmap_dir = read_cmap_dir
+        self.write_cmap_dir = write_cmap_dir
+        for read_only, cmap_dir in [(True, read_cmap_dir), (False, write_cmap_dir)]:
+            if not os.path.exists(cmap_dir):
+                os.makedirs(cmap_dir)
+            else:
+                self.colormaps.import_colormaps(cmap_dir, read_only=read_only)
 
         # timeline document storage setup with initial track order and time range
         self.product_state = defaultdict(flags)
@@ -1151,64 +1135,31 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 self.projection_info(self.current_projection)
             )
 
-    def add_to_maps(self, colorItem, name):
-        pointList = colorItem["ticks"]
-        floats = []
-        hexes = []
-        for point in pointList:
-            floats.append(point[0])
-            rgb = point[1]
-            hexCode = rgb2hex(rgb[0], rgb[1], rgb[2])
-            hexes.append(hexCode)
-
-        floats, hexes = zip(*sorted(zip(floats, hexes)))
-
-        floats = list(floats)
-        hexes = list(hexes)
-
-        if floats[0] != 0:
-            floats = [0] + floats
-            hexes = [hexes[0]] + hexes
-        if floats[-1] != 1:
-            floats.append(1)
-            hexes.append(hexes[-1])
-
+    def update_user_colormap(self, colormap, name):
+        # Update new gradient into save location
         try:
-            toAdd = Colormap(colors=hexes, controls=floats)
-            self.colormaps[name] = toAdd
-            self.usermaps[name] = toAdd
-        except AssertionError:
-            LOG.error("Error creating or setting colormap")
-            raise
-
-    # Update new gradient into save location
-    def updateGCColorMap(self, colorMap, name):
-        filepath = os.path.join(self.config_dir, 'colormaps')
-
-        try:
-            iFile = open(os.path.join(filepath, name + '.json'), 'w')
-            iFile.write(json.dumps(colorMap, indent=2, sort_keys=True))
-            iFile.close()
+            filepath = self.write_cmap_dir
+            cmap_file = open(os.path.join(filepath, name + '.json'), 'w')
+            cmap_file.write(json.dumps(colormap, indent=2, sort_keys=True))
+            cmap_file.close()
         except IOError:
-            LOG.error("Error saving gradient")
+            LOG.error("Error saving gradient: {}".format(name),
+                      exc_info=True)
 
-        self.add_to_maps(colorMap, name)
+        cmap = PyQtGraphColormap(colormap)
+        self.colormaps[name] = cmap
 
         # Update live map
-        self.change_colormap_for_layers(name)
+        uuids = [p.uuid for _, p, _ in self.current_layers_where(colormaps=[name])]
+        self.change_colormap_for_layers(name, uuids)
 
-
-    # Remove gradient from save location (on delete)
-    def removeGCColorMap(self, name):
+    def remove_user_colormap(self, name):
         try:
-            os.remove(os.path.join(self.config_dir, 'colormaps', name + '.json'))
+            os.remove(os.path.join(self.config_dir, 'colormaps', 'user', name + '.json'))
         except OSError:
             pass
 
         del self.colormaps[name]
-        del self.usermaps[name]
-
-
 
     def current_projection_index(self):
         return list(self.available_projections.keys()).index(self.current_projection)
@@ -1794,7 +1745,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.didChangeColormap.emit(nfo)
 
     def current_layers_where(self, kinds=None, bands=None, uuids=None,
-                             dataset_names=None, wavelengths=None):
+                             dataset_names=None, wavelengths=None, colormaps=None):
         """check current layer list for criteria and yield"""
         L = self.current_layer_set
         for idx,p in enumerate(L):
@@ -1808,6 +1759,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             if (dataset_names is not None) and (layer[INFO.DATASET_NAME] not in dataset_names):
                 continue
             if (wavelengths is not None) and (layer.get(INFO.CENTRAL_WAVELENGTH) not in wavelengths):
+                continue
+            if (colormaps is not None) and (p.colormap not in colormaps):
                 continue
             yield (idx, p, layer)
 

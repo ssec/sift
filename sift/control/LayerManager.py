@@ -25,7 +25,7 @@ from sift.control.layer_tree import LayerStackTreeViewModel
 from sift.model.layer import DocRGBLayer
 from sift.ui.custom_widgets import QNoScrollWebView
 import numpy as np
-from sift.view.Colormap import ALL_COLORMAPS
+from sift.view.Colormap import COLORMAP_MANAGER
 
 LOG = logging.getLogger(__name__)
 
@@ -376,6 +376,6 @@ class SingleLayerInfoPane(QObject):
             if shared_info.get("colormap", None) is None:
                 self.cmap_vis.setHtml("")
             else:
-                cmap_html = ALL_COLORMAPS[shared_info["colormap"]]._repr_html_()
+                cmap_html = COLORMAP_MANAGER[shared_info["colormap"]]._repr_html_()
                 cmap_html = cmap_html.replace("height", "border-collapse: collapse;\nheight")
                 self.cmap_vis.setHtml("""<html><head></head><body style="margin: 0px"><div>%s</div></body></html>""" % (cmap_html,))

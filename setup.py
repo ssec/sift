@@ -187,7 +187,7 @@ setup(
     install_requires=['numpy', 'pillow', 'scipy', 'numba', 'vispy>0.4.0',
                       'PyOpenGL', 'netCDF4', 'h5py', 'pyproj', 'gdal',
                       'pyshp', 'shapely', 'rasterio', 'goesr', 'sqlalchemy',
-                      'goesr', 'appdirs', 'pyyaml', 'pyqtgraph', 'colormap',
+                      'goesr', 'appdirs', 'pyyaml', 'pyqtgraph',
                       ],
     python_requires='>=3.6',
     extras_require=extras_require,

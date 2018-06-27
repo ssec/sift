@@ -36,7 +36,6 @@ requirements:
     - shapely
     - sqlalchemy
     - pyqtgraph
-    - colormap
     - pyqt <5
     - appdirs
     - pyyaml
