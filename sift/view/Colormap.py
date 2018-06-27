@@ -4,13 +4,19 @@
 """
 
 from vispy.color.colormap import (Colormap, BaseColormap, _mix_simple,
-                                  _colormaps, _default_controls)
+                                  _colormaps)
 
 import os
 import json
 import logging
 import numpy as np
 from collections import OrderedDict
+from sift.util import get_package_data_dir
+
+CMAP_BASE_DIR = os.path.join(get_package_data_dir(), 'colormaps')
+AWIPS_DIR = os.path.join(CMAP_BASE_DIR, 'OAX', 'GOES-R')
+
+
 
 LOG = logging.getLogger(__name__)
 
@@ -181,17 +187,15 @@ class BlockedColormap(Colormap):
 class AWIPSColormap(Colormap):
     def __init__(self, awips_file, flipped=False, interpolation='linear'):
         colors = _get_awips_colors(awips_file)
-        controls = _default_controls(len(colors))
         if flipped:
-            controls = controls[::-1]
-        super(AWIPSColormap, self).__init__(colors, controls=controls,
-                                            interpolation=interpolation)
+            colors = colors[::-1]
+        assert isinstance(colors, np.ndarray)
+        super(AWIPSColormap, self).__init__(colors, interpolation=interpolation)
 
 
 class PyQtGraphColormap(Colormap):
     def __init__(self, json_file_or_pqg_cmap, **kwargs):
         if isinstance(json_file_or_pqg_cmap, str):
-            import json
             file_data = json.load(open(json_file_or_pqg_cmap, 'r'))
         else:
             file_data = json_file_or_pqg_cmap
@@ -413,9 +417,6 @@ class LazyColormap(object):
         LOG.debug("Loading colormap from file: {}".format(self.cmap_file))
         return self.cmap_class(self.cmap_file, **self.kwargs)
 
-prob_severe = LazyColormap(AWIPSColormap, '/Users/davidh/repos/git/sift/sift/data/colormaps/OAX/prob_severe.cmap')
-
-
 VIS_COLORMAPS = OrderedDict([
     ('CA (Low Light Vis)', ca_low_light_vis),
     ('Linear', linear),
@@ -423,11 +424,16 @@ VIS_COLORMAPS = OrderedDict([
     ('Square Root (Vis Default)', SquareRootColormap()),
 ])
 
+
 IR_COLORMAPS = OrderedDict([
-    ('Rainbow (IR Default)', color11new),
+    ('Rainbow (IR Default)', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'IR', 'Rainbow_11_bit.cmap'), flipped=True)),
+    # ('Rainbow (legacy)', color11new),
     ('CIRA IR', cira_ir_default),
-    ('Fog', fog),
+    ('Fog', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'IR', 'fogdiff_blue.cmap'))),
+    # ('Fog (legacy)', fog),
     ('IR WV', ir_wv),
+    ('Dust and Moisture Split Window', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'IR', 'dust_and_moisture_split_window.cmap'))),
+    # ('Dust and Moisture Split Window (legacy)', dust_and_moisture_split_window),
 ])
 
 LIFTED_INDEX_COLORMAPS = OrderedDict([
@@ -451,28 +457,39 @@ SKIN_TEMP_COLORMAPS = OrderedDict([
 WV_COLORMAPS = OrderedDict([
     ('Gray Scale Water Vapor', gray_scale_water_vapor),
     ('NSSL VAS (WV Alternate)', nssl_vas_wv_alternate),
-    ('RAMSDIS WV', ramsdis_wv),
+    # ('RAMSDIS WV', ramsdis_wv),
     ('SLC WV', slc_wv),
 ])
 
 TOWRS_COLORMAPS = OrderedDict([
-    ('ACTP', actp),
-    ('ADP', adp),
-    ('RRQPE', rrqpe),
-    ('VTRSB', vtrsb),
+    ('ACTP', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'GOESR-L2', 'ACTP.cmap'))),
+    # ('ACTP (legacy)', actp),
+    ('ADP', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'GOESR-L2', 'ADP.cmap'))),
+    # ('ADP (legacy)', adp),
+    ('RRQPE', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'GOESR-L2', 'RRQPE.cmap'))),
+    # ('RRQPE (legacy)', rrqpe),
+    ('VTRSB', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'GOESR-L2', 'VTRSB.cmap'))),
+    # ('VTRSB (legacy)', vtrsb),
     ('CAPE', colorhcapeh10),
     ('LI', colorhlih10),
     ('PW10', colorhpw10h10),
     ('PW8', colorhpw8h10),
-    ('IR Color Clouds Summer', ir_color_clouds_summer),
-    ('IR Color Clouds Winter', ir_color_clouds_winter),
-    ('WV Dry Yellow', wv_dry_yellow),
-    ('Dust and Moisture Split', dust_and_moisture_split_window),
-    ('Enhanced Rainbow', enhancedhrainbowh11),
-    ('Enhanced RB Warmer Yellow', enhancedhrainbow_warmer_yellow),
-    ('Fire Detection', fire_detection_3p9),
-    ('RAMSDIS IR', ramsdis_ir_12bit),
-    ('RAMSDIS WV', ramsdis_wv_12bit),
+    ('IR Color Clouds Summer', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'IR', 'IR_Color_Clouds_Summer.cmap'), flipped=True)),
+    # ('IR Color Clouds Summer (legacy)', ir_color_clouds_summer),
+    ('IR Color Clouds Winter', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'IR', 'IR_Color_Clouds_Winter.cmap'), flipped=True)),
+    # ('IR Color Clouds Winter (legacy)', ir_color_clouds_winter),
+    ('WV Dry Yellow', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'IR', 'WV_Dry_Yellow.cmap'), flipped=True)),
+    # ('WV Dry Yellow (legacy)', wv_dry_yellow),
+    ('Enhanced Rainbow', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'IR', 'enhanced-rainbow-11.cmap'), flipped=True)),
+    # ('Enhanced Rainbow (legacy)', enhancedhrainbowh11),
+    ('Enhanced RB Warmer Yellow', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'IR', 'enhanced-rainbow_warmer_yellow.cmap'), flipped=True)),
+    # ('Enhanced RB Warmer Yellow (legacy)', enhancedhrainbow_warmer_yellow),
+    ('Fire Detection', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'IR', 'fire_detection_3.9.cmap'), flipped=True)),
+    # ('Fire Detection (legacy)', fire_detection_3p9),
+    ('RAMSDIS IR', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'IR', 'ramsdis_IR_12bit.cmap'), flipped=True)),
+    # ('RAMSDIS IR (legacy)', ramsdis_ir_12bit),
+    ('RAMSDIS WV', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'IR', 'ramsdis_WV_12bit.cmap'), flipped=True)),
+    # ('RAMSDIS WV (legacy)', ramsdis_wv_12bit),
 ])
 
 OTHER_COLORMAPS = OrderedDict([
@@ -485,13 +502,17 @@ OTHER_COLORMAPS = OrderedDict([
     ('Green Transparency', green_trans),
     ('Blue Transparency', blue_trans),
     ('grays', _colormaps['grays']),
-    ('Prob Severe', prob_severe),
+    ('Prob Severe', LazyColormap(AWIPSColormap, os.path.join(CMAP_BASE_DIR, 'OAX', 'prob_severe.cmap'))),
 ])
 
 USER_COLORMAPS = OrderedDict()
 USER_CATEGORY = 'User'
+SITE_COLORMAPS = OrderedDict()
+SITE_CATEGORY = 'Site'
 useable_vispy_cmaps = {k: v for k, v in _colormaps.items() if isinstance(v, BaseColormap)}
 CATEGORIZED_COLORMAPS = OrderedDict([
+    (USER_CATEGORY, USER_COLORMAPS),
+    (SITE_CATEGORY, SITE_COLORMAPS),
     ("Visible", VIS_COLORMAPS),
     ("IR", IR_COLORMAPS),
     ("Lifted Index", LIFTED_INDEX_COLORMAPS),
@@ -501,7 +522,6 @@ CATEGORIZED_COLORMAPS = OrderedDict([
     ("TOWR-S", TOWRS_COLORMAPS),
     ("Other", OTHER_COLORMAPS),
     ("VisPy", useable_vispy_cmaps),
-    (USER_CATEGORY, USER_COLORMAPS),
 ])
 
 DEFAULT_UNKNOWN = "grays"
@@ -544,6 +564,14 @@ class ColormapManager(OrderedDict):
                 assert isinstance(v, (LazyColormap, BaseColormap))
                 super(ColormapManager, self).__setitem__(k, v)
 
+    def __iter__(self):
+        for cat, cat_dict in self._category_dict.items():
+            for cmap_name in cat_dict:
+                yield cmap_name
+
+    def keys(self):
+        return iter(self)
+
     def iter_colormaps(self, writeable_first=True):
         all_cmaps = [(self.is_writeable_colormap(name), name) for name in self]
         all_cmaps = sorted(all_cmaps, reverse=writeable_first)  # writeable first
@@ -567,7 +595,8 @@ class ColormapManager(OrderedDict):
             if not recursive:
                 break
 
-    def import_colormaps(self, base_dir_or_files, read_only=False, recursive=True):
+    def import_colormaps(self, base_dir_or_files, read_only=False, recursive=True,
+                         category=USER_CATEGORY):
         added_colormaps = []
         if not isinstance(base_dir_or_files, (list, tuple)):
             files = self._files_for_dir(
@@ -584,9 +613,10 @@ class ColormapManager(OrderedDict):
             try:
                 cmap_class = self.colormap_classes[file_ext]
                 self.add_colormap(file_stem, LazyColormap(cmap_class, pathname),
+                                  category=category,
                                   read_only=read_only)
                 added_colormaps.append(file_stem)
-            except (ValueError, IOError):
+            except (ValueError, IOError, KeyError):
                 LOG.error("Error importing colormap: {}".format(pathname))
                 raise
         return added_colormaps
@@ -637,6 +667,8 @@ class ColormapManager(OrderedDict):
             except (ValueError, IOError, KeyError):
                 LOG.error("Could not load colormap '{}' from file "
                           "'{}'".format(key, val.cmap_file))
+                LOG.debug("Colormap import error: ", exc_info=True)
+                del self[key]
                 raise KeyError("Failed to load lazy colormap '{}'".format(key))
             super(ColormapManager, self).__setitem__(key, val)
         return val

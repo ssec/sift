@@ -82,7 +82,7 @@ from sift.queue import TASK_DOING, TASK_PROGRESS, TaskQueue
 from sift.workspace import Workspace
 from sift.util.default_paths import DOCUMENT_SETTINGS_DIR
 from sift.model.composite_recipes import RecipeManager, CompositeRecipe
-from sift.view.Colormap import COLORMAP_MANAGER, PyQtGraphColormap
+from sift.view.Colormap import COLORMAP_MANAGER, PyQtGraphColormap, SITE_CATEGORY, USER_CATEGORY
 from sift.queue import TASK_PROGRESS, TASK_DOING
 from PyQt4.QtCore import QObject, pyqtSignal
 
@@ -1062,11 +1062,17 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         write_cmap_dir = os.path.join(cmap_base_dir, 'user')  # writeable
         self.read_cmap_dir = read_cmap_dir
         self.write_cmap_dir = write_cmap_dir
-        for read_only, cmap_dir in [(True, read_cmap_dir), (False, write_cmap_dir)]:
+        importable_cmap_cats = [
+            (True, SITE_CATEGORY, read_cmap_dir),
+            (False, USER_CATEGORY, write_cmap_dir)
+        ]
+        for read_only, cmap_cat, cmap_dir in importable_cmap_cats:
             if not os.path.exists(cmap_dir):
                 os.makedirs(cmap_dir)
             else:
-                self.colormaps.import_colormaps(cmap_dir, read_only=read_only)
+                self.colormaps.import_colormaps(cmap_dir,
+                                                read_only=read_only,
+                                                category=cmap_cat)
 
         # timeline document storage setup with initial track order and time range
         self.product_state = defaultdict(flags)
