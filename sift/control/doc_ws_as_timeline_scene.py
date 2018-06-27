@@ -182,7 +182,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
             if ts._sync_and_update_frame(uuid) is None:
                 LOG.info("no corresponding frame glyph, re-syncing timeline")
                 ts.sync_available_tracks()
-                ts.update()
+                ts.sync_items()
         doc.didAddBasicLayer.connect(refresh_with_new_product)
         doc.didAddCompositeLayer.connect(refresh_with_new_product)
 
@@ -192,7 +192,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
             if None == ts._sync_and_update_frame(uuid):
                 LOG.warning("no corresponding frame glyph after rename??; re-syncing timeline")
                 ts.sync_available_tracks()
-                ts.update()
+                ts.sync_items()
         doc.didChangeLayerName.connect(refresh_product_new_name)
 
         # def refresh_track_order(self, added_tracks, removed_tracks, ts=self):
@@ -205,7 +205,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         def refresh(changed_uuids, ts=self, *args, **kwargs):
             LOG.debug("updating timeline for {} changed products".format(len(changed_uuids)))
             ts.sync_available_tracks()
-            ts.update(changed_frame_uuids=changed_uuids)
+            ts.sync_items(changed_frame_uuids=changed_uuids)
         ws.didUpdateProductsMetadata.connect(refresh)
 
         def refresh_product(uuid, state, *args, **kwargs):
@@ -273,7 +273,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         actions[menu.addAction("Deactivate")] = _deactivate
         return menu, actions
 
-    def update(self, changed_tracks: Optional[Iterable[str]]=None, changed_frame_uuids: Optional[Iterable[UUID]]=None):
+    def sync_items(self, changed_tracks: Optional[Iterable[str]]=None, changed_frame_uuids: Optional[Iterable[UUID]]=None):
         """Populate or update scene, returning number of items changed in scene
         Does not add new items for tracks and frames already present
         Parameters serve only as hints
@@ -292,6 +292,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
             LOG.warning("NOT IMPLEMENTED: selectively updating {} tracks in timeline".format(len(list(changed_tracks))))
         if not acted:
             self._invalidate()
+        self.update()
 
 
 

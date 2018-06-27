@@ -568,7 +568,7 @@ class Main(QtGui.QMainWindow):
         gv.setScene(self._timeline_scene)
         APP.aboutToQuit.connect(self._timeline_scene.clear)
 
-        self._timeline_scene.update()
+        self._timeline_scene.sync_items()
 
     def __init__(self, config_dir=None, cache_dir=None, cache_size=None, glob_pattern=None, search_paths=None, border_shapefile=None, center=None):
         super(Main, self).__init__()
