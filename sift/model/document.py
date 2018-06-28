@@ -722,7 +722,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         def _bgnd_ensure_content_loaded(ws=self.ws, frames=frames):
             ntot = len(frames)
             for nth, frame in enumerate(frames):
-                yield {TASK_DOING: "importing {}/{}".format(nth+1, ntot), TASK_PROGRESS: float(nth)/float(ntot)}
+                yield {TASK_DOING: "importing {}/{}".format(nth+1, ntot), TASK_PROGRESS: float(nth+1)/float(ntot+1)}
                 ws.import_product_content(frame)
 
         def _then_show_frames_in_document(doc = self.doc, frames = frames):
