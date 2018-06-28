@@ -197,21 +197,21 @@ class GradientControl(QtGui.QDialog):
 
     # Update the colorbar with the newly selected gradient
     def updateColorBar(self):
+        # FIXME: isn't this redundant?
         self.sqrt.setCheckState(False)
 
-        if self.cmap_list.item(self.cmap_list.currentRow()).text() in self.user_colormap_states:
+        cmap_name = self.cmap_list.item(self.cmap_list.currentRow()).text()
+        if cmap_name in self.user_colormap_states:
             NewBar = self.user_colormap_states[self.cmap_list.item(self.cmap_list.currentRow()).text()]
             self.ColorBar.restoreState(NewBar)
 
-        if self.cmap_list.item(self.cmap_list.currentRow()).text() in self.builtin_colormap_states:
+        if cmap_name in self.builtin_colormap_states:
             NewBar = self.builtin_colormap_states[self.cmap_list.item(self.cmap_list.currentRow()).text()]
             self.ColorBar.restoreState(NewBar)
 
-        SelectedThings = self.cmap_list.selectedItems()
-
-        # Bunch of functions determing which buttons to enable / disable
-
+        # Bunch of functions determining which buttons to enable / disable
         showDel = True
+        SelectedThings = self.cmap_list.selectedItems()
         for thing in SelectedThings:
             if thing.text() in self.builtin_colormap_states:
                 showDel = False
