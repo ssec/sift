@@ -16,37 +16,19 @@ build:
   number: 0
 
 requirements:
-  build:
+  host:
     - python >=3.6
     - setuptools
-    - numpy >=1.12
-    - gdal >=2.1,<2.2
-    - rasterio
-    - matplotlib
-    - scipy
-    - numba >=0.30
-    - pyproj >=1.9.4
-    - vispy ==0.5.0dev2
-    - goesr >=0.4.2 # via Ray Garcia, on sift channel
-    - pyopengl
-    - netcdf4
-    - h5py
-    - pillow
-    - pyshp
-    - shapely
-    - sqlalchemy
-    - pyqtgraph
-    - pyqt <5
-    - appdirs
-    - pyyaml
+    - pip
     - cython >=0.17 # [win]
     # this is only needed because of a weird bug with netcdf4
     # https://github.com/conda-forge/netcdf4-feedstock/issues/33
     - cython >=0.19 # [unix]
-    - quamash
 
   run:
     - python >=3.6
+    - setuptools
+    - pip
     - numpy >=1.12
     - gdal >=2.1,<2.2
     - rasterio
@@ -69,6 +51,7 @@ requirements:
     - appdirs
     - pyyaml
     - quamash
+    - satpy
 
 test:
   commands:
