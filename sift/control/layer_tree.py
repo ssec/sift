@@ -37,7 +37,7 @@ import logging, sys, os
 import pickle as pkl
 from PyQt4.QtCore import QAbstractItemModel, QAbstractListModel, Qt, QSize, QModelIndex, QPoint, QMimeData, pyqtSignal, QRect
 from PyQt4.QtGui import QTreeView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyle, QColor, QFont, QStyleOptionViewItem, QItemSelection, QItemSelectionModel, QPen
-from sift.model.document import Document
+from sift.model.document import Document, DocumentAsLayerStack
 from sift.common import INFO, KIND, get_font_size
 from sift.view.colormap_dialogs import ChangeColormapDialog
 
@@ -57,7 +57,8 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     set for a specific column, controls the rendering and editing of items in that column or row of a list or table
     see QAbstractItemView.setItemDelegateForRow/Column
     """
-    _doc = None  # document we're representing
+    _doc: Document = None  # document we're representing
+    # _doc: DocumentAsLayerStack = None  # document we're representing
 
     def layer_prez(self, index:int):
         cll = self._doc.current_layer_set
@@ -66,6 +67,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     def __init__(self, doc:Document, *args, **kwargs):
         super(LayerWidgetDelegate, self).__init__(*args, **kwargs)
         self._doc = doc
+        # self._doc = doc.as_layer_stack
         fsize = get_font_size(7)
         self.font = QFont('Andale Mono')
         self.font.setPointSizeF(fsize)

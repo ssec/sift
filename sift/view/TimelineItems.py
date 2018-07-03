@@ -149,6 +149,8 @@ class QTrackItem(QGraphicsObject):
         self._state = flags(state or [])
         self._colormap = colormap
         self._min, self._max = min, max
+        self.setToolTip(tooltip or "{}\n{}".format(title, subtitle))
+        self.setFlag(QGraphicsItem.ItemClipsChildrenToShape, enabled=True)
         self.update_pos_bounds()
         self._update_decorations()
         scene.add_track(self)
@@ -360,6 +362,9 @@ class QFrameItem(QGraphicsObject):
     _thumb: QPixmap = None
     _metadata: Mapping = None
     _bounds: QRectF = QRectF()
+    # decorations
+    _gi_title = None
+    _gi_subtitle = None
 
     def __init__(self, track: QTrackItem, scale: CoordTransform, uuid: UUID,
                  start: datetime, duration: timedelta, state: flags,
@@ -387,6 +392,7 @@ class QFrameItem(QGraphicsObject):
         self._thumb = thumb
         self._metadata = metadata
         self._uuid = uuid
+        self.setToolTip("{}\n{}".format(title, subtitle))
         # self._pen, self._brush = track.default_frame_pen_brush
         # if pen:
         #     LOG.debug('setting pen')
@@ -399,7 +405,27 @@ class QFrameItem(QGraphicsObject):
         self.update_bounds()
         track.update_pos_bounds()
         track.update_frame_positions()
+        self.setFlag(QGraphicsItem.ItemClipsChildrenToShape, enabled=True)
+        self._update_decorations()
         # self.setAcceptDrops(True)
+
+    def _update_decorations(self):
+        """Add decor sub-items to self
+        title, subtitle, icon, colormap
+        these are placed left of the local origin inside the _left_pad area
+        """
+        scene = self.scene_
+        if self._title:
+            self._gi_title = it = self._gi_title or scene.addSimpleText(self._title)
+            it.setParentItem(self)
+            it.setPos(GFXC.frame_title_pos)
+        if self._subtitle:
+            self._gi_subtitle = it = self._gi_subtitle or scene.addSimpleText(self._subtitle)
+            it.setParentItem(self)
+            it.setPos(GFXC.frame_subtitle_pos)
+        # FUTURE: add draggable color-map pixmap
+
+
 
     @property
     def scene_(self):
@@ -437,13 +463,22 @@ class QFrameItem(QGraphicsObject):
     def state(self, new_state: VisualState):
         if new_state != self._state:
             self._state = new_state
-            self.update()
 
     # painting and boundaries
 
+    @property
+    def pen_brush(self) -> Tuple[QPen, QBrush]:
+        """Pen and brush to use, based on VisualState
+        """
+        pen, brush = self._track().default_frame_pen_brush
+        s = self._state
+        if VisualState.READY in s:
+            brush = QBrush(Qt.green, Qt.SolidPattern)
+        return pen, brush
+
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget=None) -> None:
         # LOG.debug("QFrameItem.paint")
-        pen, brush = self._track().default_frame_pen_brush
+        pen, brush = self.pen_brush
         rect = self.boundingRect()
         painter.setBrush(brush)
         painter.setPen(pen)

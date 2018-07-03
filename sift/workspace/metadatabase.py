@@ -36,7 +36,7 @@ from datetime import datetime, timedelta
 from sift.common import INFO, FCS_SEP
 from functools import reduce
 from uuid import UUID
-from collections import ChainMap, MutableMapping, Iterable
+from collections import ChainMap, MutableMapping, Iterable, defaultdict
 from typing import Mapping
 
 from sqlalchemy import Table, Column, Integer, String, UnicodeText, Unicode, ForeignKey, DateTime, Interval, PickleType, Float, create_engine
@@ -686,8 +686,10 @@ class Metadatabase(object):
     engine = None
     connection = None
     session_factory = None
+    session_nesting = None
 
     def __init__(self, uri=None, **kwargs):
+        self.session_nesting = defaultdict(int)
         global _MDB
         if _MDB is not None:
             raise AssertionError('Metadatabase is a singleton and already exists')
@@ -732,15 +734,26 @@ class Metadatabase(object):
         return self.session_factory()
 
     def __enter__(self) -> Session:
-        return self.SessionRegistry()
+        ses = self.SessionRegistry()
+        self.session_nesting[id(ses)] += 1
+        return ses
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        # fetch the active session, typically zero or one active per thread
         s = self.SessionRegistry()
-        if exc_val is not None:
-            s.rollback()
-        else:
-            s.commit()
-        s.close()
+        self.session_nesting[id(s)] -= 1
+        if self.session_nesting[id(s)] <= 0:
+            if s.dirty:
+                if exc_val is not None:
+                    s.rollback()
+                else:
+                    s.commit()
+            s.close()
+            del self.session_nesting[id(s)]
+        else:  # we're in a nested context for this session
+            if exc_val is not None:  # propagate the exception to the outermost session context
+                LOG.warning('propagating database exception to outermost context')
+                raise exc_val
 
     #
     # high-level functions

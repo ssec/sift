@@ -75,9 +75,10 @@ from weakref import ref
 import os
 import json
 import warnings
+from sqlalchemy.orm import Session
 
 from sift.workspace.metadatabase import Product
-from sift.common import KIND, INFO, prez, span, FCS_SEP, ZList, flags
+from sift.common import KIND, INFO, prez, span, FCS_SEP, ZList, flags, STATE
 from sift.queue import TASK_DOING, TASK_PROGRESS, TaskQueue
 from sift.workspace import Workspace
 from sift.util.default_paths import DOCUMENT_SETTINGS_DIR
@@ -321,10 +322,30 @@ class DocumentAsContextBase(object):
 #         raise NotImplementedError()
 
 
+###################################################################################################################
+
+
+class LayerInfo(T.NamedTuple):
+    uuid: UUID
+    time_label: str
+    presentation: prez
+    f_convert: T.Callable
+    f_format: T.Callable
+
+    @property
+    def colormap(self):
+        return self.presentation.colormap
+
+    @property
+    def climits(self):
+        return self.presentation.climits
+
+
 class DocumentAsLayerStack(DocumentAsContextBase):
     """ Represent the document as a list of current layers
     As we transition to timeline model, this stops representing products and starts being a track stack
     """
+    _all_active: bool = False  # whether to represent all active products in document timespan, or just the ones under the playhead
 
     def __enter__(self):
         raise NotImplementedError()
@@ -337,6 +358,136 @@ class DocumentAsLayerStack(DocumentAsContextBase):
             # commit code
             pass
         raise NotImplementedError()
+
+    @property
+    def current_layer_set(self) -> DocLayerStack:
+        warnings.warn("this compatibility interface changes for full timeline model", DeprecationWarning)
+        return self.doc.current_layer_set
+
+    def uuid_for_current_layer(self, layer_index: int) -> UUID:
+        """given layer index from 0==top_z, return UUID of product
+        """
+        warnings.warn("this compatibility interface is currently not implemented", DeprecationWarning)
+        return self.doc.uuid_for_current_layer(layer_index)
+
+    def _layer_info_for_uuid(self, uuid) -> LayerInfo:
+        with self.mdb as s:
+            prod = s.query(Product).filter_by(uuid_str=str(uuid)).first()
+            nfo = prod.info
+            return LayerInfo(uuid=uuid,
+                             time_label=nfo.get(INFO.DISPLAY_TIME, '--:--'),
+                             presentation=self.doc.family_presentation[prod.family],
+                             f_convert=nfo.get(INFO.UNIT_CONVERSION)[1],
+                             f_format=nfo.get(INFO.UNIT_CONVERSION)[2])
+
+    @property
+    def current_layer_uuid_order(self):
+        """ the current active products in top-to-bottom order
+        """
+        if self._all_active:
+            # yield all active products in track order, but decline to rearrange
+            raise NotImplementedError()
+        else:
+            # yield the active products under the current playhead
+            raise NotImplementedError()
+
+    def prez_for_uuid(self, uuid: UUID) -> prez:
+        """presentation settings for the product uuid
+        """
+        return self.doc.family_presentation[self.doc.family_for_product_or_layer(uuid)]
+
+    def time_label_for_uuid(self, uuid):
+        """used to update animation display when a new frame is shown
+        """
+        if not uuid:
+            return "YYYY-MM-DD HH:MM"
+        return self._layer_info_for_uuid(uuid).time_label
+
+    def prez_for_uuids(self, uuids, lset=None):
+        for uuid in uuids:
+            yield self.prez_for_uuid(uuid)
+        # if lset is None:
+        #     lset = self.current_layer_set
+        # for p in lset:
+        #     if p.uuid in uuids:
+        #         yield p
+
+    def colormap_for_uuids(self, uuids, lset=None):
+        for p in self.prez_for_uuids(uuids, lset=lset):
+            yield p.colormap
+
+    def colormap_for_uuid(self, uuid, lset=None):
+        for p in self.colormap_for_uuids((uuid,), lset=lset):
+            return p
+
+    def valid_range_for_uuid(self, uuid):
+        # Limit ourselves to what information
+        # in the future valid range may be different than the default CLIMs
+        return self._layer_info_for_uuid(uuid).climits
+        # return self[uuid][INFO.CLIM]
+
+    def convert_value(self, uuid, x, inverse=False):
+        return self._layer_info_for_uuid(uuid).f_convert(x, inverse=inverse)
+        # return self[uuid][INFO.UNIT_CONVERSION][1](x, inverse=inverse)
+
+    def format_value(self, uuid, x, numeric=True, units=True):
+        return self._layer_info_for_uuid(uuid).f_format(x, numeric=numeric, units=units)
+        # return self[uuid][INFO.UNIT_CONVERSION][2](x, numeric=numeric, units=units)
+
+    def flipped_for_uuids(self, uuids, lset=None):
+        for p in self.prez_for_uuids(uuids, lset=lset):
+            default_clim = p.climits
+            # default_clim = self._layer_with_uuid[p.uuid][INFO.CLIM]
+            yield ((p.climits[1] - p.climits[0]) > 0) != ((default_clim[1] - default_clim[0]) > 0)
+
+    def __len__(self):
+        """Return active track count
+        """
+        return self.doc.track_order.top_z + 1
+
+    def _product_info_under_playhead_for_family(self, family: str) -> T.Mapping:
+        """Return the product info dictionary for
+        """
+        raise NotImplementedError("need to consult mdb to get product info dictionary under playhead")
+
+    def get_info(self, dex: [int, UUID]):
+        """return info dictionary with top z-order at 0, going downward
+        """
+        if isinstance(dex, UUID):
+            warnings.warn("DocumentAsLayerStack.get_info should not be accepting UUIDs", DeprecationWarning)
+            with self.mdb as S:
+                prod = S.query(Product).filter_by(uuid_str=str(dex)).first()
+                return prod.info
+        z = self.doc.track_order.top_z - dex
+        fam = self.doc.track_order[z]
+        prod_info = self._product_info_under_playhead_for_family(fam)
+        return prod_info
+
+    def __getitem__(self, uuid: UUID):
+        if not isinstance(uuid, UUID):
+            raise ValueError("need a UUID here")
+        with self.mdb as S:
+            prod = S.query(Product).filter_by(uuid_str=str(uuid)).first()
+            return prod.info
+
+    # FUTURE: allow re-ordering of inactive tracks?
+
+    def reorder_by_indices(self, order: T.Iterable[int]):
+        """Re-order active (z>=0) document families with new order
+        input order is expected to be listbox-like indices, i.e. order 0 is topmost z
+        """
+        order = list(order)
+        assert(len(order) == len(self))  # specified all active families
+        lut = self.doc.track_order.to_dict()
+        topz = self.doc.track_order.top_z
+        zs = [topz - x for x in order]
+        vals = [lut[z] for z in zs]
+        new_zs = [topz - x for x in range(len(order))]
+        self.doc.track_order.merge_subst(zip(new_zs, vals))
+        self.doc.didReorderTracks.emit(set(), set())
+
+
+###################################################################################################################
 
 
 class FrameInfo(T.NamedTuple):
@@ -455,6 +606,32 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 break
             yield z, track
 
+    # def product_state(self, *product_uuids: T.Iterable[UUID]) -> T.Iterable[flags]:
+    #     """Merge document and workspace state information on a given sequence of products
+    #     """
+    #     uuids = list(product_uuids)
+    #     warnings.warn("old-model query of product states, this is a crutch")
+    #     # FIXME: implement using new model
+    #     cls = self.doc.current_layer_set
+    #     ready_uuids = {x.uuid for x in cls}
+    #     if not uuids:
+    #         uuids = list(ready_uuids)
+    #     for uuid in uuids:
+    #         s = set()
+    #         if uuid in ready_uuids:
+    #             s.add(STATE.READY)
+    #         # merge state from workspace
+    #         s.update(self.ws.product_state(uuid))
+    #         yield s
+
+    def product_state(self, uuid:UUID) -> flags:
+        """Merge document state with workspace state
+        """
+        s = flags()
+        s.update(self.ws.product_state(uuid))
+        # s.update(self.doc.product_state.get(prod.uuid) or flags())
+        return s
+
     def frame_info_for_product(self, prod: Product=None, uuid: UUID=None, when_overlaps: span=None) -> T.Optional[FrameInfo]:
         """Generate info struct needed for timeline representation, optionally returning None if outside timespan of interest
         """
@@ -467,13 +644,17 @@ class DocumentAsTrackStack(DocumentAsContextBase):
             # does not intersect our desired span, skip it
             return None
         nfo = prod.info
+        # DISPLAY_NAME has DISPLAY_TIME as part of it, FIXME: stop that
+        dt = nfo[INFO.DISPLAY_TIME]
+        dn = nfo[INFO.DISPLAY_NAME].replace(dt, '').strip()
         fin = FrameInfo(
             uuid=prod.uuid,
             ident=prod.ident,
             when=span(prod.obs_time, prod.obs_duration),
-            state=self.doc.product_state.get(prod.uuid) or flags(),
-            primary=nfo[INFO.DISPLAY_NAME],
-            secondary=nfo[INFO.DISPLAY_TIME],  # prod.obs_time.strftime("%Y-%m-%d %H:%M:%S")
+            # FIXME: new model old model
+            state=self.product_state(prod.uuid),
+            primary=dn,
+            secondary=dt,  # prod.obs_time.strftime("%Y-%m-%d %H:%M:%S")
             # thumb=
         )
         return fin
@@ -540,18 +721,18 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         def _bgnd_ensure_content_loaded(ws=self.ws, frames=frames):
             ntot = len(frames)
             for nth, frame in enumerate(frames):
+                yield {TASK_DOING: "importing {}/{}".format(nth+1, ntot), TASK_PROGRESS: float(nth+1)/float(ntot+1)}
                 ws.import_product_content(frame)
-                yield {TASK_DOING: "importing {}/{}".format(nth+1, ntot), TASK_PROGRESS: float(nth)/float(ntot)}
 
         def _then_show_frames_in_document(doc = self.doc, frames = frames):
-            # FIXME: less arbitrary activation order
+            """finally-do-this section back on UI thread
+            """
             [self.doc.activate_product_uuid_as_new_layer(frame) for frame in frames]
             return
             # ensure that the track these frames belongs to is activated itself
             # update the timeline view states of these frames to show them as active as well
             # generate their presentations if needed
             # regenerate the animation plan and refresh the screen
-
 
         queue.add("activate frames " + repr(frames), _bgnd_ensure_content_loaded(), "activate {} frames".format(len(frames)),
                   interactive=False, and_then=_then_show_frames_in_document)
@@ -567,6 +748,10 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 return [UUID(x) for x in S.query(Product.uuid_str).filter(
                     (Product.family == fam) & (Product.category == ctg) &
                     ~((Product.obs_time > end) | ((Product.obs_time + Product.obs_duration) < start))).all()]
+
+    def _products_in_tracks(self, tracks: T.Iterable[str], during: span=None) -> T.Iterable[UUID]:
+        for track in tracks:
+            yield from self._products_in_track(track, during)
 
     def deactivate_frames(self, frame: UUID, *more_frames: T.Iterable[UUID]) -> T.Sequence[UUID]:
         """Activate one or more frames in the document, as directed by the timeline widgets
@@ -626,6 +811,16 @@ class DocumentAsTrackStack(DocumentAsContextBase):
             if tfam == family:
                 yield track
 
+    def sync_available_tracks(self):
+        old_tracks = set(self.doc.track_order.values())
+        self.doc.sync_potential_tracks_from_metadata()
+        new_tracks = set(self.doc.track_order.values())
+        LOG.debug("added these tracks: {}".format(repr(list(sorted(new_tracks - old_tracks)))))
+        # FIXME: make sure that tracks with active products are moved up to the active z-levels (>=0)
+        # that will require making sure that the z-order matches the layer list order and vice versa
+        # delay that transition until we're fully over to a track-centric model, since layer-centric
+        # model can have products from multiple tracks stacked in random z order
+
     # @property
     # def _deferring(self):
     #     "Am I a deferred-action context or an immediate context helper"
@@ -652,6 +847,9 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 action()
 
 
+###################################################################################################################
+
+
 class DocumentAsRegionProbes(DocumentAsContextBase):
     """Document is probed over a variety of regions
     """
@@ -666,6 +864,9 @@ class DocumentAsRegionProbes(DocumentAsContextBase):
             # commit code
             pass
         raise NotImplementedError()
+
+
+###################################################################################################################
 
 
 class DocumentAsStyledFamilies(DocumentAsContextBase):
@@ -683,6 +884,9 @@ class DocumentAsStyledFamilies(DocumentAsContextBase):
             # commit code
             pass
         raise NotImplementedError()
+
+
+###################################################################################################################
 
 
 class DocumentAsResourcePools(DocumentAsContextBase):
@@ -715,6 +919,9 @@ class DocumentAsResourcePools(DocumentAsContextBase):
         raise NotImplementedError()
 
 
+###################################################################################################################
+
+
 class DocumentAsRecipeCollection(DocumentAsContextBase):
     def __enter__(self):
         raise NotImplementedError()
@@ -727,6 +934,9 @@ class DocumentAsRecipeCollection(DocumentAsContextBase):
             # commit code
             pass
         raise NotImplementedError()
+
+
+###################################################################################################################
 
 
 class AnimationStep(T.NamedTuple):
@@ -809,6 +1019,9 @@ class DocumentAsAnimationSequence(DocumentAsContextBase):
         raise NotImplementedError()
 
 
+###################################################################################################################
+
+
 class ProductDataArrayProxy(object):
     """
     As-pythonic-as-possible dataset proxy for SIFT content.
@@ -880,8 +1093,7 @@ class DocumentAsProductArrayCollection(DocumentAsContextBase):
         raise NotImplementedError()
 
 
-# TimelineDataArrayProxy  # multiple products as a timeline, i.e. a time dimension is added representing all the products on the same timeline
-# FUTURE: class DatasetAsTimelineArrayCollection(DocumentAsContextBase):
+###################################################################################################################
 
 
 class Document(QObject):  # base class is rightmost, mixins left of that
@@ -1240,7 +1452,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if INFO.UNIT_CONVERSION not in dataset:
             dataset[INFO.UNIT_CONVERSION] = units_conversion(dataset)
         if INFO.FAMILY not in dataset:
-            dataset[INFO.FAMILY] = self._family_for_layer(dataset)
+            dataset[INFO.FAMILY] = self.family_for_product_or_layer(dataset)
         presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
 
         # signal updates from the document
@@ -1251,8 +1463,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         return uuid, dataset, active_content_data
 
-    def _family_for_layer(self, uuid_or_layer):
+    def family_for_product_or_layer(self, uuid_or_layer):
         if isinstance(uuid_or_layer, UUID):
+            with self._workspace.metadatabase as s:
+                fam = s.query(Product.family).filter_by(uuid_str=str(uuid_or_layer)).first()
+            if fam:
+                return fam
             uuid_or_layer = self[uuid_or_layer]
         if INFO.FAMILY in uuid_or_layer:
             LOG.debug('using pre-existing family {}'.format(uuid_or_layer[INFO.FAMILY]))
@@ -1379,6 +1595,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def sort_product_uuids(self, uuids: T.Iterable[UUID]) -> T.List[UUID]:
         uuidset=set(str(x) for x in uuids)
+        if not uuidset:
+            return []
         with self._workspace.metadatabase as S:
             zult = [(x.uuid, x.ident) for x in S.query(Product)
                                                 .filter(Product.uuid_str.in_(uuidset))
@@ -1855,7 +2073,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             if INFO.UNIT_CONVERSION not in dataset:
                 dataset[INFO.UNIT_CONVERSION] = units_conversion(dataset)
             if INFO.FAMILY not in dataset:
-                dataset[INFO.FAMILY] = self._family_for_layer(dataset)
+                dataset[INFO.FAMILY] = self.family_for_product_or_layer(dataset)
             self._add_layer_family(dataset)
             self.didAddCompositeLayer.emit(reordered_indices, dataset.uuid, presentation)
 
@@ -1953,7 +2171,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     "recipe": recipe,
                 }
                 # better place for this?
-                ds_info[INFO.FAMILY] = self._family_for_layer(ds_info)
+                ds_info[INFO.FAMILY] = self.family_for_product_or_layer(ds_info)
                 LOG.debug("Creating new RGB layer for recipe '{}'".format(recipe.name))
                 rgb_layer = layers[t] = DocRGBLayer(self, recipe, ds_info)
                 self._layer_with_uuid[uuid] = rgb_layer

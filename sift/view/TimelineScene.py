@@ -91,6 +91,14 @@ class QFramesInTracksScene(QGraphicsScene):
         # by default, show extent
         # self.setSceneRect(None)
 
+    def clear(self):
+        LOG.debug("clearing out Timeline Scene")
+        super(QFramesInTracksScene, self).clear()
+        super(QFramesInTracksScene, self).update()
+        self._track_items = {}
+        self._frame_items = {}
+        self._decor_items = {}
+
     @property
     def coords(self) -> CoordTransform:
         return self._coords
@@ -444,12 +452,12 @@ class QFramesInTracksScene(QGraphicsScene):
         LOG.warning("using base class menu_for_track which does nothing")
         return None
 
-    def update(self, changed_tracks: [Set[str], None] = None, changed_frame_uuids: [Set[UUID], None] = None) -> int:
+    def update(self, changed_tracks: [Set[str], None] = None, changed_frame_uuids: [Set[UUID], None] = None):
         """Populate or update scene, returning number of items changed in scene
         Does not add new items for tracks and frames already present
         Parameters serve only as hints
         """
-        LOG.warning("using base class update which does nothing")
+        # super(QFramesInTracksScene, self).update()
         return 0
 
 

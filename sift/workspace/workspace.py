@@ -59,8 +59,10 @@ from PyQt4.QtCore import QObject, pyqtSignal
 from pyproj import Proj
 from rasterio import Affine
 from shapely.geometry.polygon import LinearRing
+from sqlalchemy.orm import Session
 
-from sift.common import INFO, KIND, flags
+from sift.common import INFO, KIND, flags, STATE
+from sift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
 from sift.model.shapes import content_within_shape
 from .metadatabase import Metadatabase, Content, Product, Resource
 from .importer import aImporter, GeoTiffImporter, GoesRPUGImporter, SatPyImporter, generate_guidebook_metadata
@@ -230,12 +232,6 @@ class ActiveContent(QObject):
         self._update_mask()
 
 
-class WorkspaceState(enum.Enum):
-    ARRIVING = 1  # being imported or calculated
-    CACHED = 2  # stable on disk
-    ATTACHED = 4  # attached to memory
-
-
 class Workspace(QObject):
     """
     Workspace is a singleton object which works with Datasets shall:
@@ -266,7 +262,7 @@ class Workspace(QObject):
     # signals
     # didStartImport = pyqtSignal(dict)  # a dataset started importing; generated after overview level of detail is available
     # didMakeImportProgress = pyqtSignal(dict)
-    didUpdateDataset = pyqtSignal(dict)  # partial completion of a dataset import, new datasetinfo dict is released
+    didUpdateProductsMetadata = pyqtSignal(set)  # set of UUIDs with changes to their metadata
     # didFinishImport = pyqtSignal(dict)  # all loading activities for a dataset have completed
     # didDiscoverExternalDataset = pyqtSignal(dict)  # a new dataset was added to the workspace from an external agent
     didChangeProductState = pyqtSignal(UUID, flags)  # a product changed state, e.g. an importer started working on it
@@ -291,11 +287,11 @@ class Workspace(QObject):
         state = flags(self._state[uuid])
         # add any derived information
         if uuid in self._available:
-            state.add(WorkspaceState.ATTACHED)
+            state.add(STATE.ATTACHED)
         with self._inventory as s:
             ncontent = s.query(Content).filter_by(uuid=uuid).count()
         if ncontent > 0:
-            state.add(WorkspaceState.CACHED)
+            state.add(STATE.CACHED)
         return state
 
     @property
@@ -325,6 +321,7 @@ class Workspace(QObject):
         Initialize a new or attach an existing workspace, creating any necessary bookkeeping.
         """
         super(Workspace, self).__init__()
+        self._queue = queue
         self._max_size_gb = max_size_gb if max_size_gb is not None else DEFAULT_WORKSPACE_SIZE
         if self._max_size_gb < MIN_WORKSPACE_SIZE:
             self._max_size_gb = MIN_WORKSPACE_SIZE
@@ -431,6 +428,26 @@ class Workspace(QObject):
                     LOG.info("rewriting DATASET_NAME to new style using band: {}".format(repr(p)))
                     p.update({INFO.DATASET_NAME: 'B{:02d}'.format(p.info[INFO.BAND])})
 
+    def _bgnd_startup_purge(self):
+        ntot = 5
+        n = 1
+        yield {TASK_DOING: "DB pruning cache entries".format(n, ntot), TASK_PROGRESS: float(n) / float(ntot)}
+        self._purge_missing_content()
+        n += 1
+        yield {TASK_DOING: "DB pruning stale resources".format(n, ntot), TASK_PROGRESS: float(n) / float(ntot)}
+        self._purge_inaccessible_resources()
+        n += 1
+        yield {TASK_DOING: "DB pruning orphan products".format(n, ntot), TASK_PROGRESS: float(n) / float(ntot)}
+        self._purge_orphan_products()
+        n += 1
+        yield {TASK_DOING: "DB migrating metadata".format(n, ntot), TASK_PROGRESS: float(n) / float(ntot)}
+        self._migrate_metadata()
+        n += 1
+        yield {TASK_DOING: "DB ready".format(n, ntot), TASK_PROGRESS: float(n) / float(ntot)}
+
+    def _then_refresh_mdb_customers(self, *args, **kwargs):
+        self.didUpdateProductsMetadata.emit(set())
+
     def _init_inventory_existing_datasets(self):
         """
         Do an inventory of an pre-existing workspace
@@ -440,10 +457,8 @@ class Workspace(QObject):
         """
         # attach the database, creating it if needed
         self._init_create_workspace()
-        self._purge_missing_content()
-        self._purge_inaccessible_resources()
-        self._purge_orphan_products()
-        self._migrate_metadata()
+        self._queue.add("database cleanup", self._bgnd_startup_purge(), "database cleanup",
+                  interactive=False, and_then=self._then_refresh_mdb_customers)
 
     def _store_inventory(self):
         """
@@ -868,7 +883,7 @@ class Workspace(QObject):
             if prod is None and uuid is not None:
                 prod = self._product_with_uuid(S, uuid)
 
-            self.set_product_state_flag(prod.uuid, WorkspaceState.ARRIVING)
+            self.set_product_state_flag(prod.uuid, STATE.ARRIVING)
             default_prod_kind = prod.info[INFO.KIND]
 
             if len(prod.content):
@@ -896,7 +911,7 @@ class Workspace(QObject):
             # self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
             LOG.debug('received {} updates during import'.format(nupd))
             uuid = prod.uuid
-            self.clear_product_state_flag(prod.uuid, WorkspaceState.ARRIVING)
+            self.clear_product_state_flag(prod.uuid, STATE.ARRIVING)
         # S.commit()
         # S.flush()
 

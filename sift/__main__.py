@@ -23,12 +23,14 @@ __docformat__ = 'reStructuredText'
 from uuid import UUID
 from vispy import app
 import asyncio
+from PyQt4 import QtGui
 from quamash import QEventLoop, QThreadExecutor
 from collections import OrderedDict
 
 app_object = app.use_app('pyqt4')
-loop = QEventLoop(app_object.native)
-asyncio.set_event_loop(loop)  # NEW must set the event loop
+APP: QtGui.QApplication = app_object.native
+LOOP = QEventLoop(APP)
+asyncio.set_event_loop(LOOP)  # NEW must set the event loop
 
 
 QtCore = app_object.backend_module.QtCore
@@ -545,7 +547,7 @@ class Main(QtGui.QMainWindow):
         self.ui.cursorProbeLayer.setText(layer_str)
         self.ui.cursorProbeText.setText("{} ({})".format(data_str, probe_loc))
 
-    def _init_timeline(self, doc: Document):
+    def _init_timeline(self, doc: Document, ws: Workspace):
         gv = self.ui.timelineView
 
         # set up the widget itself
@@ -562,9 +564,11 @@ class Main(QtGui.QMainWindow):
         # connect up the scene
         doc.sync_potential_tracks_from_metadata()
         LOG.debug("Potential tracks: {}".format(repr(doc.track_order)))
-        self._timeline_scene = SiftDocumentAsFramesInTracks(doc)
+        self._timeline_scene = SiftDocumentAsFramesInTracks(doc, self.workspace)
         gv.setScene(self._timeline_scene)
-        self._timeline_scene.update()
+        APP.aboutToQuit.connect(self._timeline_scene.clear)
+
+        self._timeline_scene.sync_items()
 
     def __init__(self, config_dir=None, cache_dir=None, cache_size=None, glob_pattern=None, search_paths=None, border_shapefile=None, center=None):
         super(Main, self).__init__()
@@ -582,6 +586,7 @@ class Main(QtGui.QMainWindow):
         self.setWindowTitle(self.windowTitle().replace("|X.X.X|", __version__))
         self.tabifyDockWidget(self.ui.layersPane, self.ui.areaProbePane)
         self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.rgbConfigPane)
+        self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.timelinePane)
 
         # self.tabifyDockWidget(self.ui.rgbConfigPane, self.ui.layerDetailsPane)
         # Make the layer list and layer details shown
@@ -741,7 +746,8 @@ class Main(QtGui.QMainWindow):
 
         # set up timeline
         LOG.info("potential tracks already in database: {}".format(repr(doc.potential_tracks())))
-        self._init_timeline(doc)
+        self._init_timeline(doc, self.workspace)
+
         # FIXME: make sure sync of metadata signals sync of document potentials and track display
 
     def _timer_collect_resources(self):
@@ -1071,7 +1077,7 @@ def main():
     window.show()
     # bring window to front
     window.raise_()
-    loop.run_forever()
+    LOOP.run_forever()
     # app.run()
 
 if __name__ == '__main__':

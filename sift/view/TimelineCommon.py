@@ -20,15 +20,16 @@ LOG = logging.getLogger(__name__)
 # @dataclass
 class GraphicsConfig(object):
     track_height: float = 64.0
-    track_corner_radius1: float = 9.0
-    track_corner_radius2: float = 15.0
-    track_left_pad: float = 128.0  # scene pixels space to left of first frame which we reserve for labels etc
+    track_corner_radius1: float = 4.0
+    track_corner_radius2: float = 4.0
+    track_left_pad: float = 300.0  # scene pixels space to left of first frame which we reserve for labels etc
     track_right_pad: float = 16.0  # scene pixels space to right of last frame we reserve for track closing etc
-    track_title_pos: QPointF  = QPointF(3.0-128.0, -25.0)  # scene pixel offset relative to vertical centerline and start of first frame
-    track_subtitle_pos: QPointF = QPointF(3.0-128.0, -13.0)
+    track_title_pos: QPointF  = QPointF(3.0-300.0, -25.0)  # scene pixel offset relative to vertical centerline and start of first frame
+    track_subtitle_pos: QPointF = QPointF(3.0-300.0, -10.0)
     frame_height: float = 56.0
-    frame_corner_radius: float = 9.0
-    frame_title_pos: QPointF = QPointF(2.0, 2.0)
+    frame_corner_radius: float = 6.0
+    frame_title_pos: QPointF = QPointF(2.0, -13.0)
+    frame_subtitle_pos: QPointF = QPointF(2.0, 2.0)
 
 
 # graphics constants in setting up items and painting
@@ -62,12 +63,16 @@ class VisualState(Enum):
     """
     ERROR = 1  # error red
     WARNING = 2  # warning yellow
+
     DISABLED = 4  # greyed-out and muted, may not even display decoration; signifies user turned it off
     BUSY = 8  # when WorkspaceState.ARRIVING, show barberpole animation or at least diagonal hatch
-    READY = 16  # regular coloration - typically when WorkspaceState.CACHED
-    LOCKED = 32  # indicate the frame is locked across is entire track
-    RELEVANT = 64  # highlight that this (typically track) may be affected with the operation you have inflight
-    SELECTED = 128  # track or frame is selected by user
+    AVAILABLE = 16  # done arriving, now resides in cache but is not necessarily loaded
+    READY = 32  # regular coloration - typically when WorkspaceState.CACHED
+    HIGHLIGHT = 64  # frame is being shown on the screen at this moment in time
+
+    LOCKED = 128  # indicate the frame is locked across is entire track
+    RELEVANT = 256  # highlight that this (typically track) may be affected with the operation you have inflight
+    SELECTED = 512  # track or frame is selected by user
 
 
 class CoordTransform(QObject):
