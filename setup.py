@@ -184,7 +184,7 @@ setup(
                  "Topic :: Scientific/Engineering"],
     zip_safe=False,
     include_package_data=True,
-    install_requires=['numpy', 'pillow', 'scipy', 'numba', 'vispy>0.4.0',
+    install_requires=['numpy', 'pillow', 'scipy', 'numba', 'vispy>=0.6.0',
                       'PyOpenGL', 'netCDF4', 'h5py', 'pyproj', 'gdal',
                       'pyshp', 'shapely', 'rasterio', 'goesr', 'sqlalchemy',
                       'goesr', 'appdirs', 'pyyaml', 'pyqtgraph', 'satpy',
