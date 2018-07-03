@@ -274,7 +274,7 @@ class OpenFileWizard(QtGui.QWizard):
             # 'All supported files (*.nc *.nc4 *.tiff *.tif)',
             # 'GOES-16 NetCDF (*.nc *.nc4)',
             # 'Mercator GTIFF (*.tiff *.tif)',
-            'NWP GRIB2 (*.grib2)',
+            'NWP GRIB2 (*.grib2 *.f???)',
         ]
         if os.getenv("SIFT_ALLOW_ALL_READERS", ""):
             filename_filters = ['All files (*.*)'] + filename_filters
