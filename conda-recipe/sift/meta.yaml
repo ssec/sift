@@ -30,7 +30,7 @@ requirements:
     - setuptools
     - pip
     - numpy >=1.12
-    - gdal >=2.1,<2.2
+    - gdal >=2.2.4
     - rasterio
     - matplotlib
     - scipy
@@ -52,6 +52,7 @@ requirements:
     - pyyaml
     - quamash
     - satpy
+    - pygrib
 
 test:
   commands:
