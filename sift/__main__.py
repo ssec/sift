@@ -1015,7 +1015,7 @@ def _search_paths(arglist):
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="Run CSPOV")
+    parser = argparse.ArgumentParser(description="Run SIFT")
     parser.add_argument("-w", "--workspace",
                         help="(DEPRECATED) Specify workspace base directory")
     parser.add_argument("--cache-dir", default=WORKSPACE_DB_DIR,
