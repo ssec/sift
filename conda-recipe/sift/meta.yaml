@@ -52,7 +52,7 @@ requirements:
     - pyyaml
     - quamash
     - satpy
-    - pygrib
+    - pygrib  # [not win]
 
 test:
   commands:
