@@ -65,6 +65,7 @@ import sys
 import shutil
 import logging
 import subprocess
+from glob import glob
 from sift import version
 
 if sys.version_info < (3, 5):
@@ -90,9 +91,12 @@ ISCC_PATH = os.path.join("C:/", "Program Files (x86)", "Inno Setup 5", "ISCC.exe
 
 PLATFORMS = ['darwin', 'linux', 'win']
 CONDA_PLAT = {
-    'darwin': 'osx-64',
-    'linux': 'linux-64',
-    'win': 'win-64',
+    #'darwin': 'osx-64',
+    #'linux': 'linux-64',
+    #'win': 'win-64',
+    'darwin': 'noarch',
+    'linux': 'noarch',
+    'win': 'noarch',
 }
 
 
@@ -116,9 +120,10 @@ def _build_conda(output_dir=DIST_DIR):
     run(CONDA_BUILD_CMD.split(' '))
     # check for build revisision
     for i in range(4, -1, -1):
-        f = os.path.join(DIST_DIR, CONDA_PLAT[platform], 'sift-{}-{}.tar.bz2'.format(version.__version__, i))
-        if os.path.isfile(f):
-            return f
+        f = os.path.join(DIST_DIR, CONDA_PLAT[platform], 'sift-{}-*{}.tar.bz2'.format(version.__version__, i))
+        glob_results = glob(f)
+        if len(glob_results) == 1:
+            return f[0]
     raise FileNotFoundError("Conda package was not built")
 
 

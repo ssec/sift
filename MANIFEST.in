@@ -2,8 +2,7 @@ include sift/data/shadedrelief.jpg
 include sift/data/ne_50m_admin_0_countries/*
 include sift/data/ne_110m_admin_0_countries/*
 include sift/data/ne_50m_admin_1_states_provinces_lakes/*
-include sift/data/fonts/*
-include sift/data/colormaps/*
+recursive-include sift/data/fonts *.ttf
+recursive-include sift/data/colormaps *.cmap
 include sift/ui/*.ui
-include sift/ui/cursors/*
 include LICENSE.txt
