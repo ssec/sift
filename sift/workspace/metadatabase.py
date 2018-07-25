@@ -742,12 +742,19 @@ class Metadatabase(object):
         # fetch the active session, typically zero or one active per thread
         s = self.SessionRegistry()
         self.session_nesting[id(s)] -= 1
+        # LOG.debug("database session nesting now at {}".format(self.session_nesting[id(s)]))
         if self.session_nesting[id(s)] <= 0:
             if s.dirty:
                 if exc_val is not None:
+                    LOG.warning("an exception occurred, rolling back any metadatabase changes")
                     s.rollback()
                 else:
+                    LOG.debug("committing metadatabase changes")
                     s.commit()
+            else:
+                # LOG.debug("closing clean database session without commit")
+                LOG.debug("session is clean but committing before close anyway")
+                s.commit()
             s.close()
             del self.session_nesting[id(s)]
         else:  # we're in a nested context for this session

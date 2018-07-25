@@ -279,15 +279,16 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         Parameters serve only as hints
         """
         acted = False
-        if changed_frame_uuids is not None:
-            changed_frame_uuids = list(changed_frame_uuids)
-            all_frame_items = [self._sync_and_update_frame(uuid) for uuid in changed_frame_uuids]
-            if None in all_frame_items:
-                LOG.debug("new frames, resorting to invalidate")
-                self._invalidate()
-                return
-            LOG.debug("done updating {} products in timeline".format(len(changed_frame_uuids)))
-            acted = True
+        with self._doc.mdb as consolidate_sessions_by_nesting:  # optional peformance optimization to prevent session flipping
+            if changed_frame_uuids is not None:
+                changed_frame_uuids = list(changed_frame_uuids)
+                all_frame_items = [self._sync_and_update_frame(uuid) for uuid in changed_frame_uuids]
+                if None in all_frame_items:
+                    LOG.debug("new frames, resorting to invalidate")
+                    self._invalidate()
+                    return
+                LOG.debug("done updating {} products in timeline".format(len(changed_frame_uuids)))
+                acted = True
         if changed_tracks is not None:
             LOG.warning("NOT IMPLEMENTED: selectively updating {} tracks in timeline".format(len(list(changed_tracks))))
         if not acted:

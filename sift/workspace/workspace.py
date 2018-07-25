@@ -667,11 +667,10 @@ class Workspace(QObject):
         # FIXME: also need to include coverage and sparsity paths?? really?
         zult = {}
         with self._inventory as s:
-            for c in s.query(Content).all():
+            for c in s.query(Content).order_by(Content.atime.desc()).all():
                 p = c.product
-                if p.id in zult:
-                    continue
-                zult[p.uuid] = p.info[INFO.DISPLAY_NAME]
+                if p.uuid not in zult:
+                    zult[p.uuid] = p.info[INFO.DISPLAY_NAME]
         return zult
 
     @property
@@ -716,7 +715,7 @@ class Workspace(QObject):
                     total += self._purge_content_for_resource(rsr, defer_commit=True)
         return total
 
-    def purge_content_for_product_uuids(self, uuids):
+    def purge_content_for_product_uuids(self, uuids, also_products=False):
         """
         given one or more product uuids, purge the Content from the cache
         Note: this does not purge any ActiveContent that may still be using the files, but the files will be gone
@@ -738,6 +737,8 @@ class Workspace(QObject):
                     total += self._remove_content_files_from_workspace(con)
                     prod.content.remove(con)
                     s.delete(con)
+                if also_products:
+                    s.delete(prod)
         return total
 
     def _clean_cache(self):

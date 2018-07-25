@@ -783,7 +783,7 @@ class Main(QtGui.QMainWindow):
 
         def _purge_content_for_names(uuids):
             LOG.info('removing cached products with uuids: {}'.format(repr(uuids)))
-            self.workspace.purge_content_for_product_uuids(uuids)
+            self.workspace.purge_content_for_product_uuids(uuids, also_products=False)
             self.update_recent_file_menu()
 
         if not self._open_cache_dialog:
