@@ -70,99 +70,110 @@ DEFAULT_COLORMAPS = {
     # 'thermodynamic_phase_of_cloud_water_particles_at_cloud_top': 'Cloud Phase',
 }
 
+_NW_GOESR_ABI = {
+    INSTRUMENT.ABI: {  # http://www.goes-r.gov/education/ABI-bands-quick-info.html
+        1: 0.47,
+        2: 0.64,
+        3: 0.86,
+        4: 1.37,
+        5: 1.6,
+        6: 2.2,
+        7: 3.9,
+        8: 6.2,
+        9: 6.9,
+        10: 7.3,
+        11: 8.4,
+        12: 9.6,
+        13: 10.3,
+        14: 11.2,
+        15: 12.3,
+        16: 13.3,
+    },
+}
+
+_NW_HIMAWARI_AHI = {
+    INSTRUMENT.AHI: {
+        1: 0.47,
+        2: 0.51,
+        3: 0.64,
+        4: 0.86,
+        5: 1.6,
+        6: 2.3,
+        7: 3.9,
+        8: 6.2,
+        9: 6.9,
+        10: 7.3,
+        11: 8.6,
+        12: 9.6,
+        13: 10.4,
+        14: 11.2,
+        15: 12.4,
+        16: 13.3,
+    },
+}
 
 # Instrument -> Band Number -> Nominal Wavelength
 NOMINAL_WAVELENGTHS = {
-    PLATFORM.HIMAWARI_8: {
-        INSTRUMENT.AHI: {
-            1: 0.47,
-            2: 0.51,
-            3: 0.64,
-            4: 0.86,
-            5: 1.6,
-            6: 2.3,
-            7: 3.9,
-            8: 6.2,
-            9: 6.9,
-            10: 7.3,
-            11: 8.6,
-            12: 9.6,
-            13: 10.4,
-            14: 11.2,
-            15: 12.4,
-            16: 13.3,
-        },
-    },
-    # PLATFORM.HIMAWARI_9: {
-    #     INSTRUMENT.AHI: {
-    #     },
-    # },
-    PLATFORM.GOES_16: {
-        INSTRUMENT.ABI: {  # http://www.goes-r.gov/education/ABI-bands-quick-info.html
-            1: 0.47,
-            2: 0.64,
-            3: 0.86,
-            4: 1.37,
-            5: 1.6,
-            6: 2.2,
-            7: 3.9,
-            8: 6.2,
-            9: 6.9,
-            10: 7.3,
-            11: 8.4,
-            12: 9.6,
-            13: 10.3,
-            14: 11.2,
-            15: 12.3,
-            16: 13.3,
-        },
-    },
+    PLATFORM.HIMAWARI_8: _NW_HIMAWARI_AHI,
+    PLATFORM.HIMAWARI_9: _NW_HIMAWARI_AHI,
+
+    PLATFORM.GOES_16: _NW_GOESR_ABI,
+    PLATFORM.GOES_17: _NW_GOESR_ABI,
 }
 
 # CF compliant Standard Names (should be provided by input files or the workspace)
 # Instrument -> Band Number -> Standard Name
-STANDARD_NAMES = {
-    PLATFORM.HIMAWARI_8: {
-        INSTRUMENT.AHI: {
-            1: "toa_bidirectional_reflectance",
-            2: "toa_bidirectional_reflectance",
-            3: "toa_bidirectional_reflectance",
-            4: "toa_bidirectional_reflectance",
-            5: "toa_bidirectional_reflectance",
-            6: "toa_bidirectional_reflectance",
-            7: "toa_brightness_temperature",
-            8: "toa_brightness_temperature",
-            9: "toa_brightness_temperature",
-            10: "toa_brightness_temperature",
-            11: "toa_brightness_temperature",
-            12: "toa_brightness_temperature",
-            13: "toa_brightness_temperature",
-            14: "toa_brightness_temperature",
-            15: "toa_brightness_temperature",
-            16: "toa_brightness_temperature",
-        },
-    },
-    PLATFORM.GOES_16: {
-        INSTRUMENT.ABI: {
-            1: "toa_bidirectional_reflectance",
-            2: "toa_bidirectional_reflectance",
-            3: "toa_bidirectional_reflectance",
-            4: "toa_bidirectional_reflectance",
-            5: "toa_bidirectional_reflectance",
-            6: "toa_bidirectional_reflectance",
-            7: "toa_brightness_temperature",
-            8: "toa_brightness_temperature",
-            9: "toa_brightness_temperature",
-            10: "toa_brightness_temperature",
-            11: "toa_brightness_temperature",
-            12: "toa_brightness_temperature",
-            13: "toa_brightness_temperature",
-            14: "toa_brightness_temperature",
-            15: "toa_brightness_temperature",
-            16: "toa_brightness_temperature",
-        },
+
+_SN_GOESR_ABI = {
+    INSTRUMENT.ABI: {
+        1: "toa_bidirectional_reflectance",
+        2: "toa_bidirectional_reflectance",
+        3: "toa_bidirectional_reflectance",
+        4: "toa_bidirectional_reflectance",
+        5: "toa_bidirectional_reflectance",
+        6: "toa_bidirectional_reflectance",
+        7: "toa_brightness_temperature",
+        8: "toa_brightness_temperature",
+        9: "toa_brightness_temperature",
+        10: "toa_brightness_temperature",
+        11: "toa_brightness_temperature",
+        12: "toa_brightness_temperature",
+        13: "toa_brightness_temperature",
+        14: "toa_brightness_temperature",
+        15: "toa_brightness_temperature",
+        16: "toa_brightness_temperature",
+    }
+}
+
+_SN_HIMAWARI_AHI = {
+    INSTRUMENT.AHI: {
+        1: "toa_bidirectional_reflectance",
+        2: "toa_bidirectional_reflectance",
+        3: "toa_bidirectional_reflectance",
+        4: "toa_bidirectional_reflectance",
+        5: "toa_bidirectional_reflectance",
+        6: "toa_bidirectional_reflectance",
+        7: "toa_brightness_temperature",
+        8: "toa_brightness_temperature",
+        9: "toa_brightness_temperature",
+        10: "toa_brightness_temperature",
+        11: "toa_brightness_temperature",
+        12: "toa_brightness_temperature",
+        13: "toa_brightness_temperature",
+        14: "toa_brightness_temperature",
+        15: "toa_brightness_temperature",
+        16: "toa_brightness_temperature",
     },
 }
+
+STANDARD_NAMES = {
+    PLATFORM.HIMAWARI_8: _SN_HIMAWARI_AHI,
+    PLATFORM.HIMAWARI_9: _SN_HIMAWARI_AHI,
+    PLATFORM.GOES_16: _SN_GOESR_ABI,
+    PLATFORM.GOES_17: _SN_GOESR_ABI,
+}
+
+
 
 
 class ABI_AHI_Guidebook(Guidebook):
