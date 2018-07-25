@@ -748,13 +748,13 @@ class Metadatabase(object):
                 LOG.warning("an exception occurred, rolling back any metadatabase changes")
                 s.rollback()
             else:
-                if s.dirty:
+                if bool(s.dirty) or bool(s.new) or bool(s.deleted):
                     LOG.debug("committing metadatabase changes")
                     s.commit()
                 else:
-                    # LOG.debug("closing clean database session without commit")
-                    LOG.debug("session is clean but committing before close anyway")
-                    s.commit()
+                    LOG.debug("closing clean database session without commit")
+                    # LOG.debug("session is clean but committing before close anyway")
+                    # s.commit()
             s.close()
             del self.session_nesting[id(s)]
         else:  # we're in a nested context for this session
