@@ -582,13 +582,18 @@ class ProbeGraphDisplay (object) :
             yield {TASK_DOING: 'Probe Plot: Collecting polygon data (layer 1)...', TASK_PROGRESS: 0.0}
 
             # get the data and info we need for this plot
-            name1 = self.document[x_uuid][INFO.DISPLAY_NAME]
-            name2 = self.document[y_uuid][INFO.DISPLAY_NAME]
+            x_info = self.document[x_uuid]
+            y_info = self.document[y_uuid]
+            name1 = x_info[INFO.DISPLAY_NAME]
+            name2 = y_info[INFO.DISPLAY_NAME]
             hires_uuid = self.workspace.lowest_resolution_uuid(x_uuid, y_uuid)
+            # hires_coord_mask are the lat/lon coordinates of each of the
+            # pixels in hires_data. The coordinates are (lat, lon) to resemble
+            # the (Y, X) indexing of numpy arrays
             hires_coord_mask, hires_data = self.workspace.get_coordinate_mask_polygon(hires_uuid, polygon)
             hires_conv_func = self.document[hires_uuid][INFO.UNIT_CONVERSION][1]
-            x_conv_func = self.document[x_uuid][INFO.UNIT_CONVERSION][1]
-            y_conv_func = self.document[y_uuid][INFO.UNIT_CONVERSION][1]
+            x_conv_func = x_info[INFO.UNIT_CONVERSION][1]
+            y_conv_func = y_info[INFO.UNIT_CONVERSION][1]
             hires_data = hires_conv_func(hires_data)
             yield {TASK_DOING: 'Probe Plot: Collecting polygon data (layer 2)...', TASK_PROGRESS: 0.15}
             if hires_uuid == x_uuid:
@@ -613,10 +618,10 @@ class ProbeGraphDisplay (object) :
                 y_point = None
 
             # plot a scatter plot
-            # self.plotScatterplot (data1, name1, data2, name2)
-            data1 = data1[~np.isnan(data1)]
-            data2 = data2[~np.isnan(data2)]
-            self.plotDensityScatterplot (data1, name1, data2, name2, x_point, y_point)
+            good_mask = ~(np.isnan(data1) | np.isnan(data2))
+            data1 = data1[good_mask]
+            data2 = data2[good_mask]
+            self.plotDensityScatterplot(data1, name1, data2, name2, x_point, y_point)
 
         # if we have some combination of selections we don't understand, clear the figure
         else :
@@ -710,7 +715,7 @@ class ProbeGraphDisplay (object) :
         # draw the x vs y line
         self._draw_xy_line(axes)
 
-    def clearPlot (self) :
+    def clearPlot(self):
         """Clear our plot
         """
 
@@ -721,10 +726,6 @@ class ProbeGraphDisplay (object) :
         # get the bounds for our calculations and so we can reset the viewing window later
         x_bounds = axes.get_xbound()
         y_bounds = axes.get_ybound()
-
-        # figure out the size of the ranges
-        xrange = x_bounds[1] - x_bounds[0]
-        yrange = y_bounds[1] - y_bounds[0]
 
         # draw the x=y line
         perfect = [max(x_bounds[0], y_bounds[0]), min(x_bounds[1], y_bounds[1])]

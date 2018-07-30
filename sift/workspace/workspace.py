@@ -1254,19 +1254,53 @@ class Workspace(QObject):
         points = self._project_points(p, points)
         index_mask, data = content_within_shape(data, trans, LinearRing(points))
         coords_mask = (index_mask[0] * trans.e + trans.f, index_mask[1] * trans.a + trans.c)
-        coords_mask = p(*coords_mask, inverse=True)
+        # coords_mask is (Y, X) corresponding to (rows, cols) like numpy
+        coords_mask = p(coords_mask[1], coords_mask[0], inverse=True)[::-1]
         return coords_mask, data
 
     def get_content_coordinate_mask(self, uuid, coords_mask):
         data = self.get_content(uuid)
         trans = self._create_layer_affine(uuid)
         p = self.layer_proj(uuid)
-        coords_mask = p(*coords_mask)
+        # coords_mask is (Y, X) like a numpy array
+        coords_mask = p(coords_mask[1], coords_mask[0])[::-1]
         index_mask = (
             np.round((coords_mask[0] - trans.f) / trans.e).astype(np.uint),
             np.round((coords_mask[1] - trans.c) / trans.a).astype(np.uint),
         )
         return data[index_mask]
+
+    def get_pyresample_area(self, uuid, y_slice=None, x_slice=None):
+        """Create a pyresample compatible AreaDefinition for this layer."""
+        # WARNING: Untested!
+        from pyresample.geometry import AreaDefinition
+        from pyresample.utils import proj4_str_to_dict
+        info = self.get_info(uuid)
+        if y_slice is None:
+            y_slice = slice(None, None, None)
+        if x_slice is None:
+            x_slice = slice(None, None, None)
+        if y_slice.step not in [1, None] or x_slice.step not in [1, None]:
+            raise ValueError("Slice steps other than 1 are not supported")
+        rows, cols = info[INFO.SHAPE]
+        x_start = x_slice.start or 0
+        y_start = y_slice.start or 0
+        num_cols = (x_slice.stop or cols) - x_start
+        num_rows = (y_slice.stop or rows) - y_start
+        half_x = info[INFO.CELL_WIDTH] / 2.
+        half_y = info[INFO.CELL_HEIGHT] / 2.
+        min_x = info[INFO.ORIGIN_X] - half_x + x_start * info[INFO.CELL_WIDTH]
+        max_y = info[INFO.ORIGIN_Y] + half_y - y_start * info[INFO.CELL_HEIGHT]
+        min_y = max_y - num_rows * info[INFO.CELL_HEIGHT]
+        max_x = min_x + num_cols * info[INFO.CELL_WIDTH]
+        return AreaDefinition(
+            'layer area',
+            'layer area',
+            'layer area',
+            proj4_str_to_dict(info[INFO.PROJ]),
+            cols, rows,
+            (min_x, min_y, max_x, max_y),
+        )
 
     def __getitem__(self, datasetinfo_or_uuid):
         """
