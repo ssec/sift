@@ -47,6 +47,7 @@ import logging
 import os
 import sys
 import unittest
+import time
 import enum
 from datetime import datetime, timedelta
 from uuid import UUID, uuid1 as uuidgen
@@ -401,12 +402,16 @@ class Workspace(QObject):
         """
         LOG.debug("purging any resources that are no longer accessible")
         with self._inventory as s:
-            for r in s.query(Resource).all():
+            resall = list(s.query(Resource).all())
+            n_purged = 0
+            for r in resall:
                 if not r.exists():
                     LOG.info("resource {} no longer exists, purging from database")
                     # for p in r.product:
                     #     p.resource.remove(r)
+                    n_purged += 1
                     s.delete(r)
+        LOG.info("discarded metadata for {} orphaned resources".format(n_purged))
 
     def _purge_orphan_products(self):
         """
@@ -414,10 +419,13 @@ class Workspace(QObject):
         """
         LOG.debug("purging Products no longer recoverable by re-importing from Resources, and having no Content representation in cache")
         with self._inventory as s:
-            for p in s.query(Product).all():
+            n_purged = 0
+            prodall = list(s.query(Product).all())  # SIFT/sift#180, avoid locking database too long
+            for p in prodall:
                 if len(p.content)==0 and len(p.resource)==0:
-                    LOG.info("discarding orphaned product {}".format(repr(p)))
+                    n_purged += 1
                     s.delete(p)
+        LOG.info("discarded metadata for {} orphaned products".format(n_purged))
 
     def _migrate_metadata(self):
         """Replace legacy metadata uses with new uses."""
@@ -457,8 +465,11 @@ class Workspace(QObject):
         """
         # attach the database, creating it if needed
         self._init_create_workspace()
-        self._queue.add("database cleanup", self._bgnd_startup_purge(), "database cleanup",
-                  interactive=False, and_then=self._then_refresh_mdb_customers)
+        for _ in self._bgnd_startup_purge():
+            # SIFT/sift#180 -- background thread of lengthy database operations can cause lock failure in pysqlite
+            pass
+        # self._queue.add("database cleanup", self._bgnd_startup_purge(), "database cleanup",
+        #           interactive=False, and_then=self._then_refresh_mdb_customers)
 
     def _store_inventory(self):
         """
