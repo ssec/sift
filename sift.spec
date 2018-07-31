@@ -22,6 +22,7 @@ for shape_dir in ["ne_50m_admin_0_countries", "ne_110m_admin_0_countries", "ne_5
 hidden_imports = [
     "vispy.ext._bundled.six",
     "vispy.app.backends._pyqt4",
+    "sqlalchemy.ext.baked",
 ] + collect_submodules("rasterio")
 if is_win:
     hidden_imports += collect_submodules("encodings")
