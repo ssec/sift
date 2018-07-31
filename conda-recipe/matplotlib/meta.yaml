@@ -1,0 +1,110 @@
+# Full credit goes to https://github.com/conda/conda-recipes for providing this recipe.
+# It has been subsequently adapted for automated building with conda-forge.
+
+{% set version = "2.2.2" %}
+
+package:
+  name: matplotlib
+  version: {{ version }}
+
+source:
+  url: https://github.com/matplotlib/matplotlib/archive/v{{ version }}.tar.gz
+  sha256: 3a8236e6747dbb48c342ee194a8ced2805205cbd718899b284e4d617189cd397
+  patches:
+    # Find libpng on Windows.
+    - setupext.patch  # [win]
+    # A patch to make Qt the default backend.
+    - cfg_qt4agg.patch  # [not osx]
+    # Removes framework check from osx backend (seems unneeded)
+    - osx-frame.patch  # [osx]
+
+build:
+  number: 1
+
+requirements:
+  build:
+    - python
+    - setuptools
+    - pkg-config  # [not win]
+    - backports.functools_lru_cache  # [py2k]
+    - numpy 1.8.*  # [not (win and (py35 or py36))]
+    - numpy 1.9.*  # [win and py35]
+    - numpy 1.11.*  # [win and py36]
+    - python-dateutil
+    - freetype 2.8.*
+    - msinttypes  # [win]
+    - cycler >=0.10
+    - nose
+    - pyparsing
+    - pytz
+    #- py2cairo  # [linux and py2k]
+    - libpng >=1.6.32,<1.6.35
+    - zlib 1.2.11  # [win]
+    - pyqt 4.*  # [not osx]
+    - tk 8.6.*  # [linux]
+    - functools32  # [py2k]
+    - subprocess32  # [py2k and unix]
+    - icu 58.*  # [linux]
+  run:
+    - python
+    - setuptools
+    - numpy >=1.8  # [not (win and (py35 or py36))]
+    - numpy >=1.9  # [win and py35]
+    - numpy >=1.11  # [win and py36]
+    - backports.functools_lru_cache  # [py2k]
+    - cycler >=0.10
+    - python-dateutil
+    - freetype 2.8.*
+    - pytz
+    - pyparsing
+    #- py2cairo  # [linux and py2k]
+    - libpng >=1.6.32,<1.6.35
+    - pyqt 4.*  # [not osx]
+    - tk 8.6.*  # [linux]
+    - functools32  # [py2k]
+    - subprocess32  # [py2k and unix]
+    - icu 58.*  # [linux]
+    - tornado
+    - kiwisolver
+
+test:
+  imports:
+    - matplotlib
+    - matplotlib.pyplot
+    - matplotlib._image
+    - matplotlib._path
+    - matplotlib._png
+    - matplotlib._tri
+    - matplotlib.backends._backend_agg
+    - matplotlib.ft2font
+    - matplotlib.ttconv
+    - matplotlib.backends._tkagg  # [not win]
+    - mpl_toolkits
+    - pylab
+  commands:
+    - conda inspect linkages -p $PREFIX $PKG_NAME  # [not win]
+    - conda inspect objects -p $PREFIX $PKG_NAME  # [osx]
+
+about:
+  home: http://matplotlib.org/
+  license: PSF-based
+  license_url: http://matplotlib.sourceforge.net/users/license.html
+  license_family: PSF
+  license_file: LICENSE/LICENSE
+  summary: Publication quality figures in Python
+  description: |
+    matplotlib is a python 2D plotting library which produces publication
+    quality figures in a variety of hardcopy formats and interactive
+    environments across platforms. matplotlib can be used in Python scripts,
+    the Python and IPython shell (ala MATLAB or Mathematica), web
+    application servers, and six graphical user interface toolkits.
+  dev_url: https://github.com/matplotlib/matplotlib/
+  doc_url: http://matplotlib.org/contents.html
+
+extra:
+  recipe-maintainers:
+    - mdboom
+    - ocefpaf
+    - pelson
+    - tacaswell
+    - dopplershift
