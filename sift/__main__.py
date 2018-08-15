@@ -27,15 +27,6 @@ from PyQt4 import QtGui
 from quamash import QEventLoop, QThreadExecutor
 from collections import OrderedDict
 
-app_object = app.use_app('pyqt4')
-APP: QtGui.QApplication = app_object.native
-LOOP = QEventLoop(APP)
-asyncio.set_event_loop(LOOP)  # NEW must set the event loop
-
-
-QtCore = app_object.backend_module.QtCore
-QtGui = app_object.backend_module.QtGui
-
 import sift.ui.open_cache_dialog_ui as open_cache_dialog_ui
 from sift.control.LayerManager import LayerSetsManager
 from sift.control.rgb_behaviors import UserModifiesRGBLayers
@@ -64,9 +55,16 @@ from sift.common import INFO, KIND, TOOL, COMPOSITE_TYPE, get_font_size
 import os
 import sys
 import logging
-
-import ast
 from sift.ui.GradientControl import GradientControl
+
+app_object = app.use_app('pyqt4')
+APP: QtGui.QApplication = app_object.native
+LOOP = QEventLoop(APP)
+asyncio.set_event_loop(LOOP)  # NEW must set the event loop
+
+
+QtCore = app_object.backend_module.QtCore
+QtGui = app_object.backend_module.QtGui
 
 
 LOG = logging.getLogger(__name__)
