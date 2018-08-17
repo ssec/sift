@@ -41,6 +41,10 @@ binaries = []
 if is_linux:
     lib_dir = sys.executable.replace(os.path.join("bin", "python"), "lib")
     binaries += [(os.path.join(lib_dir, 'libfontconfig*.so'), '.')]
+if not is_win:
+    # Add extra pygrib .def files
+    share_dir = sys.executable.replace(os.path.join("bin", "python"), "share")
+    data_files.append((os.path.join(share_dir, 'grib_api', 'definitions'), os.path.join('share', 'grib_api', 'definitions')))
 
 a = Analysis([main_script_pathname],
              pathex=[_script_base],
