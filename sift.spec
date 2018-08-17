@@ -26,6 +26,8 @@ hidden_imports = [
     "vispy.app.backends._pyqt4",
     "sqlalchemy.ext.baked",
     "satpy",
+    "skimage",
+    "skimage.measure",
 ] + collect_submodules("rasterio") + collect_submodules('satpy')
 if is_win:
     hidden_imports += collect_submodules("encodings")
@@ -76,4 +78,7 @@ if is_darwin:
     app = BUNDLE(coll,
                  name=exe_name + '.app',
                  icon=None,
-                 bundle_identifier=None)
+                 bundle_identifier=None,
+                 info_plist={
+                     'LSBackgroundOnly': 'false',
+                 })
