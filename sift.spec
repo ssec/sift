@@ -29,6 +29,9 @@ hidden_imports = [
 ] + collect_submodules("rasterio") + collect_submodules('satpy')
 if is_win:
     hidden_imports += collect_submodules("encodings")
+# PyGrib hidden import
+if not is_win:
+    hidden_imports += ['ncepgrib2']
 
 
 # Add missing shared libraries
