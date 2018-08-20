@@ -44,7 +44,7 @@ if is_linux:
 if not is_win:
     # Add extra pygrib .def files
     share_dir = sys.executable.replace(os.path.join("bin", "python"), "share")
-    data_files.append((os.path.join(share_dir, 'grib_api', 'definitions'), os.path.join('share', 'grib_api', 'definitions')))
+    data_files.append((os.path.join(share_dir, 'grib_api'), os.path.join('share', 'grib_api')))
 
 a = Analysis([main_script_pathname],
              pathex=[_script_base],
