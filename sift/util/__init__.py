@@ -3,15 +3,21 @@
 
 import os
 import sys
+import logging
 from sift.util.default_paths import (WORKSPACE_DB_DIR,
                                      DOCUMENT_SETTINGS_DIR,
                                      USER_DESKTOP_DIRECTORY)
+
+LOG = logging.getLogger(__name__)
 IS_FROZEN = getattr(sys, 'frozen', False)
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
-# patch GRIB API C library when frozen
-if IS_FROZEN:
-    os.environ['GRIB_DEFINITION_PATH'] = os.path.realpath(os.path.join(SCRIPT_DIR, '..', '..', 'share', 'grib_abi', 'definitions'))
+def check_grib_definition_dir():
+    # patch GRIB API C library when frozen
+    if IS_FROZEN and not os.getenv('GRIB_DEFINITION_PATH'):
+        grib_path = os.path.realpath(os.path.join(SCRIPT_DIR, '..', '..', 'share', 'grib_api', 'definitions'))
+        LOG.debug("Setting GRIB definition path to %s", grib_path)
+        os.environ['GRIB_DEFINITION_PATH'] = grib_path
 
 def get_package_data_dir():
     """Return location of the package 'data' directory.

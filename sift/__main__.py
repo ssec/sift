@@ -43,7 +43,8 @@ from sift.workspace.collector import ResourceSearchPathCollector
 from sift import __version__
 from sift.util import (WORKSPACE_DB_DIR,
                        DOCUMENT_SETTINGS_DIR,
-                       get_package_data_dir)
+                       get_package_data_dir,
+                       check_grib_definition_dir)
 
 from glob import glob
 from functools import partial
@@ -1042,6 +1043,7 @@ def main():
                         format='%(levelname)s %(asctime)s %(module)s:%(funcName)s:L%(lineno)d %(message)s')
     # FIXME: This is needed because shapely 1.5.11 sucks
     logging.getLogger().setLevel(level)
+    check_grib_definition_dir()
     # logging.getLogger('vispy').setLevel(level)
 
     if args.workspace:
