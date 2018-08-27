@@ -660,6 +660,7 @@ class Main(QtGui.QMainWindow):
                                                        self.layerSetsManager,
                                                        parent=self)
         self.behaviorLayersList = self.layerSetsManager.getLayerStackListViewModel()
+
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
             top_uuids = list(self.document.current_visible_layer_uuids)
             LOG.debug("top visible UUID is {0!r:s}".format(top_uuids))

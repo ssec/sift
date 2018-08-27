@@ -882,7 +882,7 @@ class SceneGraphManager(QObject):
                 self.image_elements[uuid].gamma = gamma
 
     def change_layers_colormap(self, change_dict):
-        for uuid,cmapid in change_dict.items():
+        for uuid, cmapid in change_dict.items():
             LOG.info('changing {} to colormap {}'.format(uuid, cmapid))
             self.set_colormap(cmapid, uuid)
 
@@ -979,7 +979,7 @@ class SceneGraphManager(QObject):
                 gamma=p.gamma,
                 interpolation='nearest',
                 method='tiled',
-                cmap=self.document.find_colormap("grays"),
+                cmap=None,
                 double=False,
                 texture_shape=DEFAULT_TEXTURE_SHAPE,
                 wrap_lon=False,

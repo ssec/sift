@@ -664,28 +664,6 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self._data_lookup_fn["gamma"] = self._gamma
         # self._need_texture_upload = True
 
-    # def _prepare_draw(self, view):
-    #     if self._data is None:
-    #         return False
-    #
-    #     if self._need_interpolation_update:
-    #         self._build_interpolation()
-    #
-    #     if self._need_texture_upload:
-    #         self._build_texture()
-    #
-    #     if self._need_colortransform_update:
-    #         # FIXME: This uses the ndim and shape from self
-    #         self.shared_program.frag['color_transform'] = \
-    #             _build_color_transform(self, self.cmap)
-    #         self._need_colortransform_update = False
-    #
-    #     if self._need_vertex_update:
-    #         self._build_vertex_data()
-    #
-    #     if view._need_method_update:
-    #         self._update_method(view)
-
 
 TiledGeolocatedImage = create_visual_node(TiledGeolocatedImageVisual)
 
@@ -811,7 +789,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         self._grid = grid
         self._need_texture_upload = True
         self._need_vertex_update = True
-        self._need_colortransform_update = True
+        self._need_colortransform_update = False
         self._need_interpolation_update = True
         self._textures = [TextureAtlas2D(self.texture_shape, tile_shape=self.tile_shape,
                                          interpolation=texture_interpolation,
@@ -867,7 +845,10 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         self.clim = _clim
         self._texture_LUT = None
         self.gamma = gamma if gamma is not None else (1.,) * self.num_channels
-        self.cmap = _cmap[0]
+        # only set colormap if it isn't None
+        # (useful when a subclass's shader doesn't expect a colormap)
+        if _cmap[0] is not None:
+            self.cmap = _cmap[0]
 
         self.overview_info = None
         self.init_overview(data_arrays)
@@ -985,15 +966,6 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
             lookup_fn["vmin"] = self._clim[idx, 0]
             lookup_fn["vmax"] = self._clim[idx, 1]
             lookup_fn["gamma"] = self._gamma[idx]
-
-    def _build_color_transform(self):
-        if self.ndim == 2 or self.shape[2] == 1:
-            fun = FunctionChain(None, [Function(_c2l),
-                                       Function(self._cmap.glsl_map)])
-        else:
-            fun = Function(_null_color_transform)
-        # self.shared_program.frag['color_transform'] = fun
-        self._need_colortransform_update = False
 
     def _build_interpolation(self):
         # assumes 'nearest' interpolation
