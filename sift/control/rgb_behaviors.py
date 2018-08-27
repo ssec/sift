@@ -5,6 +5,10 @@
 import logging
 from PyQt4.QtCore import QObject
 from sift.common import INFO, KIND
+# type hints:
+from sift.model.document import Document
+from sift.control.LayerManager import LayerSetsManager
+from sift.view.rgb_config import RGBLayerConfigPane
 
 LOG = logging.getLogger(__name__)
 
@@ -25,7 +29,8 @@ class UserModifiesRGBLayers(QObject):
            about this new family.
 
     """
-    def __init__(self, document, rgb_pane, layer_list, parent=None):
+    def __init__(self, document: Document, rgb_pane: RGBLayerConfigPane,
+                 layer_list: LayerSetsManager, parent=None):
         super().__init__(parent)
         self.doc = document
         self.rgb_pane = rgb_pane
