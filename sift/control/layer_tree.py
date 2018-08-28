@@ -98,7 +98,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
 
         # if we have a value, break out the animation order and other info
         animation_order = None
-        if value :
+        if value:
             value, animation_order = value
 
         # if we have a point probe value, draw the filled bar to represent where it is in that layer's data range

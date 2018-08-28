@@ -2351,28 +2351,21 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def animate_siblings_of_layer(self, row_or_uuid):
         uuid = self.current_layer_set[row_or_uuid].uuid if not isinstance(row_or_uuid, UUID) else row_or_uuid
         layer = self._layer_with_uuid[uuid]
-        if isinstance(layer, DocRGBLayer):
-            return self.loop_rgb_layers_following(layer.uuid)
-        new_anim_uuids, _ = self.time_siblings(uuid)
-        if new_anim_uuids is None or len(new_anim_uuids)<2:
-            LOG.info('no time siblings to chosen band, will try channel siblings to chosen time')
-            new_anim_uuids, _ = self.channel_siblings(uuid)
-        if new_anim_uuids is None or len(new_anim_uuids)<2:
-            LOG.warning('No animation found')
-            return []
-        LOG.debug('new animation order will be {0!r:s}'.format(new_anim_uuids))
         L = self.current_layer_set
+
+        if isinstance(layer, DocRGBLayer):
+            new_anim_uuids = tuple(self._uuids_for_recipe(layer.recipe))
+        else:
+            new_anim_uuids, _ = self.time_siblings(uuid)
+            if new_anim_uuids is None or len(new_anim_uuids) < 2:
+                LOG.info('no time siblings to chosen band, will try channel siblings to chosen time')
+                new_anim_uuids, _ = self.channel_siblings(uuid)
+            if new_anim_uuids is None or len(new_anim_uuids) < 2:
+                LOG.warning('No animation found')
+                return []
+
+        LOG.debug('new animation order will be {0!r:s}'.format(new_anim_uuids))
         L.animation_order = new_anim_uuids
-        # L.clear_animation_order()
-        # for dex,u in enumerate(new_anim_uuids):
-        #     LOG.debug(u)
-        #     row = L.uuid2row.get(u, None)
-        #     if row is None:
-        #         LOG.error('unable to find row for uuid {} in current layer set'.format(u))
-        #         continue
-        #     old = L[row]
-        #     new = old._replace(a_order=dex)
-        #     L[row] = new
         self.didReorderAnimation.emit(tuple(new_anim_uuids))
         return new_anim_uuids
 
