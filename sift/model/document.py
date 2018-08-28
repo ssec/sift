@@ -2157,10 +2157,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # find all the layer combinations
         changed_uuids = []
         prez_uuids = self.current_layer_uuid_order
-        for t, sat, inst, r, g, b in self._composite_layers(recipe, times=times, rgba=rgba):
-            inst_key = (sat, inst)
+        for t, category, r, g, b in self._composite_layers(recipe, times=times, rgba=rgba):
             # (sat, inst) -> {time -> layer}
-            layers = self._recipe_layers[recipe.name].setdefault(inst_key, {})
+            layers = self._recipe_layers[recipe.name].setdefault(category, {})
             # NOTE: combinations may be returned that don't match the recipe
             if t not in layers:
                 # create a new blank RGB
@@ -2232,7 +2231,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             rgba = []
 
         def _key_func(x):
-            return x[INFO.PLATFORM], x[INFO.INSTRUMENT]
+            return x[INFO.CATEGORY]
 
         def _component_generator(family, this_rgba):
             # limit what layers are returned
@@ -2242,35 +2241,36 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             # use wavelength if it exists, use short name otherwise
             if family is None:
                 layers = self.current_layers_where(kinds=[KIND.IMAGE, KIND.COMPOSITE])
+                # layers = self.current_layers_where(kinds=[KIND.IMAGE, KIND.COMPOSITE, KIND.CONTOUR])
                 layers = (x[-1] for x in layers)
                 # return empty `None` layers since we don't know what is wanted right now
                 # we look at all possible times
-                inst_layers = {k: {l[INFO.SCHED_TIME]: None for l in g} for k, g in groupby(sorted(layers, key=_key_func), _key_func)}
+                inst_layers = {k: {l[INFO.SERIAL]: None for l in g} for k, g in groupby(sorted(layers, key=_key_func), _key_func)}
                 return inst_layers
             else:
                 family_uuids = self._families[family]
                 family_layers = [self[u] for u in family_uuids]
             # (sat, inst) -> {time -> layer}
-            inst_layers = {k: {l[INFO.SCHED_TIME]: l for l in g} for k, g in groupby(sorted(family_layers, key=_key_func), _key_func)}
+            inst_layers = {k: {l[INFO.SERIAL]: l for l in g} for k, g in groupby(sorted(family_layers, key=_key_func), _key_func)}
             return inst_layers
 
         r_layers = _component_generator(recipe.input_ids[0], 'r')
         g_layers = _component_generator(recipe.input_ids[1], 'g')
         b_layers = _component_generator(recipe.input_ids[2], 'b')
-        instruments = r_layers.keys() | g_layers.keys() | b_layers.keys()
-        for inst_key in instruments:
+        categories = r_layers.keys() | g_layers.keys() | b_layers.keys()
+        for category in categories:
             # any new times plus existing times if RGBs already exist
-            rgb_times = r_layers.setdefault(inst_key, {}).keys() | \
-                        g_layers.setdefault(inst_key, {}).keys() | \
-                        b_layers.setdefault(inst_key, {}).keys() | \
-                        self._recipe_layers[recipe.name].setdefault(inst_key, {}).keys()
+            rgb_times = r_layers.setdefault(category, {}).keys() | \
+                        g_layers.setdefault(category, {}).keys() | \
+                        b_layers.setdefault(category, {}).keys() | \
+                        self._recipe_layers[recipe.name].setdefault(category, {}).keys()
             if times:
                 rgb_times &= times
             # time order doesn't really matter
             for t in rgb_times:
-                yield t, inst_key[0], inst_key[1],\
-                      r_layers[inst_key].get(t), g_layers[inst_key].get(t),\
-                      b_layers[inst_key].get(t)
+                yield t, category,\
+                      r_layers[category].get(t), g_layers[category].get(t),\
+                      b_layers[category].get(t)
 
     def sync_composite_layer_prereqs(self, new_times):
         """Check if we can make more RGBs based on newly added times"""

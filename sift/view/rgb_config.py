@@ -114,7 +114,7 @@ class RGBLayerConfigPane(QObject):
         return self._gamma_boxes
 
     def family_added(self, family, family_info):
-        if family_info[INFO.KIND] in [KIND.RGB]:
+        if family_info[INFO.KIND] in [KIND.RGB, KIND.CONTOUR]:
             # can't choose RGBs as components of RGBs
             return
 
