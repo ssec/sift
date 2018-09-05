@@ -41,6 +41,10 @@ class ChangeColormapDialog(QtGui.QDialog):
         self.ui.gammaSpinBox.setValue(self._initial_gamma)
 
         self.ui.buttons.clicked.connect(self._clicked)
+        close_button = self.ui.buttons.button(QtGui.QDialogButtonBox.Close)
+        close_button.setAutoDefault(True)
+        reset_button = self.ui.buttons.button(QtGui.QDialogButtonBox.Reset)
+        reset_button.setAutoDefault(False)
         self.ui.buttons.accepted.disconnect()
         self.ui.buttons.rejected.disconnect()
 
