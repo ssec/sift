@@ -75,7 +75,7 @@ class ExportImageDialog(QtGui.QDialog):
         fn = QtGui.QFileDialog.getSaveFileName(self,
                                                caption=self.tr('Screenshot Filename'),
                                                directory=os.path.join(self._last_dir, self.default_filename),
-                                               filter=self.tr('Image Files (*.png *.jpg *.gif)'),
+                                               filter=self.tr('Image Files (*.png *.jpg *.gif *.mp4 *.mov)'),
                                                options=QtGui.QFileDialog.DontConfirmOverwrite)
         if fn:
             self.ui.saveAsLineEdit.setText(fn)
@@ -86,7 +86,7 @@ class ExportImageDialog(QtGui.QDialog):
     def _validate_filename(self):
         t = self.ui.saveAsLineEdit.text()
         bt = self.ui.buttonBox.button(QtGui.QDialogButtonBox.Save)
-        if not t or os.path.splitext(t)[-1] not in ['.png', '.jpg', '.gif']:
+        if not t or os.path.splitext(t)[-1] not in ['.png', '.jpg', '.gif', '.mp4', '.mov']:
             bt.setDisabled(True)
         else:
             self._last_dir = os.path.dirname(t)
