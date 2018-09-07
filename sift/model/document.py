@@ -1172,6 +1172,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # didChangeShapeLayer = pyqtSignal(dict)
     didAddFamily = pyqtSignal(str, dict)  # name of the newly added family and dict of family info
     didReorderTracks = pyqtSignal(set, set)  # added track names, removed track names
+    didChangeImageKind = pyqtSignal(dict)
 
     # high-level contexts providing purposed access to low-level document and its storage, as well as MDB and WS
     # layer display shows active products under the playhead
@@ -1468,7 +1469,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             with self._workspace.metadatabase as s:
                 fam = s.query(Product.family).filter_by(uuid_str=str(uuid_or_layer)).first()
             if fam:
-                return fam
+                return fam[0]
             uuid_or_layer = self[uuid_or_layer]
         if INFO.FAMILY in uuid_or_layer:
             LOG.debug('using pre-existing family {}'.format(uuid_or_layer[INFO.FAMILY]))
@@ -2034,6 +2035,24 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def change_gamma_for_siblings(self, uuid, gamma):
         uuids = self.time_siblings(uuid)[0]
         return self.change_gamma_for_layers_where(gamma, uuids=uuids)
+
+    def change_layers_image_kind(self, uuids, new_kind):
+        """Change an image or contour layer to present as a different kind."""
+        nfo = {}
+        layer_set = self.current_layer_set
+        assert new_kind in KIND
+        all_uuids = set()
+        for u in uuids:
+            fam = self.family_for_product_or_layer(u)
+            all_uuids.update(self._families[fam])
+        for idx, pz, layer in self.current_layers_where(uuids=all_uuids):
+            if pz.kind not in [KIND.IMAGE, KIND.CONTOUR]:
+                LOG.warning("Can't change image kind for KIND: %s", pz.kind.name)
+                continue
+            new_pz = pz._replace(kind=new_kind)
+            nfo[layer.uuid] = new_pz
+            layer_set[idx] = new_pz
+        self.didChangeImageKind.emit(nfo)
 
     def create_algebraic_composite(self, operations, namespace, info=None, insert_before=0):
         if info is None:

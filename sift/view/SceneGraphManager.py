@@ -896,6 +896,11 @@ class SceneGraphManager(QObject):
             LOG.info('changing {} to gamma {}'.format(uuid, gamma))
             self.set_gamma(gamma, uuid)
 
+    def change_layers_image_kind(self, change_dict):
+        for uuid, new_pz in change_dict.items():
+            LOG.info('changing {} to kind {}'.format(uuid, new_pz.kind.name))
+            self.add_basic_layer(None, uuid, new_pz)
+
     def add_contour_layer(self, layer:DocBasicLayer, p:prez, overview_content:np.ndarray):
         verts = overview_content[:, :2]
         connects = overview_content[:, 2].astype(np.bool)
@@ -927,9 +932,21 @@ class SceneGraphManager(QObject):
         if not layer.is_valid:
             LOG.warning('unable to add an invalid layer, will try again later when layer changes')
             return
+        if layer[INFO.UUID] in self.image_elements:
+            image = self.image_elements[layer[INFO.UUID]]
+            if p.kind == KIND.CONTOUR and isinstance(image, PrecomputedIsocurve):
+                LOG.warning("Contour layer already exists in scene")
+                return
+            if p.kind == KIND.IMAGE and isinstance(image, TiledGeolocatedImage):
+                LOG.warning("Image layer already exists in scene")
+                return
+            # we already have an image layer for it and it isn't what we want
+            # remove the existing image object and create the proper type now
+            image.parent = None
+            del self.image_elements[layer[INFO.UUID]]
 
-        overview_content = self.workspace.get_content(layer.uuid, kind=layer[INFO.KIND])
-        if layer[INFO.KIND] == KIND.CONTOUR:
+        overview_content = self.workspace.get_content(layer.uuid, kind=p.kind)
+        if p.kind == KIND.CONTOUR:
             return self.add_contour_layer(layer, p, overview_content)
 
         image = TiledGeolocatedImage(
@@ -963,9 +980,9 @@ class SceneGraphManager(QObject):
         if not layer.is_valid:
             LOG.info('unable to add an invalid layer, will try again later when layer changes')
             return
-        if layer[INFO.KIND] == KIND.RGB:
+        if p.kind == KIND.RGB:
             dep_uuids = r,g,b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
-            overview_content = list(self.workspace.get_content(cuuid) for cuuid in dep_uuids)
+            overview_content = list(self.workspace.get_content(cuuid, kind=KIND.IMAGE) for cuuid in dep_uuids)
             uuid = layer.uuid
             LOG.debug("Adding composite layer to Scene Graph Manager with UUID: %s", uuid)
             self.image_elements[uuid] = element = RGBCompositeLayer(
@@ -996,7 +1013,7 @@ class SceneGraphManager(QObject):
             element.determine_reference_points()
             self.update()
             return True
-        elif layer[INFO.KIND] == KIND.COMPOSITE:
+        elif p.kind in [KIND.COMPOSITE, KIND.IMAGE]:
             # algebraic layer
             return self.add_basic_layer(new_order, uuid, p)
 
@@ -1009,7 +1026,7 @@ class SceneGraphManager(QObject):
 
     def change_composite_layer(self, new_order:tuple, uuid:UUID, presentation:prez):
         layer = self.document[uuid]
-        if layer[INFO.KIND] == KIND.RGB:
+        if presentation.kind == KIND.RGB:
             if layer.uuid in self.image_elements:
                 if layer.is_valid:
                     # RGB selection has changed, rebuild the layer
@@ -1104,6 +1121,7 @@ class SceneGraphManager(QObject):
         document.didChangeCompositions.connect(self.change_composite_layers)
         document.didChangeColorLimits.connect(self.change_layers_color_limits)
         document.didChangeGamma.connect(self.change_layers_gamma)
+        document.didChangeImageKind.connect(self.change_layers_image_kind)
 
     def set_frame_number(self, frame_number=None):
         self.layer_set.next_frame(None, frame_number)

@@ -35,8 +35,11 @@ __docformat__ = 'reStructuredText'
 
 import logging, sys, os
 import pickle as pkl
-from PyQt4.QtCore import QAbstractItemModel, QAbstractListModel, Qt, QSize, QModelIndex, QPoint, QMimeData, pyqtSignal, QRect
-from PyQt4.QtGui import QTreeView, QStyledItemDelegate, QAbstractItemView, QMenu, QStyle, QColor, QFont, QStyleOptionViewItem, QItemSelection, QItemSelectionModel, QPen
+from PyQt4.QtCore import QAbstractItemModel, Qt, QSize, QModelIndex, QPoint, QMimeData, pyqtSignal, QRect
+from PyQt4.QtGui import (QTreeView, QStyledItemDelegate, QAbstractItemView,
+                         QMenu, QStyle, QColor, QFont, QStyleOptionViewItem,
+                         QItemSelection, QItemSelectionModel, QPen,
+                         QActionGroup, QAction)
 from sift.model.document import Document, DocumentAsLayerStack
 from sift.common import INFO, KIND, get_font_size
 from sift.view.colormap_dialogs import ChangeColormapDialog
@@ -439,6 +442,31 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         menu.addMenu(rgb_menu)
         return actions
 
+    def change_layer_image_kind_menu(self, menu, lbox, selected_uuids, *args):
+        current_kind = self.doc.prez_for_uuid(selected_uuids[0]).kind
+        kind_menu = QMenu("Change Image Kind", menu)
+        action_group = QActionGroup(menu, exclusive=True)
+        actions = {}
+        action_kinds = {}
+
+        def _change_layers_image_kind(action, action_kinds=action_kinds):
+            if not action.isChecked():
+                # can't uncheck an image kind
+                LOG.debug("Selected KIND action is not checked")
+                return
+            kind = action_kinds[action]
+            return self.doc.change_layers_image_kind(selected_uuids, kind)
+
+        for kind in [KIND.IMAGE, KIND.CONTOUR]:
+            action = action_group.addAction(QAction(kind.name, menu, checkable=True))
+            action_kinds[action] = kind
+            action.setChecked(kind == current_kind)
+            actions[action] = _change_layers_image_kind
+            kind_menu.addAction(action)
+
+        menu.addMenu(kind_menu)
+        return actions
+
     def menu(self, pos: QPoint, *args):
         lbox = self.current_set_listbox
         selected_uuids = list(self.current_selected_uuids(lbox))
@@ -448,6 +476,8 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         if len(selected_uuids) == 1:
             if self.doc[selected_uuids[0]][INFO.KIND] in [KIND.IMAGE, KIND.COMPOSITE, KIND.CONTOUR]:
                 actions.update(self.change_layer_colormap_menu(menu, lbox, selected_uuids, *args))
+            if self.doc[selected_uuids[0]][INFO.KIND] in [KIND.CONTOUR]:
+                actions.update(self.change_layer_image_kind_menu(menu, lbox, selected_uuids, *args))
         if 0 < len(selected_uuids) <= 3:
             if all(self.doc[u][INFO.KIND] in [KIND.IMAGE, KIND.COMPOSITE]
                    for u in selected_uuids):
