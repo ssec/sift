@@ -1,7 +1,9 @@
 import os
 import logging
+import numpy
 
 from PyQt4 import QtCore, QtGui
+from PIL import Image, ImageDraw, ImageFont
 import imageio
 
 from sift.common import INFO
@@ -283,12 +285,24 @@ class ExportImageHelper(QtCore.QObject):
 
         # get canvas screenshot arrays (numpy arrays of canvas pixels)
         img_arrays = self.sgm.get_screenshot_array(info['frame_range'])
+
+
         if not len(img_arrays) or len(uuids) != len(img_arrays):
             LOG.error("Number of frames does not equal number of filenames")
             return
 
+        images = [(u, Image.fromarray(x)) for u, x in img_arrays]
+
+        if info['include_footer']:
+            banner_text = [self.doc[u][INFO.DATASET_NAME] if u else "" for u, im in images]
+            images = [(u, self._add_screenshot_footer(im, bt, font_size=info['font_size'])) for (u, im), bt in
+                      zip(images, banner_text)]
+
         writer = imageio.get_writer(filenames[0])
-        for x in img_arrays:
-            writer.append_data(x[1])
+
+        for u, x in images:
+            writer.append_data(numpy.array(x))
+
+
 
         writer.close()
