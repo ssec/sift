@@ -60,7 +60,7 @@ from PyQt4.QtCore import QObject, pyqtSignal
 from pyproj import Proj
 from rasterio import Affine
 from shapely.geometry.polygon import LinearRing
-from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import NoResultFound
 
 from sift.common import INFO, KIND, flags, STATE
 from sift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
@@ -530,20 +530,28 @@ class Workspace(QObject):
 
     def _product_overview_content(self, session, prod:Product=None, uuid:UUID=None, kind:KIND=KIND.IMAGE) -> Content:
         if prod is None and uuid is not None:
-            contents = session.query(Content).filter((Product.uuid_str==str(uuid)) & (Content.product_id==Product.id)).order_by(Content.lod).all()
-            contents = [c for c in contents if c.info.get(INFO.KIND, KIND.IMAGE) == kind]
-            return contents[0]
-        contents = [c for c in prod.content if c.info.get(INFO.KIND, KIND.IMAGE)]
+            # Get Product object
+            try:
+                prod = session.query(Product).filter(Product.uuid_str == str(uuid)).one()
+            except NoResultFound:
+                LOG.error("No product with UUID {} found".format(uuid))
+                return None
+        contents = session.query(Content).filter(Content.product_id == prod.id).order_by(Content.lod).all()
+        contents = [c for c in contents if c.info.get(INFO.KIND, KIND.IMAGE) == kind]
         return None if 0 == len(contents) else contents[0]
 
     def _product_native_content(self, session, prod:Product = None, uuid:UUID=None, kind:KIND=KIND.IMAGE) -> Content:
         # NOTE: This assumes the last Content object is the best resolution
         #       but it is untested
         if prod is None and uuid is not None:
-            contents = session.query(Content).filter((Product.uuid_str==str(uuid)) & (Content.product_id==Product.id)).order_by(Content.lod.desc()).all()
-            contents = [c for c in contents if c.info.get(INFO.KIND, KIND.IMAGE) == kind]
-            return contents[-1]
-        contents = [c for c in prod.content if c.info.get(INFO.KIND, KIND.IMAGE)]
+            # Get Product object
+            try:
+                prod = session.query(Product).filter(Product.uuid_str == str(uuid)).one()
+            except NoResultFound:
+                LOG.error("No product with UUID {} found".format(uuid))
+                return None
+        contents = session.query(Content).filter(Content.product_id == prod.id).order_by(Content.lod.desc()).all()
+        contents = [c for c in contents if c.info.get(INFO.KIND, KIND.IMAGE) == kind]
         return None if 0 == len(contents) else contents[-1]
 
     #
@@ -614,7 +622,7 @@ class Workspace(QObject):
                 LOG.error("known products: {}".format(repr(self._all_product_uuids())))
                 return None
             kind = prod.info[INFO.KIND]
-            native_content = self._product_native_content(s, kind=kind, uuid=dsi_or_uuid)
+            native_content = self._product_native_content(s, prod=prod, kind=kind)
 
             if native_content is not None:
                 # FUTURE: this is especially saddening; upgrade to finer grained query and/or deprecate .get_info
@@ -1123,8 +1131,11 @@ class Workspace(QObject):
             S.add(P)
             S.add(C)
 
+        # FIXME: Do I have to flush the session so the Product gets added for sure?
+
         # activate the content we just loaded into the workspace
         overview_data = self._overview_content_for_uuid(uuid)
+        print(overview_data)
         # prod = self._product_with_uuid(S, uuid)
         return uuid, self.get_info(uuid), overview_data
 

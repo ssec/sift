@@ -412,9 +412,9 @@ class Product(Base):
 
     @property
     def path(self):
-        # if len(self.resource) > 1:
-        #     LOG.warning('Product {} has more than one resource, path is ambiguous'.format(self.name))
-        return self.resource[0].path  # FIXME if len(self.resource)==1 else None
+        if len(self.resource) > 1:
+            LOG.warning('Product {} has more than one resource, path is ambiguous'.format(self.name))
+        return self.resource[0].path if len(self.resource) == 1 else None
 
     @path.setter
     def path(self, value):

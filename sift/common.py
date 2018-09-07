@@ -167,7 +167,7 @@ class KIND(Enum):
     OUTLINE = 2
     SHAPE = 3
     RGB = 4
-    COMPOSITE = 5
+    COMPOSITE = 1  # deprecated: use KIND.IMAGE instead
     CONTOUR = 6
 
 
