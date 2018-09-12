@@ -665,7 +665,7 @@ class Main(QtGui.QMainWindow):
         self.rgb_config_pane = RGBLayerConfigPane(self.ui, self.ui.layersPaneWidget)
         self.user_rgb_behavior = UserModifiesRGBLayers(self.document,
                                                        self.rgb_config_pane,
-                                                       self.layerSetsManager.layer_list_model,
+                                                       self.layer_list_model,
                                                        parent=self)
 
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
