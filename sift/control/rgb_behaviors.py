@@ -7,7 +7,7 @@ from PyQt4.QtCore import QObject
 from sift.common import INFO, KIND
 # type hints:
 from sift.model.document import Document
-from sift.control.LayerManager import LayerSetsManager
+from sift.control.layer_tree import LayerStackTreeViewModel
 from sift.view.rgb_config import RGBLayerConfigPane
 
 LOG = logging.getLogger(__name__)
@@ -30,18 +30,18 @@ class UserModifiesRGBLayers(QObject):
 
     """
     def __init__(self, document: Document, rgb_pane: RGBLayerConfigPane,
-                 layer_list: LayerSetsManager, parent=None):
+                 layer_list_model: LayerStackTreeViewModel, parent=None):
         super().__init__(parent)
         self.doc = document
         self.rgb_pane = rgb_pane
-        self.layer_list = layer_list
+        self.layer_list_model = layer_list_model
         self._connect_signals()
 
     def _connect_signals(self):
         # Task 1
         # Added by Main UI: create_rgb
         # Task 2
-        self.layer_list.layer_list_model.uuidSelectionChanged.connect(self._selection_did_change)
+        self.layer_list_model.uuidSelectionChanged.connect(self._selection_did_change)
         # Task 3
         self.rgb_pane.didChangeRGBComponentSelection.connect(self._component_changed)
         self.rgb_pane.didChangeRGBComponentLimits.connect(self._limits_changed)
@@ -50,10 +50,9 @@ class UserModifiesRGBLayers(QObject):
         self.doc.didAddFamily.connect(self._family_added)
 
     def create_rgb(self, action=None, families=[]):
-        layer_list_model = self.layer_list.layer_list_model
         if len(families) == 0:
             # get the layers to composite from current selection
-            uuids = list(layer_list_model.current_selected_uuids())
+            uuids = list(self.layer_list_model.current_selected_uuids())
             families = [self.doc[u][INFO.FAMILY] for u in uuids]
         if len(families) < 3:  # pad with None
             families = families + ([None] * (3 - len(families)))
@@ -63,7 +62,7 @@ class UserModifiesRGBLayers(QObject):
                                                    families[1],
                                                    families[2]))
         if layer is not None:
-            layer_list_model.select([layer.uuid])
+            self.layer_list_model.select([layer.uuid])
 
     def _selection_did_change(self, uuids=None):
         if uuids is not None and len(uuids) == 1:

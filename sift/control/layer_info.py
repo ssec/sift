@@ -18,41 +18,14 @@ __docformat__ = 'reStructuredText'
 
 import logging
 from PyQt4.QtCore import QObject, Qt
-from PyQt4.QtGui import (QWidget, QTreeView,
-                         QGridLayout, QLabel, QTextEdit, QFont, QSizePolicy)
+from PyQt4.QtGui import QGridLayout, QLabel, QTextEdit, QFont, QSizePolicy
 from sift.common import INFO, KIND
-from sift.control.layer_tree import LayerStackTreeViewModel
 from sift.model.layer import DocRGBLayer
 from sift.ui.custom_widgets import QNoScrollWebView
 import numpy as np
 from sift.view.Colormap import COLORMAP_MANAGER
 
 LOG = logging.getLogger(__name__)
-
-
-class LayerSetsManager(QObject):
-    """This is the controller object that manages the extended functionality of the layer sets.
-    """
-
-    document = None
-    layer_list_widget = None
-    layer_list_model = None
-    layer_info_pane = None
-
-    def __init__(self, layer_list_widget:QWidget, layer_info_widget:QWidget, document):
-
-        super(LayerSetsManager, self).__init__(layer_list_widget)
-        self.document = document
-
-        # hang on to the various widgets for later
-        self.layer_list_widget = layer_list_widget
-        self.layer_info_pane = SingleLayerInfoPane(layer_info_widget, document)
-
-        # set up our layer sets and make the first one
-        new_layer_set = QTreeView(self.layer_list_widget)
-        self.layer_list_widget.layout().addWidget(new_layer_set)
-        self.layer_list_model = LayerStackTreeViewModel([new_layer_set], self.document, parent=self.layer_list_widget)
-        self.layer_list_model.uuidSelectionChanged.connect(self.layer_info_pane.update_display)
 
 
 class SingleLayerInfoPane(QObject):

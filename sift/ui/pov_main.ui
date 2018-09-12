@@ -437,7 +437,11 @@
    <widget class="QWidget" name="layersPaneWidget">
     <layout class="QVBoxLayout" name="verticalLayout_9">
      <item>
-      <layout class="QVBoxLayout" name="verticalLayout"/>
+      <layout class="QVBoxLayout" name="layerWidgetLayout">
+       <item>
+        <widget class="QTreeView" name="layerListView"/>
+       </item>
+      </layout>
      </item>
     </layout>
    </widget>

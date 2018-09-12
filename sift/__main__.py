@@ -28,7 +28,8 @@ from quamash import QEventLoop, QThreadExecutor
 from collections import OrderedDict
 
 import sift.ui.open_cache_dialog_ui as open_cache_dialog_ui
-from sift.control.LayerManager import LayerSetsManager
+from sift.control.layer_info import SingleLayerInfoPane
+from sift.control.layer_tree import LayerStackTreeViewModel
 from sift.control.rgb_behaviors import UserModifiesRGBLayers
 from sift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
 from sift.model.document import Document
@@ -646,20 +647,26 @@ class Main(QtGui.QMainWindow):
         self.scheduler = QtCore.QTimer(parent=self)
         self.scheduler.setInterval(200.0)
         self.scheduler.timeout.connect(partial(self.scene_manager.on_view_change, self.scheduler))
+
         def start_wrapper(timer, event):
             """Simple wrapper around a timers start method so we can accept but ignore the event provided
             """
             timer.start()
+
         self.scene_manager.main_view.scene.transform.changed.connect(partial(start_wrapper, self.scheduler))
 
         # convey action between document and layer list view
-        self.layerSetsManager = LayerSetsManager(self.ui.layersPaneWidget, self.ui.layerDetailsContents, self.document)
+        self.layer_info_pane = SingleLayerInfoPane(self.ui.layerDetailsContents, self.document)
+        self.layer_list_model = LayerStackTreeViewModel([self.ui.layerListView], self.document,
+                                                        parent=self.ui.layersPaneWidget)
+        self.layer_list_model.uuidSelectionChanged.connect(self.layer_info_pane.update_display)
+        self.behaviorLayersList = self.layer_list_model  # historical naming
+
         self.rgb_config_pane = RGBLayerConfigPane(self.ui, self.ui.layersPaneWidget)
         self.user_rgb_behavior = UserModifiesRGBLayers(self.document,
                                                        self.rgb_config_pane,
-                                                       self.layerSetsManager,
+                                                       self.layerSetsManager.layer_list_model,
                                                        parent=self)
-        self.behaviorLayersList = self.layerSetsManager.layer_list_model
 
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
             top_uuids = list(self.document.current_visible_layer_uuids)
