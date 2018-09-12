@@ -41,7 +41,7 @@ class UserModifiesRGBLayers(QObject):
         # Task 1
         # Added by Main UI: create_rgb
         # Task 2
-        self.layer_list.set_behaviors.uuidSelectionChanged.connect(self._selection_did_change)
+        self.layer_list.layer_list_model.uuidSelectionChanged.connect(self._selection_did_change)
         # Task 3
         self.rgb_pane.didChangeRGBComponentSelection.connect(self._component_changed)
         self.rgb_pane.didChangeRGBComponentLimits.connect(self._limits_changed)
@@ -50,7 +50,7 @@ class UserModifiesRGBLayers(QObject):
         self.doc.didAddFamily.connect(self._family_added)
 
     def create_rgb(self, action=None, families=[]):
-        layer_list_model = self.layer_list.getLayerStackListViewModel()
+        layer_list_model = self.layer_list.layer_list_model
         if len(families) == 0:
             # get the layers to composite from current selection
             uuids = list(layer_list_model.current_selected_uuids())

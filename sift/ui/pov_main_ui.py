@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'pov_main.ui'
+# Form implementation generated from reading ui file 'sift/ui/pov_main.ui'
 #
 # Created by: PyQt4 UI code generator 4.11.4
 #
@@ -221,18 +221,14 @@ class Ui_MainWindow(object):
         self.layersPane = QtGui.QDockWidget(MainWindow)
         self.layersPane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable|QtGui.QDockWidget.DockWidgetMovable)
         self.layersPane.setObjectName(_fromUtf8("layersPane"))
-        self.dockWidgetContents_5 = QtGui.QWidget()
-        self.dockWidgetContents_5.setObjectName(_fromUtf8("dockWidgetContents_5"))
-        self.verticalLayout = QtGui.QVBoxLayout(self.dockWidgetContents_5)
+        self.layersPaneWidget = QtGui.QWidget()
+        self.layersPaneWidget.setObjectName(_fromUtf8("layersPaneWidget"))
+        self.verticalLayout_9 = QtGui.QVBoxLayout(self.layersPaneWidget)
+        self.verticalLayout_9.setObjectName(_fromUtf8("verticalLayout_9"))
+        self.verticalLayout = QtGui.QVBoxLayout()
         self.verticalLayout.setObjectName(_fromUtf8("verticalLayout"))
-        self.layerSetTabs = QtGui.QTabWidget(self.dockWidgetContents_5)
-        self.layerSetTabs.setMinimumSize(QtCore.QSize(160, 0))
-        self.layerSetTabs.setObjectName(_fromUtf8("layerSetTabs"))
-        self.tab_plusL = QtGui.QWidget()
-        self.tab_plusL.setObjectName(_fromUtf8("tab_plusL"))
-        self.layerSetTabs.addTab(self.tab_plusL, _fromUtf8(""))
-        self.verticalLayout.addWidget(self.layerSetTabs)
-        self.layersPane.setWidget(self.dockWidgetContents_5)
+        self.verticalLayout_9.addLayout(self.verticalLayout)
+        self.layersPane.setWidget(self.layersPaneWidget)
         MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.layersPane)
         self.layerDetailsPane = QtGui.QDockWidget(MainWindow)
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Fixed)
@@ -520,7 +516,6 @@ class Ui_MainWindow(object):
 
         self.retranslateUi(MainWindow)
         self.probeTabWidget.setCurrentIndex(0)
-        self.layerSetTabs.setCurrentIndex(0)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
@@ -551,9 +546,6 @@ class Ui_MainWindow(object):
         self.areaProbePane.setWindowTitle(_translate("MainWindow", "Area Probe Graphs", None))
         self.probeTabWidget.setTabText(self.probeTabWidget.indexOf(self.tab_plus), _translate("MainWindow", "+", None))
         self.layersPane.setWindowTitle(_translate("MainWindow", "Layers", None))
-        self.layerSetTabs.setToolTip(_translate("MainWindow", "Alternate layer sets", None))
-        self.layerSetTabs.setStatusTip(_translate("MainWindow", "Select alternate layer set", None))
-        self.layerSetTabs.setTabText(self.layerSetTabs.indexOf(self.tab_plusL), _translate("MainWindow", "+", None))
         self.layerDetailsPane.setStatusTip(_translate("MainWindow", "Selected layer information", None))
         self.layerDetailsPane.setWindowTitle(_translate("MainWindow", "Layer Details", None))
         self.rgbConfigPane.setWindowTitle(_translate("MainWindow", "RGB Bounds", None))

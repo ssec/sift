@@ -653,13 +653,13 @@ class Main(QtGui.QMainWindow):
         self.scene_manager.main_view.scene.transform.changed.connect(partial(start_wrapper, self.scheduler))
 
         # convey action between document and layer list view
-        self.layerSetsManager = LayerSetsManager(self.ui.layerSetTabs, self.ui.layerDetailsContents, self.document)
-        self.rgb_config_pane = RGBLayerConfigPane(self.ui, self.ui.layerSetTabs)
+        self.layerSetsManager = LayerSetsManager(self.ui.layersPaneWidget, self.ui.layerDetailsContents, self.document)
+        self.rgb_config_pane = RGBLayerConfigPane(self.ui, self.ui.layersPaneWidget)
         self.user_rgb_behavior = UserModifiesRGBLayers(self.document,
                                                        self.rgb_config_pane,
                                                        self.layerSetsManager,
                                                        parent=self)
-        self.behaviorLayersList = self.layerSetsManager.getLayerStackListViewModel()
+        self.behaviorLayersList = self.layerSetsManager.layer_list_model
 
         def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
             top_uuids = list(self.document.current_visible_layer_uuids)
