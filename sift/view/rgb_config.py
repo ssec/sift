@@ -127,12 +127,11 @@ class RGBLayerConfigPane(QObject):
 
     def _combo_changed(self, index, combo:QComboBox=None, color=None):
         family = combo.itemData(index)
-        # if family:
-        #     family = tuple(family)
-        # else:
-        #     family = None
+        if not family:
+            # we use None as no-selection value, not empty string
+            family = None
 
-        LOG.debug("RGB: user selected %s for %s" % (family, color))
+        LOG.debug("RGB: user selected %s for %s" % (repr(family), color))
         # reset slider position to min and max for layer
         self._set_minmax_slider(color, family)
         self.didChangeRGBComponentSelection.emit(self.recipe, color, family)

@@ -33,6 +33,7 @@ from sift.control.layer_tree import LayerStackTreeViewModel
 from sift.control.rgb_behaviors import UserModifiesRGBLayers
 from sift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
 from sift.model.document import Document
+from sift.model.layer import DocRGBLayer
 from sift.view.rgb_config import RGBLayerConfigPane
 from sift.view.SceneGraphManager import SceneGraphManager
 from sift.view.ProbeGraphs import ProbeGraphManager, DEFAULT_POINT_PROBE
@@ -383,8 +384,44 @@ class Main(QtGui.QMainWindow):
 
     def remove_layer(self, *args, **kwargs):
         uuids = self.behaviorLayersList.current_selected_uuids()
-        if uuids:
-            self.document.remove_layers_from_all_sets(uuids)
+        rgb_uuids_handled = set()
+        uuids_to_remove = set()
+        # if we are deleting an RGB layer then we have to remove all of them
+        for uuid in uuids:
+            layer = self.document[uuid]
+            if not isinstance(layer, DocRGBLayer):
+                uuids_to_remove.add(uuid)
+                continue
+            elif uuid in rgb_uuids_handled:
+                continue
+
+            rgbs_uuids = self.document.family_uuids_for_uuid(uuid)
+            if len(rgbs_uuids) == 1:
+                # there is only one of these RGBs so just remove it
+                rgb_uuids_handled.add(uuid)
+                uuids_to_remove.add(uuid)
+
+            # Ask the user if this is what they want
+            msg_box = QtGui.QMessageBox()
+            msg_box.setText("Deleting RGB layer, delete all sibling RGB layers?")
+            msg_box.setInformativeText("All related RGBs must also be deleted.")
+            msg_box.setStandardButtons(msg_box.Cancel | msg_box.Yes | msg_box.No)
+            msg_box.setDefaultButton(msg_box.No)
+            response = msg_box.exec_()
+            if response == msg_box.Yes:
+                LOG.debug("Adding all RGB family UUIDs to be removed: %s", uuid)
+                rgb_uuids_handled.update(rgbs_uuids)
+                uuids_to_remove.update(rgbs_uuids)
+            elif response == msg_box.No:
+                LOG.debug("Will not delete RGB or its family: %s", uuid)
+                rgb_uuids_handled.update(rgbs_uuids)
+                continue
+            else:
+                LOG.debug("Cancelled removal of layers")
+                return
+
+        if uuids_to_remove:
+            self.document.remove_layers_from_all_sets(uuids_to_remove)
 
     def animation_slider_jump_frame(self, event, *args, **kwargs):
         "user has moved frame slider, update the display"

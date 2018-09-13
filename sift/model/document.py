@@ -2258,19 +2258,23 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 return {}
 
             # use wavelength if it exists, use short name otherwise
+            # FIXME: Should we use SERIAL instead?
+            #        Algebraic layers and RGBs need to use the same thing
+            #        Any call to 'sync_composite_layer_prereqs' needs to use
+            #        SERIAL instead of SCHED_TIME too.
             if family is None:
                 layers = self.current_layers_where(kinds=[KIND.IMAGE, KIND.COMPOSITE])
                 # layers = self.current_layers_where(kinds=[KIND.IMAGE, KIND.COMPOSITE, KIND.CONTOUR])
                 layers = (x[-1] for x in layers)
                 # return empty `None` layers since we don't know what is wanted right now
                 # we look at all possible times
-                inst_layers = {k: {l[INFO.SERIAL]: None for l in g} for k, g in groupby(sorted(layers, key=_key_func), _key_func)}
+                inst_layers = {k: {l[INFO.SCHED_TIME]: None for l in g} for k, g in groupby(sorted(layers, key=_key_func), _key_func)}
                 return inst_layers
             else:
                 family_uuids = self._families[family]
                 family_layers = [self[u] for u in family_uuids]
             # (sat, inst) -> {time -> layer}
-            inst_layers = {k: {l[INFO.SERIAL]: l for l in g} for k, g in groupby(sorted(family_layers, key=_key_func), _key_func)}
+            inst_layers = {k: {l[INFO.SCHED_TIME]: l for l in g} for k, g in groupby(sorted(family_layers, key=_key_func), _key_func)}
             return inst_layers
 
         r_layers = _component_generator(recipe.input_ids[0], 'r')
@@ -2351,20 +2355,26 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         uuid = self.current_layer_set[row].uuid
         return uuid
 
+    def family_uuids(self, family):
+        return self._families[family]
+
+    def family_uuids_for_uuid(self, uuid):
+        return self.family_uuids(self[uuid][INFO.FAMILY])
+
     def remove_layers_from_all_sets(self, uuids):
+        # find RGB layers family
+        all_uuids = set()
         for uuid in list(uuids):
-            # FUTURE: make this removal of presentation tuples from inactive layer sets less sucky
+            all_uuids.add(uuid)
+            if isinstance(self[uuid], DocRGBLayer):
+                all_uuids.update(self.family_uuids_for_uuid(uuid))
+
+        # delete all these layers
+        for uuid in all_uuids:
             LOG.debug('removing {}'.format(uuid))
-            for dex,layer_set in enumerate(self._layer_sets):
-                if dex==self.current_set_index or layer_set is None:
-                    continue
-                for pdex, presentation in enumerate(layer_set):
-                    if presentation.uuid==uuid:
-                        del layer_set[pdex]
-                        break
             # remove from available family layers
             self._remove_layer_from_family(uuid)
-            # now remove from the active layer set
+            # remove from the layer set
             self.remove_layer_prez(uuid)  # this will send signal and start purge
 
     def animate_siblings_of_layer(self, row_or_uuid):
