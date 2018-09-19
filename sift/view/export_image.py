@@ -294,9 +294,16 @@ class ExportImageHelper(QtCore.QObject):
         images = [(u, Image.fromarray(x)) for u, x in img_arrays]
 
         if info['include_footer']:
-            banner_text = [self.doc[u][INFO.DATASET_NAME] if u else "" for u, im in images]
+            banner_text = [self.doc[u][INFO.DISPLAY_NAME] if u else "" for u, im in images]
             images = [(u, self._add_screenshot_footer(im, bt, font_size=info['font_size'])) for (u, im), bt in
                       zip(images, banner_text)]
+
+        if filenames[0].endswith('.gif') and len(images) > 1:
+            params = self._get_animation_parameters(info, images)
+            filenames = filenames[:1]
+            images = images[:1]
+        else:
+            params = {}
 
         writer = imageio.get_writer(filenames[0])
 
