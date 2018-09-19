@@ -300,8 +300,6 @@ class ExportImageHelper(QtCore.QObject):
 
         if filenames[0].endswith('.gif') and len(images) > 1:
             params = self._get_animation_parameters(info, images)
-            filenames = filenames[:1]
-            images = images[:1]
         else:
             params = {}
 
