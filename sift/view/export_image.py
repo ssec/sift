@@ -75,7 +75,7 @@ class ExportImageDialog(QtGui.QDialog):
         fn = QtGui.QFileDialog.getSaveFileName(self,
                                                caption=self.tr('Screenshot Filename'),
                                                directory=os.path.join(self._last_dir, self.default_filename),
-                                               filter=self.tr('Image Files (*.png *.jpg *.gif *.mp4 *.mov)'),
+                                               filter=self.tr('Image Files (*.png *.jpg *.gif *.mp4 *.m4v)'),
                                                options=QtGui.QFileDialog.DontConfirmOverwrite)
         if fn:
             self.ui.saveAsLineEdit.setText(fn)
@@ -86,27 +86,35 @@ class ExportImageDialog(QtGui.QDialog):
     def _validate_filename(self):
         t = self.ui.saveAsLineEdit.text()
         bt = self.ui.buttonBox.button(QtGui.QDialogButtonBox.Save)
-        if not t or os.path.splitext(t)[-1] not in ['.png', '.jpg', '.gif', '.mp4', '.mov']:
+        if not t or os.path.splitext(t)[-1] not in ['.png', '.jpg', '.gif', '.mp4', '.m4v']:
             bt.setDisabled(True)
         else:
             self._last_dir = os.path.dirname(t)
             bt.setDisabled(False)
         self._check_animation_controls()
 
-    def _is_animation_filename(self):
+    def _is_gif_filename(self):
         fn = self.ui.saveAsLineEdit.text()
         return os.path.splitext(fn)[-1] in ['.gif']
 
+    def _is_animation_filename(self):
+        fn = self.ui.saveAsLineEdit.text()
+        return os.path.splitext(fn)[-1] in ['.mp4', '.m4v', '.gif']
+
     def _check_animation_controls(self):
-        disable = (self.ui.frameCurrentRadio.isChecked() or
-                   not self._is_animation_filename() or
-                   self.ui.frameRangeTo.validator().top() == 1)
-        if disable:
-            self.ui.animationGroupBox.setDisabled(True)
-            self.ui.frameDelayGroup.setDisabled(True)
-        else:
+        gif = self._is_gif_filename()
+
+        video = self._is_animation_filename()
+
+        if gif:
             self.ui.animationGroupBox.setDisabled(False)
             self.ui.frameDelayGroup.setDisabled(False)
+        elif video:
+            self.ui.animationGroupBox.setDisabled(False)
+            self.ui.frameDelayGroup.setDisabled(True)
+        else:
+            self.ui.animationGroupBox.setDisabled(True)
+            self.ui.frameDelayGroup.setDisabled(True)
 
     def change_frame_range(self):
         if self.ui.frameRangeRadio.isChecked():
@@ -234,25 +242,19 @@ class ExportImageHelper(QtCore.QObject):
 
     def _get_animation_parameters(self, info, images):
         params = {}
-        params['save_all'] = True
         if info['delay'] is None:
             t = [self.doc[u][INFO.SCHED_TIME] for u, im in images]
             t_diff = [(t[i] - t[i - 1]).total_seconds() for i in range(1, len(t))]
             min_diff = float(min(t_diff))
-            duration = [100 * int(this_diff / min_diff) for this_diff in t_diff]
+            duration = [1/10 * int(this_diff / min_diff) for this_diff in t_diff]
             params['duration'] = [duration[0]] + duration
             # params['duration'] = [50 * i for i in range(len(images))]
             if not info['loop']:
                 params['duration'] = params['duration'] + params['duration'][-2:0:-1]
         else:
-            params['duration'] = info['delay']
-        if not info['loop']:
-            # rocking animation
-            # we want frames 0, 1, 2, 3, 2, 1
-            images = images + images[-2:0:-1]
+            params['duration'] = info['delay']/1000
 
         params['loop'] = 0  # infinite number of loops
-        params['append_images'] = [x for u, x in images[1:]]
         return params
 
     def _convert_frame_range(self, frame_range):
@@ -298,16 +300,27 @@ class ExportImageHelper(QtCore.QObject):
             images = [(u, self._add_screenshot_footer(im, bt, font_size=info['font_size'])) for (u, im), bt in
                       zip(images, banner_text)]
 
+
         if filenames[0].endswith('.gif') and len(images) > 1:
             params = self._get_animation_parameters(info, images)
         else:
             params = {}
 
-        writer = imageio.get_writer(filenames[0])
+        if not info['loop']:
+            # rocking animation
+            # we want frames 0, 1, 2, 3, 2, 1
+            images = images + images[-2:0:-1]
+
+        print("Params: " + str(params))
+
+        final_imgs = []
 
         for u, x in images:
-            writer.append_data(numpy.array(x))
+            final_imgs.append(numpy.array(x))
 
 
+        if(filenames[0][-3:].upper() in ['GIF', 'MP4', 'M4V']):
+            imageio.mimsave(filenames[0], final_imgs, filenames[0][-3:].upper(), **params)
+        else:
+            imageio.imsave(filenames[0], final_imgs[0], filenames[0][-3:].upper())
 
-        writer.close()
