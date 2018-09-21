@@ -111,7 +111,7 @@ class ExportImageDialog(QtGui.QDialog):
             self.ui.frameAllRadio.setDisabled(False)
             self.ui.frameRangeRadio.setDisabled(False)
         elif video:
-            self.ui.animationGroupBox.setDisabled(False)
+            self.ui.animationGroupBox.setDisabled(True)
             self.ui.frameDelayGroup.setDisabled(True)
             self.ui.frameAllRadio.setDisabled(False)
             self.ui.frameRangeRadio.setDisabled(False)
@@ -317,20 +317,11 @@ class ExportImageHelper(QtCore.QObject):
             # we want frames 0, 1, 2, 3, 2, 1
             images = images + images[-2:0:-1]
 
-        final_imgs = []
+        if filenames[0].upper().endswith('.M4V'):
+            writer = imageio.get_writer(filenames[0], 'MP4', **params)
+        else:
+            writer = imageio.get_writer(filenames[0], **params)
 
         for u, x in images:
-            final_imgs.append(numpy.array(x))
-
-        file_suffix = filenames[0][-3:].upper()
-
-        if file_suffix == 'M4V':
-            file_suffix = 'MP4'
-
-        if file_suffix in ['GIF', 'MP4']:
-            imageio.mimsave(filenames[0], final_imgs, file_suffix, **params)
-        elif file_suffix in ['JPG']:
-            imageio.imsave(filenames[0], final_imgs[0][:,:,:3], file_suffix)
-        else:
-            imageio.imsave(filenames[0], final_imgs[0], file_suffix)
+            writer.append_data(numpy.array(x))
 
