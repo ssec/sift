@@ -322,9 +322,15 @@ class ExportImageHelper(QtCore.QObject):
         for u, x in images:
             final_imgs.append(numpy.array(x))
 
+        file_suffix = filenames[0][-3:].upper()
 
-        if(filenames[0][-3:].upper() in ['GIF', 'MP4', 'M4V']):
-            imageio.mimsave(filenames[0], final_imgs, filenames[0][-3:].upper(), **params)
+        if file_suffix == 'M4V':
+            file_suffix = 'MP4'
+
+        if file_suffix in ['GIF', 'MP4']:
+            imageio.mimsave(filenames[0], final_imgs, file_suffix, **params)
+        elif file_suffix in ['JPG']:
+            imageio.imsave(filenames[0], final_imgs[0][:,:,:3], file_suffix)
         else:
-            imageio.imsave(filenames[0], final_imgs[0], filenames[0][-3:].upper())
+            imageio.imsave(filenames[0], final_imgs[0], file_suffix)
 
