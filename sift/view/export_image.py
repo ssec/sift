@@ -150,8 +150,10 @@ class ExportImageDialog(QtGui.QDialog):
     def get_info(self):
         if self.ui.timeLapseRadio.isChecked():
             delay = None
-        else:
+        elif self.ui.constantDelayRadio.isChecked():
             delay = self.ui.constantDelaySpin.value()
+        elif self.ui.fpsDelayRadio.isChecked():
+            delay = 1000 / self.ui.fpsDelaySpin.value()
 
         # loop is actually an integer of number of times to loop (0 infinite)
         info = {
