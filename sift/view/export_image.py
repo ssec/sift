@@ -103,18 +103,23 @@ class ExportImageDialog(QtGui.QDialog):
 
     def _check_animation_controls(self):
         gif = self._is_gif_filename()
-
         video = self._is_animation_filename()
 
         if gif:
             self.ui.animationGroupBox.setDisabled(False)
             self.ui.frameDelayGroup.setDisabled(False)
+            self.ui.frameAllRadio.setDisabled(False)
+            self.ui.frameRangeRadio.setDisabled(False)
         elif video:
             self.ui.animationGroupBox.setDisabled(False)
             self.ui.frameDelayGroup.setDisabled(True)
+            self.ui.frameAllRadio.setDisabled(False)
+            self.ui.frameRangeRadio.setDisabled(False)
         else:
             self.ui.animationGroupBox.setDisabled(True)
             self.ui.frameDelayGroup.setDisabled(True)
+            self.ui.frameAllRadio.setDisabled(True)
+            self.ui.frameRangeRadio.setDisabled(True)
 
     def change_frame_range(self):
         if self.ui.frameRangeRadio.isChecked():
@@ -123,6 +128,7 @@ class ExportImageDialog(QtGui.QDialog):
         else:
             self.ui.frameRangeFrom.setDisabled(True)
             self.ui.frameRangeTo.setDisabled(True)
+
 
         self._check_animation_controls()
 
@@ -310,8 +316,6 @@ class ExportImageHelper(QtCore.QObject):
             # rocking animation
             # we want frames 0, 1, 2, 3, 2, 1
             images = images + images[-2:0:-1]
-
-        print("Params: " + str(params))
 
         final_imgs = []
 
