@@ -112,7 +112,7 @@ class ExportImageDialog(QtGui.QDialog):
             self.ui.frameRangeRadio.setDisabled(False)
         elif video:
             self.ui.animationGroupBox.setDisabled(True)
-            self.ui.frameDelayGroup.setDisabled(True)
+            self.ui.frameDelayGroup.setDisabled(False)
             self.ui.frameAllRadio.setDisabled(False)
             self.ui.frameRangeRadio.setDisabled(False)
         else:
@@ -149,11 +149,13 @@ class ExportImageDialog(QtGui.QDialog):
 
     def get_info(self):
         if self.ui.timeLapseRadio.isChecked():
-            delay = None
+            fps = None
         elif self.ui.constantDelayRadio.isChecked():
             delay = self.ui.constantDelaySpin.value()
+            fps = 1000 / delay
         elif self.ui.fpsDelayRadio.isChecked():
-            delay = 1000 / self.ui.fpsDelaySpin.value()
+            fps =  self.ui.fpsDelaySpin.value()
+
 
         # loop is actually an integer of number of times to loop (0 infinite)
         info = {
@@ -162,7 +164,7 @@ class ExportImageDialog(QtGui.QDialog):
             # 'transparency': self.ui.transparentCheckbox.isChecked(),
             'loop': self.ui.loopRadio.isChecked(),
             'filename': self.ui.saveAsLineEdit.text(),
-            'delay': delay,
+            'fps': fps,
             'font_size': self.ui.footerFontSizeSpinBox.value(),
         }
         return info
@@ -250,19 +252,20 @@ class ExportImageHelper(QtCore.QObject):
 
     def _get_animation_parameters(self, info, images):
         params = {}
-        if info['delay'] is None:
+        if info['fps'] is None:
             t = [self.doc[u][INFO.SCHED_TIME] for u, im in images]
             t_diff = [(t[i] - t[i - 1]).total_seconds() for i in range(1, len(t))]
             min_diff = float(min(t_diff))
             duration = [1/10 * int(this_diff / min_diff) for this_diff in t_diff]
-            params['duration'] = [duration[0]] + duration
             # params['duration'] = [50 * i for i in range(len(images))]
             if not info['loop']:
-                params['duration'] = params['duration'] + params['duration'][-2:0:-1]
+                duration = duration[0] + duration[-2:0:-1]
+            params['fps'] = 1000 / duration[0]
         else:
-            params['duration'] = info['delay']/1000
+            params['fps'] = info['fps']
 
-        params['loop'] = 0  # infinite number of loops
+        if info['filename'].endswith('.gif'):
+            params['loop'] = 0  # infinite number of loops
         return params
 
     def _convert_frame_range(self, frame_range):
@@ -308,8 +311,7 @@ class ExportImageHelper(QtCore.QObject):
             images = [(u, self._add_screenshot_footer(im, bt, font_size=info['font_size'])) for (u, im), bt in
                       zip(images, banner_text)]
 
-
-        if filenames[0].endswith('.gif') and len(images) > 1:
+        if len(images) > 1:
             params = self._get_animation_parameters(info, images)
         else:
             params = {}
