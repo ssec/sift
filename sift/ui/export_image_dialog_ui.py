@@ -125,7 +125,7 @@ class Ui_ExportImageDialog(object):
         self.fpsDelaySpin.setKeyboardTracking(True)
         self.fpsDelaySpin.setSuffix(_fromUtf8(""))
         self.fpsDelaySpin.setMinimum(1)
-        self.fpsDelaySpin.setMaximum(5000)
+        self.fpsDelaySpin.setMaximum(60)
         self.fpsDelaySpin.setProperty("value", 1)
         self.fpsDelaySpin.setObjectName(_fromUtf8("fpsDelaySpin"))
         self.label_3 = QtGui.QLabel(ExportImageDialog)

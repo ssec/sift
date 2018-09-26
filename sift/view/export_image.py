@@ -97,29 +97,18 @@ class ExportImageDialog(QtGui.QDialog):
         fn = self.ui.saveAsLineEdit.text()
         return os.path.splitext(fn)[-1] in ['.gif']
 
-    def _is_animation_filename(self):
+    def _is_video_filename(self):
         fn = self.ui.saveAsLineEdit.text()
         return os.path.splitext(fn)[-1] in ['.mp4', '.m4v', '.gif']
 
     def _check_animation_controls(self):
-        gif = self._is_gif_filename()
-        video = self._is_animation_filename()
+        is_gif = self._is_gif_filename()
+        is_video = self._is_video_filename()
 
-        if gif:
-            self.ui.animationGroupBox.setDisabled(False)
-            self.ui.frameDelayGroup.setDisabled(False)
-            self.ui.frameAllRadio.setDisabled(False)
-            self.ui.frameRangeRadio.setDisabled(False)
-        elif video:
-            self.ui.animationGroupBox.setDisabled(True)
-            self.ui.frameDelayGroup.setDisabled(False)
-            self.ui.frameAllRadio.setDisabled(False)
-            self.ui.frameRangeRadio.setDisabled(False)
-        else:
-            self.ui.animationGroupBox.setDisabled(True)
-            self.ui.frameDelayGroup.setDisabled(True)
-            self.ui.frameAllRadio.setDisabled(True)
-            self.ui.frameRangeRadio.setDisabled(True)
+        self.ui.animationGroupBox.setDisabled(not is_gif)
+        self.ui.frameDelayGroup.setDisabled(not (is_gif or is_video))
+        self.ui.frameAllRadio.setDisabled(not (is_gif or is_video))
+        self.ui.frameRangeRadio.setDisabled(not (is_gif or is_video))
 
     def change_frame_range(self):
         if self.ui.frameRangeRadio.isChecked():
