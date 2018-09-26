@@ -146,7 +146,7 @@ class OpenFileWizard(QtGui.QWizard):
         for idx, ds_id in enumerate(all_available_products):
             pretty_name = ds_id.name.upper() if ds_id.level is not None else ds_id.name
             properties['name'].add((ds_id.name, pretty_name))
-            pretty_level = "{:d} hPa".format(ds_id.level)
+            pretty_level = "{:d} hPa".format(ds_id.level) if ds_id.level is not None else 'NA'
             properties['level'].add((ds_id.level, pretty_level))
 
             item = QtGui.QTableWidgetItem(pretty_name)
