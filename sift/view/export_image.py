@@ -245,11 +245,11 @@ class ExportImageHelper(QtCore.QObject):
             t = [self.doc[u][INFO.SCHED_TIME] for u, im in images]
             t_diff = [(t[i] - t[i - 1]).total_seconds() for i in range(1, len(t))]
             min_diff = float(min(t_diff))
-            duration = [1/10 * int(this_diff / min_diff) for this_diff in t_diff]
+            duration = [10 * int(this_diff / min_diff) for this_diff in t_diff]
             # params['duration'] = [50 * i for i in range(len(images))]
             if not info['loop']:
-                duration = [duration[0]] + duration
-            params['fps'] = 1000 / duration[0]
+                duration = [duration[0]] + duration[-2:0:-1]
+            params['fps'] = duration[0]
         else:
             params['fps'] = info['fps']
 
@@ -317,4 +317,6 @@ class ExportImageHelper(QtCore.QObject):
 
         for u, x in images:
             writer.append_data(numpy.array(x))
+
+        writer.close()
 
