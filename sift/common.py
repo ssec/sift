@@ -138,6 +138,7 @@ prez = namedtuple('prez', [
     'mixing'     # mixing mode constant
 ])
 
+
 class STATE(Enum):
     """State for products in document
     """
@@ -184,6 +185,7 @@ class INSTRUMENT(Enum):
     ABI = 'ABI'
     AMI = 'AMI'
     GFS = 'GFS'
+    SEVIRI = 'SEVIRI'
 
 
 class PLATFORM(Enum):
@@ -193,6 +195,8 @@ class PLATFORM(Enum):
     GOES_16 = 'G16'
     GOES_17 = 'G17'
     NWP = 'NWP'
+    MSG = 'MSG'
+    MTG = 'MTG'
 
 
 class INFO(Enum):

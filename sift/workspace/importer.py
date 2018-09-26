@@ -920,6 +920,34 @@ class SatPyImporter(aImporter):
         #          which SIFT probably shouldn't care about
         return len(self.dataset_ids)
 
+    @staticmethod
+    def _get_platform_instrument(attrs: dict):
+        """Convert SatPy platform_name/sensor to """
+        attrs[INFO.INSTRUMENT] = attrs.get('sensor')
+        attrs[INFO.PLATFORM] = attrs.get('platform_name')
+
+        # Special handling of GRIB forecast data
+        if 'centreDescription' in attrs and \
+                attrs[INFO.INSTRUMENT] == 'unknown':
+            description = attrs['centreDescription']
+            if attrs.get(INFO.PLATFORM) is None:
+                attrs[INFO.PLATFORM] = 'NWP'
+            if 'NCEP' in description:
+                attrs[INFO.INSTRUMENT] = 'GFS'
+        if attrs[INFO.INSTRUMENT] in ['GFS', 'unknown']:
+            attrs[INFO.INSTRUMENT] = INSTRUMENT.GFS
+        if attrs[INFO.PLATFORM] in ['NWP', 'unknown']:
+            attrs[INFO.PLATFORM] = PLATFORM.NWP
+
+        # FUTURE: Use standard string names for platform/instrument
+        #         instead of an Enum. Otherwise, could use a reverse
+        #         Enum lookup to match Enum values to Enum keys.
+        # if we haven't figured out what these are then give up and say they are unknown
+        if not attrs[INFO.PLATFORM] or isinstance(attrs[INFO.PLATFORM], str):
+            attrs[INFO.PLATFORM] = PLATFORM.UNKNOWN
+        if not attrs[INFO.INSTRUMENT] or isinstance(attrs[INFO.INSTRUMENT], str):
+            attrs[INFO.INSTRUMENT] = INSTRUMENT.UNKNOWN
+
     def load_all_datasets(self) -> Scene:
         self.scn.load(self.dataset_ids, **self.product_filters)
         # copy satpy metadata keys to SIFT keys
@@ -935,19 +963,7 @@ class SatPyImporter(aImporter):
             # Handle GRIB platform/instrument
             ds.attrs[INFO.KIND] = KIND.IMAGE if self.reader != 'grib' else \
                 KIND.CONTOUR
-            ds.attrs[INFO.INSTRUMENT] = ds.attrs.get('sensor')
-            ds.attrs[INFO.PLATFORM] = ds.attrs.get('platform_name')
-            if 'centreDescription' in ds.attrs and \
-                    ds.attrs[INFO.INSTRUMENT] == 'unknown':
-                description = ds.attrs['centreDescription']
-                if ds.attrs.get(INFO.PLATFORM) is None:
-                    ds.attrs[INFO.PLATFORM] = 'NWP'
-                if 'NCEP' in description:
-                    ds.attrs[INFO.INSTRUMENT] = 'GFS'
-            if ds.attrs[INFO.INSTRUMENT] in ['GFS', 'unknown']:
-                ds.attrs[INFO.INSTRUMENT] = INSTRUMENT.GFS
-            if ds.attrs[INFO.PLATFORM] in ['NWP', 'unknown']:
-                ds.attrs[INFO.PLATFORM] = PLATFORM.NWP
+            self._get_platform_instrument(ds.attrs)
             ds.attrs.setdefault(INFO.STANDARD_NAME, ds.attrs.get('standard_name'))
             if 'wavelength' in ds.attrs:
                 ds.attrs.setdefault(INFO.CENTRAL_WAVELENGTH,
