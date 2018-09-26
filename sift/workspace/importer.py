@@ -887,6 +887,7 @@ class SatPyImporter(aImporter):
 
         from uuid import uuid1
         scn = self.load_all_datasets()
+        
         for ds_id, ds in scn.datasets.items():
             # don't recreate a Product for one we already have
             if ds_id in existing_ids:
@@ -903,7 +904,7 @@ class SatPyImporter(aImporter):
                 atime=now,
             )
             prod.resource.append(res)
-
+            
             assert(INFO.OBS_TIME in meta)
             assert(INFO.OBS_DURATION in meta)
             prod.update(meta)  # sets fields like obs_duration and obs_time transparently
@@ -925,9 +926,11 @@ class SatPyImporter(aImporter):
         # copy satpy metadata keys to SIFT keys
         for ds in self.scn:
             start_time = ds.attrs['start_time']
-            ds.attrs[INFO.OBS_TIME] = start_time
-            ds.attrs[INFO.SCHED_TIME] = start_time
-            duration = start_time - ds.attrs.get('end_time', start_time)
+            end_time=ds.attrs['end_time']
+            ds.attrs[INFO.OBS_TIME] = start_time[0]
+            ds.attrs[INFO.SCHED_TIME] = start_time[0]
+            duration = end_time[0]-start_time[0]
+            
             if duration.total_seconds() == 0:
                 duration = timedelta(minutes=60)
             ds.attrs[INFO.OBS_DURATION] = duration
@@ -979,11 +982,12 @@ class SatPyImporter(aImporter):
                 ds.attrs[INFO.KIND].name, ds.attrs[INFO.STANDARD_NAME],
                 ds.attrs[INFO.SHORT_NAME])
             ds.attrs[INFO.CATEGORY] = 'SatPy:{}:{}:{}:{}'.format(
-                ds.attrs[INFO.PLATFORM].name, ds.attrs[INFO.INSTRUMENT].name,
+                ds.attrs[INFO.PLATFORM], ds.attrs[INFO.INSTRUMENT],
                 ds.attrs[INFO.SCENE], cat_id)  # system:platform:instrument:target
             # TODO: Include level or something else in addition to time?
             #       Probably need to include the model run time (prefix id_str?)
-            start_str = ds.attrs['start_time'].isoformat()
+
+            start_str = ds.attrs['start_time'][0].isoformat()
             ds.attrs[INFO.SERIAL] = start_str if model_time is None else model_time + ":" + start_str
 
         return self.scn
