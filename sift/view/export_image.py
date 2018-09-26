@@ -248,7 +248,7 @@ class ExportImageHelper(QtCore.QObject):
             duration = [1/10 * int(this_diff / min_diff) for this_diff in t_diff]
             # params['duration'] = [50 * i for i in range(len(images))]
             if not info['loop']:
-                duration = duration[0] + duration[-2:0:-1]
+                duration = [duration[0]] + duration
             params['fps'] = 1000 / duration[0]
         else:
             params['fps'] = info['fps']
