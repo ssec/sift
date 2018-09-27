@@ -100,6 +100,8 @@ def unit_symbol(unit):
     # cf_units gives the wrong symbol for celsius
     if unit == '1':
         return ''
+    elif unit == '%':
+        return '%'
     elif unit == 'degrees_Celsius' or unit == 'C':
         return '°C'
     elif unit == 'kelvin' or unit == 'K':
@@ -161,6 +163,8 @@ def units_conversion(dsi):
     # FUTURE: Use cfunits or cf_units package
     if dsi.get(INFO.UNITS) in ('kelvin', 'K') and punits in ('degrees_Celsius', 'C'):
         conv_func = lambda x, inverse=False: x - 273.15 if not inverse else x + 273.15
+    elif dsi.get(INFO.UNITS) == '%' and punits == '1':
+        conv_func = lambda x, inverse=False: x / 100. if not inverse else x * 100.
     else:
         conv_func = lambda x, inverse=False: x
 

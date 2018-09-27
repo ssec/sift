@@ -226,12 +226,14 @@ class ABI_AHI_Guidebook(Guidebook):
                 z[INFO.STANDARD_NAME] = "." + str(z.get(INFO.SHORT_NAME))
 
         # Only needed for backwards compatibility with originally supported geotiffs
-        if INFO.UNITS not in info:
+        if not info.get(INFO.UNITS):
             standard_name = info.get(INFO.STANDARD_NAME, z.get(INFO.STANDARD_NAME))
             if standard_name == 'toa_bidirectional_reflectance':
                 z[INFO.UNITS] = '1'
             elif standard_name == 'toa_brightness_temperature':
                 z[INFO.UNITS] = 'kelvin'
+        if info.get(INFO.UNITS, z.get(INFO.UNITS)) in ['K', 'Kelvin']:
+            z[INFO.UNITS] = 'kelvin'
 
         return z
 
@@ -254,8 +256,11 @@ class ABI_AHI_Guidebook(Guidebook):
     def climits(self, dsi):
         # Valid min and max for colormap use for data values in file (unconverted)
         if self._is_refl(dsi):
-            # Reflectance/visible data limits
-            return -0.012, 1.192
+            lims = (-0.012, 1.192)
+            if dsi[INFO.UNITS] == '%':
+                # Reflectance/visible data limits
+                lims = (lims[0] * 100., lims[1] * 100.)
+            return lims
         elif self._is_bt(dsi):
             # BT data limits
             return -109.0 + 273.15, 55 + 273.15
