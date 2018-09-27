@@ -14,6 +14,20 @@ LOG = logging.getLogger(__name__)
 DATA_DIR = get_package_data_dir()
 
 
+def is_gif_filename(fn):
+    return os.path.splitext(fn)[-1] in ['.gif']
+
+
+def is_video_filename(fn):
+    return os.path.splitext(fn)[-1] in ['.mp4', '.m4v', '.gif']
+
+
+def get_imageio_format(fn):
+    """Ask imageio if it knows what to do with this filename."""
+    request = imageio.core.Request(fn, 'w?')
+    return imageio.formats.search_write_format(request)
+
+
 class ExportImageDialog(QtGui.QDialog):
     default_filename = 'sift_screenshot.png'
 
@@ -95,11 +109,11 @@ class ExportImageDialog(QtGui.QDialog):
 
     def _is_gif_filename(self):
         fn = self.ui.saveAsLineEdit.text()
-        return os.path.splitext(fn)[-1] in ['.gif']
+        return is_gif_filename(fn)
 
     def _is_video_filename(self):
         fn = self.ui.saveAsLineEdit.text()
-        return os.path.splitext(fn)[-1] in ['.mp4', '.m4v', '.gif']
+        return is_video_filename(fn)
 
     def _check_animation_controls(self):
         is_gif = self._is_gif_filename()
@@ -117,7 +131,6 @@ class ExportImageDialog(QtGui.QDialog):
         else:
             self.ui.frameRangeFrom.setDisabled(True)
             self.ui.frameRangeTo.setDisabled(True)
-
 
         self._check_animation_controls()
 
@@ -143,8 +156,7 @@ class ExportImageDialog(QtGui.QDialog):
             delay = self.ui.constantDelaySpin.value()
             fps = 1000 / delay
         elif self.ui.fpsDelayRadio.isChecked():
-            fps =  self.ui.fpsDelaySpin.value()
-
+            fps = self.ui.fpsDelaySpin.value()
 
         # loop is actually an integer of number of times to loop (0 infinite)
         info = {
@@ -206,7 +218,7 @@ class ExportImageHelper(QtCore.QObject):
             return [None], [base_filename]
         filenames = []
         # only use the first uuid to fill in filename information
-        file_uuids = uuids[:1] if base_filename.endswith('.gif') else uuids
+        file_uuids = uuids[:1] if is_video_filename(base_filename) else uuids
         for u in file_uuids:
             layer_info = self.doc[u]
             fn = base_filename.format(
@@ -253,7 +265,7 @@ class ExportImageHelper(QtCore.QObject):
         else:
             params['fps'] = info['fps']
 
-        if info['filename'].endswith('.gif'):
+        if is_gif_filename(info['filename']):
             params['loop'] = 0  # infinite number of loops
         return params
 
@@ -287,9 +299,7 @@ class ExportImageHelper(QtCore.QObject):
 
         # get canvas screenshot arrays (numpy arrays of canvas pixels)
         img_arrays = self.sgm.get_screenshot_array(info['frame_range'])
-
-
-        if not len(img_arrays) or len(uuids) != len(img_arrays):
+        if not img_arrays or len(uuids) != len(img_arrays):
             LOG.error("Number of frames does not equal number of filenames")
             return
 
@@ -310,11 +320,15 @@ class ExportImageHelper(QtCore.QObject):
             # we want frames 0, 1, 2, 3, 2, 1
             images = images + images[-2:0:-1]
 
-        if filenames[0].upper().endswith('.M4V'):
-            writer = imageio.get_writer(filenames[0], 'MP4', **params)
+        imageio_format = get_imageio_format(filenames[0])
+        if imageio_format:
+            format_name = imageio_format.name
+        elif filenames[0].upper().endswith('.M4V'):
+            format_name = 'MP4'
         else:
-            writer = imageio.get_writer(filenames[0], **params)
+            raise ValueError("Not sure how to handle file with format: {}".format(filenames[0]))
 
+        writer = imageio.get_writer(filenames[0], format_name, **params)
         for u, x in images:
             writer.append_data(numpy.array(x))
 
