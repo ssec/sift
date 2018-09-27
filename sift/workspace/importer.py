@@ -25,7 +25,7 @@ import numpy as np
 from pyproj import Proj
 from sqlalchemy.orm import Session
 
-from sift.common import PLATFORM, INFO, INSTRUMENT, KIND
+from sift.common import PLATFORM, INFO, INSTRUMENT, KIND, INSTRUMENT_MAP, PLATFORM_MAP
 from sift.workspace.goesr_pug import PugFile
 from sift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
 from .metadatabase import Resource, Product, Content
@@ -943,8 +943,15 @@ class SatPyImporter(aImporter):
         #         instead of an Enum. Otherwise, could use a reverse
         #         Enum lookup to match Enum values to Enum keys.
         # if we haven't figured out what these are then give up and say they are unknown
+        if isinstance(attrs[INFO.PLATFORM], str):
+            plat_str = attrs[INFO.PLATFORM].lower().replace('-', '')
+            attrs[INFO.PLATFORM] = PLATFORM_MAP.get(plat_str, attrs[INFO.PLATFORM])
         if not attrs[INFO.PLATFORM] or isinstance(attrs[INFO.PLATFORM], str):
             attrs[INFO.PLATFORM] = PLATFORM.UNKNOWN
+
+        if isinstance(attrs[INFO.INSTRUMENT], str):
+            inst_str = attrs[INFO.INSTRUMENT].lower().replace('-', '')
+            attrs[INFO.INSTRUMENT] = INSTRUMENT_MAP.get(inst_str, attrs[INFO.INSTRUMENT])
         if not attrs[INFO.INSTRUMENT] or isinstance(attrs[INFO.INSTRUMENT], str):
             attrs[INFO.INSTRUMENT] = INSTRUMENT.UNKNOWN
 
@@ -967,7 +974,7 @@ class SatPyImporter(aImporter):
             ds.attrs.setdefault(INFO.STANDARD_NAME, ds.attrs.get('standard_name'))
             if 'wavelength' in ds.attrs:
                 ds.attrs.setdefault(INFO.CENTRAL_WAVELENGTH,
-                                    ds.attrs['wavelength'])
+                                    ds.attrs['wavelength'][0])
 
             # Resolve anything else needed by SIFT
             id_str = ":".join(str(v) for v in DatasetID.from_dict(ds.attrs))
@@ -981,6 +988,7 @@ class SatPyImporter(aImporter):
                 ds.attrs[INFO.SHORT_NAME] = "{} @ {}hPa".format(
                     ds.attrs['name'], ds.attrs['level'])
             ds.attrs[INFO.SHAPE] = ds.shape
+            ds.attrs[INFO.UNITS] = ds.attrs.get('units')
             generate_guidebook_metadata(ds.attrs)
 
             # Generate FAMILY and CATEGORY

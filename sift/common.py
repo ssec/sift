@@ -188,6 +188,9 @@ class INSTRUMENT(Enum):
     SEVIRI = 'SEVIRI'
 
 
+INSTRUMENT_MAP = {v.value.lower().replace('-', ''): v for v in INSTRUMENT}
+
+
 class PLATFORM(Enum):
     UNKNOWN = '???'
     HIMAWARI_8 = 'Himawari-8'
@@ -195,8 +198,13 @@ class PLATFORM(Enum):
     GOES_16 = 'G16'
     GOES_17 = 'G17'
     NWP = 'NWP'
-    MSG = 'MSG'
-    MTG = 'MTG'
+    MSG8 = 'Meteosat-8'
+    MSG9 = 'Meteosat-9'
+    MSG10 = 'Meteosat-10'
+    MSG11 = 'Meteosat-11'
+
+
+PLATFORM_MAP = {v.value.lower().replace('-', ''): v for v in PLATFORM}
 
 
 class INFO(Enum):
