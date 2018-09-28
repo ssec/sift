@@ -44,6 +44,8 @@ requirements:
     - pyopengl
     - netcdf4
     - h5py
+    - imageio
+    - ffmpeg
     - pillow
     - pyshp
     - pyqtgraph
@@ -72,3 +74,4 @@ about:
 # See
 # http://docs.continuum.io/conda/build.html for
 # more information about meta.yaml
+
