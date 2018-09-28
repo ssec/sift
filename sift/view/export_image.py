@@ -118,11 +118,12 @@ class ExportImageDialog(QtGui.QDialog):
     def _check_animation_controls(self):
         is_gif = self._is_gif_filename()
         is_video = self._is_video_filename()
+        is_frame_current = self.ui.frameCurrentRadio.isChecked()
+        is_valid_frame_to = self.ui.frameRangeTo.validator().top() == 1
+        disable = is_frame_current or is_valid_frame_to
 
-        self.ui.animationGroupBox.setDisabled(not is_gif)
-        self.ui.frameDelayGroup.setDisabled(not (is_gif or is_video))
-        self.ui.frameAllRadio.setDisabled(not (is_gif or is_video))
-        self.ui.frameRangeRadio.setDisabled(not (is_gif or is_video))
+        self.ui.animationGroupBox.setDisabled(disable or not is_gif)
+        self.ui.frameDelayGroup.setDisabled(disable or not (is_gif or is_video))
 
     def change_frame_range(self):
         if self.ui.frameRangeRadio.isChecked():
@@ -257,16 +258,22 @@ class ExportImageHelper(QtCore.QObject):
             t = [self.doc[u][INFO.SCHED_TIME] for u, im in images]
             t_diff = [(t[i] - t[i - 1]).total_seconds() for i in range(1, len(t))]
             min_diff = float(min(t_diff))
-            duration = [10 * int(this_diff / min_diff) for this_diff in t_diff]
-            # params['duration'] = [50 * i for i in range(len(images))]
+            # imageio seems to be using duration in seconds
+            # so use 1/10th of a second
+            duration = [.1 * (this_diff / min_diff) for this_diff in t_diff]
+            duration = [duration[0]] + duration
             if not info['loop']:
-                duration = [duration[0]] + duration[-2:0:-1]
-            params['fps'] = duration[0]
+                duration = duration + duration[-2:0:-1]
+            params['duration'] = duration
         else:
             params['fps'] = info['fps']
 
         if is_gif_filename(info['filename']):
             params['loop'] = 0  # infinite number of loops
+        elif 'duration' in params:
+            # not gif but were given "Time Lapse", can only have one FPS
+            params['fps'] = int(1. / params.pop('duration')[0])
+
         return params
 
     def _convert_frame_range(self, frame_range):
@@ -300,7 +307,7 @@ class ExportImageHelper(QtCore.QObject):
         # get canvas screenshot arrays (numpy arrays of canvas pixels)
         img_arrays = self.sgm.get_screenshot_array(info['frame_range'])
         if not img_arrays or len(uuids) != len(img_arrays):
-            LOG.error("Number of frames does not equal number of filenames")
+            LOG.error("Number of frames does not equal number of UUIDs")
             return
 
         images = [(u, Image.fromarray(x)) for u, x in img_arrays]
@@ -310,16 +317,6 @@ class ExportImageHelper(QtCore.QObject):
             images = [(u, self._add_screenshot_footer(im, bt, font_size=info['font_size'])) for (u, im), bt in
                       zip(images, banner_text)]
 
-        if len(images) > 1:
-            params = self._get_animation_parameters(info, images)
-        else:
-            params = {}
-
-        if not info['loop']:
-            # rocking animation
-            # we want frames 0, 1, 2, 3, 2, 1
-            images = images + images[-2:0:-1]
-
         imageio_format = get_imageio_format(filenames[0])
         if imageio_format:
             format_name = imageio_format.name
@@ -328,9 +325,23 @@ class ExportImageHelper(QtCore.QObject):
         else:
             raise ValueError("Not sure how to handle file with format: {}".format(filenames[0]))
 
-        writer = imageio.get_writer(filenames[0], format_name, **params)
-        for u, x in images:
-            writer.append_data(numpy.array(x))
+        if is_video_filename(filenames[0]) and len(images) > 1:
+            params = self._get_animation_parameters(info, images)
+            if not info['loop'] and is_gif_filename(filenames[0]):
+                # rocking animation
+                # we want frames 0, 1, 2, 3, 2, 1
+                # NOTE: this must be done *after* we get animation properties
+                images = images + images[-2:0:-1]
+
+            filenames = [(filenames[0], images)]
+        else:
+            params = {}
+            filenames = list(zip(filenames, [[x] for x in images]))
+
+        for filename, file_images in filenames:
+            writer = imageio.get_writer(filename, format_name, **params)
+            for u, x in file_images:
+                writer.append_data(numpy.array(x))
 
         writer.close()
 
