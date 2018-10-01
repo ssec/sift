@@ -256,7 +256,7 @@ class ExportImageHelper(QtCore.QObject):
         params = {}
         if info['fps'] is None:
             t = [self.doc[u][INFO.SCHED_TIME] for u, im in images]
-            t_diff = [(t[i] - t[i - 1]).total_seconds() for i in range(1, len(t))]
+            t_diff = [max(1, (t[i] - t[i - 1]).total_seconds()) for i in range(1, len(t))]
             min_diff = float(min(t_diff))
             # imageio seems to be using duration in seconds
             # so use 1/10th of a second
