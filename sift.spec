@@ -39,6 +39,7 @@ if not is_win:
 def _include_if_exists(binaries, lib_dir, lib_pattern):
     from glob import glob
     results = glob(os.path.join(lib_dir, lib_pattern))
+    print(lib_dir, lib_pattern, results)
     if results:
         for result in results:
             binaries.append((result, '.'))
@@ -67,12 +68,12 @@ else:
 if is_linux:
     so_ext = '.so*'
 elif is_win:
-    so_ext = '.dylib'
-else:
     so_ext = '.lib'
+else:
+    so_ext = '.dylib'
 for dep_so in ['libavdevice*', 'libavfilter*', 'libavformat*', 'libavcodec*', 'libavresample*', 'libpostproc*',
                'libswresample*', 'libswscale*', 'libavutil*', 'libfreetype*', 'libbz2*', 'libgnutls*', 'libx264*',
-               'libopenh264*', 'libpng*', 'libnettle*', 'libhogweed*']:
+               'libopenh264*', 'libpng*', 'libnettle*', 'libhogweed*', 'libgmp*', 'libintl*']:
     dep_so = dep_so + so_ext
     _include_if_exists(binaries, lib_dir, dep_so)
 
