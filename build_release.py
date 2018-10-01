@@ -123,7 +123,8 @@ def _build_conda(output_dir=DIST_DIR):
         f = os.path.join(DIST_DIR, CONDA_PLAT[platform], 'sift-{}-*{}.tar.bz2'.format(version.__version__, i))
         glob_results = glob(f)
         if len(glob_results) == 1:
-            return f[0]
+            log.info("Conda package name is: %s", glob_results[0])
+            return glob_results[0]
     raise FileNotFoundError("Conda package was not built")
 
 
