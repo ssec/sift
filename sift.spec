@@ -64,8 +64,16 @@ else:
     binaries += [(os.path.join(bin_dir, 'ffmpeg.exe'), '.')]
 
 # Add ffmpeg dependencies that pyinstaller doesn't automatically find
+if is_linux:
+    so_ext = '.so*'
+elif is_win:
+    so_ext = '.dylib'
+else:
+    so_ext = '.lib'
 for dep_so in ['libavdevice*', 'libavfilter*', 'libavformat*', 'libavcodec*', 'libavresample*', 'libpostproc*',
-               'libswresample*', 'libswscale*', 'libavutil*']:
+               'libswresample*', 'libswscale*', 'libavutil*', 'libfreetype*', 'libbz2*', 'libgnutils*', 'libx264*',
+               'libopenh264*', 'libpng*']:
+    dep_so = dep_so + so_ext
     _include_if_exists(binaries, lib_dir, dep_so)
 
 a = Analysis([main_script_pathname],
