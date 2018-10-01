@@ -46,7 +46,8 @@ from sift import __version__
 from sift.util import (WORKSPACE_DB_DIR,
                        DOCUMENT_SETTINGS_DIR,
                        get_package_data_dir,
-                       check_grib_definition_dir)
+                       check_grib_definition_dir,
+                       check_imageio_deps)
 
 from glob import glob
 from functools import partial
@@ -1089,6 +1090,7 @@ def main():
     # FIXME: This is needed because shapely 1.5.11 sucks
     logging.getLogger().setLevel(level)
     check_grib_definition_dir()
+    check_imageio_deps()
     # logging.getLogger('vispy').setLevel(level)
 
     if args.workspace:

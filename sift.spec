@@ -36,6 +36,14 @@ if not is_win:
     hidden_imports += ['ncepgrib2']
 
 
+def _include_if_exists(binaries, lib_dir, lib_pattern):
+    from glob import glob
+    results = glob(os.path.join(lib_dir, lib_pattern))
+    if results:
+        for result in results:
+            binaries.append((result, '.'))
+
+
 # Add missing shared libraries
 binaries = []
 if is_linux:
@@ -44,7 +52,21 @@ if is_linux:
 if not is_win:
     # Add extra pygrib .def files
     share_dir = sys.executable.replace(os.path.join("bin", "python"), "share")
+    lib_dir = sys.executable.replace(os.path.join("bin", "python"), "lib")
+    bin_dir = sys.executable.replace(os.path.join("bin", "python"), "bin")
     data_files.append((os.path.join(share_dir, 'grib_api'), os.path.join('share', 'grib_api')))
+    # Add ffmpeg
+    binaries += [(os.path.join(bin_dir, 'ffmpeg'), '.')]
+else:
+    # Add ffmpeg
+    bin_dir = sys.executable.replace("python.exe", os.path.join("Library", "bin"))
+    bin_dir = sys.executable.replace("python.exe", os.path.join("Library", "lib"))
+    binaries += [(os.path.join(bin_dir, 'ffmpeg.exe'), '.')]
+
+# Add ffmpeg dependencies that pyinstaller doesn't automatically find
+for dep_so in ['libavdevice*', 'libavfilter*', 'libavformat*', 'libavcodec*', 'libavresample*', 'libpostproc*',
+               'libswresample*', 'libswscale*', 'libavutil*']:
+    _include_if_exists(binaries, lib_dir, dep_so)
 
 a = Analysis([main_script_pathname],
              pathex=[_script_base],
