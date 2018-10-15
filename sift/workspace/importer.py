@@ -81,6 +81,16 @@ def get_contour_increments(layer_info):
     unit_increments = {
         'K': [5., 2.5, 1., 0.5, 0.1],
         '%': [15., 10., 5., 2., 1.],
+        'kg m**-2': [20., 10., 5., 2., 1.],
+        'm s**-1': [15., 10., 5., 2., 1.],
+        'm**2 s**-1': [5000., 1000., 500., 200., 100.],
+        'gpm': [6000., 2000., 1000., 500., 200.],
+        'kg kg**-1': [16e-8, 8e-8, 4e-8, 2e-8, 1e-8],
+        'Pa s**-1': [6., 3., 2., 1., 0.5],
+        's**-1': [0.02, 0.01, 0.005, 0.002, 0.001],
+        'Pa': [5000., 1000., 500., 200., 100.],
+        'J kg**-1': [5000., 1000., 500., 200., 100.],
+        '(0 - 1)': [0.5, 0.2, 0.1, 0.05, 0.05],
     }
 
     contour_increments = increments.get(standard_name)
@@ -112,6 +122,7 @@ def get_contour_increments(layer_info):
 
 def get_contour_levels(vmin, vmax, increments):
     levels = []
+    mult = 1 / increments[-1]
     for idx, inc in enumerate(increments):
         vmin_round = np.ceil(vmin / inc) * inc
         vmax_round = np.ceil(vmax / inc) * inc
@@ -119,8 +130,11 @@ def get_contour_levels(vmin, vmax, increments):
         # round to the highest increment or modulo operations will be wrong
         inc_levels = np.round(inc_levels / increments[-1]) * increments[-1]
         if idx > 0:
+            # don't use coarse contours in the finer contour levels
+            # we multiple by 1 / increments[-1] to try to resolve precision
+            # errors which can be a big issue for very small increments.
             mask = np.logical_or.reduce([
-                np.isclose(inc_levels % i, 0) for i in increments[:idx]])
+                np.isclose((inc_levels * mult) % (i * mult), 0) for i in increments[:idx]])
             inc_levels = inc_levels[~mask]
         levels.append(inc_levels)
 
@@ -142,12 +156,15 @@ def generate_guidebook_metadata(layer_info) -> Mapping:
     if INFO.DISPLAY_NAME not in layer_info:
         layer_info[INFO.DISPLAY_NAME] = guidebook._default_display_name(layer_info)
 
+    print(layer_info['level'])
     if 'level' in layer_info:
         # calculate contour_levels and zoom levels
         increments = get_contour_increments(layer_info)
         vmin, vmax = layer_info[INFO.VALID_RANGE]
         contour_levels = get_contour_levels(vmin, vmax, increments)
         layer_info['contour_levels'] = contour_levels
+        print(increments, vmin, vmax)
+        print(contour_levels)
 
     return layer_info
 
