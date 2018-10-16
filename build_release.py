@@ -108,15 +108,15 @@ def get_platform():
 platform = get_platform()
 
 
-def _build_conda(output_dir=DIST_DIR):
+def _build_conda(python_version, output_dir=DIST_DIR):
     try:
         os.makedirs(output_dir)
     except FileExistsError:
         pass
 
     log.info("Building conda package...")
-    CONDA_BUILD_CMD = "conda build -c {} --output-folder {} {}".format(
-        SIFT_CHANNEL, DIST_DIR, CONDA_RECIPE)
+    CONDA_BUILD_CMD = "conda build -c {} --python {} --output-folder {} {}".format(
+        SIFT_CHANNEL, python_version, DIST_DIR, CONDA_RECIPE)
     run(CONDA_BUILD_CMD.split(' '))
     # check for build revisision
     for i in range(4, -1, -1):
@@ -184,6 +184,9 @@ def main():
                         help="Don't upload conda package to local channel server")
     parser.add_argument('--no-conda-index', dest='index_conda', action='store_false',
                         help="Don't update remote conda index")
+    parser.add_argument('--python', default="3.6",
+                        help="Specify what version of python to build the conda package for (see conda-build "
+                             "documentation.)")
     parser.add_argument('--no-installer', dest='build_installer', action='store_false',
                         help="Don't build an installer with pyinstaller")
     parser.add_argument('--no-installer-upload', dest='upload_installer', action='store_false',
@@ -197,7 +200,7 @@ def main():
 
     os.chdir(SCRIPT_DIR)
     if args.build_conda:
-        conda_pkg = _build_conda()
+        conda_pkg = _build_conda(python_version=args.python)
         if args.upload_conda:
             ch_path = os.path.join(CHANNEL_PATH, CONDA_PLAT[platform])
             _scp(conda_pkg, "{}@{}:{}".format(args.ftp_host_user, CHANNEL_HOST, ch_path))
