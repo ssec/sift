@@ -61,9 +61,9 @@ if not is_win:
 else:
     # Add ffmpeg
     bin_dir = sys.executable.replace("python.exe", os.path.join("Library", "bin"))
-    bin_dir = sys.executable.replace("python.exe", os.path.join("Library", "lib"))
+    lib_dir = sys.executable.replace("python.exe", os.path.join("Library", "lib"))
     binaries += [(os.path.join(bin_dir, 'ffmpeg.exe'), '.')]
-
+    
 # Add ffmpeg dependencies that pyinstaller doesn't automatically find
 if is_linux:
     so_ext = '.so*'
@@ -75,7 +75,12 @@ for dep_so in ['libavdevice*', 'libavfilter*', 'libavformat*', 'libavcodec*', 'l
                'libswresample*', 'libswscale*', 'libavutil*', 'libfreetype*', 'libbz2*', 'libgnutls*', 'libx264*',
                'libopenh264*', 'libpng*', 'libnettle*', 'libhogweed*', 'libgmp*', 'libintl*']:
     dep_so = dep_so + so_ext
-    _include_if_exists(binaries, lib_dir, dep_so)
+    if is_win:
+        # windows probably doesn't include "lib" prefix on the files
+        # and sometimes the actual library files are in bin not lib
+        _include_if_exists(binaries, lib_dir.replace('lib', '*'), dep_so[3:].replace(so_ext, '.*'))
+    else:
+        _include_if_exists(binaries, lib_dir, dep_so)
 
 a = Analysis([main_script_pathname],
              pathex=[_script_base],
