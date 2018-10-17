@@ -91,12 +91,12 @@ ISCC_PATH = os.path.join("C:/", "Program Files (x86)", "Inno Setup 5", "ISCC.exe
 
 PLATFORMS = ['darwin', 'linux', 'win']
 CONDA_PLAT = {
-    #'darwin': 'osx-64',
-    #'linux': 'linux-64',
-    #'win': 'win-64',
-    'darwin': 'noarch',
-    'linux': 'noarch',
-    'win': 'noarch',
+    'darwin': 'osx-64',
+    'linux': 'linux-64',
+    'win': 'win-64',
+    # 'darwin': 'noarch',
+    # 'linux': 'noarch',
+    # 'win': 'noarch',
 }
 
 
