@@ -473,8 +473,6 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         LOG.debug("selected UUID set is {0!r:s}".format(selected_uuids))
         menu = QMenu()
         actions = {}
-        # FIXME: RGB creation from context menu doesn't work
-        # FIXME: RGB removal doesn't actually work
         if len(selected_uuids) == 1:
             if self.doc[selected_uuids[0]][INFO.KIND] in [KIND.IMAGE, KIND.COMPOSITE, KIND.CONTOUR]:
                 actions.update(self.change_layer_colormap_menu(menu, lbox, selected_uuids, *args))
