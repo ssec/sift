@@ -121,6 +121,9 @@ class RecipeManager(object):
     def __getitem__(self, recipe_name):
         return self.recipes[recipe_name]
 
+    def __delitem__(self, recipe_name):
+        del self.recipes[recipe_name]
+
     def save_recipe(self, recipe, filename=None, overwrite=False):
         if not filename:
             filename = recipe.name + ".yaml"

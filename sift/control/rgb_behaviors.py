@@ -3,6 +3,7 @@
 """Behavior objects dealing with RGB image layers."""
 
 import logging
+import uuid
 from PyQt4.QtCore import QObject
 from sift.common import INFO, KIND
 # type hints:
@@ -27,6 +28,8 @@ class UserModifiesRGBLayers(QObject):
         4. A new layer family is discovered in the Document (a layer for a
            previously unloaded family is loaded) and the RGB pane is told
            about this new family.
+        5. User selects layers in layer list, right clicks and in the context
+           menu selects to create an RGB layer from the selections.
 
     """
     def __init__(self, document: Document, rgb_pane: RGBLayerConfigPane,
@@ -48,6 +51,18 @@ class UserModifiesRGBLayers(QObject):
         self.rgb_pane.didChangeRGBComponentGamma.connect(self._gamma_changed)
         # Task 4
         self.doc.didAddFamily.connect(self._family_added)
+        self.doc.didRemoveFamily.connect(self._family_removed)
+        # Task 5
+        self.layer_list_model.didRequestRGBCreation.connect(self.create_rgb)
+
+    def _create_rgb_from_uuids(self, recipe_dict):
+        families = []
+        for color in 'rgb':
+            if color in recipe_dict:
+                families.append(self.doc[recipe_dict[color]][INFO.FAMILY])
+            else:
+                families.append(None)
+        self.create_rgb(families=families)
 
     def create_rgb(self, action=None, families=[]):
         if len(families) == 0:
@@ -89,4 +104,7 @@ class UserModifiesRGBLayers(QObject):
         # can't use RGB layers as components of an RGB
         if family_info[INFO.KIND] not in [KIND.RGB]:
             self.rgb_pane.family_added(family, family_info)
+
+    def _family_removed(self, family):
+        self.rgb_pane.family_removed(family)
 

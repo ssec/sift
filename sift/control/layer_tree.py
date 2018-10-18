@@ -238,9 +238,10 @@ class LayerStackTreeViewModel(QAbstractItemModel):
     _mimetype = 'application/vnd.row.list'
 
     # signals
-    uuidSelectionChanged = pyqtSignal(tuple,)  # the list is a list of the currently selected UUIDs
+    uuidSelectionChanged = pyqtSignal(tuple)  # the list is a list of the currently selected UUIDs
+    didRequestRGBCreation = pyqtSignal(dict)
 
-    def __init__(self, widgets:list, doc:Document, parent=None):
+    def __init__(self, widgets: list, doc: Document, parent=None):
         """
         Connect one or more table views to the document via this model.
         :param widgets: list of TableViews to wire up
@@ -428,8 +429,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             request = requests.get(action, None)
             if request is not None:
                 LOG.debug('RGB creation using {0!r:s}'.format(request))
-                # FIXME: This should happen in conjunction with the RGB behavior
-                self.doc.create_rgb_composite(**request)
+                self.didRequestRGBCreation.emit(request)
 
         rgb_menu = QMenu("Create RGB From Selections...", menu)
         for rgb in sorted(set(x[:len(selected_uuids)] for x in ['RGB', 'RBG', 'GRB', 'GBR', 'BRG', 'BGR']), reverse=True):
@@ -473,6 +473,8 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         LOG.debug("selected UUID set is {0!r:s}".format(selected_uuids))
         menu = QMenu()
         actions = {}
+        # FIXME: RGB creation from context menu doesn't work
+        # FIXME: RGB removal doesn't actually work
         if len(selected_uuids) == 1:
             if self.doc[selected_uuids[0]][INFO.KIND] in [KIND.IMAGE, KIND.COMPOSITE, KIND.CONTOUR]:
                 actions.update(self.change_layer_colormap_menu(menu, lbox, selected_uuids, *args))

@@ -121,6 +121,11 @@ class RGBLayerConfigPane(QObject):
         self._families[family] = family_info
         self._set_combos_to_family_names()
 
+    def family_removed(self, family):
+        if family in self._families:
+            del self._families[family]
+            self._set_combos_to_family_names()
+
     def _gamma_changed(self, value):
         gamma = tuple(x.value() for x in self.gamma_boxes)
         self.didChangeRGBComponentGamma.emit(self.recipe, gamma)
@@ -350,10 +355,11 @@ class RGBLayerConfigPane(QObject):
 
         # fill up our lists of layers
         for widget, selected_family in zip(self.rgb, current_families):
-            if not selected_family:
+            if not selected_family or selected_family not in self._families:
+                # if the selection is None or the current family was removed
+                # if the current family was removed by the document then the
+                # document should have updated the recipe
                 widget.setCurrentIndex(0)
-            # else:
-                # selected_family = selected_family  # Qt item data is lists (see below)
             for idx, (family_name, family_info) in enumerate(sorted(self._families.items(), key=lambda x: x[1][INFO.DISPLAY_FAMILY])):
                 # Qt can't handle tuples as
                 display_name = family_info[INFO.DISPLAY_FAMILY]

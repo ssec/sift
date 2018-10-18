@@ -157,14 +157,11 @@ def generate_guidebook_metadata(layer_info) -> Mapping:
         layer_info[INFO.DISPLAY_NAME] = guidebook._default_display_name(layer_info)
 
     if 'level' in layer_info:
-        print(layer_info['level'])
         # calculate contour_levels and zoom levels
         increments = get_contour_increments(layer_info)
         vmin, vmax = layer_info[INFO.VALID_RANGE]
         contour_levels = get_contour_levels(vmin, vmax, increments)
         layer_info['contour_levels'] = contour_levels
-        print(increments, vmin, vmax)
-        print(contour_levels)
 
     return layer_info
 

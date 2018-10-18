@@ -1135,7 +1135,6 @@ class Workspace(QObject):
 
         # activate the content we just loaded into the workspace
         overview_data = self._overview_content_for_uuid(uuid)
-        print(overview_data)
         # prod = self._product_with_uuid(S, uuid)
         return uuid, self.get_info(uuid), overview_data
 

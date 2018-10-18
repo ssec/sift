@@ -1175,6 +1175,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didChangeProjection = pyqtSignal(str, dict)  # name of projection, dict of projection information
     # didChangeShapeLayer = pyqtSignal(dict)
     didAddFamily = pyqtSignal(str, dict)  # name of the newly added family and dict of family info
+    didRemoveFamily = pyqtSignal(str)  # name of the newly added family and dict of family info
     didReorderTracks = pyqtSignal(set, set)  # added track names, removed track names
     didChangeImageKind = pyqtSignal(dict)
 
@@ -1517,6 +1518,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         family = self[uuid][INFO.FAMILY]
         self._families[family].remove(uuid)
 
+        if not self._families[family]:
+            # remove the family entirely if it is empty
+            LOG.debug("Removing empty family: {}".format(family))
+            del self._families[family]
+            self.didRemoveFamily.emit(family)
+
     def family_info(self, family_or_layer_or_uuid):
         family = layer = family_or_layer_or_uuid
         if isinstance(family_or_layer_or_uuid, UUID):
@@ -1765,7 +1772,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for uuid, pinf in uuids:
             try:
                 lyr = self._layer_with_uuid[pinf.uuid]
-                if lyr[INFO.KIND] in [KIND.IMAGE, KIND.COMPOSITE]:
+                if lyr[INFO.KIND] in {KIND.IMAGE, KIND.COMPOSITE, KIND.CONTOUR}:
                     zult[pinf.uuid] = self._get_equalizer_values_image(lyr, pinf, xy_pos)
                 elif lyr[INFO.KIND] == KIND.RGB:
                     zult[pinf.uuid] = self._get_equalizer_values_rgb(lyr, pinf, xy_pos)
@@ -2144,7 +2151,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.update_rgb_composite_layers(recipe)
         return chain(*(x.values() for x in self._recipe_layers[recipe.name].values()))
 
-    def change_rgb_recipe_components(self, recipe, **rgba):
+    def change_rgb_recipe_components(self, recipe, update=True, **rgba):
         if recipe.read_only:
             raise ValueError("Recipe is read only, can't modify")
         for idx, channel in enumerate('rgba'):
@@ -2152,7 +2159,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 continue
             new_comp_family = rgba[channel]
             recipe.input_ids[idx] = new_comp_family
-        self.update_rgb_composite_layers(recipe, rgba=set(rgba.keys()))
+        if update:
+            self.update_rgb_composite_layers(recipe, rgba=set(rgba.keys()))
 
     def _uuids_for_recipe(self, recipe, valid_only=True):
         prez_uuids = self.current_layer_uuid_order
@@ -2227,8 +2235,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 continue
 
             # update the component layers and tell which ones changed
-            changed = self._change_rgb_component_layer(rgb_layer,
-                                                       **changed_components)
+            changed = self._change_rgb_component_layer(rgb_layer, **changed_components)
 
             # check recipes color limits and update them
             # but only if this RGB layer matches the layers the recipe has
@@ -2246,7 +2253,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     continue
             elif not should_show:
                 # is being shown, but shouldn't be
-                self.remove_layer_prez(rgb_layer[INFO.UUID], purge=False)
+                self.remove_layer_prez(rgb_layer[INFO.UUID])
                 continue
 
             if rgb_layer is not None:
@@ -2273,18 +2280,18 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             if this_rgba not in rgba:
                 return {}
 
-            # use wavelength if it exists, use short name otherwise
             # FIXME: Should we use SERIAL instead?
             #        Algebraic layers and RGBs need to use the same thing
             #        Any call to 'sync_composite_layer_prereqs' needs to use
             #        SERIAL instead of SCHED_TIME too.
             if family is None:
                 layers = self.current_layers_where(kinds=[KIND.IMAGE, KIND.COMPOSITE])
-                # layers = self.current_layers_where(kinds=[KIND.IMAGE, KIND.COMPOSITE, KIND.CONTOUR])
                 layers = (x[-1] for x in layers)
                 # return empty `None` layers since we don't know what is wanted right now
                 # we look at all possible times
-                inst_layers = {k: {l[INFO.SCHED_TIME]: None for l in g} for k, g in groupby(sorted(layers, key=_key_func), _key_func)}
+                inst_layers = {
+                    k: {l[INFO.SCHED_TIME]: None for l in g}
+                    for k, g in groupby(sorted(layers, key=_key_func), _key_func)}
                 return inst_layers
             else:
                 family_uuids = self._families[family]
@@ -2293,6 +2300,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             inst_layers = {k: {l[INFO.SCHED_TIME]: l for l in g} for k, g in groupby(sorted(family_layers, key=_key_func), _key_func)}
             return inst_layers
 
+        # if the layers we were using as dependencies have all been removed (family no longer exists)
+        # then change the recipe to use None instead. The `didRemoveFamily` signal already told the
+        # RGB pane to update its list of choices and defaults to None
+        missing_rgba = {comp: None for comp, input_id in zip('rgb', recipe.input_ids) if input_id and input_id not in self._families}
+        if missing_rgba:
+            self.change_rgb_recipe_components(recipe, update=False, **missing_rgba)
+
+        # find all the layers for these components
         r_layers = _component_generator(recipe.input_ids[0], 'r')
         g_layers = _component_generator(recipe.input_ids[1], 'g')
         b_layers = _component_generator(recipe.input_ids[2], 'b')
@@ -2371,27 +2386,56 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         uuid = self.current_layer_set[row].uuid
         return uuid
 
-    def family_uuids(self, family):
-        return self._families[family]
+    def family_uuids(self, family, active_only=False):
+        uuids = self._families[family]
+        if not active_only:
+            return uuids
+        current_visible = list(self.current_visible_layer_uuids)
+        return [u for u in uuids if u in current_visible]
 
-    def family_uuids_for_uuid(self, uuid):
-        return self.family_uuids(self[uuid][INFO.FAMILY])
+    def family_uuids_for_uuid(self, uuid, active_only=False):
+        return self.family_uuids(self[uuid][INFO.FAMILY], active_only=active_only)
+
+    def recipe_for_uuid(self, uuid):
+        # put this in a separate method in case things change in the future
+        return self[uuid]['recipe']
+
+    def remove_rgb_recipes(self, recipe_names):
+        for recipe_name in recipe_names:
+            del self.recipe_manager[recipe_name]
+            del self._recipe_layers[recipe_name]
 
     def remove_layers_from_all_sets(self, uuids):
         # find RGB layers family
         all_uuids = set()
+        recipes_to_remove = set()
         for uuid in list(uuids):
             all_uuids.add(uuid)
             if isinstance(self[uuid], DocRGBLayer):
                 all_uuids.update(self.family_uuids_for_uuid(uuid))
+                res = self.recipe_for_uuid(uuid)
+                recipes_to_remove.add(self.recipe_for_uuid(uuid).name)
 
-        # delete all these layers
+        # collect all times for these layers to update RGBs later
+        times = [self[u][INFO.SCHED_TIME] for u in all_uuids]
+
+        # delete all these layers from the layer list/presentation
         for uuid in all_uuids:
-            LOG.debug('removing {}'.format(uuid))
+            LOG.debug('removing {} from family and prez lists'.format(uuid))
             # remove from available family layers
             self._remove_layer_from_family(uuid)
             # remove from the layer set
             self.remove_layer_prez(uuid)  # this will send signal and start purge
+
+        # remove recipes for RGBs that were deleted
+        # if we don't then they may be recreated below
+        self.remove_rgb_recipes(recipes_to_remove)
+
+        # Remove this layer from any RGBs it is a part of
+        self.sync_composite_layer_prereqs(times)
+
+        # Remove data from the workspace
+        self.purge_layer_prez(uuids)
 
     def animate_siblings_of_layer(self, row_or_uuid):
         uuid = self.current_layer_set[row_or_uuid].uuid if not isinstance(row_or_uuid, UUID) else row_or_uuid
@@ -2492,7 +2536,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     return True
         return False
 
-    def remove_layer_prez(self, row_or_uuid, count:int=1, purge=True):
+    def remove_layer_prez(self, row_or_uuid, count:int=1):
         """
         remove the presentation of a given layer/s in the current set
         :param row: which current layer set row to remove
@@ -2500,7 +2544,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :return:
         """
         if isinstance(row_or_uuid, UUID) and count==1:
-            row = self.row_for_uuid(row_or_uuid)
+            try:
+                row = self.row_for_uuid(row_or_uuid)
+            except KeyError:
+                LOG.debug("Can't remove in-active layer: {}".format(row_or_uuid))
+                return
             uuids = [row_or_uuid]
         else:
             row = row_or_uuid
@@ -2510,21 +2558,17 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         del clo[row:row+count]
         del self.current_layer_set[row:row+count]
         self.didRemoveLayers.emit(tuple(clo), uuids, row, count)
-        # Remove this layer from any RGBs it is a part of
-        for uuid in uuids:
-            layer = self._layer_with_uuid[uuid]
-            self.sync_composite_layer_prereqs([layer[INFO.SCHED_TIME]])
 
-        # Purge this layer if we can
-        if purge:
-            for uuid in uuids:
-                if not self.is_using(uuid):
-                    LOG.info('purging layer {}, no longer in use'.format(uuid))
-                    self.willPurgeLayer.emit(uuid)
-                    # remove from our bookkeeping
-                    del self._layer_with_uuid[uuid]
-                    # remove from workspace
-                    self._workspace.remove(uuid)
+    def purge_layer_prez(self, uuids):
+        """Purge layers from the workspace"""
+        for uuid in uuids:
+            if not self.is_using(uuid):
+                LOG.info('purging layer {}, no longer in use'.format(uuid))
+                self.willPurgeLayer.emit(uuid)
+                # remove from our bookkeeping
+                del self._layer_with_uuid[uuid]
+                # remove from workspace
+                self._workspace.remove(uuid)
 
     def channel_siblings(self, uuid, sibling_infos=None):
         """
