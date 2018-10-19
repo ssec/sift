@@ -320,7 +320,8 @@ class DocRGBLayer(DocCompositeLayer):
 
     def _default_display_time(self):
         dep_info = [self.r, self.g, self.b]
-        valid_times = [nfo.get(INFO.DISPLAY_TIME, '<unknown time>') for nfo in dep_info if nfo is not None]
+        valid_times = [nfo.get(INFO.SCHED_TIME, None) for nfo in dep_info if nfo is not None]
+        valid_times = [x.strftime("%Y-%m-%d %H:%M:%S") if x is not None else '<unknown time>' for x in valid_times]
         if len(valid_times) == 0:
             display_time = '<unknown time>'
         else:

@@ -676,7 +676,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
 
         d[INFO.FAMILY] = '{}:{}:{}:{:5.2f}µm'.format(KIND.IMAGE.name, 'geo', d[INFO.STANDARD_NAME], d[INFO.CENTRAL_WAVELENGTH]) # kind:pointofreference:measurement:wavelength
         d[INFO.CATEGORY] = 'NOAA-PUG:{}:{}:{}'.format(d[INFO.PLATFORM].name, d[INFO.INSTRUMENT].name, d[INFO.SCENE])  # system:platform:instrument:target
-        d[INFO.SERIAL] = pug.time_span[0].strftime("%Y%m%dT%H%M%S")
+        d[INFO.SERIAL] = d[INFO.SCHED_TIME].strftime("%Y%m%dT%H%M%S")
         LOG.debug(repr(d))
         return d
 
