@@ -125,6 +125,7 @@ class RGBLayerConfigPane(QObject):
         if family in self._families:
             del self._families[family]
             self._set_combos_to_family_names()
+            self._show_settings_for_layer(self.recipe)
 
     def _gamma_changed(self, value):
         gamma = tuple(x.value() for x in self.gamma_boxes)
@@ -298,7 +299,16 @@ class RGBLayerConfigPane(QObject):
             slider[1].setSliderPosition(0)
             editn.setText('0.0')
             editx.setText('0.0')
+            slider[0].setDisabled(True)
+            slider[1].setDisabled(True)
+            editn.setDisabled(True)
+            editx.setDisabled(True)
         else:
+            slider[0].setDisabled(False)
+            slider[1].setDisabled(False)
+            editn.setDisabled(False)
+            editx.setDisabled(False)
+
             valid_range = self._families[family][INFO.VALID_RANGE]
             self._valid_ranges[idx] = valid_range
 
@@ -377,7 +387,9 @@ class RGBLayerConfigPane(QObject):
     def _set_gamma_boxes(self, recipe=None):
         if recipe is not None:
             for idx, sbox in enumerate(self.gamma_boxes):
+                sbox.setDisabled(recipe.input_ids[idx] is None)
                 sbox.setValue(recipe.gammas[idx])
         else:
             for idx, sbox in enumerate(self.gamma_boxes):
+                sbox.setDisabled(True)
                 sbox.setValue(1.)

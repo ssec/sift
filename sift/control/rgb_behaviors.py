@@ -53,7 +53,7 @@ class UserModifiesRGBLayers(QObject):
         self.doc.didAddFamily.connect(self._family_added)
         self.doc.didRemoveFamily.connect(self._family_removed)
         # Task 5
-        self.layer_list_model.didRequestRGBCreation.connect(self.create_rgb)
+        self.layer_list_model.didRequestRGBCreation.connect(self._create_rgb_from_uuids)
 
     def _create_rgb_from_uuids(self, recipe_dict):
         families = []

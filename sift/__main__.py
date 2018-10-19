@@ -398,11 +398,12 @@ class Main(QtGui.QMainWindow):
                 continue
 
             rgbs_uuids = self.document.family_uuids_for_uuid(uuid, active_only=True)
+            all_rgbs_uuids = self.document.family_uuids_for_uuid(uuid)
             if all(l_uuid in uuids for l_uuid in rgbs_uuids):
                 # there is only one of these RGBs so just remove it
                 # or they have selected all of the layers in this family
-                rgb_uuids_handled.update(rgbs_uuids)
-                uuids_to_remove.update(rgbs_uuids)
+                rgb_uuids_handled.update(all_rgbs_uuids)
+                uuids_to_remove.update(all_rgbs_uuids)
                 continue
 
             # Ask the user if this is what they want
@@ -414,11 +415,11 @@ class Main(QtGui.QMainWindow):
             response = msg_box.exec_()
             if response == msg_box.Yes:
                 LOG.debug("Setting all RGB family UUIDs to be removed: %s", uuid)
-                rgb_uuids_handled.update(rgbs_uuids)
-                uuids_to_remove.update(rgbs_uuids)
+                rgb_uuids_handled.update(all_rgbs_uuids)
+                uuids_to_remove.update(all_rgbs_uuids)
             else:
                 LOG.debug("Will not delete RGB or its family: %s", uuid)
-                rgb_uuids_handled.update(rgbs_uuids)
+                rgb_uuids_handled.update(all_rgbs_uuids)
                 continue
 
         if uuids_to_remove:

@@ -2305,13 +2305,16 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # RGB pane to update its list of choices and defaults to None
         missing_rgba = {comp: None for comp, input_id in zip('rgb', recipe.input_ids) if input_id and input_id not in self._families}
         if missing_rgba:
+            LOG.debug("Recipe's inputs have gone missing: {}".format(missing_rgba))
             self.change_rgb_recipe_components(recipe, update=False, **missing_rgba)
 
         # find all the layers for these components
         r_layers = _component_generator(recipe.input_ids[0], 'r')
         g_layers = _component_generator(recipe.input_ids[1], 'g')
         b_layers = _component_generator(recipe.input_ids[2], 'b')
-        categories = r_layers.keys() | g_layers.keys() | b_layers.keys()
+        categories = (r_layers.keys() | g_layers.keys() | b_layers.keys() |
+                      self._recipe_layers[recipe.name].keys())
+
         for category in categories:
             # any new times plus existing times if RGBs already exist
             rgb_times = r_layers.setdefault(category, {}).keys() | \
@@ -2413,7 +2416,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             all_uuids.add(uuid)
             if isinstance(self[uuid], DocRGBLayer):
                 all_uuids.update(self.family_uuids_for_uuid(uuid))
-                res = self.recipe_for_uuid(uuid)
                 recipes_to_remove.add(self.recipe_for_uuid(uuid).name)
 
         # collect all times for these layers to update RGBs later
