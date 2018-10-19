@@ -1008,19 +1008,20 @@ class SatPyImporter(aImporter):
             # Generate FAMILY and CATEGORY
             if 'model_time' in ds.attrs:
                 model_time = ds.attrs['model_time'].isoformat()
-                cat_id = model_time + ':' + id_str
             else:
                 model_time = None
-                cat_id = id_str
             ds.attrs[INFO.SCENE] = hash(ds.attrs['area'])
-            ds.attrs[INFO.FAMILY] = '{}:{}:{}'.format(
+            if ds.attrs.get(INFO.CENTRAL_WAVELENGTH) is None:
+                cw = ""
+            else:
+                cw = ":{:5.2f}µm".format(ds.attrs[INFO.CENTRAL_WAVELENGTH])
+            ds.attrs[INFO.FAMILY] = '{}:{}:{}{}'.format(
                 ds.attrs[INFO.KIND].name, ds.attrs[INFO.STANDARD_NAME],
-                ds.attrs[INFO.SHORT_NAME])
-            ds.attrs[INFO.CATEGORY] = 'SatPy:{}:{}:{}:{}'.format(
+                ds.attrs[INFO.SHORT_NAME], cw)
+            ds.attrs[INFO.CATEGORY] = 'SatPy:{}:{}:{}'.format(
                 ds.attrs[INFO.PLATFORM].name, ds.attrs[INFO.INSTRUMENT].name,
-                ds.attrs[INFO.SCENE], cat_id)  # system:platform:instrument:target
+                ds.attrs[INFO.SCENE])  # system:platform:instrument:target
             # TODO: Include level or something else in addition to time?
-            #       Probably need to include the model run time (prefix id_str?)
             start_str = ds.attrs['start_time'].isoformat()
             ds.attrs[INFO.SERIAL] = start_str if model_time is None else model_time + ":" + start_str
 

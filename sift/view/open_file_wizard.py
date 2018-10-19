@@ -32,6 +32,8 @@ BY_ID_TAB = 1
 
 
 class OpenFileWizard(QtGui.QWizard):
+    AVAILABLE_READERS = []
+
     def __init__(self, base_dir=None, parent=None):
         super(OpenFileWizard, self).__init__(parent)
         self._last_open_dir = base_dir
@@ -82,9 +84,12 @@ class OpenFileWizard(QtGui.QWizard):
 
     def _init_file_page(self):
         all_readers = bool(os.getenv("SIFT_ALLOW_ALL_READERS", ""))
-        if all_readers:
+        if all_readers and self.AVAILABLE_READERS:
+            readers = self.AVAILABLE_READERS
+        elif all_readers:
             from satpy import available_readers
             readers = sorted(available_readers())
+            OpenFileWizard.AVAILABLE_READERS = readers
         else:
             readers = ['grib']
             self.ui.readerComboBox.setDisabled(True)
