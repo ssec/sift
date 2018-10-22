@@ -48,7 +48,7 @@ SIFT_CHANNEL_PATH: (default '/var/apache/larch/htdocs/channels/sift')
     be `win-64`, `linux-64`, `osx-64`, and `noarch` directories in this
     directory.
 
-SIFT_FTP_HOST: (default 'meelo')
+SIFT_FTP_HOST: (default 'bumi')
     Server that has permission to upload to the SSEC FTP server.
 
 SIFT_FTP_HOST_PATH: (default '~/repos/git/sift/dist') Where on the FTP host
@@ -81,7 +81,7 @@ CONDA_RECIPE = os.path.join('conda-recipe', 'sift')
 CHANNEL_HOST = os.environ.get("SIFT_CHANNEL_HOST", "larch")
 CHANNEL_PATH = os.environ.get("SIFT_CHANNEL_PATH", "/var/apache/larch/htdocs/channels/sift")
 # server that is allowed to add to FTP site
-FTP_HOST = os.environ.get("SIFT_FTP_HOST", "meelo")
+FTP_HOST = os.environ.get("SIFT_FTP_HOST", "bumi")
 FTP_HOST_PATH = os.environ.get("SIFT_FTP_HOST_PATH", "repos/git/sift/dist")
 FTP_PATH = os.environ.get("SIFT_FTP_PATH", "pub/sift/dist")
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
