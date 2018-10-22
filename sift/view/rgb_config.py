@@ -143,7 +143,10 @@ class RGBLayerConfigPane(QObject):
         self.didChangeRGBComponentSelection.emit(self.recipe, color, family)
 
     def _display_to_data(self, color:str, values):
-        "convert display value to data value"
+        """Convert display value to data value."""
+        if self.recipe is None:
+            # No recipe has been set yet
+            return values
         family = self.recipe.input_ids[RGBA2IDX[color]]
         if family is None:
             return values
