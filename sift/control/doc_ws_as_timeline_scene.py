@@ -254,6 +254,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         menu = QMenu()
         actions = {}
         if frame:
+            sfx = ' frame'
 
             def _activate(*args, **kwargs):
                 self._doc.activate_frames(frame)
@@ -262,6 +263,10 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
                 self._doc.deactivate_frames(frame)
 
         else:
+            # FUTURE: frames in track is too dangerous for now
+            return None
+
+            sfx = ' frames in track'
 
             def _activate(*args, **kwargs):
                 self._doc.activate_track(track)
@@ -269,8 +274,8 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
             def _deactivate(*args, **kwargs):
                 self._doc.deactivate_track(track)
 
-        actions[menu.addAction("Activate")] = _activate
-        actions[menu.addAction("Deactivate")] = _deactivate
+        actions[menu.addAction("Activate" + sfx)] = _activate
+        actions[menu.addAction("Deactivate" + sfx)] = _deactivate
         return menu, actions
 
     def sync_items(self, changed_tracks: Optional[Iterable[str]]=None, changed_frame_uuids: Optional[Iterable[UUID]]=None):
