@@ -176,6 +176,10 @@ class QFramesInTracksScene(QGraphicsScene):
         """
         raise NotImplementedError("NYI")  # FIXME
 
+    def center_view_on_frame(self, gv: QGraphicsView, frame_uuid: UUID):
+        item = self._frame_items.get(frame_uuid)
+        if item is not None:
+            gv.centerOn(item)
 
     #
     # internal mid-level update commands
