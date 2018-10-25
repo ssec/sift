@@ -624,6 +624,8 @@ class Main(QtGui.QMainWindow):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+        # FIXME: Slider does not currently work as intended. Re-enable later
+        self.ui.timelineScaleSlider.setDisabled(True)
 
         # hack some font sizes until we migrate to PyQt5 and handle it better
         # was 14 on osx
