@@ -42,35 +42,34 @@ DEFAULT_POINT_PROBE = "default_probe_name"
 
 
 class NavigationToolbar(NavigationToolbar):
-    """Custom matplotlib toolbar
-    """
+    """Custom matplotlib toolbar."""
+    def __init__(self, *args, **kwargs):
+        self.__include_colorbar = kwargs.get('include_colorbar', False)
+        super(NavigationToolbar, self).__init__(*args, **kwargs)
+
     def edit_parameters(self):
         allaxes = self.canvas.figure.get_axes()
-        if len(allaxes) == 1:
-            axes = allaxes[0]
+        if not allaxes:
+            QtWidgets.QMessageBox.warning(
+                self.parent, "Error", "There are no axes to edit.")
+            return
+        elif len(allaxes) == 1:
+            axes, = allaxes
         else:
             titles = []
-            for axes in allaxes:
-                title = axes.get_title()
-                ylabel = axes.get_ylabel()
-                label = axes.get_label()
-                if title:
-                    fmt = "%(title)s"
-                    # if ylabel:
-                    #     fmt += ": %(ylabel)s"
-                    # fmt += " (%(axes_repr)s)"
-                elif ylabel:
-                    fmt = "%(axes_repr)s (%(ylabel)s)"
-                elif label:
-                    fmt = "%(axes_repr)s (%(label)s)"
-                else:
-                    fmt = "%(axes_repr)s"
-                titles.append(fmt % dict(title=title,
-                                         ylabel=ylabel, label=label,
-                                         axes_repr=repr(axes)))
-            if len(titles) == 2 and "Colorbar" in titles:
-                other_idx = titles.index("Colorbar") - 1
-                axes = allaxes[other_idx]
+            not_colorbar_idx = -1
+            for idx, axes in enumerate(allaxes):
+                if any(x.colorbar for x in axes.images):
+                    not_colorbar_idx = idx
+                name = (axes.get_title() or
+                        " - ".join(filter(None, [axes.get_xlabel(),
+                                                 axes.get_ylabel()])) or
+                        "<anonymous {} (id: {:#x})>".format(
+                            type(axes).__name__, id(axes)))
+                titles.append(name)
+
+            if len(titles) == 2 and not_colorbar_idx != -1 and not self.__include_colorbar:
+                axes = allaxes[not_colorbar_idx]
             else:
                 item, ok = QtWidgets.QInputDialog.getItem(
                     self.parent, 'Customize', 'Select axes:', titles, 0, False)
@@ -81,9 +80,9 @@ class NavigationToolbar(NavigationToolbar):
 
         figureoptions.figure_edit(axes, self)
 
-class ProbeGraphManager (QObject) :
-    """The ProbeGraphManager manages the many tabs of the Area Probe Graphs.
-    """
+
+class ProbeGraphManager(QObject):
+    """The ProbeGraphManager manages the many tabs of the Area Probe Graphs."""
 
     # signals
     didChangeTab = pyqtSignal(tuple,)  # list of probe areas to show
@@ -704,7 +703,6 @@ class ProbeGraphDisplay (object) :
             axes.set_autoscale_on(True)
 
         colorbar = self.figure.colorbar(img)
-        colorbar.ax.set_title("Colorbar")  # for the 'Customize' menu in the MPL toolbar
         colorbar.set_label('log(count of data points)')
 
         # set the various text labels
