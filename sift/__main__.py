@@ -609,6 +609,17 @@ class Main(QtGui.QMainWindow):
 
         self._timeline_scene.sync_items()
 
+        def center_timeline_view_on_single_frame(frame_uuids, gv=gv, timeline_scene=self._timeline_scene):
+            frame_uuids = list(frame_uuids) if not isinstance(frame_uuids, list) else frame_uuids
+            # FIXME: again, we're assuming product id = frame id = layer id
+            if len(frame_uuids) == 1 and gv.isVisible():
+                LOG.debug('centering timeline view on single selected frame')
+
+                timeline_scene.center_view_on_frame(gv, frame_uuids[0])
+
+        self.layer_list_model.uuidSelectionChanged.connect(center_timeline_view_on_single_frame)
+
+
     def __init__(self, config_dir=None, cache_dir=None, cache_size=None, glob_pattern=None, search_paths=None, border_shapefile=None, center=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()

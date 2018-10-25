@@ -743,13 +743,19 @@ class DocumentAsTrackStack(DocumentAsContextBase):
 
     def _products_in_track(self, track: str, during: span = None) -> T.List[UUID]:
         fam, ctg = track.split(FCS_SEP)
+
+        def uu(x):
+            LOG.debug("found product {}".format(x))
+            return UUID(x)
+
         if during is None:
             with self.mdb as S:
-                return [UUID(x) for x in S.query(Product.uuid_str).filter(Product.family == fam & Product.category == ctg).all()]
+                return [uu(x) for x in S.query(Product.uuid_str).filter(
+                    (Product.family == fam) & (Product.category == ctg)).all()]
         else:
             start, end = during.s, during.e
             with self.mdb as S:
-                return [UUID(x) for x in S.query(Product.uuid_str).filter(
+                return [uu(x) for x in S.query(Product.uuid_str).filter(
                     (Product.family == fam) & (Product.category == ctg) &
                     ~((Product.obs_time > end) | ((Product.obs_time + Product.obs_duration) < start))).all()]
 
@@ -760,6 +766,10 @@ class DocumentAsTrackStack(DocumentAsContextBase):
     def deactivate_frames(self, frame: UUID, *more_frames: T.Iterable[UUID]) -> T.Sequence[UUID]:
         """Activate one or more frames in the document, as directed by the timeline widgets
         """
+        away_with_thee = list(self.doc.filter_active_layers([frame] + list(more_frames)))
+        LOG.debug("about to remove {} layers".format(len(away_with_thee)))
+        self.doc.remove_layers_from_all_sets(away_with_thee)
+        return away_with_thee
 
     def deactivate_track(self, track: str):
         LOG.info("deactivate_track {}".format(track))
@@ -2380,6 +2390,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             kind = [kind]
         for x in [q for q in self._layer_with_uuid.values() if q.kind in kind]:
             yield x.uuid, x.sched_time, x.product_family_key
+
+    def filter_active_layers(self, uuids):
+        """Trim a sequence of product uuids to only the ones loaded in document
+        """
+        docset = set(x.uuid for x in self._layer_with_uuid.values())
+        for uuid in uuids:
+            if uuid in docset:
+                yield uuid
 
     def __len__(self):
         # FIXME: this should be consistent with __getitem__, not self.current_layer_set
