@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'sift/ui/pov_main.ui'
+# Form implementation generated from reading ui file 'pov_main.ui'
 #
 # Created by: PyQt4 UI code generator 4.11.4
 #
@@ -255,7 +255,7 @@ class Ui_MainWindow(object):
         self.layerDetailsScrollArea.setWidgetResizable(True)
         self.layerDetailsScrollArea.setObjectName(_fromUtf8("layerDetailsScrollArea"))
         self.layerDetailsContents = QtGui.QWidget()
-        self.layerDetailsContents.setGeometry(QtCore.QRect(0, 0, 272, 76))
+        self.layerDetailsContents.setGeometry(QtCore.QRect(0, 0, 280, 76))
         self.layerDetailsContents.setObjectName(_fromUtf8("layerDetailsContents"))
         self.layerDetailsScrollArea.setWidget(self.layerDetailsContents)
         self.gridLayout.addWidget(self.layerDetailsScrollArea, 0, 0, 1, 1)
@@ -280,7 +280,7 @@ class Ui_MainWindow(object):
         self.scrollArea.setWidgetResizable(True)
         self.scrollArea.setObjectName(_fromUtf8("scrollArea"))
         self.scrollAreaWidgetContents_8 = QtGui.QWidget()
-        self.scrollAreaWidgetContents_8.setGeometry(QtCore.QRect(0, 0, 257, 524))
+        self.scrollAreaWidgetContents_8.setGeometry(QtCore.QRect(0, 0, 265, 524))
         self.scrollAreaWidgetContents_8.setObjectName(_fromUtf8("scrollAreaWidgetContents_8"))
         self.verticalLayout_33 = QtGui.QVBoxLayout(self.scrollAreaWidgetContents_8)
         self.verticalLayout_33.setObjectName(_fromUtf8("verticalLayout_33"))
@@ -522,7 +522,7 @@ class Ui_MainWindow(object):
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
-        MainWindow.setWindowTitle(_translate("MainWindow", "SIFT Beta |X.X.X|", None))
+        MainWindow.setWindowTitle(_translate("MainWindow", "SIFT |X.X.X|", None))
         self.panZoomToolButton.setToolTip(_translate("MainWindow", "Pan/Zoom Tool", None))
         self.panZoomToolButton.setStatusTip(_translate("MainWindow", "Left mouse click and drag pans the scene", None))
         self.panZoomToolButton.setText(_translate("MainWindow", "Pan/Zoom", None))

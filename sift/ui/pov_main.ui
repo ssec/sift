@@ -14,7 +14,7 @@
    <bool>true</bool>
   </property>
   <property name="windowTitle">
-   <string>SIFT Beta |X.X.X|</string>
+   <string>SIFT |X.X.X|</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -486,7 +486,7 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>272</width>
+          <width>280</width>
           <height>76</height>
          </rect>
         </property>
@@ -539,7 +539,7 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>257</width>
+          <width>265</width>
           <height>524</height>
          </rect>
         </property>
