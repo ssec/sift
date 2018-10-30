@@ -1003,6 +1003,9 @@ class SatPyImporter(aImporter):
                     ds.attrs['name'], ds.attrs['level'])
             ds.attrs[INFO.SHAPE] = ds.shape
             ds.attrs[INFO.UNITS] = ds.attrs.get('units')
+            if ds.attrs[INFO.UNITS] == 'unknown':
+                LOG.warning("Layer units are unknown, using '1'")
+                ds.attrs[INFO.UNITS] = 1
             generate_guidebook_metadata(ds.attrs)
 
             # Generate FAMILY and CATEGORY
@@ -1010,7 +1013,7 @@ class SatPyImporter(aImporter):
                 model_time = ds.attrs['model_time'].isoformat()
             else:
                 model_time = None
-            ds.attrs[INFO.SCENE] = hash(ds.attrs['area'])
+            ds.attrs[INFO.SCENE] = ds.attrs.get('scene_id') or hash(ds.attrs['area'])
             if ds.attrs.get(INFO.CENTRAL_WAVELENGTH) is None:
                 cw = ""
             else:

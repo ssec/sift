@@ -619,7 +619,6 @@ class Main(QtGui.QMainWindow):
 
         self.layer_list_model.uuidSelectionChanged.connect(center_timeline_view_on_single_frame)
 
-
     def __init__(self, config_dir=None, cache_dir=None, cache_size=None, glob_pattern=None, search_paths=None, border_shapefile=None, center=None):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
