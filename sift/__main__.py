@@ -246,10 +246,8 @@ class Main(QtGui.QMainWindow):
         # http://pyqt.sourceforge.net/Docs/PyQt4/qfiledialog.html#getOpenFileNames
         filename_filters = [
             # 'All files (*.*)',
-            'All supported files (*.nc *.nc4 *.tiff *.tif)',
+            'All supported files (*.nc *.nc4)',
             'GOES-16 NetCDF (*.nc *.nc4)',
-            'Mercator GTIFF (*.tiff *.tif)',
-            # 'NWP GRIB2 (*.grib2)',
         ]
         filter_str = ';;'.join(filename_filters)
         files = QtGui.QFileDialog.getOpenFileNames(self,
