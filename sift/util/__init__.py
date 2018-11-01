@@ -39,7 +39,7 @@ def check_grib_definition_dir():
 
     if grib_paths:
         grib_var_value = ':'.join(grib_paths)
-        LOG.debug("Setting GRIB definition path to %s", grib_var_value)
+        LOG.info("Setting GRIB definition path to %s", grib_var_value)
         os.environ[var_name] = grib_var_value
 
 
