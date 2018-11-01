@@ -22,10 +22,25 @@ def check_imageio_deps():
 
 def check_grib_definition_dir():
     # patch GRIB API C library when frozen
-    if IS_FROZEN and not os.getenv('GRIB_DEFINITION_PATH'):
-        grib_path = os.path.realpath(os.path.join(SCRIPT_DIR, '..', '..', 'share', 'grib_api', 'definitions'))
-        LOG.debug("Setting GRIB definition path to %s", grib_path)
-        os.environ['GRIB_DEFINITION_PATH'] = grib_path
+    var_name = 'ECCODES_DEFINITION_PATH'
+    grib_paths = []
+    if os.getenv(var_name):
+        grib_paths.append(os.getenv(var_name))
+
+    # Add NCEP specific definition locations
+    grib_paths.append(os.path.realpath(os.path.join(get_package_data_dir(), 'grib_definitions')))
+
+    if IS_FROZEN:
+        # add the ECCodes definitions because otherwise they point to the
+        # wrong location
+        grib_paths.append(os.path.realpath(os.path.join(SCRIPT_DIR, '..', '..', 'share', 'eccodes', 'definitions')))
+    else:
+        grib_paths.append(os.path.join(prefix_share_dir(), 'eccodes', 'definitions'))
+
+    if grib_paths:
+        grib_var_value = ':'.join(grib_paths)
+        LOG.debug("Setting GRIB definition path to %s", grib_var_value)
+        os.environ[var_name] = grib_var_value
 
 
 def get_package_data_dir():
@@ -40,3 +55,5 @@ def get_package_data_dir():
         return os.path.realpath(os.path.join(SCRIPT_DIR, "..", "data"))
 
 
+def prefix_share_dir():
+    return os.path.realpath(os.path.join(sys.prefix, 'share'))
