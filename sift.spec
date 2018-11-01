@@ -56,7 +56,7 @@ if not is_win:
     share_dir = sys.executable.replace(os.path.join("bin", "python"), "share")
     lib_dir = sys.executable.replace(os.path.join("bin", "python"), "lib")
     bin_dir = sys.executable.replace(os.path.join("bin", "python"), "bin")
-    data_files.append((os.path.join(share_dir, 'grib_api'), os.path.join('share', 'grib_api')))
+    data_files.append((os.path.join(share_dir, 'eccodes'), os.path.join('share', 'eccodes')))
     # Add ffmpeg
     binaries += [(os.path.join(bin_dir, 'ffmpeg'), '.')]
 else:
