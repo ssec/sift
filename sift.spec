@@ -18,7 +18,8 @@ data_files = [
     (os.path.join(os.path.dirname(satpy.__file__), "etc"), os.path.join('satpy', 'etc')),
 ]
 
-for shape_dir in ["ne_50m_admin_0_countries", "ne_110m_admin_0_countries", "ne_50m_admin_1_states_provinces_lakes", "fonts", "colormaps"]:
+for shape_dir in ["ne_50m_admin_0_countries", "ne_110m_admin_0_countries", "ne_50m_admin_1_states_provinces_lakes",
+                  "fonts", "colormaps", "grib_definitions"]:
     data_files.append((os.path.join("sift", "data", shape_dir), os.path.join("sift_data", shape_dir)))
 
 hidden_imports = [
