@@ -1,0 +1,230 @@
+'999122' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 0 ;
+	}
+'999123' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 1 ;
+	}
+'999124' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 2 ;
+	}
+'999126' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 3 ;
+	}
+'999123' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 4 ;
+	}
+'999124' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 5 ;
+	}
+'999112' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 6 ;
+	}
+'999113' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 7 ;
+	}
+'999114' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 8 ;
+	}
+'999115' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 9 ;
+	}
+'999999' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 10 ;
+	}
+'9999910' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 11 ;
+	}
+'9999911' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 12 ;
+	}
+'9999912' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 13 ;
+	}
+'9999161' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 14 ;
+	}
+'9999162' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 15 ;
+	}
+'9999163' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 16 ;
+	}
+'9999164' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 17 ;
+	}
+'9999165' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 18 ;
+	}
+'9999166' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 19 ;
+	}
+'9999167' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 20 ;
+	}
+'9999168' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 21 ;
+	}
+'9999169' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 22 ;
+	}
+'99991610' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 23 ;
+	}
+'99991611' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 24 ;
+	}
+'99991612' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 25 ;
+	}
+'99991613' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 26 ;
+	}
+'99991614' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 27 ;
+	}
+'99991615' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 28 ;
+	}
+'99991616' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 29 ;
+	}
+'9999171' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 30 ;
+	}
+'9999172' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 31 ;
+	}
+'9999173' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 32 ;
+	}
+'9999174' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 33 ;
+	}
+'9999175' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 34 ;
+	}
+'9999176' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 35 ;
+	}
+'9999177' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 36 ;
+	}
+'9999178' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 37 ;
+	}
+'9999179' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 38 ;
+	}
+'99991710' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 39 ;
+	}
+'99991711' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 40 ;
+	}
+'99991712' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 41 ;
+	}
+'99991713' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 42 ;
+	}
+'99991714' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 43 ;
+	}
+'99991715' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 44 ;
+	}
+'99991716' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 45 ;
+	}

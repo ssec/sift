@@ -1,0 +1,220 @@
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 0 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 1 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 2 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 3 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 6 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 7 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 8 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 9 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 10 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 11 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 12 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 13 ;
+	}
+'toa_bidirectional_reflectance' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 14 ;
+	}
+'toa_bidirectional_reflectance' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 15 ;
+	}
+'toa_bidirectional_reflectance' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 16 ;
+	}
+'toa_bidirectional_reflectance' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 17 ;
+	}
+'toa_bidirectional_reflectance' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 18 ;
+	}
+'toa_bidirectional_reflectance' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 19 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 20 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 21 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 22 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 23 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 24 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 25 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 26 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 27 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 28 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 29 ;
+	}
+'toa_bidirectional_reflectance' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 30 ;
+	}
+'toa_bidirectional_reflectance' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 31 ;
+	}
+'toa_bidirectional_reflectance' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 32 ;
+	}
+'toa_bidirectional_reflectance' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 33 ;
+	}
+'toa_bidirectional_reflectance' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 34 ;
+	}
+'toa_bidirectional_reflectance' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 35 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 36 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 37 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 38 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 39 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 40 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 41 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 42 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 43 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 44 ;
+	}
+'brightness_temperature' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 45 ;
+	}

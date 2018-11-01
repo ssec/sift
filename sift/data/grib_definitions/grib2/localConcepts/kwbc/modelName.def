@@ -1,0 +1,315 @@
+'HRRR' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=184; }
+'HRRR' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=83; }
+'HWRF' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=89; }
+'MRF' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=78; }
+'GLWN' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=131; }
+'WAFS' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=45; }
+'WAFS' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=80; }
+'WAFS' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=81; }
+'WAFS' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=82; }
+'WAFS' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=94; }
+'gww' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=3; }
+'gww' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=10; }
+'gww2' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=11; }
+'gww4' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=10; }
+'SeaIce' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=120; }
+'rapIcing' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=191; }
+'AKWAVE239' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=122; }
+'ENPWAVE253' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=124; }
+'HurWave238' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=123; }
+'HurWave253' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=125; }
+'HPCdelta' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=183; }
+'rap32' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=105; }
+'RTMA' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=197; }
+'RTMA' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=109; }
+'GlobalWave' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=11; }
+'AKwave4' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=11; }
+'Aviation' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=191; }
+'Aviation' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=105; }
+'HiResW-ARW-East' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=116; }
+'HiResW-NMM-East' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=112; }
+'GRLKwave' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=131; }
+'MSAS' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=100; }
+'gfs' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=228; }
+'gfs' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=96; }
+'gfs' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=77; }
+'gfs' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=225; }
+'gdas' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=86; }
+'gfs' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=81; }
+'gdas' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=3; }
+'gdas' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=82; }
+'nam' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=84; }
+'lfm' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=5; }
+'lfm' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=6; }
+'rap' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=100; }
+'gefsNdgd' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=107; }
+'rap' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=105; }
+'gww375' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=10; }
+'nww3' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=233; }
+'nww3' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=88; }
+'RTGSST' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=235; }
+'RTGSST' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=44; }
+'RTGSSTHR' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=173; }
+'RTGSSTHR' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=44; }
+'AVIATION' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=105; }
+'AVIATION' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=191; }
+'wave30mGlobal' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=11; }
+'GLOBHwave' = { originatingCentre=7;
+ subCentre=0;
+ generatingProcessIdentifier=13; }
+'ENSEMBLE' = { originatingCentre=7;
+ subCentre=2;
+ generatingProcessIdentifier=80; }
+'ENSEMBLE' = { originatingCentre=7;
+ subCentre=2;
+ generatingProcessIdentifier=81; }
+'ENSEMBLE' = { originatingCentre=7;
+ subCentre=2;
+ generatingProcessIdentifier=82; }
+'ENSEMBLE' = { originatingCentre=7;
+ subCentre=2;
+ generatingProcessIdentifier=94; }
+'ENSEMBLE' = { originatingCentre=7;
+ subCentre=2;
+ generatingProcessIdentifier=96; }
+'naefs' = { originatingCentre=7;
+ subCentre=2;
+ generatingProcessIdentifier=114; }
+'rtmaDV' = { originatingCentre=7;
+ subCentre=2;
+ generatingProcessIdentifier=107; }
+'RTGSST' = { originatingCentre=7;
+ subCentre=4;
+ generatingProcessIdentifier=44; }
+'GFSGuide' = { originatingCentre=7;
+ subCentre=4;
+ generatingProcessIdentifier=96; }
+'GFSGuide' = { originatingCentre=7;
+ subCentre=4;
+ generatingProcessIdentifier=81; }
+'GFSGuide' = { originatingCentre=7;
+ subCentre=4;
+ generatingProcessIdentifier=77; }
+'RTMA' = { originatingCentre=7;
+ subCentre=4;
+ generatingProcessIdentifier=197; }
+'RTMA' = { originatingCentre=7;
+ subCentre=4;
+ generatingProcessIdentifier=109; }
+'RTGSSTHR' = { originatingCentre=7;
+ subCentre=4;
+ generatingProcessIdentifier=44; }
+'QPE' = { originatingCentre=7;
+ subCentre=4;
+ generatingProcessIdentifier=182; }
+'ccpaP5' = { originatingCentre=7;
+ subCentre=4;
+ generatingProcessIdentifier=184; }
+'ccpa' = { originatingCentre=7;
+ subCentre=4;
+ generatingProcessIdentifier=3; }
+'ccpa' = { originatingCentre=7;
+ subCentre=4;
+ generatingProcessIdentifier=184; }
+'estofsUS' = { originatingCentre=7;
+ subCentre=4;
+ generatingProcessIdentifier=14; }
+'estofsEP' = { originatingCentre=7;
+ subCentre=4;
+ generatingProcessIdentifier=17; }
+'RFCqpf' = { originatingCentre=7;
+ subCentre=5;
+ generatingProcessIdentifier=181; }
+'HPCqpf' = { originatingCentre=7;
+ subCentre=5;
+ generatingProcessIdentifier=180; }
+'HPCGuide' = { originatingCentre=7;
+ subCentre=5;
+ generatingProcessIdentifier=183; }
+'HPCqpfNDFD' = { originatingCentre=7;
+ subCentre=5;
+ generatingProcessIdentifier=197; }
+'HPCqpfNDFD' = { originatingCentre=7;
+ subCentre=5;
+ generatingProcessIdentifier=221; }
+'HPCqpfNDFD' = { originatingCentre=7;
+ subCentre=5;
+ generatingProcessIdentifier=222; }
+'HPCqpfNDFD' = { originatingCentre=7;
+ subCentre=5;
+ generatingProcessIdentifier=223; }
+'HPCqpfNDFD' = { originatingCentre=7;
+ subCentre=5;
+ generatingProcessIdentifier=224; }
+'HPCqpfNDFD' = { originatingCentre=7;
+ subCentre=5;
+ generatingProcessIdentifier=225; }
+'HPCqpfNDFD' = { originatingCentre=7;
+ subCentre=5;
+ generatingProcessIdentifier=226; }
+'HPCqpfNDFD' = { originatingCentre=7;
+ subCentre=5;
+ generatingProcessIdentifier=227; }
+'HPC-MODEL0' = { originatingCentre=7;
+ subCentre=5;
+ generatingProcessIdentifier=0; }
+'CPCoutlook-Short' = { originatingCentre=7;
+ subCentre=7;
+ generatingProcessIdentifier=201; }
+'CPCoutlook-Medium' = { originatingCentre=7;
+ subCentre=7;
+ generatingProcessIdentifier=200; }
+'CPCoutlook211' = { originatingCentre=7;
+ subCentre=7;
+ generatingProcessIdentifier=30; }
+'Aviation' = { originatingCentre=7;
+ subCentre=8;
+ generatingProcessIdentifier=105; }
+'Aviation' = { originatingCentre=7;
+ subCentre=8;
+ generatingProcessIdentifier=191; }
+'NCWF' = { originatingCentre=7;
+ subCentre=8;
+ generatingProcessIdentifier=190; }
+'AVIATION' = { originatingCentre=7;
+ subCentre=8;
+ generatingProcessIdentifier=191; }
+'SPCGuide' = { originatingCentre=7;
+ subCentre=9;
+ generatingProcessIdentifier=0; }
+'TPCWindProb' = { originatingCentre=7;
+ subCentre=10;
+ generatingProcessIdentifier=30; }
+'MOSGuide' = { originatingCentre=7;
+ subCentre=14;
+ generatingProcessIdentifier=184; }
+'MOSGuide' = { originatingCentre=7;
+ subCentre=14;
+ generatingProcessIdentifier=96; }
+'GFSLAMP5km' = { originatingCentre=7;
+ subCentre=14;
+ generatingProcessIdentifier=108; }
+'TPCSurgeProb' = { originatingCentre=7;
+ subCentre=14;
+ generatingProcessIdentifier=12; }
+'TPCSurgeProb' = { originatingCentre=7;
+ subCentre=14;
+ generatingProcessIdentifier=0; }
+'EKDMOS' = { originatingCentre=7;
+ subCentre=14;
+ generatingProcessIdentifier=114; }
+'Conductivity' = { originatingCentre=7;
+ subCentre=16;
+ generatingProcessIdentifier=255; }

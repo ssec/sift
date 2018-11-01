@@ -1,0 +1,230 @@
+'SBT 12 2' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 0 ;
+	}
+'SBT 12 3' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 1 ;
+	}
+'SBT 12 4' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 2 ;
+	}
+'SBT 12 6' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 3 ;
+	}
+'SBC 12 3' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 4 ;
+	}
+'SBC 12 4' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 5 ;
+	}
+'SBT 11 2' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 6 ;
+	}
+'SBT 11 3' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 7 ;
+	}
+'SBT 11 4' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 8 ;
+	}
+'SBT 11 5' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 9 ;
+	}
+'AMSRE 9' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 10 ;
+	}
+'AMSRE 10' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 11 ;
+	}
+'AMSRE 11' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 12 ;
+	}
+'AMSRE 12' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 13 ;
+	}
+'SRFA 16 1' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 14 ;
+	}
+'SRFA 16 2' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 15 ;
+	}
+'SRFA 16 3' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 16 ;
+	}
+'SRFA 16 4' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 17 ;
+	}
+'SRFA 16 5' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 18 ;
+	}
+'SRFA 16 6' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 19 ;
+	}
+'SBTA 16 7' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 20 ;
+	}
+'SBTA 16 8' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 21 ;
+	}
+'SBTA 16 9' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 22 ;
+	}
+'SBTA 16 10' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 23 ;
+	}
+'SBTA 16 11' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 24 ;
+	}
+'SBTA 16 12' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 25 ;
+	}
+'SBTA 16 13' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 26 ;
+	}
+'SBTA 16 14' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 27 ;
+	}
+'SBTA 16 15' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 28 ;
+	}
+'SBTA 16 16' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 29 ;
+	}
+'SRFA 17 1' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 30 ;
+	}
+'SRFA 17 2' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 31 ;
+	}
+'SRFA 17 3' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 32 ;
+	}
+'SRFA 17 4' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 33 ;
+	}
+'SRFA 17 5' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 34 ;
+	}
+'SRFA 17 6' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 35 ;
+	}
+'SBTA 17 7' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 36 ;
+	}
+'SBTA 17 8' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 37 ;
+	}
+'SBTA 17 9' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 38 ;
+	}
+'SBTA 17 10' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 39 ;
+	}
+'SBTA 17 11' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 40 ;
+	}
+'SBTA 17 12' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 41 ;
+	}
+'SBTA 17 13' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 42 ;
+	}
+'SBTA 17 14' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 43 ;
+	}
+'SBTA 17 15' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 44 ;
+	}
+'SBTA 17 16' = {
+	 discipline = 3 ;
+	 parameterCategory = 192 ;
+	 parameterNumber = 45 ;
+	}
