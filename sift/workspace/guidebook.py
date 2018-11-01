@@ -64,6 +64,7 @@ class Guidebook(object):
 DEFAULT_COLORMAPS = {
     'toa_bidirectional_reflectance': DEFAULT_VIS,
     'toa_brightness_temperature': DEFAULT_IR,
+    'brightness_temperature': DEFAULT_IR,
     'height_at_cloud_top': 'Cloud Top Height',
     'air_temperature': DEFAULT_IR,
     'relative_humidity': DEFAULT_IR,
@@ -244,7 +245,8 @@ class ABI_AHI_Guidebook(Guidebook):
 
     def _is_bt(self, dsi):
         return dsi.get(INFO.BAND) in self.BT_BANDS or \
-               dsi.get(INFO.STANDARD_NAME) == "toa_brightness_temperature"
+               dsi.get(INFO.STANDARD_NAME) in ["toa_brightness_temperature", 'brightness_temperature',
+                                               'air_temperature']
 
     def collect_info_from_seq(self, seq):
         "collect AHI metadata about a sequence of datasetinfo dictionaries"
@@ -277,7 +279,13 @@ class ABI_AHI_Guidebook(Guidebook):
             return 0., 255.
 
     def valid_range(self, dsi):
-        return dsi.get(INFO.VALID_RANGE, dsi[INFO.CLIM])
+        if 'valid_min' in dsi.attrs:
+            valid_range = (dsi.attrs['valid_min'], dsi.attrs['valid_max'])
+        elif 'valid_range' in dsi.attrs:
+            valid_range = dsi.attrs['valid_range']
+        else:
+            valid_range = dsi[INFO.CLIM]
+        return dsi.setdefault(INFO.VALID_RANGE, valid_range)
 
     def default_colormap(self, dsi):
         return DEFAULT_COLORMAPS.get(dsi.get(INFO.STANDARD_NAME), DEFAULT_UNKNOWN)

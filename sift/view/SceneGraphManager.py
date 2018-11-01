@@ -956,7 +956,7 @@ class SceneGraphManager(QObject):
             layer[INFO.CELL_WIDTH],
             layer[INFO.CELL_HEIGHT],
             name=str(uuid),
-            clim=layer[INFO.CLIM],
+            clim=p.climits,
             gamma=p.gamma,
             interpolation='nearest',
             method='tiled',

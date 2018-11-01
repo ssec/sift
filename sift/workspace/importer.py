@@ -71,7 +71,10 @@ def get_contour_increments(layer_info):
     standard_name = layer_info[INFO.STANDARD_NAME]
     units = layer_info[INFO.UNITS]
     increments = {
-        'air_temperature': [5., 2.5, 1., 0.5, 0.1],
+        'air_temperature': [10., 5., 2.5, 1., 0.5],
+        'brightness_temperature': [10., 5., 2.5, 1., 0.5],
+        'toa_brightness_temperature': [10., 5., 2.5, 1., 0.5],
+        'toa_bidirectional_reflectance': [.15, .10, .05, .02, .01],
         'relative_humidity': [15., 10., 5., 2., 1.],
         'eastward_wind': [15., 10., 5., 2., 1.],
         'northward_wind': [15., 10., 5., 2., 1.],
@@ -79,7 +82,8 @@ def get_contour_increments(layer_info):
     }
 
     unit_increments = {
-        'K': [5., 2.5, 1., 0.5, 0.1],
+        'kelvin': [10., 5., 2.5, 1., 0.5],
+        '1': [.15, .10, .05, .02, .01],
         '%': [15., 10., 5., 2., 1.],
         'kg m**-2': [20., 10., 5., 2., 1.],
         'm s**-1': [15., 10., 5., 2., 1.],
@@ -133,8 +137,7 @@ def get_contour_levels(vmin, vmax, increments):
             # don't use coarse contours in the finer contour levels
             # we multiple by 1 / increments[-1] to try to resolve precision
             # errors which can be a big issue for very small increments.
-            mask = np.logical_or.reduce([
-                np.isclose((inc_levels * mult) % (i * mult), 0) for i in increments[:idx]])
+            mask = np.logical_or.reduce([np.isclose((inc_levels * mult) % (i * mult), 0) for i in increments[:idx]])
             inc_levels = inc_levels[~mask]
         levels.append(inc_levels)
 
@@ -1208,19 +1211,18 @@ class SatPyImporter(aImporter):
         connect[gaps[:-1]] = False
         return verts, connect
 
-    def _compute_contours(self, img_data: np.ndarray,
-                          vmin: float, vmax: float,
-                          levels: list) -> np.ndarray:
+    def _compute_contours(self, img_data: np.ndarray, vmin: float, vmax: float, levels: list) -> np.ndarray:
         all_levels = []
-        level_indexes = []
+        empty_level = np.array([[0, 0, 0, 0]], dtype=np.float32)
         for level in levels:
             if level < vmin or level > vmax:
+                all_levels.append(empty_level)
                 continue
 
-            contours = find_contours(img_data, level,
-                                     positive_orientation='high')
+            contours = find_contours(img_data, level, positive_orientation='high')
             if not contours:
                 LOG.debug("No contours found for level: {}".format(level))
+                all_levels.append(empty_level)
                 continue
             v, c = self._get_verts_and_connect(contours)
             # swap row, column to column, row (x, y)
@@ -1232,7 +1234,6 @@ class SatPyImporter(aImporter):
             this_level = np.empty((v.shape[0],), np.float32)
             this_level[:] = np.nan
             this_level[-1] = v.shape[0]
-            level_indexes.append(v.shape[0])
             c = np.concatenate((c, [False])).astype(np.float32)
             # level_data = np.concatenate((v, c[:, None]), axis=1)
             level_data = np.concatenate((v, c[:, None], this_level[:, None]), axis=1)
@@ -1241,58 +1242,3 @@ class SatPyImporter(aImporter):
         if not all_levels:
             raise ValueError("No valid contour levels")
         return np.concatenate(all_levels).astype(np.float32)
-
-
-PATH_TEST_DATA = os.environ.get('TEST_DATA', os.path.expanduser("~/Data/test_files/thing.dat"))
-
-class tests(unittest.TestCase):
-    def setUp(self):
-        pass
-
-    def test_something(self):
-        pass
-
-
-def _debug(type, value, tb):
-    "enable with sys.excepthook = debug"
-    if not sys.stdin.isatty():
-        sys.__excepthook__(type, value, tb)
-    else:
-        import traceback, pdb
-        traceback.print_exception(type, value, tb)
-        # …then start the debugger in post-mortem mode.
-        pdb.post_mortem(tb)  # more “modern”
-
-
-def main():
-    import argparse
-    parser = argparse.ArgumentParser(
-        description="PURPOSE",
-        epilog="",
-        fromfile_prefix_chars='@')
-    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG')
-    parser.add_argument('-d', '--debug', dest='debug', action='store_true',
-                        help="enable interactive PDB debugger on exception")
-    parser.add_argument('inputs', nargs='*',
-                        help="input files to process")
-    args = parser.parse_args()
-
-    levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
-    logging.basicConfig(level=levels[min(3, args.verbosity)])
-
-    if args.debug:
-        sys.excepthook = _debug
-
-    if not args.inputs:
-        unittest.main()
-        return 0
-
-    for pn in args.inputs:
-        pass
-
-    return 0
-
-
-if __name__ == '__main__':
-    sys.exit(main())

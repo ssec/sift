@@ -1175,8 +1175,7 @@ class PrecomputedIsocurveVisual(IsocurveVisual):
             self._all_connects.append(connects[:end_idx])
             self._all_levels.append([x for y in levels[:zoom_level + 1] for x in y])
 
-        super(PrecomputedIsocurveVisual, self).__init__(data=None, levels=levels,
-                                                        **kwargs)
+        super(PrecomputedIsocurveVisual, self).__init__(data=None, levels=levels, **kwargs)
 
         self._data = True
         self._level_min = 0

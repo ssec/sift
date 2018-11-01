@@ -185,6 +185,7 @@ class INSTRUMENT(Enum):
     ABI = 'ABI'
     AMI = 'AMI'
     GFS = 'GFS'
+    NAM = 'NAM'
     SEVIRI = 'SEVIRI'
 
 
