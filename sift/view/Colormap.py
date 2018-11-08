@@ -209,7 +209,8 @@ class PyQtGraphColormap(Colormap):
             points = [[0, points[0][1]]] + points
         if points[-1][0] != 1:
             points.append([1, points[-1][1]])
-        controls, rgb_colors = zip(*sorted(points))
+        # must convert color elements to tuples (list and tuple can't be sorted)
+        controls, rgb_colors = zip(*sorted((tuple(x) for x in points)))
         rgb_colors = np.array(rgb_colors) / 255.
         return controls, rgb_colors
 
@@ -595,8 +596,7 @@ class ColormapManager(OrderedDict):
             if not recursive:
                 break
 
-    def import_colormaps(self, base_dir_or_files, read_only=False, recursive=True,
-                         category=USER_CATEGORY):
+    def import_colormaps(self, base_dir_or_files, read_only=False, recursive=True, category=USER_CATEGORY):
         added_colormaps = []
         if not isinstance(base_dir_or_files, (list, tuple)):
             files = self._files_for_dir(
@@ -609,12 +609,11 @@ class ColormapManager(OrderedDict):
         for pathname, file_stem, file_ext in files:
             if file_ext not in self.colormap_classes:
                 continue
-            read_only = read_only or file_ext not in self.writeable_extensions
+            ro = read_only or file_ext not in self.writeable_extensions
             try:
                 cmap_class = self.colormap_classes[file_ext]
                 self.add_colormap(file_stem, LazyColormap(cmap_class, pathname),
-                                  category=category,
-                                  read_only=read_only)
+                                  category=category, read_only=ro)
                 added_colormaps.append(file_stem)
             except (ValueError, IOError, KeyError):
                 LOG.error("Error importing colormap: {}".format(pathname))
@@ -640,10 +639,11 @@ class ColormapManager(OrderedDict):
             raise ValueError("Category '{}' already exists".format(name))
         self._category_dict.setdefault(name, [])
 
-    def add_colormap(self, name, colormap, category=USER_CATEGORY,
-                     read_only=True):
+    def add_colormap(self, name, colormap, category=USER_CATEGORY, read_only=True):
         assert isinstance(colormap, (LazyColormap, BaseColormap))
-        self._category_dict.setdefault(category, []).append(name)
+        cat_dict = self._category_dict.setdefault(category, [])
+        if name not in cat_dict:
+            cat_dict.append(name)
         if not read_only:
             self._writeable_cmaps.add(name)
         super(ColormapManager, self).__setitem__(name, colormap)

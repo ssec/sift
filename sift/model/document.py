@@ -1310,9 +1310,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             if not os.path.exists(cmap_dir):
                 os.makedirs(cmap_dir)
             else:
-                self.colormaps.import_colormaps(cmap_dir,
-                                                read_only=read_only,
-                                                category=cmap_cat)
+                self.colormaps.import_colormaps(cmap_dir, read_only=read_only, category=cmap_cat)
 
         # timeline document storage setup with initial track order and time range
         self.product_state = defaultdict(flags)
@@ -1389,8 +1387,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             cmap_file.write(json.dumps(colormap, indent=2, sort_keys=True))
             cmap_file.close()
         except IOError:
-            LOG.error("Error saving gradient: {}".format(name),
-                      exc_info=True)
+            LOG.error("Error saving gradient: {}".format(name), exc_info=True)
 
         cmap = PyQtGraphColormap(colormap)
         self.colormaps[name] = cmap
