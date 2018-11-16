@@ -199,6 +199,7 @@ class PyQtGraphColormap(Colormap):
             file_data = json.load(open(json_file_or_pqg_cmap, 'r'))
         else:
             file_data = json_file_or_pqg_cmap
+        self.sqrt = file_data.get("sqrt", False)
         controls, rgb_colors = self._convert_pyqtgraph_to_vispy(file_data)
         super(PyQtGraphColormap, self).__init__(colors=rgb_colors, controls=controls)
 

@@ -41,7 +41,7 @@ class GradientControl(QtGui.QDialog):
 
         # Create SQRT Button and Related Functions
         self.sqrt = QtGui.QCheckBox("SQRT")
-        self.sqrt.stateChanged.connect(self.sqrtAction)
+        self.sqrt.clicked.connect(self.sqrtAction)
         self.sqrt.setEnabled(False)
 
         # Create Close button
@@ -80,13 +80,15 @@ class GradientControl(QtGui.QDialog):
             editable = cmap_manager.is_writeable_colormap(cmap)
             cmap_obj = cmap_manager[cmap]
             if cmap_obj.colors and hasattr(cmap_obj, "_controls"):
-                self.importGradients(cmap, cmap_obj._controls, cmap_obj.colors._rgba, editable)
+                is_sqrt = getattr(cmap_obj, 'sqrt', False)
+                self.importGradients(cmap, cmap_obj._controls, cmap_obj.colors._rgba, sqrt=is_sqrt, editable=editable)
 
     def saveButtonClick(self):
         # Save Custom Gradient
         name = self.cmap_list.item(self.cmap_list.currentRow()).text()
         self.user_colormap_states[name] = self.ColorBar.saveState()
-        self.saveNewMap(self.ColorBar.saveState(), name)
+        self.user_colormap_states[name]["sqrt"] = self.sqrt.isChecked()
+        self.saveNewMap(self.user_colormap_states[name], name)
 
     def cloneGradient(self):
         # Clone existing gradient
@@ -120,7 +122,7 @@ class GradientControl(QtGui.QDialog):
 
                 self.user_colormap_states[save_name] = self.ColorBar.saveState()
             self.updateListWidget(save_name)
-            self.saveNewMap(self.ColorBar.saveState(), save_name)
+            self.saveNewMap(self.user_colormap_states[save_name], save_name)
 
     def toRemoveDelete(self):
         # Determine if an internal gradient is selected, returns boolean
@@ -141,7 +143,7 @@ class GradientControl(QtGui.QDialog):
         # Call document function with new gradient
         self.doc.update_user_colormap(new_cmap, name)
 
-    def importGradients(self, name, controls, colors, editable=False):
+    def importGradients(self, name, controls, colors, sqrt=False, editable=False):
         # Import a gradient into either the internal or custom gradient lists
         try:
             # FIXME: GradientWidget can accept 'allowAdd' flag for whether or
@@ -161,6 +163,7 @@ class GradientControl(QtGui.QDialog):
 
             if editable:
                 self.user_colormap_states[name] = newWidget.saveState()
+                self.user_colormap_states[name]["sqrt"] = sqrt
             else:
                 self.builtin_colormap_states[name] = newWidget.saveState()
             self.updateListWidget()
@@ -204,6 +207,8 @@ class GradientControl(QtGui.QDialog):
         if cmap_name in self.user_colormap_states:
             NewBar = self.user_colormap_states[self.cmap_list.item(self.cmap_list.currentRow()).text()]
             self.ColorBar.restoreState(NewBar)
+            if "sqrt" in NewBar:
+                self.sqrt.setChecked(NewBar["sqrt"])
 
         if cmap_name in self.builtin_colormap_states:
             NewBar = self.builtin_colormap_states[self.cmap_list.item(self.cmap_list.currentRow()).text()]
