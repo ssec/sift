@@ -282,7 +282,7 @@ class ABI_AHI_Guidebook(Guidebook):
         if 'valid_min' in dsi:
             valid_range = (dsi['valid_min'], dsi['valid_max'])
         elif 'valid_range' in dsi:
-            valid_range = dsi.attrs['valid_range']
+            valid_range = dsi['valid_range']
         else:
             valid_range = dsi[INFO.CLIM]
         return dsi.setdefault(INFO.VALID_RANGE, valid_range)
