@@ -148,7 +148,7 @@ def package_installer_osx():
     os.chdir('dist')
     vol_name = "SIFT_{}".format(version.__version__)
     dmg_name = vol_name + ".dmg"
-    run("hdiutil create -volname {} -srcfolder SIFT.app -ov -format UDZO {}".format(vol_name, dmg_name).split(' '))
+    run("hdiutil create -volname {} -fs HFS+ -srcfolder SIFT.app -ov -format UDZO {}".format(vol_name, dmg_name).split(' '))
     return dmg_name
 
 
