@@ -1429,13 +1429,21 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         elif hasattr(info, 'l'):
             gamma = (1.,) * len(info.l)
 
+        # get the presentation for another layer in our family
+        family_uuids = self.family_uuids(info[INFO.FAMILY])
+        if len(family_uuids):
+            family_member_uuid = family_uuids[0]
+            family_prez_dict = self.prez_for_uuid(family_member_uuid)._asdict()
+        else:
+            family_prez_dict = {}
+
         p = prez(uuid=info[INFO.UUID],
                  kind=info[INFO.KIND],
                  visible=True,
                  a_order=None,
-                 colormap=cmap,
-                 climits=info[INFO.CLIM],
-                 gamma=gamma,
+                 colormap=family_prez_dict.get('colormap', cmap),
+                 climits=family_prez_dict.get('climits', info[INFO.CLIM]),
+                 gamma=family_prez_dict.get('gamma', gamma),
                  mixing=Mixing.NORMAL)
 
         q = p._replace(visible=False)  # make it available but not visible in other layer sets
@@ -1476,8 +1484,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, info)
         if INFO.UNIT_CONVERSION not in dataset:
             dataset[INFO.UNIT_CONVERSION] = units_conversion(dataset)
+        print(dataset)
         if INFO.FAMILY not in dataset:
             dataset[INFO.FAMILY] = self.family_for_product_or_layer(dataset)
+        print("Family: ", dataset[INFO.FAMILY])
         presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
 
         # signal updates from the document
