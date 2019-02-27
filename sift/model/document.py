@@ -1429,13 +1429,16 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         elif hasattr(info, 'l'):
             gamma = (1.,) * len(info.l)
 
+        # get the presentation for another layer in our family
+        family_uuids = self.family_uuids(info[INFO.FAMILY])
+        family_prez = self.prez_for_uuid(family_uuids[0]) if family_uuids else None
         p = prez(uuid=info[INFO.UUID],
                  kind=info[INFO.KIND],
                  visible=True,
                  a_order=None,
-                 colormap=cmap,
-                 climits=info[INFO.CLIM],
-                 gamma=gamma,
+                 colormap=cmap if family_prez is None else family_prez.colormap,
+                 climits=info[INFO.CLIM] if family_prez is None else family_prez.climits,
+                 gamma=gamma if family_prez is None else family_prez.gamma,
                  mixing=Mixing.NORMAL)
 
         q = p._replace(visible=False)  # make it available but not visible in other layer sets
