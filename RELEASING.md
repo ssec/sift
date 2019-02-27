@@ -13,15 +13,16 @@ loghub ssec/sift -u <username> -st v1.0.5 -plg bug "Bugs fixed" -plg enhancement
 
 5. Commit the change log changes.
 
-6. Create a tag with the new version number, starting with a 'v', eg:
+6. Bump the version of the package:
 
 ```bash
-git tag -a 1.0.5 -m "Version 1.0.5"
+python setup.py bump --new-version 1.0.5 -c -t
 ```
 
 See [semver.org](http://semver.org/) on how to write a version number.
 
 6. Push changes to github `git push --follow-tags`
+
 7. Create conda package and installers for all supported platforms. See
    [the wiki page](https://github.com/ssec/sift/wiki/conda-package-building#create-a-conda-package)
    for detailed instructions on generating the conda package and other
