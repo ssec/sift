@@ -54,8 +54,10 @@ variable is not set.
 
 The downloaded DMG file can be extracted opened by double clicking on it.
 The available `.app` should then be moved to the appropriate `Applications`
-folder. Double clicking the `.app` icon from `Applications` will execute
-SIFT.
+folder. Due to Apple developer application signing limitations, the `.app`
+must first be opened by right clicking and clicking "Open". After SIFT is
+opened for the first time double clicking the `.app` icon from `Applications`
+will execute SIFT as usual.
 
 ### Installing with Conda
 
@@ -71,3 +73,10 @@ And then run with:
     
 The `-h` flag can be added for documentation on additional command line
 options.
+
+### Building and releasing
+
+For instructions on how SIFT is built and packaged see the
+[releasing instructions](RELEASING.md). Note that these instructions
+are mainly for SIFT developers and may require technical understanding of
+SIFT and the libraries it depends on.
