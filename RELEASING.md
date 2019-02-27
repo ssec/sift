@@ -35,3 +35,7 @@ Note that by default this will try to upload the installers and conda packages
 to the appropriate servers to be hosted or uploaded to FTP. If you do not have
 an account on these servers or do not which to upload/host the files then use
 the `--no-conda-upload` and/or `--no-installer-upload` flags.
+
+8. Create a release of the package on
+   [github](https://github.com/ssec/sift/releases) by drafting a new release
+   and copying the release notes from the changelog (see above).
