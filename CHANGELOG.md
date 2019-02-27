@@ -10,7 +10,7 @@ In this release 1 issue were closed.
 
 #### Bugs fixed
 
-* [PR 16](https://github.com/ssec/sift/pull/16) - Fix presentation for newly layers not matching similar layers
+* [PR 16](https://github.com/ssec/sift/pull/16) - Fix presentation for new layers not matching similar layers
 
 In this release 1 pull request was closed.
 
