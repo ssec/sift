@@ -6,6 +6,7 @@ from PyInstaller.utils.hooks import collect_submodules
 import vispy.glsl
 import vispy.io
 import satpy
+import distributed
 
 block_cipher = None
 exe_name = "SIFT"
@@ -16,6 +17,7 @@ data_files = [
     (os.path.dirname(vispy.glsl.__file__), os.path.join("vispy", "glsl")),
     (os.path.join(os.path.dirname(vispy.io.__file__), "_data"), os.path.join("vispy", "io", "_data")),
     (os.path.join(os.path.dirname(satpy.__file__), "etc"), os.path.join('satpy', 'etc')),
+    (os.path.join(os.path.dirname(distributed.__file__)), 'distributed'),
 ]
 
 for shape_dir in ["ne_50m_admin_0_countries", "ne_110m_admin_0_countries", "ne_50m_admin_1_states_provinces_lakes",
