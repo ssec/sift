@@ -141,7 +141,8 @@ def _ssh(host, command):
 
 def _run_pyinstaller():
     log.info("Building installer...")
-    run("pyinstaller -y sift.spec".split(' '))
+    shutil.rmtree(os.path.join('dist', 'SIFT'), ignore_errors=True)
+    run("pyinstaller --clean -y sift.spec".split(' '))
 
 
 def package_installer_osx():
