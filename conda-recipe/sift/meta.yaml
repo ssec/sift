@@ -31,7 +31,6 @@ requirements:
     - setuptools
     - pip
     - numpy >=1.12
-    - gdal
     - hdf5
     - rasterio
     - matplotlib
@@ -61,7 +60,7 @@ requirements:
 test:
   commands:
     - python -m sift -h
-    - python -c "import gdal"
+    - python -c "from rasterio import Affine"
     - python -c "from PyQt4 import QtGui, QtCore"
     - python -c "from netCDF4 import Dataset"
     - python -c "import h5py"
