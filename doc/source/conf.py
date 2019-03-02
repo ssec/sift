@@ -15,13 +15,11 @@
 
 import sys
 import os
-import shlex
-import sphinx_rtd_theme
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-#sys.path.insert(0, os.path.abspath('../'))
+sys.path.insert(0, os.path.abspath('../../'))
 
 # -- General configuration ------------------------------------------------
 
@@ -36,6 +34,7 @@ extensions = [
     'sphinx.ext.doctest',
     'sphinx.ext.todo',
     'sphinx.ext.coverage',
+    'sphinx.ext.intersphinx',
     'sphinx.ext.mathjax',
     'sphinx.ext.ifconfig',
     'sphinx.ext.viewcode',
@@ -43,6 +42,7 @@ extensions = [
     'sphinxcontrib.blockdiag',
 ]
 
+autodoc_mock_imports = []
 seqdiag_fontpath = os.path.abspath('./source/fonts/DejaVuSerif.ttf')
 
 
@@ -125,7 +125,6 @@ todo_include_todos = True
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 html_theme = 'sphinx_rtd_theme'
-html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -299,3 +298,18 @@ texinfo_documents = [
 
 # If true, do not generate a @detailmenu in the "Top" node's menu.
 #texinfo_no_detailmenu = False
+
+# point to external libraries documentation
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+    'numpy': ('https://docs.scipy.org/doc/numpy', None),
+    'scipy': ('https://docs.scipy.org/doc/scipy/reference', None),
+    'xarray': ('https://xarray.pydata.org/en/stable', None),
+    'dask': ('https://docs.dask.org/en/latest', None),
+    'jobqueue': ('https://jobqueue.dask.org/en/latest', None),
+    'pyresample': ('https://pyresample.readthedocs.io/en/stable', None),
+    'trollsift': ('https://trollsift.readthedocs.io/en/stable', None),
+    'trollimage': ('https://trollimage.readthedocs.io/en/stable', None),
+    'pydecorate': ('https://pydecorate.readthedocs.io/en/stable', None),
+    'satpy': ('https://satpy.readthedocs.io/en/stable', None),
+}

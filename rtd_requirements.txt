@@ -1,0 +1,3 @@
+blockdiag
+sphinxcontrib-seqdiag
+sphinxcontrib-blockdiag
