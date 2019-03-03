@@ -1,26 +1,25 @@
-.. SIFT documentation master file, created by
-   sphinx-quickstart on Fri May 13 08:35:57 2016.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+SIFT Developer Documentation
+============================
 
-Welcome to SIFT's documentation!
-================================
+SIFT, Satellite Information Familiarization Tool, is a GUI application
+for viewing and analyzing earth-observing satellite data. This documentation
+is meant for developers of SIFT or those interested in the low-level details
+(programming interfaces, public APIs, overall designs, etc).
+For general information on the use of SIFT, official releases, and
+installation instructions of those releases see the SIFT
+`home page <http://sift.ssec.wisc.edu/>`_.
 
-Contents:
+For source code and other information now provided by the home page see
+the `GitHub repository <https://github.com/ssec/sift>`_. Some of the
+original design documentation of SIFT can be found on the repository's
+`wiki <https://github.com/ssec/sift/wiki>`_. This site's documentation
+will slowly replace the low-level documents on the wiki.
 
 .. toctree::
    :maxdepth: 2
 
-.. seqdiag:: test.diag
-
-.. automodule:: sift.model.document
-   :members:
-
-.. automodule:: sift.view.SceneGraphManager
-   :members:
-
-.. automodule:: sift.workspace.workspace
-   :members:
+   design_overview
+   api
 
 
 Indices and tables

@@ -11,16 +11,14 @@ REQUIRES
 :copyright: 2017 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-import os, sys
-import logging, unittest
+import os
+import sys
+import logging
 import re
-from abc import ABC, abstractmethod, abstractclassmethod
+from abc import ABC, abstractmethod
 from collections import namedtuple
 from datetime import datetime, timedelta
 from typing import Sequence, Iterable, Generator, Mapping, Tuple
-import gdal
-import osr
-import asyncio
 import numpy as np
 from pyproj import Proj
 from sqlalchemy.orm import Session
@@ -406,6 +404,8 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
 
     @staticmethod
     def get_metadata(source_path=None, source_uri=None, **kwargs):
+        import gdal
+        import osr
         if source_uri is not None:
             raise NotImplementedError("GeoTiffImporter cannot read from URIs yet")
         d = GeoTiffImporter._metadata_for_path(source_path)
@@ -460,6 +460,7 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
 
     # @asyncio.coroutine
     def begin_import_products(self, *product_ids):  # FUTURE: allow product_ids to be uuids
+        import gdal
         source_path = self.source_path
         if product_ids:
             products = [self._S.query(Product).filter_by(id=anid).one() for anid in product_ids]
@@ -725,7 +726,6 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         # no sparsity map
 
         # shovel that data into the memmap incrementally
-        # http://geoinformaticstutorial.blogspot.com/2012/09/reading-raster-data-with-python-and-gdal.html
         img_data = np.memmap(data_path, dtype=np.float32, shape=shape, mode='w+')
 
         LOG.info('converting radiance to %s' % pug.bt_or_refl)
