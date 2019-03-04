@@ -1,21 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-workspace.py
-============
+"""Implement Workspace, a singleton object which manages large amounts of data and caches local content in memory-compatible form.
 
-OVERVIEW
-Implement Workspace, a singleton object which manages large amounts of data and caches local content in memory-compatible form
+Workspace of Products
 
-Workspace
-  of Products
-    retrieved from Resources and
-    represented by multidimensional Content
-      each of which has data,
-      coverage, and
-      sparsity arrays in separate workspace flat files
+- retrieved from Resources and
+- represented by multidimensional Content, each of which has data,
+  coverage, and sparsity arrays in separate workspace flat files
 
 Workspace responsibilities include:
+
 - understanding projections and y, x, z coordinate systems
 - subsecting data within slicing or geospatial boundaries
 - caching useful arrays as secondary content
@@ -24,23 +18,22 @@ Workspace responsibilities include:
 - maintain a metadatabase of what products have in-workspace content, and what products are available from external resources
 - compose Collector, which keeps track of Products within Resources outside the workspace
 
+FUTURE import sequence:
 
-NOTES
-    FUTURE import sequence:
-        trigger: user requests skim (metadata only) or import (metadata plus bring into document) of a file or directory system
-         for each file selected
-        phase 1: regex for file patterns identifies which importers are worth trying
-        phase 2: background: importers open files, form metadatabase insert transaction, first importer to succeed wins (priority order).
-        stop after this if just skimming
-        phase 3: background: load of overview (lod=0), adding flat files to workspace and Content entry to metadatabase
-        phase 3a: document and scenegraph show overview up on screen
-        phase 4: background: load of one or more levels of detail, with max LOD currently being considered native
-        phase 4a: document updates to show most useful LOD+stride content
-
+- trigger: user requests skim (metadata only) or import (metadata plus bring into document) of a file or directory system
+  for each file selected
+- phase 1: regex for file patterns identifies which importers are worth trying
+- phase 2: background: importers open files, form metadatabase insert transaction, first importer to succeed wins (priority order).
+  stop after this if just skimming
+- phase 3: background: load of overview (lod=0), adding flat files to workspace and Content entry to metadatabase
+- phase 3a: document and scenegraph show overview up on screen
+- phase 4: background: load of one or more levels of detail, with max LOD currently being considered native
+- phase 4a: document updates to show most useful LOD+stride content
 
 :author: R.K.Garcia <rayg@ssec.wisc.edu>
 :copyright: 2014-2017 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
+
 """
 import argparse
 import logging
@@ -234,11 +227,15 @@ class ActiveContent(QObject):
 
 
 class Workspace(QObject):
-    """
+    """Data management and cache object.
+
     Workspace is a singleton object which works with Datasets shall:
+
     - own a working directory full of recently used datasets
     - provide DatasetInfo dictionaries for shorthand use between application subsystems
-    -- datasetinfo dictionaries are ordinary python dictionaries containing [INFO.UUID], projection metadata, LOD info
+
+        - datasetinfo dictionaries are ordinary python dictionaries containing [INFO.UUID], projection metadata, LOD info
+
     - identify datasets primarily with a UUID object which tracks the dataset and its various representations through the system
     - unpack data in "packing crate" formats like NetCDF into memory-compatible flat files
     - efficiently create on-demand subsections and strides of raster data as numpy arrays
@@ -247,8 +244,8 @@ class Workspace(QObject):
     - during idle, clean out unused/idle data content, given DatasetInfo contents provides enough metadata to recreate
     - interface to external data processing or loading plug-ins and notify application of new-dataset-in-workspace
 
-    FIXME: deal with non-basic datasets (composites)
     """
+
     cwd = None  # directory we work in
     _own_cwd = None  # whether or not we created the cwd - which is also whether or not we're allowed to destroy it
     _pool = None  # process pool that importers can use for background activities, if any
