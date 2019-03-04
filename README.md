@@ -5,11 +5,18 @@ Satellite Information Familiarization Tool (SIFT) was designed by the SSEC to
 support scientists during forecaster training events. It provides a graphical
 interface for visualization and basic analysis of geostationary satellite data.
 
-The Project Wiki and Git repository can be accessed at
-https://gitlab.ssec.wisc.edu/SIFT/sift/wikis/home.
-
 SIFT is built on open source technologies like Python, OpenGL, and PyQt4. It
 can be run from Mac, Windows, and Linux.
+
+The main website is http://sift.ssec.wisc.edu/.
+
+The Git repository is available on GitHub: https://github.com/ssec/sift
+
+The project wiki with some in-depth usage and installation instructions can
+also be found on GitHub: https://github.com/ssec/sift/wiki
+
+Developer documentation can be found on https://sift.readthedocs.io/en/latest/.
+
 
 Data Access
 -----------
