@@ -53,12 +53,12 @@ from functools import partial
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from sift.ui.pov_main_ui import Ui_MainWindow
-from sift.common import INFO, TOOL, COMPOSITE_TYPE, get_font_size
+from sift.common import Info, Tool, CompositeType, get_font_size
+from sift.view.colormap_editor import ColormapEditor
 
 import os
 import sys
 import logging
-from view.colormap_editor import ColormapEditor
 
 app_object = app.use_app('pyqt4')
 APP: QtGui.QApplication = app_object.native
@@ -321,7 +321,7 @@ class Main(QtGui.QMainWindow):
         else:
             event.ignore()
 
-    def change_tool(self, checked, name=TOOL.PAN_ZOOM):
+    def change_tool(self, checked, name=Tool.PAN_ZOOM):
         if checked != True:
             return
         self.scene_manager.change_tool(name)
@@ -478,7 +478,7 @@ class Main(QtGui.QMainWindow):
         # calculate the new animation sequence by consulting the guidebook
         uuids = self.document.animate_siblings_of_layer(uuid)
         if uuids:
-            self.ui.statusbar.showMessage("INFO: Frame order updated", STATUS_BAR_DURATION)
+            self.ui.statusbar.showMessage("Info: Frame order updated", STATUS_BAR_DURATION)
             self.behaviorLayersList.select(uuids)
         else:
             self.ui.statusbar.showMessage("ERROR: Layer with time steps or band siblings needed", STATUS_BAR_DURATION)
@@ -514,11 +514,11 @@ class Main(QtGui.QMainWindow):
 
     # def accept_new_layer(self, new_order, info, overview_content):
     #     LOG.debug('accepting new layer order {0!r:s}'.format(new_order))
-    #     if info[INFO.KIND] == KIND.IMAGE:
+    #     if info[Info.Kind] == Kind.IMAGE:
     #         LOG.info("rebuilding animation based on newly loaded image layer")
-    #         self.document.animate_using_layer(info[INFO.UUID])
+    #         self.document.animate_using_layer(info[Info.UUID])
     #         self.animation_slider_jump_frame(None)
-    #         self.behaviorLayersList.select([info[INFO.UUID]])
+    #         self.behaviorLayersList.select([info[Info.UUID]])
 
     def _refresh_probe_results(self, *args):
         arg1 = args[0]
@@ -564,19 +564,19 @@ class Main(QtGui.QMainWindow):
                 layer_str = "N/A"
             else:
                 info = self.document[uuid]
-                unit_info = info[INFO.UNIT_CONVERSION]
+                unit_info = info[Info.UNIT_CONVERSION]
                 data_point = unit_info[1](data_point)
                 data_str = unit_info[2](data_point, numeric=False)
-                if info.get(INFO.CENTRAL_WAVELENGTH):
-                    wl = info[INFO.CENTRAL_WAVELENGTH]
+                if info.get(Info.CENTRAL_WAVELENGTH):
+                    wl = info[Info.CENTRAL_WAVELENGTH]
                     if wl < 4.1:
                         wl_str = "{:0.02f} µm".format(wl)
                     else:
                         wl_str = "{:0.01f} µm".format(wl)
-                    layer_str = "{}, {}".format(info[INFO.SHORT_NAME],
+                    layer_str = "{}, {}".format(info[Info.SHORT_NAME],
                                                 wl_str)
                 else:
-                    layer_str = info[INFO.SHORT_NAME]
+                    layer_str = info[Info.SHORT_NAME]
         else:
             data_str = "N/A"
             layer_str = "N/A"
@@ -616,7 +616,8 @@ class Main(QtGui.QMainWindow):
 
         self.layer_list_model.uuidSelectionChanged.connect(center_timeline_view_on_single_frame)
 
-    def __init__(self, config_dir=None, cache_dir=None, cache_size=None, glob_pattern=None, search_paths=None, border_shapefile=None, center=None):
+    def __init__(self, config_dir=None, workspace_dir=None, cache_size=None, glob_pattern=None, search_paths=None,
+                 border_shapefile=None, center=None, clear_workspace=False):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
@@ -648,7 +649,7 @@ class Main(QtGui.QMainWindow):
         self.queue.didMakeProgress.connect(self.update_progress_bar)
 
         # create manager and helper classes
-        self.workspace = Workspace(cache_dir, max_size_gb=cache_size, queue=self.queue)
+        self.workspace = Workspace(workspace_dir, max_size_gb=cache_size, queue=self.queue, initial_clear=clear_workspace)
         self.document = doc = Document(self.workspace, config_dir=config_dir, queue=self.queue)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
                                                border_shapefile=border_shapefile,
@@ -732,7 +733,7 @@ class Main(QtGui.QMainWindow):
             # do whatever other updates the scene manager needs
             self.scene_manager.on_new_polygon(polygon_name, points)
 
-            if self.scene_manager._current_tool == TOOL.REGION_PROBE:
+            if self.scene_manager._current_tool == Tool.REGION_PROBE:
                 self.ui.panZoomToolButton.click()
 
         self.scene_manager.newProbePolygon.connect(update_probe_polygon)
@@ -751,9 +752,9 @@ class Main(QtGui.QMainWindow):
         self.document.didAddCompositeLayer.connect(self.update_frame_time_to_top_visible)
         self.document.didChangeProjection.connect(self.scene_manager.set_projection)
 
-        self.ui.panZoomToolButton.toggled.connect(partial(self.change_tool, name=TOOL.PAN_ZOOM))
-        self.ui.pointSelectButton.toggled.connect(partial(self.change_tool, name=TOOL.POINT_PROBE))
-        self.ui.regionSelectButton.toggled.connect(partial(self.change_tool, name=TOOL.REGION_PROBE))
+        self.ui.panZoomToolButton.toggled.connect(partial(self.change_tool, name=Tool.PAN_ZOOM))
+        self.ui.pointSelectButton.toggled.connect(partial(self.change_tool, name=Tool.POINT_PROBE))
+        self.ui.regionSelectButton.toggled.connect(partial(self.change_tool, name=Tool.REGION_PROBE))
         self.change_tool(True)
 
         self.setup_menu()
@@ -886,7 +887,7 @@ class Main(QtGui.QMainWindow):
         LOG.info("Clearing polygon with name '%s'", removed_name)
         self.scene_manager.remove_polygon(removed_name)
 
-    def create_algebraic(self, action:QtGui.QAction=None, uuids=None, composite_type=COMPOSITE_TYPE.ARITHMETIC):
+    def create_algebraic(self, action:QtGui.QAction=None, uuids=None, composite_type=CompositeType.ARITHMETIC):
         if uuids is None:
             uuids = list(self.behaviorLayersList.current_selected_uuids())
         dialog = CreateAlgebraicDialog(self.document, uuids, parent=self)
@@ -1070,10 +1071,12 @@ def _search_paths(arglist):
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Run SIFT")
-    parser.add_argument("-w", "--workspace",
-                        help="(DEPRECATED) Specify workspace base directory")
-    parser.add_argument("--cache-dir", default=WORKSPACE_DB_DIR,
-                        help="Specify cache directory")
+    parser.add_argument("-w", "--workspace-dir", default=WORKSPACE_DB_DIR,
+                        help="Specify workspace base directory")
+    parser.add_argument("--cache-dir",
+                        help="(DEPRECATED: use --workspace-dir) Specify workspace directory")
+    parser.add_argument('--clear-workspace', action='store_true',
+                        help="Remove workspace contents during start up")
     parser.add_argument("--config-dir", default=DOCUMENT_SETTINGS_DIR,
                         help="Specify config directory")
     parser.add_argument("-s", "--space", default=256, type=int,
@@ -1089,7 +1092,7 @@ def main():
     parser.add_argument("--desktop", type=int, default=0,
                         help="Number of monitor/display to show the main window on (0 for main, 1 for secondary, etc.)")
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=int(os.environ.get("VERBOSITY", 2)),
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG (default INFO)')
+                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG (default Info)')
     args = parser.parse_args()
 
     levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
@@ -1102,10 +1105,9 @@ def main():
     check_imageio_deps()
     # logging.getLogger('vispy').setLevel(level)
 
-    if args.workspace:
-        LOG.warning("'--workspace' is deprecated, use '--cache-dir'")
-        args.config_dir = args.workspace
-        args.cache_dir = (args.workspace, args.workspace)
+    if args.cache_dir:
+        LOG.warning("'--cache-dir' is deprecated, use '--workspace-dir'")
+        args.workspace_dir = args.cache_dir
 
     LOG.info("Using configuration directory: %s", args.config_dir)
     LOG.info("Using cache directory: %s", args.cache_dir)
@@ -1120,13 +1122,14 @@ def main():
     LOG.info("will search {} for new data periodically".format(repr(data_search_paths)))
 
     window = Main(
-        cache_dir=args.cache_dir,
+        workspace_dir=args.cache_dir,
         config_dir=args.config_dir,
         cache_size=args.space,
         glob_pattern=args.glob_pattern,
         search_paths = data_search_paths,
         border_shapefile=args.border_shapefile,
         center=args.center,
+        clear_workspace=args.clear_workspace,
     )
 
     set_default_geometry(window, desktop=args.desktop)

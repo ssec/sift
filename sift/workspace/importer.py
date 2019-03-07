@@ -23,7 +23,7 @@ import numpy as np
 from pyproj import Proj
 from sqlalchemy.orm import Session
 
-from sift.common import PLATFORM, INFO, INSTRUMENT, KIND, INSTRUMENT_MAP, PLATFORM_MAP
+from sift.common import Platform, Info, Instrument, Kind, INSTRUMENT_MAP, PLATFORM_MAP
 from sift.workspace.goesr_pug import PugFile
 from sift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
 from .metadatabase import Resource, Product, Content
@@ -47,10 +47,10 @@ DEFAULT_GTIFF_OBS_DURATION = timedelta(seconds=60)
 DEFAULT_GUIDEBOOK = ABI_AHI_Guidebook
 
 GUIDEBOOKS = {
-    PLATFORM.GOES_16: ABI_AHI_Guidebook,
-    PLATFORM.GOES_17: ABI_AHI_Guidebook,
-    PLATFORM.HIMAWARI_8: ABI_AHI_Guidebook,
-    PLATFORM.HIMAWARI_9: ABI_AHI_Guidebook,
+    Platform.GOES_16: ABI_AHI_Guidebook,
+    Platform.GOES_17: ABI_AHI_Guidebook,
+    Platform.HIMAWARI_8: ABI_AHI_Guidebook,
+    Platform.HIMAWARI_9: ABI_AHI_Guidebook,
 }
 
 import_progress = namedtuple('import_progress', ['uuid', 'stages', 'current_stage', 'completion', 'stage_desc', 'dataset_info', 'data'])
@@ -61,13 +61,13 @@ import_progress = namedtuple('import_progress', ['uuid', 'stages', 'current_stag
 
 
 def get_guidebook_class(layer_info) -> Guidebook:
-    platform = layer_info.get(INFO.PLATFORM)
+    platform = layer_info.get(Info.PLATFORM)
     return GUIDEBOOKS.get(platform, DEFAULT_GUIDEBOOK)()
 
 
 def get_contour_increments(layer_info):
-    standard_name = layer_info[INFO.STANDARD_NAME]
-    units = layer_info[INFO.UNITS]
+    standard_name = layer_info[Info.STANDARD_NAME]
+    units = layer_info[Info.UNITS]
     increments = {
         'air_temperature': [10., 5., 2.5, 1., 0.5],
         'brightness_temperature': [10., 5., 2.5, 1., 0.5],
@@ -102,7 +102,7 @@ def get_contour_increments(layer_info):
         # def _in_group(wg, grp):
         #     return round(wg / grp) * grp >= grp
         # contour_increments = [5., 2.5, 1., 0.5, 0.1]
-        # vmin, vmax = layer_info[INFO.VALID_RANGE]
+        # vmin, vmax = layer_info[Info.VALID_RANGE]
         # width_guess = vmax - vmin
         # if _in_group(width_guess, 10000.):
         #     contour_increments = [x * 100. for x in contour_increments]
@@ -149,18 +149,18 @@ def generate_guidebook_metadata(layer_info) -> Mapping:
     layer_info.update(gbinfo)  # FUTURE: should guidebook be integrated into DocBasicLayer?
 
     # add as visible to the front of the current set, and invisible to the rest of the available sets
-    layer_info[INFO.COLORMAP] = guidebook.default_colormap(layer_info)
-    layer_info[INFO.CLIM] = guidebook.climits(layer_info)
-    layer_info[INFO.VALID_RANGE] = guidebook.valid_range(layer_info)
-    if INFO.DISPLAY_TIME not in layer_info:
-        layer_info[INFO.DISPLAY_TIME] = guidebook._default_display_time(layer_info)
-    if INFO.DISPLAY_NAME not in layer_info:
-        layer_info[INFO.DISPLAY_NAME] = guidebook._default_display_name(layer_info)
+    layer_info[Info.COLORMAP] = guidebook.default_colormap(layer_info)
+    layer_info[Info.CLIM] = guidebook.climits(layer_info)
+    layer_info[Info.VALID_RANGE] = guidebook.valid_range(layer_info)
+    if Info.DISPLAY_TIME not in layer_info:
+        layer_info[Info.DISPLAY_TIME] = guidebook._default_display_time(layer_info)
+    if Info.DISPLAY_NAME not in layer_info:
+        layer_info[Info.DISPLAY_NAME] = guidebook._default_display_name(layer_info)
 
     if 'level' in layer_info:
         # calculate contour_levels and zoom levels
         increments = get_contour_increments(layer_info)
-        vmin, vmax = layer_info[INFO.VALID_RANGE]
+        vmin, vmax = layer_info[Info.VALID_RANGE]
         contour_levels = get_contour_levels(vmin, vmax, increments)
         layer_info['contour_levels'] = contour_levels
 
@@ -300,18 +300,18 @@ class aSingleFileWithSingleProductImporter(aImporter):
         from uuid import uuid1
         uuid = uuid1()
         meta = self.product_metadata()
-        meta[INFO.UUID] = uuid
+        meta[Info.UUID] = uuid
 
         prod = Product(
             uuid_str = str(uuid),
             atime = now,
         )
         prod.resource.append(res)
-        assert(INFO.OBS_TIME in meta)
-        assert(INFO.OBS_DURATION in meta)
+        assert(Info.OBS_TIME in meta)
+        assert(Info.OBS_DURATION in meta)
         prod.update(meta)  # sets fields like obs_duration and obs_time transparently
-        assert(prod.info[INFO.OBS_TIME] is not None and prod.obs_time is not None)
-        assert(prod.info[INFO.VALID_RANGE] is not None)
+        assert(prod.info[Info.OBS_TIME] is not None and prod.obs_time is not None)
+        assert(prod.info[Info.VALID_RANGE] is not None)
         LOG.debug('new product: {}'.format(repr(prod)))
         self._S.add(prod)
         self._S.commit()
@@ -338,7 +338,7 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
         if m is not None:
             plat, yyyymmdd, hhmm, bb, scene = m.groups()
             when = datetime.strptime(yyyymmdd + hhmm, '%Y%m%d%H%M')
-            plat = PLATFORM('Himawari-{}'.format(int(plat)))
+            plat = Platform('Himawari-{}'.format(int(plat)))
             band = int(bb)
             #
             # # workaround to make old files work with new information
@@ -349,13 +349,13 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
             #     standard_name = "toa_brightness_temperature"
 
             meta.update({
-                INFO.PLATFORM: plat,
-                INFO.BAND: band,
-                INFO.INSTRUMENT: INSTRUMENT.AHI,
-                INFO.SCHED_TIME: when,
-                INFO.OBS_TIME: when,
-                INFO.OBS_DURATION: DEFAULT_GTIFF_OBS_DURATION,
-                INFO.SCENE: scene,
+                Info.PLATFORM: plat,
+                Info.BAND: band,
+                Info.INSTRUMENT: Instrument.AHI,
+                Info.SCHED_TIME: when,
+                Info.OBS_TIME: when,
+                Info.OBS_DURATION: DEFAULT_GTIFF_OBS_DURATION,
+                Info.SCENE: scene,
             })
         return meta
 
@@ -364,34 +364,34 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
         gtiff_meta = gtiff.GetMetadata()
         # Sanitize metadata from the file to use SIFT's Enums
         if "name" in gtiff_meta:
-            gtiff_meta[INFO.DATASET_NAME] = gtiff_meta.pop("name")
+            gtiff_meta[Info.DATASET_NAME] = gtiff_meta.pop("name")
         if "platform" in gtiff_meta:
             plat = gtiff_meta.pop("platform")
             try:
-                gtiff_meta[INFO.PLATFORM] = PLATFORM(plat)
+                gtiff_meta[Info.PLATFORM] = Platform(plat)
             except ValueError:
-                gtiff_meta[INFO.PLATFORM] = PLATFORM.UNKNOWN
+                gtiff_meta[Info.PLATFORM] = Platform.UNKNOWN
                 LOG.warning("Unknown platform being loaded: {}".format(plat))
         if "instrument" in gtiff_meta or "sensor" in gtiff_meta:
             inst = gtiff_meta.pop("sensor", gtiff_meta.pop("instrument", None))
             try:
-                gtiff_meta[INFO.INSTRUMENT] = INSTRUMENT(inst)
+                gtiff_meta[Info.INSTRUMENT] = Instrument(inst)
             except ValueError:
-                gtiff_meta[INFO.INSTRUMENT] = INSTRUMENT.UNKNOWN
+                gtiff_meta[Info.INSTRUMENT] = Instrument.UNKNOWN
                 LOG.warning("Unknown instrument being loaded: {}".format(inst))
         if "start_time" in gtiff_meta:
             start_time = datetime.strptime(gtiff_meta["start_time"], "%Y-%m-%dT%H:%M:%SZ")
-            gtiff_meta[INFO.SCHED_TIME] = start_time
-            gtiff_meta[INFO.OBS_TIME] = start_time
+            gtiff_meta[Info.SCHED_TIME] = start_time
+            gtiff_meta[Info.OBS_TIME] = start_time
             if "end_time" in gtiff_meta:
                 end_time = datetime.strptime(gtiff_meta["end_time"], "%Y-%m-%dT%H:%M:%SZ")
-                gtiff_meta[INFO.OBS_DURATION] = end_time - start_time
+                gtiff_meta[Info.OBS_DURATION] = end_time - start_time
         if "valid_min" in gtiff_meta:
             gtiff_meta["valid_min"] = float(gtiff_meta["valid_min"])
         if "valid_max" in gtiff_meta:
             gtiff_meta["valid_max"] = float(gtiff_meta["valid_max"])
         if "standard_name" in gtiff_meta:
-            gtiff_meta[INFO.STANDARD_NAME] = gtiff_meta["standard_name"]
+            gtiff_meta[Info.STANDARD_NAME] = gtiff_meta["standard_name"]
         if "flag_values" in gtiff_meta:
             gtiff_meta["flag_values"] = tuple(int(x) for x in gtiff_meta["flag_values"].split(','))
         if "flag_masks" in gtiff_meta:
@@ -399,7 +399,7 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
         if "flag_meanings" in gtiff_meta:
             gtiff_meta["flag_meanings"] = gtiff_meta["flag_meanings"].split(' ')
         if "units" in gtiff_meta:
-            gtiff_meta[INFO.UNITS] = gtiff_meta.pop('units')
+            gtiff_meta[Info.UNITS] = gtiff_meta.pop('units')
         return gtiff_meta
 
     @staticmethod
@@ -412,38 +412,38 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
         gtiff = gdal.Open(source_path)
 
         ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
-        d[INFO.KIND] = KIND.IMAGE
+        d[Info.KIND] = Kind.IMAGE
 
         # FUTURE: this is Content metadata and not Product metadata:
-        d[INFO.ORIGIN_X] = ox
-        d[INFO.ORIGIN_Y] = oy
-        d[INFO.CELL_WIDTH] = cw
-        d[INFO.CELL_HEIGHT] = ch
+        d[Info.ORIGIN_X] = ox
+        d[Info.ORIGIN_Y] = oy
+        d[Info.CELL_WIDTH] = cw
+        d[Info.CELL_HEIGHT] = ch
         # FUTURE: Should the Workspace normalize all input data or should the Image Layer handle any projection?
         srs = osr.SpatialReference()
         srs.ImportFromWkt(gtiff.GetProjection())
-        d[INFO.PROJ] = srs.ExportToProj4().strip()  # remove extra whitespace
+        d[Info.PROJ] = srs.ExportToProj4().strip()  # remove extra whitespace
 
         # Workaround for previously supported files
         # give them some kind of name that means something
-        if INFO.BAND in d:
-            d[INFO.DATASET_NAME] = "B{:02d}".format(d[INFO.BAND])
+        if Info.BAND in d:
+            d[Info.DATASET_NAME] = "B{:02d}".format(d[Info.BAND])
         else:
             # for new files, use this as a basic default
             # FUTURE: Use Dataset name instead when we can read multi-dataset files
-            d[INFO.DATASET_NAME] = os.path.split(source_path)[-1]
+            d[Info.DATASET_NAME] = os.path.split(source_path)[-1]
 
-        d[INFO.PATHNAME] = source_path
+        d[Info.PATHNAME] = source_path
         band = gtiff.GetRasterBand(1)
-        d[INFO.SHAPE] = rows, cols = (band.YSize, band.XSize)
+        d[Info.SHAPE] = rows, cols = (band.YSize, band.XSize)
 
         # Fix PROJ4 string if it needs an "+over" parameter
-        p = Proj(d[INFO.PROJ])
+        p = Proj(d[Info.PROJ])
         lon_l, lat_u = p(ox, oy, inverse=True)
         lon_r, lat_b = p(ox + cw * cols, oy + ch * rows, inverse=True)
-        if "+over" not in d[INFO.PROJ] and lon_r < lon_l:
+        if "+over" not in d[Info.PROJ] and lon_r < lon_l:
             LOG.debug("Add '+over' to geotiff PROJ.4 because it seems to cross the anti-meridian")
-            d[INFO.PROJ] += " +over"
+            d[Info.PROJ] += " +over"
 
         bandtype = gdal.GetDataTypeName(band.DataType)
         if bandtype.lower() != 'float32':
@@ -511,12 +511,12 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
         cov_data[:] = 0  # should not be needed except maybe in Windows?
 
         # LOG.debug("keys in geotiff product: {}".format(repr(list(prod.info.keys()))))
-        LOG.debug("cell size in geotiff product: {} x {}".format(prod.info[INFO.CELL_HEIGHT], prod.info[INFO.CELL_WIDTH]))
+        LOG.debug("cell size in geotiff product: {} x {}".format(prod.info[Info.CELL_HEIGHT], prod.info[Info.CELL_WIDTH]))
 
         # create and commit a Content entry pointing to where the content is in the workspace, even if coverage is empty
         c = Content(
             lod = 0,
-            resolution = int(min(abs(info[INFO.CELL_WIDTH]), abs(info[INFO.CELL_HEIGHT]))),
+            resolution = int(min(abs(info[Info.CELL_WIDTH]), abs(info[Info.CELL_HEIGHT]))),
             atime = now,
             mtime = now,
 
@@ -527,11 +527,11 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
             levels = 0,
             dtype = 'float32',
 
-            cell_width = info[INFO.CELL_WIDTH],
-            cell_height = info[INFO.CELL_HEIGHT],
-            origin_x = info[INFO.ORIGIN_X],
-            origin_y = info[INFO.ORIGIN_Y],
-            proj4 = info[INFO.PROJ],
+            cell_width = info[Info.CELL_WIDTH],
+            cell_height = info[Info.CELL_HEIGHT],
+            origin_x = info[Info.ORIGIN_X],
+            origin_y = info[Info.ORIGIN_Y],
+            proj4 = info[Info.PROJ],
 
             # info about the coverage array memmap, which in our case just tells what rows are ready
             coverage_rows = rows,
@@ -586,14 +586,14 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
 
 # map .platform_id in PUG format files to SIFT platform enum
 PLATFORM_ID_TO_PLATFORM = {
-    'G16': PLATFORM.GOES_16,
-    'G17': PLATFORM.GOES_17,
+    'G16': Platform.GOES_16,
+    'G17': Platform.GOES_17,
     # hsd2nc export of AHI data as PUG format
-    'Himawari-8': PLATFORM.HIMAWARI_8,
-    'Himawari-9': PLATFORM.HIMAWARI_9,
+    'Himawari-8': Platform.HIMAWARI_8,
+    'Himawari-9': Platform.HIMAWARI_9,
     # axi2cmi export as PUG, more consistent with other uses
-    'H8': PLATFORM.HIMAWARI_8,
-    'H9': PLATFORM.HIMAWARI_9
+    'H8': Platform.HIMAWARI_8,
+    'H9': Platform.HIMAWARI_9
 }
 
 
@@ -605,16 +605,16 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
     @staticmethod
     def _basic_pug_metadata(pug):
         return {
-            INFO.PLATFORM: PLATFORM_ID_TO_PLATFORM[pug.platform_id],  # e.g. G16, H8
-            INFO.BAND: pug.band,
-            INFO.DATASET_NAME: 'B{:02d}'.format(pug.band),
-            INFO.INSTRUMENT: INSTRUMENT.AHI if 'Himawari' in pug.instrument_type else INSTRUMENT.ABI,
-            INFO.SCHED_TIME: pug.sched_time,
-            INFO.OBS_TIME: pug.time_span[0],
-            INFO.OBS_DURATION: pug.time_span[1] - pug.time_span[0],
-            INFO.DISPLAY_TIME: pug.display_time,
-            INFO.SCENE: pug.scene_id,
-            INFO.DISPLAY_NAME: pug.display_name,
+            Info.PLATFORM: PLATFORM_ID_TO_PLATFORM[pug.platform_id],  # e.g. G16, H8
+            Info.BAND: pug.band,
+            Info.DATASET_NAME: 'B{:02d}'.format(pug.band),
+            Info.INSTRUMENT: Instrument.AHI if 'Himawari' in pug.instrument_type else Instrument.ABI,
+            Info.SCHED_TIME: pug.sched_time,
+            Info.OBS_TIME: pug.time_span[0],
+            Info.OBS_DURATION: pug.time_span[1] - pug.time_span[0],
+            Info.DISPLAY_TIME: pug.display_time,
+            Info.SCENE: pug.scene_id,
+            Info.DISPLAY_NAME: pug.display_name,
         }
 
     @classmethod
@@ -651,16 +651,16 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         pug = pug or GoesRPUGImporter.pug_factory(source_path)
 
         d.update(GoesRPUGImporter._basic_pug_metadata(pug))
-        # d[INFO.DATASET_NAME] = os.path.split(source_path)[-1]
-        d[INFO.PATHNAME] = source_path
-        d[INFO.KIND] = KIND.IMAGE
+        # d[Info.DATASET_NAME] = os.path.split(source_path)[-1]
+        d[Info.PATHNAME] = source_path
+        d[Info.KIND] = Kind.IMAGE
 
         # FUTURE: this is Content metadata and not Product metadata:
-        d[INFO.PROJ] = pug.proj4_string
+        d[Info.PROJ] = pug.proj4_string
         # get nadir-meter-ish projection coordinate vectors to be used by proj4
         y,x = pug.proj_y, pug.proj_x
-        d[INFO.ORIGIN_X] = x[0]
-        d[INFO.ORIGIN_Y] = y[0]
+        d[Info.ORIGIN_X] = x[0]
+        d[Info.ORIGIN_Y] = y[0]
 
         # midyi, midxi = int(y.shape[0] / 2), int(x.shape[0] / 2)
         # PUG states radiance at index [0,0] extends between coordinates [0,0] to [1,1] on a quadrille
@@ -669,18 +669,18 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         # for now assume all scenes are even-dimensioned (e.g. 5424x5424)
         # given that coordinates are evenly spaced in angular -> nadir-meters space,
         # technically this should work with any two neighbor values
-        # d[INFO.CELL_WIDTH] = x[midxi+1] - x[midxi]
-        # d[INFO.CELL_HEIGHT] = y[midyi+1] - y[midyi]
+        # d[Info.CELL_WIDTH] = x[midxi+1] - x[midxi]
+        # d[Info.CELL_HEIGHT] = y[midyi+1] - y[midyi]
         cell_size = pug.cell_size
-        d[INFO.CELL_HEIGHT], d[INFO.CELL_WIDTH] = cell_size
+        d[Info.CELL_HEIGHT], d[Info.CELL_WIDTH] = cell_size
 
         shape = pug.shape
-        d[INFO.SHAPE] = shape
+        d[Info.SHAPE] = shape
         generate_guidebook_metadata(d)
 
-        d[INFO.FAMILY] = '{}:{}:{}:{:5.2f}µm'.format(KIND.IMAGE.name, 'geo', d[INFO.STANDARD_NAME], d[INFO.CENTRAL_WAVELENGTH]) # kind:pointofreference:measurement:wavelength
-        d[INFO.CATEGORY] = 'NOAA-PUG:{}:{}:{}'.format(d[INFO.PLATFORM].name, d[INFO.INSTRUMENT].name, d[INFO.SCENE])  # system:platform:instrument:target
-        d[INFO.SERIAL] = d[INFO.SCHED_TIME].strftime("%Y%m%dT%H%M%S")
+        d[Info.FAMILY] = '{}:{}:{}:{:5.2f}µm'.format(Kind.IMAGE.name, 'geo', d[Info.STANDARD_NAME], d[Info.CENTRAL_WAVELENGTH]) # kind:pointofreference:measurement:wavelength
+        d[Info.CATEGORY] = 'NOAA-PUG:{}:{}:{}'.format(d[Info.PLATFORM].name, d[Info.INSTRUMENT].name, d[Info.SCENE])  # system:platform:instrument:target
+        d[Info.SERIAL] = d[Info.SCHED_TIME].strftime("%Y%m%dT%H%M%S")
         LOG.debug(repr(d))
         return d
 
@@ -913,7 +913,7 @@ class SatPyImporter(aImporter):
             existing_ids.get(ds_id, None)
             meta = ds.attrs
             uuid = uuid1()
-            meta[INFO.UUID] = uuid
+            meta[Info.UUID] = uuid
             now = datetime.utcnow()
             prod = Product(
                 uuid_str=str(uuid),
@@ -921,11 +921,11 @@ class SatPyImporter(aImporter):
             )
             prod.resource.append(res)
 
-            assert(INFO.OBS_TIME in meta)
-            assert(INFO.OBS_DURATION in meta)
+            assert(Info.OBS_TIME in meta)
+            assert(Info.OBS_DURATION in meta)
             prod.update(meta)  # sets fields like obs_duration and obs_time transparently
-            assert(prod.info[INFO.OBS_TIME] is not None and prod.obs_time is not None)
-            assert(prod.info[INFO.VALID_RANGE] is not None)
+            assert(prod.info[Info.OBS_TIME] is not None and prod.obs_time is not None)
+            assert(prod.info[Info.VALID_RANGE] is not None)
             LOG.debug('new product: {}'.format(repr(prod)))
             self._S.add(prod)
             self._S.commit()
@@ -940,75 +940,75 @@ class SatPyImporter(aImporter):
     @staticmethod
     def _get_platform_instrument(attrs: dict):
         """Convert SatPy platform_name/sensor to """
-        attrs[INFO.INSTRUMENT] = attrs.get('sensor')
-        attrs[INFO.PLATFORM] = attrs.get('platform_name')
+        attrs[Info.INSTRUMENT] = attrs.get('sensor')
+        attrs[Info.PLATFORM] = attrs.get('platform_name')
 
         # Special handling of GRIB forecast data
         if 'centreDescription' in attrs and \
-                attrs[INFO.INSTRUMENT] == 'unknown':
+                attrs[Info.INSTRUMENT] == 'unknown':
             description = attrs['centreDescription']
-            if attrs.get(INFO.PLATFORM) is None:
-                attrs[INFO.PLATFORM] = 'NWP'
+            if attrs.get(Info.PLATFORM) is None:
+                attrs[Info.PLATFORM] = 'NWP'
             if 'NCEP' in description:
-                attrs[INFO.INSTRUMENT] = 'GFS'
-        if attrs[INFO.INSTRUMENT] in ['GFS', 'unknown']:
-            attrs[INFO.INSTRUMENT] = INSTRUMENT.GFS
-        if attrs[INFO.PLATFORM] in ['NWP', 'unknown']:
-            attrs[INFO.PLATFORM] = PLATFORM.NWP
+                attrs[Info.INSTRUMENT] = 'GFS'
+        if attrs[Info.INSTRUMENT] in ['GFS', 'unknown']:
+            attrs[Info.INSTRUMENT] = Instrument.GFS
+        if attrs[Info.PLATFORM] in ['NWP', 'unknown']:
+            attrs[Info.PLATFORM] = Platform.NWP
 
         # FUTURE: Use standard string names for platform/instrument
         #         instead of an Enum. Otherwise, could use a reverse
         #         Enum lookup to match Enum values to Enum keys.
         # if we haven't figured out what these are then give up and say they are unknown
-        if isinstance(attrs[INFO.PLATFORM], str):
-            plat_str = attrs[INFO.PLATFORM].lower().replace('-', '')
-            attrs[INFO.PLATFORM] = PLATFORM_MAP.get(plat_str, attrs[INFO.PLATFORM])
-        if not attrs[INFO.PLATFORM] or isinstance(attrs[INFO.PLATFORM], str):
-            attrs[INFO.PLATFORM] = PLATFORM.UNKNOWN
+        if isinstance(attrs[Info.PLATFORM], str):
+            plat_str = attrs[Info.PLATFORM].lower().replace('-', '')
+            attrs[Info.PLATFORM] = PLATFORM_MAP.get(plat_str, attrs[Info.PLATFORM])
+        if not attrs[Info.PLATFORM] or isinstance(attrs[Info.PLATFORM], str):
+            attrs[Info.PLATFORM] = Platform.UNKNOWN
 
-        if isinstance(attrs[INFO.INSTRUMENT], str):
-            inst_str = attrs[INFO.INSTRUMENT].lower().replace('-', '')
-            attrs[INFO.INSTRUMENT] = INSTRUMENT_MAP.get(inst_str, attrs[INFO.INSTRUMENT])
-        if not attrs[INFO.INSTRUMENT] or isinstance(attrs[INFO.INSTRUMENT], str):
-            attrs[INFO.INSTRUMENT] = INSTRUMENT.UNKNOWN
+        if isinstance(attrs[Info.INSTRUMENT], str):
+            inst_str = attrs[Info.INSTRUMENT].lower().replace('-', '')
+            attrs[Info.INSTRUMENT] = INSTRUMENT_MAP.get(inst_str, attrs[Info.INSTRUMENT])
+        if not attrs[Info.INSTRUMENT] or isinstance(attrs[Info.INSTRUMENT], str):
+            attrs[Info.INSTRUMENT] = Instrument.UNKNOWN
 
     def load_all_datasets(self) -> Scene:
         self.scn.load(self.dataset_ids, **self.product_filters)
         # copy satpy metadata keys to SIFT keys
         for ds in self.scn:
             start_time = ds.attrs['start_time']
-            ds.attrs[INFO.OBS_TIME] = start_time
-            ds.attrs[INFO.SCHED_TIME] = start_time
+            ds.attrs[Info.OBS_TIME] = start_time
+            ds.attrs[Info.SCHED_TIME] = start_time
             duration = start_time - ds.attrs.get('end_time', start_time)
             if duration.total_seconds() == 0:
                 duration = timedelta(minutes=60)
-            ds.attrs[INFO.OBS_DURATION] = duration
+            ds.attrs[Info.OBS_DURATION] = duration
 
             # Handle GRIB platform/instrument
-            ds.attrs[INFO.KIND] = KIND.IMAGE if self.reader != 'grib' else \
-                KIND.CONTOUR
+            ds.attrs[Info.KIND] = Kind.IMAGE if self.reader != 'grib' else \
+                Kind.CONTOUR
             self._get_platform_instrument(ds.attrs)
-            ds.attrs.setdefault(INFO.STANDARD_NAME, ds.attrs.get('standard_name'))
+            ds.attrs.setdefault(Info.STANDARD_NAME, ds.attrs.get('standard_name'))
             if 'wavelength' in ds.attrs:
-                ds.attrs.setdefault(INFO.CENTRAL_WAVELENGTH,
+                ds.attrs.setdefault(Info.CENTRAL_WAVELENGTH,
                                     ds.attrs['wavelength'][0])
 
             # Resolve anything else needed by SIFT
             id_str = ":".join(str(v) for v in DatasetID.from_dict(ds.attrs))
-            ds.attrs[INFO.DATASET_NAME] = id_str
+            ds.attrs[Info.DATASET_NAME] = id_str
             model_time = ds.attrs.get('model_time')
             if model_time is not None:
-                ds.attrs[INFO.DATASET_NAME] += " " + model_time.isoformat()
-            ds.attrs[INFO.BAND] = 0
-            ds.attrs[INFO.SHORT_NAME] = ds.attrs['name']
+                ds.attrs[Info.DATASET_NAME] += " " + model_time.isoformat()
+            ds.attrs[Info.BAND] = 0
+            ds.attrs[Info.SHORT_NAME] = ds.attrs['name']
             if ds.attrs.get('level') is not None:
-                ds.attrs[INFO.SHORT_NAME] = "{} @ {}hPa".format(
+                ds.attrs[Info.SHORT_NAME] = "{} @ {}hPa".format(
                     ds.attrs['name'], ds.attrs['level'])
-            ds.attrs[INFO.SHAPE] = ds.shape
-            ds.attrs[INFO.UNITS] = ds.attrs.get('units')
-            if ds.attrs[INFO.UNITS] == 'unknown':
+            ds.attrs[Info.SHAPE] = ds.shape
+            ds.attrs[Info.UNITS] = ds.attrs.get('units')
+            if ds.attrs[Info.UNITS] == 'unknown':
                 LOG.warning("Layer units are unknown, using '1'")
-                ds.attrs[INFO.UNITS] = 1
+                ds.attrs[Info.UNITS] = 1
             generate_guidebook_metadata(ds.attrs)
 
             # Generate FAMILY and CATEGORY
@@ -1016,20 +1016,20 @@ class SatPyImporter(aImporter):
                 model_time = ds.attrs['model_time'].isoformat()
             else:
                 model_time = None
-            ds.attrs[INFO.SCENE] = ds.attrs.get('scene_id') or hash(ds.attrs['area'])
-            if ds.attrs.get(INFO.CENTRAL_WAVELENGTH) is None:
+            ds.attrs[Info.SCENE] = ds.attrs.get('scene_id') or hash(ds.attrs['area'])
+            if ds.attrs.get(Info.CENTRAL_WAVELENGTH) is None:
                 cw = ""
             else:
-                cw = ":{:5.2f}µm".format(ds.attrs[INFO.CENTRAL_WAVELENGTH])
-            ds.attrs[INFO.FAMILY] = '{}:{}:{}{}'.format(
-                ds.attrs[INFO.KIND].name, ds.attrs[INFO.STANDARD_NAME],
-                ds.attrs[INFO.SHORT_NAME], cw)
-            ds.attrs[INFO.CATEGORY] = 'SatPy:{}:{}:{}'.format(
-                ds.attrs[INFO.PLATFORM].name, ds.attrs[INFO.INSTRUMENT].name,
-                ds.attrs[INFO.SCENE])  # system:platform:instrument:target
+                cw = ":{:5.2f}µm".format(ds.attrs[Info.CENTRAL_WAVELENGTH])
+            ds.attrs[Info.FAMILY] = '{}:{}:{}{}'.format(
+                ds.attrs[Info.KIND].name, ds.attrs[Info.STANDARD_NAME],
+                ds.attrs[Info.SHORT_NAME], cw)
+            ds.attrs[Info.CATEGORY] = 'SatPy:{}:{}:{}'.format(
+                ds.attrs[Info.PLATFORM].name, ds.attrs[Info.INSTRUMENT].name,
+                ds.attrs[Info.SCENE])  # system:platform:instrument:target
             # TODO: Include level or something else in addition to time?
             start_str = ds.attrs['start_time'].isoformat()
-            ds.attrs[INFO.SERIAL] = start_str if model_time is None else model_time + ":" + start_str
+            ds.attrs[Info.SERIAL] = start_str if model_time is None else model_time + ":" + start_str
 
         return self.scn
 
@@ -1044,11 +1044,11 @@ class SatPyImporter(aImporter):
         half_pixel_y = abs(area.pixel_size_y) / 2.
 
         return {
-            INFO.PROJ: area.proj4_string,
-            INFO.ORIGIN_X: area.area_extent[0] + half_pixel_x,
-            INFO.ORIGIN_Y: area.area_extent[3] - half_pixel_y,
-            INFO.CELL_HEIGHT: -abs(area.pixel_size_y),
-            INFO.CELL_WIDTH: area.pixel_size_x,
+            Info.PROJ: area.proj4_string,
+            Info.ORIGIN_X: area.area_extent[0] + half_pixel_x,
+            Info.ORIGIN_Y: area.area_extent[3] - half_pixel_y,
+            Info.CELL_HEIGHT: -abs(area.pixel_size_y),
+            Info.CELL_WIDTH: area.pixel_size_x,
         }
 
     def begin_import_products(self, *product_ids) -> Generator[import_progress, None, None]:
@@ -1070,7 +1070,7 @@ class SatPyImporter(aImporter):
         for idx, (prod, ds_id) in enumerate(zip(products, dataset_ids)):
             dataset = self.scn[ds_id]
             shape = dataset.shape
-            num_contents = 1 if prod.info[INFO.KIND] == KIND.IMAGE else 2
+            num_contents = 1 if prod.info[Info.KIND] == Kind.IMAGE else 2
 
             if prod.content:
                 LOG.warning('content was already available, skipping import')
@@ -1078,11 +1078,11 @@ class SatPyImporter(aImporter):
 
             now = datetime.utcnow()
             area_info = self._area_to_sift_attrs(dataset.attrs['area'])
-            cell_width = area_info[INFO.CELL_WIDTH]
-            cell_height = area_info[INFO.CELL_HEIGHT]
-            proj4 = area_info[INFO.PROJ]
-            origin_x = area_info[INFO.ORIGIN_X]
-            origin_y = area_info[INFO.ORIGIN_Y]
+            cell_width = area_info[Info.CELL_WIDTH]
+            cell_height = area_info[Info.CELL_HEIGHT]
+            proj4 = area_info[Info.PROJ]
+            origin_x = area_info[Info.ORIGIN_X]
+            origin_y = area_info[Info.ORIGIN_Y]
             data = dataset.data
 
             # Handle building contours for data from 0 to 360 longitude
@@ -1091,7 +1091,7 @@ class SatPyImporter(aImporter):
                 # the x coordinate for the antimeridian in this projection
                 antimeridian = Proj(proj4)(antimeridian, 0)[0]
             am_index = int(np.ceil((antimeridian - origin_x) / cell_width))
-            if prod.info[INFO.KIND] == KIND.CONTOUR and 0 < am_index < shape[1]:
+            if prod.info[Info.KIND] == Kind.CONTOUR and 0 < am_index < shape[1]:
                 # if we have data from 0 to 360 longitude, we want -180 to 360
                 data = da.concatenate((data[:, am_index:], data), axis=1)
                 shape = data.shape
@@ -1127,7 +1127,7 @@ class SatPyImporter(aImporter):
                 origin_x=origin_x,
                 origin_y=origin_y,
             )
-            c.info[INFO.KIND] = KIND.IMAGE
+            c.info[Info.KIND] = Kind.IMAGE
             # c.info.update(prod.info) would just make everything leak together so let's not do it
             self._S.add(c)
             prod.content.append(c)
@@ -1155,8 +1155,8 @@ class SatPyImporter(aImporter):
             data_path = os.path.join(self._cwd, data_filename)
             try:
                 contour_data = self._compute_contours(
-                        img_data, prod.info[INFO.VALID_RANGE][0],
-                        prod.info[INFO.VALID_RANGE][1], levels)
+                        img_data, prod.info[Info.VALID_RANGE][0],
+                        prod.info[Info.VALID_RANGE][1], levels)
             except ValueError:
                 LOG.warning("Could not compute contour levels for '{}'".format(prod.uuid))
                 LOG.debug("Contour error: ", exc_info=True)
@@ -1186,7 +1186,7 @@ class SatPyImporter(aImporter):
                 origin_x=origin_x,
                 origin_y=origin_y,
             )
-            c.info[INFO.KIND] = KIND.CONTOUR
+            c.info[Info.KIND] = Kind.CONTOUR
             # c.info["level_index"] = level_indexes
             self._S.add(c)
             prod.content.append(c)

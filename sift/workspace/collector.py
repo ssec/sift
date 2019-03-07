@@ -23,7 +23,7 @@ import os, sys
 import logging, unittest
 from PyQt4.QtCore import QObject, pyqtSignal
 from typing import Union, Set, List, Iterable, Mapping
-from ..common import INFO
+from ..common import Info
 from .workspace import Workspace
 from sift.queue import TASK_DOING, TASK_PROGRESS
 from datetime import datetime
@@ -39,7 +39,7 @@ class _workspace_test_proxy(object):
     def collect_product_metadata_for_paths(self, paths):
         LOG.debug("import metadata for files: {}".format(repr(paths)))
         for path in paths:
-            yield 1, {INFO.PATHNAME: path}
+            yield 1, {Info.PATHNAME: path}
 
     class _emitsy(object):
         def emit(self, stuff):
@@ -161,11 +161,11 @@ class ResourceSearchPathCollector(QObject):
         yield {TASK_DOING: 'collecting metadata 0/{}'.format(ntodo), TASK_PROGRESS: 0.0}
         changed_uuids = set()
         for num_prods, product_info in self._ws.collect_product_metadata_for_paths(todo):
-            path = product_info.get(INFO.PATHNAME, None)
+            path = product_info.get(Info.PATHNAME, None)
             dex = redex.get(path, 0.0)
             status = {TASK_DOING: 'collecting metadata {}/{}'.format(dex+1, ntodo), TASK_PROGRESS: float(dex)/float(ntodo)}
             # LOG.debug(repr(status))
-            changed_uuids.add(product_info[INFO.UUID])
+            changed_uuids.add(product_info[Info.UUID])
             yield status
         yield {TASK_DOING: 'collecting metadata done', TASK_PROGRESS: 1.0}
         if changed_uuids:
@@ -192,7 +192,7 @@ def main():
         epilog="",
         fromfile_prefix_chars='@')
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG')
+                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG')
     parser.add_argument('-d', '--debug', dest='debug', action='store_true',
                         help="enable interactive PDB debugger on exception")
     parser.add_argument('inputs', nargs='*',

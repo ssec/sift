@@ -14,7 +14,7 @@ from uuid import UUID
 from typing import Tuple, Optional, Mapping, List, Any, Callable, Set, Iterable
 from PyQt4.QtGui import QMenu
 
-from sift.common import Span, STATE, flags
+from sift.common import Span, State, Flags
 from sift.view.timeline.common import VisualState
 from sift.view.timeline.items import QTrackItem, QFrameItem
 from sift.view.timeline.scene import QFramesInTracksScene
@@ -28,18 +28,18 @@ LOG = logging.getLogger(__name__)
 
 # since timeline view is interface-independent of sift.common, we translate
 DOC_STATE_TO_VISUAL_STATE = {
-    STATE.POTENTIAL: set(),
-    STATE.ARRIVING: {VisualState.BUSY},
-    STATE.CACHED: {VisualState.AVAILABLE},
-    STATE.ATTACHED: {VisualState.READY},
-    STATE.ONSCREEN: {VisualState.HIGHLIGHT},
-    STATE.UNKNOWN: {VisualState.ERROR},
-    STATE.DANGLING: {VisualState.WARNING},
+    State.POTENTIAL: set(),
+    State.ARRIVING: {VisualState.BUSY},
+    State.CACHED: {VisualState.AVAILABLE},
+    State.ATTACHED: {VisualState.READY},
+    State.ONSCREEN: {VisualState.HIGHLIGHT},
+    State.UNKNOWN: {VisualState.ERROR},
+    State.DANGLING: {VisualState.WARNING},
 }
 
 
-def _translate_to_visual_state(s: flags) -> flags:
-    f = flags()
+def _translate_to_visual_state(s: Flags) -> Flags:
+    f = Flags()
     for x in s:
         f.update(DOC_STATE_TO_VISUAL_STATE.get(x) or set())
     return f
@@ -320,14 +320,14 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
 #         epilog="",
 #         fromfile_prefix_chars='@')
 #     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-#                         help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG')
+#                         help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG')
 #     parser.add_argument('-d', '--debug', dest='debug', action='store_true',
 #                         help="enable interactive PDB debugger on exception")
 #     parser.add_argument('inputs', nargs='*',
 #                         help="input files to process")
 #     args = parser.parse_args()
 #
-#     levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
+#     levels = [logging.ERROR, logging.WARN, logging.Info, logging.DEBUG]
 #     logging.basicConfig(level=levels[min(3, args.verbosity)])
 #
 #     if args.debug:

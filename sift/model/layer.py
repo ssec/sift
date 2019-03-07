@@ -21,7 +21,7 @@ from _weakref import ref
 from collections import ChainMap
 from itertools import chain
 from enum import Enum
-from sift.common import INFO, KIND
+from sift.common import Info, Kind
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -86,7 +86,7 @@ class DocLayer(ChainMap):
         UUID of the layer, which for basic layers is likely to be the UUID of the dataset in the workspace.
         :return:
         """
-        return self[INFO.UUID]
+        return self[Info.UUID]
 
     @property
     def kind(self):
@@ -95,37 +95,37 @@ class DocLayer(ChainMap):
          We may deprecate this eventually?
         :return:
         """
-        return self[INFO.KIND]
+        return self[Info.KIND]
 
     @property
     def band(self):
-        return self.get(INFO.BAND)
+        return self.get(Info.BAND)
 
     @property
     def instrument(self):
-        return self.get(INFO.INSTRUMENT)
+        return self.get(Info.INSTRUMENT)
 
     @property
     def platform(self):
-        return self.get(INFO.PLATFORM)
+        return self.get(Info.PLATFORM)
 
     @property
     def sched_time(self):
-        return self.get(INFO.SCHED_TIME)
+        return self.get(Info.SCHED_TIME)
 
     @property
     def dataset_name(self):
-        return self[INFO.DATASET_NAME]
+        return self[Info.DATASET_NAME]
 
     @property
     def display_name(self):
-        return self[INFO.DISPLAY_NAME]
+        return self[Info.DISPLAY_NAME]
 
     @property
     def default_display_name(self):
         for d in reversed(self.maps):
-            if INFO.DISPLAY_NAME in d:
-                return d[INFO.DISPLAY_NAME]
+            if Info.DISPLAY_NAME in d:
+                return d[Info.DISPLAY_NAME]
         return None
 
     @property
@@ -180,7 +180,7 @@ class DocRGBLayer(DocCompositeLayer):
         self.n = [None, None, None, None]  # RGBA minimum value from upstream layers
         self.x = [None, None, None, None]  # RGBA maximum value from upstream layers
         self.recipe = recipe
-        info.setdefault(INFO.KIND, KIND.RGB)
+        info.setdefault(Info.KIND, Kind.RGB)
         super().__init__(doc, info, *args, **kwargs)
 
     @property
@@ -232,28 +232,28 @@ class DocRGBLayer(DocCompositeLayer):
 
     @property
     def shared_projections(self):
-        return all(x[INFO.PROJ] == self[INFO.PROJ] for x in self.l[:3] if x is not None)
+        return all(x[Info.PROJ] == self[Info.PROJ] for x in self.l[:3] if x is not None)
 
     @property
     def shared_origin(self):
         if all(x is None for x in self.l[:3]):
             return False
 
-        atol = max(abs(x[INFO.CELL_WIDTH])
+        atol = max(abs(x[Info.CELL_WIDTH])
                    for x in self.l[:3] if x is not None)
-        shared_x = all(np.isclose(x[INFO.ORIGIN_X], self[INFO.ORIGIN_X], atol=atol)
+        shared_x = all(np.isclose(x[Info.ORIGIN_X], self[Info.ORIGIN_X], atol=atol)
                        for x in self.l[:3] if x is not None)
 
-        atol = max(abs(x[INFO.CELL_HEIGHT])
+        atol = max(abs(x[Info.CELL_HEIGHT])
                    for x in self.l[:3] if x is not None)
-        shared_y = all(np.isclose(x[INFO.ORIGIN_Y], self[INFO.ORIGIN_Y], atol=atol)
+        shared_y = all(np.isclose(x[Info.ORIGIN_Y], self[Info.ORIGIN_Y], atol=atol)
                        for x in self.l[:3] if x is not None)
         return shared_x and shared_y
 
     @property
     def recipe_layers_match(self):
         def _get_family(layer):
-            return layer[INFO.FAMILY] if layer else None
+            return layer[Info.FAMILY] if layer else None
         return all([_get_family(x) == self.recipe.input_ids[idx] for idx, x in enumerate(self.l[:3])])
 
     @property
@@ -272,7 +272,7 @@ class DocRGBLayer(DocCompositeLayer):
 
     @property
     def central_wavelength(self):
-        gb = lambda l: None if (l is None) else l.get(INFO.CENTRAL_WAVELENGTH)
+        gb = lambda l: None if (l is None) else l.get(Info.CENTRAL_WAVELENGTH)
         return gb(self.r), gb(self.g), gb(self.b)
 
     @property
@@ -292,7 +292,7 @@ class DocRGBLayer(DocCompositeLayer):
 
     @property
     def scene(self):
-        gst = lambda x: None if (x is None) else x[INFO.SCENE]
+        gst = lambda x: None if (x is None) else x[Info.SCENE]
         return _concurring(gst(self.r), gst(self.g), gst(self.b), remove_none=True)
 
     def _get_units_conversion(self):
@@ -306,7 +306,7 @@ class DocRGBLayer(DocCompositeLayer):
                 for i, dep in enumerate(deps):
                     new_val = x_tmp[i * num_elems: (i + 1) * num_elems]
                     if dep is not None:
-                        new_val = dep[INFO.UNIT_CONVERSION][1](new_val, inverse=inverse)
+                        new_val = dep[Info.UNIT_CONVERSION][1](new_val, inverse=inverse)
                     new_vals.append(new_val)
                 res = np.array(new_vals).reshape(x.shape)
                 return res
@@ -320,7 +320,7 @@ class DocRGBLayer(DocCompositeLayer):
 
     def _default_display_time(self):
         dep_info = [self.r, self.g, self.b]
-        valid_times = [nfo.get(INFO.SCHED_TIME, None) for nfo in dep_info if nfo is not None]
+        valid_times = [nfo.get(Info.SCHED_TIME, None) for nfo in dep_info if nfo is not None]
         valid_times = [x.strftime("%Y-%m-%d %H:%M:%S") if x is not None else '<unknown time>' for x in valid_times]
         if len(valid_times) == 0:
             display_time = '<unknown time>'
@@ -337,7 +337,7 @@ class DocRGBLayer(DocCompositeLayer):
                 if dep_layer is None:
                     name = u"{}:---".format(color)
                 else:
-                    name = u"{}:{}".format(color, dep_layer[INFO.SHORT_NAME])
+                    name = u"{}:{}".format(color, dep_layer[Info.SHORT_NAME])
                 names.append(name)
             name = u' '.join(names)
         except KeyError:
@@ -365,46 +365,46 @@ class DocRGBLayer(DocCompositeLayer):
         short_name = self._default_short_name()
         name = self._default_display_name(short_name=short_name, display_time=display_time)
         ds_info = {
-            INFO.DATASET_NAME: short_name,
-            INFO.SHORT_NAME: short_name,
-            INFO.DISPLAY_NAME: name,
-            INFO.DISPLAY_TIME: display_time,
-            INFO.SCHED_TIME: self.sched_time,
-            INFO.BAND: self.band,
-            INFO.CENTRAL_WAVELENGTH: self.central_wavelength,
-            INFO.INSTRUMENT: self.instrument,
-            INFO.PLATFORM: self.platform,
-            INFO.SCENE: self.scene,
-            INFO.UNIT_CONVERSION: self._get_units_conversion(),
-            INFO.UNITS: None,
-            INFO.VALID_RANGE: [d[INFO.VALID_RANGE] if d else (None, None) for d in dep_info],
+            Info.DATASET_NAME: short_name,
+            Info.SHORT_NAME: short_name,
+            Info.DISPLAY_NAME: name,
+            Info.DISPLAY_TIME: display_time,
+            Info.SCHED_TIME: self.sched_time,
+            Info.BAND: self.band,
+            Info.CENTRAL_WAVELENGTH: self.central_wavelength,
+            Info.INSTRUMENT: self.instrument,
+            Info.PLATFORM: self.platform,
+            Info.SCENE: self.scene,
+            Info.UNIT_CONVERSION: self._get_units_conversion(),
+            Info.UNITS: None,
+            Info.VALID_RANGE: [d[Info.VALID_RANGE] if d else (None, None) for d in dep_info],
         }
 
         if self.r is None and self.g is None and self.b is None:
             ds_info.update({
-                INFO.ORIGIN_X: None,
-                INFO.ORIGIN_Y: None,
-                INFO.CELL_WIDTH: None,
-                INFO.CELL_HEIGHT: None,
-                INFO.PROJ: None,
-                INFO.CLIM: ((None, None), (None, None), (None, None)),  # defer initialization until we have upstream layers
+                Info.ORIGIN_X: None,
+                Info.ORIGIN_Y: None,
+                Info.CELL_WIDTH: None,
+                Info.CELL_HEIGHT: None,
+                Info.PROJ: None,
+                Info.CLIM: ((None, None), (None, None), (None, None)),  # defer initialization until we have upstream layers
             })
         else:
-            highest_res_dep = min([x for x in dep_info if x is not None], key=lambda x: x[INFO.CELL_WIDTH])
+            highest_res_dep = min([x for x in dep_info if x is not None], key=lambda x: x[Info.CELL_WIDTH])
             ds_info.update({
-                INFO.ORIGIN_X: highest_res_dep[INFO.ORIGIN_X],
-                INFO.ORIGIN_Y: highest_res_dep[INFO.ORIGIN_Y],
-                INFO.CELL_WIDTH: highest_res_dep[INFO.CELL_WIDTH],
-                INFO.CELL_HEIGHT: highest_res_dep[INFO.CELL_HEIGHT],
-                INFO.PROJ: highest_res_dep[INFO.PROJ],
+                Info.ORIGIN_X: highest_res_dep[Info.ORIGIN_X],
+                Info.ORIGIN_Y: highest_res_dep[Info.ORIGIN_Y],
+                Info.CELL_WIDTH: highest_res_dep[Info.CELL_WIDTH],
+                Info.CELL_HEIGHT: highest_res_dep[Info.CELL_HEIGHT],
+                Info.PROJ: highest_res_dep[Info.PROJ],
             })
 
-            old_clim = self.get(INFO.CLIM, None)
+            old_clim = self.get(Info.CLIM, None)
             if not old_clim:  # initialize from upstream default maxima
-                ds_info[INFO.CLIM] = tuple(tuple(d[INFO.CLIM]) if d is not None else (None, None) for d in dep_info)
+                ds_info[Info.CLIM] = tuple(tuple(d[Info.CLIM]) if d is not None else (None, None) for d in dep_info)
             else:  # merge upstream with existing settings, replacing None with upstream; watch out for upstream==None case
-                upclim = lambda up: (None, None) if (up is None) else tuple(up.get(INFO.CLIM, (None, None)))
-                ds_info[INFO.CLIM] = tuple((existing or upclim(upstream)) for (existing,upstream) in zip(old_clim, dep_info))
+                upclim = lambda up: (None, None) if (up is None) else tuple(up.get(Info.CLIM, (None, None)))
+                ds_info[Info.CLIM] = tuple((existing or upclim(upstream)) for (existing, upstream) in zip(old_clim, dep_info))
 
         self.update(ds_info)
         if self.has_deps:
@@ -449,7 +449,7 @@ def main():
         epilog="",
         fromfile_prefix_chars='@')
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG')
+                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG')
     # http://docs.python.org/2.7/library/argparse.html#nargs
     # parser.add_argument('--stuff', nargs='5', dest='my_stuff',
     #                    help="one or more random things")

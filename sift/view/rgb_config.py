@@ -10,7 +10,7 @@ from uuid import UUID
 from PyQt4.QtCore import QObject, pyqtSignal
 from PyQt4.QtGui import QDoubleValidator, QComboBox, QLineEdit
 
-from sift.common import INFO, KIND
+from sift.common import Info, Kind
 
 LOG = logging.getLogger(__name__)
 RGBA2IDX: Mapping[str, int] = dict(r=0, g=1, b=2, a=3)
@@ -114,7 +114,7 @@ class RGBLayerConfigPane(QObject):
         return self._gamma_boxes
 
     def family_added(self, family, family_info):
-        if family_info[INFO.KIND] in [KIND.RGB, KIND.CONTOUR]:
+        if family_info[Info.KIND] in [Kind.RGB, Kind.CONTOUR]:
             # can't choose RGBs as components of RGBs
             return
 
@@ -151,7 +151,7 @@ class RGBLayerConfigPane(QObject):
         if family is None:
             return values
         family_info = self._families[family]
-        return family_info[INFO.UNIT_CONVERSION][1](values, inverse=True)
+        return family_info[Info.UNIT_CONVERSION][1](values, inverse=True)
 
     def _data_to_display(self, color:str, values):
         "convert data value to display value"
@@ -159,7 +159,7 @@ class RGBLayerConfigPane(QObject):
         if family is None:
             return values
         family_info = self._families[family]
-        return family_info[INFO.UNIT_CONVERSION][1](values)
+        return family_info[Info.UNIT_CONVERSION][1](values)
 
     def _get_slider_value(self, valid_min, valid_max, slider_val):
         return (slider_val / self._slider_steps) * (valid_max - valid_min) + valid_min
@@ -312,7 +312,7 @@ class RGBLayerConfigPane(QObject):
             editn.setDisabled(False)
             editx.setDisabled(False)
 
-            valid_range = self._families[family][INFO.VALID_RANGE]
+            valid_range = self._families[family][Info.VALID_RANGE]
             self._valid_ranges[idx] = valid_range
 
             slider_val = self._create_slider_value(valid_range[0], valid_range[1], clims[0])
@@ -373,9 +373,9 @@ class RGBLayerConfigPane(QObject):
                 # if the current family was removed by the document then the
                 # document should have updated the recipe
                 widget.setCurrentIndex(0)
-            for idx, (family_name, family_info) in enumerate(sorted(self._families.items(), key=lambda x: x[1][INFO.DISPLAY_FAMILY])):
+            for idx, (family_name, family_info) in enumerate(sorted(self._families.items(), key=lambda x: x[1][Info.DISPLAY_FAMILY])):
                 # Qt can't handle tuples as
-                display_name = family_info[INFO.DISPLAY_FAMILY]
+                display_name = family_info[Info.DISPLAY_FAMILY]
                 LOG.debug('adding to widget family {} as "{}"'.format(family_name, display_name))
                 widget.addItem(display_name, family_name)
                 sanity_check = widget.findData(family_name)

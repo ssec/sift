@@ -196,7 +196,7 @@ def main():
     parser.add_argument("--input-pattern", default="????/*.nc",
                         help="Input pattern used search for NetCDF files in 'input_dir'")
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG (default INFO)')
+                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG (default Info)')
 
     # http://www.gdal.org/frmt_gtiff.html
     parser.add_argument('--compress', default=None,

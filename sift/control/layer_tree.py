@@ -41,7 +41,7 @@ from PyQt4.QtGui import (QTreeView, QStyledItemDelegate, QAbstractItemView,
                          QItemSelection, QItemSelectionModel, QPen,
                          QActionGroup, QAction)
 from sift.model.document import Document, DocumentAsLayerStack
-from sift.common import INFO, KIND, get_font_size
+from sift.common import Info, Kind, get_font_size
 from sift.view.colormap_dialogs import ChangeColormapDialog
 
 LOG = logging.getLogger(__name__)
@@ -77,7 +77,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
 
     def sizeHint(self, option:QStyleOptionViewItem, index:QModelIndex):
         pz = self.layer_prez(index.row())
-        # if pz.kind == KIND.RGB:
+        # if pz.kind == Kind.RGB:
         #     LOG.debug('triple-sizing composite layer')
         #     return QSize(CELL_WIDTH, CELL_HEIGHT*3)
         # else:
@@ -174,7 +174,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     #     checked = index.model().data(index, QtCore.Qt.DisplayRole) == 'True'
     #     check_box_style_option = QtGui.QStyleOptionButton()
     #
-    #     if (index.flags() & QtCore.Qt.ItemIsEditable) > 0:
+    #     if (index.Flags() & QtCore.Qt.ItemIsEditable) > 0:
     #         check_box_style_option.state |= QtGui.QStyle.State_Enabled
     #     else:
     #         check_box_style_option.state |= QtGui.QStyle.State_ReadOnly
@@ -201,7 +201,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     #     Key_Space or Key_Select and this cell is editable. Otherwise do nothing.
     #     '''
     #     print 'Check Box editor Event detected : '
-    #     if not (index.flags() & QtCore.Qt.ItemIsEditable) > 0:
+    #     if not (index.Flags() & QtCore.Qt.ItemIsEditable) > 0:
     #         return False
     #
     #     print 'Check Box edior Event detected : passed first check'
@@ -422,7 +422,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         actions = {}
         requests = {}
         if len(selected_uuids) > 3 or \
-                any(self.doc[u][INFO.KIND] not in [KIND.IMAGE, KIND.COMPOSITE] for u in selected_uuids):
+                any(self.doc[u][Info.KIND] not in [Kind.IMAGE, Kind.COMPOSITE] for u in selected_uuids):
             LOG.warning('Need 3 image layers to create a composite')
             return {}
 
@@ -453,12 +453,12 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         def _change_layers_image_kind(action, action_kinds=action_kinds):
             if not action.isChecked():
                 # can't uncheck an image kind
-                LOG.debug("Selected KIND action is not checked")
+                LOG.debug("Selected Kind action is not checked")
                 return
             kind = action_kinds[action]
             return self.doc.change_layers_image_kind(selected_uuids, kind)
 
-        for kind in [KIND.IMAGE, KIND.CONTOUR]:
+        for kind in [Kind.IMAGE, Kind.CONTOUR]:
             action = action_group.addAction(QAction(kind.name, menu, checkable=True))
             action_kinds[action] = kind
             action.setChecked(kind == current_kind)
@@ -475,12 +475,12 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         menu = QMenu()
         actions = {}
         if len(selected_uuids) == 1:
-            if self.doc[selected_uuids[0]][INFO.KIND] in [KIND.IMAGE, KIND.COMPOSITE, KIND.CONTOUR]:
+            if self.doc[selected_uuids[0]][Info.KIND] in [Kind.IMAGE, Kind.COMPOSITE, Kind.CONTOUR]:
                 actions.update(self.change_layer_colormap_menu(menu, lbox, selected_uuids, *args))
-            if self.doc[selected_uuids[0]][INFO.KIND] in [KIND.CONTOUR]:
+            if self.doc[selected_uuids[0]][Info.KIND] in [Kind.CONTOUR]:
                 actions.update(self.change_layer_image_kind_menu(menu, lbox, selected_uuids, *args))
         if 0 < len(selected_uuids) <= 3:
-            if all(self.doc[u][INFO.KIND] in [KIND.IMAGE, KIND.COMPOSITE]
+            if all(self.doc[u][Info.KIND] in [Kind.IMAGE, Kind.COMPOSITE]
                    for u in selected_uuids):
                 actions.update(self.composite_layer_menu(
                     menu, lbox, selected_uuids, *args))
@@ -583,12 +583,12 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         return ['text/uri-list', self._mimetype]  # ref https://github.com/shotgunsoftware/pyqt-uploader/blob/master/uploader.py
 
     # http://stackoverflow.com/questions/6942098/qt-qtreeview-only-allow-to-drop-on-an-existing-item
-    # Reimplement the flags method of the underlying model to return Qt::ItemIsDropEnabled only if passed index is valid.
-    # When in between items, flags() is called with an invalid index so I can decide not to accept the drop
+    # Reimplement the Flags method of the underlying model to return Qt::ItemIsDropEnabled only if passed index is valid.
+    # When in between items, Flags() is called with an invalid index so I can decide not to accept the drop
     # For the inverse you can do this: if ( index.isValid() ) { return Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsDragEnabled; }
     # else { return Qt::ItemIsSelectable | Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled | Qt::ItemIsEnabled; }
     def flags(self, index):
-        # flags = super(LayerStackListViewModel, self).flags(index)
+        # Flags = super(LayerStackListViewModel, self).Flags(index)
         if index.isValid():
             flags = (Qt.ItemIsEnabled |
                      Qt.ItemIsSelectable |
@@ -647,7 +647,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             return None
 
         # pass auxiliary info about the layer through the Qt.UserRole for use when displaying
-        eq_content = self._last_equalizer_values.get(info[INFO.UUID], None)
+        eq_content = self._last_equalizer_values.get(info[Info.UUID], None)
         if role == Qt.UserRole:
             # get the animation order also
             animation_order = self.doc.layer_animation_order(row)
@@ -665,7 +665,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             return str(value)
         elif role == Qt.DisplayRole:
             # lao = self.doc.layer_animation_order(row)
-            name = info[INFO.DISPLAY_NAME]
+            name = info[Info.DISPLAY_NAME]
             # return  ('[-]  ' if lao is None else '[{}]'.format(lao+1)) + el[row]['name']
             # if leroy:
             #     data = '[%.2f] ' % leroy[0]

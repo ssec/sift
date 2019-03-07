@@ -31,7 +31,7 @@ from vispy.visuals.transforms import STTransform, MatrixTransform, ChainTransfor
 from vispy.visuals import MarkersVisual, marker_types, LineVisual
 from vispy.scene.visuals import Markers, Polygon, Compound, Line
 from vispy.geometry import Rect
-from sift.common import DEFAULT_ANIMATION_DELAY, INFO, KIND, TOOL, Presentation
+from sift.common import DEFAULT_ANIMATION_DELAY, Info, Kind, Tool, Presentation
 from sift.view.visuals import (NEShapefileLines, TiledGeolocatedImage,
                                RGBCompositeLayer, PrecomputedIsocurve)
 from sift.view.cameras import PanZoomProbeCamera
@@ -545,14 +545,14 @@ class SceneGraphManager(QObject):
         self.main_view = self.main_canvas.central_widget.add_view()
 
         # Camera Setup
-        self.pz_camera = PanZoomProbeCamera(name=TOOL.PAN_ZOOM.name, aspect=1, pan_limits=(-1., -1., 1., 1.), zoom_limits=(0.0015, 0.0015))
+        self.pz_camera = PanZoomProbeCamera(name=Tool.PAN_ZOOM.name, aspect=1, pan_limits=(-1., -1., 1., 1.), zoom_limits=(0.0015, 0.0015))
         self.main_view.camera = self.pz_camera
         self.main_view.camera.flip = (False, False, False)
         # self.main_view.events.mouse_press.connect(self.on_mouse_press_point, after=list(self.main_view.events.mouse_press.callbacks))
         # self.main_view.events.mouse_press.connect(self.on_mouse_press_region, after=list(self.main_view.events.mouse_press.callbacks))
         self.main_view.events.mouse_press.connect(self.on_mouse_press_point)
         self.main_view.events.mouse_press.connect(self.on_mouse_press_region)
-        self.change_tool(TOOL.PAN_ZOOM)
+        self.change_tool(Tool.PAN_ZOOM)
 
         z_level_transform = MatrixTransform()
         # near/far is backwards it seems:
@@ -682,7 +682,7 @@ class SceneGraphManager(QObject):
         if event.handled:
             return
         modifiers = event.mouse_event.modifiers
-        if (event.button == 2 and not modifiers) or (self._current_tool == TOOL.POINT_PROBE and event.button == 1):
+        if (event.button == 2 and not modifiers) or (self._current_tool == Tool.POINT_PROBE and event.button == 1):
             buffer_pos = event.sources[0].transforms.get_transform().map(event.pos)
             # FIXME: We should be able to use the main_map object to do the transform...but it doesn't work (waiting on vispy developers)
             # map_pos = self.main_map.transforms.get_transform().imap(buffer_pos)
@@ -698,7 +698,7 @@ class SceneGraphManager(QObject):
         if event.handled:
             return
         modifiers = event.mouse_event.modifiers
-        if (event.button == 2 and modifiers == (SHIFT,)) or (self._current_tool == TOOL.REGION_PROBE and event.button == 1):
+        if (event.button == 2 and modifiers == (SHIFT,)) or (self._current_tool == Tool.REGION_PROBE and event.button == 1):
             buffer_pos = event.sources[0].transforms.get_transform().map(event.pos)
             map_pos = self.borders.transforms.get_transform().imap(buffer_pos)
             if np.any(np.abs(map_pos[:2]) > 1e25):
@@ -813,23 +813,23 @@ class SceneGraphManager(QObject):
         self._current_tool = name
 
         # Set the cursor
-        if name == TOOL.PAN_ZOOM:
+        if name == Tool.PAN_ZOOM:
             # self.main_canvas.native.setCursor(QCursor(QPixmap("py/sift/ui/cursors/noun_275_cc.png")))
             # self.main_canvas.native.setCursor(QCursor(Qt.SizeAllCursor))
             self.main_canvas.native.setCursor(QCursor(Qt.OpenHandCursor))
-        elif name == TOOL.POINT_PROBE:
+        elif name == Tool.POINT_PROBE:
             self.main_canvas.native.setCursor(QCursor(Qt.PointingHandCursor))
-        elif name == TOOL.REGION_PROBE:
+        elif name == Tool.REGION_PROBE:
             self.main_canvas.native.setCursor(QCursor(Qt.CrossCursor))
 
         # disconnect the previous signals (if needed)
-        if prev_tool == TOOL.PAN_ZOOM:
+        if prev_tool == Tool.PAN_ZOOM:
             self.main_view.events.mouse_press.disconnect(self.pz_camera.viewbox_mouse_event)
             self.main_view.events.mouse_release.disconnect(self.pz_camera.viewbox_mouse_event)
             self.main_view.events.mouse_move.disconnect(self.pz_camera.viewbox_mouse_event)
 
         # connect the new signals (if needed)
-        if name == TOOL.PAN_ZOOM:
+        if name == Tool.PAN_ZOOM:
             self.main_view.events.mouse_press.connect(self.pz_camera.viewbox_mouse_event)
             self.main_view.events.mouse_release.connect(self.pz_camera.viewbox_mouse_event)
             self.main_view.events.mouse_move.connect(self.pz_camera.viewbox_mouse_event)
@@ -837,7 +837,7 @@ class SceneGraphManager(QObject):
         LOG.info("Changing tool to '%s'", name)
 
     def next_tool(self):
-        tool_names = list(TOOL)
+        tool_names = list(Tool)
         idx = tool_names.index(self._current_tool)
         idx = (idx + 1) % len(tool_names)
         self.change_tool(tool_names[idx])
@@ -912,20 +912,20 @@ class SceneGraphManager(QObject):
         levels = layer["contour_levels"]
         cmap = self.document.find_colormap(p.colormap)
 
-        proj4_str = layer[INFO.PROJ]
+        proj4_str = layer[Info.PROJ]
         parent = self.proxy_nodes.get(proj4_str)
         if parent is None:
             parent = ContourGroupNode(parent=self.main_map)
-            parent.transform = PROJ4Transform(layer[INFO.PROJ], inverse=True)
+            parent.transform = PROJ4Transform(layer[Info.PROJ], inverse=True)
             self.proxy_nodes[proj4_str] = parent
 
         contour_visual = PrecomputedIsocurve(verts, connects, level_indexes,
                                              levels=levels, color_lev=cmap,
                                              clim=p.climits,
                                              parent=parent,
-                                             name=str(layer[INFO.UUID]))
+                                             name=str(layer[Info.UUID]))
         contour_visual.transform *= STTransform(translate=(0, 0, -50.0))
-        self.image_elements[layer[INFO.UUID]] = contour_visual
+        self.image_elements[layer[Info.UUID]] = contour_visual
         self.layer_set.add_layer(contour_visual)
         self.on_view_change(None)
 
@@ -935,29 +935,29 @@ class SceneGraphManager(QObject):
         if not layer.is_valid:
             LOG.warning('unable to add an invalid layer, will try again later when layer changes')
             return
-        if layer[INFO.UUID] in self.image_elements:
-            image = self.image_elements[layer[INFO.UUID]]
-            if p.kind == KIND.CONTOUR and isinstance(image, PrecomputedIsocurve):
+        if layer[Info.UUID] in self.image_elements:
+            image = self.image_elements[layer[Info.UUID]]
+            if p.kind == Kind.CONTOUR and isinstance(image, PrecomputedIsocurve):
                 LOG.warning("Contour layer already exists in scene")
                 return
-            if p.kind == KIND.IMAGE and isinstance(image, TiledGeolocatedImage):
+            if p.kind == Kind.IMAGE and isinstance(image, TiledGeolocatedImage):
                 LOG.warning("Image layer already exists in scene")
                 return
             # we already have an image layer for it and it isn't what we want
             # remove the existing image object and create the proper type now
             image.parent = None
-            del self.image_elements[layer[INFO.UUID]]
+            del self.image_elements[layer[Info.UUID]]
 
         overview_content = self.workspace.get_content(layer.uuid, kind=p.kind)
-        if p.kind == KIND.CONTOUR:
+        if p.kind == Kind.CONTOUR:
             return self.add_contour_layer(layer, p, overview_content)
 
         image = TiledGeolocatedImage(
             overview_content,
-            layer[INFO.ORIGIN_X],
-            layer[INFO.ORIGIN_Y],
-            layer[INFO.CELL_WIDTH],
-            layer[INFO.CELL_HEIGHT],
+            layer[Info.ORIGIN_X],
+            layer[Info.ORIGIN_Y],
+            layer[Info.CELL_WIDTH],
+            layer[Info.CELL_HEIGHT],
             name=str(uuid),
             clim=p.climits,
             gamma=p.gamma,
@@ -968,9 +968,9 @@ class SceneGraphManager(QObject):
             texture_shape=DEFAULT_TEXTURE_SHAPE,
             wrap_lon=False,
             parent=self.main_map,
-            projection=layer[INFO.PROJ],
+            projection=layer[Info.PROJ],
         )
-        image.transform = PROJ4Transform(layer[INFO.PROJ], inverse=True)
+        image.transform = PROJ4Transform(layer[Info.PROJ], inverse=True)
         image.transform *= STTransform(translate=(0, 0, -50.0))
         self.image_elements[uuid] = image
         self.layer_set.add_layer(image)
@@ -983,17 +983,17 @@ class SceneGraphManager(QObject):
         if not layer.is_valid:
             LOG.info('unable to add an invalid layer, will try again later when layer changes')
             return
-        if p.kind == KIND.RGB:
+        if p.kind == Kind.RGB:
             dep_uuids = r,g,b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
-            overview_content = list(self.workspace.get_content(cuuid, kind=KIND.IMAGE) for cuuid in dep_uuids)
+            overview_content = list(self.workspace.get_content(cuuid, kind=Kind.IMAGE) for cuuid in dep_uuids)
             uuid = layer.uuid
             LOG.debug("Adding composite layer to Scene Graph Manager with UUID: %s", uuid)
             self.image_elements[uuid] = element = RGBCompositeLayer(
                 overview_content,
-                layer[INFO.ORIGIN_X],
-                layer[INFO.ORIGIN_Y],
-                layer[INFO.CELL_WIDTH],
-                layer[INFO.CELL_HEIGHT],
+                layer[Info.ORIGIN_X],
+                layer[Info.ORIGIN_Y],
+                layer[Info.CELL_WIDTH],
+                layer[Info.CELL_HEIGHT],
                 name=str(uuid),
                 clim=p.climits,
                 gamma=p.gamma,
@@ -1004,9 +1004,9 @@ class SceneGraphManager(QObject):
                 texture_shape=DEFAULT_TEXTURE_SHAPE,
                 wrap_lon=False,
                 parent=self.main_map,
-                projection=layer[INFO.PROJ],
+                projection=layer[Info.PROJ],
             )
-            element.transform = PROJ4Transform(layer[INFO.PROJ], inverse=True)
+            element.transform = PROJ4Transform(layer[Info.PROJ], inverse=True)
             element.transform *= STTransform(translate=(0, 0, -50.0))
             self.composite_element_dependencies[uuid] = dep_uuids
             self.layer_set.add_layer(element)
@@ -1016,7 +1016,7 @@ class SceneGraphManager(QObject):
             element.determine_reference_points()
             self.update()
             return True
-        elif p.kind in [KIND.COMPOSITE, KIND.IMAGE]:
+        elif p.kind in [Kind.COMPOSITE, Kind.IMAGE]:
             # algebraic layer
             return self.add_basic_layer(new_order, uuid, p)
 
@@ -1029,7 +1029,7 @@ class SceneGraphManager(QObject):
 
     def change_composite_layer(self, new_order:tuple, uuid:UUID, presentation:Presentation):
         layer = self.document[uuid]
-        if presentation.kind == KIND.RGB:
+        if presentation.kind == Kind.RGB:
             if layer.uuid in self.image_elements:
                 if layer.is_valid:
                     # RGB selection has changed, rebuild the layer
@@ -1039,10 +1039,10 @@ class SceneGraphManager(QObject):
                     self.composite_element_dependencies[layer.uuid] = dep_uuids
                     elem = self.image_elements[layer.uuid]
                     elem.set_channels(overview_content,
-                                      cell_width=layer[INFO.CELL_WIDTH],
-                                      cell_height=layer[INFO.CELL_HEIGHT],
-                                      origin_x=layer[INFO.ORIGIN_X],
-                                      origin_y=layer[INFO.ORIGIN_Y])
+                                      cell_width=layer[Info.CELL_WIDTH],
+                                      cell_height=layer[Info.CELL_HEIGHT],
+                                      origin_x=layer[Info.ORIGIN_X],
+                                      origin_y=layer[Info.ORIGIN_Y])
                     elem.init_overview(overview_content)
                     elem.clim = presentation.climits
                     elem.gamma = presentation.gamma
@@ -1197,7 +1197,7 @@ class SceneGraphManager(QObject):
                 layer = active_lookup[uuid]
                 # create elements for layers which have transitioned to a valid state
                 LOG.debug('creating deferred element for layer %s' % layer.uuid)
-                if layer.kind in [KIND.COMPOSITE, KIND.RGB]:
+                if layer.kind in [Kind.COMPOSITE, Kind.RGB]:
                     # create an invisible element with the RGB
                     self.change_composite_layer(current_uuid_order, layer, prez_lookup[uuid])
                 else:

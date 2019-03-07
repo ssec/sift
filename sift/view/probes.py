@@ -16,7 +16,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import QObject, pyqtSignal
 
 # a useful constant
-from sift.common import INFO, KIND
+from sift.common import Info, Kind
 from sift.queue import TASK_PROGRESS, TASK_DOING
 
 import logging
@@ -401,8 +401,8 @@ class ProbeGraphDisplay (object) :
         # fill up our lists of layers
         for uuid in uuid_list:
             layer = self.document[uuid]
-            layer_name = layer.get(INFO.DISPLAY_NAME, "??unknown layer??")
-            if layer.get(INFO.KIND, None) == KIND.RGB:  # skip RGB layers
+            layer_name = layer.get(Info.DISPLAY_NAME, "??unknown layer??")
+            if layer.get(Info.KIND, None) == Kind.RGB:  # skip RGB layers
                 continue
             uuid_string = str(uuid)
             self.xDropDown.addItem(layer_name, uuid_string)
@@ -561,9 +561,9 @@ class ProbeGraphDisplay (object) :
 
             # get the data and info we need for this plot
             data_polygon = self.workspace.get_content_polygon(x_uuid, polygon)
-            unit_info = self.document[x_uuid][INFO.UNIT_CONVERSION]
+            unit_info = self.document[x_uuid][Info.UNIT_CONVERSION]
             data_polygon = unit_info[1](data_polygon)
-            title = self.document[x_uuid][INFO.DISPLAY_NAME]
+            title = self.document[x_uuid][Info.DISPLAY_NAME]
 
             # get point probe value
             if point_xy:
@@ -583,16 +583,16 @@ class ProbeGraphDisplay (object) :
             # get the data and info we need for this plot
             x_info = self.document[x_uuid]
             y_info = self.document[y_uuid]
-            name1 = x_info[INFO.DISPLAY_NAME]
-            name2 = y_info[INFO.DISPLAY_NAME]
+            name1 = x_info[Info.DISPLAY_NAME]
+            name2 = y_info[Info.DISPLAY_NAME]
             hires_uuid = self.workspace.lowest_resolution_uuid(x_uuid, y_uuid)
             # hires_coord_mask are the lat/lon coordinates of each of the
             # pixels in hires_data. The coordinates are (lat, lon) to resemble
             # the (Y, X) indexing of numpy arrays
             hires_coord_mask, hires_data = self.workspace.get_coordinate_mask_polygon(hires_uuid, polygon)
-            hires_conv_func = self.document[hires_uuid][INFO.UNIT_CONVERSION][1]
-            x_conv_func = x_info[INFO.UNIT_CONVERSION][1]
-            y_conv_func = y_info[INFO.UNIT_CONVERSION][1]
+            hires_conv_func = self.document[hires_uuid][Info.UNIT_CONVERSION][1]
+            x_conv_func = x_info[Info.UNIT_CONVERSION][1]
+            y_conv_func = y_info[Info.UNIT_CONVERSION][1]
             hires_data = hires_conv_func(hires_data)
             yield {TASK_DOING: 'Probe Plot: Collecting polygon data (layer 2)...', TASK_PROGRESS: 0.15}
             if hires_uuid == x_uuid:

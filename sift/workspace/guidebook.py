@@ -17,7 +17,7 @@ __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
 import logging
-from sift.common import INFO, KIND, PLATFORM, INSTRUMENT
+from sift.common import Info, Kind, Platform, Instrument
 from sift.view.colormap import DEFAULT_IR, DEFAULT_VIS, DEFAULT_UNKNOWN
 
 LOG = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ class Guidebook(object):
         :return:
         """
         if info and not path:
-            path = info.get(INFO.PATHNAME, None)
+            path = info.get(Info.PATHNAME, None)
 
     def channel_siblings(self, uuid, infos):
         """
@@ -72,7 +72,7 @@ DEFAULT_COLORMAPS = {
 }
 
 _NW_GOESR_ABI = {
-    INSTRUMENT.ABI: {  # http://www.goes-r.gov/education/ABI-bands-quick-info.html
+    Instrument.ABI: {  # http://www.goes-r.gov/education/ABI-bands-quick-info.html
         1: 0.47,
         2: 0.64,
         3: 0.86,
@@ -93,7 +93,7 @@ _NW_GOESR_ABI = {
 }
 
 _NW_HIMAWARI_AHI = {
-    INSTRUMENT.AHI: {
+    Instrument.AHI: {
         1: 0.47,
         2: 0.51,
         3: 0.64,
@@ -115,18 +115,18 @@ _NW_HIMAWARI_AHI = {
 
 # Instrument -> Band Number -> Nominal Wavelength
 NOMINAL_WAVELENGTHS = {
-    PLATFORM.HIMAWARI_8: _NW_HIMAWARI_AHI,
-    PLATFORM.HIMAWARI_9: _NW_HIMAWARI_AHI,
+    Platform.HIMAWARI_8: _NW_HIMAWARI_AHI,
+    Platform.HIMAWARI_9: _NW_HIMAWARI_AHI,
 
-    PLATFORM.GOES_16: _NW_GOESR_ABI,
-    PLATFORM.GOES_17: _NW_GOESR_ABI,
+    Platform.GOES_16: _NW_GOESR_ABI,
+    Platform.GOES_17: _NW_GOESR_ABI,
 }
 
 # CF compliant Standard Names (should be provided by input files or the workspace)
 # Instrument -> Band Number -> Standard Name
 
 _SN_GOESR_ABI = {
-    INSTRUMENT.ABI: {
+    Instrument.ABI: {
         1: "toa_bidirectional_reflectance",
         2: "toa_bidirectional_reflectance",
         3: "toa_bidirectional_reflectance",
@@ -147,7 +147,7 @@ _SN_GOESR_ABI = {
 }
 
 _SN_HIMAWARI_AHI = {
-    INSTRUMENT.AHI: {
+    Instrument.AHI: {
         1: "toa_bidirectional_reflectance",
         2: "toa_bidirectional_reflectance",
         3: "toa_bidirectional_reflectance",
@@ -168,10 +168,10 @@ _SN_HIMAWARI_AHI = {
 }
 
 STANDARD_NAMES = {
-    PLATFORM.HIMAWARI_8: _SN_HIMAWARI_AHI,
-    PLATFORM.HIMAWARI_9: _SN_HIMAWARI_AHI,
-    PLATFORM.GOES_16: _SN_GOESR_ABI,
-    PLATFORM.GOES_17: _SN_GOESR_ABI,
+    Platform.HIMAWARI_8: _SN_HIMAWARI_AHI,
+    Platform.HIMAWARI_9: _SN_HIMAWARI_AHI,
+    Platform.GOES_16: _SN_GOESR_ABI,
+    Platform.GOES_17: _SN_GOESR_ABI,
 }
 
 
@@ -190,7 +190,7 @@ class ABI_AHI_Guidebook(Guidebook):
     def _relevant_info(self, seq):
         "filter datasetinfo dictionaries in sequence, if they're not relevant to us (i.e. not AHI)"
         for dsi in seq:
-            if self.is_relevant(dsi.get(INFO.PATHNAME, None)):
+            if self.is_relevant(dsi.get(Info.PATHNAME, None)):
                 yield dsi
 
     def collect_info(self, info):
@@ -201,51 +201,51 @@ class ABI_AHI_Guidebook(Guidebook):
         """
         z = {}
 
-        if info[INFO.KIND] in (KIND.IMAGE, KIND.COMPOSITE):
-            if z.get(INFO.CENTRAL_WAVELENGTH) is None:
+        if info[Info.KIND] in (Kind.IMAGE, Kind.COMPOSITE):
+            if z.get(Info.CENTRAL_WAVELENGTH) is None:
                 try:
-                    wl = NOMINAL_WAVELENGTHS[info[INFO.PLATFORM]][info[INFO.INSTRUMENT]][info[INFO.BAND]]
+                    wl = NOMINAL_WAVELENGTHS[info[Info.PLATFORM]][info[Info.INSTRUMENT]][info[Info.BAND]]
                 except KeyError:
                     wl = None
-                z[INFO.CENTRAL_WAVELENGTH] = wl
+                z[Info.CENTRAL_WAVELENGTH] = wl
 
-        if INFO.BAND in info:
-            band_short_name = "B{:02d}".format(info[INFO.BAND])
+        if Info.BAND in info:
+            band_short_name = "B{:02d}".format(info[Info.BAND])
         else:
-            band_short_name = info.get(INFO.DATASET_NAME, '???')
-        if INFO.SHORT_NAME not in info:
-            z[INFO.SHORT_NAME] = band_short_name
+            band_short_name = info.get(Info.DATASET_NAME, '???')
+        if Info.SHORT_NAME not in info:
+            z[Info.SHORT_NAME] = band_short_name
         else:
-            z[INFO.SHORT_NAME] = info[INFO.SHORT_NAME]
-        if INFO.LONG_NAME not in info:
-            z[INFO.LONG_NAME] = info.get(INFO.SHORT_NAME, z[INFO.SHORT_NAME])
+            z[Info.SHORT_NAME] = info[Info.SHORT_NAME]
+        if Info.LONG_NAME not in info:
+            z[Info.LONG_NAME] = info.get(Info.SHORT_NAME, z[Info.SHORT_NAME])
 
-        if INFO.STANDARD_NAME not in info:
+        if Info.STANDARD_NAME not in info:
             try:
-                z[INFO.STANDARD_NAME] = STANDARD_NAMES[info[INFO.PLATFORM]][info[INFO.INSTRUMENT]][info[INFO.BAND]]
+                z[Info.STANDARD_NAME] = STANDARD_NAMES[info[Info.PLATFORM]][info[Info.INSTRUMENT]][info[Info.BAND]]
             except KeyError:
-                z[INFO.STANDARD_NAME] = "." + str(z.get(INFO.SHORT_NAME))
+                z[Info.STANDARD_NAME] = "." + str(z.get(Info.SHORT_NAME))
 
         # Only needed for backwards compatibility with originally supported geotiffs
-        if not info.get(INFO.UNITS):
-            standard_name = info.get(INFO.STANDARD_NAME, z.get(INFO.STANDARD_NAME))
+        if not info.get(Info.UNITS):
+            standard_name = info.get(Info.STANDARD_NAME, z.get(Info.STANDARD_NAME))
             if standard_name == 'toa_bidirectional_reflectance':
-                z[INFO.UNITS] = '1'
+                z[Info.UNITS] = '1'
             elif standard_name == 'toa_brightness_temperature':
-                z[INFO.UNITS] = 'kelvin'
-        if info.get(INFO.UNITS, z.get(INFO.UNITS)) in ['K', 'Kelvin']:
-            z[INFO.UNITS] = 'kelvin'
+                z[Info.UNITS] = 'kelvin'
+        if info.get(Info.UNITS, z.get(Info.UNITS)) in ['K', 'Kelvin']:
+            z[Info.UNITS] = 'kelvin'
 
         return z
 
     def _is_refl(self, dsi):
         # work around for old `if band in BAND_TYPE`
-        return dsi.get(INFO.BAND) in self.REFL_BANDS or \
-               dsi.get(INFO.STANDARD_NAME) == "toa_bidirectional_reflectance"
+        return dsi.get(Info.BAND) in self.REFL_BANDS or \
+               dsi.get(Info.STANDARD_NAME) == "toa_bidirectional_reflectance"
 
     def _is_bt(self, dsi):
-        return dsi.get(INFO.BAND) in self.BT_BANDS or \
-               dsi.get(INFO.STANDARD_NAME) in ["toa_brightness_temperature", 'brightness_temperature',
+        return dsi.get(Info.BAND) in self.BT_BANDS or \
+               dsi.get(Info.STANDARD_NAME) in ["toa_brightness_temperature", 'brightness_temperature',
                                                'air_temperature']
 
     def collect_info_from_seq(self, seq):
@@ -253,13 +253,13 @@ class ABI_AHI_Guidebook(Guidebook):
         # FUTURE: cache uuid:metadata info in the guidebook instance for quick lookup
         for each in self._relevant_info(seq):
             md = self.collect_info(each)
-            yield each[INFO.UUID], md
+            yield each[Info.UUID], md
 
     def climits(self, dsi):
         # Valid min and max for colormap use for data values in file (unconverted)
         if self._is_refl(dsi):
             lims = (-0.012, 1.192)
-            if dsi[INFO.UNITS] == '%':
+            if dsi[Info.UNITS] == '%':
                 # Reflectance/visible data limits
                 lims = (lims[0] * 100., lims[1] * 100.)
             return lims
@@ -272,8 +272,8 @@ class ABI_AHI_Guidebook(Guidebook):
             return min(dsi["flag_values"]), max(dsi["flag_values"])
         elif "valid_range" in dsi:
             return dsi['valid_range']
-        elif INFO.VALID_RANGE in dsi:
-            return dsi[INFO.VALID_RANGE]
+        elif Info.VALID_RANGE in dsi:
+            return dsi[Info.VALID_RANGE]
         else:
             # some kind of default
             return 0., 255.
@@ -284,15 +284,15 @@ class ABI_AHI_Guidebook(Guidebook):
         elif 'valid_range' in dsi:
             valid_range = dsi['valid_range']
         else:
-            valid_range = dsi[INFO.CLIM]
-        return dsi.setdefault(INFO.VALID_RANGE, valid_range)
+            valid_range = dsi[Info.CLIM]
+        return dsi.setdefault(Info.VALID_RANGE, valid_range)
 
     def default_colormap(self, dsi):
-        return DEFAULT_COLORMAPS.get(dsi.get(INFO.STANDARD_NAME), DEFAULT_UNKNOWN)
+        return DEFAULT_COLORMAPS.get(dsi.get(Info.STANDARD_NAME), DEFAULT_UNKNOWN)
 
     def _default_display_time(self, ds_info):
         # FUTURE: This can be customized by the user
-        when = ds_info.get(INFO.SCHED_TIME, ds_info.get(INFO.OBS_TIME))
+        when = ds_info.get(Info.SCHED_TIME, ds_info.get(Info.OBS_TIME))
         if when is None:
             dtime = '--:--:--'
         elif 'model_time' in ds_info:
@@ -306,11 +306,11 @@ class ABI_AHI_Guidebook(Guidebook):
 
     def _default_display_name(self, ds_info, display_time=None):
         # FUTURE: This can be customized by the user
-        sat = ds_info[INFO.PLATFORM]
-        inst = ds_info[INFO.INSTRUMENT]
-        name = ds_info.get(INFO.SHORT_NAME, '-unknown-')
+        sat = ds_info[Info.PLATFORM]
+        inst = ds_info[Info.INSTRUMENT]
+        name = ds_info.get(Info.SHORT_NAME, '-unknown-')
 
-        label = ds_info.get(INFO.STANDARD_NAME, '')
+        label = ds_info.get(Info.STANDARD_NAME, '')
         if label == 'toa_bidirectional_reflectance':
             label = 'Refl'
         elif label == 'toa_brightness_temperature':
@@ -319,7 +319,7 @@ class ABI_AHI_Guidebook(Guidebook):
             label = ''
 
         if display_time is None:
-            display_time = ds_info.get(INFO.DISPLAY_TIME, self._default_display_time(ds_info))
+            display_time = ds_info.get(Info.DISPLAY_TIME, self._default_display_time(ds_info))
         name = "{sat} {inst} {name} {standard_name} {dtime}".format(
             sat=sat.value, inst=inst.value, name=name, standard_name=label, dtime=display_time)
         return name

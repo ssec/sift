@@ -75,7 +75,7 @@ def main():
         epilog="",
         fromfile_prefix_chars='@')
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG')
+                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG')
     # http://docs.python.org/2.7/library/argparse.html#nargs
     # parser.add_argument('--stuff', nargs='5', dest='my_stuff',
     #                    help="one or more random things")

@@ -24,7 +24,7 @@ from PyQt4.QtGui import QGraphicsScene, QPen, QBrush, QPainter, QGraphicsView, Q
     QMainWindow, QStatusBar, QApplication, QGraphicsItem, QGraphicsItemAnimation
 from PyQt4.QtOpenGL import QGLFormat, QGL, QGLWidget
 
-from sift.common import flags, Span
+from sift.common import Flags, Span
 from .common import VisualState, CoordTransform
 from .items import QTrackItem, QFrameItem, QTimeRulerItem
 
@@ -209,12 +209,12 @@ class QFramesInTracksScene(QGraphicsScene):
     def _del_track(self, track):
         raise NotImplementedError("NYI")  # FIXME
 
-    def _change_frame_state(self, frame: UUID, new_state: flags):
+    def _change_frame_state(self, frame: UUID, new_state: Flags):
         """Change the displayed state of a frame and queue a visual refresh
         """
         raise NotImplementedError("NYI")  # FIXME
 
-    def _change_track_state(self, track: str, new_state: flags):
+    def _change_track_state(self, track: str, new_state: Flags):
         """Change the displayed state of a track and queue a visual refresh
         """
         raise NotImplementedError("NYI")  # FIXME
@@ -491,11 +491,11 @@ class TestScene(QFramesInTracksScene):
                             "G21 QBI B99 BT", "test track", tooltip="peremptorily cromulent")
         # scene.addItem(abitrack)  # done in init
         frame01 = QFrameItem(track0, self.coords, uuidgen(), once + mm(5), mm(5),
-                             flags([VisualState.BUSY]), "abi1", "fulldiskimus")
+                             Flags([VisualState.BUSY]), "abi1", "fulldiskimus")
         track1 = QTrackItem(self, self.coords, 'IMAGE:test::timeline:Himawari-11:AHI:mars', 0,
                             "H11 AHI B99 Rad", "second test track", tooltip="nominally cromulent")
         frame11 = QFrameItem(track1, self.coords, uuidgen(), once + mm(6), mm(1),
-                             flags([VisualState.READY]), "ahi1", "JP04")
+                             Flags([VisualState.READY]), "ahi1", "JP04")
         # self.insert_track(track0)
         # self.insert_track(track1)
         # assert(hasattr(self, '_propagate_max_z'))

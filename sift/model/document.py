@@ -78,7 +78,7 @@ import warnings
 from sqlalchemy.orm import Session
 
 from sift.workspace.metadatabase import Product
-from sift.common import KIND, INFO, Presentation, Span, FCS_SEP, ZList, flags, STATE
+from sift.common import Kind, Info, Presentation, Span, FCS_SEP, ZList, Flags, State
 from sift.queue import TASK_DOING, TASK_PROGRESS, TaskQueue
 from sift.workspace import Workspace
 from sift.util.default_paths import DOCUMENT_SETTINGS_DIR
@@ -117,7 +117,7 @@ def _unit_format_func(layer, units):
     def _format_unit(val, numeric=True, include_units=True):
         return '{:.03f}{units:s}'.format(val, units=units if include_units else "")
 
-    if layer[INFO.STANDARD_NAME] in ('toa_brightness_temperature', 'brightness_temperature'):
+    if layer[Info.STANDARD_NAME] in ('toa_brightness_temperature', 'brightness_temperature'):
         # BT data limits, Kelvin to degC
         def _format_unit(val, numeric=True, include_units=True):
             return '{:.02f}{units}'.format(val, units=units if include_units else "")
@@ -145,12 +145,12 @@ def _unit_format_func(layer, units):
 
 def preferred_units(dsi):
     # FUTURE: Use cfunits or cf_units package
-    if dsi[INFO.STANDARD_NAME] == 'toa_bidirectional_reflectance':
+    if dsi[Info.STANDARD_NAME] == 'toa_bidirectional_reflectance':
         return '1'
-    elif dsi[INFO.STANDARD_NAME] in ('toa_brightness_temperature', 'brightness_temperature'):
+    elif dsi[Info.STANDARD_NAME] in ('toa_brightness_temperature', 'brightness_temperature'):
         return 'degrees_Celsius'
     else:
-        return dsi.get(INFO.UNITS, None)
+        return dsi.get(Info.UNITS, None)
 
 
 def units_conversion(dsi):
@@ -161,9 +161,9 @@ def units_conversion(dsi):
 
     # Conversion functions
     # FUTURE: Use cfunits or cf_units package
-    if dsi.get(INFO.UNITS) in ('kelvin', 'K') and punits in ('degrees_Celsius', 'C'):
+    if dsi.get(Info.UNITS) in ('kelvin', 'K') and punits in ('degrees_Celsius', 'C'):
         conv_func = lambda x, inverse=False: x - 273.15 if not inverse else x + 273.15
-    elif dsi.get(INFO.UNITS) == '%' and punits == '1':
+    elif dsi.get(Info.UNITS) == '%' and punits == '1':
         conv_func = lambda x, inverse=False: x / 100. if not inverse else x * 100.
     else:
         conv_func = lambda x, inverse=False: x
@@ -379,10 +379,10 @@ class DocumentAsLayerStack(DocumentAsContextBase):
             prod = s.query(Product).filter_by(uuid_str=str(uuid)).first()
             nfo = prod.info
             return LayerInfo(uuid=uuid,
-                             time_label=nfo.get(INFO.DISPLAY_TIME, '--:--'),
+                             time_label=nfo.get(Info.DISPLAY_TIME, '--:--'),
                              presentation=self.doc.family_presentation[prod.family],
-                             f_convert=nfo.get(INFO.UNIT_CONVERSION)[1],
-                             f_format=nfo.get(INFO.UNIT_CONVERSION)[2])
+                             f_convert=nfo.get(Info.UNIT_CONVERSION)[1],
+                             f_format=nfo.get(Info.UNIT_CONVERSION)[2])
 
     @property
     def current_layer_uuid_order(self):
@@ -428,20 +428,20 @@ class DocumentAsLayerStack(DocumentAsContextBase):
         # Limit ourselves to what information
         # in the future valid range may be different than the default CLIMs
         return self._layer_info_for_uuid(uuid).climits
-        # return self[uuid][INFO.CLIM]
+        # return self[uuid][Info.CLIM]
 
     def convert_value(self, uuid, x, inverse=False):
         return self._layer_info_for_uuid(uuid).f_convert(x, inverse=inverse)
-        # return self[uuid][INFO.UNIT_CONVERSION][1](x, inverse=inverse)
+        # return self[uuid][Info.UNIT_CONVERSION][1](x, inverse=inverse)
 
     def format_value(self, uuid, x, numeric=True, units=True):
         return self._layer_info_for_uuid(uuid).f_format(x, numeric=numeric, units=units)
-        # return self[uuid][INFO.UNIT_CONVERSION][2](x, numeric=numeric, units=units)
+        # return self[uuid][Info.UNIT_CONVERSION][2](x, numeric=numeric, units=units)
 
     def flipped_for_uuids(self, uuids, lset=None):
         for p in self.prez_for_uuids(uuids, lset=lset):
             default_clim = p.climits
-            # default_clim = self._layer_with_uuid[p.uuid][INFO.CLIM]
+            # default_clim = self._layer_with_uuid[p.uuid][Info.CLIM]
             yield ((p.climits[1] - p.climits[0]) > 0) != ((default_clim[1] - default_clim[0]) > 0)
 
     def __len__(self):
@@ -500,7 +500,7 @@ class FrameInfo(T.NamedTuple):
     uuid: UUID
     ident: str  # family::category::serial
     when: Span  # time and duration of this frame
-    state: flags  # logical state for timeline to display with color and glyphs
+    state: Flags  # logical state for timeline to display with color and glyphs
     primary: str  # primary description for timeline, e.g. "G16 ABI B06"
     secondary: str  # secondary description, typically time information
     # thumb: QImage  # thumbnail image to embed in timeline item
@@ -510,7 +510,7 @@ class TrackInfo(T.NamedTuple):
     track: str  # family::category
     presentation: Presentation  # colorbar, ranges, gammas, etc
     when: Span  # available time-Span of the data
-    state: flags  # any status or special flags set on the track, according to document / workspace
+    state: Flags  # any status or special Flags set on the track, according to document / workspace
     primary: str  # primary label for UI
     secondary: str  # secondary label
     frames: T.List[FrameInfo]  # list of frames within specified time Span
@@ -610,7 +610,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 break
             yield z, track
 
-    # def product_state(self, *product_uuids: T.Iterable[UUID]) -> T.Iterable[flags]:
+    # def product_state(self, *product_uuids: T.Iterable[UUID]) -> T.Iterable[Flags]:
     #     """Merge document and workspace state information on a given sequence of products
     #     """
     #     uuids = list(product_uuids)
@@ -623,17 +623,17 @@ class DocumentAsTrackStack(DocumentAsContextBase):
     #     for uuid in uuids:
     #         s = set()
     #         if uuid in ready_uuids:
-    #             s.add(STATE.READY)
+    #             s.add(State.READY)
     #         # merge state from workspace
     #         s.update(self.ws.product_state(uuid))
     #         yield s
 
-    def product_state(self, uuid:UUID) -> flags:
+    def product_state(self, uuid:UUID) -> Flags:
         """Merge document state with workspace state
         """
-        s = flags()
+        s = Flags()
         s.update(self.ws.product_state(uuid))
-        # s.update(self.doc.product_state.get(prod.uuid) or flags())
+        # s.update(self.doc.product_state.get(prod.uuid) or Flags())
         return s
 
     def frame_info_for_product(self, prod: Product=None, uuid: UUID=None, when_overlaps: Span=None) -> T.Optional[FrameInfo]:
@@ -649,8 +649,8 @@ class DocumentAsTrackStack(DocumentAsContextBase):
             return None
         nfo = prod.info
         # DISPLAY_NAME has DISPLAY_TIME as part of it, FIXME: stop that
-        dt = nfo[INFO.DISPLAY_TIME]
-        dn = nfo[INFO.DISPLAY_NAME].replace(dt, '').strip()
+        dt = nfo[Info.DISPLAY_TIME]
+        dn = nfo[Info.DISPLAY_NAME].replace(dt, '').strip()
         fin = FrameInfo(
             uuid=prod.uuid,
             ident=prod.ident,
@@ -693,8 +693,8 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                     presentation=self.doc.family_presentation.get(track),
                     when=track_span,
                     frames=frames,
-                    state=flags(),  # FIXME
-                    primary=' '.join(reversed(fam.split(FCS_SEP))),  #fam_nfo[INFO.DISPLAY_FAMILY],
+                    state=Flags(),  # FIXME
+                    primary=' '.join(reversed(fam.split(FCS_SEP))),  #fam_nfo[Info.DISPLAY_FAMILY],
                     secondary=' '.join(reversed(ctg.split(FCS_SEP)))
                 )
                 yield z, trk
@@ -709,7 +709,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
             self.doc.track_frame_locks[track] = frame
 
         # FIXME: signal, since this will cause effects on animation and potentially static display order
-        # also may want to set some state flags on the track?
+        # also may want to set some state Flags on the track?
         # this needs to invalidate the current display and any animation
         self.doc.didChangeLayerVisibility.emit({frame: True})
 
@@ -967,7 +967,7 @@ class AnimationStep(T.NamedTuple):
     # corresponding family, to reduce SGM need for queries
     families: T.Tuple[str]
     # primary kind for displaying the data
-    kinds: T.Tuple[KIND]
+    kinds: T.Tuple[Kind]
     # data time Span this step represents
     data_span: Span
 
@@ -1141,8 +1141,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     playback_span: Span = None
 
     # user-directed overrides on tracks and frames (products)
-    track_state: T.Mapping[str, flags] = None
-    product_state: T.Mapping[UUID, flags] = None
+    track_state: T.Mapping[str, Flags] = None
+    product_state: T.Mapping[UUID, Flags] = None
 
     # user can lock tracks to a single frame throughout
     track_frame_locks: T.Mapping[str, UUID] = None
@@ -1313,8 +1313,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 self.colormaps.import_colormaps(cmap_dir, read_only=read_only, category=cmap_cat)
 
         # timeline document storage setup with initial track order and time range
-        self.product_state = defaultdict(flags)
-        self.track_state = defaultdict(flags)
+        self.product_state = defaultdict(Flags)
+        self.track_state = defaultdict(Flags)
         self.track_order = ZList()
         self.track_frame_locks = {}
         self.family_calculation = {}
@@ -1422,7 +1422,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :return: new Presentation tuple, new reordered indices tuple
         """
         if cmap is None:
-            cmap = info.get(INFO.COLORMAP)
+            cmap = info.get(Info.COLORMAP)
         gamma = 1.
         if isinstance(info, DocRGBLayer):
             gamma = (1.,) * 3
@@ -1430,14 +1430,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             gamma = (1.,) * len(info.l)
 
         # get the presentation for another layer in our family
-        family_uuids = self.family_uuids(info[INFO.FAMILY])
+        family_uuids = self.family_uuids(info[Info.FAMILY])
         family_prez = self.prez_for_uuid(family_uuids[0]) if family_uuids else None
-        p = Presentation(uuid=info[INFO.UUID],
-                         kind=info[INFO.KIND],
+        p = Presentation(uuid=info[Info.UUID],
+                         kind=info[Info.KIND],
                          visible=True,
                          a_order=None,
                          colormap=cmap if family_prez is None else family_prez.colormap,
-                         climits=info[INFO.CLIM] if family_prez is None else family_prez.climits,
+                         climits=info[Info.CLIM] if family_prez is None else family_prez.climits,
                          gamma=gamma if family_prez is None else family_prez.gamma,
                          mixing=Mixing.NORMAL)
 
@@ -1473,21 +1473,21 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # updated metadata with content information (most importantly nav information)
         info = self._workspace.get_info(uuid)
         assert(info is not None)
-        LOG.info('cell_width: {}'.format(repr(info[INFO.CELL_WIDTH])))
+        LOG.info('cell_width: {}'.format(repr(info[Info.CELL_WIDTH])))
 
         LOG.info('new layer info: {}'.format(repr(info)))
         self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, info)
-        if INFO.UNIT_CONVERSION not in dataset:
-            dataset[INFO.UNIT_CONVERSION] = units_conversion(dataset)
-        if INFO.FAMILY not in dataset:
-            dataset[INFO.FAMILY] = self.family_for_product_or_layer(dataset)
+        if Info.UNIT_CONVERSION not in dataset:
+            dataset[Info.UNIT_CONVERSION] = units_conversion(dataset)
+        if Info.FAMILY not in dataset:
+            dataset[Info.FAMILY] = self.family_for_product_or_layer(dataset)
         presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
 
         # signal updates from the document
         self.didAddBasicLayer.emit(reordered_indices, dataset.uuid, presentation)
         self._add_layer_family(dataset)
         # update any RGBs that could use this to make an RGB
-        self.sync_composite_layer_prereqs([dataset[INFO.SCHED_TIME]])
+        self.sync_composite_layer_prereqs([dataset[Info.SCHED_TIME]])
 
         return uuid, dataset, active_content_data
 
@@ -1498,34 +1498,34 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             if fam:
                 return fam[0]
             uuid_or_layer = self[uuid_or_layer]
-        if INFO.FAMILY in uuid_or_layer:
-            LOG.debug('using pre-existing family {}'.format(uuid_or_layer[INFO.FAMILY]))
-            return uuid_or_layer[INFO.FAMILY]
+        if Info.FAMILY in uuid_or_layer:
+            LOG.debug('using pre-existing family {}'.format(uuid_or_layer[Info.FAMILY]))
+            return uuid_or_layer[Info.FAMILY]
         # kind:pointofreference:measurement:wavelength
-        kind = uuid_or_layer[INFO.KIND]
+        kind = uuid_or_layer[Info.KIND]
         refpoint = 'unknown'  # FUTURE: geo/leo
-        measurement = uuid_or_layer.get(INFO.STANDARD_NAME)
+        measurement = uuid_or_layer.get(Info.STANDARD_NAME)
         if uuid_or_layer.get('recipe'):
             # RGB
             subcat = uuid_or_layer['recipe'].name
-        elif uuid_or_layer.get(INFO.CENTRAL_WAVELENGTH):
+        elif uuid_or_layer.get(Info.CENTRAL_WAVELENGTH):
             # basic band
-            subcat = uuid_or_layer[INFO.CENTRAL_WAVELENGTH]
+            subcat = uuid_or_layer[Info.CENTRAL_WAVELENGTH]
         else:
             # higher level product or algebraic layer
-            subcat = uuid_or_layer[INFO.DATASET_NAME]
+            subcat = uuid_or_layer[Info.DATASET_NAME]
         return "{}:{}:{}:{}".format(kind.name, refpoint, measurement, subcat)
 
     def _add_layer_family(self, layer):
-        family = layer[INFO.FAMILY]
+        family = layer[Info.FAMILY]
         is_new = family not in self._families
-        self._families[family].append(layer[INFO.UUID])
+        self._families[family].append(layer[Info.UUID])
         if is_new:
             self.didAddFamily.emit(family, self.family_info(family))
         return family
 
     def _remove_layer_from_family(self, uuid):
-        family = self[uuid][INFO.FAMILY]
+        family = self[uuid][Info.FAMILY]
         self._families[family].remove(uuid)
 
         if not self._families[family]:
@@ -1539,7 +1539,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if isinstance(family_or_layer_or_uuid, UUID):
             layer = self[family_or_layer_or_uuid]
         if isinstance(layer, DocBasicLayer):
-            family = layer[INFO.FAMILY]
+            family = layer[Info.FAMILY]
 
         # one layer that represents all the layers in this family
         family_rep = self[self._families[family][0]]
@@ -1547,23 +1547,23 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # convert family subcategory to displayable name
         # if isinstance(family[2], UUID):
         #     # RGB Recipes, this needs more thinking
-        #     display_family = family_rep[INFO.SHORT_NAME]
+        #     display_family = family_rep[Info.SHORT_NAME]
         # elif not isinstance(family[2], str):
         #     display_family = "{:.02f} µm".format(family[2])
         # else:
         #     display_family = family[2]
         family_name_components = family.split(':')
-        display_family = family_rep[INFO.SHORT_NAME] + ' ' + ' '.join(reversed(family_name_components))
+        display_family = family_rep[Info.SHORT_NAME] + ' ' + ' '.join(reversed(family_name_components))
         # display_family = str(family)
 
         # NOTE: For RGBs the SHORT_NAME will update as the RGB changes
         return {
-            INFO.VALID_RANGE: family_rep[INFO.VALID_RANGE],
-            INFO.UNIT_CONVERSION: family_rep[INFO.UNIT_CONVERSION],
-            INFO.SHORT_NAME: family_rep[INFO.SHORT_NAME],
-            INFO.UNITS: family_rep[INFO.UNITS],
-            INFO.KIND: family_rep[INFO.KIND],
-            INFO.DISPLAY_FAMILY: display_family,
+            Info.VALID_RANGE: family_rep[Info.VALID_RANGE],
+            Info.UNIT_CONVERSION: family_rep[Info.UNIT_CONVERSION],
+            Info.SHORT_NAME: family_rep[Info.SHORT_NAME],
+            Info.UNITS: family_rep[Info.UNITS],
+            Info.KIND: family_rep[Info.KIND],
+            Info.DISPLAY_FAMILY: display_family,
         }
 
     def import_files(self, paths, insert_before=0, **importer_kwargs) -> dict:
@@ -1585,12 +1585,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             yield {
                 TASK_DOING: 'Collecting metadata {}/{}'.format(dex + 1, num_prods),
                 TASK_PROGRESS: float(dex + 1) / float(num_prods),
-                'uuid': info[INFO.UUID],
+                'uuid': info[Info.UUID],
                 'num_products': num_prods,
             }
             # redundant but also more explicit than depending on num_prods
             total_products = num_prods
-            uuids.append(info[INFO.UUID])
+            uuids.append(info[Info.UUID])
 
         if not total_products:
             raise ValueError('no products available in {}'.format(paths))
@@ -1654,16 +1654,16 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     #     riffraff = []
     #     # ahi = [nfo[path] for path in paths if nfo[path]]
     #     # names = [path for path in paths if nfo[path]]
-    #     # bands = [x.get(INFO.BAND, None) for x in ahi]
-    #     # times = [x.get(INFO.SCHED_TIME, None) for x in ahi]
+    #     # bands = [x.get(Info.BAND, None) for x in ahi]
+    #     # times = [x.get(Info.SCHED_TIME, None) for x in ahi]
     #     # order = [(band, time, path) for band,time,path in zip(bands,times,names)]
     #
     #     def _sort_key(info):
-    #         return (info.get(INFO.DATASET_NAME),
-    #                 info.get(INFO.OBS_TIME),
-    #                 info.get(INFO.PATHNAME))
+    #         return (info.get(Info.DATASET_NAME),
+    #                 info.get(Info.OBS_TIME),
+    #                 info.get(Info.PATHNAME))
     #     order = sorted(infos, key=_sort_key, reverse=True)
-    #     paths = riffraff + [info.get(INFO.PATHNAME) for info in order]
+    #     paths = riffraff + [info.get(Info.PATHNAME) for info in order]
     #     LOG.debug(paths)
     #     return paths
 
@@ -1673,7 +1673,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if not uuid:
             return "YYYY-MM-DD HH:MM"
         info = self._layer_with_uuid[uuid]
-        return info.get(INFO.DISPLAY_TIME, '--:--')
+        return info.get(Info.DISPLAY_TIME, '--:--')
 
     def prez_for_uuids(self, uuids, lset=None):
         if lset is None:
@@ -1697,22 +1697,22 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def valid_range_for_uuid(self, uuid):
         # Limit ourselves to what information
         # in the future valid range may be different than the default CLIMs
-        return self[uuid][INFO.CLIM]
+        return self[uuid][Info.CLIM]
 
     def convert_value(self, uuid, x, inverse=False):
-        return self[uuid][INFO.UNIT_CONVERSION][1](x, inverse=inverse)
+        return self[uuid][Info.UNIT_CONVERSION][1](x, inverse=inverse)
 
     def format_value(self, uuid, x, numeric=True, units=True):
-        return self[uuid][INFO.UNIT_CONVERSION][2](x, numeric=numeric, units=units)
+        return self[uuid][Info.UNIT_CONVERSION][2](x, numeric=numeric, units=units)
 
     def flipped_for_uuids(self, uuids, lset=None):
         for p in self.prez_for_uuids(uuids, lset=lset):
-            default_clim = self._layer_with_uuid[p.uuid][INFO.CLIM]
+            default_clim = self._layer_with_uuid[p.uuid][Info.CLIM]
             yield ((p.climits[1] - p.climits[0]) > 0) != ((default_clim[1] - default_clim[0]) > 0)
 
     def _get_equalizer_values_image(self, lyr, pinf, xy_pos):
         value = self._workspace.get_content_point(pinf.uuid, xy_pos)
-        unit_info = lyr[INFO.UNIT_CONVERSION]
+        unit_info = lyr[Info.UNIT_CONVERSION]
         nc, xc = unit_info[1](np.array(pinf.climits))
         # calculate normalized bar width relative to its current clim
         new_value = unit_info[1](value)
@@ -1756,7 +1756,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             elif clims is None or clims[0] is None:
                 values.append(None)
             else:
-                value = self._workspace.get_content_point(dep_lyr[INFO.UUID], xy_pos)
+                value = self._workspace.get_content_point(dep_lyr[Info.UUID], xy_pos)
                 values.append(_sci_to_rgb(value, clims[0], clims[1]))
 
         nc = 0
@@ -1782,9 +1782,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for uuid, pinf in uuids:
             try:
                 lyr = self._layer_with_uuid[pinf.uuid]
-                if lyr[INFO.KIND] in {KIND.IMAGE, KIND.COMPOSITE, KIND.CONTOUR}:
+                if lyr[Info.KIND] in {Kind.IMAGE, Kind.COMPOSITE, Kind.CONTOUR}:
                     zult[pinf.uuid] = self._get_equalizer_values_image(lyr, pinf, xy_pos)
-                elif lyr[INFO.KIND] == KIND.RGB:
+                elif lyr[Info.KIND] == Kind.RGB:
                     zult[pinf.uuid] = self._get_equalizer_values_rgb(lyr, pinf, xy_pos)
             except ValueError:
                 LOG.warning("Could not get equalizer values for {}".format(uuid))
@@ -1869,7 +1869,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 if type(layer) not in in_type_set:
                     continue
             if have_proj is not None:
-                if layer[INFO.PROJ] != have_proj:
+                if layer[Info.PROJ] != have_proj:
                     continue
             yield layer
 
@@ -1980,11 +1980,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def change_layer_name(self, row, new_name):
         uuid = self.current_layer_set[row].uuid if not isinstance(row, UUID) else row
         info = self._layer_with_uuid[uuid]
-        assert(uuid==info[INFO.UUID])
+        assert(uuid == info[Info.UUID])
         if not new_name:
             # empty string, reset to default DISPLAY_NAME
             new_name = info.default_display_name
-        info[INFO.DISPLAY_NAME] = new_name
+        info[Info.DISPLAY_NAME] = new_name
         self.didChangeLayerName.emit(uuid, new_name)
 
     def change_colormap_for_layers(self, name, uuids=None):
@@ -2012,11 +2012,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             layer = self._layer_with_uuid[p.uuid]
             if (kinds is not None) and (layer.kind not in kinds):
                 continue
-            if (bands is not None) and (layer[INFO.BAND] not in bands):
+            if (bands is not None) and (layer[Info.BAND] not in bands):
                 continue
-            if (dataset_names is not None) and (layer[INFO.DATASET_NAME] not in dataset_names):
+            if (dataset_names is not None) and (layer[Info.DATASET_NAME] not in dataset_names):
                 continue
-            if (wavelengths is not None) and (layer.get(INFO.CENTRAL_WAVELENGTH) not in wavelengths):
+            if (wavelengths is not None) and (layer.get(Info.CENTRAL_WAVELENGTH) not in wavelengths):
                 continue
             if (colormaps is not None) and (p.colormap not in colormaps):
                 continue
@@ -2073,14 +2073,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """Change an image or contour layer to present as a different kind."""
         nfo = {}
         layer_set = self.current_layer_set
-        assert new_kind in KIND
+        assert new_kind in Kind
         all_uuids = set()
         for u in uuids:
             fam = self.family_for_product_or_layer(u)
             all_uuids.update(self._families[fam])
         for idx, pz, layer in self.current_layers_where(uuids=all_uuids):
-            if pz.kind not in [KIND.IMAGE, KIND.CONTOUR]:
-                LOG.warning("Can't change image kind for KIND: %s", pz.kind.name)
+            if pz.kind not in [Kind.IMAGE, Kind.CONTOUR]:
+                LOG.warning("Can't change image kind for Kind: %s", pz.kind.name)
                 continue
             new_pz = pz._replace(kind=new_kind)
             nfo[layer.uuid] = new_pz
@@ -2095,7 +2095,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # Keep track of multiple ns variables being the same UUID
         short_name_to_ns_name = {}
         for k, u in namespace.items():
-            sname = self[u][INFO.SHORT_NAME]
+            sname = self[u][Info.SHORT_NAME]
             short_name_to_ns_name.setdefault(sname, []).append(k)
 
         namespace_siblings = {k: self.time_siblings(u)[0] for k, u in namespace.items()}
@@ -2105,8 +2105,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # another has a different missing time step
         time_master = max(namespace_siblings.values(), key=lambda v: len(v))
         for idx in range(len(time_master)):
-            t = self[time_master[idx]][INFO.SCHED_TIME]
-            channel_siblings = [(self[u][INFO.SHORT_NAME], u) for u in self.channel_siblings(time_master[idx])[0]]
+            t = self[time_master[idx]][Info.SCHED_TIME]
+            channel_siblings = [(self[u][Info.SHORT_NAME], u) for u in self.channel_siblings(time_master[idx])[0]]
             temp_namespace = {}
             for sn, u in channel_siblings:
                 if sn not in short_name_to_ns_name:
@@ -2117,15 +2117,15 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             if len(temp_namespace) != len(namespace):
                 LOG.info("Missing some layers to create algebraic layer at {:%Y-%m-%d %H:%M:%S}".format(t))
                 continue
-            LOG.info("Creating algebraic layer '{}' for time {:%Y-%m-%d %H:%M:%S}".format(info.get(INFO.SHORT_NAME), self[time_master[idx]].get(INFO.SCHED_TIME)))
+            LOG.info("Creating algebraic layer '{}' for time {:%Y-%m-%d %H:%M:%S}".format(info.get(Info.SHORT_NAME), self[time_master[idx]].get(Info.SCHED_TIME)))
 
             uuid, layer_info, data = self._workspace.create_algebraic_composite(operations, temp_namespace, info.copy())
             self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, layer_info)
             presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
-            if INFO.UNIT_CONVERSION not in dataset:
-                dataset[INFO.UNIT_CONVERSION] = units_conversion(dataset)
-            if INFO.FAMILY not in dataset:
-                dataset[INFO.FAMILY] = self.family_for_product_or_layer(dataset)
+            if Info.UNIT_CONVERSION not in dataset:
+                dataset[Info.UNIT_CONVERSION] = units_conversion(dataset)
+            if Info.FAMILY not in dataset:
+                dataset[Info.FAMILY] = self.family_for_product_or_layer(dataset)
             self._add_layer_family(dataset)
             self.didAddCompositeLayer.emit(reordered_indices, dataset.uuid, presentation)
 
@@ -2133,8 +2133,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         non_rgb_classes = [DocBasicLayer, DocCompositeLayer]
         valid_ranges = {}
         for layer in self.layers_where(is_valid=True, in_type_set=non_rgb_classes):
-            sname = layer.get(INFO.CENTRAL_WAVELENGTH, layer[INFO.DATASET_NAME])
-            valid_ranges.setdefault(sname, layer[INFO.VALID_RANGE])
+            sname = layer.get(Info.CENTRAL_WAVELENGTH, layer[Info.DATASET_NAME])
+            valid_ranges.setdefault(sname, layer[Info.VALID_RANGE])
         return valid_ranges
 
     def create_rgb_composite(self, r=None, g=None, b=None, clim=None, gamma=None):
@@ -2176,7 +2176,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         prez_uuids = self.current_layer_uuid_order
         for inst_key, time_layers in self._recipe_layers[recipe.name].items():
             for t, rgb_layer in time_layers.items():
-                u = rgb_layer[INFO.UUID]
+                u = rgb_layer[Info.UUID]
                 if not valid_only:
                     yield u
                 elif u in prez_uuids:
@@ -2218,12 +2218,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 # create a new blank RGB
                 uuid = uuidgen()
                 ds_info = {
-                    INFO.UUID: uuid,
-                    INFO.KIND: KIND.RGB,
+                    Info.UUID: uuid,
+                    Info.KIND: Kind.RGB,
                     "recipe": recipe,
                 }
                 # better place for this?
-                ds_info[INFO.FAMILY] = self.family_for_product_or_layer(ds_info)
+                ds_info[Info.FAMILY] = self.family_for_product_or_layer(ds_info)
                 LOG.debug("Creating new RGB layer for recipe '{}'".format(recipe.name))
                 rgb_layer = layers[t] = DocRGBLayer(self, recipe, ds_info)
                 self._layer_with_uuid[uuid] = rgb_layer
@@ -2250,24 +2250,24 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             # check recipes color limits and update them
             # but only if this RGB layer matches the layers the recipe has
             if not recipe.read_only and changed and rgb_layer.recipe_layers_match:
-                def_limits = {comp: rgb_layer[INFO.CLIM][idx] for idx, comp in enumerate('rgb') if comp in changed}
+                def_limits = {comp: rgb_layer[Info.CLIM][idx] for idx, comp in enumerate('rgb') if comp in changed}
                 recipe.set_default_color_limits(**def_limits)
 
             # only tell other components about this layer if it is valid
             should_show = rgb_layer.is_valid or rgb_layer.recipe_layers_match
-            if rgb_layer[INFO.UUID] not in prez_uuids:
+            if rgb_layer[Info.UUID] not in prez_uuids:
                 if should_show:
                     presentation, reordered_indices = self._insert_layer_with_info(rgb_layer)
-                    self.didAddCompositeLayer.emit(reordered_indices, rgb_layer[INFO.UUID], presentation)
+                    self.didAddCompositeLayer.emit(reordered_indices, rgb_layer[Info.UUID], presentation)
                 else:
                     continue
             elif not should_show:
                 # is being shown, but shouldn't be
-                self.remove_layer_prez(rgb_layer[INFO.UUID])
+                self.remove_layer_prez(rgb_layer[Info.UUID])
                 continue
 
             if rgb_layer is not None:
-                changed_uuids.append(rgb_layer[INFO.UUID])
+                changed_uuids.append(rgb_layer[Info.UUID])
 
         self.change_rgb_recipe_prez(recipe, climits=recipe.color_limits,
                                     gamma=recipe.gammas, uuids=changed_uuids)
@@ -2283,7 +2283,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             rgba = []
 
         def _key_func(x):
-            return x[INFO.CATEGORY]
+            return x[Info.CATEGORY]
 
         def _component_generator(family, this_rgba):
             # limit what layers are returned
@@ -2295,19 +2295,19 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             #        Any call to 'sync_composite_layer_prereqs' needs to use
             #        SERIAL instead of SCHED_TIME too.
             if family is None:
-                layers = self.current_layers_where(kinds=[KIND.IMAGE, KIND.COMPOSITE])
+                layers = self.current_layers_where(kinds=[Kind.IMAGE, Kind.COMPOSITE])
                 layers = (x[-1] for x in layers)
                 # return empty `None` layers since we don't know what is wanted right now
                 # we look at all possible times
                 inst_layers = {
-                    k: {l[INFO.SCHED_TIME]: None for l in g}
+                    k: {l[Info.SCHED_TIME]: None for l in g}
                     for k, g in groupby(sorted(layers, key=_key_func), _key_func)}
                 return inst_layers
             else:
                 family_uuids = self._families[family]
                 family_layers = [self[u] for u in family_uuids]
             # (sat, inst) -> {time -> layer}
-            inst_layers = {k: {l[INFO.SCHED_TIME]: l for l in g} for k, g in groupby(sorted(family_layers, key=_key_func), _key_func)}
+            inst_layers = {k: {l[Info.SCHED_TIME]: l for l in g} for k, g in groupby(sorted(family_layers, key=_key_func), _key_func)}
             return inst_layers
 
         # if the layers we were using as dependencies have all been removed (family no longer exists)
@@ -2362,7 +2362,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             return
         # identify siblings before we make any changes!
         changed = []
-        clims = list(layer[INFO.CLIM])
+        clims = list(layer[Info.CLIM])
         for k, v in rgba.items():
             # assert(k in 'rgba')
             idx = 'rgba'.index(k)
@@ -2375,7 +2375,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             return changed
         # force an update of clims for components that changed
         # These clims are the current state of the default clims for each sub-layer
-        layer[INFO.CLIM] = tuple(clims)
+        layer[Info.CLIM] = tuple(clims)
         updated = layer.update_metadata_from_dependencies()
         LOG.info('updated metadata for layer %s: %s' % (layer.uuid, repr(list(updated.keys()))))
         return changed
@@ -2385,7 +2385,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # update the ranges on this layer and all it's siblings
         self.change_rgb_recipe_prez(recipe, climits=new_clims)
 
-    def _directory_of_layers(self, kind=KIND.IMAGE):
+    def _directory_of_layers(self, kind=Kind.IMAGE):
         if not isinstance(kind, (list, tuple)):
             kind = [kind]
         for x in [q for q in self._layer_with_uuid.values() if q.kind in kind]:
@@ -2415,7 +2415,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         return [u for u in uuids if u in current_visible]
 
     def family_uuids_for_uuid(self, uuid, active_only=False):
-        return self.family_uuids(self[uuid][INFO.FAMILY], active_only=active_only)
+        return self.family_uuids(self[uuid][Info.FAMILY], active_only=active_only)
 
     def recipe_for_uuid(self, uuid):
         # put this in a separate method in case things change in the future
@@ -2437,7 +2437,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 recipes_to_remove.add(self.recipe_for_uuid(uuid).name)
 
         # collect all times for these layers to update RGBs later
-        times = [self[u][INFO.SCHED_TIME] for u in all_uuids]
+        times = [self[u][Info.SCHED_TIME] for u in all_uuids]
 
         # delete all these layers from the layer list/presentation
         for uuid in all_uuids:
@@ -2552,7 +2552,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 if p.uuid == uuid:
                     return True
                 parent_layer = self._layer_with_uuid[p.uuid]
-                if parent_layer.kind == KIND.RGB and layer in parent_layer.l:
+                if parent_layer.kind == Kind.RGB and layer in parent_layer.l:
                     return True
         return False
 
@@ -2603,8 +2603,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         it = sibling_infos.get(uuid, None)
         if it is None:
             return None
-        sibs = [(x[INFO.SHORT_NAME], x[INFO.UUID]) for x in
-                self._filter(sibling_infos.values(), it, {INFO.SCENE, INFO.SCHED_TIME, INFO.INSTRUMENT, INFO.PLATFORM})]
+        sibs = [(x[Info.SHORT_NAME], x[Info.UUID]) for x in
+                self._filter(sibling_infos.values(), it, {Info.SCENE, Info.SCHED_TIME, Info.INSTRUMENT, Info.PLATFORM})]
         # then sort it by bands
         sibs.sort()
         offset = [i for i, x in enumerate(sibs) if x[1] == uuid]
@@ -2634,8 +2634,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         it = sibling_infos.get(uuid, None)
         if it is None:
             return [], 0
-        sibs = [(x[INFO.SCHED_TIME], x[INFO.UUID]) for x in
-                self._filter(sibling_infos.values(), it, {INFO.SHORT_NAME, INFO.STANDARD_NAME, INFO.SCENE, INFO.INSTRUMENT, INFO.PLATFORM, INFO.KIND})]
+        sibs = [(x[Info.SCHED_TIME], x[Info.UUID]) for x in
+                self._filter(sibling_infos.values(), it, {Info.SHORT_NAME, Info.STANDARD_NAME, Info.SCENE, Info.INSTRUMENT, Info.PLATFORM, Info.KIND})]
         # then sort it into time order
         sibs.sort()
         offset = [i for i,x in enumerate(sibs) if x[1]==uuid]
@@ -2687,7 +2687,7 @@ def main():
         epilog="",
         fromfile_prefix_chars='@')
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG')
+                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG')
     # http://docs.python.org/2.7/library/argparse.html#nargs
     # parser.add_argument('--stuff', nargs='5', dest='my_stuff',
     #                    help="one or more random things")

@@ -40,6 +40,7 @@ import logging
 import os
 import sys
 import unittest
+import shutil
 import time
 import enum
 from datetime import datetime, timedelta
@@ -55,7 +56,7 @@ from rasterio import Affine
 from shapely.geometry.polygon import LinearRing
 from sqlalchemy.orm.exc import NoResultFound
 
-from sift.common import INFO, KIND, flags, STATE
+from sift.common import Info, Kind, Flags, State
 from sift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
 from sift.model.shapes import content_within_shape
 from .metadatabase import Metadatabase, Content, Product, Resource
@@ -234,7 +235,7 @@ class Workspace(QObject):
     - own a working directory full of recently used datasets
     - provide DatasetInfo dictionaries for shorthand use between application subsystems
 
-        - datasetinfo dictionaries are ordinary python dictionaries containing [INFO.UUID], projection metadata, LOD info
+        - datasetinfo dictionaries are ordinary python dictionaries containing [Info.UUID], projection metadata, LOD info
 
     - identify datasets primarily with a UUID object which tracks the dataset and its various representations through the system
     - unpack data in "packing crate" formats like NetCDF into memory-compatible flat files
@@ -263,11 +264,11 @@ class Workspace(QObject):
     didUpdateProductsMetadata = pyqtSignal(set)  # set of UUIDs with changes to their metadata
     # didFinishImport = pyqtSignal(dict)  # all loading activities for a dataset have completed
     # didDiscoverExternalDataset = pyqtSignal(dict)  # a new dataset was added to the workspace from an external agent
-    didChangeProductState = pyqtSignal(UUID, flags)  # a product changed state, e.g. an importer started working on it
+    didChangeProductState = pyqtSignal(UUID, Flags)  # a product changed state, e.g. an importer started working on it
 
     _importers = [GeoTiffImporter, GoesRPUGImporter]
 
-    _state: Mapping[UUID, flags] = None
+    _state: Mapping[UUID, Flags] = None
 
     def set_product_state_flag(self, uuid: UUID, flag):
         """primarily used by Importers to signal work in progress
@@ -281,15 +282,15 @@ class Workspace(QObject):
         state.remove(flag)
         self.didChangeProductState.emit(uuid, state)
 
-    def product_state(self, uuid: UUID) -> flags:
-        state = flags(self._state[uuid])
+    def product_state(self, uuid: UUID) -> Flags:
+        state = Flags(self._state[uuid])
         # add any derived information
         if uuid in self._available:
-            state.add(STATE.ATTACHED)
+            state.add(State.ATTACHED)
         with self._inventory as s:
             ncontent = s.query(Content).filter_by(uuid=uuid).count()
         if ncontent > 0:
-            state.add(STATE.CACHED)
+            state.add(State.CACHED)
         return state
 
     @property
@@ -314,7 +315,7 @@ class Workspace(QObject):
         """
         return TheWorkspace
 
-    def __init__(self, directory_path=None, process_pool=None, max_size_gb=None, queue=None):
+    def __init__(self, directory_path=None, process_pool=None, max_size_gb=None, queue=None, initial_clear=False):
         """
         Initialize a new or attach an existing workspace, creating any necessary bookkeeping.
         """
@@ -338,6 +339,8 @@ class Workspace(QObject):
             self.cwd = directory_path = os.path.abspath(directory_path)
             self.cache_dir = cache_path = os.path.join(self.cwd, 'data_cache')
         self._inventory_path = os.path.join(self.cwd, '_inventory.db')
+        if initial_clear:
+            self.clear_workspace_content()
         if not os.path.isdir(cache_path):
             LOG.info("creating new workspace cache at {}".format(cache_path))
             os.makedirs(cache_path)
@@ -353,7 +356,7 @@ class Workspace(QObject):
 
         self._available = {}
         self._importers = [x for x in IMPORT_CLASSES]
-        self._state = defaultdict(flags)
+        self._state = defaultdict(Flags)
         global TheWorkspace  # singleton
         if TheWorkspace is None:
             TheWorkspace = self
@@ -373,6 +376,19 @@ class Workspace(QObject):
             with self._inventory as s:
                 assert(0 == s.query(Content).count())
         LOG.info('done with init')
+
+    def clear_workspace_content(self):
+        """Remove binary files from workspace and workspace database."""
+        LOG.info("Clearing workspace contents...")
+        try:
+            os.remove(self._inventory_path)
+        except FileNotFoundError:
+            LOG.debug("No inventory DB file found to remove: {}".format(self._inventory_path))
+
+        try:
+            shutil.rmtree(self.cache_dir)
+        except OSError:
+            LOG.debug("No binary cache directory found to remove: {}".format(self.cache_dir))
 
     def _purge_missing_content(self):
         """
@@ -429,9 +445,9 @@ class Workspace(QObject):
         with self._inventory as s:
             for p in s.query(Product).all():
                 # NOTE: Can be remove after 0.9.x releases are done (0.10.x or 1.0)
-                if os.path.splitext(p.info[INFO.DATASET_NAME])[1] and p.info[INFO.BAND]:
+                if os.path.splitext(p.info[Info.DATASET_NAME])[1] and p.info[Info.BAND]:
                     LOG.info("rewriting DATASET_NAME to new style using band: {}".format(repr(p)))
-                    p.update({INFO.DATASET_NAME: 'B{:02d}'.format(p.info[INFO.BAND])})
+                    p.update({Info.DATASET_NAME: 'B{:02d}'.format(p.info[Info.BAND])})
 
     def _bgnd_startup_purge(self):
         ntot = 5
@@ -525,7 +541,7 @@ class Workspace(QObject):
     def _product_with_uuid(self, session, uuid) -> Product:
         return session.query(Product).filter_by(uuid_str=str(uuid)).first()
 
-    def _product_overview_content(self, session, prod:Product=None, uuid:UUID=None, kind:KIND=KIND.IMAGE) -> Content:
+    def _product_overview_content(self, session, prod:Product=None, uuid:UUID=None, kind:Kind=Kind.IMAGE) -> Content:
         if prod is None and uuid is not None:
             # Get Product object
             try:
@@ -534,10 +550,10 @@ class Workspace(QObject):
                 LOG.error("No product with UUID {} found".format(uuid))
                 return None
         contents = session.query(Content).filter(Content.product_id == prod.id).order_by(Content.lod).all()
-        contents = [c for c in contents if c.info.get(INFO.KIND, KIND.IMAGE) == kind]
+        contents = [c for c in contents if c.info.get(Info.KIND, Kind.IMAGE) == kind]
         return None if 0 == len(contents) else contents[0]
 
-    def _product_native_content(self, session, prod:Product = None, uuid:UUID=None, kind:KIND=KIND.IMAGE) -> Content:
+    def _product_native_content(self, session, prod:Product = None, uuid:UUID=None, kind:Kind=Kind.IMAGE) -> Content:
         # NOTE: This assumes the last Content object is the best resolution
         #       but it is untested
         if prod is None and uuid is not None:
@@ -548,14 +564,14 @@ class Workspace(QObject):
                 LOG.error("No product with UUID {} found".format(uuid))
                 return None
         contents = session.query(Content).filter(Content.product_id == prod.id).order_by(Content.lod.desc()).all()
-        contents = [c for c in contents if c.info.get(INFO.KIND, KIND.IMAGE) == kind]
+        contents = [c for c in contents if c.info.get(Info.KIND, Kind.IMAGE) == kind]
         return None if 0 == len(contents) else contents[-1]
 
     #
     # combining queries with data content
     #
 
-    def _overview_content_for_uuid(self, uuid, kind=KIND.IMAGE):
+    def _overview_content_for_uuid(self, uuid, kind=Kind.IMAGE):
         # FUTURE: do a compound query for this to get the Content entry
         # prod = self._product_with_uuid(uuid)
         # assert(prod is not None)
@@ -608,7 +624,7 @@ class Workspace(QObject):
         if isinstance(dsi_or_uuid, str):
             uuid = UUID(dsi_or_uuid)
         elif not isinstance(dsi_or_uuid, UUID):
-            uuid = dsi_or_uuid[INFO.UUID]
+            uuid = dsi_or_uuid[Info.UUID]
         else:
             uuid = dsi_or_uuid
         with self._inventory as s:
@@ -618,7 +634,7 @@ class Workspace(QObject):
                 LOG.error('no info available for UUID {}'.format(dsi_or_uuid))
                 LOG.error("known products: {}".format(repr(self._all_product_uuids())))
                 return None
-            kind = prod.info[INFO.KIND]
+            kind = prod.info[Info.KIND]
             native_content = self._product_native_content(s, prod=prod, kind=kind)
 
             if native_content is not None:
@@ -627,7 +643,7 @@ class Workspace(QObject):
                 # our old model was that product == content and shares a UUID with the layer
                 # if content is available, we want to provide native content metadata along with the product metadata
                 # specifically a lot of client code assumes that resource == product == content and that singular navigation (e.g. cell_size) is norm
-                assert(native_content.info[INFO.CELL_WIDTH] is not None)  # FIXME DEBUG
+                assert(native_content.info[Info.CELL_WIDTH] is not None)  # FIXME DEBUG
                 return frozendict(ChainMap(native_content.info, prod.info))
             return frozendict(prod.info)  # mapping semantics for database fields, as well as key-value fields; flatten to one namespace and read-only
 
@@ -686,7 +702,7 @@ class Workspace(QObject):
             for c in s.query(Content).order_by(Content.atime.desc()).all():
                 p = c.product
                 if p.uuid not in zult:
-                    zult[p.uuid] = p.info[INFO.DISPLAY_NAME]
+                    zult[p.uuid] = p.info[Info.DISPLAY_NAME]
         return zult
 
     @property
@@ -697,7 +713,7 @@ class Workspace(QObject):
 
     def recently_used_products(self, n=32) -> Dict[UUID, str]:
         with self._inventory as s:
-            return OrderedDict((p.uuid, p.info[INFO.DISPLAY_NAME])
+            return OrderedDict((p.uuid, p.info[Info.DISPLAY_NAME])
                                for p in s.query(Product).order_by(Product.atime.desc()).limit(n).all())
 
     def _purge_content_for_resource(self, resource: Resource, session, defer_commit=False):
@@ -891,7 +907,7 @@ class Workspace(QObject):
                     assert(prod is not None)
                     # merge the product into our database session, since it may belong to import_session
                     zult = frozendict(prod.info)  # self._S.merge(prod)
-                    # LOG.debug('yielding product metadata for {}'.format(zult.get(INFO.DISPLAY_NAME, '?? unknown name ??')))
+                    # LOG.debug('yielding product metadata for {}'.format(zult.get(Info.DISPLAY_NAME, '?? unknown name ??')))
                     yield num_products, zult
 
     def import_product_content(self, uuid=None, prod=None, allow_cache=True, **importer_kwargs):
@@ -900,8 +916,8 @@ class Workspace(QObject):
             if prod is None and uuid is not None:
                 prod = self._product_with_uuid(S, uuid)
 
-            self.set_product_state_flag(prod.uuid, STATE.ARRIVING)
-            default_prod_kind = prod.info[INFO.KIND]
+            self.set_product_state_flag(prod.uuid, State.ARRIVING)
+            default_prod_kind = prod.info[Info.KIND]
 
             if len(prod.content):
                 LOG.info('product already has content available, using that rather than re-importing')
@@ -912,7 +928,7 @@ class Workspace(QObject):
 
             truck = aImporter.from_product(prod, workspace_cwd=self.cache_dir, database_session=S, **importer_kwargs)
             metadata = prod.info
-            name = metadata[INFO.SHORT_NAME]
+            name = metadata[Info.SHORT_NAME]
 
             # FIXME: for now, just iterate the incremental load. later we want to add this to TheQueue and update the UI as we get more data loaded
             gen = truck.begin_import_products(prod.id)
@@ -928,7 +944,7 @@ class Workspace(QObject):
             # self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
             LOG.debug('received {} updates during import'.format(nupd))
             uuid = prod.uuid
-            self.clear_product_state_flag(prod.uuid, STATE.ARRIVING)
+            self.clear_product_state_flag(prod.uuid, State.ARRIVING)
         # S.commit()
         # S.flush()
 
@@ -982,40 +998,40 @@ class Workspace(QObject):
         Returns: dict of overall metadata (same as `info`)
 
         """
-        if not all(x[INFO.PROJ] == md_list[0][INFO.PROJ] for x in md_list[1:]):
+        if not all(x[Info.PROJ] == md_list[0][Info.PROJ] for x in md_list[1:]):
             raise ValueError("Algebraic inputs must all be the same projection")
 
         uuid = uuidgen()
-        info[INFO.UUID] = uuid
-        for k in (INFO.PLATFORM, INFO.INSTRUMENT, INFO.SCENE):
+        info[Info.UUID] = uuid
+        for k in (Info.PLATFORM, Info.INSTRUMENT, Info.SCENE):
             if md_list[0].get(k) is None:
                 continue
             if all(x.get(k) == md_list[0].get(k) for x in md_list[1:]):
                 info.setdefault(k, md_list[0][k])
-        info.setdefault(INFO.KIND, KIND.COMPOSITE)
-        info.setdefault(INFO.SHORT_NAME, '<unknown>')
-        info.setdefault(INFO.DATASET_NAME, info[INFO.SHORT_NAME])
-        info.setdefault(INFO.UNITS, '1')
+        info.setdefault(Info.KIND, Kind.COMPOSITE)
+        info.setdefault(Info.SHORT_NAME, '<unknown>')
+        info.setdefault(Info.DATASET_NAME, info[Info.SHORT_NAME])
+        info.setdefault(Info.UNITS, '1')
 
-        max_meta = max(md_list, key=lambda x: x[INFO.SHAPE])
-        for k in (INFO.PROJ, INFO.ORIGIN_X, INFO.ORIGIN_Y, INFO.CELL_WIDTH, INFO.CELL_HEIGHT, INFO.SHAPE):
+        max_meta = max(md_list, key=lambda x: x[Info.SHAPE])
+        for k in (Info.PROJ, Info.ORIGIN_X, Info.ORIGIN_Y, Info.CELL_WIDTH, Info.CELL_HEIGHT, Info.SHAPE):
             info[k] = max_meta[k]
 
-        info[INFO.VALID_RANGE] = (np.nanmin(composite_array), np.nanmax(composite_array))
-        info[INFO.CLIM] = (np.nanmin(composite_array), np.nanmax(composite_array))
-        info[INFO.OBS_TIME] = min([x[INFO.OBS_TIME] for x in md_list])
-        info[INFO.SCHED_TIME] = min([x[INFO.SCHED_TIME] for x in md_list])
+        info[Info.VALID_RANGE] = (np.nanmin(composite_array), np.nanmax(composite_array))
+        info[Info.CLIM] = (np.nanmin(composite_array), np.nanmax(composite_array))
+        info[Info.OBS_TIME] = min([x[Info.OBS_TIME] for x in md_list])
+        info[Info.SCHED_TIME] = min([x[Info.SCHED_TIME] for x in md_list])
         # get the overall observation time
-        info[INFO.OBS_DURATION] = max([
-            x[INFO.OBS_TIME] + x.get(INFO.OBS_DURATION, timedelta(seconds=0)) for x in md_list]) - info[INFO.OBS_TIME]
+        info[Info.OBS_DURATION] = max([
+            x[Info.OBS_TIME] + x.get(Info.OBS_DURATION, timedelta(seconds=0)) for x in md_list]) - info[Info.OBS_TIME]
 
-        info[INFO.PATHNAME] = '<algebraic layer: {} : {} : {}>'.format(
-            info[INFO.DATASET_NAME], info[INFO.SCHED_TIME], str(info[INFO.UUID]))
+        info[Info.PATHNAME] = '<algebraic layer: {} : {} : {}>'.format(
+            info[Info.DATASET_NAME], info[Info.SCHED_TIME], str(info[Info.UUID]))
 
         # generate family and category names
-        info[INFO.FAMILY] = family = self._merge_famcat_strings(md_list, INFO.FAMILY, suffix=info.get(INFO.SHORT_NAME))
-        info[INFO.CATEGORY] = category = self._merge_famcat_strings(md_list, INFO.CATEGORY)
-        info[INFO.SERIAL] = serial = self._merge_famcat_strings(md_list, INFO.SERIAL)
+        info[Info.FAMILY] = family = self._merge_famcat_strings(md_list, Info.FAMILY, suffix=info.get(Info.SHORT_NAME))
+        info[Info.CATEGORY] = category = self._merge_famcat_strings(md_list, Info.CATEGORY)
+        info[Info.SERIAL] = serial = self._merge_famcat_strings(md_list, Info.SERIAL)
         LOG.debug("algebraic product will be {}::{}::{}".format(family,category,serial))
 
         return info
@@ -1038,17 +1054,17 @@ class Workspace(QObject):
         # See: https://stackoverflow.com/a/35608701/433202
         names = list(dep_metadata.keys())
         try:
-            valid_combos = np.array(np.meshgrid(*tuple(dep_metadata[n][INFO.VALID_RANGE] for n in names))).reshape(len(names), -1)
+            valid_combos = np.array(np.meshgrid(*tuple(dep_metadata[n][Info.VALID_RANGE] for n in names))).reshape(len(names), -1)
         except KeyError:
-            badboys = [n for n in names if INFO.VALID_RANGE not in dep_metadata[n]]
-            LOG.error("missing VALID_RANGE for: {}".format(repr([dep_metadata[n][INFO.DISPLAY_NAME] for n in badboys])))
+            badboys = [n for n in names if Info.VALID_RANGE not in dep_metadata[n]]
+            LOG.error("missing VALID_RANGE for: {}".format(repr([dep_metadata[n][Info.DISPLAY_NAME] for n in badboys])))
             LOG.error("witness sample: {}".format(repr(dep_metadata[badboys[0]])))
             raise
         valids_namespace = {n: valid_combos[idx] for idx, n in enumerate(names)}
-        content = {n: self.get_content(m[INFO.UUID]) for n, m in dep_metadata.items()}
+        content = {n: self.get_content(m[Info.UUID]) for n, m in dep_metadata.items()}
 
         # Get all content in the same shape
-        max_shape = max(x[INFO.SHAPE] for x in dep_metadata.values())
+        max_shape = max(x[Info.SHAPE] for x in dep_metadata.values())
         for k, v in content.items():
             if v.shape != max_shape:
                 f0 = int(max_shape[0] / v.shape[0])
@@ -1068,7 +1084,7 @@ class Workspace(QObject):
         # update the shape
         # NOTE: This doesn't work if the code changes the shape of the array
         # Need to update geolocation information too
-        # info[INFO.SHAPE] = content[result_name].shape
+        # info[Info.SHAPE] = content[result_name].shape
 
         info = generate_guidebook_metadata(info)
 
@@ -1091,8 +1107,8 @@ class Workspace(QObject):
         Returns:
             uuid, info, data: uuid of the new product, its official read-only metadata, and cached content ndarray
         """
-        if INFO.UUID not in info:
-            raise ValueError('currently require an INFO.UUID be included in product')
+        if Info.UUID not in info:
+            raise ValueError('currently require an Info.UUID be included in product')
         parms = dict(info)
         now = datetime.utcnow()
         parms.update(dict(
@@ -1112,8 +1128,8 @@ class Workspace(QObject):
             lod=Content.LOD_OVERVIEW,
             path=ws_filename,
             dtype=str(data.dtype),
-            proj4=info[INFO.PROJ],
-            resolution=min(info[INFO.CELL_WIDTH], info[INFO.CELL_HEIGHT])
+            proj4=info[Info.PROJ],
+            resolution=min(info[Info.CELL_WIDTH], info[Info.CELL_HEIGHT])
         ))
         rcls = dict(zip(('rows', 'cols', 'levels'), data.shape))
         parms.update(rcls)
@@ -1149,10 +1165,10 @@ class Workspace(QObject):
         :return: True if successfully deleted, False if not found
         """
         if isinstance(dsi, dict):
-            name = dsi[INFO.NAME]
+            name = dsi[Info.NAME]
         else:
             name = 'dataset'
-        uuid = dsi if isinstance(dsi, UUID) else dsi[INFO.UUID]
+        uuid = dsi if isinstance(dsi, UUID) else dsi[Info.UUID]
         zult = False
 
         if self._queue is not None:
@@ -1162,7 +1178,7 @@ class Workspace(QObject):
                 pass
         return True
 
-    def get_content(self, dsi_or_uuid, lod=None, kind=KIND.IMAGE):
+    def get_content(self, dsi_or_uuid, lod=None, kind=Kind.IMAGE):
         """
         By default, get the best-available (closest to native) np.ndarray-compatible view of the full dataset
         :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
@@ -1176,12 +1192,12 @@ class Workspace(QObject):
         elif isinstance(dsi_or_uuid, str):
             uuid = UUID(dsi_or_uuid)
         else:
-            uuid = dsi_or_uuid[INFO.UUID]
+            uuid = dsi_or_uuid[Info.UUID]
         # prod = self._product_with_uuid(dsi_or_uuid)
         # prod.touch()  TODO this causes a locking exception when run in a secondary thread. Keeping background operations lightweight makes sense however, so just review this
         with self._inventory as s:
             content = s.query(Content).filter((Product.uuid_str==str(uuid)) & (Content.product_id==Product.id)).order_by(Content.lod.desc()).all()
-            content = [x for x in content if x.info.get(INFO.KIND, KIND.IMAGE) == kind]
+            content = [x for x in content if x.info.get(Info.KIND, Kind.IMAGE) == kind]
             if len(content) != 1:
                 LOG.warning("More than one matching Content object for '{}'".format(dsi_or_uuid))
             if not len(content) or not content[0]:
@@ -1197,25 +1213,25 @@ class Workspace(QObject):
 
     def _create_position_to_index_transform(self, dsi_or_uuid):
         info = self.get_info(dsi_or_uuid)
-        origin_x = info[INFO.ORIGIN_X]
-        origin_y = info[INFO.ORIGIN_Y]
-        cell_width = info[INFO.CELL_WIDTH]
-        cell_height = info[INFO.CELL_HEIGHT]
+        origin_x = info[Info.ORIGIN_X]
+        origin_y = info[Info.ORIGIN_Y]
+        cell_width = info[Info.CELL_WIDTH]
+        cell_height = info[Info.CELL_HEIGHT]
         def _transform(x, y, origin_x=origin_x, origin_y=origin_y, cell_width=cell_width, cell_height=cell_height):
-            col = (x - info[INFO.ORIGIN_X]) / info[INFO.CELL_WIDTH]
-            row = (y - info[INFO.ORIGIN_Y]) / info[INFO.CELL_HEIGHT]
+            col = (x - info[Info.ORIGIN_X]) / info[Info.CELL_WIDTH]
+            row = (y - info[Info.ORIGIN_Y]) / info[Info.CELL_HEIGHT]
             return col, row
         return _transform
 
     def _create_layer_affine(self, dsi_or_uuid):
         info = self.get_info(dsi_or_uuid)
         affine = Affine(
-            info[INFO.CELL_WIDTH],
+            info[Info.CELL_WIDTH],
             0.0,
-            info[INFO.ORIGIN_X],
+            info[Info.ORIGIN_X],
             0.0,
-            info[INFO.CELL_HEIGHT],
-            info[INFO.ORIGIN_Y],
+            info[Info.CELL_HEIGHT],
+            info[Info.ORIGIN_Y],
         )
         return affine
 
@@ -1224,18 +1240,18 @@ class Workspace(QObject):
         if info is None:
             return None, None
         # Assume `xy_pos` is lon/lat value
-        if '+proj=latlong' in info[INFO.PROJ]:
+        if '+proj=latlong' in info[Info.PROJ]:
             x, y = xy_pos[:2]
         else:
-            x, y = Proj(info[INFO.PROJ])(*xy_pos)
-        col = (x - info[INFO.ORIGIN_X]) / info[INFO.CELL_WIDTH]
-        row = (y - info[INFO.ORIGIN_Y]) / info[INFO.CELL_HEIGHT]
+            x, y = Proj(info[Info.PROJ])(*xy_pos)
+        col = (x - info[Info.ORIGIN_X]) / info[Info.CELL_WIDTH]
+        row = (y - info[Info.ORIGIN_Y]) / info[Info.CELL_HEIGHT]
         return np.int64(np.round(row)), np.int64(np.round(col))
 
     def layer_proj(self, dsi_or_uuid):
         """Project lon/lat probe points to image X/Y"""
         info = self.get_info(dsi_or_uuid)
-        return Proj(info[INFO.PROJ])
+        return Proj(info[Info.PROJ])
 
     def _project_points(self, p, points):
         points = np.array(points)
@@ -1260,10 +1276,10 @@ class Workspace(QObject):
         return data
 
     def highest_resolution_uuid(self, *uuids):
-        return min([self.get_info(uuid) for uuid in uuids], key=lambda i: i[INFO.CELL_WIDTH])[INFO.UUID]
+        return min([self.get_info(uuid) for uuid in uuids], key=lambda i: i[Info.CELL_WIDTH])[Info.UUID]
 
     def lowest_resolution_uuid(self, *uuids):
-        return max([self.get_info(uuid) for uuid in uuids], key=lambda i: i[INFO.CELL_WIDTH])[INFO.UUID]
+        return max([self.get_info(uuid) for uuid in uuids], key=lambda i: i[Info.CELL_WIDTH])[Info.UUID]
 
     def get_coordinate_mask_polygon(self, dsi_or_uuid, points):
         data = self.get_content(dsi_or_uuid)
@@ -1300,22 +1316,22 @@ class Workspace(QObject):
             x_slice = slice(None, None, None)
         if y_slice.step not in [1, None] or x_slice.step not in [1, None]:
             raise ValueError("Slice steps other than 1 are not supported")
-        rows, cols = info[INFO.SHAPE]
+        rows, cols = info[Info.SHAPE]
         x_start = x_slice.start or 0
         y_start = y_slice.start or 0
         num_cols = (x_slice.stop or cols) - x_start
         num_rows = (y_slice.stop or rows) - y_start
-        half_x = info[INFO.CELL_WIDTH] / 2.
-        half_y = info[INFO.CELL_HEIGHT] / 2.
-        min_x = info[INFO.ORIGIN_X] - half_x + x_start * info[INFO.CELL_WIDTH]
-        max_y = info[INFO.ORIGIN_Y] + half_y - y_start * info[INFO.CELL_HEIGHT]
-        min_y = max_y - num_rows * info[INFO.CELL_HEIGHT]
-        max_x = min_x + num_cols * info[INFO.CELL_WIDTH]
+        half_x = info[Info.CELL_WIDTH] / 2.
+        half_y = info[Info.CELL_HEIGHT] / 2.
+        min_x = info[Info.ORIGIN_X] - half_x + x_start * info[Info.CELL_WIDTH]
+        max_y = info[Info.ORIGIN_Y] + half_y - y_start * info[Info.CELL_HEIGHT]
+        min_y = max_y - num_rows * info[Info.CELL_HEIGHT]
+        max_x = min_x + num_cols * info[Info.CELL_WIDTH]
         return AreaDefinition(
             'layer area',
             'layer area',
             'layer area',
-            proj4_str_to_dict(info[INFO.PROJ]),
+            proj4_str_to_dict(info[Info.PROJ]),
             cols, rows,
             (min_x, min_y, max_x, max_y),
         )
@@ -1335,7 +1351,7 @@ def main():
         epilog="",
         fromfile_prefix_chars='@')
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG')
+                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG')
     # http://docs.python.org/2.7/library/argparse.html#nargs
     # parser.add_argument('--stuff', nargs='5', dest='my_stuff',
     #                    help="one or more random things")

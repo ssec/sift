@@ -42,8 +42,13 @@ FCS_SEP = '::'
 # standard N/A string used in FCS
 NOT_AVAILABLE = FCS_NA = 'N/A'
 
-# HACK: Get a font size that looks good on this platform
+
 def get_font_size(pref_size):
+    """Get a font size that looks good on this platform.
+
+    This is a HACK and can be replaced by PyQt5 font handling after migration.
+
+    """
     # win = 7
     # osx = 12
     env_factor = os.getenv("SIFT_FONT_FACTOR", None)
@@ -119,8 +124,9 @@ class Span(typ.NamedTuple):
     def is_instantaneous(self):
         return timedelta(seconds=0) == self.d
 
-class flags(set):
-    """A set of enumerated flags which may ultimately be represented as a bitfield, but observing set interface
+
+class Flags(set):
+    """A set of enumerated Flags which may ultimately be represented as a bitfield, but observing set interface
     """
     pass
 
@@ -128,7 +134,7 @@ class flags(set):
 WORLD_EXTENT_BOX = box(b=-MAX_EXCURSION_Y, l=-MAX_EXCURSION_X, t=MAX_EXCURSION_Y, r=MAX_EXCURSION_X)
 
 
-class STATE(Enum):
+class State(Enum):
     """State for products in document
     """
     UNKNOWN = 0
@@ -141,34 +147,31 @@ class STATE(Enum):
     # PURGE = -2  # scheduled for purging -- eventually
 
 
-class TOOL(Enum):
-    """Names for cursor tools.
-    """
+class Tool(Enum):
+    """Names for cursor tools."""
     PAN_ZOOM = "pan_zoom"
     POINT_PROBE = "point_probe"
     REGION_PROBE = "region_probe"
 
 
-class KIND(Enum):
-    """kind of entities we're working with
-    """
+class Kind(Enum):
+    """Kind of entities we're working with."""
     UNKNOWN = 0
     IMAGE = 1
     OUTLINE = 2
     SHAPE = 3
     RGB = 4
-    COMPOSITE = 1  # deprecated: use KIND.IMAGE instead
+    COMPOSITE = 1  # deprecated: use Kind.IMAGE instead
     CONTOUR = 6
 
 
-class COMPOSITE_TYPE(Enum):
-    """Type of non-luminance image layers
-    """
+class CompositeType(Enum):
+    """Type of non-luminance image layers."""
     RGB = 1
     ARITHMETIC = 2
 
 
-class INSTRUMENT(Enum):
+class Instrument(Enum):
     UNKNOWN = '???'
     AHI = 'AHI'
     ABI = 'ABI'
@@ -178,10 +181,10 @@ class INSTRUMENT(Enum):
     SEVIRI = 'SEVIRI'
 
 
-INSTRUMENT_MAP = {v.value.lower().replace('-', ''): v for v in INSTRUMENT}
+INSTRUMENT_MAP = {v.value.lower().replace('-', ''): v for v in Instrument}
 
 
-class PLATFORM(Enum):
+class Platform(Enum):
     UNKNOWN = '???'
     HIMAWARI_8 = 'Himawari-8'
     HIMAWARI_9 = 'Himawari-9'
@@ -194,14 +197,14 @@ class PLATFORM(Enum):
     MSG11 = 'Meteosat-11'
 
 
-PLATFORM_MAP = {v.value.lower().replace('-', ''): v for v in PLATFORM}
-PLATFORM_MAP['H8'] = PLATFORM.HIMAWARI_8
-PLATFORM_MAP['H9'] = PLATFORM.HIMAWARI_8
-PLATFORM_MAP['GOES-16'] = PLATFORM.GOES_16
-PLATFORM_MAP['GOES-17'] = PLATFORM.GOES_17
+PLATFORM_MAP = {v.value.lower().replace('-', ''): v for v in Platform}
+PLATFORM_MAP['H8'] = Platform.HIMAWARI_8
+PLATFORM_MAP['H9'] = Platform.HIMAWARI_8
+PLATFORM_MAP['GOES-16'] = Platform.GOES_16
+PLATFORM_MAP['GOES-17'] = Platform.GOES_17
 
 
-class INFO(Enum):
+class Info(Enum):
     """
     Standard keys for info dictionaries
     Note: some fields correspond to database fields in workspace.metadatabase !
@@ -217,7 +220,7 @@ class INFO(Enum):
 
     # SIFT bookkeeping
     DATASET_NAME = 'dataset_name'  # logical name of the file (possibly human assigned)
-    KIND = 'kind'  # KIND enumeration on what kind of layer this makes
+    KIND = 'kind'  # Kind enumeration on what kind of layer this makes
     UUID = 'uuid'  # UUID assigned on import, which follows the layer around the system
 
     # track determiner is family::category; presentation is determined by family
@@ -247,7 +250,7 @@ class INFO(Enum):
     PLATFORM = 'platform' # full standard name of spacecraft
     BAND = 'band'  # band number (multispectral instruments)
     SCENE = 'scene'  # standard scene identifier string for instrument, e.g. FLDK
-    INSTRUMENT = 'instrument'  # INSTRUMENT enumeration, or string with full standard name
+    INSTRUMENT = 'instrument'  # Instrument enumeration, or string with full standard name
 
     # human-friendly conventions
     DISPLAY_NAME = 'display_name'  # preferred name in the layer list
@@ -306,7 +309,7 @@ class Presentation(typ.NamedTuple):
 
     """
     uuid: UUID  # dataset in the document/workspace
-    kind: KIND  # what kind of layer it is
+    kind: Kind  # what kind of layer it is
     visible: bool  # whether it's visible or not
     a_order: int  # None for non-animating, 0..n-1 what order to draw in during animation
     colormap: object  # name or uuid: color map to use; name for default, uuid for user-specified
@@ -935,7 +938,7 @@ def main():
         epilog="",
         fromfile_prefix_chars='@')
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG')
+                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG')
     # http://docs.python.org/2.7/library/argparse.html#nargs
     # parser.add_argument('--stuff', nargs='5', dest='my_stuff',
     #                    help="one or more random things")

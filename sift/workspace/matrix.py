@@ -153,7 +153,7 @@ def main():
         epilog="",
         fromfile_prefix_chars='@')
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG')
+                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG')
     parser.add_argument('-d', '--debug', dest='debug', action='store_true',
                         help="enable interactive PDB debugger on exception")
     # http://docs.python.org/2.7/library/argparse.html#nargs

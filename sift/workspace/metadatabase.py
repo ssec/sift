@@ -33,7 +33,7 @@ __docformat__ = 'reStructuredText'
 import os, sys
 import logging, unittest, argparse
 from datetime import datetime, timedelta
-from sift.common import INFO, FCS_SEP
+from sift.common import Info, FCS_SEP
 from functools import reduce
 from uuid import UUID
 from collections import ChainMap, MutableMapping, Iterable, defaultdict
@@ -67,9 +67,9 @@ LOG = logging.getLogger(__name__)
 #         return iter(self._proxied)
 #
 #     def __getitem__(self, key):
-#         # if key in INFO:
-#         #     v = getattr(self, str(key), INFO)
-#         #     if v is not INFO:
+#         # if key in Info:
+#         #     v = getattr(self, str(key), Info)
+#         #     if v is not Info:
 #         #         return v
 #         return self._proxied[key]
 #
@@ -182,7 +182,7 @@ class ChainRecordWithDict(MutableMapping):
         return '<ChainRecordWithDict {}>'.format(repr(tuple(self.keys())))
 
     def __setitem__(self, key, value):
-        fieldname = self._field_keys.get(key)  # INFO -> fieldname
+        fieldname = self._field_keys.get(key)  # Info -> fieldname
         if fieldname is not None:
             LOG.debug('assigning database field {}'.format(fieldname))
             # self._obj.__dict__[fieldname] = value
@@ -258,7 +258,7 @@ class Product(Base):
         fam, ctg, ser = new_ident.split("::")
         self.family, self.category, self.serial = fam, ctg, ser
 
-    # platform = Column(String)  # platform or satellite name e.g. "GOES-16", "Himawari-8"; should match PLATFORM enum
+    # platform = Column(String)  # platform or satellite name e.g. "GOES-16", "Himawari-8"; should match Platform enum
     # standard_name = Column(String, nullable=True)
     #
     # times
@@ -269,7 +269,7 @@ class Product(Base):
     # native resolution information - see Content for projection details at different LODs
     # resolution = Column(Integer, nullable=True)  # meters max resolution, e.g. 500, 1000, 2000, 4000
 
-    # descriptive - move these to INFO keys
+    # descriptive - move these to Info keys
     # units = Column(Unicode, nullable=True)  # udunits compliant units, e.g. 'K'
     # label = Column(Unicode, nullable=True)  # "AHI Refl B11"
     # description = Column(UnicodeText, nullable=True)
@@ -315,7 +315,7 @@ class Product(Base):
     @classmethod
     def from_info(cls, mapping, symbols=None, codeblock=None, only_fields=False):
         """
-        create a Product using info INFO dictionary items and arbitrary key-values
+        create a Product using info Info dictionary items and arbitrary key-values
         :param mapping: dictionary of product metadata
         :return: Product object
         """
@@ -343,7 +343,7 @@ class Product(Base):
     @property
     def info(self):
         """
-        :return: mapping merging INFO-compatible database fields with key-value dictionary access pattern
+        :return: mapping merging Info-compatible database fields with key-value dictionary access pattern
         """
         if self._info is None:
             self._info = ChainRecordWithDict(self, self.INFO_TO_FIELD, self._kwinfo)
@@ -352,7 +352,7 @@ class Product(Base):
     def update(self, d, only_keyvalues=False, only_fields=False):
         """
         update metadata, optionally only permitting key-values to be updated instead of established database fields
-        :param d: mapping of combined database fields and key-values (using INFO keys where possible)
+        :param d: mapping of combined database fields and key-values (using Info keys where possible)
         :param only_keyvalues: true if only key-value attributes should be updated
         :return:
         """
@@ -424,19 +424,19 @@ class Product(Base):
         return len(self.content)>0
 
     INFO_TO_FIELD = {
-        INFO.SHORT_NAME: 'name',
-        INFO.PATHNAME: 'path',
-        INFO.UUID: 'uuid',
-        INFO.PROJ: 'proj4',
-        INFO.OBS_TIME: 'obs_time',
-        INFO.OBS_DURATION: 'obs_duration',
-        INFO.CELL_WIDTH: 'cell_width',
-        INFO.CELL_HEIGHT: 'cell_height',
-        INFO.ORIGIN_X: 'origin_x',
-        INFO.ORIGIN_Y: 'origin_y',
-        INFO.FAMILY: 'family',
-        INFO.CATEGORY: 'category',
-        INFO.SERIAL: 'serial'
+        Info.SHORT_NAME: 'name',
+        Info.PATHNAME: 'path',
+        Info.UUID: 'uuid',
+        Info.PROJ: 'proj4',
+        Info.OBS_TIME: 'obs_time',
+        Info.OBS_DURATION: 'obs_duration',
+        Info.CELL_WIDTH: 'cell_width',
+        Info.CELL_HEIGHT: 'cell_height',
+        Info.ORIGIN_X: 'origin_x',
+        Info.ORIGIN_Y: 'origin_y',
+        Info.FAMILY: 'family',
+        Info.CATEGORY: 'category',
+        Info.SERIAL: 'serial'
     }
 
     def touch(self, when=None):
@@ -449,7 +449,7 @@ class ProductKeyValue(Base):
     """
     __tablename__ = 'product_key_values_v1'
     product_id = Column(ForeignKey(Product.id), primary_key=True)
-    key = Column(PickleType, primary_key=True)  # FUTURE: can this be a string? for now need pickling of INFO/PLATFORM Enum
+    key = Column(PickleType, primary_key=True)  # FUTURE: can this be a string? for now need pickling of Info/Platform Enum
     # relationship: .product
     value = Column(PickleType)
 
@@ -526,12 +526,12 @@ class Content(Base):
                                  creator=lambda key, value: ContentKeyValue(key=key, value=value))
 
     INFO_TO_FIELD = {
-        INFO.CELL_HEIGHT: 'cell_height',
-        INFO.CELL_WIDTH: 'cell_width',
-        INFO.ORIGIN_X: 'origin_x',
-        INFO.ORIGIN_Y: 'origin_y',
-        INFO.PROJ: 'proj4',
-        INFO.PATHNAME: 'path'
+        Info.CELL_HEIGHT: 'cell_height',
+        Info.CELL_WIDTH: 'cell_width',
+        Info.ORIGIN_X: 'origin_x',
+        Info.ORIGIN_Y: 'origin_y',
+        Info.PROJ: 'proj4',
+        Info.PATHNAME: 'path'
     }
 
     _info = None  # database fields and key-value dictionary merged as one transparent mapping
@@ -574,7 +574,7 @@ class Content(Base):
     @classmethod
     def from_info(cls, mapping, only_fields=False):
         """
-        create a Product using info INFO dictionary items and arbitrary key-values
+        create a Product using info Info dictionary items and arbitrary key-values
         :param mapping: dictionary of product metadata
         :return: Product object
         """
@@ -594,7 +594,7 @@ class Content(Base):
     @property
     def info(self):
         """
-        :return: mapping merging INFO-compatible database fields with key-value dictionary access pattern
+        :return: mapping merging Info-compatible database fields with key-value dictionary access pattern
         """
         if self._info is None:
             self._info = ChainRecordWithDict(self, self.INFO_TO_FIELD, self._kwinfo)
@@ -603,7 +603,7 @@ class Content(Base):
     def update(self, d, only_keyvalues=False, only_fields=False):
         """
         update metadata, optionally only permitting key-values to be updated instead of established database fields
-        :param d: mapping of combined database fields and key-values (using INFO keys where possible)
+        :param d: mapping of combined database fields and key-values (using Info keys where possible)
         :param only_keyvalues: true if only key-value attributes should be updated
         :return:
         """
@@ -835,10 +835,10 @@ class tests(unittest.TestCase):
         s.add(p)
         s.commit()
         p.info.update({'key': 'value'})
-        p.info.update({INFO.OBS_TIME: datetime.utcnow()})
-        p.info.update({INFO.OBS_TIME: nextwhen, INFO.OBS_DURATION: timedelta(seconds=15)})
-        # p.info.update({'key': 'value', INFO.OBS_TIME: nextwhen, INFO.OBS_DURATION: nextwhen + timedelta(seconds=15)})
-        # p.info[INFO.OBS_TIME] = nextwhen
+        p.info.update({Info.OBS_TIME: datetime.utcnow()})
+        p.info.update({Info.OBS_TIME: nextwhen, Info.OBS_DURATION: timedelta(seconds=15)})
+        # p.info.update({'key': 'value', Info.OBS_TIME: nextwhen, Info.OBS_DURATION: nextwhen + timedelta(seconds=15)})
+        # p.info[Info.OBS_TIME] = nextwhen
         # p.info['key'] = 'value'
         # p.obs_time = nextwhen
         s.commit()
@@ -848,7 +848,7 @@ class tests(unittest.TestCase):
         q = f.product[0]
         # q = s.query(Product).filter_by(resource=f).first()
         self.assertEqual(q.info['test_key'], u'test_value')
-        # self.assertEquals(q[INFO.UUID], q.uuid)
+        # self.assertEquals(q[Info.UUID], q.uuid)
         self.assertEqual(q.info['turkey'], p.info['turkey'])
         self.assertEqual(q.info['key'], p.info['key'])
         # self.assertEqual(q.obs_time, nextwhen)
@@ -871,7 +871,7 @@ def main():
         epilog="",
         fromfile_prefix_chars='@')
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG')
+                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG')
     parser.add_argument('-d', '--debug', dest='debug', action='store_true',
                         help="enable interactive PDB debugger on exception")
     # http://docs.python.org/2.7/library/argparse.html#nargs

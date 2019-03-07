@@ -57,7 +57,7 @@ class ztdtup(NamedTuple):
 
 class VisualState(Enum):
     """Visual states of frames and tracks, corresponds to a color or style.
-    They're collected in flags() objects which behaves like a set()
+    They're collected in Flags() objects which behaves like a set()
     Derived from Document / Workspace / SceneGraph states.
     Typically combines information from Workspace and Scenegraph, does not correspond to selection.
     by default, display greyed-out potential frame

@@ -69,7 +69,7 @@ from weakref import ref
 from PyQt4.QtCore import Qt
 from PyQt4.QtGui import *
 
-from sift.common import flags
+from sift.common import Flags
 from .common import *
 
 LOG = logging.getLogger(__name__)
@@ -117,7 +117,7 @@ class QTrackItem(QGraphicsObject):
     _icon: QIcon = None   # e.g. whether it's algebraic or RGB
     _metadata: Mapping = None  # arbitrary key-value store for selecting by metadata; in our case this often includes item family for seleciton
     _tooltip: str = None
-    _state: flags = None  # VisualState flags determine how it's being presented
+    _state: Flags = None  # VisualState Flags determine how it's being presented
     _colormap: [QGradient, QImage, QPixmap] = None
     _min: float = None
     _max: float = None
@@ -131,7 +131,7 @@ class QTrackItem(QGraphicsObject):
 
     def __init__(self, scene, scale: CoordTransform, track: str, z: int,
                  title: str, subtitle: str = None, icon: QIcon = None, metadata: dict = None,
-                 tooltip: str = None, state: flags = None, colormap: [QGradient, QImage] = None,
+                 tooltip: str = None, state: Flags = None, colormap: [QGradient, QImage] = None,
                  min: float = None, max: float = None):
         """Create a track and connect it to its Scene
         """
@@ -146,7 +146,7 @@ class QTrackItem(QGraphicsObject):
         self._icon = icon
         self._metadata = metadata or {}
         self._tooltip = tooltip
-        self._state = flags(state or [])
+        self._state = Flags(state or [])
         self._colormap = colormap
         self._min, self._max = min, max
         self.setToolTip(tooltip or "{}\n{}".format(title, subtitle))
@@ -351,7 +351,7 @@ class QFrameItem(QGraphicsObject):
     QGraphicsView representation of a data frame, with a start and end time relative to the scene.
     Essentially a frame sprite
     """
-    _state: flags = None
+    _state: Flags = None
     _track = None  # weakref to track we belong to
     _scale: CoordTransform = None
     _uuid: UUID = None
@@ -367,7 +367,7 @@ class QFrameItem(QGraphicsObject):
     _gi_subtitle = None
 
     def __init__(self, track: QTrackItem, scale: CoordTransform, uuid: UUID,
-                 start: datetime, duration: timedelta, state: flags,
+                 start: datetime, duration: timedelta, state: Flags,
                  title: str, subtitle: str = None, thumb: QPixmap = None,
                  metadata: Mapping[str, Any] = None):
         """create a frame representation and add it to a timeline track within a scene
@@ -383,7 +383,7 @@ class QFrameItem(QGraphicsObject):
         """
         super(QFrameItem, self).__init__()
         self._track = ref(track)
-        self._state = flags(state)
+        self._state = Flags(state)
         self._scale = scale
         self._start = start
         self._duration = duration
