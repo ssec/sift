@@ -31,10 +31,11 @@ from vispy.ext.six import string_types
 from vispy.gloo import VertexBuffer
 from vispy.io.datasets import load_spatial_filters
 from vispy.scene.visuals import create_visual_node
-from vispy.visuals import LineVisual, ImageVisual
+from vispy.visuals import LineVisual, ImageVisual, IsocurveVisual
 # The below imports are needed because we subclassed the ImageVisual
 from vispy.visuals.shaders import Function
 from vispy.visuals.transforms import NullTransform
+
 
 from sift.common import (
     DEFAULT_PROJECTION,
@@ -466,8 +467,10 @@ class TiledGeolocatedImageVisual(ImageVisual):
 
                 # Assume we were given a total image worth of this stride
                 y_slice, x_slice = self.calc.calc_tile_slice(tiy, tix, stride)
-                # force a copy of the data from the content array (provided by the workspace) to a vispy-compatible contiguous float array
-                # this can be a potentially time-expensive operation since content array is often huge and always memory-mapped, so paging may occur
+                # force a copy of the data from the content array (provided by the workspace)
+                # to a vispy-compatible contiguous float array
+                # this can be a potentially time-expensive operation since content array is
+                # often huge and always memory-mapped, so paging may occur
                 # we don't want this paging deferred until we're back in the GUI thread pushing data to OpenGL!
                 tile_data = np.array(data[y_slice, x_slice], dtype=np.float32)
                 tiles_info.append((stride, tiy, tix, tex_tile_idx, tile_data))
@@ -509,9 +512,10 @@ class TiledGeolocatedImageVisual(ImageVisual):
         # Set up the overview tile
         if self.overview_info is not None:
             # XXX: This completely depends on drawing order, putting it at the end seems to work
-            tex_coords[-6 * total_overview_tiles * TESS_LEVEL * TESS_LEVEL:, :] = self.overview_info[
-                "texture_coordinates"]
-            vertices[-6 * total_overview_tiles * TESS_LEVEL * TESS_LEVEL:, :] = self.overview_info["vertex_coordinates"]
+            tex_coords[-6 * total_overview_tiles * TESS_LEVEL * TESS_LEVEL:, :] = \
+                self.overview_info["texture_coordinates"]
+            vertices[-6 * total_overview_tiles * TESS_LEVEL * TESS_LEVEL:, :] = \
+                self.overview_info["vertex_coordinates"]
 
         LOG.debug("Building vertex data for %d tiles (%r)", total_num_tiles, tile_box)
         tl = TESS_LEVEL * TESS_LEVEL
@@ -521,23 +525,22 @@ class TiledGeolocatedImageVisual(ImageVisual):
                 # Update the index here because we have multiple exit/continuation points
                 used_tile_idx += 1
 
-                # Check if the tile we want to draw is actually in the GPU, if not (atlas too small?) fill with zeros and keep going
+                # Check if the tile we want to draw is actually in the GPU
+                # if not (atlas too small?) fill with zeros and keep going
                 if (preferred_stride, tiy, tix) not in self.texture_state:
                     # THIS SHOULD NEVER HAPPEN IF TEXTURE BUILDING IS DONE CORRECTLY AND THE ATLAS IS BIG ENOUGH
-                    tex_coords[
-                    TESS_LEVEL * TESS_LEVEL * used_tile_idx * 6: TESS_LEVEL * TESS_LEVEL * (used_tile_idx + 1) * 6,
-                    :] = 0
-                    vertices[
-                    TESS_LEVEL * TESS_LEVEL * used_tile_idx * 6: TESS_LEVEL * TESS_LEVEL * (used_tile_idx + 1) * 6,
-                    :] = 0
+                    tile_start = TESS_LEVEL * TESS_LEVEL * used_tile_idx * 6
+                    tile_end = TESS_LEVEL * TESS_LEVEL * (used_tile_idx + 1) * 6
+                    tex_coords[tile_start: tile_end, :] = 0
+                    vertices[tile_start: tile_end, :] = 0
                     continue
 
                 # we should have already loaded the texture data in to the GPU so get the index of that texture
                 tex_tile_idx = self.texture_state[(preferred_stride, tiy, tix)]
                 factor_rez, offset_rez = self.calc.calc_tile_fraction(tiy, tix, preferred_stride)
-                tex_coords[tl * used_tile_idx * 6: tl * (used_tile_idx + 1) * 6,
-                :] = self.calc.calc_texture_coordinates(tex_tile_idx, factor_rez, offset_rez,
-                                                        tessellation_level=TESS_LEVEL)
+                tex_coords[tl * used_tile_idx * 6: tl * (used_tile_idx + 1) * 6, :] = \
+                    self.calc.calc_texture_coordinates(tex_tile_idx, factor_rez, offset_rez,
+                                                       tessellation_level=TESS_LEVEL)
                 vertices[tl * used_tile_idx * 6: tl * (used_tile_idx + 1) * 6, :] = self.calc.calc_vertex_coordinates(
                     tiy, tix,
                     preferred_stride[0], preferred_stride[1],
@@ -602,9 +605,6 @@ class TiledGeolocatedImageVisual(ImageVisual):
                                  img_vbox[(self._ref1, self._ref2), :],
                                  self.canvas.size)
         view_extents = self.calc.calc_view_extents(img_cmesh[ref_idx_1], img_vbox[ref_idx_1], self.canvas.size, dx, dy)
-        # ll_corner, ur_corner = self.transforms.get_transform().imap([(-1, -1, 1), (1, 1, 1)])
-        # print("Old method: ", ll_corner, ur_corner, "dy: %f" % ((ur_corner[1] - ll_corner[1]) / self.canvas.size[1]), "dx: %f" % ((ur_corner[0] - ll_corner[0]) / self.canvas.size[0]))
-        # print("View Box: ", view_box)
         return vue(*view_extents, dx=dx, dy=dy)
 
     def _get_stride(self, view_box):
@@ -1012,8 +1012,10 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
                 y_slice, x_slice = self.calc.calc_tile_slice(tiy, tix, stride)
                 textures_data = []
                 for chn_idx in range(self.num_channels):
-                    # force a copy of the data from the content array (provided by the workspace) to a vispy-compatible contiguous float array
-                    # this can be a potentially time-expensive operation since content array is often huge and always memory-mapped, so paging may occur
+                    # force a copy of the data from the content array (provided by the workspace)
+                    # to a vispy-compatible contiguous float array
+                    # this can be a potentially time-expensive operation since content array is often huge and
+                    # always memory-mapped, so paging may occur
                     # we don't want this paging deferred until we're back in the GUI thread pushing data to OpenGL!
                     if data[chn_idx] is None:
                         # we need to fill the texture with NaNs instead of actual data
@@ -1168,8 +1170,6 @@ class NEShapefileLinesVisual(ShapefileLinesVisual):
 
 
 NEShapefileLines = create_visual_node(NEShapefileLinesVisual)
-
-from vispy.visuals import IsocurveVisual
 
 
 class PrecomputedIsocurveVisual(IsocurveVisual):
