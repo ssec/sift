@@ -20,11 +20,10 @@ REQUIRES
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-from uuid import UUID
 from vispy import app
 import asyncio
 from PyQt4 import QtGui
-from quamash import QEventLoop, QThreadExecutor
+from quamash import QEventLoop
 from collections import OrderedDict
 
 import sift.ui.open_cache_dialog_ui as open_cache_dialog_ui
@@ -54,12 +53,12 @@ from functools import partial
 
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from sift.ui.pov_main_ui import Ui_MainWindow
-from sift.common import INFO, KIND, TOOL, COMPOSITE_TYPE, get_font_size
+from sift.common import INFO, TOOL, COMPOSITE_TYPE, get_font_size
 
 import os
 import sys
 import logging
-from sift.ui.GradientControl import GradientControl
+from view.colormap_editor import ColormapEditor
 
 app_object = app.use_app('pyqt4')
 APP: QtGui.QApplication = app_object.native
@@ -236,7 +235,7 @@ class Main(QtGui.QMainWindow):
     _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
     _open_cache_dialog = None
     _screenshot_dialog = None
-    _geditor = None # Gradient editor widget
+    _cmap_editor = None # Gradient editor widget
     _resource_collector: ResourceSearchPathCollector = None
     _resource_collector_timer: QtCore.QTimer = None
     _timeline_scene: SiftDocumentAsFramesInTracks = None
@@ -998,9 +997,9 @@ class Main(QtGui.QMainWindow):
         toggle_point.setShortcut('X')
         toggle_point.triggered.connect(lambda: self.graphManager.toggle_point_probe(DEFAULT_POINT_PROBE))
 
-        open_gradient = QtGui.QAction("Toggle Gradient Editor", self)
+        open_gradient = QtGui.QAction("Toggle Colormap Editor", self)
         open_gradient.setShortcut("Ctrl+E")
-        open_gradient.triggered.connect(self.openGradientWidget)
+        open_gradient.triggered.connect(self.open_colormap_editor)
 
         edit_menu = menubar.addMenu('&Edit')
         edit_menu.addAction(remove)
@@ -1041,11 +1040,10 @@ class Main(QtGui.QMainWindow):
         # self.ui.layers.add
         pass
 
-    def openGradientWidget(self):
-        if self._geditor is None:
-            self._geditor = GradientControl(doc=self.document)
-
-        self._geditor.show()
+    def open_colormap_editor(self):
+        if self._cmap_editor is None:
+            self._cmap_editor = ColormapEditor(doc=self.document)
+        self._cmap_editor.show()
 
 
 def set_default_geometry(window, desktop=0):

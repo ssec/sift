@@ -8,9 +8,9 @@ import logging
 LOG = logging.getLogger(__name__)
 
 
-class GradientControl(QtGui.QDialog):
+class ColormapEditor(QtGui.QDialog):
     def __init__(self, doc, parent=None, **kwargs):
-        super(GradientControl, self).__init__(parent)
+        super(ColormapEditor, self).__init__(parent)
 
         l = QtGui.QGridLayout()
         l.setSpacing(0)
@@ -338,7 +338,7 @@ class GradientControl(QtGui.QDialog):
 
 def main():
     app = QtGui.QApplication([])
-    w = GradientControl()
+    w = ColormapEditor()
     w.show()
     app.exec_()
     return 0
