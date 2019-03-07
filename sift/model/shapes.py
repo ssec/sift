@@ -76,7 +76,9 @@ def content_within_shape(content: np.ndarray, trans: Affine, shape: sgp.LinearRi
     :param content: data being displayed on the screen
     :param trans: affine transform between content array indices and screen coordinates
     :param shape: LinearRing in screen coordinates (e.g. mercator meters)
-    :return: masked_content:masked_array, (y_index_offset:int, x_index_offset:int) containing minified masked content array
+    :return: masked_content:masked_array, (y_index_offset:int, x_index_offset:int)
+        containing minified masked content array
+
     """
     # Get the bounds so we can limit how big our rasterize boolean array actually is
     inv_trans = ~trans

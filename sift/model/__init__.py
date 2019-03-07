@@ -22,4 +22,4 @@ REQUIRES
 :license: GPLv3, see LICENSE for more details
 """
 
-from sift.model.document import Document
+from sift.model.document import Document  # noqa

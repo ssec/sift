@@ -48,8 +48,8 @@ Document has zero or more Colormaps, determining how they're presented
 The document does not own data (content). It only owns metadata (info).
 At most, document holds coarse overview data content for preview purposes.
 
-All entities in the Document have a UUID that is their identity throughout their lifecycle, and is often used as shorthand
-between subsystems. Document rarely deals directly with content.
+All entities in the Document have a UUID that is their identity throughout their lifecycle,
+and is often used as shorthand between subsystems. Document rarely deals directly with content.
 
 :author: R.K.Garcia <rayg@ssec.wisc.edu>
 :copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
@@ -108,10 +108,6 @@ def unit_symbol(unit):
 def _unit_format_func(layer, units):
     units = unit_symbol(units)
 
-    # default formatting string
-    def _format_unit(val, numeric=True, include_units=True):
-        return '{:.03f}{units:s}'.format(val, units=units if include_units else "")
-
     if layer[Info.STANDARD_NAME] in ('toa_brightness_temperature', 'brightness_temperature'):
         # BT data limits, Kelvin to degC
         def _format_unit(val, numeric=True, include_units=True):
@@ -135,6 +131,10 @@ def _unit_format_func(layer, units):
         else:
             def _format_unit(val, numeric=True, include_units=True):
                 return '{:d}'.format(int(val))
+    else:
+        # default formatting string
+        def _format_unit(val, numeric=True, include_units=True):
+            return '{:.03f}{units:s}'.format(val, units=units if include_units else "")
 
     return _format_unit
 
@@ -158,11 +158,14 @@ def units_conversion(dsi):
     # Conversion functions
     # FUTURE: Use cfunits or cf_units package
     if dsi.get(Info.UNITS) in ('kelvin', 'K') and punits in ('degrees_Celsius', 'C'):
-        conv_func = lambda x, inverse=False: x - 273.15 if not inverse else x + 273.15
+        def conv_func(x, inverse=False):
+            return x - 273.15 if not inverse else x + 273.15
     elif dsi.get(Info.UNITS) == '%' and punits == '1':
-        conv_func = lambda x, inverse=False: x / 100. if not inverse else x * 100.
+        def conv_func(x, inverse=False):
+            return x / 100. if not inverse else x * 100.
     else:
-        conv_func = lambda x, inverse=False: x
+        def conv_func(x, inverse=False):
+            return x
 
     # Format strings
     format_func = _unit_format_func(dsi, punits)
@@ -170,8 +173,10 @@ def units_conversion(dsi):
 
 
 class DocLayerStack(MutableSequence):
-    """
-    list-like layer set which will slowly eat functionality from Document as warranted, and provide cleaner interfacing to GUI elements
+    """list-like layer set which will slowly eat functionality from Document as warranted
+
+    Provide cleaner interfacing to GUI elements.
+
     """
     _doc = None  # weakref to document we belong to
     _store = None
@@ -345,7 +350,8 @@ class DocumentAsLayerStack(DocumentAsContextBase):
     """ Represent the document as a list of current layers
     As we transition to timeline model, this stops representing products and starts being a track stack
     """
-    _all_active: bool = False  # whether to represent all active products in document timespan, or just the ones under the playhead
+    # whether to represent all active products in document timespan, or just the ones under the playhead
+    _all_active: bool = False
 
     def __enter__(self):
         raise NotImplementedError()
@@ -569,8 +575,10 @@ class DocumentAsTrackStack(DocumentAsContextBase):
     #                         include_products=True
     #                         ) -> T.Iterable[T.Tuple[int, str, T.Optional[Product]]]:
     #     """List of tracks from highest Z order to lowest, at a given time;
-    #     (zorder, track) pairs are returned, with zorder>=0 being "part of the document" and <0 being "available but nothing activated"
-    #     include_products implies (zorder, track, product-or-None) tuples be yielded; otherwise tracks without products are not yielded
+    #     (zorder, track) pairs are returned, with zorder>=0 being "part of the document" and
+    #     <0 being "available but nothing activated"
+    #     include_products implies (zorder, track, product-or-None) tuples be yielded;
+    #     otherwise tracks without products are not yielded
     #     Inactive tracks can be filtered by stopping iteration when zorder<0
     #     tracks are returned as track-name strings
     #     Product instances are readonly metadatabase entries
@@ -581,7 +589,8 @@ class DocumentAsTrackStack(DocumentAsContextBase):
     #     if when is None:
     #         raise RuntimeError("unknown time for iterating track order, animation likely in progress")
     #     with self.mdb as s:
-    #         que = s.query(Product).filter((Product.obs_time < when) and ((Product.obs_time + Product.obs_duration) <= when))
+    #         que = s.query(Product).filter((Product.obs_time < when) and (
+    #                                       (Product.obs_time + Product.obs_duration) <= when))
     #         if only_active:
     #             famtab = dict((track, z) for (z, track) in self.doc.track_order.enumerate() if z>=0)
     #             active_families = set(famtab.keys())
@@ -599,7 +608,10 @@ class DocumentAsTrackStack(DocumentAsContextBase):
 
     def enumerate_track_names(self, only_active=False) -> T.Iterable[T.Tuple[int, str]]:
         """All the names of the tracks, from highest zorder to lowest
-        z>=0 implies an active track in the document, <0 implies potentials that have products either cached or potential
+
+        z>=0 implies an active track in the document,
+        <0 implies potentials that have products either cached or potential
+
         """
         for z, track in self.doc.track_order.items():
             if only_active and z < 0:
@@ -632,8 +644,8 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         # s.update(self.doc.product_state.get(prod.uuid) or Flags())
         return s
 
-    def frame_info_for_product(self, prod: Product = None, uuid: UUID = None, when_overlaps: Span = None) -> T.Optional[
-        FrameInfo]:
+    def frame_info_for_product(self, prod: Product = None, uuid: UUID = None,
+                               when_overlaps: Span = None) -> T.Optional[FrameInfo]:
         """Generate info struct needed for timeline representation, optionally returning None if outside timespan of interest
         """
         if prod is None:
@@ -665,7 +677,6 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         """
         if when is None:  # default to the document's Span, either explicit (user-specified) or implicit
             when = self.timeline_span
-        when_e = when.e
         with self.mdb as s:
             for z, track in self.doc.track_order.items():  # enumerates from high Z to low Z
                 if only_active and (z < 0):
@@ -981,11 +992,14 @@ class DocumentAsAnimationSequence(DocumentAsContextBase):
 
     @property
     def plan_id(self) -> T.Any:
-        """The plan id is just a hashable unique (compare with "is") saying what the current valid plan is, to allow SGM/others to cache
+        """The plan id is just a hashable unique (compare with "is") saying what the current valid plan is.
+
+        To allow SGM/others to cache.
+
         """
 
     def animation_plan(self, multiple_of_realtime: float = None, start: datetime = None, stop: datetime = None) -> \
-    T.Sequence[AnimationStep]:
+            T.Sequence[AnimationStep]:
         """Yield series of AnimationStep
         May result in a new plan_id being the valid plan
         """
@@ -999,7 +1013,10 @@ class DocumentAsAnimationSequence(DocumentAsContextBase):
 
     @property
     def family_presentation(self) -> T.Mapping[str, Presentation]:
-        """Mapping of families to their presentation tuples, guaranteed to include at least the families participating in the animation
+        """Mapping of families to their presentation tuples.
+
+        Guaranteed to include at least the families participating in the animation.
+
         """
         return dict(self.doc.family_presentation)
 
@@ -1113,9 +1130,11 @@ class DocumentAsProductArrayCollection(DocumentAsContextBase):
 
 
 class Document(QObject):  # base class is rightmost, mixins left of that
-    """Document stores user intent
+    """Storage for layer and user information.
+
     Document is a set of tracks in a Z order, with Z>=0 for "active" tracks the user is working with
-    Tracks with Z-order <0 are inactive, but may be displayed in the timeline as potentials for the user to drag to active
+    Tracks with Z-order <0 are inactive, but may be displayed in the timeline as potentials for the
+    user to drag to active
     Document has a playhead, a playback time range, an active timeline display range
     Tracks and frames (aka Products) can have state information set
 
@@ -1131,7 +1150,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # timeline the user has specified:
     track_order: ZList = None  # (zorder, family-name) with higher z above lower z; z<0 should not occur
 
-    # overall visible range of the active data if specified by user, else None means assume use the product timespan from metadatabase
+    # overall visible range of the active data if specified by user,
+    # else None means assume use the product timespan from metadatabase
     timeline_span: Span = None
 
     # playback information
@@ -1168,19 +1188,20 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     # signals
     # Clarification: Layer interfaces migrate to layer meaning "current active products under the playhead"
-    didAddBasicLayer = pyqtSignal(tuple, UUID,
-                                  Presentation)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
-    didAddCompositeLayer = pyqtSignal(tuple, UUID,
-                                      Presentation)  # comp layer is derived from multiple basic layers and has its own UUID
-    didRemoveLayers = pyqtSignal(tuple, list, int,
-                                 int)  # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
+    # new order list with None for new layer; info-dictionary, overview-content-ndarray
+    didAddBasicLayer = pyqtSignal(tuple, UUID, Presentation)
+    # comp layer is derived from multiple basic layers and has its own UUID
+    didAddCompositeLayer = pyqtSignal(tuple, UUID, Presentation)
+    # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
+    didRemoveLayers = pyqtSignal(tuple, list, int, int)
     willPurgeLayer = pyqtSignal(UUID)  # UUID of the layer being removed
     didReorderLayers = pyqtSignal(tuple)  # list of original indices in their new order, None for new layers
     didChangeLayerVisibility = pyqtSignal(dict)  # {UUID: new-visibility, ...} for changed layers
     didReorderAnimation = pyqtSignal(tuple)  # list of UUIDs representing new animation order
     didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
-    didSwitchLayerSet = pyqtSignal(int, DocLayerStack,
-                                   tuple)  # new layerset number typically 0..3, list of Presentation tuples representing new display order, new animation order
+    # new layerset number typically 0..3
+    # list of Presentation tuples representing new display order, new animation order
+    didSwitchLayerSet = pyqtSignal(int, DocLayerStack, tuple)
     didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: (vmin, vmax), ...} for all changed layers
     didChangeGamma = pyqtSignal(dict)  # dict of {uuid: gamma float, ...} for all changed layers
@@ -1198,7 +1219,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # high-level contexts providing purposed access to low-level document and its storage, as well as MDB and WS
     # layer display shows active products under the playhead
     as_layer_stack: DocumentAsLayerStack = None
-    # track display shows all available products according to metadatabase; some tracks are active, i.e. they have are allowed to present as part of document
+    # track display shows all available products according to metadatabase;
+    # some tracks are active, i.e. they have are allowed to present as part of document
     as_track_stack: DocumentAsTrackStack = None
     # presentation migrates from being layer-owned to being family-owned
     as_styled_families: DocumentAsStyledFamilies = None
@@ -1627,15 +1649,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :return: list of paths
         """
         warnings.warn(
-            "sort_paths is deprecated in favor of sort_product_uuids, since more than one product may reside in a resource",
+            "sort_paths is deprecated in favor of sort_product_uuids, "
+            "since more than one product may reside in a resource",
             DeprecationWarning)
         return list(sorted(paths, key=lambda p: os.path.basename(p)))
-        # products = list(self._workspace.collect_product_metadata_for_paths(paths))
-        # LOG.debug('sorting products {} for paths {}'.format(repr(products), repr(paths)))
-        # infos = [x.info for x in products]
-        # LOG.info('path info for sorting: {}'.format(repr(infos)))
-        # paths = list(reversed(self.sort_datasets_into_load_order(infos)))  # go from load order to display order by reversing
-        # return paths
 
     def sort_product_uuids(self, uuids: T.Iterable[UUID]) -> T.List[UUID]:
         uuidset = set(str(x) for x in uuids)
@@ -1643,9 +1660,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             return []
         with self._workspace.metadatabase as S:
             zult = [(x.uuid, x.ident) for x in S.query(Product)
-                .filter(Product.uuid_str.in_(uuidset))
-                .order_by(Product.family, Product.category, Product.serial)
-                .all()]
+                    .filter(Product.uuid_str.in_(uuidset))
+                    .order_by(Product.family, Product.category, Product.serial)
+                    .all()]
         LOG.debug("sorted products: {}".format(repr(zult)))
         return [u for u, _ in zult]
 
@@ -1901,10 +1918,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             self._layer_sets.append(None)
 
         # if the selected layer set doesn't exist yet, clone another set to make it
-        did_clone = False
         if self._layer_sets[layer_set_index] is None:
             self._layer_sets[layer_set_index] = self._clone_layer_set(self._layer_sets[self.current_set_index])
-            did_clone = True
 
         # switch to the new layer set and set off events to let others know about the change
         self.current_set_index = layer_set_index
@@ -1945,12 +1960,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param changes: dictionary of {uuid:bool} with new visibility state
         :return:
         """
-        u2r = dict((q.uuid, i) for i, q in enumerate(self.current_layer_set))
-        L = self.current_layer_set
+        curr_set = self.current_layer_set
         for uuid, visible in changes.items():
-            dex = L[uuid]
-            old = L[dex]
-            L[dex] = old._replace(visible=visible)
+            dex = curr_set[uuid]
+            old = curr_set[dex]
+            curr_set[dex] = old._replace(visible=visible)
         self.didChangeLayerVisibility.emit(changes)
 
     def next_last_step(self, uuid, delta=0, bandwise=False):
@@ -2342,17 +2356,15 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         for category in categories:
             # any new times plus existing times if RGBs already exist
-            rgb_times = r_layers.setdefault(category, {}).keys() | \
-                        g_layers.setdefault(category, {}).keys() | \
-                        b_layers.setdefault(category, {}).keys() | \
-                        self._recipe_layers[recipe.name].setdefault(category, {}).keys()
+            rgb_times = (r_layers.setdefault(category, {}).keys() |
+                         g_layers.setdefault(category, {}).keys() |
+                         b_layers.setdefault(category, {}).keys() |
+                         self._recipe_layers[recipe.name].setdefault(category, {}).keys())
             if times:
                 rgb_times &= times
             # time order doesn't really matter
             for t in rgb_times:
-                yield t, category, \
-                      r_layers[category].get(t), g_layers[category].get(t), \
-                      b_layers[category].get(t)
+                yield t, category, r_layers[category].get(t), g_layers[category].get(t), b_layers[category].get(t)
 
     def sync_composite_layer_prereqs(self, new_times):
         """Check if we can make more RGBs based on newly added times"""

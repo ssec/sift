@@ -214,13 +214,25 @@ class DocRGBLayer(DocCompositeLayer):
     def a(self, x):
         self.l[3] = x
 
+    def _get_if_not_none_func(self, attr=None, item=None):
+
+        def _get_not_none_attr(layer):
+            return None if layer is None else layer.get(item)
+
+        def _get_not_none_item(layer):
+            return None if layer is None else getattr(layer, attr)
+
+        if attr is not None:
+            return _get_not_none_attr
+        return _get_not_none_item
+
     def dep_info(self, key, include_alpha=False):
         max_idx = 4 if include_alpha else 3
         return [x.get(key) for x in self.l[:max_idx]]
 
     def product_family_keys(self, include_alpha=False):
         max_idx = 4 if include_alpha else 3
-        gb = lambda l: None if (l is None) else l.product_family_key
+        gb = self._get_if_not_none_func(attr='product_family_key')
         return [gb(x) for x in self.l[:max_idx]]
 
     @property
@@ -258,8 +270,7 @@ class DocRGBLayer(DocCompositeLayer):
 
     @property
     def is_valid(self):
-        return self.has_deps and self.shared_projections and \
-               self.shared_origin and self.recipe_layers_match
+        return self.has_deps and self.shared_projections and self.shared_origin and self.recipe_layers_match
 
     @property
     def is_flat_field(self):
@@ -267,32 +278,32 @@ class DocRGBLayer(DocCompositeLayer):
 
     @property
     def band(self):
-        gb = lambda l: None if (l is None) else l.band
+        gb = self._get_if_not_none_func(attr='band')
         return gb(self.r), gb(self.g), gb(self.b)
 
     @property
     def central_wavelength(self):
-        gb = lambda l: None if (l is None) else l.get(Info.CENTRAL_WAVELENGTH)
+        gb = self._get_if_not_none_func(item=Info.CENTRAL_WAVELENGTH)
         return gb(self.r), gb(self.g), gb(self.b)
 
     @property
     def sched_time(self):
-        gst = lambda x: None if (x is None) else x.sched_time
+        gst = self._get_if_not_none_func(attr='sched_time')
         return _concurring(gst(self.r), gst(self.g), gst(self.b), remove_none=True)
 
     @property
     def instrument(self):
-        gst = lambda x: None if (x is None) else x.instrument
+        gst = self._get_if_not_none_func(attr='instrument')
         return _concurring(gst(self.r), gst(self.g), gst(self.b), remove_none=True)
 
     @property
     def platform(self):
-        gst = lambda x: None if (x is None) else x.platform
+        gst = self._get_if_not_none_func(attr='platform')
         return _concurring(gst(self.r), gst(self.g), gst(self.b), remove_none=True)
 
     @property
     def scene(self):
-        gst = lambda x: None if (x is None) else x[Info.SCENE]
+        gst = self._get_if_not_none_func(item=Info.SCENE)
         return _concurring(gst(self.r), gst(self.g), gst(self.b), remove_none=True)
 
     def _get_units_conversion(self):
@@ -390,8 +401,8 @@ class DocRGBLayer(DocCompositeLayer):
                 Info.CELL_HEIGHT: None,
                 Info.PROJ: None,
                 Info.CLIM: ((None, None), (None, None), (None, None)),
-            # defer initialization until we have upstream layers
             })
+            # defer initialization until we have upstream layers
         else:
             highest_res_dep = min([x for x in dep_info if x is not None], key=lambda x: x[Info.CELL_WIDTH])
             ds_info.update({
@@ -402,13 +413,16 @@ class DocRGBLayer(DocCompositeLayer):
                 Info.PROJ: highest_res_dep[Info.PROJ],
             })
 
+            def upstream_clim(up):
+                return (None, None) if (up is None) else tuple(up.get(Info.CLIM, (None, None)))
+
             old_clim = self.get(Info.CLIM, None)
             if not old_clim:  # initialize from upstream default maxima
                 ds_info[Info.CLIM] = tuple(tuple(d[Info.CLIM]) if d is not None else (None, None) for d in dep_info)
-            else:  # merge upstream with existing settings, replacing None with upstream; watch out for upstream==None case
-                upclim = lambda up: (None, None) if (up is None) else tuple(up.get(Info.CLIM, (None, None)))
+            else:
+                # merge upstream with existing settings, replacing None with upstream; watch out for upstream==None case
                 ds_info[Info.CLIM] = tuple(
-                    (existing or upclim(upstream)) for (existing, upstream) in zip(old_clim, dep_info))
+                    (existing or upstream_clim(upstream)) for (existing, upstream) in zip(old_clim, dep_info))
 
         self.update(ds_info)
         if self.has_deps:
