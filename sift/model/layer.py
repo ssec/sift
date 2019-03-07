@@ -19,14 +19,13 @@ REQUIRES
 """
 from _weakref import ref
 from collections import ChainMap
-from itertools import chain
 from enum import Enum
+
 from sift.common import Info, Kind
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import os
 import sys
 import logging
 import numpy as np
@@ -254,6 +253,7 @@ class DocRGBLayer(DocCompositeLayer):
     def recipe_layers_match(self):
         def _get_family(layer):
             return layer[Info.FAMILY] if layer else None
+
         return all([_get_family(x) == self.recipe.input_ids[idx] for idx, x in enumerate(self.l[:3])])
 
     @property
@@ -316,6 +316,7 @@ class DocRGBLayer(DocCompositeLayer):
 
         def format_func(val, numeric=True, include_units=False):
             return ", ".join("{}".format(v) if v is None else "{:0.03f}".format(v) for v in val)
+
         return None, conv_func, format_func
 
     def _default_display_time(self):
@@ -325,7 +326,8 @@ class DocRGBLayer(DocCompositeLayer):
         if len(valid_times) == 0:
             display_time = '<unknown time>'
         else:
-            display_time = valid_times[0] if len(valid_times) and all(t == valid_times[0] for t in valid_times[1:]) else '<multiple times>'
+            display_time = valid_times[0] if len(valid_times) and all(
+                t == valid_times[0] for t in valid_times[1:]) else '<multiple times>'
 
         return display_time
 
@@ -387,7 +389,8 @@ class DocRGBLayer(DocCompositeLayer):
                 Info.CELL_WIDTH: None,
                 Info.CELL_HEIGHT: None,
                 Info.PROJ: None,
-                Info.CLIM: ((None, None), (None, None), (None, None)),  # defer initialization until we have upstream layers
+                Info.CLIM: ((None, None), (None, None), (None, None)),
+            # defer initialization until we have upstream layers
             })
         else:
             highest_res_dep = min([x for x in dep_info if x is not None], key=lambda x: x[Info.CELL_WIDTH])
@@ -404,7 +407,8 @@ class DocRGBLayer(DocCompositeLayer):
                 ds_info[Info.CLIM] = tuple(tuple(d[Info.CLIM]) if d is not None else (None, None) for d in dep_info)
             else:  # merge upstream with existing settings, replacing None with upstream; watch out for upstream==None case
                 upclim = lambda up: (None, None) if (up is None) else tuple(up.get(Info.CLIM, (None, None)))
-                ds_info[Info.CLIM] = tuple((existing or upclim(upstream)) for (existing, upstream) in zip(old_clim, dep_info))
+                ds_info[Info.CLIM] = tuple(
+                    (existing or upclim(upstream)) for (existing, upstream) in zip(old_clim, dep_info))
 
         self.update(ds_info)
         if self.has_deps:
@@ -423,7 +427,6 @@ class DocAlgebraicLayer(DocCompositeLayer):
     pass
 
 
-
 # class DocMapLayer(DocLayer):
 #     """
 #     FUTURE: A layer containing a background map as vector
@@ -440,7 +443,6 @@ class DocAlgebraicLayer(DocCompositeLayer):
 #     """
 #     FUTURE: A shape layer which feeds probe values to another UI element or helper.
 #     """
-
 
 
 def main():
@@ -472,4 +474,3 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
-

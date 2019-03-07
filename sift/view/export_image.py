@@ -1,10 +1,10 @@
-import os
 import logging
-import numpy
-
+import os
 from PyQt4 import QtCore, QtGui
-from PIL import Image, ImageDraw, ImageFont
+
 import imageio
+import numpy
+from PIL import Image, ImageDraw, ImageFont
 
 from sift.common import Info
 from sift.ui import export_image_dialog_ui
@@ -68,7 +68,7 @@ class ExportImageDialog(QtGui.QDialog):
         self.ui.frameRangeFrom.validator().setTop(n - 1)
         self.ui.frameRangeTo.validator().setTop(n)
         if (self.ui.frameRangeFrom.text() == '' or
-            int(self.ui.frameRangeFrom.text()) > n - 1):
+                int(self.ui.frameRangeFrom.text()) > n - 1):
             self.ui.frameRangeFrom.setText('1')
         if self.ui.frameRangeTo.text() in ['', '1']:
             self.ui.frameRangeTo.setText(str(n))
@@ -344,4 +344,3 @@ class ExportImageHelper(QtCore.QObject):
                 writer.append_data(numpy.array(x))
 
         writer.close()
-

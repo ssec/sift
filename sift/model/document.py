@@ -55,7 +55,7 @@ between subsystems. Document rarely deals directly with content.
 :copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-from sift.model.layer import Mixing, DocLayer, DocBasicLayer, DocRGBLayer,DocCompositeLayer
+from sift.model.layer import Mixing, DocLayer, DocBasicLayer, DocRGBLayer, DocCompositeLayer
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -69,26 +69,21 @@ from itertools import groupby, chain
 from uuid import UUID, uuid1 as uuidgen
 from datetime import datetime, timedelta
 import typing as T
-import enum
 import numpy as np
 from weakref import ref
 import os
 import json
 import warnings
-from sqlalchemy.orm import Session
 
 from sift.workspace.metadatabase import Product
-from sift.common import Kind, Info, Presentation, Span, FCS_SEP, ZList, Flags, State
-from sift.queue import TASK_DOING, TASK_PROGRESS, TaskQueue
+from sift.common import Kind, Info, Presentation, Span, FCS_SEP, ZList, Flags
+from sift.queue import TaskQueue
 from sift.workspace import Workspace
 from sift.util.default_paths import DOCUMENT_SETTINGS_DIR
 from sift.model.composite_recipes import RecipeManager, CompositeRecipe
 from sift.view.colormap import COLORMAP_MANAGER, PyQtGraphColormap, SITE_CATEGORY, USER_CATEGORY
 from sift.queue import TASK_PROGRESS, TASK_DOING
 from PyQt4.QtCore import QObject, pyqtSignal
-
-from vispy.color.colormap import Colormap
-
 
 LOG = logging.getLogger(__name__)
 
@@ -126,6 +121,7 @@ def _unit_format_func(layer, units):
         if "flag_meanings" in layer:
             flag_masks = layer["flag_masks"] if "flag_masks" in layer else [-1] * len(layer["flag_values"])
             flag_info = tuple(zip(layer["flag_meanings"], layer["flag_values"], flag_masks))
+
             def _format_unit(val, numeric=True, include_units=True, flag_info=flag_info):
                 val = int(val)
                 if numeric:
@@ -191,8 +187,8 @@ class DocLayerStack(MutableSequence):
         else:
             raise ValueError('cannot initialize DocLayerStack using %s' % type(doc))
 
-    def __setitem__(self, index:int, value: Presentation):
-        if index>=0 and index<len(self._store):
+    def __setitem__(self, index: int, value: Presentation):
+        if index >= 0 and index < len(self._store):
             self._store[index] = value
         elif index == len(self._store):
             self._store.append(value)
@@ -203,10 +199,10 @@ class DocLayerStack(MutableSequence):
     @property
     def uuid2row(self):
         if self._u2r is None:
-            self._u2r = dict((p.uuid,i) for (i,p) in enumerate(self._store))
+            self._u2r = dict((p.uuid, i) for (i, p) in enumerate(self._store))
         return self._u2r
 
-    def __getitem__(self, index:int):  # then return layer object
+    def __getitem__(self, index: int):  # then return layer object
         if isinstance(index, int):
             return self._store[index]
         elif isinstance(index, UUID):  # then return 0..n-1 index in stack
@@ -225,20 +221,20 @@ class DocLayerStack(MutableSequence):
     def __len__(self):
         return len(self._store)
 
-    def __delitem__(self, index:int):
+    def __delitem__(self, index: int):
         del self._store[index]
         self._u2r = None
 
-    def insert(self, index:int, value: Presentation):
+    def insert(self, index: int, value: Presentation):
         self._store.insert(index, value)
         self._u2r = None
 
     def clear_animation_order(self):
-        for i,q in enumerate(self._store):
+        for i, q in enumerate(self._store):
             self._store[i] = q._replace(a_order=None)
 
     def index(self, uuid):
-        assert(isinstance(uuid, UUID))
+        assert (isinstance(uuid, UUID))
         u2r = self.uuid2row
         return u2r.get(uuid, None)
 
@@ -251,14 +247,14 @@ class DocLayerStack(MutableSequence):
     def animation_order(self):
         aouu = [(x.a_order, x.uuid) for x in self._store if (x.a_order is not None)]
         aouu.sort()
-        ao = tuple(u for a,u in aouu)
+        ao = tuple(u for a, u in aouu)
         LOG.debug('animation order is {0!r:s}'.format(ao))
         return ao
 
     @animation_order.setter
     def animation_order(self, layer_or_uuid_seq):
         self.clear_animation_order()
-        for nth,lu in enumerate(layer_or_uuid_seq):
+        for nth, lu in enumerate(layer_or_uuid_seq):
             try:
                 idx = self[lu]
             except ValueError:
@@ -481,7 +477,7 @@ class DocumentAsLayerStack(DocumentAsContextBase):
         input order is expected to be listbox-like indices, i.e. order 0 is topmost z
         """
         order = list(order)
-        assert(len(order) == len(self))  # specified all active families
+        assert (len(order) == len(self))  # specified all active families
         lut = self.doc.track_order.to_dict()
         topz = self.doc.track_order.top_z
         zs = [topz - x for x in order]
@@ -628,7 +624,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
     #         s.update(self.ws.product_state(uuid))
     #         yield s
 
-    def product_state(self, uuid:UUID) -> Flags:
+    def product_state(self, uuid: UUID) -> Flags:
         """Merge document state with workspace state
         """
         s = Flags()
@@ -636,7 +632,8 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         # s.update(self.doc.product_state.get(prod.uuid) or Flags())
         return s
 
-    def frame_info_for_product(self, prod: Product=None, uuid: UUID=None, when_overlaps: Span=None) -> T.Optional[FrameInfo]:
+    def frame_info_for_product(self, prod: Product = None, uuid: UUID = None, when_overlaps: Span = None) -> T.Optional[
+        FrameInfo]:
         """Generate info struct needed for timeline representation, optionally returning None if outside timespan of interest
         """
         if prod is None:
@@ -694,7 +691,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                     when=track_span,
                     frames=frames,
                     state=Flags(),  # FIXME
-                    primary=' '.join(reversed(fam.split(FCS_SEP))),  #fam_nfo[Info.DISPLAY_FAMILY],
+                    primary=' '.join(reversed(fam.split(FCS_SEP))),  # fam_nfo[Info.DISPLAY_FAMILY],
                     secondary=' '.join(reversed(ctg.split(FCS_SEP)))
                 )
                 yield z, trk
@@ -725,10 +722,11 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         def _bgnd_ensure_content_loaded(ws=self.ws, frames=frames):
             ntot = len(frames)
             for nth, frame in enumerate(frames):
-                yield {TASK_DOING: "importing {}/{}".format(nth+1, ntot), TASK_PROGRESS: float(nth+1)/float(ntot+1)}
+                yield {TASK_DOING: "importing {}/{}".format(nth + 1, ntot),
+                       TASK_PROGRESS: float(nth + 1) / float(ntot + 1)}
                 ws.import_product_content(frame)
 
-        def _then_show_frames_in_document(doc = self.doc, frames = frames):
+        def _then_show_frames_in_document(doc=self.doc, frames=frames):
             """finally-do-this section back on UI thread
             """
             [self.doc.activate_product_uuid_as_new_layer(frame) for frame in frames]
@@ -738,7 +736,8 @@ class DocumentAsTrackStack(DocumentAsContextBase):
             # generate their presentations if needed
             # regenerate the animation plan and refresh the screen
 
-        queue.add("activate frames " + repr(frames), _bgnd_ensure_content_loaded(), "activate {} frames".format(len(frames)),
+        queue.add("activate frames " + repr(frames), _bgnd_ensure_content_loaded(),
+                  "activate {} frames".format(len(frames)),
                   interactive=False, and_then=_then_show_frames_in_document)
 
     def _products_in_track(self, track: str, during: Span = None) -> T.List[UUID]:
@@ -759,7 +758,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                     (Product.family == fam) & (Product.category == ctg) &
                     ~((Product.obs_time > end) | ((Product.obs_time + Product.obs_duration) < start))).all()]
 
-    def _products_in_tracks(self, tracks: T.Iterable[str], during: Span=None) -> T.Iterable[UUID]:
+    def _products_in_tracks(self, tracks: T.Iterable[str], during: Span = None) -> T.Iterable[UUID]:
         for track in tracks:
             yield from self._products_in_track(track, during)
 
@@ -867,6 +866,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
 class DocumentAsRegionProbes(DocumentAsContextBase):
     """Document is probed over a variety of regions
     """
+
     def __enter__(self):
         raise NotImplementedError()
 
@@ -887,6 +887,7 @@ class DocumentAsStyledFamilies(DocumentAsContextBase):
     """Document is composed of products falling into families, each represented onscreen with a style
 
     """
+
     def __enter__(self):
         raise NotImplementedError()
 
@@ -906,6 +907,7 @@ class DocumentAsStyledFamilies(DocumentAsContextBase):
 class DocumentAsResourcePools(DocumentAsContextBase):
     """Document allows user to specify files and directory systems to search for Resources, Products, Content
     """
+
     def __enter__(self):
         raise NotImplementedError()
 
@@ -982,7 +984,8 @@ class DocumentAsAnimationSequence(DocumentAsContextBase):
         """The plan id is just a hashable unique (compare with "is") saying what the current valid plan is, to allow SGM/others to cache
         """
 
-    def animation_plan(self, multiple_of_realtime:float = None, start:datetime=None, stop:datetime=None) -> T.Sequence[AnimationStep]:
+    def animation_plan(self, multiple_of_realtime: float = None, start: datetime = None, stop: datetime = None) -> \
+    T.Sequence[AnimationStep]:
         """Yield series of AnimationStep
         May result in a new plan_id being the valid plan
         """
@@ -1096,7 +1099,6 @@ class DocumentAsProductArrayCollection(DocumentAsContextBase):
     def __enter__(self):
         raise NotImplementedError()
 
-
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_val is not None:
             # abort code
@@ -1125,7 +1127,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     config_dir: str = None
     queue: TaskQueue = None
     _workspace: Workspace = None
-
 
     # timeline the user has specified:
     track_order: ZList = None  # (zorder, family-name) with higher z above lower z; z<0 should not occur
@@ -1167,21 +1168,26 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     # signals
     # Clarification: Layer interfaces migrate to layer meaning "current active products under the playhead"
-    didAddBasicLayer = pyqtSignal(tuple, UUID, Presentation)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
-    didAddCompositeLayer = pyqtSignal(tuple, UUID, Presentation)  # comp layer is derived from multiple basic layers and has its own UUID
-    didRemoveLayers = pyqtSignal(tuple, list, int, int)  # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
+    didAddBasicLayer = pyqtSignal(tuple, UUID,
+                                  Presentation)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
+    didAddCompositeLayer = pyqtSignal(tuple, UUID,
+                                      Presentation)  # comp layer is derived from multiple basic layers and has its own UUID
+    didRemoveLayers = pyqtSignal(tuple, list, int,
+                                 int)  # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
     willPurgeLayer = pyqtSignal(UUID)  # UUID of the layer being removed
     didReorderLayers = pyqtSignal(tuple)  # list of original indices in their new order, None for new layers
     didChangeLayerVisibility = pyqtSignal(dict)  # {UUID: new-visibility, ...} for changed layers
     didReorderAnimation = pyqtSignal(tuple)  # list of UUIDs representing new animation order
     didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
-    didSwitchLayerSet = pyqtSignal(int, DocLayerStack, tuple)  # new layerset number typically 0..3, list of Presentation tuples representing new display order, new animation order
+    didSwitchLayerSet = pyqtSignal(int, DocLayerStack,
+                                   tuple)  # new layerset number typically 0..3, list of Presentation tuples representing new display order, new animation order
     didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: (vmin, vmax), ...} for all changed layers
     didChangeGamma = pyqtSignal(dict)  # dict of {uuid: gamma float, ...} for all changed layers
     didChangeComposition = pyqtSignal(tuple, UUID, Presentation)  # new-layer-order, changed-layer, new-Presentation
     didChangeCompositions = pyqtSignal(tuple, list, list)  # new-layer-order, changed-layers, new-prezs
-    didCalculateLayerEqualizerValues = pyqtSignal(dict)  # dict of {uuid: (value, normalized_value_within_clim)} for equalizer display
+    didCalculateLayerEqualizerValues = pyqtSignal(
+        dict)  # dict of {uuid: (value, normalized_value_within_clim)} for equalizer display
     didChangeProjection = pyqtSignal(str, dict)  # name of projection, dict of projection information
     # didChangeShapeLayer = pyqtSignal(dict)
     didAddFamily = pyqtSignal(str, dict)  # name of the newly added family and dict of family info
@@ -1205,7 +1211,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # content gets probes applied across points and regions
     as_region_probes: DocumentAsRegionProbes = None
 
-    def __init__(self, workspace, queue, config_dir=DOCUMENT_SETTINGS_DIR, layer_set_count=DEFAULT_LAYER_SET_COUNT, **kwargs):
+    def __init__(self, workspace, queue, config_dir=DOCUMENT_SETTINGS_DIR, layer_set_count=DEFAULT_LAYER_SET_COUNT,
+                 **kwargs):
         super(Document, self).__init__(**kwargs)
         self.config_dir = config_dir
         self.queue = queue
@@ -1216,7 +1223,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # high level context managers provide access patterns for use-case based behaviors
         self.as_layer_stack = DocumentAsLayerStack(self, workspace.metadatabase, workspace)
         self.as_track_stack = DocumentAsTrackStack(self, workspace.metadatabase, workspace)
-        self.as_styled_families= DocumentAsStyledFamilies(self, workspace.metadatabase, workspace)
+        self.as_styled_families = DocumentAsStyledFamilies(self, workspace.metadatabase, workspace)
         self.as_resource_pools = DocumentAsResourcePools(self, workspace.metadatabase, workspace)
         self.as_recipe_collection = DocumentAsRecipeCollection(self, workspace.metadatabase, workspace)
         self.as_animation_sequence = DocumentAsAnimationSequence(self, workspace.metadatabase, workspace)
@@ -1413,7 +1420,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     @property
     def current_layer_set(self):
         cls = self._layer_sets[self.current_set_index]
-        assert(isinstance(cls, DocLayerStack))
+        assert (isinstance(cls, DocLayerStack))
         return cls
 
     def _insert_layer_with_info(self, info: DocLayer, cmap=None, insert_before=0):
@@ -1447,7 +1454,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             if lset is not None:  # uninitialized layer sets will be None
                 lset.insert(insert_before, p if dex == self.current_set_index else q)
 
-        reordered_indices = tuple([None] + list(range(old_layer_count)))  # FIXME: this should obey insert_before, currently assumes always insert at top
+        reordered_indices = tuple([None] + list(
+            range(old_layer_count)))  # FIXME: this should obey insert_before, currently assumes always insert at top
         return p, reordered_indices
 
     def open_file(self, path, insert_before=0):
@@ -1472,7 +1480,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         active_content_data = self._workspace.import_product_content(uuid, **importer_kwargs)
         # updated metadata with content information (most importantly nav information)
         info = self._workspace.get_info(uuid)
-        assert(info is not None)
+        assert (info is not None)
         LOG.info('cell_width: {}'.format(repr(info[Info.CELL_WIDTH])))
 
         LOG.info('new layer info: {}'.format(repr(info)))
@@ -1618,7 +1626,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param paths: list of paths
         :return: list of paths
         """
-        warnings.warn("sort_paths is deprecated in favor of sort_product_uuids, since more than one product may reside in a resource", DeprecationWarning)
+        warnings.warn(
+            "sort_paths is deprecated in favor of sort_product_uuids, since more than one product may reside in a resource",
+            DeprecationWarning)
         return list(sorted(paths, key=lambda p: os.path.basename(p)))
         # products = list(self._workspace.collect_product_metadata_for_paths(paths))
         # LOG.debug('sorting products {} for paths {}'.format(repr(products), repr(paths)))
@@ -1628,16 +1638,16 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # return paths
 
     def sort_product_uuids(self, uuids: T.Iterable[UUID]) -> T.List[UUID]:
-        uuidset=set(str(x) for x in uuids)
+        uuidset = set(str(x) for x in uuids)
         if not uuidset:
             return []
         with self._workspace.metadatabase as S:
             zult = [(x.uuid, x.ident) for x in S.query(Product)
-                                                .filter(Product.uuid_str.in_(uuidset))
-                                                .order_by(Product.family, Product.category, Product.serial)
-                                                .all()]
+                .filter(Product.uuid_str.in_(uuidset))
+                .order_by(Product.family, Product.category, Product.serial)
+                .all()]
         LOG.debug("sorted products: {}".format(repr(zult)))
-        return [u for u,_ in zult]
+        return [u for u, _ in zult]
 
     # def sort_datasets_into_load_order(self, infos):
     #     """
@@ -1749,6 +1759,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     v = cmax
 
             return int(round(abs(v - cmin) / abs(cmax - cmin) * 255.))
+
         values = []
         for dep_lyr, clims in zip(lyr.l[:3], pinf.climits):
             if dep_lyr is None:
@@ -1873,7 +1884,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     continue
             yield layer
 
-    def select_layer_set(self, layer_set_index:int):
+    def select_layer_set(self, layer_set_index: int):
         """Change the selected layer set, 0..N (typically 0..3), cloning the old set if needed
         emits docDidChangeLayerOrder with an empty list implying complete reassessment,
         if cloning of layer set didn't occur
@@ -1883,10 +1894,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """
 
         # the number of layer sets is no longer fixed, but you can't select more than 1 beyond the end of the list!
-        assert(layer_set_index <= len(self._layer_sets) and layer_set_index >= 0)
+        assert (layer_set_index <= len(self._layer_sets) and layer_set_index >= 0)
 
         # if we are adding a layer set, do that now
-        if layer_set_index == len(self._layer_sets) :
+        if layer_set_index == len(self._layer_sets):
             self._layer_sets.append(None)
 
         # if the selected layer set doesn't exist yet, clone another set to make it
@@ -1900,8 +1911,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.didSwitchLayerSet.emit(layer_set_index, self.current_layer_set, self.current_animation_order)
 
     def row_for_uuid(self, *uuids):
-        d = dict((q.uuid,i) for i,q in enumerate(self.current_layer_set))
-        if len(uuids)==1:
+        d = dict((q.uuid, i) for i, q in enumerate(self.current_layer_set))
+        if len(uuids) == 1:
             return d[uuids[0]]
         else:
             return [d[x] for x in uuids]
@@ -1934,9 +1945,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param changes: dictionary of {uuid:bool} with new visibility state
         :return:
         """
-        u2r = dict((q.uuid,i) for i,q in enumerate(self.current_layer_set))
+        u2r = dict((q.uuid, i) for i, q in enumerate(self.current_layer_set))
         L = self.current_layer_set
-        for uuid,visible in changes.items():
+        for uuid, visible in changes.items():
             dex = L[uuid]
             old = L[dex]
             L[dex] = old._replace(visible=visible)
@@ -1968,7 +1979,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         del sibs[dex]
         if sibs:
             self.toggle_layer_visibility(sibs, False)
-        self.toggle_layer_visibility(new_focus, True) # FUTURE: do these two commands in one step
+        self.toggle_layer_visibility(new_focus, True)  # FUTURE: do these two commands in one step
         return new_focus
 
     def is_layer_visible(self, row):
@@ -1980,7 +1991,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def change_layer_name(self, row, new_name):
         uuid = self.current_layer_set[row].uuid if not isinstance(row, UUID) else row
         info = self._layer_with_uuid[uuid]
-        assert(uuid == info[Info.UUID])
+        assert (uuid == info[Info.UUID])
         if not new_name:
             # empty string, reset to default DISPLAY_NAME
             new_name = info.default_display_name
@@ -1996,8 +2007,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         nfo = {}
         for uuid in uuids:
-            for dex,pinfo in enumerate(L):
-                if pinfo.uuid==uuid:
+            for dex, pinfo in enumerate(L):
+                if pinfo.uuid == uuid:
                     L[dex] = pinfo._replace(colormap=name)
                     nfo[uuid] = name
         self.didChangeColormap.emit(nfo)
@@ -2006,7 +2017,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                              dataset_names=None, wavelengths=None, colormaps=None):
         """check current layer list for criteria and yield"""
         L = self.current_layer_set
-        for idx,p in enumerate(L):
+        for idx, p in enumerate(L):
             if (uuids is not None) and (p.uuid not in uuids):
                 continue
             layer = self._layer_with_uuid[p.uuid]
@@ -2050,7 +2061,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         nfo = {}
         for uuid in uuids:
-            for dex,pinfo in enumerate(L):
+            for dex, pinfo in enumerate(L):
                 if pinfo.uuid == uuid:
                     nfo[uuid] = pinfo.climits[::-1]
                     L[dex] = pinfo._replace(climits=nfo[uuid])
@@ -2117,7 +2128,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             if len(temp_namespace) != len(namespace):
                 LOG.info("Missing some layers to create algebraic layer at {:%Y-%m-%d %H:%M:%S}".format(t))
                 continue
-            LOG.info("Creating algebraic layer '{}' for time {:%Y-%m-%d %H:%M:%S}".format(info.get(Info.SHORT_NAME), self[time_master[idx]].get(Info.SCHED_TIME)))
+            LOG.info("Creating algebraic layer '{}' for time {:%Y-%m-%d %H:%M:%S}".format(info.get(Info.SHORT_NAME),
+                                                                                          self[time_master[idx]].get(
+                                                                                              Info.SCHED_TIME)))
 
             uuid, layer_info, data = self._workspace.create_algebraic_composite(operations, temp_namespace, info.copy())
             self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, layer_info)
@@ -2307,13 +2320,15 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 family_uuids = self._families[family]
                 family_layers = [self[u] for u in family_uuids]
             # (sat, inst) -> {time -> layer}
-            inst_layers = {k: {l[Info.SCHED_TIME]: l for l in g} for k, g in groupby(sorted(family_layers, key=_key_func), _key_func)}
+            inst_layers = {k: {l[Info.SCHED_TIME]: l for l in g} for k, g in
+                           groupby(sorted(family_layers, key=_key_func), _key_func)}
             return inst_layers
 
         # if the layers we were using as dependencies have all been removed (family no longer exists)
         # then change the recipe to use None instead. The `didRemoveFamily` signal already told the
         # RGB pane to update its list of choices and defaults to None
-        missing_rgba = {comp: None for comp, input_id in zip('rgb', recipe.input_ids) if input_id and input_id not in self._families}
+        missing_rgba = {comp: None for comp, input_id in zip('rgb', recipe.input_ids) if
+                        input_id and input_id not in self._families}
         if missing_rgba:
             LOG.debug("Recipe's inputs have gone missing: {}".format(missing_rgba))
             self.change_rgb_recipe_components(recipe, update=False, **missing_rgba)
@@ -2335,8 +2350,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 rgb_times &= times
             # time order doesn't really matter
             for t in rgb_times:
-                yield t, category,\
-                      r_layers[category].get(t), g_layers[category].get(t),\
+                yield t, category, \
+                      r_layers[category].get(t), g_layers[category].get(t), \
                       b_layers[category].get(t)
 
     def sync_composite_layer_prereqs(self, new_times):
@@ -2349,7 +2364,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             recipe = self.recipe_manager[recipe_name]
             self.update_rgb_composite_layers(recipe, times=new_times)
 
-    def _change_rgb_component_layer(self, layer:DocRGBLayer, **rgba):
+    def _change_rgb_component_layer(self, layer: DocRGBLayer, **rgba):
         """Update RGB Layer with specified components
 
         If the layer is not valid
@@ -2380,7 +2395,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         LOG.info('updated metadata for layer %s: %s' % (layer.uuid, repr(list(updated.keys()))))
         return changed
 
-    def set_rgb_range(self, recipe:CompositeRecipe, rgba:str, min:float, max:float):
+    def set_rgb_range(self, recipe: CompositeRecipe, rgba: str, min: float, max: float):
         new_clims = tuple(x if c != rgba else (min, max) for c, x in zip("rgba", recipe.color_limits))
         # update the ranges on this layer and all it's siblings
         self.change_rgb_recipe_prez(recipe, climits=new_clims)
@@ -2520,12 +2535,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """
         if layer_set_index is None:
             layer_set_index = self.current_set_index
-        assert(len(new_order)==len(self._layer_sets[layer_set_index]))
+        assert (len(new_order) == len(self._layer_sets[layer_set_index]))
         new_layer_set = DocLayerStack(self, [self._layer_sets[layer_set_index][n] for n in new_order])
         self._layer_sets[layer_set_index] = new_layer_set
         self.didReorderLayers.emit(tuple(new_order))
 
-    def insert_layer_prez(self, row:int, layer_prez_seq):
+    def insert_layer_prez(self, row: int, layer_prez_seq):
         cls = self.current_layer_set
         clo = list(range(len(cls)))
         lps = list(layer_prez_seq)
@@ -2540,7 +2555,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             cls.insert(row, p)
             clo.insert(row, None)
 
-    def is_using(self, uuid:UUID, layer_set:int=None):
+    def is_using(self, uuid: UUID, layer_set: int = None):
         "return true if this dataset is still in use in one of the layer sets"
         layer = self._layer_with_uuid[uuid]
         if layer_set is not None:
@@ -2556,14 +2571,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     return True
         return False
 
-    def remove_layer_prez(self, row_or_uuid, count:int=1):
+    def remove_layer_prez(self, row_or_uuid, count: int = 1):
         """
         remove the presentation of a given layer/s in the current set
         :param row: which current layer set row to remove
         :param count: how many rows to remove
         :return:
         """
-        if isinstance(row_or_uuid, UUID) and count==1:
+        if isinstance(row_or_uuid, UUID) and count == 1:
             try:
                 row = self.row_for_uuid(row_or_uuid)
             except KeyError:
@@ -2572,11 +2587,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             uuids = [row_or_uuid]
         else:
             row = row_or_uuid
-            uuids = [x.uuid for x in self.current_layer_set[row:row+count]]
-        self.toggle_layer_visibility(list(range(row, row+count)), False)
+            uuids = [x.uuid for x in self.current_layer_set[row:row + count]]
+        self.toggle_layer_visibility(list(range(row, row + count)), False)
         clo = list(range(len(self.current_layer_set)))
-        del clo[row:row+count]
-        del self.current_layer_set[row:row+count]
+        del clo[row:row + count]
+        del self.current_layer_set[row:row + count]
         self.didRemoveLayers.emit(tuple(clo), uuids, row, count)
 
     def purge_layer_prez(self, uuids):
@@ -2618,7 +2633,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 val = reference.get(key, None)
                 v = md.get(key, None)
                 if val != v:
-                    fail=True
+                    fail = True
             if not fail:
                 yield md
 
@@ -2635,10 +2650,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if it is None:
             return [], 0
         sibs = [(x[Info.SCHED_TIME], x[Info.UUID]) for x in
-                self._filter(sibling_infos.values(), it, {Info.SHORT_NAME, Info.STANDARD_NAME, Info.SCENE, Info.INSTRUMENT, Info.PLATFORM, Info.KIND})]
+                self._filter(sibling_infos.values(), it,
+                             {Info.SHORT_NAME, Info.STANDARD_NAME, Info.SCENE, Info.INSTRUMENT, Info.PLATFORM,
+                              Info.KIND})]
         # then sort it into time order
         sibs.sort()
-        offset = [i for i,x in enumerate(sibs) if x[1]==uuid]
+        offset = [i for i, x in enumerate(sibs) if x[1] == uuid]
         return [x[1] for x in sibs], offset[0]
 
     def time_siblings_uuids(self, uuids, sibling_infos=None):
@@ -2651,7 +2668,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for requested_uuid in uuids:
             for sibling_uuid in self.time_siblings(requested_uuid, sibling_infos=sibling_infos)[0]:
                 yield sibling_uuid
-
 
 
 #
@@ -2710,5 +2726,3 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
-
-

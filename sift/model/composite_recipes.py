@@ -19,11 +19,13 @@ they can be recreated in the future.
 
 """
 
-import os
 import logging
-from glob import glob
+import os
 from collections import namedtuple
+from glob import glob
+
 import yaml
+
 from sift.util.default_paths import DOCUMENT_SETTINGS_DIR
 
 LOG = logging.getLogger(__name__)
@@ -35,6 +37,7 @@ class CompositeRecipe(_CompositeRecipe):
     def __new__(cls, name, input_ids=None, color_limits=None, gammas=None, read_only=False):
         def _normalize_list(x, default=None):
             return [x[idx] if x and len(x) > idx and x[idx] else default for idx in range(3)]
+
         input_ids = _normalize_list(input_ids)
         color_limits = _normalize_list(color_limits, (None, None))
         gammas = _normalize_list(gammas, 1.0)
@@ -175,4 +178,3 @@ class RecipeManager(object):
         except (ValueError, KeyError, TypeError):
             LOG.error("Could not add recipes from '{}'".format(pathname))
             raise ValueError("Could not open recipe")
-

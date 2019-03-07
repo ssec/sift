@@ -1,8 +1,8 @@
 import ast
 from PyQt4 import QtGui, QtCore
+
 from sift.common import Kind, Info
 from sift.ui.create_algebraic_dialog_ui import Ui_create_algebraic_dialog
-
 
 DIFF_OP_NAME = 'Difference'
 NDI_OP_NAME = 'Normalized Difference Index'
@@ -198,7 +198,7 @@ class CreateAlgebraicDialog(QtGui.QDialog):
                     status_title,
                     status_text,
                     QtGui.QMessageBox.Ok,
-                    )
+                )
                 return
 
         return super(CreateAlgebraicDialog, self).done(r)

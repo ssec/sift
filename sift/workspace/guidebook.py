@@ -17,6 +17,7 @@ __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
 import logging
+
 from sift.common import Info, Kind, Platform, Instrument
 from sift.view.colormap import DEFAULT_IR, DEFAULT_VIS, DEFAULT_UNKNOWN
 
@@ -28,6 +29,7 @@ class Guidebook(object):
     """
     guidebook which knows about AHI, ABI, AMI bands, timing, file naming conventions
     """
+
     @staticmethod
     def is_relevant(pathname):
         return False
@@ -173,8 +175,6 @@ STANDARD_NAMES = {
     Platform.GOES_16: _SN_GOESR_ABI,
     Platform.GOES_17: _SN_GOESR_ABI,
 }
-
-
 
 
 class ABI_AHI_Guidebook(Guidebook):
@@ -323,8 +323,6 @@ class ABI_AHI_Guidebook(Guidebook):
         name = "{sat} {inst} {name} {standard_name} {dtime}".format(
             sat=sat.value, inst=inst.value, name=name, standard_name=label, dtime=display_time)
         return name
-
-
 
 # if __name__ == '__main__':
 #     sys.exit(main())

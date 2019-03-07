@@ -16,11 +16,14 @@ except AttributeError:
 
 try:
     _encoding = QtGui.QApplication.UnicodeUTF8
+
+
     def _translate(context, text, disambig):
         return QtGui.QApplication.translate(context, text, disambig, _encoding)
 except AttributeError:
     def _translate(context, text, disambig):
         return QtGui.QApplication.translate(context, text, disambig)
+
 
 class Ui_ExportImageDialog(object):
     def setupUi(self, ExportImageDialog):
@@ -36,12 +39,12 @@ class Ui_ExportImageDialog(object):
         self.buttonBox.setEnabled(True)
         self.buttonBox.setGeometry(QtCore.QRect(10, 370, 301, 32))
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QtGui.QDialogButtonBox.Cancel|QtGui.QDialogButtonBox.Save)
+        self.buttonBox.setStandardButtons(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Save)
         self.buttonBox.setCenterButtons(False)
         self.buttonBox.setObjectName(_fromUtf8("buttonBox"))
         self.frameRangeGroupBox = QtGui.QGroupBox(ExportImageDialog)
         self.frameRangeGroupBox.setGeometry(QtCore.QRect(10, 30, 321, 111))
-        self.frameRangeGroupBox.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignTop)
+        self.frameRangeGroupBox.setAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
         self.frameRangeGroupBox.setFlat(False)
         self.frameRangeGroupBox.setCheckable(False)
         self.frameRangeGroupBox.setObjectName(_fromUtf8("frameRangeGroupBox"))
@@ -57,7 +60,7 @@ class Ui_ExportImageDialog(object):
         self.frameRangeRadio.setObjectName(_fromUtf8("frameRangeRadio"))
         self.label = QtGui.QLabel(self.frameRangeGroupBox)
         self.label.setGeometry(QtCore.QRect(110, 80, 41, 21))
-        self.label.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label.setAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         self.label.setObjectName(_fromUtf8("label"))
         self.frameRangeFrom = QtGui.QLineEdit(self.frameRangeGroupBox)
         self.frameRangeFrom.setGeometry(QtCore.QRect(150, 80, 61, 21))
@@ -164,4 +167,3 @@ class Ui_ExportImageDialog(object):
         self.fpsDelayRadio.setText(_translate("ExportImageDialog", "FPS:", None))
         self.label_3.setText(_translate("ExportImageDialog", "Font Size:", None))
         self.footerFontSizeSpinBox.setSuffix(_translate("ExportImageDialog", "px", None))
-

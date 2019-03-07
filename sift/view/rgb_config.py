@@ -3,9 +3,8 @@
 """UI objects for configuring RGB layers."""
 
 import logging
-from typing import List, Tuple, Optional, Mapping
 from functools import partial
-from uuid import UUID
+from typing import List, Tuple, Optional, Mapping
 
 from PyQt4.QtCore import QObject, pyqtSignal
 from PyQt4.QtGui import QDoubleValidator, QComboBox, QLineEdit
@@ -30,8 +29,8 @@ class RGBLayerConfigPane(QObject):
     _rgb = None  # combo boxes in r,g,b order; cache
     _sliders = None  # sliders in r,g,b order; cache
     _edits = None
-    _valid_ranges: List[Tuple[float, float]] = None # tuples of each component's c-limits
-    _gamma_boxes = None # tuple of each component's gamma spin boxes
+    _valid_ranges: List[Tuple[float, float]] = None  # tuples of each component's c-limits
+    _gamma_boxes = None  # tuple of each component's gamma spin boxes
 
     def __init__(self, ui, parent):
         super(RGBLayerConfigPane, self).__init__(parent)
@@ -58,9 +57,9 @@ class RGBLayerConfigPane(QObject):
         self.ui.editMaxBlue.setValidator(qdoba)
 
         [x.currentIndexChanged.connect(partial(self._combo_changed, combo=x, color=rgb))
-         for rgb,x in zip(('b', 'g', 'r'), (self.ui.comboBlue, self.ui.comboGreen, self.ui.comboRed))]
+         for rgb, x in zip(('b', 'g', 'r'), (self.ui.comboBlue, self.ui.comboGreen, self.ui.comboRed))]
         [x.sliderReleased.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=False))
-         for rgb,x in zip(('b', 'g', 'r'), (self.ui.slideMinBlue, self.ui.slideMinGreen, self.ui.slideMinRed))]
+         for rgb, x in zip(('b', 'g', 'r'), (self.ui.slideMinBlue, self.ui.slideMinGreen, self.ui.slideMinRed))]
         [x.sliderReleased.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=True))
          for rgb, x in zip(('b', 'g', 'r'), (self.ui.slideMaxBlue, self.ui.slideMaxGreen, self.ui.slideMaxRed))]
         [x.editingFinished.connect(partial(self._edit_changed, line_edit=x, color=rgb, is_max=False))
@@ -68,7 +67,8 @@ class RGBLayerConfigPane(QObject):
         [x.editingFinished.connect(partial(self._edit_changed, line_edit=x, color=rgb, is_max=True))
          for rgb, x in zip(('b', 'g', 'r'), (self.ui.editMaxBlue, self.ui.editMaxGreen, self.ui.editMaxRed))]
         [x.valueChanged.connect(self._gamma_changed)
-         for rgb, x in zip(('b', 'g', 'r'), (self.ui.redGammaSpinBox, self.ui.greenGammaSpinBox, self.ui.blueGammaSpinBox))]
+         for rgb, x in
+         zip(('b', 'g', 'r'), (self.ui.redGammaSpinBox, self.ui.greenGammaSpinBox, self.ui.blueGammaSpinBox))]
 
         # initialize the combo boxes
         self._set_combos_to_family_names()
@@ -131,7 +131,7 @@ class RGBLayerConfigPane(QObject):
         gamma = tuple(x.value() for x in self.gamma_boxes)
         self.didChangeRGBComponentGamma.emit(self.recipe, gamma)
 
-    def _combo_changed(self, index, combo:QComboBox=None, color=None):
+    def _combo_changed(self, index, combo: QComboBox = None, color=None):
         family = combo.itemData(index)
         if not family:
             # we use None as no-selection value, not empty string
@@ -142,7 +142,7 @@ class RGBLayerConfigPane(QObject):
         self._set_minmax_slider(color, family)
         self.didChangeRGBComponentSelection.emit(self.recipe, color, family)
 
-    def _display_to_data(self, color:str, values):
+    def _display_to_data(self, color: str, values):
         """Convert display value to data value."""
         if self.recipe is None:
             # No recipe has been set yet
@@ -153,7 +153,7 @@ class RGBLayerConfigPane(QObject):
         family_info = self._families[family]
         return family_info[Info.UNIT_CONVERSION][1](values, inverse=True)
 
-    def _data_to_display(self, color:str, values):
+    def _data_to_display(self, color: str, values):
         "convert data value to display value"
         family = self.recipe.input_ids[RGBA2IDX[color]]
         if family is None:
@@ -167,7 +167,7 @@ class RGBLayerConfigPane(QObject):
     def _create_slider_value(self, valid_min, valid_max, channel_val):
         return ((channel_val - valid_min) / (valid_max - valid_min)) * self._slider_steps
 
-    def _min_max_for_color(self, rgba:str):
+    def _min_max_for_color(self, rgba: str):
         """
         return min value, max value as represented in sliders
         :param rgba: char in 'rgba'
@@ -180,7 +180,7 @@ class RGBLayerConfigPane(QObject):
         x = self._get_slider_value(valid_min, valid_max, slider[1].value())
         return n, x
 
-    def _update_line_edits(self, color:str, n:float=None, x:float=None):
+    def _update_line_edits(self, color: str, n: float = None, x: float = None):
         """
         update edit controls to match non-None values provided
         if called with just color, returns current min and max
@@ -206,13 +206,13 @@ class RGBLayerConfigPane(QObject):
             x = self._display_to_data(color, xdis)
         return n, x
 
-    def _signal_color_changing_range(self, color:str, n:float, x:float):
+    def _signal_color_changing_range(self, color: str, n: float, x: float):
         idx = RGBA2IDX[color]
         new_limits = list(self.recipe.color_limits)
         new_limits[idx] = (n, x)
         self.didChangeRGBComponentLimits.emit(self.recipe, tuple(new_limits))
 
-    def _slider_changed(self, slider=None, color:str=None, is_max:bool=False):
+    def _slider_changed(self, slider=None, color: str = None, is_max: bool = False):
         """
         handle slider update event from user
         :param slider: control
@@ -289,12 +289,13 @@ class RGBLayerConfigPane(QObject):
             # block signals so an existing RGB layer doesn't get overwritten with new layer selections
             widget.blockSignals(False)
 
-    def _set_minmax_slider(self, color: str, family: str, clims: Optional[Tuple[float, float]]=None):
+    def _set_minmax_slider(self, color: str, family: str, clims: Optional[Tuple[float, float]] = None):
         idx = RGBA2IDX[color]
         slider = self.sliders[idx]
         editn, editx = self.line_edits[idx]
         if family not in self._families:
-            LOG.debug("Could not find {} in families {}".format(repr(family), repr(list(sorted(self._families.keys())))))
+            LOG.debug(
+                "Could not find {} in families {}".format(repr(family), repr(list(sorted(self._families.keys())))))
         if clims is None or clims == (None, None) or \
                 family not in self._families:
             self._valid_ranges[idx] = None
@@ -373,7 +374,8 @@ class RGBLayerConfigPane(QObject):
                 # if the current family was removed by the document then the
                 # document should have updated the recipe
                 widget.setCurrentIndex(0)
-            for idx, (family_name, family_info) in enumerate(sorted(self._families.items(), key=lambda x: x[1][Info.DISPLAY_FAMILY])):
+            for idx, (family_name, family_info) in enumerate(
+                    sorted(self._families.items(), key=lambda x: x[1][Info.DISPLAY_FAMILY])):
                 # Qt can't handle tuples as
                 display_name = family_info[Info.DISPLAY_FAMILY]
                 LOG.debug('adding to widget family {} as "{}"'.format(family_name, display_name))

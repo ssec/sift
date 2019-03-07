@@ -7,19 +7,18 @@
 :license: GPLv3, see LICENSE for more details
 """
 
+import logging
 import os
 import sys
-import logging
 
+import numpy as np
+import osr
 from netCDF4 import Dataset
 from osgeo import gdal
-import osr
 from pyproj import Proj
-import numpy as np
 
 LOG = logging.getLogger(__name__)
 GTIFF_DRIVER = gdal.GetDriverByName("GTIFF")
-
 
 AHI_NADIR_RES = {
     5500: 2000,
@@ -267,6 +266,7 @@ def main():
         args.output_filename = stem + ".tif"
 
     ahi2gtiff(args.input_filename, args.output_filename)
+
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -11,14 +11,14 @@ REQUIRES
 :copyright: 2017 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-import os
-import sys
 import logging
+import os
 import re
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from datetime import datetime, timedelta
-from typing import Sequence, Iterable, Generator, Mapping, Tuple
+from typing import Iterable, Generator, Mapping
+
 import numpy as np
 from pyproj import Proj
 from sqlalchemy.orm import Session
@@ -53,7 +53,10 @@ GUIDEBOOKS = {
     Platform.HIMAWARI_9: ABI_AHI_Guidebook,
 }
 
-import_progress = namedtuple('import_progress', ['uuid', 'stages', 'current_stage', 'completion', 'stage_desc', 'dataset_info', 'data'])
+import_progress = namedtuple('import_progress',
+                             ['uuid', 'stages', 'current_stage', 'completion', 'stage_desc', 'dataset_info', 'data'])
+
+
 # stages:int, number of stages this import requires
 # current_stage:int, 0..stages-1 , which stage we're on
 # completion:float, 0..1 how far we are along on this stage
@@ -172,7 +175,7 @@ class aImporter(ABC):
     Abstract Importer class creates or amends Resource, Product, Content entries in the metadatabase used by Workspace
     aImporter instances are backgrounded by the Workspace to bring Content into the workspace
     """
-    _S: Session = None   # dedicated sqlalchemy database session to use during this import instance; revert if necessary, commit as appropriate
+    _S: Session = None  # dedicated sqlalchemy database session to use during this import instance; revert if necessary, commit as appropriate
     _cwd: str = None  # where content flat files should be imported to within the workspace, omit this from content path
 
     def __init__(self, workspace_cwd, database_session, **kwargs):
@@ -303,15 +306,15 @@ class aSingleFileWithSingleProductImporter(aImporter):
         meta[Info.UUID] = uuid
 
         prod = Product(
-            uuid_str = str(uuid),
-            atime = now,
+            uuid_str=str(uuid),
+            atime=now,
         )
         prod.resource.append(res)
-        assert(Info.OBS_TIME in meta)
-        assert(Info.OBS_DURATION in meta)
+        assert (Info.OBS_TIME in meta)
+        assert (Info.OBS_DURATION in meta)
         prod.update(meta)  # sets fields like obs_duration and obs_time transparently
-        assert(prod.info[Info.OBS_TIME] is not None and prod.obs_time is not None)
-        assert(prod.info[Info.VALID_RANGE] is not None)
+        assert (prod.info[Info.OBS_TIME] is not None and prod.obs_time is not None)
+        assert (prod.info[Info.VALID_RANGE] is not None)
         LOG.debug('new product: {}'.format(repr(prod)))
         self._S.add(prod)
         self._S.commit()
@@ -322,6 +325,7 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
     """
     GeoTIFF data importer
     """
+
     @classmethod
     def is_relevant(self, source_path=None, source_uri=None):
         source = source_path or source_uri
@@ -466,10 +470,10 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
             products = [self._S.query(Product).filter_by(id=anid).one() for anid in product_ids]
         else:
             products = list(self._S.query(Resource, Product).filter(
-                Resource.path==source_path).filter(
-                Product.resource_id==Resource.id).all())
-            assert(products)
-        if len(products)>1:
+                Resource.path == source_path).filter(
+                Product.resource_id == Resource.id).all())
+            assert (products)
+        if len(products) > 1:
             LOG.warning('only first product currently handled in geotiff loader')
         prod = products[0]
 
@@ -503,7 +507,7 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
 
         # load at an increment that matches the file's tile size if possible
         IDEAL_INCREMENT = 512.0
-        increment = min(blockh * int(np.ceil(IDEAL_INCREMENT/blockh)), 2048)
+        increment = min(blockh * int(np.ceil(IDEAL_INCREMENT / blockh)), 2048)
 
         # how many coverage states are we traversing during the load? for now let's go simple and have it be just image rows
         # coverage_rows = int((rows + increment - 1) / increment) if we had an even increment but it's not guaranteed
@@ -511,32 +515,33 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
         cov_data[:] = 0  # should not be needed except maybe in Windows?
 
         # LOG.debug("keys in geotiff product: {}".format(repr(list(prod.info.keys()))))
-        LOG.debug("cell size in geotiff product: {} x {}".format(prod.info[Info.CELL_HEIGHT], prod.info[Info.CELL_WIDTH]))
+        LOG.debug(
+            "cell size in geotiff product: {} x {}".format(prod.info[Info.CELL_HEIGHT], prod.info[Info.CELL_WIDTH]))
 
         # create and commit a Content entry pointing to where the content is in the workspace, even if coverage is empty
         c = Content(
-            lod = 0,
-            resolution = int(min(abs(info[Info.CELL_WIDTH]), abs(info[Info.CELL_HEIGHT]))),
-            atime = now,
-            mtime = now,
+            lod=0,
+            resolution=int(min(abs(info[Info.CELL_WIDTH]), abs(info[Info.CELL_HEIGHT]))),
+            atime=now,
+            mtime=now,
 
             # info about the data array memmap
-            path = data_filename,
-            rows = rows,
-            cols = cols,
-            levels = 0,
-            dtype = 'float32',
+            path=data_filename,
+            rows=rows,
+            cols=cols,
+            levels=0,
+            dtype='float32',
 
-            cell_width = info[Info.CELL_WIDTH],
-            cell_height = info[Info.CELL_HEIGHT],
-            origin_x = info[Info.ORIGIN_X],
-            origin_y = info[Info.ORIGIN_Y],
-            proj4 = info[Info.PROJ],
+            cell_width=info[Info.CELL_WIDTH],
+            cell_height=info[Info.CELL_HEIGHT],
+            origin_x=info[Info.ORIGIN_X],
+            origin_y=info[Info.ORIGIN_Y],
+            proj4=info[Info.PROJ],
 
             # info about the coverage array memmap, which in our case just tells what rows are ready
-            coverage_rows = rows,
-            coverage_cols = 1,
-            coverage_path = coverage_filename
+            coverage_rows=rows,
+            coverage_cols=1,
+            coverage_path=coverage_filename
         )
         # c.info.update(prod.info) would just make everything leak together so let's not do it
         self._S.add(c)
@@ -549,18 +554,18 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
         # FUTURE: consider explicit block loads using band.ReadBlock(x,y) once
         irow = 0
         while irow < rows:
-            nrows = min(increment, rows-irow)
+            nrows = min(increment, rows - irow)
             row_data = band.ReadAsArray(0, irow, cols, nrows)
-            img_data[irow:irow+nrows,:] = np.require(row_data, dtype=np.float32)
-            cov_data[irow:irow+nrows] = 1
+            img_data[irow:irow + nrows, :] = np.require(row_data, dtype=np.float32)
+            cov_data[irow:irow + nrows] = 1
             irow += increment
             status = import_progress(uuid=prod.uuid,
-                                       stages=1,
-                                       current_stage=0,
-                                       completion=float(irow)/float(rows),
-                                       stage_desc="importing geotiff",
-                                       dataset_info=None,
-                                       data=img_data)
+                                     stages=1,
+                                     current_stage=0,
+                                     completion=float(irow) / float(rows),
+                                     stage_desc="importing geotiff",
+                                     dataset_info=None,
+                                     data=img_data)
             yield status
 
         # img_data = gtiff.GetRasterBand(1).ReadAsArray()
@@ -581,7 +586,6 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
         # Finally, update content mtime and atime
         c.atime = c.mtime = datetime.utcnow()
         # self._S.commit()
-
 
 
 # map .platform_id in PUG format files to SIFT platform enum
@@ -624,7 +628,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
 
     @staticmethod
     def pug_factory(source_path):
-        dn,fn = os.path.split(source_path)
+        dn, fn = os.path.split(source_path)
         is_netcdf = (fn.lower().endswith('.nc') or fn.lower().endswith('.nc4'))
         if not is_netcdf:
             raise ValueError("PUG loader requires files ending in .nc or .nc4: {}".format(repr(source_path)))
@@ -658,7 +662,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         # FUTURE: this is Content metadata and not Product metadata:
         d[Info.PROJ] = pug.proj4_string
         # get nadir-meter-ish projection coordinate vectors to be used by proj4
-        y,x = pug.proj_y, pug.proj_x
+        y, x = pug.proj_y, pug.proj_x
         d[Info.ORIGIN_X] = x[0]
         d[Info.ORIGIN_Y] = y[0]
 
@@ -678,8 +682,10 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         d[Info.SHAPE] = shape
         generate_guidebook_metadata(d)
 
-        d[Info.FAMILY] = '{}:{}:{}:{:5.2f}µm'.format(Kind.IMAGE.name, 'geo', d[Info.STANDARD_NAME], d[Info.CENTRAL_WAVELENGTH]) # kind:pointofreference:measurement:wavelength
-        d[Info.CATEGORY] = 'NOAA-PUG:{}:{}:{}'.format(d[Info.PLATFORM].name, d[Info.INSTRUMENT].name, d[Info.SCENE])  # system:platform:instrument:target
+        d[Info.FAMILY] = '{}:{}:{}:{:5.2f}µm'.format(Kind.IMAGE.name, 'geo', d[Info.STANDARD_NAME], d[
+            Info.CENTRAL_WAVELENGTH])  # kind:pointofreference:measurement:wavelength
+        d[Info.CATEGORY] = 'NOAA-PUG:{}:{}:{}'.format(d[Info.PLATFORM].name, d[Info.INSTRUMENT].name,
+                                                      d[Info.SCENE])  # system:platform:instrument:target
         d[Info.SERIAL] = d[Info.SCHED_TIME].strftime("%Y%m%dT%H%M%S")
         LOG.debug(repr(d))
         return d
@@ -696,7 +702,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         source_path = self.source_path
         if product_ids:
             products = [self._S.query(Product).filter_by(id=anid).one() for anid in product_ids]
-            assert(products)
+            assert (products)
         else:
             products = list(self._S.query(Resource, Product).filter(
                 Resource.path == source_path).filter(
@@ -729,7 +735,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         img_data = np.memmap(data_path, dtype=np.float32, shape=shape, mode='w+')
 
         LOG.info('converting radiance to %s' % pug.bt_or_refl)
-        image = pug.bt if 'bt'==pug.bt_or_refl else pug.refl
+        image = pug.bt if 'bt' == pug.bt_or_refl else pug.refl
         # bt_or_refl, image, units = pug.convert_from_nc()  # FIXME expensive
         # overview_image = fixme  # FIXME, we need a properly navigated overview image here
 
@@ -757,28 +763,28 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
 
         # create and commit a Content entry pointing to where the content is in the workspace, even if coverage is empty
         c = Content(
-            lod = 0,
-            resolution = int(min(abs(cell_width), abs(cell_height))),
-            atime = now,
-            mtime = now,
+            lod=0,
+            resolution=int(min(abs(cell_width), abs(cell_height))),
+            atime=now,
+            mtime=now,
 
             # info about the data array memmap
-            path = data_filename,
-            rows = rows,
-            cols = cols,
-            proj4 = proj4,
+            path=data_filename,
+            rows=rows,
+            cols=cols,
+            proj4=proj4,
             # levels = 0,
-            dtype = 'float32',
+            dtype='float32',
 
             # info about the coverage array memmap, which in our case just tells what rows are ready
             # coverage_rows = rows,
             # coverage_cols = 1,
             # coverage_path = coverage_filename
 
-            cell_width = cell_width,
-            cell_height = cell_height,
-            origin_x = origin_x,
-            origin_y = origin_y,
+            cell_width=cell_width,
+            cell_height=cell_height,
+            origin_x=origin_x,
+            origin_y=origin_y,
         )
         # c.info.update(prod.info) would just make everything leak together so let's not do it
         self._S.add(c)
@@ -819,7 +825,7 @@ class SatPyImporter(aImporter):
             self.scn = kwargs['scene']
         else:
             self.scn = Scene(reader=self.reader,
-                               filenames=self.filenames)
+                             filenames=self.filenames)
         self._resources = []
         # DatasetID filters
         self.product_filters = {}
@@ -921,11 +927,11 @@ class SatPyImporter(aImporter):
             )
             prod.resource.append(res)
 
-            assert(Info.OBS_TIME in meta)
-            assert(Info.OBS_DURATION in meta)
+            assert (Info.OBS_TIME in meta)
+            assert (Info.OBS_DURATION in meta)
             prod.update(meta)  # sets fields like obs_duration and obs_time transparently
-            assert(prod.info[Info.OBS_TIME] is not None and prod.obs_time is not None)
-            assert(prod.info[Info.VALID_RANGE] is not None)
+            assert (prod.info[Info.OBS_TIME] is not None and prod.obs_time is not None)
+            assert (prod.info[Info.VALID_RANGE] is not None)
             LOG.debug('new product: {}'.format(repr(prod)))
             self._S.add(prod)
             self._S.commit()
@@ -1155,8 +1161,8 @@ class SatPyImporter(aImporter):
             data_path = os.path.join(self._cwd, data_filename)
             try:
                 contour_data = self._compute_contours(
-                        img_data, prod.info[Info.VALID_RANGE][0],
-                        prod.info[Info.VALID_RANGE][1], levels)
+                    img_data, prod.info[Info.VALID_RANGE][0],
+                    prod.info[Info.VALID_RANGE][1], levels)
             except ValueError:
                 LOG.warning("Could not compute contour levels for '{}'".format(prod.uuid))
                 LOG.debug("Contour error: ", exc_info=True)

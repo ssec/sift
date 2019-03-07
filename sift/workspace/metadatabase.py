@@ -30,20 +30,24 @@ SQLAlchemy with SQLite
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import os, sys
-import logging, unittest, argparse
-from datetime import datetime, timedelta
-from sift.common import Info, FCS_SEP
+import argparse
+import logging
+import os
+import sys
+import unittest
+from collections import MutableMapping, defaultdict
+from datetime import datetime
 from functools import reduce
 from uuid import UUID
-from collections import ChainMap, MutableMapping, Iterable, defaultdict
-from typing import Mapping
 
-from sqlalchemy import Table, Column, Integer, String, UnicodeText, Unicode, ForeignKey, DateTime, Interval, PickleType, Float, create_engine
-from sqlalchemy.orm import Session, relationship, sessionmaker, backref, scoped_session
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm.collections import attribute_mapped_collection
+from sqlalchemy import Table, Column, Integer, String, Unicode, ForeignKey, DateTime, Interval, PickleType, \
+    Float, create_engine
 from sqlalchemy.ext.associationproxy import association_proxy
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import Session, relationship, sessionmaker, backref, scoped_session
+from sqlalchemy.orm.collections import attribute_mapped_collection
+
+from sift.common import Info, FCS_SEP
 
 LOG = logging.getLogger(__name__)
 
@@ -83,8 +87,6 @@ LOG = logging.getLogger(__name__)
 #         del self._proxied[key]
 
 
-
-
 # =================
 # Database Entities
 
@@ -96,7 +98,6 @@ PRODUCTS_FROM_RESOURCES_TABLE_NAME = 'product_resource_assoc_v1'
 ProductsFromResources = Table(PRODUCTS_FROM_RESOURCES_TABLE_NAME, Base.metadata,
                               Column('product_id', Integer, ForeignKey('products_v1.id')),
                               Column('resource_id', Integer, ForeignKey('resources_v1.id')))
-
 
 
 class Resource(Base):
@@ -112,7 +113,8 @@ class Resource(Base):
     format = Column(PickleType)  # classname, class or callable which can pull this data into workspace from storage
 
     # {scheme}://{path}/{name}?{query}, default is just an absolute path in filesystem
-    scheme = Column(Unicode, nullable=True)  # uri scheme for the content (the part left of ://), assume file:// by default
+    scheme = Column(Unicode,
+                    nullable=True)  # uri scheme for the content (the part left of ://), assume file:// by default
     path = Column(Unicode)  # '/' separated real path
     query = Column(Unicode, nullable=True)  # query portion of a URI or URL, e.g. 'interval=1m&stride=2'
 
@@ -123,7 +125,9 @@ class Resource(Base):
 
     @property
     def uri(self):
-        return self.path if (not self.scheme or self.scheme=='file') else "{}://{}/{}{}".format(self.scheme, self.path, self.name, '' if not self.query else '?' + self.query)
+        return self.path if (not self.scheme or self.scheme == 'file') else "{}://{}/{}{}".format(self.scheme,
+                                                                                                  self.path, self.name,
+                                                                                                  '' if not self.query else '?' + self.query)
 
     def touch(self, when=None):
         self.atime = datetime.utcnow() if not when else when
@@ -141,6 +145,7 @@ class ChainRecordWithDict(MutableMapping):
     """
     allow Product database entries and key-value table to act as a coherent dictionary
     """
+
     def __init__(self, obj, field_keys, more):
         self._obj, self._field_keys, self._more = obj, field_keys, more
 
@@ -174,7 +179,7 @@ class ChainRecordWithDict(MutableMapping):
     def __getitem__(self, key):
         fieldname = self._field_keys.get(key)
         if fieldname is not None:
-            assert(isinstance(fieldname, str))
+            assert (isinstance(fieldname, str))
             return getattr(self._obj, fieldname)
         return self._more[key]
 
@@ -196,7 +201,6 @@ class ChainRecordWithDict(MutableMapping):
         del self._more[key]
 
 
-
 class Product(Base):
     """
     Primary entity being tracked in metadatabase
@@ -213,7 +217,8 @@ class Product(Base):
     id = Column(Integer, primary_key=True)
     resource_id = Column(Integer, ForeignKey(Resource.id))
     # relationship: .resource
-    uuid_str = Column(String, nullable=False, unique=True)  # UUID representing this data in SIFT, or None if not in cache
+    uuid_str = Column(String, nullable=False,
+                      unique=True)  # UUID representing this data in SIFT, or None if not in cache
 
     @property
     def uuid(self):
@@ -228,15 +233,19 @@ class Product(Base):
     atime = Column(DateTime, nullable=False)  # last time this file was accessed by application
 
     # cached metadata provided by the file format handler
-    name = Column(String, nullable=False)  # product identifier eg "B01", "B02"  # resource + shortname should be sufficient to identify the data
+    name = Column(String,
+                  nullable=False)  # product identifier eg "B01", "B02"  # resource + shortname should be sufficient to identify the data
 
     # presentation is consistent within a family
     # family::category determines track, which should represent a product sequence in time
     # family::category::serial is effectively a product unique identifier
-    family = Column(Unicode, nullable=False)  # colon-separated family identifier, typically kind:pointofreference:measurement:wavelength, e.g. image:geo:refl:11µ
-                                              #  with <> used for generated content.
-    category = Column(Unicode, nullable=False)  # colon-separated processing-system, platform, instrument and scene name, typically system:platform:instrument:target e.g. NOAA-PUG:GOES-16:ABI:CONUS
-    serial = Column(Unicode, nullable=False)  # serial number within family and category; typically time-related; use ISO8601 times please
+    family = Column(Unicode,
+                    nullable=False)  # colon-separated family identifier, typically kind:pointofreference:measurement:wavelength, e.g. image:geo:refl:11µ
+    #  with <> used for generated content.
+    category = Column(Unicode,
+                      nullable=False)  # colon-separated processing-system, platform, instrument and scene name, typically system:platform:instrument:target e.g. NOAA-PUG:GOES-16:ABI:CONUS
+    serial = Column(Unicode,
+                    nullable=False)  # serial number within family and category; typically time-related; use ISO8601 times please
 
     @property
     def track(self):
@@ -279,9 +288,10 @@ class Product(Base):
 
     # link to key-value further information
     # this provides dictionary style access to key-value pairs
-    _key_values = relationship("ProductKeyValue", collection_class=attribute_mapped_collection('key'), cascade="all, delete-orphan")
+    _key_values = relationship("ProductKeyValue", collection_class=attribute_mapped_collection('key'),
+                               cascade="all, delete-orphan")
     _kwinfo = association_proxy("_key_values", "value",
-                                 creator=lambda key, value: ProductKeyValue(key=key, value=value))
+                                creator=lambda key, value: ProductKeyValue(key=key, value=value))
 
     # derived / algebraic layers have a symbol table and an expression
     # typically Content objects for algebraic layers cache calculation output
@@ -299,12 +309,14 @@ class Product(Base):
         keyvalues = {}
         valset = set(cls.INFO_TO_FIELD.values())
         columns = set(cls.__table__.columns.keys())
-        for k,v in mapping.items():
+        for k, v in mapping.items():
             f = cls.INFO_TO_FIELD.get(k)
             if f is not None:
                 fields[f] = v
             elif k in valset:
-                LOG.warning("key {} corresponds to a database field when standard key is available; this code may not be intended".format(k))
+                LOG.warning(
+                    "key {} corresponds to a database field when standard key is available; this code may not be intended".format(
+                        k))
                 fields[k] = v
             elif k in columns:
                 fields[k] = v
@@ -338,7 +350,8 @@ class Product(Base):
         return p
 
     def __repr__(self):
-        return "<Product '{}' @ {}~{} / {} keys>".format(self.name, self.obs_time, self.obs_time + self.obs_duration, len(self.info.keys()))
+        return "<Product '{}' @ {}~{} / {} keys>".format(self.name, self.obs_time, self.obs_time + self.obs_duration,
+                                                         len(self.info.keys()))
 
     @property
     def info(self):
@@ -421,7 +434,7 @@ class Product(Base):
         LOG.debug('DEPRECATED: setting path on resource')
 
     def can_be_activated_without_importing(self):
-        return len(self.content)>0
+        return len(self.content) > 0
 
     INFO_TO_FIELD = {
         Info.SHORT_NAME: 'name',
@@ -443,15 +456,18 @@ class Product(Base):
         self.atime = when = when or datetime.utcnow()
         [x.touch(when) for x in self.resource]
 
+
 class ProductKeyValue(Base):
     """
     key-value pairs associated with a product
     """
     __tablename__ = 'product_key_values_v1'
     product_id = Column(ForeignKey(Product.id), primary_key=True)
-    key = Column(PickleType, primary_key=True)  # FUTURE: can this be a string? for now need pickling of Info/Platform Enum
+    key = Column(PickleType,
+                 primary_key=True)  # FUTURE: can this be a string? for now need pickling of Info/Platform Enum
     # relationship: .product
     value = Column(PickleType)
+
 
 class SymbolKeyValue(Base):
     """
@@ -462,6 +478,7 @@ class SymbolKeyValue(Base):
     key = Column(Unicode, primary_key=True)
     # relationship: .product
     value = Column(PickleType, nullable=True)  # UUID object typically
+
 
 class Content(Base):
     """
@@ -493,13 +510,16 @@ class Content(Base):
     # NaNs are used to signify missing data; NaNs can include integer category fields in significand; please ref IEEE 754
     path = Column(String, unique=True)  # relative to workspace, binary array of data
     rows, cols, levels = Column(Integer), Column(Integer, nullable=True), Column(Integer, nullable=True)
-    dtype = Column(String, nullable=True)  # default float32; can be int16 in the future for scaled integer images for instance; should be a numpy type name
+    dtype = Column(String,
+                   nullable=True)  # default float32; can be int16 in the future for scaled integer images for instance; should be a numpy type name
     # coeffs = Column(String, nullable=True)  # json for numpy array with polynomial coefficients for transforming native data to natural units (e.g. for scaled integers), c[0] + c[1]*x + c[2]*x**2 ...
     # values = Column(String, nullable=True)  # json for optional dict {int:string} lookup table for NaN flag fields (when dtype is float32 or float64) or integer values (when dtype is an int8/16/32/64)
 
     # projection information for this representation of the data
-    proj4 = Column(String, nullable=True)  # proj4 projection string for the data in this array, if one exists; else assume y=lat/x=lon
-    cell_width, cell_height, origin_x, origin_y = Column(Float, nullable=True), Column(Float, nullable=True), Column(Float, nullable=True), Column(Float, nullable=True)
+    proj4 = Column(String,
+                   nullable=True)  # proj4 projection string for the data in this array, if one exists; else assume y=lat/x=lon
+    cell_width, cell_height, origin_x, origin_y = Column(Float, nullable=True), Column(Float, nullable=True), Column(
+        Float, nullable=True), Column(Float, nullable=True)
 
     # sparsity and coverage, int8 arrays if needed to show incremental availability of the data
     # dimensionality is always a reduction factor of rows/cols/levels
@@ -508,9 +528,13 @@ class Content(Base):
     # sparsity is broadcast over the data array
     #   e.g. for incrementally loading sparse data into a dense array
     # a zero value indicates data is not available, nonzero signifies availability
-    coverage_rows, coverage_cols, coverage_levels = Column(Integer, nullable=True), Column(Integer, nullable=True), Column(Integer, nullable=True)
+    coverage_rows, coverage_cols, coverage_levels = Column(Integer, nullable=True), Column(Integer,
+                                                                                           nullable=True), Column(
+        Integer, nullable=True)
     coverage_path = Column(String, nullable=True)
-    sparsity_rows, sparsity_cols, sparsity_levels = Column(Integer, nullable=True), Column(Integer, nullable=True), Column(Integer, nullable=True)
+    sparsity_rows, sparsity_cols, sparsity_levels = Column(Integer, nullable=True), Column(Integer,
+                                                                                           nullable=True), Column(
+        Integer, nullable=True)
     sparsity_path = Column(String, nullable=True)
 
     # navigation information, if required
@@ -521,9 +545,10 @@ class Content(Base):
 
     # link to key-value further information; primarily a hedge in case specific information has to be squirreled away for later consideration for main content table
     # this provides dictionary style access to key-value pairs
-    _key_values = relationship("ContentKeyValue", collection_class=attribute_mapped_collection('key'), cascade="all, delete-orphan")
+    _key_values = relationship("ContentKeyValue", collection_class=attribute_mapped_collection('key'),
+                               cascade="all, delete-orphan")
     _kwinfo = association_proxy("_key_values", "value",
-                                 creator=lambda key, value: ContentKeyValue(key=key, value=value))
+                                creator=lambda key, value: ContentKeyValue(key=key, value=value))
 
     INFO_TO_FIELD = {
         Info.CELL_HEIGHT: 'cell_height',
@@ -546,12 +571,14 @@ class Content(Base):
         keyvalues = {}
         valset = set(cls.INFO_TO_FIELD.values())
         columns = set(cls.__table__.columns.keys())
-        for k,v in mapping.items():
+        for k, v in mapping.items():
             f = cls.INFO_TO_FIELD.get(k)
             if f is not None:
                 fields[f] = v
             elif k in valset:
-                LOG.warning("key {} corresponds to a database field when standard key is available; this code may not be intended".format(k))
+                LOG.warning(
+                    "key {} corresponds to a database field when standard key is available; this code may not be intended".format(
+                        k))
                 fields[k] = v
             elif k in columns:
                 fields[k] = v
@@ -626,14 +653,16 @@ class Content(Base):
 
     @property
     def is_overview(self):
-        return self.lod==self.LOD_OVERVIEW
+        return self.lod == self.LOD_OVERVIEW
 
     def __str__(self):
-        product = "%s:%s.%s" % (self.product.source.name or '?', self.product.platform or '?', self.product.identifier or '?')
+        product = "%s:%s.%s" % (
+        self.product.source.name or '?', self.product.platform or '?', self.product.identifier or '?')
         isoverview = ' overview' if self.is_overview else ''
         dtype = self.dtype or 'float32'
         xyzcs = ' '.join(
-            q for (q,p) in zip('XYZCS', (self.x_path, self.y_path, self.z_path, self.coverage_path, self.sparsity_path)) if p
+            q for (q, p) in
+            zip('XYZCS', (self.x_path, self.y_path, self.z_path, self.coverage_path, self.sparsity_path)) if p
         )
         return "<{uuid} product {product} content{isoverview} with path={path} dtype={dtype} {xyzcs}>".format(
             uuid=self.uuid, product=product, isoverview=isoverview, path=self.path, dtype=dtype, xyzcs=xyzcs)
@@ -644,7 +673,7 @@ class Content(Base):
 
     @property
     def shape(self):
-        rcl = reduce( lambda a,b: a + [b] if b else a, [self.rows, self.cols, self.levels], [])
+        rcl = reduce(lambda a, b: a + [b] if b else a, [self.rows, self.cols, self.levels], [])
         return tuple(rcl)
 
     # this doesn't belong here, database routines only plz
@@ -718,8 +747,8 @@ class Metadatabase(object):
         return zult
 
     def connect(self, uri, create_tables=False, **kwargs):
-        assert(self.engine is None)
-        assert(self.connection is None)
+        assert (self.engine is None)
+        assert (self.connection is None)
         self.engine = create_engine(uri, **kwargs)
         LOG.info('attaching database at {}'.format(uri))
         if create_tables or not self._all_tables_present():
@@ -765,8 +794,6 @@ class Metadatabase(object):
     #
     # high-level functions
     #
-
-
 
 
 # # ============================
@@ -853,6 +880,7 @@ class tests(unittest.TestCase):
         self.assertEqual(q.info['key'], p.info['key'])
         # self.assertEqual(q.obs_time, nextwhen)
 
+
 def _debug(type, value, tb):
     "enable with sys.excepthook = debug"
     if not sys.stdin.isatty():
@@ -862,7 +890,6 @@ def _debug(type, value, tb):
         traceback.print_exception(type, value, tb)
         # …then start the debugger in post-mortem mode.
         pdb.post_mortem(tb)  # more “modern”
-
 
 
 def main():
@@ -891,7 +918,6 @@ def main():
 
     levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
     logging.basicConfig(level=levels[min(3, args.verbosity)])
-
 
     for pn in args.inputs:
         pass

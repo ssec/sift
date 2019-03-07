@@ -12,22 +12,21 @@ This module holds the code which deals with the controller and view for the area
 __author__ = 'evas'
 __docformat__ = 'reStructuredText'
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import QObject, pyqtSignal
-
-# a useful constant
-from sift.common import Info, Kind
-from sift.queue import TASK_PROGRESS, TASK_DOING
-
 import logging
-import numpy as np
+from PyQt4 import QtCore, QtGui
 
+import numpy as np
+from PyQt4.QtCore import QObject, pyqtSignal
 # http://stackoverflow.com/questions/12459811/how-to-embed-matplotib-in-pyqt-for-dummies
 # see also: http://matplotlib.org/users/navigation_toolbar.html
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
-from matplotlib.figure import Figure
 from matplotlib.colors import LogNorm
+from matplotlib.figure import Figure
+
+# a useful constant
+from sift.common import Info, Kind
+from sift.queue import TASK_PROGRESS, TASK_DOING
 
 # Stuff for custom toolbars
 try:

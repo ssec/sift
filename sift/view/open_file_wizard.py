@@ -16,12 +16,13 @@
 # along with SIFT.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
-from sift.ui.open_file_wizard_ui import Ui_openFileWizard
-from sift.common import get_font_size
 from PyQt4 import QtGui, QtCore
-from satpy import Scene, DatasetID
 from collections import OrderedDict
 
+from satpy import Scene, DatasetID
+
+from sift.common import get_font_size
+from sift.ui.open_file_wizard_ui import Ui_openFileWizard
 
 FILE_PAGE = 0
 PRODUCT_PAGE = 1

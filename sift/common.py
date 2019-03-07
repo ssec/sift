@@ -18,13 +18,13 @@ numba
 :copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
+import typing as typ
 from collections import namedtuple
+from enum import Enum
 from typing import MutableSequence, Tuple, Optional, Iterable, Any
+from uuid import UUID
 
 import numpy as np
-from enum import Enum
-import typing as typ
-from uuid import UUID
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -32,7 +32,7 @@ __docformat__ = 'reStructuredText'
 import os, sys
 from datetime import datetime, timedelta
 import logging, unittest, argparse
-from numba import jit, float64, int64, uint64, boolean, types as nb_types
+from numba import jit, float64, int64, boolean, types as nb_types
 from pyproj import Proj
 
 LOG = logging.getLogger(__name__)
@@ -70,9 +70,9 @@ PREFERRED_SCREEN_TO_TEXTURE_RATIO = 1.0  # screenpx:texturepx that we want to ke
 
 DEFAULT_TILE_HEIGHT = 512
 DEFAULT_TILE_WIDTH = 512
-DEFAULT_TEXTURE_HEIGHT=2
-DEFAULT_TEXTURE_WIDTH=16
-DEFAULT_ANIMATION_DELAY=100.0  # milliseconds
+DEFAULT_TEXTURE_HEIGHT = 2
+DEFAULT_TEXTURE_WIDTH = 16
+DEFAULT_ANIMATION_DELAY = 100.0  # milliseconds
 # The values below are taken from the test geotiffs that are projected to the `DEFAULT_PROJECTION` below.
 # These units are in meters in mercator projection space
 DEFAULT_X_PIXEL_SIZE = 4891.969810251281160
@@ -84,8 +84,8 @@ DEFAULT_PROJECTION = "+proj=merc +datum=WGS84 +ellps=WGS84 +over"
 DEFAULT_PROJ_OBJ = p = Proj(DEFAULT_PROJECTION)
 C_EQ = p(180, 0)[0] - p(-180, 0)[0]
 C_POL = p(0, 89.9)[1] - p(0, -89.9)[1]
-MAX_EXCURSION_Y = C_POL/2.0
-MAX_EXCURSION_X = C_EQ/2.0
+MAX_EXCURSION_Y = C_POL / 2.0
+MAX_EXCURSION_X = C_EQ / 2.0
 # how many 'tessellation' tiles in one texture tile? 2 = 2 rows x 2 cols
 TESS_LEVEL = 20
 IMAGE_MESH_SIZE = 10
@@ -93,10 +93,10 @@ IMAGE_MESH_SIZE = 10
 # before the image is considered "out of view"
 CANVAS_EXTENTS_EPSILON = 1e-4
 
-#R_EQ = 6378.1370  # km
-#R_POL = 6356.7523142  # km
-#C_EQ = 40075.0170  # linear km
-#C_POL = 40007.8630  # linear km
+# R_EQ = 6378.1370  # km
+# R_POL = 6356.7523142  # km
+# C_EQ = 40075.0170  # linear km
+# C_POL = 40007.8630  # linear km
 
 # MAX_EXCURSION_Y = C_POL/4.0
 # MAX_EXCURSION_X = C_EQ/2.0
@@ -239,7 +239,7 @@ class Info(Enum):
     # colormap amd data range
     CLIM = 'clim'  # (min,max) color map limits
     VALID_RANGE = 'valid_range'
-    SHAPE = 'shape' # (rows, columns) or (rows, columns, levels) data shape
+    SHAPE = 'shape'  # (rows, columns) or (rows, columns, levels) data shape
     COLORMAP = 'colormap'  # name or UUID of a color map
 
     SCHED_TIME = 'timeline'  # scheduled time for observation
@@ -247,7 +247,7 @@ class Info(Enum):
     OBS_DURATION = 'obsduration'  # time from start of observation to end of observation
 
     # instrument and scene information
-    PLATFORM = 'platform' # full standard name of spacecraft
+    PLATFORM = 'platform'  # full standard name of spacecraft
     BAND = 'band'  # band number (multispectral instruments)
     SCENE = 'scene'  # standard scene identifier string for instrument, e.g. FLDK
     INSTRUMENT = 'instrument'  # Instrument enumeration, or string with full standard name
@@ -421,13 +421,13 @@ def clip(v, n, x):
 
 
 @jit(nb_types.NamedUniTuple(float64, 4, box)(
-        nb_types.NamedUniTuple(float64, 4, box),
-        nb_types.Array(float64, 1, 'C'),
-        nb_types.Array(float64, 1, 'C'),
-        nb_types.UniTuple(int64, 2),
-        float64,
-        float64
-    ),
+    nb_types.NamedUniTuple(float64, 4, box),
+    nb_types.Array(float64, 1, 'C'),
+    nb_types.Array(float64, 1, 'C'),
+    nb_types.UniTuple(int64, 2),
+    float64,
+    float64
+),
     nopython=True)
 def calc_view_extents(image_extents_box, canvas_point, image_point, canvas_size, dx, dy):
     l, r = _calc_extent_component(canvas_point[0], image_point[0], canvas_size[0], dx)
@@ -446,11 +446,11 @@ def calc_view_extents(image_extents_box, canvas_point, image_point, canvas_size,
 
 
 @jit(nb_types.UniTuple(float64, 2)(
-        nb_types.NamedUniTuple(int64, 2, pnt),
-        nb_types.NamedUniTuple(int64, 2, pnt),
-        nb_types.NamedUniTuple(int64, 2, pnt)
-    ),
-     nopython=True)
+    nb_types.NamedUniTuple(int64, 2, pnt),
+    nb_types.NamedUniTuple(int64, 2, pnt),
+    nb_types.NamedUniTuple(int64, 2, pnt)
+),
+    nopython=True)
 def max_tiles_available(image_shape, tile_shape, stride):
     ath = (image_shape[0] / float(stride[0])) / tile_shape[0]
     atw = (image_shape[1] / float(stride[1])) / tile_shape[1]
@@ -554,9 +554,9 @@ class TileCalculator(object):
     common calculations for mercator tile groups in an array or file
     tiles are identified by (iy,ix) zero-based indicators
     """
-    OVERSAMPLED='oversampled'
-    UNDERSAMPLED='undersampled'
-    WELLSAMPLED='wellsampled'
+    OVERSAMPLED = 'oversampled'
+    UNDERSAMPLED = 'undersampled'
+    WELLSAMPLED = 'wellsampled'
 
     name = None
     image_shape = None
@@ -635,7 +635,7 @@ class TileCalculator(object):
                 np.float64(v[0]), np.float64(v[1]),
                 np.float64(v[2]), np.float64(v[3]),
                 np.float64(v[4]), np.float64(v[5]),
-                ),
+            ),
             pnt(np.int64(stride[0]), np.int64(stride[1])),
             box(
                 np.int64(e[0]), np.int64(e[1]),
@@ -723,8 +723,10 @@ class TileCalculator(object):
         # world distance per pixel for our data
         # compute texture pixels per screen pixels
         texture = texture or self.pixel_rez
-        tsy = min(self.overview_stride[0].step, max(1, np.ceil(visible.dy * PREFERRED_SCREEN_TO_TEXTURE_RATIO / texture.dy)))
-        tsx = min(self.overview_stride[1].step, max(1, np.ceil(visible.dx * PREFERRED_SCREEN_TO_TEXTURE_RATIO / texture.dx)))
+        tsy = min(self.overview_stride[0].step,
+                  max(1, np.ceil(visible.dy * PREFERRED_SCREEN_TO_TEXTURE_RATIO / texture.dy)))
+        tsx = min(self.overview_stride[1].step,
+                  max(1, np.ceil(visible.dx * PREFERRED_SCREEN_TO_TEXTURE_RATIO / texture.dx)))
         return pnt(np.int64(tsy), np.int64(tsx))
 
     @jit
@@ -752,9 +754,12 @@ class TileCalculator(object):
             for y_idx in range(tessellation_level):
                 start_idx = x_idx * tessellation_level + y_idx
                 quads[start_idx * 6:(start_idx + 1) * 6, 0] *= tile_w * factor_rez.dx / tessellation_level
-                quads[start_idx * 6:(start_idx + 1) * 6, 0] += origin_x + tile_w * (tix + offset_rez.dx + factor_rez.dx * x_idx / tessellation_level)
-                quads[start_idx * 6:(start_idx + 1) * 6, 1] *= -tile_h * factor_rez.dy / tessellation_level  # Origin is upper-left so image goes down
-                quads[start_idx * 6:(start_idx + 1) * 6, 1] += origin_y - tile_h * (tiy + offset_rez.dy + factor_rez.dy * y_idx / tessellation_level)
+                quads[start_idx * 6:(start_idx + 1) * 6, 0] += origin_x + tile_w * (
+                            tix + offset_rez.dx + factor_rez.dx * x_idx / tessellation_level)
+                quads[start_idx * 6:(start_idx + 1) * 6,
+                1] *= -tile_h * factor_rez.dy / tessellation_level  # Origin is upper-left so image goes down
+                quads[start_idx * 6:(start_idx + 1) * 6, 1] += origin_y - tile_h * (
+                            tiy + offset_rez.dy + factor_rez.dy * y_idx / tessellation_level)
         quads = quads.reshape(tessellation_level * tessellation_level * 6, 3)
         return quads[:, :2]
 
@@ -781,9 +786,11 @@ class TileCalculator(object):
                 # have been inserted as close to the top-left of the texture
                 # location as possible
                 quads[start_idx * 6:(start_idx + 1) * 6, 0] *= one_tile_tex_width * factor_rez.dx / tessellation_level
-                quads[start_idx * 6:(start_idx + 1) * 6, 0] += one_tile_tex_width * (tix + factor_rez.dx * x_idx / tessellation_level)
+                quads[start_idx * 6:(start_idx + 1) * 6, 0] += one_tile_tex_width * (
+                            tix + factor_rez.dx * x_idx / tessellation_level)
                 quads[start_idx * 6:(start_idx + 1) * 6, 1] *= one_tile_tex_height * factor_rez.dy / tessellation_level
-                quads[start_idx * 6:(start_idx + 1) * 6, 1] += one_tile_tex_height * (tiy + factor_rez.dy * y_idx / tessellation_level)
+                quads[start_idx * 6:(start_idx + 1) * 6, 1] += one_tile_tex_height * (
+                            tiy + factor_rez.dy * y_idx / tessellation_level)
         quads = quads.reshape(6 * tessellation_level * tessellation_level, 3)
         quads = np.ascontiguousarray(quads[:, :2])
         return quads
@@ -875,7 +882,7 @@ class ZList(MutableSequence):
             del self[old_z]
             self.insert(to_z, val)
 
-    def __init__(self, zmax:int = None, content: Iterable[Any] = None):
+    def __init__(self, zmax: int = None, content: Iterable[Any] = None):
         super(ZList, self).__init__()
         if zmax is not None:
             self._zmax = zmax
@@ -904,7 +911,7 @@ class ZList(MutableSequence):
         if z not in self:
             raise IndexError("Z={} not in ZList".format(z))
         ldex = self._zmax - z
-        if z>=0:
+        if z >= 0:
             self._zmax -= 1
         del self._content[ldex]
 
@@ -912,7 +919,7 @@ class ZList(MutableSequence):
         """batch merge of substitutions
         raises IndexError if any of them is outside current range
         """
-        for z,q in new_values:
+        for z, q in new_values:
             ldex = self._zmax - z
             self._content[ldex] = q
 
@@ -926,7 +933,7 @@ class ZList(MutableSequence):
         if not inverse:
             return dict(self.items())
         else:
-            zult = dict((b,a) for (a,b) in self.items())
+            zult = dict((b, a) for (a, b) in self.items())
             if len(zult) != len(self._content):
                 raise RuntimeWarning("ZList.to_dict inverse did not have fully unique keys")
             return zult
@@ -946,7 +953,6 @@ def main():
                         help="positional arguments don't have the '-' prefix")
     args = parser.parse_args()
 
-
     levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
     logging.basicConfig(level=levels[min(3, args.verbosity)])
 
@@ -962,5 +968,3 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
-
-

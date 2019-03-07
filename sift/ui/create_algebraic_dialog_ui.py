@@ -16,11 +16,14 @@ except AttributeError:
 
 try:
     _encoding = QtGui.QApplication.UnicodeUTF8
+
+
     def _translate(context, text, disambig):
         return QtGui.QApplication.translate(context, text, disambig, _encoding)
 except AttributeError:
     def _translate(context, text, disambig):
         return QtGui.QApplication.translate(context, text, disambig)
+
 
 class Ui_create_algebraic_dialog(object):
     def setupUi(self, create_algebraic_dialog):
@@ -29,7 +32,7 @@ class Ui_create_algebraic_dialog(object):
         self.buttons = QtGui.QDialogButtonBox(create_algebraic_dialog)
         self.buttons.setGeometry(QtCore.QRect(10, 270, 351, 32))
         self.buttons.setOrientation(QtCore.Qt.Horizontal)
-        self.buttons.setStandardButtons(QtGui.QDialogButtonBox.Cancel|QtGui.QDialogButtonBox.Ok)
+        self.buttons.setStandardButtons(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)
         self.buttons.setObjectName(_fromUtf8("buttons"))
         self.operations_text = QtGui.QPlainTextEdit(create_algebraic_dialog)
         self.operations_text.setGeometry(QtCore.QRect(10, 180, 351, 78))
@@ -41,11 +44,11 @@ class Ui_create_algebraic_dialog(object):
         self.formLayoutWidget.setObjectName(_fromUtf8("formLayoutWidget"))
         self.formLayout = QtGui.QFormLayout(self.formLayoutWidget)
         self.formLayout.setFieldGrowthPolicy(QtGui.QFormLayout.AllNonFixedFieldsGrow)
-        self.formLayout.setLabelAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
-        self.formLayout.setFormAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignTop)
+        self.formLayout.setLabelAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        self.formLayout.setFormAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
         self.formLayout.setObjectName(_fromUtf8("formLayout"))
         self.name_label = QtGui.QLabel(self.formLayoutWidget)
-        self.name_label.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.name_label.setAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         self.name_label.setObjectName(_fromUtf8("name_label"))
         self.formLayout.setWidget(0, QtGui.QFormLayout.LabelRole, self.name_label)
         self.layer_name_edit = QtGui.QLineEdit(self.formLayoutWidget)
@@ -100,4 +103,3 @@ class Ui_create_algebraic_dialog(object):
         self.y_label.setText(_translate("create_algebraic_dialog", "y:", None))
         self.z_label.setText(_translate("create_algebraic_dialog", "z:", None))
         self.operations_label.setText(_translate("create_algebraic_dialog", "Operations", None))
-

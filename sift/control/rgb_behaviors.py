@@ -3,12 +3,13 @@
 """Behavior objects dealing with RGB image layers."""
 
 import logging
-import uuid
+
 from PyQt4.QtCore import QObject
+
 from sift.common import Info, Kind
+from sift.control.layer_tree import LayerStackTreeViewModel
 # type hints:
 from sift.model.document import Document
-from sift.control.layer_tree import LayerStackTreeViewModel
 from sift.view.rgb_config import RGBLayerConfigPane
 
 LOG = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ class UserModifiesRGBLayers(QObject):
            menu selects to create an RGB layer from the selections.
 
     """
+
     def __init__(self, document: Document, rgb_pane: RGBLayerConfigPane,
                  layer_list_model: LayerStackTreeViewModel, parent=None):
         super().__init__(parent)
@@ -72,7 +74,8 @@ class UserModifiesRGBLayers(QObject):
         if len(families) < 3:  # pad with None
             families = families + ([None] * (3 - len(families)))
         # Don't use non-basic layers as starting points for the new composite
-        families = [f for f in families if f is None or self.doc.family_info(f)[Info.KIND] in [Kind.IMAGE, Kind.COMPOSITE]]
+        families = [f for f in families if
+                    f is None or self.doc.family_info(f)[Info.KIND] in [Kind.IMAGE, Kind.COMPOSITE]]
         layer = next(self.doc.create_rgb_composite(families[0],
                                                    families[1],
                                                    families[2]))
@@ -107,4 +110,3 @@ class UserModifiesRGBLayers(QObject):
 
     def _family_removed(self, family):
         self.rgb_pane.family_removed(family)
-

@@ -1,12 +1,14 @@
-from PyQt4.QtGui import QComboBox, QSlider, QDoubleSpinBox, QWizardPage
 from PyQt4 import QtGui
+
 from PyQt4.QtCore import Qt
+from PyQt4.QtGui import QComboBox, QSlider, QDoubleSpinBox, QWizardPage
 from PyQt4.QtWebKit import QWebView
 
 
 class QNoScrollComboBox(QComboBox):
     """Special subclass of QComboBox to stop it from taking focus on scroll over
     """
+
     def __init__(self, *args, **kwargs):
         super(QNoScrollComboBox, self).__init__(*args, **kwargs)
         self.setFocusPolicy(Qt.StrongFocus)
@@ -15,9 +17,9 @@ class QNoScrollComboBox(QComboBox):
         # If we want it to scroll when it has focus then uncomment
         # Currently not desired for Projection combo box, but may
         # be desired for RGB layer selector
-        #if not self.hasFocus():
+        # if not self.hasFocus():
         #    ev.ignore()
-        #else:
+        # else:
         #    super(QNoScrollComboBox, self).wheelEvent(ev)
         ev.ignore()
 

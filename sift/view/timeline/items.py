@@ -63,9 +63,10 @@ https://stackoverflow.com/questions/4216139/python-object-in-qmimedata
 :copyright: 2017 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
+from typing import Mapping
 from uuid import UUID
-from typing import Mapping, Any
 from weakref import ref
+
 from PyQt4.QtCore import Qt
 from PyQt4.QtGui import *
 
@@ -114,14 +115,14 @@ class QTrackItem(QGraphicsObject):
     _z: int = None  # our track number as displayed, 0 being highest on screen, with larger Z going downward
     _title: str = None
     _subtitle: str = None
-    _icon: QIcon = None   # e.g. whether it's algebraic or RGB
+    _icon: QIcon = None  # e.g. whether it's algebraic or RGB
     _metadata: Mapping = None  # arbitrary key-value store for selecting by metadata; in our case this often includes item family for seleciton
     _tooltip: str = None
     _state: Flags = None  # VisualState Flags determine how it's being presented
     _colormap: [QGradient, QImage, QPixmap] = None
     _min: float = None
     _max: float = None
-    _dragging: bool = False   # whether or not a drag is in progress across this item
+    _dragging: bool = False  # whether or not a drag is in progress across this item
     # position in scene coordinates is determined by _z level and starting time of first frame, minus _left_pad
     _bounds: QRectF = QRectF()  # bounds of the track in scene coordinates, assuming 0,0 corresponds to vertical center of left edge of frame representation
     _gi_title: QGraphicsTextItem = None
@@ -217,7 +218,7 @@ class QTrackItem(QGraphicsObject):
 
     # painting and boundaries
 
-    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget=None):
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None):
         # LOG.debug("QTrackItem.paint")
         # _wtf_recursion()
         pen, brush = self._scene().default_track_pen_brush
@@ -229,10 +230,9 @@ class QTrackItem(QGraphicsObject):
         # draw outer boundary
         painter.drawRoundedRect(rect, GFXC.track_corner_radius1, GFXC.track_corner_radius2, Qt.RelativeSize)
 
-
     def boundingRect(self) -> QRectF:
-    #     if self._bounds is None:
-    #         return self.update_pos_and_bounds()
+        #     if self._bounds is None:
+        #         return self.update_pos_and_bounds()
         return self._bounds
 
     # click events / drag departures
@@ -298,7 +298,7 @@ class QTrackItem(QGraphicsObject):
             # y relative to track is 0
             # calculate absolute x position in scene
             # assert (child.uuid != self.uuid)
-            t,d = child.td
+            t, d = child.td
             s = t if (s is None) else min(t, s)
             e = (t + d) if (e is None) else max(e, t + d)
         if e is None:
@@ -325,7 +325,8 @@ class QTrackItem(QGraphicsObject):
         # set track position, assuming we want origin coordinate of track item to be centered vertically within item
         # bounds relative to position in scene, left_pad space to left of local origin (x<0), frames and right-pad at x>=0
         self.prepareGeometryChange()
-        self._bounds = QRectF(-GFXC.track_left_pad, -GFXC.track_height / 2, frames_width + GFXC.track_left_pad + GFXC.track_right_pad, GFXC.track_height)
+        self._bounds = QRectF(-GFXC.track_left_pad, -GFXC.track_height / 2,
+                              frames_width + GFXC.track_left_pad + GFXC.track_right_pad, GFXC.track_height)
         LOG.debug("new track bounds: {}".format(self._bounds))
         # origin is at the start of the first frame contained. padding extends into negative x
         LOG.debug("track centerline placed at {},{}".format(frames_left, screen_track_center_y))
@@ -425,8 +426,6 @@ class QFrameItem(QGraphicsObject):
             it.setPos(GFXC.frame_subtitle_pos)
         # FUTURE: add draggable color-map pixmap
 
-
-
     @property
     def scene_(self):
         trk = self._track()
@@ -476,7 +475,7 @@ class QFrameItem(QGraphicsObject):
             brush = QBrush(Qt.green, Qt.SolidPattern)
         return pen, brush
 
-    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget=None) -> None:
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None) -> None:
         # LOG.debug("QFrameItem.paint")
         pen, brush = self.pen_brush
         rect = self.boundingRect()
@@ -544,4 +543,3 @@ class QTimeRulerItem(QGraphicsRectItem):
 
     def __init__(self):
         super(QTimeRulerItem, self).__init__()
-

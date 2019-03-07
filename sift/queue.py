@@ -22,20 +22,23 @@ REQUIRES
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import os, sys
-import logging, unittest, argparse
+import argparse
+import logging
+import sys
+import unittest
 from collections import OrderedDict
+
 from PyQt4.QtCore import QObject, pyqtSignal, QThread
 
 LOG = logging.getLogger(__name__)
 
 # keys for status dictionaries
 TASK_DOING = ("activity", str)
-TASK_PROGRESS = ("progress", float) # 0.0 - 1.0 progress
-
+TASK_PROGRESS = ("progress", float)  # 0.0 - 1.0 progress
 
 # singleton instance used by clients
 TheQueue = None
+
 
 class Worker(QThread):
     """
@@ -44,10 +47,11 @@ class Worker(QThread):
     queue = None
     depth = 0
 
-    workerDidMakeProgress = pyqtSignal(int, list)  # worker id, sequence of dictionaries listing update information to be propagated to view
+    workerDidMakeProgress = pyqtSignal(int,
+                                       list)  # worker id, sequence of dictionaries listing update information to be propagated to view
     workerDidCompleteTask = pyqtSignal(str, bool)  # task-key, ok: False if exception occurred else True
 
-    def __init__(self, myid:int):
+    def __init__(self, myid: int):
         super(Worker, self).__init__()
         self.queue = OrderedDict()
         self.depth = 0
@@ -70,7 +74,7 @@ class Worker(QThread):
         self.workerDidMakeProgress.emit(self.id, info)
 
     def run(self):
-        while len(self.queue)>0:
+        while len(self.queue) > 0:
             key, task = self.queue.popitem(last=False)
             # LOG.debug('starting background work on {}'.format(key))
             ok = True
@@ -100,6 +104,7 @@ class TaskQueue(QObject):
     _completion_futures = None  # dictionary of id(task) : completion(bool)
 
     didMakeProgress = pyqtSignal(list)  # sequence of dictionaries listing update information to be propagated to view
+
     # started : inherited
     # finished : inherited
     # terminated : inherited
@@ -119,7 +124,7 @@ class TaskQueue(QObject):
             self._last_status.append(None)
 
         global TheQueue
-        assert(TheQueue is None)
+        assert (TheQueue is None)
         TheQueue = self
 
     @property
@@ -130,7 +135,8 @@ class TaskQueue(QObject):
     def remaining(self):
         return sum([len(x.queue) for x in self.workers])
 
-    def add(self, key, task_iterable, description, interactive=False, and_then=None, use_process_pool=False, use_thread_pool=False):
+    def add(self, key, task_iterable, description, interactive=False, and_then=None, use_process_pool=False,
+            use_thread_pool=False):
         """
         Add an iterable task which will yield progress information dictionaries.
 
@@ -166,7 +172,7 @@ class TaskQueue(QObject):
 
         # report on the lowest worker number that's active; (0,1 interactive; 2 background)
         # yes, this will be redundant and #FUTURE make this a more useful signal content, rather than relying on progress_ratio back-query
-        for wdex,status in enumerate(self._last_status):
+        for wdex, status in enumerate(self._last_status):
             if self.workers[wdex].isRunning() and status is not None:
                 self.didMakeProgress.emit(status)
                 return
@@ -198,11 +204,9 @@ class TaskQueue(QObject):
 
 def test_task():
     for dex in range(10):
-        yield {TASK_DOING: 'test task', TASK_PROGRESS: float(dex)/10.0}
+        yield {TASK_DOING: 'test task', TASK_PROGRESS: float(dex) / 10.0}
         TheQueue.sleep(1)
     yield {TASK_DOING: 'test task', TASK_PROGRESS: 1.0}
-
-
 
 
 def main():

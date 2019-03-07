@@ -1,12 +1,15 @@
 #!/usr/bin/env python
-import sys, time
-from PyQt4.QtGui import *
-from PyQt4.QtCore import *
-from PyQt4.QtOpenGL import QGLWidget, QGLFormat, QGL
+import sys
+import time
 from random import randint, shuffle
 
+from PyQt4.QtCore import *
+from PyQt4.QtGui import *
+from PyQt4.QtOpenGL import QGLWidget, QGLFormat, QGL
+
+
 # http://pyqt.sourceforge.net/Docs/PyQt4/modules.html
-#from PyQt4.QtWidgets import *
+# from PyQt4.QtWidgets import *
 # ref https://ralsina.me/stories/BBS53.html
 
 class DemoScene(QGraphicsScene):
@@ -25,7 +28,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("timeline0")
 
         toolbar = QToolBar("och")
-        toolbar.setIconSize(QSize(20,20))
+        toolbar.setIconSize(QSize(20, 20))
         self.addToolBar(toolbar)
 
         button_action = QAction(QIcon("balance.png"), "ochtuse", self)
@@ -47,7 +50,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(button_action)
         file_menu.addSeparator()
         file_menu.addMenu("Do not push")
-#        file_menu.addAction()
+        #        file_menu.addAction()
 
         self._scene = scene
         gfx = self._gfx = QGraphicsView(self)
@@ -58,7 +61,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(gfx)
         fmt = QGLFormat(QGL.SampleBuffers)
         wdgt = QGLWidget(fmt)
-        assert(wdgt.isValid())
+        assert (wdgt.isValid())
         gfx.setViewport(wdgt)
         gfx.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
         gfx.setScene(scene)
@@ -72,14 +75,13 @@ class MainWindow(QMainWindow):
         # Well... it's going to have an animation, ok?
 
         # So, I set a timer to 1 second
-        self.animator=QTimer()
+        self.animator = QTimer()
 
         # And when it triggers, it calls the animate method
         self.animator.timeout.connect(self.animate)
 
         # And I animate it once manually.
         self.animate()
-
 
     def animate(self):
 
@@ -162,34 +164,33 @@ class MainWindow(QMainWindow):
     #     print(s)
 
     def populate(self):
-        self.digits=[]
-        self.animations=[]
+        self.digits = []
+        self.animations = []
 
         # This is just a nice font, use any font you like, or none
-        font=QFont('White Rabbit')
+        font = QFont('White Rabbit')
         font.setPointSize(120)
 
-
         # Create three ":" and place them in our scene
-        self.dot1=QGraphicsTextItem(':')  # from QtGui
+        self.dot1 = QGraphicsTextItem(':')  # from QtGui
         self.dot1.setFont(font)
-        self.dot1.setPos(140,0)
+        self.dot1.setPos(140, 0)
         self._scene.addItem(self.dot1)
-        self.dot2=QGraphicsTextItem(':')
+        self.dot2 = QGraphicsTextItem(':')
         self.dot2.setFont(font)
-        self.dot2.setPos(410,0)
+        self.dot2.setPos(410, 0)
         self._scene.addItem(self.dot2)
 
         # Create 6 sets of 0-9 digits
         for i in range(60):
-            l = QGraphicsTextItem(str(i%10))
+            l = QGraphicsTextItem(str(i % 10))
             l.setFont(font)
             # The zvalue is what controls what appears "on top" of what.
             # Send them to "the bottom" of the scene.
             l.setZValue(-100)
 
             # Place them anywhere
-            l.setPos(randint(0,500),randint(150,300))
+            l.setPos(randint(0, 500), randint(150, 300))
 
             # Make them semi-transparent
             l.setOpacity(.3)

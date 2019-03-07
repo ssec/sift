@@ -1,7 +1,8 @@
 import logging
+from PyQt4 import QtGui, QtCore
 from functools import partial
 from uuid import UUID
-from PyQt4 import QtGui, QtCore
+
 from sift.common import Info, Kind
 from sift.ui.change_colormap_dialog_ui import Ui_changeColormapDialog
 

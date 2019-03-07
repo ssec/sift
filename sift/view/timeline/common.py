@@ -7,9 +7,9 @@
 """
 
 import logging
+import pickle as pkl
 from datetime import datetime, timedelta
 from enum import Enum
-import pickle as pkl
 from typing import Tuple, Optional, NamedTuple, Any
 
 from PyQt4.QtCore import QObject, QRectF, QByteArray, QPointF
@@ -25,8 +25,9 @@ class GraphicsConfig(object):
     track_corner_radius2: float = 4.0
     track_left_pad: float = 300.0  # scene pixels space to left of first frame which we reserve for labels etc
     track_right_pad: float = 16.0  # scene pixels space to right of last frame we reserve for track closing etc
-    track_title_pos: QPointF  = QPointF(3.0-300.0, -25.0)  # scene pixel offset relative to vertical centerline and start of first frame
-    track_subtitle_pos: QPointF = QPointF(3.0-300.0, -10.0)
+    track_title_pos: QPointF = QPointF(3.0 - 300.0,
+                                       -25.0)  # scene pixel offset relative to vertical centerline and start of first frame
+    track_subtitle_pos: QPointF = QPointF(3.0 - 300.0, -10.0)
     frame_height: float = 56.0
     frame_corner_radius: float = 6.0
     frame_title_pos: QPointF = QPointF(2.0, -13.0)
@@ -97,7 +98,7 @@ class CoordTransform(QObject):
         return self._max_z
 
     @max_z.setter
-    def max_z(self, mz:int):
+    def max_z(self, mz: int):
         self._max_z = mz
 
     @property
@@ -123,7 +124,8 @@ class CoordTransform(QObject):
         self._time_unit = time_unit
         self._track_height = track_height or GFXC.track_height
 
-    def calc_time_duration(self, scene_x: [float, None], scene_w: [float, None]) -> Tuple[Optional[datetime], Optional[timedelta]]:
+    def calc_time_duration(self, scene_x: [float, None], scene_w: [float, None]) -> Tuple[
+        Optional[datetime], Optional[timedelta]]:
         """
         calculate time and duration given scene X coordinate and width (from QRectF typically)
         Args:
@@ -134,17 +136,19 @@ class CoordTransform(QObject):
             (start time, time width)
 
         """
-        return self._time_base + (self._time_unit * scene_x) if (scene_x is not None) else None, self._time_unit * scene_w
+        return self._time_base + (self._time_unit * scene_x) if (
+                    scene_x is not None) else None, self._time_unit * scene_w
 
     def calc_scene_width(self, d: timedelta):
         return self._time_unit * d
 
-    def calc_track_pixel_y_center(self, z:int):
+    def calc_track_pixel_y_center(self, z: int):
         """normalize based on max_z such that max_z..-bignum becomes 0..bignum going downward on the screen
         """
         return self._track_height * (0.5 + float(self._max_z - z))
 
-    def calc_scene_rect(self, ztd: ztdtup=None, z:int=None, t: datetime=None, d: timedelta=None) -> [QRectF, None]:
+    def calc_scene_rect(self, ztd: ztdtup = None, z: int = None, t: datetime = None, d: timedelta = None) -> [QRectF,
+                                                                                                              None]:
         """
         calculate scene coordinates given time and Z
         Args:
@@ -185,5 +189,3 @@ def recv_mime(event: QGraphicsSceneDragDropEvent, mimetype: str):
 def send_mime(event: QGraphicsSceneDragDropEvent, mimetype: str, obj):
     qb = QByteArray(pkl.dumps(obj, protocol=pkl.HIGHEST_PROTOCOL))
     event.setData(mimetype, qb)
-
-

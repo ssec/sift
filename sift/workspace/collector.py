@@ -19,15 +19,18 @@ REQUIRES
 :copyright: 2017 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-import os, sys
-import logging, unittest
-from PyQt4.QtCore import QObject, pyqtSignal
-from typing import Union, Set, List, Iterable, Mapping
-from ..common import Info
-from .workspace import Workspace
-from sift.queue import TASK_DOING, TASK_PROGRESS
+import logging
+import os
+import sys
+import unittest
 from datetime import datetime
+from typing import List, Iterable, Mapping
 
+from PyQt4.QtCore import QObject
+
+from sift.queue import TASK_DOING, TASK_PROGRESS
+from .workspace import Workspace
+from ..common import Info
 
 LOG = logging.getLogger(__name__)
 
@@ -143,7 +146,8 @@ class ResourceSearchPathCollector(QObject):
         when = self._touch()
         new_files = list(self._skim(when))
         if new_files:
-            LOG.info('found {} additional files to skim metadata for, for a total of {}'.format(len(new_files), len(self._scheduled_files)))
+            LOG.info('found {} additional files to skim metadata for, for a total of {}'.format(len(new_files), len(
+                self._scheduled_files)))
             self._scheduled_files += new_files
 
     def bgnd_look_for_new_files(self):
@@ -163,7 +167,8 @@ class ResourceSearchPathCollector(QObject):
         for num_prods, product_info in self._ws.collect_product_metadata_for_paths(todo):
             path = product_info.get(Info.PATHNAME, None)
             dex = redex.get(path, 0.0)
-            status = {TASK_DOING: 'collecting metadata {}/{}'.format(dex+1, ntodo), TASK_PROGRESS: float(dex)/float(ntodo)}
+            status = {TASK_DOING: 'collecting metadata {}/{}'.format(dex + 1, ntodo),
+                      TASK_PROGRESS: float(dex) / float(ntodo)}
             # LOG.debug(repr(status))
             changed_uuids.add(product_info[Info.UUID])
             yield status
@@ -218,7 +223,7 @@ def main():
     for i in range(3):
         if i > 0:
             sleep(5)
-        LOG.info("poll #{}".format(i+1))
+        LOG.info("poll #{}".format(i + 1))
         collector.look_for_new_files()
         if collector.has_pending_files:
             for progress in collector.bgnd_merge_new_file_metadata_into_mdb():

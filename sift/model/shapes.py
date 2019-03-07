@@ -20,20 +20,23 @@ REQUIRES
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import os, sys
-import logging, unittest, argparse
+import logging
 from functools import partial
-import shapely.geometry.polygon as sgp, shapely.ops as sops, shapely.geometry as sgeo
+
 # import shapefile as shf
 import numpy as np
 import pyproj as prj
+import shapely.geometry as sgeo
+import shapely.geometry.polygon as sgp
+import shapely.ops as sops
 from numba import jit
-from rasterio.features import rasterize
 from rasterio import Affine
+from rasterio.features import rasterize
 
 LOG = logging.getLogger(__name__)
 
-def convert_shape_to_proj(to_proj:prj.Proj, shape:sgp.LinearRing, shape_proj:prj.Proj):
+
+def convert_shape_to_proj(to_proj: prj.Proj, shape: sgp.LinearRing, shape_proj: prj.Proj):
     # ref http://toblerity.org/shapely/manual.html#shapely.ops.transform
     # ref http://all-geo.org/volcan01010/2012/11/change-coordinates-with-pyproj/
     # inverse-project the ring
@@ -46,6 +49,7 @@ def convert_shape_to_proj(to_proj:prj.Proj, shape:sgp.LinearRing, shape_proj:prj
     newshape = sops.transform(project, shape)
     return newshape
 
+
 @jit
 def mask_inside_index_shape(xoff, yoff, width, height, shape):
     """
@@ -57,16 +61,16 @@ def mask_inside_index_shape(xoff, yoff, width, height, shape):
     :param shape:
     :return:
     """
-    mask = np.zeros((height,width), dtype=np.bool_)
+    mask = np.zeros((height, width), dtype=np.bool_)
     for y in range(height):
         for x in range(width):
-            p = sgeo.Point(x+xoff,y+yoff)
+            p = sgeo.Point(x + xoff, y + yoff)
             if p.within(shape):
-                mask[y,x] = True
+                mask[y, x] = True
     return mask
 
 
-def content_within_shape(content:np.ndarray, trans:Affine, shape:sgp.LinearRing):
+def content_within_shape(content: np.ndarray, trans: Affine, shape: sgp.LinearRing):
     """
 
     :param content: data being displayed on the screen
@@ -85,8 +89,8 @@ def content_within_shape(content:np.ndarray, trans:Affine, shape:sgp.LinearRing)
     mx, ny = int(np.ceil(mx)), int(np.ceil(ny))
 
     # subset the content (ny is the higher *index*, my is the lower *index*)
-    w = (mx-nx)+1
-    h = (ny-my)+1
+    w = (mx - nx) + 1
+    h = (ny - my) + 1
 
     # Make our linear ring a properly oriented shapely polygon
     shape = sgp.Polygon(shape)
@@ -95,7 +99,8 @@ def content_within_shape(content:np.ndarray, trans:Affine, shape:sgp.LinearRing)
     offset_trans = trans * Affine.translation(nx, my)
 
     # Get boolean mask for where the polygon is and get an index mask of those positions
-    index_mask = np.nonzero(rasterize([shape], out_shape=(h, w), transform=offset_trans, default_value=1).astype(np.bool_))
+    index_mask = np.nonzero(
+        rasterize([shape], out_shape=(h, w), transform=offset_trans, default_value=1).astype(np.bool_))
     # translate the mask indexes back to the original data array coordinates (original index mask is read-only)
     index_mask = (index_mask[0] + my, index_mask[1] + nx)
     return index_mask, content[index_mask]

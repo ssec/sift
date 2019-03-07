@@ -16,12 +16,11 @@ import sys
 import unittest
 from datetime import datetime, timedelta
 from typing import Tuple, Optional, Mapping, List, Callable, Set, Iterable, Sequence, Any
-from abc import ABC, abstractmethod, abstractproperty
 from uuid import UUID
 
 from PyQt4.QtCore import QRectF, Qt, pyqtSignal
-from PyQt4.QtGui import QGraphicsScene, QPen, QBrush, QPainter, QGraphicsView, QMenu, QGraphicsTextItem, QFont, \
-    QMainWindow, QStatusBar, QApplication, QGraphicsItem, QGraphicsItemAnimation
+from PyQt4.QtGui import QGraphicsScene, QPen, QBrush, QPainter, QGraphicsView, QMenu, QMainWindow, QStatusBar, \
+    QApplication, QGraphicsItem
 from PyQt4.QtOpenGL import QGLFormat, QGL, QGLWidget
 
 from sift.common import Flags, Span
@@ -113,7 +112,7 @@ class QFramesInTracksScene(QGraphicsScene):
         self.addItem(track)
         self._verify_z_contiguity()
 
-    def add_frame(self, frame:QFrameItem):
+    def add_frame(self, frame: QFrameItem):
         """Called by QTrackItem at QFrameItem's constructor-time
         We need to maintain references to Q*Items, Qt will not do it for us
         """
@@ -150,7 +149,7 @@ class QFramesInTracksScene(QGraphicsScene):
     def drawBackground(self, painter: QPainter, invalidated_region: QRectF):
         super(QFramesInTracksScene, self).drawBackground(painter, invalidated_region)
 
-    def _update_rulers_to_extents(self, tick_interval: timedelta=None):
+    def _update_rulers_to_extents(self, tick_interval: timedelta = None):
         """Revise ruler size and internal tick items and labels to match scene extents"""
 
     def _update_cursor_in_rulers(self):
@@ -270,7 +269,7 @@ class QFramesInTracksScene(QGraphicsScene):
         for track, z in order:
             trk = self._track_items.get(track)
             if trk is None:
-                raise ValueError("track {} not found in set_track_order offset {}".format( track, z))
+                raise ValueError("track {} not found in set_track_order offset {}".format(track, z))
             if trk.z == z:
                 continue
             trk.z = z
@@ -335,7 +334,7 @@ class QFramesInTracksScene(QGraphicsScene):
                 changed.append(bub)
             inserting_above_z += 1
         else:
-            downward = list(track for (z,track) in zord.items() if (z <= inserting_above_z) and (track is not subject))
+            downward = list(track for (z, track) in zord.items() if (z <= inserting_above_z) and (track is not subject))
             for bub in downward:
                 bub.z -= 1
                 changed.append(bub)
@@ -374,8 +373,8 @@ class QFramesInTracksScene(QGraphicsScene):
         """Change track z-order after it's been inserted
         return list of tracks that had their z-order shifted
         """
-        assert(trk in self._track_items.values())
-        assert(trk is self._track_items[trk.track])
+        assert (trk in self._track_items.values())
+        assert (trk is self._track_items[trk.track])
         closing_changes = self._shift_zorders_to_close(trk.z, subject=trk)
         opening_changes, new_z = self._shift_zorders_to_open(new_z, subject=trk)
         trk.z = new_z
@@ -398,7 +397,8 @@ class QFramesInTracksScene(QGraphicsScene):
     didSelectTracksAndFrames = pyqtSignal(set, set)  # track names and frame uuids respectively
     didChangeTrackOrder = pyqtSignal(list)  # list of track UUIDs from top to bottom
     didMovePlayheadToTime = pyqtSignal(datetime, timedelta)  # instantaneous or time-range cursor move occurred
-    didRequestActivation = pyqtSignal(dict, dict)  # user requests activation/deactivation of tracks {trackname: bool} and frames {uuid: bool}
+    didRequestActivation = pyqtSignal(dict,
+                                      dict)  # user requests activation/deactivation of tracks {trackname: bool} and frames {uuid: bool}
     didCopyPresentationBetweenTracks = pyqtSignal(str, str)  # from-track and to-track
     didChangePlaybackSpan = pyqtSignal(Span)  # overall playback Span had one or both of its ends moved
     didChangeVisibleAreaForView = pyqtSignal(QGraphicsView,
@@ -450,7 +450,8 @@ class QFramesInTracksScene(QGraphicsScene):
         LOG.warning("using base class may_reassign_color_map which does nothing")
         return lambda b: None
 
-    def menu_for_track(self, track: str, frame: Optional[UUID] = None) -> Optional[Tuple[QMenu, Mapping[Any, Callable]]]:
+    def menu_for_track(self, track: str, frame: Optional[UUID] = None) -> Optional[
+        Tuple[QMenu, Mapping[Any, Callable]]]:
         """Generate QMenu and action LUT to use as context menu for a given track, optionally with frame if mouse was over that frame
         """
         LOG.warning("using base class menu_for_track which does nothing")
@@ -509,7 +510,7 @@ class TestScene(QFramesInTracksScene):
         # blabla.setFont(font)
         # blabla.setPos(140, 100)
         # self.addItem(blabla)
-        blabla=None
+        blabla = None
         self.content = [track0, frame01, track1, frame11]
 
 
@@ -520,7 +521,7 @@ class QFramesInTracksView(QGraphicsView):
         super(QFramesInTracksView, self).__init__(*args, **kwargs)
         fmt = QGLFormat(QGL.SampleBuffers)
         wdgt = QGLWidget(fmt)
-        assert(wdgt.isValid())
+        assert (wdgt.isValid())
         self.setViewport(wdgt)
         self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
@@ -533,7 +534,6 @@ class TestWindow(QMainWindow):
     _gfx = None
 
     def __init__(self, scene, *args, **kwargs):
-
         super(TestWindow, self).__init__(*args, **kwargs)
         # self.windowTitleChanged.connect(self.onWindowTitleChange)
         self.setWindowTitle("timeline unit test")
@@ -561,7 +561,7 @@ class TestWindow(QMainWindow):
         # file_menu.addAction(button_action)
         # file_menu.addSeparator()
         file_menu.addMenu("Do not push")
-#        file_menu.addAction()
+        #        file_menu.addAction()
 
         self._scene = scene
         gfx = self._gfx = QFramesInTracksView(self)
@@ -571,7 +571,7 @@ class TestWindow(QMainWindow):
         # ref https://doc.qt.io/archives/qq/qq26-openglcanvas.html
         self.setCentralWidget(gfx)
 
-        scene.setSceneRect(QRectF(0,0, 800, 600))
+        scene.setSceneRect(QRectF(0, 0, 800, 600))
         gfx.setScene(scene)
 
         # populate fills the scene with interesting stuff.
@@ -627,6 +627,7 @@ def main():
     app.exec_()
 
     return 0
+
 
 if __name__ == '__main__':
     sys.exit(main())

@@ -17,12 +17,14 @@ __author__ = 'evas'
 __docformat__ = 'reStructuredText'
 
 import logging
+
+import numpy as np
 from PyQt4.QtCore import QObject, Qt
 from PyQt4.QtGui import QGridLayout, QLabel, QTextEdit, QFont, QSizePolicy
+
 from sift.common import Info, Kind
 from sift.model.layer import DocRGBLayer
 from sift.ui.custom_widgets import QNoScrollWebView
-import numpy as np
 from sift.view.colormap import COLORMAP_MANAGER
 
 LOG = logging.getLogger(__name__)
@@ -79,13 +81,13 @@ class SingleLayerInfoPane(QObject):
         # set the layout
         # Note: add in a grid is (widget, row#, col#) or (widget, row#, col#, row_span, col_span)
         layout = QGridLayout()
-        layout.addWidget(self.name_text,       1, 1)
-        layout.addWidget(self.time_text,       2, 1)
+        layout.addWidget(self.name_text, 1, 1)
+        layout.addWidget(self.time_text, 2, 1)
         layout.addWidget(self.instrument_text, 3, 1)
-        layout.addWidget(self.band_text,       4, 1)
+        layout.addWidget(self.band_text, 4, 1)
         layout.addWidget(self.wavelength_text, 5, 1)
-        layout.addWidget(self.colormap_text,   6, 1)
-        layout.addWidget(self.clims_text,      7, 1)
+        layout.addWidget(self.colormap_text, 6, 1)
+        layout.addWidget(self.clims_text, 7, 1)
         layout.addWidget(self.cmap_vis, 8, 1)
         layout.addWidget(self.composite_details, 9, 1)
         layout.addWidget(self.composite_codeblock, 10, 1)
@@ -99,7 +101,7 @@ class SingleLayerInfoPane(QObject):
 
         If the uuid list parameter is None, clear out the information instead
         """
-        if selected_uuid_list is not None and len(selected_uuid_list)==1:
+        if selected_uuid_list is not None and len(selected_uuid_list) == 1:
             layer_uuid, = list(selected_uuid_list)
             layer_info = self.document[layer_uuid]
             is_rgb = isinstance(layer_info, DocRGBLayer)
@@ -126,8 +128,8 @@ class SingleLayerInfoPane(QObject):
                 layer_info = self.document.get_info(uuid=layer_uuid)
 
                 this_prez = None
-                for prez_tuple in presentation_info :
-                    if prez_tuple.uuid == layer_uuid :
+                for prez_tuple in presentation_info:
+                    if prez_tuple.uuid == layer_uuid:
                         this_prez = prez_tuple
 
                 # compare our various values
@@ -141,16 +143,16 @@ class SingleLayerInfoPane(QObject):
 
                 # time
                 new_time = layer_info[Info.DISPLAY_TIME] if Info.DISPLAY_TIME in layer_info else ""
-                if Info.DISPLAY_TIME not in shared_info :
+                if Info.DISPLAY_TIME not in shared_info:
                     shared_info[Info.DISPLAY_TIME] = new_time
-                else :
+                else:
                     shared_info[Info.DISPLAY_TIME] = "" if shared_info[Info.DISPLAY_TIME] != new_time else new_time
 
                 # instrument
                 new_inst = str(layer_info[Info.INSTRUMENT].value) if layer_info.get(Info.INSTRUMENT) else ""
-                if Info.INSTRUMENT not in shared_info :
+                if Info.INSTRUMENT not in shared_info:
                     shared_info[Info.INSTRUMENT] = new_inst
-                else :
+                else:
                     shared_info[Info.INSTRUMENT] = "" if shared_info[Info.INSTRUMENT] != new_inst else new_inst
 
                 # band
@@ -181,7 +183,7 @@ class SingleLayerInfoPane(QObject):
                 new_cmap = this_prez.colormap if this_prez is not None else ""
                 if "colormap" not in shared_info:
                     shared_info["colormap"] = new_cmap
-                else :
+                else:
                     shared_info["colormap"] = "" if shared_info["colormap"] != new_cmap else new_cmap
 
                 # c-limits
@@ -214,9 +216,9 @@ class SingleLayerInfoPane(QObject):
                     except TypeError as err:
                         LOG.warning("unable to format color limit: %r" % (new_clims,), exc_info=True)
                         new_clims = "N/A"
-                if "climits" not in shared_info :
+                if "climits" not in shared_info:
                     shared_info["climits"] = new_clims
-                else :
+                else:
                     shared_info["climits"] = "" if shared_info["climits"] != new_clims else new_clims
 
                 # color map
@@ -269,4 +271,5 @@ class SingleLayerInfoPane(QObject):
             else:
                 cmap_html = COLORMAP_MANAGER[shared_info["colormap"]]._repr_html_()
                 cmap_html = cmap_html.replace("height", "border-collapse: collapse;\nheight")
-                self.cmap_vis.setHtml("""<html><head></head><body style="margin: 0px"><div>%s</div></body></html>""" % (cmap_html,))
+                self.cmap_vis.setHtml(
+                    """<html><head></head><body style="margin: 0px"><div>%s</div></body></html>""" % (cmap_html,))

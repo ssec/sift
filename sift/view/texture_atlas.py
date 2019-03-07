@@ -18,17 +18,18 @@ REQUIRES
 :license: GPLv3, see LICENSE for more details
 """
 
-import os
 import logging
+import os
+
 import numpy as np
 from vispy.gloo import Texture2D
 
 from sift.common import DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH
+
 DEBUG_IMAGE_TILE = bool(os.environ.get("SIFT_DEBUG_TILES", False))
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
-
 
 LOG = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ LOG = logging.getLogger(__name__)
 class TextureAtlas2D(Texture2D):
     """A 2D Texture Array structure implemented as a 2D Texture Atlas.
     """
+
     def __init__(self, texture_shape, tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH),
                  format=None, resizable=True,
                  interpolation=None, wrapping=None,
@@ -87,4 +89,3 @@ class TextureAtlas2D(Texture2D):
             data[:, :5] = 1000.
             data[:, -5:] = 1000.
         super(TextureAtlas2D, self).set_data(data, offset=offset, copy=copy)
-

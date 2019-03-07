@@ -28,26 +28,27 @@ REQUIRES
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-from PyQt4.QtCore import QObject
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import logging, sys, os
+import logging
 import pickle as pkl
+import sys
+
 from PyQt4.QtCore import QAbstractItemModel, Qt, QSize, QModelIndex, QPoint, QMimeData, pyqtSignal, QRect
 from PyQt4.QtGui import (QTreeView, QStyledItemDelegate, QAbstractItemView,
                          QMenu, QStyle, QColor, QFont, QStyleOptionViewItem,
                          QItemSelection, QItemSelectionModel, QPen,
                          QActionGroup, QAction)
-from sift.model.document import Document, DocumentAsLayerStack
+
 from sift.common import Info, Kind, get_font_size
+from sift.model.document import Document
 from sift.view.colormap_dialogs import ChangeColormapDialog
 
 LOG = logging.getLogger(__name__)
 
-
-COLUMNS=('Visibility', 'Name', 'Enhancement')
+COLUMNS = ('Visibility', 'Name', 'Enhancement')
 
 CELL_HEIGHT = 36 if 'darwin' in sys.platform else 48
 CELL_WIDTH = 128 if 'darwin' in sys.platform else 160
@@ -61,13 +62,14 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     see QAbstractItemView.setItemDelegateForRow/Column
     """
     _doc: Document = None  # document we're representing
+
     # _doc: DocumentAsLayerStack = None  # document we're representing
 
-    def layer_prez(self, index:int):
+    def layer_prez(self, index: int):
         cll = self._doc.current_layer_set
-        return cll[index] if index<len(cll) and index>=0 else None
+        return cll[index] if index < len(cll) and index >= 0 else None
 
-    def __init__(self, doc:Document, *args, **kwargs):
+    def __init__(self, doc: Document, *args, **kwargs):
         super(LayerWidgetDelegate, self).__init__(*args, **kwargs)
         self._doc = doc
         # self._doc = doc.as_layer_stack
@@ -75,7 +77,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
         self.font = QFont('Andale Mono')
         self.font.setPointSizeF(fsize)
 
-    def sizeHint(self, option:QStyleOptionViewItem, index:QModelIndex):
+    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex):
         pz = self.layer_prez(index.row())
         # if pz.kind == Kind.RGB:
         #     LOG.debug('triple-sizing composite layer')
@@ -91,7 +93,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
         """
         painter.save()
 
-        color = QColor(187, 213, 255, 255) if index.row()%2==0 else QColor(177, 223, 255, 255)
+        color = QColor(187, 213, 255, 255) if index.row() % 2 == 0 else QColor(177, 223, 255, 255)
         # color = QColor(187, 213, 255, 255)
         painter.setPen(QPen(color))
         painter.setFont(self.font)
@@ -121,9 +123,9 @@ class LayerWidgetDelegate(QStyledItemDelegate):
         painter.setPen(QPen(Qt.black))
         painter.setFont(self.font)
         bounds = painter.drawText(rect.left() + LEFT_OFFSET,
-                                  rect.top()+TOP_OFFSET,
-                                  rect.width()-LEFT_OFFSET,
-                                  CELL_HEIGHT/2-TOP_OFFSET,
+                                  rect.top() + TOP_OFFSET,
+                                  rect.width() - LEFT_OFFSET,
+                                  CELL_HEIGHT / 2 - TOP_OFFSET,
                                   Qt.AlignLeft,
                                   text,
                                   )
@@ -132,9 +134,9 @@ class LayerWidgetDelegate(QStyledItemDelegate):
         if animation_order is not None:
             painter.setPen(QPen(Qt.white))
             ao_rect = QRect(bounds.right(),
-                            rect.top()+TOP_OFFSET,
-                            rect.width()-bounds.right(),
-                            CELL_HEIGHT/2-TOP_OFFSET,
+                            rect.top() + TOP_OFFSET,
+                            rect.width() - bounds.right(),
+                            CELL_HEIGHT / 2 - TOP_OFFSET,
                             )
             # draw the text once to get the bounding rectangle
             bounds = painter.drawText(ao_rect,
@@ -151,9 +153,9 @@ class LayerWidgetDelegate(QStyledItemDelegate):
         # if we have a point probe value, draw text with it's value
         if value:
             painter.setPen(Qt.darkBlue)
-            theight = CELL_HEIGHT/2
+            theight = CELL_HEIGHT / 2
             t = rect.top() + rect.height() - theight
-            if w < rect.width()/3:  # place the text to the right of the bar instead of inside
+            if w < rect.width() / 3:  # place the text to the right of the bar instead of inside
                 l = max(int(w), LEFT_OFFSET)
                 r = rect.width()
                 align = Qt.AlignLeft
@@ -161,10 +163,9 @@ class LayerWidgetDelegate(QStyledItemDelegate):
                 l = 0
                 r = w
                 align = Qt.AlignRight
-            painter.drawText(l, t, r-l, theight, align, fmtd_str)
+            painter.drawText(l, t, r - l, theight, align, fmtd_str)
 
         painter.restore()
-
 
     # def paint(self, painter, option, index):
     #     '''
@@ -250,7 +251,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         """
         super(LayerStackTreeViewModel, self).__init__(parent)
 
-        self.widgets = [ ]
+        self.widgets = []
         self.doc = doc
         # self._column = [self._visibilityData, self._nameData]
         self.item_delegate = LayerWidgetDelegate(doc)
@@ -277,10 +278,10 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             self._init_widget(widget)
 
     # TODO, this wrapper is probably not needed, possibly remove later
-    def add_widget(self, listbox:QTreeView):
+    def add_widget(self, listbox: QTreeView):
         self._init_widget(listbox)
 
-    def _init_widget(self, listbox:QTreeView):
+    def _init_widget(self, listbox: QTreeView):
         listbox.setModel(self)
         listbox.setItemDelegate(self.item_delegate)
         listbox.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -314,7 +315,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
     def supportedDropActions(self):
         return Qt.MoveAction | Qt.LinkAction
 
-    def changedSelection(self, *args) :
+    def changedSelection(self, *args):
         """connected to the various listbox signals that represent the user changing selections
         """
         selected_uuids = tuple(self.current_selected_uuids(self.current_set_listbox))
@@ -334,7 +335,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
                 return widget
 
     def doc_added_basic_layer(self, new_order, layer, presentation):
-        #dexes = [i for i,q in enumerate(new_order) if q==None]
+        # dexes = [i for i,q in enumerate(new_order) if q==None]
         # for dex in dexes:
         #     self.beginInsertRows(QModelIndex(), dex, dex)
         #     self.endInsertRows()
@@ -351,7 +352,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         self.changedSelection(None)
         self.current_set_listbox.update()
 
-    def current_selected_uuids(self, lbox:QTreeView=None):
+    def current_selected_uuids(self, lbox: QTreeView = None):
         lbox = self.current_set_listbox if lbox is None else lbox
         if lbox is None:
             LOG.error('not sure which list box is active! oh pooh.')
@@ -359,13 +360,13 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         for q in lbox.selectedIndexes():
             yield self.doc.uuid_for_current_layer(q.row())
 
-    def select(self, uuids, lbox:QTreeView=None, scroll_to_show_single=True):
+    def select(self, uuids, lbox: QTreeView = None, scroll_to_show_single=True):
         lbox = self.current_set_listbox if lbox is None else lbox
         lbox.clearSelection()
         if not uuids:
             return
         # FUTURE: this is quick and dirty
-        rowdict = dict((u,i) for i,u in enumerate(self.doc.current_layer_uuid_order))
+        rowdict = dict((u, i) for i, u in enumerate(self.doc.current_layer_uuid_order))
         items = QItemSelection()
         q = None
         for uuid in uuids:
@@ -377,7 +378,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             items.select(q, q)
             lbox.selectionModel().select(items, QItemSelectionModel.Select)
             # lbox.setCurrentIndex(q)
-        if scroll_to_show_single and len(uuids)==1 and q is not None:
+        if scroll_to_show_single and len(uuids) == 1 and q is not None:
             lbox.scrollTo(q)
 
     def drop_layers_just_removed(self, layer_indices, uuid, row, count):
@@ -405,16 +406,17 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             self._last_equalizer_values.update(doc_values)
         self.refresh()
 
-    def change_layer_colormap_menu(self, menu, lbox:QTreeView, selected_uuids:list, *args):
+    def change_layer_colormap_menu(self, menu, lbox: QTreeView, selected_uuids: list, *args):
         def _show_change_colormap_dialog(action):
             d = ChangeColormapDialog(self.doc, selected_uuids[0], parent=lbox)
             d.show()
             d.raise_()
             d.activateWindow()
+
         action = menu.addAction('Change Colormap...')
         return {action: _show_change_colormap_dialog}
 
-    def composite_layer_menu(self, menu, lbox:QTreeView, selected_uuids:list, *args):
+    def composite_layer_menu(self, menu, lbox: QTreeView, selected_uuids: list, *args):
         """
         provide common options for RGB or other composite layers, eventually with option to go to a compositing dialog
 
@@ -433,11 +435,12 @@ class LayerStackTreeViewModel(QAbstractItemModel):
                 self.didRequestRGBCreation.emit(request)
 
         rgb_menu = QMenu("Create RGB From Selections...", menu)
-        for rgb in sorted(set(x[:len(selected_uuids)] for x in ['RGB', 'RBG', 'GRB', 'GBR', 'BRG', 'BGR']), reverse=True):
+        for rgb in sorted(set(x[:len(selected_uuids)] for x in ['RGB', 'RBG', 'GRB', 'GBR', 'BRG', 'BGR']),
+                          reverse=True):
             # Only include the number of channels selected
             rgb = rgb[:len(selected_uuids)]
             action = rgb_menu.addAction(rgb)
-            request = dict((channel.lower(), uuid) for (channel,uuid) in zip(rgb, selected_uuids))
+            request = dict((channel.lower(), uuid) for (channel, uuid) in zip(rgb, selected_uuids))
             actions[action] = _make_rgb_composite
             requests[action] = request
         menu.addMenu(rgb_menu)
@@ -499,18 +502,19 @@ class LayerStackTreeViewModel(QAbstractItemModel):
 
     def columnCount(self, QModelIndex_parent=None, *args, **kwargs):
         return 1
+
     #
     # def hasChildren(self, QModelIndex_parent=None, *args, **kwargs):
     #     return False  # FIXME
 
-    def headerData(self, section:int, Qt_Orientation, role=None):
+    def headerData(self, section: int, Qt_Orientation, role=None):
         pass
 
     @property
     def listing(self):
         return [self.doc.get_info(dex) for dex in range(len(self.doc))]
 
-    def dropMimeData(self, mime:QMimeData, action, row:int, column:int, parent:QModelIndex):
+    def dropMimeData(self, mime: QMimeData, action, row: int, column: int, parent: QModelIndex):
         LOG.debug('dropMimeData at row {}'.format(row))
         if action == Qt.IgnoreAction:
             return True
@@ -545,7 +549,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             uuids = []
             for old_row, presentation in reversed(sorted(insertion_info)):
                 del order[old_row]
-                if old_row<insertion_point:
+                if old_row < insertion_point:
                     insertion_point -= 1
                 inserted_row_numbers.insert(0, old_row)
                 uuids.append(presentation.uuid)
@@ -560,7 +564,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             # for exrow in delete_these_rows:
             #     self.doc.remove_layer_prez(exrow)
             # self.doc.didReorderLayers.emit(order)  # FUTURE: not our business to be emitting on behalf of the document
-            assert(count==len(insertion_info))
+            assert (count == len(insertion_info))
             return True
         return False
         # return super(LayerStackListViewModel, self).dropMimeData(mime, action, row, column, parent)
@@ -580,7 +584,8 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         return mime
 
     def mimeTypes(self):
-        return ['text/uri-list', self._mimetype]  # ref https://github.com/shotgunsoftware/pyqt-uploader/blob/master/uploader.py
+        return ['text/uri-list',
+                self._mimetype]  # ref https://github.com/shotgunsoftware/pyqt-uploader/blob/master/uploader.py
 
     # http://stackoverflow.com/questions/6942098/qt-qtreeview-only-allow-to-drop-on-an-existing-item
     # Reimplement the Flags method of the underlying model to return Qt::ItemIsDropEnabled only if passed index is valid.
@@ -604,11 +609,11 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             # then look up whether this layer has child layers, e.g. for RGB or algebraic
             # actually: current layer list ignores RGB/algebraic child layers
             return False
-        return (row >=0 and row < len(self.doc))
+        return (row >= 0 and row < len(self.doc))
 
     def rowCount(self, QModelIndex_parent=None, *args, **kwargs):
         # LOG.debug('{} layers'.format(len(self.doc)))
-        if QModelIndex_parent==None or QModelIndex_parent==QModelIndex():
+        if QModelIndex_parent == None or QModelIndex_parent == QModelIndex():
             return len(self.doc)
         return 0
 
@@ -635,14 +640,14 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         #
         # return self.createIndex(parentItem.row(), 0, parentItem)
 
-    def data(self, index:QModelIndex, role:int=None):
+    def data(self, index: QModelIndex, role: int = None):
         if not index.isValid():
             return None
         row = index.row()
         # LOG.debug("getting data for row %d" % row)
         # col = index.column()
         el = self.listing
-        info = el[row] if row<len(self.doc) else None
+        info = el[row] if row < len(self.doc) else None
         if not info:
             return None
 
@@ -654,7 +659,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             return (eq_content, animation_order)
 
         elif role == Qt.EditRole:
-            return self.doc.current_layer_set[index.row()] if index.row()<len(self.doc) else None
+            return self.doc.current_layer_set[index.row()] if index.row() < len(self.doc) else None
         elif role == Qt.CheckStateRole:
             check = Qt.Checked if self.doc.is_layer_visible(row) else Qt.Unchecked
             return check
@@ -673,7 +678,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             return name
         return None
 
-    def setData(self, index:QModelIndex, data, role:int=None):
+    def setData(self, index: QModelIndex, data, role: int = None):
         LOG.debug('setData {0!r:s}'.format(data))
         if not index.isValid():
             return False
@@ -686,18 +691,18 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             else:
                 LOG.debug("data type is {0!r:s}".format(type(data)))
         elif role == Qt.CheckStateRole:
-            newvalue = True if data==Qt.Checked else False
+            newvalue = True if data == Qt.Checked else False
             LOG.debug('toggle layer visibility for row {} to {}'.format(index.row(), newvalue))
             self.doc.toggle_layer_visibility(index.row(), newvalue)
             self.dataChanged.emit(index, index)
             return True
-        elif role==Qt.ItemDataRole:
+        elif role == Qt.ItemDataRole:
             LOG.warning('attempting to change layer')
             # self.doc.replace_layer()
             # FIXME implement this
             self.dataChanged.emit(index, index)
             return True
-        elif role==Qt.DisplayRole:
+        elif role == Qt.DisplayRole:
             if index.isValid():
                 LOG.debug("changing row {} name to {0!r:s}".format(index.row(), data))
                 self.doc.change_layer_name(index.row(), data)
@@ -705,14 +710,14 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         return False
 
     def insertRows(self, row, count, parent=QModelIndex()):
-        self.beginInsertRows(QModelIndex(), row, row+count-1)
+        self.beginInsertRows(QModelIndex(), row, row + count - 1)
         LOG.debug(">>>> INSERT {} rows".format(count))
         # TODO: insert 'count' empty rows into document
         self.endInsertRows()
         return True
 
     def removeRows(self, row, count, QModelIndex_parent=None, *args, **kwargs):
-        self.beginRemoveRows(QModelIndex(), row, row+count-1)
+        self.beginRemoveRows(QModelIndex(), row, row + count - 1)
         LOG.debug(">>>> REMOVE {} rows at {}".format(count, row))
         # self.doc.remove_layer_prez(row, count)
         self.endRemoveRows()
@@ -748,7 +753,6 @@ class LayerStackTreeViewModel(QAbstractItemModel):
     #     else:
     #         event.ignore()
 
-        # self.widget().clear()
-        # for x in self.doc.asListing():
-        #     self.widget().addItem(x['name'])
-
+    # self.widget().clear()
+    # for x in self.doc.asListing():
+    #     self.widget().addItem(x['name'])

@@ -1,9 +1,10 @@
-import pyqtgraph as pg
-from PyQt4 import QtGui, QtCore
-import os
 import json
-import math
 import logging
+import math
+import os
+from PyQt4 import QtGui, QtCore
+
+import pyqtgraph as pg
 
 LOG = logging.getLogger(__name__)
 
@@ -346,4 +347,5 @@ def main():
 
 if __name__ == '__main__':
     import sys
+
     sys.exit(main())

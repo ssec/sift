@@ -20,55 +20,51 @@ REQUIRES
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-from vispy import app
 import asyncio
+import logging
+import os
+import sys
 from PyQt4 import QtGui
-from quamash import QEventLoop
 from collections import OrderedDict
+from functools import partial
+from glob import glob
+
+from quamash import QEventLoop
+from vispy import app
 
 import sift.ui.open_cache_dialog_ui as open_cache_dialog_ui
+from sift import __version__
+from sift.common import Info, Tool, CompositeType, get_font_size
+from sift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
 from sift.control.layer_info import SingleLayerInfoPane
 from sift.control.layer_tree import LayerStackTreeViewModel
 from sift.control.rgb_behaviors import UserModifiesRGBLayers
-from sift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
 from sift.model.document import Document
 from sift.model.layer import DocRGBLayer
-from sift.view.rgb_config import RGBLayerConfigPane
-from sift.view.scene_graph import SceneGraphManager
-from sift.view.probes import ProbeGraphManager, DEFAULT_POINT_PROBE
-from sift.view.export_image import ExportImageHelper
-from sift.view.create_algebraic import CreateAlgebraicDialog
 from sift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
-from sift.workspace import Workspace
-from sift.workspace.collector import ResourceSearchPathCollector
-from sift import __version__
+# this is generated with pyuic4 pov_main.ui >pov_main_ui.py
+from sift.ui.pov_main_ui import Ui_MainWindow
 from sift.util import (WORKSPACE_DB_DIR,
                        DOCUMENT_SETTINGS_DIR,
                        get_package_data_dir,
                        check_grib_definition_dir,
                        check_imageio_deps)
-
-from glob import glob
-from functools import partial
-
-# this is generated with pyuic4 pov_main.ui >pov_main_ui.py
-from sift.ui.pov_main_ui import Ui_MainWindow
-from sift.common import Info, Tool, CompositeType, get_font_size
 from sift.view.colormap_editor import ColormapEditor
-
-import os
-import sys
-import logging
+from sift.view.create_algebraic import CreateAlgebraicDialog
+from sift.view.export_image import ExportImageHelper
+from sift.view.probes import ProbeGraphManager, DEFAULT_POINT_PROBE
+from sift.view.rgb_config import RGBLayerConfigPane
+from sift.view.scene_graph import SceneGraphManager
+from sift.workspace import Workspace
+from sift.workspace.collector import ResourceSearchPathCollector
 
 app_object = app.use_app('pyqt4')
 APP: QtGui.QApplication = app_object.native
 LOOP = QEventLoop(APP)
 asyncio.set_event_loop(LOOP)  # NEW must set the event loop
 
-
 QtCore = app_object.backend_module.QtCore
 QtGui = app_object.backend_module.QtGui
-
 
 LOG = logging.getLogger(__name__)
 PROGRESS_BAR_MAX = 1000
@@ -151,7 +147,7 @@ class AnimationSpeedPopupWindow(QtGui.QWidget):
         self._slider = QtGui.QSlider(parent=self)
         # n, x = self._convert(10, reverse=True), self._convert(5000, reverse=True)
         n, x = 2, 150  # frames per 10 seconds
-        self._slider.setRange(n, x) #
+        self._slider.setRange(n, x)  #
         # self._slider.setSingleStep(1)
         # self._slider.setInvertedAppearance(True)
         self._slot = slot
@@ -167,7 +163,7 @@ class AnimationSpeedPopupWindow(QtGui.QWidget):
         :param reverse: when true, reverse conversion
         :return:
         """
-        if reverse: # convert milliseconds to fp10s
+        if reverse:  # convert milliseconds to fp10s
             fp10s = 10000.0 / float(val)
             return fp10s
         else:
@@ -196,11 +192,12 @@ class AnimationSpeedPopupWindow(QtGui.QWidget):
         self.hide()
         self._active = False
 
+
 def _recursive_split(path):
-    dn,fn = os.path.split(path)
+    dn, fn = os.path.split(path)
     if dn and not fn:
         yield dn
-    if len(dn)>0 and dn!=path and len(fn)>0:
+    if len(dn) > 0 and dn != path and len(fn) > 0:
         for pc in _recursive_split(dn):
             yield pc
     if len(fn):
@@ -220,7 +217,7 @@ def _common_path_prefix(paths):
     "find the most common directory shared by a list of paths"
     paths = list(paths)
     LOG.debug('looking for common path prefix for {}'.format(repr(paths)))
-    if len(paths)==1:
+    if len(paths) == 1:
         return os.path.split(paths[0])[0]
     parts = list(_common_path_prefix_seq(paths))
     if parts:
@@ -231,11 +228,11 @@ def _common_path_prefix(paths):
 
 class Main(QtGui.QMainWindow):
     _last_open_dir = None  # directory to open files in
-    _recent_files_menu = None # QMenu
+    _recent_files_menu = None  # QMenu
     _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
     _open_cache_dialog = None
     _screenshot_dialog = None
-    _cmap_editor = None # Gradient editor widget
+    _cmap_editor = None  # Gradient editor widget
     _resource_collector: ResourceSearchPathCollector = None
     _resource_collector_timer: QtCore.QTimer = None
     _timeline_scene: SiftDocumentAsFramesInTracks = None
@@ -335,24 +332,25 @@ class Main(QtGui.QMainWindow):
                 LOG.debug('open recent product {}'.format(uuid))
                 self.scene_manager.layer_set.animating = False
                 self.activate_products_by_uuid([uuid])
+
             open_action = QtGui.QAction(p_name, self)
             open_action.triggered.connect(openit)
             self._recent_files_menu.addAction(open_action)
 
     def update_progress_bar(self, status_info, *args, **kwargs):
-        active = status_info[0] if len(status_info)>0 else None
+        active = status_info[0] if len(status_info) > 0 else None
         # LOG.debug('{0!r:s}'.format(status_info))
         val = active[TASK_PROGRESS] if active else 0.0
         txt = active[TASK_DOING] if active else ''
         val = self.queue.progress_ratio(val)
-        self.ui.progressBar.setValue(int(val*PROGRESS_BAR_MAX))
+        self.ui.progressBar.setValue(int(val * PROGRESS_BAR_MAX))
         self.ui.progressText.setText(txt)
-        #LOG.warning('progress bar updated to {}'.format(val))
+        # LOG.warning('progress bar updated to {}'.format(val))
 
     def reset_frame_slider(self, *args, **kwargs):
         frame_count = len(self.document.current_animation_order)
-        frame_index = None # self.scene_manager.layer_set._frame_number  # FIXME BAAD
-        self.ui.animationSlider.setRange(0, frame_count-1)
+        frame_index = None  # self.scene_manager.layer_set._frame_number  # FIXME BAAD
+        self.ui.animationSlider.setRange(0, frame_count - 1)
         self.ui.animationSlider.setValue(frame_index or 0)
         self.ui.animPlayPause.setDown(False)
         self.ui.animationSlider.repaint()
@@ -366,7 +364,7 @@ class Main(QtGui.QMainWindow):
         :return:
         """
         frame_index, frame_count, animating, uuid = frame_info[:4]
-        self.ui.animationSlider.setRange(0, frame_count-1)
+        self.ui.animationSlider.setRange(0, frame_count - 1)
         self.ui.animationSlider.setValue(frame_index or 0)
         # LOG.debug('did update animation slider {} {}'.format(frame_index, frame_count))
         self.ui.animPlayPause.setDown(animating)
@@ -462,7 +460,7 @@ class Main(QtGui.QMainWindow):
         uuids = self.behaviorLayersList.current_selected_uuids()
         new_focus = None
         if not uuids:
-            pass # FIXME: notify user
+            pass  # FIXME: notify user
         for uuid in uuids:
             new_focus = self.document.next_last_step(uuid, direction, bandwise=True)
         if new_focus is not None:
@@ -489,7 +487,7 @@ class Main(QtGui.QMainWindow):
         # FUTURE: propagate this into the document?
         self.scene_manager.layer_set.animation_speed = milliseconds
 
-    def show_animation_speed_slider(self, pos:QtCore.QPoint, *args):
+    def show_animation_speed_slider(self, pos: QtCore.QPoint, *args):
         LOG.info('menu requested for animation control')
         gpos = self.ui.animPlayPause.mapToGlobal(pos)
 
@@ -590,7 +588,7 @@ class Main(QtGui.QMainWindow):
         from PyQt4.QtOpenGL import QGLFormat, QGL, QGLWidget
         fmt = QGLFormat(QGL.SampleBuffers)
         wdgt = QGLWidget(fmt)
-        assert(wdgt.isValid())
+        assert (wdgt.isValid())
         gv.setViewport(wdgt)
         gv.setViewportUpdateMode(QtGui.QGraphicsView.FullViewportUpdate)
         gv.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
@@ -649,7 +647,8 @@ class Main(QtGui.QMainWindow):
         self.queue.didMakeProgress.connect(self.update_progress_bar)
 
         # create manager and helper classes
-        self.workspace = Workspace(workspace_dir, max_size_gb=cache_size, queue=self.queue, initial_clear=clear_workspace)
+        self.workspace = Workspace(workspace_dir, max_size_gb=cache_size, queue=self.queue,
+                                   initial_clear=clear_workspace)
         self.document = doc = Document(self.workspace, config_dir=config_dir, queue=self.queue)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
                                                border_shapefile=border_shapefile,
@@ -666,13 +665,17 @@ class Main(QtGui.QMainWindow):
         self.ui.animPlayPause.clicked.connect(self.toggle_animation)
         self.ui.animPlayPause.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.ui.animPlayPause.customContextMenuRequested.connect(self.show_animation_speed_slider)
+
         def next_frame(*args, **kwargs):
             self.scene_manager.layer_set.animating = False
             self.scene_manager.layer_set.next_frame()
+
         self.ui.animForward.clicked.connect(next_frame)
+
         def prev_frame(*args, **kwargs):
             self.scene_manager.layer_set.animating = False
             self.scene_manager.layer_set.next_frame(frame_number=-1)
+
         self.ui.animBack.clicked.connect(prev_frame)
 
         # allow animation slider to set animation frame being displayed:
@@ -770,10 +773,12 @@ class Main(QtGui.QMainWindow):
         zap = lambda *args: self.graphManager.update_point_probe(DEFAULT_POINT_PROBE)
         self.document.didAddBasicLayer.connect(zap)
         self.document.didAddCompositeLayer.connect(zap)
+
         # FIXME: These were added as a simple fix to update the probe value on layer changes, but this should really
         #        have its own manager-like object
         def _blackhole(*args, **kwargs):
             return self.update_point_probe_text(DEFAULT_POINT_PROBE)
+
         self.document.didChangeLayerVisibility.connect(_blackhole)
         self.document.didAddBasicLayer.connect(_blackhole)
         self.document.didAddCompositeLayer.connect(_blackhole)
@@ -785,7 +790,8 @@ class Main(QtGui.QMainWindow):
             pass
         else:
             # XXX: Disable the below line if updating the probe value during animation isn't a performance problem
-            self.scene_manager.didChangeFrame.connect(lambda frame_info: self.ui.cursorProbeText.setText("Probe Value: <animating>"))
+            self.scene_manager.didChangeFrame.connect(
+                lambda frame_info: self.ui.cursorProbeText.setText("Probe Value: <animating>"))
 
         # Set the projection based on the document's default
         self.document.change_projection()
@@ -809,14 +815,16 @@ class Main(QtGui.QMainWindow):
     def _timer_collect_resources(self):
         if self._resource_collector:
             LOG.debug("launching background resource search")
-            self.queue.add('resource_find', self._resource_collector.bgnd_look_for_new_files(), "look for new or modified files",
+            self.queue.add('resource_find', self._resource_collector.bgnd_look_for_new_files(),
+                           "look for new or modified files",
                            and_then=self._finish_collecting_resources, interactive=False)
 
-    def _finish_collecting_resources(self, previous_stage_ok:bool = True):
+    def _finish_collecting_resources(self, previous_stage_ok: bool = True):
         ntodo = self._resource_collector.has_pending_files
         if ntodo:
             LOG.debug("{} new resources to collect metadata from".format(ntodo))
-            self.queue.add("resource_collect", self._resource_collector.bgnd_merge_new_file_metadata_into_mdb(), "add metadata for newly found files", interactive=False)
+            self.queue.add("resource_collect", self._resource_collector.bgnd_merge_new_file_metadata_into_mdb(),
+                           "add metadata for newly found files", interactive=False)
         else:
             LOG.debug("no resources to collect, skipping followup task")
 
@@ -824,7 +832,7 @@ class Main(QtGui.QMainWindow):
         LOG.debug('main window closing')
         self.workspace.close()
 
-    def toggle_animation(self, action:QtGui.QAction=None, *args):
+    def toggle_animation(self, action: QtGui.QAction = None, *args):
         new_state = self.scene_manager.layer_set.toggle_animation()
         self.ui.animPlayPause.setChecked(new_state)
 
@@ -854,7 +862,7 @@ class Main(QtGui.QMainWindow):
 
     def open_glob(self, *args, **kwargs):
         text, ok = QtGui.QInputDialog.getText(self, 'Open Glob Pattern',
-            'Open files matching pattern:')
+                                              'Open files matching pattern:')
         from glob import glob
         if ok:
             paths = list(glob(text))
@@ -877,7 +885,7 @@ class Main(QtGui.QMainWindow):
         else:
             LOG.debug("Wizard closed, nothing to load")
 
-    def remove_region_polygon(self, action:QtGui.QAction=None, *args):
+    def remove_region_polygon(self, action: QtGui.QAction = None, *args):
         if self.scene_manager.has_pending_polygon():
             self.scene_manager.clear_pending_polygon()
             return
@@ -887,7 +895,7 @@ class Main(QtGui.QMainWindow):
         LOG.info("Clearing polygon with name '%s'", removed_name)
         self.scene_manager.remove_polygon(removed_name)
 
-    def create_algebraic(self, action:QtGui.QAction=None, uuids=None, composite_type=CompositeType.ARITHMETIC):
+    def create_algebraic(self, action: QtGui.QAction = None, uuids=None, composite_type=CompositeType.ARITHMETIC):
         if uuids is None:
             uuids = list(self.behaviorLayersList.current_selected_uuids())
         dialog = CreateAlgebraicDialog(self.document, uuids, parent=self)
@@ -903,7 +911,7 @@ class Main(QtGui.QMainWindow):
         exit_action = QtGui.QAction("&Exit", self)
         exit_action.setShortcut("Ctrl+Q")
         exit_action.triggered.connect(QtGui.qApp.quit)
-        
+
         open_cache_action = QtGui.QAction("Open from Cache...", self)
         open_cache_action.setShortcut("Ctrl+A")
         open_cache_action.triggered.connect(self.open_from_cache)
@@ -969,7 +977,8 @@ class Main(QtGui.QMainWindow):
 
         flip_colormap = QtGui.QAction("Flip Color Limits (Top Layer)", self)
         flip_colormap.setShortcut("/")
-        flip_colormap.triggered.connect(lambda: self.document.flip_climits_for_layers([self.document.current_visible_layer_uuid]))
+        flip_colormap.triggered.connect(
+            lambda: self.document.flip_climits_for_layers([self.document.current_visible_layer_uuid]))
 
         cycle_borders = QtGui.QAction("Cycle &Borders", self)
         cycle_borders.setShortcut('B')
@@ -1033,6 +1042,7 @@ class Main(QtGui.QMainWindow):
             def tmp_cb(key, cb=cb):
                 if key.text == required_key:
                     return cb()
+
             return tmp_cb
 
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("t", self.scene_manager.next_tool))
@@ -1091,7 +1101,8 @@ def main():
                         help="Specify center longitude and latitude for camera")
     parser.add_argument("--desktop", type=int, default=0,
                         help="Number of monitor/display to show the main window on (0 for main, 1 for secondary, etc.)")
-    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=int(os.environ.get("VERBOSITY", 2)),
+    parser.add_argument('-v', '--verbose', dest='verbosity', action="count",
+                        default=int(os.environ.get("VERBOSITY", 2)),
                         help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG (default Info)')
     args = parser.parse_args()
 
@@ -1126,7 +1137,7 @@ def main():
         config_dir=args.config_dir,
         cache_size=args.space,
         glob_pattern=args.glob_pattern,
-        search_paths = data_search_paths,
+        search_paths=data_search_paths,
         border_shapefile=args.border_shapefile,
         center=args.center,
         clear_workspace=args.clear_workspace,
@@ -1138,6 +1149,7 @@ def main():
     window.raise_()
     LOOP.run_forever()
     # app.run()
+
 
 if __name__ == '__main__':
     sys.exit(main())

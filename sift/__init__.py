@@ -20,9 +20,10 @@ REQUIRES
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import os, sys
-import logging, unittest, argparse
-from sift.version import __version__
+import argparse
+import logging
+import sys
+import unittest
 
 LOG = logging.getLogger(__name__)
 

@@ -20,9 +20,13 @@ REQUIRES
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import os, sys
-import logging, unittest, argparse
+import argparse
+import logging
+import sys
+import unittest
+
 from PyQt4.QtCore import QObject
+
 # from PyQt4.QtGui import QAction
 
 

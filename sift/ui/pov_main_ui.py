@@ -16,11 +16,14 @@ except AttributeError:
 
 try:
     _encoding = QtGui.QApplication.UnicodeUTF8
+
+
     def _translate(context, text, disambig):
         return QtGui.QApplication.translate(context, text, disambig, _encoding)
 except AttributeError:
     def _translate(context, text, disambig):
         return QtGui.QApplication.translate(context, text, disambig)
+
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -101,7 +104,7 @@ class Ui_MainWindow(object):
         font.setPointSize(14)
         self.cursorProbeText.setFont(font)
         self.cursorProbeText.setScaledContents(False)
-        self.cursorProbeText.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.cursorProbeText.setAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         self.cursorProbeText.setObjectName(_fromUtf8("cursorProbeText"))
         self.horizontalLayout_2.addWidget(self.cursorProbeText)
         spacerItem = QtGui.QSpacerItem(40, 20, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
@@ -117,7 +120,7 @@ class Ui_MainWindow(object):
         font.setFamily(_fromUtf8("Andale Mono"))
         font.setPointSize(14)
         self.cursorProbeLayer.setFont(font)
-        self.cursorProbeLayer.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
+        self.cursorProbeLayer.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignTrailing | QtCore.Qt.AlignVCenter)
         self.cursorProbeLayer.setObjectName(_fromUtf8("cursorProbeLayer"))
         self.horizontalLayout_2.addWidget(self.cursorProbeLayer)
         self.verticalLayout_2.addLayout(self.horizontalLayout_2)
@@ -198,7 +201,7 @@ class Ui_MainWindow(object):
         self.statusbar.setObjectName(_fromUtf8("statusbar"))
         MainWindow.setStatusBar(self.statusbar)
         self.areaProbePane = QtGui.QDockWidget(MainWindow)
-        self.areaProbePane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable|QtGui.QDockWidget.DockWidgetMovable)
+        self.areaProbePane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable | QtGui.QDockWidget.DockWidgetMovable)
         self.areaProbePane.setObjectName(_fromUtf8("areaProbePane"))
         self.probeWidget = QtGui.QWidget()
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Preferred)
@@ -219,7 +222,7 @@ class Ui_MainWindow(object):
         self.areaProbePane.setWidget(self.probeWidget)
         MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.areaProbePane)
         self.layersPane = QtGui.QDockWidget(MainWindow)
-        self.layersPane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable|QtGui.QDockWidget.DockWidgetMovable)
+        self.layersPane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable | QtGui.QDockWidget.DockWidgetMovable)
         self.layersPane.setObjectName(_fromUtf8("layersPane"))
         self.layersPaneWidget = QtGui.QWidget()
         self.layersPaneWidget.setObjectName(_fromUtf8("layersPaneWidget"))
@@ -239,7 +242,7 @@ class Ui_MainWindow(object):
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.layerDetailsPane.sizePolicy().hasHeightForWidth())
         self.layerDetailsPane.setSizePolicy(sizePolicy)
-        self.layerDetailsPane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable|QtGui.QDockWidget.DockWidgetMovable)
+        self.layerDetailsPane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable | QtGui.QDockWidget.DockWidgetMovable)
         self.layerDetailsPane.setObjectName(_fromUtf8("layerDetailsPane"))
         self.layerInfoContents = QtGui.QWidget()
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Preferred)
@@ -269,7 +272,7 @@ class Ui_MainWindow(object):
         self.rgbConfigPane.setSizePolicy(sizePolicy)
         self.rgbConfigPane.setMaximumSize(QtCore.QSize(800, 800))
         self.rgbConfigPane.setBaseSize(QtCore.QSize(128, 128))
-        self.rgbConfigPane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable|QtGui.QDockWidget.DockWidgetMovable)
+        self.rgbConfigPane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable | QtGui.QDockWidget.DockWidgetMovable)
         self.rgbConfigPane.setObjectName(_fromUtf8("rgbConfigPane"))
         self.dockWidgetContents = QtGui.QWidget()
         self.dockWidgetContents.setObjectName(_fromUtf8("dockWidgetContents"))
@@ -496,7 +499,8 @@ class Ui_MainWindow(object):
         self.timelinePane = QtGui.QDockWidget(MainWindow)
         self.timelinePane.setMinimumSize(QtCore.QSize(172, 102))
         self.timelinePane.setBaseSize(QtCore.QSize(0, 32))
-        self.timelinePane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable|QtGui.QDockWidget.DockWidgetMovable|QtGui.QDockWidget.DockWidgetVerticalTitleBar)
+        self.timelinePane.setFeatures(
+            QtGui.QDockWidget.DockWidgetFloatable | QtGui.QDockWidget.DockWidgetMovable | QtGui.QDockWidget.DockWidgetVerticalTitleBar)
         self.timelinePane.setObjectName(_fromUtf8("timelinePane"))
         self.dockWidgetContents_2 = QtGui.QWidget()
         self.dockWidgetContents_2.setObjectName(_fromUtf8("dockWidgetContents_2"))
@@ -527,10 +531,13 @@ class Ui_MainWindow(object):
         self.panZoomToolButton.setStatusTip(_translate("MainWindow", "Left mouse click and drag pans the scene", None))
         self.panZoomToolButton.setText(_translate("MainWindow", "Pan/Zoom", None))
         self.pointSelectButton.setToolTip(_translate("MainWindow", "Point Probe Tool", None))
-        self.pointSelectButton.setStatusTip(_translate("MainWindow", "Left mouse click probes a single point in the scene", None))
+        self.pointSelectButton.setStatusTip(
+            _translate("MainWindow", "Left mouse click probes a single point in the scene", None))
         self.pointSelectButton.setText(_translate("MainWindow", "Point", None))
         self.regionSelectButton.setToolTip(_translate("MainWindow", "Region Probe Tool", None))
-        self.regionSelectButton.setStatusTip(_translate("MainWindow", "Left mouse click creates a polygon vertex (click initial vertex to complete)", None))
+        self.regionSelectButton.setStatusTip(
+            _translate("MainWindow", "Left mouse click creates a polygon vertex (click initial vertex to complete)",
+                       None))
         self.regionSelectButton.setText(_translate("MainWindow", "Region", None))
         self.projectionLabel.setText(_translate("MainWindow", "Projection:", None))
         self.cursorProbeText.setToolTip(_translate("MainWindow", "Value under cursor", None))
@@ -571,5 +578,6 @@ class Ui_MainWindow(object):
         self.slideMaxBlue.setToolTip(_translate("MainWindow", "value at 100% blue", None))
         self.blueGammaLabel.setText(_translate("MainWindow", "Gamma: ", None))
         self.timelinePane.setWindowTitle(_translate("MainWindow", "Timeline", None))
+
 
 from sift.ui.custom_widgets import QNoScrollComboBox, QNoScrollDoubleSpinBox, QNoScrollSlider

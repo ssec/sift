@@ -24,42 +24,44 @@ REQUIRES
 __docformat__ = 'reStructuredText'
 __author__ = 'davidh'
 
-from vispy import app
-from vispy import scene
-from vispy.util.keys import SHIFT
-from vispy.visuals.transforms import STTransform, MatrixTransform, ChainTransform
-from vispy.visuals import MarkersVisual, marker_types, LineVisual
-from vispy.scene.visuals import Markers, Polygon, Compound, Line
-from vispy.geometry import Rect
-from sift.common import DEFAULT_ANIMATION_DELAY, Info, Kind, Tool, Presentation
-from sift.view.visuals import (NEShapefileLines, TiledGeolocatedImage,
-                               RGBCompositeLayer, PrecomputedIsocurve)
-from sift.view.cameras import PanZoomProbeCamera
-from sift.model.document import DocLayerStack, DocBasicLayer
-from sift.queue import TASK_DOING, TASK_PROGRESS
-from sift.view.probes import DEFAULT_POINT_PROBE
-from sift.view.transform import PROJ4Transform
-from sift.util import get_package_data_dir
-
-from PyQt4.QtCore import QObject, pyqtSignal, Qt
-from PyQt4.QtGui import QCursor, QPixmap
-import numpy as np
+import logging
+import os
 from uuid import UUID
 
-import os
-import sys
-import logging
+import numpy as np
+from PyQt4.QtCore import QObject, pyqtSignal, Qt
+from PyQt4.QtGui import QCursor
+from vispy import app
+from vispy import scene
+from vispy.geometry import Rect
+from vispy.scene.visuals import Markers, Polygon, Compound, Line
+from vispy.util.keys import SHIFT
+from vispy.visuals import LineVisual
+from vispy.visuals.transforms import STTransform, MatrixTransform, ChainTransform
+
+from sift.common import DEFAULT_ANIMATION_DELAY, Info, Kind, Tool, Presentation
+from sift.model.document import DocLayerStack, DocBasicLayer
+from sift.queue import TASK_DOING, TASK_PROGRESS
+from sift.util import get_package_data_dir
+from sift.view.cameras import PanZoomProbeCamera
+from sift.view.probes import DEFAULT_POINT_PROBE
+from sift.view.transform import PROJ4Transform
+from sift.view.visuals import (NEShapefileLines, TiledGeolocatedImage,
+                               RGBCompositeLayer, PrecomputedIsocurve)
 
 LOG = logging.getLogger(__name__)
 DATA_DIR = get_package_data_dir()
 DEFAULT_SHAPE_FILE = os.path.join(DATA_DIR, 'ne_50m_admin_0_countries', 'ne_50m_admin_0_countries.shp')
-DEFAULT_STATES_SHAPE_FILE = os.path.join(DATA_DIR, 'ne_50m_admin_1_states_provinces_lakes', 'ne_50m_admin_1_states_provinces_lakes.shp')
+DEFAULT_STATES_SHAPE_FILE = os.path.join(DATA_DIR, 'ne_50m_admin_1_states_provinces_lakes',
+                                         'ne_50m_admin_1_states_provinces_lakes.shp')
 DEFAULT_TEXTURE_SHAPE = (4, 16)
 
 
 class Markers2(Markers):
     def _set_clipper(self, node, clipper):
         return
+
+
 Markers = Markers2
 
 
@@ -86,8 +88,10 @@ class FakeMarker(Compound):
     def _get_positions(self, point):
         margin = 0.5
         if self.symbol == 'x':
-            pos1 = np.array([[point[0] - margin, point[1] - margin * 2, point[2]], [point[0] + margin, point[1] + margin * 2, point[2]]])
-            pos2 = np.array([[point[0] - margin, point[1] + margin * 2, point[2]], [point[0] + margin, point[1] - margin * 2, point[2]]])
+            pos1 = np.array([[point[0] - margin, point[1] - margin * 2, point[2]],
+                             [point[0] + margin, point[1] + margin * 2, point[2]]])
+            pos2 = np.array([[point[0] - margin, point[1] + margin * 2, point[2]],
+                             [point[0] + margin, point[1] - margin * 2, point[2]]])
         else:
             pos1 = np.array([[point[0] - margin, point[1], point[2]], [point[0] + margin, point[1], point[2]]])
             pos2 = np.array([[point[0], point[1] - margin * 2, point[2]], [point[0], point[1] + margin * 2, point[2]]])
@@ -107,6 +111,7 @@ class SIFTMainMapCanvas(scene.SceneCanvas):
 
 class MainMap(scene.Node):
     """Scene node for holding all of the information for the main map area."""
+
     def __init__(self, *args, **kwargs):
         super(MainMap, self).__init__(*args, **kwargs)
 
@@ -114,6 +119,7 @@ class MainMap(scene.Node):
 class PendingPolygon(object):
     """Temporary information holder for Probe Polygons.
     """
+
     def __init__(self, point_parent):
         self.parent = point_parent
         self.markers = []
@@ -164,6 +170,7 @@ class LayerSet(object):
      - Animation loop and frame order
      - Layer Order
     """
+
     def __init__(self, parent, layers=None, layer_order=None, frame_order=None, frame_change_cb=None):
         if layers is None and (layer_order is not None or frame_order is not None):
             raise ValueError("'layers' required when 'layer_order' or 'frame_order' is specified")
@@ -176,7 +183,7 @@ class LayerSet(object):
         self._frame_number = 0
         self._frame_change_cb = frame_change_cb
         self._animation_speed = DEFAULT_ANIMATION_DELAY  # milliseconds
-        self._animation_timer = app.Timer(self._animation_speed/1000.0, connect=self.next_frame)
+        self._animation_timer = app.Timer(self._animation_speed / 1000.0, connect=self.next_frame)
 
         if layers is not None:
             self.set_layers(layers)
@@ -209,7 +216,7 @@ class LayerSet(object):
             return
         self._animation_timer.stop()
         self._animation_speed = milliseconds
-        self._animation_timer.interval = milliseconds/1000.0
+        self._animation_timer.interval = milliseconds / 1000.0
         if self._frame_order:
             self._animating = True
             self._animation_timer.start()
@@ -263,7 +270,7 @@ class LayerSet(object):
             if isinstance(transform, ChainTransform):
                 # assume ChainTransform where the last transform is STTransform for Z level
                 transform = transform.transforms[-1]
-            transform.translate = (0, 0, 0-int(z_level))
+            transform.translate = (0, 0, 0 - int(z_level))
             self._layers[uuid].order = len(self._layer_order) - int(z_level)
         # Need to tell the scene to recalculate the drawing order (HACK, but it works)
         # FIXME: This should probably be accomplished by overriding the right method from the Node or Visual class
@@ -334,11 +341,11 @@ class LayerSet(object):
         if frame_number is None:
             frame = self._frame_number + 1
         elif isinstance(frame_number, int):
-            if frame_number==-1:
+            if frame_number == -1:
                 frame = self._frame_number + (lfo - 1)
             else:
                 frame = frame_number
-        if lfo>0:
+        if lfo > 0:
             frame %= lfo
         else:
             frame = 0
@@ -489,11 +496,11 @@ class SceneGraphManager(QObject):
 
         # border and lat/lon grid color choices
         self._color_choices = [
-            np.array([1., 1., 1., 1.], dtype=np.float32), # white
-            np.array([.5, .5, .5, 1.], dtype=np.float32), # gray
-            np.array([0., 1., 1., 1.], dtype=np.float32), # cyan
-            np.array([0., 0., 0., 1.], dtype=np.float32), # black
-            np.array([0., 0., 0., 0.], dtype=np.float32), # transparent
+            np.array([1., 1., 1., 1.], dtype=np.float32),  # white
+            np.array([.5, .5, .5, 1.], dtype=np.float32),  # gray
+            np.array([0., 1., 1., 1.], dtype=np.float32),  # cyan
+            np.array([0., 0., 0., 1.], dtype=np.float32),  # black
+            np.array([0., 0., 0., 0.], dtype=np.float32),  # transparent
         ]
 
         self.setup_initial_canvas(center)
@@ -535,9 +542,9 @@ class SceneGraphManager(QObject):
             # watch out for signal loops!
             uuid = frame_info[3]
             uuids = self.layer_set.frame_order
-            tfu = lambda u: True if uuid==u else False
+            tfu = lambda u: True if uuid == u else False
             # note that all the layers in the layer_order but the current one are now invisible
-            vis = dict((u,tfu(u)) for u in uuids)
+            vis = dict((u, tfu(u)) for u in uuids)
             self.didChangeLayerVisibility.emit(vis)
 
     def setup_initial_canvas(self, center=None):
@@ -545,7 +552,8 @@ class SceneGraphManager(QObject):
         self.main_view = self.main_canvas.central_widget.add_view()
 
         # Camera Setup
-        self.pz_camera = PanZoomProbeCamera(name=Tool.PAN_ZOOM.name, aspect=1, pan_limits=(-1., -1., 1., 1.), zoom_limits=(0.0015, 0.0015))
+        self.pz_camera = PanZoomProbeCamera(name=Tool.PAN_ZOOM.name, aspect=1, pan_limits=(-1., -1., 1., 1.),
+                                            zoom_limits=(0.0015, 0.0015))
         self.main_view.camera = self.pz_camera
         self.main_view.camera.flip = (False, False, False)
         # self.main_view.events.mouse_press.connect(self.on_mouse_press_point, after=list(self.main_view.events.mouse_press.callbacks))
@@ -570,9 +578,11 @@ class SceneGraphManager(QObject):
         self.proxy_nodes = {}
 
         self._borders_color_idx = 0
-        self.borders = NEShapefileLines(self.border_shapefile, double=True, color=self._color_choices[self._borders_color_idx], parent=self.main_map)
+        self.borders = NEShapefileLines(self.border_shapefile, double=True,
+                                        color=self._color_choices[self._borders_color_idx], parent=self.main_map)
         self.borders.transform = STTransform(translate=(0, 0, 40))
-        self.conus_states = NEShapefileLines(self.conus_states_shapefile, double=True, color=self._color_choices[self._borders_color_idx], parent=self.main_map)
+        self.conus_states = NEShapefileLines(self.conus_states_shapefile, double=True,
+                                             color=self._color_choices[self._borders_color_idx], parent=self.main_map)
         self.conus_states.transform = STTransform(translate=(0, 0, 45))
 
         self._latlon_grid_color_idx = 1
@@ -586,8 +596,10 @@ class SceneGraphManager(QObject):
         center = center or proj_info["default_center"]
         width = proj_info["default_width"] / 2.
         height = proj_info["default_height"] / 2.
-        ll_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] - width, center[1] - height)])[0][:2]
-        ur_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] + width, center[1] + height)])[0][:2]
+        ll_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] - width, center[1] - height)])[0][
+                :2]
+        ur_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] + width, center[1] + height)])[0][
+                :2]
         self.main_view.camera.rect = Rect(ll_xy, (ur_xy[0] - ll_xy[0], ur_xy[1] - ll_xy[1]))
 
     def create_test_image(self):
@@ -631,8 +643,10 @@ class SceneGraphManager(QObject):
         center = center or proj_info["default_center"]
         width = proj_info["default_width"] / 2.
         height = proj_info["default_height"] / 2.
-        ll_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] - width, center[1] - height)])[0][:2]
-        ur_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] + width, center[1] + height)])[0][:2]
+        ll_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] - width, center[1] - height)])[0][
+                :2]
+        ur_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] + width, center[1] + height)])[0][
+                :2]
         self.main_view.camera.rect = Rect(ll_xy, (ur_xy[0] - ll_xy[0], ur_xy[1] - ll_xy[1]))
         for img in self.image_elements.values():
             if hasattr(img, 'determine_reference_points'):
@@ -698,7 +712,8 @@ class SceneGraphManager(QObject):
         if event.handled:
             return
         modifiers = event.mouse_event.modifiers
-        if (event.button == 2 and modifiers == (SHIFT,)) or (self._current_tool == Tool.REGION_PROBE and event.button == 1):
+        if (event.button == 2 and modifiers == (SHIFT,)) or (
+                self._current_tool == Tool.REGION_PROBE and event.button == 1):
             buffer_pos = event.sources[0].transforms.get_transform().map(event.pos)
             map_pos = self.borders.transforms.get_transform().imap(buffer_pos)
             if np.any(np.abs(map_pos[:2]) > 1e25):
@@ -770,16 +785,16 @@ class SceneGraphManager(QObject):
         poly = Polygon(parent=self.main_map, pos=points, **kwargs)
         poly.order = 50  # set polygons to be drawn last (stops 'see through' polygons)
         poly.transform = STTransform(translate=(0, 0, z))
-        if probe_name in self.polygon_probes :
+        if probe_name in self.polygon_probes:
             self.polygon_probes[probe_name].parent = None
         self.polygon_probes[probe_name] = poly
 
     def copy_polygon(self, old_name, new_name):
         self.on_new_polygon(new_name, self.polygon_probes[old_name].pos)
 
-    def show_only_polygons(self, polygon_names_to_show) :
+    def show_only_polygons(self, polygon_names_to_show):
         temp_set = set(polygon_names_to_show)
-        for polygon_name in self.polygon_probes.keys() :
+        for polygon_name in self.polygon_probes.keys():
             self.polygon_probes[polygon_name].visible = polygon_name in temp_set
 
     def update(self):
@@ -904,7 +919,7 @@ class SceneGraphManager(QObject):
             LOG.info('changing {} to kind {}'.format(uuid, new_pz.kind.name))
             self.add_basic_layer(None, uuid, new_pz)
 
-    def add_contour_layer(self, layer:DocBasicLayer, p:Presentation, overview_content:np.ndarray):
+    def add_contour_layer(self, layer: DocBasicLayer, p: Presentation, overview_content: np.ndarray):
         verts = overview_content[:, :2]
         connects = overview_content[:, 2].astype(np.bool)
         level_indexes = overview_content[:, 3]
@@ -929,7 +944,7 @@ class SceneGraphManager(QObject):
         self.layer_set.add_layer(contour_visual)
         self.on_view_change(None)
 
-    def add_basic_layer(self, new_order:tuple, uuid:UUID, p:Presentation):
+    def add_basic_layer(self, new_order: tuple, uuid: UUID, p: Presentation):
         layer = self.document[uuid]
         # create a new layer in the imagelist
         if not layer.is_valid:
@@ -977,14 +992,14 @@ class SceneGraphManager(QObject):
         image.determine_reference_points()
         self.on_view_change(None)
 
-    def add_composite_layer(self, new_order:tuple, uuid:UUID, p:Presentation):
+    def add_composite_layer(self, new_order: tuple, uuid: UUID, p: Presentation):
         layer = self.document[uuid]
         LOG.debug("SceneGraphManager.add_composite_layer %s" % repr(layer))
         if not layer.is_valid:
             LOG.info('unable to add an invalid layer, will try again later when layer changes')
             return
         if p.kind == Kind.RGB:
-            dep_uuids = r,g,b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
+            dep_uuids = r, g, b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
             overview_content = list(self.workspace.get_content(cuuid, kind=Kind.IMAGE) for cuuid in dep_uuids)
             uuid = layer.uuid
             LOG.debug("Adding composite layer to Scene Graph Manager with UUID: %s", uuid)
@@ -1020,21 +1035,21 @@ class SceneGraphManager(QObject):
             # algebraic layer
             return self.add_basic_layer(new_order, uuid, p)
 
-    def change_composite_layers(self, new_order:tuple, uuid_list:list, presentations:list):
+    def change_composite_layers(self, new_order: tuple, uuid_list: list, presentations: list):
         for uuid, presentation in zip(uuid_list, presentations):
             self.change_composite_layer(None, uuid, presentation)
         # set the order after we've updated and created all the new layers
         if new_order:
             self.layer_set.set_layer_order(new_order)
 
-    def change_composite_layer(self, new_order:tuple, uuid:UUID, presentation:Presentation):
+    def change_composite_layer(self, new_order: tuple, uuid: UUID, presentation: Presentation):
         layer = self.document[uuid]
         if presentation.kind == Kind.RGB:
             if layer.uuid in self.image_elements:
                 if layer.is_valid:
                     # RGB selection has changed, rebuild the layer
                     LOG.debug("Changing existing composite layer to Scene Graph Manager with UUID: %s", layer.uuid)
-                    dep_uuids = r,g,b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
+                    dep_uuids = r, g, b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
                     overview_content = list(self.workspace.get_content(cuuid) for cuuid in dep_uuids)
                     self.composite_element_dependencies[layer.uuid] = dep_uuids
                     elem = self.image_elements[layer.uuid]
@@ -1063,7 +1078,7 @@ class SceneGraphManager(QObject):
         else:
             raise ValueError("Unknown or unimplemented composite type")
 
-    def remove_layer(self, new_order:tuple, uuids_removed:tuple, row:int, count:int):
+    def remove_layer(self, new_order: tuple, uuids_removed: tuple, row: int, count: int):
         """
         remove (disable) a layer, though this may be temporary due to a move.
         wait for purge to truly flush out this puppy
@@ -1081,7 +1096,7 @@ class SceneGraphManager(QObject):
         # when removing the layer is the only operation being performed then update when we are done
         self.update()
 
-    def purge_layer(self, uuid_removed:UUID):
+    def purge_layer(self, uuid_removed: UUID):
         """
         Layer has been purged from document (no longer used anywhere) - flush it all out
         :param uuid_removed: UUID of the layer that is to be removed
@@ -1102,18 +1117,19 @@ class SceneGraphManager(QObject):
         self.update()
         return res
 
-    def change_layers_visibility(self, layers_changed:dict):
+    def change_layers_visibility(self, layers_changed: dict):
         for uuid, visible in layers_changed.items():
             self.set_layer_visible(uuid, visible)
 
-    def rebuild_new_layer_set(self, new_set_number:int, new_prez_order:DocLayerStack, new_anim_order:list):
+    def rebuild_new_layer_set(self, new_set_number: int, new_prez_order: DocLayerStack, new_anim_order: list):
         self.rebuild_all()
         # raise NotImplementedError("layer set change not implemented in SceneGraphManager")
 
     def _connect_doc_signals(self, document):
         document.didReorderLayers.connect(self._rebuild_layer_order)  # current layer set changed z/anim order
         document.didAddBasicLayer.connect(self.add_basic_layer)  # layer added to one or more layer sets
-        document.didAddCompositeLayer.connect(self.add_composite_layer)  # layer derived from other layers (either basic or composite themselves)
+        document.didAddCompositeLayer.connect(
+            self.add_composite_layer)  # layer derived from other layers (either basic or composite themselves)
         document.didRemoveLayers.connect(self._remove_layer)  # layer removed from current layer set
         document.willPurgeLayer.connect(self._purge_layer)  # layer removed from document
         document.didSwitchLayerSet.connect(self.rebuild_new_layer_set)
@@ -1150,7 +1166,7 @@ class SceneGraphManager(QObject):
         self.update()
         return res
 
-    def rebuild_frame_order(self, uuid_list:list, *args, **kwargs):
+    def rebuild_frame_order(self, uuid_list: list, *args, **kwargs):
         LOG.debug('setting SGM new frame order to {0!r:s}'.format(uuid_list))
         self.layer_set.frame_order = uuid_list
 
@@ -1160,7 +1176,7 @@ class SceneGraphManager(QObject):
         self.update()
         return res
 
-    def rebuild_presentation(self, presentation_info:dict):
+    def rebuild_presentation(self, presentation_info: dict):
         # refresh our presentation info
         # presentation_info = self.document.current_layer_set
         for uuid, layer_prez in presentation_info.items():
@@ -1178,11 +1194,11 @@ class SceneGraphManager(QObject):
         """
         # get the list of layers which are valid, and either visible or in the animation order
         doc_layers = list(self.document.active_layer_order)
-        presentation_info = tuple(p for (p,l) in doc_layers)
-        active_layers = tuple(l for (p,l) in doc_layers)
+        presentation_info = tuple(p for (p, l) in doc_layers)
+        active_layers = tuple(l for (p, l) in doc_layers)
         active_uuids = set(x.uuid for x in active_layers)
-        active_lookup = dict((x.uuid,x) for x in active_layers)
-        prez_lookup = dict((x.uuid,x) for x in presentation_info)
+        active_lookup = dict((x.uuid, x) for x in active_layers)
+        prez_lookup = dict((x.uuid, x) for x in presentation_info)
 
         uuids_w_elements = set(self.image_elements.keys())
         # get set of valid layers not having elements and invalid layers having elements
@@ -1223,12 +1239,13 @@ class SceneGraphManager(QObject):
         # Stop the timer so it doesn't continuously call this slot
         if scheduler:
             scheduler.stop()
+
         def _assess(uuid, child):
             need_retile, preferred_stride, tile_box = child.assess()
             if need_retile:
                 self.start_retiling_task(uuid, preferred_stride, tile_box)
 
-        current_visible_layers = [p.uuid for (p,l) in self.document.active_layer_order if p.visible]
+        current_visible_layers = [p.uuid for (p, l) in self.document.active_layer_order if p.visible]
         current_invisible_layers = set(self.image_elements.keys()) - set(current_visible_layers)
 
         def _assess_if_active(uuid):
@@ -1247,7 +1264,8 @@ class SceneGraphManager(QObject):
 
     def start_retiling_task(self, uuid, preferred_stride, tile_box):
         LOG.debug("Scheduling retile for child with UUID: %s", uuid)
-        self.queue.add(str(uuid) + "_retile", self._retile_child(uuid, preferred_stride, tile_box), 'Retile calculations for image layer ' + str(uuid), interactive=True)
+        self.queue.add(str(uuid) + "_retile", self._retile_child(uuid, preferred_stride, tile_box),
+                       'Retile calculations for image layer ' + str(uuid), interactive=True)
 
     def _retile_child(self, uuid, preferred_stride, tile_box):
         LOG.debug("Retiling child with UUID: '%s'", uuid)
@@ -1263,10 +1281,13 @@ class SceneGraphManager(QObject):
             self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)
         else:
             child = self.image_elements[uuid]
-            data = [self.workspace.get_content(d_uuid, lod=preferred_stride) for d_uuid in self.composite_element_dependencies[uuid]]
+            data = [self.workspace.get_content(d_uuid, lod=preferred_stride) for d_uuid in
+                    self.composite_element_dependencies[uuid]]
             yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.5}
             # FIXME: Use LOD instead of stride and provide the lod to the workspace
-            data = [d[::int(preferred_stride[0] / factor), ::int(preferred_stride[1] / factor)] if d is not None else None for factor, d in zip(child._channel_factors, data)]
+            data = [
+                d[::int(preferred_stride[0] / factor), ::int(preferred_stride[1] / factor)] if d is not None else None
+                for factor, d in zip(child._channel_factors, data)]
             tiles_info, vertices, tex_coords = child.retile(data, preferred_stride, tile_box)
             yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 1.0}
             self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)
@@ -1290,5 +1311,3 @@ class SceneGraphManager(QObject):
 
     def on_data_loaded(self, event):
         pass
-
-
