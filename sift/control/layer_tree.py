@@ -568,7 +568,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
     def mimeData(self, list_of_QModelIndex):
         l = []
         for index in list_of_QModelIndex:
-            # create a list of prez tuples showing how layers are presented
+            # create a list of Presentation tuples showing how layers are presented
             if index.isValid():
                 l.append((index.row(), self.doc.current_layer_set[index.row()]))
         p = pkl.dumps((len(self.doc.current_layer_set), l), pkl.HIGHEST_PROTOCOL)

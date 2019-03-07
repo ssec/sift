@@ -127,7 +127,7 @@ class flags(set):
 WORLD_EXTENT_BOX = box(b=-MAX_EXCURSION_Y, l=-MAX_EXCURSION_X, t=MAX_EXCURSION_Y, r=MAX_EXCURSION_X)
 
 # presentation information for a layer; z_order comes from the layerset
-prez = namedtuple('prez', [
+Presentation = namedtuple('Presentation', [
     'uuid',      # UUID: dataset in the document/workspace
     'kind',      # what kind of layer it is
     'visible',   # bool: whether it's visible or not

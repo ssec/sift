@@ -31,7 +31,7 @@ from vispy.visuals.transforms import STTransform, MatrixTransform, ChainTransfor
 from vispy.visuals import MarkersVisual, marker_types, LineVisual
 from vispy.scene.visuals import Markers, Polygon, Compound, Line
 from vispy.geometry import Rect
-from sift.common import DEFAULT_ANIMATION_DELAY, INFO, KIND, TOOL, prez
+from sift.common import DEFAULT_ANIMATION_DELAY, INFO, KIND, TOOL, Presentation
 from sift.view.LayerRep import (NEShapefileLines, TiledGeolocatedImage,
                                 RGBCompositeLayer, PrecomputedIsocurve)
 from sift.view.MapWidget import SIFTMainMapCanvas
@@ -901,7 +901,7 @@ class SceneGraphManager(QObject):
             LOG.info('changing {} to kind {}'.format(uuid, new_pz.kind.name))
             self.add_basic_layer(None, uuid, new_pz)
 
-    def add_contour_layer(self, layer:DocBasicLayer, p:prez, overview_content:np.ndarray):
+    def add_contour_layer(self, layer:DocBasicLayer, p:Presentation, overview_content:np.ndarray):
         verts = overview_content[:, :2]
         connects = overview_content[:, 2].astype(np.bool)
         level_indexes = overview_content[:, 3]
@@ -926,7 +926,7 @@ class SceneGraphManager(QObject):
         self.layer_set.add_layer(contour_visual)
         self.on_view_change(None)
 
-    def add_basic_layer(self, new_order:tuple, uuid:UUID, p:prez):
+    def add_basic_layer(self, new_order:tuple, uuid:UUID, p:Presentation):
         layer = self.document[uuid]
         # create a new layer in the imagelist
         if not layer.is_valid:
@@ -974,7 +974,7 @@ class SceneGraphManager(QObject):
         image.determine_reference_points()
         self.on_view_change(None)
 
-    def add_composite_layer(self, new_order:tuple, uuid:UUID, p:prez):
+    def add_composite_layer(self, new_order:tuple, uuid:UUID, p:Presentation):
         layer = self.document[uuid]
         LOG.debug("SceneGraphManager.add_composite_layer %s" % repr(layer))
         if not layer.is_valid:
@@ -1024,7 +1024,7 @@ class SceneGraphManager(QObject):
         if new_order:
             self.layer_set.set_layer_order(new_order)
 
-    def change_composite_layer(self, new_order:tuple, uuid:UUID, presentation:prez):
+    def change_composite_layer(self, new_order:tuple, uuid:UUID, presentation:Presentation):
         layer = self.document[uuid]
         if presentation.kind == KIND.RGB:
             if layer.uuid in self.image_elements:

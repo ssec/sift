@@ -78,7 +78,7 @@ import warnings
 from sqlalchemy.orm import Session
 
 from sift.workspace.metadatabase import Product
-from sift.common import KIND, INFO, prez, span, FCS_SEP, ZList, flags, STATE
+from sift.common import KIND, INFO, Presentation, span, FCS_SEP, ZList, flags, STATE
 from sift.queue import TASK_DOING, TASK_PROGRESS, TaskQueue
 from sift.workspace import Workspace
 from sift.util.default_paths import DOCUMENT_SETTINGS_DIR
@@ -191,7 +191,7 @@ class DocLayerStack(MutableSequence):
         else:
             raise ValueError('cannot initialize DocLayerStack using %s' % type(doc))
 
-    def __setitem__(self, index:int, value: prez):
+    def __setitem__(self, index:int, value: Presentation):
         if index>=0 and index<len(self._store):
             self._store[index] = value
         elif index == len(self._store):
@@ -213,7 +213,7 @@ class DocLayerStack(MutableSequence):
             return self.uuid2row.get(index, None)
         elif isinstance(index, DocLayer):
             return self.uuid2row.get(index.uuid, None)
-        elif isinstance(index, prez):
+        elif isinstance(index, Presentation):
             return self.uuid2row.get(index.uuid, None)
         else:
             raise ValueError('unable to index LayerStack using %s' % repr(index))
@@ -229,7 +229,7 @@ class DocLayerStack(MutableSequence):
         del self._store[index]
         self._u2r = None
 
-    def insert(self, index:int, value: prez):
+    def insert(self, index:int, value: Presentation):
         self._store.insert(index, value)
         self._u2r = None
 
@@ -332,7 +332,7 @@ class DocumentAsContextBase(object):
 class LayerInfo(T.NamedTuple):
     uuid: UUID
     time_label: str
-    presentation: prez
+    presentation: Presentation
     f_convert: T.Callable
     f_format: T.Callable
 
@@ -395,7 +395,7 @@ class DocumentAsLayerStack(DocumentAsContextBase):
             # yield the active products under the current playhead
             raise NotImplementedError()
 
-    def prez_for_uuid(self, uuid: UUID) -> prez:
+    def prez_for_uuid(self, uuid: UUID) -> Presentation:
         """presentation settings for the product uuid
         """
         return self.doc.family_presentation[self.doc.family_for_product_or_layer(uuid)]
@@ -508,7 +508,7 @@ class FrameInfo(T.NamedTuple):
 
 class TrackInfo(T.NamedTuple):
     track: str  # family::category
-    presentation: prez  # colorbar, ranges, gammas, etc
+    presentation: Presentation  # colorbar, ranges, gammas, etc
     when: span  # available time-span of the data
     state: flags  # any status or special flags set on the track, according to document / workspace
     primary: str  # primary label for UI
@@ -995,7 +995,7 @@ class DocumentAsAnimationSequence(DocumentAsContextBase):
     #     """
 
     @property
-    def family_presentation(self) -> T.Mapping[str, prez]:
+    def family_presentation(self) -> T.Mapping[str, Presentation]:
         """Mapping of families to their presentation tuples, guaranteed to include at least the families participating in the animation
         """
         return dict(self.doc.family_presentation)
@@ -1148,7 +1148,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     track_frame_locks: T.Mapping[str, UUID] = None
 
     # Maps of family names to their document recipes
-    family_presentation: T.Mapping[str, prez] = None
+    family_presentation: T.Mapping[str, Presentation] = None
     family_composition: T.Mapping[str, CompositeRecipe] = None  # using multiple products to present RGBA
     family_calculation: T.Mapping[str, object] = None  # algebraic combinations of multiple products
 
@@ -1162,24 +1162,24 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     Probe areas are translated into localized data masks against the workspace raw data content
     """
     current_set_index = 0
-    _layer_sets = None  # list(DocLayerSet(prez, ...) or None)
+    _layer_sets = None  # list(DocLayerSet(Presentation, ...) or None)
     _layer_with_uuid = None  # dict(uuid:Doc____Layer)
 
     # signals
     # Clarification: Layer interfaces migrate to layer meaning "current active products under the playhead"
-    didAddBasicLayer = pyqtSignal(tuple, UUID, prez)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
-    didAddCompositeLayer = pyqtSignal(tuple, UUID, prez)  # comp layer is derived from multiple basic layers and has its own UUID
+    didAddBasicLayer = pyqtSignal(tuple, UUID, Presentation)  # new order list with None for new layer; info-dictionary, overview-content-ndarray
+    didAddCompositeLayer = pyqtSignal(tuple, UUID, Presentation)  # comp layer is derived from multiple basic layers and has its own UUID
     didRemoveLayers = pyqtSignal(tuple, list, int, int)  # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
     willPurgeLayer = pyqtSignal(UUID)  # UUID of the layer being removed
     didReorderLayers = pyqtSignal(tuple)  # list of original indices in their new order, None for new layers
     didChangeLayerVisibility = pyqtSignal(dict)  # {UUID: new-visibility, ...} for changed layers
     didReorderAnimation = pyqtSignal(tuple)  # list of UUIDs representing new animation order
     didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
-    didSwitchLayerSet = pyqtSignal(int, DocLayerStack, tuple)  # new layerset number typically 0..3, list of prez tuples representing new display order, new animation order
+    didSwitchLayerSet = pyqtSignal(int, DocLayerStack, tuple)  # new layerset number typically 0..3, list of Presentation tuples representing new display order, new animation order
     didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: (vmin, vmax), ...} for all changed layers
     didChangeGamma = pyqtSignal(dict)  # dict of {uuid: gamma float, ...} for all changed layers
-    didChangeComposition = pyqtSignal(tuple, UUID, prez)  # new-layer-order, changed-layer, new-prez
+    didChangeComposition = pyqtSignal(tuple, UUID, Presentation)  # new-layer-order, changed-layer, new-Presentation
     didChangeCompositions = pyqtSignal(tuple, list, list)  # new-layer-order, changed-layers, new-prezs
     didCalculateLayerEqualizerValues = pyqtSignal(dict)  # dict of {uuid: (value, normalized_value_within_clim)} for equalizer display
     didChangeProjection = pyqtSignal(str, dict)  # name of projection, dict of projection information
@@ -1419,7 +1419,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def _insert_layer_with_info(self, info: DocLayer, cmap=None, insert_before=0):
         """
         insert a layer into the presentations but do not signal
-        :return: new prez tuple, new reordered indices tuple
+        :return: new Presentation tuple, new reordered indices tuple
         """
         if cmap is None:
             cmap = info.get(INFO.COLORMAP)
@@ -1432,14 +1432,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # get the presentation for another layer in our family
         family_uuids = self.family_uuids(info[INFO.FAMILY])
         family_prez = self.prez_for_uuid(family_uuids[0]) if family_uuids else None
-        p = prez(uuid=info[INFO.UUID],
-                 kind=info[INFO.KIND],
-                 visible=True,
-                 a_order=None,
-                 colormap=cmap if family_prez is None else family_prez.colormap,
-                 climits=info[INFO.CLIM] if family_prez is None else family_prez.climits,
-                 gamma=gamma if family_prez is None else family_prez.gamma,
-                 mixing=Mixing.NORMAL)
+        p = Presentation(uuid=info[INFO.UUID],
+                         kind=info[INFO.KIND],
+                         visible=True,
+                         a_order=None,
+                         colormap=cmap if family_prez is None else family_prez.colormap,
+                         climits=info[INFO.CLIM] if family_prez is None else family_prez.climits,
+                         gamma=gamma if family_prez is None else family_prez.gamma,
+                         mixing=Mixing.NORMAL)
 
         q = p._replace(visible=False)  # make it available but not visible in other layer sets
         old_layer_count = len(self._layer_sets[self.current_set_index])
@@ -2272,7 +2272,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.change_rgb_recipe_prez(recipe, climits=recipe.color_limits,
                                     gamma=recipe.gammas, uuids=changed_uuids)
         if changed_uuids:
-            # self.didChangeComposition.emit((), layer.uuid, prez, rgba)
+            # self.didChangeComposition.emit((), layer.uuid, Presentation, rgba)
             self.didChangeCompositions.emit((), changed_uuids,
                                             list(self.prez_for_uuids(changed_uuids)))
 
@@ -2441,7 +2441,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         # delete all these layers from the layer list/presentation
         for uuid in all_uuids:
-            LOG.debug('removing {} from family and prez lists'.format(uuid))
+            LOG.debug('removing {} from family and Presentation lists'.format(uuid))
             # remove from available family layers
             self._remove_layer_from_family(uuid)
             # remove from the layer set
@@ -2534,7 +2534,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             LOG.warning('attempt to drop empty content')
             return
         for p in lps:
-            if not isinstance(p, prez):
+            if not isinstance(p, Presentation):
                 LOG.error('attempt to drop a new layer with the wrong type: {0!r:s}'.format(p))
                 continue
             cls.insert(row, p)
