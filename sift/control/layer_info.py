@@ -23,7 +23,6 @@ from PyQt4.QtCore import QObject, Qt
 from PyQt4.QtGui import QGridLayout, QLabel, QTextEdit, QFont, QSizePolicy
 
 from sift.common import Info, Kind
-from sift.model.layer import DocRGBLayer
 from sift.ui.custom_widgets import QNoScrollWebView
 from sift.view.colormap import COLORMAP_MANAGER
 
@@ -104,7 +103,7 @@ class SingleLayerInfoPane(QObject):
         if selected_uuid_list is not None and len(selected_uuid_list) == 1:
             layer_uuid, = list(selected_uuid_list)
             layer_info = self.document[layer_uuid]
-            is_rgb = isinstance(layer_info, DocRGBLayer)
+            # is_rgb = isinstance(layer_info, DocRGBLayer)
 
         # clear the list if we got None
         if selected_uuid_list is None or len(selected_uuid_list) <= 0:
@@ -213,7 +212,7 @@ class SingleLayerInfoPane(QObject):
                             new_clims = ", ".join(tmp_clims)
                         else:
                             new_clims = "N/A"
-                    except TypeError as err:
+                    except TypeError:
                         LOG.warning("unable to format color limit: %r" % (new_clims,), exc_info=True)
                         new_clims = "N/A"
                 if "climits" not in shared_info:

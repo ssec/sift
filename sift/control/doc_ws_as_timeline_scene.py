@@ -20,7 +20,6 @@ from sift.view.timeline.common import VisualState
 from sift.view.timeline.items import QTrackItem, QFrameItem
 from sift.view.timeline.scene import QFramesInTracksScene
 from sift.workspace import Workspace
-from sift.workspace.metadatabase import Metadatabase
 
 LOG = logging.getLogger(__name__)
 
@@ -53,10 +52,11 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
 
     def __init__(self, doc: Document, ws: Workspace, *args, **kwargs):
         """
+
         Args:
-            ws (Workspace): owns cached and computed data
-            mdb (Metadatabase): owns definitive metadata
             doc (Document): owns user selections and constructions
+            ws (Workspace): owns cached and computed data
+
         """
         super(SiftDocumentAsFramesInTracks, self).__init__(*args, **kwargs)
         self._doc = doc.as_track_stack  # we should be limiting our interaction to this context
@@ -67,7 +67,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         return self._doc.timeline_span
 
     def _sync_track(self, qti: QTrackItem, z: int, trk: TrackInfo):
-        qti.z, old_z = z, qti.z
+        qti.z = z
         qti.state = trk.state
         # qti.update()
 
@@ -124,9 +124,8 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
                     try:
                         orphan_frames.remove(qfi.uuid)
                     except KeyError:
-                        LOG.warning("frame {} <{}> found but not originally present in collection {}".format(frm.ident,
-                                                                                                             frm.uuid,
-                                                                                                             orphan_frames))
+                        LOG.warning("frame {} <{}> found but not originally "
+                                    "present in collection {}".format(frm.ident, frm.uuid, orphan_frames))
                 else:
                     new_frames.append(self._create_frame(qti, frm))
         LOG.debug("added {} tracks and {} frames to timeline scene after {} iterations".format(len(new_tracks),
@@ -191,7 +190,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         doc.didChangeLayerVisibility.connect(self._update_visibility_for_products)
 
         def refresh_product_new_name(uuid, name, ts=self):
-            if None == ts._sync_and_update_frame(uuid):
+            if ts._sync_and_update_frame(uuid) is None:
                 LOG.warning("no corresponding frame glyph after rename??; re-syncing timeline")
                 ts.sync_available_tracks()
                 ts.sync_items()
@@ -241,8 +240,11 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         return lambda commit: None
 
     def tracks_in_same_family(self, track: str) -> Set[str]:
-        """inform the view on which tracks are closely related to the given track
-        typically this is used to stylistically highlight related active tracks during a drag or presentation editing operation
+        """Inform the view on which tracks are closely related to the given track.
+
+        Typically this is used to stylistically highlight related active tracks during a drag or presentation editing
+        operation.
+
         """
         return set(self._doc.tracks_in_family(track, only_active=True))
 
@@ -253,7 +255,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         return lambda b: None
 
     def menu_for_track(self, track: str, frame: Optional[UUID] = None) -> Optional[
-        Tuple[QMenu, Mapping[Any, Callable]]]:
+            Tuple[QMenu, Mapping[Any, Callable]]]:
         """Generate QMenu to use as context menu for a given track, optionally with frame if mouse was over that frame
         """
         LOG.debug("generating menu with track {} and frame {}".format(track, frame))
@@ -291,7 +293,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         Parameters serve only as hints
         """
         acted = False
-        with self._doc.mdb as consolidate_sessions_by_nesting:  # optional peformance optimization to prevent session flipping
+        with self._doc.mdb:  # optional peformance optimization to prevent session flipping
             if changed_frame_uuids is not None:
                 changed_frame_uuids = list(changed_frame_uuids)
                 all_frame_items = [self._sync_and_update_frame(uuid) for uuid in changed_frame_uuids]
