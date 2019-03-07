@@ -447,17 +447,17 @@ class TiledGeolocatedImageVisual(ImageVisual):
 
         return data
 
-    def _build_texture_tiles(self, data, stride, tile_box):
+    def _build_texture_tiles(self, data, stride, tile_box: Box):
         """Prepare and organize strided data in to individual tiles with associated information.
         """
         data = self._normalize_data(data)
 
-        LOG.debug("Uploading texture data for %d tiles (%r)", (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l),
-                  tile_box)
+        LOG.debug("Uploading texture data for %d tiles (%r)",
+                  (tile_box.bottom - tile_box.top) * (tile_box.right - tile_box.left), tile_box)
         # Tiles start at upper-left so go from top to bottom
         tiles_info = []
-        for tiy in range(tile_box.t, tile_box.b):
-            for tix in range(tile_box.l, tile_box.r):
+        for tiy in range(tile_box.top, tile_box.bottom):
+            for tix in range(tile_box.left, tile_box.right):
                 already_in = (stride, tiy, tix) in self.texture_state
                 # Update the age if already in there
                 # Assume that texture_state does not change from the main thread if this is run in another
@@ -483,13 +483,13 @@ class TiledGeolocatedImageVisual(ImageVisual):
             stride, tiy, tix, tex_tile_idx, data = tile_info
             self._texture.set_tile_data(tex_tile_idx, data)
 
-    def _build_vertex_tiles(self, preferred_stride, tile_box):
+    def _build_vertex_tiles(self, preferred_stride, tile_box: Box):
         """Rebuild the vertex buffers used for rendering the image when using
         the subdivide method.
 
         SIFT Note: Copied from 0.5.0dev original ImageVisual class
         """
-        total_num_tiles = (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l)
+        total_num_tiles = (tile_box.bottom - tile_box.top) * (tile_box.right - tile_box.left)
         total_overview_tiles = 0
         if self.overview_info is not None:
             # we should be providing an overview image
@@ -521,8 +521,8 @@ class TiledGeolocatedImageVisual(ImageVisual):
         LOG.debug("Building vertex data for %d tiles (%r)", total_num_tiles, tile_box)
         tl = TESS_LEVEL * TESS_LEVEL
         # Tiles start at upper-left so go from top to bottom
-        for tiy in range(tile_box.t, tile_box.b):
-            for tix in range(tile_box.l, tile_box.r):
+        for tiy in range(tile_box.top, tile_box.bottom):
+            for tix in range(tile_box.left, tile_box.right):
                 # Update the index here because we have multiple exit/continuation points
                 used_tile_idx += 1
 
@@ -624,7 +624,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
             LOG.error("Could not determine viewable image area for '{}'".format(self.name))
             return False, self._stride, self._latest_tile_box
 
-        num_tiles = (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l)
+        num_tiles = (tile_box.bottom - tile_box.top) * (tile_box.right - tile_box.left)
         LOG.debug("Assessment: Prefer '%s' have '%s', was looking at %r, now looking at %r",
                   preferred_stride, self._stride, self._latest_tile_box, tile_box)
 
@@ -997,12 +997,12 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         """
         data = [self._normalize_data(d) for d in data]
 
-        LOG.debug("Uploading texture data for %d tiles (%r)", (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l),
-                  tile_box)
+        LOG.debug("Uploading texture data for %d tiles (%r)",
+                  (tile_box.bottom - tile_box.top) * (tile_box.right - tile_box.left), tile_box)
         # Tiles start at upper-left so go from top to bottom
         tiles_info = []
-        for tiy in range(tile_box.t, tile_box.b):
-            for tix in range(tile_box.l, tile_box.r):
+        for tiy in range(tile_box.top, tile_box.bottom):
+            for tix in range(tile_box.left, tile_box.right):
                 already_in = (stride, tiy, tix) in self.texture_state
                 # Update the age if already in there
                 # Assume that texture_state does not change from the main thread if this is run in another

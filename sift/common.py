@@ -102,10 +102,10 @@ CANVAS_EXTENTS_EPSILON = 1e-4
 
 
 class Box(NamedTuple):
-    b: float
-    l: float
-    t: float
-    r: float
+    bottom: float
+    left: float
+    top: float
+    right: float
 
 
 class Resolution(NamedTuple):
@@ -120,16 +120,16 @@ class Point(NamedTuple):
 
 
 class Coordinate(NamedTuple):
-    n: float  # deg_north
-    e: float  # deg_east
+    deg_north: float
+    deg_east: float
 
 
 class ViewBox(NamedTuple):
     """Combination of Box + Resolution."""
-    b: float
-    l: float
-    t: float
-    r: float
+    bottom: float
+    left: float
+    top: float
+    right: float
     dy: float
     dx: float
 
@@ -155,9 +155,6 @@ class Flags(set):
     """A set of enumerated Flags which may ultimately be represented as a bitfield, but observing set interface
     """
     pass
-
-
-WORLD_EXTENT_BOX = Box(b=-MAX_EXCURSION_Y, l=-MAX_EXCURSION_X, t=MAX_EXCURSION_Y, r=MAX_EXCURSION_X)
 
 
 class State(Enum):
@@ -457,20 +454,20 @@ def clip(v, n, x):
     float64
 ),
     nopython=True)
-def calc_view_extents(image_extents_box, canvas_point, image_point, canvas_size, dx, dy):
-    l, r = _calc_extent_component(canvas_point[0], image_point[0], canvas_size[0], dx)
-    l = clip(l, image_extents_box.l, image_extents_box.r)
-    r = clip(r, image_extents_box.l, image_extents_box.r)
+def calc_view_extents(image_extents_box: Box, canvas_point, image_point, canvas_size, dx, dy) -> Box:
+    left, right = _calc_extent_component(canvas_point[0], image_point[0], canvas_size[0], dx)
+    left = clip(left, image_extents_box.left, image_extents_box.right)
+    right = clip(right, image_extents_box.left, image_extents_box.right)
 
-    b, t = _calc_extent_component(canvas_point[1], image_point[1], canvas_size[1], dy)
-    b = clip(b, image_extents_box.b, image_extents_box.t)
-    t = clip(t, image_extents_box.b, image_extents_box.t)
+    bot, top = _calc_extent_component(canvas_point[1], image_point[1], canvas_size[1], dy)
+    bot = clip(bot, image_extents_box.bottom, image_extents_box.top)
+    top = clip(top, image_extents_box.bottom, image_extents_box.top)
 
-    if (r - l) < CANVAS_EXTENTS_EPSILON or (t - b) < CANVAS_EXTENTS_EPSILON:
+    if (right - left) < CANVAS_EXTENTS_EPSILON or (top - bot) < CANVAS_EXTENTS_EPSILON:
         # they are viewing essentially nothing or the image isn't in view
         raise ValueError("Image can't be currently viewed")
 
-    return Box(l=l, r=r, b=b, t=t)
+    return Box(left=left, right=right, bottom=bot, top=top)
 
 
 @jit(nb_types.UniTuple(float64, 2)(
@@ -497,12 +494,12 @@ def max_tiles_available(image_shape, tile_shape, stride):
 #     ),
 #      nopython=True)
 @jit(nopython=True)
-def visible_tiles(pixel_rez,
-                  tile_size,
-                  image_center,
-                  image_shape,
-                  tile_shape,
-                  visible_geom, stride, extra_tiles_box):
+def visible_tiles(pixel_rez: Resolution,
+                  tile_size: Resolution,
+                  image_center: Point,
+                  image_shape: Point,
+                  tile_shape: Point,
+                  visible_geom: ViewBox, stride: Point, extra_tiles_box: Box):
     """
     given a visible world geometry and sampling, return (sampling-state, [Box-of-tiles-to-draw])
     sampling state is WELLSAMPLED/OVERSAMPLED/UNDERSAMPLED
@@ -520,34 +517,34 @@ def visible_tiles(pixel_rez,
 
     # number of data pixels between view edge and originpoint
     pv = Box(
-        b=(V.b - to.y) / -(Z.dy * stride[0]),
-        t=(V.t - to.y) / -(Z.dy * stride[0]),
-        l=(V.l - to.x) / (Z.dx * stride[1]),
-        r=(V.r - to.x) / (Z.dx * stride[1])
+        bottom=(V.bottom - to.y) / -(Z.dy * stride[0]),
+        top=(V.top - to.y) / -(Z.dy * stride[0]),
+        left=(V.left - to.x) / (Z.dx * stride[1]),
+        right=(V.right - to.x) / (Z.dx * stride[1])
     )
 
     th, tw = tile_shape
     # first tile we'll need is (tiy0, tix0)
     # floor to make sure we get the upper-left of the theoretical tile
-    tiy0 = np.floor(pv.t / th)
-    tix0 = np.floor(pv.l / tw)
+    tiy0 = np.floor(pv.top / th)
+    tix0 = np.floor(pv.left / tw)
     # number of tiles wide and high we'll absolutely need
     # add 0.5 and ceil to make sure we include all possible tiles
     # NOTE: output r and b values are exclusive, l and t are inclusive
-    nth = np.ceil((pv.b - tiy0 * th) / th + 0.5)
-    ntw = np.ceil((pv.r - tix0 * tw) / tw + 0.5)
+    nth = np.ceil((pv.bottom - tiy0 * th) / th + 0.5)
+    ntw = np.ceil((pv.right - tix0 * tw) / tw + 0.5)
 
     # now add the extras
-    if X.b > 0:
-        nth += int(X.b)
-    if X.l > 0:
-        tix0 -= int(X.l)
-        ntw += int(X.l)
-    if X.t > 0:
-        tiy0 -= int(X.t)
-        nth += int(X.t)
-    if X.r > 0:
-        ntw += int(X.r)
+    if X.bottom > 0:
+        nth += int(X.bottom)
+    if X.left > 0:
+        tix0 -= int(X.left)
+        ntw += int(X.left)
+    if X.top > 0:
+        tiy0 -= int(X.top)
+        nth += int(X.top)
+    if X.right > 0:
+        ntw += int(X.right)
 
     # Total number of tiles in this image at this stride (could be fractional)
     ath, atw = max_tiles_available(image_shape, tile_shape, stride)
@@ -569,10 +566,10 @@ def visible_tiles(pixel_rez,
         nth = hh + 0.5 - tiy0
 
     tilebox = Box(
-        b=np.int64(np.ceil(tiy0 + nth)),
-        l=np.int64(np.floor(tix0)),
-        t=np.int64(np.floor(tiy0)),
-        r=np.int64(np.ceil(tix0 + ntw)),
+        bottom=np.int64(np.ceil(tiy0 + nth)),
+        left=np.int64(np.floor(tix0)),
+        top=np.int64(np.floor(tiy0)),
+        right=np.int64(np.ceil(tix0 + ntw)),
     )
     return tilebox
 
@@ -634,14 +631,15 @@ class TileCalculator(object):
 
         self.proj = Proj(projection)
         self.image_extents_box = e = Box(
-            b=np.float64(self.ul_origin[0] - self.image_shape[0] * self.pixel_rez.dy),
-            t=np.float64(self.ul_origin[0]),
-            l=np.float64(self.ul_origin[1]),
-            r=np.float64(self.ul_origin[1] + self.image_shape[1] * self.pixel_rez.dx),
+            bottom=np.float64(self.ul_origin[0] - self.image_shape[0] * self.pixel_rez.dy),
+            top=np.float64(self.ul_origin[0]),
+            left=np.float64(self.ul_origin[1]),
+            right=np.float64(self.ul_origin[1] + self.image_shape[1] * self.pixel_rez.dx),
         )
         # Array of points across the image space to be used as an estimate of image coverage
         # Used when checking if the image is viewable on the current canvas's projection
-        self.image_mesh = np.meshgrid(np.linspace(e.l, e.r, IMAGE_MESH_SIZE), np.linspace(e.b, e.t, IMAGE_MESH_SIZE))
+        self.image_mesh = np.meshgrid(np.linspace(e.left, e.right, IMAGE_MESH_SIZE),
+                                      np.linspace(e.bottom, e.top, IMAGE_MESH_SIZE))
         self.image_mesh = np.column_stack((self.image_mesh[0].ravel(), self.image_mesh[1].ravel(),))
         self.image_center = Point(self.ul_origin.y - self.image_shape[0] / 2. * self.pixel_rez.dy,
                                   self.ul_origin.x + self.image_shape[1] / 2. * self.pixel_rez.dx)
@@ -649,15 +647,7 @@ class TileCalculator(object):
         self.tile_size = Resolution(self.pixel_rez.dy * self.tile_shape[0], self.pixel_rez.dx * self.tile_shape[1])
         self.overview_stride = self.calc_overview_stride()
 
-    def visible_tiles(self, visible_geom, stride=Point(1, 1), extra_tiles_box=Box(0, 0, 0, 0)):
-        # return visible_tiles(self.pixel_rez,
-        #                      self.tile_size,
-        #                      self.image_center,
-        #                      self.image_shape,
-        #                      self.tile_shape,
-        #                      visible_geom,
-        #                      stride,
-        #                      extra_tiles_box)
+    def visible_tiles(self, visible_geom, stride=Point(1, 1), extra_tiles_box=Box(0, 0, 0, 0)) -> Box:
         v = visible_geom
         e = extra_tiles_box
         return visible_tiles(
