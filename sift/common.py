@@ -29,9 +29,10 @@ import numpy as np
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import os, sys
+import os
+import sys
 from datetime import datetime, timedelta
-import logging, unittest, argparse
+import logging
 from numba import jit, float64, int64, boolean, types as nb_types
 from pyproj import Proj
 
@@ -210,7 +211,9 @@ class Info(Enum):
     Note: some fields correspond to database fields in workspace.metadatabase !
     """
     UNKNOWN = '???'
-    PATHNAME = 'path'  # full path to the resource that the file came from. DEPRECATED, since datasets may not have one-to-one pathname mapping
+    # full path to the resource that the file came from
+    # DEPRECATED since datasets may not have one-to-one pathname mapping
+    PATHNAME = 'path'
 
     # CF content
     SHORT_NAME = 'short_name'  # CF short_name
@@ -225,7 +228,8 @@ class Info(Enum):
 
     # track determiner is family::category; presentation is determined by family
     # family::category::serial is a unique identifier equivalent to conventional make-model-serialnumber
-    FAMILY = 'family'  # string representing data family, typically instrument:measurement:wavelength but may vary by data content
+    # string representing data family, typically instrument:measurement:wavelength but may vary by data content
+    FAMILY = 'family'
     CATEGORY = 'category'  # string with platform:instrument:target typically but may vary by data content
     SERIAL = 'serial'  # serial number
 
@@ -550,9 +554,10 @@ def visible_tiles(pixel_rez,
 
 
 class TileCalculator(object):
-    """
-    common calculations for mercator tile groups in an array or file
-    tiles are identified by (iy,ix) zero-based indicators
+    """Common calculations for geographic image tile groups in an array or file
+
+    Tiles are identified by (iy,ix) zero-based indicators.
+
     """
     OVERSAMPLED = 'oversampled'
     UNDERSAMPLED = 'undersampled'
@@ -572,17 +577,23 @@ class TileCalculator(object):
                  texture_shape=(DEFAULT_TEXTURE_HEIGHT, DEFAULT_TEXTURE_WIDTH),
                  projection=DEFAULT_PROJECTION,
                  wrap_lon=False):
-        """
-        name: the 'name' of the tile, typically the path of the file it represents
-        image_shape: (h:int,w:int) in pixels
-        ul_origin: (y:float,x:float) in world coords specifies upper-left coordinate of the image
-        pixel_rez: (dy:float,dx:float) in world coords per pixel ascending from corner [0,0], as measured near zero_point
-        tile_shape: the pixel dimensions (h:int, w:int) of the GPU tiling we want to use
-        texture_shape: the size of the texture being used (h:int, w:int) in number of tiles
+        """Initialize numbers used by multiple calculations.
 
-        Tiling is aligned to pixels, not world
-        World coordinates are eqm such that 0,0 matches 0°N 0°E, going north/south +-90° and west/east +-180°
-        Data coordinates are pixels with b l or b r corner being 0,0
+        Args:
+            name (str): the 'name' of the tile, typically the path of the file it represents
+            image_shape (int, int): (height, width) in pixels
+            ul_origin (float, float): (y, x) in world coords specifies upper-left coordinate of the image
+            pixel_rez (float, float): (dy, dx) in world coords per pixel ascending from corner [0,0],
+                as measured near zero_point
+            tile_shape (int, int): the pixel dimensions (h:int, w:int) of the GPU tiling we want to use
+            texture_shape (int, int): the size of the texture being used (h, w) in number of tiles
+
+        Notes:
+
+            - Tiling is aligned to pixels, not world
+            - World coordinates are eqm such that 0,0 matches 0°N 0°E, going north/south +-90° and west/east +-180°
+            - Data coordinates are pixels with b l or b r corner being 0,0
+
         """
         super(TileCalculator, self).__init__()
         self.name = name
@@ -755,11 +766,11 @@ class TileCalculator(object):
                 start_idx = x_idx * tessellation_level + y_idx
                 quads[start_idx * 6:(start_idx + 1) * 6, 0] *= tile_w * factor_rez.dx / tessellation_level
                 quads[start_idx * 6:(start_idx + 1) * 6, 0] += origin_x + tile_w * (
-                            tix + offset_rez.dx + factor_rez.dx * x_idx / tessellation_level)
-                quads[start_idx * 6:(start_idx + 1) * 6,
-                1] *= -tile_h * factor_rez.dy / tessellation_level  # Origin is upper-left so image goes down
+                    tix + offset_rez.dx + factor_rez.dx * x_idx / tessellation_level)
+                # Origin is upper-left so image goes down
+                quads[start_idx * 6:(start_idx + 1) * 6, 1] *= -tile_h * factor_rez.dy / tessellation_level
                 quads[start_idx * 6:(start_idx + 1) * 6, 1] += origin_y - tile_h * (
-                            tiy + offset_rez.dy + factor_rez.dy * y_idx / tessellation_level)
+                    tiy + offset_rez.dy + factor_rez.dy * y_idx / tessellation_level)
         quads = quads.reshape(tessellation_level * tessellation_level * 6, 3)
         return quads[:, :2]
 
@@ -787,10 +798,10 @@ class TileCalculator(object):
                 # location as possible
                 quads[start_idx * 6:(start_idx + 1) * 6, 0] *= one_tile_tex_width * factor_rez.dx / tessellation_level
                 quads[start_idx * 6:(start_idx + 1) * 6, 0] += one_tile_tex_width * (
-                            tix + factor_rez.dx * x_idx / tessellation_level)
+                    tix + factor_rez.dx * x_idx / tessellation_level)
                 quads[start_idx * 6:(start_idx + 1) * 6, 1] *= one_tile_tex_height * factor_rez.dy / tessellation_level
                 quads[start_idx * 6:(start_idx + 1) * 6, 1] += one_tile_tex_height * (
-                            tiy + factor_rez.dy * y_idx / tessellation_level)
+                    tiy + factor_rez.dy * y_idx / tessellation_level)
         quads = quads.reshape(6 * tessellation_level * tessellation_level, 3)
         quads = np.ascontiguousarray(quads[:, :2])
         return quads
@@ -937,34 +948,3 @@ class ZList(MutableSequence):
             if len(zult) != len(self._content):
                 raise RuntimeWarning("ZList.to_dict inverse did not have fully unique keys")
             return zult
-
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="PURPOSE",
-        epilog="",
-        fromfile_prefix_chars='@')
-    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG')
-    # http://docs.python.org/2.7/library/argparse.html#nargs
-    # parser.add_argument('--stuff', nargs='5', dest='my_stuff',
-    #                    help="one or more random things")
-    parser.add_argument('pos_args', nargs='*',
-                        help="positional arguments don't have the '-' prefix")
-    args = parser.parse_args()
-
-    levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
-    logging.basicConfig(level=levels[min(3, args.verbosity)])
-
-    if not args.pos_args:
-        unittest.main()
-        return 0
-
-    for pn in args.pos_args:
-        pass
-
-    return 0
-
-
-if __name__ == '__main__':
-    sys.exit(main())

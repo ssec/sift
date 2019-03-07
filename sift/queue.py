@@ -47,9 +47,10 @@ class Worker(QThread):
     queue = None
     depth = 0
 
-    workerDidMakeProgress = pyqtSignal(int,
-                                       list)  # worker id, sequence of dictionaries listing update information to be propagated to view
-    workerDidCompleteTask = pyqtSignal(str, bool)  # task-key, ok: False if exception occurred else True
+    # worker id, sequence of dictionaries listing update information to be propagated to view
+    workerDidMakeProgress = pyqtSignal(int, list)
+    # task-key, ok: False if exception occurred else True
+    workerDidCompleteTask = pyqtSignal(str, bool)
 
     def __init__(self, myid: int):
         super(Worker, self).__init__()
@@ -137,18 +138,20 @@ class TaskQueue(QObject):
 
     def add(self, key, task_iterable, description, interactive=False, and_then=None, use_process_pool=False,
             use_thread_pool=False):
-        """
-        Add an iterable task which will yield progress information dictionaries.
+        """Add an iterable task which will yield progress information dictionaries.
 
-        Expect behavior like this:
+        Expect behavior like this::
+
          for task in queue:
             for status_info in task:
                 update_display(status_info)
             pop_display(final_status_info)
 
-        :param key: unique key for task; queuing the same key will result in the old task being removed and the new one deferred to the end
-        :param task_iterable: callable resulting in an iterable, or an iterable itself to be run on the background
-        :return:
+        Args:
+            key (str): unique key for task. Queuing the same key will result in the old task being removed
+                and the new one deferred to the end
+            task_iterable (iter): callable resulting in an iterable, or an iterable itself to be run on the background
+
         """
         if interactive:
             wdex = self._interactive_round_robin
@@ -171,7 +174,8 @@ class TaskQueue(QObject):
         self._last_status[worker_id] = worker_status
 
         # report on the lowest worker number that's active; (0,1 interactive; 2 background)
-        # yes, this will be redundant and #FUTURE make this a more useful signal content, rather than relying on progress_ratio back-query
+        # yes, this will be redundant
+        # FUTURE make this a more useful signal content, rather than relying on progress_ratio back-query
         for wdex, status in enumerate(self._last_status):
             if self.workers[wdex].isRunning() and status is not None:
                 self.didMakeProgress.emit(status)
