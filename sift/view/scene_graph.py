@@ -144,7 +144,6 @@ class PendingPolygon(object):
         self.points.append(xy_pos)
         if len(xy_pos) == 2:
             xy_pos = [xy_pos[0], xy_pos[1], z]
-        # point_visual = FakeMarker(parent=self.parent, symbol="disc", pos=np.array([xy_pos]), color=np.array([0., 0.5, 0.5, 1.]))
         point_visual = Markers(parent=self.parent,
                                name='polygon_%02d' % (len(self.markers),),
                                symbol="disc", pos=np.array([xy_pos]),
@@ -527,10 +526,12 @@ class SceneGraphManager(QObject):
         return images
 
     def frame_changed(self, frame_info):
-        """
-        callback which emits information on current animation frame as a signal
-        (see LayerSet.next_frame)
-        :param frame_info: tuple to be relayed in the signal, typically (frame_index:int, total_frames:int, animating:bool, frame_id:UUID)
+        """Callback which emits information on current animation frame as a signal (see LayerSet.next_frame)
+
+        Args:
+            frame_info (tuple): to be relayed in the signal.
+                Typically (frame_index:int, total_frames:int, animating:bool, frame_id:UUID)
+
         """
         # LOG.debug('emitting didChangeFrame')
         self.didChangeFrame.emit(frame_info)
@@ -540,11 +541,9 @@ class SceneGraphManager(QObject):
             # except that visibility is being changed by animation interactions
             # only do this when we're not animating, however
             # watch out for signal loops!
-            uuid = frame_info[3]
             uuids = self.layer_set.frame_order
-            tfu = lambda u: True if uuid == u else False
             # note that all the layers in the layer_order but the current one are now invisible
-            vis = dict((u, tfu(u)) for u in uuids)
+            vis = dict((u, u == frame_info[3]) for u in uuids)
             self.didChangeLayerVisibility.emit(vis)
 
     def setup_initial_canvas(self, center=None):
@@ -556,8 +555,6 @@ class SceneGraphManager(QObject):
                                             zoom_limits=(0.0015, 0.0015))
         self.main_view.camera = self.pz_camera
         self.main_view.camera.flip = (False, False, False)
-        # self.main_view.events.mouse_press.connect(self.on_mouse_press_point, after=list(self.main_view.events.mouse_press.callbacks))
-        # self.main_view.events.mouse_press.connect(self.on_mouse_press_region, after=list(self.main_view.events.mouse_press.callbacks))
         self.main_view.events.mouse_press.connect(self.on_mouse_press_point)
         self.main_view.events.mouse_press.connect(self.on_mouse_press_region)
         self.change_tool(Tool.PAN_ZOOM)
@@ -596,10 +593,10 @@ class SceneGraphManager(QObject):
         center = center or proj_info["default_center"]
         width = proj_info["default_width"] / 2.
         height = proj_info["default_height"] / 2.
-        ll_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] - width, center[1] - height)])[0][
-                :2]
-        ur_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] + width, center[1] + height)])[0][
-                :2]
+        ll_xy = self.borders.transforms.get_transform(map_to="scene").map(
+            [(center[0] - width, center[1] - height)])[0][:2]
+        ur_xy = self.borders.transforms.get_transform(map_to="scene").map(
+            [(center[0] + width, center[1] + height)])[0][:2]
         self.main_view.camera.rect = Rect(ll_xy, (ur_xy[0] - ll_xy[0], ur_xy[1] - ll_xy[1]))
 
     def create_test_image(self):
@@ -643,10 +640,10 @@ class SceneGraphManager(QObject):
         center = center or proj_info["default_center"]
         width = proj_info["default_width"] / 2.
         height = proj_info["default_height"] / 2.
-        ll_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] - width, center[1] - height)])[0][
-                :2]
-        ur_xy = self.borders.transforms.get_transform(map_to="scene").map([(center[0] + width, center[1] + height)])[0][
-                :2]
+        ll_xy = self.borders.transforms.get_transform(map_to="scene").map(
+            [(center[0] - width, center[1] - height)])[0][:2]
+        ur_xy = self.borders.transforms.get_transform(map_to="scene").map(
+            [(center[0] + width, center[1] + height)])[0][:2]
         self.main_view.camera.rect = Rect(ll_xy, (ur_xy[0] - ll_xy[0], ur_xy[1] - ll_xy[1]))
         for img in self.image_elements.values():
             if hasattr(img, 'determine_reference_points'):
@@ -698,7 +695,8 @@ class SceneGraphManager(QObject):
         modifiers = event.mouse_event.modifiers
         if (event.button == 2 and not modifiers) or (self._current_tool == Tool.POINT_PROBE and event.button == 1):
             buffer_pos = event.sources[0].transforms.get_transform().map(event.pos)
-            # FIXME: We should be able to use the main_map object to do the transform...but it doesn't work (waiting on vispy developers)
+            # FIXME: We should be able to use the main_map object to do the transform
+            #  but it doesn't work (waiting on vispy developers)
             # map_pos = self.main_map.transforms.get_transform().imap(buffer_pos)
             map_pos = self.borders.transforms.get_transform().imap(buffer_pos)
             if np.any(np.abs(map_pos[:2]) > 1e25):
