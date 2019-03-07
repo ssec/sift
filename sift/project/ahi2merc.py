@@ -41,7 +41,8 @@ def main():
     parser.add_argument("--input-pattern", default="????/*.nc",
                         help="Input pattern used search for NetCDF files in 'input_dir'")
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG (default Info)')
+                        help='each occurrence increases verbosity 1 level through '
+                             'ERROR-WARNING-Info-DEBUG (default Info)')
 
     # http://www.gdal.org/frmt_gtiff.html
     parser.add_argument('--compress', default=None,
@@ -62,7 +63,8 @@ def main():
     parser.add_argument("input_dir",
                         help="Input directory to search for the 'input_pattern' specified")
     parser.add_argument("output_dir",
-                        help="Output directory to place new mercator files (input_pattern structure is reflected in output dir)")
+                        help="Output directory to place new mercator files "
+                             "(input_pattern structure is reflected in output dir)")
     parser.add_argument("gdalwarp_args", nargs="*",
                         help="arguments that are passed directly to gdalwarp")
     args = parser.parse_args()

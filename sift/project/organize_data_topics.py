@@ -139,10 +139,12 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description="Regenerate or generate mirrored AHI data structure")
     parser.add_argument("base_ahi_dir", default="/odyssey/isis/tmp/davidh/sift_data/ahi",
-                        help="Base AHI directory for the geotiff data files (next child directory is the full dated directory)")
+                        help="Base AHI directory for the geotiff data files "
+                             "(next child directory is the full dated directory)")
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count",
                         default=int(os.environ.get("VERBOSITY", 2)),
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG (default Info)')
+                        help='each occurrence increases verbosity 1 level through '
+                             'ERROR-WARNING-Info-DEBUG (default Info)')
     parser.add_argument("--overwrite", action="store_true",
                         help="Overwrite existing hardlinks")
     args = parser.parse_args()

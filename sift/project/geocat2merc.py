@@ -20,7 +20,7 @@ from netCDF4 import Dataset
 from osgeo import gdal
 from pyproj import Proj
 
-from sift.project.ahi2gtiff import create_ahi_geotiff, ahi_image_data, AHI_NADIR_RES
+from sift.project.ahi2gtiff import create_ahi_geotiff, AHI_NADIR_RES
 
 LOG = logging.getLogger(__name__)
 GTIFF_DRIVER = gdal.GetDriverByName("GTIFF")
@@ -78,7 +78,8 @@ def ahi_image_info(input_filename):
     # input_proj_str += "+h={perspective_point_height} "
     # input_proj_str += "+sweep={sweep_angle_axis}"
     # input_proj_str = input_proj_str.format(**projection_info)
-    input_proj_str = "+proj=geos +over +lon_0=140.7 +h=35785863 +x_0=0 +y_0=0 +a=6378137 +b=6356752.299581327 +units=m +no_defs"
+    input_proj_str = "+proj=geos +over +lon_0=140.7 +h=35785863 +x_0=0 +y_0=0 " \
+                     "+a=6378137 +b=6356752.299581327 +units=m +no_defs"
     LOG.debug("AHI Fixed Grid Projection String: %s", input_proj_str)
 
     # Calculate upper-left corner (origin) using center point as a reference
@@ -198,7 +199,8 @@ def main():
     parser.add_argument("--input-pattern", default="????/*.nc",
                         help="Input pattern used search for NetCDF files in 'input_dir'")
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG (default Info)')
+                        help='each occurrence increases verbosity 1 level through'
+                             'ERROR-WARNING-Info-DEBUG (default Info)')
 
     # http://www.gdal.org/frmt_gtiff.html
     parser.add_argument('--compress', default=None,
@@ -222,7 +224,8 @@ def main():
     parser.add_argument("input_dir",
                         help="Input directory to search for the 'input_pattern' specified")
     parser.add_argument("output_dir",
-                        help="Output directory to place new mercator files (input_pattern structure is reflected in output dir)")
+                        help="Output directory to place new mercator files "
+                             "(input_pattern structure is reflected in output dir)")
     parser.add_argument("gdalwarp_args", nargs="*",
                         help="arguments that are passed directly to gdalwarp")
     args = parser.parse_args()

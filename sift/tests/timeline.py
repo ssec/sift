@@ -3,8 +3,8 @@ import sys
 import time
 from random import randint, shuffle
 
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
+from PyQt4.QtCore import *  # noqa
+from PyQt4.QtGui import *  # noqa
 from PyQt4.QtOpenGL import QGLWidget, QGLFormat, QGL
 
 
