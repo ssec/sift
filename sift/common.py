@@ -161,8 +161,7 @@ WORLD_EXTENT_BOX = Box(b=-MAX_EXCURSION_Y, l=-MAX_EXCURSION_X, t=MAX_EXCURSION_Y
 
 
 class State(Enum):
-    """State for products in document
-    """
+    """State for products in document."""
     UNKNOWN = 0
     POTENTIAL = 1  # product is available as a resource and could be imported or calculated
     ARRIVING = 2  # import or calculation in progress
