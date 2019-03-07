@@ -168,10 +168,10 @@ class CreateAlgebraicDialog(QtGui.QDialog):
             try:
                 operations = self.ui.operations_text.toPlainText()
                 ops_ast = ast.parse(operations, mode='exec')
-                ops = compile(ops_ast, '<string>', 'exec')
-                result_name = ops_ast.body[-1].targets[0].id
+                compile(ops_ast, '<string>', 'exec')
+                # result_name = ops_ast.body[-1].targets[0].id
             except (AttributeError, KeyError, IndexError, SyntaxError):
-                ret_button = QtGui.QMessageBox.critical(
+                _ = QtGui.QMessageBox.critical(
                     self,
                     'Error: Syntax Error',
                     'Error: Syntax Error in Operations code. Must be valid Python 3 syntax.',
@@ -193,7 +193,7 @@ class CreateAlgebraicDialog(QtGui.QDialog):
                 if ret == QtGui.QMessageBox.No:
                     return
             elif status_title.startswith('Error'):
-                ret_button = QtGui.QMessageBox.critical(
+                QtGui.QMessageBox.critical(
                     self,
                     status_title,
                     status_text,

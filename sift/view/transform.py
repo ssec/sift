@@ -171,7 +171,7 @@ def stere_init(proj_dict):
                 proj_dict['akm1'] = 2. / np.sqrt((1 + e) ** (1 + e) * (1 - e) ** (1 - e))
             else:
                 proj_dict['akm1'] = np.cos(phits) / (
-                            pj_tsfn_py(phits, np.sin(phits), e) * np.sqrt(1. - (np.sin(phits) * e) ** 2))
+                    pj_tsfn_py(phits, np.sin(phits), e) * np.sqrt(1. - (np.sin(phits) * e) ** 2))
         else:
             # sphere
             proj_dict['akm1'] = np.cos(phits) / np.tan(M_FORTPI - .5 * phits) if abs(phits - M_HALFPI) >= 1e-10 else 2.

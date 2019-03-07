@@ -117,8 +117,9 @@ class ColormapEditor(QtGui.QDialog):
                     self.user_colormap_states[save_name] = self.ColorBar.saveState()
             else:
                 if save_name in self.builtin_colormap_states:
-                    QtGui.QMessageBox.information(self, "Error",
-                                                  "You cannot save a gradient with the same name as one of the internal gradients.")
+                    QtGui.QMessageBox.information(
+                        self, "Error",
+                        "You cannot save a gradient with the same name as one of the internal gradients.")
                     return
 
                 self.user_colormap_states[save_name] = self.ColorBar.saveState()

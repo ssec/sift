@@ -380,7 +380,7 @@ class RGBLayerConfigPane(QObject):
                 display_name = family_info[Info.DISPLAY_FAMILY]
                 LOG.debug('adding to widget family {} as "{}"'.format(family_name, display_name))
                 widget.addItem(display_name, family_name)
-                sanity_check = widget.findData(family_name)
+                widget.findData(family_name)  # sanity check
                 if family_name == selected_family:
                     # None is 0 so add 1 to index
                     widget.setCurrentIndex(idx + 1)
