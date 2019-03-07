@@ -78,7 +78,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
         self.font.setPointSizeF(fsize)
 
     def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex):
-        pz = self.layer_prez(index.row())
+        # pz = self.layer_prez(index.row())
         # if pz.kind == Kind.RGB:
         #     LOG.debug('triple-sizing composite layer')
         #     return QSize(CELL_WIDTH, CELL_HEIGHT*3)
@@ -109,15 +109,15 @@ class LayerWidgetDelegate(QStyledItemDelegate):
         # if we have a point probe value, draw the filled bar to represent where it is in that layer's data range
         if value:
             value, bar, fmtd_str = value
-            w = bar * float(rect.width())
-            r = QRect(rect.left(), rect.top(), int(w), rect.height())
-            painter.fillRect(r, color)
+            width = bar * float(rect.width())
+            right = QRect(rect.left(), rect.top(), int(width), rect.height())
+            painter.fillRect(right, color)
 
         super(LayerWidgetDelegate, self).paint(painter, option, index)
 
         # if this layer is selected, draw a colored rectangle to highlight it
         if option.state & QStyle.State_Selected and value:
-            painter.fillRect(r, QColor(213, 187, 255, 96))
+            painter.fillRect(right, QColor(213, 187, 255, 96))
 
         # draw the name of the layer
         painter.setPen(QPen(Qt.black))
@@ -154,16 +154,16 @@ class LayerWidgetDelegate(QStyledItemDelegate):
         if value:
             painter.setPen(Qt.darkBlue)
             theight = CELL_HEIGHT / 2
-            t = rect.top() + rect.height() - theight
-            if w < rect.width() / 3:  # place the text to the right of the bar instead of inside
-                l = max(int(w), LEFT_OFFSET)
-                r = rect.width()
+            top = rect.top() + rect.height() - theight
+            if width < rect.width() / 3:  # place the text to the right of the bar instead of inside
+                left = max(int(width), LEFT_OFFSET)
+                right = rect.width()
                 align = Qt.AlignLeft
             else:
-                l = 0
-                r = w
+                left = 0
+                right = width
                 align = Qt.AlignRight
-            painter.drawText(l, t, r - l, theight, align, fmtd_str)
+            painter.drawText(left, top, right - left, theight, align, fmtd_str)
 
         painter.restore()
 
@@ -224,13 +224,18 @@ class LayerWidgetDelegate(QStyledItemDelegate):
 
 
 class LayerStackTreeViewModel(QAbstractItemModel):
-    """ behavior connecting list widget to layer stack (both ways)
-        Each table view represents a different configured document layer stack "set" - user can select from at least four.
-        Convey layer set information to/from the document to the respective table, including selection.
-        ref: http://duganchen.ca/a-pythonic-qt-list-model-implementation/
-        http://doc.qt.io/qt-5/qabstractitemmodel.html#beginMoveRows
-        http://pyqt.sourceforge.net/Docs/PyQt4/qabstractitemmodel.html
-        http://doc.qt.io/qt-5/qtwidgets-itemviews-simpletreemodel-example.html
+    """Behavior connecting list widget to layer stack (both ways)
+
+    Each table view represents a different configured document layer stack "set" - user can select from at least four.
+    Convey layer set information to/from the document to the respective table, including selection.
+
+    References:
+
+        - http://duganchen.ca/a-pythonic-qt-list-model-implementation/
+        - http://doc.qt.io/qt-5/qabstractitemmodel.html#beginMoveRows
+        - http://pyqt.sourceforge.net/Docs/PyQt4/qabstractitemmodel.html
+        - http://doc.qt.io/qt-5/qtwidgets-itemviews-simpletreemodel-example.html
+
     """
     widgets = None
     doc = None
@@ -319,7 +324,8 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         """connected to the various listbox signals that represent the user changing selections
         """
         selected_uuids = tuple(self.current_selected_uuids(self.current_set_listbox))
-        self.current_set_listbox.update()  # FUTURE: this is needed in order to prevent selection display artifacts. why?
+        # FUTURE: this is needed in order to prevent selection display artifacts. why?
+        self.current_set_listbox.update()
         self.uuidSelectionChanged.emit(selected_uuids)
 
     @property
@@ -537,7 +543,8 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             count = len(insertion_info)
             if row == -1:
                 row = len(self.doc)  # append
-                # FIXME: row=col=-1 implies drop-on-parent, which may mean replace or may mean append for composite layers
+                # FIXME: row=col=-1 implies drop-on-parent
+                #  which may mean replace or may mean append for composite layers
             # self.insertRows(row, count)
             # for i, presentation in enumerate(l):
             #     self.setData(self.index(row+i, 0), presentation)
@@ -570,17 +577,17 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         # return super(LayerStackListViewModel, self).dropMimeData(mime, action, row, column, parent)
 
     def mimeData(self, list_of_QModelIndex):
-        l = []
+        valid_rows = []
         for index in list_of_QModelIndex:
             # create a list of Presentation tuples showing how layers are presented
             if index.isValid():
-                l.append((index.row(), self.doc.current_layer_set[index.row()]))
-        p = pkl.dumps((len(self.doc.current_layer_set), l), pkl.HIGHEST_PROTOCOL)
+                valid_rows.append((index.row(), self.doc.current_layer_set[index.row()]))
+        p = pkl.dumps((len(self.doc.current_layer_set), valid_rows), pkl.HIGHEST_PROTOCOL)
         mime = QMimeData()
         # t = base64.encodebytes(p).decode('ascii')
         # LOG.debug('mimetext for drag is "{}"'.format(t))
         mime.setData(self._mimetype, p)
-        LOG.debug('presenting mime data for {0!r:s}'.format(l))
+        LOG.debug('presenting mime data for {0!r:s}'.format(valid_rows))
         return mime
 
     def mimeTypes(self):
@@ -588,9 +595,11 @@ class LayerStackTreeViewModel(QAbstractItemModel):
                 self._mimetype]  # ref https://github.com/shotgunsoftware/pyqt-uploader/blob/master/uploader.py
 
     # http://stackoverflow.com/questions/6942098/qt-qtreeview-only-allow-to-drop-on-an-existing-item
-    # Reimplement the Flags method of the underlying model to return Qt::ItemIsDropEnabled only if passed index is valid.
+    # Reimplement the Flags method of the underlying model to return
+    #     Qt::ItemIsDropEnabled only if passed index is valid.
     # When in between items, Flags() is called with an invalid index so I can decide not to accept the drop
-    # For the inverse you can do this: if ( index.isValid() ) { return Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsDragEnabled; }
+    # For the inverse you can do this:
+    #     if ( index.isValid() ) { return Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsDragEnabled; }
     # else { return Qt::ItemIsSelectable | Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled | Qt::ItemIsEnabled; }
     def flags(self, index):
         # Flags = super(LayerStackListViewModel, self).Flags(index)
@@ -613,7 +622,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
 
     def rowCount(self, QModelIndex_parent=None, *args, **kwargs):
         # LOG.debug('{} layers'.format(len(self.doc)))
-        if QModelIndex_parent == None or QModelIndex_parent == QModelIndex():
+        if QModelIndex_parent is None or QModelIndex_parent == QModelIndex():
             return len(self.doc)
         return 0
 
