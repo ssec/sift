@@ -18,10 +18,8 @@ numba
 :copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-import typing as typ
-from collections import namedtuple
 from enum import Enum
-from typing import MutableSequence, Tuple, Optional, Iterable, Any
+from typing import MutableSequence, Tuple, Optional, Iterable, Any, NamedTuple
 from uuid import UUID
 
 import numpy as np
@@ -102,14 +100,41 @@ CANVAS_EXTENTS_EPSILON = 1e-4
 # MAX_EXCURSION_Y = C_POL/4.0
 # MAX_EXCURSION_X = C_EQ/2.0
 
-box = namedtuple('box', ('b', 'l', 't', 'r'))  # bottom, left, top, right
-rez = namedtuple('rez', ('dy', 'dx'))  # world km / pixel distance
-pnt = namedtuple('pnt', ('y', 'x'))
-geo = namedtuple('geo', ('n', 'e'))  # lat N, lon E
-vue = namedtuple('vue', ('b', 'l', 't', 'r', 'dy', 'dx'))  # combination of box + rez
+
+class Box(NamedTuple):
+    b: float
+    l: float
+    t: float
+    r: float
 
 
-class Span(typ.NamedTuple):
+class Resolution(NamedTuple):
+    """Pixel resolution (km per pixel)."""
+    dy: float
+    dx: float
+
+
+class Point(NamedTuple):
+    y: float
+    x: float
+
+
+class Coordinate(NamedTuple):
+    n: float  # deg_north
+    e: float  # deg_east
+
+
+class ViewBox(NamedTuple):
+    """Combination of Box + Resolution."""
+    b: float
+    l: float
+    t: float
+    r: float
+    dy: float
+    dx: float
+
+
+class Span(NamedTuple):
     s: datetime  # start
     d: timedelta  # duration
 
@@ -132,7 +157,7 @@ class Flags(set):
     pass
 
 
-WORLD_EXTENT_BOX = box(b=-MAX_EXCURSION_Y, l=-MAX_EXCURSION_X, t=MAX_EXCURSION_Y, r=MAX_EXCURSION_X)
+WORLD_EXTENT_BOX = Box(b=-MAX_EXCURSION_Y, l=-MAX_EXCURSION_X, t=MAX_EXCURSION_Y, r=MAX_EXCURSION_X)
 
 
 class State(Enum):
@@ -306,7 +331,7 @@ class Info(Enum):
         raise ValueError("cannot compare {} == {}".format(repr(self), repr(other)))
 
 
-class Presentation(typ.NamedTuple):
+class Presentation(NamedTuple):
     """Presentation information for a layer.
 
     z_order comes from the layerset
@@ -424,8 +449,8 @@ def clip(v, n, x):
     return max(min(v, x), n)
 
 
-@jit(nb_types.NamedUniTuple(float64, 4, box)(
-    nb_types.NamedUniTuple(float64, 4, box),
+@jit(nb_types.NamedUniTuple(float64, 4, Box)(
+    nb_types.NamedUniTuple(float64, 4, Box),
     nb_types.Array(float64, 1, 'C'),
     nb_types.Array(float64, 1, 'C'),
     nb_types.UniTuple(int64, 2),
@@ -446,13 +471,13 @@ def calc_view_extents(image_extents_box, canvas_point, image_point, canvas_size,
         # they are viewing essentially nothing or the image isn't in view
         raise ValueError("Image can't be currently viewed")
 
-    return box(l=l, r=r, b=b, t=t)
+    return Box(l=l, r=r, b=b, t=t)
 
 
 @jit(nb_types.UniTuple(float64, 2)(
-    nb_types.NamedUniTuple(int64, 2, pnt),
-    nb_types.NamedUniTuple(int64, 2, pnt),
-    nb_types.NamedUniTuple(int64, 2, pnt)
+    nb_types.NamedUniTuple(int64, 2, Point),
+    nb_types.NamedUniTuple(int64, 2, Point),
+    nb_types.NamedUniTuple(int64, 2, Point)
 ),
     nopython=True)
 def max_tiles_available(image_shape, tile_shape, stride):
@@ -461,15 +486,15 @@ def max_tiles_available(image_shape, tile_shape, stride):
     return ath, atw
 
 
-# @jit(nb_types.NamedUniTuple(int64, 4, box)(
-#         nb_types.NamedUniTuple(float64, 2, rez),
-#         nb_types.NamedUniTuple(float64, 2, rez),
-#         nb_types.NamedUniTuple(float64, 2, pnt),
-#         nb_types.NamedUniTuple(int64, 2, pnt),
-#         nb_types.NamedUniTuple(int64, 2, pnt),
-#         nb_types.NamedUniTuple(float64, 6, vue),
-#         nb_types.NamedUniTuple(int64, 2, pnt),
-#         nb_types.NamedUniTuple(int64, 4, box)
+# @jit(nb_types.NamedUniTuple(int64, 4, Box)(
+#         nb_types.NamedUniTuple(float64, 2, Resolution),
+#         nb_types.NamedUniTuple(float64, 2, Resolution),
+#         nb_types.NamedUniTuple(float64, 2, Point),
+#         nb_types.NamedUniTuple(int64, 2, Point),
+#         nb_types.NamedUniTuple(int64, 2, Point),
+#         nb_types.NamedUniTuple(float64, 6, ViewBox),
+#         nb_types.NamedUniTuple(int64, 2, Point),
+#         nb_types.NamedUniTuple(int64, 4, Box)
 #     ),
 #      nopython=True)
 @jit(nopython=True)
@@ -480,22 +505,22 @@ def visible_tiles(pixel_rez,
                   tile_shape,
                   visible_geom, stride, extra_tiles_box):
     """
-    given a visible world geometry and sampling, return (sampling-state, [box-of-tiles-to-draw])
+    given a visible world geometry and sampling, return (sampling-state, [Box-of-tiles-to-draw])
     sampling state is WELLSAMPLED/OVERSAMPLED/UNDERSAMPLED
-    returned box should be iterated per standard start:stop style
+    returned Box should be iterated per standard start:stop style
     tiles are specified as (iy,ix) integer pairs
     extra_box value says how many extra tiles to include around each edge
     """
     V = visible_geom
     X = extra_tiles_box  # FUTURE: extra_geom_box specifies in world coordinates instead of tile count
     Z = pixel_rez
-    tile_size = rez(tile_size.dy * stride[0], tile_size.dx * stride[1])
+    tile_size = Resolution(tile_size.dy * stride[0], tile_size.dx * stride[1])
     # should be the upper-left corner of the tile centered on the center of the image
-    to = pnt(image_center[0] + tile_size.dy / 2.,
-             image_center[1] - tile_size.dx / 2.)  # tile origin
+    to = Point(image_center[0] + tile_size.dy / 2.,
+               image_center[1] - tile_size.dx / 2.)  # tile origin
 
     # number of data pixels between view edge and originpoint
-    pv = box(
+    pv = Box(
         b=(V.b - to.y) / -(Z.dy * stride[0]),
         t=(V.t - to.y) / -(Z.dy * stride[0]),
         l=(V.l - to.x) / (Z.dx * stride[1]),
@@ -544,7 +569,7 @@ def visible_tiles(pixel_rez,
     if tiy0 + nth > hh + 0.5:
         nth = hh + 0.5 - tiy0
 
-    tilebox = box(
+    tilebox = Box(
         b=np.int64(np.ceil(tiy0 + nth)),
         l=np.int64(np.floor(tix0)),
         t=np.int64(np.floor(tiy0)),
@@ -597,10 +622,10 @@ class TileCalculator(object):
         """
         super(TileCalculator, self).__init__()
         self.name = name
-        self.image_shape = pnt(np.int64(image_shape[0]), np.int64(image_shape[1]))
-        self.ul_origin = pnt(*ul_origin)
-        self.pixel_rez = rez(np.float64(pixel_rez[0]), np.float64(pixel_rez[1]))
-        self.tile_shape = pnt(np.int64(tile_shape[0]), np.int64(tile_shape[1]))
+        self.image_shape = Point(np.int64(image_shape[0]), np.int64(image_shape[1]))
+        self.ul_origin = Point(*ul_origin)
+        self.pixel_rez = Resolution(np.float64(pixel_rez[0]), np.float64(pixel_rez[1]))
+        self.tile_shape = Point(np.int64(tile_shape[0]), np.int64(tile_shape[1]))
         # in units of tiles:
         self.texture_shape = texture_shape
         # in units of data elements (float32):
@@ -609,7 +634,7 @@ class TileCalculator(object):
         self.wrap_lon = wrap_lon
 
         self.proj = Proj(projection)
-        self.image_extents_box = e = box(
+        self.image_extents_box = e = Box(
             b=np.float64(self.ul_origin[0] - self.image_shape[0] * self.pixel_rez.dy),
             t=np.float64(self.ul_origin[0]),
             l=np.float64(self.ul_origin[1]),
@@ -619,13 +644,13 @@ class TileCalculator(object):
         # Used when checking if the image is viewable on the current canvas's projection
         self.image_mesh = np.meshgrid(np.linspace(e.l, e.r, IMAGE_MESH_SIZE), np.linspace(e.b, e.t, IMAGE_MESH_SIZE))
         self.image_mesh = np.column_stack((self.image_mesh[0].ravel(), self.image_mesh[1].ravel(),))
-        self.image_center = pnt(self.ul_origin.y - self.image_shape[0] / 2. * self.pixel_rez.dy,
-                                self.ul_origin.x + self.image_shape[1] / 2. * self.pixel_rez.dx)
+        self.image_center = Point(self.ul_origin.y - self.image_shape[0] / 2. * self.pixel_rez.dy,
+                                  self.ul_origin.x + self.image_shape[1] / 2. * self.pixel_rez.dx)
         # size of tile in image projection
-        self.tile_size = rez(self.pixel_rez.dy * self.tile_shape[0], self.pixel_rez.dx * self.tile_shape[1])
+        self.tile_size = Resolution(self.pixel_rez.dy * self.tile_shape[0], self.pixel_rez.dx * self.tile_shape[1])
         self.overview_stride = self.calc_overview_stride()
 
-    def visible_tiles(self, visible_geom, stride=pnt(1, 1), extra_tiles_box=box(0, 0, 0, 0)):
+    def visible_tiles(self, visible_geom, stride=Point(1, 1), extra_tiles_box=Box(0, 0, 0, 0)):
         # return visible_tiles(self.pixel_rez,
         #                      self.tile_size,
         #                      self.image_center,
@@ -637,18 +662,18 @@ class TileCalculator(object):
         v = visible_geom
         e = extra_tiles_box
         return visible_tiles(
-            rez(np.float64(self.pixel_rez[0]), np.float64(self.pixel_rez[1])),
-            rez(np.float64(self.tile_size[0]), np.float64(self.tile_size[1])),
-            pnt(np.float64(self.image_center[0]), np.float64(self.image_center[1])),
-            pnt(np.int64(self.image_shape[0]), np.int64(self.image_shape[1])),
-            pnt(np.int64(self.tile_shape[0]), np.int64(self.tile_shape[1])),
-            vue(
+            Resolution(np.float64(self.pixel_rez[0]), np.float64(self.pixel_rez[1])),
+            Resolution(np.float64(self.tile_size[0]), np.float64(self.tile_size[1])),
+            Point(np.float64(self.image_center[0]), np.float64(self.image_center[1])),
+            Point(np.int64(self.image_shape[0]), np.int64(self.image_shape[1])),
+            Point(np.int64(self.tile_shape[0]), np.int64(self.tile_shape[1])),
+            ViewBox(
                 np.float64(v[0]), np.float64(v[1]),
                 np.float64(v[2]), np.float64(v[3]),
                 np.float64(v[4]), np.float64(v[5]),
             ),
-            pnt(np.int64(stride[0]), np.int64(stride[1])),
-            box(
+            Point(np.int64(stride[0]), np.int64(stride[1])),
+            Box(
                 np.int64(e[0]), np.int64(e[1]),
                 np.int64(e[2]), np.int64(e[3])
             ))
@@ -686,7 +711,7 @@ class TileCalculator(object):
         """Calculate the fractional components of the specified tile
 
         Returns:
-            (factor, offset): Two `rez` objects stating the relative size
+            (factor, offset): Two `Resolution` objects stating the relative size
                               of the tile compared to a whole tile and the
                               offset from the origin of a whole tile.
         """
@@ -718,17 +743,17 @@ class TileCalculator(object):
             offset_y = 0.
             factor_y = 1.
 
-        factor_rez = rez(dy=factor_y, dx=factor_x)
-        offset_rez = rez(dy=offset_y, dx=offset_x)
+        factor_rez = Resolution(dy=factor_y, dx=factor_x)
+        offset_rez = Resolution(dy=offset_y, dx=offset_x)
         return factor_rez, offset_rez
 
     @jit
     def calc_stride(self, visible, texture=None):
         """
-        given world geometry and sampling as a vue or rez tuple
+        given world geometry and sampling as a ViewBox or Resolution tuple
         calculate a conservative stride value for rendering a set of tiles
-        :param visible: vue or rez with world pixels per screen pixel
-        :param texture: vue or rez with texture resolution as world pixels per screen pixel
+        :param visible: ViewBox or Resolution with world pixels per screen pixel
+        :param texture: ViewBox or Resolution with texture resolution as world pixels per screen pixel
         """
         # screen dy,dx in world distance per pixel
         # world distance per pixel for our data
@@ -738,7 +763,7 @@ class TileCalculator(object):
                   max(1, np.ceil(visible.dy * PREFERRED_SCREEN_TO_TEXTURE_RATIO / texture.dy)))
         tsx = min(self.overview_stride[1].step,
                   max(1, np.ceil(visible.dx * PREFERRED_SCREEN_TO_TEXTURE_RATIO / texture.dx)))
-        return pnt(np.int64(tsy), np.int64(tsx))
+        return Point(np.int64(tsy), np.int64(tsx))
 
     @jit
     def calc_overview_stride(self, image_shape=None):

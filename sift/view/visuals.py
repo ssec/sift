@@ -44,7 +44,7 @@ from sift.common import (
     DEFAULT_TEXTURE_HEIGHT,
     DEFAULT_TEXTURE_WIDTH,
     TESS_LEVEL,
-    box, pnt, rez, vue,
+    Box, Point, Resolution, ViewBox,
     TileCalculator,
     calc_pixel_size,
     get_reference_points,
@@ -284,8 +284,8 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self.calc = TileCalculator(
             self.name,
             self.shape,
-            pnt(x=self.origin_x, y=self.origin_y),
-            rez(dy=abs(self.cell_height), dx=abs(self.cell_width)),
+            Point(x=self.origin_x, y=self.origin_y),
+            Resolution(dy=abs(self.cell_height), dx=abs(self.cell_width)),
             self.tile_shape,
             self.texture_shape,
             wrap_lon=self.wrap_lon,
@@ -432,7 +432,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         tl = TESS_LEVEL * TESS_LEVEL
         nfo["texture_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
         nfo["vertex_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
-        factor_rez, offset_rez = self.calc.calc_tile_fraction(0, 0, pnt(np.int64(y_slice.step), np.int64(x_slice.step)))
+        factor_rez, offset_rez = self.calc.calc_tile_fraction(0, 0, Point(np.int64(y_slice.step), np.int64(x_slice.step)))
         nfo["texture_coordinates"][:6 * tl, :2] = self.calc.calc_texture_coordinates(ttile_idx, factor_rez, offset_rez,
                                                                                      tessellation_level=TESS_LEVEL)
         nfo["vertex_coordinates"][:6 * tl, :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step,
@@ -605,7 +605,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
                                  img_vbox[(self._ref1, self._ref2), :],
                                  self.canvas.size)
         view_extents = self.calc.calc_view_extents(img_cmesh[ref_idx_1], img_vbox[ref_idx_1], self.canvas.size, dx, dy)
-        return vue(*view_extents, dx=dx, dy=dy)
+        return ViewBox(*view_extents, dx=dx, dy=dy)
 
     def _get_stride(self, view_box):
         return self.calc.calc_stride(view_box)
@@ -618,7 +618,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         try:
             view_box = self.get_view_box()
             preferred_stride = self._get_stride(view_box)
-            tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride, extra_tiles_box=box(1, 1, 1, 1))
+            tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride, extra_tiles_box=Box(1, 1, 1, 1))
         except ValueError:
             LOG.error("Could not determine viewable image area for '{}'".format(self.name))
             return False, self._stride, self._latest_tile_box
@@ -885,14 +885,14 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         self._channel_factors = tuple(
             self.shape[0] / float(chn.shape[0]) if chn is not None else 1. for chn in data_arrays)
         self._lowest_factor = max(self._channel_factors)
-        self._lowest_rez = rez(abs(self.cell_height * self._lowest_factor), abs(self.cell_width * self._lowest_factor))
+        self._lowest_rez = Resolution(abs(self.cell_height * self._lowest_factor), abs(self.cell_width * self._lowest_factor))
 
         # Where does this image lie in this lonely world
         self.calc = TileCalculator(
             self.name,
             self.shape,
-            pnt(x=self.origin_x, y=self.origin_y),
-            rez(dy=abs(self.cell_height), dx=abs(self.cell_width)),
+            Point(x=self.origin_x, y=self.origin_y),
+            Resolution(dy=abs(self.cell_height), dx=abs(self.cell_width)),
             self.tile_shape,
             self.texture_shape,
             wrap_lon=self.wrap_lon
@@ -934,7 +934,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         tl = TESS_LEVEL * TESS_LEVEL
         nfo["texture_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
         nfo["vertex_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
-        factor_rez, offset_rez = self.calc.calc_tile_fraction(0, 0, pnt(np.int64(y_slice.step), np.int64(x_slice.step)))
+        factor_rez, offset_rez = self.calc.calc_tile_fraction(0, 0, Point(np.int64(y_slice.step), np.int64(x_slice.step)))
         nfo["texture_coordinates"][:6 * tl, :2] = self.calc.calc_texture_coordinates(ttile_idx, factor_rez, offset_rez,
                                                                                      tessellation_level=TESS_LEVEL)
         nfo["vertex_coordinates"][:6 * tl, :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step,
@@ -1035,7 +1035,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
 
     def _get_stride(self, view_box):
         s = self.calc.calc_stride(view_box, texture=self._lowest_rez)
-        return pnt(np.int64(s[0] * self._lowest_factor), np.int64(s[1] * self._lowest_factor))
+        return Point(np.int64(s[0] * self._lowest_factor), np.int64(s[1] * self._lowest_factor))
 
 
 CompositeLayer = create_visual_node(CompositeLayerVisual)
