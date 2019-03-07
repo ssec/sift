@@ -63,15 +63,22 @@ https://stackoverflow.com/questions/4216139/python-object-in-qmimedata
 :copyright: 2017 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-from typing import Mapping
+import logging
+from typing import Mapping, Any, Tuple
 from uuid import UUID
 from weakref import ref
+import pickle as pkl
+from datetime import datetime, timedelta
 
-from PyQt4.QtCore import Qt
-from PyQt4.QtGui import *
+from PyQt4.QtCore import Qt, QRectF
+from PyQt4.QtGui import (QGraphicsItem, QGraphicsObject, QIcon, QGradient, QImage, QPixmap,
+                         QGraphicsTextItem, QGraphicsPixmapItem, QPainter, QStyleOptionGraphicsItem,
+                         QWidget, QGraphicsSceneMouseEvent, QGraphicsSceneDragDropEvent, QGraphicsSceneContextMenuEvent,
+                         QPen, QBrush, QGraphicsRectItem)
 
 from sift.common import Flags
-from .common import *
+from .common import (CoordTransform, GFXC, MIMETYPE_TIMELINE_COLORMAP, MIMETYPE_TIMELINE_TRACK,
+                     mimed_colormap, mimed_track, recv_mime, VisualState)
 
 LOG = logging.getLogger(__name__)
 
@@ -116,7 +123,9 @@ class QTrackItem(QGraphicsObject):
     _title: str = None
     _subtitle: str = None
     _icon: QIcon = None  # e.g. whether it's algebraic or RGB
-    _metadata: Mapping = None  # arbitrary key-value store for selecting by metadata; in our case this often includes item family for seleciton
+    # arbitrary key-value store for selecting by metadata;
+    # in our case this often includes item family for seleciton
+    _metadata: Mapping = None
     _tooltip: str = None
     _state: Flags = None  # VisualState Flags determine how it's being presented
     _colormap: [QGradient, QImage, QPixmap] = None
@@ -124,7 +133,9 @@ class QTrackItem(QGraphicsObject):
     _max: float = None
     _dragging: bool = False  # whether or not a drag is in progress across this item
     # position in scene coordinates is determined by _z level and starting time of first frame, minus _left_pad
-    _bounds: QRectF = QRectF()  # bounds of the track in scene coordinates, assuming 0,0 corresponds to vertical center of left edge of frame representation
+    # bounds of the track in scene coordinates, assuming 0,0 corresponds to vertical center of left edge of
+    # frame representation
+    _bounds: QRectF = QRectF()
     _gi_title: QGraphicsTextItem = None
     _gi_subtitle: QGraphicsTextItem = None
     _gi_icon: QGraphicsPixmapItem = None
@@ -277,7 +288,7 @@ class QTrackItem(QGraphicsObject):
         new_track_before = recv_mime(event, MIMETYPE_TIMELINE_TRACK)
         if new_track_before is not None:
             self.insert_track_before(new_track_before)
-        content = pkl.loads(event.mimeData().data())
+        _ = pkl.loads(event.mimeData().data())
         event.setAccepted(False)
 
     # working with Frames as sub-items, updating and syncing position and extents
@@ -321,9 +332,11 @@ class QTrackItem(QGraphicsObject):
         # convert track extent to scene coordinates using current transform
         frames_left, frames_width = self._scale.calc_pixel_x_pos(t, d)
         screen_track_center_y = self._scale.calc_track_pixel_y_center(self.z)
-        # track_left, track_width = self._scale.calc_pixel_x_pos(t - GFXC.track_left_pad, d + GFXC.track_left_pad + GFXC.track_right_pad)
+        # track_left, track_width = self._scale.calc_pixel_x_pos(t - GFXC.track_left_pad,
+        #     d + GFXC.track_left_pad + GFXC.track_right_pad)
         # set track position, assuming we want origin coordinate of track item to be centered vertically within item
-        # bounds relative to position in scene, left_pad space to left of local origin (x<0), frames and right-pad at x>=0
+        # bounds relative to position in scene, left_pad space to left of local origin (x<0),
+        # frames and right-pad at x>=0
         self.prepareGeometryChange()
         self._bounds = QRectF(-GFXC.track_left_pad, -GFXC.track_height / 2,
                               frames_width + GFXC.track_left_pad + GFXC.track_right_pad, GFXC.track_height)
@@ -539,7 +552,11 @@ class QFrameItem(QGraphicsObject):
 
 
 class QTimeRulerItem(QGraphicsRectItem):
-    """A ruler object showing the time dimension, an instance of which is at the top, bottom, or both ends of the Scene"""
+    """A ruler object showing the time dimension.
+
+    An instance is at the top, bottom, or both ends of the Scene.
+
+    """
 
     def __init__(self):
         super(QTimeRulerItem, self).__init__()

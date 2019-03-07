@@ -312,8 +312,11 @@ class QFramesInTracksScene(QGraphicsScene):
     def _shift_zorders_to_open(self, inserting_above_z: int,
                                subject: QTrackItem = None,
                                zord: Mapping[int, QTrackItem] = None) -> Tuple[List[QTrackItem], int]:
-        """open up a z-order to move or insert a track
-        for zorder >=0 we bubble everything above upward and place new layer at trkz+1; for zorder<0 we bubble everything downward
+        """Open up a z-order to move or insert a track.
+
+        For zorder >=0 we bubble everything above upward and place new layer at trkz+1;
+        for zorder < 0 we bubble everything downward.
+
         """
         changed = []
         if zord is None:
@@ -397,8 +400,8 @@ class QFramesInTracksScene(QGraphicsScene):
     didSelectTracksAndFrames = pyqtSignal(set, set)  # track names and frame uuids respectively
     didChangeTrackOrder = pyqtSignal(list)  # list of track UUIDs from top to bottom
     didMovePlayheadToTime = pyqtSignal(datetime, timedelta)  # instantaneous or time-range cursor move occurred
-    didRequestActivation = pyqtSignal(dict,
-                                      dict)  # user requests activation/deactivation of tracks {trackname: bool} and frames {uuid: bool}
+    # user requests activation/deactivation of tracks {trackname: bool} and frames {uuid: bool}
+    didRequestActivation = pyqtSignal(dict, dict)
     didCopyPresentationBetweenTracks = pyqtSignal(str, str)  # from-track and to-track
     didChangePlaybackSpan = pyqtSignal(Span)  # overall playback Span had one or both of its ends moved
     didChangeVisibleAreaForView = pyqtSignal(QGraphicsView,
@@ -406,7 +409,8 @@ class QFramesInTracksScene(QGraphicsScene):
                                              timedelta)  # note: multiple views can share one scene
 
     # delegate functions to implement for document and workspace
-    # these are typically called by view or scene control logic, e.g. to decide menu to display or progress of a drag operation
+    # these are typically called by view or scene control logic
+    # e.g. to decide menu to display or progress of a drag operation
     # FUTURE: decide if we actually need a delegate ABC to compose, rather than subclass overrides
     # for now simpler is better and Scene is already delegate/model-like so let's not over-indirect
     #
@@ -445,14 +449,20 @@ class QFramesInTracksScene(QGraphicsScene):
         return set()
 
     def may_reassign_color_map(self, from_track: str, to_track: str) -> Optional[Callable[[bool], None]]:
-        """User is dragging a color map around, determine if drop is permitted and provide a commit/abort function if so
+        """Check if user colormap drag is permitted.
+
+        User is dragging a color map around, determine if drop is permitted and provide a commit/abort function if so
+
         """
         LOG.warning("using base class may_reassign_color_map which does nothing")
         return lambda b: None
 
     def menu_for_track(self, track: str, frame: Optional[UUID] = None) -> Optional[
-        Tuple[QMenu, Mapping[Any, Callable]]]:
-        """Generate QMenu and action LUT to use as context menu for a given track, optionally with frame if mouse was over that frame
+            Tuple[QMenu, Mapping[Any, Callable]]]:
+        """Generate QMenu and action LUT to use as context menu for a given track.
+
+        Optionally with frame if mouse was over that frame
+
         """
         LOG.warning("using base class menu_for_track which does nothing")
         return None
@@ -485,17 +495,19 @@ class TestScene(QFramesInTracksScene):
     def _test_populate(self):
         from uuid import uuid1 as uuidgen
         once = datetime.utcnow()
-        mm = lambda m: timedelta(minutes=m)
+
+        def minutes_td(minutes):
+            return timedelta(minutes=minutes)
         # assert(hasattr(self, '_track_order'))
-        self._span = Span(once - mm(10), mm(30))
+        self._span = Span(once - minutes_td(10), minutes_td(30))
         track0 = QTrackItem(self, self.coords, 'IMAGE:test::timeline:GOES-21:QBI:mars', 1,
                             "G21 QBI B99 BT", "test track", tooltip="peremptorily cromulent")
         # scene.addItem(abitrack)  # done in init
-        frame01 = QFrameItem(track0, self.coords, uuidgen(), once + mm(5), mm(5),
+        frame01 = QFrameItem(track0, self.coords, uuidgen(), once + minutes_td(5), minutes_td(5),
                              Flags([VisualState.BUSY]), "abi1", "fulldiskimus")
         track1 = QTrackItem(self, self.coords, 'IMAGE:test::timeline:Himawari-11:AHI:mars', 0,
                             "H11 AHI B99 Rad", "second test track", tooltip="nominally cromulent")
-        frame11 = QFrameItem(track1, self.coords, uuidgen(), once + mm(6), mm(1),
+        frame11 = QFrameItem(track1, self.coords, uuidgen(), once + minutes_td(6), minutes_td(1),
                              Flags([VisualState.READY]), "ahi1", "JP04")
         # self.insert_track(track0)
         # self.insert_track(track1)
@@ -510,7 +522,7 @@ class TestScene(QFramesInTracksScene):
         # blabla.setFont(font)
         # blabla.setPos(140, 100)
         # self.addItem(blabla)
-        blabla = None
+        # blabla = None
         self.content = [track0, frame01, track1, frame11]
 
 
@@ -607,7 +619,8 @@ def _debug(type, value, tb):
     if not sys.stdin.isatty():
         sys.__excepthook__(type, value, tb)
     else:
-        import traceback, pdb
+        import traceback
+        import pdb
         traceback.print_exception(type, value, tb)
         # …then start the debugger in post-mortem mode.
         pdb.post_mortem(tb)  # more “modern”
