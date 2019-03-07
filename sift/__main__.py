@@ -1133,7 +1133,7 @@ def main():
     LOG.info("will search {} for new data periodically".format(repr(data_search_paths)))
 
     window = Main(
-        workspace_dir=args.cache_dir,
+        workspace_dir=args.workspace_dir,
         config_dir=args.config_dir,
         cache_size=args.space,
         glob_pattern=args.glob_pattern,
