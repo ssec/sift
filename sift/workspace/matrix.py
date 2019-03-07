@@ -147,7 +147,8 @@ def _debug(type, value, tb):
     if not sys.stdin.isatty():
         sys.__excepthook__(type, value, tb)
     else:
-        import traceback, pdb
+        import traceback
+        import pdb
         traceback.print_exception(type, value, tb)
         # …then start the debugger in post-mortem mode.
         pdb.post_mortem(tb)  # more “modern”

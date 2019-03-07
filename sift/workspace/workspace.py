@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Implement Workspace, a singleton object which manages large amounts of data and caches local content in memory-compatible form.
+"""Implement Workspace, a singleton object which manages large amounts of data and caches local content.
 
 Workspace of Products
 
@@ -15,16 +15,17 @@ Workspace responsibilities include:
 - caching useful arrays as secondary content
 - performing minimized on-demand calculations, e.g. algebraic layers, in the background
 - use Importers to bring content arrays into the workspace from external resources, also in the background
-- maintain a metadatabase of what products have in-workspace content, and what products are available from external resources
+- maintain a metadatabase of what products have in-workspace content, and what products are available
+  from external resources
 - compose Collector, which keeps track of Products within Resources outside the workspace
 
 FUTURE import sequence:
 
-- trigger: user requests skim (metadata only) or import (metadata plus bring into document) of a file or directory system
-  for each file selected
+- trigger: user requests skim (metadata only) or import (metadata plus bring into document)
+      of a file or directory system for each file selected
 - phase 1: regex for file patterns identifies which importers are worth trying
-- phase 2: background: importers open files, form metadatabase insert transaction, first importer to succeed wins (priority order).
-  stop after this if just skimming
+- phase 2: background: importers open files, form metadatabase insert transaction,
+      first importer to succeed wins (priority order). stop after this if just skimming
 - phase 3: background: load of overview (lod=0), adding flat files to workspace and Content entry to metadatabase
 - phase 3a: document and scenegraph show overview up on screen
 - phase 4: background: load of one or more levels of detail, with max LOD currently being considered native
@@ -193,8 +194,8 @@ class ActiveContent(QObject):
         else:
             mask = self._mask
             mask[:] = False
-        present = np.array([[1]], dtype=np.int8)
         LOG.warning('mask_from_coverage_sparsity needs inclusion')
+        # present = np.array([[1]], dtype=np.int8)
         # mask_from_coverage_sparsity_2d(mask, self._coverage or present, self._sparsity or present)
 
     def _attach(self, c: Content, mode='c'):
@@ -235,9 +236,11 @@ class Workspace(QObject):
     - own a working directory full of recently used datasets
     - provide DatasetInfo dictionaries for shorthand use between application subsystems
 
-        - datasetinfo dictionaries are ordinary python dictionaries containing [Info.UUID], projection metadata, LOD info
+        - datasetinfo dictionaries are ordinary python dictionaries containing [Info.UUID],
+          projection metadata, LOD info
 
-    - identify datasets primarily with a UUID object which tracks the dataset and its various representations through the system
+    - identify datasets primarily with a UUID object which tracks the dataset and
+      its various representations through the system
     - unpack data in "packing crate" formats like NetCDF into memory-compatible flat files
     - efficiently create on-demand subsections and strides of raster data as numpy arrays
     - incrementally cache often-used subsections and strides ("image pyramid") using appropriate tools like gdal
@@ -259,7 +262,8 @@ class Workspace(QObject):
     _queue = None
 
     # signals
-    # didStartImport = pyqtSignal(dict)  # a dataset started importing; generated after overview level of detail is available
+    # a dataset started importing; generated after overview level of detail is available
+    # didStartImport = pyqtSignal(dict)
     # didMakeImportProgress = pyqtSignal(dict)
     didUpdateProductsMetadata = pyqtSignal(set)  # set of UUIDs with changes to their metadata
     # didFinishImport = pyqtSignal(dict)  # all loading activities for a dataset have completed
@@ -406,7 +410,8 @@ class Workspace(QObject):
             for c in to_purge:
                 try:
                     c.product.content.remove(c)
-                except AttributeError as no_product:
+                except AttributeError:
+                    # no_product
                     LOG.warning("orphaned content {}??, removing".format(c.path))
                 s.delete(c)
 
@@ -431,8 +436,8 @@ class Workspace(QObject):
         """
         remove products from database that have no cached Content, and no Resource we can re-import from
         """
-        LOG.debug(
-            "purging Products no longer recoverable by re-importing from Resources, and having no Content representation in cache")
+        LOG.debug("purging Products no longer recoverable by re-importing from Resources, "
+                  "and having no Content representation in cache")
         with self._inventory as s:
             n_purged = 0
             prodall = list(s.query(Product).all())  # SIFT/sift#180, avoid locking database too long
@@ -508,7 +513,7 @@ class Workspace(QObject):
                 total += os.stat(pn).st_size
                 try:
                     os.remove(pn)
-                except FileNotFoundError as user_intrusion_likely:
+                except FileNotFoundError:
                     LOG.warning("could not remove {} - file not found; continuing".format(pn))
 
         return total
@@ -644,11 +649,13 @@ class Workspace(QObject):
                 # once upon a time...
                 # our old model was that product == content and shares a UUID with the layer
                 # if content is available, we want to provide native content metadata along with the product metadata
-                # specifically a lot of client code assumes that resource == product == content and that singular navigation (e.g. cell_size) is norm
+                # specifically a lot of client code assumes that resource == product == content and
+                # that singular navigation (e.g. cell_size) is norm
                 assert (native_content.info[Info.CELL_WIDTH] is not None)  # FIXME DEBUG
                 return frozendict(ChainMap(native_content.info, prod.info))
-            return frozendict(
-                prod.info)  # mapping semantics for database fields, as well as key-value fields; flatten to one namespace and read-only
+            # mapping semantics for database fields, as well as key-value fields;
+            # flatten to one namespace and read-only
+            return frozendict(prod.info)
 
     def get_algebraic_namespace(self, uuid):
         if uuid is None:
@@ -809,10 +816,12 @@ class Workspace(QObject):
         # self._S.remove()
 
     def idle(self):
-        """
-        Called periodically when application is idle. Does a clean-up tasks and returns True if more needs to be done later.
+        """Called periodically when application is idle.
+
+        Does a clean-up tasks and returns True if more needs to be done later.
         Time constrained to ~0.1s.
         :return: True/False, whether or not more clean-up needs to be scheduled.
+
         """
         return False
 
@@ -823,7 +832,8 @@ class Workspace(QObject):
             uuid_or_path: product uuid, or path to the resource path it lives in
 
         Returns:
-            metadata (Mapping), metadata for the product at this path; FUTURE note more than one product may be in a single file
+            metadata (Mapping), metadata for the product at this path;
+            FUTURE note more than one product may be in a single file
         """
         if isinstance(uuid_or_path, UUID):
             return self.get_info(uuid_or_path)  # get product metadata
@@ -842,8 +852,8 @@ class Workspace(QObject):
                         prod = resource.product[0]
                         return prod.info
 
-    def collect_product_metadata_for_paths(self, paths: list, **importer_kwargs) -> Generator[
-        Tuple[int, frozendict], None, None]:
+    def collect_product_metadata_for_paths(self, paths: list,
+                                           **importer_kwargs) -> Generator[Tuple[int, frozendict], None, None]:
         """
         Start loading URI data into the workspace asynchronously.
         return sequence of read-only info dictionaries
@@ -852,7 +862,8 @@ class Workspace(QObject):
 
         """
         with self._inventory as import_session:
-            # FUTURE: consider returning importers instead of products, since we can then re-use them to import the content instead of having to regenerate
+            # FUTURE: consider returning importers instead of products,
+            # since we can then re-use them to import the content instead of having to regenerate
             # import_session = self._S
             importers = []
             num_products = 0
@@ -911,7 +922,8 @@ class Workspace(QObject):
                     assert (prod is not None)
                     # merge the product into our database session, since it may belong to import_session
                     zult = frozendict(prod.info)  # self._S.merge(prod)
-                    # LOG.debug('yielding product metadata for {}'.format(zult.get(Info.DISPLAY_NAME, '?? unknown name ??')))
+                    # LOG.debug('yielding product metadata for {}'.format(
+                    #     zult.get(Info.DISPLAY_NAME, '?? unknown name ??')))
                     yield num_products, zult
 
     def import_product_content(self, uuid=None, prod=None, allow_cache=True, **importer_kwargs):
@@ -934,7 +946,8 @@ class Workspace(QObject):
             metadata = prod.info
             name = metadata[Info.SHORT_NAME]
 
-            # FIXME: for now, just iterate the incremental load. later we want to add this to TheQueue and update the UI as we get more data loaded
+            # FIXME: for now, just iterate the incremental load.
+            #  later we want to add this to TheQueue and update the UI as we get more data loaded
             gen = truck.begin_import_products(prod.id)
             nupd = 0
             for update in gen:
@@ -1164,23 +1177,20 @@ class Workspace(QObject):
         yield {TASK_DOING: 'purging memory', TASK_PROGRESS: 1.0}
 
     def remove(self, dsi):
-        """
-        Formally detach a dataset, removing its content from the workspace fully by the time that idle() has nothing more to do.
+        """Formally detach a dataset.
+
+        Removing its content from the workspace fully by the time that idle() has nothing more to do.
+
         :param dsi: datasetinfo dictionary or UUID of a dataset
         :return: True if successfully deleted, False if not found
         """
-        if isinstance(dsi, dict):
-            name = dsi[Info.NAME]
-        else:
-            name = 'dataset'
         uuid = dsi if isinstance(dsi, UUID) else dsi[Info.UUID]
-        zult = False
 
         if self._queue is not None:
             self._queue.add(str(uuid), self._bgnd_remove(uuid), 'Purge dataset')
         else:
-            for blank in self._bgnd_remove(uuid):
-                pass
+            # iterate over generator
+            list(self._bgnd_remove(uuid))
         return True
 
     def get_content(self, dsi_or_uuid, lod=None, kind=Kind.IMAGE):
@@ -1199,7 +1209,9 @@ class Workspace(QObject):
         else:
             uuid = dsi_or_uuid[Info.UUID]
         # prod = self._product_with_uuid(dsi_or_uuid)
-        # prod.touch()  TODO this causes a locking exception when run in a secondary thread. Keeping background operations lightweight makes sense however, so just review this
+        # TODO: this causes a locking exception when run in a secondary thread.
+        #  Keeping background operations lightweight makes sense however, so just review this
+        # prod.touch()
         with self._inventory as s:
             content = s.query(Content).filter(
                 (Product.uuid_str == str(uuid)) & (Content.product_id == Product.id)).order_by(Content.lod.desc()).all()

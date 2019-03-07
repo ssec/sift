@@ -10,12 +10,15 @@ SQLAlchemy database tables of metadata used by Workspace to manage its local cac
 
 OVERVIEW
 
-Resource : a file containing products, somewhere in the filesystem, or a resource on a remote system we can access (openDAP etc)
+Resource : a file containing products, somewhere in the filesystem,
+ |         or a resource on a remote system we can access (openDAP etc)
  |_ Product* : product stored in a resource
-     |_ Content* : workspace cache content corresponding to a product, may be one of many available views (e.g. projections)
+     |_ Content* : workspace cache content corresponding to a product,
+     |   |         may be one of many available views (e.g. projections)
      |   |_ ContentKeyValue* : additional information on content
      |_ ProductKeyValue* : additional information on product
-     |_ SymbolKeyValue* : if product is derived from other products, symbol table for that expression is in this kv table
+     |_ SymbolKeyValue* : if product is derived from other products,
+                          symbol table for that expression is in this kv table
 
 A typical baseline product will have two content: and overview (lod==0) and a native resolution (lod>0)
 
@@ -125,9 +128,8 @@ class Resource(Base):
 
     @property
     def uri(self):
-        return self.path if (not self.scheme or self.scheme == 'file') else "{}://{}/{}{}".format(self.scheme,
-                                                                                                  self.path, self.name,
-                                                                                                  '' if not self.query else '?' + self.query)
+        return self.path if (not self.scheme or self.scheme == 'file') else "{}://{}/{}{}".format(
+            self.scheme, self.path, self.name, '' if not self.query else '?' + self.query)
 
     def touch(self, when=None):
         self.atime = datetime.utcnow() if not when else when
@@ -233,24 +235,24 @@ class Product(Base):
     atime = Column(DateTime, nullable=False)  # last time this file was accessed by application
 
     # cached metadata provided by the file format handler
-    name = Column(String,
-                  nullable=False)  # product identifier eg "B01", "B02"  # resource + shortname should be sufficient to identify the data
+    # product identifier eg "B01", "B02"  # resource + shortname should be sufficient to identify the data
+    name = Column(String, nullable=False)
 
     # presentation is consistent within a family
     # family::category determines track, which should represent a product sequence in time
     # family::category::serial is effectively a product unique identifier
-    family = Column(Unicode,
-                    nullable=False)  # colon-separated family identifier, typically kind:pointofreference:measurement:wavelength, e.g. image:geo:refl:11µ
+    # colon-separated family identifier, typically kind:pointofreference:measurement:wavelength, e.g. image:geo:refl:11µ
     #  with <> used for generated content.
-    category = Column(Unicode,
-                      nullable=False)  # colon-separated processing-system, platform, instrument and scene name, typically system:platform:instrument:target e.g. NOAA-PUG:GOES-16:ABI:CONUS
-    serial = Column(Unicode,
-                    nullable=False)  # serial number within family and category; typically time-related; use ISO8601 times please
+    family = Column(Unicode, nullable=False)
+    # colon-separated processing-system, platform, instrument and scene name,
+    # typically system:platform:instrument:target e.g. NOAA-PUG:GOES-16:ABI:CONUS
+    category = Column(Unicode, nullable=False)
+    # serial number within family and category; typically time-related; use ISO8601 times please
+    serial = Column(Unicode, nullable=False)
 
     @property
     def track(self):
-        """track is family::category
-        """
+        """track is family::category."""
         return self.family + FCS_SEP + self.category
 
     @track.setter
@@ -314,9 +316,8 @@ class Product(Base):
             if f is not None:
                 fields[f] = v
             elif k in valset:
-                LOG.warning(
-                    "key {} corresponds to a database field when standard key is available; this code may not be intended".format(
-                        k))
+                LOG.warning("key {} corresponds to a database field when standard key is available; "
+                            "this code may not be intended".format(k))
                 fields[k] = v
             elif k in columns:
                 fields[k] = v
@@ -502,24 +503,32 @@ class Content(Base):
 
     resolution = Column(Integer)  # maximum resolution in meters for this representation of the dataset
 
-    # time accounting, used to check if data needs to be re-imported to workspace, or whether data is LRU and can be removed from a crowded workspace
+    # time accounting, used to check if data needs to be re-imported to workspace,
+    # or whether data is LRU and can be removed from a crowded workspace
     mtime = Column(DateTime)  # last observed mtime of the original source of this data, for change checking
     atime = Column(DateTime)  # last time this product was accessed by application
 
     # actual data content
-    # NaNs are used to signify missing data; NaNs can include integer category fields in significand; please ref IEEE 754
+    # NaNs are used to signify missing data; NaNs can include integer category fields in significand;
+    # please ref IEEE 754
     path = Column(String, unique=True)  # relative to workspace, binary array of data
     rows, cols, levels = Column(Integer), Column(Integer, nullable=True), Column(Integer, nullable=True)
-    dtype = Column(String,
-                   nullable=True)  # default float32; can be int16 in the future for scaled integer images for instance; should be a numpy type name
-    # coeffs = Column(String, nullable=True)  # json for numpy array with polynomial coefficients for transforming native data to natural units (e.g. for scaled integers), c[0] + c[1]*x + c[2]*x**2 ...
-    # values = Column(String, nullable=True)  # json for optional dict {int:string} lookup table for NaN flag fields (when dtype is float32 or float64) or integer values (when dtype is an int8/16/32/64)
+    # default float32; can be int16 in the future for scaled integer images for instance; should be a numpy type name
+    dtype = Column(String, nullable=True)
+    # json for numpy array with polynomial coefficients for transforming native data to natural units
+    # (e.g. for scaled integers), c[0] + c[1]*x + c[2]*x**2 ...
+    # coeffs = Column(String, nullable=True)
+    # json for optional dict {int:string} lookup table for NaN flag fields
+    # (when dtype is float32 or float64) or integer values (when dtype is an int8/16/32/64)
+    # values = Column(String, nullable=True)
 
     # projection information for this representation of the data
-    proj4 = Column(String,
-                   nullable=True)  # proj4 projection string for the data in this array, if one exists; else assume y=lat/x=lon
-    cell_width, cell_height, origin_x, origin_y = Column(Float, nullable=True), Column(Float, nullable=True), Column(
-        Float, nullable=True), Column(Float, nullable=True)
+    # proj4 projection string for the data in this array, if one exists; else assume y=lat/x=lon
+    proj4 = Column(String, nullable=True)
+    cell_width = Column(Float, nullable=True)
+    cell_height = Column(Float, nullable=True)
+    origin_x = Column(Float, nullable=True)
+    origin_y = Column(Float, nullable=True)
 
     # sparsity and coverage, int8 arrays if needed to show incremental availability of the data
     # dimensionality is always a reduction factor of rows/cols/levels
@@ -528,13 +537,13 @@ class Content(Base):
     # sparsity is broadcast over the data array
     #   e.g. for incrementally loading sparse data into a dense array
     # a zero value indicates data is not available, nonzero signifies availability
-    coverage_rows, coverage_cols, coverage_levels = Column(Integer, nullable=True), Column(Integer,
-                                                                                           nullable=True), Column(
-        Integer, nullable=True)
+    coverage_rows = Column(Integer, nullable=True)
+    coverage_cols = Column(Integer, nullable=True)
+    coverage_levels = Column(Integer, nullable=True)
     coverage_path = Column(String, nullable=True)
-    sparsity_rows, sparsity_cols, sparsity_levels = Column(Integer, nullable=True), Column(Integer,
-                                                                                           nullable=True), Column(
-        Integer, nullable=True)
+    sparsity_rows = Column(Integer, nullable=True)
+    sparsity_cols = Column(Integer, nullable=True)
+    sparsity_levels = Column(Integer, nullable=True)
     sparsity_path = Column(String, nullable=True)
 
     # navigation information, if required
@@ -543,7 +552,8 @@ class Content(Base):
     x_path = Column(String, nullable=True)  # if needed, x location cache path relative to workspace
     z_path = Column(String, nullable=True)  # if needed, z location cache path relative to workspace
 
-    # link to key-value further information; primarily a hedge in case specific information has to be squirreled away for later consideration for main content table
+    # link to key-value further information; primarily a hedge in case specific information
+    # has to be squirreled away for later consideration for main content table
     # this provides dictionary style access to key-value pairs
     _key_values = relationship("ContentKeyValue", collection_class=attribute_mapped_collection('key'),
                                cascade="all, delete-orphan")
@@ -576,9 +586,8 @@ class Content(Base):
             if f is not None:
                 fields[f] = v
             elif k in valset:
-                LOG.warning(
-                    "key {} corresponds to a database field when standard key is available; this code may not be intended".format(
-                        k))
+                LOG.warning("key {} corresponds to a database field when standard key is available; "
+                            "this code may not be intended".format(k))
                 fields[k] = v
             elif k in columns:
                 fields[k] = v
@@ -656,8 +665,9 @@ class Content(Base):
         return self.lod == self.LOD_OVERVIEW
 
     def __str__(self):
-        product = "%s:%s.%s" % (
-        self.product.source.name or '?', self.product.platform or '?', self.product.identifier or '?')
+        product = "%s:%s.%s" % (self.product.source.name or '?',
+                                self.product.platform or '?',
+                                self.product.identifier or '?')
         isoverview = ' overview' if self.is_overview else ''
         dtype = self.dtype or 'float32'
         xyzcs = ' '.join(
@@ -886,7 +896,8 @@ def _debug(type, value, tb):
     if not sys.stdin.isatty():
         sys.__excepthook__(type, value, tb)
     else:
-        import traceback, pdb
+        import traceback
+        import pdb
         traceback.print_exception(type, value, tb)
         # …then start the debugger in post-mortem mode.
         pdb.post_mortem(tb)  # more “modern”

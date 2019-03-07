@@ -175,8 +175,11 @@ class aImporter(ABC):
     Abstract Importer class creates or amends Resource, Product, Content entries in the metadatabase used by Workspace
     aImporter instances are backgrounded by the Workspace to bring Content into the workspace
     """
-    _S: Session = None  # dedicated sqlalchemy database session to use during this import instance; revert if necessary, commit as appropriate
-    _cwd: str = None  # where content flat files should be imported to within the workspace, omit this from content path
+    # dedicated sqlalchemy database session to use during this import instance;
+    # revert if necessary, commit as appropriate
+    _S: Session = None
+    # where content flat files should be imported to within the workspace, omit this from content path
+    _cwd: str = None
 
     def __init__(self, workspace_cwd, database_session, **kwargs):
         super(aImporter, self).__init__()
@@ -509,7 +512,8 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
         IDEAL_INCREMENT = 512.0
         increment = min(blockh * int(np.ceil(IDEAL_INCREMENT / blockh)), 2048)
 
-        # how many coverage states are we traversing during the load? for now let's go simple and have it be just image rows
+        # how many coverage states are we traversing during the load?
+        # for now let's go simple and have it be just image rows
         # coverage_rows = int((rows + increment - 1) / increment) if we had an even increment but it's not guaranteed
         cov_data = np.memmap(coverage_path, dtype=np.int8, shape=(rows,), mode='w+')
         cov_data[:] = 0  # should not be needed except maybe in Windows?
@@ -757,8 +761,6 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
 
         # FUTURE as we're doing so, also update coverage array (showing what sections of data are loaded)
         # FUTURE and for some cases the sparsity array, if the data is interleaved (N/A for NetCDF imagery)
-
-        bandtype = np.float32
         img_data[:] = np.ma.fix_invalid(image, copy=False, fill_value=np.NAN)  # FIXME: expensive
 
         # create and commit a Content entry pointing to where the content is in the workspace, even if coverage is empty

@@ -49,7 +49,8 @@ class Guidebook(object):
         determine the channel siblings of a given dataset
         :param uuid: uuid of the dataset we're interested in
         :param infos: datasetinfo_dict sequence, available datasets
-        :return: (list,offset:int): list of [uuid,uuid,uuid] for siblings in order; offset of where the input is found in list
+        :return: (list,offset:int): list of [uuid,uuid,uuid] for siblings in order;
+                 offset of where the input is found in list
         """
         return None, None
 
@@ -58,7 +59,8 @@ class Guidebook(object):
         determine the time siblings of a given dataset
         :param uuid: uuid of the dataset we're interested in
         :param infos: datasetinfo_dict sequence, available datasets
-        :return: (list,offset:int): list of [uuid,uuid,uuid] for siblings in order; offset of where the input is found in list
+        :return: (list,offset:int): list of [uuid,uuid,uuid] for siblings in order;
+                 offset of where the input is found in list
         """
         return None, None
 
@@ -240,13 +242,11 @@ class ABI_AHI_Guidebook(Guidebook):
 
     def _is_refl(self, dsi):
         # work around for old `if band in BAND_TYPE`
-        return dsi.get(Info.BAND) in self.REFL_BANDS or \
-               dsi.get(Info.STANDARD_NAME) == "toa_bidirectional_reflectance"
+        return dsi.get(Info.BAND) in self.REFL_BANDS or dsi.get(Info.STANDARD_NAME) == "toa_bidirectional_reflectance"
 
     def _is_bt(self, dsi):
         return dsi.get(Info.BAND) in self.BT_BANDS or \
-               dsi.get(Info.STANDARD_NAME) in ["toa_brightness_temperature", 'brightness_temperature',
-                                               'air_temperature']
+            dsi.get(Info.STANDARD_NAME) in ["toa_brightness_temperature", 'brightness_temperature', 'air_temperature']
 
     def collect_info_from_seq(self, seq):
         "collect AHI metadata about a sequence of datasetinfo dictionaries"
