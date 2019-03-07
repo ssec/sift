@@ -15,9 +15,9 @@ from typing import Tuple, Optional, Mapping, List, Any, Callable, Set, Iterable
 from PyQt4.QtGui import QMenu
 
 from sift.common import span, STATE, flags
-from sift.view.TimelineCommon import VisualState
-from sift.view.TimelineItems import QTrackItem, QFrameItem
-from sift.view.TimelineScene import QFramesInTracksScene
+from sift.view.timeline.common import VisualState
+from sift.view.timeline.items import QTrackItem, QFrameItem
+from sift.view.timeline.scene import QFramesInTracksScene
 from sift.workspace import Workspace
 from sift.model.document import Document, DocumentAsTrackStack, FrameInfo, TrackInfo
 from sift.workspace.metadatabase import Metadatabase

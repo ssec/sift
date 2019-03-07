@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-ProbeGraphs.py
+probes.py
 ~~~
 This module holds the code which deals with the controller and view for the area probe graphs.
 

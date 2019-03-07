@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-LayerRep.py
+visuals.py
 ~~~~~~~~~~~
 
 PURPOSE
@@ -47,7 +47,7 @@ from sift.common import (
     calc_pixel_size,
     get_reference_points,
     )
-from sift.view.Program import TextureAtlas2D, Texture2D
+from sift.view.texture_atlas import TextureAtlas2D, Texture2D
 # The below imports are needed because we subclassed the ImageVisual
 from vispy.visuals.shaders import Function
 from vispy.visuals.transforms import NullTransform

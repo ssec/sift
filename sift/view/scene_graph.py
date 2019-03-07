@@ -32,13 +32,12 @@ from vispy.visuals import MarkersVisual, marker_types, LineVisual
 from vispy.scene.visuals import Markers, Polygon, Compound, Line
 from vispy.geometry import Rect
 from sift.common import DEFAULT_ANIMATION_DELAY, INFO, KIND, TOOL, Presentation
-from sift.view.LayerRep import (NEShapefileLines, TiledGeolocatedImage,
-                                RGBCompositeLayer, PrecomputedIsocurve)
-from sift.view.MapWidget import SIFTMainMapCanvas
-from sift.view.Cameras import PanZoomProbeCamera
+from sift.view.visuals import (NEShapefileLines, TiledGeolocatedImage,
+                               RGBCompositeLayer, PrecomputedIsocurve)
+from sift.view.cameras import PanZoomProbeCamera
 from sift.model.document import DocLayerStack, DocBasicLayer
 from sift.queue import TASK_DOING, TASK_PROGRESS
-from sift.view.ProbeGraphs import DEFAULT_POINT_PROBE
+from sift.view.probes import DEFAULT_POINT_PROBE
 from sift.view.transform import PROJ4Transform
 from sift.util import get_package_data_dir
 
@@ -101,9 +100,13 @@ class FakeMarker(Compound):
         self.line_two.set_data(pos=pos2)
 
 
+class SIFTMainMapCanvas(scene.SceneCanvas):
+    """High level map canvas node."""
+    pass
+
+
 class MainMap(scene.Node):
-    """Scene node for holding all of the information for the main map area
-    """
+    """Scene node for holding all of the information for the main map area."""
     def __init__(self, *args, **kwargs):
         super(MainMap, self).__init__(*args, **kwargs)
 

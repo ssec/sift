@@ -70,7 +70,7 @@ from PyQt4.QtCore import Qt
 from PyQt4.QtGui import *
 
 from sift.common import flags
-from sift.view.TimelineCommon import *
+from .common import *
 
 LOG = logging.getLogger(__name__)
 

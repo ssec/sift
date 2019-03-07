@@ -35,8 +35,8 @@ from sift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
 from sift.model.document import Document
 from sift.model.layer import DocRGBLayer
 from sift.view.rgb_config import RGBLayerConfigPane
-from sift.view.SceneGraphManager import SceneGraphManager
-from sift.view.ProbeGraphs import ProbeGraphManager, DEFAULT_POINT_PROBE
+from sift.view.scene_graph import SceneGraphManager
+from sift.view.probes import ProbeGraphManager, DEFAULT_POINT_PROBE
 from sift.view.export_image import ExportImageHelper
 from sift.view.create_algebraic import CreateAlgebraicDialog
 from sift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING

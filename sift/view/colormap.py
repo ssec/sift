@@ -15,9 +15,6 @@ from sift.util import get_package_data_dir
 
 CMAP_BASE_DIR = os.path.join(get_package_data_dir(), 'colormaps')
 AWIPS_DIR = os.path.join(CMAP_BASE_DIR, 'OAX', 'GOES-R')
-
-
-
 LOG = logging.getLogger(__name__)
 
 

@@ -23,7 +23,7 @@ from sift.common import INFO, KIND
 from sift.model.layer import DocRGBLayer
 from sift.ui.custom_widgets import QNoScrollWebView
 import numpy as np
-from sift.view.Colormap import COLORMAP_MANAGER
+from sift.view.colormap import COLORMAP_MANAGER
 
 LOG = logging.getLogger(__name__)
 

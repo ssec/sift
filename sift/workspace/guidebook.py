@@ -18,7 +18,7 @@ __docformat__ = 'reStructuredText'
 
 import logging
 from sift.common import INFO, KIND, PLATFORM, INSTRUMENT
-from sift.view.Colormap import DEFAULT_IR, DEFAULT_VIS, DEFAULT_UNKNOWN
+from sift.view.colormap import DEFAULT_IR, DEFAULT_VIS, DEFAULT_UNKNOWN
 
 LOG = logging.getLogger(__name__)
 GUIDEBOOKS = {}

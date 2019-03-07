@@ -17,6 +17,7 @@ from PyQt4.QtGui import QGraphicsSceneDragDropEvent
 
 LOG = logging.getLogger(__name__)
 
+
 # @dataclass
 class GraphicsConfig(object):
     track_height: float = 64.0
