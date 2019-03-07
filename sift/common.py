@@ -103,7 +103,7 @@ geo = namedtuple('geo', ('n', 'e'))  # lat N, lon E
 vue = namedtuple('vue', ('b', 'l', 't', 'r', 'dy', 'dx'))  # combination of box + rez
 
 
-class span(typ.NamedTuple):
+class Span(typ.NamedTuple):
     s: datetime  # start
     d: timedelta  # duration
 
@@ -113,7 +113,7 @@ class span(typ.NamedTuple):
 
     @staticmethod
     def from_s_e(s: datetime, e: datetime):
-        return span(s, e-s) if (s is not None) and (e is not None) else None
+        return Span(s, e - s) if (s is not None) and (e is not None) else None
 
     @property
     def is_instantaneous(self):

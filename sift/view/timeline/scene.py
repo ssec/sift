@@ -24,7 +24,7 @@ from PyQt4.QtGui import QGraphicsScene, QPen, QBrush, QPainter, QGraphicsView, Q
     QMainWindow, QStatusBar, QApplication, QGraphicsItem, QGraphicsItemAnimation
 from PyQt4.QtOpenGL import QGLFormat, QGL, QGLWidget
 
-from sift.common import flags, span
+from sift.common import flags, Span
 from .common import VisualState, CoordTransform
 from .items import QTrackItem, QFrameItem, QTimeRulerItem
 
@@ -134,17 +134,17 @@ class QFramesInTracksScene(QGraphicsScene):
         return self._frame_pen_brush
 
     @property
-    def timeline_span(self) -> span:
+    def timeline_span(self) -> Span:
         if hasattr(self, '_demo_time_span'):
             return self._demo_time_span
         t = datetime.utcnow()
         hh = timedelta(minutes=30)
-        dts = self._demo_time_span = span(t - hh, hh * 2)
+        dts = self._demo_time_span = Span(t - hh, hh * 2)
         LOG.warning("using demo timespan on document")
         return dts
 
     @property
-    def playback_span(self) -> span:
+    def playback_span(self) -> Span:
         return self.timeline_span
 
     def drawBackground(self, painter: QPainter, invalidated_region: QRectF):
@@ -400,7 +400,7 @@ class QFramesInTracksScene(QGraphicsScene):
     didMovePlayheadToTime = pyqtSignal(datetime, timedelta)  # instantaneous or time-range cursor move occurred
     didRequestActivation = pyqtSignal(dict, dict)  # user requests activation/deactivation of tracks {trackname: bool} and frames {uuid: bool}
     didCopyPresentationBetweenTracks = pyqtSignal(str, str)  # from-track and to-track
-    didChangePlaybackSpan = pyqtSignal(span)  # overall playback span had one or both of its ends moved
+    didChangePlaybackSpan = pyqtSignal(Span)  # overall playback Span had one or both of its ends moved
     didChangeVisibleAreaForView = pyqtSignal(QGraphicsView,
                                              datetime,
                                              timedelta)  # note: multiple views can share one scene
@@ -478,7 +478,7 @@ class TestScene(QFramesInTracksScene):
         self._test_populate()
 
     @property
-    def timeline_span(self) -> span:
+    def timeline_span(self) -> Span:
         return self._span
 
     def _test_populate(self):
@@ -486,7 +486,7 @@ class TestScene(QFramesInTracksScene):
         once = datetime.utcnow()
         mm = lambda m: timedelta(minutes=m)
         # assert(hasattr(self, '_track_order'))
-        self._span = span(once - mm(10), mm(30))
+        self._span = Span(once - mm(10), mm(30))
         track0 = QTrackItem(self, self.coords, 'IMAGE:test::timeline:GOES-21:QBI:mars', 1,
                             "G21 QBI B99 BT", "test track", tooltip="peremptorily cromulent")
         # scene.addItem(abitrack)  # done in init

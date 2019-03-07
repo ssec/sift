@@ -14,7 +14,7 @@ from uuid import UUID
 from typing import Tuple, Optional, Mapping, List, Any, Callable, Set, Iterable
 from PyQt4.QtGui import QMenu
 
-from sift.common import span, STATE, flags
+from sift.common import Span, STATE, flags
 from sift.view.timeline.common import VisualState
 from sift.view.timeline.items import QTrackItem, QFrameItem
 from sift.view.timeline.scene import QFramesInTracksScene
@@ -65,7 +65,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         self._connect_signals(doc, ws)  # but the main doc is still the signaling hub
 
     @property
-    def timeline_span(self) -> span:
+    def timeline_span(self) -> Span:
         return self._doc.timeline_span
 
     def _sync_track(self, qti: QTrackItem, z:int, trk: TrackInfo):

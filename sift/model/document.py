@@ -78,7 +78,7 @@ import warnings
 from sqlalchemy.orm import Session
 
 from sift.workspace.metadatabase import Product
-from sift.common import KIND, INFO, Presentation, span, FCS_SEP, ZList, flags, STATE
+from sift.common import KIND, INFO, Presentation, Span, FCS_SEP, ZList, flags, STATE
 from sift.queue import TASK_DOING, TASK_PROGRESS, TaskQueue
 from sift.workspace import Workspace
 from sift.util.default_paths import DOCUMENT_SETTINGS_DIR
@@ -499,7 +499,7 @@ class FrameInfo(T.NamedTuple):
     """
     uuid: UUID
     ident: str  # family::category::serial
-    when: span  # time and duration of this frame
+    when: Span  # time and duration of this frame
     state: flags  # logical state for timeline to display with color and glyphs
     primary: str  # primary description for timeline, e.g. "G16 ABI B06"
     secondary: str  # secondary description, typically time information
@@ -509,11 +509,11 @@ class FrameInfo(T.NamedTuple):
 class TrackInfo(T.NamedTuple):
     track: str  # family::category
     presentation: Presentation  # colorbar, ranges, gammas, etc
-    when: span  # available time-span of the data
+    when: Span  # available time-Span of the data
     state: flags  # any status or special flags set on the track, according to document / workspace
     primary: str  # primary label for UI
     secondary: str  # secondary label
-    frames: T.List[FrameInfo]  # list of frames within specified time span
+    frames: T.List[FrameInfo]  # list of frames within specified time Span
 
 
 class DocumentAsTrackStack(DocumentAsContextBase):
@@ -539,29 +539,29 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         self.doc.playhead_time = t
 
     @property
-    def playback_span(self) -> span:
+    def playback_span(self) -> Span:
         pbs = self.doc.playback_span
         if not pbs or pbs.is_instantaneous:
             return self.timeline_span
 
     @playback_span.setter
-    def playback_span(self, when: span):
+    def playback_span(self, when: Span):
         self.doc.playback_span = when
         # FIXME: signal
 
     @property
-    def timeline_span(self) -> span:
-        """Document preferred time-span (user-specified or from a default)
+    def timeline_span(self) -> Span:
+        """Document preferred time-Span (user-specified or from a default)
         :return:
         """
         dts = self.doc.timeline_span  # first, check for user intent
         if not dts or dts.is_instantaneous:
-            LOG.info("document timeline span is not set, using metadata extents")
+            LOG.info("document timeline Span is not set, using metadata extents")
             dts = self.doc.potential_product_span()
         if not dts or dts.is_instantaneous:
             LOG.info("insufficient metadata, using 12h around current time due to no available timespan")
             sh = timedelta(hours=6)
-            dts = span(datetime.utcnow() - sh, sh * 2)
+            dts = Span(datetime.utcnow() - sh, sh * 2)
         return dts
 
     @property
@@ -636,7 +636,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         # s.update(self.doc.product_state.get(prod.uuid) or flags())
         return s
 
-    def frame_info_for_product(self, prod: Product=None, uuid: UUID=None, when_overlaps: span=None) -> T.Optional[FrameInfo]:
+    def frame_info_for_product(self, prod: Product=None, uuid: UUID=None, when_overlaps: Span=None) -> T.Optional[FrameInfo]:
         """Generate info struct needed for timeline representation, optionally returning None if outside timespan of interest
         """
         if prod is None:
@@ -645,7 +645,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 return self.frame_info_for_product(prod=prod, when_overlaps=when_overlaps)
         prod_e = prod.obs_time + prod.obs_duration
         if (when_overlaps is not None) and ((prod_e <= when_overlaps.s) or (prod.obs_time >= when_overlaps.e)):
-            # does not intersect our desired span, skip it
+            # does not intersect our desired Span, skip it
             return None
         nfo = prod.info
         # DISPLAY_NAME has DISPLAY_TIME as part of it, FIXME: stop that
@@ -654,7 +654,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         fin = FrameInfo(
             uuid=prod.uuid,
             ident=prod.ident,
-            when=span(prod.obs_time, prod.obs_duration),
+            when=Span(prod.obs_time, prod.obs_duration),
             # FIXME: new model old model
             state=self.product_state(prod.uuid),
             primary=dn,
@@ -663,10 +663,10 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         )
         return fin
 
-    def enumerate_tracks_frames(self, only_active: bool = False, when: span = None) -> T.Iterable[TrackInfo]:
+    def enumerate_tracks_frames(self, only_active: bool = False, when: Span = None) -> T.Iterable[TrackInfo]:
         """enumerate tracks as TrackInfo and FrameInfo structures for timeline use, in top-Z to bottom-Z order
         """
-        if when is None:  # default to the document's span, either explicit (user-specified) or implicit
+        if when is None:  # default to the document's Span, either explicit (user-specified) or implicit
             when = self.timeline_span
         when_e = when.e
         with self.mdb as s:
@@ -687,7 +687,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                     continue
                 LOG.debug("found {} frames for track {}".format(len(frames), track))
                 frames.sort(key=lambda x: x.when.s)
-                track_span = span.from_s_e(frames[0].when.s, frames[-1].when.e) if frames else None
+                track_span = Span.from_s_e(frames[0].when.s, frames[-1].when.e) if frames else None
                 trk = TrackInfo(
                     track=track,
                     presentation=self.doc.family_presentation.get(track),
@@ -741,7 +741,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         queue.add("activate frames " + repr(frames), _bgnd_ensure_content_loaded(), "activate {} frames".format(len(frames)),
                   interactive=False, and_then=_then_show_frames_in_document)
 
-    def _products_in_track(self, track: str, during: span = None) -> T.List[UUID]:
+    def _products_in_track(self, track: str, during: Span = None) -> T.List[UUID]:
         fam, ctg = track.split(FCS_SEP)
 
         def uu(x):
@@ -759,7 +759,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                     (Product.family == fam) & (Product.category == ctg) &
                     ~((Product.obs_time > end) | ((Product.obs_time + Product.obs_duration) < start))).all()]
 
-    def _products_in_tracks(self, tracks: T.Iterable[str], during: span=None) -> T.Iterable[UUID]:
+    def _products_in_tracks(self, tracks: T.Iterable[str], during: Span=None) -> T.Iterable[UUID]:
         for track in tracks:
             yield from self._products_in_track(track, during)
 
@@ -773,7 +773,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
 
     def deactivate_track(self, track: str):
         LOG.info("deactivate_track {}".format(track))
-        # time_range: span = self.timeline_span
+        # time_range: Span = self.timeline_span
         pit = self._products_in_track(track)
         if pit:
             self.deactivate_frames(*pit)
@@ -786,7 +786,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
     def activate_track(self, track: str):
         """Activate a track, nudging all frames in the active time range into active state
         """
-        # time_range: span = self.timeline_span
+        # time_range: Span = self.timeline_span
         pit = self._products_in_track(track)
         if pit:
             self.activate_frames(*pit)
@@ -796,7 +796,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         self._finally(self.doc.didReorderTracks.emit, {track}, set())
         LOG.info("activate_track {}".format(track))
 
-    # def activate_track_time_range(self, track: str, when: span, activate: bool=True):
+    # def activate_track_time_range(self, track: str, when: Span, activate: bool=True):
     #     pass
     #
     # def disable_track(self, track:str):
@@ -968,8 +968,8 @@ class AnimationStep(T.NamedTuple):
     families: T.Tuple[str]
     # primary kind for displaying the data
     kinds: T.Tuple[KIND]
-    # data time span this step represents
-    data_span: span
+    # data time Span this step represents
+    data_span: Span
 
 
 class DocumentAsAnimationSequence(DocumentAsContextBase):
@@ -1022,11 +1022,11 @@ class DocumentAsAnimationSequence(DocumentAsContextBase):
         raise NotImplementedError()
 
     @property
-    def playback_time_range(self) -> span:
+    def playback_time_range(self) -> Span:
         raise NotImplementedError()
 
     @playback_time_range.setter
-    def playback_time_range(self, start_end: span):
+    def playback_time_range(self, start_end: Span):
         # set document playback time range
         # if we're in a with-clause, defer signals until outermost exit
         # if we're not in a with-clause, raise ContextNeededForEditing exception
@@ -1131,14 +1131,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     track_order: ZList = None  # (zorder, family-name) with higher z above lower z; z<0 should not occur
 
     # overall visible range of the active data if specified by user, else None means assume use the product timespan from metadatabase
-    timeline_span: span = None
+    timeline_span: Span = None
 
     # playback information
     playhead_time: datetime = None  # document stored playhead time
     playback_per_sec: timedelta = timedelta(seconds=60.0)  # data time increment per wall-second
 
     # playback time range, if not None is a subset of overall timeline
-    playback_span: span = None
+    playback_span: Span = None
 
     # user-directed overrides on tracks and frames (products)
     track_state: T.Mapping[str, flags] = None
@@ -1326,7 +1326,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # self.timeline_span = self.playback_span = self.potential_product_span()
         self.sync_potential_tracks_from_metadata()
 
-    def potential_product_span(self) -> T.Optional[span]:
+    def potential_product_span(self) -> T.Optional[Span]:
         with self._workspace.metadatabase as S:
             all_times = list(S.query(Product.obs_time, Product.obs_duration).distinct())
         if not all_times:
@@ -1335,7 +1335,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         ends = [(s + d) for (s, d) in all_times]
         s = min(starts)
         e = max(ends)
-        return span(s, e - s)
+        return Span(s, e - s)
 
     def potential_tracks(self) -> T.List[str]:
         """List the names of available tracks (both active and potential) according to the metadatabase
