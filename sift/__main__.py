@@ -319,7 +319,7 @@ class Main(QtGui.QMainWindow):
             event.ignore()
 
     def change_tool(self, checked, name=Tool.PAN_ZOOM):
-        if checked != True:
+        if checked is not True:
             return
         self.scene_manager.change_tool(name)
 
@@ -442,7 +442,7 @@ class Main(QtGui.QMainWindow):
         cao = self.document.current_animation_order
         try:
             dex = cao.index(uuid)
-        except ValueError as not_present:
+        except ValueError:
             return
         frame_change_tuple = (dex, len(cao), False, uuid)
         self.update_frame_slider(frame_change_tuple)
@@ -502,9 +502,6 @@ class Main(QtGui.QMainWindow):
         uuids = self.behaviorLayersList.current_selected_uuids()
         self.document.toggle_layer_visibility(uuids)
         self.update_frame_time_to_top_visible()
-
-    def toggle_animation(self, event, *args, **kwargs):
-        self.scene_manager.layer_set.toggle_animation(*args, **kwargs)
 
     def animation_reset_by_layer_set_switch(self, *args, **kwargs):
         self.reset_frame_slider()
@@ -770,9 +767,11 @@ class Main(QtGui.QMainWindow):
         self.graphManager.pointProbeChanged.connect(self.graphManager.update_point_probe_graph)
 
         self.scene_manager.newPointProbe.connect(self.graphManager.update_point_probe)
-        zap = lambda *args: self.graphManager.update_point_probe(DEFAULT_POINT_PROBE)
-        self.document.didAddBasicLayer.connect(zap)
-        self.document.didAddCompositeLayer.connect(zap)
+
+        def _update_point_probe_slot(*args):
+            return self.graphManager.update_point_probe(DEFAULT_POINT_PROBE)
+        self.document.didAddBasicLayer.connect(_update_point_probe_slot)
+        self.document.didAddCompositeLayer.connect(_update_point_probe_slot)
 
         # FIXME: These were added as a simple fix to update the probe value on layer changes, but this should really
         #        have its own manager-like object
@@ -1103,7 +1102,8 @@ def main():
                         help="Number of monitor/display to show the main window on (0 for main, 1 for secondary, etc.)")
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count",
                         default=int(os.environ.get("VERBOSITY", 2)),
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG (default Info)')
+                        help='each occurrence increases verbosity 1 level through '
+                             'ERROR-WARNING-Info-DEBUG (default Info)')
     args = parser.parse_args()
 
     levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
