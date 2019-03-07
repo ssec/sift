@@ -23,7 +23,8 @@ from typing import MutableSequence, Tuple, Optional, Iterable, Any
 
 import numpy as np
 from enum import Enum
-import typing as T
+import typing as typ
+from uuid import UUID
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -102,7 +103,7 @@ geo = namedtuple('geo', ('n', 'e'))  # lat N, lon E
 vue = namedtuple('vue', ('b', 'l', 't', 'r', 'dy', 'dx'))  # combination of box + rez
 
 
-class span(T.NamedTuple):
+class span(typ.NamedTuple):
     s: datetime  # start
     d: timedelta  # duration
 
@@ -125,18 +126,6 @@ class flags(set):
 
 
 WORLD_EXTENT_BOX = box(b=-MAX_EXCURSION_Y, l=-MAX_EXCURSION_X, t=MAX_EXCURSION_Y, r=MAX_EXCURSION_X)
-
-# presentation information for a layer; z_order comes from the layerset
-Presentation = namedtuple('Presentation', [
-    'uuid',      # UUID: dataset in the document/workspace
-    'kind',      # what kind of layer it is
-    'visible',   # bool: whether it's visible or not
-    'a_order',   # int: None for non-animating, 0..n-1 what order to draw in during animation
-    'colormap',  # name or uuid: color map to use; name for default, uuid for user-specified
-    'climits',   # tuple: valid min and valid max used for color mapping normalization
-    'gamma',     # float: valid (0 to 5) for gamma correction (default should be 1.0)
-    'mixing'     # mixing mode constant
-])
 
 
 class STATE(Enum):
@@ -308,6 +297,23 @@ class INFO(Enum):
         elif isinstance(other, type(self)):
             return self.value == other.value
         raise ValueError("cannot compare {} == {}".format(repr(self), repr(other)))
+
+
+class Presentation(typ.NamedTuple):
+    """Presentation information for a layer.
+
+    z_order comes from the layerset
+
+    """
+    uuid: UUID  # dataset in the document/workspace
+    kind: KIND  # what kind of layer it is
+    visible: bool  # whether it's visible or not
+    a_order: int  # None for non-animating, 0..n-1 what order to draw in during animation
+    colormap: object  # name or uuid: color map to use; name for default, uuid for user-specified
+    climits: tuple  # valid min and valid max used for color mapping normalization
+    gamma: float  # valid (0 to 5) for gamma correction (default should be 1.0)
+    mixing: object  # mixing mode constant
+
 
 @jit(nb_types.UniTuple(int64, 2)(float64[:, :], float64[:, :]))
 def get_reference_points(img_cmesh, img_vbox):
