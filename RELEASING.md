@@ -8,7 +8,7 @@
    installed, do so by running `pip install loghub`.
 
 ```bash
-loghub ssec/sift -u <username> -st v1.0.5 -plg bug "Bugs fixed" -plg enhancement "Features added" -plg documentation "Documentation changes" -plg backwards-incompatibility "Backwards incompatible changes"
+loghub ssec/sift -u <username> -st 1.0.5 -plg bug "Bugs fixed" -plg enhancement "Features added" -plg documentation "Documentation changes" -plg backwards-incompatibility "Backwards incompatible changes"
 ```
 
 5. Commit the change log changes.
@@ -40,3 +40,4 @@ the `--no-conda-upload` and/or `--no-installer-upload` flags.
 8. Create a release of the package on
    [github](https://github.com/ssec/sift/releases) by drafting a new release
    and copying the release notes from the changelog (see above).
+   
