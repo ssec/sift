@@ -63,14 +63,22 @@ https://stackoverflow.com/questions/4216139/python-object-in-qmimedata
 :copyright: 2017 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
+import logging
+from typing import Mapping, Any, Tuple
 from uuid import UUID
-from typing import Mapping, Any
 from weakref import ref
-from PyQt4.QtCore import Qt
-from PyQt4.QtGui import *
+import pickle as pkl
+from datetime import datetime, timedelta
 
-from sift.common import flags
-from sift.view.TimelineCommon import *
+from PyQt4.QtCore import Qt, QRectF
+from PyQt4.QtGui import (QGraphicsItem, QGraphicsObject, QIcon, QGradient, QImage, QPixmap,
+                         QGraphicsTextItem, QGraphicsPixmapItem, QPainter, QStyleOptionGraphicsItem,
+                         QWidget, QGraphicsSceneMouseEvent, QGraphicsSceneDragDropEvent, QGraphicsSceneContextMenuEvent,
+                         QPen, QBrush, QGraphicsRectItem)
+
+from sift.common import Flags
+from .common import (CoordTransform, GFXC, MIMETYPE_TIMELINE_COLORMAP, MIMETYPE_TIMELINE_TRACK,
+                     mimed_colormap, mimed_track, recv_mime, VisualState)
 
 LOG = logging.getLogger(__name__)
 
@@ -114,16 +122,20 @@ class QTrackItem(QGraphicsObject):
     _z: int = None  # our track number as displayed, 0 being highest on screen, with larger Z going downward
     _title: str = None
     _subtitle: str = None
-    _icon: QIcon = None   # e.g. whether it's algebraic or RGB
-    _metadata: Mapping = None  # arbitrary key-value store for selecting by metadata; in our case this often includes item family for seleciton
+    _icon: QIcon = None  # e.g. whether it's algebraic or RGB
+    # arbitrary key-value store for selecting by metadata;
+    # in our case this often includes item family for seleciton
+    _metadata: Mapping = None
     _tooltip: str = None
-    _state: flags = None  # VisualState flags determine how it's being presented
+    _state: Flags = None  # VisualState Flags determine how it's being presented
     _colormap: [QGradient, QImage, QPixmap] = None
     _min: float = None
     _max: float = None
-    _dragging: bool = False   # whether or not a drag is in progress across this item
+    _dragging: bool = False  # whether or not a drag is in progress across this item
     # position in scene coordinates is determined by _z level and starting time of first frame, minus _left_pad
-    _bounds: QRectF = QRectF()  # bounds of the track in scene coordinates, assuming 0,0 corresponds to vertical center of left edge of frame representation
+    # bounds of the track in scene coordinates, assuming 0,0 corresponds to vertical center of left edge of
+    # frame representation
+    _bounds: QRectF = QRectF()
     _gi_title: QGraphicsTextItem = None
     _gi_subtitle: QGraphicsTextItem = None
     _gi_icon: QGraphicsPixmapItem = None
@@ -131,7 +143,7 @@ class QTrackItem(QGraphicsObject):
 
     def __init__(self, scene, scale: CoordTransform, track: str, z: int,
                  title: str, subtitle: str = None, icon: QIcon = None, metadata: dict = None,
-                 tooltip: str = None, state: flags = None, colormap: [QGradient, QImage] = None,
+                 tooltip: str = None, state: Flags = None, colormap: [QGradient, QImage] = None,
                  min: float = None, max: float = None):
         """Create a track and connect it to its Scene
         """
@@ -146,7 +158,7 @@ class QTrackItem(QGraphicsObject):
         self._icon = icon
         self._metadata = metadata or {}
         self._tooltip = tooltip
-        self._state = flags(state or [])
+        self._state = Flags(state or [])
         self._colormap = colormap
         self._min, self._max = min, max
         self.setToolTip(tooltip or "{}\n{}".format(title, subtitle))
@@ -217,7 +229,7 @@ class QTrackItem(QGraphicsObject):
 
     # painting and boundaries
 
-    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget=None):
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None):
         # LOG.debug("QTrackItem.paint")
         # _wtf_recursion()
         pen, brush = self._scene().default_track_pen_brush
@@ -229,10 +241,9 @@ class QTrackItem(QGraphicsObject):
         # draw outer boundary
         painter.drawRoundedRect(rect, GFXC.track_corner_radius1, GFXC.track_corner_radius2, Qt.RelativeSize)
 
-
     def boundingRect(self) -> QRectF:
-    #     if self._bounds is None:
-    #         return self.update_pos_and_bounds()
+        #     if self._bounds is None:
+        #         return self.update_pos_and_bounds()
         return self._bounds
 
     # click events / drag departures
@@ -277,7 +288,7 @@ class QTrackItem(QGraphicsObject):
         new_track_before = recv_mime(event, MIMETYPE_TIMELINE_TRACK)
         if new_track_before is not None:
             self.insert_track_before(new_track_before)
-        content = pkl.loads(event.mimeData().data())
+        _ = pkl.loads(event.mimeData().data())
         event.setAccepted(False)
 
     # working with Frames as sub-items, updating and syncing position and extents
@@ -298,7 +309,7 @@ class QTrackItem(QGraphicsObject):
             # y relative to track is 0
             # calculate absolute x position in scene
             # assert (child.uuid != self.uuid)
-            t,d = child.td
+            t, d = child.td
             s = t if (s is None) else min(t, s)
             e = (t + d) if (e is None) else max(e, t + d)
         if e is None:
@@ -321,11 +332,14 @@ class QTrackItem(QGraphicsObject):
         # convert track extent to scene coordinates using current transform
         frames_left, frames_width = self._scale.calc_pixel_x_pos(t, d)
         screen_track_center_y = self._scale.calc_track_pixel_y_center(self.z)
-        # track_left, track_width = self._scale.calc_pixel_x_pos(t - GFXC.track_left_pad, d + GFXC.track_left_pad + GFXC.track_right_pad)
+        # track_left, track_width = self._scale.calc_pixel_x_pos(t - GFXC.track_left_pad,
+        #     d + GFXC.track_left_pad + GFXC.track_right_pad)
         # set track position, assuming we want origin coordinate of track item to be centered vertically within item
-        # bounds relative to position in scene, left_pad space to left of local origin (x<0), frames and right-pad at x>=0
+        # bounds relative to position in scene, left_pad space to left of local origin (x<0),
+        # frames and right-pad at x>=0
         self.prepareGeometryChange()
-        self._bounds = QRectF(-GFXC.track_left_pad, -GFXC.track_height / 2, frames_width + GFXC.track_left_pad + GFXC.track_right_pad, GFXC.track_height)
+        self._bounds = QRectF(-GFXC.track_left_pad, -GFXC.track_height / 2,
+                              frames_width + GFXC.track_left_pad + GFXC.track_right_pad, GFXC.track_height)
         LOG.debug("new track bounds: {}".format(self._bounds))
         # origin is at the start of the first frame contained. padding extends into negative x
         LOG.debug("track centerline placed at {},{}".format(frames_left, screen_track_center_y))
@@ -351,7 +365,7 @@ class QFrameItem(QGraphicsObject):
     QGraphicsView representation of a data frame, with a start and end time relative to the scene.
     Essentially a frame sprite
     """
-    _state: flags = None
+    _state: Flags = None
     _track = None  # weakref to track we belong to
     _scale: CoordTransform = None
     _uuid: UUID = None
@@ -367,7 +381,7 @@ class QFrameItem(QGraphicsObject):
     _gi_subtitle = None
 
     def __init__(self, track: QTrackItem, scale: CoordTransform, uuid: UUID,
-                 start: datetime, duration: timedelta, state: flags,
+                 start: datetime, duration: timedelta, state: Flags,
                  title: str, subtitle: str = None, thumb: QPixmap = None,
                  metadata: Mapping[str, Any] = None):
         """create a frame representation and add it to a timeline track within a scene
@@ -383,7 +397,7 @@ class QFrameItem(QGraphicsObject):
         """
         super(QFrameItem, self).__init__()
         self._track = ref(track)
-        self._state = flags(state)
+        self._state = Flags(state)
         self._scale = scale
         self._start = start
         self._duration = duration
@@ -424,8 +438,6 @@ class QFrameItem(QGraphicsObject):
             it.setParentItem(self)
             it.setPos(GFXC.frame_subtitle_pos)
         # FUTURE: add draggable color-map pixmap
-
-
 
     @property
     def scene_(self):
@@ -476,7 +488,7 @@ class QFrameItem(QGraphicsObject):
             brush = QBrush(Qt.green, Qt.SolidPattern)
         return pen, brush
 
-    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget=None) -> None:
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None) -> None:
         # LOG.debug("QFrameItem.paint")
         pen, brush = self.pen_brush
         rect = self.boundingRect()
@@ -540,8 +552,11 @@ class QFrameItem(QGraphicsObject):
 
 
 class QTimeRulerItem(QGraphicsRectItem):
-    """A ruler object showing the time dimension, an instance of which is at the top, bottom, or both ends of the Scene"""
+    """A ruler object showing the time dimension.
+
+    An instance is at the top, bottom, or both ends of the Scene.
+
+    """
 
     def __init__(self):
         super(QTimeRulerItem, self).__init__()
-

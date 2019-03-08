@@ -7,19 +7,18 @@
 :license: GPLv3, see LICENSE for more details
 """
 
+import logging
 import os
 import sys
-import logging
 
+import numpy as np
+import osr
 from netCDF4 import Dataset
 from osgeo import gdal
-import osr
 from pyproj import Proj
-import numpy as np
 
 LOG = logging.getLogger(__name__)
 GTIFF_DRIVER = gdal.GetDriverByName("GTIFF")
-
 
 AHI_NADIR_RES = {
     5500: 2000,
@@ -57,7 +56,6 @@ def create_geotiff(data, output_filename, proj4_str, geotransform, etype=gdal.GD
                    nodata=np.nan, meta=None, **kwargs):
     """Function that creates a geotiff from the information provided.
     """
-    log_level = logging.getLogger('').handlers[0].level or 0
     LOG.info("Creating geotiff '%s'" % (output_filename,))
 
     if etype != gdal.GDT_Float32 and nodata is not None and np.isnan(nodata):
@@ -256,7 +254,8 @@ def main():
     parser.add_argument("-o", "--output", dest="output_filename", default=None,
                         help="Output geotiff filename")
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG (default INFO)')
+                        help='each occurrence increases verbosity 1 level through '
+                             'ERROR-WARNING-Info-DEBUG (default Info)')
     args = parser.parse_args()
 
     levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
@@ -267,6 +266,7 @@ def main():
         args.output_filename = stem + ".tif"
 
     ahi2gtiff(args.input_filename, args.output_filename)
+
 
 if __name__ == "__main__":
     sys.exit(main())

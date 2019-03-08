@@ -8,12 +8,13 @@ possible to implement in Matrix transforms that come with VisPy.
 """
 
 import re
-from pyproj import Proj, pj_ellps
+
 import numpy as np
-from vispy.visuals.transforms import BaseTransform
-from vispy.visuals.transforms._util import arg_to_vec4, as_vec4
-from vispy.visuals.shaders import Function, Variable
+from pyproj import Proj, pj_ellps
+from vispy.visuals.shaders import Function
 from vispy.visuals.shaders.expression import TextExpression
+from vispy.visuals.transforms import BaseTransform
+from vispy.visuals.transforms._util import arg_to_vec4
 
 
 # FIXME: This is the wrong usage of TextExpression. See if we can switch to
@@ -35,6 +36,7 @@ class MacroExpression(TextExpression):
     @property
     def name(self):
         return self._name
+
 
 COMMON_DEFINITIONS = """#define SPI     3.14159265359
 #define TWOPI   6.2831853071795864769
@@ -166,9 +168,10 @@ def stere_init(proj_dict):
             # ellipsoid
             e = proj_dict['e']
             if abs(phits - M_HALFPI) < 1e-10:
-                proj_dict['akm1'] = 2. / np.sqrt((1+e)**(1+e) * (1-e)**(1-e))
+                proj_dict['akm1'] = 2. / np.sqrt((1 + e) ** (1 + e) * (1 - e) ** (1 - e))
             else:
-                proj_dict['akm1'] = np.cos(phits) / (pj_tsfn_py(phits, np.sin(phits), e) * np.sqrt(1. - (np.sin(phits)*e)**2))
+                proj_dict['akm1'] = np.cos(phits) / (
+                    pj_tsfn_py(phits, np.sin(phits), e) * np.sqrt(1. - (np.sin(phits) * e) ** 2))
         else:
             # sphere
             proj_dict['akm1'] = np.cos(phits) / np.tan(M_FORTPI - .5 * phits) if abs(phits - M_HALFPI) >= 1e-10 else 2.
@@ -517,16 +520,16 @@ PROJECTIONS = {
     ),
     'eqc': (
         eqc_init,
-            None,
-            """vec4 eqc_map_s(vec4 pos) {{
-            {es};
-            float lambda = radians(pos.x);
-            {over}
-            float phi = radians(pos.y);
-            float x = {a} * {rc} * lambda;
-            float y = {a} * (phi - {phi0});
-            return vec4(x, y, pos.z, pos.w);
-        }}""",
+        None,
+        """vec4 eqc_map_s(vec4 pos) {{
+        {es};
+        float lambda = radians(pos.x);
+        {over}
+        float phi = radians(pos.y);
+        float x = {a} * {rc} * lambda;
+        float y = {a} * (phi - {phi0});
+        return vec4(x, y, pos.z, pos.w);
+    }}""",
         None,
         """vec4 eqc_imap_s(vec4 pos) {{
             float x = pos.x / {a};
@@ -565,6 +568,7 @@ pj_msfn = Function("""
 
 def pj_msfn_py(sinphi, cosphi, es):
     return cosphi / np.sqrt(1. - es * sinphi * sinphi)
+
 
 pj_tsfn = Function("""
     float pj_tsfn(float phi, float sinphi, float e) {
@@ -747,11 +751,11 @@ class PROJ4Transform(BaseTransform):
             d['b'] = d['a'] * (1. - d['f'])
         if 'es' not in d:
             if 'e' in d:
-                d['es'] = d['e']**2
+                d['es'] = d['e'] ** 2
             else:
-                d['es'] = 2 * d['f'] - d['f']**2
+                d['es'] = 2 * d['f'] - d['f'] ** 2
         if 'e' not in d:
-            d['e'] = d['es']**0.5
+            d['e'] = d['es'] ** 0.5
 
         return d
 

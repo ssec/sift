@@ -1,8 +1,8 @@
 import ast
 from PyQt4 import QtGui, QtCore
-from sift.common import KIND, INFO
-from sift.ui.create_algebraic_dialog_ui import Ui_create_algebraic_dialog
 
+from sift.common import Kind, Info
+from sift.ui.create_algebraic_dialog_ui import Ui_create_algebraic_dialog
 
 DIFF_OP_NAME = 'Difference'
 NDI_OP_NAME = 'Normalized Difference Index'
@@ -31,13 +31,13 @@ class CreateAlgebraicDialog(QtGui.QDialog):
         available_short_names = []
         selected_short_names = []
         # use DATASET_NAME as unique group identifier
-        for idx, prez, layer in self.doc.current_layers_where(kinds=(KIND.IMAGE, KIND.COMPOSITE)):
+        for idx, prez, layer in self.doc.current_layers_where(kinds=(Kind.IMAGE, Kind.COMPOSITE)):
             # use the UUID as a representative when talking to the document
-            available_info.setdefault(layer[INFO.SHORT_NAME],
-                                      layer[INFO.UUID])
-            available_short_names.append(layer[INFO.SHORT_NAME])
-            if layer[INFO.UUID] in selected_uuids:
-                selected_short_names.append(layer[INFO.SHORT_NAME])
+            available_info.setdefault(layer[Info.SHORT_NAME],
+                                      layer[Info.UUID])
+            available_short_names.append(layer[Info.SHORT_NAME])
+            if layer[Info.UUID] in selected_uuids:
+                selected_short_names.append(layer[Info.SHORT_NAME])
 
         self.ui.layer_name_edit.textEdited.connect(self._validate)
         self.accepted.connect(self._create_algebraic)
@@ -141,7 +141,7 @@ class CreateAlgebraicDialog(QtGui.QDialog):
             namespace[name] = combo.itemData(combo.currentIndex())
         operations = self.ui.operations_text.toPlainText()
         info = {
-            INFO.SHORT_NAME: new_name,
+            Info.SHORT_NAME: new_name,
         }
 
         self.doc.create_algebraic_composite(operations=operations, namespace=namespace, info=info)
@@ -161,17 +161,17 @@ class CreateAlgebraicDialog(QtGui.QDialog):
                 if namespace['x'] == namespace['y']:
                     status_title = 'Error: Bad layer selection'
                     status_text = 'Error: Subtracting a layer from itself'
-                elif x[INFO.STANDARD_NAME] != y[INFO.STANDARD_NAME]:
+                elif x[Info.STANDARD_NAME] != y[Info.STANDARD_NAME]:
                     status_title = 'Warning: Bad layer selection'
                     status_text = 'Warning: Subtracting layers with different units'
 
             try:
                 operations = self.ui.operations_text.toPlainText()
                 ops_ast = ast.parse(operations, mode='exec')
-                ops = compile(ops_ast, '<string>', 'exec')
-                result_name = ops_ast.body[-1].targets[0].id
+                compile(ops_ast, '<string>', 'exec')
+                # result_name = ops_ast.body[-1].targets[0].id
             except (AttributeError, KeyError, IndexError, SyntaxError):
-                ret_button = QtGui.QMessageBox.critical(
+                _ = QtGui.QMessageBox.critical(
                     self,
                     'Error: Syntax Error',
                     'Error: Syntax Error in Operations code. Must be valid Python 3 syntax.',
@@ -193,12 +193,12 @@ class CreateAlgebraicDialog(QtGui.QDialog):
                 if ret == QtGui.QMessageBox.No:
                     return
             elif status_title.startswith('Error'):
-                ret_button = QtGui.QMessageBox.critical(
+                QtGui.QMessageBox.critical(
                     self,
                     status_title,
                     status_text,
                     QtGui.QMessageBox.Ok,
-                    )
+                )
                 return
 
         return super(CreateAlgebraicDialog, self).done(r)

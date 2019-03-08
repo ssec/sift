@@ -38,12 +38,16 @@ REQUIRES
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import os, sys
-import logging, unittest, argparse
-from datetime import timedelta, datetime
+import argparse
+import logging
+import os
+import sys
+import unittest
 from collections import namedtuple
+from datetime import timedelta
 from enum import Enum
-from PyQt4.QtCore import QObject, pyqtSignal
+
+from PyQt4.QtCore import QObject
 
 LOG = logging.getLogger(__name__)
 
@@ -63,6 +67,7 @@ class state(Enum):
     CACHED = 3  # in cache, has UUID, but not being accessed (does not exist as a layer or scene graph element)
     ACTIVE = 4  # available as layer, dataset in workspace, and has at least one presentation
 
+
 column_info = namedtuple('column_info', ('time', 'product_count'))
 
 row_info = namedtuple('row_info', ('product_name', 'timestep_count'))
@@ -78,6 +83,7 @@ class DataAdjacencyMatrix(QObject):
     - manages default presentation on a per-product basis
     - allows re-ordering of products, resulting in z-order scenegraph changes
     """
+
     def __init__(self, initial_search_paths=[]):
         super(DataAdjacencyMatrix, self).__init__()
 
@@ -104,7 +110,7 @@ class DataAdjacencyMatrix(QObject):
         """
         :return: tuple of (products, timesteps)
         """
-        return (0,0)
+        return (0, 0)
 
     def column_info(self, column):
         """
@@ -141,7 +147,8 @@ def _debug(type, value, tb):
     if not sys.stdin.isatty():
         sys.__excepthook__(type, value, tb)
     else:
-        import traceback, pdb
+        import traceback
+        import pdb
         traceback.print_exception(type, value, tb)
         # …then start the debugger in post-mortem mode.
         pdb.post_mortem(tb)  # more “modern”
@@ -153,7 +160,7 @@ def main():
         epilog="",
         fromfile_prefix_chars='@')
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG')
+                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG')
     parser.add_argument('-d', '--debug', dest='debug', action='store_true',
                         help="enable interactive PDB debugger on exception")
     # http://docs.python.org/2.7/library/argparse.html#nargs

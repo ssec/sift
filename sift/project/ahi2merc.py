@@ -8,16 +8,16 @@
 """
 __author__ = 'davidh'
 
-import os
-import sys
 import logging
+import os
 import subprocess
-
-import osr
+import sys
 from glob import glob
+
+import numpy as np
+import osr
 from osgeo import gdal
 from pyproj import Proj
-import numpy as np
 
 from sift.project.ahi2gtiff import create_ahi_geotiff, ahi_image_info, ahi_image_data
 
@@ -34,13 +34,15 @@ def run_gdalwarp(input_file, output_file, *args):
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="Convert AHI Geos NetCDF files to mercator geotiffs at the same resolution")
+    parser = argparse.ArgumentParser(
+        description="Convert AHI Geos NetCDF files to mercator geotiffs at the same resolution")
     parser.add_argument("--merc-ext", default=".merc.tif",
                         help="Extension for new mercator files (replace '.tif' with '.merc.tif' by default)")
     parser.add_argument("--input-pattern", default="????/*.nc",
                         help="Input pattern used search for NetCDF files in 'input_dir'")
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG (default INFO)')
+                        help='each occurrence increases verbosity 1 level through '
+                             'ERROR-WARNING-Info-DEBUG (default Info)')
 
     # http://www.gdal.org/frmt_gtiff.html
     parser.add_argument('--compress', default=None,
@@ -61,7 +63,8 @@ def main():
     parser.add_argument("input_dir",
                         help="Input directory to search for the 'input_pattern' specified")
     parser.add_argument("output_dir",
-                        help="Output directory to place new mercator files (input_pattern structure is reflected in output dir)")
+                        help="Output directory to place new mercator files "
+                             "(input_pattern structure is reflected in output dir)")
     parser.add_argument("gdalwarp_args", nargs="*",
                         help="arguments that are passed directly to gdalwarp")
     args = parser.parse_args()
@@ -148,7 +151,7 @@ def main():
         LOG.debug("Using extents (%f : %f : %f : %f)", x_extent[0], y_extent[0], x_extent[1], y_extent[1])
 
         gdalwarp_args = args.gdalwarp_args + [
-            #"-multi",
+            # "-multi",
             "-t_srs", proj,
             "-tr", str(cw), str(ch),
             "-te",
@@ -173,6 +176,7 @@ def main():
         if args.blockysize is not None:
             gdalwarp_args.extend(["-co", "BLOCKYSIZE=%d" % (args.blockysize,)])
         run_gdalwarp(geos_file, merc_file, *gdalwarp_args)
+
 
 if __name__ == "__main__":
     sys.exit(main())

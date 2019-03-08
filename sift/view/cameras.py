@@ -25,11 +25,11 @@ __docformat__ = 'reStructuredText'
 __author__ = 'davidh'
 
 import logging
-import numpy as np
 
+import numpy as np
+from vispy.geometry import Rect
 from vispy.scene import PanZoomCamera, BaseCamera
 from vispy.util.keys import SHIFT
-from vispy.geometry import Rect
 
 LOG = logging.getLogger(__name__)
 
@@ -37,6 +37,7 @@ LOG = logging.getLogger(__name__)
 class PanZoomProbeCamera(PanZoomCamera):
     """Camera that maps mouse presses to events for probing.
     """
+
     # def viewbox_mouse_event(self, event):
     #     """
     #     The SubScene received a mouse event; update transform
@@ -81,7 +82,6 @@ class PanZoomProbeCamera(PanZoomCamera):
         viewbox.events.mouse_move.disconnect(self.viewbox_mouse_event)
         viewbox.events.mouse_wheel.disconnect(self.viewbox_mouse_event)
         viewbox.events.resize.disconnect(self.viewbox_resize_event)
-
 
     @property
     def rect(self):
@@ -171,14 +171,14 @@ class PanZoomProbeCamera(PanZoomCamera):
                 p2 = np.array(event.pos)[:2]
                 p1s = self._transform.imap(p1)
                 p2s = self._transform.imap(p2)
-                self.pan(p1s-p2s)
+                self.pan(p1s - p2s)
                 event.handled = True
             elif 1 in event.buttons and modifiers == (SHIFT,):
                 # Zoom
                 p1c = np.array(event.last_event.pos)[:2]
                 p2c = np.array(event.pos)[:2]
                 scale = ((1 + self.zoom_factor) **
-                         ((p1c-p2c) * np.array([1, -1])))
+                         ((p1c - p2c) * np.array([1, -1])))
                 center = self._transform.imap(event.press_event.pos[:2])
                 self.zoom(scale, center)
                 event.handled = True

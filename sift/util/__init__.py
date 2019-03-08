@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import logging
 import os
 import sys
-import logging
-from sift.util.default_paths import (WORKSPACE_DB_DIR,
-                                     DOCUMENT_SETTINGS_DIR,
-                                     USER_DESKTOP_DIRECTORY)
+
+from sift.util.default_paths import WORKSPACE_DB_DIR, DOCUMENT_SETTINGS_DIR, USER_DESKTOP_DIRECTORY  # noqa
 
 LOG = logging.getLogger(__name__)
 IS_FROZEN = getattr(sys, 'frozen', False)

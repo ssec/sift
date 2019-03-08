@@ -22,4 +22,4 @@ REQUIRES
 :license: GPLv3, see LICENSE for more details
 """
 
-from .workspace import Workspace
+from .workspace import Workspace  # noqa

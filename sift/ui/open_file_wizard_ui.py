@@ -16,11 +16,14 @@ except AttributeError:
 
 try:
     _encoding = QtGui.QApplication.UnicodeUTF8
+
+
     def _translate(context, text, disambig):
         return QtGui.QApplication.translate(context, text, disambig, _encoding)
 except AttributeError:
     def _translate(context, text, disambig):
         return QtGui.QApplication.translate(context, text, disambig)
+
 
 class Ui_openFileWizard(object):
     def setupUi(self, openFileWizard):
@@ -171,10 +174,13 @@ class Ui_openFileWizard(object):
         self.productSelectionPage.setSubTitle(_translate("openFileWizard", "Select products to add", None))
         self.selectByNameLabel.setText(_translate("openFileWizard", "Name", None))
         self.selectByLevelLabel.setText(_translate("openFileWizard", "Level", None))
-        self.selectByTabWidget.setTabText(self.selectByTabWidget.indexOf(self.selectByParameters), _translate("openFileWizard", "Properties", None))
+        self.selectByTabWidget.setTabText(self.selectByTabWidget.indexOf(self.selectByParameters),
+                                          _translate("openFileWizard", "Properties", None))
         self.selectIDTable.setSortingEnabled(False)
-        self.selectByTabWidget.setTabText(self.selectByTabWidget.indexOf(self.selectByID), _translate("openFileWizard", "List", None))
+        self.selectByTabWidget.setTabText(self.selectByTabWidget.indexOf(self.selectByID),
+                                          _translate("openFileWizard", "List", None))
         self.summaryPage.setTitle(_translate("openFileWizard", "Products Summary", None))
         self.summaryPage.setSubTitle(_translate("openFileWizard", "Verify the products that will be loaded", None))
+
 
 from sift.ui.custom_widgets import AnyWizardPage

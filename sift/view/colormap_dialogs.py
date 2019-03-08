@@ -1,8 +1,9 @@
 import logging
+from PyQt4 import QtGui, QtCore
 from functools import partial
 from uuid import UUID
-from PyQt4 import QtGui, QtCore
-from sift.common import INFO, KIND
+
+from sift.common import Info, Kind
 from sift.ui.change_colormap_dialog_ui import Ui_changeColormapDialog
 
 LOG = logging.getLogger(__name__)
@@ -21,8 +22,8 @@ class ChangeColormapDialog(QtGui.QDialog):
         self.valid_min, self.valid_max = self.doc.valid_range_for_uuid(self.uuid)
         prez = self.doc.prez_for_uuid(self.uuid)
         layer = self.doc[self.uuid]
-        conv = layer[INFO.UNIT_CONVERSION]
-        self.setWindowTitle(str(self.windowTitle()) + ": " + self.doc[self.uuid][INFO.SHORT_NAME])
+        conv = layer[Info.UNIT_CONVERSION]
+        self.setWindowTitle(str(self.windowTitle()) + ": " + self.doc[self.uuid][Info.SHORT_NAME])
         self._initial_cmap = prez.colormap
         self._current_cmap = self._initial_cmap
         self._initial_clims = prez.climits
@@ -54,7 +55,7 @@ class ChangeColormapDialog(QtGui.QDialog):
         self.ui.vmin_edit.editingFinished.connect(partial(self._edit_changed, is_max=False))
         self.ui.vmax_edit.editingFinished.connect(partial(self._edit_changed, is_max=True))
 
-        if layer[INFO.KIND] in [KIND.CONTOUR]:
+        if layer[Info.KIND] in [Kind.CONTOUR]:
             self.ui.gammaSpinBox.setDisabled(True)
         else:
             self.ui.gammaSpinBox.valueChanged.connect(self._gamma_changed)
@@ -90,7 +91,7 @@ class ChangeColormapDialog(QtGui.QDialog):
 
         val = self._get_slider_value(slider.value())
         LOG.debug('slider %s %s => %f' % (self.uuid, 'max' if is_max else 'min', val))
-        display_val = self.doc[self.uuid][INFO.UNIT_CONVERSION][1](val)
+        display_val = self.doc[self.uuid][Info.UNIT_CONVERSION][1](val)
         edit.setText('{:0.03f}'.format(display_val))
         return self._set_new_clims(val, is_max)
 
@@ -99,7 +100,7 @@ class ChangeColormapDialog(QtGui.QDialog):
         edit = self.ui.vmax_edit if is_max else self.ui.vmin_edit
 
         vdis = float(edit.text())
-        val = self.doc[self.uuid][INFO.UNIT_CONVERSION][1](vdis, inverse=True)
+        val = self.doc[self.uuid][Info.UNIT_CONVERSION][1](vdis, inverse=True)
         LOG.debug('line edit %s %s => %f => %f' % (self.uuid, 'max' if is_max else 'min', vdis, val))
         sv = self._create_slider_value(val)
         slider.setValue(sv)

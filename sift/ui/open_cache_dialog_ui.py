@@ -16,11 +16,14 @@ except AttributeError:
 
 try:
     _encoding = QtGui.QApplication.UnicodeUTF8
+
+
     def _translate(context, text, disambig):
         return QtGui.QApplication.translate(context, text, disambig, _encoding)
 except AttributeError:
     def _translate(context, text, disambig):
         return QtGui.QApplication.translate(context, text, disambig)
+
 
 class Ui_openFromCacheDialog(object):
     def setupUi(self, openFromCacheDialog):
@@ -45,7 +48,7 @@ class Ui_openFromCacheDialog(object):
         self.verticalLayout.addWidget(self.cacheListWidget)
         self.buttonBox = QtGui.QDialogButtonBox(openFromCacheDialog)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QtGui.QDialogButtonBox.Cancel|QtGui.QDialogButtonBox.Ok)
+        self.buttonBox.setStandardButtons(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName(_fromUtf8("buttonBox"))
         self.verticalLayout.addWidget(self.buttonBox)
 
@@ -56,6 +59,6 @@ class Ui_openFromCacheDialog(object):
 
     def retranslateUi(self, openFromCacheDialog):
         openFromCacheDialog.setWindowTitle(_translate("openFromCacheDialog", "Open Cached Layers", None))
-        self.label.setText(_translate("openFromCacheDialog", "Pre-processed layers stored in cache will load quickly.", None))
+        self.label.setText(
+            _translate("openFromCacheDialog", "Pre-processed layers stored in cache will load quickly.", None))
         self.removeFromCacheButton.setText(_translate("openFromCacheDialog", "Remove Selected Cached Layers", None))
-

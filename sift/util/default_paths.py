@@ -13,6 +13,7 @@ Directory Constants:
 """
 import os
 import sys
+
 import appdirs
 
 APPLICATION_AUTHOR = "CIMSS-SSEC"
@@ -25,6 +26,8 @@ USER_CONFIG_DIR = appdirs.user_config_dir(APPLICATION_DIR, APPLICATION_AUTHOR, r
 
 WORKSPACE_DB_DIR = os.path.join(USER_CACHE_DIR, 'workspace')
 DOCUMENT_SETTINGS_DIR = os.path.join(USER_CONFIG_DIR, 'settings')
+
+
 # FUTURE: Is there Document data versus Document configuration?
 
 

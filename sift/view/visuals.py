@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-LayerRep.py
+visuals.py
 ~~~~~~~~~~~
 
 PURPOSE
@@ -22,18 +22,20 @@ REQUIRES
 :license: GPLv3, see LICENSE for more details
 """
 
-import sys
 import logging
-import unittest
-import argparse
-
-import shapefile
-
-from vispy.scene.visuals import create_visual_node
-from vispy.visuals import LineVisual, ImageVisual
-from vispy.ext.six import string_types
-import numpy as np
 from datetime import datetime
+
+import numpy as np
+import shapefile
+from vispy.ext.six import string_types
+from vispy.gloo import VertexBuffer
+from vispy.io.datasets import load_spatial_filters
+from vispy.scene.visuals import create_visual_node
+from vispy.visuals import LineVisual, ImageVisual, IsocurveVisual
+# The below imports are needed because we subclassed the ImageVisual
+from vispy.visuals.shaders import Function
+from vispy.visuals.transforms import NullTransform
+
 
 from sift.common import (
     DEFAULT_PROJECTION,
@@ -42,18 +44,12 @@ from sift.common import (
     DEFAULT_TEXTURE_HEIGHT,
     DEFAULT_TEXTURE_WIDTH,
     TESS_LEVEL,
-    box, pnt, rez, vue,
+    Box, Point, Resolution, ViewBox,
     TileCalculator,
     calc_pixel_size,
     get_reference_points,
-    )
-from sift.view.Program import TextureAtlas2D, Texture2D
-# The below imports are needed because we subclassed the ImageVisual
-from vispy.visuals.shaders import Function
-from vispy.visuals.transforms import NullTransform
-from vispy.gloo import VertexBuffer
-from vispy.io.datasets import load_spatial_filters
-from vispy.visuals.shaders import FunctionChain
+)
+from sift.view.texture_atlas import TextureAtlas2D, Texture2D
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -63,6 +59,8 @@ LOG = logging.getLogger(__name__)
 # then we consider it invalid
 # these values can get large when zoomed way in
 CANVAS_EPSILON = 1e5
+
+
 # CANVAS_EPSILON = 1e30
 
 
@@ -174,6 +172,7 @@ class TextureTileState(object):
     This class is meant to be used as a bookkeeper/consultant right before taking action
     on the Texture Atlas.
     """
+
     def __init__(self, num_tiles):
         self.num_tiles = num_tiles
         self.reset()
@@ -285,8 +284,8 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self.calc = TileCalculator(
             self.name,
             self.shape,
-            pnt(x=self.origin_x, y=self.origin_y),
-            rez(dy=abs(self.cell_height), dx=abs(self.cell_width)),
+            Point(x=self.origin_x, y=self.origin_y),
+            Resolution(dy=abs(self.cell_height), dx=abs(self.cell_width)),
             self.tile_shape,
             self.texture_shape,
             wrap_lon=self.wrap_lon,
@@ -433,9 +432,13 @@ class TiledGeolocatedImageVisual(ImageVisual):
         tl = TESS_LEVEL * TESS_LEVEL
         nfo["texture_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
         nfo["vertex_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
-        factor_rez, offset_rez = self.calc.calc_tile_fraction(0, 0, pnt(np.int64(y_slice.step), np.int64(x_slice.step)))
-        nfo["texture_coordinates"][:6 * tl, :2] = self.calc.calc_texture_coordinates(ttile_idx, factor_rez, offset_rez, tessellation_level=TESS_LEVEL)
-        nfo["vertex_coordinates"][:6 * tl, :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step, factor_rez, offset_rez, tessellation_level=TESS_LEVEL)
+        factor_rez, offset_rez = self.calc.calc_tile_fraction(0, 0,
+                                                              Point(np.int64(y_slice.step), np.int64(x_slice.step)))
+        nfo["texture_coordinates"][:6 * tl, :2] = self.calc.calc_texture_coordinates(ttile_idx, factor_rez, offset_rez,
+                                                                                     tessellation_level=TESS_LEVEL)
+        nfo["vertex_coordinates"][:6 * tl, :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step,
+                                                                                   factor_rez, offset_rez,
+                                                                                   tessellation_level=TESS_LEVEL)
         self._set_vertex_tiles(nfo["vertex_coordinates"], nfo["texture_coordinates"])
 
     def _normalize_data(self, data):
@@ -444,16 +447,17 @@ class TiledGeolocatedImageVisual(ImageVisual):
 
         return data
 
-    def _build_texture_tiles(self, data, stride, tile_box):
+    def _build_texture_tiles(self, data, stride, tile_box: Box):
         """Prepare and organize strided data in to individual tiles with associated information.
         """
         data = self._normalize_data(data)
 
-        LOG.debug("Uploading texture data for %d tiles (%r)", (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l), tile_box)
+        LOG.debug("Uploading texture data for %d tiles (%r)",
+                  (tile_box.bottom - tile_box.top) * (tile_box.right - tile_box.left), tile_box)
         # Tiles start at upper-left so go from top to bottom
         tiles_info = []
-        for tiy in range(tile_box.t, tile_box.b):
-            for tix in range(tile_box.l, tile_box.r):
+        for tiy in range(tile_box.top, tile_box.bottom):
+            for tix in range(tile_box.left, tile_box.right):
                 already_in = (stride, tiy, tix) in self.texture_state
                 # Update the age if already in there
                 # Assume that texture_state does not change from the main thread if this is run in another
@@ -464,8 +468,10 @@ class TiledGeolocatedImageVisual(ImageVisual):
 
                 # Assume we were given a total image worth of this stride
                 y_slice, x_slice = self.calc.calc_tile_slice(tiy, tix, stride)
-                # force a copy of the data from the content array (provided by the workspace) to a vispy-compatible contiguous float array
-                # this can be a potentially time-expensive operation since content array is often huge and always memory-mapped, so paging may occur
+                # force a copy of the data from the content array (provided by the workspace)
+                # to a vispy-compatible contiguous float array
+                # this can be a potentially time-expensive operation since content array is
+                # often huge and always memory-mapped, so paging may occur
                 # we don't want this paging deferred until we're back in the GUI thread pushing data to OpenGL!
                 tile_data = np.array(data[y_slice, x_slice], dtype=np.float32)
                 tiles_info.append((stride, tiy, tix, tex_tile_idx, tile_data))
@@ -477,17 +483,18 @@ class TiledGeolocatedImageVisual(ImageVisual):
             stride, tiy, tix, tex_tile_idx, data = tile_info
             self._texture.set_tile_data(tex_tile_idx, data)
 
-    def _build_vertex_tiles(self, preferred_stride, tile_box):
+    def _build_vertex_tiles(self, preferred_stride, tile_box: Box):
         """Rebuild the vertex buffers used for rendering the image when using
         the subdivide method.
 
         SIFT Note: Copied from 0.5.0dev original ImageVisual class
         """
-        total_num_tiles = (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l)
+        total_num_tiles = (tile_box.bottom - tile_box.top) * (tile_box.right - tile_box.left)
         total_overview_tiles = 0
         if self.overview_info is not None:
             # we should be providing an overview image
-            total_overview_tiles = int(self.overview_info["vertex_coordinates"].shape[0] / 6 / (TESS_LEVEL * TESS_LEVEL))
+            total_overview_tiles = int(
+                self.overview_info["vertex_coordinates"].shape[0] / 6 / (TESS_LEVEL * TESS_LEVEL))
 
         if total_num_tiles <= 0:
             # we aren't looking at this image
@@ -506,32 +513,40 @@ class TiledGeolocatedImageVisual(ImageVisual):
         # Set up the overview tile
         if self.overview_info is not None:
             # XXX: This completely depends on drawing order, putting it at the end seems to work
-            tex_coords[-6 * total_overview_tiles * TESS_LEVEL * TESS_LEVEL:, :] = self.overview_info["texture_coordinates"]
-            vertices[-6 * total_overview_tiles * TESS_LEVEL * TESS_LEVEL:, :] = self.overview_info["vertex_coordinates"]
+            tex_coords[-6 * total_overview_tiles * TESS_LEVEL * TESS_LEVEL:, :] = \
+                self.overview_info["texture_coordinates"]
+            vertices[-6 * total_overview_tiles * TESS_LEVEL * TESS_LEVEL:, :] = \
+                self.overview_info["vertex_coordinates"]
 
         LOG.debug("Building vertex data for %d tiles (%r)", total_num_tiles, tile_box)
         tl = TESS_LEVEL * TESS_LEVEL
         # Tiles start at upper-left so go from top to bottom
-        for tiy in range(tile_box.t, tile_box.b):
-            for tix in range(tile_box.l, tile_box.r):
+        for tiy in range(tile_box.top, tile_box.bottom):
+            for tix in range(tile_box.left, tile_box.right):
                 # Update the index here because we have multiple exit/continuation points
                 used_tile_idx += 1
 
-                # Check if the tile we want to draw is actually in the GPU, if not (atlas too small?) fill with zeros and keep going
+                # Check if the tile we want to draw is actually in the GPU
+                # if not (atlas too small?) fill with zeros and keep going
                 if (preferred_stride, tiy, tix) not in self.texture_state:
                     # THIS SHOULD NEVER HAPPEN IF TEXTURE BUILDING IS DONE CORRECTLY AND THE ATLAS IS BIG ENOUGH
-                    tex_coords[TESS_LEVEL*TESS_LEVEL*used_tile_idx*6: TESS_LEVEL*TESS_LEVEL*(used_tile_idx+1)*6, :] = 0
-                    vertices[TESS_LEVEL*TESS_LEVEL*used_tile_idx*6: TESS_LEVEL*TESS_LEVEL*(used_tile_idx+1)*6, :] = 0
+                    tile_start = TESS_LEVEL * TESS_LEVEL * used_tile_idx * 6
+                    tile_end = TESS_LEVEL * TESS_LEVEL * (used_tile_idx + 1) * 6
+                    tex_coords[tile_start: tile_end, :] = 0
+                    vertices[tile_start: tile_end, :] = 0
                     continue
 
                 # we should have already loaded the texture data in to the GPU so get the index of that texture
                 tex_tile_idx = self.texture_state[(preferred_stride, tiy, tix)]
                 factor_rez, offset_rez = self.calc.calc_tile_fraction(tiy, tix, preferred_stride)
-                tex_coords[tl*used_tile_idx*6: tl*(used_tile_idx+1)*6, :] = self.calc.calc_texture_coordinates(tex_tile_idx, factor_rez, offset_rez, tessellation_level=TESS_LEVEL)
-                vertices[tl*used_tile_idx*6: tl*(used_tile_idx+1)*6, :] = self.calc.calc_vertex_coordinates(tiy, tix,
-                                                                                                            preferred_stride[0], preferred_stride[1],
-                                                                                                            factor_rez, offset_rez,
-                                                                                                            tessellation_level=TESS_LEVEL)
+                tex_coords[tl * used_tile_idx * 6: tl * (used_tile_idx + 1) * 6, :] = \
+                    self.calc.calc_texture_coordinates(tex_tile_idx, factor_rez, offset_rez,
+                                                       tessellation_level=TESS_LEVEL)
+                vertices[tl * used_tile_idx * 6: tl * (used_tile_idx + 1) * 6, :] = self.calc.calc_vertex_coordinates(
+                    tiy, tix,
+                    preferred_stride[0], preferred_stride[1],
+                    factor_rez, offset_rez,
+                    tessellation_level=TESS_LEVEL)
 
         return vertices, tex_coords
 
@@ -591,10 +606,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
                                  img_vbox[(self._ref1, self._ref2), :],
                                  self.canvas.size)
         view_extents = self.calc.calc_view_extents(img_cmesh[ref_idx_1], img_vbox[ref_idx_1], self.canvas.size, dx, dy)
-        # ll_corner, ur_corner = self.transforms.get_transform().imap([(-1, -1, 1), (1, 1, 1)])
-        # print("Old method: ", ll_corner, ur_corner, "dy: %f" % ((ur_corner[1] - ll_corner[1]) / self.canvas.size[1]), "dx: %f" % ((ur_corner[0] - ll_corner[0]) / self.canvas.size[0]))
-        # print("View Box: ", view_box)
-        return vue(*view_extents, dx=dx, dy=dy)
+        return ViewBox(*view_extents, dx=dx, dy=dy)
 
     def _get_stride(self, view_box):
         return self.calc.calc_stride(view_box)
@@ -607,12 +619,12 @@ class TiledGeolocatedImageVisual(ImageVisual):
         try:
             view_box = self.get_view_box()
             preferred_stride = self._get_stride(view_box)
-            tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride, extra_tiles_box=box(1, 1, 1, 1))
+            tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride, extra_tiles_box=Box(1, 1, 1, 1))
         except ValueError:
             LOG.error("Could not determine viewable image area for '{}'".format(self.name))
             return False, self._stride, self._latest_tile_box
 
-        num_tiles = (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l)
+        num_tiles = (tile_box.bottom - tile_box.top) * (tile_box.right - tile_box.left)
         LOG.debug("Assessment: Prefer '%s' have '%s', was looking at %r, now looking at %r",
                   preferred_stride, self._stride, self._latest_tile_box, tile_box)
 
@@ -795,7 +807,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
                                          interpolation=texture_interpolation,
                                          format="LUMINANCE", internalformat="R32F",
                                          ) for i in range(self.num_channels)
-        ]
+                          ]
         self._subdiv_position = VertexBuffer()
         self._subdiv_texcoord = VertexBuffer()
 
@@ -824,8 +836,8 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         if not isinstance(cmap, (tuple, list)):
             cmap = [cmap] * self.num_channels
 
-        assert(len(clim) == self.num_channels)
-        assert(len(cmap) == self.num_channels)
+        assert (len(clim) == self.num_channels)
+        assert (len(cmap) == self.num_channels)
         _clim = []
         _cmap = []
         for idx in range(self.num_channels):
@@ -871,16 +883,18 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         assert None not in (self.cell_width, self.cell_height, self.origin_x, self.origin_y, self.shape)
         # how many of the higher resolution channel tiles (smaller geographic area) make
         # up a low resolution channel tile
-        self._channel_factors = tuple(self.shape[0] / float(chn.shape[0]) if chn is not None else 1. for chn in data_arrays)
+        self._channel_factors = tuple(
+            self.shape[0] / float(chn.shape[0]) if chn is not None else 1. for chn in data_arrays)
         self._lowest_factor = max(self._channel_factors)
-        self._lowest_rez = rez(abs(self.cell_height * self._lowest_factor), abs(self.cell_width * self._lowest_factor))
+        self._lowest_rez = Resolution(abs(self.cell_height * self._lowest_factor),
+                                      abs(self.cell_width * self._lowest_factor))
 
         # Where does this image lie in this lonely world
         self.calc = TileCalculator(
             self.name,
             self.shape,
-            pnt(x=self.origin_x, y=self.origin_y),
-            rez(dy=abs(self.cell_height), dx=abs(self.cell_width)),
+            Point(x=self.origin_x, y=self.origin_y),
+            Resolution(dy=abs(self.cell_height), dx=abs(self.cell_width)),
             self.tile_shape,
             self.texture_shape,
             wrap_lon=self.wrap_lon
@@ -922,9 +936,13 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         tl = TESS_LEVEL * TESS_LEVEL
         nfo["texture_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
         nfo["vertex_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
-        factor_rez, offset_rez = self.calc.calc_tile_fraction(0, 0, pnt(np.int64(y_slice.step), np.int64(x_slice.step)))
-        nfo["texture_coordinates"][:6 * tl, :2] = self.calc.calc_texture_coordinates(ttile_idx, factor_rez, offset_rez, tessellation_level=TESS_LEVEL)
-        nfo["vertex_coordinates"][:6 * tl, :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step, factor_rez, offset_rez, tessellation_level=TESS_LEVEL)
+        factor_rez, offset_rez = self.calc.calc_tile_fraction(
+            0, 0, Point(np.int64(y_slice.step), np.int64(x_slice.step)))
+        nfo["texture_coordinates"][:6 * tl, :2] = self.calc.calc_texture_coordinates(ttile_idx, factor_rez, offset_rez,
+                                                                                     tessellation_level=TESS_LEVEL)
+        nfo["vertex_coordinates"][:6 * tl, :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step,
+                                                                                   factor_rez, offset_rez,
+                                                                                   tessellation_level=TESS_LEVEL)
         self._set_vertex_tiles(nfo["vertex_coordinates"], nfo["texture_coordinates"])
 
     @property
@@ -979,11 +997,12 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         """
         data = [self._normalize_data(d) for d in data]
 
-        LOG.debug("Uploading texture data for %d tiles (%r)", (tile_box.b - tile_box.t) * (tile_box.r - tile_box.l), tile_box)
+        LOG.debug("Uploading texture data for %d tiles (%r)",
+                  (tile_box.bottom - tile_box.top) * (tile_box.right - tile_box.left), tile_box)
         # Tiles start at upper-left so go from top to bottom
         tiles_info = []
-        for tiy in range(tile_box.t, tile_box.b):
-            for tix in range(tile_box.l, tile_box.r):
+        for tiy in range(tile_box.top, tile_box.bottom):
+            for tix in range(tile_box.left, tile_box.right):
                 already_in = (stride, tiy, tix) in self.texture_state
                 # Update the age if already in there
                 # Assume that texture_state does not change from the main thread if this is run in another
@@ -996,8 +1015,10 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
                 y_slice, x_slice = self.calc.calc_tile_slice(tiy, tix, stride)
                 textures_data = []
                 for chn_idx in range(self.num_channels):
-                    # force a copy of the data from the content array (provided by the workspace) to a vispy-compatible contiguous float array
-                    # this can be a potentially time-expensive operation since content array is often huge and always memory-mapped, so paging may occur
+                    # force a copy of the data from the content array (provided by the workspace)
+                    # to a vispy-compatible contiguous float array
+                    # this can be a potentially time-expensive operation since content array is often huge and
+                    # always memory-mapped, so paging may occur
                     # we don't want this paging deferred until we're back in the GUI thread pushing data to OpenGL!
                     if data[chn_idx] is None:
                         # we need to fill the texture with NaNs instead of actual data
@@ -1016,8 +1037,9 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
                 self._textures[idx].set_tile_data(tex_tile_idx, data)
 
     def _get_stride(self, view_box):
-        s = self.calc.calc_stride( view_box, texture=self._lowest_rez)
-        return pnt(np.int64(s[0] * self._lowest_factor), np.int64(s[1] * self._lowest_factor))
+        s = self.calc.calc_stride(view_box, texture=self._lowest_rez)
+        return Point(np.int64(s[0] * self._lowest_factor), np.int64(s[1] * self._lowest_factor))
+
 
 CompositeLayer = create_visual_node(CompositeLayerVisual)
 
@@ -1090,6 +1112,7 @@ class RGBCompositeLayerVisual(CompositeLayerVisual):
     VERT_SHADER = RGB_VERT_SHADER
     FRAG_SHADER = RGB_FRAG_SHADER
 
+
 RGBCompositeLayer = create_visual_node(RGBCompositeLayerVisual)
 
 
@@ -1113,8 +1136,8 @@ class ShapefileLinesVisual(LineVisual):
             # for part_idx in one_shape.parts:
             for part_start, part_end in zip(one_shape.parts, list(one_shape.parts[1:]) + [len(one_shape.points)]):
                 end_idx = prev_idx + (part_end - part_start) * 2 - 2
-                vertex_buffer[prev_idx:end_idx:2] = one_shape.points[part_start:part_end-1]
-                vertex_buffer[prev_idx + 1:end_idx:2] = one_shape.points[part_start+1:part_end]
+                vertex_buffer[prev_idx:end_idx:2] = one_shape.points[part_start:part_end - 1]
+                vertex_buffer[prev_idx + 1:end_idx:2] = one_shape.points[part_start + 1:part_end]
                 prev_idx = end_idx
 
         # Clip lats to +/- 89.9 otherwise PROJ.4 on mercator projection will fail
@@ -1131,6 +1154,7 @@ class ShapefileLinesVisual(LineVisual):
         kwargs.setdefault("width", 1)
         super().__init__(pos=vertex_buffer, connect="segments", **kwargs)
         LOG.info("Done loading boundaries: %s", datetime.utcnow().isoformat(" "))
+
 
 ShapefileLines = create_visual_node(ShapefileLinesVisual)
 
@@ -1149,9 +1173,6 @@ class NEShapefileLinesVisual(ShapefileLinesVisual):
 
 
 NEShapefileLines = create_visual_node(NEShapefileLinesVisual)
-
-
-from vispy.visuals import IsocurveVisual
 
 
 class PrecomputedIsocurveVisual(IsocurveVisual):

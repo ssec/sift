@@ -8,19 +8,19 @@
 """
 __author__ = 'davidh'
 
-import os
-import sys
 import logging
+import os
 import subprocess
-
-import osr
+import sys
 from glob import glob
+
+import numpy as np
+import osr
+from netCDF4 import Dataset
 from osgeo import gdal
 from pyproj import Proj
-import numpy as np
-from netCDF4 import Dataset
 
-from sift.project.ahi2gtiff import create_ahi_geotiff, ahi_image_data, AHI_NADIR_RES
+from sift.project.ahi2gtiff import create_ahi_geotiff, AHI_NADIR_RES
 
 LOG = logging.getLogger(__name__)
 GTIFF_DRIVER = gdal.GetDriverByName("GTIFF")
@@ -78,7 +78,8 @@ def ahi_image_info(input_filename):
     # input_proj_str += "+h={perspective_point_height} "
     # input_proj_str += "+sweep={sweep_angle_axis}"
     # input_proj_str = input_proj_str.format(**projection_info)
-    input_proj_str = "+proj=geos +over +lon_0=140.7 +h=35785863 +x_0=0 +y_0=0 +a=6378137 +b=6356752.299581327 +units=m +no_defs"
+    input_proj_str = "+proj=geos +over +lon_0=140.7 +h=35785863 +x_0=0 +y_0=0 " \
+                     "+a=6378137 +b=6356752.299581327 +units=m +no_defs"
     LOG.debug("AHI Fixed Grid Projection String: %s", input_proj_str)
 
     # Calculate upper-left corner (origin) using center point as a reference
@@ -156,7 +157,8 @@ def ahi_dataset_metadata(input_filename, dataset_name):
         metadata["sensor"] = "AHI"
 
     # if we have valid_min and valid_max then get the scaled values
-    valid_min, valid_max = metadata.pop("valid_range", (metadata.pop("valid_min", None), metadata.pop("valid_max", None)))
+    valid_min, valid_max = metadata.pop("valid_range",
+                                        (metadata.pop("valid_min", None), metadata.pop("valid_max", None)))
     scale_factor = metadata.pop("scale_factor", 1)
     add_offset = metadata.pop("add_offset", 0)
     if valid_min is not None and valid_max is not None:
@@ -190,13 +192,15 @@ def ahi_image_data(input_filename, dataset):
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="Convert geocat HDF4 files to mercator geotiffs at the same resolution")
+    parser = argparse.ArgumentParser(
+        description="Convert geocat HDF4 files to mercator geotiffs at the same resolution")
     parser.add_argument("--merc-ext", default=".{dataset}.merc.tif",
                         help="Extension for new mercator files (replace '.tif' with '.merc.tif' by default)")
     parser.add_argument("--input-pattern", default="????/*.nc",
                         help="Input pattern used search for NetCDF files in 'input_dir'")
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG (default INFO)')
+                        help='each occurrence increases verbosity 1 level through'
+                             'ERROR-WARNING-Info-DEBUG (default Info)')
 
     # http://www.gdal.org/frmt_gtiff.html
     parser.add_argument('--compress', default=None,
@@ -220,7 +224,8 @@ def main():
     parser.add_argument("input_dir",
                         help="Input directory to search for the 'input_pattern' specified")
     parser.add_argument("output_dir",
-                        help="Output directory to place new mercator files (input_pattern structure is reflected in output dir)")
+                        help="Output directory to place new mercator files "
+                             "(input_pattern structure is reflected in output dir)")
     parser.add_argument("gdalwarp_args", nargs="*",
                         help="arguments that are passed directly to gdalwarp")
     args = parser.parse_args()
@@ -316,7 +321,7 @@ def main():
             # import ipdb; ipdb.set_trace()
 
             gdalwarp_args = args.gdalwarp_args + [
-                #"-multi",
+                # "-multi",
                 "-t_srs", proj,
                 "-tr", str(cw), str(ch),
                 "-te",
@@ -341,6 +346,7 @@ def main():
             if args.blockysize is not None:
                 gdalwarp_args.extend(["-co", "BLOCKYSIZE=%d" % (args.blockysize,)])
             run_gdalwarp(geos_file, merc_file, *gdalwarp_args)
+
 
 if __name__ == "__main__":
     sys.exit(main())

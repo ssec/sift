@@ -1,12 +1,12 @@
-import os
 import logging
-import numpy
-
+import os
 from PyQt4 import QtCore, QtGui
-from PIL import Image, ImageDraw, ImageFont
-import imageio
 
-from sift.common import INFO
+import imageio
+import numpy
+from PIL import Image, ImageDraw, ImageFont
+
+from sift.common import Info
 from sift.ui import export_image_dialog_ui
 from sift.util import get_package_data_dir, USER_DESKTOP_DIRECTORY
 
@@ -68,7 +68,7 @@ class ExportImageDialog(QtGui.QDialog):
         self.ui.frameRangeFrom.validator().setTop(n - 1)
         self.ui.frameRangeTo.validator().setTop(n)
         if (self.ui.frameRangeFrom.text() == '' or
-            int(self.ui.frameRangeFrom.text()) > n - 1):
+                int(self.ui.frameRangeFrom.text()) > n - 1):
             self.ui.frameRangeFrom.setText('1')
         if self.ui.frameRangeTo.text() in ['', '1']:
             self.ui.frameRangeTo.setText(str(n))
@@ -223,9 +223,9 @@ class ExportImageHelper(QtCore.QObject):
         for u in file_uuids:
             layer_info = self.doc[u]
             fn = base_filename.format(
-                start_time=layer_info[INFO.SCHED_TIME],
-                scene=INFO.SCENE,
-                instrument=INFO.INSTRUMENT,
+                start_time=layer_info[Info.SCHED_TIME],
+                scene=Info.SCENE,
+                instrument=Info.INSTRUMENT,
             )
             filenames.append(fn)
 
@@ -255,7 +255,7 @@ class ExportImageHelper(QtCore.QObject):
     def _get_animation_parameters(self, info, images):
         params = {}
         if info['fps'] is None:
-            t = [self.doc[u][INFO.SCHED_TIME] for u, im in images]
+            t = [self.doc[u][Info.SCHED_TIME] for u, im in images]
             t_diff = [max(1, (t[i] - t[i - 1]).total_seconds()) for i in range(1, len(t))]
             min_diff = float(min(t_diff))
             # imageio seems to be using duration in seconds
@@ -313,7 +313,7 @@ class ExportImageHelper(QtCore.QObject):
         images = [(u, Image.fromarray(x)) for u, x in img_arrays]
 
         if info['include_footer']:
-            banner_text = [self.doc[u][INFO.DISPLAY_NAME] if u else "" for u, im in images]
+            banner_text = [self.doc[u][Info.DISPLAY_NAME] if u else "" for u, im in images]
             images = [(u, self._add_screenshot_footer(im, bt, font_size=info['font_size'])) for (u, im), bt in
                       zip(images, banner_text)]
 
@@ -344,4 +344,3 @@ class ExportImageHelper(QtCore.QObject):
                 writer.append_data(numpy.array(x))
 
         writer.close()
-

@@ -19,15 +19,18 @@ REQUIRES
 :copyright: 2017 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-import os, sys
-import logging, unittest
-from PyQt4.QtCore import QObject, pyqtSignal
-from typing import Union, Set, List, Iterable, Mapping
-from ..common import INFO
-from .workspace import Workspace
-from sift.queue import TASK_DOING, TASK_PROGRESS
+import logging
+import os
+import sys
+import unittest
 from datetime import datetime
+from typing import List, Iterable, Mapping
 
+from PyQt4.QtCore import QObject
+
+from sift.queue import TASK_DOING, TASK_PROGRESS
+from .workspace import Workspace
+from ..common import Info
 
 LOG = logging.getLogger(__name__)
 
@@ -39,7 +42,7 @@ class _workspace_test_proxy(object):
     def collect_product_metadata_for_paths(self, paths):
         LOG.debug("import metadata for files: {}".format(repr(paths)))
         for path in paths:
-            yield 1, {INFO.PATHNAME: path}
+            yield 1, {Info.PATHNAME: path}
 
     class _emitsy(object):
         def emit(self, stuff):
@@ -143,7 +146,8 @@ class ResourceSearchPathCollector(QObject):
         when = self._touch()
         new_files = list(self._skim(when))
         if new_files:
-            LOG.info('found {} additional files to skim metadata for, for a total of {}'.format(len(new_files), len(self._scheduled_files)))
+            LOG.info('found {} additional files to skim metadata for, for a total of {}'.format(len(new_files), len(
+                self._scheduled_files)))
             self._scheduled_files += new_files
 
     def bgnd_look_for_new_files(self):
@@ -161,11 +165,12 @@ class ResourceSearchPathCollector(QObject):
         yield {TASK_DOING: 'collecting metadata 0/{}'.format(ntodo), TASK_PROGRESS: 0.0}
         changed_uuids = set()
         for num_prods, product_info in self._ws.collect_product_metadata_for_paths(todo):
-            path = product_info.get(INFO.PATHNAME, None)
+            path = product_info.get(Info.PATHNAME, None)
             dex = redex.get(path, 0.0)
-            status = {TASK_DOING: 'collecting metadata {}/{}'.format(dex+1, ntodo), TASK_PROGRESS: float(dex)/float(ntodo)}
+            status = {TASK_DOING: 'collecting metadata {}/{}'.format(dex + 1, ntodo),
+                      TASK_PROGRESS: float(dex) / float(ntodo)}
             # LOG.debug(repr(status))
-            changed_uuids.add(product_info[INFO.UUID])
+            changed_uuids.add(product_info[Info.UUID])
             yield status
         yield {TASK_DOING: 'collecting metadata done', TASK_PROGRESS: 1.0}
         if changed_uuids:
@@ -179,7 +184,8 @@ def _debug(type, value, tb):
     if not sys.stdin.isatty():
         sys.__excepthook__(type, value, tb)
     else:
-        import traceback, pdb
+        import traceback
+        import pdb
         traceback.print_exception(type, value, tb)
         # …then start the debugger in post-mortem mode.
         pdb.post_mortem(tb)  # more “modern”
@@ -192,7 +198,7 @@ def main():
         epilog="",
         fromfile_prefix_chars='@')
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG')
+                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG')
     parser.add_argument('-d', '--debug', dest='debug', action='store_true',
                         help="enable interactive PDB debugger on exception")
     parser.add_argument('inputs', nargs='*',
@@ -218,7 +224,7 @@ def main():
     for i in range(3):
         if i > 0:
             sleep(5)
-        LOG.info("poll #{}".format(i+1))
+        LOG.info("poll #{}".format(i + 1))
         collector.look_for_new_files()
         if collector.has_pending_files:
             for progress in collector.bgnd_merge_new_file_metadata_into_mdb():

@@ -16,11 +16,14 @@ except AttributeError:
 
 try:
     _encoding = QtGui.QApplication.UnicodeUTF8
+
+
     def _translate(context, text, disambig):
         return QtGui.QApplication.translate(context, text, disambig, _encoding)
 except AttributeError:
     def _translate(context, text, disambig):
         return QtGui.QApplication.translate(context, text, disambig)
+
 
 class Ui_changeColormapDialog(object):
     def setupUi(self, changeColormapDialog):
@@ -34,7 +37,7 @@ class Ui_changeColormapDialog(object):
         self.buttons = QtGui.QDialogButtonBox(changeColormapDialog)
         self.buttons.setGeometry(QtCore.QRect(20, 160, 321, 32))
         self.buttons.setOrientation(QtCore.Qt.Horizontal)
-        self.buttons.setStandardButtons(QtGui.QDialogButtonBox.Close|QtGui.QDialogButtonBox.Reset)
+        self.buttons.setStandardButtons(QtGui.QDialogButtonBox.Close | QtGui.QDialogButtonBox.Reset)
         self.buttons.setCenterButtons(False)
         self.buttons.setObjectName(_fromUtf8("buttons"))
         self.cmap_combobox = QtGui.QComboBox(changeColormapDialog)
@@ -64,7 +67,7 @@ class Ui_changeColormapDialog(object):
         self.gammaSpinBox.setObjectName(_fromUtf8("gammaSpinBox"))
         self.gammaLabel = QtGui.QLabel(changeColormapDialog)
         self.gammaLabel.setGeometry(QtCore.QRect(200, 120, 56, 24))
-        self.gammaLabel.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.gammaLabel.setAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         self.gammaLabel.setObjectName(_fromUtf8("gammaLabel"))
 
         self.retranslateUi(changeColormapDialog)
@@ -79,5 +82,6 @@ class Ui_changeColormapDialog(object):
         self.vmax_slider.setToolTip(_translate("changeColormapDialog", "maximum color limit", None))
         self.vmax_edit.setToolTip(_translate("changeColormapDialog", "maximum color limit", None))
         self.gammaLabel.setText(_translate("changeColormapDialog", "Gamma: ", None))
+
 
 from sift.ui.custom_widgets import QNoScrollDoubleSpinBox

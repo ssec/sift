@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Implement Workspace, a singleton object which manages large amounts of data and caches local content in memory-compatible form.
+"""Implement Workspace, a singleton object which manages large amounts of data and caches local content.
 
 Workspace of Products
 
@@ -15,16 +15,17 @@ Workspace responsibilities include:
 - caching useful arrays as secondary content
 - performing minimized on-demand calculations, e.g. algebraic layers, in the background
 - use Importers to bring content arrays into the workspace from external resources, also in the background
-- maintain a metadatabase of what products have in-workspace content, and what products are available from external resources
+- maintain a metadatabase of what products have in-workspace content, and what products are available
+  from external resources
 - compose Collector, which keeps track of Products within Resources outside the workspace
 
 FUTURE import sequence:
 
-- trigger: user requests skim (metadata only) or import (metadata plus bring into document) of a file or directory system
-  for each file selected
+- trigger: user requests skim (metadata only) or import (metadata plus bring into document)
+      of a file or directory system for each file selected
 - phase 1: regex for file patterns identifies which importers are worth trying
-- phase 2: background: importers open files, form metadatabase insert transaction, first importer to succeed wins (priority order).
-  stop after this if just skimming
+- phase 2: background: importers open files, form metadatabase insert transaction,
+      first importer to succeed wins (priority order). stop after this if just skimming
 - phase 3: background: load of overview (lod=0), adding flat files to workspace and Content entry to metadatabase
 - phase 3a: document and scenegraph show overview up on screen
 - phase 4: background: load of one or more levels of detail, with max LOD currently being considered native
@@ -38,14 +39,13 @@ FUTURE import sequence:
 import argparse
 import logging
 import os
+import shutil
 import sys
 import unittest
-import time
-import enum
-from datetime import datetime, timedelta
-from uuid import UUID, uuid1 as uuidgen
-from typing import Mapping, Set, List, Iterable, Generator, Tuple, Dict
 from collections import Mapping as ReadOnlyMapping, defaultdict, OrderedDict
+from datetime import datetime, timedelta
+from typing import Mapping, Generator, Tuple, Dict
+from uuid import UUID, uuid1 as uuidgen
 
 import numba as nb
 import numpy as np
@@ -55,11 +55,11 @@ from rasterio import Affine
 from shapely.geometry.polygon import LinearRing
 from sqlalchemy.orm.exc import NoResultFound
 
-from sift.common import INFO, KIND, flags, STATE
-from sift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
+from sift.common import Info, Kind, Flags, State
 from sift.model.shapes import content_within_shape
-from .metadatabase import Metadatabase, Content, Product, Resource
+from sift.queue import TASK_PROGRESS, TASK_DOING
 from .importer import aImporter, GeoTiffImporter, GoesRPUGImporter, SatPyImporter, generate_guidebook_metadata
+from .metadatabase import Metadatabase, Content, Product, Resource
 
 LOG = logging.getLogger(__name__)
 
@@ -67,7 +67,6 @@ DEFAULT_WORKSPACE_SIZE = 256
 MIN_WORKSPACE_SIZE = 8
 
 IMPORT_CLASSES = [GeoTiffImporter, GoesRPUGImporter]
-
 
 # first instance is main singleton instance; don't preclude the possibility of importing from another workspace later on
 TheWorkspace = None
@@ -88,7 +87,7 @@ class frozendict(ReadOnlyMapping):
         return len(self._D)
 
     def __repr__(self):
-        return "frozendict({" + ", ".join("{}: {}".format(repr(k), repr(v)) for (k,v) in self.items()) + "})"
+        return "frozendict({" + ", ".join("{}: {}".format(repr(k), repr(v)) for (k, v) in self.items()) + "})"
 
 
 @nb.jit(nogil=True)
@@ -101,7 +100,7 @@ def mask_from_coverage_sparsity_2d(mask: np.ndarray, coverage: np.ndarray, spars
         sparsity (np.array) : sparsity array to repeat across the mask
     """
     # FIXME: we should not be using this without slicing to the part of interest; else we can eat a whole lot of memory
-    h,w = mask.shape
+    h, w = mask.shape
     cov_rpt_y, cov_rpt_x = h // coverage.shape[0], w // coverage.shape[1]
     spr_h, spr_w = sparsity.shape
     for y in range(h):
@@ -142,12 +141,12 @@ class ActiveContent(QObject):
         data = np.cumsum(data, axis=1)
         self._data = data
         self._sparsity = sp = np.zeros((2, 2), dtype=np.int8)
-        sp[1,1] = 1  # only 1/4 of dataset loaded
+        sp[1, 1] = 1  # only 1/4 of dataset loaded
         self._coverage = co = np.zeros((4, 1), dtype=np.int8)
         co[2:4] = 1  # and of that, only the bottom half of the image
 
     @staticmethod
-    def _rcls(r:int, c:int, l:int):
+    def _rcls(r: int, c: int, l: int):
         """
         :param r: rows or None
         :param c: columns or None
@@ -161,7 +160,7 @@ class ActiveContent(QObject):
         return rcl, shape
 
     @classmethod
-    def can_attach(cls, wsd:str, c:Content):
+    def can_attach(cls, wsd: str, c: Content):
         """
         Is this content available in the workspace?
         Args:
@@ -195,8 +194,8 @@ class ActiveContent(QObject):
         else:
             mask = self._mask
             mask[:] = False
-        present = np.array([[1]], dtype=np.int8)
         LOG.warning('mask_from_coverage_sparsity needs inclusion')
+        # present = np.array([[1]], dtype=np.int8)
         # mask_from_coverage_sparsity_2d(mask, self._coverage or present, self._sparsity or present)
 
     def _attach(self, c: Content, mode='c'):
@@ -206,6 +205,7 @@ class ActiveContent(QObject):
         :return: workspace_data_arrays instance
         """
         self._rcl, self._shape = rcl, shape = self._rcls(c.rows, c.cols, c.levels)
+
         def mm(path, *args, **kwargs):
             full_path = os.path.join(self._wsd, path)
             if not os.access(full_path, os.R_OK):
@@ -219,9 +219,11 @@ class ActiveContent(QObject):
         self._z = mm(c.z_path, dtype=c.dtype or np.float32, mode=mode, shape=shape) if c.z_path else None
 
         _, cshape = self._rcls(c.coverage_cols, c.coverage_cols, c.coverage_levels)
-        self._coverage = mm(c.coverage_path, dtype=np.int8, mode=mode, shape=cshape) if c.coverage_path else np.array([1])
+        self._coverage = mm(c.coverage_path, dtype=np.int8, mode=mode, shape=cshape) if c.coverage_path else np.array(
+            [1])
         _, sshape = self._rcls(c.coverage_cols, c.coverage_cols, c.coverage_levels)
-        self._sparsity = mm(c.sparsity_path, dtype=np.int8, mode=mode, shape=sshape) if c.sparsity_path else np.array([1])
+        self._sparsity = mm(c.sparsity_path, dtype=np.int8, mode=mode, shape=sshape) if c.sparsity_path else np.array(
+            [1])
 
         self._update_mask()
 
@@ -234,9 +236,11 @@ class Workspace(QObject):
     - own a working directory full of recently used datasets
     - provide DatasetInfo dictionaries for shorthand use between application subsystems
 
-        - datasetinfo dictionaries are ordinary python dictionaries containing [INFO.UUID], projection metadata, LOD info
+        - datasetinfo dictionaries are ordinary python dictionaries containing [Info.UUID],
+          projection metadata, LOD info
 
-    - identify datasets primarily with a UUID object which tracks the dataset and its various representations through the system
+    - identify datasets primarily with a UUID object which tracks the dataset and
+      its various representations through the system
     - unpack data in "packing crate" formats like NetCDF into memory-compatible flat files
     - efficiently create on-demand subsections and strides of raster data as numpy arrays
     - incrementally cache often-used subsections and strides ("image pyramid") using appropriate tools like gdal
@@ -258,16 +262,17 @@ class Workspace(QObject):
     _queue = None
 
     # signals
-    # didStartImport = pyqtSignal(dict)  # a dataset started importing; generated after overview level of detail is available
+    # a dataset started importing; generated after overview level of detail is available
+    # didStartImport = pyqtSignal(dict)
     # didMakeImportProgress = pyqtSignal(dict)
     didUpdateProductsMetadata = pyqtSignal(set)  # set of UUIDs with changes to their metadata
     # didFinishImport = pyqtSignal(dict)  # all loading activities for a dataset have completed
     # didDiscoverExternalDataset = pyqtSignal(dict)  # a new dataset was added to the workspace from an external agent
-    didChangeProductState = pyqtSignal(UUID, flags)  # a product changed state, e.g. an importer started working on it
+    didChangeProductState = pyqtSignal(UUID, Flags)  # a product changed state, e.g. an importer started working on it
 
     _importers = [GeoTiffImporter, GoesRPUGImporter]
 
-    _state: Mapping[UUID, flags] = None
+    _state: Mapping[UUID, Flags] = None
 
     def set_product_state_flag(self, uuid: UUID, flag):
         """primarily used by Importers to signal work in progress
@@ -281,15 +286,15 @@ class Workspace(QObject):
         state.remove(flag)
         self.didChangeProductState.emit(uuid, state)
 
-    def product_state(self, uuid: UUID) -> flags:
-        state = flags(self._state[uuid])
+    def product_state(self, uuid: UUID) -> Flags:
+        state = Flags(self._state[uuid])
         # add any derived information
         if uuid in self._available:
-            state.add(STATE.ATTACHED)
+            state.add(State.ATTACHED)
         with self._inventory as s:
             ncontent = s.query(Content).filter_by(uuid=uuid).count()
         if ncontent > 0:
-            state.add(STATE.CACHED)
+            state.add(State.CACHED)
         return state
 
     @property
@@ -314,7 +319,7 @@ class Workspace(QObject):
         """
         return TheWorkspace
 
-    def __init__(self, directory_path=None, process_pool=None, max_size_gb=None, queue=None):
+    def __init__(self, directory_path=None, process_pool=None, max_size_gb=None, queue=None, initial_clear=False):
         """
         Initialize a new or attach an existing workspace, creating any necessary bookkeeping.
         """
@@ -338,6 +343,8 @@ class Workspace(QObject):
             self.cwd = directory_path = os.path.abspath(directory_path)
             self.cache_dir = cache_path = os.path.join(self.cwd, 'data_cache')
         self._inventory_path = os.path.join(self.cwd, '_inventory.db')
+        if initial_clear:
+            self.clear_workspace_content()
         if not os.path.isdir(cache_path):
             LOG.info("creating new workspace cache at {}".format(cache_path))
             os.makedirs(cache_path)
@@ -353,7 +360,7 @@ class Workspace(QObject):
 
         self._available = {}
         self._importers = [x for x in IMPORT_CLASSES]
-        self._state = defaultdict(flags)
+        self._state = defaultdict(Flags)
         global TheWorkspace  # singleton
         if TheWorkspace is None:
             TheWorkspace = self
@@ -364,15 +371,28 @@ class Workspace(QObject):
         :return:
         """
         should_init = not os.path.exists(self._inventory_path)
-        dn,fn = os.path.split(self._inventory_path)
+        dn, fn = os.path.split(self._inventory_path)
         if not os.path.isdir(dn):
             raise EnvironmentError("workspace directory {} does not exist".format(dn))
         LOG.info('{} database at {}'.format('initializing' if should_init else 'attaching', self._inventory_path))
         self._inventory = Metadatabase('sqlite:///' + self._inventory_path, create_tables=should_init)
         if should_init:
             with self._inventory as s:
-                assert(0 == s.query(Content).count())
+                assert (0 == s.query(Content).count())
         LOG.info('done with init')
+
+    def clear_workspace_content(self):
+        """Remove binary files from workspace and workspace database."""
+        LOG.info("Clearing workspace contents...")
+        try:
+            os.remove(self._inventory_path)
+        except FileNotFoundError:
+            LOG.debug("No inventory DB file found to remove: {}".format(self._inventory_path))
+
+        try:
+            shutil.rmtree(self.cache_dir)
+        except OSError:
+            LOG.debug("No binary cache directory found to remove: {}".format(self.cache_dir))
 
     def _purge_missing_content(self):
         """
@@ -385,11 +405,13 @@ class Workspace(QObject):
                 if not ActiveContent.can_attach(self.cache_dir, c):
                     LOG.warning("purging missing content {}".format(c.path))
                     to_purge.append(c)
-            LOG.debug("{} content entities no longer present in cache - will remove from database".format(len(to_purge)))
+            LOG.debug(
+                "{} content entities no longer present in cache - will remove from database".format(len(to_purge)))
             for c in to_purge:
                 try:
                     c.product.content.remove(c)
-                except AttributeError as no_product:
+                except AttributeError:
+                    # no_product
                     LOG.warning("orphaned content {}??, removing".format(c.path))
                 s.delete(c)
 
@@ -414,12 +436,13 @@ class Workspace(QObject):
         """
         remove products from database that have no cached Content, and no Resource we can re-import from
         """
-        LOG.debug("purging Products no longer recoverable by re-importing from Resources, and having no Content representation in cache")
+        LOG.debug("purging Products no longer recoverable by re-importing from Resources, "
+                  "and having no Content representation in cache")
         with self._inventory as s:
             n_purged = 0
             prodall = list(s.query(Product).all())  # SIFT/sift#180, avoid locking database too long
             for p in prodall:
-                if len(p.content)==0 and len(p.resource)==0:
+                if len(p.content) == 0 and len(p.resource) == 0:
                     n_purged += 1
                     s.delete(p)
         LOG.info("discarded metadata for {} orphaned products".format(n_purged))
@@ -429,9 +452,9 @@ class Workspace(QObject):
         with self._inventory as s:
             for p in s.query(Product).all():
                 # NOTE: Can be remove after 0.9.x releases are done (0.10.x or 1.0)
-                if os.path.splitext(p.info[INFO.DATASET_NAME])[1] and p.info[INFO.BAND]:
+                if os.path.splitext(p.info[Info.DATASET_NAME])[1] and p.info[Info.BAND]:
                     LOG.info("rewriting DATASET_NAME to new style using band: {}".format(repr(p)))
-                    p.update({INFO.DATASET_NAME: 'B{:02d}'.format(p.info[INFO.BAND])})
+                    p.update({Info.DATASET_NAME: 'B{:02d}'.format(p.info[Info.BAND])})
 
     def _bgnd_startup_purge(self):
         ntot = 5
@@ -479,7 +502,7 @@ class Workspace(QObject):
     #  data array handling
     #
 
-    def _remove_content_files_from_workspace(self, c: Content ):
+    def _remove_content_files_from_workspace(self, c: Content):
         total = 0
         for filename in [c.path, c.coverage_path, c.sparsity_path]:
             if not filename:
@@ -490,7 +513,7 @@ class Workspace(QObject):
                 total += os.stat(pn).st_size
                 try:
                     os.remove(pn)
-                except FileNotFoundError as user_intrusion_likely:
+                except FileNotFoundError:
                     LOG.warning("could not remove {} - file not found; continuing".format(pn))
 
         return total
@@ -501,7 +524,7 @@ class Workspace(QObject):
         c.product.touch()
         return zult
 
-    def _cached_arrays_for_content(self, c:Content):
+    def _cached_arrays_for_content(self, c: Content):
         """
         attach cached data indicated in Content, unless it's been attached already and is in _available
         touch the content and product in the database to appease the LRU gods
@@ -511,12 +534,11 @@ class Workspace(QObject):
         cache_entry = self._available.get(c.id)
         return cache_entry or self._activate_content(c)
 
-    def _deactivate_content_for_product(self, p:Product):
+    def _deactivate_content_for_product(self, p: Product):
         if p is None:
             return
         for c in p.content:
             self._available.pop(c.id, None)
-
 
     #
     # often-used queries
@@ -525,7 +547,8 @@ class Workspace(QObject):
     def _product_with_uuid(self, session, uuid) -> Product:
         return session.query(Product).filter_by(uuid_str=str(uuid)).first()
 
-    def _product_overview_content(self, session, prod:Product=None, uuid:UUID=None, kind:KIND=KIND.IMAGE) -> Content:
+    def _product_overview_content(self, session, prod: Product = None, uuid: UUID = None,
+                                  kind: Kind = Kind.IMAGE) -> Content:
         if prod is None and uuid is not None:
             # Get Product object
             try:
@@ -534,10 +557,11 @@ class Workspace(QObject):
                 LOG.error("No product with UUID {} found".format(uuid))
                 return None
         contents = session.query(Content).filter(Content.product_id == prod.id).order_by(Content.lod).all()
-        contents = [c for c in contents if c.info.get(INFO.KIND, KIND.IMAGE) == kind]
+        contents = [c for c in contents if c.info.get(Info.KIND, Kind.IMAGE) == kind]
         return None if 0 == len(contents) else contents[0]
 
-    def _product_native_content(self, session, prod:Product = None, uuid:UUID=None, kind:KIND=KIND.IMAGE) -> Content:
+    def _product_native_content(self, session, prod: Product = None, uuid: UUID = None,
+                                kind: Kind = Kind.IMAGE) -> Content:
         # NOTE: This assumes the last Content object is the best resolution
         #       but it is untested
         if prod is None and uuid is not None:
@@ -548,20 +572,20 @@ class Workspace(QObject):
                 LOG.error("No product with UUID {} found".format(uuid))
                 return None
         contents = session.query(Content).filter(Content.product_id == prod.id).order_by(Content.lod.desc()).all()
-        contents = [c for c in contents if c.info.get(INFO.KIND, KIND.IMAGE) == kind]
+        contents = [c for c in contents if c.info.get(Info.KIND, Kind.IMAGE) == kind]
         return None if 0 == len(contents) else contents[-1]
 
     #
     # combining queries with data content
     #
 
-    def _overview_content_for_uuid(self, uuid, kind=KIND.IMAGE):
+    def _overview_content_for_uuid(self, uuid, kind=Kind.IMAGE):
         # FUTURE: do a compound query for this to get the Content entry
         # prod = self._product_with_uuid(uuid)
         # assert(prod is not None)
         with self._inventory as s:
             ovc = self._product_overview_content(s, uuid=uuid)
-            assert(ovc is not None)
+            assert (ovc is not None)
             arrays = self._cached_arrays_for_content(ovc)
             return arrays.data
 
@@ -572,7 +596,6 @@ class Workspace(QObject):
             nac = self._product_native_content(s, uuid=uuid)
             arrays = self._cached_arrays_for_content(nac)
             return arrays.data
-
 
     #
     # workspace file management
@@ -596,7 +619,7 @@ class Workspace(QObject):
         with self._inventory as s:
             return [q.uuid for q in s.query(Product).all()]
 
-#----------------------------------------------------------------------
+    # ----------------------------------------------------------------------
     def get_info(self, dsi_or_uuid, lod=None):
         """
         :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
@@ -608,7 +631,7 @@ class Workspace(QObject):
         if isinstance(dsi_or_uuid, str):
             uuid = UUID(dsi_or_uuid)
         elif not isinstance(dsi_or_uuid, UUID):
-            uuid = dsi_or_uuid[INFO.UUID]
+            uuid = dsi_or_uuid[Info.UUID]
         else:
             uuid = dsi_or_uuid
         with self._inventory as s:
@@ -618,7 +641,7 @@ class Workspace(QObject):
                 LOG.error('no info available for UUID {}'.format(dsi_or_uuid))
                 LOG.error("known products: {}".format(repr(self._all_product_uuids())))
                 return None
-            kind = prod.info[INFO.KIND]
+            kind = prod.info[Info.KIND]
             native_content = self._product_native_content(s, prod=prod, kind=kind)
 
             if native_content is not None:
@@ -626,10 +649,13 @@ class Workspace(QObject):
                 # once upon a time...
                 # our old model was that product == content and shares a UUID with the layer
                 # if content is available, we want to provide native content metadata along with the product metadata
-                # specifically a lot of client code assumes that resource == product == content and that singular navigation (e.g. cell_size) is norm
-                assert(native_content.info[INFO.CELL_WIDTH] is not None)  # FIXME DEBUG
+                # specifically a lot of client code assumes that resource == product == content and
+                # that singular navigation (e.g. cell_size) is norm
+                assert (native_content.info[Info.CELL_WIDTH] is not None)  # FIXME DEBUG
                 return frozendict(ChainMap(native_content.info, prod.info))
-            return frozendict(prod.info)  # mapping semantics for database fields, as well as key-value fields; flatten to one namespace and read-only
+            # mapping semantics for database fields, as well as key-value fields;
+            # flatten to one namespace and read-only
+            return frozendict(prod.info)
 
     def get_algebraic_namespace(self, uuid):
         if uuid is None:
@@ -653,7 +679,7 @@ class Workspace(QObject):
             hits = s.query(Resource).filter_by(path=path).all()
             if not hits:
                 return None
-            if len(hits)>=1:
+            if len(hits) >= 1:
                 if len(hits) > 1:
                     LOG.warning('more than one Resource found suitable, there can be only one')
                 resource = hits[0]
@@ -661,7 +687,7 @@ class Workspace(QObject):
                     Content.product_id == Product.id).filter(
                     Product.resource_id == resource.id).order_by(
                     Content.lod).all())
-                if len(hits)>=1:
+                if len(hits) >= 1:
                     content = hits[0]  # presumably this is closest to LOD_OVERVIEW
                     # if len(hits)>1:
                     #     LOG.warning('more than one Content found suitable, there can be only one')
@@ -686,7 +712,7 @@ class Workspace(QObject):
             for c in s.query(Content).order_by(Content.atime.desc()).all():
                 p = c.product
                 if p.uuid not in zult:
-                    zult[p.uuid] = p.info[INFO.DISPLAY_NAME]
+                    zult[p.uuid] = p.info[Info.DISPLAY_NAME]
         return zult
 
     @property
@@ -697,7 +723,7 @@ class Workspace(QObject):
 
     def recently_used_products(self, n=32) -> Dict[UUID, str]:
         with self._inventory as s:
-            return OrderedDict((p.uuid, p.info[INFO.DISPLAY_NAME])
+            return OrderedDict((p.uuid, p.info[Info.DISPLAY_NAME])
                                for p in s.query(Product).order_by(Product.atime.desc()).limit(n).all())
 
     def _purge_content_for_resource(self, resource: Resource, session, defer_commit=False):
@@ -768,8 +794,8 @@ class Workspace(QObject):
         with self._inventory as S:
             LOG.info("cleaning cache")
             total_size = self._total_workspace_bytes
-            GB = 1024**3
-            LOG.info("total cache size is {}GB of max {}GB".format(total_size/GB, self._max_size_gb))
+            GB = 1024 ** 3
+            LOG.info("total cache size is {}GB of max {}GB".format(total_size / GB, self._max_size_gb))
             max_size = self._max_size_gb * GB
             for res in S.query(Resource).order_by(Resource.atime).all():
                 if total_size < max_size:
@@ -790,10 +816,12 @@ class Workspace(QObject):
         # self._S.remove()
 
     def idle(self):
-        """
-        Called periodically when application is idle. Does a clean-up tasks and returns True if more needs to be done later.
+        """Called periodically when application is idle.
+
+        Does a clean-up tasks and returns True if more needs to be done later.
         Time constrained to ~0.1s.
         :return: True/False, whether or not more clean-up needs to be scheduled.
+
         """
         return False
 
@@ -804,7 +832,8 @@ class Workspace(QObject):
             uuid_or_path: product uuid, or path to the resource path it lives in
 
         Returns:
-            metadata (Mapping), metadata for the product at this path; FUTURE note more than one product may be in a single file
+            metadata (Mapping), metadata for the product at this path;
+            FUTURE note more than one product may be in a single file
         """
         if isinstance(uuid_or_path, UUID):
             return self.get_info(uuid_or_path)  # get product metadata
@@ -823,7 +852,8 @@ class Workspace(QObject):
                         prod = resource.product[0]
                         return prod.info
 
-    def collect_product_metadata_for_paths(self, paths: list, **importer_kwargs) -> Generator[Tuple[int, frozendict], None, None]:
+    def collect_product_metadata_for_paths(self, paths: list,
+                                           **importer_kwargs) -> Generator[Tuple[int, frozendict], None, None]:
         """
         Start loading URI data into the workspace asynchronously.
         return sequence of read-only info dictionaries
@@ -832,7 +862,8 @@ class Workspace(QObject):
 
         """
         with self._inventory as import_session:
-            # FUTURE: consider returning importers instead of products, since we can then re-use them to import the content instead of having to regenerate
+            # FUTURE: consider returning importers instead of products,
+            # since we can then re-use them to import the content instead of having to regenerate
             # import_session = self._S
             importers = []
             num_products = 0
@@ -888,10 +919,11 @@ class Workspace(QObject):
 
             for hauler in importers:
                 for prod in hauler.merge_products():
-                    assert(prod is not None)
+                    assert (prod is not None)
                     # merge the product into our database session, since it may belong to import_session
                     zult = frozendict(prod.info)  # self._S.merge(prod)
-                    # LOG.debug('yielding product metadata for {}'.format(zult.get(INFO.DISPLAY_NAME, '?? unknown name ??')))
+                    # LOG.debug('yielding product metadata for {}'.format(
+                    #     zult.get(Info.DISPLAY_NAME, '?? unknown name ??')))
                     yield num_products, zult
 
     def import_product_content(self, uuid=None, prod=None, allow_cache=True, **importer_kwargs):
@@ -900,8 +932,8 @@ class Workspace(QObject):
             if prod is None and uuid is not None:
                 prod = self._product_with_uuid(S, uuid)
 
-            self.set_product_state_flag(prod.uuid, STATE.ARRIVING)
-            default_prod_kind = prod.info[INFO.KIND]
+            self.set_product_state_flag(prod.uuid, State.ARRIVING)
+            default_prod_kind = prod.info[Info.KIND]
 
             if len(prod.content):
                 LOG.info('product already has content available, using that rather than re-importing')
@@ -912,9 +944,10 @@ class Workspace(QObject):
 
             truck = aImporter.from_product(prod, workspace_cwd=self.cache_dir, database_session=S, **importer_kwargs)
             metadata = prod.info
-            name = metadata[INFO.SHORT_NAME]
+            name = metadata[Info.SHORT_NAME]
 
-            # FIXME: for now, just iterate the incremental load. later we want to add this to TheQueue and update the UI as we get more data loaded
+            # FIXME: for now, just iterate the incremental load.
+            #  later we want to add this to TheQueue and update the UI as we get more data loaded
             gen = truck.begin_import_products(prod.id)
             nupd = 0
             for update in gen:
@@ -924,11 +957,11 @@ class Workspace(QObject):
                 # Content is in the metadatabase and being updated + committed, including sparsity and coverage arrays
                 if update.data is not None:
                     # data = update.data
-                    LOG.info("{} {}: {:.01f}%".format(name, update.stage_desc, update.completion*100.0))
+                    LOG.info("{} {}: {:.01f}%".format(name, update.stage_desc, update.completion * 100.0))
             # self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
             LOG.debug('received {} updates during import'.format(nupd))
             uuid = prod.uuid
-            self.clear_product_state_flag(prod.uuid, STATE.ARRIVING)
+            self.clear_product_state_flag(prod.uuid, State.ARRIVING)
         # S.commit()
         # S.flush()
 
@@ -936,7 +969,7 @@ class Workspace(QObject):
         ac = self._overview_content_for_uuid(uuid, kind=default_prod_kind)
         return ac.data
 
-    def create_composite(self, symbols:dict, relation:dict):
+    def create_composite(self, symbols: dict, relation: dict):
         """
         create a layer composite in the workspace
         :param symbols: dictionary of logical-name to uuid
@@ -982,41 +1015,41 @@ class Workspace(QObject):
         Returns: dict of overall metadata (same as `info`)
 
         """
-        if not all(x[INFO.PROJ] == md_list[0][INFO.PROJ] for x in md_list[1:]):
+        if not all(x[Info.PROJ] == md_list[0][Info.PROJ] for x in md_list[1:]):
             raise ValueError("Algebraic inputs must all be the same projection")
 
         uuid = uuidgen()
-        info[INFO.UUID] = uuid
-        for k in (INFO.PLATFORM, INFO.INSTRUMENT, INFO.SCENE):
+        info[Info.UUID] = uuid
+        for k in (Info.PLATFORM, Info.INSTRUMENT, Info.SCENE):
             if md_list[0].get(k) is None:
                 continue
             if all(x.get(k) == md_list[0].get(k) for x in md_list[1:]):
                 info.setdefault(k, md_list[0][k])
-        info.setdefault(INFO.KIND, KIND.COMPOSITE)
-        info.setdefault(INFO.SHORT_NAME, '<unknown>')
-        info.setdefault(INFO.DATASET_NAME, info[INFO.SHORT_NAME])
-        info.setdefault(INFO.UNITS, '1')
+        info.setdefault(Info.KIND, Kind.COMPOSITE)
+        info.setdefault(Info.SHORT_NAME, '<unknown>')
+        info.setdefault(Info.DATASET_NAME, info[Info.SHORT_NAME])
+        info.setdefault(Info.UNITS, '1')
 
-        max_meta = max(md_list, key=lambda x: x[INFO.SHAPE])
-        for k in (INFO.PROJ, INFO.ORIGIN_X, INFO.ORIGIN_Y, INFO.CELL_WIDTH, INFO.CELL_HEIGHT, INFO.SHAPE):
+        max_meta = max(md_list, key=lambda x: x[Info.SHAPE])
+        for k in (Info.PROJ, Info.ORIGIN_X, Info.ORIGIN_Y, Info.CELL_WIDTH, Info.CELL_HEIGHT, Info.SHAPE):
             info[k] = max_meta[k]
 
-        info[INFO.VALID_RANGE] = (np.nanmin(composite_array), np.nanmax(composite_array))
-        info[INFO.CLIM] = (np.nanmin(composite_array), np.nanmax(composite_array))
-        info[INFO.OBS_TIME] = min([x[INFO.OBS_TIME] for x in md_list])
-        info[INFO.SCHED_TIME] = min([x[INFO.SCHED_TIME] for x in md_list])
+        info[Info.VALID_RANGE] = (np.nanmin(composite_array), np.nanmax(composite_array))
+        info[Info.CLIM] = (np.nanmin(composite_array), np.nanmax(composite_array))
+        info[Info.OBS_TIME] = min([x[Info.OBS_TIME] for x in md_list])
+        info[Info.SCHED_TIME] = min([x[Info.SCHED_TIME] for x in md_list])
         # get the overall observation time
-        info[INFO.OBS_DURATION] = max([
-            x[INFO.OBS_TIME] + x.get(INFO.OBS_DURATION, timedelta(seconds=0)) for x in md_list]) - info[INFO.OBS_TIME]
+        info[Info.OBS_DURATION] = max([
+            x[Info.OBS_TIME] + x.get(Info.OBS_DURATION, timedelta(seconds=0)) for x in md_list]) - info[Info.OBS_TIME]
 
-        info[INFO.PATHNAME] = '<algebraic layer: {} : {} : {}>'.format(
-            info[INFO.DATASET_NAME], info[INFO.SCHED_TIME], str(info[INFO.UUID]))
+        info[Info.PATHNAME] = '<algebraic layer: {} : {} : {}>'.format(
+            info[Info.DATASET_NAME], info[Info.SCHED_TIME], str(info[Info.UUID]))
 
         # generate family and category names
-        info[INFO.FAMILY] = family = self._merge_famcat_strings(md_list, INFO.FAMILY, suffix=info.get(INFO.SHORT_NAME))
-        info[INFO.CATEGORY] = category = self._merge_famcat_strings(md_list, INFO.CATEGORY)
-        info[INFO.SERIAL] = serial = self._merge_famcat_strings(md_list, INFO.SERIAL)
-        LOG.debug("algebraic product will be {}::{}::{}".format(family,category,serial))
+        info[Info.FAMILY] = family = self._merge_famcat_strings(md_list, Info.FAMILY, suffix=info.get(Info.SHORT_NAME))
+        info[Info.CATEGORY] = category = self._merge_famcat_strings(md_list, Info.CATEGORY)
+        info[Info.SERIAL] = serial = self._merge_famcat_strings(md_list, Info.SERIAL)
+        LOG.debug("algebraic product will be {}::{}::{}".format(family, category, serial))
 
         return info
 
@@ -1038,17 +1071,18 @@ class Workspace(QObject):
         # See: https://stackoverflow.com/a/35608701/433202
         names = list(dep_metadata.keys())
         try:
-            valid_combos = np.array(np.meshgrid(*tuple(dep_metadata[n][INFO.VALID_RANGE] for n in names))).reshape(len(names), -1)
+            valid_combos = np.array(np.meshgrid(*tuple(dep_metadata[n][Info.VALID_RANGE] for n in names))).reshape(
+                len(names), -1)
         except KeyError:
-            badboys = [n for n in names if INFO.VALID_RANGE not in dep_metadata[n]]
-            LOG.error("missing VALID_RANGE for: {}".format(repr([dep_metadata[n][INFO.DISPLAY_NAME] for n in badboys])))
+            badboys = [n for n in names if Info.VALID_RANGE not in dep_metadata[n]]
+            LOG.error("missing VALID_RANGE for: {}".format(repr([dep_metadata[n][Info.DISPLAY_NAME] for n in badboys])))
             LOG.error("witness sample: {}".format(repr(dep_metadata[badboys[0]])))
             raise
         valids_namespace = {n: valid_combos[idx] for idx, n in enumerate(names)}
-        content = {n: self.get_content(m[INFO.UUID]) for n, m in dep_metadata.items()}
+        content = {n: self.get_content(m[Info.UUID]) for n, m in dep_metadata.items()}
 
         # Get all content in the same shape
-        max_shape = max(x[INFO.SHAPE] for x in dep_metadata.values())
+        max_shape = max(x[Info.SHAPE] for x in dep_metadata.values())
         for k, v in content.items():
             if v.shape != max_shape:
                 f0 = int(max_shape[0] / v.shape[0])
@@ -1068,7 +1102,7 @@ class Workspace(QObject):
         # update the shape
         # NOTE: This doesn't work if the code changes the shape of the array
         # Need to update geolocation information too
-        # info[INFO.SHAPE] = content[result_name].shape
+        # info[Info.SHAPE] = content[result_name].shape
 
         info = generate_guidebook_metadata(info)
 
@@ -1091,8 +1125,8 @@ class Workspace(QObject):
         Returns:
             uuid, info, data: uuid of the new product, its official read-only metadata, and cached content ndarray
         """
-        if INFO.UUID not in info:
-            raise ValueError('currently require an INFO.UUID be included in product')
+        if Info.UUID not in info:
+            raise ValueError('currently require an Info.UUID be included in product')
         parms = dict(info)
         now = datetime.utcnow()
         parms.update(dict(
@@ -1112,8 +1146,8 @@ class Workspace(QObject):
             lod=Content.LOD_OVERVIEW,
             path=ws_filename,
             dtype=str(data.dtype),
-            proj4=info[INFO.PROJ],
-            resolution=min(info[INFO.CELL_WIDTH], info[INFO.CELL_HEIGHT])
+            proj4=info[Info.PROJ],
+            resolution=min(info[Info.CELL_WIDTH], info[Info.CELL_HEIGHT])
         ))
         rcls = dict(zip(('rows', 'cols', 'levels'), data.shape))
         parms.update(rcls)
@@ -1143,26 +1177,23 @@ class Workspace(QObject):
         yield {TASK_DOING: 'purging memory', TASK_PROGRESS: 1.0}
 
     def remove(self, dsi):
-        """
-        Formally detach a dataset, removing its content from the workspace fully by the time that idle() has nothing more to do.
+        """Formally detach a dataset.
+
+        Removing its content from the workspace fully by the time that idle() has nothing more to do.
+
         :param dsi: datasetinfo dictionary or UUID of a dataset
         :return: True if successfully deleted, False if not found
         """
-        if isinstance(dsi, dict):
-            name = dsi[INFO.NAME]
-        else:
-            name = 'dataset'
-        uuid = dsi if isinstance(dsi, UUID) else dsi[INFO.UUID]
-        zult = False
+        uuid = dsi if isinstance(dsi, UUID) else dsi[Info.UUID]
 
         if self._queue is not None:
             self._queue.add(str(uuid), self._bgnd_remove(uuid), 'Purge dataset')
         else:
-            for blank in self._bgnd_remove(uuid):
-                pass
+            # iterate over generator
+            list(self._bgnd_remove(uuid))
         return True
 
-    def get_content(self, dsi_or_uuid, lod=None, kind=KIND.IMAGE):
+    def get_content(self, dsi_or_uuid, lod=None, kind=Kind.IMAGE):
         """
         By default, get the best-available (closest to native) np.ndarray-compatible view of the full dataset
         :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
@@ -1176,12 +1207,15 @@ class Workspace(QObject):
         elif isinstance(dsi_or_uuid, str):
             uuid = UUID(dsi_or_uuid)
         else:
-            uuid = dsi_or_uuid[INFO.UUID]
+            uuid = dsi_or_uuid[Info.UUID]
         # prod = self._product_with_uuid(dsi_or_uuid)
-        # prod.touch()  TODO this causes a locking exception when run in a secondary thread. Keeping background operations lightweight makes sense however, so just review this
+        # TODO: this causes a locking exception when run in a secondary thread.
+        #  Keeping background operations lightweight makes sense however, so just review this
+        # prod.touch()
         with self._inventory as s:
-            content = s.query(Content).filter((Product.uuid_str==str(uuid)) & (Content.product_id==Product.id)).order_by(Content.lod.desc()).all()
-            content = [x for x in content if x.info.get(INFO.KIND, KIND.IMAGE) == kind]
+            content = s.query(Content).filter(
+                (Product.uuid_str == str(uuid)) & (Content.product_id == Product.id)).order_by(Content.lod.desc()).all()
+            content = [x for x in content if x.info.get(Info.KIND, Kind.IMAGE) == kind]
             if len(content) != 1:
                 LOG.warning("More than one matching Content object for '{}'".format(dsi_or_uuid))
             if not len(content) or not content[0]:
@@ -1197,25 +1231,27 @@ class Workspace(QObject):
 
     def _create_position_to_index_transform(self, dsi_or_uuid):
         info = self.get_info(dsi_or_uuid)
-        origin_x = info[INFO.ORIGIN_X]
-        origin_y = info[INFO.ORIGIN_Y]
-        cell_width = info[INFO.CELL_WIDTH]
-        cell_height = info[INFO.CELL_HEIGHT]
+        origin_x = info[Info.ORIGIN_X]
+        origin_y = info[Info.ORIGIN_Y]
+        cell_width = info[Info.CELL_WIDTH]
+        cell_height = info[Info.CELL_HEIGHT]
+
         def _transform(x, y, origin_x=origin_x, origin_y=origin_y, cell_width=cell_width, cell_height=cell_height):
-            col = (x - info[INFO.ORIGIN_X]) / info[INFO.CELL_WIDTH]
-            row = (y - info[INFO.ORIGIN_Y]) / info[INFO.CELL_HEIGHT]
+            col = (x - info[Info.ORIGIN_X]) / info[Info.CELL_WIDTH]
+            row = (y - info[Info.ORIGIN_Y]) / info[Info.CELL_HEIGHT]
             return col, row
+
         return _transform
 
     def _create_layer_affine(self, dsi_or_uuid):
         info = self.get_info(dsi_or_uuid)
         affine = Affine(
-            info[INFO.CELL_WIDTH],
+            info[Info.CELL_WIDTH],
             0.0,
-            info[INFO.ORIGIN_X],
+            info[Info.ORIGIN_X],
             0.0,
-            info[INFO.CELL_HEIGHT],
-            info[INFO.ORIGIN_Y],
+            info[Info.CELL_HEIGHT],
+            info[Info.ORIGIN_Y],
         )
         return affine
 
@@ -1224,18 +1260,18 @@ class Workspace(QObject):
         if info is None:
             return None, None
         # Assume `xy_pos` is lon/lat value
-        if '+proj=latlong' in info[INFO.PROJ]:
+        if '+proj=latlong' in info[Info.PROJ]:
             x, y = xy_pos[:2]
         else:
-            x, y = Proj(info[INFO.PROJ])(*xy_pos)
-        col = (x - info[INFO.ORIGIN_X]) / info[INFO.CELL_WIDTH]
-        row = (y - info[INFO.ORIGIN_Y]) / info[INFO.CELL_HEIGHT]
+            x, y = Proj(info[Info.PROJ])(*xy_pos)
+        col = (x - info[Info.ORIGIN_X]) / info[Info.CELL_WIDTH]
+        row = (y - info[Info.ORIGIN_Y]) / info[Info.CELL_HEIGHT]
         return np.int64(np.round(row)), np.int64(np.round(col))
 
     def layer_proj(self, dsi_or_uuid):
         """Project lon/lat probe points to image X/Y"""
         info = self.get_info(dsi_or_uuid)
-        return Proj(info[INFO.PROJ])
+        return Proj(info[Info.PROJ])
 
     def _project_points(self, p, points):
         points = np.array(points)
@@ -1260,10 +1296,10 @@ class Workspace(QObject):
         return data
 
     def highest_resolution_uuid(self, *uuids):
-        return min([self.get_info(uuid) for uuid in uuids], key=lambda i: i[INFO.CELL_WIDTH])[INFO.UUID]
+        return min([self.get_info(uuid) for uuid in uuids], key=lambda i: i[Info.CELL_WIDTH])[Info.UUID]
 
     def lowest_resolution_uuid(self, *uuids):
-        return max([self.get_info(uuid) for uuid in uuids], key=lambda i: i[INFO.CELL_WIDTH])[INFO.UUID]
+        return max([self.get_info(uuid) for uuid in uuids], key=lambda i: i[Info.CELL_WIDTH])[Info.UUID]
 
     def get_coordinate_mask_polygon(self, dsi_or_uuid, points):
         data = self.get_content(dsi_or_uuid)
@@ -1300,22 +1336,22 @@ class Workspace(QObject):
             x_slice = slice(None, None, None)
         if y_slice.step not in [1, None] or x_slice.step not in [1, None]:
             raise ValueError("Slice steps other than 1 are not supported")
-        rows, cols = info[INFO.SHAPE]
+        rows, cols = info[Info.SHAPE]
         x_start = x_slice.start or 0
         y_start = y_slice.start or 0
         num_cols = (x_slice.stop or cols) - x_start
         num_rows = (y_slice.stop or rows) - y_start
-        half_x = info[INFO.CELL_WIDTH] / 2.
-        half_y = info[INFO.CELL_HEIGHT] / 2.
-        min_x = info[INFO.ORIGIN_X] - half_x + x_start * info[INFO.CELL_WIDTH]
-        max_y = info[INFO.ORIGIN_Y] + half_y - y_start * info[INFO.CELL_HEIGHT]
-        min_y = max_y - num_rows * info[INFO.CELL_HEIGHT]
-        max_x = min_x + num_cols * info[INFO.CELL_WIDTH]
+        half_x = info[Info.CELL_WIDTH] / 2.
+        half_y = info[Info.CELL_HEIGHT] / 2.
+        min_x = info[Info.ORIGIN_X] - half_x + x_start * info[Info.CELL_WIDTH]
+        max_y = info[Info.ORIGIN_Y] + half_y - y_start * info[Info.CELL_HEIGHT]
+        min_y = max_y - num_rows * info[Info.CELL_HEIGHT]
+        max_x = min_x + num_cols * info[Info.CELL_WIDTH]
         return AreaDefinition(
             'layer area',
             'layer area',
             'layer area',
-            proj4_str_to_dict(info[INFO.PROJ]),
+            proj4_str_to_dict(info[Info.PROJ]),
             cols, rows,
             (min_x, min_y, max_x, max_y),
         )
@@ -1335,7 +1371,7 @@ def main():
         epilog="",
         fromfile_prefix_chars='@')
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-INFO-DEBUG')
+                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG')
     # http://docs.python.org/2.7/library/argparse.html#nargs
     # parser.add_argument('--stuff', nargs='5', dest='my_stuff',
     #                    help="one or more random things")

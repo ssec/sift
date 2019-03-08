@@ -3,12 +3,13 @@
 """Behavior objects dealing with RGB image layers."""
 
 import logging
-import uuid
+
 from PyQt4.QtCore import QObject
-from sift.common import INFO, KIND
+
+from sift.common import Info, Kind
+from sift.control.layer_tree import LayerStackTreeViewModel
 # type hints:
 from sift.model.document import Document
-from sift.control.layer_tree import LayerStackTreeViewModel
 from sift.view.rgb_config import RGBLayerConfigPane
 
 LOG = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ class UserModifiesRGBLayers(QObject):
            menu selects to create an RGB layer from the selections.
 
     """
+
     def __init__(self, document: Document, rgb_pane: RGBLayerConfigPane,
                  layer_list_model: LayerStackTreeViewModel, parent=None):
         super().__init__(parent)
@@ -59,7 +61,7 @@ class UserModifiesRGBLayers(QObject):
         families = []
         for color in 'rgb':
             if color in recipe_dict:
-                families.append(self.doc[recipe_dict[color]][INFO.FAMILY])
+                families.append(self.doc[recipe_dict[color]][Info.FAMILY])
             else:
                 families.append(None)
         self.create_rgb(families=families)
@@ -68,11 +70,12 @@ class UserModifiesRGBLayers(QObject):
         if len(families) == 0:
             # get the layers to composite from current selection
             uuids = list(self.layer_list_model.current_selected_uuids())
-            families = [self.doc[u][INFO.FAMILY] for u in uuids]
+            families = [self.doc[u][Info.FAMILY] for u in uuids]
         if len(families) < 3:  # pad with None
             families = families + ([None] * (3 - len(families)))
         # Don't use non-basic layers as starting points for the new composite
-        families = [f for f in families if f is None or self.doc.family_info(f)[INFO.KIND] in [KIND.IMAGE, KIND.COMPOSITE]]
+        families = [f for f in families if
+                    f is None or self.doc.family_info(f)[Info.KIND] in [Kind.IMAGE, Kind.COMPOSITE]]
         layer = next(self.doc.create_rgb_composite(families[0],
                                                    families[1],
                                                    families[2]))
@@ -83,7 +86,7 @@ class UserModifiesRGBLayers(QObject):
         if uuids is not None and len(uuids) == 1:
             # get the recipe for the RGB layer if that's what this is
             layer = self.doc[uuids[0]]
-            if layer[INFO.KIND] == KIND.RGB:
+            if layer[Info.KIND] == Kind.RGB:
                 recipe = layer.get('recipe')
                 self.rgb_pane.selection_did_change(recipe)
                 return
@@ -102,9 +105,8 @@ class UserModifiesRGBLayers(QObject):
 
     def _family_added(self, family, family_info):
         # can't use RGB layers as components of an RGB
-        if family_info[INFO.KIND] not in [KIND.RGB]:
+        if family_info[Info.KIND] not in [Kind.RGB]:
             self.rgb_pane.family_added(family, family_info)
 
     def _family_removed(self, family):
         self.rgb_pane.family_removed(family)
-
