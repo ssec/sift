@@ -1548,7 +1548,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def _add_layer_family(self, layer):
         family = layer[Info.FAMILY]
-        is_new = family not in self._families
+        is_new = family not in self._families or not len(self._families[family])
         self._families[family].append(layer[Info.UUID])
         if is_new:
             self.didAddFamily.emit(family, self.family_info(family))
