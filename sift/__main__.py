@@ -619,25 +619,10 @@ class Main(QtGui.QMainWindow):
         # FIXME: Slider does not currently work as intended. Re-enable later
         self.ui.timelineScaleSlider.setDisabled(True)
 
-        # hack some font sizes until we migrate to PyQt5 and handle it better
-        # was 14 on osx
-        fsize = get_font_size(8.2)
-        font = QtGui.QFont('Andale Mono')
-        font.setPointSizeF(fsize)
-        self.ui.cursorProbeLayer.setFont(font)
-        self.ui.cursorProbeText.setFont(font)
+        self._init_font_sizes()
 
         self.setWindowTitle(self.windowTitle().replace("|X.X.X|", __version__))
-        self.tabifyDockWidget(self.ui.layersPane, self.ui.areaProbePane)
-        self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.rgbConfigPane)
-        self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.timelinePane)
-
-        # self.tabifyDockWidget(self.ui.rgbConfigPane, self.ui.layerDetailsPane)
-        # Make the layer list and layer details shown
-        self.ui.layersPane.raise_()
-        self.ui.layerDetailsPane.raise_()
-        # refer to objectName'd entities as self.ui.objectName
-        self.setAcceptDrops(True)
+        self._init_arrange_panes()
 
         self.queue = TaskQueue()
         self.ui.progressBar.setRange(0, PROGRESS_BAR_MAX)
@@ -653,33 +638,7 @@ class Main(QtGui.QMainWindow):
                                                parent=self)
         self.export_image = ExportImageHelper(self, self.document, self.scene_manager)
 
-        # connect canvas and projection pieces
-        self.ui.mainMapWidget.layout().addWidget(self.scene_manager.main_canvas.native)
-        self.ui.projectionComboBox.addItems(tuple(self.document.available_projections.keys()))
-        self.ui.projectionComboBox.currentIndexChanged.connect(self.document.change_projection_index)
-
-        self.scene_manager.didChangeFrame.connect(self.update_frame_slider)
-        self.ui.animPlayPause.clicked.connect(self.toggle_animation)
-        self.ui.animPlayPause.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        self.ui.animPlayPause.customContextMenuRequested.connect(self.show_animation_speed_slider)
-
-        def next_frame(*args, **kwargs):
-            self.scene_manager.layer_set.animating = False
-            self.scene_manager.layer_set.next_frame()
-
-        self.ui.animForward.clicked.connect(next_frame)
-
-        def prev_frame(*args, **kwargs):
-            self.scene_manager.layer_set.animating = False
-            self.scene_manager.layer_set.next_frame(frame_number=-1)
-
-        self.ui.animBack.clicked.connect(prev_frame)
-
-        # allow animation slider to set animation frame being displayed:
-        self.ui.animationSlider.valueChanged.connect(self.animation_slider_jump_frame)
-
-        # allow animation, once stopped, to propagate visibility to the document and layerlist:
-        self.scene_manager.didChangeLayerVisibility.connect(self.document.animation_changed_visibility)
+        self._init_animating_map_widgets()
 
         # disable close button on panes
         for pane in [self.ui.areaProbePane, self.ui.layersPane, self.ui.layerDetailsPane, self.ui.rgbConfigPane]:
@@ -692,7 +651,8 @@ class Main(QtGui.QMainWindow):
         # loop.create_task(do_test_cycle(self.ui.cursorProbeText))
 
         # Interaction Setup
-        self.setup_key_releases()
+        self._init_key_releases()
+
         self.scheduler = QtCore.QTimer(parent=self)
         self.scheduler.setInterval(200.0)
         self.scheduler.timeout.connect(partial(self.scene_manager.on_view_change, self.scheduler))
@@ -704,60 +664,40 @@ class Main(QtGui.QMainWindow):
 
         self.scene_manager.main_view.scene.transform.changed.connect(partial(start_wrapper, self.scheduler))
 
-        # convey action between document and layer list view
-        self.layer_info_pane = SingleLayerInfoPane(self.ui.layerDetailsContents, self.document)
-        self.layer_list_model = LayerStackTreeViewModel([self.ui.layerListView], self.document,
-                                                        parent=self.ui.layersPaneWidget)
-        self.layer_list_model.uuidSelectionChanged.connect(self.layer_info_pane.update_display)
-        self.behaviorLayersList = self.layer_list_model  # historical naming
-
-        self.rgb_config_pane = RGBLayerConfigPane(self.ui, self.ui.layersPaneWidget)
-        self.user_rgb_behavior = UserModifiesRGBLayers(self.document,
-                                                       self.rgb_config_pane,
-                                                       self.layer_list_model,
-                                                       parent=self)
-
-        def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
-            top_uuids = list(self.document.current_visible_layer_uuids)
-            LOG.debug("top visible UUID is {0!r:s}".format(top_uuids))
-
-            # TODO, when the plots manage their own layer selection, change this call
-            # FUTURE, once the polygon is a layer, this will need to change
-            # set the selection for the probe plot to the top visible layer(s)
-            # new tabs should clone the information from the currently selected tab
-            # the call below will check if this is a new polygon
-            self.graphManager.set_default_layer_selections(*top_uuids)
-            # update our current plot with the new polygon
-            polygon_name = self.graphManager.currentPolygonChanged(polygonPoints=points)
-
-            # do whatever other updates the scene manager needs
-            self.scene_manager.on_new_polygon(polygon_name, points)
-
-            if self.scene_manager._current_tool == Tool.REGION_PROBE:
-                self.ui.panZoomToolButton.click()
-
-        self.scene_manager.newProbePolygon.connect(update_probe_polygon)
-
-        # setup RGB configuration
-        self.document.didChangeComposition.connect(lambda *args: self._refresh_probe_results(*args[1:]))
-        self.document.didChangeColorLimits.connect(self._refresh_probe_results)
+        self._init_layer_panes()
+        self._init_rgb_pane()
 
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
         self.document.didSwitchLayerSet.connect(self.animation_reset_by_layer_set_switch)
 
-        self.document.didChangeLayerVisibility.connect(self.update_frame_time_to_top_visible)
-        self.document.didReorderLayers.connect(self.update_frame_time_to_top_visible)
-        self.document.didRemoveLayers.connect(self.update_frame_time_to_top_visible)
-        self.document.didAddBasicLayer.connect(self.update_frame_time_to_top_visible)
-        self.document.didAddCompositeLayer.connect(self.update_frame_time_to_top_visible)
-        self.document.didChangeProjection.connect(self.scene_manager.set_projection)
+        self._init_frame_time_display_updates()
+        self._init_tool_controls()
+        self._init_menu()
+        self._init_point_polygon_probes()
 
-        self.ui.panZoomToolButton.toggled.connect(partial(self.change_tool, name=Tool.PAN_ZOOM))
-        self.ui.pointSelectButton.toggled.connect(partial(self.change_tool, name=Tool.POINT_PROBE))
-        self.ui.regionSelectButton.toggled.connect(partial(self.change_tool, name=Tool.REGION_PROBE))
-        self.change_tool(True)
+        # Set the projection based on the document's default
+        self.document.change_projection()
+        self.ui.projectionComboBox.setCurrentIndex(self.document.current_projection_index())
 
-        self.setup_menu()
+        self._init_metadata_background_collection(search_paths)
+
+        # set up timeline
+        LOG.info("potential tracks already in database: {}".format(repr(doc.potential_tracks())))
+        self._init_timeline(doc, self.workspace)
+
+        # FIXME: make sure sync of metadata signals sync of document potentials and track display
+
+    def _init_metadata_background_collection(self, search_paths):
+        # if search paths are provided on the command line,
+        self._resource_collector = collector = ResourceSearchPathCollector(self.workspace)
+        collector.paths = search_paths or []
+        # periodically launch a background scan
+        self._resource_collector_timer = timer = QtCore.QTimer()
+        self._timer_collect_resources()
+        timer.timeout.connect(self._timer_collect_resources)
+        timer.start(60000)
+
+    def _init_point_polygon_probes(self):
         self.graphManager = ProbeGraphManager(self.ui.probeTabWidget, self.workspace, self.document, self.queue)
         self.graphManager.didChangeTab.connect(self.scene_manager.show_only_polygons)
         self.graphManager.didClonePolygon.connect(self.scene_manager.copy_polygon)
@@ -792,24 +732,105 @@ class Main(QtGui.QMainWindow):
             self.scene_manager.didChangeFrame.connect(
                 lambda frame_info: self.ui.cursorProbeText.setText("Probe Value: <animating>"))
 
-        # Set the projection based on the document's default
-        self.document.change_projection()
-        self.ui.projectionComboBox.setCurrentIndex(self.document.current_projection_index())
+        def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
+            top_uuids = list(self.document.current_visible_layer_uuids)
+            LOG.debug("top visible UUID is {0!r:s}".format(top_uuids))
 
-        # if search paths are provided on the command line,
-        self._resource_collector = collector = ResourceSearchPathCollector(self.workspace)
-        collector.paths = search_paths or []
-        # periodically launch a background scan
-        self._resource_collector_timer = timer = QtCore.QTimer()
-        self._timer_collect_resources()
-        timer.timeout.connect(self._timer_collect_resources)
-        timer.start(60000)
+            # TODO, when the plots manage their own layer selection, change this call
+            # FUTURE, once the polygon is a layer, this will need to change
+            # set the selection for the probe plot to the top visible layer(s)
+            # new tabs should clone the information from the currently selected tab
+            # the call below will check if this is a new polygon
+            self.graphManager.set_default_layer_selections(*top_uuids)
+            # update our current plot with the new polygon
+            polygon_name = self.graphManager.currentPolygonChanged(polygonPoints=points)
 
-        # set up timeline
-        LOG.info("potential tracks already in database: {}".format(repr(doc.potential_tracks())))
-        self._init_timeline(doc, self.workspace)
+            # do whatever other updates the scene manager needs
+            self.scene_manager.on_new_polygon(polygon_name, points)
 
-        # FIXME: make sure sync of metadata signals sync of document potentials and track display
+            if self.scene_manager._current_tool == Tool.REGION_PROBE:
+                self.ui.panZoomToolButton.click()
+
+        self.scene_manager.newProbePolygon.connect(update_probe_polygon)
+        # setup RGB configuration
+        self.document.didChangeComposition.connect(lambda *args: self._refresh_probe_results(*args[1:]))
+        self.document.didChangeColorLimits.connect(self._refresh_probe_results)
+
+    def _init_tool_controls(self):
+        self.ui.panZoomToolButton.toggled.connect(partial(self.change_tool, name=Tool.PAN_ZOOM))
+        self.ui.pointSelectButton.toggled.connect(partial(self.change_tool, name=Tool.POINT_PROBE))
+        self.ui.regionSelectButton.toggled.connect(partial(self.change_tool, name=Tool.REGION_PROBE))
+        self.change_tool(True)
+
+    def _init_frame_time_display_updates(self):
+        self.document.didChangeLayerVisibility.connect(self.update_frame_time_to_top_visible)
+        self.document.didReorderLayers.connect(self.update_frame_time_to_top_visible)
+        self.document.didRemoveLayers.connect(self.update_frame_time_to_top_visible)
+        self.document.didAddBasicLayer.connect(self.update_frame_time_to_top_visible)
+        self.document.didAddCompositeLayer.connect(self.update_frame_time_to_top_visible)
+        self.document.didChangeProjection.connect(self.scene_manager.set_projection)
+
+    def _init_rgb_pane(self):
+        self.rgb_config_pane = RGBLayerConfigPane(self.ui, self.ui.layersPaneWidget)
+        self.user_rgb_behavior = UserModifiesRGBLayers(self.document,
+                                                       self.rgb_config_pane,
+                                                       self.layer_list_model,
+                                                       parent=self)
+
+    def _init_layer_panes(self):
+        # convey action between document and layer list view
+        self.layer_info_pane = SingleLayerInfoPane(self.ui.layerDetailsContents, self.document)
+        self.layer_list_model = LayerStackTreeViewModel([self.ui.layerListView], self.document,
+                                                        parent=self.ui.layersPaneWidget)
+        self.layer_list_model.uuidSelectionChanged.connect(self.layer_info_pane.update_display)
+        self.behaviorLayersList = self.layer_list_model  # historical naming
+
+    def _init_animating_map_widgets(self):
+        # connect canvas and projection pieces
+        self.ui.mainMapWidget.layout().addWidget(self.scene_manager.main_canvas.native)
+        self.ui.projectionComboBox.addItems(tuple(self.document.available_projections.keys()))
+        self.ui.projectionComboBox.currentIndexChanged.connect(self.document.change_projection_index)
+        self.scene_manager.didChangeFrame.connect(self.update_frame_slider)
+        self.ui.animPlayPause.clicked.connect(self.toggle_animation)
+        self.ui.animPlayPause.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.ui.animPlayPause.customContextMenuRequested.connect(self.show_animation_speed_slider)
+        def next_frame(*args, **kwargs):
+            self.scene_manager.layer_set.animating = False
+            self.scene_manager.layer_set.next_frame()
+
+        self.ui.animForward.clicked.connect(next_frame)
+
+        def prev_frame(*args, **kwargs):
+            self.scene_manager.layer_set.animating = False
+            self.scene_manager.layer_set.next_frame(frame_number=-1)
+
+        self.ui.animBack.clicked.connect(prev_frame)
+
+        # allow animation slider to set animation frame being displayed:
+        self.ui.animationSlider.valueChanged.connect(self.animation_slider_jump_frame)
+
+        # allow animation, once stopped, to propagate visibility to the document and layerlist:
+        self.scene_manager.didChangeLayerVisibility.connect(self.document.animation_changed_visibility)
+
+    def _init_arrange_panes(self):
+        self.tabifyDockWidget(self.ui.layersPane, self.ui.areaProbePane)
+        self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.rgbConfigPane)
+        self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.timelinePane)
+        # self.tabifyDockWidget(self.ui.rgbConfigPane, self.ui.layerDetailsPane)
+        # Make the layer list and layer details shown
+        self.ui.layersPane.raise_()
+        self.ui.layerDetailsPane.raise_()
+        # refer to objectName'd entities as self.ui.objectName
+        self.setAcceptDrops(True)
+
+    def _init_font_sizes(self):
+        # hack some font sizes until we migrate to PyQt5 and handle it better
+        # was 14 on osx
+        fsize = get_font_size(8.2)
+        font = QtGui.QFont('Andale Mono')
+        font.setPointSizeF(fsize)
+        self.ui.cursorProbeLayer.setFont(font)
+        self.ui.cursorProbeText.setFont(font)
 
     def _timer_collect_resources(self):
         if self._resource_collector:
@@ -902,7 +923,7 @@ class Main(QtGui.QMainWindow):
         dialog.raise_()
         dialog.activateWindow()
 
-    def setup_menu(self):
+    def _init_menu(self):
         open_action = QtGui.QAction("&Open...", self)
         open_action.setShortcut("Ctrl+O")
         open_action.triggered.connect(self.interactive_open_files)
@@ -1036,7 +1057,7 @@ class Main(QtGui.QMainWindow):
         self.update_recent_file_menu()
         menubar.setEnabled(True)
 
-    def setup_key_releases(self):
+    def _init_key_releases(self):
         def cb_factory(required_key, cb):
             def tmp_cb(key, cb=cb):
                 if key.text == required_key:
