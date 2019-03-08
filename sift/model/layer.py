@@ -216,10 +216,10 @@ class DocRGBLayer(DocCompositeLayer):
 
     def _get_if_not_none_func(self, attr=None, item=None):
 
-        def _get_not_none_attr(layer):
+        def _get_not_none_item(layer):
             return None if layer is None else layer.get(item)
 
-        def _get_not_none_item(layer):
+        def _get_not_none_attr(layer):
             return None if layer is None else getattr(layer, attr)
 
         if attr is not None:
