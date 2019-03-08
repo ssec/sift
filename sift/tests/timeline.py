@@ -146,12 +146,12 @@ class MainWindow(QMainWindow):
 
         # Other items, animate randomly
         for i in range(len(self.animations)):
-            l = self.digits[i]
+            t_item = self.digits[i]
             if i in [h1, h2, m1, m2, s1, s2]:
-                l.setOpacity(1)
+                t_item.setOpacity(1)
                 continue
-            l.setOpacity(.3)
-            self.animations[i] = animate_to(1, l, randint(0, 500), randint(0, 300), randint(0, 0))
+            t_item.setOpacity(.3)
+            self.animations[i] = animate_to(1, t_item, randint(0, 500), randint(0, 300), randint(0, 0))
 
         [animation.timeLine().start() for animation in self.animations]
 
@@ -183,23 +183,23 @@ class MainWindow(QMainWindow):
 
         # Create 6 sets of 0-9 digits
         for i in range(60):
-            l = QGraphicsTextItem(str(i % 10))
-            l.setFont(font)
+            t_item = QGraphicsTextItem(str(i % 10))
+            t_item.setFont(font)
             # The zvalue is what controls what appears "on top" of what.
             # Send them to "the bottom" of the scene.
-            l.setZValue(-100)
+            t_item.setZValue(-100)
 
             # Place them anywhere
-            l.setPos(randint(0, 500), randint(150, 300))
+            t_item.setPos(randint(0, 500), randint(150, 300))
 
             # Make them semi-transparent
-            l.setOpacity(.3)
+            t_item.setOpacity(.3)
 
             # Put them in the scene
-            self._scene.addItem(l)
+            self._scene.addItem(t_item)
 
             # Keep a reference for internal purposes
-            self.digits.append(l)
+            self.digits.append(t_item)
 
 
 app = QApplication(sys.argv)

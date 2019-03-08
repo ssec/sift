@@ -420,9 +420,9 @@ def _calc_extent_component(canvas_point, image_point, num_pixels, meters_per_pix
     # Calculate the theoretical bounding box if the image was
     # perfectly centered on the closest reference point
     # Clip the bounding box to the extents of the image
-    l = viewed_img_center_x - half_canvas_width
-    r = viewed_img_center_x + half_canvas_width
-    return l, r
+    left = viewed_img_center_x - half_canvas_width
+    right = viewed_img_center_x + half_canvas_width
+    return left, right
 
 
 @jit(nb_types.UniTuple(float64, 2)(float64[:, :], float64[:, :], nb_types.UniTuple(int64, 2)), nopython=True)

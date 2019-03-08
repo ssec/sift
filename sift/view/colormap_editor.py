@@ -13,9 +13,9 @@ class ColormapEditor(QtGui.QDialog):
     def __init__(self, doc, parent=None, **kwargs):
         super(ColormapEditor, self).__init__(parent)
 
-        l = QtGui.QGridLayout()
-        l.setSpacing(0)
-        self.setLayout(l)
+        layout = QtGui.QGridLayout()
+        layout.setSpacing(0)
+        self.setLayout(layout)
         self.doc = doc
         self.user_colormap_states = {}
         self.builtin_colormap_states = {}
@@ -65,15 +65,15 @@ class ColormapEditor(QtGui.QDialog):
         self.SaveButton.setEnabled(False)
 
         # Add widgets to their respective spots in the UI grid
-        l.addWidget(self.ImportButton, 0, 0)
-        l.addWidget(self.SaveButton, 0, 2)
-        l.addWidget(self.sqrt, 1, 2)
-        l.addWidget(self.ColorBar, 4, 1)
-        l.addWidget(self.CloneButton, 1, 0)
-        l.addWidget(self.cmap_list, 1, 1, 3, 1)
-        l.addWidget(self.CloseButton, 6, 2)
-        l.addWidget(self.ExportButton, 2, 2)
-        l.addWidget(self.DeleteButton, 2, 0)
+        layout.addWidget(self.ImportButton, 0, 0)
+        layout.addWidget(self.SaveButton, 0, 2)
+        layout.addWidget(self.sqrt, 1, 2)
+        layout.addWidget(self.ColorBar, 4, 1)
+        layout.addWidget(self.CloneButton, 1, 0)
+        layout.addWidget(self.cmap_list, 1, 1, 3, 1)
+        layout.addWidget(self.CloseButton, 6, 2)
+        layout.addWidget(self.ExportButton, 2, 2)
+        layout.addWidget(self.DeleteButton, 2, 0)
 
         # Import custom colormaps
         cmap_manager = self.doc.colormaps

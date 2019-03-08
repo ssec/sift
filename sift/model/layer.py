@@ -175,44 +175,44 @@ def _concurring(*q, remove_none=False):
 
 class DocRGBLayer(DocCompositeLayer):
     def __init__(self, doc, recipe, info, *args, **kwargs):
-        self.l = [None, None, None, None]  # RGBA upstream layers
-        self.n = [None, None, None, None]  # RGBA minimum value from upstream layers
-        self.x = [None, None, None, None]  # RGBA maximum value from upstream layers
+        self.layers = [None, None, None, None]  # RGBA upstream layers
+        self.mins = [None, None, None, None]  # RGBA minimum value from upstream layers
+        self.maxs = [None, None, None, None]  # RGBA maximum value from upstream layers
         self.recipe = recipe
         info.setdefault(Info.KIND, Kind.RGB)
         super().__init__(doc, info, *args, **kwargs)
 
     @property
     def r(self):
-        return self.l[0]
+        return self.layers[0]
 
     @property
     def g(self):
-        return self.l[1]
+        return self.layers[1]
 
     @property
     def b(self):
-        return self.l[2]
+        return self.layers[2]
 
     @property
     def a(self):
-        return self.l[3]
+        return self.layers[3]
 
     @r.setter
     def r(self, x):
-        self.l[0] = x
+        self.layers[0] = x
 
     @g.setter
     def g(self, x):
-        self.l[1] = x
+        self.layers[1] = x
 
     @b.setter
     def b(self, x):
-        self.l[2] = x
+        self.layers[2] = x
 
     @a.setter
     def a(self, x):
-        self.l[3] = x
+        self.layers[3] = x
 
     def _get_if_not_none_func(self, attr=None, item=None):
 
@@ -228,12 +228,12 @@ class DocRGBLayer(DocCompositeLayer):
 
     def dep_info(self, key, include_alpha=False):
         max_idx = 4 if include_alpha else 3
-        return [x.get(key) for x in self.l[:max_idx]]
+        return [x.get(key) for x in self.layers[:max_idx]]
 
     def product_family_keys(self, include_alpha=False):
         max_idx = 4 if include_alpha else 3
         gb = self._get_if_not_none_func(attr='product_family_key')
-        return [gb(x) for x in self.l[:max_idx]]
+        return [gb(x) for x in self.layers[:max_idx]]
 
     @property
     def has_deps(self):
@@ -243,22 +243,22 @@ class DocRGBLayer(DocCompositeLayer):
 
     @property
     def shared_projections(self):
-        return all(x[Info.PROJ] == self[Info.PROJ] for x in self.l[:3] if x is not None)
+        return all(x[Info.PROJ] == self[Info.PROJ] for x in self.layers[:3] if x is not None)
 
     @property
     def shared_origin(self):
-        if all(x is None for x in self.l[:3]):
+        if all(x is None for x in self.layers[:3]):
             return False
 
         atol = max(abs(x[Info.CELL_WIDTH])
-                   for x in self.l[:3] if x is not None)
+                   for x in self.layers[:3] if x is not None)
         shared_x = all(np.isclose(x[Info.ORIGIN_X], self[Info.ORIGIN_X], atol=atol)
-                       for x in self.l[:3] if x is not None)
+                       for x in self.layers[:3] if x is not None)
 
         atol = max(abs(x[Info.CELL_HEIGHT])
-                   for x in self.l[:3] if x is not None)
+                   for x in self.layers[:3] if x is not None)
         shared_y = all(np.isclose(x[Info.ORIGIN_Y], self[Info.ORIGIN_Y], atol=atol)
-                       for x in self.l[:3] if x is not None)
+                       for x in self.layers[:3] if x is not None)
         return shared_x and shared_y
 
     @property
@@ -266,7 +266,7 @@ class DocRGBLayer(DocCompositeLayer):
         def _get_family(layer):
             return layer[Info.FAMILY] if layer else None
 
-        return all([_get_family(x) == self.recipe.input_ids[idx] for idx, x in enumerate(self.l[:3])])
+        return all([_get_family(x) == self.recipe.input_ids[idx] for idx, x in enumerate(self.layers[:3])])
 
     @property
     def is_valid(self):
