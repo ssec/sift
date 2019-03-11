@@ -17,6 +17,7 @@ REQUIRES
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
+
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
@@ -24,7 +25,7 @@ import asyncio
 import logging
 import os
 import sys
-from PyQt4 import QtGui
+from PyQt4 import QtGui, QtCore
 from collections import OrderedDict
 from functools import partial
 from glob import glob
@@ -226,12 +227,167 @@ def _common_path_prefix(paths):
         return None
 
 
-class Main(QtGui.QMainWindow):
-    _last_open_dir = None  # directory to open files in
-    _recent_files_menu = None  # QMenu
+class UserControlsAnimation(QtCore.QObject):
     _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
-    _open_cache_dialog = None
-    _screenshot_dialog = None
+
+    def __init__(self, ui, scene_manager: SceneGraphManager, document: Document, layer_list_model):
+        super(UserControlsAnimation, self).__init__()
+        self.ui = ui
+        self.scene_manager = scene_manager
+        self.document = document
+        self.layer_list_model = layer_list_model
+
+        self.scene_manager.didChangeFrame.connect(self.update_frame_slider)
+        self.ui.animPlayPause.clicked.connect(self.toggle_animation)
+        self.ui.animPlayPause.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.ui.animPlayPause.customContextMenuRequested.connect(self.show_animation_speed_slider)
+
+        self.ui.animForward.clicked.connect(self.next_frame)
+        self.ui.animBack.clicked.connect(self.prev_frame)
+
+        # allow animation slider to set animation frame being displayed:
+        self.ui.animationSlider.valueChanged.connect(self.animation_slider_jump_frame)
+
+        # allow animation, once stopped, to propagate visibility to the document and layerlist:
+        self.scene_manager.didChangeLayerVisibility.connect(self.document.animation_changed_visibility)
+
+        self.document.didSwitchLayerSet.connect(self.animation_reset_by_layer_set_switch)
+        self.document.didChangeLayerVisibility.connect(self.update_frame_time_to_top_visible)
+        self.document.didReorderLayers.connect(self.update_frame_time_to_top_visible)
+        self.document.didRemoveLayers.connect(self.update_frame_time_to_top_visible)
+        self.document.didAddBasicLayer.connect(self.update_frame_time_to_top_visible)
+        self.document.didAddCompositeLayer.connect(self.update_frame_time_to_top_visible)
+
+    def next_frame(self, *args, **kwargs):
+        self.scene_manager.layer_set.animating = False
+        self.scene_manager.layer_set.next_frame()
+
+    def prev_frame(self, *args, **kwargs):
+        self.scene_manager.layer_set.animating = False
+        self.scene_manager.layer_set.next_frame(frame_number=-1)
+
+    def reset_frame_slider(self, *args, **kwargs):
+        frame_count = len(self.document.current_animation_order)
+        frame_index = None  # self.scene_manager.layer_set._frame_number  # FIXME BAAD
+        self.ui.animationSlider.setRange(0, frame_count - 1)
+        self.ui.animationSlider.setValue(frame_index or 0)
+        self.ui.animPlayPause.setDown(False)
+        self.ui.animationSlider.repaint()
+        self.update_frame_time_to_top_visible()
+
+    def update_frame_slider(self, frame_info):
+        """
+        animation is in progress or completed
+        update the animation slider and label to show what's going on
+        :param frame_info: tuple, ultimately from scenegraphmanager.layer_set callback into sgm
+        :return:
+        """
+        frame_index, frame_count, animating, uuid = frame_info[:4]
+        self.ui.animationSlider.setRange(0, frame_count - 1)
+        self.ui.animationSlider.setValue(frame_index or 0)
+        # LOG.debug('did update animation slider {} {}'.format(frame_index, frame_count))
+        self.ui.animPlayPause.setDown(animating)
+        self.ui.animationSlider.repaint()
+        if animating:
+            self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
+        else:
+            self.update_frame_time_to_top_visible()
+
+    def update_frame_time_to_top_visible(self, *args):
+        # FUTURE: don't address layer set directly
+        self.ui.animationLabel.setText(self.document.time_label_for_uuid(self.scene_manager.layer_set.top_layer_uuid()))
+
+    def animation_slider_jump_frame(self, event, *args, **kwargs):
+        """Update display to match frame slider change."""
+        frame = self.ui.animationSlider.value()
+        self.scene_manager.set_frame_number(frame)
+        # TODO: update layer list to reflect what layers are visible/hidden?
+
+    def _next_last_time_visibility(self, direction=0, *args, **kwargs):
+        LOG.info('time incr {}'.format(direction))
+        # TODO: if this frame is part of the animation sequence, update the slider as well!
+        uuids = self.layer_list_model.current_selected_uuids()
+        if not uuids:
+            self.ui.statusbar.showMessage('ERROR: No layer selected', STATUS_BAR_DURATION)
+        new_focus = None
+        for uuid in uuids:
+            new_focus = self.document.next_last_step(uuid, direction, bandwise=False)
+        return new_focus
+
+    def update_slider_if_frame_is_in_animation(self, uuid, **kwargs):
+        # FUTURE: this could be a cheaper operation but it's probably fine since it's input-driven
+        cao = self.document.current_animation_order
+        try:
+            dex = cao.index(uuid)
+        except ValueError:
+            return
+        frame_change_tuple = (dex, len(cao), False, uuid)
+        self.update_frame_slider(frame_change_tuple)
+
+    def next_last_time(self, direction=0, *args, **kwargs):
+        self.scene_manager.layer_set.animating = False
+        new_focus = self._next_last_time_visibility(direction=direction)
+        self.layer_list_model.select([new_focus])
+        # if this part of the animation cycle, update the animation slider and displayed time as well
+        self.update_slider_if_frame_is_in_animation(new_focus)
+        return new_focus
+
+    def next_last_band(self, direction=0, *args, **kwargs):
+        LOG.info('band incr {}'.format(direction))
+        uuids = self.layer_list_model.current_selected_uuids()
+        new_focus = None
+        if not uuids:
+            pass  # FIXME: notify user
+        for uuid in uuids:
+            new_focus = self.document.next_last_step(uuid, direction, bandwise=True)
+        if new_focus is not None:
+            self.layer_list_model.select([new_focus])
+            self.update_frame_time_to_top_visible()
+            self.update_slider_if_frame_is_in_animation(new_focus)
+
+    def set_animation_speed(self, milliseconds):
+        LOG.info('animation speed set to {}ms'.format(milliseconds))
+        self.scene_manager.layer_set.animation_speed = milliseconds
+
+    def show_animation_speed_slider(self, pos: QtCore.QPoint, *args):
+        LOG.info('menu requested for animation control')
+        gpos = self.ui.animPlayPause.mapToGlobal(pos)
+
+        if self._animation_speed_popup is None:
+            self._animation_speed_popup = popup = AnimationSpeedPopupWindow(slot=self.set_animation_speed, parent=None)
+        else:
+            popup = self._animation_speed_popup
+        if not popup.isVisible():
+            popup.show_at(gpos, self.scene_manager.layer_set.animation_speed)
+
+    def animation_reset_by_layer_set_switch(self, *args, **kwargs):
+        self.reset_frame_slider()
+        self.update_frame_time_to_top_visible()
+
+    def change_animation_to_current_selection_siblings(self, *args, **kwargs):
+        uuid = self._next_last_time_visibility(direction=0)
+        if uuid is None:
+            self.ui.statusbar.showMessage("ERROR: No layer selected", STATUS_BAR_DURATION)
+            return
+        # calculate the new animation sequence by consulting the guidebook
+        uuids = self.document.animate_siblings_of_layer(uuid)
+        if uuids:
+            self.ui.statusbar.showMessage("Info: Frame order updated", STATUS_BAR_DURATION)
+            self.layer_list_model.select(uuids)
+        else:
+            self.ui.statusbar.showMessage("ERROR: Layer with time steps or band siblings needed", STATUS_BAR_DURATION)
+        LOG.info('using siblings of {} for animation loop'.format(uuids[0] if uuids else '-unknown-'))
+
+    def toggle_animation(self, action: QtGui.QAction = None, *args):
+        new_state = self.scene_manager.layer_set.toggle_animation()
+        self.ui.animPlayPause.setChecked(new_state)
+
+
+class Main(QtGui.QMainWindow):
+    _last_open_dir: str = None  # directory to open files in
+    _recent_files_menu: QtGui.QMenu = None  # QMenu
+    _open_cache_dialog: QtGui.QDialog = None
+    _screenshot_dialog: QtGui.QDialog = None
     _cmap_editor = None  # Gradient editor widget
     _resource_collector: ResourceSearchPathCollector = None
     _resource_collector_timer: QtCore.QTimer = None
@@ -273,7 +429,7 @@ class Main(QtGui.QMainWindow):
         if not isok:
             raise ValueError("background open did not succeed")
         uuid = uuid_list[-1]
-        self.behaviorLayersList.select([uuid])
+        self.layer_list_model.select([uuid])
         # set the animation based on the last added (topmost) layer
         self.document.animate_siblings_of_layer(uuid)
         # force the newest layer to be visible
@@ -298,7 +454,7 @@ class Main(QtGui.QMainWindow):
         for uuid in uuids:
             self.document.activate_product_uuid_as_new_layer(uuid)
         uuid = uuids[-1]
-        self.behaviorLayersList.select([uuid])
+        self.layer_list_model.select([uuid])
         # set the animation based on the last added (topmost) layer
         self.document.animate_siblings_of_layer(uuid)
         # force the newest layer to be visible
@@ -347,39 +503,13 @@ class Main(QtGui.QMainWindow):
         self.ui.progressText.setText(txt)
         # LOG.warning('progress bar updated to {}'.format(val))
 
-    def reset_frame_slider(self, *args, **kwargs):
-        frame_count = len(self.document.current_animation_order)
-        frame_index = None  # self.scene_manager.layer_set._frame_number  # FIXME BAAD
-        self.ui.animationSlider.setRange(0, frame_count - 1)
-        self.ui.animationSlider.setValue(frame_index or 0)
-        self.ui.animPlayPause.setDown(False)
-        self.ui.animationSlider.repaint()
-        self.update_frame_time_to_top_visible()
-
-    def update_frame_slider(self, frame_info):
-        """
-        animation is in progress or completed
-        update the animation slider and label to show what's going on
-        :param frame_info: tuple, ultimately from scenegraphmanager.layer_set callback into sgm
-        :return:
-        """
-        frame_index, frame_count, animating, uuid = frame_info[:4]
-        self.ui.animationSlider.setRange(0, frame_count - 1)
-        self.ui.animationSlider.setValue(frame_index or 0)
-        # LOG.debug('did update animation slider {} {}'.format(frame_index, frame_count))
-        self.ui.animPlayPause.setDown(animating)
-        self.ui.animationSlider.repaint()
-        if animating:
-            self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
-        else:
-            self.update_frame_time_to_top_visible()
-
-    def update_frame_time_to_top_visible(self, *args):
-        # FUTURE: don't address layer set directly
-        self.ui.animationLabel.setText(self.document.time_label_for_uuid(self.scene_manager.layer_set.top_layer_uuid()))
+    def toggle_visibility_on_selected_layers(self, *args, **kwargs):
+        uuids = self.layer_list_model.current_selected_uuids()
+        self.document.toggle_layer_visibility(uuids)
+        self.animation.update_frame_time_to_top_visible()
 
     def remove_layer(self, *args, **kwargs):
-        uuids = self.behaviorLayersList.current_selected_uuids()
+        uuids = self.layer_list_model.current_selected_uuids()
         rgb_uuids_handled = set()
         uuids_to_remove = set()
         # if we are deleting an RGB layer then we have to remove all of them
@@ -419,101 +549,6 @@ class Main(QtGui.QMainWindow):
 
         if uuids_to_remove:
             self.document.remove_layers_from_all_sets(uuids_to_remove)
-
-    def animation_slider_jump_frame(self, event, *args, **kwargs):
-        "user has moved frame slider, update the display"
-        frame = self.ui.animationSlider.value()
-        self.scene_manager.set_frame_number(frame)
-        # TODO: update layer list to reflect what layers are visible/hidden?
-
-    def _next_last_time_visibility(self, direction=0, *args, **kwargs):
-        LOG.info('time incr {}'.format(direction))
-        # TODO: if this frame is part of the animation sequence, update the slider as well!
-        uuids = self.behaviorLayersList.current_selected_uuids()
-        if not uuids:
-            self.ui.statusbar.showMessage('ERROR: No layer selected', STATUS_BAR_DURATION)
-        new_focus = None
-        for uuid in uuids:
-            new_focus = self.document.next_last_step(uuid, direction, bandwise=False)
-        return new_focus
-
-    def update_slider_if_frame_is_in_animation(self, uuid, **kwargs):
-        # FUTURE: this could be a cheaper operation but it's probably fine since it's input-driven
-        cao = self.document.current_animation_order
-        try:
-            dex = cao.index(uuid)
-        except ValueError:
-            return
-        frame_change_tuple = (dex, len(cao), False, uuid)
-        self.update_frame_slider(frame_change_tuple)
-
-    def next_last_time(self, direction=0, *args, **kwargs):
-        self.scene_manager.layer_set.animating = False
-        new_focus = self._next_last_time_visibility(direction=direction)
-        self.behaviorLayersList.select([new_focus])
-        # if this part of the animation cycle, update the animation slider and displayed time as well
-        self.update_slider_if_frame_is_in_animation(new_focus)
-        return new_focus
-
-    def next_last_band(self, direction=0, *args, **kwargs):
-        LOG.info('band incr {}'.format(direction))
-        uuids = self.behaviorLayersList.current_selected_uuids()
-        new_focus = None
-        if not uuids:
-            pass  # FIXME: notify user
-        for uuid in uuids:
-            new_focus = self.document.next_last_step(uuid, direction, bandwise=True)
-        if new_focus is not None:
-            self.behaviorLayersList.select([new_focus])
-            self.update_frame_time_to_top_visible()
-            self.update_slider_if_frame_is_in_animation(new_focus)
-
-    def change_animation_to_current_selection_siblings(self, *args, **kwargs):
-        uuid = self._next_last_time_visibility(direction=0)
-        if uuid is None:
-            self.ui.statusbar.showMessage("ERROR: No layer selected", STATUS_BAR_DURATION)
-            return
-        # calculate the new animation sequence by consulting the guidebook
-        uuids = self.document.animate_siblings_of_layer(uuid)
-        if uuids:
-            self.ui.statusbar.showMessage("Info: Frame order updated", STATUS_BAR_DURATION)
-            self.behaviorLayersList.select(uuids)
-        else:
-            self.ui.statusbar.showMessage("ERROR: Layer with time steps or band siblings needed", STATUS_BAR_DURATION)
-        LOG.info('using siblings of {} for animation loop'.format(uuids[0] if uuids else '-unknown-'))
-
-    def set_animation_speed(self, milliseconds):
-        LOG.info('animation speed set to {}ms'.format(milliseconds))
-        # FUTURE: propagate this into the document?
-        self.scene_manager.layer_set.animation_speed = milliseconds
-
-    def show_animation_speed_slider(self, pos: QtCore.QPoint, *args):
-        LOG.info('menu requested for animation control')
-        gpos = self.ui.animPlayPause.mapToGlobal(pos)
-
-        if self._animation_speed_popup is None:
-            self._animation_speed_popup = popup = AnimationSpeedPopupWindow(slot=self.set_animation_speed, parent=None)
-        else:
-            popup = self._animation_speed_popup
-        if not popup.isVisible():
-            popup.show_at(gpos, self.scene_manager.layer_set.animation_speed)
-
-    def toggle_visibility_on_selected_layers(self, *args, **kwargs):
-        uuids = self.behaviorLayersList.current_selected_uuids()
-        self.document.toggle_layer_visibility(uuids)
-        self.update_frame_time_to_top_visible()
-
-    def animation_reset_by_layer_set_switch(self, *args, **kwargs):
-        self.reset_frame_slider()
-        self.update_frame_time_to_top_visible()
-
-    # def accept_new_layer(self, new_order, info, overview_content):
-    #     LOG.debug('accepting new layer order {0!r:s}'.format(new_order))
-    #     if info[Info.Kind] == Kind.IMAGE:
-    #         LOG.info("rebuilding animation based on newly loaded image layer")
-    #         self.document.animate_using_layer(info[Info.UUID])
-    #         self.animation_slider_jump_frame(None)
-    #         self.behaviorLayersList.select([info[Info.UUID]])
 
     def _refresh_probe_results(self, *args):
         arg1 = args[0]
@@ -638,7 +673,15 @@ class Main(QtGui.QMainWindow):
                                                parent=self)
         self.export_image = ExportImageHelper(self, self.document, self.scene_manager)
 
-        self._init_animating_map_widgets()
+        self._init_layer_panes()
+        self._init_rgb_pane()
+        self._init_map_widget()
+
+        self.animation = UserControlsAnimation(self.ui,
+                                               self.scene_manager,
+                                               self.document,
+                                               self.layer_list_model
+                                               )
 
         # disable close button on panes
         for pane in [self.ui.areaProbePane, self.ui.layersPane, self.ui.layerDetailsPane, self.ui.rgbConfigPane]:
@@ -664,13 +707,8 @@ class Main(QtGui.QMainWindow):
 
         self.scene_manager.main_view.scene.transform.changed.connect(partial(start_wrapper, self.scheduler))
 
-        self._init_layer_panes()
-        self._init_rgb_pane()
-
         print(self.scene_manager.main_view.describe_tree(with_transform=True))
-        self.document.didSwitchLayerSet.connect(self.animation_reset_by_layer_set_switch)
 
-        self._init_frame_time_display_updates()
         self._init_tool_controls()
         self._init_menu()
         self._init_point_polygon_probes()
@@ -732,7 +770,7 @@ class Main(QtGui.QMainWindow):
             self.scene_manager.didChangeFrame.connect(
                 lambda frame_info: self.ui.cursorProbeText.setText("Probe Value: <animating>"))
 
-        def update_probe_polygon(uuid, points, layerlist=self.behaviorLayersList):
+        def update_probe_polygon(uuid, points, layerlist=self.layer_list_model):
             top_uuids = list(self.document.current_visible_layer_uuids)
             LOG.debug("top visible UUID is {0!r:s}".format(top_uuids))
 
@@ -762,14 +800,6 @@ class Main(QtGui.QMainWindow):
         self.ui.regionSelectButton.toggled.connect(partial(self.change_tool, name=Tool.REGION_PROBE))
         self.change_tool(True)
 
-    def _init_frame_time_display_updates(self):
-        self.document.didChangeLayerVisibility.connect(self.update_frame_time_to_top_visible)
-        self.document.didReorderLayers.connect(self.update_frame_time_to_top_visible)
-        self.document.didRemoveLayers.connect(self.update_frame_time_to_top_visible)
-        self.document.didAddBasicLayer.connect(self.update_frame_time_to_top_visible)
-        self.document.didAddCompositeLayer.connect(self.update_frame_time_to_top_visible)
-        self.document.didChangeProjection.connect(self.scene_manager.set_projection)
-
     def _init_rgb_pane(self):
         self.rgb_config_pane = RGBLayerConfigPane(self.ui, self.ui.layersPaneWidget)
         self.user_rgb_behavior = UserModifiesRGBLayers(self.document,
@@ -783,34 +813,13 @@ class Main(QtGui.QMainWindow):
         self.layer_list_model = LayerStackTreeViewModel([self.ui.layerListView], self.document,
                                                         parent=self.ui.layersPaneWidget)
         self.layer_list_model.uuidSelectionChanged.connect(self.layer_info_pane.update_display)
-        self.behaviorLayersList = self.layer_list_model  # historical naming
 
-    def _init_animating_map_widgets(self):
+    def _init_map_widget(self):
         # connect canvas and projection pieces
         self.ui.mainMapWidget.layout().addWidget(self.scene_manager.main_canvas.native)
         self.ui.projectionComboBox.addItems(tuple(self.document.available_projections.keys()))
         self.ui.projectionComboBox.currentIndexChanged.connect(self.document.change_projection_index)
-        self.scene_manager.didChangeFrame.connect(self.update_frame_slider)
-        self.ui.animPlayPause.clicked.connect(self.toggle_animation)
-        self.ui.animPlayPause.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        self.ui.animPlayPause.customContextMenuRequested.connect(self.show_animation_speed_slider)
-        def next_frame(*args, **kwargs):
-            self.scene_manager.layer_set.animating = False
-            self.scene_manager.layer_set.next_frame()
-
-        self.ui.animForward.clicked.connect(next_frame)
-
-        def prev_frame(*args, **kwargs):
-            self.scene_manager.layer_set.animating = False
-            self.scene_manager.layer_set.next_frame(frame_number=-1)
-
-        self.ui.animBack.clicked.connect(prev_frame)
-
-        # allow animation slider to set animation frame being displayed:
-        self.ui.animationSlider.valueChanged.connect(self.animation_slider_jump_frame)
-
-        # allow animation, once stopped, to propagate visibility to the document and layerlist:
-        self.scene_manager.didChangeLayerVisibility.connect(self.document.animation_changed_visibility)
+        self.document.didChangeProjection.connect(self.scene_manager.set_projection)
 
     def _init_arrange_panes(self):
         self.tabifyDockWidget(self.ui.layersPane, self.ui.areaProbePane)
@@ -851,10 +860,6 @@ class Main(QtGui.QMainWindow):
     def closeEvent(self, event, *args, **kwargs):
         LOG.debug('main window closing')
         self.workspace.close()
-
-    def toggle_animation(self, action: QtGui.QAction = None, *args):
-        new_state = self.scene_manager.layer_set.toggle_animation()
-        self.ui.animPlayPause.setChecked(new_state)
 
     def _remove_paths_from_cache(self, paths):
         self.workspace.remove_all_workspace_content_for_resource_paths(paths)
@@ -917,7 +922,7 @@ class Main(QtGui.QMainWindow):
 
     def create_algebraic(self, action: QtGui.QAction = None, uuids=None, composite_type=CompositeType.ARITHMETIC):
         if uuids is None:
-            uuids = list(self.behaviorLayersList.current_selected_uuids())
+            uuids = list(self.layer_list_model.current_selected_uuids())
         dialog = CreateAlgebraicDialog(self.document, uuids, parent=self)
         dialog.show()
         dialog.raise_()
@@ -961,27 +966,27 @@ class Main(QtGui.QMainWindow):
 
         next_time = QtGui.QAction("Next Time", self)
         next_time.setShortcut(QtCore.Qt.Key_Right)
-        next_slot = partial(self.next_last_time, direction=1)
+        next_slot = partial(self.animation.next_last_time, direction=1)
         next_time.triggered.connect(next_slot)
         # self.ui.animForward.clicked.connect(next_slot)
 
         focus_current = QtGui.QAction("Focus Current Timestep", self)
         focus_current.setShortcut('.')
-        focus_current.triggered.connect(partial(self.next_last_band, direction=0))
+        focus_current.triggered.connect(partial(self.animation.next_last_band, direction=0))
 
         prev_time = QtGui.QAction("Previous Time", self)
         prev_time.setShortcut(QtCore.Qt.Key_Left)
-        prev_slot = partial(self.next_last_time, direction=-1)
+        prev_slot = partial(self.animation.next_last_time, direction=-1)
         prev_time.triggered.connect(prev_slot)
         # self.ui.animBack.clicked.connect(prev_slot)
 
         focus_prev_band = QtGui.QAction("Next Band", self)
         focus_prev_band.setShortcut(QtCore.Qt.Key_Up)
-        focus_prev_band.triggered.connect(partial(self.next_last_band, direction=-1))
+        focus_prev_band.triggered.connect(partial(self.animation.next_last_band, direction=-1))
 
         focus_next_band = QtGui.QAction("Previous Band", self)
         focus_next_band.setShortcut(QtCore.Qt.Key_Down)
-        focus_next_band.triggered.connect(partial(self.next_last_band, direction=1))
+        focus_next_band.triggered.connect(partial(self.animation.next_last_band, direction=1))
 
         toggle_vis = QtGui.QAction("Toggle &Visibility", self)
         toggle_vis.setShortcut('V')
@@ -989,11 +994,11 @@ class Main(QtGui.QMainWindow):
 
         animate = QtGui.QAction("Animate", self)
         animate.setShortcut('A')
-        animate.triggered.connect(partial(self.toggle_animation, action=animate))
+        animate.triggered.connect(partial(self.animation.toggle_animation, action=animate))
 
         change_order = QtGui.QAction("Set Animation &Order", self)
         change_order.setShortcut('O')
-        change_order.triggered.connect(self.change_animation_to_current_selection_siblings)
+        change_order.triggered.connect(self.animation.change_animation_to_current_selection_siblings)
 
         flip_colormap = QtGui.QAction("Flip Color Limits (Top Layer)", self)
         flip_colormap.setShortcut("/")
