@@ -1,4 +1,4 @@
-{% set version = "0.6.0.dev0" %}
+{% set version = "0.6.0.dev1" %}
 
 package:
   name: vispy
@@ -6,12 +6,12 @@ package:
 
 source:
   git_url: https://github.com/vispy/vispy.git
-  git_rev: a6ec64bb7b56739b463e3c16245a31940ca4f5f7
+  git_rev: 47f3cd0cf179286774b8ec5d1fbe063a28b8e56b
   patches:
     - ctypes_fontconfig.diff
 
 build:
-  number: 4
+  number: 0
   script: python setup.py install --single-version-externally-managed --record record.txt
 
 requirements:
@@ -19,18 +19,14 @@ requirements:
     - python
     - pip
     - setuptools
-    - numpy 1.8.*  # [not (win and (py35 or py36))]
-    - numpy 1.9.*  # [win and py35]
-    - numpy 1.11.*  # [win and py36]
+    - numpy 1.11.*
     - fontconfig  # [unix]
     - gcc  # [linux]
     - cython
 
   run:
     - python
-    - numpy >=1.8  # [not (win and (py35 or py36))]
-    - numpy >=1.9  # [win and py35]
-    - numpy >=1.11  # [win and py36]
+    - numpy >=1.11
     - fontconfig  # [unix]
     - scikit-image
 
