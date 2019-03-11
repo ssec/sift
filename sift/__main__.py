@@ -19,7 +19,6 @@ REQUIRES
 """
 
 __author__ = 'rayg'
-__docformat__ = 'reStructuredText'
 
 import asyncio
 import logging
@@ -228,9 +227,33 @@ def _common_path_prefix(paths):
 
 
 class UserControlsAnimation(QtCore.QObject):
+    """Controller behavior focused around animation bar and next/last key bindings.
+    Connects between document, scene graph manager, layer list view of document; uses UI elements.
+    Is composed into MainWindow.
+    - scrub left and right on slider
+    - next and last timestep (if time animation)
+    - next and last bandstep (if band animation)
+    - update time display above time slider
+    - update animation rate using popup widget
+    """
+    ui = None
+    document: Document = None
+    scene_manager: SceneGraphManager = None
+    layer_list_model: LayerStackTreeViewModel = None
     _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
 
-    def __init__(self, ui, scene_manager: SceneGraphManager, document: Document, layer_list_model):
+    def __init__(self, ui,
+                 scene_manager: SceneGraphManager,
+                 document: Document,
+                 layer_list_model: LayerStackTreeViewModel
+                 ):
+        """
+        Args:
+            ui: QtDesigner UI element tree for application
+            scene_manager: Map display manager, needed for controller screen animation
+            document: document object, needed for sibling lookups
+            layer_list_model: model used to display current layer list, needed for selection
+        """
         super(UserControlsAnimation, self).__init__()
         self.ui = ui
         self.scene_manager = scene_manager
@@ -259,14 +282,17 @@ class UserControlsAnimation(QtCore.QObject):
         self.document.didAddCompositeLayer.connect(self.update_frame_time_to_top_visible)
 
     def next_frame(self, *args, **kwargs):
+        """Advance a frame along the animation order."""
         self.scene_manager.layer_set.animating = False
         self.scene_manager.layer_set.next_frame()
 
     def prev_frame(self, *args, **kwargs):
+        """Retreat a frame along the animation list."""
         self.scene_manager.layer_set.animating = False
         self.scene_manager.layer_set.next_frame(frame_number=-1)
 
     def reset_frame_slider(self, *args, **kwargs):
+        """Reset frame slider to show current animation state in document when aniamtion list changes."""
         frame_count = len(self.document.current_animation_order)
         frame_index = None  # self.scene_manager.layer_set._frame_number  # FIXME BAAD
         self.ui.animationSlider.setRange(0, frame_count - 1)
@@ -277,10 +303,9 @@ class UserControlsAnimation(QtCore.QObject):
 
     def update_frame_slider(self, frame_info):
         """
-        animation is in progress or completed
-        update the animation slider and label to show what's going on
-        :param frame_info: tuple, ultimately from scenegraphmanager.layer_set callback into sgm
-        :return:
+        Update animation frame slider and time display to reflect current document animation state.
+        Args:
+            frame_info: tuple, ultimately from SceneGraphManager.layer_set callback
         """
         frame_index, frame_count, animating, uuid = frame_info[:4]
         self.ui.animationSlider.setRange(0, frame_count - 1)
@@ -294,6 +319,7 @@ class UserControlsAnimation(QtCore.QObject):
             self.update_frame_time_to_top_visible()
 
     def update_frame_time_to_top_visible(self, *args):
+        """Update frame slider's time display to show the current top layer's time."""
         # FUTURE: don't address layer set directly
         self.ui.animationLabel.setText(self.document.time_label_for_uuid(self.scene_manager.layer_set.top_layer_uuid()))
 
@@ -315,6 +341,7 @@ class UserControlsAnimation(QtCore.QObject):
         return new_focus
 
     def update_slider_if_frame_is_in_animation(self, uuid, **kwargs):
+        """Update frame slider to the specified frame UUID, but only if it's part of animation order."""
         # FUTURE: this could be a cheaper operation but it's probably fine since it's input-driven
         cao = self.document.current_animation_order
         try:
@@ -325,6 +352,7 @@ class UserControlsAnimation(QtCore.QObject):
         self.update_frame_slider(frame_change_tuple)
 
     def next_last_time(self, direction=0, *args, **kwargs):
+        """Move forward (direction=+1) or backward (-1) a time step in animation order."""
         self.scene_manager.layer_set.animating = False
         new_focus = self._next_last_time_visibility(direction=direction)
         self.layer_list_model.select([new_focus])
@@ -333,6 +361,7 @@ class UserControlsAnimation(QtCore.QObject):
         return new_focus
 
     def next_last_band(self, direction=0, *args, **kwargs):
+        """Move forward (direction=+1) or backward (-1) a band step in animation order."""
         LOG.info('band incr {}'.format(direction))
         uuids = self.layer_list_model.current_selected_uuids()
         new_focus = None
@@ -346,10 +375,12 @@ class UserControlsAnimation(QtCore.QObject):
             self.update_slider_if_frame_is_in_animation(new_focus)
 
     def set_animation_speed(self, milliseconds):
+        """Change frame rate as measured in milliseconds."""
         LOG.info('animation speed set to {}ms'.format(milliseconds))
         self.scene_manager.layer_set.animation_speed = milliseconds
 
     def show_animation_speed_slider(self, pos: QtCore.QPoint, *args):
+        """Show frame-rate slider as a pop-up control, at current mouse position."""
         LOG.info('menu requested for animation control')
         gpos = self.ui.animPlayPause.mapToGlobal(pos)
 
@@ -361,10 +392,12 @@ class UserControlsAnimation(QtCore.QObject):
             popup.show_at(gpos, self.scene_manager.layer_set.animation_speed)
 
     def animation_reset_by_layer_set_switch(self, *args, **kwargs):
+        """Perform necessary control resets when document layer set is swapped."""
         self.reset_frame_slider()
         self.update_frame_time_to_top_visible()
 
     def change_animation_to_current_selection_siblings(self, *args, **kwargs):
+        """Assign new animation order based on selection."""
         uuid = self._next_last_time_visibility(direction=0)
         if uuid is None:
             self.ui.statusbar.showMessage("ERROR: No layer selected", STATUS_BAR_DURATION)
@@ -379,6 +412,7 @@ class UserControlsAnimation(QtCore.QObject):
         LOG.info('using siblings of {} for animation loop'.format(uuids[0] if uuids else '-unknown-'))
 
     def toggle_animation(self, action: QtGui.QAction = None, *args):
+        """Toggle animation on/off."""
         new_state = self.scene_manager.layer_set.toggle_animation()
         self.ui.animPlayPause.setChecked(new_state)
 
