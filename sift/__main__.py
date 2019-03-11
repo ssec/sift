@@ -24,11 +24,11 @@ import asyncio
 import logging
 import os
 import sys
-from PyQt4 import QtGui, QtCore
 from collections import OrderedDict
 from functools import partial
 from glob import glob
 
+from PyQt4 import QtCore, QtGui
 from quamash import QEventLoop
 from vispy import app
 
@@ -62,9 +62,6 @@ app_object = app.use_app('pyqt4')
 APP: QtGui.QApplication = app_object.native
 LOOP = QEventLoop(APP)
 asyncio.set_event_loop(LOOP)  # NEW must set the event loop
-
-QtCore = app_object.backend_module.QtCore
-QtGui = app_object.backend_module.QtGui
 
 LOG = logging.getLogger(__name__)
 PROGRESS_BAR_MAX = 1000
