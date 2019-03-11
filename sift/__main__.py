@@ -27,6 +27,8 @@ import sys
 from collections import OrderedDict
 from functools import partial
 from glob import glob
+import typing as typ
+from uuid import UUID
 
 from PyQt4 import QtCore, QtGui
 from quamash import QEventLoop
@@ -153,12 +155,14 @@ class AnimationSpeedPopupWindow(QtGui.QWidget):
         self._layout.addWidget(self._slider)
         self.setLayout(self._layout)
 
-    def _convert(self, val, reverse=False):
-        """
-        map 1..100 nonlinearly to 10ms .. 5000ms
-        :param val: ticks to convert to milliseconds
-        :param reverse: when true, reverse conversion
-        :return:
+    def _convert(self, val: int, reverse: bool = False) -> float:
+        """Map 1..100 nonlinearly to 10ms .. 5000ms.
+
+        Args:
+            val: raw value to remap to milliseconds
+            reverse: when True, reverse conversion milliseconds to ticks
+
+        Returns: converted value
         """
         if reverse:  # convert milliseconds to fp10s
             fp10s = 10000.0 / float(val)
@@ -225,6 +229,7 @@ def _common_path_prefix(paths):
 
 class UserControlsAnimation(QtCore.QObject):
     """Controller behavior focused around animation bar and next/last key bindings.
+
     Connects between document, scene graph manager, layer list view of document; uses UI elements.
     Is composed into MainWindow.
     - scrub left and right on slider
@@ -449,11 +454,12 @@ class Main(QtGui.QMainWindow):
             uuid_list.append(progress['uuid'])
         yield {TASK_DOING: 'products loaded from paths', TASK_PROGRESS: 1.0}
 
-    def _bgnd_open_paths_finish(self, isok: bool, uuid_list):
-        """Main thread finalization after background imports are done
-        :param isok: whether _bgnd_open_paths ran without exception
-        :param uuid_list: list of UUIDs it generated
-        :return:
+    def _bgnd_open_paths_finish(self, isok: bool, uuid_list: typ.List[UUID]):
+        """Main thread finalization after background imports are done.
+
+        Args:
+            isok: whether _bgnd_open_paths ran without exception
+            uuid_list: list of UUIDs it generated
         """
         if not uuid_list:
             raise ValueError("no UUIDs provided by background open in _bgnd_open_paths_when_done")
