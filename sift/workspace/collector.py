@@ -26,7 +26,7 @@ import unittest
 from datetime import datetime
 from typing import List, Iterable, Mapping
 
-from PyQt4.QtCore import QObject
+from PyQt5.QtCore import QObject
 
 from sift.queue import TASK_DOING, TASK_PROGRESS
 from .workspace import Workspace

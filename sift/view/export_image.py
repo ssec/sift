@@ -1,6 +1,6 @@
 import logging
 import os
-from PyQt4 import QtCore, QtGui
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 import imageio
 import numpy
@@ -28,7 +28,7 @@ def get_imageio_format(fn):
     return imageio.formats.search_write_format(request)
 
 
-class ExportImageDialog(QtGui.QDialog):
+class ExportImageDialog(QtWidgets.QDialog):
     default_filename = 'sift_screenshot.png'
 
     def __init__(self, parent):
@@ -86,11 +86,11 @@ class ExportImageDialog(QtGui.QDialog):
             self.ui.footerFontSizeSpinBox.setDisabled(True)
 
     def _show_file_dialog(self):
-        fn = QtGui.QFileDialog.getSaveFileName(self,
+        fn = QtWidgets.QFileDialog.getSaveFileName(self,
                                                caption=self.tr('Screenshot Filename'),
                                                directory=os.path.join(self._last_dir, self.default_filename),
                                                filter=self.tr('Image Files (*.png *.jpg *.gif *.mp4 *.m4v)'),
-                                               options=QtGui.QFileDialog.DontConfirmOverwrite)
+                                               options=QtWidgets.QFileDialog.DontConfirmOverwrite)[0]
         if fn:
             self.ui.saveAsLineEdit.setText(fn)
         # bring this dialog back in focus
@@ -99,7 +99,7 @@ class ExportImageDialog(QtGui.QDialog):
 
     def _validate_filename(self):
         t = self.ui.saveAsLineEdit.text()
-        bt = self.ui.buttonBox.button(QtGui.QDialogButtonBox.Save)
+        bt = self.ui.buttonBox.button(QtWidgets.QDialogButtonBox.Save)
         if not t or os.path.splitext(t)[-1] not in ['.png', '.jpg', '.gif', '.mp4', '.m4v']:
             bt.setDisabled(True)
         else:
@@ -237,7 +237,7 @@ class ExportImageHelper(QtCore.QObject):
         return uuids, filenames
 
     def _overwrite_dialog(self):
-        msg = QtGui.QMessageBox(self.parent())
+        msg = QtWidgets.QMessageBox(self.parent())
         msg.setWindowTitle("Overwrite File(s)?")
         msg.setText("One or more files already exist.")
         msg.setInformativeText("Do you want to overwrite existing files?")

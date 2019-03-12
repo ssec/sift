@@ -2,18 +2,18 @@ import json
 import logging
 import math
 import os
-from PyQt4 import QtGui, QtCore
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 import pyqtgraph as pg
 
 LOG = logging.getLogger(__name__)
 
 
-class ColormapEditor(QtGui.QDialog):
+class ColormapEditor(QtWidgets.QDialog):
     def __init__(self, doc, parent=None, **kwargs):
         super(ColormapEditor, self).__init__(parent)
 
-        layout = QtGui.QGridLayout()
+        layout = QtWidgets.QGridLayout()
         layout.setSpacing(0)
         self.setLayout(layout)
         self.doc = doc
@@ -27,40 +27,40 @@ class ColormapEditor(QtGui.QDialog):
             self.ColorBar.removeTick(tick[0])
         self.ColorBar.setEnabled(False)
 
-        self.CloneButton = QtGui.QPushButton("Clone Colormap")
+        self.CloneButton = QtWidgets.QPushButton("Clone Colormap")
         self.CloneButton.clicked.connect(self.clone_colormap)
         self.CloneButton.setEnabled(False)
 
         # Create Import button
-        self.ImportButton = QtGui.QPushButton("Import Colormap")
+        self.ImportButton = QtWidgets.QPushButton("Import Colormap")
         self.ImportButton.clicked.connect(self.importButtonClick)
 
         # Create Colormap List and Related Functions
-        self.cmap_list = QtGui.QListWidget()
-        self.cmap_list.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
+        self.cmap_list = QtWidgets.QListWidget()
+        self.cmap_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.cmap_list.itemSelectionChanged.connect(self.update_color_bar)
 
         # Create SQRT Button and Related Functions
-        self.sqrt = QtGui.QCheckBox("SQRT")
+        self.sqrt = QtWidgets.QCheckBox("SQRT")
         self.sqrt.clicked.connect(self.sqrt_action)
         self.sqrt.setEnabled(False)
 
         # Create Close button
-        self.CloseButton = QtGui.QPushButton("Close")
+        self.CloseButton = QtWidgets.QPushButton("Close")
         self.CloseButton.clicked.connect(self.close)
 
         # Create Delete Button and Related Functions
-        self.DeleteButton = QtGui.QPushButton("Delete Colormap")
+        self.DeleteButton = QtWidgets.QPushButton("Delete Colormap")
         self.DeleteButton.clicked.connect(self.handle_delete_click)
         self.DeleteButton.setEnabled(False)
 
         # Create Export Button and Related Functions
-        self.ExportButton = QtGui.QPushButton("Export Colormap")
+        self.ExportButton = QtWidgets.QPushButton("Export Colormap")
         self.ExportButton.clicked.connect(self.exportButtonClick)
         self.ExportButton.setEnabled(False)
 
         # Create Save button
-        self.SaveButton = QtGui.QPushButton("Save Colormap")
+        self.SaveButton = QtWidgets.QPushButton("Save Colormap")
         self.SaveButton.clicked.connect(self.save_button_click)
         self.SaveButton.setEnabled(False)
 
@@ -93,19 +93,19 @@ class ColormapEditor(QtGui.QDialog):
 
     def clone_colormap(self):
         # Clone existing colormap
-        text, ok = QtGui.QInputDialog.getText(self, 'Clone Colormap', 'Enter colormap name:')
+        text, ok = QtWidgets.QInputDialog.getText(self, 'Clone Colormap', 'Enter colormap name:')
         protected_names = ['mode', 'ticks', 'step']
 
         if ok:
             save_name = str(text)
             if save_name in self.user_colormap_states or save_name in protected_names:
                 overwrite_msg = "There is already a save with this name. Would you like to Overwrite?"
-                reply = QtGui.QMessageBox.question(self, 'Message',
-                                                   overwrite_msg, QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
+                reply = QtWidgets.QMessageBox.question(self, 'Message',
+                                                   overwrite_msg, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
 
-                if reply == QtGui.QMessageBox.Yes:
+                if reply == QtWidgets.QMessageBox.Yes:
                     if save_name in self.builtin_colormap_states or save_name in protected_names:
-                        QtGui.QMessageBox.information(
+                        QtWidgets.QMessageBox.information(
                             self, "Error", "You cannot save a colormap with "
                                            "the same name as one of the "
                                            "internal colormaps or one of the "
@@ -117,7 +117,7 @@ class ColormapEditor(QtGui.QDialog):
                     self.user_colormap_states[save_name] = self.ColorBar.saveState()
             else:
                 if save_name in self.builtin_colormap_states:
-                    QtGui.QMessageBox.information(
+                    QtWidgets.QMessageBox.information(
                         self, "Error",
                         "You cannot save a colormap with the same name as one of the internal colormaps.")
                     return
@@ -198,7 +198,7 @@ class ColormapEditor(QtGui.QDialog):
                 corVal = total_count
 
         if to_show is not None:
-            self.cmap_list.setCurrentRow(corVal, QtGui.QItemSelectionModel.Select)
+            self.cmap_list.setCurrentRow(corVal, QtCore.QItemSelectionModel.Select)
 
     def update_color_bar(self):
         # Update the colorbar with the newly selected colormap
@@ -257,16 +257,16 @@ class ColormapEditor(QtGui.QDialog):
         block = self.toRemoveDelete()
         if block is True:
             # This shouldn't happen
-            QtGui.QMessageBox.information(self, "Error: Can not delete internal colormaps.")
+            QtWidgets.QMessageBox.information(self, "Error: Can not delete internal colormaps.")
             return
 
         selected_colormaps= self.cmap_list.selectedItems()
         to_print = ",".join([x.text() for x in selected_colormaps])
 
         delete_msg = "Please confirm you want to delete the colormap(s): " + to_print
-        reply = QtGui.QMessageBox.question(self, 'Message',
-                                           delete_msg, QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
-        if reply == QtGui.QMessageBox.Yes:
+        reply = QtWidgets.QMessageBox.question(self, 'Message',
+                                           delete_msg, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
+        if reply == QtWidgets.QMessageBox.Yes:
             for index in selected_colormaps:
                 del self.user_colormap_states[index.text()]
                 self.doc.remove_user_colormap(index.text())
@@ -274,9 +274,9 @@ class ColormapEditor(QtGui.QDialog):
 
     def importButtonClick(self):
         # Import colormap
-        fname = QtGui.QFileDialog.getOpenFileName(self, 'Get Colormap File',
+        fname = QtWidgets.QFileDialog.getOpenFileName(self, 'Get Colormap File',
                                                   os.path.expanduser('~'),
-                                                  "Colormaps (*.json)")
+                                                  "Colormaps (*.json)")[0]
         self._import_single_file(fname)
 
     def _import_single_file(self, filename):
@@ -316,7 +316,7 @@ class ColormapEditor(QtGui.QDialog):
     def exportButtonClick(self):
         # Export colormap(s)
         selected_colormaps = self.cmap_list.selectedItems()
-        fname = QtGui.QFileDialog.getSaveFileName(None, 'Save As', 'Export.json')
+        fname = QtWidgets.QFileDialog.getSaveFileName(None, 'Save As', 'Export.json')[0]
         toExport = set()
         for index in selected_colormaps:
             toExport.add(index.text())
@@ -339,7 +339,7 @@ class ColormapEditor(QtGui.QDialog):
 
 
 def main():
-    app = QtGui.QApplication([])
+    app = QtWidgets.QApplication([])
     w = ColormapEditor()
     w.show()
     app.exec_()

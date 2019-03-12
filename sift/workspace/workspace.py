@@ -49,7 +49,7 @@ from uuid import UUID, uuid1 as uuidgen
 
 import numba as nb
 import numpy as np
-from PyQt4.QtCore import QObject, pyqtSignal
+from PyQt5.QtCore import QObject, pyqtSignal
 from pyproj import Proj
 from rasterio import Affine
 from shapely.geometry.polygon import LinearRing

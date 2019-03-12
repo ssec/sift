@@ -12,8 +12,8 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Tuple, Optional, NamedTuple, Any
 
-from PyQt4.QtCore import QObject, QRectF, QByteArray, QPointF
-from PyQt4.QtGui import QGraphicsSceneDragDropEvent
+from PyQt5.QtCore import QObject, QRectF, QByteArray, QPointF
+from PyQt5.QtWidgets import QGraphicsSceneDragDropEvent
 
 LOG = logging.getLogger(__name__)
 

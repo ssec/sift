@@ -13,10 +13,10 @@ __author__ = 'evas'
 __docformat__ = 'reStructuredText'
 
 import logging
-from PyQt4 import QtCore, QtGui
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 import numpy as np
-from PyQt4.QtCore import QObject, pyqtSignal
+from PyQt5.QtCore import QObject, pyqtSignal
 # http://stackoverflow.com/questions/12459811/how-to-embed-matplotib-in-pyqt-for-dummies
 # see also: http://matplotlib.org/users/navigation_toolbar.html
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
@@ -125,9 +125,7 @@ class ProbeGraphManager(QObject):
         self.set_up_tab(self.selected_graph_index, do_increment_tab_letter=False)
 
         # hook things up so we know when the selected tab changes
-        self.tab_widget_object.connect(self.tab_widget_object,
-                                       QtCore.SIGNAL('currentChanged(int)'),
-                                       self.handle_tab_change)
+        self.tab_widget_object.currentChanged[int].connect(self.handle_tab_change)
         self.drawChildGraph.connect(self.draw_child)
 
         # hook up the various document signals that would mean we need to reload things
@@ -153,7 +151,7 @@ class ProbeGraphManager(QObject):
             self.max_tab_letter = chr(ord(self.max_tab_letter) + 1)  # this will get strange after Z!
 
         # create our tab
-        temp_widget = QtGui.QWidget()
+        temp_widget = QtWidgets.QWidget()
         self.tab_widget_object.insertTab(tab_index, temp_widget, self.max_tab_letter)
 
         # create the associated graph display object
@@ -358,27 +356,27 @@ class ProbeGraphDisplay(object):
         # create our selection controls
 
         # the label for the x selection
-        xLabel = QtGui.QLabel("X layer:")
+        xLabel = QtWidgets.QLabel("X layer:")
 
         # the check box that turns on and off comparing to a y layer
-        self.yCheckBox = QtGui.QCheckBox("vs Y layer:")
+        self.yCheckBox = QtWidgets.QCheckBox("vs Y layer:")
         self.yCheckBox.setToolTip("Plot X layer data vs Y layer when this is checked.")
         self.yCheckBox.stateChanged.connect(self.vsChecked)
 
         # the drop down for selecting the x layer
-        self.xDropDown = QtGui.QComboBox(qt_parent)
+        self.xDropDown = QtWidgets.QComboBox(qt_parent)
         self.xDropDown.setToolTip("The X layer data to use for plotting.")
         self.xDropDown.activated.connect(self.xSelected)
 
         # the drop down for selecting the y layer
-        self.yDropDown = QtGui.QComboBox(qt_parent)
+        self.yDropDown = QtWidgets.QComboBox(qt_parent)
         self.yDropDown.setDisabled(True)
         self.yDropDown.setToolTip("The Y layer data to use for plotting.")
         self.yDropDown.activated.connect(self.ySelected)
 
         # set the layout
         # Note: add in a grid is (widget, row#, col#) or (widget, row#, col#, row_span, col_span)
-        layout = QtGui.QGridLayout()
+        layout = QtWidgets.QGridLayout()
         layout.addWidget(self.toolbar, 1, 1, 1, 3)
         layout.addWidget(self.canvas, 2, 1, 1, 3)
         layout.addWidget(xLabel, 3, 1)

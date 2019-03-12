@@ -16,7 +16,7 @@
 # along with SIFT.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
-from PyQt4 import QtGui, QtCore
+from PyQt5 import QtCore, QtGui, QtWidgets
 from collections import OrderedDict
 
 from satpy import Scene, DatasetID
@@ -32,7 +32,7 @@ BY_PARAMETER_TAB = 0
 BY_ID_TAB = 1
 
 
-class OpenFileWizard(QtGui.QWizard):
+class OpenFileWizard(QtWidgets.QWizard):
     AVAILABLE_READERS = []
 
     def __init__(self, base_dir=None, parent=None):
@@ -155,12 +155,12 @@ class OpenFileWizard(QtGui.QWizard):
             pretty_level = "{:d} hPa".format(ds_id.level) if ds_id.level is not None else 'NA'
             properties['level'].add((ds_id.level, pretty_level))
 
-            item = QtGui.QTableWidgetItem(pretty_name)
+            item = QtWidgets.QTableWidgetItem(pretty_name)
             item.setData(QtCore.Qt.UserRole, ds_id.name)
             item.setFlags((item.flags() ^ QtCore.Qt.ItemIsEditable) | QtCore.Qt.ItemIsUserCheckable)
             item.setCheckState(QtCore.Qt.Unchecked)
             self.ui.selectIDTable.setItem(idx, 0, item)
-            item = QtGui.QTableWidgetItem(pretty_level)
+            item = QtWidgets.QTableWidgetItem(pretty_level)
             item.setData(QtCore.Qt.UserRole, ds_id.level)
             item.setFlags((item.flags() ^ QtCore.Qt.ItemIsEditable) | QtCore.Qt.ItemIsUserCheckable)
             self.ui.selectIDTable.setItem(idx, 1, item)
@@ -168,14 +168,14 @@ class OpenFileWizard(QtGui.QWizard):
         # Update the per-property lists
         names = sorted(properties['name'])
         for name, pretty_name in names:
-            item = QtGui.QListWidgetItem(pretty_name)
+            item = QtWidgets.QListWidgetItem(pretty_name)
             item.setData(QtCore.Qt.UserRole, name)
             item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable)
             item.setCheckState(QtCore.Qt.Unchecked)
             self.ui.selectByNameList.addItem(item)
         levels = sorted(properties['level'])
         for level, pretty_level in levels:
-            item = QtGui.QListWidgetItem(pretty_level)
+            item = QtWidgets.QListWidgetItem(pretty_level)
             item.setData(QtCore.Qt.UserRole, level)
             item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable)
             item.setCheckState(QtCore.Qt.Unchecked)
@@ -285,17 +285,17 @@ class OpenFileWizard(QtGui.QWizard):
         if os.getenv("SIFT_ALLOW_ALL_READERS", ""):
             filename_filters = ['All files (*.*)'] + filename_filters
         filter_str = ';;'.join(filename_filters)
-        files = QtGui.QFileDialog.getOpenFileNames(self,
+        files = QtWidgets.QFileDialog.getOpenFileNames(self,
                                                    "Select one or more files to open",
                                                    self._last_open_dir or os.getenv("HOME"),
-                                                   filter_str)
+                                                   filter_str)[0]
         if not files:
             return
         self._last_open_dir = os.path.dirname(files[0])
         for fn in files:
             if fn in self._filenames:
                 continue
-            item = QtGui.QListWidgetItem(fn, self.ui.fileList)
+            item = QtWidgets.QListWidgetItem(fn, self.ui.fileList)
             item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable)
             item.setCheckState(QtCore.Qt.Checked)
             self.ui.fileList.addItem(item)

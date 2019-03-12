@@ -13,7 +13,7 @@ source:
 build:
   # If this is a new build for the same version, increment the build
   # number. If you do not include this key, it defaults to 0.
-  number: 1
+  number: 0
   script: python -m pip install --no-deps --ignore-installed .
 
 requirements:
@@ -21,10 +21,10 @@ requirements:
     - python {{PY_VER}}*,>=3.6
     - setuptools
     - pip
-    - cython >=0.17 # [win]
-    # this is only needed because of a weird bug with netcdf4
-    # https://github.com/conda-forge/netcdf4-feedstock/issues/33
-    - cython >=0.19 # [unix]
+#    - cython >=0.17 # [win]
+#    # this is only needed because of a weird bug with netcdf4
+#    # https://github.com/conda-forge/netcdf4-feedstock/issues/33
+#    - cython >=0.19 # [unix]
 
   run:
     - python >=3.6
@@ -37,7 +37,7 @@ requirements:
     - scipy
     - numba >=0.30
     - pyproj >=1.9.4
-    - vispy >=0.6.0.dev0
+    - vispy >=0.6.0.dev1
     - goesr >=0.4.2 # via Ray Garcia, on sift channel
     - pyopengl
     - netcdf4
@@ -50,7 +50,7 @@ requirements:
     - pyqtgraph
     - shapely
     - sqlalchemy
-    - pyqt <5
+    - pyqt >=5
     - appdirs
     - pyyaml
     - quamash
@@ -61,7 +61,7 @@ test:
   commands:
     - python -m sift -h
     - python -c "from rasterio import Affine"
-    - python -c "from PyQt4 import QtGui, QtCore"
+    - python -c "from PyQt5 import QtGui, QtCore, QWidgets"
     - python -c "from netCDF4 import Dataset"
     - python -c "import h5py"
 
