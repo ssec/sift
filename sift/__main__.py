@@ -322,8 +322,8 @@ class UserControlsAnimation(QtCore.QObject):
 
     def update_frame_time_to_top_visible(self, *args):
         """Update frame slider's time display to show the current top layer's time."""
-        # FUTURE: don't address layer set directly
-        self.ui.animationLabel.setText(self.document.time_label_for_uuid(self.scene_manager.layer_set.top_layer_uuid()))
+        self.ui.animationLabel.setText(self.document.time_label_for_uuid(self.document.current_visible_layer_uuid))
+        # self.ui.animationLabel.setText(self.document.time_label_for_uuid(self.scene_manager.layer_set.top_layer_uuid()))
 
     def animation_slider_jump_frame(self, event, *args, **kwargs):
         """Update display to match frame slider change."""
