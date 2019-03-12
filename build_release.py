@@ -185,7 +185,7 @@ def main():
                         help="Don't upload conda package to local channel server")
     parser.add_argument('--no-conda-index', dest='index_conda', action='store_false',
                         help="Don't update remote conda index")
-    parser.add_argument('--python', default="3.6",
+    parser.add_argument('--python', default="3.7",
                         help="Specify what version of python to build the conda package for (see conda-build "
                              "documentation.)")
     parser.add_argument('--no-installer', dest='build_installer', action='store_false',
