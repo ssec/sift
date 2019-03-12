@@ -12,7 +12,7 @@ import logging
 from typing import Tuple, Optional, Mapping, List, Any, Callable, Set, Iterable
 from uuid import UUID
 
-from PyQt4.QtGui import QMenu
+from PyQt5.QtWidgets import QMenu
 
 from sift.common import Span, State, Flags
 from sift.model.document import Document, DocumentAsTrackStack, FrameInfo, TrackInfo

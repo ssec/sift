@@ -6,57 +6,51 @@
 #
 # WARNING! All changes made in this file will be lost!
 
-from PyQt4 import QtCore, QtGui
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 try:
-    _fromUtf8 = QtCore.QString.fromUtf8
-except AttributeError:
-    def _fromUtf8(s):
-        return s
-
-try:
-    _encoding = QtGui.QApplication.UnicodeUTF8
+    _encoding = QtWidgets.QApplication.UnicodeUTF8
 
 
     def _translate(context, text, disambig):
-        return QtGui.QApplication.translate(context, text, disambig, _encoding)
+        return QtCore.QCoreApplication.translate(context, text, disambig, _encoding)
 except AttributeError:
     def _translate(context, text, disambig):
-        return QtGui.QApplication.translate(context, text, disambig)
+        return QtCore.QCoreApplication.translate(context, text, disambig)
 
 
 class Ui_changeColormapDialog(object):
     def setupUi(self, changeColormapDialog):
-        changeColormapDialog.setObjectName(_fromUtf8("changeColormapDialog"))
+        changeColormapDialog.setObjectName("changeColormapDialog")
         changeColormapDialog.resize(351, 199)
-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(changeColormapDialog.sizePolicy().hasHeightForWidth())
         changeColormapDialog.setSizePolicy(sizePolicy)
-        self.buttons = QtGui.QDialogButtonBox(changeColormapDialog)
+        self.buttons = QtWidgets.QDialogButtonBox(changeColormapDialog)
         self.buttons.setGeometry(QtCore.QRect(20, 160, 321, 32))
         self.buttons.setOrientation(QtCore.Qt.Horizontal)
-        self.buttons.setStandardButtons(QtGui.QDialogButtonBox.Close | QtGui.QDialogButtonBox.Reset)
+        self.buttons.setStandardButtons(QtWidgets.QDialogButtonBox.Close | QtWidgets.QDialogButtonBox.Reset)
         self.buttons.setCenterButtons(False)
-        self.buttons.setObjectName(_fromUtf8("buttons"))
-        self.cmap_combobox = QtGui.QComboBox(changeColormapDialog)
+        self.buttons.setObjectName("buttons")
+        self.cmap_combobox = QtWidgets.QComboBox(changeColormapDialog)
         self.cmap_combobox.setGeometry(QtCore.QRect(10, 10, 331, 26))
-        self.cmap_combobox.setObjectName(_fromUtf8("cmap_combobox"))
-        self.vmin_edit = QtGui.QLineEdit(changeColormapDialog)
+        self.cmap_combobox.setObjectName("cmap_combobox")
+        self.vmin_edit = QtWidgets.QLineEdit(changeColormapDialog)
         self.vmin_edit.setGeometry(QtCore.QRect(260, 50, 71, 21))
-        self.vmin_edit.setObjectName(_fromUtf8("vmin_edit"))
-        self.vmin_slider = QtGui.QSlider(changeColormapDialog)
+        self.vmin_edit.setObjectName("vmin_edit")
+        self.vmin_slider = QtWidgets.QSlider(changeColormapDialog)
         self.vmin_slider.setGeometry(QtCore.QRect(10, 50, 241, 21))
         self.vmin_slider.setOrientation(QtCore.Qt.Horizontal)
-        self.vmin_slider.setObjectName(_fromUtf8("vmin_slider"))
-        self.vmax_slider = QtGui.QSlider(changeColormapDialog)
+        self.vmin_slider.setObjectName("vmin_slider")
+        self.vmax_slider = QtWidgets.QSlider(changeColormapDialog)
         self.vmax_slider.setGeometry(QtCore.QRect(10, 90, 241, 21))
         self.vmax_slider.setOrientation(QtCore.Qt.Horizontal)
-        self.vmax_slider.setObjectName(_fromUtf8("vmax_slider"))
-        self.vmax_edit = QtGui.QLineEdit(changeColormapDialog)
+        self.vmax_slider.setObjectName("vmax_slider")
+        self.vmax_edit = QtWidgets.QLineEdit(changeColormapDialog)
         self.vmax_edit.setGeometry(QtCore.QRect(260, 90, 71, 21))
-        self.vmax_edit.setObjectName(_fromUtf8("vmax_edit"))
+        self.vmax_edit.setObjectName("vmax_edit")
         self.gammaSpinBox = QNoScrollDoubleSpinBox(changeColormapDialog)
         self.gammaSpinBox.setEnabled(True)
         self.gammaSpinBox.setGeometry(QtCore.QRect(260, 120, 71, 24))
@@ -64,15 +58,15 @@ class Ui_changeColormapDialog(object):
         self.gammaSpinBox.setMaximum(5.0)
         self.gammaSpinBox.setSingleStep(0.1)
         self.gammaSpinBox.setProperty("value", 1.0)
-        self.gammaSpinBox.setObjectName(_fromUtf8("gammaSpinBox"))
-        self.gammaLabel = QtGui.QLabel(changeColormapDialog)
+        self.gammaSpinBox.setObjectName("gammaSpinBox")
+        self.gammaLabel = QtWidgets.QLabel(changeColormapDialog)
         self.gammaLabel.setGeometry(QtCore.QRect(200, 120, 56, 24))
         self.gammaLabel.setAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-        self.gammaLabel.setObjectName(_fromUtf8("gammaLabel"))
+        self.gammaLabel.setObjectName("gammaLabel")
 
         self.retranslateUi(changeColormapDialog)
-        QtCore.QObject.connect(self.buttons, QtCore.SIGNAL(_fromUtf8("accepted()")), changeColormapDialog.accept)
-        QtCore.QObject.connect(self.buttons, QtCore.SIGNAL(_fromUtf8("rejected()")), changeColormapDialog.reject)
+        self.buttons.accepted.connect(changeColormapDialog.accept)
+        self.buttons.rejected.connect(changeColormapDialog.reject)
         QtCore.QMetaObject.connectSlotsByName(changeColormapDialog)
 
     def retranslateUi(self, changeColormapDialog):

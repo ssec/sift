@@ -6,8 +6,9 @@ import logging
 from functools import partial
 from typing import List, Tuple, Optional, Mapping
 
-from PyQt4.QtCore import QObject, pyqtSignal
-from PyQt4.QtGui import QDoubleValidator, QComboBox, QLineEdit
+from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt5.QtGui import QDoubleValidator
+from PyQt5.QtWidgets import QComboBox, QLineEdit
 
 from sift.common import Info, Kind
 

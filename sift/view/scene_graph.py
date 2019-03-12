@@ -29,8 +29,8 @@ import os
 from uuid import UUID
 
 import numpy as np
-from PyQt4.QtCore import QObject, pyqtSignal, Qt
-from PyQt4.QtGui import QCursor
+from PyQt5.QtCore import QObject, pyqtSignal, Qt
+from PyQt5.QtGui import QCursor
 from vispy import app
 from vispy import scene
 from vispy.geometry import Rect

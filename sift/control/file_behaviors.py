@@ -25,7 +25,7 @@ import logging
 import sys
 import unittest
 
-from PyQt4.QtCore import QObject
+from PyQt5.QtCore import QObject
 
 # from PyQt4.QtGui import QAction
 
