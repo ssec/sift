@@ -806,8 +806,8 @@ class Main(QtWidgets.QMainWindow):
         timer.start(60000)
 
         # set up timeline
-        LOG.info("potential tracks already in database: {}".format(repr(doc.potential_tracks())))
-        self._init_timeline(doc, self.workspace)
+        # LOG.info("potential tracks already in database: {}".format(repr(doc.potential_tracks())))
+        # self._init_timeline(doc, self.workspace)
 
         # FIXME: make sure sync of metadata signals sync of document potentials and track display
 
