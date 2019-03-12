@@ -36,11 +36,11 @@ import logging
 import pickle as pkl
 import sys
 
-from PyQt4.QtCore import QAbstractItemModel, Qt, QSize, QModelIndex, QPoint, QMimeData, pyqtSignal, QRect
-from PyQt4.QtGui import (QTreeView, QStyledItemDelegate, QAbstractItemView,
-                         QMenu, QStyle, QColor, QFont, QStyleOptionViewItem,
-                         QItemSelection, QItemSelectionModel, QPen,
-                         QActionGroup, QAction)
+from PyQt5.QtCore import (QAbstractItemModel, Qt, QSize, QModelIndex, QPoint, QMimeData,
+                          pyqtSignal, QRect, QItemSelection, QItemSelectionModel)
+from PyQt5.QtGui import QColor, QFont, QPen
+from PyQt5.QtWidgets import (QTreeView, QStyledItemDelegate, QAbstractItemView,
+                             QMenu, QStyle, QStyleOptionViewItem, QActionGroup, QAction)
 
 from sift.common import Info, Kind, get_font_size
 from sift.model.document import Document

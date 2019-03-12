@@ -2,18 +2,18 @@ import json
 import logging
 import math
 import os
-from PyQt4 import QtGui, QtCore
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 import pyqtgraph as pg
 
 LOG = logging.getLogger(__name__)
 
 
-class ColormapEditor(QtGui.QDialog):
+class ColormapEditor(QtWidgets.QDialog):
     def __init__(self, doc, parent=None, **kwargs):
         super(ColormapEditor, self).__init__(parent)
 
-        layout = QtGui.QGridLayout()
+        layout = QtWidgets.QGridLayout()
         layout.setSpacing(0)
         self.setLayout(layout)
         self.doc = doc
@@ -27,41 +27,41 @@ class ColormapEditor(QtGui.QDialog):
             self.ColorBar.removeTick(tick[0])
         self.ColorBar.setEnabled(False)
 
-        self.CloneButton = QtGui.QPushButton("Clone Gradient")
-        self.CloneButton.clicked.connect(self.cloneGradient)
+        self.CloneButton = QtWidgets.QPushButton("Clone Colormap")
+        self.CloneButton.clicked.connect(self.clone_colormap)
         self.CloneButton.setEnabled(False)
 
         # Create Import button
-        self.ImportButton = QtGui.QPushButton("Import Gradient")
+        self.ImportButton = QtWidgets.QPushButton("Import Colormap")
         self.ImportButton.clicked.connect(self.importButtonClick)
 
-        # Create Gradient List and Related Functions
-        self.cmap_list = QtGui.QListWidget()
-        self.cmap_list.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
-        self.cmap_list.itemSelectionChanged.connect(self.updateColorBar)
+        # Create Colormap List and Related Functions
+        self.cmap_list = QtWidgets.QListWidget()
+        self.cmap_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        self.cmap_list.itemSelectionChanged.connect(self.update_color_bar)
 
         # Create SQRT Button and Related Functions
-        self.sqrt = QtGui.QCheckBox("SQRT")
-        self.sqrt.clicked.connect(self.sqrtAction)
+        self.sqrt = QtWidgets.QCheckBox("SQRT")
+        self.sqrt.clicked.connect(self.sqrt_action)
         self.sqrt.setEnabled(False)
 
         # Create Close button
-        self.CloseButton = QtGui.QPushButton("Close")
+        self.CloseButton = QtWidgets.QPushButton("Close")
         self.CloseButton.clicked.connect(self.close)
 
         # Create Delete Button and Related Functions
-        self.DeleteButton = QtGui.QPushButton("Delete Gradient")
+        self.DeleteButton = QtWidgets.QPushButton("Delete Colormap")
         self.DeleteButton.clicked.connect(self.handle_delete_click)
         self.DeleteButton.setEnabled(False)
 
         # Create Export Button and Related Functions
-        self.ExportButton = QtGui.QPushButton("Export Gradient")
+        self.ExportButton = QtWidgets.QPushButton("Export Colormap")
         self.ExportButton.clicked.connect(self.exportButtonClick)
         self.ExportButton.setEnabled(False)
 
         # Create Save button
-        self.SaveButton = QtGui.QPushButton("Save Gradient")
-        self.SaveButton.clicked.connect(self.saveButtonClick)
+        self.SaveButton = QtWidgets.QPushButton("Save Colormap")
+        self.SaveButton.clicked.connect(self.save_button_click)
         self.SaveButton.setEnabled(False)
 
         # Add widgets to their respective spots in the UI grid
@@ -82,33 +82,33 @@ class ColormapEditor(QtGui.QDialog):
             cmap_obj = cmap_manager[cmap]
             if cmap_obj.colors and hasattr(cmap_obj, "_controls"):
                 is_sqrt = getattr(cmap_obj, 'sqrt', False)
-                self.importGradients(cmap, cmap_obj._controls, cmap_obj.colors._rgba, sqrt=is_sqrt, editable=editable)
+                self.import_colormaps(cmap, cmap_obj._controls, cmap_obj.colors._rgba, sqrt=is_sqrt, editable=editable)
 
-    def saveButtonClick(self):
-        # Save Custom Gradient
+    def save_button_click(self):
+        # save custom colormap
         name = self.cmap_list.item(self.cmap_list.currentRow()).text()
         self.user_colormap_states[name] = self.ColorBar.saveState()
         self.user_colormap_states[name]["sqrt"] = self.sqrt.isChecked()
-        self.saveNewMap(self.user_colormap_states[name], name)
+        self.save_new_map(self.user_colormap_states[name], name)
 
-    def cloneGradient(self):
-        # Clone existing gradient
-        text, ok = QtGui.QInputDialog.getText(self, 'Clone Gradient', 'Enter gradient name:')
+    def clone_colormap(self):
+        # Clone existing colormap
+        text, ok = QtWidgets.QInputDialog.getText(self, 'Clone Colormap', 'Enter colormap name:')
         protected_names = ['mode', 'ticks', 'step']
 
         if ok:
             save_name = str(text)
             if save_name in self.user_colormap_states or save_name in protected_names:
                 overwrite_msg = "There is already a save with this name. Would you like to Overwrite?"
-                reply = QtGui.QMessageBox.question(self, 'Message',
-                                                   overwrite_msg, QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
+                reply = QtWidgets.QMessageBox.question(self, 'Message',
+                                                   overwrite_msg, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
 
-                if reply == QtGui.QMessageBox.Yes:
+                if reply == QtWidgets.QMessageBox.Yes:
                     if save_name in self.builtin_colormap_states or save_name in protected_names:
-                        QtGui.QMessageBox.information(
-                            self, "Error", "You cannot save a gradient with "
+                        QtWidgets.QMessageBox.information(
+                            self, "Error", "You cannot save a colormap with "
                                            "the same name as one of the "
-                                           "internal gradients or one of the "
+                                           "internal colormaps or one of the "
                                            "protected names ('mode', "
                                            "'ticks', 'step').")
                         reply.close()
@@ -117,17 +117,17 @@ class ColormapEditor(QtGui.QDialog):
                     self.user_colormap_states[save_name] = self.ColorBar.saveState()
             else:
                 if save_name in self.builtin_colormap_states:
-                    QtGui.QMessageBox.information(
+                    QtWidgets.QMessageBox.information(
                         self, "Error",
-                        "You cannot save a gradient with the same name as one of the internal gradients.")
+                        "You cannot save a colormap with the same name as one of the internal colormaps.")
                     return
 
                 self.user_colormap_states[save_name] = self.ColorBar.saveState()
             self.updateListWidget(save_name)
-            self.saveNewMap(self.user_colormap_states[save_name], save_name)
+            self.save_new_map(self.user_colormap_states[save_name], save_name)
 
     def toRemoveDelete(self):
-        # Determine if an internal gradient is selected, returns boolean
+        # Determine if an internal colormap is selected, returns boolean
         toReturn = False
 
         ListCount = self.cmap_list.count()
@@ -141,12 +141,12 @@ class ColormapEditor(QtGui.QDialog):
 
         return toReturn
 
-    def saveNewMap(self, new_cmap, name):
-        # Call document function with new gradient
+    def save_new_map(self, new_cmap, name):
+        # Call document function with new colormap
         self.doc.update_user_colormap(new_cmap, name)
 
-    def importGradients(self, name, controls, colors, sqrt=False, editable=False):
-        # Import a gradient into either the internal or custom gradient lists
+    def import_colormaps(self, name, controls, colors, sqrt=False, editable=False):
+        # Import a colormap into either the internal or custom colormap lists
         try:
             # FIXME: GradientWidget can accept 'allowAdd' flag for whether or
             #        not a widget is editable
@@ -172,8 +172,8 @@ class ColormapEditor(QtGui.QDialog):
         except AssertionError as e:
             LOG.error(e)
 
-    # Update list widget with new gradient list
     def updateListWidget(self, to_show=None):
+        # Update list widget with new colormap list
         self.cmap_list.clear()
 
         total_count = 0
@@ -198,10 +198,10 @@ class ColormapEditor(QtGui.QDialog):
                 corVal = total_count
 
         if to_show is not None:
-            self.cmap_list.setCurrentRow(corVal, QtGui.QItemSelectionModel.Select)
+            self.cmap_list.setCurrentRow(corVal, QtCore.QItemSelectionModel.Select)
 
-    # Update the colorbar with the newly selected gradient
-    def updateColorBar(self):
+    def update_color_bar(self):
+        # Update the colorbar with the newly selected colormap
         # FIXME: isn't this redundant?
         self.sqrt.setCheckState(False)
 
@@ -241,7 +241,7 @@ class ColormapEditor(QtGui.QDialog):
 
         self.DeleteButton.setEnabled(showDel)
 
-    def sqrtAction(self):
+    def sqrt_action(self):
         # If square root button is checked/unchecked, modify the ticks as such
         if self.sqrt.isChecked():
             tickList = self.ColorBar.listTicks()
@@ -253,30 +253,30 @@ class ColormapEditor(QtGui.QDialog):
                 self.ColorBar.setTickValue(tick[0], self.ColorBar.tickValue(tick[0]) * self.ColorBar.tickValue(tick[0]))
 
     def handle_delete_click(self):
-        # Delete gradient(s)
+        # Delete colormap(s)
         block = self.toRemoveDelete()
         if block is True:
             # This shouldn't happen
-            QtGui.QMessageBox.information(self, "Error: Can not delete internal gradients.")
+            QtWidgets.QMessageBox.information(self, "Error: Can not delete internal colormaps.")
             return
 
-        selectedGradients = self.cmap_list.selectedItems()
-        toPrint = ",".join([x.text() for x in selectedGradients])
+        selected_colormaps= self.cmap_list.selectedItems()
+        to_print = ",".join([x.text() for x in selected_colormaps])
 
-        delete_msg = "Please confirm you want to delete the Gradient(s): " + toPrint
-        reply = QtGui.QMessageBox.question(self, 'Message',
-                                           delete_msg, QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
-        if reply == QtGui.QMessageBox.Yes:
-            for index in selectedGradients:
+        delete_msg = "Please confirm you want to delete the colormap(s): " + to_print
+        reply = QtWidgets.QMessageBox.question(self, 'Message',
+                                           delete_msg, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
+        if reply == QtWidgets.QMessageBox.Yes:
+            for index in selected_colormaps:
                 del self.user_colormap_states[index.text()]
                 self.doc.remove_user_colormap(index.text())
             self.updateListWidget()
 
     def importButtonClick(self):
-        # Import gradient
-        fname = QtGui.QFileDialog.getOpenFileName(self, 'Get Colormap File',
+        # Import colormap
+        fname = QtWidgets.QFileDialog.getOpenFileName(self, 'Get Colormap File',
                                                   os.path.expanduser('~'),
-                                                  "Colormaps (*.json)")
+                                                  "Colormaps (*.json)")[0]
         self._import_single_file(fname)
 
     def _import_single_file(self, filename):
@@ -298,7 +298,7 @@ class ColormapEditor(QtGui.QDialog):
                     QtGui.QMessageBox.information(
                         self, "Error", "You cannot import a colormap with "
                                        "the same name as one of the internal "
-                                       "gradients: {}".format(cmap_name))
+                                       "colormaps: {}".format(cmap_name))
                     return
 
             for cmap_name, cmap_info in cmap_content.items():
@@ -306,7 +306,7 @@ class ColormapEditor(QtGui.QDialog):
                     LOG.info("Overwriting colormap '{}'".format(cmap_name))
                 else:
                     LOG.info("Importing new colormap '{}'".format(cmap_name))
-                self.saveNewMap(cmap_info, cmap_name)
+                self.save_new_map(cmap_info, cmap_name)
             self.user_colormap_states.update(cmap_content)
             self.updateListWidget(cmap_name)
         except IOError:
@@ -314,11 +314,11 @@ class ColormapEditor(QtGui.QDialog):
                       "{}".format(filename), exc_info=True)
 
     def exportButtonClick(self):
-        # Export gradient(s)
-        selectedGradients = self.cmap_list.selectedItems()
-        fname = QtGui.QFileDialog.getSaveFileName(None, 'Save As', 'Export.json')
+        # Export colormap(s)
+        selected_colormaps = self.cmap_list.selectedItems()
+        fname = QtWidgets.QFileDialog.getSaveFileName(None, 'Save As', 'Export.json')[0]
         toExport = set()
-        for index in selectedGradients:
+        for index in selected_colormaps:
             toExport.add(index.text())
         done = {}
 
@@ -339,7 +339,7 @@ class ColormapEditor(QtGui.QDialog):
 
 
 def main():
-    app = QtGui.QApplication([])
+    app = QtWidgets.QApplication([])
     w = ColormapEditor()
     w.show()
     app.exec_()

@@ -1,5 +1,5 @@
 import logging
-from PyQt4 import QtGui, QtCore
+from PyQt5 import QtCore, QtGui, QtWidgets
 from functools import partial
 from uuid import UUID
 
@@ -9,7 +9,7 @@ from sift.ui.change_colormap_dialog_ui import Ui_changeColormapDialog
 LOG = logging.getLogger(__name__)
 
 
-class ChangeColormapDialog(QtGui.QDialog):
+class ChangeColormapDialog(QtWidgets.QDialog):
     userDidChangeColorLimits = QtCore.pyqtSignal(UUID, tuple)  # layer being changed, char from 'rgba', new-min, new-max
 
     def __init__(self, doc, uuid, parent=None):
@@ -42,9 +42,9 @@ class ChangeColormapDialog(QtGui.QDialog):
         self.ui.gammaSpinBox.setValue(self._initial_gamma)
 
         self.ui.buttons.clicked.connect(self._clicked)
-        close_button = self.ui.buttons.button(QtGui.QDialogButtonBox.Close)
+        close_button = self.ui.buttons.button(QtWidgets.QDialogButtonBox.Close)
         close_button.setAutoDefault(True)
-        reset_button = self.ui.buttons.button(QtGui.QDialogButtonBox.Reset)
+        reset_button = self.ui.buttons.button(QtWidgets.QDialogButtonBox.Reset)
         reset_button.setAutoDefault(False)
         self.ui.buttons.accepted.disconnect()
         self.ui.buttons.rejected.disconnect()

@@ -18,10 +18,12 @@ from datetime import datetime, timedelta
 from typing import Tuple, Optional, Mapping, List, Callable, Set, Iterable, Sequence, Any
 from uuid import UUID
 
-from PyQt4.QtCore import QRectF, Qt, pyqtSignal
-from PyQt4.QtGui import QGraphicsScene, QPen, QBrush, QPainter, QGraphicsView, QMenu, QMainWindow, QStatusBar, \
-    QApplication, QGraphicsItem
-from PyQt4.QtOpenGL import QGLFormat, QGL, QGLWidget
+from PyQt5.QtCore import QRectF, Qt, pyqtSignal
+from PyQt5.QtGui import QPen, QBrush, QPainter
+from PyQt5.QtWidgets import (QGraphicsScene, QGraphicsView,
+                             QMenu, QMainWindow, QStatusBar, QApplication,
+                             QGraphicsItem)
+from PyQt5.QtOpenGL import QGLFormat, QGL, QGLWidget
 
 from sift.common import Flags, Span
 from .common import VisualState, CoordTransform

@@ -1,8 +1,8 @@
 {% set name = "Quamash" %}
-{% set version = "0.6.0" %}
+{% set version = "0.6.1" %}
 {% set file_ext = "tar.gz" %}
 {% set hash_type = "sha256" %}
-{% set hash_value = "59fc4267194446b225eebd1d1b5f1b0ca5f57e461b9aecd63d6faf08ebab7c07" %}
+{% set hash_value = "6a31a6c9be7c20591e65a082b87566c82ccdfee4a7a11714655bd41b98f61b5c" %}
 
 package:
   name: '{{ name|lower }}'

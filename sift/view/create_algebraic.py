@@ -1,5 +1,5 @@
 import ast
-from PyQt4 import QtGui, QtCore
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 from sift.common import Kind, Info
 from sift.ui.create_algebraic_dialog_ui import Ui_create_algebraic_dialog
@@ -13,9 +13,9 @@ PRESET_OPERATIONS = {
 }
 
 
-class CreateAlgebraicDialog(QtGui.QDialog):
+class CreateAlgebraicDialog(QtWidgets.QDialog):
     def __init__(self, doc, selected_uuids=None, parent=None):
-        super(QtGui.QDialog, self).__init__(parent)
+        super(QtWidgets.QDialog, self).__init__(parent)
         self.ui = Ui_create_algebraic_dialog()
         self.ui.setupUi(self)
         # NOTE: For now disable the operations area
@@ -114,7 +114,7 @@ class CreateAlgebraicDialog(QtGui.QDialog):
                     valid_choices = False
                     break
 
-        ok_button = self.ui.buttons.button(QtGui.QDialogButtonBox.Ok)
+        ok_button = self.ui.buttons.button(QtWidgets.QDialogButtonBox.Ok)
         if valid_name and valid_choices:
             ok_button.setDisabled(False)
         else:
@@ -147,7 +147,7 @@ class CreateAlgebraicDialog(QtGui.QDialog):
         self.doc.create_algebraic_composite(operations=operations, namespace=namespace, info=info)
 
     def done(self, r):
-        if r == QtGui.QDialog.Accepted:
+        if r == QtWidgets.QDialog.Accepted:
             operation = self.ui.operation_combo.currentText()
 
             status_title = ''
@@ -171,33 +171,33 @@ class CreateAlgebraicDialog(QtGui.QDialog):
                 compile(ops_ast, '<string>', 'exec')
                 # result_name = ops_ast.body[-1].targets[0].id
             except (AttributeError, KeyError, IndexError, SyntaxError):
-                _ = QtGui.QMessageBox.critical(
+                _ = QtWidgets.QMessageBox.critical(
                     self,
                     'Error: Syntax Error',
                     'Error: Syntax Error in Operations code. Must be valid Python 3 syntax.',
-                    QtGui.QMessageBox.Ok,
+                    QtWidgets.QMessageBox.Ok,
                 )
                 return
 
             if status_title.startswith("Warning"):
-                msg_box = QtGui.QMessageBox(
-                    QtGui.QMessageBox.Warning,
+                msg_box = QtWidgets.QMessageBox(
+                    QtWidgets.QMessageBox.Warning,
                     status_title,
                     status_text,
-                    QtGui.QMessageBox.No | QtGui.QMessageBox.Yes,
+                    QtWidgets.QMessageBox.No | QtWidgets.QMessageBox.Yes,
                     self,
                 )
                 msg_box.setInformativeText("Do you want to create the layer anyway?")
-                msg_box.setDefaultButton(QtGui.QMessageBox.No)
+                msg_box.setDefaultButton(QtWidgets.QMessageBox.No)
                 ret = msg_box.exec_()
-                if ret == QtGui.QMessageBox.No:
+                if ret == QtWidgets.QMessageBox.No:
                     return
             elif status_title.startswith('Error'):
-                QtGui.QMessageBox.critical(
+                QtWidgets.QMessageBox.critical(
                     self,
                     status_title,
                     status_text,
-                    QtGui.QMessageBox.Ok,
+                    QtWidgets.QMessageBox.Ok,
                 )
                 return
 

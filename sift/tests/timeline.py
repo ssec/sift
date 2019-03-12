@@ -3,9 +3,10 @@ import sys
 import time
 from random import randint, shuffle
 
-from PyQt4.QtCore import *  # noqa
-from PyQt4.QtGui import *  # noqa
-from PyQt4.QtOpenGL import QGLWidget, QGLFormat, QGL
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *  # noqa
+from PyQt5.QtGui import *  # noqa
+from PyQt5.QtOpenGL import QGLWidget, QGLFormat, QGL
 
 
 # http://pyqt.sourceforge.net/Docs/PyQt4/modules.html
@@ -94,6 +95,7 @@ class MainWindow(QMainWindow):
         def animate_to(t, item, x, y, angle):
             # The QGraphicsItemAnimation class is used to
             # animate an item in specific ways
+            # FIXME QGraphicsItemAnimation class is no longer supported.
             animation = QGraphicsItemAnimation()
 
             # You create a timeline (in this case, it is 1 second long

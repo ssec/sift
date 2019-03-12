@@ -1,8 +1,7 @@
-from PyQt4 import QtGui
 
-from PyQt4.QtCore import Qt
-from PyQt4.QtGui import QComboBox, QSlider, QDoubleSpinBox, QWizardPage
-from PyQt4.QtWebKit import QWebView
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QComboBox, QSlider, QDoubleSpinBox, QWizardPage, QTableWidget, QListWidget
+from PyQt5.QtWebKitWidgets import QWebView
 
 
 class QNoScrollComboBox(QComboBox):
@@ -68,7 +67,7 @@ class AnyWizardPage(QWizardPage):
 
     """
 
-    child_types = (QtGui.QListWidget, QtGui.QTableWidget)
+    child_types = (QListWidget, QTableWidget)
 
     def __init__(self, *args, **kwargs):
         self.important_children = kwargs.pop("important_children", [])
@@ -77,7 +76,7 @@ class AnyWizardPage(QWizardPage):
     def isComplete(self):
         children = self.important_children or self.findChildren(self.child_types)
         for child_widget in children:
-            if isinstance(child_widget, QtGui.QListWidget):
+            if isinstance(child_widget, QListWidget):
                 count = child_widget.count()
                 get_item = child_widget.item
             else:

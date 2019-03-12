@@ -28,7 +28,7 @@ import sys
 import unittest
 from collections import OrderedDict
 
-from PyQt4.QtCore import QObject, pyqtSignal, QThread
+from PyQt5.QtCore import QObject, pyqtSignal, QThread
 
 LOG = logging.getLogger(__name__)
 

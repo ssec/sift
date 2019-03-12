@@ -30,7 +30,7 @@ from glob import glob
 import typing as typ
 from uuid import UUID
 
-from PyQt4 import QtCore, QtGui
+from PyQt5 import QtCore, QtGui, QtWidgets
 from quamash import QEventLoop
 from vispy import app
 
@@ -60,7 +60,7 @@ from sift.view.scene_graph import SceneGraphManager
 from sift.workspace import Workspace
 from sift.workspace.collector import ResourceSearchPathCollector
 
-app_object = app.use_app('pyqt4')
+app_object = app.use_app('pyqt5')
 APP: QtGui.QApplication = app_object.native
 LOOP = QEventLoop(APP)
 asyncio.set_event_loop(LOOP)  # NEW must set the event loop
@@ -80,7 +80,7 @@ def test_layers(doc, glob_pattern=None):
     return []
 
 
-async def do_test_cycle(txt: QtGui.QWidget):
+async def do_test_cycle(txt: QtWidgets.QWidget):
     from asyncio import sleep
     n = 0
     while True:
@@ -89,7 +89,7 @@ async def do_test_cycle(txt: QtGui.QWidget):
         n += 1
 
 
-class OpenCacheDialog(QtGui.QDialog):
+class OpenCacheDialog(QtWidgets.QDialog):
     _opener = None
     _remover = None
 
@@ -97,7 +97,7 @@ class OpenCacheDialog(QtGui.QDialog):
         super(OpenCacheDialog, self).__init__(parent)
         self.ui = open_cache_dialog_ui.Ui_openFromCacheDialog()
         self.ui.setupUi(self)
-        self.ui.cacheListWidget.setSelectionMode(QtGui.QListWidget.ExtendedSelection)
+        self.ui.cacheListWidget.setSelectionMode(QtWidgets.QListWidget.ExtendedSelection)
         self.ui.removeFromCacheButton.clicked.connect(self._do_remove)
         self._opener = opener
         self._remover = remover
@@ -109,7 +109,7 @@ class OpenCacheDialog(QtGui.QDialog):
         # sorted_items = sorted(uuid_to_name.items(),
         #                       key=lambda x: x[1])
         for uuid, name in sorted_items:
-            li = QtGui.QListWidgetItem(name)
+            li = QtWidgets.QListWidgetItem(name)
             li.setData(QtCore.Qt.UserRole, uuid)
             self.ui.cacheListWidget.addItem(li)
         self.show()
@@ -133,17 +133,17 @@ class OpenCacheDialog(QtGui.QDialog):
         self.hide()
 
 
-class AnimationSpeedPopupWindow(QtGui.QWidget):
+class AnimationSpeedPopupWindow(QtWidgets.QWidget):
     _slider = None
     _active = False
 
     def __init__(self, slot, *args, **kwargs):
         super(AnimationSpeedPopupWindow, self).__init__(*args, **kwargs)
-        from PyQt4.QtCore import Qt
+        from PyQt5.QtCore import Qt
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Popup)
         self.setFocusPolicy(Qt.ClickFocus)
         self.setToolTip('Set animation speed')
-        self._slider = QtGui.QSlider(parent=self)
+        self._slider = QtWidgets.QSlider(parent=self)
         # n, x = self._convert(10, reverse=True), self._convert(5000, reverse=True)
         n, x = 2, 150  # frames per 10 seconds
         self._slider.setRange(n, x)  #
@@ -151,7 +151,7 @@ class AnimationSpeedPopupWindow(QtGui.QWidget):
         # self._slider.setInvertedAppearance(True)
         self._slot = slot
         self._slider.valueChanged.connect(self._changed)
-        self._layout = QtGui.QHBoxLayout()
+        self._layout = QtWidgets.QHBoxLayout()
         self._layout.addWidget(self._slider)
         self.setLayout(self._layout)
 
@@ -180,7 +180,7 @@ class AnimationSpeedPopupWindow(QtGui.QWidget):
         self._slot(val)
 
     def show_at(self, pos, val):
-        from PyQt4.QtCore import QRect, QPoint, QSize
+        from PyQt5.QtCore import QRect, QPoint, QSize
         sz = QSize(40, 180)
         pt = QPoint(pos.x() - 20, pos.y() - 160)
         rect = QRect(pt, sz)
@@ -438,10 +438,10 @@ class Main(QtGui.QMainWindow):
             'GOES-16 NetCDF (*.nc *.nc4)',
         ]
         filter_str = ';;'.join(filename_filters)
-        files = QtGui.QFileDialog.getOpenFileNames(self,
+        files = QtWidgets.QFileDialog.getOpenFileNames(self,
                                                    "Select one or more files to open",
                                                    self._last_open_dir or os.getenv("HOME"),
-                                                   filter_str)
+                                                   filter_str)[0]
         self.open_paths(files)
 
     def _bgnd_open_paths(self, paths, uuid_list, **importer_kwargs):
@@ -526,7 +526,7 @@ class Main(QtGui.QMainWindow):
                 self.scene_manager.layer_set.animating = False
                 self.activate_products_by_uuid([uuid])
 
-            open_action = QtGui.QAction(p_name, self)
+            open_action = QtWidgets.QAction(p_name, self)
             open_action.triggered.connect(openit)
             self._recent_files_menu.addAction(open_action)
 
@@ -569,7 +569,7 @@ class Main(QtGui.QMainWindow):
                 continue
 
             # Ask the user if this is what they want
-            msg_box = QtGui.QMessageBox()
+            msg_box = QtWidgets.QMessageBox()
             msg_box.setText("Deleting RGB layer, delete all times for this RGB?")
             msg_box.setInformativeText("All related RGBs must also be deleted.")
             msg_box.setStandardButtons(msg_box.Yes | msg_box.No)
@@ -654,15 +654,10 @@ class Main(QtGui.QMainWindow):
         gv = self.ui.timelineView
 
         # set up the widget itself
-        from PyQt4.QtOpenGL import QGLFormat, QGL, QGLWidget
-        fmt = QGLFormat(QGL.SampleBuffers)
-        wdgt = QGLWidget(fmt)
-        assert (wdgt.isValid())
-        gv.setViewport(wdgt)
         gv.setViewportUpdateMode(QtGui.QGraphicsView.FullViewportUpdate)
         gv.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
         gv.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-        gv.setRenderHints(QtGui.QPainter.Antialiasing)
+        # gv.setRenderHints(QtGui.QPainter.Antialiasing)
 
         # connect up the scene
         doc.sync_potential_tracks_from_metadata()
@@ -722,8 +717,8 @@ class Main(QtGui.QMainWindow):
 
         # disable close button on panes
         for pane in [self.ui.areaProbePane, self.ui.layersPane, self.ui.layerDetailsPane, self.ui.rgbConfigPane]:
-            pane.setFeatures(QtGui.QDockWidget.DockWidgetFloatable |
-                             QtGui.QDockWidget.DockWidgetMovable)
+            pane.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable |
+                             QtWidgets.QDockWidget.DockWidgetMovable)
 
         test_layers(self.document, glob_pattern=glob_pattern)
 
@@ -923,7 +918,7 @@ class Main(QtGui.QMainWindow):
         self._open_cache_dialog.activate(ordered_uuid_to_name)
 
     def open_glob(self, *args, **kwargs):
-        text, ok = QtGui.QInputDialog.getText(self, 'Open Glob Pattern',
+        text, ok = QtWidgets.QInputDialog.getText(self, 'Open Glob Pattern',
                                               'Open files matching pattern:')
         from glob import glob
         if ok:
@@ -966,23 +961,23 @@ class Main(QtGui.QMainWindow):
         dialog.activateWindow()
 
     def _init_menu(self):
-        open_action = QtGui.QAction("&Open...", self)
+        open_action = QtWidgets.QAction("&Open...", self)
         open_action.setShortcut("Ctrl+O")
         open_action.triggered.connect(self.interactive_open_files)
 
-        exit_action = QtGui.QAction("&Exit", self)
+        exit_action = QtWidgets.QAction("&Exit", self)
         exit_action.setShortcut("Ctrl+Q")
-        exit_action.triggered.connect(QtGui.qApp.quit)
+        exit_action.triggered.connect(QtWidgets.QApplication.quit)
 
-        open_cache_action = QtGui.QAction("Open from Cache...", self)
+        open_cache_action = QtWidgets.QAction("Open from Cache...", self)
         open_cache_action.setShortcut("Ctrl+A")
         open_cache_action.triggered.connect(self.open_from_cache)
 
-        open_glob_action = QtGui.QAction("Open Filename Pattern...", self)
+        open_glob_action = QtWidgets.QAction("Open Filename Pattern...", self)
         open_glob_action.setShortcut("Ctrl+Shift+O")
         open_glob_action.triggered.connect(self.open_glob)
 
-        open_wizard_action = QtGui.QAction("Open File Wizard...", self)
+        open_wizard_action = QtWidgets.QAction("Open File Wizard...", self)
         open_wizard_action.setShortcut("Ctrl+Alt+O")
         open_wizard_action.triggered.connect(self.open_wizard)
 
@@ -994,82 +989,82 @@ class Main(QtGui.QMainWindow):
         file_menu.addAction(open_wizard_action)
         self._recent_files_menu = file_menu.addMenu('Open Recent')
 
-        screenshot_action = QtGui.QAction("Export Image", self)
+        screenshot_action = QtWidgets.QAction("Export Image", self)
         screenshot_action.setShortcut("Ctrl+I")
         screenshot_action.triggered.connect(self.export_image.take_screenshot)
         file_menu.addAction(screenshot_action)
 
         file_menu.addAction(exit_action)
 
-        next_time = QtGui.QAction("Next Time", self)
+        next_time = QtWidgets.QAction("Next Time", self)
         next_time.setShortcut(QtCore.Qt.Key_Right)
         next_slot = partial(self.animation.next_last_time, direction=1)
         next_time.triggered.connect(next_slot)
         # self.ui.animForward.clicked.connect(next_slot)
 
-        focus_current = QtGui.QAction("Focus Current Timestep", self)
+        focus_current = QtWidgets.QAction("Focus Current Timestep", self)
         focus_current.setShortcut('.')
         focus_current.triggered.connect(partial(self.animation.next_last_band, direction=0))
 
-        prev_time = QtGui.QAction("Previous Time", self)
+        prev_time = QtWidgets.QAction("Previous Time", self)
         prev_time.setShortcut(QtCore.Qt.Key_Left)
         prev_slot = partial(self.animation.next_last_time, direction=-1)
         prev_time.triggered.connect(prev_slot)
         # self.ui.animBack.clicked.connect(prev_slot)
 
-        focus_prev_band = QtGui.QAction("Next Band", self)
+        focus_prev_band = QtWidgets.QAction("Next Band", self)
         focus_prev_band.setShortcut(QtCore.Qt.Key_Up)
         focus_prev_band.triggered.connect(partial(self.animation.next_last_band, direction=-1))
 
-        focus_next_band = QtGui.QAction("Previous Band", self)
+        focus_next_band = QtWidgets.QAction("Previous Band", self)
         focus_next_band.setShortcut(QtCore.Qt.Key_Down)
         focus_next_band.triggered.connect(partial(self.animation.next_last_band, direction=1))
 
-        toggle_vis = QtGui.QAction("Toggle &Visibility", self)
+        toggle_vis = QtWidgets.QAction("Toggle &Visibility", self)
         toggle_vis.setShortcut('V')
         toggle_vis.triggered.connect(self.toggle_visibility_on_selected_layers)
 
-        animate = QtGui.QAction("Animate", self)
+        animate = QtWidgets.QAction("Animate", self)
         animate.setShortcut('A')
         animate.triggered.connect(partial(self.animation.toggle_animation, action=animate))
 
-        change_order = QtGui.QAction("Set Animation &Order", self)
+        change_order = QtWidgets.QAction("Set Animation &Order", self)
         change_order.setShortcut('O')
         change_order.triggered.connect(self.animation.change_animation_to_current_selection_siblings)
 
-        flip_colormap = QtGui.QAction("Flip Color Limits (Top Layer)", self)
+        flip_colormap = QtWidgets.QAction("Flip Color Limits (Top Layer)", self)
         flip_colormap.setShortcut("/")
         flip_colormap.triggered.connect(
             lambda: self.document.flip_climits_for_layers([self.document.current_visible_layer_uuid]))
 
-        cycle_borders = QtGui.QAction("Cycle &Borders", self)
+        cycle_borders = QtWidgets.QAction("Cycle &Borders", self)
         cycle_borders.setShortcut('B')
         cycle_borders.triggered.connect(self.scene_manager.cycle_borders_color)
 
-        cycle_grid = QtGui.QAction("Cycle &Lat/Lon Grid", self)
+        cycle_grid = QtWidgets.QAction("Cycle &Lat/Lon Grid", self)
         cycle_grid.setShortcut('L')
         cycle_grid.triggered.connect(self.scene_manager.cycle_grid_color)
 
-        remove = QtGui.QAction("Remove Layer", self)
+        remove = QtWidgets.QAction("Remove Layer", self)
         remove.setShortcut(QtCore.Qt.Key_Delete)
         remove.triggered.connect(self.remove_layer)
 
-        clear = QtGui.QAction("Clear Region Selection", self)
+        clear = QtWidgets.QAction("Clear Region Selection", self)
         clear.setShortcut(QtCore.Qt.Key_Escape)
         clear.triggered.connect(self.remove_region_polygon)
 
-        composite = QtGui.QAction("Create Composite", self)
+        composite = QtWidgets.QAction("Create Composite", self)
         composite.setShortcut('C')
         composite.triggered.connect(self.user_rgb_behavior.create_rgb)
 
-        algebraic = QtGui.QAction("Create Algebraic", self)
+        algebraic = QtWidgets.QAction("Create Algebraic", self)
         algebraic.triggered.connect(self.create_algebraic)
 
-        toggle_point = QtGui.QAction("Toggle Point Probe", self)
+        toggle_point = QtWidgets.QAction("Toggle Point Probe", self)
         toggle_point.setShortcut('X')
         toggle_point.triggered.connect(lambda: self.graphManager.toggle_point_probe(DEFAULT_POINT_PROBE))
 
-        open_gradient = QtGui.QAction("Toggle Colormap Editor", self)
+        open_gradient = QtWidgets.QAction("Toggle Colormap Editor", self)
         open_gradient.setShortcut("Ctrl+E")
         open_gradient.triggered.connect(self.open_colormap_editor)
 
@@ -1120,7 +1115,7 @@ class Main(QtGui.QMainWindow):
 
 
 def set_default_geometry(window, desktop=0):
-    screen = QtGui.QApplication.desktop()
+    screen = QtWidgets.QApplication.desktop()
     screen_geometry = screen.screenGeometry(desktop)
     # TODO: Remove platform specific code
     if 'darwin' not in sys.platform:

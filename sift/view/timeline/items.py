@@ -70,11 +70,12 @@ from weakref import ref
 import pickle as pkl
 from datetime import datetime, timedelta
 
-from PyQt4.QtCore import Qt, QRectF
-from PyQt4.QtGui import (QGraphicsItem, QGraphicsObject, QIcon, QGradient, QImage, QPixmap,
-                         QGraphicsTextItem, QGraphicsPixmapItem, QPainter, QStyleOptionGraphicsItem,
-                         QWidget, QGraphicsSceneMouseEvent, QGraphicsSceneDragDropEvent, QGraphicsSceneContextMenuEvent,
-                         QPen, QBrush, QGraphicsRectItem)
+from PyQt5.QtCore import Qt, QRectF
+from PyQt5.QtGui import QIcon, QGradient, QImage, QPixmap, QPainter, QPen, QBrush
+from PyQt5.QtWidgets import (QGraphicsItem, QGraphicsObject, QGraphicsTextItem,
+                             QGraphicsPixmapItem, QStyleOptionGraphicsItem, QWidget,
+                             QGraphicsSceneMouseEvent, QGraphicsSceneDragDropEvent,
+                             QGraphicsSceneContextMenuEvent, QGraphicsRectItem)
 
 from sift.common import Flags
 from .common import (CoordTransform, GFXC, MIMETYPE_TIMELINE_COLORMAP, MIMETYPE_TIMELINE_TRACK,

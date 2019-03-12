@@ -47,7 +47,7 @@ from collections import namedtuple
 from datetime import timedelta
 from enum import Enum
 
-from PyQt4.QtCore import QObject
+from PyQt5.QtCore import QObject
 
 LOG = logging.getLogger(__name__)
 

@@ -19,8 +19,9 @@ __docformat__ = 'reStructuredText'
 import logging
 
 import numpy as np
-from PyQt4.QtCore import QObject, Qt
-from PyQt4.QtGui import QGridLayout, QLabel, QTextEdit, QFont, QSizePolicy
+from PyQt5.QtCore import QObject, Qt
+from PyQt5.QtGui import QFont
+from PyQt5.QtWidgets import QGridLayout, QLabel, QTextEdit, QSizePolicy
 
 from sift.common import Info, Kind
 from sift.ui.custom_widgets import QNoScrollWebView

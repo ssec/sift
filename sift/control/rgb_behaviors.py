@@ -4,7 +4,7 @@
 
 import logging
 
-from PyQt4.QtCore import QObject
+from PyQt5.QtCore import QObject
 
 from sift.common import Info, Kind
 from sift.control.layer_tree import LayerStackTreeViewModel
