@@ -588,15 +588,10 @@ class Main(QtGui.QMainWindow):
         gv = self.ui.timelineView
 
         # set up the widget itself
-        from PyQt4.QtOpenGL import QGLFormat, QGL, QGLWidget
-        fmt = QGLFormat(QGL.SampleBuffers)
-        wdgt = QGLWidget(fmt)
-        assert(wdgt.isValid())
-        gv.setViewport(wdgt)
         gv.setViewportUpdateMode(QtGui.QGraphicsView.FullViewportUpdate)
         gv.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
         gv.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-        gv.setRenderHints(QtGui.QPainter.Antialiasing)
+        # gv.setRenderHints(QtGui.QPainter.Antialiasing)
 
         # connect up the scene
         doc.sync_potential_tracks_from_metadata()
