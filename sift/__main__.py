@@ -582,15 +582,10 @@ class Main(QtWidgets.QMainWindow):
         gv = self.ui.timelineView
 
         # set up the widget itself
-        from PyQt5.QtOpenGL import QGLFormat, QGL, QGLWidget
-        fmt = QGLFormat(QGL.SampleBuffers)
-        wdgt = QGLWidget(fmt)
-        assert (wdgt.isValid())
-        gv.setViewport(wdgt)
-        gv.setViewportUpdateMode(QtWidgets.QGraphicsView.FullViewportUpdate)
+        gv.setViewportUpdateMode(QtGui.QGraphicsView.FullViewportUpdate)
         gv.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
         gv.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-        gv.setRenderHints(QtGui.QPainter.Antialiasing)
+        # gv.setRenderHints(QtGui.QPainter.Antialiasing)
 
         # connect up the scene
         doc.sync_potential_tracks_from_metadata()
@@ -806,8 +801,8 @@ class Main(QtWidgets.QMainWindow):
         timer.start(60000)
 
         # set up timeline
-        # LOG.info("potential tracks already in database: {}".format(repr(doc.potential_tracks())))
-        # self._init_timeline(doc, self.workspace)
+        LOG.info("potential tracks already in database: {}".format(repr(doc.potential_tracks())))
+        self._init_timeline(doc, self.workspace)
 
         # FIXME: make sure sync of metadata signals sync of document potentials and track display
 
