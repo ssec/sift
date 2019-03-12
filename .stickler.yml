@@ -1,7 +1,4 @@
 linters:
   flake8:
-    fixer: true
-  shellcheck:
-    shell: bash
-fixers:
-  enable: true
+    python: 3
+    config: setup.cfg
