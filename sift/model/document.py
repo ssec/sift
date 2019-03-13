@@ -1992,7 +1992,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         new_focus = sibs[dex]
         del sibs[dex]
         if sibs:
+            LOG.debug("hiding {} siblings".format(len(sibs)))
             self.toggle_layer_visibility(sibs, False)
+        LOG.debug("showing new preferred {}step {}".format("time" if not bandwise else "band", new_focus))
         self.toggle_layer_visibility(new_focus, True)  # FUTURE: do these two commands in one step
         return new_focus
 
