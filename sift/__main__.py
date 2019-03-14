@@ -1183,6 +1183,9 @@ def main():
     LOG.info("Using configuration directory: %s", args.config_dir)
     LOG.info("Using cache directory: %s", args.cache_dir)
     app.create()
+    APP.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+    if hasattr(QtWidgets.QStyleFactory, 'AA_UseHighDpiPixmaps'):
+        APP.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
 
     # Add our own fonts to Qt windowing system
     font_pattern = os.path.join(get_package_data_dir(), 'fonts', '*')

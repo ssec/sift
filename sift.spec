@@ -124,4 +124,5 @@ if is_darwin:
                  bundle_identifier=None,
                  info_plist={
                      'LSBackgroundOnly': 'false',
+                     'NSHighResolutionCapable': 'True',
                  })
