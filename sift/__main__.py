@@ -840,7 +840,7 @@ class Main(QtGui.QMainWindow):
 
     def _init_layer_panes(self):
         # convey action between document and layer list view
-        self.layer_info_pane = SingleLayerInfoPane(self.ui.layerDetailsContents, self.document)
+        self.layer_info_pane = SingleLayerInfoPane(self.document, parent=self.ui.layerDetailsContents)
         self.layer_list_model = LayerStackTreeViewModel([self.ui.layerListView], self.document,
                                                         parent=self.ui.layersPaneWidget)
         self.layer_list_model.uuidSelectionChanged.connect(self.layer_info_pane.update_display)
