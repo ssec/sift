@@ -111,7 +111,7 @@ class SingleLayerInfoPane(QWidget):
         self.instrument_text.setText("Instrument: " + shared_info[Info.INSTRUMENT])
         self.band_text.setText("Band: " + shared_info[Info.BAND])
         self.wavelength_text.setText("Wavelength: " + shared_info[Info.CENTRAL_WAVELENGTH])
-        self.colormap_text.setText("Colormap: " + shared_info["colormap"])
+        self.colormap_text.setText("Colormap: " + (shared_info["colormap"] or ""))
         self.clims_text.setText("Color Limits: " + shared_info["climits"])
         self.composite_codeblock.setText(shared_info['codeblock'])
 

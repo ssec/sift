@@ -239,7 +239,7 @@ class LayerSet(object):
     def set_layer_order(self, layer_order):
         for o in layer_order:
             # Layer names are UUIDs
-            if o not in self._layers:
+            if o not in self._layers and o is not None:
                 LOG.error('set_layer_order cannot deal with unknown layer {}'.format(o))
                 return
         self._layer_order = list(layer_order)

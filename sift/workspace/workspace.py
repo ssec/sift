@@ -194,7 +194,7 @@ class ActiveContent(QObject):
         else:
             mask = self._mask
             mask[:] = False
-        LOG.warning('mask_from_coverage_sparsity needs inclusion')
+        # LOG.warning('mask_from_coverage_sparsity needs inclusion')
         # present = np.array([[1]], dtype=np.int8)
         # mask_from_coverage_sparsity_2d(mask, self._coverage or present, self._sparsity or present)
 

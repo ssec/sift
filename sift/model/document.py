@@ -1200,7 +1200,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: (vmin, vmax), ...} for all changed layers
     didChangeGamma = pyqtSignal(dict)  # dict of {uuid: gamma float, ...} for all changed layers
     didChangeComposition = pyqtSignal(tuple, UUID, Presentation)  # new-layer-order, changed-layer, new-Presentation
-    didChangeCompositions = pyqtSignal(tuple, list, list)  # new-layer-order, changed-layers, new-prezs
+    didChangeCompositions = pyqtSignal(tuple, tuple, tuple)  # new-layer-order, changed-layers, new-prezs
     didCalculateLayerEqualizerValues = pyqtSignal(
         dict)  # dict of {uuid: (value, normalized_value_within_clim)} for equalizer display
     didChangeProjection = pyqtSignal(str, dict)  # name of projection, dict of projection information
