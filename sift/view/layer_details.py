@@ -84,7 +84,8 @@ class SingleLayerInfoPane(QWidget):
         # set the layout for this widget
         # Note: add in a grid is (widget, row#, col#) or (widget, row#, col#, row_span, col_span)
         layout = QGridLayout()
-        layout.addWidget(self.name_text, 0, 0, Qt.AlignLeft)
+        layout.setAlignment(Qt.AlignLeft)
+        layout.addWidget(self.name_text, 0, 0)
         layout.addWidget(self.time_text, 1, 0)
         layout.addWidget(self.instrument_text, 2, 0)
         layout.addWidget(self.band_text, 3, 0)
