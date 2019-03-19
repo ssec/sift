@@ -38,7 +38,6 @@ import sift.ui.open_cache_dialog_ui as open_cache_dialog_ui
 from sift import __version__
 from sift.common import Info, Tool, CompositeType, get_font_size
 from sift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
-from sift.control.layer_info import SingleLayerInfoPane
 from sift.control.layer_tree import LayerStackTreeViewModel
 from sift.control.rgb_behaviors import UserModifiesRGBLayers
 from sift.model.document import Document
@@ -54,6 +53,7 @@ from sift.util import (WORKSPACE_DB_DIR,
 from sift.view.colormap_editor import ColormapEditor
 from sift.view.create_algebraic import CreateAlgebraicDialog
 from sift.view.export_image import ExportImageHelper
+from sift.view.layer_details import SingleLayerInfoPane
 from sift.view.probes import ProbeGraphManager, DEFAULT_POINT_PROBE
 from sift.view.rgb_config import RGBLayerConfigPane
 from sift.view.scene_graph import SceneGraphManager
