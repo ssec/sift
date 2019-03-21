@@ -715,9 +715,12 @@ class Main(QtGui.QMainWindow):
                                                )
 
         # disable close button on panes
-        for pane in [self.ui.areaProbePane, self.ui.layersPane, self.ui.layerDetailsPane, self.ui.rgbConfigPane]:
+        panes = [self.ui.areaProbePane, self.ui.layersPane, self.ui.layerDetailsPane, self.ui.rgbConfigPane]
+        for pane in panes:
             pane.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable |
                              QtWidgets.QDockWidget.DockWidgetMovable)
+        # Make the panes on the right side 375px wide
+        self.resizeDocks(panes, [375] * len(panes), QtCore.Qt.Horizontal)
 
         test_layers(self.document, glob_pattern=glob_pattern)
 
