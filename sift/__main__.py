@@ -38,7 +38,6 @@ import sift.ui.open_cache_dialog_ui as open_cache_dialog_ui
 from sift import __version__
 from sift.common import Info, Tool, CompositeType, get_font_size
 from sift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
-from sift.control.layer_info import SingleLayerInfoPane
 from sift.control.layer_tree import LayerStackTreeViewModel
 from sift.control.rgb_behaviors import UserModifiesRGBLayers
 from sift.model.document import Document
@@ -54,6 +53,7 @@ from sift.util import (WORKSPACE_DB_DIR,
 from sift.view.colormap_editor import ColormapEditor
 from sift.view.create_algebraic import CreateAlgebraicDialog
 from sift.view.export_image import ExportImageHelper
+from sift.view.layer_details import SingleLayerInfoPane
 from sift.view.probes import ProbeGraphManager, DEFAULT_POINT_PROBE
 from sift.view.rgb_config import RGBLayerConfigPane
 from sift.view.scene_graph import SceneGraphManager
@@ -715,9 +715,12 @@ class Main(QtGui.QMainWindow):
                                                )
 
         # disable close button on panes
-        for pane in [self.ui.areaProbePane, self.ui.layersPane, self.ui.layerDetailsPane, self.ui.rgbConfigPane]:
+        panes = [self.ui.areaProbePane, self.ui.layersPane, self.ui.layerDetailsPane, self.ui.rgbConfigPane]
+        for pane in panes:
             pane.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable |
                              QtWidgets.QDockWidget.DockWidgetMovable)
+        # Make the panes on the right side 375px wide
+        self.resizeDocks(panes, [375] * len(panes), QtCore.Qt.Horizontal)
 
         test_layers(self.document, glob_pattern=glob_pattern)
 
@@ -840,7 +843,7 @@ class Main(QtGui.QMainWindow):
 
     def _init_layer_panes(self):
         # convey action between document and layer list view
-        self.layer_info_pane = SingleLayerInfoPane(self.ui.layerDetailsContents, self.document)
+        self.layer_info_pane = SingleLayerInfoPane(self.document, parent=self.ui.layerDetailsContents)
         self.layer_list_model = LayerStackTreeViewModel([self.ui.layerListView], self.document,
                                                         parent=self.ui.layersPaneWidget)
         self.layer_list_model.uuidSelectionChanged.connect(self.layer_info_pane.update_display)

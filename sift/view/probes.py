@@ -345,7 +345,7 @@ class ProbeGraphDisplay(object):
         self.figure = Figure(figsize=(3, 3), dpi=72)
         # this is the Canvas Widget that displays the `figure`
         # it takes the `figure` instance as a parameter to __init__
-        self.canvas = FigureCanvas(self.figure, )
+        self.canvas = FigureCanvas(self.figure)
         self.canvas.setMinimumSize(100, 100)
         # make sure our figure is clear
         self.clearPlot()

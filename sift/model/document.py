@@ -68,7 +68,7 @@ from collections import MutableSequence, OrderedDict, defaultdict
 from itertools import groupby, chain
 from uuid import UUID, uuid1 as uuidgen
 from datetime import datetime, timedelta
-import typing as T
+import typing as typ
 import numpy as np
 from weakref import ref
 import os
@@ -284,7 +284,7 @@ class DocumentAsContextBase(object):
         self.mdb = mdb
         self.ws = ws
 
-    def _finally(self, fn: T.Callable, *args, **kwargs):
+    def _finally(self, fn: typ.Callable, *args, **kwargs):
         """Defer a call until context close, if a context is active; else do immediately
         """
         from functools import partial
@@ -330,12 +330,12 @@ class DocumentAsContextBase(object):
 ###################################################################################################################
 
 
-class LayerInfo(T.NamedTuple):
+class LayerInfo(typ.NamedTuple):
     uuid: UUID
     time_label: str
     presentation: Presentation
-    f_convert: T.Callable
-    f_format: T.Callable
+    f_convert: typ.Callable
+    f_format: typ.Callable
 
     @property
     def colormap(self):
@@ -440,18 +440,12 @@ class DocumentAsLayerStack(DocumentAsContextBase):
         return self._layer_info_for_uuid(uuid).f_format(x, numeric=numeric, units=units)
         # return self[uuid][Info.UNIT_CONVERSION][2](x, numeric=numeric, units=units)
 
-    def flipped_for_uuids(self, uuids, lset=None):
-        for p in self.prez_for_uuids(uuids, lset=lset):
-            default_clim = p.climits
-            # default_clim = self._layer_with_uuid[p.uuid][Info.CLIM]
-            yield ((p.climits[1] - p.climits[0]) > 0) != ((default_clim[1] - default_clim[0]) > 0)
-
     def __len__(self):
         """Return active track count
         """
         return self.doc.track_order.top_z + 1
 
-    def _product_info_under_playhead_for_family(self, family: str) -> T.Mapping:
+    def _product_info_under_playhead_for_family(self, family: str) -> typ.Mapping:
         """Return the product info dictionary for
         """
         raise NotImplementedError("need to consult mdb to get product info dictionary under playhead")
@@ -478,7 +472,7 @@ class DocumentAsLayerStack(DocumentAsContextBase):
 
     # FUTURE: allow re-ordering of inactive tracks?
 
-    def reorder_by_indices(self, order: T.Iterable[int]):
+    def reorder_by_indices(self, order: typ.Iterable[int]):
         """Re-order active (z>=0) document families with new order
         input order is expected to be listbox-like indices, i.e. order 0 is topmost z
         """
@@ -496,7 +490,7 @@ class DocumentAsLayerStack(DocumentAsContextBase):
 ###################################################################################################################
 
 
-class FrameInfo(T.NamedTuple):
+class FrameInfo(typ.NamedTuple):
     """Represent a data Product as information to display as a frame on timeline
     """
     uuid: UUID
@@ -508,14 +502,14 @@ class FrameInfo(T.NamedTuple):
     # thumb: QImage  # thumbnail image to embed in timeline item
 
 
-class TrackInfo(T.NamedTuple):
+class TrackInfo(typ.NamedTuple):
     track: str  # family::category
     presentation: Presentation  # colorbar, ranges, gammas, etc
     when: Span  # available time-Span of the data
     state: Flags  # any status or special Flags set on the track, according to document / workspace
     primary: str  # primary label for UI
     secondary: str  # secondary label
-    frames: T.List[FrameInfo]  # list of frames within specified time Span
+    frames: typ.List[FrameInfo]  # list of frames within specified time Span
 
 
 class DocumentAsTrackStack(DocumentAsContextBase):
@@ -525,11 +519,11 @@ class DocumentAsTrackStack(DocumentAsContextBase):
     zorder <0 implies available but inactive track, i.e. metadata / resource / content are unrealized currently
     """
 
-    _actions: T.List[T.Callable] = None  # only available when used as a context manager
+    _actions: typ.List[typ.Callable] = None  # only available when used as a context manager
     animating: bool = False
 
     @property
-    def playhead_time(self) -> T.Optional[datetime]:
+    def playhead_time(self) -> typ.Optional[datetime]:
         """current document playhead time, or None if animating
         """
         return self.doc.playhead_time if not self.animating else None
@@ -606,7 +600,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
     #         zult.sort(reverse=True)
     #         return zult
 
-    def enumerate_track_names(self, only_active=False) -> T.Iterable[T.Tuple[int, str]]:
+    def enumerate_track_names(self, only_active=False) -> typ.Iterable[typ.Tuple[int, str]]:
         """All the names of the tracks, from highest zorder to lowest
 
         z>=0 implies an active track in the document,
@@ -645,7 +639,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         return s
 
     def frame_info_for_product(self, prod: Product = None, uuid: UUID = None,
-                               when_overlaps: Span = None) -> T.Optional[FrameInfo]:
+                               when_overlaps: Span = None) -> typ.Optional[FrameInfo]:
         """Generate info struct needed for timeline representation, optionally returning None if outside timespan of interest
         """
         if prod is None:
@@ -672,7 +666,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         )
         return fin
 
-    def enumerate_tracks_frames(self, only_active: bool = False, when: Span = None) -> T.Iterable[TrackInfo]:
+    def enumerate_tracks_frames(self, only_active: bool = False, when: Span = None) -> typ.Iterable[TrackInfo]:
         """enumerate tracks as TrackInfo and FrameInfo structures for timeline use, in top-Z to bottom-Z order
         """
         if when is None:  # default to the document's Span, either explicit (user-specified) or implicit
@@ -721,7 +715,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         # this needs to invalidate the current display and any animation
         self.doc.didChangeLayerVisibility.emit({frame: True})
 
-    def activate_frames(self, frame: UUID, *more_frames: T.Iterable[UUID]) -> T.Sequence[UUID]:
+    def activate_frames(self, frame: UUID, *more_frames: typ.Iterable[UUID]) -> typ.Sequence[UUID]:
         """Activate one or more frames in the document, as directed by the timeline widgets
         :returns sequence of UUIDs actually activated
         """
@@ -751,7 +745,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                   "activate {} frames".format(len(frames)),
                   interactive=False, and_then=_then_show_frames_in_document)
 
-    def _products_in_track(self, track: str, during: Span = None) -> T.List[UUID]:
+    def _products_in_track(self, track: str, during: Span = None) -> typ.List[UUID]:
         fam, ctg = track.split(FCS_SEP)
 
         def uu(x):
@@ -769,11 +763,11 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                     (Product.family == fam) & (Product.category == ctg) &
                     ~((Product.obs_time > end) | ((Product.obs_time + Product.obs_duration) < start))).all()]
 
-    def _products_in_tracks(self, tracks: T.Iterable[str], during: Span = None) -> T.Iterable[UUID]:
+    def _products_in_tracks(self, tracks: typ.Iterable[str], during: Span = None) -> typ.Iterable[UUID]:
         for track in tracks:
             yield from self._products_in_track(track, during)
 
-    def deactivate_frames(self, frame: UUID, *more_frames: T.Iterable[UUID]) -> T.Sequence[UUID]:
+    def deactivate_frames(self, frame: UUID, *more_frames: typ.Iterable[UUID]) -> typ.Sequence[UUID]:
         """Activate one or more frames in the document, as directed by the timeline widgets
         """
         away_with_thee = list(self.doc.filter_active_layers([frame] + list(more_frames)))
@@ -825,7 +819,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
 
     # def reorder_tracks(self, new_order: T.Iterable[T.Tuple[int, str]]):
 
-    def tracks_in_family(self, family: str, only_active: bool = True) -> T.Sequence[str]:
+    def tracks_in_family(self, family: str, only_active: bool = True) -> typ.Sequence[str]:
         """ yield track names in document that share a common family
         """
         for z, track in self.doc.track_order.items():
@@ -966,21 +960,21 @@ class DocumentAsRecipeCollection(DocumentAsContextBase):
 ###################################################################################################################
 
 
-class AnimationStep(T.NamedTuple):
+class AnimationStep(typ.NamedTuple):
     """Animation sequence used by SGM is a series of AnimationSteps, obtained from doc.as_animation_sequence
     SGM uses them to signal other subsystems on playback progress
     A change of presentation for one or more families does not invalidate an animation plan
     """
-    plan_id: T.Any  # a unique per generated plan, used for cache validation purposes
+    plan_id: typ.Any  # a unique per generated plan, used for cache validation purposes
     # how many wall microseconds this frame occurs at and lasts
     offset: int
     duration: int  # 0 if undetermined / infinite
     # back-to-front list of products to present during this timestep
-    uuids: T.Tuple[UUID]
+    uuids: typ.Tuple[UUID]
     # corresponding family, to reduce SGM need for queries
-    families: T.Tuple[str]
+    families: typ.Tuple[str]
     # primary kind for displaying the data
-    kinds: T.Tuple[Kind]
+    kinds: typ.Tuple[Kind]
     # data time Span this step represents
     data_span: Span
 
@@ -991,7 +985,7 @@ class DocumentAsAnimationSequence(DocumentAsContextBase):
     """
 
     @property
-    def plan_id(self) -> T.Any:
+    def plan_id(self) -> typ.Any:
         """The plan id is just a hashable unique (compare with "is") saying what the current valid plan is.
 
         To allow SGM/others to cache.
@@ -999,7 +993,7 @@ class DocumentAsAnimationSequence(DocumentAsContextBase):
         """
 
     def animation_plan(self, multiple_of_realtime: float = None, start: datetime = None, stop: datetime = None) -> \
-            T.Sequence[AnimationStep]:
+            typ.Sequence[AnimationStep]:
         """Yield series of AnimationStep
         May result in a new plan_id being the valid plan
         """
@@ -1012,7 +1006,7 @@ class DocumentAsAnimationSequence(DocumentAsContextBase):
     #     """
 
     @property
-    def family_presentation(self) -> T.Mapping[str, Presentation]:
+    def family_presentation(self) -> typ.Mapping[str, Presentation]:
         """Mapping of families to their presentation tuples.
 
         Guaranteed to include at least the families participating in the animation.
@@ -1032,7 +1026,7 @@ class DocumentAsAnimationSequence(DocumentAsContextBase):
         """
 
     @property
-    def playhead_time(self) -> T.Optional[datetime]:
+    def playhead_time(self) -> typ.Optional[datetime]:
         """ playhead time, or None if animating
         """
         raise NotImplementedError()
@@ -1162,16 +1156,16 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     playback_span: Span = None
 
     # user-directed overrides on tracks and frames (products)
-    track_state: T.Mapping[str, Flags] = None
-    product_state: T.Mapping[UUID, Flags] = None
+    track_state: typ.Mapping[str, Flags] = None
+    product_state: typ.Mapping[UUID, Flags] = None
 
     # user can lock tracks to a single frame throughout
-    track_frame_locks: T.Mapping[str, UUID] = None
+    track_frame_locks: typ.Mapping[str, UUID] = None
 
     # Maps of family names to their document recipes
-    family_presentation: T.Mapping[str, Presentation] = None
-    family_composition: T.Mapping[str, CompositeRecipe] = None  # using multiple products to present RGBA
-    family_calculation: T.Mapping[str, object] = None  # algebraic combinations of multiple products
+    family_presentation: typ.Mapping[str, Presentation] = None
+    family_composition: typ.Mapping[str, CompositeRecipe] = None  # using multiple products to present RGBA
+    family_calculation: typ.Mapping[str, object] = None  # algebraic combinations of multiple products
 
     # DEPRECATION in progress: layer sets
     """
@@ -1206,7 +1200,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: (vmin, vmax), ...} for all changed layers
     didChangeGamma = pyqtSignal(dict)  # dict of {uuid: gamma float, ...} for all changed layers
     didChangeComposition = pyqtSignal(tuple, UUID, Presentation)  # new-layer-order, changed-layer, new-Presentation
-    didChangeCompositions = pyqtSignal(tuple, list, list)  # new-layer-order, changed-layers, new-prezs
+    didChangeCompositions = pyqtSignal(tuple, tuple, tuple)  # new-layer-order, changed-layers, new-prezs
     didCalculateLayerEqualizerValues = pyqtSignal(
         dict)  # dict of {uuid: (value, normalized_value_within_clim)} for equalizer display
     didChangeProjection = pyqtSignal(str, dict)  # name of projection, dict of projection information
@@ -1355,7 +1349,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # self.timeline_span = self.playback_span = self.potential_product_span()
         self.sync_potential_tracks_from_metadata()
 
-    def potential_product_span(self) -> T.Optional[Span]:
+    def potential_product_span(self) -> typ.Optional[Span]:
         with self._workspace.metadatabase as S:
             all_times = list(S.query(Product.obs_time, Product.obs_duration).distinct())
         if not all_times:
@@ -1366,7 +1360,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         e = max(ends)
         return Span(s, e - s)
 
-    def potential_tracks(self) -> T.List[str]:
+    def potential_tracks(self) -> typ.List[str]:
         """List the names of available tracks (both active and potential) according to the metadatabase
         """
         with self._workspace.metadatabase as S:
@@ -1654,7 +1648,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             DeprecationWarning)
         return list(sorted(paths, key=lambda p: os.path.basename(p)))
 
-    def sort_product_uuids(self, uuids: T.Iterable[UUID]) -> T.List[UUID]:
+    def sort_product_uuids(self, uuids: typ.Iterable[UUID]) -> typ.List[UUID]:
         uuidset = set(str(x) for x in uuids)
         if not uuidset:
             return []
@@ -1702,23 +1696,23 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         info = self._layer_with_uuid[uuid]
         return info.get(Info.DISPLAY_TIME, '--:--')
 
-    def prez_for_uuids(self, uuids, lset=None):
+    def prez_for_uuids(self, uuids: typ.List[UUID], lset: list = None) -> typ.Iterable[typ.Tuple[UUID, Presentation]]:
         if lset is None:
             lset = self.current_layer_set
         for p in lset:
             if p.uuid in uuids:
-                yield p
+                yield p.uuid, p
 
-    def prez_for_uuid(self, uuid, lset=None):
-        for p in self.prez_for_uuids((uuid,), lset=lset):
+    def prez_for_uuid(self, uuid: UUID, lset: list = None) -> Presentation:
+        for _, p in self.prez_for_uuids((uuid,), lset=lset):
             return p
 
-    def colormap_for_uuids(self, uuids, lset=None):
-        for p in self.prez_for_uuids(uuids, lset=lset):
-            yield p.colormap
+    def colormap_for_uuids(self, uuids: typ.List[UUID], lset: list = None) -> typ.Iterable[typ.Tuple[UUID, str]]:
+        for u, p in self.prez_for_uuids(uuids, lset=lset):
+            yield u, p.colormap
 
-    def colormap_for_uuid(self, uuid, lset=None):
-        for p in self.colormap_for_uuids((uuid,), lset=lset):
+    def colormap_for_uuid(self, uuid: UUID, lset: list = None) -> str:
+        for _, p in self.colormap_for_uuids((uuid,), lset=lset):
             return p
 
     def valid_range_for_uuid(self, uuid):
@@ -1731,11 +1725,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def format_value(self, uuid, x, numeric=True, units=True):
         return self[uuid][Info.UNIT_CONVERSION][2](x, numeric=numeric, units=units)
-
-    def flipped_for_uuids(self, uuids, lset=None):
-        for p in self.prez_for_uuids(uuids, lset=lset):
-            default_clim = self._layer_with_uuid[p.uuid][Info.CLIM]
-            yield ((p.climits[1] - p.climits[0]) > 0) != ((default_clim[1] - default_clim[0]) > 0)
 
     def _get_equalizer_values_image(self, lyr, pinf, xy_pos):
         value = self._workspace.get_content_point(pinf.uuid, xy_pos)
@@ -1803,20 +1792,20 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             return
 
         if uuids is None:
-            uuids = [(pinf.uuid, pinf) for pinf in self.current_layer_set]
+            uuid_prezs = [(pinf.uuid, pinf) for pinf in self.current_layer_set]
         else:
-            uuids = [(pinf.uuid, pinf) for pinf in self.prez_for_uuids(uuids)]
+            uuid_prezs = self.prez_for_uuids(uuids)
         zult = {}
-        for uuid, pinf in uuids:
+        for uuid, pinf in uuid_prezs:
             try:
-                lyr = self._layer_with_uuid[pinf.uuid]
+                lyr = self._layer_with_uuid[uuid]
                 if lyr[Info.KIND] in {Kind.IMAGE, Kind.COMPOSITE, Kind.CONTOUR}:
-                    zult[pinf.uuid] = self._get_equalizer_values_image(lyr, pinf, xy_pos)
+                    zult[uuid] = self._get_equalizer_values_image(lyr, pinf, xy_pos)
                 elif lyr[Info.KIND] == Kind.RGB:
-                    zult[pinf.uuid] = self._get_equalizer_values_rgb(lyr, pinf, xy_pos)
+                    zult[uuid] = self._get_equalizer_values_rgb(lyr, pinf, xy_pos)
             except ValueError:
                 LOG.warning("Could not get equalizer values for {}".format(uuid))
-                zult[pinf.uuid] = (0, 0, 0)
+                zult[uuid] = (0, 0, 0)
 
         self.didCalculateLayerEqualizerValues.emit(zult)  # is picked up by layer list model to update display
 
@@ -2301,9 +2290,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.change_rgb_recipe_prez(recipe, climits=recipe.color_limits,
                                     gamma=recipe.gammas, uuids=changed_uuids)
         if changed_uuids:
-            # self.didChangeComposition.emit((), layer.uuid, Presentation, rgba)
-            self.didChangeCompositions.emit((), changed_uuids,
-                                            list(self.prez_for_uuids(changed_uuids)))
+            self.didChangeCompositions.emit((), *zip(*self.prez_for_uuids(changed_uuids)))
 
     def _composite_layers(self, recipe, times=None, rgba=None):
         if times:
@@ -2499,7 +2486,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 LOG.info('no time siblings to chosen band, will try channel siblings to chosen time')
                 new_anim_uuids, _ = self.channel_siblings(uuid)
             if new_anim_uuids is None or len(new_anim_uuids) < 2:
-                LOG.warning('No animation found')
+                LOG.info('No animation found')
                 return []
 
         LOG.debug('new animation order will be {0!r:s}'.format(new_anim_uuids))
@@ -2507,7 +2494,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.didReorderAnimation.emit(tuple(new_anim_uuids))
         return new_anim_uuids
 
-    def get_info(self, row=None, uuid=None):
+    def get_info(self, row: int = None, uuid: UUID = None) -> typ.Optional[DocBasicLayer]:
         if row is not None:
             uuid_temp = self.current_layer_set[row].uuid
             nfo = self._layer_with_uuid[uuid_temp]
