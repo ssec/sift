@@ -869,9 +869,9 @@ class Main(QtGui.QMainWindow):
     def _init_font_sizes(self):
         # hack some font sizes until we migrate to PyQt5 and handle it better
         # was 14 on osx
-        fsize = get_font_size(8.2)
+        # fsize = get_font_size(8.2)
         font = QtGui.QFont('Andale Mono')
-        font.setPointSizeF(fsize)
+        font.setPointSizeF(14)
         self.ui.cursorProbeLayer.setFont(font)
         self.ui.cursorProbeText.setFont(font)
 
