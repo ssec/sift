@@ -47,9 +47,9 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui = Ui_openFileWizard()
         self.ui.setupUi(self)
 
-        fsize = get_font_size(8.2)
+        # fsize = get_font_size(8.2)
         font = QtGui.QFont('Andale Mono')
-        font.setPointSizeF(fsize)
+        font.setPointSizeF(14)
         self.ui.productSummaryText.setFont(font)
 
         self.ui.addButton.released.connect(self.add_file)

@@ -6,12 +6,12 @@ package:
 
 source:
   git_url: https://github.com/vispy/vispy.git
-  git_rev: 47f3cd0cf179286774b8ec5d1fbe063a28b8e56b
+  git_rev: 94b0bc70a5ed7b056a23fb273553eb54f93d3a81
   patches:
     - ctypes_fontconfig.diff
 
 build:
-  number: 0
+  number: 1
   script: python setup.py install --single-version-externally-managed --record record.txt
 
 requirements:

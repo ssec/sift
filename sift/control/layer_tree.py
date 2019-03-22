@@ -73,9 +73,9 @@ class LayerWidgetDelegate(QStyledItemDelegate):
         super(LayerWidgetDelegate, self).__init__(*args, **kwargs)
         self._doc = doc
         # self._doc = doc.as_layer_stack
-        fsize = get_font_size(7)
+        # fsize = get_font_size(7)
         self.font = QFont('Andale Mono')
-        self.font.setPointSizeF(fsize)
+        self.font.setPointSizeF(12)
 
     def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex):
         # pz = self.layer_prez(index.row())
