@@ -3,7 +3,7 @@ set home_path=C:\Users\%username%
 set desktop_path=%home_path%\Desktop
 set channel=http://larch.ssec.wisc.edu/channels/sift
 set workspace=%home_path%\sift_workspace
-set pkg_name=sift
+set pkg_name=uwsift
 set env_name=sift
 
 REM The best thing would be to do "activate sift" but for some reason we can't do goto's properly when using that

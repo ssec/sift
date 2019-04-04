@@ -48,7 +48,7 @@ import re
 from setuptools import setup, find_packages, Command
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
-version_pathname = os.path.join(script_dir, "sift", "version.py")
+version_pathname = os.path.join(script_dir, "uwsift", "version.py")
 version_str = open(version_pathname).readlines()[-1].split()[-1].strip("\"\'")
 version_regex = re.compile('^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<micro>\d+)(?:(?P<dev_level>(a|b|rc))(?P<dev_version>\d))?$')
 version_info = version_regex.match(version_str).groupdict()
@@ -169,12 +169,12 @@ class BumpCommand(Command):
 
 
 setup(
-    name='sift',
+    name='uwsift',
     version=version_str,
     description="Satellite Information Familiarization Tool",
     author='R.K.Garcia, University of Wisconsin - Madison Space Science & Engineering Center',
     author_email='rkgarcia@wisc.edu',
-    url='https://gitlab.ssec.wisc.edu/SIFT/sift',
+    url='https://github.com/ssec/sift',
     classifiers=["Development Status :: 5 - Production/Stable",
                  "Intended Audience :: Science/Research",
                  "License :: OSI Approved :: GNU General Public License v3 " +

@@ -14,7 +14,7 @@
 # serve to show the default.
 
 # To generate apidoc modules:
-#     sphinx-apidoc -f -T -o source/api ../sift ../sift/tests
+#     sphinx-apidoc -f -T -o source/api ../uwsift ../uwsift/tests
 
 import os
 import sys
@@ -24,7 +24,7 @@ from datetime import datetime
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('../../'))
-from sift import __version__
+from uwsift import __version__
 
 # -- General configuration ------------------------------------------------
 

@@ -7,7 +7,8 @@ is meant for developers of SIFT or those interested in the low-level details
 (programming interfaces, public APIs, overall designs, etc).
 For general information on the use of SIFT, official releases, and
 installation instructions of those releases see the SIFT
-`home page <http://sift.ssec.wisc.edu/>`_.
+`home page <http://sift.ssec.wisc.edu/>`_. Note that the library and
+python package for the SIFT project are named ``uwsift``.
 
 For source code and other information now provided by the home page see
 the `GitHub repository <https://github.com/ssec/sift>`_. Some of the

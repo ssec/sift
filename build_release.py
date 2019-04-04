@@ -66,7 +66,7 @@ import shutil
 import logging
 import subprocess
 from glob import glob
-from sift import version
+from uwsift import version
 
 if sys.version_info < (3, 5):
     run = subprocess.check_call
@@ -77,12 +77,12 @@ else:
 log = logging.getLogger(__name__)
 
 SIFT_CHANNEL = "http://larch.ssec.wisc.edu/channels/sift"
-CONDA_RECIPE = os.path.join('conda-recipe', 'sift')
+CONDA_RECIPE = os.path.join('conda-recipe', 'uwsift')
 CHANNEL_HOST = os.environ.get("SIFT_CHANNEL_HOST", "larch")
 CHANNEL_PATH = os.environ.get("SIFT_CHANNEL_PATH", "/var/apache/larch/htdocs/channels/sift")
 # server that is allowed to add to FTP site
 FTP_HOST = os.environ.get("SIFT_FTP_HOST", "bumi")
-FTP_HOST_PATH = os.environ.get("SIFT_FTP_HOST_PATH", "repos/git/sift/dist")
+FTP_HOST_PATH = os.environ.get("SIFT_FTP_HOST_PATH", "repos/git/uwsift/dist")
 FTP_PATH = os.environ.get("SIFT_FTP_PATH", "pub/sift/dist")
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 DIST_DIR = os.path.join(SCRIPT_DIR, 'dist')
@@ -120,7 +120,7 @@ def _build_conda(python_version, output_dir=DIST_DIR):
     run(CONDA_BUILD_CMD.split(' '))
     # check for build revisision
     for i in range(4, -1, -1):
-        f = os.path.join(DIST_DIR, CONDA_PLAT[platform], 'sift-{}-*{}.tar.bz2'.format(version.__version__, i))
+        f = os.path.join(DIST_DIR, CONDA_PLAT[platform], 'uwsift-{}-*{}.tar.bz2'.format(version.__version__, i))
         glob_results = glob(f)
         if len(glob_results) == 1:
             log.info("Conda package name is: %s", glob_results[0])
@@ -161,7 +161,7 @@ def package_installer_linux():
 
 
 def package_installer_win():
-    run([ISCC_PATH, "sift.iss"])
+    run([ISCC_PATH, "uwsift.iss"])
     vol_name = "SIFT_{}.exe".format(version.__version__)
     vol_name = os.path.join('sift_inno_setup_output', vol_name)
     old_name = os.path.join('sift_inno_setup_output', 'setup.exe')

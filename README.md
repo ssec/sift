@@ -72,11 +72,11 @@ SIFT can also be installed with the Anaconda/Conda package manager. Python
 3.6 is currently the only supported python environment. It can be installed by
 running:
 
-    conda install -c http://larch.ssec.wisc.edu/channels/sift sift
+    conda install -c http://larch.ssec.wisc.edu/channels/sift uwsift
     
 And then run with:
 
-    python -m sift
+    python -m uwsift
     
 The `-h` flag can be added for documentation on additional command line
 options.
