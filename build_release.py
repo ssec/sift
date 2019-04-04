@@ -161,7 +161,11 @@ def package_installer_linux():
 
 
 def package_installer_win():
-    run([ISCC_PATH, "uwsift.iss"])
+    from uwsift.util.default_paths import WORKSPACE_DB_DIR, DOCUMENT_SETTINGS_DIR
+    new_env = os.environ.copy()
+    new_env['WORKSPACE_DB_DIR'] = WORKSPACE_DB_DIR
+    new_env['DOCUMENT_SETTINGS_DIR'] = DOCUMENT_SETTINGS_DIR
+    run([ISCC_PATH, "uwsift.iss"], env=new_env)
     vol_name = "SIFT_{}.exe".format(version.__version__)
     vol_name = os.path.join('sift_inno_setup_output', vol_name)
     old_name = os.path.join('sift_inno_setup_output', 'setup.exe')
