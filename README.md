@@ -41,9 +41,11 @@ operating system.
 
 After executing the downloaded `.exe` installer follow the installation
 wizard to install SIFT. SIFT can then be run from the "SIFT" shortcut
-in the start menu. By default SIFT caches files in a "Workspace" located
-at the user's `Documents/sift_workspace`. The installation wizard allows
-you to customize this location.
+in the start menu. By default SIFT caches files in a "workspace" located
+at the user's
+`/Users/<User>/AppData/Local/CIMSS-SSEC/SIFT/Cache/workspace` directory.
+Configuration files for the application are stored in the user's
+`/Users/<User>/AppData/Roaming/CIMSS-SSEC/SIFT/settings` directory.
 
 ### Run on Linux
 
@@ -57,6 +59,9 @@ for available command line options.
 If SIFT will not start please ensure that the `LD_LIBRARY_PATH` environment
 variable is not set.
 
+SIFT will cache files in a `~/.cache/SIFT` directory and configuration
+files in a `~/.config/SIFT` directory.
+
 ### Run on Mac
 
 The downloaded DMG file can be extracted opened by double clicking on it.
@@ -66,17 +71,21 @@ must first be opened by right clicking and clicking "Open". After SIFT is
 opened for the first time double clicking the `.app` icon from `Applications`
 will execute SIFT as usual.
 
+SIFT will cache files in a `~/Library/Caches/SIFT` directory and configuration
+files in a `~/Library/Application Support/SIFT` directory.
+
+
 ### Installing with Conda
 
 SIFT can also be installed with the Anaconda/Conda package manager. Python
-3.6 is currently the only supported python environment. It can be installed by
+3.7 is currently the only supported python environment. It can be installed by
 running:
 
-    conda install -c http://larch.ssec.wisc.edu/channels/sift sift
+    conda install -c http://larch.ssec.wisc.edu/channels/sift uwsift
     
 And then run with:
 
-    python -m sift
+    python -m uwsift
     
 The `-h` flag can be added for documentation on additional command line
 options.

@@ -14,17 +14,12 @@ OutputDir=sift_inno_setup_output
 Source: "dist\SIFT\*"; DestDir: "{app}\bin"; Flags: replacesameversion recursesubdirs
 Source: "README.md"; DestName: "README.txt"; DestDir: "{app}"; Flags: isreadme; AfterInstall: ConvertLineEndings
 
-[Dirs]
-Name: "{userdocs}\sift_workspace"; Flags: setntfscompression; Tasks: workspace
-
-[Tasks]
-Name: workspace; Description: "Create default workspace directory: {userdocs}\sift_workspace";
-
 [Icons]
 Name: "{group}\SIFT"; Filename: "{app}\bin\SIFT.exe"
 Name: "{group}\Bug Tracker"; Filename: "https://gitlab.ssec.wisc.edu/SIFT/sift/issues"
 Name: "{group}\Wiki"; Filename: "https://gitlab.ssec.wisc.edu/SIFT/sift/wikis/home"
-Name: "{group}\Open Workspace"; Filename: "{userdocs}\sift_workspace"
+Name: "{group}\Open Workspace Folder"; Filename: "{%WORKSPACE_DB_DIR}"
+Name: "{group}\Open Settings Folder"; Filename: "{%DOCUMENT_SETTINGS_DIR}"
 Name: "{group}\Uninstall SIFT"; Filename: "{uninstallexe}"
 
 [Code]
