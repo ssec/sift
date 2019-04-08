@@ -21,7 +21,6 @@ from collections import OrderedDict
 
 from satpy import Scene, DatasetID
 
-from uwsift.common import get_font_size
 from uwsift.ui.open_file_wizard_ui import Ui_openFileWizard
 
 FILE_PAGE = 0
@@ -47,7 +46,6 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui = Ui_openFileWizard()
         self.ui.setupUi(self)
 
-        # fsize = get_font_size(8.2)
         font = QtGui.QFont('Andale Mono')
         font.setPointSizeF(14)
         self.ui.productSummaryText.setFont(font)
@@ -285,10 +283,8 @@ class OpenFileWizard(QtWidgets.QWizard):
         if os.getenv("SIFT_ALLOW_ALL_READERS", ""):
             filename_filters = ['All files (*.*)'] + filename_filters
         filter_str = ';;'.join(filename_filters)
-        files = QtWidgets.QFileDialog.getOpenFileNames(self,
-                                                   "Select one or more files to open",
-                                                   self._last_open_dir or os.getenv("HOME"),
-                                                   filter_str)[0]
+        files = QtWidgets.QFileDialog.getOpenFileNames(
+            self, "Select one or more files to open", self._last_open_dir or os.getenv("HOME"), filter_str)[0]
         if not files:
             return
         self._last_open_dir = os.path.dirname(files[0])

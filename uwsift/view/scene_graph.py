@@ -46,8 +46,7 @@ from uwsift.util import get_package_data_dir
 from uwsift.view.cameras import PanZoomProbeCamera
 from uwsift.view.probes import DEFAULT_POINT_PROBE
 from uwsift.view.transform import PROJ4Transform
-from uwsift.view.visuals import (NEShapefileLines, TiledGeolocatedImage,
-                               RGBCompositeLayer, PrecomputedIsocurve)
+from uwsift.view.visuals import (NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer, PrecomputedIsocurve)
 
 LOG = logging.getLogger(__name__)
 DATA_DIR = get_package_data_dir()

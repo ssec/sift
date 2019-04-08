@@ -100,8 +100,8 @@ class ColormapEditor(QtWidgets.QDialog):
             save_name = str(text)
             if save_name in self.user_colormap_states or save_name in protected_names:
                 overwrite_msg = "There is already a save with this name. Would you like to Overwrite?"
-                reply = QtWidgets.QMessageBox.question(self, 'Message',
-                                                   overwrite_msg, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
+                reply = QtWidgets.QMessageBox.question(
+                    self, 'Message', overwrite_msg, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
 
                 if reply == QtWidgets.QMessageBox.Yes:
                     if save_name in self.builtin_colormap_states or save_name in protected_names:
@@ -260,12 +260,12 @@ class ColormapEditor(QtWidgets.QDialog):
             QtWidgets.QMessageBox.information(self, "Error: Can not delete internal colormaps.")
             return
 
-        selected_colormaps= self.cmap_list.selectedItems()
+        selected_colormaps = self.cmap_list.selectedItems()
         to_print = ",".join([x.text() for x in selected_colormaps])
 
         delete_msg = "Please confirm you want to delete the colormap(s): " + to_print
-        reply = QtWidgets.QMessageBox.question(self, 'Message',
-                                           delete_msg, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
+        reply = QtWidgets.QMessageBox.question(
+            self, 'Message', delete_msg, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
         if reply == QtWidgets.QMessageBox.Yes:
             for index in selected_colormaps:
                 del self.user_colormap_states[index.text()]
@@ -274,9 +274,8 @@ class ColormapEditor(QtWidgets.QDialog):
 
     def importButtonClick(self):
         # Import colormap
-        fname = QtWidgets.QFileDialog.getOpenFileName(self, 'Get Colormap File',
-                                                  os.path.expanduser('~'),
-                                                  "Colormaps (*.json)")[0]
+        fname = QtWidgets.QFileDialog.getOpenFileName(
+            self, 'Get Colormap File', os.path.expanduser('~'), "Colormaps (*.json)")[0]
         self._import_single_file(fname)
 
     def _import_single_file(self, filename):

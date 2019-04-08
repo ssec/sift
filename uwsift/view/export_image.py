@@ -86,11 +86,11 @@ class ExportImageDialog(QtWidgets.QDialog):
             self.ui.footerFontSizeSpinBox.setDisabled(True)
 
     def _show_file_dialog(self):
-        fn = QtWidgets.QFileDialog.getSaveFileName(self,
-                                               caption=self.tr('Screenshot Filename'),
-                                               directory=os.path.join(self._last_dir, self.default_filename),
-                                               filter=self.tr('Image Files (*.png *.jpg *.gif *.mp4 *.m4v)'),
-                                               options=QtWidgets.QFileDialog.DontConfirmOverwrite)[0]
+        fn = QtWidgets.QFileDialog.getSaveFileName(
+            self, caption=self.tr('Screenshot Filename'),
+            directory=os.path.join(self._last_dir, self.default_filename),
+            filter=self.tr('Image Files (*.png *.jpg *.gif *.mp4 *.m4v)'),
+            options=QtWidgets.QFileDialog.DontConfirmOverwrite)[0]
         if fn:
             self.ui.saveAsLineEdit.setText(fn)
         # bring this dialog back in focus
