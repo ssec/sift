@@ -3,9 +3,10 @@ import sys
 import time
 from random import randint, shuffle
 
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *  # noqa
-from PyQt5.QtGui import *  # noqa
+from PyQt5.QtWidgets import (QGraphicsScene, QMainWindow, QToolBar, QAction, QLabel, QCheckBox, QStatusBar,
+                             QGraphicsView, QGraphicsTextItem, QApplication)
+from PyQt5.QtCore import QSize, QTimer, Qt, QTimeLine, QPointF
+from PyQt5.QtGui import QKeySequence, QIcon, QFont
 from PyQt5.QtOpenGL import QGLWidget, QGLFormat, QGL
 
 
@@ -204,10 +205,11 @@ class MainWindow(QMainWindow):
             self.digits.append(t_item)
 
 
-app = QApplication(sys.argv)
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
 
-scene = DemoScene()
-window = MainWindow(scene)
-window.show()
+    scene = DemoScene()
+    window = MainWindow(scene)
+    window.show()
 
-app.exec_()
+    app.exec_()

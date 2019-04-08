@@ -13,7 +13,7 @@ __author__ = 'evas'
 __docformat__ = 'reStructuredText'
 
 import logging
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtWidgets
 
 import numpy as np
 from PyQt5.QtCore import QObject, pyqtSignal
@@ -31,7 +31,6 @@ from uwsift.queue import TASK_PROGRESS, TASK_DOING
 # Stuff for custom toolbars
 try:
     import six
-    from matplotlib.backends.qt_compat import QtWidgets
     import matplotlib.backends.qt_editor.figureoptions as figureoptions
 except ImportError:
     figureoptions = None

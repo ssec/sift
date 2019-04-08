@@ -36,7 +36,7 @@ from vispy import app
 
 import uwsift.ui.open_cache_dialog_ui as open_cache_dialog_ui
 from uwsift import __version__
-from uwsift.common import Info, Tool, CompositeType, get_font_size
+from uwsift.common import Info, Tool, CompositeType
 from uwsift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
 from uwsift.control.layer_tree import LayerStackTreeViewModel
 from uwsift.control.rgb_behaviors import UserModifiesRGBLayers
@@ -45,11 +45,8 @@ from uwsift.model.layer import DocRGBLayer
 from uwsift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from uwsift.ui.pov_main_ui import Ui_MainWindow
-from uwsift.util import (WORKSPACE_DB_DIR,
-                       DOCUMENT_SETTINGS_DIR,
-                       get_package_data_dir,
-                       check_grib_definition_dir,
-                       check_imageio_deps)
+from uwsift.util import (WORKSPACE_DB_DIR, DOCUMENT_SETTINGS_DIR,
+                         get_package_data_dir, check_grib_definition_dir, check_imageio_deps)
 from uwsift.view.colormap_editor import ColormapEditor
 from uwsift.view.create_algebraic import CreateAlgebraicDialog
 from uwsift.view.export_image import ExportImageHelper
@@ -437,10 +434,8 @@ class Main(QtGui.QMainWindow):
             'GOES-16 NetCDF (*.nc *.nc4)',
         ]
         filter_str = ';;'.join(filename_filters)
-        files = QtWidgets.QFileDialog.getOpenFileNames(self,
-                                                   "Select one or more files to open",
-                                                   self._last_open_dir or os.getenv("HOME"),
-                                                   filter_str)[0]
+        files = QtWidgets.QFileDialog.getOpenFileNames(
+            self, "Select one or more files to open", self._last_open_dir or os.getenv("HOME"), filter_str)[0]
         self.open_paths(files)
 
     def _bgnd_open_paths(self, paths, uuid_list, **importer_kwargs):
@@ -869,7 +864,6 @@ class Main(QtGui.QMainWindow):
     def _init_font_sizes(self):
         # hack some font sizes until we migrate to PyQt5 and handle it better
         # was 14 on osx
-        # fsize = get_font_size(8.2)
         font = QtGui.QFont('Andale Mono')
         font.setPointSizeF(14)
         self.ui.cursorProbeLayer.setFont(font)
@@ -920,8 +914,7 @@ class Main(QtGui.QMainWindow):
         self._open_cache_dialog.activate(ordered_uuid_to_name)
 
     def open_glob(self, *args, **kwargs):
-        text, ok = QtWidgets.QInputDialog.getText(self, 'Open Glob Pattern',
-                                              'Open files matching pattern:')
+        text, ok = QtWidgets.QInputDialog.getText(self, 'Open Glob Pattern', 'Open files matching pattern:')
         from glob import glob
         if ok:
             paths = list(glob(text))
