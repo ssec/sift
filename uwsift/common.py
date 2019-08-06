@@ -212,6 +212,7 @@ class Platform(Enum):
     HIMAWARI_9 = 'Himawari-9'
     GOES_16 = 'G16'
     GOES_17 = 'G17'
+    GOES_18 = 'G18'
     NWP = 'NWP'
     MSG8 = 'Meteosat-8'
     MSG9 = 'Meteosat-9'
@@ -220,10 +221,11 @@ class Platform(Enum):
 
 
 PLATFORM_MAP = {v.value.lower().replace('-', ''): v for v in Platform}
-PLATFORM_MAP['H8'] = Platform.HIMAWARI_8
-PLATFORM_MAP['H9'] = Platform.HIMAWARI_8
-PLATFORM_MAP['GOES-16'] = Platform.GOES_16
-PLATFORM_MAP['GOES-17'] = Platform.GOES_17
+PLATFORM_MAP['h8'] = Platform.HIMAWARI_8
+PLATFORM_MAP['h9'] = Platform.HIMAWARI_9
+PLATFORM_MAP['goes16'] = Platform.GOES_16
+PLATFORM_MAP['goes17'] = Platform.GOES_17
+PLATFORM_MAP['goes18'] = Platform.GOES_18
 
 
 class Info(Enum):

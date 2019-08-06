@@ -19,7 +19,8 @@ import os
 from PyQt5 import QtCore, QtGui, QtWidgets
 from collections import OrderedDict
 
-from satpy import Scene, DatasetID
+from satpy import MultiScene, Scene, DatasetID
+from satpy.readers import group_files
 
 from uwsift.ui.open_file_wizard_ui import Ui_openFileWizard
 
@@ -82,16 +83,12 @@ class OpenFileWizard(QtWidgets.QWizard):
             self._init_summary_page()
 
     def _init_file_page(self):
-        all_readers = bool(os.getenv("SIFT_ALLOW_ALL_READERS", ""))
-        if all_readers and self.AVAILABLE_READERS:
+        if self.AVAILABLE_READERS:
             readers = self.AVAILABLE_READERS
-        elif all_readers:
+        else:
             from satpy import available_readers
             readers = sorted(available_readers())
             OpenFileWizard.AVAILABLE_READERS = readers
-        else:
-            readers = ['grib']
-            self.ui.readerComboBox.setDisabled(True)
 
         self.ui.readerComboBox.addItems(readers)
 
@@ -126,15 +123,14 @@ class OpenFileWizard(QtWidgets.QWizard):
 
         self._selected_files = self._filenames.copy()
         all_available_products = set()
-        for fn in self._selected_files:
-            these_files = tuple(sorted([fn]))
-            # TODO: We need to be able to figure out how many paths go to each
-            #       Scene (add to satpy as utility function)
-            if these_files in self.scenes:
-                continue
-            reader = self.ui.readerComboBox.currentText()
-            scn = Scene(reader=reader, filenames=these_files)
-            self.scenes[these_files] = scn
+        reader = self.ui.readerComboBox.currentText()
+        for file_group in group_files(self._filenames, reader=reader):
+            # file_group includes what reader to use
+            # NOTE: We only allow a single reader at a time
+            groups_files = tuple(sorted(fn for group_id, group_list in file_group.items() for fn in group_list))
+            self.scenes[groups_files] = scn = Scene(filenames=file_group)
+
+            # TODO: Add a check to see if they've already imported these Scenes
             all_available_products.update(scn.available_dataset_ids())
 
         # update the widgets
@@ -273,15 +269,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.productSummaryText.setText(summary_text)
 
     def add_file(self):
-        filename_filters = [
-            # 'All files (*.*)',
-            # 'All supported files (*.nc *.nc4 *.tiff *.tif)',
-            # 'GOES-16 NetCDF (*.nc *.nc4)',
-            # 'Mercator GTIFF (*.tiff *.tif)',
-            'NWP GRIB2 (*.grib2 *.f???)',
-        ]
-        if os.getenv("SIFT_ALLOW_ALL_READERS", ""):
-            filename_filters = ['All files (*.*)'] + filename_filters
+        filename_filters = ['All files (*.*)']
         filter_str = ';;'.join(filename_filters)
         files = QtWidgets.QFileDialog.getOpenFileNames(
             self, "Select one or more files to open", self._last_open_dir or os.getenv("HOME"), filter_str)[0]

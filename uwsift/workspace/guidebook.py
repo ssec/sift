@@ -199,12 +199,14 @@ class ABI_AHI_Guidebook(Guidebook):
         """Collect information that may not come from the dataset.
 
         This method should only be called once to "fill in" metadata
-        that isn't originally known about an opened file.
+        that isn't originally known about an opened file. The provided `info`
+        is used as a starting point, but is not modified by this method.
+        
         """
         z = {}
 
         if info[Info.KIND] in (Kind.IMAGE, Kind.COMPOSITE):
-            if z.get(Info.CENTRAL_WAVELENGTH) is None:
+            if info.get(Info.CENTRAL_WAVELENGTH) is None:
                 try:
                     wl = NOMINAL_WAVELENGTHS[info[Info.PLATFORM]][info[Info.INSTRUMENT]][info[Info.BAND]]
                 except KeyError:

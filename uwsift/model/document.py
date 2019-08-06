@@ -1600,8 +1600,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """
         # Load all the metadata so we can sort the files
         # assume metadata collection is in the most user-friendly order
-        infos = self._workspace.collect_product_metadata_for_paths(
-            paths, **importer_kwargs)
+        infos = self._workspace.collect_product_metadata_for_paths(paths, **importer_kwargs)
         uuids = []
         total_products = 0
         for dex, (num_prods, info) in enumerate(infos):

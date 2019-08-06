@@ -913,12 +913,12 @@ class Main(QtGui.QMainWindow):
         ordered_uuid_to_name = OrderedDict([(u, uuid_to_name[u]) for u in ordered_uuids])
         self._open_cache_dialog.activate(ordered_uuid_to_name)
 
-    def open_glob(self, *args, **kwargs):
-        text, ok = QtWidgets.QInputDialog.getText(self, 'Open Glob Pattern', 'Open files matching pattern:')
-        from glob import glob
-        if ok:
-            paths = list(glob(text))
-            self.open_paths(paths)
+    # def open_glob(self, *args, **kwargs):
+    #     text, ok = QtWidgets.QInputDialog.getText(self, 'Open Glob Pattern', 'Open files matching pattern:')
+    #     from glob import glob
+    #     if ok:
+    #         paths = list(glob(text))
+    #         self.open_paths(paths)
 
     def open_wizard(self, *args, **kwargs):
         from uwsift.view.open_file_wizard import OpenFileWizard
@@ -957,7 +957,7 @@ class Main(QtGui.QMainWindow):
 
     def _init_menu(self):
         open_action = QtWidgets.QAction("&Open...", self)
-        open_action.setShortcut("Ctrl+O")
+        open_action.setShortcut("Ctrl+Shift+O")
         open_action.triggered.connect(self.interactive_open_files)
 
         exit_action = QtWidgets.QAction("&Exit", self)
@@ -968,19 +968,19 @@ class Main(QtGui.QMainWindow):
         open_cache_action.setShortcut("Ctrl+A")
         open_cache_action.triggered.connect(self.open_from_cache)
 
-        open_glob_action = QtWidgets.QAction("Open Filename Pattern...", self)
-        open_glob_action.setShortcut("Ctrl+Shift+O")
-        open_glob_action.triggered.connect(self.open_glob)
+        # open_glob_action = QtWidgets.QAction("Open Filename Pattern...", self)
+        # open_glob_action.setShortcut("Ctrl+Shift+O")
+        # open_glob_action.triggered.connect(self.open_glob)
 
         open_wizard_action = QtWidgets.QAction("Open File Wizard...", self)
-        open_wizard_action.setShortcut("Ctrl+Alt+O")
+        open_wizard_action.setShortcuts(["Ctrl+O", "Ctrl+Alt+O"])
         open_wizard_action.triggered.connect(self.open_wizard)
 
         menubar = self.ui.menubar
         file_menu = menubar.addMenu('&File')
-        file_menu.addAction(open_action)
+        self.addAction(open_action)  # add it to the main window, not the menu (hide it)
         file_menu.addAction(open_cache_action)
-        file_menu.addAction(open_glob_action)
+        # file_menu.addAction(open_glob_action)
         file_menu.addAction(open_wizard_action)
         self._recent_files_menu = file_menu.addMenu('Open Recent')
 

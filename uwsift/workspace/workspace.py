@@ -66,7 +66,7 @@ LOG = logging.getLogger(__name__)
 DEFAULT_WORKSPACE_SIZE = 256
 MIN_WORKSPACE_SIZE = 8
 
-IMPORT_CLASSES = [GeoTiffImporter, GoesRPUGImporter]
+IMPORT_CLASSES = [GoesRPUGImporter]
 
 # first instance is main singleton instance; don't preclude the possibility of importing from another workspace later on
 TheWorkspace = None
@@ -270,8 +270,6 @@ class Workspace(QObject):
     # didDiscoverExternalDataset = pyqtSignal(dict)  # a new dataset was added to the workspace from an external agent
     didChangeProductState = pyqtSignal(UUID, Flags)  # a product changed state, e.g. an importer started working on it
 
-    _importers = [GeoTiffImporter, GoesRPUGImporter]
-
     _state: Mapping[UUID, Flags] = None
 
     def set_product_state_flag(self, uuid: UUID, flag):
@@ -359,7 +357,7 @@ class Workspace(QObject):
             self._init_inventory_existing_datasets()
 
         self._available = {}
-        self._importers = [x for x in IMPORT_CLASSES]
+        self._importers = IMPORT_CLASSES.copy()
         self._state = defaultdict(Flags)
         global TheWorkspace  # singleton
         if TheWorkspace is None:
@@ -854,11 +852,14 @@ class Workspace(QObject):
 
     def collect_product_metadata_for_paths(self, paths: list,
                                            **importer_kwargs) -> Generator[Tuple[int, frozendict], None, None]:
-        """
-        Start loading URI data into the workspace asynchronously.
-        return sequence of read-only info dictionaries
+        """Start loading URI data into the workspace asynchronously.
 
-        NOTE: If
+        Args:
+            paths (list): String paths to open and get metadata for
+            **importer_kwargs: Keyword arguments to pass to the lower-level
+                importer class.
+
+        Returns: sequence of read-only info dictionaries
 
         """
         with self._inventory as import_session:
@@ -901,10 +902,9 @@ class Workspace(QObject):
                 if 'scenes' in importer_kwargs:
                     # another component already created the satpy scenes, use those
                     scenes = importer_kwargs.pop('scenes')
+                    scenes = scenes.items()
                 else:
                     scenes = [(paths, None)]
-                if isinstance(scenes, dict):
-                    scenes = scenes.items()
                 for paths, scene in scenes:
                     imp = SatPyImporter
                     these_kwargs = importer_kwargs.copy()

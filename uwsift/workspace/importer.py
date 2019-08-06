@@ -194,7 +194,8 @@ class aImporter(ABC):
         except IndexError:
             LOG.error('no resources in {} {}'.format(repr(type(prod)), repr(prod)))
             raise
-        return cls(prod.resource[0].path, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
+        paths = [r.path for r in prod.resource]
+        return cls(paths, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
 
     @classmethod
     @abstractmethod
@@ -245,6 +246,9 @@ class aSingleFileWithSingleProductImporter(aImporter):
     _resource: Resource = None
 
     def __init__(self, source_path, workspace_cwd, database_session, **kwargs):
+        if isinstance(source_path, list) and len(source_path) == 1:
+            # backwards compatibility - we now expect a list
+            source_path = source_path[0]
         super(aSingleFileWithSingleProductImporter, self).__init__(workspace_cwd, database_session)
         self.source_path = source_path
 
@@ -806,28 +810,23 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
 class SatPyImporter(aImporter):
     """Generic SatPy importer"""
 
-    def __init__(self, source_path, workspace_cwd, database_session, **kwargs):
+    def __init__(self, source_paths, workspace_cwd, database_session, **kwargs):
         super(SatPyImporter, self).__init__(workspace_cwd, database_session)
         reader = kwargs.pop('reader', None)
         if reader is None:
             raise NotImplementedError("Can't automatically determine reader.")
-        if not isinstance(source_path, (list, tuple)):
-            source_path = [source_path]
+        if not isinstance(source_paths, (list, tuple)):
+            source_paths = [source_paths]
 
-        if len(source_path) > 1:
-            raise NotImplementedError("SatPy importer does not currently "
-                                      "support reading more than one file "
-                                      "at a time.")
         if Scene is None:
             raise ImportError("SatPy is not available and can't be used as "
                               "an importer")
-        self.filenames = list(source_path)
+        self.filenames = list(source_paths)
         self.reader = reader
         if 'scene' in kwargs:
             self.scn = kwargs['scene']
         else:
-            self.scn = Scene(reader=self.reader,
-                             filenames=self.filenames)
+            self.scn = Scene(reader=self.reader, filenames=self.filenames)
         self._resources = []
         # DatasetID filters
         self.product_filters = {}
@@ -854,7 +853,8 @@ class SatPyImporter(aImporter):
         kwargs.pop('scenes', None)
         kwargs.pop('scene', None)
         kwargs['dataset_ids'] = [DatasetID.from_dict(prod.info)]
-        return cls(prod.resource[0].path, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
+        filenames = [r.path for r in prod.resource]
+        return cls(filenames, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
 
     @classmethod
     def is_relevant(cls, source_path=None, source_uri=None):
@@ -997,9 +997,11 @@ class SatPyImporter(aImporter):
                 Kind.CONTOUR
             self._get_platform_instrument(ds.attrs)
             ds.attrs.setdefault(Info.STANDARD_NAME, ds.attrs.get('standard_name'))
+            print(ds.attrs.get('wavelength'), ds.attrs.get(Info.CENTRAL_WAVELENGTH), Info.CENTRAL_WAVELENGTH in ds.attrs)
             if 'wavelength' in ds.attrs:
                 ds.attrs.setdefault(Info.CENTRAL_WAVELENGTH,
                                     ds.attrs['wavelength'][0])
+            print(ds.attrs.get('wavelength'), ds.attrs.get(Info.CENTRAL_WAVELENGTH), Info.CENTRAL_WAVELENGTH in ds.attrs)
 
             # Resolve anything else needed by SIFT
             id_str = ":".join(str(v) for v in DatasetID.from_dict(ds.attrs))
@@ -1017,7 +1019,9 @@ class SatPyImporter(aImporter):
             if ds.attrs[Info.UNITS] == 'unknown':
                 LOG.warning("Layer units are unknown, using '1'")
                 ds.attrs[Info.UNITS] = 1
+            print(ds.attrs.get('wavelength'), ds.attrs.get(Info.CENTRAL_WAVELENGTH), Info.CENTRAL_WAVELENGTH in ds.attrs)
             generate_guidebook_metadata(ds.attrs)
+            print(ds.attrs.get('wavelength'), ds.attrs.get(Info.CENTRAL_WAVELENGTH), Info.CENTRAL_WAVELENGTH in ds.attrs)
 
             # Generate FAMILY and CATEGORY
             if 'model_time' in ds.attrs:
