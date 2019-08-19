@@ -1,7 +1,7 @@
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QComboBox, QSlider, QDoubleSpinBox, QWizardPage, QTableWidget, QListWidget
-from PyQt5.QtWebKitWidgets import QWebView
+from PyQt5.QtWebEngineWidgets import QWebEngineView
 
 
 class QNoScrollComboBox(QComboBox):
@@ -47,7 +47,7 @@ class QNoScrollDoubleSpinBox(QDoubleSpinBox):
             super(QNoScrollDoubleSpinBox, self).wheelEvent(ev)
 
 
-class QNoScrollWebView(QWebView):
+class QNoScrollWebView(QWebEngineView):
     def __init__(self, *args, **kwargs):
         super(QNoScrollWebView, self).__init__(*args, **kwargs)
         self.setFocusPolicy(Qt.StrongFocus)
