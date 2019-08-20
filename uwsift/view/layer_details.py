@@ -69,7 +69,7 @@ class SingleLayerInfoPane(QWidget):
         self.clims_text.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.cmap_vis = QNoScrollWebView()
         self.cmap_vis.setFixedSize(min_width, 30)
-        self.cmap_vis.page().mainFrame().setScrollBarPolicy(Qt.Vertical, Qt.ScrollBarAlwaysOff)
+        self.cmap_vis.page().runJavaScript('document.body.style.overflow = "hidden";')
         self.composite_details = QLabel("Composite Details")
         self.composite_details.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         f = QFont()
