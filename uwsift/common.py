@@ -343,7 +343,7 @@ class Presentation(NamedTuple):
     mixing: object  # mixing mode constant
 
 
-@jit(nb_types.UniTuple(int64, 2)(float64[:, :], float64[:, :]), forceobj=True)
+@jit(nb_types.UniTuple(int64, 2)(float64[:, :], float64[:, :]))
 def get_reference_points(img_cmesh, img_vbox):
     """Get two image reference point indexes.
 
@@ -372,7 +372,7 @@ def get_reference_points(img_cmesh, img_vbox):
     return ref_idx_1, near_points_2[0]
 
 
-@jit(nb_types.UniTuple(int64, 2)(float64[:, :], boolean[:, :]), forceobj=True)
+@jit(nb_types.UniTuple(int64, 2)(float64[:, :], boolean[:]))
 def get_reference_points_image(img_dist, valid_mask):
     """Get two image reference point indexes close to image center.
 
