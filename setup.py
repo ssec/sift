@@ -188,7 +188,7 @@ setup(
                       'PyOpenGL', 'netCDF4', 'h5py', 'pyproj',
                       'pyshp', 'shapely', 'rasterio', 'goesr', 'sqlalchemy',
                       'goesr', 'appdirs', 'pyyaml', 'pyqtgraph', 'satpy',
-                      'pygrib', 'imageio'
+                      'pygrib', 'imageio', 'pyqt5'
                       ],
     python_requires='>=3.6',
     extras_require=extras_require,
