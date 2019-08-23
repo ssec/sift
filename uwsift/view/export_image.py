@@ -4,10 +4,14 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 
 import imageio
 import numpy
+import tempfile
+import matplotlib as mpl
+from matplotlib import pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
 
 from uwsift.common import Info
 from uwsift.ui import export_image_dialog_ui
+from uwsift.view.colormap import COLORMAP_MANAGER
 from uwsift.util import get_package_data_dir, USER_DESKTOP_DIRECTORY
 
 LOG = logging.getLogger(__name__)
@@ -115,6 +119,14 @@ class ExportImageDialog(QtWidgets.QDialog):
         fn = self.ui.saveAsLineEdit.text()
         return is_video_filename(fn)
 
+    def _get_append_direction(self):
+        if self.ui.colorbarVerticalRadio.isChecked():
+            return "vertical"
+        elif self.ui.colorbarHorizontalRadio.isChecked():
+            return "horizontal"
+        else:
+            return None
+
     def _check_animation_controls(self):
         is_gif = self._is_gif_filename()
         is_video = self._is_video_filename()
@@ -168,6 +180,7 @@ class ExportImageDialog(QtWidgets.QDialog):
             'filename': self.ui.saveAsLineEdit.text(),
             'fps': fps,
             'font_size': self.ui.footerFontSizeSpinBox.value(),
+            'colorbar': self._get_append_direction(),
         }
         return info
 
@@ -182,7 +195,7 @@ class ExportImageHelper(QtCore.QObject):
 
     def __init__(self, parent, doc, sgm):
         """Initialize helper with defaults and other object handles.
-        
+
         Args:
             doc: Main ``Document`` object for frame metadata
             sgm: ``SceneGraphManager`` object to get image data
@@ -213,6 +226,48 @@ class ExportImageHelper(QtCore.QObject):
         new_draw.text([orig_w - txt_w, orig_h], "SIFT", fill="#ffffff", font=font)
         new_im.paste(im, (0, 0, orig_w, orig_h))
         return new_im
+
+    def _append_colorbar(self, mode, im, u):
+        mpl.rcParams['font.sans-serif'] = 'arial'
+        mpl.rcParams.update({'font.size': 16})
+        colors = COLORMAP_MANAGER[self.doc.colormap_for_uuid(u)].colors.rgba
+
+        LOG.info("control points: {}".format(COLORMAP_MANAGER[self.doc.colormap_for_uuid(u)]._controls))
+        LOG.info("colors: {}".format(COLORMAP_MANAGER[self.doc.colormap_for_uuid(u)].colors))
+        with tempfile.TemporaryFile(suffix='.png') as tmpfile:
+            if mode == 'vertical':
+                fig = plt.figure(figsize=(2, 11.8))
+                ax = fig.add_axes([0.35, 0.05, 0.2, 0.9])
+            else:
+                fig = plt.figure(figsize=(19.45, 2))
+                ax = fig.add_axes([0.05, 0.4, 0.9, 0.2])
+
+            cmap = mpl.colors.ListedColormap(colors)
+            vmin, vmax = self.doc.prez_for_uuid(u).climits
+            norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+            if len(colors) < 15:
+                ticks = numpy.linspace(vmin, vmax, len(colors) + 1)
+            else:
+                ticks = numpy.linspace(vmin, vmax, 3)
+            mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation=mode, ticks=ticks)
+            fig.savefig(tmpfile, format='png')
+            fig_im = Image.open(tmpfile)
+            orig_w, orig_h = im.size
+            fig_w, fig_h = fig_im.size
+
+            offset = 0
+            if mode == 'vertical':
+                new_im = Image.new(im.mode, (orig_w + fig_w, orig_h))
+                for i in [im, fig_im]:
+                    new_im.paste(i, (offset, 0))
+                    offset += i.size[0]
+                return new_im
+            else:
+                new_im = Image.new(im.mode, (orig_w, orig_h + fig_h))
+                for i in [im, fig_im]:
+                    new_im.paste(i, (0, offset))
+                    offset += i.size[1]
+                return new_im
 
     def _create_filenames(self, uuids, base_filename):
         if not uuids or uuids[0] is None:
@@ -311,6 +366,9 @@ class ExportImageHelper(QtCore.QObject):
             return
 
         images = [(u, Image.fromarray(x)) for u, x in img_arrays]
+
+        if info['colorbar'] != None:
+            images = [(u, self._append_colorbar(info['colorbar'], im, u)) for (u, im) in images]
 
         if info['include_footer']:
             banner_text = [self.doc[u][Info.DISPLAY_NAME] if u else "" for u, im in images]
