@@ -191,6 +191,26 @@
       <property name="currentIndex">
        <number>0</number>
       </property>
+      <widget class="QWidget" name="selectByID">
+       <attribute name="title">
+        <string>List</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_5">
+        <item>
+         <widget class="QTableWidget" name="selectIDTable">
+          <property name="dragEnabled">
+           <bool>false</bool>
+          </property>
+          <property name="selectionBehavior">
+           <enum>QAbstractItemView::SelectRows</enum>
+          </property>
+          <property name="sortingEnabled">
+           <bool>false</bool>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
       <widget class="QWidget" name="selectByParameters">
        <attribute name="title">
         <string>Properties</string>
@@ -251,26 +271,6 @@
         </item>
        </layout>
       </widget>
-      <widget class="QWidget" name="selectByID">
-       <attribute name="title">
-        <string>List</string>
-       </attribute>
-       <layout class="QVBoxLayout" name="verticalLayout_5">
-        <item>
-         <widget class="QTableWidget" name="selectIDTable">
-          <property name="dragEnabled">
-           <bool>false</bool>
-          </property>
-          <property name="selectionBehavior">
-           <enum>QAbstractItemView::SelectRows</enum>
-          </property>
-          <property name="sortingEnabled">
-           <bool>false</bool>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </widget>
      </widget>
     </item>
    </layout>
@@ -297,7 +297,7 @@
   <customwidget>
    <class>AnyWizardPage</class>
    <extends>QWizardPage</extends>
-   <header>sift/ui/custom_widgets.h</header>
+   <header>uwsift/ui/custom_widgets.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

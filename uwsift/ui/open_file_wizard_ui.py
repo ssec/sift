@@ -2,22 +2,11 @@
 
 # Form implementation generated from reading ui file 'open_file_wizard.ui'
 #
-# Created by: PyQt4 UI code generator 4.11.4
+# Created by: PyQt5 UI code generator 5.6
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-
-try:
-    _encoding = QtWidgets.QApplication.UnicodeUTF8
-
-
-    def _translate(context, text, disambig):
-        return QtCore.QCoreApplication.translate(context, text, disambig, _encoding)
-except AttributeError:
-    def _translate(context, text, disambig):
-        return QtCore.QCoreApplication.translate(context, text, disambig)
-
 
 class Ui_openFileWizard(object):
     def setupUi(self, openFileWizard):
@@ -89,9 +78,23 @@ class Ui_openFileWizard(object):
         self.verticalLayout.setObjectName("verticalLayout")
         self.selectByTabWidget = QtWidgets.QTabWidget(self.productSelectionPage)
         self.selectByTabWidget.setObjectName("selectByTabWidget")
+        self.selectByID = QtWidgets.QWidget()
+        self.selectByID.setObjectName("selectByID")
+        self.verticalLayout_5 = QtWidgets.QVBoxLayout(self.selectByID)
+        self.verticalLayout_5.setContentsMargins(0, 0, 0, 0)
+        self.verticalLayout_5.setObjectName("verticalLayout_5")
+        self.selectIDTable = QtWidgets.QTableWidget(self.selectByID)
+        self.selectIDTable.setDragEnabled(False)
+        self.selectIDTable.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.selectIDTable.setObjectName("selectIDTable")
+        self.selectIDTable.setColumnCount(0)
+        self.selectIDTable.setRowCount(0)
+        self.verticalLayout_5.addWidget(self.selectIDTable)
+        self.selectByTabWidget.addTab(self.selectByID, "")
         self.selectByParameters = QtWidgets.QWidget()
         self.selectByParameters.setObjectName("selectByParameters")
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout(self.selectByParameters)
+        self.horizontalLayout_2.setContentsMargins(0, 0, 0, 0)
         self.horizontalLayout_2.setObjectName("horizontalLayout_2")
         self.selectByNameLayout = QtWidgets.QVBoxLayout()
         self.selectByNameLayout.setObjectName("selectByNameLayout")
@@ -125,18 +128,6 @@ class Ui_openFileWizard(object):
         self.selectByLevelLayout.addWidget(self.selectByLevelList)
         self.horizontalLayout_2.addLayout(self.selectByLevelLayout)
         self.selectByTabWidget.addTab(self.selectByParameters, "")
-        self.selectByID = QtWidgets.QWidget()
-        self.selectByID.setObjectName("selectByID")
-        self.verticalLayout_5 = QtWidgets.QVBoxLayout(self.selectByID)
-        self.verticalLayout_5.setObjectName("verticalLayout_5")
-        self.selectIDTable = QtWidgets.QTableWidget(self.selectByID)
-        self.selectIDTable.setDragEnabled(False)
-        self.selectIDTable.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
-        self.selectIDTable.setObjectName("selectIDTable")
-        self.selectIDTable.setColumnCount(0)
-        self.selectIDTable.setRowCount(0)
-        self.verticalLayout_5.addWidget(self.selectIDTable)
-        self.selectByTabWidget.addTab(self.selectByID, "")
         self.verticalLayout.addWidget(self.selectByTabWidget)
         openFileWizard.addPage(self.productSelectionPage)
         self.summaryPage = QtWidgets.QWizardPage()
@@ -154,27 +145,25 @@ class Ui_openFileWizard(object):
         QtCore.QMetaObject.connectSlotsByName(openFileWizard)
 
     def retranslateUi(self, openFileWizard):
-        openFileWizard.setWindowTitle(_translate("openFileWizard", "Open File Wizard", None))
-        self.fileSelectionPage.setTitle(_translate("openFileWizard", "Select Files", None))
-        self.fileSelectionPage.setSubTitle(_translate("openFileWizard", "Add data files to be opened", None))
-        self.readerLabel.setText(_translate("openFileWizard", "Reader:", None))
-        self.inputFilesLabel.setText(_translate("openFileWizard", "Input Files", None))
+        _translate = QtCore.QCoreApplication.translate
+        openFileWizard.setWindowTitle(_translate("openFileWizard", "Open File Wizard"))
+        self.fileSelectionPage.setTitle(_translate("openFileWizard", "Select Files"))
+        self.fileSelectionPage.setSubTitle(_translate("openFileWizard", "Add data files to be opened"))
+        self.readerLabel.setText(_translate("openFileWizard", "Reader:"))
+        self.inputFilesLabel.setText(_translate("openFileWizard", "Input Files"))
         self.fileList.setSortingEnabled(True)
-        self.addButton.setToolTip(_translate("openFileWizard", "Add files/dirs to list", None))
-        self.addButton.setText(_translate("openFileWizard", "+", None))
-        self.removeButton.setToolTip(_translate("openFileWizard", "Remove file from list", None))
-        self.removeButton.setText(_translate("openFileWizard", "-", None))
-        self.productSelectionPage.setTitle(_translate("openFileWizard", "Select Products", None))
-        self.productSelectionPage.setSubTitle(_translate("openFileWizard", "Select products to add", None))
-        self.selectByNameLabel.setText(_translate("openFileWizard", "Name", None))
-        self.selectByLevelLabel.setText(_translate("openFileWizard", "Level", None))
-        self.selectByTabWidget.setTabText(self.selectByTabWidget.indexOf(self.selectByParameters),
-                                          _translate("openFileWizard", "Properties", None))
+        self.addButton.setToolTip(_translate("openFileWizard", "Add files/dirs to list"))
+        self.addButton.setText(_translate("openFileWizard", "+"))
+        self.removeButton.setToolTip(_translate("openFileWizard", "Remove file from list"))
+        self.removeButton.setText(_translate("openFileWizard", "-"))
+        self.productSelectionPage.setTitle(_translate("openFileWizard", "Select Products"))
+        self.productSelectionPage.setSubTitle(_translate("openFileWizard", "Select products to add"))
         self.selectIDTable.setSortingEnabled(False)
-        self.selectByTabWidget.setTabText(self.selectByTabWidget.indexOf(self.selectByID),
-                                          _translate("openFileWizard", "List", None))
-        self.summaryPage.setTitle(_translate("openFileWizard", "Products Summary", None))
-        self.summaryPage.setSubTitle(_translate("openFileWizard", "Verify the products that will be loaded", None))
-
+        self.selectByTabWidget.setTabText(self.selectByTabWidget.indexOf(self.selectByID), _translate("openFileWizard", "List"))
+        self.selectByNameLabel.setText(_translate("openFileWizard", "Name"))
+        self.selectByLevelLabel.setText(_translate("openFileWizard", "Level"))
+        self.selectByTabWidget.setTabText(self.selectByTabWidget.indexOf(self.selectByParameters), _translate("openFileWizard", "Properties"))
+        self.summaryPage.setTitle(_translate("openFileWizard", "Products Summary"))
+        self.summaryPage.setSubTitle(_translate("openFileWizard", "Verify the products that will be loaded"))
 
 from uwsift.ui.custom_widgets import AnyWizardPage

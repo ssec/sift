@@ -152,7 +152,7 @@
   <customwidget>
    <class>QNoScrollDoubleSpinBox</class>
    <extends>QDoubleSpinBox</extends>
-   <header>sift.ui.custom_widgets</header>
+   <header>uwsift.ui.custom_widgets</header>
   </customwidget>
  </customwidgets>
  <resources/>

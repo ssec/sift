@@ -992,17 +992,17 @@
   <customwidget>
    <class>QNoScrollComboBox</class>
    <extends>QComboBox</extends>
-   <header>sift.ui.custom_widgets</header>
+   <header>uwsift.ui.custom_widgets</header>
   </customwidget>
   <customwidget>
    <class>QNoScrollSlider</class>
    <extends>QSlider</extends>
-   <header>sift.ui.custom_widgets</header>
+   <header>uwsift.ui.custom_widgets</header>
   </customwidget>
   <customwidget>
    <class>QNoScrollDoubleSpinBox</class>
    <extends>QDoubleSpinBox</extends>
-   <header>sift.ui.custom_widgets</header>
+   <header>uwsift.ui.custom_widgets</header>
   </customwidget>
  </customwidgets>
  <resources/>

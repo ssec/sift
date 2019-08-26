@@ -997,11 +997,9 @@ class SatPyImporter(aImporter):
                 Kind.CONTOUR
             self._get_platform_instrument(ds.attrs)
             ds.attrs.setdefault(Info.STANDARD_NAME, ds.attrs.get('standard_name'))
-            print(ds.attrs.get('wavelength'), ds.attrs.get(Info.CENTRAL_WAVELENGTH), Info.CENTRAL_WAVELENGTH in ds.attrs)
             if 'wavelength' in ds.attrs:
                 ds.attrs.setdefault(Info.CENTRAL_WAVELENGTH,
                                     ds.attrs['wavelength'][0])
-            print(ds.attrs.get('wavelength'), ds.attrs.get(Info.CENTRAL_WAVELENGTH), Info.CENTRAL_WAVELENGTH in ds.attrs)
 
             # Resolve anything else needed by SIFT
             id_str = ":".join(str(v) for v in DatasetID.from_dict(ds.attrs))
@@ -1019,9 +1017,7 @@ class SatPyImporter(aImporter):
             if ds.attrs[Info.UNITS] == 'unknown':
                 LOG.warning("Layer units are unknown, using '1'")
                 ds.attrs[Info.UNITS] = 1
-            print(ds.attrs.get('wavelength'), ds.attrs.get(Info.CENTRAL_WAVELENGTH), Info.CENTRAL_WAVELENGTH in ds.attrs)
             generate_guidebook_metadata(ds.attrs)
-            print(ds.attrs.get('wavelength'), ds.attrs.get(Info.CENTRAL_WAVELENGTH), Info.CENTRAL_WAVELENGTH in ds.attrs)
 
             # Generate FAMILY and CATEGORY
             if 'model_time' in ds.attrs:
