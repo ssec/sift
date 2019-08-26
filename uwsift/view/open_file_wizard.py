@@ -20,7 +20,7 @@ from PyQt5 import QtCore, QtWidgets
 from collections import OrderedDict
 from typing import Generator, Tuple, Iterable
 
-from satpy import Scene, DatasetID, DATASET_KEYS
+from satpy import Scene, DatasetID
 from satpy.readers import group_files
 
 from uwsift.ui.open_file_wizard_ui import Ui_openFileWizard
@@ -108,9 +108,11 @@ class OpenFileWizard(QtWidgets.QWizard):
     def collect_selected_ids(self):
         selected_ids = []
         for item_idx in range(self.ui.selectIDTable.rowCount()):
-            id_items = OrderedDict((key, self.ui.selectIDTable.item(item_idx, id_idx)) for id_idx, key in enumerate(ID_COMPONENTS))
+            id_items = OrderedDict((key, self.ui.selectIDTable.item(item_idx, id_idx))
+                                   for id_idx, key in enumerate(ID_COMPONENTS))
             if id_items['name'].checkState():
-                id_dict = {key: id_item.data(QtCore.Qt.UserRole) for key, id_item in id_items.items() if id_item is not None}
+                id_dict = {key: id_item.data(QtCore.Qt.UserRole)
+                           for key, id_item in id_items.items() if id_item is not None}
                 selected_ids.append(DatasetID(**id_dict))
         return selected_ids
 
