@@ -18,8 +18,9 @@
 import os
 from PyQt5 import QtCore, QtGui, QtWidgets
 from collections import OrderedDict
+from typing import Generator, Tuple, Iterable
 
-from satpy import MultiScene, Scene, DatasetID
+from satpy import Scene, DatasetID, DATASET_KEYS
 from satpy.readers import group_files
 
 from uwsift.ui.open_file_wizard_ui import Ui_openFileWizard
@@ -28,8 +29,57 @@ FILE_PAGE = 0
 PRODUCT_PAGE = 1
 SUMMARY_PAGE = 2
 
-BY_PARAMETER_TAB = 0
-BY_ID_TAB = 1
+BY_PARAMETER_TAB = 1
+BY_ID_TAB = 0
+
+ID_COMPONENTS = [
+    'name',
+    'wavelength',
+    'resolution',
+    'calibration',
+    'level',
+]
+READERS = None  # all readers
+
+FORMAT_WIDTH = {
+    'name': 20,
+    'wavelength': 10,
+    'calibration': 15,
+    'resolution': 12,
+    'polarization': 10,
+    'level': 8,
+}
+
+EXCLUDE_DATASETS = {'calibration': ['radiance', 'counts']}
+
+
+def _pretty_identifiers(ds_id: DatasetID) -> Generator[Tuple[str, object, str], None, None]:
+    """Determine pretty version of each identifier."""
+    for key in ID_COMPONENTS:
+        value = getattr(ds_id, key, None)
+        if value is None:
+            pretty_val = "N/A"
+        elif key == 'wavelength':
+            pretty_val = "{:0.02f} µm".format(value[1])
+        elif key == 'level':
+            pretty_val = "{:d} hPa".format(value)
+        elif key == 'resolution':
+            pretty_val = "{:d}m".format(value)
+        else:
+            pretty_val = value
+
+        yield key, value, pretty_val
+
+
+def _filter_identifiers(ids_to_filter: Iterable[DatasetID]) -> Generator[DatasetID, None, None]:
+    """Generate only non-filtered DatasetIDs based on EXCLUDE_DATASETS global filters."""
+    # skip certain DatasetIDs
+    for ds_id in ids_to_filter:
+        for filter_key, filtered_values in EXCLUDE_DATASETS.items():
+            if getattr(ds_id, filter_key) in filtered_values:
+                break
+        else:
+            yield ds_id
 
 
 class OpenFileWizard(QtWidgets.QWizard):
@@ -97,20 +147,20 @@ class OpenFileWizard(QtWidgets.QWizard):
         if tabs_switched:
             # we want to disconnect the previous tab
             current_idx = 0 if current_idx else 1
-        if current_idx == 0:
+        if current_idx == BY_PARAMETER_TAB:
             self._disconnect_next_button_signals(self.ui.selectByNameList, self.ui.productSelectionPage)
             self._disconnect_next_button_signals(self.ui.selectByLevelList, self.ui.productSelectionPage)
-        elif current_idx == 1:
+        elif current_idx == BY_ID_TAB:
             self._disconnect_next_button_signals(self.ui.selectIDTable, self.ui.productSelectionPage)
 
     def _connect_product_select_complete(self):
         current_idx = self.ui.selectByTabWidget.currentIndex()
-        if current_idx == 0:
+        if current_idx == BY_PARAMETER_TAB:
             self.ui.productSelectionPage.important_children = [
                 self.ui.selectByNameList, self.ui.selectByLevelList]
             self._connect_next_button_signals(self.ui.selectByNameList, self.ui.productSelectionPage)
             self._connect_next_button_signals(self.ui.selectByLevelList, self.ui.productSelectionPage)
-        elif current_idx == 1:
+        elif current_idx == BY_ID_TAB:
             self.ui.productSelectionPage.important_children = [self.ui.selectIDTable]
             self._connect_next_button_signals(self.ui.selectIDTable, self.ui.productSelectionPage)
 
@@ -135,29 +185,25 @@ class OpenFileWizard(QtWidgets.QWizard):
 
         # update the widgets
         all_available_products = sorted(all_available_products)
-        self.ui.selectIDTable.setRowCount(len(all_available_products))
         # name and level
-        self.ui.selectIDTable.setColumnCount(2)
-        self.ui.selectIDTable.setHorizontalHeaderLabels(['name', 'level'])
-        properties = OrderedDict((
-            ('name', set()),
-            ('level', set()),
-        ))
-        for idx, ds_id in enumerate(all_available_products):
-            pretty_name = ds_id.name.upper() if ds_id.level is not None else ds_id.name
-            properties['name'].add((ds_id.name, pretty_name))
-            pretty_level = "{:d} hPa".format(ds_id.level) if ds_id.level is not None else 'NA'
-            properties['level'].add((ds_id.level, pretty_level))
+        self.ui.selectIDTable.setColumnCount(len(ID_COMPONENTS))
+        self.ui.selectIDTable.setHorizontalHeaderLabels([x.title() for x in ID_COMPONENTS])
+        properties = OrderedDict(((key, set()) for key in DATASET_KEYS if key in ID_COMPONENTS))
+        for idx, ds_id in enumerate(_filter_identifiers(all_available_products)):
+            col_idx = 0
+            for id_key, id_val, pretty_val in _pretty_identifiers(ds_id):
+                if id_key not in ID_COMPONENTS:
+                    continue
 
-            item = QtWidgets.QTableWidgetItem(pretty_name)
-            item.setData(QtCore.Qt.UserRole, ds_id.name)
-            item.setFlags((item.flags() ^ QtCore.Qt.ItemIsEditable) | QtCore.Qt.ItemIsUserCheckable)
-            item.setCheckState(QtCore.Qt.Unchecked)
-            self.ui.selectIDTable.setItem(idx, 0, item)
-            item = QtWidgets.QTableWidgetItem(pretty_level)
-            item.setData(QtCore.Qt.UserRole, ds_id.level)
-            item.setFlags((item.flags() ^ QtCore.Qt.ItemIsEditable) | QtCore.Qt.ItemIsUserCheckable)
-            self.ui.selectIDTable.setItem(idx, 1, item)
+                self.ui.selectIDTable.setRowCount(idx + 1)
+                properties[id_key].add((id_val, pretty_val))
+                item = QtWidgets.QTableWidgetItem(pretty_val)
+                item.setData(QtCore.Qt.UserRole, id_val)
+                item.setFlags((item.flags() ^ QtCore.Qt.ItemIsEditable) | QtCore.Qt.ItemIsUserCheckable)
+                if id_key == 'name':
+                    item.setCheckState(QtCore.Qt.Unchecked)
+                self.ui.selectIDTable.setItem(idx, col_idx, item)
+                col_idx += 1
 
         # Update the per-property lists
         names = sorted(properties['name'])
@@ -188,9 +234,11 @@ class OpenFileWizard(QtWidgets.QWizard):
         # need to update which selections should be chosen
         names = set()
         levels = set()
+        id_idx_name = ID_COMPONENTS.index('name')
+        id_idx_level = ID_COMPONENTS.index('level')
         for item_idx in range(self.ui.selectIDTable.rowCount()):
-            name_item = self.ui.selectIDTable.item(item_idx, 0)
-            level_item = self.ui.selectIDTable.item(item_idx, 1)
+            name_item = self.ui.selectIDTable.item(item_idx, id_idx_name)
+            level_item = self.ui.selectIDTable.item(item_idx, id_idx_level)
 
             if name_item.checkState():
                 names.add(name_item.data(QtCore.Qt.UserRole))
@@ -220,12 +268,11 @@ class OpenFileWizard(QtWidgets.QWizard):
                 levels.add(item.data(QtCore.Qt.UserRole))
 
         for item_idx in range(self.ui.selectIDTable.rowCount()):
-            name_item = self.ui.selectIDTable.item(item_idx, 0)
-            level_item = self.ui.selectIDTable.item(item_idx, 1)
+            items = {id_comp: self.ui.selectIDTable.item(item_idx, id_idx) for id_idx, id_comp in enumerate(ID_COMPONENTS)}
 
-            name_selected = name_item.data(QtCore.Qt.UserRole) in names
-            level_selected = level_item.data(QtCore.Qt.UserRole) in levels
-            name_item.setCheckState(self._get_checked(name_selected and level_selected))
+            name_selected = items['name'].data(QtCore.Qt.UserRole) in names
+            level_selected = items['level'].data(QtCore.Qt.UserRole) in levels
+            items['name'].setCheckState(self._get_checked(name_selected and level_selected))
 
     def _product_selection_tab_change(self, tab_idx, force_reinit=True):
         self._disconnect_product_select_complete(tabs_switched=True)
@@ -243,20 +290,20 @@ class OpenFileWizard(QtWidgets.QWizard):
 
         selected_text = []
         selected_ids = []
-        id_format = "| {name:<20s} | {level:>8s} |"
-        header_format = "| {name:<20s} | {level:>8s} |"
-        header_line = "|-{0:-^20s}-|-{0:-^8s}-|".format('-')
+        # id_format = "| {name:<20s} | {level:>8s} |"
+        id_format = "| " + " | ".join("{{{key}:<{width}}}".format(key=key, width=FORMAT_WIDTH[key]) for key in ID_COMPONENTS) + " |"
+        # header_format = "| {name:<20s} | {level:>8s} |"
+        header_format = "| " + " | ".join("{{{key}:<{width}}}".format(key=key, width=FORMAT_WIDTH[key]) for key in ID_COMPONENTS) + " |"
+        # header_line = "|-{0:-^20s}-|-{0:-^8s}-|".format('-')
+        header_line = "|-" + "-|-".join("{{0:-^{width}}}".format(width=FORMAT_WIDTH[key]) for key in ID_COMPONENTS) + "-|"
+        header_line = header_line.format('-')
         for item_idx in range(self.ui.selectIDTable.rowCount()):
-            name_item = self.ui.selectIDTable.item(item_idx, 0)
-            level_item = self.ui.selectIDTable.item(item_idx, 1)
-            if name_item.checkState():
-                name = name_item.data(QtCore.Qt.UserRole)
-                level = level_item.data(QtCore.Qt.UserRole)
-                selected_ids.append(DatasetID(name=name, level=level))
-                selected_text.append(id_format.format(
-                    name=name_item.text(),
-                    level=level_item.text(),
-                ))
+            id_items = OrderedDict((key, self.ui.selectIDTable.item(item_idx, id_idx)) for id_idx, key in enumerate(ID_COMPONENTS))
+            if id_items['name'].checkState():
+                id_dict = {key: id_item.data(QtCore.Qt.UserRole) for key, id_item in id_items.items() if id_item is not None}
+                text_dict = {key: ("N/A" if id_item is None else id_item.text()) for key, id_item in id_items.items()}
+                selected_ids.append(DatasetID(**id_dict))
+                selected_text.append(id_format.format(**text_dict))
 
         self.selected_ids = selected_ids
 
@@ -264,7 +311,7 @@ class OpenFileWizard(QtWidgets.QWizard):
 
 """.format(len(selected_ids))
 
-        header = header_format.format(name="Name", level="Level")
+        header = header_format.format(**{key: key.title() for key in ID_COMPONENTS})
         summary_text += "\n".join([header, header_line] + selected_text)
         self.ui.productSummaryText.setText(summary_text)
 
