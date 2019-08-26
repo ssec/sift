@@ -930,7 +930,7 @@ class Main(QtGui.QMainWindow):
             importer_kwargs = {
                 'reader': reader,
                 'scenes': scenes,
-                'dataset_ids': wizard_dialog.selected_ids,
+                'dataset_ids': wizard_dialog.collect_selected_ids(),
             }
             self.open_paths(wizard_dialog._selected_files,
                             **importer_kwargs)
