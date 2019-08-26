@@ -889,20 +889,17 @@ class SatPyImporter(aImporter):
         self._resources = res_dict.values()
         return self._resources
 
-    def merge_products(self):
+    def merge_products(self) -> Iterable[Product]:
         resources = self.merge_resources()
         if resources is None:
             LOG.debug('no resources for {}'.format(self.filenames))
             return
 
-        # FIXME: This doesn't work for multiple files to one product
+        existing_ids = {}
         resources = list(resources)
-        if len(resources) > 1:
-            raise NotImplementedError("Products created from more than one "
-                                      "file are not currently supported.")
-        res = resources[0]
-        products = list(res.product)
-        existing_ids = {DatasetID.from_dict(prod.info): prod for prod in products}
+        for res in resources:
+            products = list(res.product)
+            existing_ids.update({DatasetID.from_dict(prod.info): prod for prod in products})
         existing_prods = {x: existing_ids[x] for x in self.dataset_ids if x in existing_ids}
         if products and len(existing_prods) == len(self.dataset_ids):
             products = existing_prods.values()
@@ -927,7 +924,7 @@ class SatPyImporter(aImporter):
                 uuid_str=str(uuid),
                 atime=now,
             )
-            prod.resource.append(res)
+            prod.resource.extend(resources)
 
             assert (Info.OBS_TIME in meta)
             assert (Info.OBS_DURATION in meta)

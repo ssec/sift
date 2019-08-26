@@ -932,6 +932,7 @@ class Main(QtGui.QMainWindow):
                 'scenes': scenes,
                 'dataset_ids': wizard_dialog.collect_selected_ids(),
             }
+            self._last_open_dir = wizard_dialog.last_open_dir
             self.open_paths(wizard_dialog._selected_files,
                             **importer_kwargs)
         else:

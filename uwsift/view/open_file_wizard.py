@@ -73,11 +73,13 @@ class OpenFileWizard(QtWidgets.QWizard):
 
     def __init__(self, base_dir=None, parent=None):
         super(OpenFileWizard, self).__init__(parent)
-        self._last_open_dir = base_dir
+        self.last_open_dir = base_dir
         self._filenames = set()
         self._selected_files = []
         # tuple(filenames) -> scene object
         self.scenes = {}
+        # filename -> group tuple of filenames
+        self.all_known_files = {}
 
         self.ui = Ui_openFileWizard()
         self.ui.setupUi(self)
@@ -142,9 +144,17 @@ class OpenFileWizard(QtWidgets.QWizard):
             # file_group includes what reader to use
             # NOTE: We only allow a single reader at a time
             groups_files = tuple(sorted(fn for group_id, group_list in file_group.items() for fn in group_list))
-            self.scenes[groups_files] = scn = Scene(filenames=file_group)
+            if groups_files not in self.scenes:
+                # never seen this exact group of files before
+                # let's make sure we remove any previous sub-groups
+                for fn in groups_files:
+                    if fn in self.all_known_files:
+                        del self.scenes[self.all_known_files[fn]]
+                    self.all_known_files[fn] = groups_files
+                self.scenes[groups_files] = scn = Scene(filenames=file_group)
+            else:
+                scn = self.scenes[groups_files]
 
-            # TODO: Add a check to see if they've already imported these Scenes
             all_available_products.update(scn.available_dataset_ids())
 
         # update the widgets
@@ -181,10 +191,10 @@ class OpenFileWizard(QtWidgets.QWizard):
         filename_filters = ['All files (*.*)']
         filter_str = ';;'.join(filename_filters)
         files = QtWidgets.QFileDialog.getOpenFileNames(
-            self, "Select one or more files to open", self._last_open_dir or os.getenv("HOME"), filter_str)[0]
+            self, "Select one or more files to open", self.last_open_dir or os.getenv("HOME"), filter_str)[0]
         if not files:
             return
-        self._last_open_dir = os.path.dirname(files[0])
+        self.last_open_dir = os.path.dirname(files[0])
         for fn in files:
             if fn in self._filenames:
                 continue
