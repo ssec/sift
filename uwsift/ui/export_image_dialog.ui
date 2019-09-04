@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>342</width>
+    <width>272</width>
     <height>490</height>
    </rect>
   </property>
@@ -28,7 +28,7 @@
    </property>
    <property name="geometry">
     <rect>
-     <x>180</x>
+     <x>110</x>
      <y>450</y>
      <width>161</width>
      <height>32</height>
@@ -49,7 +49,7 @@
     <rect>
      <x>10</x>
      <y>30</y>
-     <width>321</width>
+     <width>251</width>
      <height>111</height>
     </rect>
    </property>
@@ -99,7 +99,7 @@
      <rect>
       <x>10</x>
       <y>80</y>
-      <width>100</width>
+      <width>71</width>
       <height>21</height>
      </rect>
     </property>
@@ -110,7 +110,7 @@
    <widget class="QLabel" name="label">
     <property name="geometry">
      <rect>
-      <x>110</x>
+      <x>80</x>
       <y>80</y>
       <width>41</width>
       <height>21</height>
@@ -126,9 +126,9 @@
    <widget class="QLineEdit" name="frameRangeFrom">
     <property name="geometry">
      <rect>
-      <x>150</x>
+      <x>120</x>
       <y>80</y>
-      <width>61</width>
+      <width>31</width>
       <height>21</height>
      </rect>
     </property>
@@ -148,7 +148,7 @@
    <widget class="QLabel" name="label_2">
     <property name="geometry">
      <rect>
-      <x>230</x>
+      <x>160</x>
       <y>80</y>
       <width>21</width>
       <height>21</height>
@@ -161,9 +161,9 @@
    <widget class="QLineEdit" name="frameRangeTo">
     <property name="geometry">
      <rect>
-      <x>250</x>
+      <x>180</x>
       <y>80</y>
-      <width>61</width>
+      <width>31</width>
       <height>21</height>
      </rect>
     </property>
@@ -174,7 +174,7 @@
     <rect>
      <x>10</x>
      <y>10</y>
-     <width>291</width>
+     <width>221</width>
      <height>21</height>
     </rect>
    </property>
@@ -185,7 +185,7 @@
   <widget class="QPushButton" name="saveAsButton">
    <property name="geometry">
     <rect>
-     <x>300</x>
+     <x>230</x>
      <y>10</y>
      <width>31</width>
      <height>21</height>
@@ -241,8 +241,8 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>200</y>
-     <width>261</width>
+     <y>210</y>
+     <width>251</width>
      <height>131</height>
     </rect>
    </property>
@@ -371,8 +371,8 @@
     <rect>
      <x>10</x>
      <y>340</y>
-     <width>161</width>
-     <height>131</height>
+     <width>251</width>
+     <height>61</height>
     </rect>
    </property>
    <property name="title">
@@ -397,8 +397,8 @@
    <widget class="QRadioButton" name="colorbarHorizontalRadio">
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>60</y>
+      <x>80</x>
+      <y>30</y>
       <width>91</width>
       <height>21</height>
      </rect>
@@ -410,8 +410,8 @@
    <widget class="QRadioButton" name="colorbarVerticalRadio">
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>90</y>
+      <x>170</x>
+      <y>30</y>
       <width>81</width>
       <height>21</height>
      </rect>
@@ -424,13 +424,13 @@
   <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
-     <x>190</x>
-     <y>370</y>
-     <width>136</width>
-     <height>51</height>
+     <x>10</x>
+     <y>410</y>
+     <width>255</width>
+     <height>33</height>
     </rect>
    </property>
-   <layout class="QVBoxLayout" name="verticalLayout">
+   <layout class="QHBoxLayout" name="horizontalLayout_2">
     <item>
      <widget class="QCheckBox" name="includeFooterCheckbox">
       <property name="text">
@@ -443,6 +443,32 @@
     </item>
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout">
+      <item>
+       <spacer name="horizontalSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer_2">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
       <item>
        <widget class="QLabel" name="label_3">
         <property name="text">
