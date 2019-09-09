@@ -310,11 +310,11 @@ def calc_vertex_coordinates(tiy, tix, stridey, stridex, factor_rez, offset_rez, 
             start_idx = x_idx * tessellation_level + y_idx
             quads[start_idx * 6:(start_idx + 1) * 6, 0] *= tile_w * factor_rez.dx / tessellation_level
             quads[start_idx * 6:(start_idx + 1) * 6, 0] += origin_x + tile_w * (
-                    tix + offset_rez.dx + factor_rez.dx * x_idx / tessellation_level)
+                tix + offset_rez.dx + factor_rez.dx * x_idx / tessellation_level)
             # Origin is upper-left so image goes dow,n
             quads[start_idx * 6:(start_idx + 1) * 6, 1] *= -tile_h * factor_rez.dy / tessellation_level
             quads[start_idx * 6:(start_idx + 1) * 6, 1] += origin_y - tile_h * (
-                    tiy + offset_rez.dy + factor_rez.dy * y_idx / tessellation_level)
+                tiy + offset_rez.dy + factor_rez.dy * y_idx / tessellation_level)
     return quads
 
 
@@ -331,10 +331,10 @@ def calc_texture_coordinates(tiy, tix, factor_rez, tessellation_level, texture_s
             # location as possible
             quads[start_idx * 6:(start_idx + 1) * 6, 0] *= one_tile_tex_width * factor_rez.dx / tessellation_level
             quads[start_idx * 6:(start_idx + 1) * 6, 0] += one_tile_tex_width * (
-                    tix + factor_rez.dx * x_idx / tessellation_level)
+                tix + factor_rez.dx * x_idx / tessellation_level)
             quads[start_idx * 6:(start_idx + 1) * 6, 1] *= one_tile_tex_height * factor_rez.dy / tessellation_level
             quads[start_idx * 6:(start_idx + 1) * 6, 1] += one_tile_tex_height * (
-                    tiy + factor_rez.dy * y_idx / tessellation_level)
+                tiy + factor_rez.dy * y_idx / tessellation_level)
     return quads
 
 
