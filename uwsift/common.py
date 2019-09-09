@@ -31,7 +31,7 @@ import os
 import sys
 from datetime import datetime, timedelta
 import logging
-from numba import jit, float64, float32, int64, boolean, types as nb_types
+from numba import jit, float64, int64, types as nb_types
 from pyproj import Proj
 
 LOG = logging.getLogger(__name__)

@@ -1,5 +1,5 @@
 import numpy as np
-from numba import jit, float64, float32, int64, boolean, types as nb_types
+from numba import jit, float64, int64, types as nb_types
 from pyproj import Proj
 
 from uwsift.common import (Resolution, Point, Box, ViewBox,
