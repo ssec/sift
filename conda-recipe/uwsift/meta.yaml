@@ -50,7 +50,7 @@ requirements:
     - pyqtgraph
     - shapely
     - sqlalchemy
-    - pyqt >=5
+    - pyqt >=5.9
     - appdirs
     - pyyaml
     - quamash
