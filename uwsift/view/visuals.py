@@ -45,11 +45,11 @@ from uwsift.common import (
     DEFAULT_TEXTURE_WIDTH,
     TESS_LEVEL,
     Box, Point, Resolution, ViewBox,
-    TileCalculator,
     calc_pixel_size,
     get_reference_points,
 )
 from uwsift.view.texture_atlas import TextureAtlas2D, Texture2D
+from uwsift.view.tile_calculator import TileCalculator
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
