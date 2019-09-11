@@ -17,8 +17,10 @@
 
 import os
 from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtCore import QPoint
+from PyQt5.QtWidgets import QMenu, QAction
 from collections import OrderedDict
-from typing import Generator, Tuple, Iterable
+from typing import Generator, Tuple, Iterable, Union
 
 from satpy import Scene, DatasetID
 from satpy.readers import group_files
@@ -73,6 +75,8 @@ class OpenFileWizard(QtWidgets.QWizard):
 
     def __init__(self, base_dir=None, parent=None):
         super(OpenFileWizard, self).__init__(parent)
+        # enable context menus
+        self.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
         self.last_open_dir = base_dir
         self._filenames = set()
         self._selected_files = []
@@ -94,6 +98,10 @@ class OpenFileWizard(QtWidgets.QWizard):
 
         # Page 2 - Product selection
         self._connect_next_button_signals(self.ui.selectIDTable, self.ui.productSelectionPage)
+        self._all_selected = True
+        self.ui.selectAllButton.clicked.connect(self.select_all_products_state)
+        self.ui.selectIDTable.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.ui.selectIDTable.customContextMenuRequested.connect(self._product_context_menu)
 
     def _connect_next_button_signals(self, widget, page):
         widget.model().rowsInserted.connect(page.completeChangedSlot)
@@ -104,6 +112,44 @@ class OpenFileWizard(QtWidgets.QWizard):
         widget.model().rowsInserted.disconnect(page.completeChangedSlot)
         widget.model().rowsRemoved.disconnect(page.completeChangedSlot)
         widget.itemChanged.disconnect(page.completeChangedSlot)
+
+    def select_all_products_state(self, checked: bool):
+        """Select all or deselect all products listed on the product table."""
+        # the new state (all selected or all unselected)
+        self._all_selected = not self._all_selected
+        self.select_all_products(select=self._all_selected)
+
+    def select_all_products(self, select=True, prop_key: Union[str, None] = None,
+                            prop_val: Union[str, None] = None):
+        """Select products based on a specific property."""
+        if prop_key is not None:
+            prop_column = ID_COMPONENTS.index(prop_key)
+        else:
+            prop_column = 0
+
+        for row_idx in range(self.ui.selectIDTable.rowCount()):
+            # our check state goes on the name item (always)
+            name_item = self.ui.selectIDTable.item(row_idx, 0)
+            if prop_key is not None:
+                prop_item = self.ui.selectIDTable.item(row_idx, prop_column)
+                item_val = prop_item.data(QtCore.Qt.UserRole)
+                if item_val != prop_val:
+                    continue
+            check_state = self._get_checked(select)
+            name_item.setCheckState(check_state)
+
+    def _product_context_menu(self, position: QPoint):
+        item = self.ui.selectIDTable.itemAt(position)
+        col = item.column()
+        id_comp = ID_COMPONENTS[col]
+        id_val = item.data(QtCore.Qt.UserRole)
+        menu = QMenu()
+        select_action = menu.addAction("Select all by '{}'".format(id_comp))
+        deselect_action = menu.addAction("Deselect all by '{}'".format(id_comp))
+        action = menu.exec_(self.ui.selectIDTable.mapToGlobal(position))
+        if action == select_action or action == deselect_action:
+            select = action == select_action
+            self.select_all_products(select=select, prop_key=id_comp, prop_val=id_val)
 
     def collect_selected_ids(self):
         selected_ids = []
@@ -175,7 +221,7 @@ class OpenFileWizard(QtWidgets.QWizard):
                 item.setData(QtCore.Qt.UserRole, id_val)
                 item.setFlags((item.flags() ^ QtCore.Qt.ItemIsEditable) | QtCore.Qt.ItemIsUserCheckable)
                 if id_key == 'name':
-                    item.setCheckState(QtCore.Qt.Unchecked)
+                    item.setCheckState(QtCore.Qt.Checked)
                 self.ui.selectIDTable.setItem(idx, col_idx, item)
                 col_idx += 1
 

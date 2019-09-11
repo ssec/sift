@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'open_file_wizard.ui'
 #
-# Created by: PyQt5 UI code generator 5.6
+# Created by: PyQt5 UI code generator 5.9.2
 #
 # WARNING! All changes made in this file will be lost!
 
@@ -76,6 +76,14 @@ class Ui_openFileWizard(object):
         self.productSelectionPage.setObjectName("productSelectionPage")
         self.verticalLayout = QtWidgets.QVBoxLayout(self.productSelectionPage)
         self.verticalLayout.setObjectName("verticalLayout")
+        self.productSelectionButtonLayout = QtWidgets.QHBoxLayout()
+        self.productSelectionButtonLayout.setObjectName("productSelectionButtonLayout")
+        self.selectAllButton = QtWidgets.QPushButton(self.productSelectionPage)
+        self.selectAllButton.setObjectName("selectAllButton")
+        self.productSelectionButtonLayout.addWidget(self.selectAllButton)
+        spacerItem2 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.productSelectionButtonLayout.addItem(spacerItem2)
+        self.verticalLayout.addLayout(self.productSelectionButtonLayout)
         self.selectIDTable = QtWidgets.QTableWidget(self.productSelectionPage)
         self.selectIDTable.setDragEnabled(False)
         self.selectIDTable.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
@@ -102,6 +110,7 @@ class Ui_openFileWizard(object):
         self.removeButton.setText(_translate("openFileWizard", "-"))
         self.productSelectionPage.setTitle(_translate("openFileWizard", "Select Products"))
         self.productSelectionPage.setSubTitle(_translate("openFileWizard", "Select products to add"))
+        self.selectAllButton.setText(_translate("openFileWizard", "Select/Deselect All"))
         self.selectIDTable.setSortingEnabled(False)
 
 from uwsift.ui.custom_widgets import AnyWizardPage
