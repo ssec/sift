@@ -498,10 +498,8 @@ class Main(QtGui.QMainWindow):
         if mime.hasUrls:
             event.setDropAction(QtCore.Qt.CopyAction)
             event.accept()
-            for url in mime.urls():
-                path = str(url.toLocalFile())
-                LOG.info('about to open {}'.format(path))
-                self.document.open_file(path)
+            paths = [str(url.toLocalFile()) for url in mime.urls()]
+            self.document.import_files(paths)
         else:
             event.ignore()
 

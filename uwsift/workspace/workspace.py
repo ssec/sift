@@ -58,7 +58,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from uwsift.common import Info, Kind, Flags, State
 from uwsift.model.shapes import content_within_shape
 from uwsift.queue import TASK_PROGRESS, TASK_DOING
-from .importer import aImporter, GeoTiffImporter, GoesRPUGImporter, SatPyImporter, generate_guidebook_metadata
+from .importer import aImporter, GeoTiffImporter, GoesRPUGImporter, SatpyImporter, generate_guidebook_metadata
 from .metadatabase import Metadatabase, Content, Product, Resource
 
 LOG = logging.getLogger(__name__)
@@ -904,9 +904,9 @@ class Workspace(QObject):
                     scenes = importer_kwargs.pop('scenes')
                     scenes = scenes.items()
                 else:
-                    scenes = [(paths, None)]
+                    scenes = [(remaining_paths, None)]
                 for paths, scene in scenes:
-                    imp = SatPyImporter
+                    imp = SatpyImporter
                     these_kwargs = importer_kwargs.copy()
                     these_kwargs['scene'] = scene
                     hauler = imp(paths,

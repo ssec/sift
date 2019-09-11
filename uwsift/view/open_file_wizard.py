@@ -18,14 +18,15 @@
 import os
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import QPoint
-from PyQt5.QtWidgets import QMenu, QAction
+from PyQt5.QtWidgets import QMenu
 from collections import OrderedDict
-from typing import Generator, Tuple, Iterable, Union
+from typing import Generator, Tuple, Union
 
 from satpy import Scene, DatasetID
 from satpy.readers import group_files
 
 from uwsift.ui.open_file_wizard_ui import Ui_openFileWizard
+from uwsift.workspace.importer import SATPY_READERS, filter_dataset_ids
 
 FILE_PAGE = 0
 PRODUCT_PAGE = 1
@@ -37,8 +38,6 @@ ID_COMPONENTS = [
     'calibration',
     'level',
 ]
-READERS = None  # all readers
-EXCLUDE_DATASETS = {'calibration': ['radiance', 'counts']}
 
 
 def _pretty_identifiers(ds_id: DatasetID) -> Generator[Tuple[str, object, str], None, None]:
@@ -59,19 +58,8 @@ def _pretty_identifiers(ds_id: DatasetID) -> Generator[Tuple[str, object, str], 
         yield key, value, pretty_val
 
 
-def _filter_identifiers(ids_to_filter: Iterable[DatasetID]) -> Generator[DatasetID, None, None]:
-    """Generate only non-filtered DatasetIDs based on EXCLUDE_DATASETS global filters."""
-    # skip certain DatasetIDs
-    for ds_id in ids_to_filter:
-        for filter_key, filtered_values in EXCLUDE_DATASETS.items():
-            if getattr(ds_id, filter_key) in filtered_values:
-                break
-        else:
-            yield ds_id
-
-
 class OpenFileWizard(QtWidgets.QWizard):
-    AVAILABLE_READERS = []
+    AVAILABLE_READERS = OrderedDict()
 
     def __init__(self, base_dir=None, parent=None):
         super(OpenFileWizard, self).__init__(parent)
@@ -173,10 +161,13 @@ class OpenFileWizard(QtWidgets.QWizard):
             readers = self.AVAILABLE_READERS
         else:
             from satpy import available_readers
-            readers = sorted(available_readers())
+            readers = (r for r in available_readers(as_dict=True) if not SATPY_READERS or r['name'] in SATPY_READERS)
+            readers = sorted(readers, key=lambda x: x.get('long_name', x['name']))
+            readers = OrderedDict((ri.get('long_name', ri['name']), ri['name']) for ri in readers)
             OpenFileWizard.AVAILABLE_READERS = readers
 
-        self.ui.readerComboBox.addItems(readers)
+        for reader_short_name, reader_name in readers.items():
+            self.ui.readerComboBox.addItem(reader_short_name, reader_name)
 
     def _init_product_select_page(self):
         if self._selected_files == self._filenames:
@@ -187,7 +178,7 @@ class OpenFileWizard(QtWidgets.QWizard):
 
         self._selected_files = self._filenames.copy()
         all_available_products = set()
-        reader = self.ui.readerComboBox.currentText()
+        reader = self.ui.readerComboBox.currentData()
         for file_group in group_files(self._filenames, reader=reader):
             # file_group includes what reader to use
             # NOTE: We only allow a single reader at a time
@@ -197,7 +188,7 @@ class OpenFileWizard(QtWidgets.QWizard):
                 # let's make sure we remove any previous sub-groups
                 for fn in groups_files:
                     if fn in self.all_known_files:
-                        del self.scenes[self.all_known_files[fn]]
+                        self.scenes.pop(self.all_known_files[fn])
                     self.all_known_files[fn] = groups_files
                 self.scenes[groups_files] = scn = Scene(filenames=file_group)
             else:
@@ -207,10 +198,11 @@ class OpenFileWizard(QtWidgets.QWizard):
 
         # update the widgets
         all_available_products = sorted(all_available_products)
+        # FIXME: Need to not switch to product list if no products are available
         # name and level
         self.ui.selectIDTable.setColumnCount(len(ID_COMPONENTS))
         self.ui.selectIDTable.setHorizontalHeaderLabels([x.title() for x in ID_COMPONENTS])
-        for idx, ds_id in enumerate(_filter_identifiers(all_available_products)):
+        for idx, ds_id in enumerate(filter_dataset_ids(all_available_products)):
             col_idx = 0
             for id_key, id_val, pretty_val in _pretty_identifiers(ds_id):
                 if id_key not in ID_COMPONENTS:

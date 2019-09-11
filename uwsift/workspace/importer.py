@@ -28,6 +28,13 @@ from uwsift.workspace.goesr_pug import PugFile
 from uwsift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
 from .metadatabase import Resource, Product, Content
 
+# List of readers to use/include when searching for loadable files
+# None = all readers
+SATPY_READERS = None
+# Filters for what datasets not to include
+EXCLUDE_DATASETS = {'calibration': ['radiance', 'counts']}
+
+
 LOG = logging.getLogger(__name__)
 
 try:
@@ -55,12 +62,23 @@ GUIDEBOOKS = {
 
 import_progress = namedtuple('import_progress',
                              ['uuid', 'stages', 'current_stage', 'completion', 'stage_desc', 'dataset_info', 'data'])
-
-
+"""
 # stages:int, number of stages this import requires
 # current_stage:int, 0..stages-1 , which stage we're on
 # completion:float, 0..1 how far we are along on this stage
 # stage_desc:tuple(str), brief description of each of the stages we'll be doing
+"""
+
+
+def filter_dataset_ids(ids_to_filter: Iterable[DatasetID]) -> Generator[DatasetID, None, None]:
+    """Generate only non-filtered DatasetIDs based on EXCLUDE_DATASETS global filters."""
+    # skip certain DatasetIDs
+    for ds_id in ids_to_filter:
+        for filter_key, filtered_values in EXCLUDE_DATASETS.items():
+            if getattr(ds_id, filter_key) in filtered_values:
+                break
+        else:
+            yield ds_id
 
 
 def get_guidebook_class(layer_info) -> Guidebook:
@@ -807,11 +825,11 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
                               data=img_data)
 
 
-class SatPyImporter(aImporter):
+class SatpyImporter(aImporter):
     """Generic SatPy importer"""
 
     def __init__(self, source_paths, workspace_cwd, database_session, **kwargs):
-        super(SatPyImporter, self).__init__(workspace_cwd, database_session)
+        super(SatpyImporter, self).__init__(workspace_cwd, database_session)
         reader = kwargs.pop('reader', None)
         if reader is None:
             raise NotImplementedError("Can't automatically determine reader.")
@@ -823,9 +841,8 @@ class SatPyImporter(aImporter):
                               "an importer")
         self.filenames = list(source_paths)
         self.reader = reader
-        if 'scene' in kwargs:
-            self.scn = kwargs['scene']
-        else:
+        self.scn = kwargs.get('scene')
+        if self.scn is None:
             self.scn = Scene(reader=self.reader, filenames=self.filenames)
         self._resources = []
         # DatasetID filters
@@ -835,7 +852,10 @@ class SatPyImporter(aImporter):
                 self.product_filters[k] = kwargs.pop(k)
         # NOTE: product_filters don't do anything if the dataset_ids aren't
         #       specified since we are using all available dataset ids
-        self.dataset_ids = sorted(kwargs.get('dataset_ids', self.scn.available_dataset_ids()))
+        self.dataset_ids = kwargs.get('dataset_ids')
+        if self.dataset_ids is None:
+            self.dataset_ids = filter_dataset_ids(self.scn.available_dataset_ids())
+        self.dataset_ids = sorted(self.dataset_ids)
 
     @classmethod
     def from_product(cls, prod: Product, workspace_cwd, database_session, **kwargs):

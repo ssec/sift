@@ -1474,18 +1474,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             range(old_layer_count)))  # FIXME: this should obey insert_before, currently assumes always insert at top
         return p, reordered_indices
 
-    def open_file(self, path, insert_before=0):
-        """
-        open an arbitrary file and make it the new top layer.
-        emits docDidChangeLayer followed by docDidChangeLayerOrder
-        :param path: file to open and add
-        :return: overview (uuid:UUID, datasetinfo:dict, overviewdata:numpy.ndarray)
-        """
-        import warnings
-        warnings.warn("'open_file' is deprecated, use 'open_files' instead.",
-                      DeprecationWarning)
-        return list(self.import_files([path], insert_before=insert_before))
-
     def activate_product_uuid_as_new_layer(self, uuid: UUID, insert_before=0, **importer_kwargs):
         if uuid in self._layer_with_uuid:
             LOG.debug("Layer already loaded: {}".format(uuid))
