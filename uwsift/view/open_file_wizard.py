@@ -26,7 +26,7 @@ from satpy import Scene, DatasetID
 from satpy.readers import group_files
 
 from uwsift.ui.open_file_wizard_ui import Ui_openFileWizard
-from uwsift.workspace.importer import SATPY_READERS, filter_dataset_ids
+from uwsift.workspace.importer import available_satpy_readers, SATPY_READERS, filter_dataset_ids
 
 FILE_PAGE = 0
 PRODUCT_PAGE = 1
@@ -160,8 +160,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         if self.AVAILABLE_READERS:
             readers = self.AVAILABLE_READERS
         else:
-            from satpy import available_readers
-            readers = (r for r in available_readers(as_dict=True) if not SATPY_READERS or r['name'] in SATPY_READERS)
+            readers = (r for r in available_satpy_readers(as_dict=True) if not SATPY_READERS or r['name'] in SATPY_READERS)
             readers = sorted(readers, key=lambda x: x.get('long_name', x['name']))
             readers = OrderedDict((ri.get('long_name', ri['name']), ri['name']) for ri in readers)
             OpenFileWizard.AVAILABLE_READERS = readers

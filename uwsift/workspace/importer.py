@@ -31,6 +31,7 @@ from .metadatabase import Resource, Product, Content
 # List of readers to use/include when searching for loadable files
 # None = all readers
 SATPY_READERS = None
+_SATPY_READERS = None  # cache: see `available_satpy_readers()` below
 # Filters for what datasets not to include
 EXCLUDE_DATASETS = {'calibration': ['radiance', 'counts']}
 
@@ -68,6 +69,17 @@ import_progress = namedtuple('import_progress',
 # completion:float, 0..1 how far we are along on this stage
 # stage_desc:tuple(str), brief description of each of the stages we'll be doing
 """
+
+
+def available_satpy_readers(as_dict=False):
+    from satpy import available_readers
+    global _SATPY_READERS
+    if _SATPY_READERS is None:
+        _SATPY_READERS = available_readers(as_dict=True)
+
+    if not as_dict:
+        return [r['name'] for r in _SATPY_READERS]
+    return _SATPY_READERS
 
 
 def filter_dataset_ids(ids_to_filter: Iterable[DatasetID]) -> Generator[DatasetID, None, None]:
@@ -213,6 +225,10 @@ class aImporter(ABC):
             LOG.error('no resources in {} {}'.format(repr(type(prod)), repr(prod)))
             raise
         paths = [r.path for r in prod.resource]
+        # HACK for Satpy importer
+        print("##### Base from_product: ", list(prod.info.keys()))
+        if 'reader' in prod.info:
+            kwargs.setdefault('reader', prod.info['reader'])
         return cls(paths, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
 
     @classmethod
@@ -462,7 +478,6 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
             # FUTURE: Use Dataset name instead when we can read multi-dataset files
             d[Info.DATASET_NAME] = os.path.split(source_path)[-1]
 
-        d[Info.PATHNAME] = source_path
         band = gtiff.GetRasterBand(1)
         d[Info.SHAPE] = rows, cols = (band.YSize, band.XSize)
 
@@ -682,7 +697,6 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
 
         d.update(GoesRPUGImporter._basic_pug_metadata(pug))
         # d[Info.DATASET_NAME] = os.path.split(source_path)[-1]
-        d[Info.PATHNAME] = source_path
         d[Info.KIND] = Kind.IMAGE
 
         # FUTURE: this is Content metadata and not Product metadata:
@@ -874,6 +888,7 @@ class SatpyImporter(aImporter):
         kwargs.pop('scene', None)
         kwargs['dataset_ids'] = [DatasetID.from_dict(prod.info)]
         filenames = [r.path for r in prod.resource]
+        print("##########################   Custom from_product")
         return cls(filenames, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
 
     @classmethod
@@ -1001,11 +1016,12 @@ class SatpyImporter(aImporter):
         self.scn.load(self.dataset_ids, **self.product_filters)
         # copy satpy metadata keys to SIFT keys
         for ds in self.scn:
+            print(ds.attrs)
             start_time = ds.attrs['start_time']
             ds.attrs[Info.OBS_TIME] = start_time
             ds.attrs[Info.SCHED_TIME] = start_time
-            duration = start_time - ds.attrs.get('end_time', start_time)
-            if duration.total_seconds() == 0:
+            duration = ds.attrs.get('end_time', start_time) - start_time
+            if duration.total_seconds() <= 0:
                 duration = timedelta(minutes=60)
             ds.attrs[Info.OBS_DURATION] = duration
 
@@ -1055,6 +1071,7 @@ class SatpyImporter(aImporter):
             # TODO: Include level or something else in addition to time?
             start_str = ds.attrs['start_time'].isoformat()
             ds.attrs[Info.SERIAL] = start_str if model_time is None else model_time + ":" + start_str
+            ds.attrs.setdefault('reader', self.reader)
 
         return self.scn
 

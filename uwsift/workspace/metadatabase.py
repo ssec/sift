@@ -424,22 +424,11 @@ class Product(Base):
     def origin_y(self, value):
         LOG.debug('DEPRECATED: setting origin_y on resource')
 
-    @property
-    def path(self):
-        if len(self.resource) > 1:
-            LOG.warning('Product {} has more than one resource, path is ambiguous'.format(self.name))
-        return self.resource[0].path if len(self.resource) == 1 else None
-
-    @path.setter
-    def path(self, value):
-        LOG.debug('DEPRECATED: setting path on resource')
-
     def can_be_activated_without_importing(self):
         return len(self.content) > 0
 
     INFO_TO_FIELD = {
         Info.SHORT_NAME: 'name',
-        Info.PATHNAME: 'path',
         Info.UUID: 'uuid',
         Info.PROJ: 'proj4',
         Info.OBS_TIME: 'obs_time',

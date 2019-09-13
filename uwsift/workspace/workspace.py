@@ -66,7 +66,7 @@ LOG = logging.getLogger(__name__)
 DEFAULT_WORKSPACE_SIZE = 256
 MIN_WORKSPACE_SIZE = 8
 
-IMPORT_CLASSES = [GoesRPUGImporter]
+IMPORT_CLASSES = [SatpyImporter]
 
 # first instance is main singleton instance; don't preclude the possibility of importing from another workspace later on
 TheWorkspace = None
@@ -1041,9 +1041,6 @@ class Workspace(QObject):
         # get the overall observation time
         info[Info.OBS_DURATION] = max([
             x[Info.OBS_TIME] + x.get(Info.OBS_DURATION, timedelta(seconds=0)) for x in md_list]) - info[Info.OBS_TIME]
-
-        info[Info.PATHNAME] = '<algebraic layer: {} : {} : {}>'.format(
-            info[Info.DATASET_NAME], info[Info.SCHED_TIME], str(info[Info.UUID]))
 
         # generate family and category names
         info[Info.FAMILY] = family = self._merge_famcat_strings(md_list, Info.FAMILY, suffix=info.get(Info.SHORT_NAME))
