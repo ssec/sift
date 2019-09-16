@@ -16,6 +16,7 @@
 # along with SIFT.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+import logging
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import QPoint
 from PyQt5.QtWidgets import QMenu
@@ -27,6 +28,8 @@ from satpy.readers import group_files
 
 from uwsift.ui.open_file_wizard_ui import Ui_openFileWizard
 from uwsift.workspace.importer import available_satpy_readers, SATPY_READERS, filter_dataset_ids
+
+LOG = logging.getLogger(__name__)
 
 FILE_PAGE = 0
 PRODUCT_PAGE = 1
@@ -70,8 +73,11 @@ class OpenFileWizard(QtWidgets.QWizard):
         self._selected_files = []
         # tuple(filenames) -> scene object
         self.scenes = {}
+        self.all_available_products = None
+        self._previous_reader = None
         # filename -> group tuple of filenames
         self.all_known_files = {}
+        self.file_groups = []
 
         self.ui = Ui_openFileWizard()
         self.ui.setupUi(self)
@@ -80,9 +86,11 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.removeButton.released.connect(self.remove_file)
         # Connect signals so Next buttons are determined by selections on pages
         self._connect_next_button_signals(self.ui.fileList, self.ui.fileSelectionPage)
-        self.ui.fileList.model().rowsInserted.connect(lambda x: self.ui.fileSelectionPage.completeChanged.emit())
-        self.ui.fileList.model().rowsRemoved.connect(lambda x: self.ui.fileSelectionPage.completeChanged.emit())
-        self.ui.fileList.itemChanged.connect(lambda x: self.ui.fileSelectionPage.completeChanged.emit())
+        self.ui.fileList.model().rowsInserted.connect(self._file_selection_or_reader_changed)
+        self.ui.fileList.model().rowsRemoved.connect(self._file_selection_or_reader_changed)
+        self.ui.fileList.itemChanged.connect(self._file_selection_or_reader_changed)
+        self.ui.readerComboBox.currentIndexChanged.connect(self._file_selection_or_reader_changed)
+        self.ui.statusMessage.setText("")
 
         # Page 2 - Product selection
         self._connect_next_button_signals(self.ui.selectIDTable, self.ui.productSelectionPage)
@@ -90,6 +98,11 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.selectAllButton.clicked.connect(self.select_all_products_state)
         self.ui.selectIDTable.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.ui.selectIDTable.customContextMenuRequested.connect(self._product_context_menu)
+
+    def _file_selection_or_reader_changed(self, *args, **kwargs):
+        """Set status message to empty text and check if this page is complete."""
+        self.ui.statusMessage.setText('')
+        self.ui.fileSelectionPage.completeChanged.emit()
 
     def _connect_next_button_signals(self, widget, page):
         widget.model().rowsInserted.connect(page.completeChangedSlot)
@@ -156,6 +169,74 @@ class OpenFileWizard(QtWidgets.QWizard):
         elif p_int == PRODUCT_PAGE:
             self._init_product_select_page()
 
+    def validateCurrentPage(self) -> bool:
+        """Check that the current page will generate the necessary data."""
+        valid = super(OpenFileWizard, self).validateCurrentPage()
+        if not valid:
+            self.ui.statusMessage.setText('')
+            return valid
+
+        p_int = self.currentId()
+        if p_int == FILE_PAGE:
+            try:
+                reader = self.ui.readerComboBox.currentData()
+                groups_updated = self._group_files(reader)
+                if groups_updated:
+                    self._create_scenes()
+            except (RuntimeError, ValueError):
+                LOG.error("Could not load files with Satpy reader.")
+                LOG.debug("Could not load files with Satpy reader.", exc_info=True)
+                self.ui.statusMessage.setText("ERROR: Could not load files with specified reader")
+                self.ui.statusMessage.setStyleSheet('color: red')
+                return False
+
+            if not self.all_available_products:
+                LOG.error("No known products can be loaded from the available files.")
+                self.ui.statusMessage.setText("ERROR: No known products can be loaded from the available files.")
+                self.ui.statusMessage.setStyleSheet('color: red')
+                return False
+        self.ui.statusMessage.setText('')
+        return True
+
+    def _group_files(self, reader):
+        """Group provided files by time step."""
+        # the files haven't changed since we were last run
+        if self._selected_files == self._filenames and self._previous_reader == reader:
+            return False
+
+        self.file_groups = []  # reset the list, just in case
+        self._selected_files = self._filenames.copy()
+        self._previous_reader = reader
+        file_groups = group_files(self._filenames, reader=reader)
+        if not file_groups:
+            raise ValueError("Files not recognized for reader '{}'".format(reader))
+        self.file_groups = file_groups
+        # self.unknown_files = set(self._selected_files) - set(self.all_known_files.keys())
+        return True
+
+    def _create_scenes(self):
+        """Create Scene objects for the selected files."""
+        all_available_products = set()
+        for file_group in self.file_groups:
+            # file_group includes what reader to use
+            # NOTE: We only allow a single reader at a time
+            groups_files = tuple(sorted(fn for group_id, group_list in file_group.items() for fn in group_list))
+            if groups_files not in self.scenes:
+                # never seen this exact group of files before
+                # let's make sure we remove any previous sub-groups
+                for fn in groups_files:
+                    if fn in self.all_known_files:
+                        self.scenes.pop(self.all_known_files[fn], None)
+                    self.all_known_files[fn] = groups_files
+                self.scenes[groups_files] = scn = Scene(filenames=file_group)
+            else:
+                scn = self.scenes[groups_files]
+
+            all_available_products.update(scn.available_dataset_ids())
+
+        # update the widgets
+        self.all_available_products = sorted(all_available_products)
+
     def _init_file_page(self):
         if self.AVAILABLE_READERS:
             readers = self.AVAILABLE_READERS
@@ -169,39 +250,13 @@ class OpenFileWizard(QtWidgets.QWizard):
             self.ui.readerComboBox.addItem(reader_short_name, reader_name)
 
     def _init_product_select_page(self):
-        if self._selected_files == self._filenames:
-            return
-
         # Disconnect the signals until we are done setting up the widgets
         self._disconnect_next_button_signals(self.ui.selectIDTable, self.ui.productSelectionPage)
 
-        self._selected_files = self._filenames.copy()
-        all_available_products = set()
-        reader = self.ui.readerComboBox.currentData()
-        for file_group in group_files(self._filenames, reader=reader):
-            # file_group includes what reader to use
-            # NOTE: We only allow a single reader at a time
-            groups_files = tuple(sorted(fn for group_id, group_list in file_group.items() for fn in group_list))
-            if groups_files not in self.scenes:
-                # never seen this exact group of files before
-                # let's make sure we remove any previous sub-groups
-                for fn in groups_files:
-                    if fn in self.all_known_files:
-                        self.scenes.pop(self.all_known_files[fn])
-                    self.all_known_files[fn] = groups_files
-                self.scenes[groups_files] = scn = Scene(filenames=file_group)
-            else:
-                scn = self.scenes[groups_files]
-
-            all_available_products.update(scn.available_dataset_ids())
-
-        # update the widgets
-        all_available_products = sorted(all_available_products)
-        # FIXME: Need to not switch to product list if no products are available
         # name and level
         self.ui.selectIDTable.setColumnCount(len(ID_COMPONENTS))
         self.ui.selectIDTable.setHorizontalHeaderLabels([x.title() for x in ID_COMPONENTS])
-        for idx, ds_id in enumerate(filter_dataset_ids(all_available_products)):
+        for idx, ds_id in enumerate(filter_dataset_ids(self.all_available_products)):
             col_idx = 0
             for id_key, id_val, pretty_val in _pretty_identifiers(ds_id):
                 if id_key not in ID_COMPONENTS:

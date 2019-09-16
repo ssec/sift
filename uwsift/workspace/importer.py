@@ -226,7 +226,6 @@ class aImporter(ABC):
             raise
         paths = [r.path for r in prod.resource]
         # HACK for Satpy importer
-        print("##### Base from_product: ", list(prod.info.keys()))
         if 'reader' in prod.info:
             kwargs.setdefault('reader', prod.info['reader'])
         return cls(paths, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
@@ -888,7 +887,6 @@ class SatpyImporter(aImporter):
         kwargs.pop('scene', None)
         kwargs['dataset_ids'] = [DatasetID.from_dict(prod.info)]
         filenames = [r.path for r in prod.resource]
-        print("##########################   Custom from_product")
         return cls(filenames, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
 
     @classmethod
@@ -1016,7 +1014,6 @@ class SatpyImporter(aImporter):
         self.scn.load(self.dataset_ids, **self.product_filters)
         # copy satpy metadata keys to SIFT keys
         for ds in self.scn:
-            print(ds.attrs)
             start_time = ds.attrs['start_time']
             ds.attrs[Info.OBS_TIME] = start_time
             ds.attrs[Info.SCHED_TIME] = start_time
