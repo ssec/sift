@@ -50,8 +50,8 @@ def get_reference_points(img_cmesh, img_vbox):
     ref_idx_1 = near_points[0]
 
     # pick a second reference point that isn't in the same row or column as the first
-    near_points_2 = near_points[~np.isclose(img_vbox[near_points][:, 0], img_vbox[ref_idx_1][0]) &
-                                ~np.isclose(img_vbox[near_points][:, 1], img_vbox[ref_idx_1][1])]
+    near_points_2 = near_points[~np.isclose(img_vbox[near_points][:, 0], img_vbox[ref_idx_1][0])
+                                & ~np.isclose(img_vbox[near_points][:, 1], img_vbox[ref_idx_1][1])]
     if near_points_2.shape[0] == 0:
         raise ValueError("Could not determine reference points")
 
@@ -100,10 +100,10 @@ def calc_pixel_size(canvas_point, image_point, canvas_size):
     # (1 - (-1) = 2). Use this ratio to calculate number of
     # screen pixels between the two reference points. Then
     # determine how many image units cover that number of pixels.
-    dx = abs((image_point[1, 0] - image_point[0, 0]) /
-             (canvas_size[0] * (canvas_point[1, 0] - canvas_point[0, 0]) / 2.))
-    dy = abs((image_point[1, 1] - image_point[0, 1]) /
-             (canvas_size[1] * (canvas_point[1, 1] - canvas_point[0, 1]) / 2.))
+    dx = abs((image_point[1, 0] - image_point[0, 0])
+             / (canvas_size[0] * (canvas_point[1, 0] - canvas_point[0, 0]) / 2.))
+    dy = abs((image_point[1, 1] - image_point[0, 1])
+             / (canvas_size[1] * (canvas_point[1, 1] - canvas_point[0, 1]) / 2.))
     return dx, dy
 
 
