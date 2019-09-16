@@ -1,5 +1,6 @@
 import numpy as np
 from numba import jit, float64, int64, types as nb_types
+from numba.extending import overload
 from pyproj import Proj
 
 from uwsift.common import (Resolution, Point, Box, ViewBox,
@@ -13,7 +14,100 @@ from uwsift.common import (Resolution, Point, Box, ViewBox,
                            DEFAULT_TILE_WIDTH)
 
 
-@jit(nb_types.UniTuple(float64, 2)(float64, float64, int64, float64), nopython=True)
+@overload(np.isclose)
+def isclose(a, b):
+    """Implementation of numpy.isclose() since it is currently not supported by numba.
+    """
+
+    def isclose_impl(a, b):
+        atol = 1e-8
+        rtol = 1e-5
+        res = np.abs(a - b) <= (atol + rtol * np.abs(b))
+        return res
+
+    return isclose_impl
+
+
+@jit(nb_types.UniTuple(int64, 2)(float64[:, :], float64[:, :]), nopython=True, cache=True)
+def get_reference_points(img_cmesh, img_vbox):
+    """Get two image reference point indexes.
+
+    This function will return the two nearest reference points to the
+    center of the viewed canvas. The first argument `img_cmesh` is all
+    valid image mesh points that were successfully transformed to the
+    view projection. The second argument `img_vbox` is these same mesh
+    points, but in the original image projection units.
+
+    :param img_cmesh: (N, 2) array of valid points across the image space
+    :param img_vbox: (N, 2) array of valid points across the image space
+    :return: (reference array index 1, reference array index 2)
+    :raises: ValueError if not enough valid points to create
+             two reference points
+    """
+    # Sort points by nearest to further from the 0,0 center of the canvas
+    # Uses a cheap Pythagorean theorem by summing X + Y
+    near_points = np.sum(np.abs(img_cmesh), axis=1).argsort()
+    ref_idx_1 = near_points[0]
+
+    # pick a second reference point that isn't in the same row or column as the first
+    near_points_2 = near_points[~np.isclose(img_vbox[near_points][:, 0], img_vbox[ref_idx_1][0]) &
+                                ~np.isclose(img_vbox[near_points][:, 1], img_vbox[ref_idx_1][1])]
+    if near_points_2.shape[0] == 0:
+        raise ValueError("Could not determine reference points")
+
+    return ref_idx_1, near_points_2[0]
+
+
+# @jit(nb_types.UniTuple(int64, 2)(float64[:, :], boolean[:, :]))
+# def get_reference_points_image(img_dist, valid_mask):
+#     """Get two image reference point indexes close to image center.
+#
+#     This function will return the two nearest reference points to the
+#     center of the image. The argument `img_vbox` is an array of points
+#     across the image that can be successfully projected to the viewed
+#     projection.
+#
+#     :param img_dist: (N, 2) array of distances from the image center
+#                      in image space for points that can be projected
+#                      to the viewed projection
+#     :return: (reference array index 1, reference array index 2)
+#     :raises: ValueError if not enough valid points to create
+#              two reference points
+#     """
+#     # Sort points by nearest to further from the 0,0 center of the canvas
+#     # Uses a cheap Pythagorean theorem by summing X + Y
+#     near_points = np.sum(np.abs(img_dist), axis=1)
+#     near_points[~valid_mask] = np.inf
+#     near_points = near_points.argsort()
+#     ref_idx_1 = near_points[0]
+#     if np.isinf(near_points[ref_idx_1]):
+#         raise ValueError("Could not determine reference points")
+#     # pick a second reference point that isn't in the same row or column as the first
+#     near_points_2 = near_points[~np.isclose(img_dist[near_points][:, 0], img_dist[ref_idx_1][0]) &
+#                                 ~np.isclose(img_dist[near_points][:, 1], img_dist[ref_idx_1][1])]
+#     if near_points_2.shape[0] == 0:
+#         raise ValueError("Could not determine reference points")
+#
+#     return ref_idx_1, near_points_2[0]
+
+
+@jit(nb_types.UniTuple(float64, 2)(float64[:, :], float64[:, :], nb_types.UniTuple(int64, 2)), nopython=True,
+     cache=True)
+def calc_pixel_size(canvas_point, image_point, canvas_size):
+    # Calculate the number of image meters per display pixel
+    # That is, use the ratio of the distance in canvas space
+    # between two points to the distance of the canvas
+    # (1 - (-1) = 2). Use this ratio to calculate number of
+    # screen pixels between the two reference points. Then
+    # determine how many image units cover that number of pixels.
+    dx = abs((image_point[1, 0] - image_point[0, 0]) /
+             (canvas_size[0] * (canvas_point[1, 0] - canvas_point[0, 0]) / 2.))
+    dy = abs((image_point[1, 1] - image_point[0, 1]) /
+             (canvas_size[1] * (canvas_point[1, 1] - canvas_point[0, 1]) / 2.))
+    return dx, dy
+
+
+@jit(nb_types.UniTuple(float64, 2)(float64, float64, int64, float64), nopython=True, cache=True)
 def _calc_extent_component(canvas_point, image_point, num_pixels, meters_per_pixel):
     """Calculate """
     # Find the distance in image space between the closest
@@ -33,7 +127,7 @@ def _calc_extent_component(canvas_point, image_point, num_pixels, meters_per_pix
     return left, right
 
 
-@jit(nopython=True)
+@jit(float64(float64, float64, float64), nopython=True, cache=True)
 def clip(v, n, x):
     return max(min(v, x), n)
 
@@ -46,7 +140,7 @@ def clip(v, n, x):
     float64,
     float64
 ),
-    nopython=True)
+    nopython=True, cache=True)
 def calc_view_extents(image_extents_box: Box, canvas_point, image_point, canvas_size, dx, dy) -> Box:
     left, right = _calc_extent_component(canvas_point[0], image_point[0], canvas_size[0], dx)
     left = clip(left, image_extents_box.left, image_extents_box.right)
@@ -68,7 +162,7 @@ def calc_view_extents(image_extents_box: Box, canvas_point, image_point, canvas_
     nb_types.NamedUniTuple(int64, 2, Point),
     nb_types.NamedUniTuple(int64, 2, Point)
 ),
-    nopython=True)
+    nopython=True, cache=True)
 def max_tiles_available(image_shape, tile_shape, stride):
     ath = (image_shape[0] / float(stride[0])) / tile_shape[0]
     atw = (image_shape[1] / float(stride[1])) / tile_shape[1]
@@ -76,30 +170,22 @@ def max_tiles_available(image_shape, tile_shape, stride):
 
 
 # @jit(nb_types.NamedUniTuple(int64, 4, Box)(
-#         nb_types.NamedUniTuple(float64, 2, Resolution),
-#         nb_types.NamedUniTuple(float64, 2, Resolution),
-#         nb_types.NamedUniTuple(float64, 2, Point),
-#         nb_types.NamedUniTuple(int64, 2, Point),
-#         nb_types.NamedUniTuple(int64, 2, Point),
-#         nb_types.NamedUniTuple(float64, 6, ViewBox),
-#         nb_types.NamedUniTuple(int64, 2, Point),
-#         nb_types.NamedUniTuple(int64, 4, Box)
-#     ),
-#      nopython=True)
-@jit(nopython=True)
+#     nb_types.NamedUniTuple(float64, 2, Resolution),
+#     nb_types.NamedUniTuple(float64, 2, Resolution),
+#     nb_types.NamedUniTuple(float64, 2, Point),
+#     nb_types.NamedUniTuple(int64, 2, Point),
+#     nb_types.NamedUniTuple(int64, 2, Point),
+#     nb_types.NamedUniTuple(float64, 6, ViewBox),
+#     nb_types.NamedUniTuple(int64, 2, Point),
+#     nb_types.NamedUniTuple(int64, 4, Box)
+# ), nopython=True, cache=True)
+@jit(nopython=True, cache=True)
 def visible_tiles(pixel_rez: Resolution,
                   tile_size: Resolution,
                   image_center: Point,
                   image_shape: Point,
                   tile_shape: Point,
                   visible_geom: ViewBox, stride: Point, extra_tiles_box: Box):
-    """
-    given a visible world geometry and sampling, return (sampling-state, [Box-of-tiles-to-draw])
-    sampling state is WELLSAMPLED/OVERSAMPLED/UNDERSAMPLED
-    returned Box should be iterated per standard start:stop style
-    tiles are specified as (iy,ix) integer pairs
-    extra_box value says how many extra tiles to include around each edge
-    """
     V = visible_geom
     X = extra_tiles_box  # FUTURE: extra_geom_box specifies in world coordinates instead of tile count
     Z = pixel_rez
@@ -167,19 +253,15 @@ def visible_tiles(pixel_rez: Resolution,
     return tilebox
 
 
-@jit(nopython=True)
+@jit(nb_types.UniTuple(nb_types.Tuple([int64, int64, int64]), 2)(
+    int64,
+    int64,
+    nb_types.Tuple([int64, int64]),
+    nb_types.NamedUniTuple(int64, 2, Point),
+    nb_types.NamedUniTuple(int64, 2, Point)
+),
+    nopython=True, cache=True)
 def calc_tile_slice(tiy, tix, stride, image_shape, tile_shape):
-    """Calculate the slice needed to get data.
-
-    The returned slice assumes the original image data has already
-    been reduced by the provided stride.
-
-    Args:
-        tiy (int): Tile Y index (down is positive)
-        tix (int): Tile X index (right is positive)
-        stride (tuple): (Original data Y-stride, Original data X-stride)
-
-    """
     y_offset = int(image_shape[0] / 2. / stride[0] - tile_shape[0] / 2.)
     y_start = int(tiy * tile_shape[0] + y_offset)
     if y_start < 0:
@@ -203,15 +285,9 @@ def calc_tile_slice(tiy, tix, stride, image_shape, tile_shape):
 #     nb_types.NamedUniTuple(int64, 2, Point),
 #     nb_types.NamedUniTuple(int64, 2, Point)
 # ),
-@jit(nopython=True)
+#     nopython=True, cache=True)
+@jit(nopython=True, cache=True)
 def calc_tile_fraction(tiy, tix, stride, image_shape, tile_shape):
-    """Calculate the fractional components of the specified tile
-
-    Returns:
-        (factor, offset): Two `Resolution` objects stating the relative size
-                          of the tile compared to a whole tile and the
-                          offset from the origin of a whole tile.
-    """
     mt = max_tiles_available(image_shape, tile_shape, stride)
 
     if tix < -mt[1] / 2. + 0.5:
@@ -245,22 +321,15 @@ def calc_tile_fraction(tiy, tix, stride, image_shape, tile_shape):
     return factor_rez, offset_rez
 
 
-# @jit(nb_types.NamedUniTuple(int64, 2, Point)(
-#     float64,
-#     float64,
-#     float64,
-#     float64,
-#     int64,
-#     int64
-# ),  nopython=True)
-@jit(nopython=True)
+@jit(nb_types.NamedUniTuple(int64, 2, Point)(
+    float64,
+    float64,
+    float64,
+    float64,
+    int64,
+    int64
+), nopython=True, cache=True)
 def calc_stride(v_dx, v_dy, t_dx, t_dy, overview_stride_y, overview_stride_x):
-    """
-    given world geometry and sampling as a ViewBox or Resolution tuple
-    calculate a conservative stride value for rendering a set of tiles
-    :param visible: ViewBox or Resolution with world pixels per screen pixel
-    :param texture: ViewBox or Resolution with texture resolution as world pixels per screen pixel
-    """
     # screen dy,dx in world distance per pixel
     # world distance per pixel for our data
     # compute texture pixels per screen pixels
@@ -272,11 +341,10 @@ def calc_stride(v_dx, v_dy, t_dx, t_dy, overview_stride_y, overview_stride_x):
     return Point(np.int64(tsy), np.int64(tsx))
 
 
-# @jit(nb_types.UniTuple(int64, 2)(
-#     nb_types.NamedUniTuple(int64, 2, Point),
-#     nb_types.NamedUniTuple(int64, 2, Point)
-# ),  nopython=True)
-@jit(nopython=True)
+@jit(nb_types.UniTuple(int64, 2)(
+    nb_types.NamedUniTuple(int64, 2, Point),
+    nb_types.NamedUniTuple(int64, 2, Point)
+), nopython=True, cache=True)
 def calc_overview_stride(image_shape, tile_shape):
     # FUTURE: Come up with a fancier way of doing overviews like averaging each strided section, if needed
     tsy = max(1, int(np.floor(image_shape[0] / tile_shape[0])))
@@ -296,9 +364,9 @@ def calc_overview_stride(image_shape, tile_shape):
 #      float64,
 #      nb_types.NamedUniTuple(int64, 2, Point),
 #      nb_types.NamedUniTuple(float64, 2, Point),
-#      float32[:,:]
-# ), nopython=True)
-@jit(nopython=True)
+#      nb_types.Array(float32, 2, 'C')
+# ), nopython=True, cache=True)
+@jit(nopython=True, cache=True)
 def calc_vertex_coordinates(tiy, tix, stridey, stridex, factor_rez, offset_rez, tessellation_level, p_dx, p_dy,
                             tile_shape, image_center, quads):
     tile_w = p_dx * tile_shape[1] * stridex
@@ -310,15 +378,24 @@ def calc_vertex_coordinates(tiy, tix, stridey, stridex, factor_rez, offset_rez, 
             start_idx = x_idx * tessellation_level + y_idx
             quads[start_idx * 6:(start_idx + 1) * 6, 0] *= tile_w * factor_rez.dx / tessellation_level
             quads[start_idx * 6:(start_idx + 1) * 6, 0] += origin_x + tile_w * (
-                tix + offset_rez.dx + factor_rez.dx * x_idx / tessellation_level)
+                    tix + offset_rez.dx + factor_rez.dx * x_idx / tessellation_level)
             # Origin is upper-left so image goes dow,n
             quads[start_idx * 6:(start_idx + 1) * 6, 1] *= -tile_h * factor_rez.dy / tessellation_level
             quads[start_idx * 6:(start_idx + 1) * 6, 1] += origin_y - tile_h * (
-                tiy + offset_rez.dy + factor_rez.dy * y_idx / tessellation_level)
+                    tiy + offset_rez.dy + factor_rez.dy * y_idx / tessellation_level)
     return quads
 
 
-@jit(nopython=True)
+# @jit(float32[:,:](
+#      int64,
+#      int64,
+#      nb_types.NamedUniTuple(float64, 2, Resolution),
+#      int64,
+#      nb_types.Tuple([int64, int64]),
+#      nb_types.NamedUniTuple(int64, 2, Point),
+#      nb_types.Array(float32, 2, 'C')
+# ), nopython=True, cache=True)
+@jit(nopython=True, cache=True)
 def calc_texture_coordinates(tiy, tix, factor_rez, tessellation_level, texture_size, tile_shape, quads):
     # Now scale and translate the coordinates so they only apply to one tile in the texture
     one_tile_tex_width = 1.0 / texture_size[1] * tile_shape[1]
@@ -331,10 +408,10 @@ def calc_texture_coordinates(tiy, tix, factor_rez, tessellation_level, texture_s
             # location as possible
             quads[start_idx * 6:(start_idx + 1) * 6, 0] *= one_tile_tex_width * factor_rez.dx / tessellation_level
             quads[start_idx * 6:(start_idx + 1) * 6, 0] += one_tile_tex_width * (
-                tix + factor_rez.dx * x_idx / tessellation_level)
+                    tix + factor_rez.dx * x_idx / tessellation_level)
             quads[start_idx * 6:(start_idx + 1) * 6, 1] *= one_tile_tex_height * factor_rez.dy / tessellation_level
             quads[start_idx * 6:(start_idx + 1) * 6, 1] += one_tile_tex_height * (
-                tiy + factor_rez.dy * y_idx / tessellation_level)
+                    tiy + factor_rez.dy * y_idx / tessellation_level)
     return quads
 
 
@@ -412,23 +489,30 @@ class TileCalculator(object):
         self.overview_stride = self.calc_overview_stride()
 
     def visible_tiles(self, visible_geom, stride=Point(1, 1), extra_tiles_box=Box(0, 0, 0, 0)) -> Box:
+        """
+        given a visible world geometry and sampling, return (sampling-state, [Box-of-tiles-to-draw])
+        sampling state is WELLSAMPLED/OVERSAMPLED/UNDERSAMPLED
+        returned Box should be iterated per standard start:stop style
+        tiles are specified as (iy,ix) integer pairs
+        extra_box value says how many extra tiles to include around each edge
+        """
         v = visible_geom
         e = extra_tiles_box
         return visible_tiles(
-            Resolution(np.float64(self.pixel_rez[0]), np.float64(self.pixel_rez[1])),
-            Resolution(np.float64(self.tile_size[0]), np.float64(self.tile_size[1])),
-            Point(np.float64(self.image_center[0]), np.float64(self.image_center[1])),
-            Point(np.int64(self.image_shape[0]), np.int64(self.image_shape[1])),
-            Point(np.int64(self.tile_shape[0]), np.int64(self.tile_shape[1])),
+            Resolution(float(self.pixel_rez[0]), float(self.pixel_rez[1])),
+            Resolution(float(self.tile_size[0]), float(self.tile_size[1])),
+            Point(float(self.image_center[0]), float(self.image_center[1])),
+            Point(int(self.image_shape[0]), int(self.image_shape[1])),
+            Point(int(self.tile_shape[0]), int(self.tile_shape[1])),
             ViewBox(
-                np.float64(v[0]), np.float64(v[1]),
-                np.float64(v[2]), np.float64(v[3]),
-                np.float64(v[4]), np.float64(v[5]),
+                float(v[0]), float(v[1]),
+                float(v[2]), float(v[3]),
+                float(v[4]), float(v[5])
             ),
-            Point(np.int64(stride[0]), np.int64(stride[1])),
+            Point(int(stride[0]), int(stride[1])),
             Box(
-                np.int64(e[0]), np.int64(e[1]),
-                np.int64(e[2]), np.int64(e[3])
+                int(e[0]), int(e[1]),
+                int(e[2]), int(e[3])
             ))
 
     def calc_tile_slice(self, tiy, tix, stride):
@@ -447,6 +531,13 @@ class TileCalculator(object):
         return slice(*row_slice), slice(*col_slice)
 
     def calc_tile_fraction(self, tiy, tix, stride):
+        """Calculate the fractional components of the specified tile
+
+        Returns:
+            (factor, offset): Two `Resolution` objects stating the relative size
+                              of the tile compared to a whole tile and the
+                              offset from the origin of a whole tile.
+        """
         return calc_tile_fraction(tiy, tix, stride, self.image_shape, self.tile_shape)
 
     def calc_stride(self, visible, texture=None):
@@ -456,10 +547,6 @@ class TileCalculator(object):
         :param visible: ViewBox or Resolution with world pixels per screen pixel
         :param texture: ViewBox or Resolution with texture resolution as world pixels per screen pixel
         """
-        # screen dy,dx in world distance per pixel
-        # world distance per pixel for our data
-        # compute texture pixels per screen pixels
-
         texture = texture or self.pixel_rez
         return calc_stride(visible.dx, visible.dy, texture.dx, texture.dy, self.overview_stride[0].step,
                            self.overview_stride[1].step)
@@ -478,7 +565,6 @@ class TileCalculator(object):
         quads = np.tile(quad, (tessellation_level * tessellation_level, 1))
         quads = calc_vertex_coordinates(tiy, tix, stridey, stridex, factor_rez, offset_rez, tessellation_level,
                                         self.pixel_rez.dx, self.pixel_rez.dy, self.tile_shape, self.image_center, quads)
-
         quads = quads.reshape(tessellation_level * tessellation_level * 6, 3)
         return quads[:, :2]
 
