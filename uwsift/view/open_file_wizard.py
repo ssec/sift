@@ -17,7 +17,7 @@
 
 import os
 import logging
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtCore, QtWidgets, QtGui
 from PyQt5.QtCore import QPoint
 from PyQt5.QtWidgets import QMenu
 from collections import OrderedDict
@@ -63,21 +63,25 @@ def _pretty_identifiers(ds_id: DatasetID) -> Generator[Tuple[str, object, str], 
 
 class OpenFileWizard(QtWidgets.QWizard):
     AVAILABLE_READERS = OrderedDict()
+    filesChanged = QtCore.pyqtSignal()
 
     def __init__(self, base_dir=None, parent=None):
         super(OpenFileWizard, self).__init__(parent)
         # enable context menus
         self.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
         self.last_open_dir = base_dir
-        self._filenames = set()
-        self._selected_files = []
+        self._all_filenames = set()
+        self._filelist_changed = False
         # tuple(filenames) -> scene object
         self.scenes = {}
         self.all_available_products = None
         self._previous_reader = None
-        # filename -> group tuple of filenames
-        self.all_known_files = {}
-        self.file_groups = []
+        self.file_groups = {}
+        self.unknown_files = set()
+        app = QtWidgets.QApplication.instance()
+        self._unknown_icon = app.style().standardIcon(QtGui.QStyle.SP_DialogCancelButton)
+        self._known_icon = QtGui.QIcon()
+        # self._known_icon = app.style().standardIcon(QtGui.QStyle.SP_DialogApplyButton)
 
         self.ui = Ui_openFileWizard()
         self.ui.setupUi(self)
@@ -86,9 +90,10 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.removeButton.released.connect(self.remove_file)
         # Connect signals so Next buttons are determined by selections on pages
         self._connect_next_button_signals(self.ui.fileList, self.ui.fileSelectionPage)
-        self.ui.fileList.model().rowsInserted.connect(self._file_selection_or_reader_changed)
-        self.ui.fileList.model().rowsRemoved.connect(self._file_selection_or_reader_changed)
-        self.ui.fileList.itemChanged.connect(self._file_selection_or_reader_changed)
+        # self.ui.fileList.model().rowsInserted.connect(self._file_selection_or_reader_changed)
+        # self.ui.fileList.model().rowsRemoved.connect(self._file_selection_or_reader_changed)
+        # self.ui.fileList.itemChanged.connect(self._file_selection_or_reader_changed)
+        self.filesChanged.connect(self._file_selection_or_reader_changed)
         self.ui.readerComboBox.currentIndexChanged.connect(self._file_selection_or_reader_changed)
         self.ui.statusMessage.setText("")
 
@@ -101,8 +106,31 @@ class OpenFileWizard(QtWidgets.QWizard):
 
     def _file_selection_or_reader_changed(self, *args, **kwargs):
         """Set status message to empty text and check if this page is complete."""
-        self.ui.statusMessage.setText('')
+        self.ui.fileSelectionPage.sift_page_checked = True
+        if self.ui.fileList.count() != 0:
+            self.ui.statusMessage.setText('Checking file/reader compatibility...')
+            self.ui.statusMessage.setStyleSheet('color: black')
+            reader = self.ui.readerComboBox.currentData()
+            groups_updated = self._group_files(reader)
+            if groups_updated:
+                self._mark_unknown_files()
+            if not self.file_groups:
+                # if none of the files were usable then the user can't click Next
+                self.ui.fileSelectionPage.sift_page_checked = False
+                self.ui.statusMessage.setText("ERROR: Could not load any files with specified reader")
+                self.ui.statusMessage.setStyleSheet('color: red')
+            else:
+                self.ui.statusMessage.setText('')
         self.ui.fileSelectionPage.completeChanged.emit()
+
+    def _mark_unknown_files(self):
+        for row_idx in range(self.ui.fileList.count()):
+            item = self.ui.fileList.item(row_idx)
+            fn = item.text()
+            if fn in self.unknown_files:
+                item.setIcon(self._unknown_icon)
+            else:
+                item.setIcon(self._known_icon)
 
     def _connect_next_button_signals(self, widget, page):
         widget.model().rowsInserted.connect(page.completeChangedSlot)
@@ -179,10 +207,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         p_int = self.currentId()
         if p_int == FILE_PAGE:
             try:
-                reader = self.ui.readerComboBox.currentData()
-                groups_updated = self._group_files(reader)
-                if groups_updated:
-                    self._create_scenes()
+                self._create_scenes()
             except (RuntimeError, ValueError):
                 LOG.error("Could not load files with Satpy reader.")
                 LOG.debug("Could not load files with Satpy reader.", exc_info=True)
@@ -198,39 +223,51 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.statusMessage.setText('')
         return True
 
-    def _group_files(self, reader):
+    def _group_files(self, reader) -> bool:
         """Group provided files by time step."""
         # the files haven't changed since we were last run
-        if self._selected_files == self._filenames and self._previous_reader == reader:
+        if not self._filelist_changed and self._previous_reader == reader:
             return False
 
-        self.file_groups = []  # reset the list, just in case
-        self._selected_files = self._filenames.copy()
+        self._filelist_changed = False
+        self.file_groups = {}  # reset the list, just in case
+        selected_files = self._all_filenames.copy()
         self._previous_reader = reader
-        file_groups = group_files(self._filenames, reader=reader)
+        file_groups = group_files(selected_files, reader=reader)
         if not file_groups:
-            raise ValueError("Files not recognized for reader '{}'".format(reader))
-        self.file_groups = file_groups
-        # self.unknown_files = set(self._selected_files) - set(self.all_known_files.keys())
+            self.unknown_files = selected_files
+            self.file_groups = {}
+            return True
+
+        scenes = {}  # recreate Scene dictionary
+        file_group_map = {}
+        known_files = set()
+        for file_group in file_groups:
+            # file_group includes what reader to use
+            # NOTE: We only allow a single reader at a time
+            group_id = tuple(sorted(fn for group_list in file_group.values() for fn in group_list))
+            known_files.update(group_id)
+            if group_id not in self.scenes:
+                # never seen this exact group of files before
+                scenes[group_id] = None  # filled in later
+            else:
+                scenes[group_id] = self.scenes[group_id]
+            file_group_map[group_id] = file_group
+        self.scenes = scenes
+        self.file_groups = file_group_map
+        self.unknown_files = selected_files - known_files
         return True
 
     def _create_scenes(self):
         """Create Scene objects for the selected files."""
         all_available_products = set()
-        for file_group in self.file_groups:
-            # file_group includes what reader to use
-            # NOTE: We only allow a single reader at a time
-            groups_files = tuple(sorted(fn for group_id, group_list in file_group.items() for fn in group_list))
-            if groups_files not in self.scenes:
-                # never seen this exact group of files before
-                # let's make sure we remove any previous sub-groups
-                for fn in groups_files:
-                    if fn in self.all_known_files:
-                        self.scenes.pop(self.all_known_files[fn], None)
-                    self.all_known_files[fn] = groups_files
-                self.scenes[groups_files] = scn = Scene(filenames=file_group)
-            else:
-                scn = self.scenes[groups_files]
+        for group_id, file_group in self.file_groups.items():
+            scn = self.scenes.get(group_id)
+            if scn is None:
+                # need to create the Scene for the first time
+                # file_group includes what reader to use
+                # NOTE: We only allow a single reader at a time
+                self.scenes[group_id] = scn = Scene(filenames=file_group)
 
             all_available_products.update(scn.available_dataset_ids())
 
@@ -290,18 +327,28 @@ class OpenFileWizard(QtWidgets.QWizard):
             return
         self.last_open_dir = os.path.dirname(files[0])
         for fn in files:
-            if fn in self._filenames:
+            if fn in self._all_filenames:
                 continue
             item = QtWidgets.QListWidgetItem(fn, self.ui.fileList)
-            item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable)
-            item.setCheckState(QtCore.Qt.Checked)
+            # turn off checkability so we can tell the difference between this
+            # and the product list when checking WizardPage.isComplete
+            item.setFlags(item.flags() & ~QtCore.Qt.ItemIsUserCheckable)
+            self._filelist_changed = True
+            self._all_filenames.add(fn)
             self.ui.fileList.addItem(item)
-            self._filenames.add(fn)
+        self.filesChanged.emit()
 
     def remove_file(self):
         # need to go backwards to index numbers don't change
         for item_idx in range(self.ui.fileList.count() - 1, -1, -1):
             item = self.ui.fileList.item(item_idx)
             if self.ui.fileList.isItemSelected(item):
+                self._filelist_changed = True
+                self._all_filenames.remove(item.text())
                 self.ui.fileList.takeItem(item_idx)
-                self._filenames.remove(item.text())
+        self.filesChanged.emit()
+
+    @property
+    def files_to_load(self):
+        """Files that should be used by the Document/Workspace."""
+        return [fn for fgroup in self.file_groups.values() for fn in fgroup]

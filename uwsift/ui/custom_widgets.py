@@ -70,9 +70,13 @@ class AnyWizardPage(QWizardPage):
 
     def __init__(self, *args, **kwargs):
         self.important_children = kwargs.pop("important_children", [])
+        self.sift_page_checked = True
         super(AnyWizardPage, self).__init__(*args, **kwargs)
 
     def isComplete(self):
+        if not self.sift_page_checked:
+            return False
+
         children = self.important_children or self.findChildren(self.child_types)
         for child_widget in children:
             if isinstance(child_widget, QListWidget):
@@ -83,7 +87,9 @@ class AnyWizardPage(QWizardPage):
                 get_item = lambda row: child_widget.item(row, 0)
             for item_idx in range(count):
                 item = get_item(item_idx)
-                if item.checkState():
+                # if the item is not checkable or it is and it is checked
+                # then this widget is complete
+                if not bool(item.flags() & Qt.ItemIsUserCheckable) or item.checkState():
                     break
             else:
                 return False

@@ -931,7 +931,7 @@ class Main(QtGui.QMainWindow):
                 'dataset_ids': wizard_dialog.collect_selected_ids(),
             }
             self._last_open_dir = wizard_dialog.last_open_dir
-            self.open_paths(wizard_dialog._selected_files,
+            self.open_paths(wizard_dialog.files_to_load,
                             **importer_kwargs)
         else:
             LOG.debug("Wizard closed, nothing to load")
