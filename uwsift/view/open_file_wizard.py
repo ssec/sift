@@ -278,7 +278,8 @@ class OpenFileWizard(QtWidgets.QWizard):
         if self.AVAILABLE_READERS:
             readers = self.AVAILABLE_READERS
         else:
-            readers = (r for r in available_satpy_readers(as_dict=True) if not SATPY_READERS or r['name'] in SATPY_READERS)
+            readers = available_satpy_readers(as_dict=True)
+            readers = (r for r in readers if not SATPY_READERS or r['name'] in SATPY_READERS)
             readers = sorted(readers, key=lambda x: x.get('long_name', x['name']))
             readers = OrderedDict((ri.get('long_name', ri['name']), ri['name']) for ri in readers)
             OpenFileWizard.AVAILABLE_READERS = readers

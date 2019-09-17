@@ -29,7 +29,6 @@ from typing import List, Iterable, Mapping
 from PyQt5.QtCore import QObject
 
 from satpy.readers import group_files
-from satpy import Scene
 from uwsift.queue import TASK_DOING, TASK_PROGRESS
 from .workspace import Workspace
 from .importer import SATPY_READERS, available_satpy_readers
@@ -172,7 +171,8 @@ class ResourceSearchPathCollector(QObject):
         num_seen = 0
         for reader_and_files in readers_and_files:
             for reader_name, filenames in reader_and_files.items():
-                for num_prods, product_info in self._ws.collect_product_metadata_for_paths(filenames, reader=reader_name):
+                product_infos = self._ws.collect_product_metadata_for_paths(filenames, reader=reader_name)
+                for num_prods, product_info in product_infos:
                     changed_uuids.add(product_info[Info.UUID])
                     num_seen += len(filenames)
                     status = {TASK_DOING: 'collecting metadata {}/{}'.format(num_seen, ntodo),
