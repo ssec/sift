@@ -3,7 +3,7 @@ from numba import jit, float64, int64, float32, types as nb_types
 from numba.extending import overload
 from pyproj import Proj
 
-from uwsift.common import (Resolution, Point, Box, ViewBox,
+from uwsift.common import (Resolution, Point, Box,
                            CANVAS_EXTENTS_EPSILON,
                            PREFERRED_SCREEN_TO_TEXTURE_RATIO,
                            IMAGE_MESH_SIZE,
