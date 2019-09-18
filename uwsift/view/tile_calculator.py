@@ -1,5 +1,5 @@
 import numpy as np
-from numba import jit, float64, int64, types as nb_types
+from numba import jit, float64, int64, float32, types as nb_types
 from numba.extending import overload
 from pyproj import Proj
 
@@ -50,8 +50,9 @@ def get_reference_points(img_cmesh, img_vbox):
     ref_idx_1 = near_points[0]
 
     # pick a second reference point that isn't in the same row or column as the first
-    near_points_2 = near_points[~np.isclose(img_vbox[near_points][:, 0], img_vbox[ref_idx_1][0])
-                                & ~np.isclose(img_vbox[near_points][:, 1], img_vbox[ref_idx_1][1])]
+    near_points_2 = near_points[
+        ~np.isclose(img_vbox[near_points][:, 0], img_vbox[ref_idx_1][0]) & ~np.isclose(img_vbox[near_points][:, 1],
+                                                                                       img_vbox[ref_idx_1][1])]
     if near_points_2.shape[0] == 0:
         raise ValueError("Could not determine reference points")
 
@@ -100,10 +101,10 @@ def calc_pixel_size(canvas_point, image_point, canvas_size):
     # (1 - (-1) = 2). Use this ratio to calculate number of
     # screen pixels between the two reference points. Then
     # determine how many image units cover that number of pixels.
-    dx = abs((image_point[1, 0] - image_point[0, 0])
-             / (canvas_size[0] * (canvas_point[1, 0] - canvas_point[0, 0]) / 2.))
-    dy = abs((image_point[1, 1] - image_point[0, 1])
-             / (canvas_size[1] * (canvas_point[1, 1] - canvas_point[0, 1]) / 2.))
+    dx = abs(
+        (image_point[1, 0] - image_point[0, 0]) / (canvas_size[0] * (canvas_point[1, 0] - canvas_point[0, 0]) / 2.))
+    dy = abs(
+        (image_point[1, 1] - image_point[0, 1]) / (canvas_size[1] * (canvas_point[1, 1] - canvas_point[0, 1]) / 2.))
     return dx, dy
 
 
@@ -169,40 +170,53 @@ def max_tiles_available(image_shape, tile_shape, stride):
     return ath, atw
 
 
-# @jit(nb_types.NamedUniTuple(int64, 4, Box)(
-#     nb_types.NamedUniTuple(float64, 2, Resolution),
-#     nb_types.NamedUniTuple(float64, 2, Resolution),
-#     nb_types.NamedUniTuple(float64, 2, Point),
-#     nb_types.NamedUniTuple(int64, 2, Point),
-#     nb_types.NamedUniTuple(int64, 2, Point),
-#     nb_types.NamedUniTuple(float64, 6, ViewBox),
-#     nb_types.NamedUniTuple(int64, 2, Point),
-#     nb_types.NamedUniTuple(int64, 4, Box)
-# ), nopython=True, cache=True)
-@jit(nopython=True, cache=True)
-def visible_tiles(pixel_rez: Resolution,
-                  tile_size: Resolution,
-                  image_center: Point,
-                  image_shape: Point,
-                  tile_shape: Point,
-                  visible_geom: ViewBox, stride: Point, extra_tiles_box: Box):
-    V = visible_geom
-    X = extra_tiles_box  # FUTURE: extra_geom_box specifies in world coordinates instead of tile count
-    Z = pixel_rez
-    tile_size = Resolution(tile_size.dy * stride[0], tile_size.dx * stride[1])
+@jit(nb_types.NamedUniTuple(int64, 4, Box)(
+    float64,
+    float64,
+    float64,
+    float64,
+    float64,
+    float64,
+    int64,
+    int64,
+    int64,
+    int64,
+    float64,
+    float64,
+    float64,
+    float64,
+    float64,
+    float64,
+    int64,
+    int64,
+    int64,
+    int64,
+    int64,
+    int64
+), nopython=True, cache=True)
+def visible_tiles(z_dy, z_dx,
+                  tile_size_dy, tile_size_dx,
+                  image_center_y, image_center_x,
+                  image_shape_y, image_shape_x,
+                  tile_shape_y, tile_shape_x,
+                  v_bottom, v_left, v_top, v_right, v_dy, v_dx,
+                  stride_y, stride_x,
+                  x_bottom, x_left, x_top, x_right):
+    tile_size = Resolution(tile_size_dy * stride_y, tile_size_dx * stride_x)
     # should be the upper-left corner of the tile centered on the center of the image
-    to = Point(image_center[0] + tile_size.dy / 2.,
-               image_center[1] - tile_size.dx / 2.)  # tile origin
+    to = Point(image_center_y + tile_size.dy / 2.,
+               image_center_x - tile_size.dx / 2.)  # tile origin
 
     # number of data pixels between view edge and originpoint
     pv = Box(
-        bottom=(V.bottom - to.y) / -(Z.dy * stride[0]),
-        top=(V.top - to.y) / -(Z.dy * stride[0]),
-        left=(V.left - to.x) / (Z.dx * stride[1]),
-        right=(V.right - to.x) / (Z.dx * stride[1])
+        bottom=(v_bottom - to.y) / -(z_dy * stride_y),
+        top=(v_top - to.y) / -(z_dy * stride_y),
+        left=(v_left - to.x) / (z_dx * stride_x),
+        right=(v_right - to.x) / (z_dx * stride_x)
     )
 
-    th, tw = tile_shape
+    th = tile_shape_y
+    tw = tile_shape_x
     # first tile we'll need is (tiy0, tix0)
     # floor to make sure we get the upper-left of the theoretical tile
     tiy0 = np.floor(pv.top / th)
@@ -214,19 +228,21 @@ def visible_tiles(pixel_rez: Resolution,
     ntw = np.ceil((pv.right - tix0 * tw) / tw + 0.5)
 
     # now add the extras
-    if X.bottom > 0:
-        nth += int(X.bottom)
-    if X.left > 0:
-        tix0 -= int(X.left)
-        ntw += int(X.left)
-    if X.top > 0:
-        tiy0 -= int(X.top)
-        nth += int(X.top)
-    if X.right > 0:
-        ntw += int(X.right)
+    if x_bottom > 0:
+        nth += int(x_bottom)
+    if x_left > 0:
+        tix0 -= int(x_left)
+        ntw += int(x_left)
+    if x_top > 0:
+        tiy0 -= int(x_top)
+        nth += int(x_top)
+    if x_right > 0:
+        ntw += int(x_right)
 
     # Total number of tiles in this image at this stride (could be fractional)
-    ath, atw = max_tiles_available(image_shape, tile_shape, stride)
+    ath, atw = max_tiles_available(Point(image_shape_y, image_shape_x),
+                                   Point(tile_shape_y, tile_shape_x),
+                                   Point(stride_y, stride_x))
     # truncate to the available tiles
     hw = atw / 2.
     hh = ath / 2.
@@ -259,8 +275,7 @@ def visible_tiles(pixel_rez: Resolution,
     nb_types.Tuple([int64, int64]),
     nb_types.NamedUniTuple(int64, 2, Point),
     nb_types.NamedUniTuple(int64, 2, Point)
-),
-    nopython=True, cache=True)
+), nopython=True, cache=True)
 def calc_tile_slice(tiy, tix, stride, image_shape, tile_shape):
     y_offset = int(image_shape[0] / 2. / stride[0] - tile_shape[0] / 2.)
     y_start = int(tiy * tile_shape[0] + y_offset)
@@ -278,17 +293,20 @@ def calc_tile_slice(tiy, tix, stride, image_shape, tile_shape):
     return row_slice, col_slice
 
 
-# @jit(nb_types.UniTuple(nb_types.NamedUniTuple(float64, 2, Resolution), 2)(
-#     int64,
-#     int64,
-#     nb_types.NamedUniTuple(int64, 2, Point),
-#     nb_types.NamedUniTuple(int64, 2, Point),
-#     nb_types.NamedUniTuple(int64, 2, Point)
-# ),
-#     nopython=True, cache=True)
-@jit(nopython=True, cache=True)
-def calc_tile_fraction(tiy, tix, stride, image_shape, tile_shape):
-    mt = max_tiles_available(image_shape, tile_shape, stride)
+@jit(nb_types.UniTuple(nb_types.NamedUniTuple(float64, 2, Resolution), 2)(
+    int64,
+    int64,
+    int64,
+    int64,
+    int64,
+    int64,
+    int64,
+    int64
+), nopython=True, cache=True)
+def calc_tile_fraction(tiy, tix, stride_y, stride_x, image_y, image_x, tile_y, tile_x):  # image_shape, tile_shape):
+    # def calc_tile_fraction(tiy, tix, stride, image_shape, tile_shape):
+    # mt = max_tiles_available(image_shape, tile_shape, stride)
+    mt = max_tiles_available(Point(image_y, image_x), Point(tile_y, tile_x), Point(stride_y, stride_x))
 
     if tix < -mt[1] / 2. + 0.5:
         # left edge tile
@@ -352,66 +370,80 @@ def calc_overview_stride(image_shape, tile_shape):
     return tsy, tsx
 
 
-# @jit(float32[:,:](
-#      int64,
-#      int64,
-#      int64,
-#      int64,
-#      nb_types.NamedUniTuple(float64, 2, Resolution),
-#      nb_types.NamedUniTuple(float64, 2, Resolution),
-#      int64,
-#      float64,
-#      float64,
-#      nb_types.NamedUniTuple(int64, 2, Point),
-#      nb_types.NamedUniTuple(float64, 2, Point),
-#      nb_types.Array(float32, 2, 'C')
-# ), nopython=True, cache=True)
-@jit(nopython=True, cache=True)
-def calc_vertex_coordinates(tiy, tix, stridey, stridex, factor_rez, offset_rez, tessellation_level, p_dx, p_dy,
-                            tile_shape, image_center, quads):
-    tile_w = p_dx * tile_shape[1] * stridex
-    tile_h = p_dy * tile_shape[0] * stridey
-    origin_x = image_center[1] - tile_w / 2.
-    origin_y = image_center[0] + tile_h / 2.
+@jit(float32[:, :](
+    int64,
+    int64,
+    int64,
+    int64,
+    float64,
+    float64,
+    float64,
+    float64,
+    int64,
+    float64,
+    float64,
+    int64,
+    int64,
+    float64,
+    float64,
+    float32[:, :]
+), nopython=True, cache=True)
+def calc_vertex_coordinates(tiy, tix, stridey, stridex,
+                            factor_rez_dy, factor_rez_dx,
+                            offset_rez_dy, offset_rez_dx,
+                            tessellation_level, p_dx, p_dy,
+                            tile_shape_y, tile_shape_x,
+                            image_center_y, image_center_x,
+                            quads):
+    tile_w = p_dx * tile_shape_x * stridex
+    tile_h = p_dy * tile_shape_y * stridey
+    origin_x = image_center_x - tile_w / 2.
+    origin_y = image_center_y + tile_h / 2.
     for x_idx in range(tessellation_level):
         for y_idx in range(tessellation_level):
             start_idx = x_idx * tessellation_level + y_idx
-            quads[start_idx * 6:(start_idx + 1) * 6, 0] *= tile_w * factor_rez.dx / tessellation_level
+            quads[start_idx * 6:(start_idx + 1) * 6, 0] *= tile_w * factor_rez_dx / tessellation_level
             quads[start_idx * 6:(start_idx + 1) * 6, 0] += origin_x + tile_w * (
-                    tix + offset_rez.dx + factor_rez.dx * x_idx / tessellation_level)
+                tix + offset_rez_dx + factor_rez_dx * x_idx / tessellation_level)
             # Origin is upper-left so image goes dow,n
-            quads[start_idx * 6:(start_idx + 1) * 6, 1] *= -tile_h * factor_rez.dy / tessellation_level
+            quads[start_idx * 6:(start_idx + 1) * 6, 1] *= -tile_h * factor_rez_dy / tessellation_level
             quads[start_idx * 6:(start_idx + 1) * 6, 1] += origin_y - tile_h * (
-                    tiy + offset_rez.dy + factor_rez.dy * y_idx / tessellation_level)
+                tiy + offset_rez_dy + factor_rez_dy * y_idx / tessellation_level)
     return quads
 
 
-# @jit(float32[:,:](
-#      int64,
-#      int64,
-#      nb_types.NamedUniTuple(float64, 2, Resolution),
-#      int64,
-#      nb_types.Tuple([int64, int64]),
-#      nb_types.NamedUniTuple(int64, 2, Point),
-#      nb_types.Array(float32, 2, 'C')
-# ), nopython=True, cache=True)
-@jit(nopython=True, cache=True)
-def calc_texture_coordinates(tiy, tix, factor_rez, tessellation_level, texture_size, tile_shape, quads):
+@jit(float32[:, :](
+    int64,
+    int64,
+    float64,
+    float64,
+    int64,
+    int64,
+    int64,
+    int64,
+    int64,
+    float32[:, :]
+), nopython=True, cache=True)
+def calc_texture_coordinates(tiy, tix, factor_rez_dy, factor_rez_dx,
+                             tessellation_level,
+                             texture_size_y, texture_size_x,
+                             tile_shape_y, tile_shape_x,
+                             quads):
     # Now scale and translate the coordinates so they only apply to one tile in the texture
-    one_tile_tex_width = 1.0 / texture_size[1] * tile_shape[1]
-    one_tile_tex_height = 1.0 / texture_size[0] * tile_shape[0]
+    one_tile_tex_width = 1.0 / texture_size_x * tile_shape_x
+    one_tile_tex_height = 1.0 / texture_size_y * tile_shape_y
     for x_idx in range(tessellation_level):
         for y_idx in range(tessellation_level):
             start_idx = x_idx * tessellation_level + y_idx
             # offset for this tile isn't needed because the data should
             # have been inserted as close to the top-left of the texture
             # location as possible
-            quads[start_idx * 6:(start_idx + 1) * 6, 0] *= one_tile_tex_width * factor_rez.dx / tessellation_level
+            quads[start_idx * 6:(start_idx + 1) * 6, 0] *= one_tile_tex_width * factor_rez_dx / tessellation_level
             quads[start_idx * 6:(start_idx + 1) * 6, 0] += one_tile_tex_width * (
-                    tix + factor_rez.dx * x_idx / tessellation_level)
-            quads[start_idx * 6:(start_idx + 1) * 6, 1] *= one_tile_tex_height * factor_rez.dy / tessellation_level
+                tix + factor_rez_dx * x_idx / tessellation_level)
+            quads[start_idx * 6:(start_idx + 1) * 6, 1] *= one_tile_tex_height * factor_rez_dy / tessellation_level
             quads[start_idx * 6:(start_idx + 1) * 6, 1] += one_tile_tex_height * (
-                    tiy + factor_rez.dy * y_idx / tessellation_level)
+                tiy + factor_rez_dy * y_idx / tessellation_level)
     return quads
 
 
@@ -499,21 +531,18 @@ class TileCalculator(object):
         v = visible_geom
         e = extra_tiles_box
         return visible_tiles(
-            Resolution(float(self.pixel_rez[0]), float(self.pixel_rez[1])),
-            Resolution(float(self.tile_size[0]), float(self.tile_size[1])),
-            Point(float(self.image_center[0]), float(self.image_center[1])),
-            Point(int(self.image_shape[0]), int(self.image_shape[1])),
-            Point(int(self.tile_shape[0]), int(self.tile_shape[1])),
-            ViewBox(
-                float(v[0]), float(v[1]),
-                float(v[2]), float(v[3]),
-                float(v[4]), float(v[5])
-            ),
-            Point(int(stride[0]), int(stride[1])),
-            Box(
-                int(e[0]), int(e[1]),
-                int(e[2]), int(e[3])
-            ))
+            float(self.pixel_rez[0]), float(self.pixel_rez[1]),
+            float(self.tile_size[0]), float(self.tile_size[1]),
+            float(self.image_center[0]), float(self.image_center[1]),
+            int(self.image_shape[0]), int(self.image_shape[1]),
+            int(self.tile_shape[0]), int(self.tile_shape[1]),
+            float(v[0]), float(v[1]),
+            float(v[2]), float(v[3]),
+            float(v[4]), float(v[5]),
+            int(stride[0]), int(stride[1]),
+            int(e[0]), int(e[1]),
+            int(e[2]), int(e[3])
+        )
 
     def calc_tile_slice(self, tiy, tix, stride):
         """Calculate the slice needed to get data.
@@ -538,7 +567,8 @@ class TileCalculator(object):
                               of the tile compared to a whole tile and the
                               offset from the origin of a whole tile.
         """
-        return calc_tile_fraction(tiy, tix, stride, self.image_shape, self.tile_shape)
+        return calc_tile_fraction(tiy, tix, stride[0], stride[1],
+                                  self.image_shape[0], self.image_shape[1], self.tile_shape[0], self.tile_shape[1])
 
     def calc_stride(self, visible, texture=None):
         """
@@ -563,8 +593,11 @@ class TileCalculator(object):
                          [0, 0, 0], [1, 1, 0], [0, 1, 0]],
                         dtype=np.float32)
         quads = np.tile(quad, (tessellation_level * tessellation_level, 1))
-        quads = calc_vertex_coordinates(tiy, tix, stridey, stridex, factor_rez, offset_rez, tessellation_level,
-                                        self.pixel_rez.dx, self.pixel_rez.dy, self.tile_shape, self.image_center, quads)
+        quads = calc_vertex_coordinates(tiy, tix, stridey, stridex, factor_rez.dy, factor_rez.dx,
+                                        offset_rez.dy, offset_rez.dx, tessellation_level,
+                                        self.pixel_rez.dx, self.pixel_rez.dy,
+                                        self.tile_shape.y, self.tile_shape.x,
+                                        self.image_center.y, self.image_shape.x, quads)
         quads = quads.reshape(tessellation_level * tessellation_level * 6, 3)
         return quads[:, :2]
 
@@ -580,8 +613,9 @@ class TileCalculator(object):
                          [0, 0, 0], [1, 1, 0], [0, 1, 0]],
                         dtype=np.float32)
         quads = np.tile(quad, (tessellation_level * tessellation_level, 1))
-        quads = calc_texture_coordinates(tiy, tix, factor_rez, tessellation_level, self.texture_size,
-                                         self.tile_shape, quads)
+        quads = calc_texture_coordinates(tiy, tix, factor_rez.dy, factor_rez.dx, tessellation_level,
+                                         self.texture_size[0], self.texture_size[1],
+                                         self.tile_shape.y, self.tile_shape.x, quads)
         quads = quads.reshape(6 * tessellation_level * tessellation_level, 3)
         quads = np.ascontiguousarray(quads[:, :2])
         return quads
