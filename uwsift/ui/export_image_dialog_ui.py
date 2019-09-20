@@ -8,6 +8,7 @@
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
+
 class Ui_ExportImageDialog(object):
     def setupUi(self, ExportImageDialog):
         ExportImageDialog.setObjectName("ExportImageDialog")
@@ -22,12 +23,12 @@ class Ui_ExportImageDialog(object):
         self.buttonBox.setEnabled(True)
         self.buttonBox.setGeometry(QtCore.QRect(110, 450, 161, 32))
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Save)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Save)
         self.buttonBox.setCenterButtons(False)
         self.buttonBox.setObjectName("buttonBox")
         self.frameRangeGroupBox = QtWidgets.QGroupBox(ExportImageDialog)
         self.frameRangeGroupBox.setGeometry(QtCore.QRect(10, 30, 251, 111))
-        self.frameRangeGroupBox.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignTop)
+        self.frameRangeGroupBox.setAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
         self.frameRangeGroupBox.setFlat(False)
         self.frameRangeGroupBox.setCheckable(False)
         self.frameRangeGroupBox.setObjectName("frameRangeGroupBox")
@@ -43,7 +44,7 @@ class Ui_ExportImageDialog(object):
         self.frameRangeRadio.setObjectName("frameRangeRadio")
         self.label = QtWidgets.QLabel(self.frameRangeGroupBox)
         self.label.setGeometry(QtCore.QRect(80, 80, 41, 21))
-        self.label.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.label.setAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         self.label.setObjectName("label")
         self.frameRangeFrom = QtWidgets.QLineEdit(self.frameRangeGroupBox)
         self.frameRangeFrom.setGeometry(QtCore.QRect(120, 80, 31, 21))
@@ -181,4 +182,3 @@ class Ui_ExportImageDialog(object):
         self.includeFooterCheckbox.setText(_translate("ExportImageDialog", "Include Footer"))
         self.label_3.setText(_translate("ExportImageDialog", "Font Size:"))
         self.footerFontSizeSpinBox.setSuffix(_translate("ExportImageDialog", "px"))
-

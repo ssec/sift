@@ -380,7 +380,7 @@ class ExportImageHelper(QtCore.QObject):
 
         images = [(u, Image.fromarray(x)) for u, x in img_arrays]
 
-        if info['colorbar'] != None:
+        if info['colorbar'] is not None:
             images = [(u, self._append_colorbar(info['colorbar'], im, u)) for (u, im) in images]
 
         if info['include_footer']:

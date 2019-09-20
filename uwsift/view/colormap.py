@@ -64,18 +64,18 @@ def generate_from_awips_cmap(cmap_file, flip=False):
                 bpd += 1
                 skp = 0
             elif ((rcs * rds >= 0 and gcs * gds >= 0 and bcs * bds >= 0) and
-                    ((bpd >= 10 and (rds * rdsp != 0 or (rds * rdsp == 0 and max(abs(rds), abs(rdsp)) == 0)) and
-                      (gds * gdsp != 0 or (gds * gdsp == 0 and max(abs(gds), abs(gdsp)) == 0)) and
-                      (bds * bdsp != 0 or (bds * bdsp == 0 and max(abs(bds), abs(bdsp)) == 0))) or bpd < 10) and
-                    ((abs(rcs) > np.ceil(abs(rds) + ep) and abs(res) < abs(rcs)) or (
-                        abs(rcs) < np.floor(abs(rds) - ep) and abs(res) > abs(rcs)) or
-                     np.floor(abs(rds) - ep) <= abs(rcs) <= np.ceil(abs(rds) + ep)) and
-                    ((abs(gcs) > np.ceil(abs(gds) + ep) and abs(ges) < abs(gcs)) or (
-                        abs(gcs) < np.floor(abs(gds) - ep) and abs(ges) > abs(gcs)) or
-                     np.floor(abs(gds) - ep) <= abs(gcs) <= np.ceil(abs(gds) + ep)) and
-                    ((abs(bcs) > np.ceil(abs(bds) + ep) and abs(bes) < abs(bcs)) or (
-                        abs(bcs) < np.floor(abs(bds) - ep) and abs(bes) > abs(bcs)) or
-                     np.floor(abs(bds) - ep) <= abs(bcs) <= np.ceil(abs(bds) + ep))):
+                  ((bpd >= 10 and (rds * rdsp != 0 or (rds * rdsp == 0 and max(abs(rds), abs(rdsp)) == 0)) and
+                    (gds * gdsp != 0 or (gds * gdsp == 0 and max(abs(gds), abs(gdsp)) == 0)) and
+                    (bds * bdsp != 0 or (bds * bdsp == 0 and max(abs(bds), abs(bdsp)) == 0))) or bpd < 10) and
+                  ((abs(rcs) > np.ceil(abs(rds) + ep) and abs(res) < abs(rcs)) or (
+                          abs(rcs) < np.floor(abs(rds) - ep) and abs(res) > abs(rcs)) or
+                   np.floor(abs(rds) - ep) <= abs(rcs) <= np.ceil(abs(rds) + ep)) and
+                  ((abs(gcs) > np.ceil(abs(gds) + ep) and abs(ges) < abs(gcs)) or (
+                          abs(gcs) < np.floor(abs(gds) - ep) and abs(ges) > abs(gcs)) or
+                   np.floor(abs(gds) - ep) <= abs(gcs) <= np.ceil(abs(gds) + ep)) and
+                  ((abs(bcs) > np.ceil(abs(bds) + ep) and abs(bes) < abs(bcs)) or (
+                          abs(bcs) < np.floor(abs(bds) - ep) and abs(bes) > abs(bcs)) or
+                   np.floor(abs(bds) - ep) <= abs(bcs) <= np.ceil(abs(bds) + ep))):
                 bpd += 1
             else:
                 control_indexes.append(cn - 1)
@@ -657,9 +657,11 @@ SKIN_TEMP_COLORMAPS = OrderedDict([
 ])
 
 WV_COLORMAPS = OrderedDict([
-    ('Gray Scale Water Vapor', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'WV', 'Gray Scale Water Vapor.cmap'))),
+    ('Gray Scale Water Vapor',
+     LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'WV', 'Gray Scale Water Vapor.cmap'))),
     # ('Gray Scale Water Vapor (legacy)', gray_scale_water_vapor),
-    ('NSSL VAS (WV Alternate)', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'WV', 'NSSL VAS (WV Alternate).cmap'))),
+    ('NSSL VAS (WV Alternate)',
+     LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'WV', 'NSSL VAS (WV Alternate).cmap'))),
     # ('NSSL VAS (WV Alternate) (legacy)', nssl_vas_wv_alternate),
     # ('RAMSDIS WV', ramsdis_wv),
     ('SLC WV', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'WV', 'SLC WV.cmap'))),
