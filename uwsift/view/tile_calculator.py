@@ -1,22 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-.py
-~~~
-
-PURPOSE
-Support calculations used throughout the library and application.
-
-REFERENCES
-
-
-REQUIRES
-numpy
-numba
-
-:author: R.K.Garcia <rayg@ssec.wisc.edu>
-:copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
-:license: GPLv3, see LICENSE for more details
+Supports calculations used throughout the library and application.
 """
 
 import numpy as np
