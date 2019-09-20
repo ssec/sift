@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-Supports calculations used throughout the library and application.
-"""
+"""Supports calculations used throughout the library and application."""
 
 import numpy as np
 from numba import jit, float64, int64, float32, types as nb_types
