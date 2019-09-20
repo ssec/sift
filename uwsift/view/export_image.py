@@ -20,6 +20,7 @@ DATA_DIR = get_package_data_dir()
 NUM_TICKS = 8
 TICK_SIZE = 14
 
+
 def is_gif_filename(fn):
     return os.path.splitext(fn)[-1] in ['.gif']
 
@@ -245,10 +246,10 @@ class ExportImageHelper(QtCore.QObject):
 
         with tempfile.TemporaryFile(suffix='.png') as tmpfile:
             if mode == 'vertical':
-                fig = plt.figure(figsize=(im.size[0]/dpi * .1, im.size[1]/dpi * 1.2), dpi=dpi)
+                fig = plt.figure(figsize=(im.size[0] / dpi * .1, im.size[1] / dpi * 1.2), dpi=dpi)
                 ax = fig.add_axes([0.3, 0.05, 0.2, 0.9])
             else:
-                fig = plt.figure(figsize=(im.size[0]/dpi * 1.2, im.size[1]/dpi * .1), dpi=dpi)
+                fig = plt.figure(figsize=(im.size[0] / dpi * 1.2, im.size[1] / dpi * .1), dpi=dpi)
                 ax = fig.add_axes([0.05, 0.4, 0.9, 0.2])
 
             cmap = mpl.colors.ListedColormap(colors)
