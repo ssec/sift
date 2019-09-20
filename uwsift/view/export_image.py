@@ -17,6 +17,8 @@ from uwsift.util import get_package_data_dir, USER_DESKTOP_DIRECTORY
 LOG = logging.getLogger(__name__)
 DATA_DIR = get_package_data_dir()
 
+NUM_TICKS = 8
+TICK_SIZE = 14
 
 def is_gif_filename(fn):
     return os.path.splitext(fn)[-1] in ['.gif']
@@ -229,29 +231,39 @@ class ExportImageHelper(QtCore.QObject):
 
     def _append_colorbar(self, mode, im, u):
         mpl.rcParams['font.sans-serif'] = 'arial'
-        mpl.rcParams.update({'font.size': 16})
-        colors = COLORMAP_MANAGER[self.doc.colormap_for_uuid(u)].colors.rgba
+        mpl.rcParams.update({'font.size': TICK_SIZE})
 
-        LOG.info("control points: {}".format(COLORMAP_MANAGER[self.doc.colormap_for_uuid(u)]._controls))
-        LOG.info("colors: {}".format(COLORMAP_MANAGER[self.doc.colormap_for_uuid(u)].colors))
+        colors = COLORMAP_MANAGER.get(self.doc.colormap_for_uuid(u), None)
+        if colors is None:
+            return im
+        elif self.doc.prez_for_uuid(u).colormap == 'Square Root (Vis Default)':
+            colors = colors.map(numpy.linspace((0, 0, 0, 1), (1, 1, 1, 1), 256))
+        else:
+            colors = colors.colors.rgba
+
+        dpi = self.sgm.main_canvas.dpi
+
         with tempfile.TemporaryFile(suffix='.png') as tmpfile:
             if mode == 'vertical':
-                fig = plt.figure(figsize=(2, 11.8))
-                ax = fig.add_axes([0.35, 0.05, 0.2, 0.9])
+                fig = plt.figure(figsize=(im.size[0]/dpi * .1, im.size[1]/dpi * 1.2), dpi=dpi)
+                ax = fig.add_axes([0.3, 0.05, 0.2, 0.9])
             else:
-                fig = plt.figure(figsize=(19.45, 2))
+                fig = plt.figure(figsize=(im.size[0]/dpi * 1.2, im.size[1]/dpi * .1), dpi=dpi)
                 ax = fig.add_axes([0.05, 0.4, 0.9, 0.2])
 
             cmap = mpl.colors.ListedColormap(colors)
             vmin, vmax = self.doc.prez_for_uuid(u).climits
             norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
-            if len(colors) < 15:
-                ticks = numpy.linspace(vmin, vmax, len(colors) + 1)
-            else:
-                ticks = numpy.linspace(vmin, vmax, 3)
-            mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation=mode, ticks=ticks)
-            fig.savefig(tmpfile, format='png')
+            cbar = mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation=mode)
+            ticks = ["{}".format(self.doc[u][Info.UNIT_CONVERSION][2](self.doc[u][Info.UNIT_CONVERSION][1](t)))
+                     for t in numpy.linspace(vmin, vmax, NUM_TICKS)]
+            cbar.set_ticks(numpy.linspace(vmin, vmax, NUM_TICKS))
+            cbar.set_ticklabels(ticks)
+
+            fig.savefig(tmpfile, format='png', bbox_inches='tight', dpi=dpi)
             fig_im = Image.open(tmpfile)
+
+            fig_im.thumbnail(im.size)
             orig_w, orig_h = im.size
             fig_w, fig_h = fig_im.size
 
