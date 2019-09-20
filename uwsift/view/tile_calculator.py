@@ -1,3 +1,24 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+.py
+~~~
+
+PURPOSE
+Support calculations used throughout the library and application.
+
+REFERENCES
+
+
+REQUIRES
+numpy
+numba
+
+:author: R.K.Garcia <rayg@ssec.wisc.edu>
+:copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
+:license: GPLv3, see LICENSE for more details
+"""
+
 import numpy as np
 from numba import jit, float64, int64, float32, types as nb_types
 from numba.extending import overload
@@ -28,7 +49,10 @@ def isclose(a, b):
     return isclose_impl
 
 
-@jit(nb_types.UniTuple(int64, 2)(float64[:, :], float64[:, :]), nopython=True, cache=True)
+@jit(nb_types.UniTuple(int64, 2)(
+    float64[:, :],
+    float64[:, :]
+), nopython=True, cache=True, nogil=True)
 def get_reference_points(img_cmesh, img_vbox):
     """Get two image reference point indexes.
 
@@ -92,8 +116,11 @@ def get_reference_points(img_cmesh, img_vbox):
 #     return ref_idx_1, near_points_2[0]
 
 
-@jit(nb_types.UniTuple(float64, 2)(float64[:, :], float64[:, :], nb_types.UniTuple(int64, 2)), nopython=True,
-     cache=True)
+@jit(nb_types.UniTuple(float64, 2)(
+    float64[:, :],
+    float64[:, :],
+    nb_types.UniTuple(int64, 2)
+), nopython=True, cache=True, nogil=True)
 def calc_pixel_size(canvas_point, image_point, canvas_size):
     # Calculate the number of image meters per display pixel
     # That is, use the ratio of the distance in canvas space
@@ -108,7 +135,12 @@ def calc_pixel_size(canvas_point, image_point, canvas_size):
     return dx, dy
 
 
-@jit(nb_types.UniTuple(float64, 2)(float64, float64, int64, float64), nopython=True, cache=True)
+@jit(nb_types.UniTuple(float64, 2)(
+    float64,
+    float64,
+    int64,
+    float64
+), nopython=True, cache=True, nogil=True)
 def _calc_extent_component(canvas_point, image_point, num_pixels, meters_per_pixel):
     """Calculate """
     # Find the distance in image space between the closest
@@ -128,7 +160,11 @@ def _calc_extent_component(canvas_point, image_point, num_pixels, meters_per_pix
     return left, right
 
 
-@jit(float64(float64, float64, float64), nopython=True, cache=True)
+@jit(float64(
+    float64,
+    float64,
+    float64
+), nopython=True, cache=True, nogil=True)
 def clip(v, n, x):
     return max(min(v, x), n)
 
@@ -140,8 +176,7 @@ def clip(v, n, x):
     nb_types.UniTuple(int64, 2),
     float64,
     float64
-),
-    nopython=True, cache=True)
+), nopython=True, cache=True, nogil=True)
 def calc_view_extents(image_extents_box: Box, canvas_point, image_point, canvas_size, dx, dy) -> Box:
     left, right = _calc_extent_component(canvas_point[0], image_point[0], canvas_size[0], dx)
     left = clip(left, image_extents_box.left, image_extents_box.right)
@@ -162,8 +197,7 @@ def calc_view_extents(image_extents_box: Box, canvas_point, image_point, canvas_
     nb_types.NamedUniTuple(int64, 2, Point),
     nb_types.NamedUniTuple(int64, 2, Point),
     nb_types.NamedUniTuple(int64, 2, Point)
-),
-    nopython=True, cache=True)
+), nopython=True, cache=True, nogil=True)
 def max_tiles_available(image_shape, tile_shape, stride):
     ath = (image_shape[0] / float(stride[0])) / tile_shape[0]
     atw = (image_shape[1] / float(stride[1])) / tile_shape[1]
@@ -193,7 +227,7 @@ def max_tiles_available(image_shape, tile_shape, stride):
     int64,
     int64,
     int64
-), nopython=True, cache=True)
+), nopython=True, cache=True, nogil=True)
 def visible_tiles(z_dy, z_dx,
                   tile_size_dy, tile_size_dx,
                   image_center_y, image_center_x,
@@ -275,7 +309,7 @@ def visible_tiles(z_dy, z_dx,
     nb_types.Tuple([int64, int64]),
     nb_types.NamedUniTuple(int64, 2, Point),
     nb_types.NamedUniTuple(int64, 2, Point)
-), nopython=True, cache=True)
+), nopython=True, cache=True, nogil=True)
 def calc_tile_slice(tiy, tix, stride, image_shape, tile_shape):
     y_offset = int(image_shape[0] / 2. / stride[0] - tile_shape[0] / 2.)
     y_start = int(tiy * tile_shape[0] + y_offset)
@@ -302,7 +336,7 @@ def calc_tile_slice(tiy, tix, stride, image_shape, tile_shape):
     int64,
     int64,
     int64
-), nopython=True, cache=True)
+), nopython=True, cache=True, nogil=True)
 def calc_tile_fraction(tiy, tix, stride_y, stride_x, image_y, image_x, tile_y, tile_x):  # image_shape, tile_shape):
     # def calc_tile_fraction(tiy, tix, stride, image_shape, tile_shape):
     # mt = max_tiles_available(image_shape, tile_shape, stride)
@@ -346,7 +380,7 @@ def calc_tile_fraction(tiy, tix, stride_y, stride_x, image_y, image_x, tile_y, t
     float64,
     int64,
     int64
-), nopython=True, cache=True)
+), nopython=True, cache=True, nogil=True)
 def calc_stride(v_dx, v_dy, t_dx, t_dy, overview_stride_y, overview_stride_x):
     # screen dy,dx in world distance per pixel
     # world distance per pixel for our data
@@ -362,7 +396,7 @@ def calc_stride(v_dx, v_dy, t_dx, t_dy, overview_stride_y, overview_stride_x):
 @jit(nb_types.UniTuple(int64, 2)(
     nb_types.NamedUniTuple(int64, 2, Point),
     nb_types.NamedUniTuple(int64, 2, Point)
-), nopython=True, cache=True)
+), nopython=True, cache=True, nogil=True)
 def calc_overview_stride(image_shape, tile_shape):
     # FUTURE: Come up with a fancier way of doing overviews like averaging each strided section, if needed
     tsy = max(1, int(np.floor(image_shape[0] / tile_shape[0])))
@@ -387,7 +421,7 @@ def calc_overview_stride(image_shape, tile_shape):
     float64,
     float64,
     float32[:, :]
-), nopython=True, cache=True)
+), nopython=True, cache=True, nogil=True)
 def calc_vertex_coordinates(tiy, tix, stridey, stridex,
                             factor_rez_dy, factor_rez_dx,
                             offset_rez_dy, offset_rez_dx,
@@ -423,7 +457,7 @@ def calc_vertex_coordinates(tiy, tix, stridey, stridex,
     int64,
     int64,
     float32[:, :]
-), nopython=True, cache=True)
+), nopython=True, cache=True, nogil=True)
 def calc_texture_coordinates(tiy, tix, factor_rez_dy, factor_rez_dx,
                              tessellation_level,
                              texture_size_y, texture_size_x,
