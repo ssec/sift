@@ -354,8 +354,11 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         self.layoutChanged.emit()
 
         # this is an ugly way to make sure the selection stays current
-        self.changedSelection(None)
-        self.current_set_listbox.update()
+        try:
+            self.changedSelection(None)
+            self.current_set_listbox.update()
+        except IndexError:
+            pass
 
     def current_selected_uuids(self, lbox: QTreeView = None):
         lbox = self.current_set_listbox if lbox is None else lbox
