@@ -705,6 +705,13 @@ class PROJ4Transform(BaseTransform):
 
         # print(self._shader_map.compile())
 
+    @property
+    def is_geographic(self):
+        if hasattr(self.proj, 'crs'):
+            # pyproj 2.0+
+            return self.proj.crs.is_geographic
+        return self.proj.is_latlong()
+
     def create_proj_dict(self, proj_str):
         d = tuple(x.replace("+", "").split("=") for x in proj_str.split(" "))
         d = dict((x[0], x[1] if len(x) > 1 else 'true') for x in d)
@@ -769,7 +776,7 @@ class PROJ4Transform(BaseTransform):
             Coordinates to map.
         """
         m = np.empty(coords.shape)
-        if self.proj.is_latlong():
+        if self.is_geographic:
             m[:, 0] = coords[:, 0]
             m[:, 1] = coords[:, 1]
         else:
@@ -787,7 +794,7 @@ class PROJ4Transform(BaseTransform):
             Coordinates to inverse map.
         """
         m = np.empty(coords.shape)
-        if self.proj.is_latlong():
+        if self.is_geographic:
             m[:, 0] = coords[:, 0]
             m[:, 1] = coords[:, 1]
         else:

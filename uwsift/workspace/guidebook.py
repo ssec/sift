@@ -30,20 +30,6 @@ class Guidebook(object):
     guidebook which knows about AHI, ABI, AMI bands, timing, file naming conventions
     """
 
-    @staticmethod
-    def is_relevant(pathname):
-        return False
-
-    @staticmethod
-    def for_info(info=None, path=None):
-        """
-        given an info dictionary, figure out which
-        :param info:
-        :return:
-        """
-        if info and not path:
-            path = info.get(Info.PATHNAME, None)
-
     def channel_siblings(self, uuid, infos):
         """
         determine the channel siblings of a given dataset
@@ -189,22 +175,18 @@ class ABI_AHI_Guidebook(Guidebook):
     def __init__(self):
         self._cache = {}
 
-    def _relevant_info(self, seq):
-        "filter datasetinfo dictionaries in sequence, if they're not relevant to us (i.e. not AHI)"
-        for dsi in seq:
-            if self.is_relevant(dsi.get(Info.PATHNAME, None)):
-                yield dsi
-
     def collect_info(self, info):
         """Collect information that may not come from the dataset.
 
         This method should only be called once to "fill in" metadata
-        that isn't originally known about an opened file.
+        that isn't originally known about an opened file. The provided `info`
+        is used as a starting point, but is not modified by this method.
+        
         """
         z = {}
 
         if info[Info.KIND] in (Kind.IMAGE, Kind.COMPOSITE):
-            if z.get(Info.CENTRAL_WAVELENGTH) is None:
+            if info.get(Info.CENTRAL_WAVELENGTH) is None:
                 try:
                     wl = NOMINAL_WAVELENGTHS[info[Info.PLATFORM]][info[Info.INSTRUMENT]][info[Info.BAND]]
                 except KeyError:
@@ -247,13 +229,6 @@ class ABI_AHI_Guidebook(Guidebook):
     def _is_bt(self, dsi):
         return dsi.get(Info.BAND) in self.BT_BANDS or \
             dsi.get(Info.STANDARD_NAME) in ["toa_brightness_temperature", 'brightness_temperature', 'air_temperature']
-
-    def collect_info_from_seq(self, seq):
-        "collect AHI metadata about a sequence of datasetinfo dictionaries"
-        # FUTURE: cache uuid:metadata info in the guidebook instance for quick lookup
-        for each in self._relevant_info(seq):
-            md = self.collect_info(each)
-            yield each[Info.UUID], md
 
     def climits(self, dsi):
         # Valid min and max for colormap use for data values in file (unconverted)

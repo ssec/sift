@@ -527,11 +527,8 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         if mime.hasFormat('text/uri-list'):
             if mime.hasUrls():
                 LOG.debug('found urls in drop!')
-                for qurl in mime.urls():
-                    LOG.debug(qurl.path())
-                    if qurl.isLocalFile():
-                        path = qurl.path()
-                        self.doc.open_file(path)  # FIXME: replace with a signal
+                paths = [qurl.path() for qurl in mime.urls() if qurl.isLocalFile()]
+                self.doc.import_files(paths)  # FIXME: replace with a signal
                 return True
         elif mime.hasFormat(self._mimetype):
             # unpickle the presentation information and re-insert it

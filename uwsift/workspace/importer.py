@@ -28,6 +28,14 @@ from uwsift.workspace.goesr_pug import PugFile
 from uwsift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
 from .metadatabase import Resource, Product, Content
 
+# List of readers to use/include when searching for loadable files
+# None = all readers
+SATPY_READERS = None
+_SATPY_READERS = None  # cache: see `available_satpy_readers()` below
+# Filters for what datasets not to include
+EXCLUDE_DATASETS = {'calibration': ['radiance', 'counts']}
+
+
 LOG = logging.getLogger(__name__)
 
 try:
@@ -55,12 +63,34 @@ GUIDEBOOKS = {
 
 import_progress = namedtuple('import_progress',
                              ['uuid', 'stages', 'current_stage', 'completion', 'stage_desc', 'dataset_info', 'data'])
-
-
+"""
 # stages:int, number of stages this import requires
 # current_stage:int, 0..stages-1 , which stage we're on
 # completion:float, 0..1 how far we are along on this stage
 # stage_desc:tuple(str), brief description of each of the stages we'll be doing
+"""
+
+
+def available_satpy_readers(as_dict=False):
+    from satpy import available_readers
+    global _SATPY_READERS
+    if _SATPY_READERS is None:
+        _SATPY_READERS = available_readers(as_dict=True)
+
+    if not as_dict:
+        return [r['name'] for r in _SATPY_READERS]
+    return _SATPY_READERS
+
+
+def filter_dataset_ids(ids_to_filter: Iterable[DatasetID]) -> Generator[DatasetID, None, None]:
+    """Generate only non-filtered DatasetIDs based on EXCLUDE_DATASETS global filters."""
+    # skip certain DatasetIDs
+    for ds_id in ids_to_filter:
+        for filter_key, filtered_values in EXCLUDE_DATASETS.items():
+            if getattr(ds_id, filter_key) in filtered_values:
+                break
+        else:
+            yield ds_id
 
 
 def get_guidebook_class(layer_info) -> Guidebook:
@@ -194,7 +224,11 @@ class aImporter(ABC):
         except IndexError:
             LOG.error('no resources in {} {}'.format(repr(type(prod)), repr(prod)))
             raise
-        return cls(prod.resource[0].path, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
+        paths = [r.path for r in prod.resource]
+        # HACK for Satpy importer
+        if 'reader' in prod.info:
+            kwargs.setdefault('reader', prod.info['reader'])
+        return cls(paths, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
 
     @classmethod
     @abstractmethod
@@ -245,6 +279,9 @@ class aSingleFileWithSingleProductImporter(aImporter):
     _resource: Resource = None
 
     def __init__(self, source_path, workspace_cwd, database_session, **kwargs):
+        if isinstance(source_path, list) and len(source_path) == 1:
+            # backwards compatibility - we now expect a list
+            source_path = source_path[0]
         super(aSingleFileWithSingleProductImporter, self).__init__(workspace_cwd, database_session)
         self.source_path = source_path
 
@@ -440,7 +477,6 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
             # FUTURE: Use Dataset name instead when we can read multi-dataset files
             d[Info.DATASET_NAME] = os.path.split(source_path)[-1]
 
-        d[Info.PATHNAME] = source_path
         band = gtiff.GetRasterBand(1)
         d[Info.SHAPE] = rows, cols = (band.YSize, band.XSize)
 
@@ -660,7 +696,6 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
 
         d.update(GoesRPUGImporter._basic_pug_metadata(pug))
         # d[Info.DATASET_NAME] = os.path.split(source_path)[-1]
-        d[Info.PATHNAME] = source_path
         d[Info.KIND] = Kind.IMAGE
 
         # FUTURE: this is Content metadata and not Product metadata:
@@ -803,31 +838,25 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
                               data=img_data)
 
 
-class SatPyImporter(aImporter):
+class SatpyImporter(aImporter):
     """Generic SatPy importer"""
 
-    def __init__(self, source_path, workspace_cwd, database_session, **kwargs):
-        super(SatPyImporter, self).__init__(workspace_cwd, database_session)
+    def __init__(self, source_paths, workspace_cwd, database_session, **kwargs):
+        super(SatpyImporter, self).__init__(workspace_cwd, database_session)
         reader = kwargs.pop('reader', None)
         if reader is None:
             raise NotImplementedError("Can't automatically determine reader.")
-        if not isinstance(source_path, (list, tuple)):
-            source_path = [source_path]
+        if not isinstance(source_paths, (list, tuple)):
+            source_paths = [source_paths]
 
-        if len(source_path) > 1:
-            raise NotImplementedError("SatPy importer does not currently "
-                                      "support reading more than one file "
-                                      "at a time.")
         if Scene is None:
             raise ImportError("SatPy is not available and can't be used as "
                               "an importer")
-        self.filenames = list(source_path)
+        self.filenames = list(source_paths)
         self.reader = reader
-        if 'scene' in kwargs:
-            self.scn = kwargs['scene']
-        else:
-            self.scn = Scene(reader=self.reader,
-                             filenames=self.filenames)
+        self.scn = kwargs.get('scene')
+        if self.scn is None:
+            self.scn = Scene(reader=self.reader, filenames=self.filenames)
         self._resources = []
         # DatasetID filters
         self.product_filters = {}
@@ -836,7 +865,10 @@ class SatPyImporter(aImporter):
                 self.product_filters[k] = kwargs.pop(k)
         # NOTE: product_filters don't do anything if the dataset_ids aren't
         #       specified since we are using all available dataset ids
-        self.dataset_ids = sorted(kwargs.get('dataset_ids', self.scn.available_dataset_ids()))
+        self.dataset_ids = kwargs.get('dataset_ids')
+        if self.dataset_ids is None:
+            self.dataset_ids = filter_dataset_ids(self.scn.available_dataset_ids())
+        self.dataset_ids = sorted(self.dataset_ids)
 
     @classmethod
     def from_product(cls, prod: Product, workspace_cwd, database_session, **kwargs):
@@ -854,7 +886,8 @@ class SatPyImporter(aImporter):
         kwargs.pop('scenes', None)
         kwargs.pop('scene', None)
         kwargs['dataset_ids'] = [DatasetID.from_dict(prod.info)]
-        return cls(prod.resource[0].path, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
+        filenames = [r.path for r in prod.resource]
+        return cls(filenames, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
 
     @classmethod
     def is_relevant(cls, source_path=None, source_uri=None):
@@ -889,20 +922,17 @@ class SatPyImporter(aImporter):
         self._resources = res_dict.values()
         return self._resources
 
-    def merge_products(self):
+    def merge_products(self) -> Iterable[Product]:
         resources = self.merge_resources()
         if resources is None:
             LOG.debug('no resources for {}'.format(self.filenames))
             return
 
-        # FIXME: This doesn't work for multiple files to one product
+        existing_ids = {}
         resources = list(resources)
-        if len(resources) > 1:
-            raise NotImplementedError("Products created from more than one "
-                                      "file are not currently supported.")
-        res = resources[0]
-        products = list(res.product)
-        existing_ids = {DatasetID.from_dict(prod.info): prod for prod in products}
+        for res in resources:
+            products = list(res.product)
+            existing_ids.update({DatasetID.from_dict(prod.info): prod for prod in products})
         existing_prods = {x: existing_ids[x] for x in self.dataset_ids if x in existing_ids}
         if products and len(existing_prods) == len(self.dataset_ids):
             products = existing_prods.values()
@@ -927,7 +957,7 @@ class SatPyImporter(aImporter):
                 uuid_str=str(uuid),
                 atime=now,
             )
-            prod.resource.append(res)
+            prod.resource.extend(resources)
 
             assert (Info.OBS_TIME in meta)
             assert (Info.OBS_DURATION in meta)
@@ -987,8 +1017,8 @@ class SatPyImporter(aImporter):
             start_time = ds.attrs['start_time']
             ds.attrs[Info.OBS_TIME] = start_time
             ds.attrs[Info.SCHED_TIME] = start_time
-            duration = start_time - ds.attrs.get('end_time', start_time)
-            if duration.total_seconds() == 0:
+            duration = ds.attrs.get('end_time', start_time) - start_time
+            if duration.total_seconds() <= 0:
                 duration = timedelta(minutes=60)
             ds.attrs[Info.OBS_DURATION] = duration
 
@@ -1038,6 +1068,7 @@ class SatPyImporter(aImporter):
             # TODO: Include level or something else in addition to time?
             start_str = ds.attrs['start_time'].isoformat()
             ds.attrs[Info.SERIAL] = start_str if model_time is None else model_time + ":" + start_str
+            ds.attrs.setdefault('reader', self.reader)
 
         return self.scn
 

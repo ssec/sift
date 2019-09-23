@@ -16,51 +16,121 @@
 # along with SIFT.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
-from PyQt5 import QtCore, QtGui, QtWidgets
+import logging
+from PyQt5 import QtCore, QtWidgets, QtGui
+from PyQt5.QtCore import QPoint
+from PyQt5.QtWidgets import QMenu
 from collections import OrderedDict
+from typing import Generator, Tuple, Union
 
 from satpy import Scene, DatasetID
+from satpy.readers import group_files
 
 from uwsift.ui.open_file_wizard_ui import Ui_openFileWizard
+from uwsift.workspace.importer import available_satpy_readers, SATPY_READERS, filter_dataset_ids
+
+LOG = logging.getLogger(__name__)
 
 FILE_PAGE = 0
 PRODUCT_PAGE = 1
-SUMMARY_PAGE = 2
 
-BY_PARAMETER_TAB = 0
-BY_ID_TAB = 1
+ID_COMPONENTS = [
+    'name',
+    'wavelength',
+    'resolution',
+    'calibration',
+    'level',
+]
+
+
+def _pretty_identifiers(ds_id: DatasetID) -> Generator[Tuple[str, object, str], None, None]:
+    """Determine pretty version of each identifier."""
+    for key in ID_COMPONENTS:
+        value = getattr(ds_id, key, None)
+        if value is None:
+            pretty_val = "N/A"
+        elif key == 'wavelength':
+            pretty_val = "{:0.02f} µm".format(value[1])
+        elif key == 'level':
+            pretty_val = "{:d} hPa".format(value)
+        elif key == 'resolution':
+            pretty_val = "{:d}m".format(value)
+        else:
+            pretty_val = value
+
+        yield key, value, pretty_val
 
 
 class OpenFileWizard(QtWidgets.QWizard):
-    AVAILABLE_READERS = []
+    AVAILABLE_READERS = OrderedDict()
+    filesChanged = QtCore.pyqtSignal()
 
     def __init__(self, base_dir=None, parent=None):
         super(OpenFileWizard, self).__init__(parent)
-        self._last_open_dir = base_dir
-        self._filenames = set()
-        self._selected_files = []
+        # enable context menus
+        self.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
+        self.last_open_dir = base_dir
+        self._all_filenames = set()
+        self._filelist_changed = False
         # tuple(filenames) -> scene object
         self.scenes = {}
-        self.selected_ids = []
+        self.all_available_products = None
+        self._previous_reader = None
+        self.file_groups = {}
+        self.unknown_files = set()
+        app = QtWidgets.QApplication.instance()
+        self._unknown_icon = app.style().standardIcon(QtGui.QStyle.SP_DialogCancelButton)
+        self._known_icon = QtGui.QIcon()
+        # self._known_icon = app.style().standardIcon(QtGui.QStyle.SP_DialogApplyButton)
 
         self.ui = Ui_openFileWizard()
         self.ui.setupUi(self)
-
-        font = QtGui.QFont('Andale Mono')
-        font.setPointSizeF(14)
-        self.ui.productSummaryText.setFont(font)
 
         self.ui.addButton.released.connect(self.add_file)
         self.ui.removeButton.released.connect(self.remove_file)
         # Connect signals so Next buttons are determined by selections on pages
         self._connect_next_button_signals(self.ui.fileList, self.ui.fileSelectionPage)
-        self.ui.fileList.model().rowsInserted.connect(lambda x: self.ui.fileSelectionPage.completeChanged.emit())
-        self.ui.fileList.model().rowsRemoved.connect(lambda x: self.ui.fileSelectionPage.completeChanged.emit())
-        self.ui.fileList.itemChanged.connect(lambda x: self.ui.fileSelectionPage.completeChanged.emit())
-        self.ui.selectByTabWidget.currentChanged.connect(self._product_selection_tab_change)
+        # self.ui.fileList.model().rowsInserted.connect(self._file_selection_or_reader_changed)
+        # self.ui.fileList.model().rowsRemoved.connect(self._file_selection_or_reader_changed)
+        # self.ui.fileList.itemChanged.connect(self._file_selection_or_reader_changed)
+        self.filesChanged.connect(self._file_selection_or_reader_changed)
+        self.ui.readerComboBox.currentIndexChanged.connect(self._file_selection_or_reader_changed)
+        self.ui.statusMessage.setText("")
 
         # Page 2 - Product selection
-        self._connect_product_select_complete()
+        self._connect_next_button_signals(self.ui.selectIDTable, self.ui.productSelectionPage)
+        self._all_selected = True
+        self.ui.selectAllButton.clicked.connect(self.select_all_products_state)
+        self.ui.selectIDTable.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.ui.selectIDTable.customContextMenuRequested.connect(self._product_context_menu)
+
+    def _file_selection_or_reader_changed(self, *args, **kwargs):
+        """Set status message to empty text and check if this page is complete."""
+        self.ui.fileSelectionPage.sift_page_checked = True
+        if self.ui.fileList.count() != 0:
+            self.ui.statusMessage.setText('Checking file/reader compatibility...')
+            self.ui.statusMessage.setStyleSheet('color: black')
+            reader = self.ui.readerComboBox.currentData()
+            groups_updated = self._group_files(reader)
+            if groups_updated:
+                self._mark_unknown_files()
+            if not self.file_groups:
+                # if none of the files were usable then the user can't click Next
+                self.ui.fileSelectionPage.sift_page_checked = False
+                self.ui.statusMessage.setText("ERROR: Could not load any files with specified reader")
+                self.ui.statusMessage.setStyleSheet('color: red')
+            else:
+                self.ui.statusMessage.setText('')
+        self.ui.fileSelectionPage.completeChanged.emit()
+
+    def _mark_unknown_files(self):
+        for row_idx in range(self.ui.fileList.count()):
+            item = self.ui.fileList.item(row_idx)
+            fn = item.text()
+            if fn in self.unknown_files:
+                item.setIcon(self._unknown_icon)
+            else:
+                item.setIcon(self._known_icon)
 
     def _connect_next_button_signals(self, widget, page):
         widget.model().rowsInserted.connect(page.completeChangedSlot)
@@ -72,114 +142,176 @@ class OpenFileWizard(QtWidgets.QWizard):
         widget.model().rowsRemoved.disconnect(page.completeChangedSlot)
         widget.itemChanged.disconnect(page.completeChangedSlot)
 
+    def select_all_products_state(self, checked: bool):
+        """Select all or deselect all products listed on the product table."""
+        # the new state (all selected or all unselected)
+        self._all_selected = not self._all_selected
+        self.select_all_products(select=self._all_selected)
+
+    def select_all_products(self, select=True, prop_key: Union[str, None] = None,
+                            prop_val: Union[str, None] = None):
+        """Select products based on a specific property."""
+        if prop_key is not None:
+            prop_column = ID_COMPONENTS.index(prop_key)
+        else:
+            prop_column = 0
+
+        for row_idx in range(self.ui.selectIDTable.rowCount()):
+            # our check state goes on the name item (always)
+            name_item = self.ui.selectIDTable.item(row_idx, 0)
+            if prop_key is not None:
+                prop_item = self.ui.selectIDTable.item(row_idx, prop_column)
+                item_val = prop_item.data(QtCore.Qt.UserRole)
+                if item_val != prop_val:
+                    continue
+            check_state = self._get_checked(select)
+            name_item.setCheckState(check_state)
+
+    def _product_context_menu(self, position: QPoint):
+        item = self.ui.selectIDTable.itemAt(position)
+        col = item.column()
+        id_comp = ID_COMPONENTS[col]
+        id_val = item.data(QtCore.Qt.UserRole)
+        menu = QMenu()
+        select_action = menu.addAction("Select all by '{}'".format(id_comp))
+        deselect_action = menu.addAction("Deselect all by '{}'".format(id_comp))
+        action = menu.exec_(self.ui.selectIDTable.mapToGlobal(position))
+        if action == select_action or action == deselect_action:
+            select = action == select_action
+            self.select_all_products(select=select, prop_key=id_comp, prop_val=id_val)
+
+    def collect_selected_ids(self):
+        selected_ids = []
+        for item_idx in range(self.ui.selectIDTable.rowCount()):
+            id_items = OrderedDict((key, self.ui.selectIDTable.item(item_idx, id_idx))
+                                   for id_idx, key in enumerate(ID_COMPONENTS))
+            if id_items['name'].checkState():
+                id_dict = {key: id_item.data(QtCore.Qt.UserRole)
+                           for key, id_item in id_items.items() if id_item is not None}
+                selected_ids.append(DatasetID(**id_dict))
+        return selected_ids
+
     def initializePage(self, p_int):
-        self.selected_ids = []
         if p_int == FILE_PAGE:
             self._init_file_page()
         elif p_int == PRODUCT_PAGE:
             self._init_product_select_page()
-        elif p_int == SUMMARY_PAGE:
-            self._init_summary_page()
 
-    def _init_file_page(self):
-        all_readers = bool(os.getenv("SIFT_ALLOW_ALL_READERS", ""))
-        if all_readers and self.AVAILABLE_READERS:
-            readers = self.AVAILABLE_READERS
-        elif all_readers:
-            from satpy import available_readers
-            readers = sorted(available_readers())
-            OpenFileWizard.AVAILABLE_READERS = readers
-        else:
-            readers = ['grib']
-            self.ui.readerComboBox.setDisabled(True)
+    def validateCurrentPage(self) -> bool:
+        """Check that the current page will generate the necessary data."""
+        valid = super(OpenFileWizard, self).validateCurrentPage()
+        if not valid:
+            self.ui.statusMessage.setText('')
+            return valid
 
-        self.ui.readerComboBox.addItems(readers)
+        p_int = self.currentId()
+        if p_int == FILE_PAGE:
+            try:
+                self._create_scenes()
+            except (RuntimeError, ValueError):
+                LOG.error("Could not load files with Satpy reader.")
+                LOG.debug("Could not load files with Satpy reader.", exc_info=True)
+                self.ui.statusMessage.setText("ERROR: Could not load files with specified reader")
+                self.ui.statusMessage.setStyleSheet('color: red')
+                return False
 
-    def _disconnect_product_select_complete(self, tabs_switched=False):
-        current_idx = self.ui.selectByTabWidget.currentIndex()
-        if tabs_switched:
-            # we want to disconnect the previous tab
-            current_idx = 0 if current_idx else 1
-        if current_idx == 0:
-            self._disconnect_next_button_signals(self.ui.selectByNameList, self.ui.productSelectionPage)
-            self._disconnect_next_button_signals(self.ui.selectByLevelList, self.ui.productSelectionPage)
-        elif current_idx == 1:
-            self._disconnect_next_button_signals(self.ui.selectIDTable, self.ui.productSelectionPage)
+            if not self.all_available_products:
+                LOG.error("No known products can be loaded from the available files.")
+                self.ui.statusMessage.setText("ERROR: No known products can be loaded from the available files.")
+                self.ui.statusMessage.setStyleSheet('color: red')
+                return False
+        self.ui.statusMessage.setText('')
+        return True
 
-    def _connect_product_select_complete(self):
-        current_idx = self.ui.selectByTabWidget.currentIndex()
-        if current_idx == 0:
-            self.ui.productSelectionPage.important_children = [
-                self.ui.selectByNameList, self.ui.selectByLevelList]
-            self._connect_next_button_signals(self.ui.selectByNameList, self.ui.productSelectionPage)
-            self._connect_next_button_signals(self.ui.selectByLevelList, self.ui.productSelectionPage)
-        elif current_idx == 1:
-            self.ui.productSelectionPage.important_children = [self.ui.selectIDTable]
-            self._connect_next_button_signals(self.ui.selectIDTable, self.ui.productSelectionPage)
+    def _group_files(self, reader) -> bool:
+        """Group provided files by time step."""
+        # the files haven't changed since we were last run
+        if not self._filelist_changed and self._previous_reader == reader:
+            return False
 
-    def _init_product_select_page(self):
-        if self._selected_files == self._filenames:
-            return
+        self._filelist_changed = False
+        self.file_groups = {}  # reset the list, just in case
+        selected_files = self._all_filenames.copy()
+        self._previous_reader = reader
+        file_groups = group_files(selected_files, reader=reader)
+        if not file_groups:
+            self.unknown_files = selected_files
+            self.file_groups = {}
+            return True
 
-        # Disconnect the signals until we are done setting up the widgets
-        self._disconnect_product_select_complete()
+        scenes = {}  # recreate Scene dictionary
+        file_group_map = {}
+        known_files = set()
+        for file_group in file_groups:
+            # file_group includes what reader to use
+            # NOTE: We only allow a single reader at a time
+            group_id = tuple(sorted(fn for group_list in file_group.values() for fn in group_list))
+            known_files.update(group_id)
+            if group_id not in self.scenes:
+                # never seen this exact group of files before
+                scenes[group_id] = None  # filled in later
+            else:
+                scenes[group_id] = self.scenes[group_id]
+            file_group_map[group_id] = file_group
+        self.scenes = scenes
+        self.file_groups = file_group_map
+        self.unknown_files = selected_files - known_files
+        return True
 
-        self._selected_files = self._filenames.copy()
+    def _create_scenes(self):
+        """Create Scene objects for the selected files."""
         all_available_products = set()
-        for fn in self._selected_files:
-            these_files = tuple(sorted([fn]))
-            # TODO: We need to be able to figure out how many paths go to each
-            #       Scene (add to satpy as utility function)
-            if these_files in self.scenes:
-                continue
-            reader = self.ui.readerComboBox.currentText()
-            scn = Scene(reader=reader, filenames=these_files)
-            self.scenes[these_files] = scn
+        for group_id, file_group in self.file_groups.items():
+            scn = self.scenes.get(group_id)
+            if scn is None:
+                # need to create the Scene for the first time
+                # file_group includes what reader to use
+                # NOTE: We only allow a single reader at a time
+                self.scenes[group_id] = scn = Scene(filenames=file_group)
+
             all_available_products.update(scn.available_dataset_ids())
 
         # update the widgets
-        all_available_products = sorted(all_available_products)
-        self.ui.selectIDTable.setRowCount(len(all_available_products))
+        self.all_available_products = sorted(all_available_products)
+
+    def _init_file_page(self):
+        if self.AVAILABLE_READERS:
+            readers = self.AVAILABLE_READERS
+        else:
+            readers = available_satpy_readers(as_dict=True)
+            readers = (r for r in readers if not SATPY_READERS or r['name'] in SATPY_READERS)
+            readers = sorted(readers, key=lambda x: x.get('long_name', x['name']))
+            readers = OrderedDict((ri.get('long_name', ri['name']), ri['name']) for ri in readers)
+            OpenFileWizard.AVAILABLE_READERS = readers
+
+        for reader_short_name, reader_name in readers.items():
+            self.ui.readerComboBox.addItem(reader_short_name, reader_name)
+
+    def _init_product_select_page(self):
+        # Disconnect the signals until we are done setting up the widgets
+        self._disconnect_next_button_signals(self.ui.selectIDTable, self.ui.productSelectionPage)
+
         # name and level
-        self.ui.selectIDTable.setColumnCount(2)
-        self.ui.selectIDTable.setHorizontalHeaderLabels(['name', 'level'])
-        properties = OrderedDict((
-            ('name', set()),
-            ('level', set()),
-        ))
-        for idx, ds_id in enumerate(all_available_products):
-            pretty_name = ds_id.name.upper() if ds_id.level is not None else ds_id.name
-            properties['name'].add((ds_id.name, pretty_name))
-            pretty_level = "{:d} hPa".format(ds_id.level) if ds_id.level is not None else 'NA'
-            properties['level'].add((ds_id.level, pretty_level))
+        self.ui.selectIDTable.setColumnCount(len(ID_COMPONENTS))
+        self.ui.selectIDTable.setHorizontalHeaderLabels([x.title() for x in ID_COMPONENTS])
+        for idx, ds_id in enumerate(filter_dataset_ids(self.all_available_products)):
+            col_idx = 0
+            for id_key, id_val, pretty_val in _pretty_identifiers(ds_id):
+                if id_key not in ID_COMPONENTS:
+                    continue
 
-            item = QtWidgets.QTableWidgetItem(pretty_name)
-            item.setData(QtCore.Qt.UserRole, ds_id.name)
-            item.setFlags((item.flags() ^ QtCore.Qt.ItemIsEditable) | QtCore.Qt.ItemIsUserCheckable)
-            item.setCheckState(QtCore.Qt.Unchecked)
-            self.ui.selectIDTable.setItem(idx, 0, item)
-            item = QtWidgets.QTableWidgetItem(pretty_level)
-            item.setData(QtCore.Qt.UserRole, ds_id.level)
-            item.setFlags((item.flags() ^ QtCore.Qt.ItemIsEditable) | QtCore.Qt.ItemIsUserCheckable)
-            self.ui.selectIDTable.setItem(idx, 1, item)
+                self.ui.selectIDTable.setRowCount(idx + 1)
+                item = QtWidgets.QTableWidgetItem(pretty_val)
+                item.setData(QtCore.Qt.UserRole, id_val)
+                item.setFlags((item.flags() ^ QtCore.Qt.ItemIsEditable) | QtCore.Qt.ItemIsUserCheckable)
+                if id_key == 'name':
+                    item.setCheckState(QtCore.Qt.Checked)
+                self.ui.selectIDTable.setItem(idx, col_idx, item)
+                col_idx += 1
 
-        # Update the per-property lists
-        names = sorted(properties['name'])
-        for name, pretty_name in names:
-            item = QtWidgets.QListWidgetItem(pretty_name)
-            item.setData(QtCore.Qt.UserRole, name)
-            item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable)
-            item.setCheckState(QtCore.Qt.Unchecked)
-            self.ui.selectByNameList.addItem(item)
-        levels = sorted(properties['level'])
-        for level, pretty_level in levels:
-            item = QtWidgets.QListWidgetItem(pretty_level)
-            item.setData(QtCore.Qt.UserRole, level)
-            item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable)
-            item.setCheckState(QtCore.Qt.Unchecked)
-            self.ui.selectByLevelList.addItem(item)
-
-        self._connect_product_select_complete()
+        # must do this after everything is added so we don't trigger the
+        # "complete" checks a ton of times
+        self._connect_next_button_signals(self.ui.selectIDTable, self.ui.productSelectionPage)
 
     def _get_checked(self, bool_val):
         if bool_val:
@@ -187,120 +319,37 @@ class OpenFileWizard(QtWidgets.QWizard):
         else:
             return QtCore.Qt.Unchecked
 
-    def _reinit_parameter_tab(self):
-        # we were on the ID list, now one the parameter lists
-        # need to update which selections should be chosen
-        names = set()
-        levels = set()
-        for item_idx in range(self.ui.selectIDTable.rowCount()):
-            name_item = self.ui.selectIDTable.item(item_idx, 0)
-            level_item = self.ui.selectIDTable.item(item_idx, 1)
-
-            if name_item.checkState():
-                names.add(name_item.data(QtCore.Qt.UserRole))
-                levels.add(level_item.data(QtCore.Qt.UserRole))
-        # enable all the names that were checked in the ID list
-        for item_idx in range(self.ui.selectByNameList.count()):
-            item = self.ui.selectByNameList.item(item_idx)
-            name = item.data(QtCore.Qt.UserRole)
-            item.setCheckState(self._get_checked(name in names))
-        # enable all the levels that were checked in the ID list
-        for item_idx in range(self.ui.selectByLevelList.count()):
-            item = self.ui.selectByLevelList.item(item_idx)
-            level = item.data(QtCore.Qt.UserRole)
-            item.setCheckState(self._get_checked(level in levels))
-
-    def _reinit_id_tab(self):
-        names = set()
-        for item_idx in range(self.ui.selectByNameList.count()):
-            item = self.ui.selectByNameList.item(item_idx)
-            if item.checkState():
-                names.add(item.data(QtCore.Qt.UserRole))
-
-        levels = set()
-        for item_idx in range(self.ui.selectByLevelList.count()):
-            item = self.ui.selectByLevelList.item(item_idx)
-            if item.checkState():
-                levels.add(item.data(QtCore.Qt.UserRole))
-
-        for item_idx in range(self.ui.selectIDTable.rowCount()):
-            name_item = self.ui.selectIDTable.item(item_idx, 0)
-            level_item = self.ui.selectIDTable.item(item_idx, 1)
-
-            name_selected = name_item.data(QtCore.Qt.UserRole) in names
-            level_selected = level_item.data(QtCore.Qt.UserRole) in levels
-            name_item.setCheckState(self._get_checked(name_selected and level_selected))
-
-    def _product_selection_tab_change(self, tab_idx, force_reinit=True):
-        self._disconnect_product_select_complete(tabs_switched=True)
-        if tab_idx == BY_PARAMETER_TAB:
-            self._reinit_parameter_tab()
-        elif tab_idx == BY_ID_TAB:
-            self._reinit_id_tab()
-        self._connect_product_select_complete()
-
-    def _init_summary_page(self):
-        # we are going to use the id table to get our summary
-        # so make sure the values are correct
-        if self.ui.selectByTabWidget.currentIndex() != BY_ID_TAB:
-            self.ui.selectByTabWidget.setCurrentIndex(BY_ID_TAB)
-
-        selected_text = []
-        selected_ids = []
-        id_format = "| {name:<20s} | {level:>8s} |"
-        header_format = "| {name:<20s} | {level:>8s} |"
-        header_line = "|-{0:-^20s}-|-{0:-^8s}-|".format('-')
-        for item_idx in range(self.ui.selectIDTable.rowCount()):
-            name_item = self.ui.selectIDTable.item(item_idx, 0)
-            level_item = self.ui.selectIDTable.item(item_idx, 1)
-            if name_item.checkState():
-                name = name_item.data(QtCore.Qt.UserRole)
-                level = level_item.data(QtCore.Qt.UserRole)
-                selected_ids.append(DatasetID(name=name, level=level))
-                selected_text.append(id_format.format(
-                    name=name_item.text(),
-                    level=level_item.text(),
-                ))
-
-        self.selected_ids = selected_ids
-
-        summary_text = """Products to be loaded: {}
-
-""".format(len(selected_ids))
-
-        header = header_format.format(name="Name", level="Level")
-        summary_text += "\n".join([header, header_line] + selected_text)
-        self.ui.productSummaryText.setText(summary_text)
-
     def add_file(self):
-        filename_filters = [
-            # 'All files (*.*)',
-            # 'All supported files (*.nc *.nc4 *.tiff *.tif)',
-            # 'GOES-16 NetCDF (*.nc *.nc4)',
-            # 'Mercator GTIFF (*.tiff *.tif)',
-            'NWP GRIB2 (*.grib2 *.f???)',
-        ]
-        if os.getenv("SIFT_ALLOW_ALL_READERS", ""):
-            filename_filters = ['All files (*.*)'] + filename_filters
+        filename_filters = ['All files (*.*)']
         filter_str = ';;'.join(filename_filters)
         files = QtWidgets.QFileDialog.getOpenFileNames(
-            self, "Select one or more files to open", self._last_open_dir or os.getenv("HOME"), filter_str)[0]
+            self, "Select one or more files to open", self.last_open_dir or os.getenv("HOME"), filter_str)[0]
         if not files:
             return
-        self._last_open_dir = os.path.dirname(files[0])
+        self.last_open_dir = os.path.dirname(files[0])
         for fn in files:
-            if fn in self._filenames:
+            if fn in self._all_filenames:
                 continue
             item = QtWidgets.QListWidgetItem(fn, self.ui.fileList)
-            item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable)
-            item.setCheckState(QtCore.Qt.Checked)
+            # turn off checkability so we can tell the difference between this
+            # and the product list when checking WizardPage.isComplete
+            item.setFlags(item.flags() & ~QtCore.Qt.ItemIsUserCheckable)
+            self._filelist_changed = True
+            self._all_filenames.add(fn)
             self.ui.fileList.addItem(item)
-            self._filenames.add(fn)
+        self.filesChanged.emit()
 
     def remove_file(self):
         # need to go backwards to index numbers don't change
         for item_idx in range(self.ui.fileList.count() - 1, -1, -1):
             item = self.ui.fileList.item(item_idx)
             if self.ui.fileList.isItemSelected(item):
+                self._filelist_changed = True
+                self._all_filenames.remove(item.text())
                 self.ui.fileList.takeItem(item_idx)
-                self._filenames.remove(item.text())
+        self.filesChanged.emit()
+
+    @property
+    def files_to_load(self):
+        """Files that should be used by the Document/Workspace."""
+        return [fn for fgroup in self.file_groups.values() for fn in fgroup]

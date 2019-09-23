@@ -2,22 +2,11 @@
 
 # Form implementation generated from reading ui file 'open_file_wizard.ui'
 #
-# Created by: PyQt4 UI code generator 4.11.4
+# Created by: PyQt5 UI code generator 5.9.2
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-
-try:
-    _encoding = QtWidgets.QApplication.UnicodeUTF8
-
-
-    def _translate(context, text, disambig):
-        return QtCore.QCoreApplication.translate(context, text, disambig, _encoding)
-except AttributeError:
-    def _translate(context, text, disambig):
-        return QtCore.QCoreApplication.translate(context, text, disambig)
-
 
 class Ui_openFileWizard(object):
     def setupUi(self, openFileWizard):
@@ -79,102 +68,56 @@ class Ui_openFileWizard(object):
         self.removeButton.setMaximumSize(QtCore.QSize(25, 25))
         self.removeButton.setObjectName("removeButton")
         self.horizontalLayout.addWidget(self.removeButton)
-        spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem1 = QtWidgets.QSpacerItem(10, 20, QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Minimum)
         self.horizontalLayout.addItem(spacerItem1)
+        self.statusMessage = QtWidgets.QLabel(self.fileSelectionPage)
+        self.statusMessage.setMinimumSize(QtCore.QSize(400, 0))
+        self.statusMessage.setObjectName("statusMessage")
+        self.horizontalLayout.addWidget(self.statusMessage)
+        spacerItem2 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.horizontalLayout.addItem(spacerItem2)
         self.verticalLayout_3.addLayout(self.horizontalLayout)
         openFileWizard.addPage(self.fileSelectionPage)
         self.productSelectionPage = AnyWizardPage()
         self.productSelectionPage.setObjectName("productSelectionPage")
         self.verticalLayout = QtWidgets.QVBoxLayout(self.productSelectionPage)
         self.verticalLayout.setObjectName("verticalLayout")
-        self.selectByTabWidget = QtWidgets.QTabWidget(self.productSelectionPage)
-        self.selectByTabWidget.setObjectName("selectByTabWidget")
-        self.selectByParameters = QtWidgets.QWidget()
-        self.selectByParameters.setObjectName("selectByParameters")
-        self.horizontalLayout_2 = QtWidgets.QHBoxLayout(self.selectByParameters)
-        self.horizontalLayout_2.setObjectName("horizontalLayout_2")
-        self.selectByNameLayout = QtWidgets.QVBoxLayout()
-        self.selectByNameLayout.setObjectName("selectByNameLayout")
-        self.selectByNameLabel = QtWidgets.QLabel(self.selectByParameters)
-        font = QtGui.QFont()
-        font.setBold(True)
-        font.setUnderline(True)
-        font.setWeight(75)
-        self.selectByNameLabel.setFont(font)
-        self.selectByNameLabel.setObjectName("selectByNameLabel")
-        self.selectByNameLayout.addWidget(self.selectByNameLabel)
-        self.selectByNameList = QtWidgets.QListWidget(self.selectByParameters)
-        self.selectByNameList.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-        self.selectByNameList.setObjectName("selectByNameList")
-        self.selectByNameLayout.addWidget(self.selectByNameList)
-        self.horizontalLayout_2.addLayout(self.selectByNameLayout)
-        self.selectByLevelLayout = QtWidgets.QVBoxLayout()
-        self.selectByLevelLayout.setSizeConstraint(QtWidgets.QLayout.SetNoConstraint)
-        self.selectByLevelLayout.setObjectName("selectByLevelLayout")
-        self.selectByLevelLabel = QtWidgets.QLabel(self.selectByParameters)
-        font = QtGui.QFont()
-        font.setBold(True)
-        font.setUnderline(True)
-        font.setWeight(75)
-        self.selectByLevelLabel.setFont(font)
-        self.selectByLevelLabel.setObjectName("selectByLevelLabel")
-        self.selectByLevelLayout.addWidget(self.selectByLevelLabel)
-        self.selectByLevelList = QtWidgets.QListWidget(self.selectByParameters)
-        self.selectByLevelList.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-        self.selectByLevelList.setObjectName("selectByLevelList")
-        self.selectByLevelLayout.addWidget(self.selectByLevelList)
-        self.horizontalLayout_2.addLayout(self.selectByLevelLayout)
-        self.selectByTabWidget.addTab(self.selectByParameters, "")
-        self.selectByID = QtWidgets.QWidget()
-        self.selectByID.setObjectName("selectByID")
-        self.verticalLayout_5 = QtWidgets.QVBoxLayout(self.selectByID)
-        self.verticalLayout_5.setObjectName("verticalLayout_5")
-        self.selectIDTable = QtWidgets.QTableWidget(self.selectByID)
+        self.productSelectionButtonLayout = QtWidgets.QHBoxLayout()
+        self.productSelectionButtonLayout.setObjectName("productSelectionButtonLayout")
+        self.selectAllButton = QtWidgets.QPushButton(self.productSelectionPage)
+        self.selectAllButton.setObjectName("selectAllButton")
+        self.productSelectionButtonLayout.addWidget(self.selectAllButton)
+        spacerItem3 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.productSelectionButtonLayout.addItem(spacerItem3)
+        self.verticalLayout.addLayout(self.productSelectionButtonLayout)
+        self.selectIDTable = QtWidgets.QTableWidget(self.productSelectionPage)
         self.selectIDTable.setDragEnabled(False)
         self.selectIDTable.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.selectIDTable.setObjectName("selectIDTable")
         self.selectIDTable.setColumnCount(0)
         self.selectIDTable.setRowCount(0)
-        self.verticalLayout_5.addWidget(self.selectIDTable)
-        self.selectByTabWidget.addTab(self.selectByID, "")
-        self.verticalLayout.addWidget(self.selectByTabWidget)
+        self.verticalLayout.addWidget(self.selectIDTable)
         openFileWizard.addPage(self.productSelectionPage)
-        self.summaryPage = QtWidgets.QWizardPage()
-        self.summaryPage.setObjectName("summaryPage")
-        self.verticalLayout_4 = QtWidgets.QVBoxLayout(self.summaryPage)
-        self.verticalLayout_4.setObjectName("verticalLayout_4")
-        self.productSummaryText = QtWidgets.QTextBrowser(self.summaryPage)
-        self.productSummaryText.setEnabled(True)
-        self.productSummaryText.setObjectName("productSummaryText")
-        self.verticalLayout_4.addWidget(self.productSummaryText)
-        openFileWizard.addPage(self.summaryPage)
 
         self.retranslateUi(openFileWizard)
-        self.selectByTabWidget.setCurrentIndex(0)
         QtCore.QMetaObject.connectSlotsByName(openFileWizard)
 
     def retranslateUi(self, openFileWizard):
-        openFileWizard.setWindowTitle(_translate("openFileWizard", "Open File Wizard", None))
-        self.fileSelectionPage.setTitle(_translate("openFileWizard", "Select Files", None))
-        self.fileSelectionPage.setSubTitle(_translate("openFileWizard", "Add data files to be opened", None))
-        self.readerLabel.setText(_translate("openFileWizard", "Reader:", None))
-        self.inputFilesLabel.setText(_translate("openFileWizard", "Input Files", None))
+        _translate = QtCore.QCoreApplication.translate
+        openFileWizard.setWindowTitle(_translate("openFileWizard", "Open File Wizard"))
+        self.fileSelectionPage.setTitle(_translate("openFileWizard", "Select Files"))
+        self.fileSelectionPage.setSubTitle(_translate("openFileWizard", "Add data files to be opened"))
+        self.readerLabel.setText(_translate("openFileWizard", "Reader:"))
+        self.inputFilesLabel.setText(_translate("openFileWizard", "Input Files"))
         self.fileList.setSortingEnabled(True)
-        self.addButton.setToolTip(_translate("openFileWizard", "Add files/dirs to list", None))
-        self.addButton.setText(_translate("openFileWizard", "+", None))
-        self.removeButton.setToolTip(_translate("openFileWizard", "Remove file from list", None))
-        self.removeButton.setText(_translate("openFileWizard", "-", None))
-        self.productSelectionPage.setTitle(_translate("openFileWizard", "Select Products", None))
-        self.productSelectionPage.setSubTitle(_translate("openFileWizard", "Select products to add", None))
-        self.selectByNameLabel.setText(_translate("openFileWizard", "Name", None))
-        self.selectByLevelLabel.setText(_translate("openFileWizard", "Level", None))
-        self.selectByTabWidget.setTabText(self.selectByTabWidget.indexOf(self.selectByParameters),
-                                          _translate("openFileWizard", "Properties", None))
+        self.addButton.setToolTip(_translate("openFileWizard", "Add files/dirs to list"))
+        self.addButton.setText(_translate("openFileWizard", "+"))
+        self.removeButton.setToolTip(_translate("openFileWizard", "Remove file from list"))
+        self.removeButton.setText(_translate("openFileWizard", "-"))
+        self.statusMessage.setText(_translate("openFileWizard", "Reading Status"))
+        self.productSelectionPage.setTitle(_translate("openFileWizard", "Select Products"))
+        self.productSelectionPage.setSubTitle(_translate("openFileWizard", "Select products to add"))
+        self.selectAllButton.setText(_translate("openFileWizard", "Select/Deselect All"))
         self.selectIDTable.setSortingEnabled(False)
-        self.selectByTabWidget.setTabText(self.selectByTabWidget.indexOf(self.selectByID),
-                                          _translate("openFileWizard", "List", None))
-        self.summaryPage.setTitle(_translate("openFileWizard", "Products Summary", None))
-        self.summaryPage.setSubTitle(_translate("openFileWizard", "Verify the products that will be loaded", None))
-
 
 from uwsift.ui.custom_widgets import AnyWizardPage

@@ -28,8 +28,10 @@ from typing import List, Iterable, Mapping
 
 from PyQt5.QtCore import QObject
 
+from satpy.readers import group_files
 from uwsift.queue import TASK_DOING, TASK_PROGRESS
 from .workspace import Workspace
+from .importer import SATPY_READERS, available_satpy_readers
 from ..common import Info
 
 LOG = logging.getLogger(__name__)
@@ -135,6 +137,9 @@ class ResourceSearchPathCollector(QObject):
         self._scheduled_files = []
         self._timestamp_path = os.path.join(ws.cwd, '.last_collection_check')
         self._is_posix = sys.platform in {'linux', 'darwin'}
+        self.satpy_readers = SATPY_READERS
+        if not self.satpy_readers:
+            self.satpy_readers = available_satpy_readers()
 
     def look_for_new_files(self):
         if len(self._scheduled_dirs):
@@ -157,21 +162,22 @@ class ResourceSearchPathCollector(QObject):
         yield {TASK_DOING: 'skimming', TASK_PROGRESS: 1.0}
 
     def bgnd_merge_new_file_metadata_into_mdb(self):
-        # FIXME: Don't depend on paths as the "how many products will we have"
         todo, self._scheduled_files = self._scheduled_files, []
         ntodo = len(todo)
         LOG.debug('collecting metadata from {} potential new files'.format(ntodo))
-        redex = dict((name, dex) for (dex, name) in enumerate(todo))
         yield {TASK_DOING: 'collecting metadata 0/{}'.format(ntodo), TASK_PROGRESS: 0.0}
         changed_uuids = set()
-        for num_prods, product_info in self._ws.collect_product_metadata_for_paths(todo):
-            path = product_info.get(Info.PATHNAME, None)
-            dex = redex.get(path, 0.0)
-            status = {TASK_DOING: 'collecting metadata {}/{}'.format(dex + 1, ntodo),
-                      TASK_PROGRESS: float(dex) / float(ntodo)}
-            # LOG.debug(repr(status))
-            changed_uuids.add(product_info[Info.UUID])
-            yield status
+        readers_and_files = group_files(todo, reader='abi_l1b')
+        num_seen = 0
+        for reader_and_files in readers_and_files:
+            for reader_name, filenames in reader_and_files.items():
+                product_infos = self._ws.collect_product_metadata_for_paths(filenames, reader=reader_name)
+                for num_prods, product_info in product_infos:
+                    changed_uuids.add(product_info[Info.UUID])
+                    num_seen += len(filenames)
+                    status = {TASK_DOING: 'collecting metadata {}/{}'.format(num_seen, ntodo),
+                              TASK_PROGRESS: float(num_seen) / ntodo + 1}
+                    yield status
         yield {TASK_DOING: 'collecting metadata done', TASK_PROGRESS: 1.0}
         if changed_uuids:
             LOG.debug('{} changed UUIDs, signaling product updates'.format(len(changed_uuids)))
