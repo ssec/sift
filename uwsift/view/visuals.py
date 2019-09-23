@@ -591,7 +591,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         While the result of the chosen method may not always be completely
         accurate, it should work for all possible viewing cases.
         """
-        if self._viewable_mesh_mask is None:
+        if self._viewable_mesh_mask is None or self.canvas.size[0] == 0 or self.canvas.size[1] == 0:
             raise ValueError("Image '%s' is not viewable in this projection" % (self.name,))
 
         # Image points transformed to canvas coordinates
@@ -604,7 +604,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         ref_idx_1, ref_idx_2 = get_reference_points(img_cmesh, img_vbox)
         dx, dy = calc_pixel_size(img_cmesh[(self._ref1, self._ref2), :],
                                  img_vbox[(self._ref1, self._ref2), :],
-                                 self.canvas.size) if self.canvas.size[0] != 0 and self.canvas.size[1] != 0 else (0, 0)
+                                 self.canvas.size)
         view_extents = self.calc.calc_view_extents(img_cmesh[ref_idx_1], img_vbox[ref_idx_1], self.canvas.size, dx, dy)
         return ViewBox(*view_extents, dx=dx, dy=dy)
 
