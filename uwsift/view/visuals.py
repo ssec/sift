@@ -589,7 +589,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
         While the result of the chosen method may not always be completely
         accurate, it should work for all possible viewing cases.
         """
-        if self._viewable_mesh_mask is None:
+        if self._viewable_mesh_mask is None or self.canvas.size[0] == 0 or self.canvas.size[1] == 0:
             raise ValueError("Image '%s' is not viewable in this projection" % (self.name,))
 
         # Image points transformed to canvas coordinates
