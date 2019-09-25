@@ -68,13 +68,13 @@ def generate_from_awips_cmap(cmap_file, flip=False):
                     (gds * gdsp != 0 or (gds * gdsp == 0 and max(abs(gds), abs(gdsp)) == 0)) and
                     (bds * bdsp != 0 or (bds * bdsp == 0 and max(abs(bds), abs(bdsp)) == 0))) or bpd < 10) and
                   ((abs(rcs) > np.ceil(abs(rds) + ep) and abs(res) < abs(rcs)) or (
-                        abs(rcs) < np.floor(abs(rds) - ep) and abs(res) > abs(rcs)) or
+                      abs(rcs) < np.floor(abs(rds) - ep) and abs(res) > abs(rcs)) or
                    np.floor(abs(rds) - ep) <= abs(rcs) <= np.ceil(abs(rds) + ep)) and
                   ((abs(gcs) > np.ceil(abs(gds) + ep) and abs(ges) < abs(gcs)) or (
-                        abs(gcs) < np.floor(abs(gds) - ep) and abs(ges) > abs(gcs)) or
+                      abs(gcs) < np.floor(abs(gds) - ep) and abs(ges) > abs(gcs)) or
                    np.floor(abs(gds) - ep) <= abs(gcs) <= np.ceil(abs(gds) + ep)) and
                   ((abs(bcs) > np.ceil(abs(bds) + ep) and abs(bes) < abs(bcs)) or (
-                        abs(bcs) < np.floor(abs(bds) - ep) and abs(bes) > abs(bcs)) or
+                      abs(bcs) < np.floor(abs(bds) - ep) and abs(bes) > abs(bcs)) or
                    np.floor(abs(bds) - ep) <= abs(bcs) <= np.ceil(abs(bds) + ep))):
                 bpd += 1
             else:
@@ -604,11 +604,11 @@ class LazyColormap(object):
 
 VIS_COLORMAPS = OrderedDict([
     ('CA (Low Light Vis)', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'VIS', 'CA (Low Light Vis).cmap'))),
-    #('CA (Low Light Vis) (legacy)', ca_low_light_vis),
+    # ('CA (Low Light Vis) (legacy)', ca_low_light_vis),
     ('Linear', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'VIS', 'Linear.cmap'))),
-    #('Linear (legacy)', linear),
+    # ('Linear (legacy)', linear),
     ('ZA', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'VIS', 'ZA (Vis Default).cmap'))),
-    #('ZA (legacy)', za_vis_default),
+    # ('ZA (legacy)', za_vis_default),
     ('Square Root (Vis Default)', SquareRootColormap()),
 ])
 
