@@ -1449,8 +1449,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         gamma = 1.
         if isinstance(info, DocRGBLayer):
             gamma = (1.,) * 3
-        elif hasattr(info, 'l'):
-            gamma = (1.,) * len(info.l)
+        elif hasattr(info, 'layers'):
+            gamma = (1.,) * len(info.layers)
 
         # get the presentation for another layer in our family
         family_uuids = self.family_uuids(info[Info.FAMILY])
@@ -1754,7 +1754,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             return int(round(abs(v - cmin) / abs(cmax - cmin) * 255.))
 
         values = []
-        for dep_lyr, clims in zip(lyr.l[:3], pinf.climits):
+        for dep_lyr, clims in zip(lyr.layers[:3], pinf.climits):
             if dep_lyr is None:
                 values.append(None)
             elif clims is None or clims[0] is None:
@@ -2555,7 +2555,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 if p.uuid == uuid:
                     return True
                 parent_layer = self._layer_with_uuid[p.uuid]
-                if parent_layer.kind == Kind.RGB and layer in parent_layer.l:
+                if parent_layer.kind == Kind.RGB and layer in parent_layer.layers:
                     return True
         return False
 
