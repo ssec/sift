@@ -603,9 +603,12 @@ class LazyColormap(object):
 
 
 VIS_COLORMAPS = OrderedDict([
-    ('CA (Low Light Vis)', ca_low_light_vis),
-    ('Linear', linear),
-    ('ZA', za_vis_default),
+    ('CA (Low Light Vis)', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'VIS', 'CA (Low Light Vis).cmap'))),
+    #('CA (Low Light Vis) (legacy)', ca_low_light_vis),
+    ('Linear', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'VIS', 'Linear.cmap'))),
+    #('Linear (legacy)', linear),
+    ('ZA', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'VIS', 'ZA (Vis Default).cmap'))),
+    #('ZA (legacy)', za_vis_default),
     ('Square Root (Vis Default)', SquareRootColormap()),
 ])
 
