@@ -1,10 +1,10 @@
 import logging
 import os
+import io
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 import imageio
 import numpy
-import tempfile
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
@@ -244,43 +244,44 @@ class ExportImageHelper(QtCore.QObject):
 
         dpi = self.sgm.main_canvas.dpi
 
-        with tempfile.TemporaryFile(suffix='.png') as tmpfile:
-            if mode == 'vertical':
-                fig = plt.figure(figsize=(im.size[0] / dpi * .1, im.size[1] / dpi * 1.2), dpi=dpi)
-                ax = fig.add_axes([0.3, 0.05, 0.2, 0.9])
-            else:
-                fig = plt.figure(figsize=(im.size[0] / dpi * 1.2, im.size[1] / dpi * .1), dpi=dpi)
-                ax = fig.add_axes([0.05, 0.4, 0.9, 0.2])
+        if mode == 'vertical':
+            fig = plt.figure(figsize=(im.size[0] / dpi * .1, im.size[1] / dpi * 1.2), dpi=dpi)
+            ax = fig.add_axes([0.3, 0.05, 0.2, 0.9])
+        else:
+            fig = plt.figure(figsize=(im.size[0] / dpi * 1.2, im.size[1] / dpi * .1), dpi=dpi)
+            ax = fig.add_axes([0.05, 0.4, 0.9, 0.2])
 
-            cmap = mpl.colors.ListedColormap(colors)
-            vmin, vmax = self.doc.prez_for_uuid(u).climits
-            norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
-            cbar = mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation=mode)
-            ticks = ["{}".format(self.doc[u][Info.UNIT_CONVERSION][2](self.doc[u][Info.UNIT_CONVERSION][1](t)))
-                     for t in numpy.linspace(vmin, vmax, NUM_TICKS)]
-            cbar.set_ticks(numpy.linspace(vmin, vmax, NUM_TICKS))
-            cbar.set_ticklabels(ticks)
+        cmap = mpl.colors.ListedColormap(colors)
+        vmin, vmax = self.doc.prez_for_uuid(u).climits
+        norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+        cbar = mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation=mode)
+        ticks = ["{}".format(self.doc[u][Info.UNIT_CONVERSION][2](self.doc[u][Info.UNIT_CONVERSION][1](t)))
+                 for t in numpy.linspace(vmin, vmax, NUM_TICKS)]
+        cbar.set_ticks(numpy.linspace(vmin, vmax, NUM_TICKS))
+        cbar.set_ticklabels(ticks)
 
-            fig.savefig(tmpfile, format='png', bbox_inches='tight', dpi=dpi)
-            fig_im = Image.open(tmpfile)
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', bbox_inches='tight', dpi=dpi)
+        buf.seek(0)
+        fig_im = Image.open(buf)
 
-            fig_im.thumbnail(im.size)
-            orig_w, orig_h = im.size
-            fig_w, fig_h = fig_im.size
+        fig_im.thumbnail(im.size)
+        orig_w, orig_h = im.size
+        fig_w, fig_h = fig_im.size
 
-            offset = 0
-            if mode == 'vertical':
-                new_im = Image.new(im.mode, (orig_w + fig_w, orig_h))
-                for i in [im, fig_im]:
-                    new_im.paste(i, (offset, 0))
-                    offset += i.size[0]
-                return new_im
-            else:
-                new_im = Image.new(im.mode, (orig_w, orig_h + fig_h))
-                for i in [im, fig_im]:
-                    new_im.paste(i, (0, offset))
-                    offset += i.size[1]
-                return new_im
+        offset = 0
+        if mode == 'vertical':
+            new_im = Image.new(im.mode, (orig_w + fig_w, orig_h))
+            for i in [im, fig_im]:
+                new_im.paste(i, (offset, 0))
+                offset += i.size[0]
+            return new_im
+        else:
+            new_im = Image.new(im.mode, (orig_w, orig_h + fig_h))
+            for i in [im, fig_im]:
+                new_im.paste(i, (0, offset))
+                offset += i.size[1]
+            return new_im
 
     def _create_filenames(self, uuids, base_filename):
         if not uuids or uuids[0] is None:
