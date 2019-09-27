@@ -38,6 +38,7 @@ from vispy.scene.visuals import Markers, Polygon, Compound, Line
 from vispy.util.keys import SHIFT
 from vispy.visuals import LineVisual
 from vispy.visuals.transforms import STTransform, MatrixTransform, ChainTransform
+from vispy.gloo.util import _screenshot
 
 from uwsift.common import DEFAULT_ANIMATION_DELAY, Info, Kind, Tool, Presentation
 from uwsift.model.document import DocLayerStack, DocBasicLayer
@@ -505,8 +506,9 @@ class SceneGraphManager(QObject):
         self.pending_polygon = PendingPolygon(self.main_map)
 
     def get_screenshot_array(self, frame_range=None):
-        from vispy.gloo.util import _screenshot
+        """Get numpy arrays representing the current canvas."""
         if frame_range is None:
+            self.main_canvas.on_draw(None)
             return [(self.layer_set.top_layer_uuid(), _screenshot())]
         s, e = frame_range
 

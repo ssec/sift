@@ -1,17 +1,24 @@
 import logging
 import os
+import io
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 import imageio
 import numpy
+import matplotlib as mpl
+from matplotlib import pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
 
 from uwsift.common import Info
 from uwsift.ui import export_image_dialog_ui
+from uwsift.view.colormap import COLORMAP_MANAGER
 from uwsift.util import get_package_data_dir, USER_DESKTOP_DIRECTORY
 
 LOG = logging.getLogger(__name__)
 DATA_DIR = get_package_data_dir()
+
+NUM_TICKS = 8
+TICK_SIZE = 14
 
 
 def is_gif_filename(fn):
@@ -115,6 +122,14 @@ class ExportImageDialog(QtWidgets.QDialog):
         fn = self.ui.saveAsLineEdit.text()
         return is_video_filename(fn)
 
+    def _get_append_direction(self):
+        if self.ui.colorbarVerticalRadio.isChecked():
+            return "vertical"
+        elif self.ui.colorbarHorizontalRadio.isChecked():
+            return "horizontal"
+        else:
+            return None
+
     def _check_animation_controls(self):
         is_gif = self._is_gif_filename()
         is_video = self._is_video_filename()
@@ -168,6 +183,7 @@ class ExportImageDialog(QtWidgets.QDialog):
             'filename': self.ui.saveAsLineEdit.text(),
             'fps': fps,
             'font_size': self.ui.footerFontSizeSpinBox.value(),
+            'colorbar': self._get_append_direction(),
         }
         return info
 
@@ -182,7 +198,7 @@ class ExportImageHelper(QtCore.QObject):
 
     def __init__(self, parent, doc, sgm):
         """Initialize helper with defaults and other object handles.
-        
+
         Args:
             doc: Main ``Document`` object for frame metadata
             sgm: ``SceneGraphManager`` object to get image data
@@ -213,6 +229,59 @@ class ExportImageHelper(QtCore.QObject):
         new_draw.text([orig_w - txt_w, orig_h], "SIFT", fill="#ffffff", font=font)
         new_im.paste(im, (0, 0, orig_w, orig_h))
         return new_im
+
+    def _append_colorbar(self, mode, im, u):
+        mpl.rcParams['font.sans-serif'] = 'arial'
+        mpl.rcParams.update({'font.size': TICK_SIZE})
+
+        colors = COLORMAP_MANAGER.get(self.doc.colormap_for_uuid(u), None)
+        if colors is None:
+            return im
+        elif self.doc.prez_for_uuid(u).colormap == 'Square Root (Vis Default)':
+            colors = colors.map(numpy.linspace((0, 0, 0, 1), (1, 1, 1, 1), 256))
+        else:
+            colors = colors.colors.rgba
+
+        dpi = self.sgm.main_canvas.dpi
+
+        if mode == 'vertical':
+            fig = plt.figure(figsize=(im.size[0] / dpi * .1, im.size[1] / dpi * 1.2), dpi=dpi)
+            ax = fig.add_axes([0.3, 0.05, 0.2, 0.9])
+        else:
+            fig = plt.figure(figsize=(im.size[0] / dpi * 1.2, im.size[1] / dpi * .1), dpi=dpi)
+            ax = fig.add_axes([0.05, 0.4, 0.9, 0.2])
+
+        cmap = mpl.colors.ListedColormap(colors)
+        vmin, vmax = self.doc.prez_for_uuid(u).climits
+        norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+        cbar = mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation=mode)
+        ticks = ["{}".format(self.doc[u][Info.UNIT_CONVERSION][2](self.doc[u][Info.UNIT_CONVERSION][1](t)))
+                 for t in numpy.linspace(vmin, vmax, NUM_TICKS)]
+        cbar.set_ticks(numpy.linspace(vmin, vmax, NUM_TICKS))
+        cbar.set_ticklabels(ticks)
+
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', bbox_inches='tight', dpi=dpi)
+        buf.seek(0)
+        fig_im = Image.open(buf)
+
+        fig_im.thumbnail(im.size)
+        orig_w, orig_h = im.size
+        fig_w, fig_h = fig_im.size
+
+        offset = 0
+        if mode == 'vertical':
+            new_im = Image.new(im.mode, (orig_w + fig_w, orig_h))
+            for i in [im, fig_im]:
+                new_im.paste(i, (offset, 0))
+                offset += i.size[0]
+            return new_im
+        else:
+            new_im = Image.new(im.mode, (orig_w, orig_h + fig_h))
+            for i in [im, fig_im]:
+                new_im.paste(i, (0, offset))
+                offset += i.size[1]
+            return new_im
 
     def _create_filenames(self, uuids, base_filename):
         if not uuids or uuids[0] is None:
@@ -311,6 +380,9 @@ class ExportImageHelper(QtCore.QObject):
             return
 
         images = [(u, Image.fromarray(x)) for u, x in img_arrays]
+
+        if info['colorbar'] is not None:
+            images = [(u, self._append_colorbar(info['colorbar'], im, u)) for (u, im) in images]
 
         if info['include_footer']:
             banner_text = [self.doc[u][Info.DISPLAY_NAME] if u else "" for u, im in images]

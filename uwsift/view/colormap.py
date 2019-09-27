@@ -64,18 +64,18 @@ def generate_from_awips_cmap(cmap_file, flip=False):
                 bpd += 1
                 skp = 0
             elif ((rcs * rds >= 0 and gcs * gds >= 0 and bcs * bds >= 0) and
-                    ((bpd >= 10 and (rds * rdsp != 0 or (rds * rdsp == 0 and max(abs(rds), abs(rdsp)) == 0)) and
-                      (gds * gdsp != 0 or (gds * gdsp == 0 and max(abs(gds), abs(gdsp)) == 0)) and
-                      (bds * bdsp != 0 or (bds * bdsp == 0 and max(abs(bds), abs(bdsp)) == 0))) or bpd < 10) and
-                    ((abs(rcs) > np.ceil(abs(rds) + ep) and abs(res) < abs(rcs)) or (
-                        abs(rcs) < np.floor(abs(rds) - ep) and abs(res) > abs(rcs)) or
-                     np.floor(abs(rds) - ep) <= abs(rcs) <= np.ceil(abs(rds) + ep)) and
-                    ((abs(gcs) > np.ceil(abs(gds) + ep) and abs(ges) < abs(gcs)) or (
-                        abs(gcs) < np.floor(abs(gds) - ep) and abs(ges) > abs(gcs)) or
-                     np.floor(abs(gds) - ep) <= abs(gcs) <= np.ceil(abs(gds) + ep)) and
-                    ((abs(bcs) > np.ceil(abs(bds) + ep) and abs(bes) < abs(bcs)) or (
-                        abs(bcs) < np.floor(abs(bds) - ep) and abs(bes) > abs(bcs)) or
-                     np.floor(abs(bds) - ep) <= abs(bcs) <= np.ceil(abs(bds) + ep))):
+                  ((bpd >= 10 and (rds * rdsp != 0 or (rds * rdsp == 0 and max(abs(rds), abs(rdsp)) == 0)) and
+                    (gds * gdsp != 0 or (gds * gdsp == 0 and max(abs(gds), abs(gdsp)) == 0)) and
+                    (bds * bdsp != 0 or (bds * bdsp == 0 and max(abs(bds), abs(bdsp)) == 0))) or bpd < 10) and
+                  ((abs(rcs) > np.ceil(abs(rds) + ep) and abs(res) < abs(rcs)) or (
+                      abs(rcs) < np.floor(abs(rds) - ep) and abs(res) > abs(rcs)) or
+                   np.floor(abs(rds) - ep) <= abs(rcs) <= np.ceil(abs(rds) + ep)) and
+                  ((abs(gcs) > np.ceil(abs(gds) + ep) and abs(ges) < abs(gcs)) or (
+                      abs(gcs) < np.floor(abs(gds) - ep) and abs(ges) > abs(gcs)) or
+                   np.floor(abs(gds) - ep) <= abs(gcs) <= np.ceil(abs(gds) + ep)) and
+                  ((abs(bcs) > np.ceil(abs(bds) + ep) and abs(bes) < abs(bcs)) or (
+                      abs(bcs) < np.floor(abs(bds) - ep) and abs(bes) > abs(bcs)) or
+                   np.floor(abs(bds) - ep) <= abs(bcs) <= np.ceil(abs(bds) + ep))):
                 bpd += 1
             else:
                 control_indexes.append(cn - 1)
@@ -603,9 +603,12 @@ class LazyColormap(object):
 
 
 VIS_COLORMAPS = OrderedDict([
-    ('CA (Low Light Vis)', ca_low_light_vis),
-    ('Linear', linear),
-    ('ZA', za_vis_default),
+    ('CA (Low Light Vis)', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'VIS', 'CA (Low Light Vis).cmap'))),
+    # ('CA (Low Light Vis) (legacy)', ca_low_light_vis),
+    ('Linear', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'VIS', 'Linear.cmap'))),
+    # ('Linear (legacy)', linear),
+    ('ZA', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'VIS', 'ZA (Vis Default).cmap'))),
+    # ('ZA (legacy)', za_vis_default),
     ('Square Root (Vis Default)', SquareRootColormap()),
 ])
 
@@ -613,38 +616,59 @@ IR_COLORMAPS = OrderedDict([
     ('Rainbow (IR Default)',
      LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'IR', 'Rainbow_11_bit.cmap'), flipped=True)),
     # ('Rainbow (legacy)', color11new),
-    ('CIRA IR', cira_ir_default),
+    ('CIRA IR', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'IR', 'CIRA (IR Default).cmap'))),
+    # ('CIRA IR (legacy)', cira_ir_default),
     ('Fog', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'IR', 'fogdiff_blue.cmap'))),
     # ('Fog (legacy)', fog),
-    ('IR WV', ir_wv),
+    ('IR WV', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'IR', 'IR WV.cmap'))),
+    # ('IR WV (legacy)', ir_wv),
     ('Dust and Moisture Split Window',
      LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'IR', 'dust_and_moisture_split_window.cmap'))),
     # ('Dust and Moisture Split Window (legacy)', dust_and_moisture_split_window),
 ])
 
 LIFTED_INDEX_COLORMAPS = OrderedDict([
-    ('Lifted Index (New CIMSS)', lifted_index__new_cimss_table),
-    ('Lifted Index', lifted_index_default),
+    ('Lifted Index (New CIMSS)',
+     LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'Lifted Index', 'Lifted Index - New CIMSS Table.cmap'))),
+    # ('Lifted Index (New CIMSS) (legacy)', lifted_index__new_cimss_table),
+    ('Lifted Index', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'Lifted Index', 'Lifted Index Default.cmap'))),
+    # ('Lifted Index (legacy)', lifted_index_default),
 ])
 
 PRECIP_COLORMAPS = OrderedDict([
-    ('Blended TPW', blended_total_precip_water),
-    ('Percent of Normal TPW', percent_of_normal_tpw),
-    ('Precipitable Water (New CIMSS)', precip_water__new_cimss_table),
-    ('Precipitable Water (Polar)', precip_water__polar),
-    ('Precipitable Water', precip_water_default),
+    ('Blended TPW', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'Precip', 'Blended Total Precip Water.cmap'))),
+    # ('Blended TPW (legacy)', blended_total_precip_water),
+    ('Percent of Normal TPW',
+     LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'Precip', 'Percent of Normal TPW.cmap'))),
+    # ('Percent of Normal TPW (legacy)', percent_of_normal_tpw),
+    ('Precipitable Water (New CIMSS)',
+     LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'Precip', 'Precip Water - New CIMSS Table.cmap'))),
+    # ('Precipitable Water (New CIMSS) (legacy)', precip_water__new_cimss_table),
+    ('Precipitable Water (Polar)',
+     LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'Precip', 'Precip Water - Polar.cmap'))),
+    # ('Precipitable Water (Polar) (legacy)', precip_water__polar),
+    ('Precipitable Water', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'Precip', 'Precip Water Default.cmap'))),
+    # ('Precipitable Water (legacy)', precip_water_default),
 ])
 
 SKIN_TEMP_COLORMAPS = OrderedDict([
-    ('Skin Temp (New CIMSS)', skin_temp__new_cimss_table),
-    ('Skin Temp', skin_temp_default),
+    ('Skin Temp (New CIMSS)',
+     LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'Skin Temp', 'Skin Temp - New CIMSS Table.cmap'))),
+    # ('Skin Temp (New CIMSS) (legacy)', skin_temp__new_cimss_table),
+    ('Skin Temp', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'Skin Temp', 'Skin Temp Default.cmap'))),
+    # ('Skin Temp (legacy)', skin_temp_default),
 ])
 
 WV_COLORMAPS = OrderedDict([
-    ('Gray Scale Water Vapor', gray_scale_water_vapor),
-    ('NSSL VAS (WV Alternate)', nssl_vas_wv_alternate),
+    ('Gray Scale Water Vapor',
+     LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'WV', 'Gray Scale Water Vapor.cmap'))),
+    # ('Gray Scale Water Vapor (legacy)', gray_scale_water_vapor),
+    ('NSSL VAS (WV Alternate)',
+     LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'WV', 'NSSL VAS (WV Alternate).cmap'))),
+    # ('NSSL VAS (WV Alternate) (legacy)', nssl_vas_wv_alternate),
     # ('RAMSDIS WV', ramsdis_wv),
-    ('SLC WV', slc_wv),
+    ('SLC WV', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'WV', 'SLC WV.cmap'))),
+    # ('SLC WV (legacy)', slc_wv),
 ])
 
 TOWRS_COLORMAPS = OrderedDict([
@@ -656,10 +680,14 @@ TOWRS_COLORMAPS = OrderedDict([
     # ('RRQPE (legacy)', rrqpe),
     ('VTRSB', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'GOESR-L2', 'VTRSB.cmap'))),
     # ('VTRSB (legacy)', vtrsb),
-    ('CAPE', colorhcapeh10),
-    ('LI', colorhlih10),
-    ('PW10', colorhpw10h10),
-    ('PW8', colorhpw8h10),
+    ('CAPE', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'GOESR-L2', 'color-cape-10.cmap'))),
+    # ('CAPE (legacy)', colorhcapeh10),
+    ('LI', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'GOESR-L2', 'color-li-10.cmap'))),
+    # ('LI  (legacy)', colorhlih10),
+    ('PW10', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'GOESR-L2', 'color-pw10-10.cmap'))),
+    # ('PW10 (legacy)', colorhpw10h10),
+    ('PW8', LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'GOESR-L2', 'color-pw8-10.cmap'))),
+    # ('PW8 (legacy)', colorhpw8h10),
     ('IR Color Clouds Summer',
      LazyColormap(AWIPSColormap, os.path.join(AWIPS_DIR, 'IR', 'IR_Color_Clouds_Summer.cmap'), flipped=True)),
     # ('IR Color Clouds Summer (legacy)', ir_color_clouds_summer),
@@ -684,10 +712,14 @@ TOWRS_COLORMAPS = OrderedDict([
 ])
 
 OTHER_COLORMAPS = OrderedDict([
-    ('Rain Rate', rain_rate),
-    ('Low Cloud Base', low_cloud_base),
-    ('Cloud Amount', cloud_amount_default),
-    ('Cloud Top Height', cloud_top_height),
+    ('Rain Rate', LazyColormap(AWIPSColormap, os.path.join(CMAP_BASE_DIR, 'OAX', 'Rain Rate.cmap'))),
+    # ('Rain Rate (legacy)', rain_rate),
+    ('Low Cloud Base', LazyColormap(AWIPSColormap, os.path.join(CMAP_BASE_DIR, 'OAX', 'Low Cloud Base.cmap'))),
+    # ('Low Cloud Base (legacy)', low_cloud_base),
+    ('Cloud Amount', LazyColormap(AWIPSColormap, os.path.join(CMAP_BASE_DIR, 'OAX', 'Cloud Amount Default.cmap'))),
+    # ('Cloud Amount (legacy)', cloud_amount_default),
+    ('Cloud Top Height', LazyColormap(AWIPSColormap, os.path.join(CMAP_BASE_DIR, 'OAX', 'Cloud Top Height.cmap'))),
+    # ('Cloud Top Height (legacy)', cloud_top_height),
     ('White Transparency', white_trans),
     ('Red Transparency', red_trans),
     ('Green Transparency', green_trans),
