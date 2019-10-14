@@ -69,7 +69,13 @@ class UserModifiesRGBLayers(QObject):
     def create_rgb(self, action=None, families=[]):
         if len(families) == 0:
             # get the layers to composite from current selection
-            uuids = list(self.layer_list_model.current_selected_uuids())
+            #uuids = list(self.layer_list_model.current_selected_uuids())
+            uuids = [u for u in self.layer_list_model.current_selected_uuids() if
+                     self.doc[u][Info.KIND] in [Kind.IMAGE, Kind.COMPOSITE]]
+            #uuids = [u for u in uuids if self.doc[u][Info.KIND] in [Kind.IMAGE, Kind.COMPOSITE]]
+            if not uuids:
+                LOG.warning("No layers available to make RGB")
+                return
             families = [self.doc[u][Info.FAMILY] for u in uuids]
         if len(families) < 3:  # pad with None
             families = families + ([None] * (3 - len(families)))
@@ -77,8 +83,9 @@ class UserModifiesRGBLayers(QObject):
         families = [f for f in families if
                     f is None or self.doc.family_info(f)[Info.KIND] in [Kind.IMAGE, Kind.COMPOSITE]]
         layer = next(self.doc.create_rgb_composite(families[0],
-                                                   families[1],
-                                                   families[2]))
+                                                       families[1],
+                                                       families[2]))
+
         if layer is not None:
             self.layer_list_model.select([layer.uuid])
 
