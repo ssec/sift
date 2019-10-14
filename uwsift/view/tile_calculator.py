@@ -286,13 +286,19 @@ def visible_tiles(z_dy, z_dx,
     return tilebox
 
 
-@jit(nb_types.UniTuple(nb_types.Tuple([int64, int64, int64]), 2)(
+@jit([nb_types.UniTuple(nb_types.Tuple([int64, int64, int64]), 2)(
     int64,
     int64,
     nb_types.Tuple([int64, int64]),
     nb_types.NamedUniTuple(int64, 2, Point),
-    nb_types.NamedUniTuple(int64, 2, Point)
-), nopython=True, cache=True, nogil=True)
+    nb_types.NamedUniTuple(int64, 2, Point)),
+    nb_types.UniTuple(nb_types.Tuple([int64, int64, int64]), 2)(
+    int64,
+    int64,
+    nb_types.NamedUniTuple(int64, 2, Point),
+    nb_types.NamedUniTuple(int64, 2, Point),
+    nb_types.NamedUniTuple(int64, 2, Point))
+], nopython=True, cache=True, nogil=True)
 def calc_tile_slice(tiy, tix, stride, image_shape, tile_shape):
     y_offset = int(image_shape[0] / 2. / stride[0] - tile_shape[0] / 2.)
     y_start = int(tiy * tile_shape[0] + y_offset)
@@ -376,10 +382,13 @@ def calc_stride(v_dx, v_dy, t_dx, t_dy, overview_stride_y, overview_stride_x):
     return Point(np.int64(tsy), np.int64(tsx))
 
 
-@jit(nb_types.UniTuple(int64, 2)(
+@jit([nb_types.UniTuple(int64, 2)(
     nb_types.NamedUniTuple(int64, 2, Point),
-    nb_types.NamedUniTuple(int64, 2, Point)
-), nopython=True, cache=True, nogil=True)
+    nb_types.NamedUniTuple(int64, 2, Point)),
+    nb_types.UniTuple(int64, 2)(
+    nb_types.Tuple((int64, int64)),
+    nb_types.NamedUniTuple(int64, 2, Point))
+], nopython=True, cache=True, nogil=True)
 def calc_overview_stride(image_shape, tile_shape):
     # FUTURE: Come up with a fancier way of doing overviews like averaging each strided section, if needed
     tsy = max(1, int(np.floor(image_shape[0] / tile_shape[0])))
