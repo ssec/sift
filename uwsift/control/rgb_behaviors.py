@@ -81,8 +81,8 @@ class UserModifiesRGBLayers(QObject):
         families = [f for f in families if
                     f is None or self.doc.family_info(f)[Info.KIND] in [Kind.IMAGE, Kind.COMPOSITE]]
         layer = next(self.doc.create_rgb_composite(families[0],
-                                                       families[1],
-                                                       families[2]))
+                                                   families[1],
+                                                   families[2]))
 
         if layer is not None:
             self.layer_list_model.select([layer.uuid])
