@@ -1,16 +1,15 @@
+import PyQt5.QtWebEngineWidgets
 from uwsift.__main__ import Main
 from uwsift.util.default_paths import USER_CONFIG_DIR
 from uwsift.view import export_image
-import pytest
 from numpy.testing import assert_array_equal
 from PIL import Image
 from matplotlib import pyplot as plt
+from collections import namedtuple
+import pytest
 import datetime
 import os
 import imageio
-from collections import namedtuple
-
-window = Main(config_dir=USER_CONFIG_DIR)
 
 
 def _get_mock_doc():
@@ -45,6 +44,7 @@ def _get_mock_doc():
 
     return MockDoc()
 
+
 def _get_mock_sd(fr, fn):
     class MockScreenshotDialog:
         def __init__(self, frame_range, filename):
@@ -56,27 +56,32 @@ def _get_mock_sd(fr, fn):
                 'font_size': 10,
                 'loop': True,
             }
+
         def get_info(self):
             return self.info
 
     return MockScreenshotDialog(fr, fn)
 
+
 def _get_mock_sgm(frame_order):
     class MockLayerSet:
         def __init__(self, fo):
             self.frame_order = fo
+
         def top_layer_uuid(self):
             return 1
 
     class MockSGM:
         def __init__(self, fo):
             self.layer_set = MockLayerSet(fo)
+
         def get_screenshot_array(self, fr):
             if fr is None:
                 return None
             return [[fr[1], fr[1] - fr[0]]]
 
     return MockSGM(frame_order)
+
 
 def _get_mock_writer():
     class MockWriter:
@@ -91,12 +96,20 @@ def _get_mock_writer():
 
     return MockWriter()
 
+
+@pytest.fixture(scope="session")
+def window(tmp_path_factory):
+    d = tmp_path_factory.mktemp("tmp")
+    window = Main(config_dir=USER_CONFIG_DIR, workspace_dir=str(d))
+    return window
+
+
 @pytest.mark.parametrize("size,exp,mode", [
     ((100, 100), [0.1, 1.2], 'vertical'),
     ((100, 100), [1.2, 0.1], 'horizontal'),
     ((0, 0), [0, 0], 'vertical'),
 ])
-def test_create_colorbar(size, exp, mode, monkeypatch):
+def test_create_colorbar(size, exp, mode, monkeypatch, window):
     monkeypatch.setattr(window.export_image, 'doc', _get_mock_doc())
     monkeypatch.setattr(window.export_image.sgm.main_canvas, 'dpi', 100)
 
@@ -105,25 +118,28 @@ def test_create_colorbar(size, exp, mode, monkeypatch):
     assert_array_equal(res.get_size_inches(), exp)
     assert res.dpi == 100
 
+
 @pytest.mark.parametrize("mode,size,cbar_size", [
     (None, (100, 100), (0, 0)),
     ('vertical', (108, 100), (10, 120)),
     ('horizontal', (100, 108), (120, 10)),
 ])
-def test_append_colorbar(mode, size, cbar_size, monkeypatch):
+def test_append_colorbar(mode, size, cbar_size, monkeypatch, window):
     monkeypatch.setattr(window.export_image, 'doc', _get_mock_doc())
     monkeypatch.setattr(window.export_image.sgm.main_canvas, 'dpi', 100)
-    monkeypatch.setattr(window.export_image, '_create_colorbar', lambda x,y,z: plt.figure(figsize=cbar_size))
+    monkeypatch.setattr(window.export_image, '_create_colorbar', lambda x, y, z: plt.figure(figsize=cbar_size))
 
     im = Image.new('RGBA', (100, 100))
     res = window.export_image._append_colorbar(mode, im, None)
 
     assert res.size == size
 
-def test_add_screenshot_footer():
+
+def test_add_screenshot_footer(window):
     im = Image.new('RGBA', (100, 100))
     res = window.export_image._add_screenshot_footer(im, 'text', font_size=10)
     assert res.size == (100, 110)
+
 
 @pytest.mark.parametrize('range,exp', [
     (None, None),
@@ -131,9 +147,10 @@ def test_add_screenshot_footer():
     ((1, None), (0, 0)),
     ((1, 5), (0, 4)),
 ])
-def test_convert_frame_range(range, exp):
+def test_convert_frame_range(range, exp, window):
     res = window.export_image._convert_frame_range(range)
     assert res == exp
+
 
 @pytest.mark.parametrize('info,isgif,exp', [
     ({'fps': None, 'filename': None, 'loop': 0}, True, {'duration': [0.1, 0.1], 'loop': 0}),
@@ -141,7 +158,7 @@ def test_convert_frame_range(range, exp):
     ({'fps': 1, 'filename': None}, True, {'fps': 1, 'loop': 0}),
     ({'fps': 1, 'filename': None}, False, {'fps': 1})
 ])
-def test_get_animation_parameters(info, isgif, exp, monkeypatch):
+def test_get_animation_parameters(info, isgif, exp, monkeypatch, window):
     monkeypatch.setattr(window.export_image, 'doc', _get_mock_doc())
     monkeypatch.setattr(export_image, 'is_gif_filename', lambda x: isgif)
 
@@ -150,6 +167,7 @@ def test_get_animation_parameters(info, isgif, exp, monkeypatch):
     res = window.export_image._get_animation_parameters(info, [(0, im), (0, im)])
     assert res == exp
 
+
 @pytest.mark.parametrize('fn,exp', [
     ('test.gif', True),
     ('test.png', False)
@@ -157,6 +175,7 @@ def test_get_animation_parameters(info, isgif, exp, monkeypatch):
 def test_is_gif_filename(fn, exp):
     res = export_image.is_gif_filename(fn)
     assert res == exp
+
 
 @pytest.mark.parametrize('fn,exp', [
     ('test.gif', True),
@@ -168,15 +187,17 @@ def test_is_video_filename(fn, exp):
     res = export_image.is_video_filename(fn)
     assert res == exp
 
+
 @pytest.mark.parametrize('uuids,base,exp', [
     ([0, 0], 'test.gif', ([0, 0], ["test.gif"])),
     ([0, 0], 'test.png', ([0, 0], ["test_001.png", "test_002.png"])),
     (None, 'test.gif', ([None], ['test.gif']))
 ])
-def test_create_filenames(uuids, base, exp, monkeypatch):
+def test_create_filenames(uuids, base, exp, monkeypatch, window):
     monkeypatch.setattr(window.export_image, 'doc', _get_mock_doc())
     res = window.export_image._create_filenames(uuids, base)
     assert res == exp
+
 
 @pytest.mark.parametrize('fr,fn,overwrite,exp', [
     ([1, 2], 'test.gif', True, 1),
@@ -184,7 +205,7 @@ def test_create_filenames(uuids, base, exp, monkeypatch):
     (None, 'test.m4v', True, 0),
     ([1, 2], 'test.gif', False, 0)
 ])
-def test_save_screenshot(fr, fn, overwrite, exp, monkeypatch):
+def test_save_screenshot(fr, fn, overwrite, exp, monkeypatch, window):
     writer = _get_mock_writer()
     IFormat = namedtuple('IFormat', 'name')
 

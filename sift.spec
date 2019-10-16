@@ -10,7 +10,7 @@ import distributed
 
 block_cipher = None
 exe_name = "SIFT"
-main_script_pathname = os.path.join("sift", "__main__.py")
+main_script_pathname = os.path.join("uwsift", "__main__.py")
 _script_base = os.path.dirname(os.path.realpath(sys.argv[0]))
 
 data_files = [
@@ -22,7 +22,7 @@ data_files = [
 
 for shape_dir in ["ne_50m_admin_0_countries", "ne_110m_admin_0_countries", "ne_50m_admin_1_states_provinces_lakes",
                   "fonts", "colormaps", "grib_definitions"]:
-    data_files.append((os.path.join("sift", "data", shape_dir), os.path.join("sift_data", shape_dir)))
+    data_files.append((os.path.join("uwsift", "data", shape_dir), os.path.join("sift_data", shape_dir)))
 
 hidden_imports = [
     "vispy.ext._bundled.six",
@@ -66,7 +66,7 @@ else:
     bin_dir = sys.executable.replace("python.exe", os.path.join("Library", "bin"))
     lib_dir = sys.executable.replace("python.exe", os.path.join("Library", "lib"))
     binaries += [(os.path.join(bin_dir, 'ffmpeg.exe'), '.')]
-    
+
 # Add ffmpeg dependencies that pyinstaller doesn't automatically find
 if is_linux:
     so_ext = '.so*'

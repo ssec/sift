@@ -186,9 +186,9 @@ setup(
     include_package_data=True,
     install_requires=['numpy', 'pillow', 'scipy', 'numba', 'vispy>=0.6.0',
                       'PyOpenGL', 'netCDF4', 'h5py', 'pyproj',
-                      'pyshp', 'shapely', 'rasterio', 'goesr', 'sqlalchemy',
-                      'goesr', 'appdirs', 'pyyaml', 'pyqtgraph', 'satpy',
-                      'pygrib', 'imageio', 'pyqt5>=5.9'
+                      'pyshp', 'shapely', 'rasterio', 'sqlalchemy',
+                      'appdirs', 'pyyaml', 'pyqtgraph', 'satpy',
+                      'pygrib;sys_platform=="linux" or sys_platform=="darwin"', 'imageio', 'pyqt5>=5.9'
                       ],
     python_requires='>=3.6',
     extras_require=extras_require,

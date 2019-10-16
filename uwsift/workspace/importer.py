@@ -24,7 +24,7 @@ from pyproj import Proj
 from sqlalchemy.orm import Session
 
 from uwsift.common import Platform, Info, Instrument, Kind, INSTRUMENT_MAP, PLATFORM_MAP
-from uwsift.workspace.goesr_pug import PugFile
+#from uwsift.workspace.goesr_pug import PugFile
 from uwsift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
 from .metadatabase import Resource, Product, Content
 
