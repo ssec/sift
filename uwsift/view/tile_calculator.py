@@ -286,28 +286,23 @@ def visible_tiles(z_dy, z_dx,
     return tilebox
 
 
-@jit([nb_types.UniTuple(nb_types.Tuple([int64, int64, int64]), 2)(
+@jit(nb_types.UniTuple(nb_types.Tuple([int64, int64, int64]), 2)(
     int64,
     int64,
-    nb_types.Tuple([int64, int64]),
-    nb_types.NamedUniTuple(int64, 2, Point),
-    nb_types.NamedUniTuple(int64, 2, Point)),
-    nb_types.UniTuple(nb_types.Tuple([int64, int64, int64]), 2)(
     int64,
     int64,
     nb_types.NamedUniTuple(int64, 2, Point),
-    nb_types.NamedUniTuple(int64, 2, Point),
-    nb_types.NamedUniTuple(int64, 2, Point))
-], nopython=True, cache=True, nogil=True)
-def calc_tile_slice(tiy, tix, stride, image_shape, tile_shape):
-    y_offset = int(image_shape[0] / 2. / stride[0] - tile_shape[0] / 2.)
+    nb_types.NamedUniTuple(int64, 2, Point)
+), nopython=True, cache=True, nogil=True)
+def calc_tile_slice(tiy, tix, stride_y, stride_x, image_shape, tile_shape):
+    y_offset = int(image_shape[0] / 2. / stride_y - tile_shape[0] / 2.)
     y_start = int(tiy * tile_shape[0] + y_offset)
     if y_start < 0:
         row_slice = (0, max(0, y_start + tile_shape[0]), 1)
     else:
         row_slice = (y_start, y_start + tile_shape[0], 1)
 
-    x_offset = int(image_shape[1] / 2. / stride[1] - tile_shape[1] / 2.)
+    x_offset = int(image_shape[1] / 2. / stride_x - tile_shape[1] / 2.)
     x_start = int(tix * tile_shape[1] + x_offset)
     if x_start < 0:
         col_slice = (0, max(0, x_start + tile_shape[1]), 1)
@@ -382,17 +377,15 @@ def calc_stride(v_dx, v_dy, t_dx, t_dy, overview_stride_y, overview_stride_x):
     return Point(np.int64(tsy), np.int64(tsx))
 
 
-@jit([nb_types.UniTuple(int64, 2)(
-    nb_types.NamedUniTuple(int64, 2, Point),
-    nb_types.NamedUniTuple(int64, 2, Point)),
-    nb_types.UniTuple(int64, 2)(
-    nb_types.Tuple((int64, int64)),
-    nb_types.NamedUniTuple(int64, 2, Point))
-], nopython=True, cache=True, nogil=True)
-def calc_overview_stride(image_shape, tile_shape):
+@jit(nb_types.UniTuple(int64, 2)(
+    int64,
+    int64,
+    nb_types.NamedUniTuple(int64, 2, Point)
+), nopython=True, cache=True, nogil=True)
+def calc_overview_stride(image_shape_y, image_shape_x, tile_shape):
     # FUTURE: Come up with a fancier way of doing overviews like averaging each strided section, if needed
-    tsy = max(1, int(np.floor(image_shape[0] / tile_shape[0])))
-    tsx = max(1, int(np.floor(image_shape[1] / tile_shape[1])))
+    tsy = max(1, int(np.floor(image_shape_y / tile_shape[0])))
+    tsx = max(1, int(np.floor(image_shape_x / tile_shape[1])))
     return tsy, tsx
 
 
@@ -582,7 +575,7 @@ class TileCalculator(object):
             stride (tuple): (Original data Y-stride, Original data X-stride)
 
         """
-        row_slice, col_slice = calc_tile_slice(tiy, tix, stride, self.image_shape, self.tile_shape)
+        row_slice, col_slice = calc_tile_slice(tiy, tix, stride[0], stride[1], self.image_shape, self.tile_shape)
         return slice(*row_slice), slice(*col_slice)
 
     def calc_tile_fraction(self, tiy, tix, stride):
@@ -610,7 +603,7 @@ class TileCalculator(object):
     def calc_overview_stride(self, image_shape=None):
         image_shape = image_shape or self.image_shape
         # FUTURE: Come up with a fancier way of doing overviews like averaging each strided section, if needed
-        tsy, tsx = calc_overview_stride(image_shape, self.tile_shape)
+        tsy, tsx = calc_overview_stride(image_shape[0], image_shape[1], self.tile_shape)
         return slice(0, image_shape[0], tsy), slice(0, image_shape[1], tsx)
 
     def calc_vertex_coordinates(self, tiy, tix, stridey, stridex,
