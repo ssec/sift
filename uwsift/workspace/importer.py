@@ -23,19 +23,13 @@ import numpy as np
 from pyproj import Proj
 from sqlalchemy.orm import Session
 
+from uwsift import config
 from uwsift.common import Platform, Info, Instrument, Kind, INSTRUMENT_MAP, PLATFORM_MAP
 from uwsift.workspace.goesr_pug import PugFile
 from uwsift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
 from .metadatabase import Resource, Product, Content
 
-# List of readers to use/include when searching for loadable files
-# None = all readers
-SATPY_READERS = None
 _SATPY_READERS = None  # cache: see `available_satpy_readers()` below
-# Filters for what datasets not to include
-EXCLUDE_DATASETS = {'calibration': ['radiance', 'counts']}
-
-
 LOG = logging.getLogger(__name__)
 
 try:
@@ -86,7 +80,7 @@ def filter_dataset_ids(ids_to_filter: Iterable[DatasetID]) -> Generator[DatasetI
     """Generate only non-filtered DatasetIDs based on EXCLUDE_DATASETS global filters."""
     # skip certain DatasetIDs
     for ds_id in ids_to_filter:
-        for filter_key, filtered_values in EXCLUDE_DATASETS.items():
+        for filter_key, filtered_values in config.get('data_reading.exclude_datasets').items():
             if getattr(ds_id, filter_key) in filtered_values:
                 break
         else:

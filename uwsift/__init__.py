@@ -13,17 +13,24 @@ CONFIG_PATHS = [
 ]
 
 DEFAULT_CONFIGURATION = {
-    'open_file_wizard': {
-        'readers': None,  # all readers
-        'id_components': [
-            'name',
-            'wavelength',
-            'calibration',
-            'level',
-        ],
+    # related to any reading of data
+    'data_reading': {
+        'readers': None,  # None=all readers
+        # Filters for what datasets not to include
         'exclude_datasets': {
             'calibration': ['radiance', 'counts'],
         }
+    },
+    # specific to the open file wizard dialog
+    'open_file_wizard': {
+        'default_reader': None,  # first in list
+        'id_components': [
+            'name',
+            'wavelength',
+            'resolution',
+            'calibration',
+            'level',
+        ],
     }
 }
 
