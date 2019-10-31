@@ -275,7 +275,6 @@ class Info(Enum):
 
     # instrument and scene information
     PLATFORM = 'platform'  # full standard name of spacecraft
-    BAND = 'band'  # band number (multispectral instruments)
     SCENE = 'scene'  # standard scene identifier string for instrument, e.g. FLDK
     INSTRUMENT = 'instrument'  # Instrument enumeration, or string with full standard name
 

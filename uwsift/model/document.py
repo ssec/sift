@@ -1647,34 +1647,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         LOG.debug("sorted products: {}".format(repr(zult)))
         return [u for u, _ in zult]
 
-    # def sort_datasets_into_load_order(self, infos):
-    #     """
-    #     given a list of paths, sort them into order, assuming layers are added at top of layer list
-    #     first: unknown paths
-    #     outer order: descending band number
-    #     inner order: descending time step
-    #     :param infos: iterable of info dictionaries
-    #     :return: ordered list of path strings
-    #     """
-    #
-    #     # FIXME: It is not possible for a pathname to be considered "irrelevant"
-    #     # riffraff = [path for path in paths if not nfo[path]]
-    #     riffraff = []
-    #     # ahi = [nfo[path] for path in paths if nfo[path]]
-    #     # names = [path for path in paths if nfo[path]]
-    #     # bands = [x.get(Info.BAND, None) for x in ahi]
-    #     # times = [x.get(Info.SCHED_TIME, None) for x in ahi]
-    #     # order = [(band, time, path) for band,time,path in zip(bands,times,names)]
-    #
-    #     def _sort_key(info):
-    #         return (info.get(Info.DATASET_NAME),
-    #                 info.get(Info.OBS_TIME),
-    #                 info.get(Info.PATHNAME))
-    #     order = sorted(infos, key=_sort_key, reverse=True)
-    #     paths = riffraff + [info.get(Info.PATHNAME) for info in order]
-    #     LOG.debug(paths)
-    #     return paths
-
     def time_label_for_uuid(self, uuid):
         """used to update animation display when a new frame is shown
         """
@@ -2005,7 +1977,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     nfo[uuid] = name
         self.didChangeColormap.emit(nfo)
 
-    def current_layers_where(self, kinds=None, bands=None, uuids=None,
+    def current_layers_where(self, kinds=None, uuids=None,
                              dataset_names=None, wavelengths=None, colormaps=None):
         """check current layer list for criteria and yield"""
         L = self.current_layer_set
@@ -2014,8 +1986,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 continue
             layer = self._layer_with_uuid[p.uuid]
             if (kinds is not None) and (layer.kind not in kinds):
-                continue
-            if (bands is not None) and (layer[Info.BAND] not in bands):
                 continue
             if (dataset_names is not None) and (layer[Info.DATASET_NAME] not in dataset_names):
                 continue

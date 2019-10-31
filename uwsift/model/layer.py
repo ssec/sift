@@ -97,10 +97,6 @@ class DocLayer(ChainMap):
         return self[Info.KIND]
 
     @property
-    def band(self):
-        return self.get(Info.BAND)
-
-    @property
     def instrument(self):
         return self.get(Info.INSTRUMENT)
 
@@ -277,11 +273,6 @@ class DocRGBLayer(DocCompositeLayer):
         return False
 
     @property
-    def band(self):
-        gb = self._get_if_not_none_func(attr='band')
-        return gb(self.r), gb(self.g), gb(self.b)
-
-    @property
     def central_wavelength(self):
         gb = self._get_if_not_none_func(item=Info.CENTRAL_WAVELENGTH)
         return gb(self.r), gb(self.g), gb(self.b)
@@ -383,7 +374,6 @@ class DocRGBLayer(DocCompositeLayer):
             Info.DISPLAY_NAME: name,
             Info.DISPLAY_TIME: display_time,
             Info.SCHED_TIME: self.sched_time,
-            Info.BAND: self.band,
             Info.CENTRAL_WAVELENGTH: self.central_wavelength,
             Info.INSTRUMENT: self.instrument,
             Info.PLATFORM: self.platform,

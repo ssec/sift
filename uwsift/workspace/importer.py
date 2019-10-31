@@ -1037,7 +1037,6 @@ class SatpyImporter(aImporter):
             model_time = ds.attrs.get('model_time')
             if model_time is not None:
                 ds.attrs[Info.DATASET_NAME] += " " + model_time.isoformat()
-            ds.attrs[Info.BAND] = 0
             ds.attrs[Info.SHORT_NAME] = ds.attrs['name']
             if ds.attrs.get('level') is not None:
                 ds.attrs[Info.SHORT_NAME] = "{} @ {}hPa".format(
