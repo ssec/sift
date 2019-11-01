@@ -164,6 +164,8 @@ STANDARD_NAMES = {
     Platform.GOES_17: _SN_GOESR_ABI,
 }
 
+BT_STANDARD_NAMES = ["toa_brightness_temperature", 'brightness_temperature', 'air_temperature']
+
 
 class ABI_AHI_Guidebook(Guidebook):
     "e.g. HS_H08_20150714_0030_B10_FLDK_R20.merc.tif"
@@ -200,8 +202,7 @@ class ABI_AHI_Guidebook(Guidebook):
         return dsi.get(Info.STANDARD_NAME) == "toa_bidirectional_reflectance"
 
     def _is_bt(self, dsi):
-        return dsi.get(Info.STANDARD_NAME) in \
-               ["toa_brightness_temperature", 'brightness_temperature', 'air_temperature']
+        return dsi.get(Info.STANDARD_NAME) in BT_STANDARD_NAMES
 
     def climits(self, dsi):
         # Valid min and max for colormap use for data values in file (unconverted)
