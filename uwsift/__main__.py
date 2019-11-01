@@ -31,7 +31,6 @@ import typing as typ
 from uuid import UUID
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from quamash import QEventLoop
 from vispy import app
 
 import uwsift.ui.open_cache_dialog_ui as open_cache_dialog_ui
@@ -59,8 +58,8 @@ from uwsift.workspace.collector import ResourceSearchPathCollector
 
 app_object = app.use_app('pyqt5')
 APP: QtGui.QApplication = app_object.native
-LOOP = QEventLoop(APP)
-asyncio.set_event_loop(LOOP)  # NEW must set the event loop
+# LOOP = QEventLoop(APP)
+# asyncio.set_event_loop(LOOP)  # NEW must set the event loop
 
 LOG = logging.getLogger(__name__)
 PROGRESS_BAR_MAX = 1000
@@ -1162,8 +1161,6 @@ def main():
     level = levels[min(3, args.verbosity)]
     logging.basicConfig(level=level, datefmt='%H:%M:%S',
                         format='%(levelname)s %(asctime)s %(module)s:%(funcName)s:L%(lineno)d %(message)s')
-    # FIXME: This is needed because shapely 1.5.11 sucks
-    logging.getLogger().setLevel(level)
     check_grib_definition_dir()
     check_imageio_deps()
     # logging.getLogger('vispy').setLevel(level)
@@ -1202,8 +1199,8 @@ def main():
     window.show()
     # bring window to front
     window.raise_()
-    LOOP.run_forever()
-    # app.run()
+    # LOOP.run_forever()
+    app.run()
 
 
 if __name__ == '__main__':
