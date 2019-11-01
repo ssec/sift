@@ -1,4 +1,3 @@
-import PyQt5.QtWebEngineWidgets
 from uwsift.__main__ import Main
 from uwsift.util.default_paths import USER_CONFIG_DIR
 from uwsift.view import export_image
