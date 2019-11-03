@@ -15,7 +15,10 @@ CONFIG_PATHS = [
 DEFAULT_CONFIGURATION = {
     # related to any reading of data
     'data_reading': {
-        'readers': None,  # None=all readers
+        # What readers to use when opening files
+        # None => all readers
+        # from environment variable: export UWSIFT_DATA_READING__READERS = "['abi_l1b', 'ami_l1b']"
+        'readers': None,
         # Filters for what datasets not to include
         'exclude_datasets': {
             'calibration': ['radiance', 'counts'],
