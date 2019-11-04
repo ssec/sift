@@ -187,7 +187,7 @@ setup(
     install_requires=['numpy', 'pillow', 'scipy', 'numba', 'vispy>=0.6.0',
                       'PyOpenGL', 'netCDF4', 'h5py', 'pyproj',
                       'pyshp', 'shapely', 'rasterio', 'sqlalchemy',
-                      'appdirs', 'pyyaml', 'pyqtgraph', 'satpy',
+                      'appdirs', 'pyyaml', 'pyqtgraph', 'satpy', 'matplotlib',
                       'pygrib;sys_platform=="linux" or sys_platform=="darwin"', 'imageio', 'pyqt5>=5.9'
                       ],
     python_requires='>=3.6',
