@@ -616,7 +616,7 @@ class TileCalculator(object):
                                         offset_rez.dy, offset_rez.dx, tessellation_level,
                                         self.pixel_rez.dx, self.pixel_rez.dy,
                                         self.tile_shape.y, self.tile_shape.x,
-                                        self.image_center.y, self.image_shape.x, quads)
+                                        self.image_center.y, self.image_center.x, quads)
         quads = quads.reshape(tessellation_level * tessellation_level * 6, 3)
         return quads[:, :2]
 
