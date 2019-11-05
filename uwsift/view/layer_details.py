@@ -42,7 +42,6 @@ class SingleLayerInfoPane(QWidget):
     name_text = None
     time_text = None
     instrument_text = None
-    band_text = None
     colormap_text = None
     clims_text = None
 
@@ -59,8 +58,6 @@ class SingleLayerInfoPane(QWidget):
         self.time_text.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.instrument_text = QLabel("")
         self.instrument_text.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.band_text = QLabel("")
-        self.band_text.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.wavelength_text = QLabel("")
         self.wavelength_text.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.colormap_text = QLabel("")
@@ -88,13 +85,12 @@ class SingleLayerInfoPane(QWidget):
         layout.addWidget(self.name_text, 0, 0)
         layout.addWidget(self.time_text, 1, 0)
         layout.addWidget(self.instrument_text, 2, 0)
-        layout.addWidget(self.band_text, 3, 0)
-        layout.addWidget(self.wavelength_text, 4, 0)
-        layout.addWidget(self.colormap_text, 5, 0)
-        layout.addWidget(self.clims_text, 6, 0)
-        layout.addWidget(self.cmap_vis, 7, 0)
-        layout.addWidget(self.composite_details, 8, 0)
-        layout.addWidget(self.composite_codeblock, 9, 0)
+        layout.addWidget(self.wavelength_text, 3, 0)
+        layout.addWidget(self.colormap_text, 4, 0)
+        layout.addWidget(self.clims_text, 5, 0)
+        layout.addWidget(self.cmap_vis, 6, 0)
+        layout.addWidget(self.composite_details, 7, 0)
+        layout.addWidget(self.composite_codeblock, 8, 0)
         self.setLayout(layout)
 
         # add this widget to the scrollable parent widget
@@ -109,7 +105,6 @@ class SingleLayerInfoPane(QWidget):
         self.name_text.setText("Name: " + shared_info[Info.DISPLAY_NAME])
         self.time_text.setText("Time: " + shared_info[Info.DISPLAY_TIME])
         self.instrument_text.setText("Instrument: " + shared_info[Info.INSTRUMENT])
-        self.band_text.setText("Band: " + shared_info[Info.BAND])
         self.wavelength_text.setText("Wavelength: " + shared_info[Info.CENTRAL_WAVELENGTH])
         self.colormap_text.setText("Colormap: " + (shared_info["colormap"] or ""))
         self.clims_text.setText("Color Limits: " + shared_info["climits"])
@@ -233,17 +228,6 @@ class SingleLayerInfoPane(QWidget):
             self._update_if_different(shared_info, this_prez, attr='colormap')
             self._get_shared_color_limits(shared_info, layer_info, this_prez)
             self._get_code_block(shared_info, layer_uuid)
-
-            # band
-            new_band = layer_info.get(Info.BAND)
-            if isinstance(new_band, (tuple, list)):
-                new_band = "(" + ", ".join([str(x) if x is not None else '---' for x in new_band]) + ")"
-            else:
-                new_band = str(new_band) if new_band is not None else '---'
-            if Info.BAND not in shared_info:
-                shared_info[Info.BAND] = new_band
-            else:
-                shared_info[Info.BAND] = "---" if shared_info[Info.BAND] != new_band else new_band
 
             # wavelength
             wl = layer_info.get(Info.CENTRAL_WAVELENGTH)

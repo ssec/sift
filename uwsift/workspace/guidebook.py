@@ -164,13 +164,12 @@ STANDARD_NAMES = {
     Platform.GOES_17: _SN_GOESR_ABI,
 }
 
+BT_STANDARD_NAMES = ["toa_brightness_temperature", 'brightness_temperature', 'air_temperature']
+
 
 class ABI_AHI_Guidebook(Guidebook):
     "e.g. HS_H08_20150714_0030_B10_FLDK_R20.merc.tif"
     _cache = None  # {uuid:metadata-dictionary, ...}
-
-    REFL_BANDS = [1, 2, 3, 4, 5, 6]
-    BT_BANDS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 
     def __init__(self):
         self._cache = {}
@@ -185,18 +184,7 @@ class ABI_AHI_Guidebook(Guidebook):
         """
         z = {}
 
-        if info[Info.KIND] in (Kind.IMAGE, Kind.COMPOSITE):
-            if info.get(Info.CENTRAL_WAVELENGTH) is None:
-                try:
-                    wl = NOMINAL_WAVELENGTHS[info[Info.PLATFORM]][info[Info.INSTRUMENT]][info[Info.BAND]]
-                except KeyError:
-                    wl = None
-                z[Info.CENTRAL_WAVELENGTH] = wl
-
-        if Info.BAND in info:
-            band_short_name = "B{:02d}".format(info[Info.BAND])
-        else:
-            band_short_name = info.get(Info.DATASET_NAME, '???')
+        band_short_name = info.get(Info.DATASET_NAME, '???')
         if Info.SHORT_NAME not in info:
             z[Info.SHORT_NAME] = band_short_name
         else:
@@ -204,31 +192,17 @@ class ABI_AHI_Guidebook(Guidebook):
         if Info.LONG_NAME not in info:
             z[Info.LONG_NAME] = info.get(Info.SHORT_NAME, z[Info.SHORT_NAME])
 
-        if Info.STANDARD_NAME not in info:
-            try:
-                z[Info.STANDARD_NAME] = STANDARD_NAMES[info[Info.PLATFORM]][info[Info.INSTRUMENT]][info[Info.BAND]]
-            except KeyError:
-                z[Info.STANDARD_NAME] = "." + str(z.get(Info.SHORT_NAME))
-
-        # Only needed for backwards compatibility with originally supported geotiffs
-        if not info.get(Info.UNITS):
-            standard_name = info.get(Info.STANDARD_NAME, z.get(Info.STANDARD_NAME))
-            if standard_name == 'toa_bidirectional_reflectance':
-                z[Info.UNITS] = '1'
-            elif standard_name == 'toa_brightness_temperature':
-                z[Info.UNITS] = 'kelvin'
+        z.setdefault(info.get(Info.STANDARD_NAME, 'unknown'))
         if info.get(Info.UNITS, z.get(Info.UNITS)) in ['K', 'Kelvin']:
             z[Info.UNITS] = 'kelvin'
 
         return z
 
     def _is_refl(self, dsi):
-        # work around for old `if band in BAND_TYPE`
-        return dsi.get(Info.BAND) in self.REFL_BANDS or dsi.get(Info.STANDARD_NAME) == "toa_bidirectional_reflectance"
+        return dsi.get(Info.STANDARD_NAME) == "toa_bidirectional_reflectance"
 
     def _is_bt(self, dsi):
-        return dsi.get(Info.BAND) in self.BT_BANDS or \
-            dsi.get(Info.STANDARD_NAME) in ["toa_brightness_temperature", 'brightness_temperature', 'air_temperature']
+        return dsi.get(Info.STANDARD_NAME) in BT_STANDARD_NAMES
 
     def climits(self, dsi):
         # Valid min and max for colormap use for data values in file (unconverted)
