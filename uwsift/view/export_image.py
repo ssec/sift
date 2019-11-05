@@ -19,6 +19,7 @@ DATA_DIR = get_package_data_dir()
 
 NUM_TICKS = 8
 TICK_SIZE = 14
+FONT = 'arial'
 
 
 def is_gif_filename(fn):
@@ -230,38 +231,44 @@ class ExportImageHelper(QtCore.QObject):
         new_im.paste(im, (0, 0, orig_w, orig_h))
         return new_im
 
-    def _append_colorbar(self, mode, im, u):
-        mpl.rcParams['font.sans-serif'] = 'arial'
+    def _create_colorbar(self, mode, u, size):
+        mpl.rcParams['font.sans-serif'] = FONT
         mpl.rcParams.update({'font.size': TICK_SIZE})
 
-        colors = COLORMAP_MANAGER.get(self.doc.colormap_for_uuid(u), None)
-        if colors is None:
-            return im
-        elif self.doc.prez_for_uuid(u).colormap == 'Square Root (Vis Default)':
+        colors = COLORMAP_MANAGER[self.doc.colormap_for_uuid(u)]
+        if self.doc.prez_for_uuid(u).colormap == 'Square Root (Vis Default)':
             colors = colors.map(numpy.linspace((0, 0, 0, 1), (1, 1, 1, 1), 256))
         else:
             colors = colors.colors.rgba
 
         dpi = self.sgm.main_canvas.dpi
-
         if mode == 'vertical':
-            fig = plt.figure(figsize=(im.size[0] / dpi * .1, im.size[1] / dpi * 1.2), dpi=dpi)
+            fig = plt.figure(figsize=(size[0] / dpi * .1, size[1] / dpi * 1.2), dpi=dpi)
             ax = fig.add_axes([0.3, 0.05, 0.2, 0.9])
         else:
-            fig = plt.figure(figsize=(im.size[0] / dpi * 1.2, im.size[1] / dpi * .1), dpi=dpi)
+            fig = plt.figure(figsize=(size[0] / dpi * 1.2, size[1] / dpi * .1), dpi=dpi)
             ax = fig.add_axes([0.05, 0.4, 0.9, 0.2])
 
         cmap = mpl.colors.ListedColormap(colors)
         vmin, vmax = self.doc.prez_for_uuid(u).climits
         norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
         cbar = mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation=mode)
-        ticks = ["{}".format(self.doc[u][Info.UNIT_CONVERSION][2](self.doc[u][Info.UNIT_CONVERSION][1](t)))
+
+        ticks = [str(self.doc[u][Info.UNIT_CONVERSION][2](self.doc[u][Info.UNIT_CONVERSION][1](t)))
                  for t in numpy.linspace(vmin, vmax, NUM_TICKS)]
         cbar.set_ticks(numpy.linspace(vmin, vmax, NUM_TICKS))
         cbar.set_ticklabels(ticks)
 
+        return fig
+
+    def _append_colorbar(self, mode, im, u):
+        if mode is None or COLORMAP_MANAGER.get(self.doc.colormap_for_uuid(u)) is None:
+            return im
+
+        fig = self._create_colorbar(mode, u, im.size)
+
         buf = io.BytesIO()
-        fig.savefig(buf, format='png', bbox_inches='tight', dpi=dpi)
+        fig.savefig(buf, format='png', bbox_inches='tight', dpi=self.sgm.main_canvas.dpi)
         buf.seek(0)
         fig_im = Image.open(buf)
 

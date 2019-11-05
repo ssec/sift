@@ -1,9 +1,9 @@
-include sift/data/shadedrelief.jpg
-include sift/data/ne_50m_admin_0_countries/*
-include sift/data/ne_110m_admin_0_countries/*
-include sift/data/ne_50m_admin_1_states_provinces_lakes/*
-recursive-include sift/data/fonts *.ttf
-recursive-include sift/data/colormaps *.cmap
-recursive-include sift/data/grib_definitions *.def
-include sift/ui/*.ui
+include uwsift/data/shadedrelief.jpg
+include uwsift/data/ne_50m_admin_0_countries/*
+include uwsift/data/ne_110m_admin_0_countries/*
+include uwsift/data/ne_50m_admin_1_states_provinces_lakes/*
+recursive-include uwsift/data/fonts *.ttf
+recursive-include uwsift/data/colormaps *.cmap
+recursive-include uwsift/data/grib_definitions *.def
+include uwsift/ui/*.ui
 include LICENSE.txt
