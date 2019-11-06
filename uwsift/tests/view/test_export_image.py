@@ -6,9 +6,14 @@ from PIL import Image
 from matplotlib import pyplot as plt
 from collections import namedtuple
 import pytest
+from pytest_mock import mocker
 import datetime
 import os
 import imageio
+from PyQt5.QtCore import Qt, QCoreApplication
+from PyQt5.QtGui import QKeySequence, QShortcutEvent
+from PyQt5.QtTest import QTest
+from PyQt5.QtWidgets import QAction
 
 
 def _get_mock_doc():
@@ -100,6 +105,8 @@ def _get_mock_writer():
 def window(tmp_path_factory):
     d = tmp_path_factory.mktemp("tmp")
     window = Main(config_dir=USER_CONFIG_DIR, workspace_dir=str(d))
+    window.show()
+    QTest.qWaitForWindowExposed(window)
     return window
 
 
@@ -225,3 +232,35 @@ def test_save_screenshot(fr, fn, overwrite, exp, monkeypatch, window):
     window.export_image._save_screenshot()
 
     assert len(writer.data) == exp
+
+
+def test_cmd_open_export_image_dialog(qtbot, window):
+    qtbot.addWidget(window)
+    qtbot.keyClick(window, Qt.Key_I, Qt.ControlModifier)
+
+    def check_dialog():
+        assert window.export_image._screenshot_dialog is not None
+
+    qtbot.waitUntil(check_dialog)
+
+
+def test_export_image_dialog_info_default(qtbot, window):
+    window.export_image.take_screenshot()
+    qtbot.waitUntil(lambda: window.export_image._screenshot_dialog is not None)
+
+    res = window.export_image._screenshot_dialog.get_info()
+
+    # only look at the default name
+    res['filename'] = os.path.split(res['filename'])[-1]
+
+    exp = {
+        'frame_range': None,
+        'include_footer': True,
+        'loop': True,
+        'filename': export_image.ExportImageDialog.default_filename,
+        'fps': None,
+        'font_size': 11,
+        'colorbar': None
+    }
+
+    assert res == exp
