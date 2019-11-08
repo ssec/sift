@@ -1,5 +1,3 @@
-from uwsift.__main__ import Main
-from uwsift.util.default_paths import USER_CONFIG_DIR
 from uwsift.view import export_image
 from numpy.testing import assert_array_equal
 from PIL import Image
@@ -96,18 +94,6 @@ def _get_mock_writer():
             pass
 
     return MockWriter()
-
-
-@pytest.fixture(scope="session")
-def window(tmp_path_factory):
-    d = tmp_path_factory.mktemp("tmp")
-    window = Main(config_dir=USER_CONFIG_DIR, workspace_dir=str(d))
-    window.show()
-    QTest.qWaitForWindowExposed(window)
-    QTest.qWaitForWindowActive(window)
-    window.raise_()
-    window.activateWindow()
-    return window
 
 
 @pytest.mark.parametrize("size,exp,mode", [
