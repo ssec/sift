@@ -5,7 +5,7 @@ env:
   - PYTHON_VERSION=$TRAVIS_PYTHON_VERSION
   - NUMPY_VERSION=stable
   - MAIN_CMD='python setup.py'
-  - CONDA_DEPENDENCIES='hdf5 rasterio matplotlib scipy numba pyproj coveralls pytest pytest-cov pytest-xvfb vispy pyopengl netcdf4 h5py imageio imageio-ffmpeg ffmpeg pillow pyshp pyqtgraph shapely sqlalchemy pyqt appdirs pyyaml satpy eccodes'
+  - CONDA_DEPENDENCIES='hdf5 rasterio matplotlib scipy numba pyproj coveralls pytest pytest-cov pytest-qt pytest-xvfb vispy pyopengl netcdf4 h5py imageio imageio-ffmpeg ffmpeg pillow pyshp pyqtgraph shapely sqlalchemy pyqt appdirs pyyaml satpy eccodes'
   - PIP_DEPENDENCIES='quamash'
   - SETUP_XVFB=True
   - EVENT_TYPE='push pull_request'
