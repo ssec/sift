@@ -247,7 +247,7 @@ def test_export_image_dialog_info_default(qtbot, window):
 
     res = window.export_image._screenshot_dialog.get_info()
 
-    # only look at the default name
+    # only look at the filename
     res['filename'] = os.path.split(res['filename'])[-1]
 
     exp = {
