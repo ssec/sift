@@ -104,6 +104,9 @@ def window(tmp_path_factory):
     window = Main(config_dir=USER_CONFIG_DIR, workspace_dir=str(d))
     window.show()
     QTest.qWaitForWindowExposed(window)
+    QTest.qWaitForWindowActive(window)
+    window.raise_()
+    window.activateWindow()
     return window
 
 
