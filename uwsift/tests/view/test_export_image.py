@@ -5,15 +5,12 @@ from numpy.testing import assert_array_equal
 from PIL import Image
 from matplotlib import pyplot as plt
 from collections import namedtuple
+from PyQt5.QtCore import Qt
+from PyQt5.QtTest import QTest
 import pytest
-from pytest_mock import mocker
 import datetime
 import os
 import imageio
-from PyQt5.QtCore import Qt, QCoreApplication
-from PyQt5.QtGui import QKeySequence, QShortcutEvent
-from PyQt5.QtTest import QTest
-from PyQt5.QtWidgets import QAction
 
 
 def _get_mock_doc():
@@ -261,6 +258,36 @@ def test_export_image_dialog_info_default(qtbot, window):
         'fps': None,
         'font_size': 11,
         'colorbar': None
+    }
+
+    assert res == exp
+
+
+def test_export_image_dialog_info(qtbot, window):
+    window.export_image.take_screenshot()
+    qtbot.waitUntil(lambda: window.export_image._screenshot_dialog is not None)
+
+    qtbot.keyClick(window.export_image._screenshot_dialog.ui.saveAsLineEdit, Qt.Key_A, Qt.ControlModifier)
+    qtbot.keyClick(window.export_image._screenshot_dialog.ui.saveAsLineEdit, Qt.Key_Backspace)
+    qtbot.keyClicks(window.export_image._screenshot_dialog.ui.saveAsLineEdit, 'test.png')
+    qtbot.keyClick(window.export_image._screenshot_dialog.ui.footerFontSizeSpinBox, Qt.Key_A, Qt.ControlModifier)
+    qtbot.keyClick(window.export_image._screenshot_dialog.ui.footerFontSizeSpinBox, Qt.Key_Backspace)
+    qtbot.keyClicks(window.export_image._screenshot_dialog.ui.footerFontSizeSpinBox, '20')
+    qtbot.mouseClick(window.export_image._screenshot_dialog.ui.frameRangeRadio, Qt.LeftButton)
+    qtbot.mouseClick(window.export_image._screenshot_dialog.ui.colorbarVerticalRadio, Qt.LeftButton)
+    qtbot.mouseClick(window.export_image._screenshot_dialog.ui.includeFooterCheckbox, Qt.LeftButton)
+
+    res = window.export_image._screenshot_dialog.get_info()
+    res['filename'] = os.path.split(res['filename'])[-1]
+
+    exp = {
+        'frame_range': [1, 1],
+        'include_footer': False,
+        'loop': True,
+        'filename': 'test.png',
+        'fps': None,
+        'font_size': 20,
+        'colorbar': 'vertical'
     }
 
     assert res == exp
