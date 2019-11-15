@@ -2,6 +2,7 @@ import pytest
 from uwsift.__main__ import Main
 from uwsift.util.default_paths import USER_CONFIG_DIR
 
+
 @pytest.fixture(scope="session")
 def window(tmp_path_factory):
     d = tmp_path_factory.mktemp("tmp")
