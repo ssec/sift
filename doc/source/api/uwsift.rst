@@ -8,7 +8,6 @@ Subpackages
 
    uwsift.control
    uwsift.model
-   uwsift.project
    uwsift.ui
    uwsift.util
    uwsift.view

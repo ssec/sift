@@ -54,7 +54,7 @@ extensions = [
 #                   'goesr', 'appdirs', 'pyyaml', 'pyqtgraph', 'satpy',
 #                   'pygrib', 'imageio'
 autodoc_mock_imports = [
-    'numba', 'netCDF4', 'h5py', 'pyshp', 'shapely', 'rasterio', 'goesr',
+    'netCDF4', 'h5py', 'pyshp', 'shapely', 'rasterio', 'goesr',
     'pyqtgraph', 'satpy', 'pygrib', 'imageio']
 seqdiag_fontpath = os.path.abspath('./source/fonts/DejaVuSerif.ttf')
 

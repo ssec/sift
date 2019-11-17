@@ -31,8 +31,8 @@ class Guidebook(object):
     """
 
     def channel_siblings(self, uuid, infos):
-        """
-        determine the channel siblings of a given dataset
+        """Determine the channel siblings of a given dataset.
+
         :param uuid: uuid of the dataset we're interested in
         :param infos: datasetinfo_dict sequence, available datasets
         :return: (list,offset:int): list of [uuid,uuid,uuid] for siblings in order;
