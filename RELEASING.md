@@ -1,7 +1,13 @@
 # Releasing SIFT
 
-1. Checkout master (`git checkout master`)
-2. Pull from repository (`git pull`)
+The following instructions will walk you through making a release of the
+SIFT application and python library. These instructions assume that you
+already have the SIFT git repository cloned from GitHub and that the
+`origin` git remote is pointing to the `ssec/sift` repository. Instructions
+must be adjusted if `origin` points to your fork of the `sift` repository.
+
+1. Make sure you are on the master branch (`git checkout master`)
+2. Pull the most recent changes (`git pull`)
 3. Run any necessary tests. For basic dependency checks `python sift -h`
    should suffice.
 4. Run `loghub` and update the `CHANGELOG.md` file. If `loghub` is not
@@ -11,7 +17,7 @@
 loghub ssec/sift -u <username> -st 1.0.5 -plg bug "Bugs fixed" -plg enhancement "Features added" -plg documentation "Documentation changes" -plg backwards-incompatibility "Backwards incompatible changes"
 ```
 
-5. Commit the change log changes.
+5. Commit the changelog changes.
 
 6. Bump the version of the package:
 
