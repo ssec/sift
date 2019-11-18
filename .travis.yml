@@ -11,6 +11,7 @@ env:
   - EVENT_TYPE='push pull_request'
   - SETUP_CMD='test'
   - CONDA_CHANNELS='conda-forge'
+  - CONDA_CHANNEL_PRIORITY='strict'
   - DEBUG=True
 matrix:
   include:
@@ -19,7 +20,10 @@ matrix:
   - env: PYTHON_VERSION=3.7
     os: osx
     language: generic
-  - env: PYTHON_VERSION=3.7
+  - env:
+    - PYTHON_VERSION=3.7
+    # See https://github.com/conda-forge/scipy-feedstock/issues/120
+    - CONDA_CHANNEL_PRIORITY='flexible'
     os: windows
     language: shell
 install:
