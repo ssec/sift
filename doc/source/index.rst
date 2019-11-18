@@ -20,7 +20,8 @@ will slowly replace the low-level documents on the wiki.
    :maxdepth: 2
 
    design_overview
-   api
+   API <api/uwsift>
+   Contributing <CONTRIBUTING>
 
 
 Indices and tables

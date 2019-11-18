@@ -91,7 +91,7 @@ class DocLayer(ChainMap):
     def kind(self):
         """
         which kind of layer it is - RGB, Algebraic, etc. This can also be tested by the class of the layer typically.
-         We may deprecate this eventually?
+        We may deprecate this eventually?
         :return:
         """
         return self[Info.KIND]

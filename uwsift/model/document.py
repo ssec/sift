@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 uwsift.model.document
---------------------
+---------------------
 
 Core (low-level) document model for SIFT.
 The core is sometimes accessed via Facets, which are like database views for a specific group of use cases

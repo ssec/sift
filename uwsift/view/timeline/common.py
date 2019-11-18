@@ -87,7 +87,8 @@ class CoordTransform(QObject):
     typically QTimelineItem will have a nonzero Z determining its y coordinate in the scene
     QTimelineItem contains zero or more QFrameItems
     QFrameItems coordinates are relative to their QTimelineItem parent and (for now) are z=0
-        When we have expandable RGB timelines this will change
+    When we have expandable RGB timelines this will change
+
     """
     _time_base: datetime = None
     _time_unit: timedelta = None

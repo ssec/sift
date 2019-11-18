@@ -12,12 +12,12 @@ OutputDir=sift_inno_setup_output
 
 [Files]
 Source: "dist\SIFT\*"; DestDir: "{app}\bin"; Flags: replacesameversion recursesubdirs
-Source: "README.md"; DestName: "README.txt"; DestDir: "{app}"; Flags: isreadme; AfterInstall: ConvertLineEndings
+Source: "INSTALLER_README.md"; DestName: "README.txt"; DestDir: "{app}"; Flags: isreadme; AfterInstall: ConvertLineEndings
 
 [Icons]
 Name: "{group}\SIFT"; Filename: "{app}\bin\SIFT.exe"
-Name: "{group}\Bug Tracker"; Filename: "https://gitlab.ssec.wisc.edu/SIFT/sift/issues"
-Name: "{group}\Wiki"; Filename: "https://gitlab.ssec.wisc.edu/SIFT/sift/wikis/home"
+Name: "{group}\Bug Tracker"; Filename: "https://github.com/ssec/sift/issues"
+Name: "{group}\Wiki"; Filename: "https://github.com/ssec/sift/wiki"
 Name: "{group}\Open Workspace Folder"; Filename: "{%WORKSPACE_DB_DIR}"
 Name: "{group}\Open Settings Folder"; Filename: "{%DOCUMENT_SETTINGS_DIR}"
 Name: "{group}\Uninstall SIFT"; Filename: "{uninstallexe}"

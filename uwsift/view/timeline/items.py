@@ -26,8 +26,10 @@ Assume X coordinate corresponds to seconds, apply transforms as needed
 - display movable and live-updated time cursor (playhead), including highlighting borders of frames under time cursor
 - signal playhead movement to external agencies
 - jump playhead to arbitrary time, optionally using left-right arrow keys
+
     + when track/s or frames selected, jump to next/last frame transition within the selection
     + when no tracks selected, consider all available frames (may require document help)
+
 - change horizontal seconds-per-pixel (generally done with an external slider or mouse alt-drag on time scale)
 - permit dragging of colorbars between layers
 - permit dragging of colorbars off an external palette
