@@ -23,7 +23,8 @@ matrix:
     os: windows
     language: shell
 install:
-  - git clone --depth 1 git://github.com/astropy/ci-helpers.git
+#  - git clone --depth 1 git://github.com/astropy/ci-helpers.git
+  - git clone --depth 1 -b remove-tee git://github.com/djhoese/ci-helpers.git
   - source ci-helpers/travis/setup_conda.sh
   - if [ "${TRAVIS_OS_NAME}" = "windows" ]; then git clone --depth 1 git://github.com/vtkiorg/gl-ci-helpers.git; fi;
   - if [ "${TRAVIS_OS_NAME}" = "windows" ]; then powershell -Command "Set-ExecutionPolicy RemoteSigned -scope CurrentUser"; fi;
