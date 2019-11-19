@@ -48,7 +48,6 @@ script:
 after_success:
 - if [[ $PYTHON_VERSION == 3.7 ]]; then coveralls; fi;
 deploy:
-  matrix:
   - provider: pypi
     user: __token__
     password:
