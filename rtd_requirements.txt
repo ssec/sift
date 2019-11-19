@@ -3,7 +3,6 @@ sphinxcontrib-seqdiag
 sphinxcontrib-blockdiag
 sphinx_rtd_theme
 numpy
-scipy
 pillow
 pyproj
 sqlalchemy

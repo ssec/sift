@@ -189,10 +189,11 @@ setup(
                  "Topic :: Scientific/Engineering"],
     zip_safe=False,
     include_package_data=True,
-    install_requires=['numpy', 'pillow', 'scipy', 'numba', 'vispy>=0.6.0',
+    install_requires=['numpy', 'pillow', 'numba', 'vispy>=0.6.0',
                       'PyOpenGL', 'netCDF4', 'h5py', 'pyproj',
                       'pyshp', 'shapely', 'rasterio', 'sqlalchemy',
                       'appdirs', 'pyyaml', 'pyqtgraph', 'satpy', 'matplotlib',
+                      'scikit-image',
                       'pygrib;sys_platform=="linux" or sys_platform=="darwin"', 'imageio', 'pyqt5>=5.9'
                       ],
     python_requires='>=3.6',

@@ -48,11 +48,6 @@ extensions = [
     'sphinxcontrib.blockdiag',
 ]
 
-# install_requires=['numpy', 'pillow', 'scipy', 'numba', 'vispy>=0.6.0',
-#                   'PyOpenGL', 'netCDF4', 'h5py', 'pyproj',
-#                   'pyshp', 'shapely', 'rasterio', 'goesr', 'sqlalchemy',
-#                   'goesr', 'appdirs', 'pyyaml', 'pyqtgraph', 'satpy',
-#                   'pygrib', 'imageio'
 autodoc_mock_imports = [
     'netCDF4', 'h5py', 'pyshp', 'shapely', 'rasterio', 'goesr',
     'pyqtgraph', 'satpy', 'pygrib', 'imageio']
