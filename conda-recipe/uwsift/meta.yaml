@@ -30,15 +30,12 @@ requirements:
     - python >=3.6
     - setuptools
     - pip
-    - numpy >=1.12
-    - hdf5
+    - numpy
     - rasterio
     - matplotlib
-    - numba >=0.30
-    - pyproj >=1.9.4
-    - vispy >=0.6.0.dev1
-    - goesr >=0.4.2 # via Ray Garcia, on sift channel
-    - pyopengl
+    - numba
+    - pyproj
+    - vispy
     - netcdf4
     - h5py
     - imageio
@@ -52,7 +49,7 @@ requirements:
     - pyqt >=5.9
     - appdirs
     - pyyaml
-    - satpy >=0.10.0a0
+    - satpy
     - pygrib  # [not win]
     - scikit-image
 
