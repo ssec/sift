@@ -34,7 +34,6 @@ requirements:
     - hdf5
     - rasterio
     - matplotlib
-    - scipy
     - numba >=0.30
     - pyproj >=1.9.4
     - vispy >=0.6.0.dev1
@@ -55,6 +54,7 @@ requirements:
     - pyyaml
     - satpy >=0.10.0a0
     - pygrib  # [not win]
+    - scikit-image
 
 test:
   commands:
