@@ -56,4 +56,4 @@ deploy:
     skip_existing: true
     on:
       tags: true
-      repo: sift/sift
+      repo: ssec/sift
