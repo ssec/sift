@@ -6,8 +6,33 @@ from uwsift.view.tile_calculator import (TileCalculator,
                                          _calc_extent_component,
                                          clip,
                                          calc_view_extents,
-                                         max_tiles_available)
+                                         max_tiles_available,
+                                         calc_tile_slice,
+                                         visible_tiles,
+                                         calc_tile_fraction,
+                                         calc_stride,
+                                         calc_overview_stride,
+                                         calc_vertex_coordinates,
+                                         calc_texture_coordinates)
 from uwsift.common import Point, Box, ViewBox, Resolution
+
+
+@pytest.fixture(params=[True, False], autouse=True)
+def enable_jit(request, monkeypatch):
+    if request.param:
+        monkeypatch.setattr('uwsift.view.tile_calculator.calc_tile_slice', calc_tile_slice.py_func)
+        monkeypatch.setattr('uwsift.view.tile_calculator.get_reference_points', get_reference_points.py_func)
+        monkeypatch.setattr('uwsift.view.tile_calculator.calc_pixel_size', calc_pixel_size.py_func)
+        monkeypatch.setattr('uwsift.view.tile_calculator._calc_extent_component', _calc_extent_component.py_func)
+        monkeypatch.setattr('uwsift.view.tile_calculator.clip', clip.py_func)
+        monkeypatch.setattr('uwsift.view.tile_calculator.calc_view_extents', calc_view_extents.py_func)
+        monkeypatch.setattr('uwsift.view.tile_calculator.max_tiles_available', max_tiles_available.py_func)
+        monkeypatch.setattr('uwsift.view.tile_calculator.visible_tiles', visible_tiles.py_func)
+        monkeypatch.setattr('uwsift.view.tile_calculator.calc_tile_fraction', calc_tile_fraction.py_func)
+        monkeypatch.setattr('uwsift.view.tile_calculator.calc_stride', calc_stride.py_func)
+        monkeypatch.setattr('uwsift.view.tile_calculator.calc_overview_stride', calc_overview_stride.py_func)
+        monkeypatch.setattr('uwsift.view.tile_calculator.calc_vertex_coordinates', calc_vertex_coordinates.py_func)
+        monkeypatch.setattr('uwsift.view.tile_calculator.calc_texture_coordinates', calc_texture_coordinates.py_func)
 
 
 @pytest.mark.parametrize("tc_params,vg,etiles,stride,tiles,exp", [
@@ -95,9 +120,9 @@ def test_max_tiles_available(ims, ts, s, exp):
     (["test", (500, 500), Point(500000, -500000), Resolution(200, 200), (50, 50)],
      10, 10, (2, 2), (slice(600, 650, 1), slice(600, 650, 1))),
     (["test", (500, 500), Point(500000, -500000), Resolution(200, 200), (500, 500)],
-     0.5, 0.5, (2, 2), (slice(0, 375, 1), slice(0, 375, 1)))
+     0, 0, (2, 2), (slice(0, 375, 1), slice(0, 375, 1)))
 ])
-def test_calc_tile_slice(tc_params, tiy, tix, s, exp):
+def test_calc_tile_slice(tc_params, tiy, tix, s, exp, monkeypatch):
     tile_calc = TileCalculator(*tc_params)
     res = tile_calc.calc_tile_slice(tiy, tix, s)
     assert res == exp
