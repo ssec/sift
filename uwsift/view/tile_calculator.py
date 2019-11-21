@@ -177,13 +177,16 @@ def calc_view_extents(image_extents_box: Box, canvas_point, image_point, canvas_
 
 
 @jit(nb_types.UniTuple(float64, 2)(
-    nb_types.NamedUniTuple(int64, 2, Point),
-    nb_types.NamedUniTuple(int64, 2, Point),
-    nb_types.NamedUniTuple(int64, 2, Point)
+    int64,
+    int64,
+    int64,
+    int64,
+    int64,
+    int64
 ), nopython=True, cache=True, nogil=True)
-def max_tiles_available(image_shape, tile_shape, stride):
-    ath = (image_shape[0] / float(stride[0])) / tile_shape[0]
-    atw = (image_shape[1] / float(stride[1])) / tile_shape[1]
+def max_tiles_available(image_shape_y, image_shape_x, tile_shape_y, tile_shape_x, stride_y, stride_x):
+    ath = (image_shape_y / float(stride_y)) / tile_shape_y
+    atw = (image_shape_x / float(stride_x)) / tile_shape_x
     return ath, atw
 
 
@@ -257,9 +260,9 @@ def visible_tiles(z_dy, z_dx,
         ntw += int(x_right)
 
     # Total number of tiles in this image at this stride (could be fractional)
-    ath, atw = max_tiles_available(Point(image_shape_y, image_shape_x),
-                                   Point(tile_shape_y, tile_shape_x),
-                                   Point(stride_y, stride_x))
+    ath, atw = max_tiles_available(image_shape_y, image_shape_x,
+                                   tile_shape_y, tile_shape_x,
+                                   stride_y, stride_x)
     # truncate to the available tiles
     hw = atw / 2.
     hh = ath / 2.
@@ -321,10 +324,8 @@ def calc_tile_slice(tiy, tix, stride_y, stride_x, image_shape, tile_shape):
     int64,
     int64
 ), nopython=True, cache=True, nogil=True)
-def calc_tile_fraction(tiy, tix, stride_y, stride_x, image_y, image_x, tile_y, tile_x):  # image_shape, tile_shape):
-    # def calc_tile_fraction(tiy, tix, stride, image_shape, tile_shape):
-    # mt = max_tiles_available(image_shape, tile_shape, stride)
-    mt = max_tiles_available(Point(image_y, image_x), Point(tile_y, tile_x), Point(stride_y, stride_x))
+def calc_tile_fraction(tiy, tix, stride_y, stride_x, image_y, image_x, tile_y, tile_x):
+    mt = max_tiles_available(image_y, image_x, tile_y, tile_x, stride_y, stride_x)
 
     if tix < -mt[1] / 2. + 0.5:
         # left edge tile
