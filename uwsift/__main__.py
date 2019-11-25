@@ -746,8 +746,8 @@ class Main(QtGui.QMainWindow):
         self._init_metadata_background_collection(search_paths)
 
         # set up timeline
-        LOG.info("potential tracks already in database: {}".format(repr(doc.potential_tracks())))
-        self._init_timeline(doc, self.workspace)
+        # LOG.info("potential tracks already in database: {}".format(repr(doc.potential_tracks())))
+        # self._init_timeline(doc, self.workspace)
 
         # FIXME: make sure sync of metadata signals sync of document potentials and track display
 
@@ -850,7 +850,10 @@ class Main(QtGui.QMainWindow):
     def _init_arrange_panes(self):
         self.tabifyDockWidget(self.ui.layersPane, self.ui.areaProbePane)
         self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.rgbConfigPane)
-        self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.timelinePane)
+        # self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.timelinePane)
+        self.layout().removeWidget(self.ui.timelinePane)
+        self.ui.timelinePane.deleteLater()
+        self.ui.timelinePane = None
         # self.tabifyDockWidget(self.ui.rgbConfigPane, self.ui.layerDetailsPane)
         # Make the layer list and layer details shown
         self.ui.layersPane.raise_()
