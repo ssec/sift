@@ -75,9 +75,16 @@ import_progress = namedtuple('import_progress',
 """
 
 
-def _load_satpy_readers_cache():
+def _load_satpy_readers_cache(force_refresh=None):
+    """Get Satpy reader information from a cache file or Satpy itself."""
+    if force_refresh is None:
+        force_refresh = os.getenv("UWSIFT_SATPY_CACHE_REFRESH", "False").lower()
+        force_refresh = force_refresh in [True, "true"]
+
     import satpy
     try:
+        if force_refresh:
+            raise RuntimeError("Forcing refresh of available Satpy readers list")
         with open(SATPY_READER_CACHE_FILE, 'r') as cfile:
             LOG.info("Loading cached available Satpy readers from {}".format(SATPY_READER_CACHE_FILE))
             cache_contents = yaml.load(cfile, yaml.SafeLoader)
@@ -104,15 +111,17 @@ def _load_satpy_readers_cache():
 
 
 def _save_satpy_readers_cache(cache_contents):
+    """Write reader cache information to a file on disk."""
     with open(SATPY_READER_CACHE_FILE, 'w') as cfile:
         LOG.info("Caching available Satpy readers to {}".format(SATPY_READER_CACHE_FILE))
         yaml.dump(cache_contents, cfile)
 
 
-def available_satpy_readers(as_dict=False, force_cache_refresh=False):
+def available_satpy_readers(as_dict=False, force_cache_refresh=None):
+    """Get a list of reader names or reader information."""
     global _SATPY_READERS
-    if _SATPY_READERS is None:
-        _SATPY_READERS = _load_satpy_readers_cache()
+    if _SATPY_READERS is None or force_cache_refresh:
+        _SATPY_READERS = _load_satpy_readers_cache(force_refresh=force_cache_refresh)
 
     if not as_dict:
         return [r['name'] for r in _SATPY_READERS]
