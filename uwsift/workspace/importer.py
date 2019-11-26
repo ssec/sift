@@ -43,7 +43,7 @@ SATPY_READER_CACHE_FILE = os.path.join(USER_CACHE_DIR,
 LOG = logging.getLogger(__name__)
 
 try:
-    from satpy import Scene
+    from satpy import Scene, available_readers, __version__ as satpy_version
     from satpy.dataset import DatasetID
 except ImportError:
     LOG.warning("SatPy is not installed and will not be used for importing.")
@@ -81,7 +81,6 @@ def _load_satpy_readers_cache(force_refresh=None):
         force_refresh = os.getenv("UWSIFT_SATPY_CACHE_REFRESH", "False").lower()
         force_refresh = force_refresh in [True, "true"]
 
-    import satpy
     try:
         if force_refresh:
             raise RuntimeError("Forcing refresh of available Satpy readers list")
@@ -90,11 +89,10 @@ def _load_satpy_readers_cache(force_refresh=None):
             cache_contents = yaml.load(cfile, yaml.SafeLoader)
         if cache_contents is None:
             raise RuntimeError("Cached reader list is empty, regenerating...")
-        if cache_contents['satpy_version'] < satpy.__version__:
+        if cache_contents['satpy_version'] < satpy_version:
             raise RuntimeError("Satpy has been updated, regenerating available readers...")
     except (FileNotFoundError, RuntimeError, KeyError) as cause:
         LOG.info("Updating list of available Satpy readers...")
-        from satpy import available_readers
         cause.__suppress_context__ = True
         readers = available_readers(as_dict=True)
         # sort list of readers just in case we depend on this in the future
@@ -103,7 +101,7 @@ def _load_satpy_readers_cache(force_refresh=None):
         for reader_info in readers:
             reader_info.pop('reader')
         cache_contents = {
-            'satpy_version': satpy.__version__,
+            'satpy_version': satpy_version,
             'readers': readers,
         }
         _save_satpy_readers_cache(cache_contents)
@@ -112,6 +110,8 @@ def _load_satpy_readers_cache(force_refresh=None):
 
 def _save_satpy_readers_cache(cache_contents):
     """Write reader cache information to a file on disk."""
+    cfile_dir = os.path.dirname(SATPY_READER_CACHE_FILE)
+    os.makedirs(cfile_dir, exist_ok=True)
     with open(SATPY_READER_CACHE_FILE, 'w') as cfile:
         LOG.info("Caching available Satpy readers to {}".format(SATPY_READER_CACHE_FILE))
         yaml.dump(cache_contents, cfile)
