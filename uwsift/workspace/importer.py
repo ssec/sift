@@ -19,12 +19,13 @@ from collections import namedtuple
 from datetime import datetime, timedelta
 from typing import Iterable, Generator, Mapping
 
+import yaml
 import numpy as np
 from pyproj import Proj
 from sqlalchemy.orm import Session
 
 from uwsift.common import Platform, Info, Instrument, Kind, INSTRUMENT_MAP, PLATFORM_MAP
-#from uwsift.workspace.goesr_pug import PugFile
+from uwsift.util import USER_CACHE_DIR
 from uwsift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
 from .metadatabase import Resource, Product, Content
 
@@ -35,11 +36,14 @@ _SATPY_READERS = None  # cache: see `available_satpy_readers()` below
 # Filters for what datasets not to include
 EXCLUDE_DATASETS = {'calibration': ['radiance', 'counts']}
 
+SATPY_READER_CACHE_FILE = os.path.join(USER_CACHE_DIR,
+                                       'available_satpy_readers.yaml')
+
 
 LOG = logging.getLogger(__name__)
 
 try:
-    from satpy import Scene
+    from satpy import Scene, available_readers, __version__ as satpy_version
     from satpy.dataset import DatasetID
 except ImportError:
     LOG.warning("SatPy is not installed and will not be used for importing.")
@@ -71,11 +75,53 @@ import_progress = namedtuple('import_progress',
 """
 
 
-def available_satpy_readers(as_dict=False):
-    from satpy import available_readers
+def _load_satpy_readers_cache(force_refresh=None):
+    """Get Satpy reader information from a cache file or Satpy itself."""
+    if force_refresh is None:
+        force_refresh = os.getenv("UWSIFT_SATPY_CACHE_REFRESH", "False").lower()
+        force_refresh = force_refresh in [True, "true"]
+
+    try:
+        if force_refresh:
+            raise RuntimeError("Forcing refresh of available Satpy readers list")
+        with open(SATPY_READER_CACHE_FILE, 'r') as cfile:
+            LOG.info("Loading cached available Satpy readers from {}".format(SATPY_READER_CACHE_FILE))
+            cache_contents = yaml.load(cfile, yaml.SafeLoader)
+        if cache_contents is None:
+            raise RuntimeError("Cached reader list is empty, regenerating...")
+        if cache_contents['satpy_version'] < satpy_version:
+            raise RuntimeError("Satpy has been updated, regenerating available readers...")
+    except (FileNotFoundError, RuntimeError, KeyError) as cause:
+        LOG.info("Updating list of available Satpy readers...")
+        cause.__suppress_context__ = True
+        readers = available_readers(as_dict=True)
+        # sort list of readers just in case we depend on this in the future
+        readers = sorted(readers, key=lambda x: x['name'])
+        # filter out known python objects to simplify YAML serialization
+        for reader_info in readers:
+            reader_info.pop('reader')
+        cache_contents = {
+            'satpy_version': satpy_version,
+            'readers': readers,
+        }
+        _save_satpy_readers_cache(cache_contents)
+    return cache_contents['readers']
+
+
+def _save_satpy_readers_cache(cache_contents):
+    """Write reader cache information to a file on disk."""
+    cfile_dir = os.path.dirname(SATPY_READER_CACHE_FILE)
+    os.makedirs(cfile_dir, exist_ok=True)
+    with open(SATPY_READER_CACHE_FILE, 'w') as cfile:
+        LOG.info("Caching available Satpy readers to {}".format(SATPY_READER_CACHE_FILE))
+        yaml.dump(cache_contents, cfile)
+
+
+def available_satpy_readers(as_dict=False, force_cache_refresh=None):
+    """Get a list of reader names or reader information."""
     global _SATPY_READERS
-    if _SATPY_READERS is None:
-        _SATPY_READERS = available_readers(as_dict=True)
+    if _SATPY_READERS is None or force_cache_refresh:
+        _SATPY_READERS = _load_satpy_readers_cache(force_refresh=force_cache_refresh)
 
     if not as_dict:
         return [r['name'] for r in _SATPY_READERS]

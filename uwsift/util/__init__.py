@@ -5,7 +5,9 @@ import logging
 import os
 import sys
 
-from uwsift.util.default_paths import WORKSPACE_DB_DIR, DOCUMENT_SETTINGS_DIR, USER_DESKTOP_DIRECTORY  # noqa
+from uwsift.util.default_paths import (  # noqa
+    WORKSPACE_DB_DIR, DOCUMENT_SETTINGS_DIR, USER_DESKTOP_DIRECTORY,
+    USER_CACHE_DIR)
 
 LOG = logging.getLogger(__name__)
 IS_FROZEN = getattr(sys, 'frozen', False)
