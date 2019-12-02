@@ -12,6 +12,7 @@ import imageio
 
 def _get_mock_doc():
     """Mock Document class for testing."""
+
     class MockPrez():
         def __init__(self):
             self.colormap = 'Rainbow (IR Default)'
@@ -46,6 +47,7 @@ def _get_mock_doc():
 
 def _get_mock_sd(fr, fn):
     """Mock ScreenshotDialog class for testing."""
+
     class MockScreenshotDialog:
         def __init__(self, frame_range, filename):
             self.info = {
@@ -65,6 +67,7 @@ def _get_mock_sd(fr, fn):
 
 def _get_mock_sgm(frame_order):
     """Mock SceneGraphManager class for testing."""
+
     class MockLayerSet:
         def __init__(self, fo):
             self.frame_order = fo
@@ -86,6 +89,7 @@ def _get_mock_sgm(frame_order):
 
 def _get_mock_writer():
     """Mock Writer class for testing."""
+
     class MockWriter:
         def __init__(self):
             self.data = []
@@ -130,6 +134,7 @@ def test_append_colorbar(mode, cbar_size, exp, monkeypatch, window):
     res = window.export_image._append_colorbar(mode, im, None)
 
     assert res.size == exp
+
 
 @pytest.mark.parametrize("size,fs,exp", [
     ((100, 100), 10, (100, 110))
