@@ -6,6 +6,7 @@ from PyQt5.QtTest import QTest
 
 @pytest.fixture(scope="session")
 def window(tmp_path_factory):
+    """Provides the SIFT GUI to tests."""
     d = tmp_path_factory.mktemp("tmp")
     window = Main(config_dir=USER_CONFIG_DIR, workspace_dir=str(d))
     window.show()

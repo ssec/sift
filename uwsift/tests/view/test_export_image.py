@@ -4,7 +4,6 @@ from PIL import Image
 from matplotlib import pyplot as plt
 from collections import namedtuple
 from PyQt5.QtCore import Qt
-from PyQt5.QtTest import QTest
 import pytest
 import datetime
 import os
@@ -12,6 +11,7 @@ import imageio
 
 
 def _get_mock_doc():
+    """Mock Document class for testing."""
     class MockPrez():
         def __init__(self):
             self.colormap = 'Rainbow (IR Default)'
@@ -45,6 +45,7 @@ def _get_mock_doc():
 
 
 def _get_mock_sd(fr, fn):
+    """Mock ScreenshotDialog class for testing."""
     class MockScreenshotDialog:
         def __init__(self, frame_range, filename):
             self.info = {
@@ -63,6 +64,7 @@ def _get_mock_sd(fr, fn):
 
 
 def _get_mock_sgm(frame_order):
+    """Mock SceneGraphManager class for testing."""
     class MockLayerSet:
         def __init__(self, fo):
             self.frame_order = fo
@@ -83,6 +85,7 @@ def _get_mock_sgm(frame_order):
 
 
 def _get_mock_writer():
+    """Mock Writer class for testing."""
     class MockWriter:
         def __init__(self):
             self.data = []
@@ -96,12 +99,13 @@ def _get_mock_writer():
     return MockWriter()
 
 
-@pytest.mark.parametrize("size,exp,mode", [
-    ((100, 100), [0.1, 1.2], 'vertical'),
-    ((100, 100), [1.2, 0.1], 'horizontal'),
-    ((0, 0), [0, 0], 'vertical'),
+@pytest.mark.parametrize("size,mode,exp", [
+    ((100, 100), 'vertical', [0.1, 1.2]),
+    ((100, 100), 'horizontal', [1.2, 0.1]),
+    ((0, 0), 'vertical', [0, 0]),
 ])
-def test_create_colorbar(size, exp, mode, monkeypatch, window):
+def test_create_colorbar(size, mode, exp, monkeypatch, window):
+    """Test colorbar is created correctly given dimensions and the colorbar append direction."""
     monkeypatch.setattr(window.export_image, 'doc', _get_mock_doc())
     monkeypatch.setattr(window.export_image.sgm.main_canvas, 'dpi', 100)
 
@@ -111,12 +115,13 @@ def test_create_colorbar(size, exp, mode, monkeypatch, window):
     assert res.dpi == 100
 
 
-@pytest.mark.parametrize("mode,size,cbar_size", [
-    (None, (100, 100), (0, 0)),
-    ('vertical', (108, 100), (10, 120)),
-    ('horizontal', (100, 108), (120, 10)),
+@pytest.mark.parametrize("mode,cbar_size,exp", [
+    (None, (0, 0), (100, 100)),
+    ('vertical', (10, 120), (108, 100)),
+    ('horizontal', (120, 10), (100, 108)),
 ])
-def test_append_colorbar(mode, size, cbar_size, monkeypatch, window):
+def test_append_colorbar(mode, cbar_size, exp, monkeypatch, window):
+    """Test colorbar is appended to the appropriate location given the colorbar append direction."""
     monkeypatch.setattr(window.export_image, 'doc', _get_mock_doc())
     monkeypatch.setattr(window.export_image.sgm.main_canvas, 'dpi', 100)
     monkeypatch.setattr(window.export_image, '_create_colorbar', lambda x, y, z: plt.figure(figsize=cbar_size))
@@ -124,33 +129,38 @@ def test_append_colorbar(mode, size, cbar_size, monkeypatch, window):
     im = Image.new('RGBA', (100, 100))
     res = window.export_image._append_colorbar(mode, im, None)
 
-    assert res.size == size
+    assert res.size == exp
+
+@pytest.mark.parametrize("size,fs,exp", [
+    ((100, 100), 10, (100, 110))
+])
+def test_add_screenshot_footer(size, fs, exp, window):
+    """Test screenshot footer is appended correctly."""
+    im = Image.new('RGBA', size)
+    res = window.export_image._add_screenshot_footer(im, 'text', font_size=fs)
+    assert res.size == exp
 
 
-def test_add_screenshot_footer(window):
-    im = Image.new('RGBA', (100, 100))
-    res = window.export_image._add_screenshot_footer(im, 'text', font_size=10)
-    assert res.size == (100, 110)
-
-
-@pytest.mark.parametrize('range,exp', [
+@pytest.mark.parametrize("range,exp", [
     (None, None),
     ((None, 2), (0, 1)),
     ((1, None), (0, 0)),
     ((1, 5), (0, 4)),
 ])
 def test_convert_frame_range(range, exp, window):
+    """Test frame range is converted correctly."""
     res = window.export_image._convert_frame_range(range)
     assert res == exp
 
 
-@pytest.mark.parametrize('info,isgif,exp', [
+@pytest.mark.parametrize("info,isgif,exp", [
     ({'fps': None, 'filename': None, 'loop': 0}, True, {'duration': [0.1, 0.1], 'loop': 0}),
     ({'fps': None, 'filename': None, 'loop': 0}, False, {'fps': 10}),
     ({'fps': 1, 'filename': None}, True, {'fps': 1, 'loop': 0}),
     ({'fps': 1, 'filename': None}, False, {'fps': 1})
 ])
 def test_get_animation_parameters(info, isgif, exp, monkeypatch, window):
+    """Test animation parameters are calculated correctly."""
     monkeypatch.setattr(window.export_image, 'doc', _get_mock_doc())
     monkeypatch.setattr(export_image, 'is_gif_filename', lambda x: isgif)
 
@@ -165,6 +175,7 @@ def test_get_animation_parameters(info, isgif, exp, monkeypatch, window):
     ('test.png', False)
 ])
 def test_is_gif_filename(fn, exp):
+    """Test that gif file names are recognized."""
     res = export_image.is_gif_filename(fn)
     assert res == exp
 
@@ -176,6 +187,7 @@ def test_is_gif_filename(fn, exp):
     ('test.png', False)
 ])
 def test_is_video_filename(fn, exp):
+    """Test that video file names are recognized."""
     res = export_image.is_video_filename(fn)
     assert res == exp
 
@@ -186,6 +198,7 @@ def test_is_video_filename(fn, exp):
     (None, 'test.gif', ([None], ['test.gif']))
 ])
 def test_create_filenames(uuids, base, exp, monkeypatch, window):
+    """Test file names are created correctly."""
     monkeypatch.setattr(window.export_image, 'doc', _get_mock_doc())
     res = window.export_image._create_filenames(uuids, base)
     assert res == exp
@@ -198,6 +211,7 @@ def test_create_filenames(uuids, base, exp, monkeypatch, window):
     ([1, 2], 'test.gif', False, 0)
 ])
 def test_save_screenshot(fr, fn, overwrite, exp, monkeypatch, window):
+    """Test screenshot is saved correctly given the frame range and filename."""
     writer = _get_mock_writer()
     IFormat = namedtuple('IFormat', 'name')
 
@@ -221,6 +235,7 @@ def test_save_screenshot(fr, fn, overwrite, exp, monkeypatch, window):
 
 
 def test_cmd_open_export_image_dialog(qtbot, window):
+    """Test that the keyboard shortcut Ctrl/Cmd + I opens the export image menu."""
     qtbot.addWidget(window)
     qtbot.keyClick(window, Qt.Key_I, Qt.ControlModifier)
 
@@ -231,6 +246,7 @@ def test_cmd_open_export_image_dialog(qtbot, window):
 
 
 def test_export_image_dialog_info_default(qtbot, window):
+    """Assert changing no options results in the default screenshot settings."""
     window.export_image.take_screenshot()
     qtbot.waitUntil(lambda: window.export_image._screenshot_dialog is not None)
 
@@ -253,6 +269,7 @@ def test_export_image_dialog_info_default(qtbot, window):
 
 
 def test_export_image_dialog_info(qtbot, window):
+    """Test changing the options in the export image GUI."""
     window.export_image.take_screenshot()
     qtbot.waitUntil(lambda: window.export_image._screenshot_dialog is not None)
 
