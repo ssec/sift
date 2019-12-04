@@ -447,12 +447,9 @@ class Workspace(QObject):
 
     def _migrate_metadata(self):
         """Replace legacy metadata uses with new uses."""
-        with self._inventory as s:
-            for p in s.query(Product).all():
-                # NOTE: Can be remove after 0.9.x releases are done (0.10.x or 1.0)
-                if os.path.splitext(p.info[Info.DATASET_NAME])[1] and p.info[Info.BAND]:
-                    LOG.info("rewriting DATASET_NAME to new style using band: {}".format(repr(p)))
-                    p.update({Info.DATASET_NAME: 'B{:02d}'.format(p.info[Info.BAND])})
+        # with self._inventory as s:
+        #     for p in s.query(Product).all():
+        #         pass
 
     def _bgnd_startup_purge(self):
         ntot = 5

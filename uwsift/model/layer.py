@@ -91,14 +91,10 @@ class DocLayer(ChainMap):
     def kind(self):
         """
         which kind of layer it is - RGB, Algebraic, etc. This can also be tested by the class of the layer typically.
-         We may deprecate this eventually?
+        We may deprecate this eventually?
         :return:
         """
         return self[Info.KIND]
-
-    @property
-    def band(self):
-        return self.get(Info.BAND)
 
     @property
     def instrument(self):
@@ -277,11 +273,6 @@ class DocRGBLayer(DocCompositeLayer):
         return False
 
     @property
-    def band(self):
-        gb = self._get_if_not_none_func(attr='band')
-        return gb(self.r), gb(self.g), gb(self.b)
-
-    @property
     def central_wavelength(self):
         gb = self._get_if_not_none_func(item=Info.CENTRAL_WAVELENGTH)
         return gb(self.r), gb(self.g), gb(self.b)
@@ -383,7 +374,6 @@ class DocRGBLayer(DocCompositeLayer):
             Info.DISPLAY_NAME: name,
             Info.DISPLAY_TIME: display_time,
             Info.SCHED_TIME: self.sched_time,
-            Info.BAND: self.band,
             Info.CENTRAL_WAVELENGTH: self.central_wavelength,
             Info.INSTRUMENT: self.instrument,
             Info.PLATFORM: self.platform,

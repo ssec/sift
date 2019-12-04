@@ -1,0 +1,56 @@
+language: python
+env:
+  global:
+  - PYTHON_VERSION=$TRAVIS_PYTHON_VERSION
+  - NUMPY_VERSION=stable
+  - MAIN_CMD='python setup.py'
+  - CONDA_DEPENDENCIES='hdf5 rasterio matplotlib numba pyproj coveralls pytest pytest-mock
+    pytest-cov pytest-qt vispy netcdf4 h5py imageio imageio-ffmpeg ffmpeg
+    pillow pyshp pyqtgraph shapely sqlalchemy pyqt appdirs pyyaml satpy eccodes scikit-image'
+  - PIP_DEPENDENCIES='pytest-xvfb'
+  - SETUP_XVFB=True
+  - EVENT_TYPE='push pull_request'
+  - SETUP_CMD='test'
+  - CONDA_CHANNELS='conda-forge'
+  - CONDA_CHANNEL_PRIORITY='strict'
+matrix:
+  include:
+  - env: PYTHON_VERSION=3.7
+    os: linux
+  - env: PYTHON_VERSION=3.7
+    os: osx
+    language: generic
+  - env: PYTHON_VERSION=3.7
+    os: windows
+    language: shell
+install:
+- git clone --depth 1 git://github.com/astropy/ci-helpers.git
+- source ci-helpers/travis/setup_conda.sh
+- if [ "${TRAVIS_OS_NAME}" = "windows" ]; then git clone --depth 1 git://github.com/vtkiorg/gl-ci-helpers.git;
+  fi;
+- if [ "${TRAVIS_OS_NAME}" = "windows" ]; then powershell -Command "Set-ExecutionPolicy
+  RemoteSigned -scope CurrentUser"; fi;
+- if [ "${TRAVIS_OS_NAME}" = "windows" ]; then powershell gl-ci-helpers/appveyor/install_opengl.ps1;
+  fi;
+- if [ "${TRAVIS_OS_NAME}" = "windows" ]; then pip install PyQt5==5.9; fi;
+- if [ "${TRAVIS_OS_NAME}" = "linux" ] || [ "${TRAVIS_OS_NAME}" = "osx" ]; then conda
+  install pygrib; fi;
+before_script:
+- export DISPLAY=:99.0
+- if [ "${TRAVIS_OS_NAME}" = "osx" ]; then ( sudo Xvfb :99 -ac -screen 0 1400x900x24
+  +render +iglx; echo ok )& fi;
+script:
+- pip install -e .
+- pytest -s --cov-report term --cov=uwsift uwsift/tests
+after_success:
+- if [[ $PYTHON_VERSION == 3.7 ]]; then coveralls; fi;
+deploy:
+  - provider: pypi
+    user: __token__
+    password:
+      secure: X4kzZ61c2Vc45zMnztnQryKkWYzCNOwPCBZ6s9dFrlLw6YRwM7StwlYSREZMVV77zAVPnj8gEM1x1j6Rzl5+BL/w7zsrJpNv6uc1hR+CPysIBmnhHQPXmIcj/GakRGRL+0kDm2hB+ALVVwzI5GZC8KwHeDW/R8Fou32Vxxc13aU2eZcFupVetN664K7WP76ZLS4Ep3YVjSvlziQ0hVZmYQKE84Uvep/t74Pa82N/R+iXRddrGaLbiCgF7uOxW9sOHhkVPaWtpZS5cECCJyMQCgZaN3S5YyRrtqcx7wnBVTUes1OdkNds7HuH0Yl/VYmc5DxEDn4VpGSjYhi7sk+mcr4b3GosWXAOsRQPHr4FlmAiM3fWAQw92MvUsfA7++KEOKqyF6w3uIB8TR3UXTR9SyWg9xmBdACikXjRaO+h85NuHbXSr0Urffbdr96kM/DrsDeMjJ/oGOvhXYRr/9aoSs506FoEK+/5htBciyPLmUUMZpPUqpbMd+7/3weNIXseSj1pRx8HFKIdiH9VxQHkU3LTS01GWo0fo3mPh6GY0fQDsqajGCQqXMtecHuQ8jGKeA3QQuVYGT/BdDn5/71hH+ZqNlUlUrgU7W53xD6ppnuoewH5Vv3HlTGxOJ16gNRgzC6wLrApg5tey6Mh2GEtiyZZQMmomwUT4JGl1tjhorU=
+    distributions: sdist
+    skip_existing: true
+    on:
+      tags: true
+      repo: ssec/sift

@@ -3,13 +3,13 @@
 """
 PURPOSE
 Collector is a zookeeper of products, which populates and revises the workspace metadatabase
- Collector uses Hunters to find individual formats/conventions/products
- Products live in Resources (typically files)
- Collector skims files without reading data
- Collector populates the metadatabase with information about available products
- More than one Product may be in a Resource
+Collector uses Hunters to find individual formats/conventions/products
+Products live in Resources (typically files)
+Collector skims files without reading data
+Collector populates the metadatabase with information about available products
+More than one Product may be in a Resource
 
- Collector also knows which Importer can bring Content from the Resource into the Workspace
+Collector also knows which Importer can bring Content from the Resource into the Workspace
 
 REFERENCES
 

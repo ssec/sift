@@ -168,10 +168,14 @@ class BumpCommand(Command):
         print("To push git changes to remote, run:\n    git push --follow-tags")
 
 
+readme = open(os.path.join(script_dir, 'README.md')).read()
+
 setup(
     name='uwsift',
     version=version_str,
     description="Satellite Information Familiarization Tool",
+    long_description=readme,
+    long_description_content_type='text/markdown',
     author='R.K.Garcia, University of Wisconsin - Madison Space Science & Engineering Center',
     author_email='rkgarcia@wisc.edu',
     url='https://github.com/ssec/sift',
@@ -181,14 +185,16 @@ setup(
                  "or later (GPLv3+)",
                  "Operating System :: OS Independent",
                  "Programming Language :: Python",
+                 "Programming Language :: Python :: 3",
                  "Topic :: Scientific/Engineering"],
     zip_safe=False,
     include_package_data=True,
-    install_requires=['numpy', 'pillow', 'scipy', 'numba', 'vispy>=0.6.0',
-                      'PyOpenGL', 'netCDF4', 'h5py', 'pyproj',
-                      'pyshp', 'shapely', 'rasterio', 'goesr', 'sqlalchemy',
-                      'goesr', 'appdirs', 'pyyaml', 'pyqtgraph', 'satpy',
-                      'pygrib', 'imageio', 'pyqt5>=5.9'
+    install_requires=['numpy', 'pillow', 'numba', 'vispy>=0.6.0',
+                      'netCDF4', 'h5py', 'pyproj',
+                      'pyshp', 'shapely', 'rasterio', 'sqlalchemy',
+                      'appdirs', 'pyyaml', 'pyqtgraph', 'satpy', 'matplotlib',
+                      'scikit-image',
+                      'pygrib;sys_platform=="linux" or sys_platform=="darwin"', 'imageio', 'pyqt5>=5.9'
                       ],
     python_requires='>=3.6',
     extras_require=extras_require,

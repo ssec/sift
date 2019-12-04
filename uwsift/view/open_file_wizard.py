@@ -341,7 +341,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         # need to go backwards to index numbers don't change
         for item_idx in range(self.ui.fileList.count() - 1, -1, -1):
             item = self.ui.fileList.item(item_idx)
-            if self.ui.fileList.isItemSelected(item):
+            if item.isSelected():
                 self._filelist_changed = True
                 self._all_filenames.remove(item.text())
                 self.ui.fileList.takeItem(item_idx)

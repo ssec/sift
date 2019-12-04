@@ -923,7 +923,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         nfo["texture_tile_index"] = ttile_idx = self.texture_state.add_tile((0, 0, 0), expires=False)
         for idx, data in enumerate(data_arrays):
             if data is not None:
-                _y_slice, _x_slice = self.calc.calc_overview_stride(image_shape=data.shape)
+                _y_slice, _x_slice = self.calc.calc_overview_stride(image_shape=Point(data.shape[0], data.shape[1]))
                 overview_data = data[_y_slice, _x_slice]
             else:
                 overview_data = None
@@ -1010,7 +1010,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
                     continue
 
                 # Assume we were given a total image worth of this stride
-                y_slice, x_slice = self.calc.calc_tile_slice(tiy, tix, stride)
+                y_slice, x_slice = self.calc.calc_tile_slice(tiy, tix, tuple(stride))
                 textures_data = []
                 for chn_idx in range(self.num_channels):
                     # force a copy of the data from the content array (provided by the workspace)

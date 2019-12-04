@@ -1,94 +1,62 @@
-SIFT
-====
+# SIFT
 
-Satellite Information Familiarization Tool (SIFT) was designed by the SSEC to
-support scientists during forecaster training events. It provides a graphical
-interface for visualization and basic analysis of geostationary satellite data.
+[![Coverage Status](https://coveralls.io/repos/github/ssec/sift/badge.svg)](https://coveralls.io/github/ssec/sift)
+[![PyPI version](https://badge.fury.io/py/uwsift.svg)](https://badge.fury.io/py/uwsift)
+[![Build Status](https://travis-ci.org/ssec/sift.svg?branch=master)](https://travis-ci.org/ssec/sift)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.2587908.svg)](https://doi.org/10.5281/zenodo.2587908)
+[![Gitter chat](https://badges.gitter.im/gitterHQ/gitter.png)](https://gitter.im/gitterHQ/gitter)
 
-SIFT is built on open source technologies like Python, OpenGL, and PyQt4. It
-can be run from Mac, Windows, and Linux.
 
-The main website is http://sift.ssec.wisc.edu/.
+Satellite Information Familiarization Tool (SIFT) was designed by the Space
+Science and Engineering Center (SSEC) at the University of Wisconsin - Madison
+to support scientists during forecaster training events. It provides a
+graphical interface for visualization and basic analysis of geostationary
+satellite data.
 
-The Git repository is available on GitHub: https://github.com/ssec/sift
+SIFT is built on open source technologies like Python, OpenGL, and PyQt5. It
+can be run from Mac, Windows, and Linux. The SIFT application is provided as
+a python library called "uwsift". It can also be installed as a standalone
+application.
+
+SIFT's main website is http://sift.ssec.wisc.edu/.
+
+The Git repository where you can find SIFT's source code, issue tracker, and
+other documentation is on GitHub: https://github.com/ssec/sift
 
 The project wiki with some in-depth usage and installation instructions can
 also be found on GitHub: https://github.com/ssec/sift/wiki
 
 Developer documentation can be found on https://sift.readthedocs.io/en/latest/.
 
+## Data Access and Reading
 
-Data Access
------------
+SIFT uses the open source python library Satpy to read input data. By using
+Satpy SIFT is able to read many satellite instrument file formats, but may not
+be able to display or understand all data formats that Satpy can read. SIFT
+defaults to a limited set of readers for loading satellite instrument data.
+This set of readers includes but is not limited to:
 
-SIFT currently accepts a limited number of input formats. It is able to load
-NetCDF4 L1B files for the GOES-16 ABI instrument. It will accept more input
-files in the future. Please contact Jordan Gerth, Ray Garcia, or David Hoese
-to get access to this early release data set.
+* GOES-R ABI Level 1b
+* Himawari AHI HRIT
+* Himawari AHI HSD
+* GEO-KOMPSAT-2 AMI Level 1b
 
-Installation
-------------
+Other readers can be accessed from SIFT but this is considered an advanced
+usage right now.
 
-SIFT installers and bundles are available on the SIFT FTP location:
+## Installation
 
-ftp://ftp.ssec.wisc.edu/pub/sift/dist
-    
-The Windows installers end in `.exe`, Linux with `.tar.gz`, and Mac OSX with
-`.dmg`. See the sections below for details on installing SIFT for each
-operating system.
+SIFT can be installed as an all-in-one bundled application or the python
+library "uwsift" can be installed in a traditional python environment.
 
-### Run on Windows
+Detailed installation instructions can be found on the
+[GitHub Wiki](https://github.com/ssec/sift/wiki/Installation-Guide).
 
-After executing the downloaded `.exe` installer follow the installation
-wizard to install SIFT. SIFT can then be run from the "SIFT" shortcut
-in the start menu. By default SIFT caches files in a "workspace" located
-at the user's
-`/Users/<User>/AppData/Local/CIMSS-SSEC/SIFT/Cache/workspace` directory.
-Configuration files for the application are stored in the user's
-`/Users/<User>/AppData/Roaming/CIMSS-SSEC/SIFT/settings` directory.
+## Contributors
 
-### Run on Linux
-
-The downloaded tarball `.tar.gz` can be extracted by running:
-
-    tar -xf SIFT_X.Y.Z.tar.gz
-    
-SIFT can then be run by executing the `SIFT/SIFT`. Run `SIFT/SIFT -h`
-for available command line options.
-
-If SIFT will not start please ensure that the `LD_LIBRARY_PATH` environment
-variable is not set.
-
-SIFT will cache files in a `~/.cache/SIFT` directory and configuration
-files in a `~/.config/SIFT` directory.
-
-### Run on Mac
-
-The downloaded DMG file can be extracted opened by double clicking on it.
-The available `.app` should then be moved to the appropriate `Applications`
-folder. Due to Apple developer application signing limitations, the `.app`
-must first be opened by right clicking and clicking "Open". After SIFT is
-opened for the first time double clicking the `.app` icon from `Applications`
-will execute SIFT as usual.
-
-SIFT will cache files in a `~/Library/Caches/SIFT` directory and configuration
-files in a `~/Library/Application Support/SIFT` directory.
-
-
-### Installing with Conda
-
-SIFT can also be installed with the Anaconda/Conda package manager. Python
-3.7 is currently the only supported python environment. It can be installed by
-running:
-
-    conda install -c http://larch.ssec.wisc.edu/channels/sift uwsift
-    
-And then run with:
-
-    python -m uwsift
-    
-The `-h` flag can be added for documentation on additional command line
-options.
+SIFT is an open source project welcoming all contributions. See the
+[Contributing Guide](https://github.com/ssec/sift/wiki/Contributing)
+for more information on how you can help.
 
 ### Building and releasing
 

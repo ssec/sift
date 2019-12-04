@@ -31,7 +31,6 @@ import typing as typ
 from uuid import UUID
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from quamash import QEventLoop
 from vispy import app
 
 import uwsift.ui.open_cache_dialog_ui as open_cache_dialog_ui
@@ -59,8 +58,8 @@ from uwsift.workspace.collector import ResourceSearchPathCollector
 
 app_object = app.use_app('pyqt5')
 APP: QtGui.QApplication = app_object.native
-LOOP = QEventLoop(APP)
-asyncio.set_event_loop(LOOP)  # NEW must set the event loop
+# LOOP = QEventLoop(APP)
+# asyncio.set_event_loop(LOOP)  # NEW must set the event loop
 
 LOG = logging.getLogger(__name__)
 PROGRESS_BAR_MAX = 1000
@@ -747,8 +746,8 @@ class Main(QtGui.QMainWindow):
         self._init_metadata_background_collection(search_paths)
 
         # set up timeline
-        LOG.info("potential tracks already in database: {}".format(repr(doc.potential_tracks())))
-        self._init_timeline(doc, self.workspace)
+        # LOG.info("potential tracks already in database: {}".format(repr(doc.potential_tracks())))
+        # self._init_timeline(doc, self.workspace)
 
         # FIXME: make sure sync of metadata signals sync of document potentials and track display
 
@@ -851,7 +850,10 @@ class Main(QtGui.QMainWindow):
     def _init_arrange_panes(self):
         self.tabifyDockWidget(self.ui.layersPane, self.ui.areaProbePane)
         self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.rgbConfigPane)
-        self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.timelinePane)
+        # self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.timelinePane)
+        self.layout().removeWidget(self.ui.timelinePane)
+        self.ui.timelinePane.deleteLater()
+        self.ui.timelinePane = None
         # self.tabifyDockWidget(self.ui.rgbConfigPane, self.ui.layerDetailsPane)
         # Make the layer list and layer details shown
         self.ui.layersPane.raise_()
@@ -1162,8 +1164,6 @@ def main():
     level = levels[min(3, args.verbosity)]
     logging.basicConfig(level=level, datefmt='%H:%M:%S',
                         format='%(levelname)s %(asctime)s %(module)s:%(funcName)s:L%(lineno)d %(message)s')
-    # FIXME: This is needed because shapely 1.5.11 sucks
-    logging.getLogger().setLevel(level)
     check_grib_definition_dir()
     check_imageio_deps()
     # logging.getLogger('vispy').setLevel(level)
@@ -1202,8 +1202,8 @@ def main():
     window.show()
     # bring window to front
     window.raise_()
-    LOOP.run_forever()
-    # app.run()
+    # LOOP.run_forever()
+    app.run()
 
 
 if __name__ == '__main__':
