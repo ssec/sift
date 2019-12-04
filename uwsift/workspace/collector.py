@@ -28,10 +28,11 @@ from typing import List, Iterable, Mapping
 
 from PyQt5.QtCore import QObject
 
+from uwsift import config
 from satpy.readers import group_files
 from uwsift.queue import TASK_DOING, TASK_PROGRESS
 from .workspace import Workspace
-from .importer import SATPY_READERS, available_satpy_readers
+from .importer import available_satpy_readers
 from ..common import Info
 
 LOG = logging.getLogger(__name__)
@@ -137,7 +138,7 @@ class ResourceSearchPathCollector(QObject):
         self._scheduled_files = []
         self._timestamp_path = os.path.join(ws.cwd, '.last_collection_check')
         self._is_posix = sys.platform in {'linux', 'darwin'}
-        self.satpy_readers = SATPY_READERS
+        self.satpy_readers = config.get('data_reading.readers')
         if not self.satpy_readers:
             self.satpy_readers = available_satpy_readers()
 

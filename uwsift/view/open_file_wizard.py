@@ -26,39 +26,14 @@ from typing import Generator, Tuple, Union
 from satpy import Scene, DatasetID
 from satpy.readers import group_files
 
+from uwsift import config
 from uwsift.ui.open_file_wizard_ui import Ui_openFileWizard
-from uwsift.workspace.importer import available_satpy_readers, SATPY_READERS, filter_dataset_ids
+from uwsift.workspace.importer import available_satpy_readers, filter_dataset_ids
 
 LOG = logging.getLogger(__name__)
 
 FILE_PAGE = 0
 PRODUCT_PAGE = 1
-
-ID_COMPONENTS = [
-    'name',
-    'wavelength',
-    'resolution',
-    'calibration',
-    'level',
-]
-
-
-def _pretty_identifiers(ds_id: DatasetID) -> Generator[Tuple[str, object, str], None, None]:
-    """Determine pretty version of each identifier."""
-    for key in ID_COMPONENTS:
-        value = getattr(ds_id, key, None)
-        if value is None:
-            pretty_val = "N/A"
-        elif key == 'wavelength':
-            pretty_val = "{:0.02f} µm".format(value[1])
-        elif key == 'level':
-            pretty_val = "{:d} hPa".format(value)
-        elif key == 'resolution':
-            pretty_val = "{:d}m".format(value)
-        else:
-            pretty_val = value
-
-        yield key, value, pretty_val
 
 
 class OpenFileWizard(QtWidgets.QWizard):
@@ -69,6 +44,8 @@ class OpenFileWizard(QtWidgets.QWizard):
         super(OpenFileWizard, self).__init__(parent)
         # enable context menus
         self.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
+        # assume this doesn't change through the lifetime of the wizard
+        self.config = config.get('open_file_wizard')
         self.last_open_dir = base_dir
         self._all_filenames = set()
         self._filelist_changed = False
@@ -152,7 +129,7 @@ class OpenFileWizard(QtWidgets.QWizard):
                             prop_val: Union[str, None] = None):
         """Select products based on a specific property."""
         if prop_key is not None:
-            prop_column = ID_COMPONENTS.index(prop_key)
+            prop_column = self.config['id_components'].index(prop_key)
         else:
             prop_column = 0
 
@@ -170,7 +147,7 @@ class OpenFileWizard(QtWidgets.QWizard):
     def _product_context_menu(self, position: QPoint):
         item = self.ui.selectIDTable.itemAt(position)
         col = item.column()
-        id_comp = ID_COMPONENTS[col]
+        id_comp = self.config['id_components'][col]
         id_val = item.data(QtCore.Qt.UserRole)
         menu = QMenu()
         select_action = menu.addAction("Select all by '{}'".format(id_comp))
@@ -184,7 +161,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         selected_ids = []
         for item_idx in range(self.ui.selectIDTable.rowCount()):
             id_items = OrderedDict((key, self.ui.selectIDTable.item(item_idx, id_idx))
-                                   for id_idx, key in enumerate(ID_COMPONENTS))
+                                   for id_idx, key in enumerate(self.config['id_components']))
             if id_items['name'].checkState():
                 id_dict = {key: id_item.data(QtCore.Qt.UserRole)
                            for key, id_item in id_items.items() if id_item is not None}
@@ -278,26 +255,47 @@ class OpenFileWizard(QtWidgets.QWizard):
         if self.AVAILABLE_READERS:
             readers = self.AVAILABLE_READERS
         else:
+            satpy_readers = config.get('data_reading.readers')
             readers = available_satpy_readers(as_dict=True)
-            readers = (r for r in readers if not SATPY_READERS or r['name'] in SATPY_READERS)
+            readers = (r for r in readers if not satpy_readers or r['name'] in satpy_readers)
             readers = sorted(readers, key=lambda x: x.get('long_name', x['name']))
             readers = OrderedDict((ri.get('long_name', ri['name']), ri['name']) for ri in readers)
             OpenFileWizard.AVAILABLE_READERS = readers
 
-        for reader_short_name, reader_name in readers.items():
+        for idx, (reader_short_name, reader_name) in enumerate(readers.items()):
             self.ui.readerComboBox.addItem(reader_short_name, reader_name)
+            if self.config['default_reader'] == reader_name:
+                self.ui.readerComboBox.setCurrentIndex(idx)
+
+    def _pretty_identifiers(self, ds_id: DatasetID) -> Generator[Tuple[str, object, str], None, None]:
+        """Determine pretty version of each identifier."""
+        for key in self.config['id_components']:
+            value = getattr(ds_id, key, None)
+            if value is None:
+                pretty_val = "N/A"
+            elif key == 'wavelength':
+                pretty_val = "{:0.02f} µm".format(value[1])
+            elif key == 'level':
+                pretty_val = "{:d} hPa".format(value)
+            elif key == 'resolution':
+                pretty_val = "{:d}m".format(value)
+            else:
+                pretty_val = value
+
+            yield key, value, pretty_val
 
     def _init_product_select_page(self):
         # Disconnect the signals until we are done setting up the widgets
         self._disconnect_next_button_signals(self.ui.selectIDTable, self.ui.productSelectionPage)
 
         # name and level
-        self.ui.selectIDTable.setColumnCount(len(ID_COMPONENTS))
-        self.ui.selectIDTable.setHorizontalHeaderLabels([x.title() for x in ID_COMPONENTS])
+        id_components = self.config['id_components']
+        self.ui.selectIDTable.setColumnCount(len(id_components))
+        self.ui.selectIDTable.setHorizontalHeaderLabels([x.title() for x in id_components])
         for idx, ds_id in enumerate(filter_dataset_ids(self.all_available_products)):
             col_idx = 0
-            for id_key, id_val, pretty_val in _pretty_identifiers(ds_id):
-                if id_key not in ID_COMPONENTS:
+            for id_key, id_val, pretty_val in self._pretty_identifiers(ds_id):
+                if id_key not in id_components:
                     continue
 
                 self.ui.selectIDTable.setRowCount(idx + 1)

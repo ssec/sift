@@ -6,7 +6,8 @@ env:
   - MAIN_CMD='python setup.py'
   - CONDA_DEPENDENCIES='hdf5 rasterio matplotlib numba pyproj coveralls pytest pytest-mock
     pytest-cov pytest-qt vispy netcdf4 h5py imageio imageio-ffmpeg ffmpeg
-    pillow pyshp pyqtgraph shapely sqlalchemy pyqt appdirs pyyaml satpy eccodes scikit-image'
+    pillow pyshp pyqtgraph shapely sqlalchemy pyqt appdirs pyyaml satpy eccodes scikit-image
+    donfig'
   - PIP_DEPENDENCIES='pytest-xvfb'
   - SETUP_XVFB=True
   - EVENT_TYPE='push pull_request'
