@@ -1,3 +1,56 @@
+## Version 1.1.0 (2019/12/04)
+
+### Issues Closed
+
+* [Issue 253](https://github.com/ssec/sift/issues/253) - AttributeError and core dump when removing file from selection dialogue
+* [Issue 252](https://github.com/ssec/sift/issues/252) - Incorrect geolocation for ABI L1B RadC (CONUS) data ([PR 254](https://github.com/ssec/sift/pull/254))
+* [Issue 243](https://github.com/ssec/sift/issues/243) - RGB "gamma" values, worked with the inverse
+* [Issue 235](https://github.com/ssec/sift/issues/235) - Export image screenshots whole window ([PR 238](https://github.com/ssec/sift/pull/238))
+* [Issue 234](https://github.com/ssec/sift/issues/234) - Fix numba warnings when opening SIFT ([PR 237](https://github.com/ssec/sift/pull/237))
+* [Issue 233](https://github.com/ssec/sift/issues/233) - PyQt5 from conda-forge no longer builds with WebKit ([PR 236](https://github.com/ssec/sift/pull/236))
+* [Issue 229](https://github.com/ssec/sift/issues/229) - Update workspace directory on Windows installations
+* [Issue 227](https://github.com/ssec/sift/issues/227) - Rename package name for conda-forge and PyPI ([PR 230](https://github.com/ssec/sift/pull/230))
+* [Issue 220](https://github.com/ssec/sift/issues/220) - Migrate to PyQt5 ([PR 222](https://github.com/ssec/sift/pull/222))
+* [Issue 216](https://github.com/ssec/sift/issues/216) - Refactor names and modules to be more PEP8 compliant
+* [Issue 210](https://github.com/ssec/sift/issues/210) - Add option for color bar on exported images ([PR 238](https://github.com/ssec/sift/pull/238))
+* [Issue 3](https://github.com/ssec/sift/issues/3) - Satpy readers only version of SIFT
+
+In this release 12 issues were closed.
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 254](https://github.com/ssec/sift/pull/254) - Fix vertex coordinates being calculated incorrectly ([252](https://github.com/ssec/sift/issues/252))
+* [PR 241](https://github.com/ssec/sift/pull/241) - Fix probing RGB layers crashes
+
+#### Features added
+
+* [PR 263](https://github.com/ssec/sift/pull/263) - Add caching to satpy available readers
+* [PR 262](https://github.com/ssec/sift/pull/262) - Remove timeline from user interface until feature is complete
+* [PR 249](https://github.com/ssec/sift/pull/249) - Add experimental global configuration object using the donfig package
+* [PR 238](https://github.com/ssec/sift/pull/238) - Add colorbar option for saving images ([235](https://github.com/ssec/sift/issues/235), [210](https://github.com/ssec/sift/issues/210))
+* [PR 236](https://github.com/ssec/sift/pull/236) - Use WebEngine instead of building with WebKit ([233](https://github.com/ssec/sift/issues/233))
+* [PR 232](https://github.com/ssec/sift/pull/232) - Transition to Satpy for all data reading
+* [PR 225](https://github.com/ssec/sift/pull/225) - Add settings for better HiDPI support
+* [PR 222](https://github.com/ssec/sift/pull/222) - Migrate to PyQt5 ([220](https://github.com/ssec/sift/issues/220))
+
+#### Documentation changes
+
+* [PR 257](https://github.com/ssec/sift/pull/257) - Rewrite README and fix various docstring issues
+* [PR 226](https://github.com/ssec/sift/pull/226) - Add AUTHORS list
+
+#### Backwards incompatible changes
+
+* [PR 247](https://github.com/ssec/sift/pull/247) - Remove unnecessary band metadata
+* [PR 236](https://github.com/ssec/sift/pull/236) - Use WebEngine instead of building with WebKit ([233](https://github.com/ssec/sift/issues/233))
+* [PR 228](https://github.com/ssec/sift/pull/228) - Move sift.control.layer_info to sift.view.layer_details
+* [PR 222](https://github.com/ssec/sift/pull/222) - Migrate to PyQt5 ([220](https://github.com/ssec/sift/issues/220))
+* [PR 217](https://github.com/ssec/sift/pull/217) - Refactor code to be more PEP8 compliant
+
+In this release 17 pull requests were closed.
+
+
 ## Version 1.0.6 (2019/03/07)
 
 ### Issues Closed
