@@ -193,7 +193,7 @@ setup(
                       'netCDF4', 'h5py', 'pyproj',
                       'pyshp', 'shapely', 'rasterio', 'sqlalchemy',
                       'appdirs', 'pyyaml', 'pyqtgraph', 'satpy', 'matplotlib',
-                      'scikit-image',
+                      'scikit-image', 'donfig',
                       'pygrib;sys_platform=="linux" or sys_platform=="darwin"', 'imageio', 'pyqt5>=5.9'
                       ],
     python_requires='>=3.6',

@@ -52,6 +52,7 @@ requirements:
     - satpy
     - pygrib  # [not win]
     - scikit-image
+    - donfig
 
 test:
   commands:
