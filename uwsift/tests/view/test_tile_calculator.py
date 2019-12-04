@@ -17,8 +17,9 @@ from uwsift.view.tile_calculator import (TileCalculator,
 from uwsift.common import Point, Box, ViewBox, Resolution
 
 
-@pytest.fixture(params=[True, False], autouse=True)
-def enable_jit(request, monkeypatch):
+@pytest.fixture(params=[False, True], autouse=True)
+def disable_jit(request, monkeypatch):
+    """Runs the tests with jit enabled and disabled."""
     if request.param:
         monkeypatch.setattr('uwsift.view.tile_calculator.calc_tile_slice', calc_tile_slice.py_func)
         monkeypatch.setattr('uwsift.view.tile_calculator.get_reference_points', get_reference_points.py_func)
@@ -35,12 +36,13 @@ def enable_jit(request, monkeypatch):
         monkeypatch.setattr('uwsift.view.tile_calculator.calc_texture_coordinates', calc_texture_coordinates.py_func)
 
 
-@pytest.mark.parametrize("tc_params,vg,etiles,stride,tiles,exp", [
+@pytest.mark.parametrize("tc_params,vg,etiles,stride,exp", [
     (["test", (500, 500), Point(500000, -500000), Resolution(200, 200), (50, 50)],
-     ViewBox(200000, -300000, 500000, -6000, 500, 400), (1, 1, 1, 1), (2, 2), (5.0, 5.0),
+     ViewBox(200000, -300000, 500000, -6000, 500, 400), (1, 1, 1, 1), (2, 2),
      Box(bottom=3, left=7, top=-2, right=3))
 ])
-def test_visible_tiles(tc_params, vg, etiles, stride, tiles, exp):
+def test_visible_tiles(tc_params, vg, etiles, stride, exp):
+    """Test returned box of tiles to draw is correct given a visible world geometry and sampling."""
     tile_calc = TileCalculator(*tc_params)
     res = tile_calc.visible_tiles(vg, stride, etiles)
     assert res == exp
@@ -50,6 +52,7 @@ def test_visible_tiles(tc_params, vg, etiles, stride, tiles, exp):
     ([[10.0, 10.0], [20.0, 20.0]], [[10.0, 10.0], [20.0, 20.0]], (1, 1), (2.0, 2.0))
 ])
 def test_calc_pixel_size(cp, ip, cs, exp):
+    """Test calculated pixel size is correct given image data."""
     res = calc_pixel_size(np.array(cp), np.array(ip), cs)
     assert res == exp
 
@@ -59,6 +62,7 @@ def test_calc_pixel_size(cp, ip, cs, exp):
      [[1.0, 3.0, 7.0, 2.0], [3.0, 2.0, 8.0, 5.0]], (0, 1))
 ])
 def test_get_reference_points(ic, iv, exp):
+    """Test returned image reference point indexes are correct."""
     res = get_reference_points(np.array(ic), np.array(iv))
     assert res == exp
 
@@ -67,7 +71,8 @@ def test_get_reference_points(ic, iv, exp):
     ([[0.0, 0.0, 0.0, 1.0], [1.0, 0.0, 1.0, 1.0]],
      [[0.0, 0.0, 0.0, 1.0], [1.0, 0.0, 1.0, 1.0]])
 ])
-def test_get_reference_points_bad_args(ic, iv):
+def test_get_reference_points_bad_points(ic, iv):
+    """Test that error is thrown if given invalid mesh points."""
     with pytest.raises(ValueError):
         get_reference_points(np.array(ic), np.array(iv))
         assert False
@@ -77,6 +82,7 @@ def test_get_reference_points_bad_args(ic, iv):
     (1.0, 500.0, 100, 3, (200, 500))
 ])
 def test_calc_extent_component(cp, ip, num_p, mpp, exp):
+    """Test bounding box extents are correct."""
     res = _calc_extent_component(cp, ip, num_p, mpp)
     assert res == exp
 
@@ -86,6 +92,7 @@ def test_calc_extent_component(cp, ip, num_p, mpp, exp):
     (0.0, 0.0, 0.0, 0.0)
 ])
 def test_clip(v, n, x, exp):
+    """Test clipped value is correct."""
     res = clip(v, n, x)
     assert res == exp
 
@@ -95,6 +102,7 @@ def test_clip(v, n, x, exp):
      Box(bottom=175.0, left=200.0, top=200.0, right=300.0))
 ])
 def test_calc_view_extents(iebox, cp, ip, cs, dx, dy, exp):
+    """Test calculated viewing box for image is correct."""
     res = calc_view_extents(iebox, np.array(cp), np.array(ip), cs, dx, dy)
     assert res == exp
 
@@ -102,7 +110,8 @@ def test_calc_view_extents(iebox, cp, ip, cs, dx, dy, exp):
 @pytest.mark.parametrize("iebox,cp,ip,cs,dx,dy", [
     (Box(0.0, 0.0, 0.0, 0.0), [1.0, 1.0], [500.0, 500.0], (100, 100), 3.0, 3.0)
 ])
-def test_calc_view_extents_bad_args(iebox, cp, ip, cs, dx, dy):
+def test_calc_view_extents_bad_box(iebox, cp, ip, cs, dx, dy):
+    """Test that error is thrown given zero-sized box."""
     with pytest.raises(ValueError):
         calc_view_extents(iebox, np.array(cp), np.array(ip), cs, dx, dy)
         assert False
@@ -112,6 +121,7 @@ def test_calc_view_extents_bad_args(iebox, cp, ip, cs, dx, dy):
     (Point(20, 20), Point(2, 2), Point(2, 2), (5.0, 5.0))
 ])
 def test_max_tiles_available(ims, ts, s, exp):
+    """Test the max number of tiles available is returned given image shape, tile shape, and stride."""
     res = max_tiles_available(ims[0], ims[1], ts[0], ts[1], s[0], s[1])
     assert res == exp
 
@@ -123,6 +133,7 @@ def test_max_tiles_available(ims, ts, s, exp):
      0, 0, (2, 2), (slice(0, 375, 1), slice(0, 375, 1)))
 ])
 def test_calc_tile_slice(tc_params, tiy, tix, s, exp, monkeypatch):
+    """Test appropriate slice is returned given image data."""
     tile_calc = TileCalculator(*tc_params)
     res = tile_calc.calc_tile_slice(tiy, tix, s)
     assert res == exp
@@ -137,6 +148,7 @@ def test_calc_tile_slice(tc_params, tiy, tix, s, exp, monkeypatch):
      5, 5, (2, 2), (Resolution(-2.0, -2.0), Resolution(0.0, 0.0))),
 ])
 def test_calc_tile_fraction(tc_params, tiy, tix, s, exp):
+    """Test calculated fractional components of the specified tile are correct."""
     tile_calc = TileCalculator(*tc_params)
     res = tile_calc.calc_tile_fraction(tiy, tix, s)
     assert res == exp
@@ -151,6 +163,7 @@ def test_calc_tile_fraction(tc_params, tiy, tix, s, exp):
      ViewBox(dx=1, dy=1, bottom=1, top=1, right=1, left=1), Resolution(100, 100), Point(y=1, x=1)),
 ])
 def test_calc_stride(tc_params, v, t, exp):
+    """Test calculated stride value is correct given world geometry and sampling."""
     tile_calc = TileCalculator(*tc_params)
     res = tile_calc.calc_stride(v, t)
     assert res == exp
@@ -162,7 +175,8 @@ def test_calc_stride(tc_params, v, t, exp):
     (["test", (500, 500), Point(500000, -500000), Resolution(200, 200), (50, 50)],
      (100, 100), (slice(0, 100, 2), slice(0, 100, 2)))
 ])
-def test_calc_overview_strde(tc_params, ims, exp):
+def test_calc_overview_stride(tc_params, ims, exp):
+    """Test calculated stride is correct given a valid image."""
     tile_calc = TileCalculator(*tc_params)
     res = tile_calc.calc_overview_stride(ims)
     assert res == exp
@@ -179,6 +193,7 @@ def test_calc_overview_strde(tc_params, ims, exp):
                [-220000, 180000.]]))
 ])
 def test_calc_vertex_coordinates(tc_params, tiy, tix, sy, sx, fr, ofr, tl, exp):
+    """Test vertex coordinates for a given tile are correct."""
     tile_calc = TileCalculator(*tc_params)
     res = tile_calc.calc_vertex_coordinates(tiy, tix, sy, sx, fr, ofr, tl)
     assert np.array_equal(res, exp)
@@ -195,6 +210,7 @@ def test_calc_vertex_coordinates(tc_params, tiy, tix, sy, sx, fr, ofr, tl, exp):
                [0.625, 1.]]))
 ])
 def test_calc_texture_coordinates(tc_params, ti, fr, ofr, tl, exp):
+    """Test texture coordinates for a given tile are correct."""
     tile_calc = TileCalculator(*tc_params)
     res = tile_calc.calc_texture_coordinates(ti, fr, ofr, tl)
     assert np.array_equal(res, exp)
