@@ -16,40 +16,12 @@
 # along with SIFT.  If not, see <http://www.gnu.org/licenses/>.
 """Test various parts of the Open File Wizard dialog."""
 
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5 import QtWidgets
+from PyQt5.QtCore import Qt
 from uwsift.view.open_file_wizard import OpenFileWizard
-from functools import partial
-
-
-def get_wizard_object(window):
-    """Wait until the OpenFileWizard dialog is available and return a reference."""
-    wiz = window.findChildren(OpenFileWizard)
-    while len(wiz) < 1:
-        # force Qt event loop to process events until our dialog is shown
-        QtWidgets.QApplication.processEvents()
-    assert len(wiz) == 1
-    return wiz[0]
-
-
-def need_wizard_test(func, *args):
-    """Decorator used to simplify tests between the main window and wizard."""
-    def new_func(qtbot, window):
-        """Wrap decorated function to simplify getting the wizard object."""
-        def check_dialog():
-            """Keep checking that the wizard is closed until it is closed."""
-            wiz = window.findChildren(OpenFileWizard)
-            # make sure it is closed and deleted
-            assert len(wiz) == 0
-
-        qtbot.addWidget(window)
-        QTimer.singleShot(0, partial(func, qtbot, window))
-        qtbot.keyClick(window, Qt.Key_O, Qt.ControlModifier)
-        qtbot.waitUntil(check_dialog)
-    return new_func
 
 
 def create_scene(dataset_ids):
+    """Create a fake Scene object with specified datasets available."""
     class _SceneMock(object):
         """Fake Satpy Scene object."""
 
@@ -58,6 +30,7 @@ def create_scene(dataset_ids):
             pass
 
         def available_dataset_ids(self):
+            """Fake available dataset IDs."""
             return dataset_ids
 
     return _SceneMock
@@ -71,21 +44,16 @@ def _get_group_files_mock(groups):
     return _group_files_mock
 
 
-@need_wizard_test
-def test_cmd_open_export_image_dialog(qtbot, window):
-    """Run our actual in-dialog tests."""
-    wiz = get_wizard_object(window)
-    qtbot.addWidget(wiz)
-    wiz.close()
-
-
 def _create_get_open_file_names_mock(returned_files):
+    """Create a mocked open file dialog box."""
     def _get_open_file_names(self_, msg, start_dir, filter_str):
+        """Return filenames like a open file dialog."""
         return [returned_files]
     return _get_open_file_names
 
 
 def test_wizard_abi_l1b(qtbot, monkeypatch):
+    """Test that the open file wizard works all the way through."""
     from satpy import DatasetID
     files = ['OR_ABI-L1b-RadM1-M3C01_G16_s20182541300210_e20182541300267_c20182541300308.nc']
     dataset_ids = [
