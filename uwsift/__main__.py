@@ -20,7 +20,6 @@ REQUIRES
 
 __author__ = 'rayg'
 
-import asyncio
 import logging
 import os
 import sys

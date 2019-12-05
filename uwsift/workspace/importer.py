@@ -713,7 +713,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         is_netcdf = (fn.lower().endswith('.nc') or fn.lower().endswith('.nc4'))
         if not is_netcdf:
             raise ValueError("PUG loader requires files ending in .nc or .nc4: {}".format(repr(source_path)))
-        return PugFile.attach(source_path)
+        return PugFile.attach(source_path)  # noqa
         # if 'L1b' in fn:
         #     LOG.debug('attaching {} as PUG L1b'.format(source_path))
         #     return PugL1bTools(source_path)

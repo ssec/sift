@@ -133,4 +133,3 @@ def test_wizard_abi_l1b(qtbot, monkeypatch):
     assert len(wiz.scenes) == 1
     sel_ids = wiz.collect_selected_ids()
     assert len(sel_ids) == 1
-
