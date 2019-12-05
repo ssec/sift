@@ -3,7 +3,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/ssec/sift/badge.svg)](https://coveralls.io/github/ssec/sift)
 [![PyPI version](https://badge.fury.io/py/uwsift.svg)](https://badge.fury.io/py/uwsift)
 [![Build Status](https://travis-ci.org/ssec/sift.svg?branch=master)](https://travis-ci.org/ssec/sift)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.2587908.svg)](https://doi.org/10.5281/zenodo.2587908)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.2587907.svg)](https://doi.org/10.5281/zenodo.2587907)
 [![Gitter chat](https://badges.gitter.im/gitterHQ/gitter.png)](https://gitter.im/gitterHQ/gitter)
 
 
