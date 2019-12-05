@@ -28,6 +28,7 @@ DEFAULT_CONFIGURATION = {
             'ami_l1b',
             'fci_l1c_fdhsi',
             'glm_l2',
+            'grib',
             'li_l2',
             'seviri_l1b_hrit',
             'seviri_l1b_native',
