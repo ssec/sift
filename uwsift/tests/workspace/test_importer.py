@@ -119,4 +119,3 @@ def test_satpy_importer_basic(tmpdir, monkeypatch, mocker):
     products = list(imp.merge_products())
     assert len(products) == 1
     assert products[0].info[Info.CENTRAL_WAVELENGTH] == 2.0
-
