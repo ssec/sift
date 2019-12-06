@@ -1168,8 +1168,13 @@ class SatpyImporter(aImporter):
             antimeridian = 179.999
             if '+proj=latlong' not in proj4:
                 # the x coordinate for the antimeridian in this projection
-                antimeridian = Proj(proj4)(antimeridian, 0)[0]
-            am_index = int(np.ceil((antimeridian - origin_x) / cell_width))
+                am = Proj(proj4)(antimeridian, 0)[0]
+                if am < 1e30:
+                    am_index = -1
+                else:
+                    am_index = int(np.ceil((antimeridian - origin_x) / cell_width))
+            else:
+                am_index = int(np.ceil((antimeridian - origin_x) / cell_width))
             if prod.info[Info.KIND] == Kind.CONTOUR and 0 < am_index < shape[1]:
                 # if we have data from 0 to 360 longitude, we want -180 to 360
                 data = da.concatenate((data[:, am_index:], data), axis=1)
