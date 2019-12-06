@@ -198,7 +198,7 @@ setup(
                       'scikit-image', 'donfig',
                       'pygrib;sys_platform=="linux" or sys_platform=="darwin"', 'imageio', 'pyqt5>=5.9'
                       ],
-    tests_requires=['pytest', 'pytest-qt'],
+    tests_requires=['pytest', 'pytest-qt', 'pytest-mock'],
     python_requires='>=3.6',
     extras_require=extras_require,
     packages=find_packages(),
