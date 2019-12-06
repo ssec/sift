@@ -1070,7 +1070,7 @@ class SatpyImporter(aImporter):
             ds.attrs.setdefault(Info.STANDARD_NAME, ds.attrs.get('standard_name'))
             if 'wavelength' in ds.attrs:
                 ds.attrs.setdefault(Info.CENTRAL_WAVELENGTH,
-                                    ds.attrs['wavelength'][0])
+                                    ds.attrs['wavelength'][1])
 
             # Resolve anything else needed by SIFT
             id_str = ":".join(str(v) for v in DatasetID.from_dict(ds.attrs))
