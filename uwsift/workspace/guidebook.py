@@ -18,7 +18,7 @@ __docformat__ = 'reStructuredText'
 
 import logging
 
-from uwsift.common import Info, Kind, Platform, Instrument
+from uwsift.common import Info, Platform, Instrument
 from uwsift.view.colormap import DEFAULT_IR, DEFAULT_VIS, DEFAULT_UNKNOWN
 
 LOG = logging.getLogger(__name__)

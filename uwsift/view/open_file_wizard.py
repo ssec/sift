@@ -276,9 +276,9 @@ class OpenFileWizard(QtWidgets.QWizard):
             elif key == 'wavelength':
                 pretty_val = "{:0.02f} µm".format(value[1])
             elif key == 'level':
-                pretty_val = "{:d} hPa".format(value)
+                pretty_val = "{:d} hPa".format(int(value))
             elif key == 'resolution':
-                pretty_val = "{:d}m".format(value)
+                pretty_val = "{:d}m".format(int(value))
             else:
                 pretty_val = value
 

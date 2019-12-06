@@ -22,11 +22,6 @@ from enum import Enum
 from typing import MutableSequence, Tuple, Optional, Iterable, Any, NamedTuple
 from uuid import UUID
 
-import numpy as np
-
-__author__ = 'rayg'
-__docformat__ = 'reStructuredText'
-
 import os
 import sys
 from datetime import datetime, timedelta

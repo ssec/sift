@@ -20,7 +20,6 @@ REQUIRES
 
 __author__ = 'rayg'
 
-import asyncio
 import logging
 import os
 import sys
@@ -695,6 +694,7 @@ class Main(QtGui.QMainWindow):
                                                center=center,
                                                parent=self)
         self.export_image = ExportImageHelper(self, self.document, self.scene_manager)
+        self._wizard_dialog = None
 
         self._init_layer_panes()
         self._init_rgb_pane()
@@ -923,6 +923,7 @@ class Main(QtGui.QMainWindow):
     def open_wizard(self, *args, **kwargs):
         from uwsift.view.open_file_wizard import OpenFileWizard
         wizard_dialog = OpenFileWizard(base_dir=self._last_open_dir, parent=self)
+        self._wizard_dialog = wizard_dialog
         if wizard_dialog.exec_():
             LOG.info("Loading products from open wizard...")
             scenes = wizard_dialog.scenes
@@ -937,6 +938,7 @@ class Main(QtGui.QMainWindow):
                             **importer_kwargs)
         else:
             LOG.debug("Wizard closed, nothing to load")
+        self._wizard_dialog = None
 
     def remove_region_polygon(self, action: QtGui.QAction = None, *args):
         if self.scene_manager.has_pending_polygon():
