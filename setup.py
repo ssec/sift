@@ -95,7 +95,7 @@ class BumpCommand(Command):
         new_version = current_version.copy()
         if self.new_version is not None:
             new_version_str = self.new_version
-            assert(version_regex.match(new_version_str) is not None)
+            assert version_regex.match(new_version_str) is not None
         else:
             if self.bump_level == "micro":
                 new_version["micro"] += 1
@@ -127,7 +127,8 @@ class BumpCommand(Command):
         # Update the version.py
         print("Updating version.py...")
         version_data = open(version_pathname, "r").read()
-        version_data = version_data.replace("__version__ = \"{}\"".format(version_str), "__version__ = \"{}\"".format(new_version_str))
+        version_data = version_data.replace("__version__ = \"{}\"".format(version_str),
+                                            "__version__ = \"{}\"".format(new_version_str))
         open(version_pathname, "w").write(version_data)
 
         # Updating Windows Inno Setup file
@@ -196,12 +197,12 @@ setup(
                       'scikit-image', 'donfig',
                       'pygrib;sys_platform=="linux" or sys_platform=="darwin"', 'imageio', 'pyqt5>=5.9'
                       ],
+    tests_requires=['pytest', 'pytest-qt', 'pytest-mock'],
     python_requires='>=3.6',
     extras_require=extras_require,
     packages=find_packages(),
-    #entry_points={},
+    # entry_points={},
     cmdclass={
         'bump': BumpCommand,
     }
 )
-
