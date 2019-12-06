@@ -1,3 +1,30 @@
+## Version 1.1.1 (2019/12/06)
+
+### Issues Closed
+
+* [Issue 267](https://github.com/ssec/sift/issues/267) - "Layer details"-tab shows incorrect central wavelength ([PR 268](https://github.com/ssec/sift/pull/268))
+* [Issue 266](https://github.com/ssec/sift/issues/266) - Proj4 returns `inf` for antimeridian in `begin_import_products` ([PR 272](https://github.com/ssec/sift/pull/272))
+* [Issue 265](https://github.com/ssec/sift/issues/265) - `_pretty_identifiers` crash if `resolution` is a float ([PR 270](https://github.com/ssec/sift/pull/270))
+* [Issue 251](https://github.com/ssec/sift/issues/251) - conda installation instructions do not work
+
+In this release 4 issues were closed.
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 272](https://github.com/ssec/sift/pull/272) - Fix crash during importing when pyproj 2.4.2 is installed ([266](https://github.com/ssec/sift/issues/266))
+* [PR 270](https://github.com/ssec/sift/pull/270) - Fix open file wizard when resolution is a floating point number ([265](https://github.com/ssec/sift/issues/265))
+* [PR 269](https://github.com/ssec/sift/pull/269) - Fix grib reader not being included in available readers by default
+* [PR 268](https://github.com/ssec/sift/pull/268) - Fix incorrect wavelength being taken from Satpy ([267](https://github.com/ssec/sift/issues/267))
+
+#### Documentation changes
+
+* [PR 273](https://github.com/ssec/sift/pull/273) - Add test_requires to setup.py
+
+In this release 5 pull requests were closed.
+
+
 ## Version 1.1.0 (2019/12/04)
 
 ### Issues Closed
