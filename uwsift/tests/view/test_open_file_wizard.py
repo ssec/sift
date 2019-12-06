@@ -17,6 +17,7 @@
 """Test various parts of the Open File Wizard dialog."""
 
 from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QWizard
 from uwsift.view.open_file_wizard import OpenFileWizard
 
 
@@ -82,7 +83,8 @@ def test_wizard_abi_l1b(qtbot, monkeypatch):
     # Add a single file (see mock above)
     qtbot.mouseClick(wiz.ui.addButton, Qt.LeftButton)
     # Adding this file for the 'abi_l1b' should make this page complete
-    assert wiz.button(wiz.WizardButton.NextButton).isEnabled()
+    print(dir(QWizard.WizardButton))
+    assert wiz.button(QWizard.WizardButton.NextButton).isEnabled()
     # Go to the next page
     wiz.next()
 
@@ -93,7 +95,7 @@ def test_wizard_abi_l1b(qtbot, monkeypatch):
         item = wiz.ui.selectIDTable.item(row_idx, 0)
         assert item.checkState() == Qt.Checked
     # A product is selected, that should be to good for the next page
-    assert wiz.button(wiz.WizardButton.FinishButton).isEnabled()
+    assert wiz.button(QWizard.WizardButton.FinishButton).isEnabled()
     # Go to the next page
     wiz.next()
 
