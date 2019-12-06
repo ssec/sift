@@ -83,8 +83,8 @@ def test_wizard_abi_l1b(qtbot, monkeypatch):
     # Add a single file (see mock above)
     qtbot.mouseClick(wiz.ui.addButton, Qt.LeftButton)
     # Adding this file for the 'abi_l1b' should make this page complete
-    print(dir(QWizard.WizardButton))
-    assert wiz.button(QWizard.WizardButton.NextButton).isEnabled()
+    # HACK: Bug in Windows, no enum's by name
+    assert wiz.button(getattr(QWizard.WizardButton, 'NextButton', 1)).isEnabled()
     # Go to the next page
     wiz.next()
 
@@ -95,7 +95,8 @@ def test_wizard_abi_l1b(qtbot, monkeypatch):
         item = wiz.ui.selectIDTable.item(row_idx, 0)
         assert item.checkState() == Qt.Checked
     # A product is selected, that should be to good for the next page
-    assert wiz.button(QWizard.WizardButton.FinishButton).isEnabled()
+    # HACK: Bug in Windows, no enum's by name
+    assert wiz.button(getattr(QWizard.WizardButton, 'FinishButton', 1)).isEnabled()
     # Go to the next page
     wiz.next()
 
