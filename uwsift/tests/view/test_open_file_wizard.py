@@ -96,7 +96,7 @@ def test_wizard_abi_l1b(qtbot, monkeypatch):
         assert item.checkState() == Qt.Checked
     # A product is selected, that should be to good for the next page
     # HACK: Bug in Windows, no enum's by name
-    assert wiz.button(getattr(QWizard.WizardButton, 'FinishButton', 1)).isEnabled()
+    assert wiz.button(getattr(QWizard.WizardButton, 'FinishButton', 3)).isEnabled()
     # Go to the next page
     wiz.next()
 
