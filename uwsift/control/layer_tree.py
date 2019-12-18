@@ -354,11 +354,8 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         self.layoutChanged.emit()
 
         # this is an ugly way to make sure the selection stays current
-        try:
-            self.changedSelection(None)
-            self.current_set_listbox.update()
-        except IndexError:
-            pass
+        self.changedSelection(None)
+        self.current_set_listbox.update()
 
     def current_selected_uuids(self, lbox: QTreeView = None):
         lbox = self.current_set_listbox if lbox is None else lbox
@@ -396,8 +393,10 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         :param uuid:
         :return:
         """
+        self.layoutAboutToBeChanged.emit()
+        self.removeRows(row, count)
+        self.layoutChanged.emit()
         self.refresh()
-        # self.removeRows(row, count)
 
     def update_equalizer(self, doc_values):
         """
