@@ -134,7 +134,7 @@ def _unit_format_func(layer, units):
     else:
         # default formatting string
         def _format_unit(val, numeric=True, include_units=True):
-            return '{:.03f}{units:s}'.format(val, units=units if include_units else "")
+            return '{:.03f} {units:s}'.format(val, units=units if include_units else "")
 
     return _format_unit
 
