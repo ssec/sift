@@ -778,7 +778,12 @@ class SceneGraphManager(QObject):
         point_visual.visible = state
 
     def on_new_polygon(self, probe_name, points, **kwargs):
-        kwargs.setdefault("color", (1.0, 0.0, 1.0, 0.5))
+        points = np.array(points, dtype=np.float32) # convert list to NumPy array
+
+        # kwargs.setdefault("color", (1.0, 0.0, 1.0, 0.5))
+        kwargs.setdefault("color", None)
+        kwargs.setdefault("border_color", (1.0, 0.0, 1.0, 1.0))
+
         # marker default is 60, polygon default is 50 so markers can be put on top of polygons
         z = float(kwargs.get("z", 50))
         poly = Polygon(parent=self.main_map, pos=points, **kwargs)
