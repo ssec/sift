@@ -1094,7 +1094,15 @@ class SatpyImporter(aImporter):
                 model_time = ds.attrs['model_time'].isoformat()
             else:
                 model_time = None
-            ds.attrs[Info.SCENE] = ds.attrs.get('scene_id') or hash(ds.attrs['area'])
+            ds.attrs[Info.SCENE] = ds.attrs.get('scene_id')
+            if ds.attrs[Info.SCENE] is None:
+                # compute a "good enough" hash for this Scene
+                area = ds.attrs['area']
+                extents = area.area_extent
+                # round extents to nearest 100 meters
+                extents = tuple(int(np.round(x / 100.0) * 100.0) for x in extents)
+                proj_str = area.proj4_string
+                ds.attrs[Info.SCENE] = "{}-{}".format(str(extents), proj_str)
             if ds.attrs.get(Info.CENTRAL_WAVELENGTH) is None:
                 cw = ""
             else:
