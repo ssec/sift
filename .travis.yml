@@ -2,7 +2,7 @@ language: python
 env:
   global:
   - PYTHON_VERSION=$TRAVIS_PYTHON_VERSION
-  - NUMPY_VERSION=stable
+  - NUMPY_VERSION=1.17
   - MAIN_CMD='python setup.py'
   - CONDA_DEPENDENCIES='hdf5 rasterio matplotlib numba pyproj coveralls pytest pytest-mock
     pytest-cov pytest-qt vispy netcdf4 h5py imageio imageio-ffmpeg ffmpeg
