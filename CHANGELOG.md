@@ -1,3 +1,21 @@
+## Version 1.1.2 (2020/01/10)
+
+### Issues Closed
+
+* [Issue 278](https://github.com/ssec/sift/issues/278) - Bands of different resolutions are not grouped together ([PR 279](https://github.com/ssec/sift/pull/279))
+
+In this release 1 issue was closed.
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 279](https://github.com/ssec/sift/pull/279) - Fix incorrectly grouping layers from the same scene ([278](https://github.com/ssec/sift/issues/278))
+* [PR 275](https://github.com/ssec/sift/pull/275) - Recognize GEO-KOMPSAT-2A satellite and LI and GLM instruments
+
+In this release 2 pull requests were closed.
+
+
 ## Version 1.1.1 (2019/12/06)
 
 ### Issues Closed
