@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>599</width>
-    <height>461</height>
+    <height>438</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -202,6 +202,13 @@
          </size>
         </property>
        </spacer>
+      </item>
+      <item>
+       <widget class="QToolButton" name="resampleToolButton">
+        <property name="text">
+         <string>Resample Data...</string>
+        </property>
+       </widget>
       </item>
      </layout>
     </item>
