@@ -19,6 +19,7 @@ from collections import namedtuple
 from datetime import datetime, timedelta
 from typing import Iterable, Generator, Mapping
 
+import pyresample
 import yaml
 import numpy as np
 from pyproj import Proj
@@ -895,6 +896,7 @@ class SatpyImporter(aImporter):
                               "an importer")
         self.filenames = list(source_paths)
         self.reader = reader
+        self.resampling_info = kwargs.get('resampling_info')
         self.scn = kwargs.get('scene')
         if self.scn is None:
             self.scn = Scene(reader=self.reader, filenames=self.filenames)
@@ -1153,6 +1155,17 @@ class SatpyImporter(aImporter):
         # FIXME: Don't recreate the importer every time we want to load data
         dataset_ids = [DatasetID.from_dict(prod.info) for prod in products]
         self.scn.load(dataset_ids)
+
+        if self.resampling_info is not None and self.resampling_info['resampler']:
+            max_area = self.scn.max_area()
+            new_shape = self.resampling_info['shape'] or max_area.shape
+            new_res = self.resampling_info['resolution']
+            new_area_extent = self.resampling_info['area extent'] or max_area.area_extent
+            new_def = pyresample.geometry.DynamicAreaDefinition(projection=self.resampling_info['projection'][1]['proj4_str'],
+                                                                area_extent=new_area_extent)
+            new_def = new_def.freeze(self.scn.max_area().get_lonlats(), shape=new_shape, resolution=new_res)
+            self.scn = self.scn.resample(new_def, resampler=self.resampling_info['resampler'], cache_dir=self._cwd)
+
         num_stages = len(products)
         for idx, (prod, ds_id) in enumerate(zip(products, dataset_ids)):
             dataset = self.scn[ds_id]
@@ -1171,6 +1184,7 @@ class SatpyImporter(aImporter):
             origin_x = area_info[Info.ORIGIN_X]
             origin_y = area_info[Info.ORIGIN_Y]
             data = dataset.data
+            area_def_hash = hash(dataset.attrs['area'])
 
             # Handle building contours for data from 0 to 360 longitude
             antimeridian = 179.999
@@ -1190,7 +1204,7 @@ class SatpyImporter(aImporter):
                 origin_x -= am_index * cell_width
 
             # shovel that data into the memmap incrementally
-            data_filename = '{}.image'.format(prod.uuid)
+            data_filename = '{}.{}.image'.format(prod.uuid, area_def_hash)
             data_path = os.path.join(self._cwd, data_filename)
             img_data = np.memmap(data_path, dtype=np.float32, shape=shape, mode='w+')
             da.store(data, img_data)
@@ -1243,7 +1257,7 @@ class SatpyImporter(aImporter):
 
             # XXX: Should/could 'lod' be used for different contour level data?
             levels = [x for y in prod.info['contour_levels'] for x in y]
-            data_filename = '{}.contour'.format(prod.uuid)
+            data_filename = '{}.{}.contour'.format(prod.uuid, area_def_hash)
             data_path = os.path.join(self._cwd, data_filename)
             try:
                 contour_data = self._compute_contours(

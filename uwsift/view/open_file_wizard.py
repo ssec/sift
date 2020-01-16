@@ -28,6 +28,7 @@ from satpy.readers import group_files
 
 from uwsift import config
 from uwsift.ui.open_file_wizard_ui import Ui_openFileWizard
+from uwsift.view.resample import ResampleDialog
 from uwsift.workspace.importer import available_satpy_readers, filter_dataset_ids
 
 LOG = logging.getLogger(__name__)
@@ -72,6 +73,11 @@ class OpenFileWizard(QtWidgets.QWizard):
         # self.ui.fileList.itemChanged.connect(self._file_selection_or_reader_changed)
         self.filesChanged.connect(self._file_selection_or_reader_changed)
         self.ui.readerComboBox.currentIndexChanged.connect(self._file_selection_or_reader_changed)
+
+        self.ui.resampleToolButton.released.connect(lambda: self.resample_dialog.exec_())
+        self.resample_dialog = ResampleDialog(parent=self)
+        self.resampling_info = None
+
         self.ui.statusMessage.setText("")
 
         # Page 2 - Product selection
