@@ -35,7 +35,6 @@ _SATPY_READERS = None  # cache: see `available_satpy_readers()` below
 SATPY_READER_CACHE_FILE = os.path.join(USER_CACHE_DIR,
                                        'available_satpy_readers.yaml')
 
-
 LOG = logging.getLogger(__name__)
 
 try:
@@ -1026,7 +1025,7 @@ class SatpyImporter(aImporter):
 
         # Special handling of GRIB forecast data
         if 'centreDescription' in attrs and \
-                attrs[Info.INSTRUMENT] == 'unknown':
+            attrs[Info.INSTRUMENT] == 'unknown':
             description = attrs['centreDescription']
             if attrs.get(Info.PLATFORM) is None:
                 attrs[Info.PLATFORM] = 'NWP'
@@ -1158,12 +1157,11 @@ class SatpyImporter(aImporter):
 
         if self.resampling_info is not None and self.resampling_info['resampler']:
             max_area = self.scn.max_area()
-            new_shape = self.resampling_info['shape'] or max_area.shape
-            new_res = self.resampling_info['resolution']
-            new_area_extent = self.resampling_info['area extent'] or max_area.area_extent
-            new_def = pyresample.geometry.DynamicAreaDefinition(projection=self.resampling_info['projection'][1]['proj4_str'],
-                                                                area_extent=new_area_extent)
-            new_def = new_def.freeze(self.scn.max_area().get_lonlats(), shape=new_shape, resolution=new_res)
+            new_res = self.resampling_info['resolution'] or max_area.resolution
+
+            new_def = pyresample.geometry.DynamicAreaDefinition(
+                projection=self.resampling_info['projection'][1]['proj4_str'])
+            new_def = new_def.freeze(self.scn.max_area().get_lonlats(), resolution=new_res)
             self.scn = self.scn.resample(new_def, resampler=self.resampling_info['resampler'], cache_dir=self._cwd)
 
         num_stages = len(products)

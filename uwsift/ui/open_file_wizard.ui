@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>599</width>
-    <height>438</height>
+    <width>640</width>
+    <height>476</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -203,13 +203,6 @@
         </property>
        </spacer>
       </item>
-      <item>
-       <widget class="QToolButton" name="resampleToolButton">
-        <property name="text">
-         <string>Resample Data...</string>
-        </property>
-       </widget>
-      </item>
      </layout>
     </item>
    </layout>
@@ -258,6 +251,30 @@
        <bool>false</bool>
       </property>
      </widget>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="resampleButtonLayout">
+      <item>
+       <spacer name="horizontalSpacer_4">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QToolButton" name="resampleToolButton">
+        <property name="text">
+         <string>Resample Data...</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </item>
    </layout>
   </widget>

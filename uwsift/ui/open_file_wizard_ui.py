@@ -11,7 +11,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_openFileWizard(object):
     def setupUi(self, openFileWizard):
         openFileWizard.setObjectName("openFileWizard")
-        openFileWizard.resize(599, 438)
+        openFileWizard.resize(640, 476)
         openFileWizard.setSizeGripEnabled(True)
         openFileWizard.setModal(True)
         openFileWizard.setWizardStyle(QtWidgets.QWizard.ModernStyle)
@@ -76,9 +76,6 @@ class Ui_openFileWizard(object):
         self.horizontalLayout.addWidget(self.statusMessage)
         spacerItem2 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.horizontalLayout.addItem(spacerItem2)
-        self.resampleToolButton = QtWidgets.QToolButton(self.fileSelectionPage)
-        self.resampleToolButton.setObjectName("resampleToolButton")
-        self.horizontalLayout.addWidget(self.resampleToolButton)
         self.verticalLayout_3.addLayout(self.horizontalLayout)
         openFileWizard.addPage(self.fileSelectionPage)
         self.productSelectionPage = AnyWizardPage()
@@ -100,6 +97,14 @@ class Ui_openFileWizard(object):
         self.selectIDTable.setColumnCount(0)
         self.selectIDTable.setRowCount(0)
         self.verticalLayout.addWidget(self.selectIDTable)
+        self.resampleButtonLayout = QtWidgets.QHBoxLayout()
+        self.resampleButtonLayout.setObjectName("resampleButtonLayout")
+        spacerItem4 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.resampleButtonLayout.addItem(spacerItem4)
+        self.resampleToolButton = QtWidgets.QToolButton(self.productSelectionPage)
+        self.resampleToolButton.setObjectName("resampleToolButton")
+        self.resampleButtonLayout.addWidget(self.resampleToolButton)
+        self.verticalLayout.addLayout(self.resampleButtonLayout)
         openFileWizard.addPage(self.productSelectionPage)
 
         self.retranslateUi(openFileWizard)
@@ -118,10 +123,10 @@ class Ui_openFileWizard(object):
         self.removeButton.setToolTip(_translate("openFileWizard", "Remove file from list"))
         self.removeButton.setText(_translate("openFileWizard", "-"))
         self.statusMessage.setText(_translate("openFileWizard", "Reading Status"))
-        self.resampleToolButton.setText(_translate("openFileWizard", "Resample Data..."))
         self.productSelectionPage.setTitle(_translate("openFileWizard", "Select Products"))
         self.productSelectionPage.setSubTitle(_translate("openFileWizard", "Select products to add"))
         self.selectAllButton.setText(_translate("openFileWizard", "Select/Deselect All"))
         self.selectIDTable.setSortingEnabled(False)
+        self.resampleToolButton.setText(_translate("openFileWizard", "Resample Data..."))
 
 from uwsift.ui.custom_widgets import AnyWizardPage
