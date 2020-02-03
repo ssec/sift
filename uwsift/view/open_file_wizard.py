@@ -318,7 +318,7 @@ class OpenFileWizard(QtWidgets.QWizard):
             return QtCore.Qt.Unchecked
 
     def add_file(self):
-        filename_filters = ['All files (*.*)']
+        filename_filters = ['All files (*)']
         filter_str = ';;'.join(filename_filters)
         files = QtWidgets.QFileDialog.getOpenFileNames(
             self, "Select one or more files to open", self.last_open_dir or os.getenv("HOME"), filter_str)[0]
