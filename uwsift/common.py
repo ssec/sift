@@ -198,6 +198,7 @@ class Instrument(Enum):
     SEVIRI = 'SEVIRI'
     LI = 'LI'
     GLM = 'GLM'
+    VIIRS = 'VIIRS'
 
 
 INSTRUMENT_MAP = {v.value.lower().replace('-', ''): v for v in Instrument}
@@ -216,6 +217,9 @@ class Platform(Enum):
     MSG10 = 'Meteosat-10'
     MSG11 = 'Meteosat-11'
     GK2A = "GEO-KOMPSAT-2A"
+    SNPP = "Suomi-NPP"
+    N20 = "NOAA-20"
+    N21 = "NOAA-21"
 
 
 PLATFORM_MAP = {v.value.lower().replace('-', ''): v for v in Platform}
