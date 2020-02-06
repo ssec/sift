@@ -992,6 +992,7 @@ class SatpyImporter(aImporter):
 
             existing_ids.get(ds_id, None)
             meta = ds.attrs
+            ds.attrs.pop('area')
             uuid = uuid1()
             meta[Info.UUID] = uuid
             now = datetime.utcnow()
@@ -1069,7 +1070,7 @@ class SatpyImporter(aImporter):
                 Kind.CONTOUR
             self._get_platform_instrument(ds.attrs)
             ds.attrs.setdefault(Info.STANDARD_NAME, ds.attrs.get('standard_name'))
-            if 'wavelength' in ds.attrs:
+            if 'wavelength' in ds.attrs and ds.attrs['wavelength'] is not None:
                 ds.attrs.setdefault(Info.CENTRAL_WAVELENGTH,
                                     ds.attrs['wavelength'][1])
 
@@ -1099,10 +1100,14 @@ class SatpyImporter(aImporter):
             if ds.attrs[Info.SCENE] is None:
                 # compute a "good enough" hash for this Scene
                 area = ds.attrs['area']
-                extents = area.area_extent
-                # round extents to nearest 100 meters
-                extents = tuple(int(np.round(x / 100.0) * 100.0) for x in extents)
-                proj_str = area.proj4_string
+                if not isinstance(area, pyresample.geometry.SwathDefinition):
+                    extents = area.area_extent
+                    # round extents to nearest 100 meters
+                    extents = tuple(int(np.round(x / 100.0) * 100.0) for x in extents)
+                    proj_str = area.proj4_string
+                else:
+                    extents = None
+                    proj_str = None
                 ds.attrs[Info.SCENE] = "{}-{}".format(str(extents), proj_str)
             if ds.attrs.get(Info.CENTRAL_WAVELENGTH) is None:
                 cw = ""
@@ -1155,13 +1160,11 @@ class SatpyImporter(aImporter):
         dataset_ids = [DatasetID.from_dict(prod.info) for prod in products]
         self.scn.load(dataset_ids)
 
-        if self.resampling_info is not None and self.resampling_info['resampler']:
+        if isinstance(self.scn.max_area(), pyresample.geometry.SwathDefinition):
             max_area = self.scn.max_area()
-            new_res = self.resampling_info['resolution'] or max_area.resolution
-
             new_def = pyresample.geometry.DynamicAreaDefinition(
                 projection=self.resampling_info['projection'][1]['proj4_str'])
-            new_def = new_def.freeze(self.scn.max_area().get_lonlats(), resolution=new_res)
+            new_def = new_def.freeze(self.scn.max_area().get_lonlats(), shape=max_area.shape)
             self.scn = self.scn.resample(new_def, resampler=self.resampling_info['resampler'], cache_dir=self._cwd)
 
         num_stages = len(products)
