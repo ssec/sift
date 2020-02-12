@@ -1259,14 +1259,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             ('SEVIRI FES', {
                 'proj4_str': '+proj=geos +lon_0=0.0 +h=35786023.0 +a=6378137.0 +b=6356752.31414 +sweep=x +units=m',
                 'default_center': (0., 0.),  # lon, lat center point
-                'default_width': 40.,  # degrees from left edge to right edge
-                'default_height': 40.,  # degrees from bottom edge to top edge
+                'default_width': 134.,  # degrees from left edge to right edge
+                'default_height': 134.,  # degrees from bottom edge to top edge
             }),
             ('SEVIRI IODC', {
                 'proj4_str': '+proj=geos +lon_0=41.4 +h=35786023.0 +a=6378137.0 +b=6356752.31414 +sweep=x +units=m',
                 'default_center': (41.5, 0.),  # lon, lat center point
-                'default_width': 40.,  # degrees from left edge to right edge
-                'default_height': 40.,  # degrees from bottom edge to top edge
+                'default_width': 134.,  # degrees from left edge to right edge
+                'default_height': 134.,  # degrees from bottom edge to top edge
             }),
             ('LCC (CONUS)', {
                 'proj4_str': '+proj=lcc +a=6371200 +b=6371200 +lat_0=25 +lat_1=25 +lon_0=-95 +units=m +no_defs +over',
@@ -1312,7 +1312,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 'default_height': 20.,  # degrees from bottom edge to top edge
             }),
         ))
-        self.default_projection = 'LCC (CONUS)'
+        self.default_projection = 'SEVIRI FES'
         self.current_projection = self.default_projection
         self.recipe_manager = RecipeManager(self.config_dir)
         self._recipe_layers = {}
