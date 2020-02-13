@@ -1096,6 +1096,11 @@ class SatpyImporter(aImporter):
                 model_time = None
             ds.attrs[Info.SCENE] = ds.attrs.get('scene_id')
             if ds.attrs[Info.SCENE] is None:
+
+                # Flip area according to data mapping configuration
+                from uwsift.workspace.utils import import_utils as u
+                ds.attrs.update({'area': u.flip_area_for_sift(ds.attrs['area'], self.reader)})
+
                 # compute a "good enough" hash for this Scene
                 area = ds.attrs['area']
                 extents = area.area_extent
@@ -1122,10 +1127,10 @@ class SatpyImporter(aImporter):
 
     def _area_to_sift_attrs(self, area):
         """Area to uwsift keys"""
-        from pyresample.geometry import AreaDefinition
-        if not isinstance(area, AreaDefinition):
-            raise NotImplementedError("Only AreaDefinition datasets can "
-                                      "be loaded at this time.")
+
+        # Flip area according to data mapping configuration
+        from uwsift.workspace.utils import import_utils as u
+        area = u.flip_area_for_sift(area, self.reader)
 
         half_pixel_x = abs(area.pixel_size_x) / 2.
         half_pixel_y = abs(area.pixel_size_y) / 2.
@@ -1170,7 +1175,10 @@ class SatpyImporter(aImporter):
             proj4 = area_info[Info.PROJ]
             origin_x = area_info[Info.ORIGIN_X]
             origin_y = area_info[Info.ORIGIN_Y]
-            data = dataset.data
+
+            # Flip data according to data mapping configuration
+            from uwsift.workspace.utils import import_utils as u
+            data = u.flip_data_for_sift(dataset.data, self.reader)
 
             # Handle building contours for data from 0 to 360 longitude
             antimeridian = 179.999
