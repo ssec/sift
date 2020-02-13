@@ -33,7 +33,7 @@ endif()
 if( NOT "${Conda_ENVIRONMENT}" STREQUAL "${${PROJECT_NAME}_CONDA_ENVIRONMENT}" )
   message( FATAL_ERROR
     "Current Conda environment '${Conda_ENVIRONMENT}' doesn't match the configured build environment '${${PROJECT_NAME}_CONDA_ENVIRONMENT}'!\n"
-    "Please run\n"
+     "Please run\n"
     "  conda activate ${${PROJECT_NAME}_CONDA_ENVIRONMENT}\n"
     "in your working shell or synchronize the value of ${PROJECT_NAME}_CONDA_ENVIRONMENT in the CMake configuration." )
 endif()
@@ -57,3 +57,36 @@ add_custom_target( conda-packages
   )
 
 endif( DIST_Conda )
+
+#-------------------------------------------------------------------------------------------------
+# PyInstaller Packaging
+#-------------------------------------------------------------------------------------------------
+
+option( DIST_PyInstaller "If set, a target for building installers with PyInstaller is created" ON ) 
+if( DIST_PyInstaller )
+  find_package( PyInstaller REQUIRED )
+
+set( ${PROJECT_NAME}_PYINSTALLER_BASE_DIR "${CMAKE_BINARY_DIR}/../pyinstaller" CACHE STRING
+  "Path to where PyInstaller shall put its artefacts.\n
+   CAUTION: The directory must be outside the source tree to avoid that PyInstaller artefacts interfere with Conda packaging.\n
+   WARNING: The directory is *owned* by the build system, it will be removed and recreated by the target 'pyinstaller-package'!" )
+  message( WARNING "Please consider carefully: "
+    " The directory configured as ${PROJECT_NAME}_PYINSTALLER_BASE_DIR='${${PROJECT_NAME}_PYINSTALLER_BASE_DIR}'"
+    " is *owned* by the build system, it will be removed and recreated by the target 'pyinstaller-package'!" )
+
+foreach( PYINSTALLER_MODE onedir onefile )
+  message( "Creating target 'pyinstaller-${PYINSTALLER_MODE}-package'" )
+  set( _pyi_dir_ ${${PROJECT_NAME}_PYINSTALLER_BASE_DIR}/${PYINSTALLER_MODE}  )
+  add_custom_target( pyinstaller-${PYINSTALLER_MODE}-package
+    COMMAND ${CMAKE_COMMAND} -E remove_directory ${${PROJECT_NAME}_PYINSTALLER_BASE_DIR}/${PYINSTALLER_MODE}
+    COMMAND pip install -e .
+    COMMAND ${PyInstaller_EXECUTABLE} --distpath "${_pyi_dir_}/dist" --workpath "${_pyi_dir_}/work" --clean -y ${PROJECT_NAME}-${PYINSTALLER_MODE}.spec
+    BYPRODUCTS "${_pyi_dir_}/dist/${PROJECT_NAME}/${PROJECT_NAME}"
+    VERBATIM
+    COMMENT "Building PyInstaller package in '${_pyi_dir_}/dist/${PROJECT_NAME}/${PROJECT_NAME}'"
+    )
+
+endforeach()
+
+endif( DIST_PyInstaller )
+
