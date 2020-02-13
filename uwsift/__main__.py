@@ -607,11 +607,14 @@ class Main(QtGui.QMainWindow):
         else:
             probe_loc = "{:>6s}  , {:>6s}  ".format("N/A", "N/A")
 
+        col, row = "N/A", "N/A"
+
         if animating:
             data_str = "<animating>"
         elif state and uuid is not None:
             try:
                 data_point = self.workspace.get_content_point(uuid, xy_pos)
+                col, row = self.workspace.position_to_original_data_index(uuid, xy_pos)
             except ValueError:
                 LOG.debug("Could not get data value", exc_info=True)
                 data_point = None
@@ -638,7 +641,7 @@ class Main(QtGui.QMainWindow):
             data_str = "N/A"
             layer_str = "N/A"
         self.ui.cursorProbeLayer.setText(layer_str)
-        self.ui.cursorProbeText.setText("{} ({})".format(data_str, probe_loc))
+        self.ui.cursorProbeText.setText("{} ({}) [{}, {}]".format(data_str, probe_loc, col, row))
 
     def _init_timeline(self, doc: Document, ws: Workspace):
         gv = self.ui.timelineView

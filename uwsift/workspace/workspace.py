@@ -60,6 +60,7 @@ from uwsift.model.shapes import content_within_shape
 from uwsift.queue import TASK_PROGRESS, TASK_DOING
 from .importer import aImporter, SatpyImporter, generate_guidebook_metadata
 from .metadatabase import Metadatabase, Content, Product, Resource
+from uwsift.workspace.utils import import_utils
 
 LOG = logging.getLogger(__name__)
 
@@ -1223,19 +1224,20 @@ class Workspace(QObject):
             active_content = self._cached_arrays_for_content(content)
             return active_content.data
 
-    def _create_position_to_index_transform(self, dsi_or_uuid):
-        info = self.get_info(dsi_or_uuid)
-        origin_x = info[Info.ORIGIN_X]
-        origin_y = info[Info.ORIGIN_Y]
-        cell_width = info[Info.CELL_WIDTH]
-        cell_height = info[Info.CELL_HEIGHT]
-
-        def _transform(x, y, origin_x=origin_x, origin_y=origin_y, cell_width=cell_width, cell_height=cell_height):
-            col = (x - info[Info.ORIGIN_X]) / info[Info.CELL_WIDTH]
-            row = (y - info[Info.ORIGIN_Y]) / info[Info.CELL_HEIGHT]
-            return col, row
-
-        return _transform
+    # NOTE: when using this function in future, decide whether data flipping needs to be considered
+    # def _create_position_to_index_transform(self, dsi_or_uuid):
+    #     info = self.get_info(dsi_or_uuid)
+    #     origin_x = info[Info.ORIGIN_X]
+    #     origin_y = info[Info.ORIGIN_Y]
+    #     cell_width = info[Info.CELL_WIDTH]
+    #     cell_height = info[Info.CELL_HEIGHT]
+    #
+    #     def _transform(x, y, origin_x=origin_x, origin_y=origin_y, cell_width=cell_width, cell_height=cell_height):
+    #         col = (x - info[Info.ORIGIN_X]) / info[Info.CELL_WIDTH]
+    #         row = (y - info[Info.ORIGIN_Y]) / info[Info.CELL_HEIGHT]
+    #         return col, row
+    #
+    #     return _transform
 
     def _create_layer_affine(self, dsi_or_uuid):
         info = self.get_info(dsi_or_uuid)
@@ -1249,17 +1251,44 @@ class Workspace(QObject):
         )
         return affine
 
-    def _position_to_index(self, dsi_or_uuid, xy_pos):
+    def position_to_sift_data_index(self, dsi_or_uuid, xy_pos):
+        """Calculate the sift-internal data index from lon/lat values"""
         info = self.get_info(dsi_or_uuid)
         if info is None:
             return None, None
+
         # Assume `xy_pos` is lon/lat value
         if '+proj=latlong' in info[Info.PROJ]:
             x, y = xy_pos[:2]
         else:
             x, y = Proj(info[Info.PROJ])(*xy_pos)
+
         col = (x - info[Info.ORIGIN_X]) / info[Info.CELL_WIDTH]
         row = (y - info[Info.ORIGIN_Y]) / info[Info.CELL_HEIGHT]
+
+        return np.int64(np.round(row)), np.int64(np.round(col))
+
+    def position_to_original_data_index(self, dsi_or_uuid, xy_pos):
+        """Calculate the original data index from lon/lat values and consider data flipping"""
+        info = self.get_info(dsi_or_uuid)
+        if info is None:
+            return None, None
+
+        # Assume `xy_pos` is lon/lat value
+        if '+proj=latlong' in info[Info.PROJ]:
+            x, y = xy_pos[:2]
+        else:
+            x, y = Proj(info[Info.PROJ])(*xy_pos)
+
+        # consider data flipping
+        flip_left_right, flip_up_down, swap_axes =\
+            import_utils.get_flipping_parameters(info['reader'])
+        sign_x = -1 if flip_left_right else 1
+        sign_y = -1 if flip_up_down else 1
+
+        col = (sign_x * x - info[Info.ORIGIN_X]) / info[Info.CELL_WIDTH]
+        row = (sign_y * y - info[Info.ORIGIN_Y]) / info[Info.CELL_HEIGHT]
+
         return np.int64(np.round(row)), np.int64(np.round(col))
 
     def layer_proj(self, dsi_or_uuid):
@@ -1273,7 +1302,7 @@ class Workspace(QObject):
         return points
 
     def get_content_point(self, dsi_or_uuid, xy_pos):
-        row, col = self._position_to_index(dsi_or_uuid, xy_pos)
+        row, col = self.position_to_sift_data_index(dsi_or_uuid, xy_pos)
         if row is None or col is None:
             return None
         data = self.get_content(dsi_or_uuid)
