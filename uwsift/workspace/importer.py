@@ -1026,7 +1026,7 @@ class SatpyImporter(aImporter):
 
         # Special handling of GRIB forecast data
         if 'centreDescription' in attrs and \
-            attrs[Info.INSTRUMENT] == 'unknown':
+                attrs[Info.INSTRUMENT] == 'unknown':
             description = attrs['centreDescription']
             if attrs.get(Info.PLATFORM) is None:
                 attrs[Info.PLATFORM] = 'NWP'

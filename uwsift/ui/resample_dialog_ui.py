@@ -6,7 +6,8 @@
 #
 # WARNING! All changes made in this file will be lost!
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
+
 
 class Ui_ResampleDialog(object):
     def setupUi(self, ResampleDialog):
@@ -15,7 +16,7 @@ class Ui_ResampleDialog(object):
         self.buttonBox = QtWidgets.QDialogButtonBox(ResampleDialog)
         self.buttonBox.setGeometry(QtCore.QRect(130, 240, 171, 32))
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName("buttonBox")
         self.resGroupBox = QtWidgets.QGroupBox(ResampleDialog)
         self.resGroupBox.setGeometry(QtCore.QRect(20, 150, 131, 81))
@@ -53,4 +54,3 @@ class Ui_ResampleDialog(object):
         self.resYLineEdit.setPlaceholderText(_translate("ResampleDialog", "pixel size in y dir"))
         self.resamplingMethodGroupBox.setTitle(_translate("ResampleDialog", "Resampling Method"))
         self.projectionGroupBox.setTitle(_translate("ResampleDialog", "Projection"))
-
