@@ -1,0 +1,94 @@
+{% set data = load_setup_py_data() %}
+
+package:
+  name: mtgsift
+  version: {{ data.get('version') }}
+
+source:
+  path: ../../
+
+build:
+  # If this is a new build for the same version, increment the build
+  # number. If you do not include this key, it defaults to 0.
+  number: 0
+  script: python -m pip install --no-deps --ignore-installed .
+
+requirements:
+  host:
+    - python {{PY_VER}}*
+    - setuptools
+    - pip
+
+outputs:
+
+  - name: mtgsift-deps
+    requirements:
+      run:
+        - python {{PY_VER}}*
+        - numpy
+        - rasterio
+        - matplotlib
+        - numba
+        - pyproj
+        - vispy
+        - netcdf4
+        - h5py
+        - imageio
+        - imageio-ffmpeg
+        - ffmpeg
+        - pillow
+        - pyshp
+        - pyqtgraph
+        - shapely
+        - sqlalchemy
+        - pyqt >=5.9
+        - appdirs
+        - pyyaml
+        - satpy
+        - pygrib
+        - scikit-image
+        - donfig
+    test:
+      commands:
+        - python -c "from rasterio import Affine"
+        - python -c "from PyQt5 import QtGui, QtCore, QtWidgets"
+        - python -c "from netCDF4 import Dataset"
+        - python -c "import h5py"
+
+  - name: mtgsift
+    files:
+      - "**/uwsift/**/*"
+    requirements:
+      run:
+        - mtgsift-deps
+
+  - name: mtgsift-devel-deps
+    requirements:
+      run:
+        - mtgsift-deps
+        - pip
+        - setuptools
+        - cmake
+        - conda-build
+        - git
+        - git-bash # [win]
+        - make # Alternative: ninja
+        - pyinstaller
+        - pytest-mock
+        - pytest-qt
+
+test:
+  commands:
+    - python -m uwsift -h
+
+about:
+  home: https://gitlab.eumetsat.int/webservices/mtg-sift
+  license: "GNU Lesser General Public License v3 or later (LGPLv3+)"
+  summary: "Visualization tool for MTG satellite imagery data"
+
+extra:
+  maintainers: ask - Innovative Visualisierungsloesungen GmbH
+
+# See
+# https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html
+# more information about meta.yaml
