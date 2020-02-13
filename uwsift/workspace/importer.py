@@ -1164,7 +1164,11 @@ class SatpyImporter(aImporter):
             max_area = self.scn.max_area()
             new_def = pyresample.geometry.DynamicAreaDefinition(
                 projection=self.resampling_info['projection'][1]['proj4_str'])
-            new_def = new_def.freeze(self.scn.max_area().get_lonlats(), shape=max_area.shape)
+            if self.resampling_info['resolution'] is None:
+                new_def = new_def.freeze(self.scn.max_area().get_lonlats(), shape=max_area.shape)
+            else:
+                new_def = new_def.freeze(self.scn.max_area().get_lonlats(),
+                                         resolution=self.resampling_info['resolution'])
             self.scn = self.scn.resample(new_def, resampler=self.resampling_info['resampler'], cache_dir=self._cwd)
 
         num_stages = len(products)
