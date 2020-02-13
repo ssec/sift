@@ -23,6 +23,7 @@ from uwsift.view.open_file_wizard import OpenFileWizard
 
 def create_scene(dataset_ids):
     """Create a fake Scene object with specified datasets available."""
+
     class _SceneMock(object):
         """Fake Satpy Scene object."""
 
@@ -39,18 +40,43 @@ def create_scene(dataset_ids):
 
 def _get_group_files_mock(groups):
     """Create a fake group_files function for testing."""
+
     def _group_files_mock(*args, **kwargs):
         """Fake Satpy group_files function."""
         return groups
+
     return _group_files_mock
 
 
 def _create_get_open_file_names_mock(returned_files):
     """Create a mocked open file dialog box."""
+
     def _get_open_file_names(self_, msg, start_dir, filter_str):
         """Return filenames like a open file dialog."""
         return [returned_files]
+
     return _get_open_file_names
+
+
+def _create_mock_doc(a=None):
+    """Create a mocked Document object."""
+
+    class _DocMock:
+        def __init__(self):
+            self.available_projections = {'Mercator': 'proj_str1', 'LCC Conus': 'proj_str2'}
+            self.current_projection = 'Mercator'
+
+        def current_projection_index(self):
+            return 0
+
+    class _ParentMock():
+        def __init__(self):
+            self.document = _DocMock()
+
+        def parent(self):
+            return self
+
+    return _ParentMock()
 
 
 def test_wizard_abi_l1b(qtbot, monkeypatch):
@@ -71,6 +97,7 @@ def test_wizard_abi_l1b(qtbot, monkeypatch):
     monkeypatch.setattr('uwsift.view.open_file_wizard.QtWidgets.QFileDialog.getOpenFileNames',
                         _create_get_open_file_names_mock(
                             ['OR_ABI-L1b-RadM1-M3C01_G16_s20182541300210_e20182541300267_c20182541300308.nc']))
+    monkeypatch.setattr('uwsift.view.open_file_wizard.OpenFileWizard.parent', _create_mock_doc)
 
     # open the dialog and do some things
     wiz = OpenFileWizard()
