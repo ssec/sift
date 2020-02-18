@@ -49,6 +49,10 @@ DEFAULT_CONFIGURATION = {
             'calibration',
             'level',
         ],
+    },
+    # enable/disable resampling functionality
+    'resample': {
+        'enabled': False,
     }
 }
 
