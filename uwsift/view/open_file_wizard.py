@@ -75,7 +75,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.readerComboBox.currentIndexChanged.connect(self._file_selection_or_reader_changed)
 
         self.ui.resampleToolButton.released.connect(lambda: self.resample_dialog.exec_())
-        if not config.get('resample.enabled'):
+        if not self.config['resample']['enabled']:
             self.ui.resampleToolButton.hide()
         self.resample_dialog = ResampleDialog(parent=self)
         self.default_resample = {
