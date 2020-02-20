@@ -41,6 +41,7 @@ before_script:
   +render +iglx; echo ok )& fi;
 script:
 - pip install --no-deps -e .
+- conda list
 - pytest -s --cov-report term --cov=uwsift uwsift/tests
 after_success:
 - if [[ $PYTHON_VERSION == 3.7 ]]; then coveralls; fi;
