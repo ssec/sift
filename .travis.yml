@@ -33,7 +33,6 @@ install:
   RemoteSigned -scope CurrentUser"; fi;
 - if [ "${TRAVIS_OS_NAME}" = "windows" ]; then powershell gl-ci-helpers/appveyor/install_opengl.ps1;
   fi;
-- if [ "${TRAVIS_OS_NAME}" = "windows" ]; then pip install PyQt5==5.9; fi;
 - if [ "${TRAVIS_OS_NAME}" = "linux" ] || [ "${TRAVIS_OS_NAME}" = "osx" ]; then conda
   install pygrib; fi;
 before_script:
