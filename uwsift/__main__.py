@@ -924,7 +924,7 @@ class Main(QtGui.QMainWindow):
     #         self.open_paths(paths)
 
     def open_wizard(self, *args, **kwargs):
-        from uwsift.view.open_file_wizard import OpenFileWizard
+        from uwsift.view.open_file_wizard_2 import OpenFileWizard
         wizard_dialog = OpenFileWizard(base_dir=self._last_open_dir, parent=self)
         self._wizard_dialog = wizard_dialog
         if wizard_dialog.exec_():
@@ -936,7 +936,7 @@ class Main(QtGui.QMainWindow):
                 'scenes': scenes,
                 'dataset_ids': wizard_dialog.collect_selected_ids(),
             }
-            self._last_open_dir = wizard_dialog.last_open_dir
+            self._last_open_dir = wizard_dialog.current_dir
             self.open_paths(wizard_dialog.files_to_load,
                             **importer_kwargs)
         else:

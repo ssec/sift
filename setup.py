@@ -195,7 +195,8 @@ setup(
                       'pyshp', 'shapely', 'rasterio', 'sqlalchemy',
                       'appdirs', 'pyyaml', 'pyqtgraph', 'satpy', 'matplotlib',
                       'scikit-image', 'donfig',
-                      'pygrib;sys_platform=="linux" or sys_platform=="darwin"', 'imageio', 'pyqt5>=5.9'
+                      'pygrib;sys_platform=="linux" or sys_platform=="darwin"', 'imageio', 'pyqt5>=5.9',
+                      'trollsift'
                       ],
     tests_requires=['pytest', 'pytest-qt', 'pytest-mock'],
     python_requires='>=3.6',
