@@ -40,7 +40,7 @@ before_script:
 - if [ "${TRAVIS_OS_NAME}" = "osx" ]; then ( sudo Xvfb :99 -ac -screen 0 1400x900x24
   +render +iglx; echo ok )& fi;
 script:
-- pip install -e .
+- pip install --no-deps -e .
 - pytest -s --cov-report term --cov=uwsift uwsift/tests
 after_success:
 - if [[ $PYTHON_VERSION == 3.7 ]]; then coveralls; fi;
