@@ -38,12 +38,25 @@ SATPY_READER_CACHE_FILE = os.path.join(USER_CACHE_DIR,
 LOG = logging.getLogger(__name__)
 
 try:
-    from satpy import Scene, available_readers, __version__ as satpy_version
+    from satpy import Scene, available_readers
     from satpy.dataset import DatasetID
-except ImportError:
+except ImportError as e:
     LOG.warning("SatPy is not installed and will not be used for importing.")
+    LOG.warning(e)
     Scene = None
     DatasetID = None
+
+satpy_version = None
+#try:
+#    import satpy
+#    satpy_version = satpy.__version__
+#except Exception as e: #AttributeError as e:
+#    # Satpy's internal way of defining its version breaks when it is not
+#    # installed. This leads to the exception when referencing satpy from just
+#    # a git clone without installing it or within a PyInstaller package (bug
+#    # report pending).
+#    LOG.warning("BUG: Cannot determine satpy version. Cached information must be ignored."
+#                "(Reason:" + e + ")")
 
 try:
     from skimage.measure import find_contours
@@ -84,8 +97,10 @@ def _load_satpy_readers_cache(force_refresh=None):
             cache_contents = yaml.load(cfile, yaml.SafeLoader)
         if cache_contents is None:
             raise RuntimeError("Cached reader list is empty, regenerating...")
-        if cache_contents['satpy_version'] < satpy_version:
-            raise RuntimeError("Satpy has been updated, regenerating available readers...")
+        if not satpy_version:
+            raise RuntimeError("Satpy version cannot be determined, regenerating available readers...")
+        if cache_contents['satpy_version'] != satpy_version:
+            raise RuntimeError("Satpy has different version, regenerating available readers...")
     except (FileNotFoundError, RuntimeError, KeyError) as cause:
         LOG.info("Updating list of available Satpy readers...")
         cause.__suppress_context__ = True
