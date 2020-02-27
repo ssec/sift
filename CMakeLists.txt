@@ -29,16 +29,50 @@ find_package( Conda REQUIRED )
 
 if( NOT ${PROJECT_NAME}_CONDA_ENVIRONMENT )
   set( ${PROJECT_NAME}_CONDA_ENVIRONMENT "$ENV{CONDA_DEFAULT_ENV}" CACHE STRING "Name (or absolute path) of conda environment in which ${PROJECT_NAME} is build/packaged" )
-endif()
-if( NOT "${Conda_ENVIRONMENT}" STREQUAL "${${PROJECT_NAME}_CONDA_ENVIRONMENT}" )
-  message( FATAL_ERROR
-    "Current Conda environment '${Conda_ENVIRONMENT}' doesn't match the configured build environment '${${PROJECT_NAME}_CONDA_ENVIRONMENT}'!\n"
-     "Please run\n"
-    "  conda activate ${${PROJECT_NAME}_CONDA_ENVIRONMENT}\n"
-    "in your working shell or synchronize the value of ${PROJECT_NAME}_CONDA_ENVIRONMENT in the CMake configuration." )
+  if( "${${PROJECT_NAME}_CONDA_ENVIRONMENT}" STREQUAL "base" )
+    set( ${PROJECT_NAME}_CONDA_ENVIRONMENT "devel-default"         CACHE STRING "Name (or absolute path) of conda environment in which ${PROJECT_NAME} is build/packaged" FORCE )
+  endif()
 endif()
 
 set( ${PROJECT_NAME}_DEPENDENCIES_CHANNEL "conda-forge" CACHE STRING "Conda channel which provides dependencies of ${PROJECT_NAME}." )
+
+#-------------------------------------------------------------------------------------------------
+# Convenience Target 'devel-bootstrap'
+#-------------------------------------------------------------------------------------------------
+
+# Support bootstrap a development environment
+# Prerequisite: Anaconda3 is installed, environment (base) activated
+
+add_custom_target( devel-bootstrap
+  COMMAND ${Conda_EXECUTABLE} create  --name ${${PROJECT_NAME}_CONDA_ENVIRONMENT} --channel conda-forge --strict-channel-priority python=${PYTHON_VERSION}
+  COMMAND ${Conda_EXECUTABLE} install --name ${${PROJECT_NAME}_CONDA_ENVIRONMENT} --channel conda-forge --strict-channel-priority --file conda-envs/mtgsift-devel.pkgs
+  COMMAND echo "You may want to run the following commands manually:"
+  COMMAND echo "  conda activate ${${PROJECT_NAME}_CONDA_ENVIRONMENT}"
+  COMMAND echo "  conda config --env --add channels conda-forge"
+  COMMAND echo "  conda config --env --set channel_priority strict"
+  COMMAND echo "  ${CMAKE_COMMAND} ."
+  COMMAND echo "  ${CMAKE_MAKE_PROGRAM} patch-shapely # This may fail, if the patch is already applied"
+  VERBATIM
+  COMMENT "Setting up conda environment for development ..."
+  )
+
+#-------------------------------------------------------------------------------------------------
+# Check: make sure the current environment is the one the build system was set up in.
+#-------------------------------------------------------------------------------------------------
+
+if( NOT "${Conda_ENVIRONMENT}" STREQUAL "${${PROJECT_NAME}_CONDA_ENVIRONMENT}" )
+  message( WARNING
+    "Current Conda environment '${Conda_ENVIRONMENT}' doesn't match the configured build environment '${${PROJECT_NAME}_CONDA_ENVIRONMENT}'!\n"
+    "Please run\n"
+    "  ${CMAKE_MAKE_PROGRAM} devel-bootstrap\n"
+    "to set up an initial development environment '${${PROJECT_NAME}_CONDA_ENVIRONMENT}'\n"
+    "or if it already exists:\n"
+    "  conda activate ${${PROJECT_NAME}_CONDA_ENVIRONMENT}\n"  
+    "in your working shell\n"
+    "or synchronize the value of ${PROJECT_NAME}_CONDA_ENVIRONMENT in the CMake configuration.\n"
+    )
+  return()
+endif()
 
 #-------------------------------------------------------------------------------------------------
 # Conda Packaging
