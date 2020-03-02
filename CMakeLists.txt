@@ -64,7 +64,12 @@ endif( DIST_Conda )
 
 option( DIST_PyInstaller "If set, a target for building installers with PyInstaller is created" ON ) 
 if( DIST_PyInstaller )
+  
   find_package( PyInstaller REQUIRED )
+  find_package( SelfPackers )
+  if( NOT SELF_PACKER_FOR_EXECUTABLE )
+    message( "PyInstaller packaging: Consider to install UPX (https://upx.github.io/) to get a smaller package." )
+  endif()
 
 #---------- Patching Shapely.geos for PyInstaller ------------------------
 # This block may be removed as soon as Shapely cleanly can by PyInstaller'ed
