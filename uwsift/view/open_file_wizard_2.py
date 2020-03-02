@@ -142,6 +142,10 @@ class OpenFileWizard(QtWidgets.QWizard):
             # try to create scenes
             try:
                 self._create_scenes()
+            except IOError as e:
+                self.ui.statusMessage.setText(f"ERROR: {e}")
+                self.ui.statusMessage.setStyleSheet('color: red')
+                return False
             except (RuntimeError, ValueError):
                 LOG.error("Could not load files with Satpy reader.")
                 LOG.debug("Could not load files with Satpy reader.", exc_info=True)
@@ -228,6 +232,25 @@ class OpenFileWizard(QtWidgets.QWizard):
                 # file_group includes what reader to use
                 # NOTE: We only allow a single reader at a time
                 self.scenes[group_id] = scn = Scene(filenames=file_group)
+
+                # WORKAROUND: to decompress compressed SEVIRI HRIT files, an environment variable
+                # needs to be set. Check if decompression might have introduced errors when using
+                # the specific reader and loading a file with compression flag set.
+                # NOTE: in case this workaround-check fails data cannot be loaded in SIFT although
+                # creating the scene might have succeeded!
+                compressed_seviri = False
+                from satpy.readers.hrit_base import get_xritdecompress_cmd
+                for r in scn.readers.values():
+                    # only perform check when using a relevant reader, so that this is not triggered
+                    # mistakenly when another reader uses the same meta data key for another purpose
+                    if r.name in ['seviri_l1b_hrit']:
+                        for fh in r.file_handlers.values():
+                            for fh2 in fh:
+                                if fh2.mda.get('compression_flag_for_data'):
+                                    compressed_seviri = True
+                if compressed_seviri:
+                    get_xritdecompress_cmd()
+                # END OF WORKAROUND
 
             all_available_products.update(scn.available_dataset_ids())
 
