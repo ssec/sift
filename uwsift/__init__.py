@@ -37,14 +37,35 @@ DEFAULT_CONFIGURATION = {
             'seviri_l1b_native',
             'seviri_l1b_nc',
             'seviri_l2_bufr'],
+
         # Filters for what datasets not to include
         'exclude_datasets': {
-            'calibration': ['radiance', 'counts'],
-        }
+            # 'calibration': ['radiance', 'counts'],
+        },
+
+        # Reader-specific reading configuration
+        'seviri_l1b_hrit': {
+            # If group_keys is not specified it defaults to Satpy's configuration
+            'group_keys': ['start_time', 'platform_shortname', 'service'],
+            # Offered patterns to filter files (trollsift syntax), by default first entry is used.
+            'filter_patterns': [
+                '{rate:1s}-000-{hrit_format:_<6s}-{platform_shortname:4s}_{service:_<7s}-{channel:_<6s}___-{segment:_<6s}___-{start_time:%Y%m%d%H%M}-{c:1s}_',
+                '{rate:1s}-000-{hrit_format:_<6s}-{platform_shortname:4s}_{service:_<7s}-{channel:_<6s}___-{segment:_<6s}___-{start_time:%Y%m%d%H%M}-__',
+            ],
+        },
     },
+
+    # Reader-specific mapping configuration
+    'data_mapping': {
+        'seviri_l1b_hrit': {
+            'iScansNegatively': True,
+            'jScansPositively': True,
+        },
+    },
+
     # specific to the open file wizard dialog
     'open_file_wizard': {
-        'default_reader': None,  # first in list
+        'default_reader': 'seviri_l1b_hrit',  # use 'None' for first in list
         'id_components': [
             'name',
             'wavelength',
@@ -52,7 +73,7 @@ DEFAULT_CONFIGURATION = {
             'calibration',
             'level',
         ],
-    }
+    },
 }
 
 config = Config('uwsift', defaults=[DEFAULT_CONFIGURATION], paths=CONFIG_PATHS)
