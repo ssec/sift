@@ -5,7 +5,7 @@ env:
   - NUMPY_VERSION=stable
   - MAIN_CMD='python setup.py'
   - CONDA_DEPENDENCIES='hdf5 rasterio matplotlib numba pyproj coveralls pytest pytest-mock
-    pytest-cov pytest-qt vispy netcdf4 h5py imageio imageio-ffmpeg ffmpeg
+    pytest-cov coverage pytest-qt vispy netcdf4 h5py imageio imageio-ffmpeg ffmpeg
     pillow pyshp pyqtgraph shapely sqlalchemy pyqt appdirs pyyaml satpy eccodes scikit-image
     donfig'
   - PIP_DEPENDENCIES='pytest-xvfb'
@@ -37,7 +37,7 @@ install:
   fi;
 before_script:
 - export DISPLAY=:99.0
-- if [ "${TRAVIS_OS_NAME}" = "osx" ]; then ( sudo Xvfb :99 -ac -screen 0 1400x900x24
+- if [ "${TRAVIS_OS_NAME}" == "osx" ]; then ( sudo Xvfb :99 -ac -screen 0 1400x900x24
   +render +iglx; echo ok )& fi;
 script:
 - pip install -e .
