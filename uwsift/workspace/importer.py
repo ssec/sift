@@ -30,15 +30,14 @@ from uwsift.util import USER_CACHE_DIR
 from uwsift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
 from .metadatabase import Resource, Product, Content
 
+from satpy import Scene, available_readers, __version__ as satpy_version
+from satpy.dataset import DatasetID
+
 _SATPY_READERS = None  # cache: see `available_satpy_readers()` below
 SATPY_READER_CACHE_FILE = os.path.join(USER_CACHE_DIR,
                                        'available_satpy_readers.yaml')
 
-
 LOG = logging.getLogger(__name__)
-
-from satpy import Scene, available_readers, __version__ as satpy_version
-from satpy.dataset import DatasetID
 
 try:
     from skimage.measure import find_contours
