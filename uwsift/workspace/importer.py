@@ -37,13 +37,8 @@ SATPY_READER_CACHE_FILE = os.path.join(USER_CACHE_DIR,
 
 LOG = logging.getLogger(__name__)
 
-try:
-    from satpy import Scene, available_readers, __version__ as satpy_version
-    from satpy.dataset import DatasetID
-except ImportError:
-    LOG.warning("SatPy is not installed and will not be used for importing.")
-    Scene = None
-    DatasetID = None
+from satpy import Scene, available_readers, __version__ as satpy_version
+from satpy.dataset import DatasetID
 
 try:
     from skimage.measure import find_contours
