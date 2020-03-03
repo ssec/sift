@@ -27,15 +27,14 @@ matrix:
 install:
 - git clone --depth 1 git://github.com/astropy/ci-helpers.git
 - source ci-helpers/travis/setup_conda.sh
-- if [ "${TRAVIS_OS_NAME}" = "windows" ]; then git clone --depth 1 git://github.com/vtkiorg/gl-ci-helpers.git;
+- if [ "${TRAVIS_OS_NAME}" == "windows" ]; then
+      git clone --depth 1 -b feature-travis-windows git://github.com/djhoese/gl-ci-helpers.git;
+      powershell -Command "Set-ExecutionPolicy RemoteSigned -scope CurrentUser";
+      powershell gl-ci-helpers/appveyor/install_opengl.ps1;
   fi;
-- if [ "${TRAVIS_OS_NAME}" = "windows" ]; then powershell -Command "Set-ExecutionPolicy
-  RemoteSigned -scope CurrentUser"; fi;
-- if [ "${TRAVIS_OS_NAME}" = "windows" ]; then powershell gl-ci-helpers/appveyor/install_opengl.ps1;
+- if [ "${TRAVIS_OS_NAME}" == "linux" ] || [ "${TRAVIS_OS_NAME}" == "osx" ]; then
+      conda install pygrib;
   fi;
-- if [ "${TRAVIS_OS_NAME}" = "windows" ]; then pip install PyQt5==5.9; fi;
-- if [ "${TRAVIS_OS_NAME}" = "linux" ] || [ "${TRAVIS_OS_NAME}" = "osx" ]; then conda
-  install pygrib; fi;
 before_script:
 - export DISPLAY=:99.0
 - if [ "${TRAVIS_OS_NAME}" = "osx" ]; then ( sudo Xvfb :99 -ac -screen 0 1400x900x24
