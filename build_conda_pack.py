@@ -30,7 +30,9 @@ def get_version():
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="Build SIFT installation tarball")
+    parser = argparse.ArgumentParser(
+        description="Build SIFT installation tarball (remaining arguments "
+                    "are passed to conda-pack)")
     parser.add_argument('--arcroot',
                         help="Directory name inside the tarball (default: SIFT_X.Y.Z)")
     parser.add_argument('-o', '--output',
@@ -38,9 +40,7 @@ def main():
                              "'SIFT_X.Y.Z_<platform>.<ext>' where platform is "
                              "'linux', 'darwin', or 'win32' and ext is "
                              "'.tar.gz' for linux and OSX, '.zip' for Windows.")
-    parser.add_argument('conda_pack_args', nargs='*',
-                        help="Other arguments passed directly to the 'conda-pack' command.")
-    args = parser.parse_args()
+    args, unknown_args = parser.parse_known_args()
 
     version = get_version()
     if args.arcroot is None:
@@ -65,7 +65,9 @@ def main():
         raise RuntimeError(f"Unknown platform: {sys.platform}")
 
     subprocess.check_call(['conda-pack', '--arcroot', args.arcroot,
-                          '--output', args.output] + args.conda_pack_args)
+                          '--output', args.output] + unknown_args)
+
+    # TODO: Do additional risky cleanup to reduce output file size
 
 
 if __name__ == "__main__":
