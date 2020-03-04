@@ -48,7 +48,7 @@ def main():
         args.arcroot = f"SIFT_{version}"
     if args.output is None:
         ext = '.zip' if 'win' in sys.platform else '.tar.gz'
-        args.output = f"SIFT_{version}_{sys.platform}.{ext}"
+        args.output = f"SIFT_{version}_{sys.platform}{ext}"
 
     # Copy appropriate wrapper scripts
     dst = sys.prefix
@@ -67,6 +67,7 @@ def main():
 
     subprocess.check_call(['conda-pack', '--arcroot', args.arcroot,
                           '--output', args.output] + unknown_args)
+    os.chmod(args.output, 0o755)
 
     # TODO: Do additional risky cleanup to reduce output file size
 

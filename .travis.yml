@@ -68,6 +68,10 @@ script:
   fi
 after_success:
 - if [[ $PYTHON_VERSION == "3.7" && $BUNDLE == "False" ]]; then coveralls; fi;
+- if [[ $BUNDLE == "True" && $TRAVIS_TAG != "" ]]; then
+    echo "${SFTP_UPLOAD_KEY}" | base64 --decode >/tmp/sftp_rsa;
+    curl -T SIFT_?.?.?_*.* --key /tmp/sftp_rsa sftp://anonymous:davidh@ftp.ssec.wisc.edu/pub/sift/dist/;
+  fi
 deploy:
   - provider: pypi
     user: __token__
