@@ -9,11 +9,11 @@ while [[ -h "$SOURCE" ]] ; do SOURCE="$(readlink "$SOURCE")"; done
 BASE="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 
 # Remove user environment variables that may conflict with installation
-unset LD_LIBRARY_PATH
-unset PYTHONPATH
 unset LD_PRELOAD
-unset PYTHONNOUSERSITE
+unset LD_LIBRARY_PATH
 unset DYLD_LIBRARY_PATH
+unset PYTHONPATH
+export PYTHONNOUSERSITE=1
 
 # Activate the conda-pack'd environment
 source $BASE/activate
