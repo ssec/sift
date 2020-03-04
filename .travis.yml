@@ -31,16 +31,17 @@ install:
       git clone --depth 1 -b feature-travis-windows git://github.com/djhoese/gl-ci-helpers.git;
       powershell -Command "Set-ExecutionPolicy RemoteSigned -scope CurrentUser";
       powershell gl-ci-helpers/appveyor/install_opengl.ps1;
+      pip install -U pyqt5
   fi;
 - if [ "${TRAVIS_OS_NAME}" == "linux" ] || [ "${TRAVIS_OS_NAME}" == "osx" ]; then
       conda install pygrib;
   fi;
+- pip install -e . --no-deps
 before_script:
 - export DISPLAY=:99.0
 - if [ "${TRAVIS_OS_NAME}" == "osx" ]; then ( sudo Xvfb :99 -ac -screen 0 1400x900x24
   +render +iglx; echo ok )& fi;
 script:
-- pip install -e .
 - pytest -s --cov-report term --cov=uwsift uwsift/tests
 after_success:
 - if [[ $PYTHON_VERSION == 3.7 ]]; then coveralls; fi;
