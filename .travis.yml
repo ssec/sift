@@ -31,7 +31,7 @@ install:
       git clone --depth 1 -b feature-travis-windows git://github.com/djhoese/gl-ci-helpers.git;
       powershell -Command "Set-ExecutionPolicy RemoteSigned -scope CurrentUser";
       powershell gl-ci-helpers/appveyor/install_opengl.ps1;
-      pip install -U pyqt5
+      pip install -U pyqt5;
   fi;
 - if [ "${TRAVIS_OS_NAME}" == "linux" ] || [ "${TRAVIS_OS_NAME}" == "osx" ]; then
       conda install pygrib;
