@@ -14,6 +14,7 @@ env:
   - SETUP_CMD='test'
   - CONDA_CHANNELS='conda-forge'
   - CONDA_CHANNEL_PRIORITY='strict'
+  - BUNDLE=False
 matrix:
   include:
   - env: PYTHON_VERSION=3.7
@@ -22,6 +23,21 @@ matrix:
     os: osx
     language: generic
   - env: PYTHON_VERSION=3.7
+    os: windows
+    language: shell
+  # Bundle building environments
+  - env:
+    - PYTHON_VERSION=3.7
+    - BUNDLE=True
+    os: linux
+  - env:
+    - PYTHON_VERSION=3.7
+    - BUNDLE=True
+    os: osx
+    language: generic
+  - env:
+    - PYTHON_VERSION=3.7
+    - BUNDLE=True
     os: windows
     language: shell
 install:
@@ -42,9 +58,16 @@ before_script:
 - if [ "${TRAVIS_OS_NAME}" == "osx" ]; then ( sudo Xvfb :99 -ac -screen 0 1400x900x24
   +render +iglx; echo ok )& fi;
 script:
-- pytest -s --cov-report term --cov=uwsift uwsift/tests
+- if [[ $BUNDLE == "False" ]]; then
+    pytest -s --cov-report term --cov=uwsift uwsift/tests;
+  fi
+- if [[ $BUNDLE == "True" ]]; then
+    pip install --no-deps .;
+    python build_conda_pack.py;
+    ls -l
+  fi
 after_success:
-- if [[ $PYTHON_VERSION == 3.7 ]]; then coveralls; fi;
+- if [[ $PYTHON_VERSION == "3.7" && $BUNDLE == "False" ]]; then coveralls; fi;
 deploy:
   - provider: pypi
     user: __token__
