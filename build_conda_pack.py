@@ -24,6 +24,7 @@ import subprocess
 def get_version():
     try:
         from uwsift import __version__
+        return __version__
     except ImportError:
         raise RuntimeError("Could not determine SIFT version. Is SIFT installed?")
 
