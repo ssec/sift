@@ -63,8 +63,8 @@ script:
   fi
 - if [[ $BUNDLE == "True" ]]; then
     pip install --no-deps .;
-    python build_conda_pack.py;
-    ls -l
+    python build_conda_pack.py -j -1;
+    ls -l;
   fi
 after_success:
 - if [[ $PYTHON_VERSION == "3.7" && $BUNDLE == "False" ]]; then coveralls; fi;
