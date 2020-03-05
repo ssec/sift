@@ -106,7 +106,6 @@ def _get_mock_writer():
 @pytest.mark.parametrize("size,mode,exp", [
     ((100, 100), 'vertical', [0.1, 1.2]),
     ((100, 100), 'horizontal', [1.2, 0.1]),
-    ((0, 0), 'vertical', [0, 0]),
 ])
 def test_create_colorbar(size, mode, exp, monkeypatch, window):
     """Test colorbar is created correctly given dimensions and the colorbar append direction."""
