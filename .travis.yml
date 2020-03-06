@@ -53,7 +53,7 @@ script:
     else
       ext="tar.gz";
     fi;
-    output="-o SIFT_${version}-dev_$(date +%Y%m%d_%H%M%S).${ext};
+    output="-o SIFT_${version}-dev_$(date +%Y%m%d_%H%M%S).${ext}";
   else
     output="";
   fi
