@@ -14,7 +14,6 @@ env:
   - SETUP_CMD='test'
   - CONDA_CHANNELS='conda-forge'
   - CONDA_CHANNEL_PRIORITY='strict'
-  - BUNDLE=False
 matrix:
   include:
   - env: PYTHON_VERSION=3.7
@@ -23,21 +22,6 @@ matrix:
     os: osx
     language: generic
   - env: PYTHON_VERSION=3.7
-    os: windows
-    language: shell
-  # Bundle building environments
-  - env:
-    - PYTHON_VERSION=3.7
-    - BUNDLE=True
-    os: linux
-  - env:
-    - PYTHON_VERSION=3.7
-    - BUNDLE=True
-    os: osx
-    language: generic
-  - env:
-    - PYTHON_VERSION=3.7
-    - BUNDLE=True
     os: windows
     language: shell
 install:
@@ -58,20 +42,33 @@ before_script:
 - if [ "${TRAVIS_OS_NAME}" == "osx" ]; then ( sudo Xvfb :99 -ac -screen 0 1400x900x24
   +render +iglx; echo ok )& fi;
 script:
-- if [[ $BUNDLE == "False" ]]; then
-    pytest -s --cov-report term --cov=uwsift uwsift/tests;
+- pytest -s --cov-report term --cov=uwsift uwsift/tests;
+# Reinstall SIFT *into* the environment so conda-pack can bundle it
+- pip install --no-deps .
+# Unstable version
+- if [[ $TRAVIS_TAG == "" ]]; then
+    version=$(python -c "from uwsift import __version__; print(__version__)");
+    if [[ "${TRAVIS_OS_NAME}" == "windows" ]]; then
+      ext="zip";
+    else
+      ext="tar.gz";
+    fi;
+    output="-o SIFT_${version}-dev_$(date +%Y%m%d_%H%M%S).${ext};
+  else
+    output="";
   fi
-- if [[ $BUNDLE == "True" ]]; then
-    pip install --no-deps .;
-    python build_conda_pack.py -j -1;
-    ls -l;
-  fi
+- python build_conda_pack.py -j -1 $output
+- ls -l
 after_success:
-- if [[ $PYTHON_VERSION == "3.7" && $BUNDLE == "False" ]]; then coveralls; fi;
-- if [[ $BUNDLE == "True" && $TRAVIS_TAG != "" ]]; then
-    echo "${SFTP_UPLOAD_KEY}" | base64 --decode >/tmp/sftp_rsa;
-    curl -T SIFT_?.?.?_*.* --key /tmp/sftp_rsa sftp://anonymous:davidh@ftp.ssec.wisc.edu/pub/sift/dist/;
+- if [[ $PYTHON_VERSION == "3.7" ]]; then coveralls; fi;
+- if [[ $TRAVIS_TAG != "" ]]; then
+    dst="pub/sift/dist/experimental";
+  else
+    dst="pub/sift/dist";
   fi
+- echo "${SFTP_UPLOAD_KEY}" | base64 --decode >/tmp/sftp_rsa
+# fails currently:
+#- curl -T SIFT_?.?.?_*.* --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/${dst}/
 deploy:
   - provider: pypi
     user: __token__
