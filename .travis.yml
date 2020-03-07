@@ -34,7 +34,7 @@ install:
       pip install -U pyqt5;
   fi;
 - if [ "${TRAVIS_OS_NAME}" == "linux" ] || [ "${TRAVIS_OS_NAME}" == "osx" ]; then
-      conda install pygrib;
+      conda install -y pygrib;
   fi;
 - pip install -e . --no-deps
 before_script:
@@ -50,10 +50,16 @@ script:
     version=$(python -c "from uwsift import __version__; print(__version__)");
     if [[ "${TRAVIS_OS_NAME}" == "windows" ]]; then
       ext="zip";
+      platform="windows";
     else
       ext="tar.gz";
+      if [[ "${TRAVIS_OS_NAME}" == "osx" ]]; then
+        platform="darwin";
+      else
+        platform="linux";
+      fi;
     fi;
-    oflag="-o SIFT_${version}dev_$(date +%Y%m%d_%H%M%S).${ext}";
+    oflag="-o SIFT_${version}dev_${platform}_$(date +%Y%m%d_%H%M%S).${ext}";
   else
     oflag="";
   fi
@@ -67,7 +73,14 @@ after_success:
     odir="";
   fi
 - echo "${SFTP_UPLOAD_KEY}" | base64 --decode >/tmp/sftp_rsa
-- curl -T SIFT_*.*.*_*.* --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/${odir}
+#- if [[ $TRAVIS_BRANCH == "master" ]]; then
+#    curl -k --ftp-create-dirs -T SIFT_*.*.*_*.* --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/${odir};
+#  fi
+- curl -k --ftp-create-dirs -T SIFT_*.*.*_*.* --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/${odir}
+# if we made a real release, delete all experimental releases
+- if [[ $TRAVIS_TAG != "" ]]; then
+    curl -k -l --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/experimental | grep SIFT_*.*.*_*.* | xargs -I{} -- curl -k -v --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/experimental -Q "DELE {}";
+  fi
 deploy:
   - provider: pypi
     user: __token__
