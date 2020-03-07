@@ -53,22 +53,21 @@ script:
     else
       ext="tar.gz";
     fi;
-    output="-o SIFT_${version}-dev_$(date +%Y%m%d_%H%M%S).${ext}";
+    oflag="-o SIFT_${version}dev_$(date +%Y%m%d_%H%M%S).${ext}";
   else
-    output="";
+    oflag="";
   fi
-- python build_conda_pack.py -j -1 $output
+- python build_conda_pack.py -j -1 $oflag
 - ls -l
 after_success:
 - if [[ $PYTHON_VERSION == "3.7" ]]; then coveralls; fi;
-- if [[ $TRAVIS_TAG != "" ]]; then
-    dst="pub/sift/dist/experimental";
+- if [[ $TRAVIS_TAG == "" ]]; then
+    odir="experimental/";
   else
-    dst="pub/sift/dist";
+    odir="";
   fi
 - echo "${SFTP_UPLOAD_KEY}" | base64 --decode >/tmp/sftp_rsa
-# fails currently:
-#- curl -T SIFT_?.?.?_*.* --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/${dst}/
+- curl -T SIFT_*.*.*_*.* --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/${odir}
 deploy:
   - provider: pypi
     user: __token__
