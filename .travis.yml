@@ -73,13 +73,13 @@ after_success:
     odir="";
   fi
 - echo "${SFTP_UPLOAD_KEY}" | base64 --decode >/tmp/sftp_rsa
-#- if [[ $TRAVIS_BRANCH == "master" ]]; then
-#    curl -k --ftp-create-dirs -T SIFT_*.*.*_*.* --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/${odir};
-#  fi
-- curl -k --ftp-create-dirs -T SIFT_*.*.*_*.* --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/${odir}
+# if we're on master, upload the new version
 # if we made a real release, delete all experimental releases
-- if [[ $TRAVIS_TAG != "" ]]; then
-    curl -k -l --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/experimental | grep SIFT_*.*.*_*.* | xargs -I{} -- curl -k -v --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/experimental -Q "DELE {}";
+- if [[ $TRAVIS_BRANCH == "master" ]]; then
+    curl -k --ftp-create-dirs -T SIFT_*.*.*_*.* --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/${odir};
+    if [[ $TRAVIS_TAG != "" ]]; then
+      curl -k -l --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/experimental | grep SIFT_*.*.*_*.* | xargs -I{} -- curl -k -v --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/experimental -Q "DELE {}";
+    fi;
   fi
 deploy:
   - provider: pypi
