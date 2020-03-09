@@ -30,10 +30,11 @@ install:
 - conda update -y -n base conda
 - conda deactivate
 - conda activate test
-- conda install -y --force-reinstall pyqt
-- which conda
+- conda install -y -n test --force-reinstall pyqt
+#- which conda
 - conda --version
 - python -c "from satpy import Scene"
+- conda run -n test python -c "from PyQt5.QtWebEngineWidgets import QWebEngineView"
 - python -c "from PyQt5.QtWebEngineWidgets import QWebEngineView"
 - which python
 - conda activate test
