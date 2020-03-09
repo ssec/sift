@@ -27,6 +27,8 @@ matrix:
 install:
 - git clone --depth 1 git://github.com/astropy/ci-helpers.git
 - source ci-helpers/travis/setup_conda.sh
+- conda deactivate
+- conda activate test
 - python -c "from satpy import Scene"
 - python -c "from PyQt5.QtWebEngineWidgets import QWebEngineView"
 - which python
