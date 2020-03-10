@@ -14,6 +14,8 @@ env:
   - SETUP_CMD='test'
   - CONDA_CHANNELS='conda-forge'
   - CONDA_CHANNEL_PRIORITY='strict'
+  - DEBUG=True
+  - PIP_FALLBACK=false
 matrix:
   include:
   - env: PYTHON_VERSION=3.7
@@ -34,7 +36,7 @@ install:
 - conda info
 - conda list pyqt
 - conda run -n test python -c "import PyQt5; print(PyQt5.__file__)"
-- echo "##### Separator #####"
+- echo "--------- Separator -----------"
 - python -c "import PyQt5; print(PyQt5.__file__)"
 - python -c "from PyQt5.QtWebEngineWidgets import QWebEngineView"
 - if [ "${TRAVIS_OS_NAME}" == "windows" ]; then
