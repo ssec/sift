@@ -31,16 +31,12 @@ install:
 - conda deactivate
 - conda activate test
 - conda install -y -n test --force-reinstall pyqt
-- which python || echo "No Python"
-- conda --version
-- python --version
-- python -c "import satpy; print(satpy.__file__)"
 - conda info
-- conda run -n test python -c "import PyQt5; print(PyQt5.__file__); from PyQt5.QtWebEngineWidgets import QWebEngineView"
-- python -c "import PyQt5; print(PyQt5.__file__); from PyQt5.QtWebEngineWidgets import QWebEngineView"
-- which python
-- conda activate test
-- which python
+- conda list pyqt
+- conda run -n test python -c "import PyQt5; print(PyQt5.__file__)"
+- echo "##### Separator #####"
+- python -c "import PyQt5; print(PyQt5.__file__)"
+- python -c "from PyQt5.QtWebEngineWidgets import QWebEngineView"
 - if [ "${TRAVIS_OS_NAME}" == "windows" ]; then
       git clone --depth 1 -b feature-travis-windows git://github.com/djhoese/gl-ci-helpers.git;
       powershell -Command "Set-ExecutionPolicy RemoteSigned -scope CurrentUser";
