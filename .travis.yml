@@ -27,14 +27,14 @@ matrix:
 install:
 - git clone --depth 1 git://github.com/astropy/ci-helpers.git
 - source ci-helpers/travis/setup_conda.sh
-- conda update -y -n base conda
+- conda update -y -n base "conda>=4.8"
 - conda deactivate
 - conda activate test
 - conda install -y -n test --force-reinstall pyqt
 - which python || echo "No Python"
 - conda --version
 - python --version
-- python -c "import satpy; print(satpy.__version__)"
+- python -c "import satpy; print(satpy.__file__)"
 - conda run -n test python -c "import PyQt5; print(PyQt5.__file__); from PyQt5.QtWebEngineWidgets import QWebEngineView"
 - python -c "import PyQt5; print(PyQt5.__file__); from PyQt5.QtWebEngineWidgets import QWebEngineView"
 - which python
