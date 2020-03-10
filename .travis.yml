@@ -29,6 +29,7 @@ matrix:
 install:
 - git clone --depth 1 git://github.com/astropy/ci-helpers.git
 - source ci-helpers/travis/setup_conda.sh
+- conda list pyqt
 - conda install -y -c conda-forge -n base "conda>=4.8"
 - conda deactivate
 - conda activate test
