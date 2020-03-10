@@ -14,7 +14,6 @@ env:
   - SETUP_CMD='test'
   - CONDA_CHANNELS='conda-forge'
   - CONDA_CHANNEL_PRIORITY='strict'
-  - DEBUG=True
   - PIP_FALLBACK=false
 matrix:
   include:
@@ -25,17 +24,16 @@ matrix:
     language: generic
   - env: PYTHON_VERSION=3.7
     os: windows
-    language: shell
+    language: c++
 install:
 - git clone --depth 1 git://github.com/astropy/ci-helpers.git
 - source ci-helpers/travis/setup_conda.sh
-- conda list qt
-- conda list | grep pypi
-- pip uninstall -y pyqt5-sip pyqtwebengine
-- conda install -y -n test --force-reinstall pyqt
 - conda info
 - conda list qt
 - conda list | grep pypi
+- echo $PATH
+- echo $PYTHONPATH
+- export PYTHONPATH="$PYTHONPATH:/c/tools/miniconda3/envs/test/Library/lib"
 - python -c "import PyQt5; print(PyQt5.__file__)"
 - python -c "from PyQt5.QtWebEngineWidgets import QWebEngineView"
 - if [ "${TRAVIS_OS_NAME}" == "windows" ]; then
