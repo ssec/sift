@@ -35,6 +35,7 @@ install:
 - conda --version
 - python --version
 - python -c "import satpy; print(satpy.__file__)"
+- conda info
 - conda run -n test python -c "import PyQt5; print(PyQt5.__file__); from PyQt5.QtWebEngineWidgets import QWebEngineView"
 - python -c "import PyQt5; print(PyQt5.__file__); from PyQt5.QtWebEngineWidgets import QWebEngineView"
 - which python
