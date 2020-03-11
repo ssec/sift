@@ -22,8 +22,9 @@ matrix:
     language: c
 install:
 - choco install miniconda3 --params="'/AddToPath:1'"
-- source bundle_scripts/refreshenv.sh
-- RefreshEnv
+- /c/tools/miniconda3/scripts/conda init bash
+- source "/c/Users/travis/.bash_profile"
+- conda activate base
 - conda config --add channels conda-forge
 - conda config --set channel_priority strict
 - conda config --set always_yes True
