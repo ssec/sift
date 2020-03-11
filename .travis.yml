@@ -1,7 +1,6 @@
 language: python
 env:
   global:
-  - PYTHON_VERSION=$TRAVIS_PYTHON_VERSION
   - NUMPY_VERSION=stable
   - MAIN_CMD='python setup.py'
   - CONDA_DEPENDENCIES='pyqt'
@@ -23,9 +22,9 @@ matrix:
 #  - env: PYTHON_VERSION=3.7
 #    os: osx
 #    language: generic
-  - env: PYTHON_VERSION=3.7
-    os: windows
-    language: bash
+  - os: windows
+    env: PYTHON_VERSION=3.7
+    language: c
 install:
 - git clone --depth 1 git://github.com/astropy/ci-helpers.git
 - source ci-helpers/travis/setup_conda.sh
