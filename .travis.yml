@@ -1,20 +1,4 @@
 language: python
-#env:
-#  global:
-#  - NUMPY_VERSION=stable
-#  - MAIN_CMD='python setup.py'
-#  - CONDA_DEPENDENCIES='pyqt'
-#  #- CONDA_DEPENDENCIES='hdf5 rasterio matplotlib numba pyproj coveralls pytest pytest-mock
-#  #  pytest-cov coverage pytest-qt vispy netcdf4 h5py imageio imageio-ffmpeg ffmpeg
-#  #  pillow pyshp pyqtgraph shapely sqlalchemy pyqt appdirs pyyaml satpy eccodes scikit-image
-#  #  donfig conda-pack'
-#  - PIP_DEPENDENCIES=''
-##  - PIP_DEPENDENCIES='pytest-xvfb'
-#  - SETUP_XVFB=True
-#  - EVENT_TYPE='push pull_request'
-#  - SETUP_CMD='test'
-#  - CONDA_CHANNELS='conda-forge'
-#  - CONDA_CHANNEL_PRIORITY='strict'
 matrix:
   include:
   - os: windows
@@ -25,26 +9,12 @@ install:
 - /c/tools/miniconda3/scripts/conda init bash
 - source "/c/Users/travis/.bash_profile"
 - conda activate base
-#- conda config --add channels conda-forge
 - conda config --set channel_priority flexible
 - conda config --set always_yes True
-#- conda create -n test python=3.7
 - conda create -n test python=3.7 pyqt
 - conda activate test
-#- python -m pip install pyqt5
 - python -c "import sys; print(sys.path)"
-#- export PYTHONPATH="/c/tools/miniconda3/envs/test/library/lib"
-#- python -c "import sys; print(sys.path)"
 - python -c "from PyQt5.QtWebEngineWidgets import QWebEngineView"
-#- if [ "${TRAVIS_OS_NAME}" == "windows" ]; then
-#      git clone --depth 1 -b feature-travis-windows git://github.com/djhoese/gl-ci-helpers.git;
-#      powershell -Command "Set-ExecutionPolicy RemoteSigned -scope CurrentUser";
-#      powershell gl-ci-helpers/appveyor/install_opengl.ps1;
-#  fi;
-#- if [ "${TRAVIS_OS_NAME}" == "linux" ] || [ "${TRAVIS_OS_NAME}" == "osx" ]; then
-#      conda install -y pygrib;
-#  fi;
-#- pip install -e . --no-deps
 before_script:
 - export DISPLAY=:99.0
 - if [ "${TRAVIS_OS_NAME}" == "osx" ]; then ( sudo Xvfb :99 -ac -screen 0 1400x900x24
