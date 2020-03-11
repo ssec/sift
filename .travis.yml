@@ -30,7 +30,7 @@ install:
 - conda config --set always_yes True
 - conda create -n test python=3.7 pyqt
 - conda activate test
-- python -c "import sys; print(sys.path)
+- python -c "import sys; print(sys.path)"
 - python -c "from PyQt5.QtWebEngineWidgets import QWebEngineView"
 #- if [ "${TRAVIS_OS_NAME}" == "windows" ]; then
 #      git clone --depth 1 -b feature-travis-windows git://github.com/djhoese/gl-ci-helpers.git;
