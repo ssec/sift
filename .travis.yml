@@ -1,20 +1,20 @@
 language: python
-env:
-  global:
-  - NUMPY_VERSION=stable
-  - MAIN_CMD='python setup.py'
-  - CONDA_DEPENDENCIES='pyqt'
-  #- CONDA_DEPENDENCIES='hdf5 rasterio matplotlib numba pyproj coveralls pytest pytest-mock
-  #  pytest-cov coverage pytest-qt vispy netcdf4 h5py imageio imageio-ffmpeg ffmpeg
-  #  pillow pyshp pyqtgraph shapely sqlalchemy pyqt appdirs pyyaml satpy eccodes scikit-image
-  #  donfig conda-pack'
-  - PIP_DEPENDENCIES=''
-#  - PIP_DEPENDENCIES='pytest-xvfb'
-  - SETUP_XVFB=True
-  - EVENT_TYPE='push pull_request'
-  - SETUP_CMD='test'
-  - CONDA_CHANNELS='conda-forge'
-  - CONDA_CHANNEL_PRIORITY='strict'
+#env:
+#  global:
+#  - NUMPY_VERSION=stable
+#  - MAIN_CMD='python setup.py'
+#  - CONDA_DEPENDENCIES='pyqt'
+#  #- CONDA_DEPENDENCIES='hdf5 rasterio matplotlib numba pyproj coveralls pytest pytest-mock
+#  #  pytest-cov coverage pytest-qt vispy netcdf4 h5py imageio imageio-ffmpeg ffmpeg
+#  #  pillow pyshp pyqtgraph shapely sqlalchemy pyqt appdirs pyyaml satpy eccodes scikit-image
+#  #  donfig conda-pack'
+#  - PIP_DEPENDENCIES=''
+##  - PIP_DEPENDENCIES='pytest-xvfb'
+#  - SETUP_XVFB=True
+#  - EVENT_TYPE='push pull_request'
+#  - SETUP_CMD='test'
+#  - CONDA_CHANNELS='conda-forge'
+#  - CONDA_CHANNEL_PRIORITY='strict'
 matrix:
   include:
   - os: windows
@@ -26,7 +26,7 @@ install:
 - source "/c/Users/travis/.bash_profile"
 - conda activate base
 #- conda config --add channels conda-forge
-#- conda config --set channel_priority strict
+- conda config --set channel_priority flexible
 - conda config --set always_yes True
 #- conda create -n test python=3.7
 - conda create -n test python=3.7 pyqt
