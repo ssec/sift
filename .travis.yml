@@ -25,13 +25,13 @@ install:
 - /c/tools/miniconda3/scripts/conda init bash
 - source "/c/Users/travis/.bash_profile"
 - conda activate base
-- conda config --add channels conda-forge
-- conda config --set channel_priority strict
+#- conda config --add channels conda-forge
+#- conda config --set channel_priority strict
 - conda config --set always_yes True
-- conda create -n test python=3.7
-#- conda create -n test python=3.7 pyqt
+#- conda create -n test python=3.7
+- conda create -n test python=3.7 pyqt
 - conda activate test
-- python -m pip install pyqt5
+#- python -m pip install pyqt5
 - python -c "import sys; print(sys.path)"
 #- export PYTHONPATH="/c/tools/miniconda3/envs/test/library/lib"
 #- python -c "import sys; print(sys.path)"
