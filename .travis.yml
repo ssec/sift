@@ -4,11 +4,13 @@ env:
   - PYTHON_VERSION=$TRAVIS_PYTHON_VERSION
   - NUMPY_VERSION=stable
   - MAIN_CMD='python setup.py'
-  - CONDA_DEPENDENCIES='hdf5 rasterio matplotlib numba pyproj coveralls pytest pytest-mock
-    pytest-cov coverage pytest-qt vispy netcdf4 h5py imageio imageio-ffmpeg ffmpeg
-    pillow pyshp pyqtgraph shapely sqlalchemy pyqt appdirs pyyaml satpy eccodes scikit-image
-    donfig conda-pack'
-  - PIP_DEPENDENCIES='pytest-xvfb'
+  - CONDA_DEPENDENCIES='pyqt'
+  #- CONDA_DEPENDENCIES='hdf5 rasterio matplotlib numba pyproj coveralls pytest pytest-mock
+  #  pytest-cov coverage pytest-qt vispy netcdf4 h5py imageio imageio-ffmpeg ffmpeg
+  #  pillow pyshp pyqtgraph shapely sqlalchemy pyqt appdirs pyyaml satpy eccodes scikit-image
+  #  donfig conda-pack'
+  - PIP_DEPENDENCIES=''
+#  - PIP_DEPENDENCIES='pytest-xvfb'
   - SETUP_XVFB=True
   - EVENT_TYPE='push pull_request'
   - SETUP_CMD='test'
@@ -16,17 +18,18 @@ env:
   - CONDA_CHANNEL_PRIORITY='strict'
 matrix:
   include:
-  - env: PYTHON_VERSION=3.7
-    os: linux
-  - env: PYTHON_VERSION=3.7
-    os: osx
-    language: generic
+#  - env: PYTHON_VERSION=3.7
+#    os: linux
+#  - env: PYTHON_VERSION=3.7
+#    os: osx
+#    language: generic
   - env: PYTHON_VERSION=3.7
     os: windows
     language: bash
 install:
 - git clone --depth 1 git://github.com/astropy/ci-helpers.git
 - source ci-helpers/travis/setup_conda.sh
+- python -c "from PyQt5.QtWebEngineWidgets import QWebEngineView"
 - if [ "${TRAVIS_OS_NAME}" == "windows" ]; then
       git clone --depth 1 -b feature-travis-windows git://github.com/djhoese/gl-ci-helpers.git;
       powershell -Command "Set-ExecutionPolicy RemoteSigned -scope CurrentUser";
