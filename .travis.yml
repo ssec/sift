@@ -15,6 +15,9 @@ install:
 - conda activate test
 - export CONDA_DLL_SEARCH_MODIFICATION_ENABLE=1
 - export CONDA_DLL_SEARCH_MODIFICATION_DEBUG=1
+- curl -Lo Dependencies.zip https://github.com/lucasg/Dependencies/releases/download/v1.10/Dependencies_x64_Release.zip
+- unzip Dependencies.zip
+- ./Dependencies.exe -chain /c/tools/miniconda3/envs/test/lib/site-packages/PyQt5/QtWebEngineWidgets.pyd
 - python -c "from PyQt5.QtWebEngineWidgets import QWebEngineView"
 before_script:
 - export DISPLAY=:99.0
