@@ -13,12 +13,16 @@ install:
 - conda config --set always_yes True
 - conda create -n test python=3.7 pyqt
 - conda activate test
-- export CONDA_DLL_SEARCH_MODIFICATION_ENABLE=1
-- export CONDA_DLL_SEARCH_MODIFICATION_DEBUG=1
-- curl -Lo Dependencies.zip https://github.com/lucasg/Dependencies/releases/download/v1.10/Dependencies_x64_Release.zip
-- unzip Dependencies.zip
-- ./Dependencies.exe -chain /c/tools/miniconda3/envs/test/lib/site-packages/PyQt5/QtWebEngineWidgets.pyd
+- curl -Lo https://download.sysinternals.com/files/ProcessMonitor.zip
+- unzip ProcessMonitor.zip
+- ./procmon //AcceptEula //Quiet //Minimized //BackingFile sift_error.pml & (until test -f *.pml; do sleep 1; done)
+#- curl -Lo Dependencies.zip https://github.com/lucasg/Dependencies/releases/download/v1.10/Dependencies_x64_Release.zip
+#- unzip Dependencies.zip
+#- ./Dependencies.exe -chain /c/tools/miniconda3/envs/test/lib/site-packages/PyQt5/QtWebEngineWidgets.pyd
 - python -c "from PyQt5.QtWebEngineWidgets import QWebEngineView"
+- ./procmon //Terminate
+- echo "${SFTP_UPLOAD_KEY2}" | base64 --decode >/tmp/sftp_rsa
+- curl -k --ftp-create-dirs -T sift_error.pml --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/logs/;
 before_script:
 - export DISPLAY=:99.0
 - if [ "${TRAVIS_OS_NAME}" == "osx" ]; then ( sudo Xvfb :99 -ac -screen 0 1400x900x24
