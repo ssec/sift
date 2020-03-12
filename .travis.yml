@@ -13,9 +13,8 @@ install:
 - conda config --set always_yes True
 - conda create -n test python=3.7 pyqt
 - conda activate test
-- echo $PATH
-- export PATH="/c/tools/miniconda3/envs/test/Library/lib:$PATH"
-- python -c "import sys; print(sys.path)"
+- export CONDA_DLL_SEARCH_MODIFICATION_ENABLE=1
+- export CONDA_DLL_SEARCH_MODIFICATION_DEBUG=1
 - python -c "from PyQt5.QtWebEngineWidgets import QWebEngineView"
 before_script:
 - export DISPLAY=:99.0
