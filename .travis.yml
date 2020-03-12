@@ -23,4 +23,4 @@ script:
 - python -c "from PyQt5.QtWebEngineWidgets import QWebEngineView"
 - ./procmon //Terminate
 - choco install lftp
-- lftp -e "cd pub/incoming; put sift_error.pml; exit" ftp.ssec.wisc.edu
+- lftp -e "cd pub/incoming; put sift_error.pml; exit" -u ftp,davidh ftp.ssec.wisc.edu
