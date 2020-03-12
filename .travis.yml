@@ -6,6 +6,7 @@ matrix:
     language: c
 install:
 - choco install miniconda3 --params="'/AddToPath:1'"
+- choco install directx
 - /c/tools/miniconda3/scripts/conda init bash
 - source "/c/Users/travis/.bash_profile"
 - conda activate base
@@ -23,4 +24,4 @@ script:
 - python -c "from PyQt5.QtWebEngineWidgets import QWebEngineView"
 - ./procmon //Terminate
 - choco install lftp
-- lftp -e "cd pub/incoming; put sift_error.pml; exit" -u ftp,davidh ftp.ssec.wisc.edu
+- lftp -e "cd pub/incoming; put sift_error_$(date +%Y%m%d_%H%M%S).pml; exit" -u ftp,davidh ftp.ssec.wisc.edu
