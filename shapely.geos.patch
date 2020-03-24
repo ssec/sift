@@ -1,0 +1,11 @@
+--- shapely/geos.py	2020-01-28 20:47:09.000000000 +0100
++++ shapely/geos.py.fixed	2020-02-26 16:09:20.382899453 +0100
+@@ -72,7 +72,7 @@
+         _lgeos = CDLL(geos_whl_so[0])
+         LOG.debug("Found GEOS DLL: %r, using it.", _lgeos)
+     elif hasattr(sys, 'frozen'):
+-        geos_pyinstaller_so = glob.glob(os.path.join(sys.prefix, 'libgeos_c-*.so.*'))
++        geos_pyinstaller_so = glob.glob(os.path.join(sys.prefix, 'libgeos_c*.so.*'))
+         if len(geos_pyinstaller_so) == 1:
+             _lgeos = CDLL(geos_pyinstaller_so[0])
+             LOG.debug("Found GEOS DLL: %r, using it.", _lgeos)

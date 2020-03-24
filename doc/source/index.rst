@@ -22,6 +22,8 @@ will slowly replace the low-level documents on the wiki.
    design_overview
    API <api/uwsift>
    Contributing <CONTRIBUTING>
+   Installation options for MTG-Sift <INSTALLATION-mtgsift>
+   Initial setup for packaging MTG-Sift with CMake <PACKAGING-mtgsift>
 
 
 Indices and tables
