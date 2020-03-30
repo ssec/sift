@@ -1,0 +1,3 @@
+# Overwrite the default import path for the Sapty package
+# This can be used during development to load a different version of Satpy without the need to package it first
+#satpy_import_path: "path/to/satpy"
