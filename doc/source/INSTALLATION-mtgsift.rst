@@ -17,7 +17,7 @@ it.
 
 The other package - *mtgsift-devel-deps* - actually doesn't even provide
 MTG-Sift but only makes sure, that the dependencies necessary to develop and
-packagage it are installed. MTG-Sift itself must be provided as source tree
+package it are installed. MTG-Sift itself must be provided as source tree
 e.g. by cloning from its Git repository or by extracting it from a tarball.
 
 There is a third Conda package - *mtgsift-deps*. It is not meant to be
@@ -59,7 +59,7 @@ prepared as described above::
 
   (work)%> conda install mtgsift
 
-Now you can start MTG- like so::
+Now you can start MTG-Sift like so::
  
   (work)%> python -m uwsift
 
@@ -71,7 +71,7 @@ Installation for developing MTG-Sift
 Set up the Conda environment as above - let's call it ``devel`` - and then
 install all dependencies for developing MTG-Sift as follows::
   
-  (devel)%> conda install mtgsift-devel
+  (devel)%> conda install mtgsift-devel-deps
 
 PIP-install MTG-Sift in editable mode by run the following in the root
 directory of the MTG-Sift sources::
@@ -87,12 +87,13 @@ How to Install MTG-Sift from PyInstaller Packages
 -------------------------------------------------
 
 The MTG-Sift packages created with PyInstaller are "portable software", i.e.,
-there is no installation step requiring adminstration privileges
-required. Depending on how your MTG-Sift packager provides the software you
-may get it either as one single executable file *mtgsift* (*mtgsift.exe* for
-Windows) or as a directory *mtgsift* (you may need to unpack it from an
-archive), which contains an executable *mtgsift* (*mtgsift.exe* for Windows)
-as well as all dependencies (libraries, configuration, databases).
+they neither need to be installed nor do they require administration
+privileges to be run. Depending on how your MTG-Sift packager provides the
+software you may get it either as one single executable file *mtgsift*
+(*mtgsift.exe* for Windows) or as a directory *mtgsift* (you may need to
+unpack it from an archive), which contains an executable *mtgsift*
+(*mtgsift.exe* for Windows) as well as all dependencies (libraries,
+configuration, databases).
 
 Note that the single executable file variant has significant slower startup
 since each time it is run the contained dependencies are extracted into a
