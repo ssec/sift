@@ -1,8 +1,8 @@
 How to get started using the CMake build system
 ===============================================
 
-The following documentation gives a step-by-step introduction how to intially
-set up a MTG-Sift development environment from scratch using the CMake-based
+The following documentation gives a step-by-step introduction how to initially
+set up a MTG-SIFT development environment from scratch using the CMake-based
 build system.
 
 The description is platform independent [#f1]_ but based on the usual Linux
@@ -11,13 +11,13 @@ workflows of course.
 
 It is assumed that the reader knows how to install and initialize a Conda
 environment (refer to :ref:`_install-conda-packages` otherwise) and how to get
-the MTG-Sift sources from the Git repository or from an archive.
+the MTG-SIFT sources from the Git repository or from an archive.
 
 Bootstrapping
 -------------
 
 This procedure is (only) necessary as long as there is no Conda package
-*mtgsift-devel* available for the current platform. When the package is
+*mtgsift-devel-deps* available for the current platform. When the package is
 available you may skip this part and jump instead to
 :ref:`install-conda-mtgsift-devel` and then continue with
 :ref:`conda-and-pyinstaller-packaging`.
@@ -30,10 +30,16 @@ Only a few preparatory steps need to be done outside the build system.
 It is assumed that Miniconda3 (recommended) or Anaconda3 is installed and
 properly initialized for your shell [#f2]_.
 
-Install *CMake* and *Make* [#f3]_ into your *base* environment. This step is
-optional - if any of these tools is already available in your shell in a
-suitable recent version (CMake: version 3.14 at least) there is no need to
-install it into the *base* environment.
+Install *CMake* and *Make* [#f3]_ into your *base* environment.
+
+On *Linux* this step may be optional - if any of these tools is already
+available in your shell in a suitably recent version (CMake: version 3.14 at
+least) there is no need to install it into the *base* environment.
+
+On *Windows* you should perform this step in any case, unless you know how to
+perform the following steps analogously using a different build system
+combination than CMake with "Unix Makefiles".
+
 ::
 
   %> conda install --name base cmake make
@@ -45,14 +51,14 @@ Activate the *base* environment::
 
   %> conda activate base
 
-In the toplevel directory of the MTG-Sift sources run *cmake* with a generator
+In the top-level directory of the MTG-SIFT sources run *cmake* with a generator
 for the chosen build system::
 
   (base)%> cmake -G "Unix Makefiles" .
 
 Then follow the advice given by the messages showing up. When doing so, a new
 Conda environment *devel-default* [#f4]_ will be created and populated with
-all packages necessary for MTG-Sift development and packaging::
+all packages necessary for MTG-SIFT development and packaging::
 
   (base)%> make devel-bootstrap
 
@@ -73,7 +79,7 @@ If not already done, execute the steps::
   (devel-default)%> make patch-shapely
 
 The system is now ready to create Conda and PyInstaller packages for
-MTG-Sift. The according targets can be found in the target lists printed by
+MTG-SIFT. The according targets can be found in the target lists printed by
 running::
 
   (devel-default)%> make help
@@ -94,11 +100,11 @@ The Target *conda-packages*
 +++++++++++++++++++++++++++
 
 The target *conda-packages* creates three Conda packages: *mtgsift*,
-*mtgsift-devel* and *mtgsift-deps*.
+*mtgsift-devel-deps* and *mtgsift-deps*.
 
-Only *mtgsift* and *mtgsift-devel* are meant to be directly installed from an
-appropriate Conda channel *mtgsift-channel* [#f6]_. However, the two packages
-should not be installed into the same Conda environment together.
+Only *mtgsift* and *mtgsift-devel-deps* are meant to be directly installed
+from an appropriate Conda channel *mtgsift-channel* [#f6]_. However, the two
+packages should not be installed into the same Conda environment together.
 
 The third one is a meta-package which only pulls common dependencies for two
 others and is automatically installed when any of them is installed. Please
@@ -116,13 +122,13 @@ environment from which the path is accessible::
 The targets *pyinstaller-onedir-package* and *pyinstaller-onefile-package*
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-Using the two targets you can create executables which allow to run MTG-Sift
-without any additonal installation of dependencies. All dependencies are
+Using the two targets you can create executables which allow to run MTG-SIFT
+without any additional installation of dependencies. All dependencies are
 provided.
 
 Please don't forget to at least once build the target *patch-shapely* in the
-Conda environment you use for packaging. The MTG-Sift dependency *Shapely* has
-an issue with respect to PyInstaller based packagaing, which is fixed with the
+Conda environment you use for packaging. The MTG-SIFT dependency *Shapely* has
+an issue with respect to PyInstaller based packaging, which is fixed with the
 provided patch for now::
 
   (devel-default)%> make patch-shapely
