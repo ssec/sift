@@ -2,7 +2,7 @@ How to get started using the CMake build system
 ===============================================
 
 The following documentation gives a step-by-step introduction how to initially
-set up a MTG-Sift development environment from scratch using the CMake-based
+set up a MTG-SIFT development environment from scratch using the CMake-based
 build system.
 
 The description is platform independent [#f1]_ but based on the usual Linux
@@ -11,7 +11,7 @@ workflows of course.
 
 It is assumed that the reader knows how to install and initialize a Conda
 environment (refer to :ref:`_install-conda-packages` otherwise) and how to get
-the MTG-Sift sources from the Git repository or from an archive.
+the MTG-SIFT sources from the Git repository or from an archive.
 
 Bootstrapping
 -------------
@@ -51,14 +51,14 @@ Activate the *base* environment::
 
   %> conda activate base
 
-In the top-level directory of the MTG-Sift sources run *cmake* with a generator
+In the top-level directory of the MTG-SIFT sources run *cmake* with a generator
 for the chosen build system::
 
   (base)%> cmake -G "Unix Makefiles" .
 
 Then follow the advice given by the messages showing up. When doing so, a new
 Conda environment *devel-default* [#f4]_ will be created and populated with
-all packages necessary for MTG-Sift development and packaging::
+all packages necessary for MTG-SIFT development and packaging::
 
   (base)%> make devel-bootstrap
 
@@ -79,7 +79,7 @@ If not already done, execute the steps::
   (devel-default)%> make patch-shapely
 
 The system is now ready to create Conda and PyInstaller packages for
-MTG-Sift. The according targets can be found in the target lists printed by
+MTG-SIFT. The according targets can be found in the target lists printed by
 running::
 
   (devel-default)%> make help
@@ -122,12 +122,12 @@ environment from which the path is accessible::
 The targets *pyinstaller-onedir-package* and *pyinstaller-onefile-package*
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-Using the two targets you can create executables which allow to run MTG-Sift
+Using the two targets you can create executables which allow to run MTG-SIFT
 without any additional installation of dependencies. All dependencies are
 provided.
 
 Please don't forget to at least once build the target *patch-shapely* in the
-Conda environment you use for packaging. The MTG-Sift dependency *Shapely* has
+Conda environment you use for packaging. The MTG-SIFT dependency *Shapely* has
 an issue with respect to PyInstaller based packaging, which is fixed with the
 provided patch for now::
 
