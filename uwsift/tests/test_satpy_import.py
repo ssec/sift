@@ -4,9 +4,10 @@ import importlib
 import importlib.util
 import appdirs
 import subprocess
-import runpy
 import shutil
 import pytest
+
+from ast import literal_eval
 
 
 def remove_cached_module(module_name: str):
@@ -21,47 +22,50 @@ def remove_cached_module(module_name: str):
     importlib.invalidate_caches()
 
 
-@pytest.mark.skip
+def get_python_path() -> str:
+    process = subprocess.run([sys.executable, "--version"], stdout=subprocess.PIPE, check=True)
+    if process.stdout.decode("utf-8").startswith("Python "):
+        return sys.executable
+    else:
+        raise RuntimeError("Python has been embedded into another application")
+
+
 @pytest.mark.skipif(not sys.platform.startswith("linux"), reason="can only set the config directory on Linux")
 def test_config_satpy_import_path(tmp_path):
+    # get the folder structure of the config directory
     uwsift_module = importlib.import_module("uwsift")
     relative_config_dir = os.path.relpath(uwsift_module.BASE_CONFIG_DIR, appdirs.user_config_dir())
 
+    # recreate that folder structure inside the temp directory `config`
     tmp_config_dir = os.path.join(tmp_path, "config")
     sift_tmp_config_dir = os.path.join(tmp_config_dir, relative_config_dir)
     os.makedirs(sift_tmp_config_dir)
 
+    # copy the Satpy module to the temp directory `satpy`
     tmp_satpy_dir = os.path.join(tmp_path, "satpy")
     satpy_module = importlib.import_module("satpy")
     shutil.copytree(os.path.dirname(satpy_module.__file__), tmp_satpy_dir)
 
-    general_settings = os.path.join(sift_tmp_config_dir, "general_settings.yml")
-    with open(general_settings, "w") as file:
+    # create a config file, which points to the Satpy module in the temp `satpy` directory
+    general_settings_path = os.path.join(sift_tmp_config_dir, "general_settings.yml")
+    with open(general_settings_path, "w") as file:
         file.write(f'satpy_import_path: "{tmp_satpy_dir}"\n')
 
-    os.environ["XDG_CONFIG_HOME"] = tmp_config_dir
-    assert appdirs.user_config_dir() == tmp_config_dir
+    # Don't import the `uwsift` using the current Python Interpreter, because the code in the
+    # __init__.py is just executed once. Use a subprocess, such that the code can be be exected
+    # multiple times with different config files and corrupted Satpy modules.
+    modified_env = {"PATH": os.getenv("PATH"), "XDG_CONFIG_HOME": tmp_config_dir}
+    command = [get_python_path(), "-c", "import uwsift\nprint({'base_config_dir': uwsift.BASE_CONFIG_DIR, "
+                                     "'satpy_import_path': uwsift.config['satpy_import_path']})"]
+    working_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    process = subprocess.run(command, stdout=subprocess.PIPE, env=modified_env, cwd=working_dir, check=True)
+    results = literal_eval(process.stdout.decode("utf-8"))
 
-    # remove all `uwsift` modules from the cache in order to execute the __init__.py again
-    remove_cached_module("uwsift")
+    # Can we configure the config file path with the environment variable `XDG_CONFIG_HOME`?
+    assert results["base_config_dir"] == sift_tmp_config_dir
 
-    # 1: try to import the uwsift package (we must reload the module in order to execute __init__.py again)
-    uwsift_module = importlib.import_module("uwsift")
-    uwsift_util_module = importlib.import_module("uwsift.util")
-    importlib.reload(uwsift_module)
-    importlib.reload(uwsift_util_module)
-    assert uwsift_module.config["satpy_import_path"] == tmp_satpy_dir
-
-    # 2: try to execute the uwsift module with runpy
-    uwsift_gloval_vars = runpy.run_module("uwsift")
-    assert uwsift_gloval_vars["DOCUMENT_SETTINGS_DIR"] == sift_tmp_config_dir
-
-    # 3: try to test the config with a subprocess
-    modified_env = {"PATH": os.getenv("PATH"), "XDG_CONFIG_HOME": tmp_satpy_dir}
-    command = ["python", "-c", "import uwsift\nprint(uwsift.config['satpy_import_path'])"]
-    cwd = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
-    process = subprocess.run(command, stdout=subprocess.PIPE, env=modified_env, cwd=cwd)
-    assert process.stdout.decode("utf-8").rstrip("\n") == tmp_satpy_dir
+    # Is the Satpy module path correctly read from the config file `general_settings.yml`?
+    assert results["satpy_import_path"] == tmp_satpy_dir
 
 
 @pytest.mark.skip
