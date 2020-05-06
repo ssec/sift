@@ -1,18 +1,27 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-LayerRep.py
-~~~~~~~~~~~
+scene_graph.py
+~~~~~~~~~~~~~~
 
 PURPOSE
-Layer representation - the "physical" realization of content to draw on the map.
-A layer representation can have multiple levels of detail
+Provides a SceneGraphManager to handle display of visuals, in this case satellite imaging data,
+latitude/longitude lines and coastlines.
 
-A factory will convert URIs into LayerReps
-LayerReps are managed by document, and handed off to the MapWidget as part of a LayerDrawingPlan
+As per http://api.vispy.org/en/latest/scene.html (abridged)
+
+        - Vispy scene graph (SG) prerequisites:
+            1. create SceneCanvas -> this object's scene property is top level node in SG:
+                ```
+                    vispy_canvas = scene.SceneCanvas
+                    sg_root_node = vispy_canvas.scene
+                ```
+            2. create node instances (from vispy.scene.visuals)
+            3. add node instances to scene by making them children of canvas scene, or
+                of nodes already in the scene
 
 REFERENCES
-
+http://api.vispy.org/en/latest/scene.html
 
 REQUIRES
 
