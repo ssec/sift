@@ -28,15 +28,18 @@ from typing import Optional
 
 import numpy as np
 import shapefile
+from vispy.color import Color
 from vispy.ext.six import string_types
 from vispy.gloo import VertexBuffer
+from vispy.util.profiler import Profiler
 from vispy.io.datasets import load_spatial_filters
 from vispy.scene.visuals import create_visual_node
 from vispy.visuals import LineVisual, ImageVisual, IsocurveVisual
-# The below imports are needed because we subclassed the ImageVisual
+# The below imports are needed because we subclassed ImageVisual and ArrowVisual
+from vispy.visuals.line.arrow import _ArrowHeadVisual, ArrowVisual
+from vispy.visuals.line.line import _AggLineVisual, _GLLineVisual, vec3to4, vec2to4
 from vispy.visuals.shaders import Function
-from vispy.visuals.transforms import NullTransform
-
+from vispy.visuals.transforms import NullTransform, as_vec4
 
 from uwsift.common import (
     DEFAULT_PROJECTION,
@@ -1392,3 +1395,331 @@ class GammaImageVisual(ImageVisual):
 
 
 GammaImage = create_visual_node(GammaImageVisual)
+
+
+class _GLGradientLineVisual(_GLLineVisual):
+    def __init__(self, arrow_size, *args, **kwargs):
+        self._arrow_size = arrow_size
+        super().__init__(*args, **kwargs)
+
+    def _prepare_draw(self, view):
+        prof = Profiler()
+
+        if self._parent._changed['pos']:
+            if self._parent._pos is None:
+                return False
+            # todo: does this result in unnecessary copies?
+            pos = np.ascontiguousarray(self._parent._pos.astype(np.float32))
+            xf = view.transforms.get_transform('visual', 'framebuffer')
+            # transform pos to pixel coords
+            pos_px = xf.map(pos)
+            # subtract necessary offset
+            line_dirs = pos_px[1::2, 0:2] - pos_px[0::2, 0:2]
+            line_dirs_normed = (1.0 / (
+                np.linalg.norm(line_dirs, axis=1)))*line_dirs
+            offset = self._arrow_size/2.0
+            pos_px[1::2, 0:2] -= offset * line_dirs_normed
+            # tranform back to visual coords
+            pos_re = xf.imap(pos_px)[:, 0:2].astype(np.float32)
+            self._pos_vbo.set_data(pos_re)
+            # self._pos_vbo.set_data(pos)
+            self._program.vert['position'] = self._pos_vbo
+            if pos.shape[-1] == 2:
+                self._program.vert['to_vec4'] = vec2to4
+            elif pos.shape[-1] == 3:
+                self._program.vert['to_vec4'] = vec3to4
+            else:
+                raise TypeError("Got bad position array shape: %r"
+                                % (pos.shape,))
+
+        if self._parent._changed['color']:
+            color, cmap = self._parent._interpret_color()
+            # If color is not visible, just quit now
+            if isinstance(color, Color) and color.is_blank:
+                return False
+            if isinstance(color, Function):
+                # TODO: Change to the parametric coordinate once that is done
+                self._program.vert['color'] = color(
+                    '(gl_Position.x + 1.0) / 2.0')
+            else:
+                if color.ndim == 1:
+                    self._program.vert['color'] = color
+                else:
+                    self._color_vbo.set_data(color)
+                    self._program.vert['color'] = self._color_vbo
+
+            self.shared_program['texture2D_LUT'] = cmap.texture_lut() \
+                if (hasattr(cmap, 'texture_lut')) else None
+
+        # Do we want to use OpenGL, and can we?
+        GL = None
+        from vispy.app._default_app import default_app
+        if default_app is not None and \
+                default_app.backend_name != 'ipynb_webgl':
+            try:
+                import OpenGL.GL as GL
+            except Exception:  # can be other than ImportError sometimes
+                pass
+
+        # Turn on line smooth and/or line width
+        if GL:
+            if self._parent._antialias:
+                GL.glEnable(GL.GL_LINE_SMOOTH)
+            else:
+                GL.glDisable(GL.GL_LINE_SMOOTH)
+            px_scale = self.transforms.pixel_scale
+            width = px_scale * self._parent._width
+            GL.glLineWidth(max(width, 1.))
+
+        if self._parent._changed['connect']:
+            self._connect = self._parent._interpret_connect()
+            if isinstance(self._connect, np.ndarray):
+                self._connect_ibo.set_data(self._connect)
+        if self._connect is None:
+            return False
+
+        prof('prepare')
+
+        # Draw
+        if isinstance(self._connect, string_types) and \
+                self._connect == 'strip':
+            self._draw_mode = 'line_strip'
+            self._index_buffer = None
+        elif isinstance(self._connect, string_types) and \
+                self._connect == 'segments':
+            self._draw_mode = 'lines'
+            self._index_buffer = None
+        elif isinstance(self._connect, np.ndarray):
+            self._draw_mode = 'lines'
+            self._index_buffer = self._connect_ibo
+        else:
+            raise ValueError("Invalid line connect mode: %r" % self._connect)
+
+        prof('draw')
+
+
+class GradientLineVisual(LineVisual):
+    """Gradient line visual
+
+    Parameters
+    ----------
+    pos : array
+        Array of shape (..., 2) or (..., 3) specifying vertex coordinates.
+    color : Color, tuple, or array
+        The color to use when drawing the line. If an array is given, it
+        must be of shape (..., 4) and provide one rgba color per vertex.
+        Can also be a colormap name, or appropriate `Function`.
+    width:
+        The width of the line in px. Line widths > 1px are only
+        guaranteed to work when using 'agg' method.
+    connect : str or array
+        Determines which vertices are connected by lines.
+
+            * "strip" causes the line to be drawn with each vertex
+              connected to the next.
+            * "segments" causes each pair of vertices to draw an
+              independent line segment
+            * numpy arrays specify the exact set of segment pairs to
+              connect.
+
+    method : str
+        Mode to use for drawing.
+
+            * "agg" uses anti-grain geometry to draw nicely antialiased lines
+              with proper joins and endcaps.
+            * "gl" uses OpenGL's built-in line rendering. This is much faster,
+              but produces much lower-quality results and is not guaranteed to
+              obey the requested line width or join/endcap styles.
+
+    antialias : bool
+        Enables or disables antialiasing.
+        For method='gl', this specifies whether to use GL's line smoothing,
+        which may be unavailable or inconsistent on some platforms.
+    """
+    def __init__(self, pos=None, color=(0.5, 0.5, 0.5, 1), width=1,
+                 arrow_size=None, connect='strip', method='gl',
+                 antialias=False):
+        self._line_visual = None
+
+        self._changed = {'pos': False, 'color': False, 'width': False,
+                         'connect': False}
+
+        self._pos = None
+        self._color = None
+        self._width = None
+        self._arrow_size = arrow_size
+        self._connect = None
+        self._bounds = None
+        self._antialias = None
+        self._method = 'none'
+
+        super(LineVisual, self).__init__([])
+
+        # don't call subclass set_data; these often have different
+        # signatures.
+        LineVisual.set_data(self, pos=pos, color=color, width=width,
+                            connect=connect)
+        self.antialias = antialias
+        self.method = method
+
+
+    def method(self, method):
+        if method not in ('agg', 'gl'):
+            raise ValueError('method argument must be "agg" or "gl".')
+        if method == self._method:
+            return
+
+        self._method = method
+        if self._line_visual is not None:
+            self.remove_subvisual(self._line_visual)
+
+        if method == 'gl':
+            self._line_visual = _GLGradientLineVisual(self, self._arrow_size)
+        elif method == 'agg':
+            self._line_visual = _AggLineVisual(self)
+        self.add_subvisual(self._line_visual)
+
+        for k in self._changed:
+            self._changed[k] = True
+
+
+class _TipAlignedArrowHeadVisual(_ArrowHeadVisual):
+    def __index__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _prepare_draw(self, view):
+        if self._parent._arrows_changed:
+            self._prepare_vertex_data(view)
+        self.shared_program.bind(self._arrow_vbo)
+        self.shared_program['antialias'] = 1.0
+        self.shared_program.frag['arrow_type'] = self._parent.arrow_type
+        self.shared_program.frag['fill_type'] = "filled"
+
+    def _prepare_vertex_data(self, view):
+        arrows = self._parent.arrows
+
+        xf = view.transforms.get_transform('visual', 'framebuffer')
+
+        if arrows is None or arrows.size == 0:
+            self._arrow_vbo = VertexBuffer(
+                np.array([], dtype=self._arrow_vtype))
+            return
+
+        # arrows present in (N/2 x 4), need (N x 2) where N is number of
+        # vertices
+        arrows = arrows.reshape(-1, 2)
+        # transform arrow positions to pixel coords
+        arrows_px = xf.map(arrows)
+        # subtract necessary offset
+        arrow_dirs = arrows_px[1::2, 0:2] - arrows_px[0::2, 0:2]
+        arrow_dirs_normed = (1.0 / (np.linalg.norm(arrow_dirs, axis=1)))[:, np.newaxis] * arrow_dirs
+        offset = self._parent.arrow_size / 2.0
+        arrows_px[1::2, 0:2] -= offset*arrow_dirs_normed
+        # tranform back to visual coords
+        arrows_re = xf.imap(arrows_px)[:, 0:2].astype(np.float32)
+        # arrows now again needed in (N/2 x 4)
+        arrows = arrows_re.reshape((-1, 4))
+        v = np.zeros(len(arrows), dtype=self._arrow_vtype)
+        # 2d // 3d v1 v2.
+        sh = int(arrows.shape[1] / 2)
+        v['v1'] = as_vec4(arrows[:, 0:sh])
+        v['v2'] = as_vec4(arrows[:, sh:int(2 * sh)])
+        v['size'][:] = self._parent.arrow_size
+        color, cmap = self._parent._interpret_color(self._parent.arrow_color)
+        v['color'][:] = color
+        v['linewidth'][:] = self._parent.width
+        self._arrow_vbo = VertexBuffer(v)
+
+
+class TipAlignedArrowVisual(ArrowVisual):
+    """
+        Almost exactly the same as vispy's ArrowVisual with the exception
+        of the arrow's head not being centered at the end of the arrow's
+        line but the arrows tip pointing to the coordinate of the arrow's line.
+
+    Parameters
+    ----------
+    pos : array
+        Array of shape (..., 2) or (..., 3) specifying vertex coordinates.
+    color : Color, tuple, or array
+        The color to use when drawing the line. If an array is given, it
+        must be of shape (..., 4) and provide one rgba color per vertex.
+        Can also be a colormap name, or appropriate `Function`.
+    width:
+        The width of the line in px. Line widths > 1px are only
+        guaranteed to work when using 'agg' method.
+    connect : str or array
+        Determines which vertices are connected by lines.
+
+            * "strip" causes the line to be drawn with each vertex
+              connected to the next.
+            * "segments" causes each pair of vertices to draw an
+              independent line segment
+            * numpy arrays specify the exact set of segment pairs to
+              connect.
+    method : str
+        Mode to use for drawing.
+
+            * "agg" uses anti-grain geometry to draw nicely antialiased lines
+              with proper joins and endcaps.
+            * "gl" uses OpenGL's built-in line rendering. This is much faster,
+              but produces much lower-quality results and is not guaranteed to
+              obey the requested line width or join/endcap styles.
+    antialias : bool
+        Enables or disables antialiasing.
+        For method='gl', this specifies whether to use GL's line smoothing,
+        which may be unavailable or inconsistent on some platforms.
+    arrows : array
+        A (N, 4) or (N, 6) matrix where each row contains the (x, y) or the
+        (x, y, z) coordinate of the first and second vertex of the arrow
+        body. Remember that the second vertex is used as center point for
+        the arrow head, and the first vertex is only used for determining
+        the arrow head orientation.
+    arrow_type : string
+        Specify the arrow head type, the currently available arrow head types
+        are:
+
+            * stealth
+            * curved
+            * triangle_30
+            * triangle_60
+            * triangle_90
+            * angle_30
+            * angle_60
+            * angle_90
+            * inhibitor_round
+    arrow_size : float
+        Specify the arrow size
+    arrow_color : Color, tuple, or array
+        The arrow head color. If an array is given, it must be of shape
+        (..., 4) and provide one rgba color per arrow head. Can also be a
+        colormap name, or appropriate `Function`.
+    """
+    def __init__(self, pos=None, color=(0.5, 0.5, 0.5, 1), width=1,
+                 connect='strip', method='gl', antialias=False, arrows=None,
+                 arrow_type='stealth', arrow_size=None,
+                 arrow_color=(0.5, 0.5, 0.5, 1)):
+        # Do not use the self._changed dictionary as it gets overwritten by
+        # the LineVisual constructor.
+        self._arrows_changed = False
+
+        self._arrow_type = None
+        self._arrow_size = None
+        self._arrows = None
+
+        self.arrow_type = arrow_type
+        self.arrow_size = arrow_size
+        self.arrow_color = arrow_color
+
+        self.arrow_head = _TipAlignedArrowHeadVisual(self)
+
+        # TODO: `LineVisual.__init__` also calls its own `set_data` method,
+        # which triggers an *update* event. This results in a redraw. After
+        # that we call our own `set_data` method, which triggers another
+        # redraw. This should be fixed.
+        GradientLineVisual.__init__(self, pos, color, width, arrow_size,
+                                    connect, method, antialias)
+        TipAlignedArrowVisual.set_data(self, arrows=arrows)
+
+        # Add marker visual for the arrow head
+        self.add_subvisual(self.arrow_head)
