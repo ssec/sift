@@ -1,16 +1,19 @@
-REM Initialize SIFT installation if necessary and run SIFT
 @echo off
+REM Initialize SIFT installation if necessary and run SIFT
 
 set base_dir=%~p0
 
 REM Activate the conda environment
-%base_dir\bin\activate
+call %base_dir%Scripts\activate
 
 REM Create a signal file that we have run conda-unpack
 set installed=%base_dir%.installed
-if not exist "%installed%\" (
+if not exist "%installed%" (
+  echo Running one-time initialization of SIFT installation...
   conda-unpack
-  @echo %base_dir> %installed%
+  echo %base_dir% > %installed%
 )
 
-REM
+echo Running SIFT...
+
+python -m uwsift %*
