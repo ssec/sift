@@ -1485,9 +1485,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # updated metadata with content information (most importantly nav information)
         info = self._workspace.get_info(uuid)
         assert (info is not None)
-        LOG.info('cell_width: {}'.format(repr(info[Info.CELL_WIDTH])))
+        LOG.debug('cell_width: {}'.format(repr(info[Info.CELL_WIDTH])))
 
-        LOG.info('new layer info: {}'.format(repr(info)))
+        LOG.debug('new layer info: {}'.format(repr(info)))
         self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, info)
         if Info.UNIT_CONVERSION not in dataset:
             dataset[Info.UNIT_CONVERSION] = units_conversion(dataset)
