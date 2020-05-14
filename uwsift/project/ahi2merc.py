@@ -85,7 +85,7 @@ def main():
         geos_file = nc_file.replace(idir, odir, 1).replace(".nc", ".tif")
         opath = os.path.dirname(geos_file)
         if not os.path.exists(opath):
-            LOG.info("Creating output directory: %s", opath)
+            LOG.debug("Creating output directory: %s", opath)
             os.makedirs(opath, exist_ok=True)
 
         # Come up with an output mercator filename
@@ -128,7 +128,7 @@ def main():
         ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
 
         # Run gdalwarp
-        LOG.info("Running gdalwarp on '%s' to create '%s'", geos_file, merc_file)
+        LOG.debug("Running gdalwarp on '%s' to create '%s'", geos_file, merc_file)
         proj = DEFAULT_PROJ_STR
         proj = proj + " +over" if lon_east >= 180 else proj
         # Include the '+over' parameter so longitudes are wrapper around the antimeridian

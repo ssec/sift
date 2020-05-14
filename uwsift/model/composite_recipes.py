@@ -101,7 +101,7 @@ class RecipeManager(object):
 
         recipe_dir = os.path.join(config_dir, 'composite_recipes')
         if not os.path.isdir(recipe_dir):
-            LOG.info("creating new composite recipes directory at {}".format(recipe_dir))
+            LOG.debug("creating new composite recipes directory at {}".format(recipe_dir))
             os.makedirs(recipe_dir)
         self.recipe_dir = recipe_dir
         # recipe_name -> recipe object

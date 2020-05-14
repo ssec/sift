@@ -75,9 +75,9 @@ def main():
             continue
         link_dir = os.path.dirname(link_path)
         if not os.path.isdir(link_dir):
-            LOG.info("Creating directory for link: %s", link_dir)
+            LOG.debug("Creating directory for link: %s", link_dir)
             os.makedirs(link_dir)
-        LOG.info("Creating hardlink '%s' -> '%s'", link_path, tif_file)
+        LOG.debug("Creating hardlink '%s' -> '%s'", link_path, tif_file)
         os.link(tif_file, link_path)
     LOG.info("Done mirroring files")
 
