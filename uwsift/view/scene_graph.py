@@ -26,6 +26,7 @@ __author__ = 'davidh'
 
 import logging
 import os
+from numbers import Number
 from uuid import UUID
 
 import numpy as np
@@ -48,6 +49,7 @@ from uwsift.view.cameras import PanZoomProbeCamera
 from uwsift.view.probes import DEFAULT_POINT_PROBE
 from uwsift.view.transform import PROJ4Transform
 from uwsift.view.visuals import (NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer, PrecomputedIsocurve)
+from uwsift import config
 
 LOG = logging.getLogger(__name__)
 DATA_DIR = get_package_data_dir()
@@ -584,7 +586,11 @@ class SceneGraphManager(QObject):
         self.conus_states.transform = STTransform(translate=(0, 0, 45))
 
         self._latlon_grid_color_idx = 1
-        self.latlon_grid = self._init_latlon_grid_layer(color=self._color_choices[self._latlon_grid_color_idx])
+        latlon_grid_resolution = \
+            get_configured_latlon_grid_resolution()
+        self.latlon_grid = self._init_latlon_grid_layer(
+            resolution=latlon_grid_resolution,
+            color=self._color_choices[self._latlon_grid_color_idx])
         self.latlon_grid.transform = STTransform(translate=(0, 0, 45))
 
         self.create_test_image()
@@ -1315,3 +1321,40 @@ class SceneGraphManager(QObject):
 
     def on_data_loaded(self, event):
         pass
+
+
+# TODO move these defaults to common config defaults location
+LATLON_GRID_RESOLUTION_MIN: float = 0.1
+LATLON_GRID_RESOLUTION_DEFAULT: float = 5.0
+LATLON_GRID_RESOLUTION_MAX: float = 10.0
+
+
+def get_configured_latlon_grid_resolution() -> float:
+
+    resolution: float = config.get("latlon_grid.resolution",
+                                   LATLON_GRID_RESOLUTION_DEFAULT)
+
+    if not isinstance(resolution, Number):
+        LOG.warning(
+            f"Invalid configuration for lat/lon grid resolution"
+            f" (='{resolution}') found."
+            f" Using the default {LATLON_GRID_RESOLUTION_DEFAULT}°.")
+        return LATLON_GRID_RESOLUTION_DEFAULT
+
+    if resolution > LATLON_GRID_RESOLUTION_MAX:
+        LOG.warning(
+            f"Configured lat/lon grid resolution {resolution}°"
+            f" is greater than allowed maximum."
+            f" Using the maximum {LATLON_GRID_RESOLUTION_MAX}°.")
+        return LATLON_GRID_RESOLUTION_MAX
+
+    if resolution < LATLON_GRID_RESOLUTION_MIN:
+        LOG.warning(
+            f"Configured lat/lon grid resolution {resolution}°"
+            f" is less than allowed minimum."
+            f" Using the minimum {LATLON_GRID_RESOLUTION_MIN}°.")
+        return LATLON_GRID_RESOLUTION_MIN
+
+    return resolution
+
+
