@@ -1,0 +1,8 @@
+default_colormaps:
+  toa_bidirectional_reflectance: Square Root (Vis Default)
+  toa_brightness_temperature: Rainbow (IR Default)
+  brightness_temperature: Rainbow (IR Default)
+  height_at_cloud_top: Cloud Top Height
+  air_temperature: Rainbow (IR Default)
+  relative_humidity: Rainbow (IR Default)
+  # thermodynamic_phase_of_cloud_water_particles_at_cloud_top: Cloud Phase
