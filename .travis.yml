@@ -3,7 +3,7 @@ env:
   global:
   - NUMPY_VERSION=stable
   - MAIN_CMD='python setup.py'
-  - CONDA_DEPENDENCIES='hdf5 rasterio matplotlib==3.2.0 numba pyproj coveralls pytest pytest-mock
+  - CONDA_DEPENDENCIES='hdf5 rasterio numba pyproj coveralls pytest pytest-mock
     pytest-cov coverage pytest-qt vispy netcdf4 h5py imageio imageio-ffmpeg ffmpeg
     pillow pyshp pyqtgraph shapely sqlalchemy pyqt appdirs pyyaml satpy eccodes scikit-image
     donfig conda-pack'
@@ -36,7 +36,7 @@ install:
       powershell gl-ci-helpers/appveyor/install_opengl.ps1;
   fi;
 - if [ "${TRAVIS_OS_NAME}" == "linux" ] || [ "${TRAVIS_OS_NAME}" == "osx" ]; then
-      conda install -y pygrib;
+      conda install -y pygrib matplotlib==3.2.0;
   fi;
 - pip install -e . --no-deps
 before_script:
