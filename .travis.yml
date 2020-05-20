@@ -36,7 +36,7 @@ install:
       powershell gl-ci-helpers/appveyor/install_opengl.ps1;
   fi;
 - if [ "${TRAVIS_OS_NAME}" == "linux" ] || [ "${TRAVIS_OS_NAME}" == "osx" ]; then
-      conda install -y pygrib matplotlib==3.2.0;
+      conda install -y pygrib matplotlib==3.1.3;
   fi;
 - pip install -e . --no-deps
 before_script:
