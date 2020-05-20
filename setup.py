@@ -201,7 +201,11 @@ setup(
     python_requires='>=3.6',
     extras_require=extras_require,
     packages=find_packages(),
-    # entry_points={},
+    entry_points={
+        "console_scripts": [
+            "SIFT = uwsift.__main__:main",
+        ],
+    },
     cmdclass={
         'bump': BumpCommand,
     }

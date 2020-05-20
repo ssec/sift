@@ -1,13 +1,12 @@
 language: python
 env:
   global:
-  - PYTHON_VERSION=$TRAVIS_PYTHON_VERSION
-  - NUMPY_VERSION=1.17
+  - NUMPY_VERSION=stable
   - MAIN_CMD='python setup.py'
   - CONDA_DEPENDENCIES='hdf5 rasterio matplotlib numba pyproj coveralls pytest pytest-mock
-    pytest-cov pytest-qt vispy netcdf4 h5py imageio imageio-ffmpeg ffmpeg
+    pytest-cov coverage pytest-qt vispy netcdf4 h5py imageio imageio-ffmpeg ffmpeg
     pillow pyshp pyqtgraph shapely sqlalchemy pyqt appdirs pyyaml satpy eccodes scikit-image
-    donfig'
+    donfig conda-pack'
   - PIP_DEPENDENCIES='pytest-xvfb'
   - SETUP_XVFB=True
   - EVENT_TYPE='push pull_request'
@@ -21,30 +20,72 @@ matrix:
   - env: PYTHON_VERSION=3.7
     os: osx
     language: generic
-  - env: PYTHON_VERSION=3.7
-    os: windows
-    language: shell
+  - os: windows
+    env: PYTHON_VERSION=3.7
+    language: c
+  allow_failures:
+    - os: windows
+      env: PYTHON_VERSION=3.7
+      language: c
 install:
 - git clone --depth 1 git://github.com/astropy/ci-helpers.git
 - source ci-helpers/travis/setup_conda.sh
-- if [ "${TRAVIS_OS_NAME}" = "windows" ]; then git clone --depth 1 git://github.com/vtkiorg/gl-ci-helpers.git;
+- if [ "${TRAVIS_OS_NAME}" == "windows" ]; then
+      git clone --depth 1 -b feature-travis-windows git://github.com/djhoese/gl-ci-helpers.git;
+      powershell -Command "Set-ExecutionPolicy RemoteSigned -scope CurrentUser";
+      powershell gl-ci-helpers/appveyor/install_opengl.ps1;
   fi;
-- if [ "${TRAVIS_OS_NAME}" = "windows" ]; then powershell -Command "Set-ExecutionPolicy
-  RemoteSigned -scope CurrentUser"; fi;
-- if [ "${TRAVIS_OS_NAME}" = "windows" ]; then powershell gl-ci-helpers/appveyor/install_opengl.ps1;
+- if [ "${TRAVIS_OS_NAME}" == "linux" ] || [ "${TRAVIS_OS_NAME}" == "osx" ]; then
+      conda install -y pygrib;
   fi;
-- if [ "${TRAVIS_OS_NAME}" = "windows" ]; then pip install PyQt5==5.9; fi;
-- if [ "${TRAVIS_OS_NAME}" = "linux" ] || [ "${TRAVIS_OS_NAME}" = "osx" ]; then conda
-  install pygrib; fi;
+- pip install -e . --no-deps
 before_script:
 - export DISPLAY=:99.0
-- if [ "${TRAVIS_OS_NAME}" = "osx" ]; then ( sudo Xvfb :99 -ac -screen 0 1400x900x24
+- if [ "${TRAVIS_OS_NAME}" == "osx" ]; then ( sudo Xvfb :99 -ac -screen 0 1400x900x24
   +render +iglx; echo ok )& fi;
 script:
-- pip install -e .
-- pytest -s --cov-report term --cov=uwsift uwsift/tests
+# Tests need DirectX to run which is not available on Travis right now
+- if [ "${TRAVIS_OS_NAME}" != "windows" ]; then
+    pytest -s --cov-report term --cov=uwsift uwsift/tests;
+  fi
+# Reinstall SIFT *into* the environment so conda-pack can bundle it
+- pip install --no-deps .
+# Unstable version
+- if [[ $TRAVIS_TAG == "" ]]; then
+    version=$(python -c "from uwsift import __version__; print(__version__)");
+    if [[ "${TRAVIS_OS_NAME}" == "windows" ]]; then
+      ext="zip";
+      platform="windows";
+    else
+      ext="tar.gz";
+      if [[ "${TRAVIS_OS_NAME}" == "osx" ]]; then
+        platform="darwin";
+      else
+        platform="linux";
+      fi;
+    fi;
+    oflag="-o SIFT_${version}dev_${platform}_$(date +%Y%m%d_%H%M%S).${ext}";
+  else
+    oflag="";
+  fi
+- python build_conda_pack.py -j -1 $oflag
+- ls -l
 after_success:
-- if [[ $PYTHON_VERSION == 3.7 ]]; then coveralls; fi;
+- if [[ $PYTHON_VERSION == "3.7" ]]; then coveralls; fi;
+- if [[ $TRAVIS_TAG == "" ]]; then
+    odir="experimental/";
+  else
+    odir="";
+  fi
+- echo "${SFTP_UPLOAD_KEY}" | base64 --decode >/tmp/sftp_rsa
+# if this isn't a pull request, upload the new version
+# if we made a real release, delete all experimental releases
+- if [[ $TRAVIS_PULL_REQUEST_BRANCH == "" ]]; then
+    curl -k --ftp-create-dirs -T SIFT_*.*.*_*.* --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/${odir};
+    if [[ $TRAVIS_TAG != "" ]]; then
+      curl -k -l --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/experimental | grep SIFT_*.*.*_*.* | xargs -I{} -- curl -k -v --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/experimental -Q "DELE {}";
+    fi;
+  fi
 deploy:
   - provider: pypi
     user: __token__

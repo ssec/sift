@@ -185,6 +185,8 @@ class ABI_AHI_Guidebook(Guidebook):
         z = {}
 
         band_short_name = info.get(Info.DATASET_NAME, '???')
+        # FIXME: Don't use pure DATASET_NAME since resolution should not be part of the SHORT_NAME
+        #        And/or don't use SHORT_NAME for grouping
         if Info.SHORT_NAME not in info:
             z[Info.SHORT_NAME] = band_short_name
         else:

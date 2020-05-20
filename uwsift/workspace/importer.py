@@ -30,20 +30,14 @@ from uwsift.util import USER_CACHE_DIR
 from uwsift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
 from .metadatabase import Resource, Product, Content
 
+from satpy import Scene, available_readers, __version__ as satpy_version
+from satpy.dataset import DatasetID
+
 _SATPY_READERS = None  # cache: see `available_satpy_readers()` below
 SATPY_READER_CACHE_FILE = os.path.join(USER_CACHE_DIR,
                                        'available_satpy_readers.yaml')
 
-
 LOG = logging.getLogger(__name__)
-
-try:
-    from satpy import Scene, available_readers, __version__ as satpy_version
-    from satpy.dataset import DatasetID
-except ImportError:
-    LOG.warning("SatPy is not installed and will not be used for importing.")
-    Scene = None
-    DatasetID = None
 
 try:
     from skimage.measure import find_contours

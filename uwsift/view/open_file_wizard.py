@@ -165,6 +165,7 @@ class OpenFileWizard(QtWidgets.QWizard):
             if id_items['name'].checkState():
                 id_dict = {key: id_item.data(QtCore.Qt.UserRole)
                            for key, id_item in id_items.items() if id_item is not None}
+                id_dict['modifiers'] = None
                 selected_ids.append(DatasetID(**id_dict))
         return selected_ids
 
