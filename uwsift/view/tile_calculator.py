@@ -111,9 +111,9 @@ def calc_pixel_size(canvas_point, image_point, canvas_size):
     # (1 - (-1) = 2). Use this ratio to calculate number of
     # screen pixels between the two reference points. Then
     # determine how many image units cover that number of pixels.
-    dx = abs(
+    dx = (
         (image_point[1, 0] - image_point[0, 0]) / (canvas_size[0] * (canvas_point[1, 0] - canvas_point[0, 0]) / 2.))
-    dy = abs(
+    dy = (
         (image_point[1, 1] - image_point[0, 1]) / (canvas_size[1] * (canvas_point[1, 1] - canvas_point[0, 1]) / 2.))
     return dx, dy
 
@@ -169,7 +169,7 @@ def calc_view_extents(image_extents_box: Box, canvas_point, image_point, canvas_
     bot = clip(bot, image_extents_box.bottom, image_extents_box.top)
     top = clip(top, image_extents_box.bottom, image_extents_box.top)
 
-    if (right - left) < CANVAS_EXTENTS_EPSILON or (top - bot) < CANVAS_EXTENTS_EPSILON:
+    if abs(right - left) < CANVAS_EXTENTS_EPSILON or abs(top - bot) < CANVAS_EXTENTS_EPSILON:
         # they are viewing essentially nothing or the image isn't in view
         raise ValueError("Image can't be currently viewed")
 
@@ -224,15 +224,15 @@ def visible_tiles(z_dy, z_dx,
                   x_bottom, x_left, x_top, x_right):
     tile_size = Resolution(tile_size_dy * stride_y, tile_size_dx * stride_x)
     # should be the upper-left corner of the tile centered on the center of the image
-    to = Point(image_center_y + tile_size.dy / 2.,
+    to = Point(image_center_y - tile_size.dy / 2.,
                image_center_x - tile_size.dx / 2.)  # tile origin
 
     # number of data pixels between view edge and originpoint
     pv = Box(
-        bottom=(v_bottom - to.y) / -(z_dy * stride_y),
-        top=(v_top - to.y) / -(z_dy * stride_y),
-        left=(v_left - to.x) / (z_dx * stride_x),
-        right=(v_right - to.x) / (z_dx * stride_x)
+        bottom=abs((v_bottom - to.y) / (z_dy * stride_y)),
+        top=abs((v_top - to.y) / (z_dy * stride_y)),
+        left=abs((v_left - to.x) / (z_dx * stride_x)),
+        right=abs((v_right - to.x) / (z_dx * stride_x))
     )
 
     th = tile_shape_y
@@ -371,9 +371,9 @@ def calc_stride(v_dx, v_dy, t_dx, t_dy, overview_stride_y, overview_stride_x):
     # world distance per pixel for our data
     # compute texture pixels per screen pixels
     tsy = min(overview_stride_y,
-              max(1, np.ceil(v_dy * PREFERRED_SCREEN_TO_TEXTURE_RATIO / t_dy)))
+              max(1, np.ceil(np.abs(v_dy * PREFERRED_SCREEN_TO_TEXTURE_RATIO / t_dy))))
     tsx = min(overview_stride_x,
-              max(1, np.ceil(v_dx * PREFERRED_SCREEN_TO_TEXTURE_RATIO / t_dx)))
+              max(1, np.ceil(np.abs(v_dx * PREFERRED_SCREEN_TO_TEXTURE_RATIO / t_dx))))
 
     return Point(np.int64(tsy), np.int64(tsx))
 
@@ -418,7 +418,7 @@ def calc_vertex_coordinates(tiy, tix, stridey, stridex,
     tile_w = p_dx * tile_shape_x * stridex
     tile_h = p_dy * tile_shape_y * stridey
     origin_x = image_center_x - tile_w / 2.
-    origin_y = image_center_y + tile_h / 2.
+    origin_y = image_center_y - tile_h / 2.
     for x_idx in range(tessellation_level):
         for y_idx in range(tessellation_level):
             start_idx = x_idx * tessellation_level + y_idx
@@ -426,8 +426,8 @@ def calc_vertex_coordinates(tiy, tix, stridey, stridex,
             quads[start_idx * 6:(start_idx + 1) * 6, 0] += origin_x + tile_w * (
                 tix + offset_rez_dx + factor_rez_dx * x_idx / tessellation_level)
             # Origin is upper-left so image goes dow,n
-            quads[start_idx * 6:(start_idx + 1) * 6, 1] *= -tile_h * factor_rez_dy / tessellation_level
-            quads[start_idx * 6:(start_idx + 1) * 6, 1] += origin_y - tile_h * (
+            quads[start_idx * 6:(start_idx + 1) * 6, 1] *= tile_h * factor_rez_dy / tessellation_level
+            quads[start_idx * 6:(start_idx + 1) * 6, 1] += origin_y + tile_h * (
                 tiy + offset_rez_dy + factor_rez_dy * y_idx / tessellation_level)
     return quads
 
@@ -524,20 +524,21 @@ class TileCalculator(object):
 
         self.proj = Proj(projection)
         self.image_extents_box = e = Box(
-            bottom=np.float64(self.ul_origin[0] - self.image_shape[0] * self.pixel_rez.dy),
+            bottom=np.float64(self.ul_origin[0] + self.image_shape[0] * self.pixel_rez.dy),
             top=np.float64(self.ul_origin[0]),
             left=np.float64(self.ul_origin[1]),
             right=np.float64(self.ul_origin[1] + self.image_shape[1] * self.pixel_rez.dx),
         )
+        print(self.pixel_rez, self.image_extents_box)
         # Array of points across the image space to be used as an estimate of image coverage
         # Used when checking if the image is viewable on the current canvas's projection
         self.image_mesh = np.meshgrid(np.linspace(e.left, e.right, IMAGE_MESH_SIZE),
                                       np.linspace(e.bottom, e.top, IMAGE_MESH_SIZE))
         self.image_mesh = np.column_stack((self.image_mesh[0].ravel(), self.image_mesh[1].ravel(),))
-        self.image_center = Point(self.ul_origin.y - self.image_shape[0] / 2. * self.pixel_rez.dy,
+        self.image_center = Point(self.ul_origin.y + self.image_shape[0] / 2. * self.pixel_rez.dy,
                                   self.ul_origin.x + self.image_shape[1] / 2. * self.pixel_rez.dx)
         # size of tile in image projection
-        self.tile_size = Resolution(self.pixel_rez.dy * self.tile_shape[0], self.pixel_rez.dx * self.tile_shape[1])
+        self.tile_size = Resolution(abs(self.pixel_rez.dy * self.tile_shape[0]), abs(self.pixel_rez.dx * self.tile_shape[1]))
         self.overview_stride = self.calc_overview_stride()
 
     def visible_tiles(self, visible_geom, stride=Point(1, 1), extra_tiles_box=Box(0, 0, 0, 0)) -> Box:

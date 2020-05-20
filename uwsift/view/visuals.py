@@ -283,7 +283,7 @@ class TiledGeolocatedImageVisual(ImageVisual):
             self.name,
             self.shape,
             Point(x=self.origin_x, y=self.origin_y),
-            Resolution(dy=abs(self.cell_height), dx=abs(self.cell_width)),
+            Resolution(dy=self.cell_height, dx=self.cell_width),
             self.tile_shape,
             self.texture_shape,
             wrap_lon=self.wrap_lon,
@@ -557,12 +557,17 @@ class TiledGeolocatedImageVisual(ImageVisual):
         img_cmesh = self.transforms.get_transform().map(self.calc.image_mesh)
         # Mask any points that are really far off screen (can't be transformed)
         valid_mask = (np.abs(img_cmesh[:, 0]) < CANVAS_EPSILON) & (np.abs(img_cmesh[:, 1]) < CANVAS_EPSILON)
+        print(img_cmesh)
+        print(valid_mask)
         # The image mesh projected to canvas coordinates (valid only)
         img_cmesh = img_cmesh[valid_mask]
         # The image mesh of only valid "viewable" projected coordinates
         img_vbox = self.calc.image_mesh[valid_mask]
+        print(img_cmesh)
+        print(img_vbox)
 
         if not img_cmesh[:, 0].size or not img_cmesh[:, 0].size:
+            print("No valid points")
             self._viewable_mesh_mask = None
             self._ref1, self._ref2 = None, None
             return
@@ -594,16 +599,21 @@ class TiledGeolocatedImageVisual(ImageVisual):
 
         # Image points transformed to canvas coordinates
         img_cmesh = self.transforms.get_transform().map(self.calc.image_mesh)
+        print(img_cmesh)
         # The image mesh projected to canvas coordinates (valid only)
         img_cmesh = img_cmesh[self._viewable_mesh_mask]
+        print(img_cmesh)
         # The image mesh of only valid "viewable" projected coordinates
         img_vbox = self.calc.image_mesh[self._viewable_mesh_mask]
+        print(img_vbox)
 
         ref_idx_1, ref_idx_2 = get_reference_points(img_cmesh, img_vbox)
+        print(ref_idx_1, ref_idx_2)
         dx, dy = calc_pixel_size(img_cmesh[(self._ref1, self._ref2), :],
                                  img_vbox[(self._ref1, self._ref2), :],
                                  self.canvas.size)
         view_extents = self.calc.calc_view_extents(img_cmesh[ref_idx_1], img_vbox[ref_idx_1], self.canvas.size, dx, dy)
+        print(view_extents, dx, dy)
         return ViewBox(*view_extents, dx=dx, dy=dy)
 
     def _get_stride(self, view_box):
@@ -620,9 +630,10 @@ class TiledGeolocatedImageVisual(ImageVisual):
             tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride, extra_tiles_box=Box(1, 1, 1, 1))
         except ValueError:
             LOG.error("Could not determine viewable image area for '{}'".format(self.name))
+            LOG.debug("DEBUG 'assess' error: ", exc_info=True)
             return False, self._stride, self._latest_tile_box
 
-        num_tiles = (tile_box.bottom - tile_box.top) * (tile_box.right - tile_box.left)
+        num_tiles = abs(tile_box.bottom - tile_box.top) * abs(tile_box.right - tile_box.left)
         LOG.debug("Assessment: Prefer '%s' have '%s', was looking at %r, now looking at %r",
                   preferred_stride, self._stride, self._latest_tile_box, tile_box)
 

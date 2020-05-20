@@ -1127,14 +1127,16 @@ class SatpyImporter(aImporter):
             raise NotImplementedError("Only AreaDefinition datasets can "
                                       "be loaded at this time.")
 
-        half_pixel_x = abs(area.pixel_size_x) / 2.
-        half_pixel_y = abs(area.pixel_size_y) / 2.
+        half_pixel_x = area.pixel_size_x / 2.
+        half_pixel_y = area.pixel_size_y / 2.
+        print(half_pixel_x, half_pixel_y)
+        print(area.area_extent)
 
         return {
             Info.PROJ: area.proj4_string,
             Info.ORIGIN_X: area.area_extent[0] + half_pixel_x,
             Info.ORIGIN_Y: area.area_extent[3] - half_pixel_y,
-            Info.CELL_HEIGHT: -abs(area.pixel_size_y),
+            Info.CELL_HEIGHT: -area.pixel_size_y,
             Info.CELL_WIDTH: area.pixel_size_x,
         }
 
