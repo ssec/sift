@@ -22,6 +22,14 @@ CONFIG_PATHS = [
 # EXPERIMENTAL: This functionality is experimental and may change in future
 #     releases until it is an advertised feature.
 DEFAULT_CONFIGURATION = {
+    # settings for storing temporary or persistent data on the file system
+    # this preset is for using a simple workspace without any caching
+    'storage': {
+        'use_inventory_db': False,
+        'cleanup_file_cache': True
+    },
+
+
     # related to any reading of data
     'data_reading': {
         # What readers to use when opening files
@@ -128,3 +136,6 @@ if satpy_import_path is not None:
 
 
 USE_TILED_GEOLOCATED_IMAGES = config.get("display.use_tiled_geolocated_images")
+
+USE_INVENTORY_DB = config.get("storage.use_inventory_db")
+CLEANUP_FILE_CACHE = config.get("storage.cleanup_file_cache")
