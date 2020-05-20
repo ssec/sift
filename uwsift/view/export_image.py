@@ -279,15 +279,19 @@ class ExportImageHelper(QtCore.QObject):
         offset = 0
         if mode == 'vertical':
             new_im = Image.new(im.mode, (orig_w + fig_w, orig_h))
+            print('vert new_im size: ', new_im.size)
             for i in [im, fig_im]:
                 new_im.paste(i, (offset, 0))
                 offset += i.size[0]
+            print('vert offset: ', offset)
             return new_im
         else:
             new_im = Image.new(im.mode, (orig_w, orig_h + fig_h))
+            print('horiz new_im size: ', new_im.size)
             for i in [im, fig_im]:
                 new_im.paste(i, (0, offset))
                 offset += i.size[1]
+            print('horiz offset: ', offset)
             return new_im
 
     def _create_filenames(self, uuids, base_filename):
