@@ -1128,6 +1128,15 @@ def _search_paths(arglist):
             yield subpath
 
 
+def create_app() -> (app.Application, QtWidgets.QApplication):
+    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+    vispy_app = app.use_app('pyqt5')
+    qt_app = vispy_app.create()
+    if hasattr(QtWidgets.QStyleFactory, 'AA_UseHighDpiPixmaps'):
+        qt_app.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
+    return vispy_app, qt_app
+
+
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Run SIFT")
@@ -1171,11 +1180,7 @@ def main():
 
     LOG.info("Using configuration directory: %s", args.config_dir)
     LOG.info("Using cache directory: %s", args.cache_dir)
-    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
-    vispy_app = app.use_app('pyqt5')
-    qt_app = vispy_app.create()
-    if hasattr(QtWidgets.QStyleFactory, 'AA_UseHighDpiPixmaps'):
-        qt_app.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
+    vispy_app, qt_app = create_app()
 
     # Add our own fonts to Qt windowing system
     font_pattern = os.path.join(get_package_data_dir(), 'fonts', '*')
