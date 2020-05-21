@@ -15,7 +15,7 @@ def _get_data_array_generator(data_arrs):
 def test_satpy_importer_basic(tmpdir, monkeypatch, mocker):
     """Basic import test using Satpy."""
     from uwsift.workspace import Workspace
-    from uwsift.model.layer import DocBasicLayer, DocAlgebraicLayer
+    from uwsift.model.layer import DocBasicLayer
     from uuid import uuid1 as uuidgen
     ws = Workspace(str(tmpdir))
     c01_attrs = {
@@ -65,4 +65,3 @@ def test_satpy_importer_basic(tmpdir, monkeypatch, mocker):
 
     np.testing.assert_equal(data, 1)
     assert info.get(Info.STANDARD_NAME) == "unknown"
-
