@@ -24,9 +24,12 @@ matrix:
     env: PYTHON_VERSION=3.7
     language: c
   allow_failures:
-    - os: windows
-      env: PYTHON_VERSION=3.7
-      language: c
+  - os: windows
+    env: PYTHON_VERSION=3.7
+    language: c
+before_install:
+  - openssl aes-256-cbc -K $encrypted_f8c2318670e7_key -iv $encrypted_f8c2318670e7_iv
+    -in id_rsa_sift_sftp.enc -out /tmp/sftp_rsa -d
 install:
 - git clone --depth 1 git://github.com/astropy/ci-helpers.git
 - source ci-helpers/travis/setup_conda.sh
@@ -71,13 +74,12 @@ script:
 - python build_conda_pack.py -j -1 $oflag
 - ls -l
 after_success:
-- if [[ $PYTHON_VERSION == "3.7" ]]; then coveralls; fi;
+- if [ $PYTHON_VERSION == "3.7" ] && [ "${TRAVIS_OS_NAME}" != "windows" ]; then coveralls;
 - if [[ $TRAVIS_TAG == "" ]]; then
     odir="experimental/";
   else
     odir="";
   fi
-- echo "${SFTP_UPLOAD_KEY}" | base64 --decode >/tmp/sftp_rsa
 # if this isn't a pull request, upload the new version
 # if we made a real release, delete all experimental releases
 - if [[ $TRAVIS_PULL_REQUEST_BRANCH == "" ]]; then
@@ -87,12 +89,12 @@ after_success:
     fi;
   fi
 deploy:
-  - provider: pypi
-    user: __token__
-    password:
-      secure: X4kzZ61c2Vc45zMnztnQryKkWYzCNOwPCBZ6s9dFrlLw6YRwM7StwlYSREZMVV77zAVPnj8gEM1x1j6Rzl5+BL/w7zsrJpNv6uc1hR+CPysIBmnhHQPXmIcj/GakRGRL+0kDm2hB+ALVVwzI5GZC8KwHeDW/R8Fou32Vxxc13aU2eZcFupVetN664K7WP76ZLS4Ep3YVjSvlziQ0hVZmYQKE84Uvep/t74Pa82N/R+iXRddrGaLbiCgF7uOxW9sOHhkVPaWtpZS5cECCJyMQCgZaN3S5YyRrtqcx7wnBVTUes1OdkNds7HuH0Yl/VYmc5DxEDn4VpGSjYhi7sk+mcr4b3GosWXAOsRQPHr4FlmAiM3fWAQw92MvUsfA7++KEOKqyF6w3uIB8TR3UXTR9SyWg9xmBdACikXjRaO+h85NuHbXSr0Urffbdr96kM/DrsDeMjJ/oGOvhXYRr/9aoSs506FoEK+/5htBciyPLmUUMZpPUqpbMd+7/3weNIXseSj1pRx8HFKIdiH9VxQHkU3LTS01GWo0fo3mPh6GY0fQDsqajGCQqXMtecHuQ8jGKeA3QQuVYGT/BdDn5/71hH+ZqNlUlUrgU7W53xD6ppnuoewH5Vv3HlTGxOJ16gNRgzC6wLrApg5tey6Mh2GEtiyZZQMmomwUT4JGl1tjhorU=
-    distributions: sdist
-    skip_existing: true
-    on:
-      tags: true
-      repo: ssec/sift
+- provider: pypi
+  user: __token__
+  password:
+    secure: X4kzZ61c2Vc45zMnztnQryKkWYzCNOwPCBZ6s9dFrlLw6YRwM7StwlYSREZMVV77zAVPnj8gEM1x1j6Rzl5+BL/w7zsrJpNv6uc1hR+CPysIBmnhHQPXmIcj/GakRGRL+0kDm2hB+ALVVwzI5GZC8KwHeDW/R8Fou32Vxxc13aU2eZcFupVetN664K7WP76ZLS4Ep3YVjSvlziQ0hVZmYQKE84Uvep/t74Pa82N/R+iXRddrGaLbiCgF7uOxW9sOHhkVPaWtpZS5cECCJyMQCgZaN3S5YyRrtqcx7wnBVTUes1OdkNds7HuH0Yl/VYmc5DxEDn4VpGSjYhi7sk+mcr4b3GosWXAOsRQPHr4FlmAiM3fWAQw92MvUsfA7++KEOKqyF6w3uIB8TR3UXTR9SyWg9xmBdACikXjRaO+h85NuHbXSr0Urffbdr96kM/DrsDeMjJ/oGOvhXYRr/9aoSs506FoEK+/5htBciyPLmUUMZpPUqpbMd+7/3weNIXseSj1pRx8HFKIdiH9VxQHkU3LTS01GWo0fo3mPh6GY0fQDsqajGCQqXMtecHuQ8jGKeA3QQuVYGT/BdDn5/71hH+ZqNlUlUrgU7W53xD6ppnuoewH5Vv3HlTGxOJ16gNRgzC6wLrApg5tey6Mh2GEtiyZZQMmomwUT4JGl1tjhorU=
+  distributions: sdist
+  skip_existing: true
+  on:
+    tags: true
+    repo: ssec/sift
