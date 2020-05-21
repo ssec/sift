@@ -16,7 +16,7 @@ unset PYTHONPATH
 export PYTHONNOUSERSITE=1
 
 # Activate the conda-pack'd environment
-source $BASE/activate
+source $BASE/bin/activate
 
 # Check if we already ran conda-unpack
 install_signal="${BASE}/.installed"

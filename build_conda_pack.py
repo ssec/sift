@@ -55,13 +55,13 @@ def main():
     script_dir = os.path.realpath(os.path.dirname(__file__))
     if 'nux' in sys.platform:
         script = os.path.join(script_dir, 'bundle_scripts', 'SIFT.sh')
-        shutil.copyfile(script, os.path.join(dst, 'SIFT.sh'))
+        shutil.copy(script, os.path.join(dst, 'SIFT.sh'))
     elif 'darwin' in sys.platform:
         script = os.path.join(script_dir, 'bundle_scripts', 'SIFT.sh')
-        shutil.copyfile(script, os.path.join(dst, 'SIFT.command'))
+        shutil.copy(script, os.path.join(dst, 'SIFT.command'))
     elif 'win' in sys.platform:
         script = os.path.join(script_dir, 'bundle_scripts', 'SIFT.bat')
-        shutil.copyfile(script, os.path.join(dst, 'SIFT.bat'))
+        shutil.copy(script, os.path.join(dst, 'SIFT.bat'))
     else:
         raise RuntimeError(f"Unknown platform: {sys.platform}")
 
