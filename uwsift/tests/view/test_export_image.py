@@ -121,7 +121,7 @@ def test_create_colorbar(size, mode, exp, monkeypatch, window):
 @pytest.mark.parametrize("mode,cbar_size,exp", [
     (None, (0, 0), (100, 100)),
     ('vertical', (10, 120), (108, 100)),
-    ('horizontal', (120, 10), (100, 109)),
+    ('horizontal', (110, 10), (100, 109)),
 ])
 def test_append_colorbar(mode, cbar_size, exp, monkeypatch, window):
     """Test colorbar is appended to the appropriate location given the colorbar append direction."""
