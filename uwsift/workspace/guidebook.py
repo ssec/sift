@@ -194,7 +194,7 @@ class ABI_AHI_Guidebook(Guidebook):
         if Info.LONG_NAME not in info:
             z[Info.LONG_NAME] = info.get(Info.SHORT_NAME, z[Info.SHORT_NAME])
 
-        z.setdefault(info.get(Info.STANDARD_NAME, 'unknown'))
+        z.setdefault(Info.STANDARD_NAME, info.get(Info.STANDARD_NAME, 'unknown'))
         if info.get(Info.UNITS, z.get(Info.UNITS)) in ['K', 'Kelvin']:
             z[Info.UNITS] = 'kelvin'
 
