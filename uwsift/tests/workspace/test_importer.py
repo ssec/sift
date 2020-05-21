@@ -103,6 +103,7 @@ def test_satpy_importer_basic(tmpdir, monkeypatch, mocker):
         ),
         'start_time': datetime(2018, 9, 10, 17, 0, 31, 100000),
         'end_time': datetime(2018, 9, 10, 17, 11, 7, 800000),
+        'standard_name': 'toa_bidirectional_reflectance',
     }
     data_arr = xr.DataArray(da.from_array(np.empty((5, 5), dtype=np.float64), chunks='auto'),
                             attrs=attrs)
@@ -119,3 +120,4 @@ def test_satpy_importer_basic(tmpdir, monkeypatch, mocker):
     products = list(imp.merge_products())
     assert len(products) == 1
     assert products[0].info[Info.CENTRAL_WAVELENGTH] == 2.0
+    assert products[0].info[Info.STANDARD_NAME] == 'toa_bidirectional_reflectance'
