@@ -84,7 +84,7 @@ after_success:
 # if this isn't a pull request, upload the new version
 # if we made a real release, delete all experimental releases
 - if [[ $TRAVIS_PULL_REQUEST_BRANCH == "" ]]; then
-    curl --progress-bar -k --ftp-create-dirs -T SIFT_*.*.*_*.* --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/${odir};
+    travis_wait curl -k --ftp-create-dirs -T SIFT_*.*.*_*.* --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/${odir};
     if [[ $TRAVIS_TAG != "" ]]; then
       curl -k -l --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/experimental | grep SIFT_*.*.*_*.* | xargs -I{} -- curl -k -v --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/experimental -Q "DELE {}";
     fi;
