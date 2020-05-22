@@ -55,11 +55,6 @@ from uwsift.view.scene_graph import SceneGraphManager
 from uwsift.workspace import Workspace
 from uwsift.workspace.collector import ResourceSearchPathCollector
 
-app_object = app.use_app('pyqt5')
-APP: QtGui.QApplication = app_object.native
-# LOOP = QEventLoop(APP)
-# asyncio.set_event_loop(LOOP)  # NEW must set the event loop
-
 LOG = logging.getLogger(__name__)
 PROGRESS_BAR_MAX = 1000
 STATUS_BAR_DURATION = 2000  # ms
@@ -654,7 +649,7 @@ class Main(QtGui.QMainWindow):
         LOG.debug("Potential tracks: {}".format(repr(doc.track_order)))
         self._timeline_scene = SiftDocumentAsFramesInTracks(doc, self.workspace)
         gv.setScene(self._timeline_scene)
-        APP.aboutToQuit.connect(self._timeline_scene.clear)
+        QtWidgets.QApplication.instance().aboutToQuit.connect(self._timeline_scene.clear)
 
         self._timeline_scene.sync_items()
 
@@ -1133,6 +1128,15 @@ def _search_paths(arglist):
             yield subpath
 
 
+def create_app() -> (app.Application, QtWidgets.QApplication):
+    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+    vispy_app = app.use_app('pyqt5')
+    qt_app = vispy_app.create()
+    if hasattr(QtWidgets.QStyleFactory, 'AA_UseHighDpiPixmaps'):
+        qt_app.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
+    return vispy_app, qt_app
+
+
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Run SIFT")
@@ -1176,10 +1180,7 @@ def main():
 
     LOG.info("Using configuration directory: %s", args.config_dir)
     LOG.info("Using cache directory: %s", args.cache_dir)
-    app.create()
-    APP.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
-    if hasattr(QtWidgets.QStyleFactory, 'AA_UseHighDpiPixmaps'):
-        APP.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
+    vispy_app, qt_app = create_app()
 
     # Add our own fonts to Qt windowing system
     font_pattern = os.path.join(get_package_data_dir(), 'fonts', '*')
@@ -1204,8 +1205,7 @@ def main():
     window.show()
     # bring window to front
     window.raise_()
-    # LOOP.run_forever()
-    app.run()
+    vispy_app.run()
 
 
 if __name__ == '__main__':
