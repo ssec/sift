@@ -20,10 +20,7 @@ from vispy.visuals.transforms import BaseTransform
 from vispy.visuals.transforms._util import arg_to_vec4
 
 
-GLSL_MATH_CONSTANTS = glsl.get("math/constants.glsl")
-
-
-class EasyVariableDeclaration(TextExpression):
+class VariableDeclaration(TextExpression):
     def __init__(self, name: str, text: str):
         self._name = name
         super().__init__(text)
@@ -37,19 +34,20 @@ class EasyVariableDeclaration(TextExpression):
 
 
 class GLSL_Adapter(TextExpression):
-    def __init__(self, file_path: str):
-        self._content = glsl.get(file_path)
+
+    _expr_list = []
+
+    def __init__(self, text: str):
         guard_pattern = re.compile(r'^#ifndef\s*(?P<guard>_[A-Za-z]*_)')
-        self.expr_list = []
         _guard_flag = False
-        for line in self._content.splitlines():
+        for line in text.splitlines():
             match_guard = guard_pattern.match(line)
             var_match = find_program_variables(line)
             if match_guard is not None:
                 _name = match_guard['guard']
                 _text = match_guard.group(0) + os_linesep + f"#define {_name}"
-                self.expr_list.append(EasyVariableDeclaration(_name, _text))
-                self.expr_list.append(EasyVariableDeclaration(_name+"EIF",
+                self._expr_list.append(VariableDeclaration(_name, _text))
+                self._expr_list.append(VariableDeclaration(_name+"EIF",
                                                               "#endif"))
                 _guard_flag = True
             elif var_match is not None:
@@ -59,35 +57,24 @@ class GLSL_Adapter(TextExpression):
                         "More than one variable definition per line "
                         "not supported.")
                 elif len(key_list) != 0:
-                    self.expr_list.append(EasyVariableDeclaration(key_list[0],
+                    self._expr_list.append(VariableDeclaration(key_list[0],
                                                                   line))
         if _guard_flag:
-            tmp = self.expr_list[1]
-            self.expr_list[1:-1] = self.expr_list[2:]
-            self.expr_list[-1] = tmp
-        # TODO(mk):
-        #   - check for include guards
-        #   - replace include guards with define of Symbol
-        #   - check for vars and parse them
-
-
-class VariableDeclaration(TextExpression):
-
-    def __init__(self, text: str):
-        parse_res = find_program_variables(text)
-        key_list = list(parse_res.keys())
-        if len(key_list) > 1:
-            raise ValueError("More than one variable definition per line "
-                             "not supported.")
-        self._name = key_list[0]
-        super().__init__(text)
-
-    def definition(self, names, version=None, shader=None):
-        return self.text
+            # in case of include guards, shift #endif to bottom of
+            # expression list to match #ifndef
+            eif_token = self._expr_list[1]
+            self._expr_list[1:-1] = self._expr_list[2:]
+            self._expr_list[-1] = eif_token
 
     @property
-    def name(self):
-        return self._name
+    def expr_list(self):
+        return self._expr_list
+
+
+class GLSL_FileAdapter(GLSL_Adapter):
+    def __init__(self, file_path: str):
+        text = glsl.get(file_path)
+        super(GLSL_FileAdapter, self).__init__(text)
 
 
 COMMON_VALUES = """const float SPI = 3.14159265359;
@@ -101,11 +88,8 @@ const float M_TWO_D_PI = 2.0/M_PI;                  /* 2/pi */
 const float M_TWOPI_HALFPI = 2.5 / M_PI;            /* 2.5*pi */
 """
 
-m_consts = GLSL_Adapter("math/constants.glsl")
-m_consts = GLSL_Adapter("math/constants.glsl").expr_list
-#TODO: Unify this into GLSL_Adapter
-COMMON_VALUES = [VariableDeclaration(line)
-                 for line in COMMON_VALUES.splitlines()]
+math_consts = GLSL_FileAdapter("math/constants.glsl").expr_list
+COMMON_VALUES = GLSL_Adapter(COMMON_VALUES).expr_list
 M_FORTPI = M_PI_4 = 0.78539816339744828
 M_HALFPI = M_PI_2 = 1.57079632679489660
 
@@ -743,8 +727,7 @@ class PROJ4Transform(BaseTransform):
         super(PROJ4Transform, self).__init__()
 
         # Add common definitions and functions
-        # for d in COMMON_VALUES + m_consts + (pj_tsfn, pj_phi2, hypot):
-        for d in m_consts + COMMON_VALUES + [pj_tsfn, pj_phi2, hypot]:
+        for d in math_consts + COMMON_VALUES + [pj_tsfn, pj_phi2, hypot]:
             self._shader_map._add_dep(d)
             self._shader_imap._add_dep(d)
 
