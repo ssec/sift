@@ -36,6 +36,7 @@ __author__ = 'davidh'
 import logging
 import os
 from numbers import Number
+from typing import Dict, Optional
 from uuid import UUID
 
 import numpy as np
@@ -51,7 +52,7 @@ from vispy.visuals.transforms import STTransform, MatrixTransform, ChainTransfor
 from vispy.gloo.util import _screenshot
 
 from uwsift.common import DEFAULT_ANIMATION_DELAY, Info, Kind, Tool, Presentation
-from uwsift.model.document import DocLayerStack, DocBasicLayer
+from uwsift.model.document import DocLayerStack, DocBasicLayer, Document
 from uwsift.queue import TASK_DOING, TASK_PROGRESS
 from uwsift.util import get_package_data_dir
 from uwsift.view.cameras import PanZoomProbeCamera
@@ -651,7 +652,7 @@ class SceneGraphManager(QObject):
         image.transform *= STTransform(translate=(0, 0, -50.0))
         self._test_img = image
 
-    def set_projection(self, projection_name, proj_info, center=None):
+    def set_projection(self, projection_name: str, proj_info: dict, center=None):
         self.main_map.transform = PROJ4Transform(proj_info['proj4_str'])
         center = center or proj_info["default_center"]
         width = proj_info["default_width"] / 2.
@@ -838,7 +839,7 @@ class SceneGraphManager(QObject):
             self.latlon_grid.set_data(color=self._color_choices[self._latlon_grid_color_idx])
             self.latlon_grid.visible = True
 
-    def change_tool(self, name):
+    def change_tool(self, name: Tool):
         prev_tool = self._current_tool
         if name == prev_tool:
             # it's the same tool
@@ -1136,7 +1137,7 @@ class SceneGraphManager(QObject):
         self.update()
         return res
 
-    def change_layers_visibility(self, layers_changed: dict):
+    def change_layers_visibility(self, layers_changed: Dict[UUID, bool]):
         for uuid, visible in layers_changed.items():
             self.set_layer_visible(uuid, visible)
 
@@ -1144,7 +1145,7 @@ class SceneGraphManager(QObject):
         self.rebuild_all()
         # raise NotImplementedError("layer set change not implemented in SceneGraphManager")
 
-    def _connect_doc_signals(self, document):
+    def _connect_doc_signals(self, document: Document):
         document.didReorderLayers.connect(self._rebuild_layer_order)  # current layer set changed z/anim order
         document.didAddBasicLayer.connect(self.add_basic_layer)  # layer added to one or more layer sets
         document.didAddCompositeLayer.connect(
@@ -1164,7 +1165,7 @@ class SceneGraphManager(QObject):
     def set_frame_number(self, frame_number=None):
         self.layer_set.next_frame(None, frame_number)
 
-    def set_layer_visible(self, uuid, visible=None):
+    def set_layer_visible(self, uuid: UUID, visible: Optional[bool] = None):
         image = self.image_elements.get(uuid, None)
         if image is None:
             return
