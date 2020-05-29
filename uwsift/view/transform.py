@@ -9,6 +9,7 @@ possible to implement in Matrix transforms that come with VisPy.
 
 import re
 from os import linesep as os_linesep
+from typing import List
 
 import numpy as np
 from pyproj import Proj, pj_ellps
@@ -21,23 +22,45 @@ from vispy.visuals.transforms._util import arg_to_vec4
 
 
 class VariableDeclaration(TextExpression):
-    def __init__(self, name: str, text: str):
+    """TextExpression subclass for exposing GLSL variables to vispy glsl interface.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+        text : str
+            Rvalue to be assigned to the variable.
+    """
+
+    def __init__(self, name: str, text: str) -> None:
         self._name = name
         super().__init__(text)
 
-    def definition(self, names, version=None, shader=None):
+    def definition(self, names, version=None, shader=None) -> str:
         return self.text
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._name
 
 
 class GLSL_Adapter(TextExpression):
+    """TextExpression subclass for parsing Macro definitions from .glsl header files and exposing
+        them to the vispy glsl interface and make them accessible for vispy's shader code
+        processing. Assumes .glsl code to be parsed is accessible as python string. For reading
+        .glsl header code from a file see GLSL_FileAdapter subclass.
 
+            Parameters
+            ----------
+            text : str
+                Actual .glsl code string.
+    """
     _expr_list = []
 
-    def __init__(self, text: str):
+    def __init__(self, text: str) -> None:
+        # Regular expression for parsing possibly include-guarded macro definitions from .glsl
+        # header files; makes strong assumptions about formatting of macro names by assuming
+        # underscores in front of and behind the macro name. In line with vispy .glsl shader code.
         guard_pattern = re.compile(r'^#ifndef\s*(?P<guard>_[A-Za-z]*_)')
         _guard_flag = False
         for line in text.splitlines():
@@ -47,8 +70,7 @@ class GLSL_Adapter(TextExpression):
                 _name = match_guard['guard']
                 _text = match_guard.group(0) + os_linesep + f"#define {_name}"
                 self._expr_list.append(VariableDeclaration(_name, _text))
-                self._expr_list.append(VariableDeclaration(_name+"EIF",
-                                                              "#endif"))
+                self._expr_list.append(VariableDeclaration(_name+"EIF", "#endif"))
                 _guard_flag = True
             elif var_match is not None:
                 key_list = list(var_match.keys())
@@ -67,12 +89,19 @@ class GLSL_Adapter(TextExpression):
             self._expr_list[-1] = eif_token
 
     @property
-    def expr_list(self):
+    def expr_list(self) -> List[VariableDeclaration]:
         return self._expr_list
 
 
 class GLSL_FileAdapter(GLSL_Adapter):
-    def __init__(self, file_path: str):
+    """GLSL_Adapter subclass adding the functionality to read .glsl header code from files.
+
+                Parameters
+                ----------
+                file_path : str
+                    Path to .glsl header file.
+        """
+    def __init__(self, file_path: str) -> None:
         text = glsl.get(file_path)
         super(GLSL_FileAdapter, self).__init__(text)
 
