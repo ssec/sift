@@ -1186,6 +1186,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didAddBasicLayer = pyqtSignal(tuple, UUID, Presentation)
     # comp layer is derived from multiple basic layers and has its own UUID
     didAddCompositeLayer = pyqtSignal(tuple, UUID, Presentation)
+    didAddVectorsLayer = pyqtSignal(tuple, UUID, Presentation)
     # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
     didRemoveLayers = pyqtSignal(tuple, list, int, int)
     willPurgeLayer = pyqtSignal(UUID)  # UUID of the layer being removed
@@ -1496,11 +1497,15 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             dataset[Info.FAMILY] = self.family_for_product_or_layer(dataset)
         presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
 
-        # signal updates from the document
-        self.didAddBasicLayer.emit(reordered_indices, dataset.uuid, presentation)
-        self._add_layer_family(dataset)
-        # update any RGBs that could use this to make an RGB
-        self.sync_composite_layer_prereqs([dataset[Info.SCHED_TIME]])
+        if dataset[Info.KIND] == Kind.VECTORS:
+            self.didAddVectorsLayer.emit(reordered_indices, dataset.uuid, presentation)
+            self._add_layer_family(dataset)
+        else:
+            # signal updates from the document
+            self.didAddBasicLayer.emit(reordered_indices, dataset.uuid, presentation)
+            self._add_layer_family(dataset)
+            # update any RGBs that could use this to make an RGB
+            self.sync_composite_layer_prereqs([dataset[Info.SCHED_TIME]])
 
         return uuid, dataset, active_content_data
 

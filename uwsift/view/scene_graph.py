@@ -61,7 +61,7 @@ from uwsift.view.cameras import PanZoomProbeCamera
 from uwsift.view.probes import DEFAULT_POINT_PROBE
 from uwsift.view.transform import PROJ4Transform
 from uwsift.view.visuals import (NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer,
-                                 PrecomputedIsocurve, GammaImage)
+                                 PrecomputedIsocurve, GammaImage, Vectors)
 
 LOG = logging.getLogger(__name__)
 DATA_DIR = get_package_data_dir()
@@ -1100,6 +1100,22 @@ class SceneGraphManager(QObject):
             # algebraic layer
             return self.add_basic_layer(new_order, uuid, p)
 
+    def add_vectors_layer(self, new_order: tuple, uuid: UUID, p: Presentation):
+        layer = self.document[uuid]
+        if not layer.is_valid:
+            LOG.info('unable to add an invalid vectors layer, will try again later when layer changes')
+            return
+        points = self.workspace.get_content(uuid, kind=p.kind)
+        if points is None:
+            LOG.info('layer contains no vectors: {}'.format(uuid))
+            return
+        vectors = Vectors(points, parent=self.main_map)
+        vectors.transform *= STTransform(translate=(0., 0., 50.))
+        vectors.name = str(uuid)
+        self.image_elements[uuid] = vectors
+        self.layer_set.add_layer(vectors)
+        self.on_view_change(None)
+
     def change_composite_layers(self, new_order: tuple, uuid_list: list, presentations: list):
         for uuid, presentation in zip(uuid_list, presentations):
             self.change_composite_layer(None, uuid, presentation)
@@ -1195,6 +1211,7 @@ class SceneGraphManager(QObject):
         document.didAddBasicLayer.connect(self.add_basic_layer)  # layer added to one or more layer sets
         document.didAddCompositeLayer.connect(
             self.add_composite_layer)  # layer derived from other layers (either basic or composite themselves)
+        document.didAddVectorsLayer.connect(self.add_vectors_layer)
         document.didRemoveLayers.connect(self._remove_layer)  # layer removed from current layer set
         document.willPurgeLayer.connect(self._purge_layer)  # layer removed from document
         document.didSwitchLayerSet.connect(self.rebuild_new_layer_set)

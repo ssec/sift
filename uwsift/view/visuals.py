@@ -1723,3 +1723,44 @@ class TipAlignedArrowVisual(ArrowVisual):
 
         # Add marker visual for the arrow head
         self.add_subvisual(self.arrow_head)
+
+
+class VectorsVisual(TipAlignedArrowVisual):
+    default_colors = {
+        "red": (1., 0., 0., 1.),
+        "green": (0., 1., 0., 1.),
+    }
+
+    def __init__(self, arrows: np.ndarray, colors: Optional[np.ndarray] = None):
+        # if colors not set, use green-red gradient
+        # if only one color given, use only one color
+        # otherwise two colors need to be provided by caller, one for each point
+        # in point pairs
+
+        n_points, n_coordinates = arrows.shape
+        if n_coordinates != 4:
+            raise AttributeError("Expected 4 coordinates per arrow.")
+
+        points = arrows.reshape(-1, 2)
+
+        # Remember that the second vertex is used as center point for the
+        # arrow head, and the first vertex is only used for determining
+        # the arrow head orientation.
+        if colors is None:
+            colors = np.array([np.array(self.default_colors["green"]),
+                               np.array(self.default_colors["red"])])
+            colors = np.tile(colors, (n_points, 1))
+        elif colors.ndim == 1 and colors.size == 4:
+            pass
+        elif colors.ndim == 2 and colors.shape[0] == 2:
+            colors = np.tile(colors, (n_points, 1))
+        else:
+            raise AttributeError("Too many colors provided or colors ill-formed, "
+                                 "provide at-most two colors in RGBA format.")
+
+        super().__init__(pos=points, arrows=arrows, arrow_type='triangle_30',
+                         color=colors, arrow_color='w', arrow_size=10,
+                         connect='segments', method='gl')
+
+
+Vectors = create_visual_node(VectorsVisual)
