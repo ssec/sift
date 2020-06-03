@@ -1151,7 +1151,7 @@ def _search_paths(arglist):
             yield subpath
 
 
-def main():
+def main() -> int:
     import argparse
     parser = argparse.ArgumentParser(description="Run SIFT")
     parser.add_argument("-w", "--workspace-dir", default=WORKSPACE_DB_DIR,
@@ -1225,8 +1225,14 @@ def main():
     window.show()
     # bring window to front
     window.raise_()
-    # LOOP.run_forever()
-    app.run()
+    # run the event loop until the user closes the application
+    exit_code = app.run()
+    # Workaround PyCharm issue: The PyCharm dev console raises a TypeError if
+    # None is passed to 'sys.exit()'. Thus replace None by 0, both represent
+    # success for 'sys.exit()'.
+    if exit_code is not None:
+        return exit_code
+    return 0
 
 
 if __name__ == '__main__':
