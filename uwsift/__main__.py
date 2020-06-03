@@ -44,7 +44,8 @@ from uwsift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from uwsift.ui.pov_main_ui import Ui_MainWindow
 from uwsift.util import (WORKSPACE_DB_DIR, DOCUMENT_SETTINGS_DIR,
-                         get_package_data_dir, check_grib_definition_dir, check_imageio_deps)
+                         get_package_data_dir, check_grib_definition_dir, check_imageio_deps,
+                         HeapProfiler)
 from uwsift.util.logger import configure_loggers
 from uwsift.view.colormap_editor import ColormapEditor
 from uwsift.view.create_algebraic import CreateAlgebraicDialog
@@ -1174,11 +1175,16 @@ def main() -> int:
                         help="Specify center longitude and latitude for camera")
     parser.add_argument("--desktop", type=int, default=0,
                         help="Number of monitor/display to show the main window on (0 for main, 1 for secondary, etc.)")
+    parser.add_argument("--profile-heap", type=float, help="take a snapshot of the heap in the given interval (in seconds)")
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count",
                         default=int(os.environ.get("VERBOSITY", 2)),
                         help='each occurrence increases verbosity 1 level through '
                              'ERROR-WARNING-Info-DEBUG (default Info)')
     args = parser.parse_args()
+
+    if args.profile_heap:
+        heap_profiler = HeapProfiler(args.profile_heap)
+        heap_profiler.start()
 
     # levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
     # level = levels[min(3, args.verbosity)]
