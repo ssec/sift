@@ -477,7 +477,8 @@ class Main(QtGui.QMainWindow):
         self.queue.add("load_files", bop(paths), "Open {} files".format(len(paths)), and_then=bopf, interactive=False)
         # don't use <algebraic layer ...> type paths
         self._last_open_dir = _common_path_prefix([x for x in paths if x[0] != '<']) or self._last_open_dir
-        self.update_recent_file_menu()
+        if USE_INVENTORY_DB:
+            self.update_recent_file_menu()
 
     def activate_products_by_uuid(self, uuids):
         uuids = list(uuids)
@@ -903,7 +904,8 @@ class Main(QtGui.QMainWindow):
 
     def _remove_paths_from_cache(self, paths):
         self.workspace.remove_all_workspace_content_for_resource_paths(paths)
-        self.update_recent_file_menu()
+        if USE_INVENTORY_DB:
+            self.update_recent_file_menu()
 
     def open_from_cache(self, *args, **kwargs):
         def _activate_products_for_names(uuids):
@@ -913,7 +915,8 @@ class Main(QtGui.QMainWindow):
         def _purge_content_for_names(uuids):
             LOG.info('removing cached products with uuids: {}'.format(repr(uuids)))
             self.workspace.purge_content_for_product_uuids(uuids, also_products=False)
-            self.update_recent_file_menu()
+            if USE_INVENTORY_DB:
+                self.update_recent_file_menu()
 
         if not self._open_cache_dialog:
             self._open_cache_dialog = OpenCacheDialog(self,
@@ -979,9 +982,10 @@ class Main(QtGui.QMainWindow):
         exit_action.setShortcut("Ctrl+Q")
         exit_action.triggered.connect(QtWidgets.QApplication.quit)
 
-        open_cache_action = QtWidgets.QAction("Open from Cache...", self)
-        open_cache_action.setShortcut("Ctrl+A")
-        open_cache_action.triggered.connect(self.open_from_cache)
+        if USE_INVENTORY_DB:
+            open_cache_action = QtWidgets.QAction("Open from Cache...", self)
+            open_cache_action.setShortcut("Ctrl+A")
+            open_cache_action.triggered.connect(self.open_from_cache)
 
         # open_glob_action = QtWidgets.QAction("Open Filename Pattern...", self)
         # open_glob_action.setShortcut("Ctrl+Shift+O")
@@ -994,10 +998,12 @@ class Main(QtGui.QMainWindow):
         menubar = self.ui.menubar
         file_menu = menubar.addMenu('&File')
         self.addAction(open_action)  # add it to the main window, not the menu (hide it)
-        file_menu.addAction(open_cache_action)
-        # file_menu.addAction(open_glob_action)
+        if USE_INVENTORY_DB:
+            file_menu.addAction(open_cache_action)
         file_menu.addAction(open_wizard_action)
-        self._recent_files_menu = file_menu.addMenu('Open Recent')
+        if USE_INVENTORY_DB:
+            # file_menu.addAction(open_glob_action)
+            self._recent_files_menu = file_menu.addMenu('Open Recent')
 
         screenshot_action = QtWidgets.QAction("Export Image", self)
         screenshot_action.setShortcut("Ctrl+I")
@@ -1101,7 +1107,8 @@ class Main(QtGui.QMainWindow):
         view_menu.addAction(cycle_borders)
         view_menu.addAction(cycle_grid)
 
-        self.update_recent_file_menu()
+        if USE_INVENTORY_DB:
+            self.update_recent_file_menu()
         menubar.setEnabled(True)
 
     def _init_key_releases(self):
