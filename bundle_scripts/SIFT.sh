@@ -20,7 +20,7 @@ source $BASE/bin/activate
 
 # Check if we already ran conda-unpack
 install_signal="${BASE}/.installed"
-if [[ ! -f "${install_signal}" ]]; then
+if [[ "$(head -n 1 ${install_signal} 2>/dev/null)" != "${BASE}" ]]; then
     echo "Running one-time initialization of SIFT installation..."
     conda-unpack
     echo "${BASE}" > "${install_signal}"
