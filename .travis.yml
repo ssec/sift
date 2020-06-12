@@ -86,7 +86,7 @@ after_success:
 - if [[ $TRAVIS_PULL_REQUEST_BRANCH == "" ]]; then
     travis_wait curl -k --ftp-create-dirs -T SIFT_*.*.*_*.* --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/${odir};
     if [[ $TRAVIS_TAG != "" ]]; then
-      curl -k -l --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/experimental | grep SIFT_*.*.*_*.* | xargs -I{} -- curl -k -v --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/experimental -Q "DELE {}";
+      curl -k -l --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/experimental/ | grep SIFT_*.*.*_*.* | xargs -I{} -- curl -k -v --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/experimental/ -Q "RM experimental/{}";
     fi;
   fi
 deploy:
