@@ -13,9 +13,9 @@ must be adjusted if `origin` points to your fork of the `sift` repository.
 4. Run `loghub` and update the `CHANGELOG.md` file. If `loghub` is not
    installed, do so by running `pip install loghub`.
 
-```bash
-loghub ssec/sift -u <username> -st 1.0.5 -plg bug "Bugs fixed" -plg enhancement "Features added" -plg documentation "Documentation changes" -plg backwards-incompatibility "Backwards incompatible changes"
-```
+   ```bash
+   loghub ssec/sift --token $LOGHUB_GITHUB_TOKEN -st <previous_version_tag> -plg bug "Bugs fixed" -plg enhancement "Features added" -plg documentation "Documentation changes" -plg backwards-incompatibility "Backwards incompatible changes"
+   ```
 
 5. Commit the changelog changes.
 

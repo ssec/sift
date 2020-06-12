@@ -1,3 +1,21 @@
+## Version 1.1.3 (2020/06/12)
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 296](https://github.com/ssec/sift/pull/296) - Update bundle scripts to handle installation directory being moved
+* [PR 293](https://github.com/ssec/sift/pull/293) - Fix HiDPI setting being set too late
+* [PR 292](https://github.com/ssec/sift/pull/292) - Fix bundle script having wrong permissions and activation path
+* [PR 288](https://github.com/ssec/sift/pull/288) - Fix STANDARD_NAME not being set correctly
+
+#### Features added
+
+* [PR 282](https://github.com/ssec/sift/pull/282) - Add SIFT script to python package installation
+
+In this release 5 pull requests were closed.
+
+
 ## Version 1.1.2 (2020/01/10)
 
 ### Issues Closed
