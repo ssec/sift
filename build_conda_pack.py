@@ -47,7 +47,7 @@ def main():
     if args.arcroot is None:
         args.arcroot = f"SIFT_{version}"
     if args.output is None:
-        ext = '.zip' if 'win' in sys.platform else '.tar.gz'
+        ext = '.zip' if sys.platform.startswith('win') else '.tar.gz'
         args.output = f"SIFT_{version}_{sys.platform}{ext}"
 
     # Copy appropriate wrapper scripts
