@@ -29,19 +29,8 @@ See [semver.org](http://semver.org/) on how to write a version number.
 
 6. Push changes to github `git push --follow-tags`
 
-7. Create conda package and installers for all supported platforms. See
-   [the wiki page](https://github.com/ssec/sift/wiki/conda-package-building#create-a-conda-package)
-   for detailed instructions on generating the conda package and other
-   special instructions. Typically this can be done with one command:
-   
-```bash
-python build_release.py
-```
-
-Note that by default this will try to upload the installers and conda packages
-to the appropriate servers to be hosted or uploaded to FTP. If you do not have
-an account on these servers or do not which to upload/host the files then use
-the `--no-conda-upload` and/or `--no-installer-upload` flags.
+7. This step is no longer needed as installers are automatically built with
+   Travis CI and made available on ftp://ftp.ssec.wisc.edu/pub/sift/dist.
 
 8. Create a release of the package on
    [github](https://github.com/ssec/sift/releases) by drafting a new release
