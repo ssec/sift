@@ -20,6 +20,7 @@ REQUIRES
 
 __author__ = 'rayg'
 
+import gc
 import logging
 import os
 import sys
@@ -677,6 +678,15 @@ class Main(QtGui.QMainWindow):
 
         self.layer_list_model.uuidSelectionChanged.connect(center_timeline_view_on_single_frame)
 
+    @staticmethod
+    def run_gc_after_layer_deletion(new_order: tuple, removed_uuids: list, first_removed_row: int, rows_removed: int):
+        """
+        Trigger a full garbage collection run after the deletion of a layer from the scene graph.
+        The code uses cyclic and weak references, which can only be freed by the GC.
+        """
+        unreachable_object_count = gc.collect()
+        LOG.debug(f"GC found {unreachable_object_count} unreachable objects")
+
     def __init__(self, config_dir=None, workspace_dir=None, cache_size=None, glob_pattern=None, search_paths=None,
                  border_shapefile=None, center=None, clear_workspace=False):
         super(Main, self).__init__()
@@ -703,6 +713,7 @@ class Main(QtGui.QMainWindow):
         else:
             self.workspace = SimpleWorkspace(workspace_dir)
         self.document = doc = Document(self.workspace, config_dir=config_dir, queue=self.queue)
+        self.document.didRemoveLayers.connect(self.run_gc_after_layer_deletion)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
                                                border_shapefile=border_shapefile,
                                                center=center,
