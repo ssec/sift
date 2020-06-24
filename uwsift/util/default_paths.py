@@ -13,8 +13,9 @@ Directory Constants:
 """
 import os
 import sys
-
+import tempfile
 import appdirs
+from pathlib import Path
 
 APPLICATION_AUTHOR = "CIMSS-SSEC"
 APPLICATION_DIR = "SIFT"
@@ -25,6 +26,7 @@ USER_DATA_DIR = appdirs.user_data_dir(APPLICATION_DIR, APPLICATION_AUTHOR, roami
 USER_CONFIG_DIR = appdirs.user_config_dir(APPLICATION_DIR, APPLICATION_AUTHOR, roaming=True)
 
 WORKSPACE_DB_DIR = os.path.join(USER_CACHE_DIR, 'workspace')
+WORKSPACE_TEMP_DIR = os.path.join(WORKSPACE_DB_DIR, "temp")
 DOCUMENT_SETTINGS_DIR = os.path.join(USER_CONFIG_DIR, 'settings')
 
 
@@ -44,3 +46,10 @@ def _desktop_directory():
 
 
 USER_DESKTOP_DIRECTORY = _desktop_directory()
+
+# satpy uses gettempdir() for the extraction of compressed datasets
+# the default in Linux is /tmp, but we can cleanup these temp files better if we use a custom subdirectory
+Path(WORKSPACE_TEMP_DIR).mkdir(parents=True, exist_ok=True)
+os.environ["TMPDIR"] = WORKSPACE_TEMP_DIR
+tempfile.tempdir = WORKSPACE_TEMP_DIR
+assert tempfile.gettempdir() == WORKSPACE_TEMP_DIR
