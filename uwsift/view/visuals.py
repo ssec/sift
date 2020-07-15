@@ -619,8 +619,9 @@ class TiledGeolocatedImageVisual(ImageVisual):
             view_box = self.get_view_box()
             preferred_stride = self._get_stride(view_box)
             tile_box = self.calc.visible_tiles(view_box, stride=preferred_stride, extra_tiles_box=Box(1, 1, 1, 1))
-        except ValueError:
-            LOG.error("Could not determine viewable image area for '{}'".format(self.name))
+        except ValueError as e:
+            # If image is outside of canvas, then an exception will be raised
+            LOG.warning("Could not determine viewable image area for '{}': {}".format(self.name, e))
             return False, self._stride, self._latest_tile_box
 
         num_tiles = (tile_box.bottom - tile_box.top) * (tile_box.right - tile_box.left)
