@@ -11,6 +11,7 @@ set installed=%base_dir%.installed
 if not exist "%installed%" (
   echo Running one-time initialization of SIFT installation...
   conda-unpack
+  python %base_dir%\qt_conf_fix.py %base_dir%
   echo %base_dir% > %installed%
 )
 
