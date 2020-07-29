@@ -1,7 +1,7 @@
 @echo off
 REM Initialize SIFT installation if necessary and run SIFT
 
-set base_dir=%~p0
+set base_dir=%~dp0
 
 REM Activate the conda environment
 call %base_dir%Scripts\activate
