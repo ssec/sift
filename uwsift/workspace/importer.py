@@ -31,7 +31,7 @@ from uwsift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
 from .metadatabase import Resource, Product, Content
 
 from satpy import Scene, available_readers, __version__ as satpy_version
-from satpy.dataset import DatasetID
+from uwsift.satpy_compat import DataID, get_id_value, get_id_items
 
 _SATPY_READERS = None  # cache: see `available_satpy_readers()` below
 SATPY_READER_CACHE_FILE = os.path.join(USER_CACHE_DIR,
@@ -117,12 +117,12 @@ def available_satpy_readers(as_dict=False, force_cache_refresh=None):
     return _SATPY_READERS
 
 
-def filter_dataset_ids(ids_to_filter: Iterable[DatasetID]) -> Generator[DatasetID, None, None]:
-    """Generate only non-filtered DatasetIDs based on EXCLUDE_DATASETS global filters."""
-    # skip certain DatasetIDs
+def filter_dataset_ids(ids_to_filter: Iterable[DataID]) -> Generator[DataID, None, None]:
+    """Generate only non-filtered DataIDs based on EXCLUDE_DATASETS global filters."""
+    # skip certain DataIDs
     for ds_id in ids_to_filter:
         for filter_key, filtered_values in config.get('data_reading.exclude_datasets').items():
-            if getattr(ds_id, filter_key) in filtered_values:
+            if get_id_value(ds_id, filter_key) in filtered_values:
                 break
         else:
             yield ds_id
@@ -893,7 +893,7 @@ class SatpyImporter(aImporter):
         if self.scn is None:
             self.scn = Scene(reader=self.reader, filenames=self.filenames)
         self._resources = []
-        # DatasetID filters
+        # DataID filters
         self.product_filters = {}
         for k in ['resolution', 'calibration', 'level']:
             if k in kwargs:
@@ -920,7 +920,7 @@ class SatpyImporter(aImporter):
         kwargs.pop('reader', None)
         kwargs.pop('scenes', None)
         kwargs.pop('scene', None)
-        kwargs['dataset_ids'] = [DatasetID.from_dict(prod.info)]
+        kwargs['dataset_ids'] = [prod.info['_satpy_id']]
         filenames = [r.path for r in prod.resource]
         return cls(filenames, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
 
@@ -967,7 +967,7 @@ class SatpyImporter(aImporter):
         resources = list(resources)
         for res in resources:
             products = list(res.product)
-            existing_ids.update({DatasetID.from_dict(prod.info): prod for prod in products})
+            existing_ids.update({prod.info['_satpy_id']: prod for prod in products})
         existing_prods = {x: existing_ids[x] for x in self.dataset_ids if x in existing_ids}
         if products and len(existing_prods) == len(self.dataset_ids):
             products = existing_prods.values()
@@ -983,10 +983,10 @@ class SatpyImporter(aImporter):
                 yield existing_ids[ds_id]
                 continue
 
-            existing_ids.get(ds_id, None)
             meta = ds.attrs
             uuid = uuid1()
             meta[Info.UUID] = uuid
+            meta['_satpy_id'] = ds_id
             now = datetime.utcnow()
             prod = Product(
                 uuid_str=str(uuid),
@@ -1050,6 +1050,13 @@ class SatpyImporter(aImporter):
         # copy satpy metadata keys to SIFT keys
         for ds in self.scn:
             start_time = ds.attrs['start_time']
+            try:
+                # new satpy
+                id_str = ":".join(str(v[1]) for v in get_id_items(ds.attrs['_satpy_id']))
+            except KeyError:
+                # old satpy (DataID is DatasetID)
+                id_str = ":".join(str(v) for v in DataID.from_dict(ds.attrs))
+            ds.attrs[Info.DATASET_NAME] = id_str
             ds.attrs[Info.OBS_TIME] = start_time
             ds.attrs[Info.SCHED_TIME] = start_time
             duration = ds.attrs.get('end_time', start_time) - start_time
@@ -1067,8 +1074,6 @@ class SatpyImporter(aImporter):
                                     ds.attrs['wavelength'][1])
 
             # Resolve anything else needed by SIFT
-            id_str = ":".join(str(v) for v in DatasetID.from_dict(ds.attrs))
-            ds.attrs[Info.DATASET_NAME] = id_str
             model_time = ds.attrs.get('model_time')
             if model_time is not None:
                 ds.attrs[Info.DATASET_NAME] += " " + model_time.isoformat()
@@ -1145,7 +1150,7 @@ class SatpyImporter(aImporter):
             assert products
 
         # FIXME: Don't recreate the importer every time we want to load data
-        dataset_ids = [DatasetID.from_dict(prod.info) for prod in products]
+        dataset_ids = [prod.info['_satpy_id'] for prod in products]
         self.scn.load(dataset_ids)
         num_stages = len(products)
         for idx, (prod, ds_id) in enumerate(zip(products, dataset_ids)):
