@@ -75,7 +75,7 @@ script:
 - python build_conda_pack.py -j -1 $oflag
 - ls -l
 after_success:
-- if [ $PYTHON_VERSION == "3.7" ] && [ "${TRAVIS_OS_NAME}" != "windows" ]; then coveralls;
+- if [ $PYTHON_VERSION == "3.7" ] && [ "${TRAVIS_OS_NAME}" != "windows" ]; then coveralls; fi
 - if [[ $TRAVIS_TAG == "" ]]; then
     odir="experimental/";
   else
