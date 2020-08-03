@@ -158,8 +158,6 @@ def test_satpy_importer_contour_0_360(tmpdir, monkeypatch, mocker):
     assert imp.num_products == 1
     products = list(imp.merge_products())
     assert len(products) == 1
-    from pprint import pprint
-    pprint(dict(products[0].info))
     assert products[0].info[Info.STANDARD_NAME] == 'geopotential_height'
     assert products[0].info[Info.KIND] == Kind.CONTOUR
 
