@@ -31,7 +31,7 @@ from uwsift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
 from .metadatabase import Resource, Product, Content
 
 from satpy import Scene, available_readers, __version__ as satpy_version
-from uwsift.satpy_compat import DataID, get_id_value, get_id_items
+from uwsift.satpy_compat import DataID, get_id_value, get_id_items, id_from_attrs
 
 _SATPY_READERS = None  # cache: see `available_satpy_readers()` below
 SATPY_READER_CACHE_FILE = os.path.join(USER_CACHE_DIR,
@@ -1050,12 +1050,7 @@ class SatpyImporter(aImporter):
         # copy satpy metadata keys to SIFT keys
         for ds in self.scn:
             start_time = ds.attrs['start_time']
-            try:
-                # new satpy
-                id_str = ":".join(str(v[1]) for v in get_id_items(ds.attrs['_satpy_id']))
-            except KeyError:
-                # old satpy (DataID is DatasetID)
-                id_str = ":".join(str(v) for v in DataID.from_dict(ds.attrs))
+            id_str = ":".join(str(v[1]) for v in get_id_items(id_from_attrs(ds.attrs)))
             ds.attrs[Info.DATASET_NAME] = id_str
             ds.attrs[Info.OBS_TIME] = start_time
             ds.attrs[Info.SCHED_TIME] = start_time
@@ -1172,21 +1167,35 @@ class SatpyImporter(aImporter):
             data = dataset.data
 
             # Handle building contours for data from 0 to 360 longitude
+            # our map's antimeridian is 180
             antimeridian = 179.999
+            # find out if there is data beyond 180 in this data
             if '+proj=latlong' not in proj4:
                 # the x coordinate for the antimeridian in this projection
                 am = Proj(proj4)(antimeridian, 0)[0]
-                if am < 1e30:
+                if am >= 1e30:
                     am_index = -1
                 else:
-                    am_index = int(np.ceil((antimeridian - origin_x) / cell_width))
+                    am_index = int(np.ceil((am - origin_x) / cell_width))
             else:
                 am_index = int(np.ceil((antimeridian - origin_x) / cell_width))
+            # if there is data beyond 180, let's copy it to the beginning of the
+            # array so it shows up in the primary -180/0 portion of the SIFT map
             if prod.info[Info.KIND] == Kind.CONTOUR and 0 < am_index < shape[1]:
+                # Previous implementation:
+                # Prepend a copy of the last half of the data (180 to 360 -> -180 to 0)
+                # data = da.concatenate((data[:, am_index:], data), axis=1)
+                # adjust X origin to be -180
+                # origin_x -= (shape[1] - am_index) * cell_width
+                # The above no longer works with newer PROJ because +over is deprecated
+                #
+                # New implementation:
+                # Swap the 180 to 360 portion to be -180 to 0
                 # if we have data from 0 to 360 longitude, we want -180 to 360
-                data = da.concatenate((data[:, am_index:], data), axis=1)
-                shape = data.shape
-                origin_x -= am_index * cell_width
+                data = da.concatenate((data[:, am_index:], data[:, :am_index]), axis=1)
+                # remove the custom 180 prime meridian in the projection
+                proj4 = proj4.replace("+pm=180 ", "")
+                area_info[Info.PROJ] = proj4
 
             # shovel that data into the memmap incrementally
             data_filename = '{}.image'.format(prod.uuid)
