@@ -66,7 +66,7 @@ def main():
         raise RuntimeError(f"Unknown platform: {sys.platform}")
 
     # HACK: https://github.com/conda/conda-pack/issues/141
-    if 'win' in sys.platform:
+    if sys.platform.startswith('win'):
         desired_prefix = sys.prefix  # escaped backslashes (\\)
         in_file_prefix = sys.prefix.replace('\\', '/')
         with open(os.path.join(script_dir, 'qt.conf')) as qtconf:
