@@ -67,10 +67,8 @@ def main():
 
     # HACK: https://github.com/conda/conda-pack/issues/141
     if sys.platform.startswith('win'):
-        desired_prefix = sys.prefix  # escaped backslashes (\\)
-        in_file_prefix = sys.prefix.replace('\\', '/')
         with open(os.path.join(sys.prefix, 'qt.conf')) as qtconf:
-            new_text = qtconf.read().replace(in_file_prefix, desired_prefix)
+            new_text = qtconf.read().replace('/', r'\\')
         with open(os.path.join(sys.prefix, 'qt.conf'), 'w') as qtconf:
             qtconf.write(new_text)
         with open(os.path.join(sys.prefix, 'Library', 'bin', 'qt.conf'), 'w') as qtconf:
