@@ -65,6 +65,17 @@ def main():
     else:
         raise RuntimeError(f"Unknown platform: {sys.platform}")
 
+    # HACK: https://github.com/conda/conda-pack/issues/141
+    if sys.platform.startswith('win'):
+        desired_prefix = sys.prefix  # escaped backslashes (\\)
+        in_file_prefix = sys.prefix.replace('\\', '/')
+        with open(os.path.join(sys.prefix, 'qt.conf')) as qtconf:
+            new_text = qtconf.read().replace(in_file_prefix, desired_prefix)
+        with open(os.path.join(sys.prefix, 'qt.conf'), 'w') as qtconf:
+            qtconf.write(new_text)
+        with open(os.path.join(sys.prefix, 'Library', 'bin', 'qt.conf'), 'w') as qtconf:
+            qtconf.write(new_text)
+
     subprocess.check_call(['conda-pack', '--arcroot', args.arcroot,
                           '--output', args.output] + unknown_args)
     os.chmod(args.output, 0o755)
