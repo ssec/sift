@@ -3,14 +3,16 @@
 import logging
 import os
 import shlex
+import signal
 import subprocess
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from socket import gethostname
 from time import sleep
-from typing import List
+from typing import List, Tuple
 
 import appdirs
 from donfig import Config
+from psutil import Process, NoSuchProcess
 
 LOG = logging.getLogger(__name__)
 
@@ -60,12 +62,28 @@ class Watchdog:
                                " in the  watchdog config")
         self.max_tolerable_idle_time = float(max_tolerable_idle_time)
 
-    def _read_watchdog_file(self) -> datetime:
+        restart_interval = int(config.get("watchdog.auto_restart_interval", 0))
+        if restart_interval == 0:
+            LOG.warning("Auto Restart is disabled")
+            self.restart_interval = None
+        else:
+            self.restart_interval = timedelta(seconds=restart_interval)
+
+        ask_again_interval = int(config.get(
+            "watchdog.auto_restart_ask_again_interval", 0))
+        if ask_again_interval == 0:
+            LOG.warning("Auto Restart will ask the user only once")
+            self.ask_again_interval = None
+        else:
+            self.ask_again_interval = timedelta(seconds=ask_again_interval)
+
+    def _read_watchdog_file(self) -> Tuple[int, datetime]:
         with open(self.heartbeat_file) as file:
             content = file.read()
 
-        return datetime.strptime(content.rstrip("\n"),
-                                 WATCHDOG_DATETIME_FORMAT_STORE)
+        pid, timestamp = content.splitlines()
+        return int(pid), datetime.strptime(timestamp,
+                                           WATCHDOG_DATETIME_FORMAT_STORE)
 
     def _notify(self, level: int, text: str):
         if not self.notification_cmd:
@@ -85,11 +103,22 @@ class Watchdog:
                 LOG.log(level, text)
 
     def run(self):
+        old_pid = None
+        application_start_time = None
+        sent_restart_request = False
+
+        process_cwd = None
+        process_cmdline = None
+
         while True:
-            sleep(self.heartbeat_check_interval)
+            if self.restart_interval is None:
+                sleep(self.heartbeat_check_interval)
+            else:
+                sleep(min(self.heartbeat_check_interval,
+                          self.restart_interval.seconds))
 
             try:
-                latest_dataset_time = self._read_watchdog_file()
+                pid, latest_dataset_time = self._read_watchdog_file()
             except ValueError as err:
                 self._notify(logging.ERROR, f"Can't parse the watchdog file:"
                                             f" {err}")
@@ -131,6 +160,49 @@ class Watchdog:
                 self._notify(logging.INFO,
                              f"Current dataset scheduled time for observation"
                              f" ('start_time'): {latest_dataset_time} - OK")
+
+            if application_start_time is None:
+                application_start_time = now_utc
+
+            if old_pid is None:
+                old_pid = pid
+            elif old_pid != pid:
+                self._notify(logging.INFO, f"Application was restarted: {pid}")
+                application_start_time = now_utc
+                old_pid = pid
+
+            try:
+                process = Process(pid)
+                process_cwd = process.cwd()
+                process_cmdline = process.cmdline()
+            except NoSuchProcess:
+                if process_cwd is None or process_cmdline is None:
+                    self._notify(logging.ERROR, "Can't restart the application "
+                                 "because the current working directory and "
+                                 "command line could not be retrieved")
+                    continue
+
+                # this doesn't race because the uwsift process died
+                # prevent auto restart from spawning multiple subprocesses
+                os.remove(self.heartbeat_file)
+
+                # don't wait for the subprocess to finish
+                # the subprocess will be terminated when the watchdog exits
+                process = subprocess.Popen(process_cmdline, cwd=process_cwd)
+                application_start_time = now_utc
+                old_pid = process.pid
+                continue
+
+            if self.restart_interval is not None and not sent_restart_request:
+                runtime = now_utc - application_start_time
+                if runtime > self.restart_interval:
+                    os.kill(pid, signal.SIGHUP)
+                    self._notify(logging.INFO, f"Sent restart request to {pid}")
+                    if self.ask_again_interval is None:
+                        # send the restart request only once
+                        sent_restart_request = True
+                    else:
+                        application_start_time += self.ask_again_interval
 
 
 if __name__ == "__main__":
