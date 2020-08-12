@@ -78,8 +78,6 @@ DEFAULT_CONFIGURATION = {
             'level',
         ],
     },
-
-    'satpy_import_path': None,
 }
 
 config = Config('uwsift', defaults=[DEFAULT_CONFIGURATION], paths=CONFIG_PATHS)
