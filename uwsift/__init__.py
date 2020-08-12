@@ -87,31 +87,31 @@ config = Config('uwsift', defaults=[DEFAULT_CONFIGURATION], paths=CONFIG_PATHS)
 
 def overwrite_import(package_name: str, custom_import_path: str, *, verbose=True):
     if (custom_import_path is not None) and (not os.path.exists(custom_import_path)):
-        raise FileNotFoundError(f"custom package `{package_name}` doesn't exist: {custom_import_path}")
+        raise FileNotFoundError(
+            f"Package '{package_name}' "
+            f"doesn't exist at given custom import path '{custom_import_path}'")
 
     class CustomPathFinder(PathFinder):
         @classmethod
         def find_spec(cls, fullname: str, path=None, target=None):
-            if fullname.startswith(package_name):
-                if custom_import_path is not None:
-                    package_parts = fullname.split(".")
-                    assert package_parts[0] == package_name
-                    del package_parts[0]
+            package_parts = fullname.split(".")
+            if package_parts[0] == package_name and custom_import_path is not None:
+                del package_parts[0]
 
-                    if len(package_parts) == 0:
-                        # import the root of the package
-                        package_import_path = os.path.join(custom_import_path, "__init__.py")
-                        spec = spec_from_file_location(fullname, package_import_path)
-                    else:
-                        # import the base directory of the subpackage
-                        package_parts.pop()
-                        package_import_path = os.path.join(custom_import_path, *package_parts)
-                        spec = super().find_spec(fullname, [package_import_path], target)
+                if len(package_parts) == 0:
+                    # import the root of the package
+                    package_import_path = os.path.join(custom_import_path, "__init__.py")
+                    spec = spec_from_file_location(fullname, package_import_path)
+                else:
+                    # import the base directory of the subpackage
+                    package_parts.pop()
+                    package_import_path = os.path.join(custom_import_path, *package_parts)
+                    spec = super().find_spec(fullname, [package_import_path], target)
 
-                    if verbose:
-                        # setup for the logger happens in __main__, thus use print
-                        print(f"Custom import path for package `{fullname}`: {package_import_path}")
-                    return spec
+                if verbose:
+                    # setup for the logger happens in __main__, thus use print
+                    print(f"Custom import path for package `{fullname}`: {package_import_path}")
+                return spec
             return None
 
     # The CustomPathFinder must have high priority, therefore set it to the front of the list.
@@ -119,4 +119,6 @@ def overwrite_import(package_name: str, custom_import_path: str, *, verbose=True
     sys.meta_path.insert(0, CustomPathFinder)
 
 
-overwrite_import("satpy", config["satpy_import_path"])
+satpy_import_path = config.get("satpy_import_path", None)
+if satpy_import_path is not None:
+    overwrite_import("satpy", satpy_import_path)
