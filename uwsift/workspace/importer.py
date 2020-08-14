@@ -29,6 +29,7 @@ from uwsift.common import Platform, Info, Instrument, Kind, INSTRUMENT_MAP, PLAT
 from uwsift.util import USER_CACHE_DIR
 from uwsift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
 from .metadatabase import Resource, Product, Content
+from .utils.metadata_utils import get_default_colormap
 
 _SATPY_READERS = None  # cache: see `available_satpy_readers()` below
 SATPY_READER_CACHE_FILE = os.path.join(USER_CACHE_DIR,
@@ -238,7 +239,7 @@ def generate_guidebook_metadata(layer_info) -> Mapping:
     layer_info.update(gbinfo)  # FUTURE: should guidebook be integrated into DocBasicLayer?
 
     # add as visible to the front of the current set, and invisible to the rest of the available sets
-    layer_info[Info.COLORMAP] = guidebook.default_colormap(layer_info)
+    layer_info[Info.COLORMAP] = get_default_colormap(layer_info, guidebook)
     layer_info[Info.CLIM] = guidebook.climits(layer_info)
     layer_info[Info.VALID_RANGE] = guidebook.valid_range(layer_info)
     if Info.DISPLAY_TIME not in layer_info:
