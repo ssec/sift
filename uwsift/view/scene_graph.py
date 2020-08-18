@@ -607,11 +607,12 @@ class SceneGraphManager(QObject):
         self.conus_states.transform = STTransform(translate=(0, 0, 45))
 
         self._latlon_grid_color_idx = 1
-        latlon_grid_resolution = \
-            get_configured_latlon_grid_resolution()
-        self.latlon_grid = self._init_latlon_grid_layer(
-            resolution=latlon_grid_resolution,
-            color=self._color_choices[self._latlon_grid_color_idx])
+        latlon_grid_resolution = get_configured_latlon_grid_resolution()
+        latlon_grid_points = self._create_latlon_grid_points(
+            resolution=latlon_grid_resolution)
+        self.latlon_grid = Line(pos=latlon_grid_points, connect="strip",
+                                color=self._color_choices[self._latlon_grid_color_idx],
+                                parent=self.main_map)
         self.latlon_grid.transform = STTransform(translate=(0, 0, 45))
 
         self.create_test_image()
@@ -678,7 +679,8 @@ class SceneGraphManager(QObject):
                 img.determine_reference_points()
         self.on_view_change(None)
 
-    def _init_latlon_grid_layer(self, color=None, resolution=5.):
+    @staticmethod
+    def _create_latlon_grid_points(resolution=5.):
         """Create a series of line segments representing latitude and longitude lines.
 
         :param resolution: number of degrees between lines
@@ -711,9 +713,7 @@ class SceneGraphManager(QObject):
         points2[points.shape[0]:, :] = points
         points2[points.shape[0]:, 0] += offset
 
-        # return Line(pos=points2, connect="segments", color=color, parent=self.main_map)
-        return Line(pos=points2, connect="strip", color=color, parent=self.main_map)
-        # return Line(pos=points, connect="strip", color=color, parent=self.main_map)
+        return points2
 
     def on_mouse_press_point(self, event):
         """Handle mouse events that mean we are using the point probe.
