@@ -560,7 +560,7 @@ class SceneGraphManager(QObject):
 
     def setup_initial_canvas(self, center=None):
         self.main_canvas = SIFTMainMapCanvas(parent=self.parent())
-        self.main_view = self.main_canvas.central_widget.add_view()
+        self.main_view = self.main_canvas.central_widget.add_view(name="MainView")
 
         # Camera Setup
         self.pz_camera = PanZoomProbeCamera(name=Tool.PAN_ZOOM.name, aspect=1, pan_limits=(-1., -1., 1., 1.),
