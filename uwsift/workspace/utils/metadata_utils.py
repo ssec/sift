@@ -25,6 +25,7 @@ def get_default_colormap(layer_info: dict,
                                None)
     if colormap_name in COLORMAP_MANAGER:
         LOG.debug(f"Returning color map '{colormap_name}' as configured for"
+                  f" layer standard name '{layer_standard_name}'.")
         return colormap_name
 
     if colormap_name:
