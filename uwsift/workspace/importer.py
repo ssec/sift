@@ -1184,7 +1184,7 @@ class SatpyImporter(aImporter):
 
         # FIXME: Don't recreate the importer every time we want to load data
         dataset_ids = [prod.info['_satpy_id'] for prod in products]
-        self.scn.load(dataset_ids)
+        self.scn.load(dataset_ids, pad_data=True, upper_right_corner="NE")
         num_stages = len(products)
         for idx, (prod, ds_id) in enumerate(zip(products, dataset_ids)):
             dataset = self.scn[ds_id]
