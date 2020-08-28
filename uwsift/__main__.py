@@ -45,6 +45,7 @@ from uwsift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
 from uwsift.ui.pov_main_ui import Ui_MainWindow
 from uwsift.util import (WORKSPACE_DB_DIR, DOCUMENT_SETTINGS_DIR,
                          get_package_data_dir, check_grib_definition_dir, check_imageio_deps)
+from uwsift.util.logger import configure_loggers
 from uwsift.view.colormap_editor import ColormapEditor
 from uwsift.view.create_algebraic import CreateAlgebraicDialog
 from uwsift.view.export_image import ExportImageHelper
@@ -55,12 +56,14 @@ from uwsift.view.scene_graph import SceneGraphManager
 from uwsift.workspace import Workspace
 from uwsift.workspace.collector import ResourceSearchPathCollector
 
+LOG = logging.getLogger(__name__)
+
 app_object = app.use_app('pyqt5')
 APP: QtGui.QApplication = app_object.native
 # LOOP = QEventLoop(APP)
 # asyncio.set_event_loop(LOOP)  # NEW must set the event loop
 
-LOG = logging.getLogger(__name__)
+
 PROGRESS_BAR_MAX = 1000
 STATUS_BAR_DURATION = 2000  # ms
 
@@ -1165,10 +1168,13 @@ def main():
                              'ERROR-WARNING-Info-DEBUG (default Info)')
     args = parser.parse_args()
 
-    levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
-    level = levels[min(3, args.verbosity)]
-    logging.basicConfig(level=level, datefmt='%H:%M:%S',
-                        format='%(levelname)s %(asctime)s %(module)s:%(funcName)s:L%(lineno)d %(message)s')
+    # levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
+    # level = levels[min(3, args.verbosity)]
+    # logging.basicConfig(level=level, datefmt='%H:%M:%S',
+    #                     format='%(levelname)s %(asctime)s %(module)s:%(funcName)s:L%(lineno)d %(message)s')
+
+    configure_loggers()
+
     check_grib_definition_dir()
     check_imageio_deps()
     # logging.getLogger('vispy').setLevel(level)

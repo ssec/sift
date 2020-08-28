@@ -552,10 +552,10 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         """
         dts = self.doc.timeline_span  # first, check for user intent
         if not dts or dts.is_instantaneous:
-            LOG.info("document timeline Span is not set, using metadata extents")
+            LOG.debug("document timeline Span is not set, using metadata extents")
             dts = self.doc.potential_product_span()
         if not dts or dts.is_instantaneous:
-            LOG.info("insufficient metadata, using 12h around current time due to no available timespan")
+            LOG.debug("insufficient metadata, using 12h around current time due to no available timespan")
             sh = timedelta(hours=6)
             dts = Span(datetime.utcnow() - sh, sh * 2)
         return dts
@@ -776,7 +776,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         return away_with_thee
 
     def deactivate_track(self, track: str):
-        LOG.info("deactivate_track {}".format(track))
+        LOG.debug("deactivate_track {}".format(track))
         # time_range: Span = self.timeline_span
         pit = self._products_in_track(track)
         if pit:
@@ -798,7 +798,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
 
         # send a refresh to the timeline display and layer list
         self._finally(self.doc.didReorderTracks.emit, {track}, set())
-        LOG.info("activate_track {}".format(track))
+        LOG.debug("activate_track {}".format(track))
 
     # def activate_track_time_range(self, track: str, when: Span, activate: bool=True):
     #     pass
@@ -1233,7 +1233,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.config_dir = config_dir
         self.queue = queue
         if not os.path.isdir(self.config_dir):
-            LOG.info("Creating settings directory {}".format(self.config_dir))
+            LOG.debug("Creating settings directory {}".format(self.config_dir))
             os.makedirs(self.config_dir)
 
         # high level context managers provide access patterns for use-case based behaviors
@@ -1395,7 +1395,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             projection_name = self.default_projection
         assert projection_name in self.available_projections
         if projection_name != self.current_projection:
-            LOG.info("Changing projection from '{}' to '{}'".format(self.current_projection, projection_name))
+            LOG.debug("Changing projection from '{}' to '{}'".format(self.current_projection, projection_name))
             self.current_projection = projection_name
             self.didChangeProjection.emit(
                 self.current_projection,
@@ -1485,9 +1485,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # updated metadata with content information (most importantly nav information)
         info = self._workspace.get_info(uuid)
         assert (info is not None)
-        LOG.info('cell_width: {}'.format(repr(info[Info.CELL_WIDTH])))
+        LOG.debug('cell_width: {}'.format(repr(info[Info.CELL_WIDTH])))
 
-        LOG.info('new layer info: {}'.format(repr(info)))
+        LOG.debug('new layer info: {}'.format(repr(info)))
         self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, info)
         if Info.UNIT_CONVERSION not in dataset:
             dataset[Info.UNIT_CONVERSION] = units_conversion(dataset)
@@ -2248,6 +2248,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                                     gamma=recipe.gammas, uuids=changed_uuids)
         if changed_uuids:
             self.didChangeCompositions.emit((), *zip(*self.prez_for_uuids(changed_uuids)))
+        LOG.info('Done with updating RGB composite.')
 
     def _composite_layers(self, recipe, times=None, rgba=None):
         if times:
@@ -2350,7 +2351,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # These clims are the current state of the default clims for each sub-layer
         layer[Info.CLIM] = tuple(clims)
         updated = layer.update_metadata_from_dependencies()
-        LOG.info('updated metadata for layer %s: %s' % (layer.uuid, repr(list(updated.keys()))))
+        LOG.debug('updated metadata for layer %s: %s' % (layer.uuid, repr(list(updated.keys()))))
+
         return changed
 
     def set_rgb_range(self, recipe: CompositeRecipe, rgba: str, min: float, max: float):
@@ -2556,7 +2558,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """Purge layers from the workspace"""
         for uuid in uuids:
             if not self.is_using(uuid):
-                LOG.info('purging layer {}, no longer in use'.format(uuid))
+                LOG.debug('purging layer {}, no longer in use'.format(uuid))
                 self.willPurgeLayer.emit(uuid)
                 # remove from our bookkeeping
                 del self._layer_with_uuid[uuid]
