@@ -1003,7 +1003,12 @@ class SatpyImporter(aImporter):
 
         from uuid import uuid1
         scn = self.load_all_datasets()
-        for ds_id, ds in scn._datasets.items():
+        for ds_id in scn.available_dataset_ids():
+            ds = scn.get(ds_id)
+            if ds is None:
+                # TODO: Shouldn't happen, should it?
+                continue
+
             # don't recreate a Product for one we already have
             if ds_id in existing_ids:
                 yield existing_ids[ds_id]
