@@ -942,12 +942,8 @@ class Main(QtGui.QMainWindow):
         if wizard_dialog.exec_():
             LOG.info("Loading products from open wizard...")
             scenes = wizard_dialog.scenes
-            # TODO: Scene may not provide information about reader in the
-            # future - here the "protected" variable '_readers' is used as
-            # workaround already
-            reader = list(list(scenes.values())[0]._readers.keys())[0]
             importer_kwargs = {
-                'reader': reader,
+                'reader': wizard_dialog.get_reader_name(),
                 'scenes': scenes,
                 'dataset_ids': wizard_dialog.collect_selected_ids(),
             }

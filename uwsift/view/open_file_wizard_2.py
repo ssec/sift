@@ -286,6 +286,9 @@ class OpenFileWizard(QtWidgets.QWizard):
         """Return files that should be used by the Document/Workspace."""
         return [fn for fgroup in self.file_groups.values() for fn in fgroup]
 
+    def get_reader_name(self) -> str:
+        return self.ui.readerComboBox.currentData()
+
     # ==============================================================================================
     # PAGE 1 RELATED FUNCTIONALITY
     # ==============================================================================================
