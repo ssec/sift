@@ -456,6 +456,8 @@ class SceneGraphManager(QObject):
     in order to feed the display optimally.
     """
 
+    # TODO(ar) REVIEW: distinction between class and member/instance
+    # variables seems random (see below)
     document = None  # Document object we work with
     workspace = None  # where we get data arrays from
     queue = None  # background jobs go here
@@ -513,6 +515,15 @@ class SceneGraphManager(QObject):
             np.array([0., 0., 0., 1.], dtype=np.float32),  # black
             np.array([0., 0., 0., 0.], dtype=np.float32),  # transparent
         ]
+
+        # TODO(ar) REVIEW: distinction between class and member/instance
+        # variables seems random (see above)
+        # These following three were initialized in self.setup_initial_canvas()
+        # thus indirectly as instance/member variables.
+        # Why aren't they class variables like 'document', 'workspace', ...?
+        self.main_view = None
+        self.main_canvas = None
+        self.pz_camera = None
 
         self.setup_initial_canvas(center)
         self.pending_polygon = PendingPolygon(self.main_map)
