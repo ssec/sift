@@ -51,6 +51,8 @@ from vispy.visuals import LineVisual
 from vispy.visuals.transforms import STTransform, MatrixTransform, ChainTransform
 from vispy.gloo.util import _screenshot
 
+from uwsift import config
+from uwsift import USE_TILED_GEOLOCATED_IMAGES
 from uwsift.common import DEFAULT_ANIMATION_DELAY, Info, Kind, Tool, Presentation
 from uwsift.model.document import DocLayerStack, DocBasicLayer, Document
 from uwsift.queue import TASK_DOING, TASK_PROGRESS
@@ -58,8 +60,8 @@ from uwsift.util import get_package_data_dir
 from uwsift.view.cameras import PanZoomProbeCamera
 from uwsift.view.probes import DEFAULT_POINT_PROBE
 from uwsift.view.transform import PROJ4Transform
-from uwsift.view.visuals import (NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer, PrecomputedIsocurve)
-from uwsift import config
+from uwsift.view.visuals import (NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer,
+                                 PrecomputedIsocurve, GammaImage)
 
 LOG = logging.getLogger(__name__)
 DATA_DIR = get_package_data_dir()
@@ -899,7 +901,8 @@ class SceneGraphManager(QObject):
 
         for uuid in uuids:
             layer = self.image_elements[uuid]
-            if isinstance(layer, TiledGeolocatedImage):
+            if (isinstance(layer, TiledGeolocatedImage)
+                    or isinstance(layer, GammaImage)):
                 self.image_elements[uuid].cmap = colormap
             else:
                 self.image_elements[uuid].color = colormap
@@ -987,7 +990,10 @@ class SceneGraphManager(QObject):
                 LOG.warning("Contour layer already exists in scene")
                 return
             if p.kind == Kind.IMAGE and isinstance(image, TiledGeolocatedImage):
-                LOG.warning("Image layer already exists in scene")
+                LOG.warning("Image layer (geolocated) already exists in scene")
+                return
+            if p.kind == Kind.IMAGE and isinstance(image, GammaImage):
+                LOG.warning("Image layer (pixel matrix) already exists in scene")
                 return
             # we already have an image layer for it and it isn't what we want
             # remove the existing image object and create the proper type now
@@ -998,29 +1004,57 @@ class SceneGraphManager(QObject):
         if p.kind == Kind.CONTOUR:
             return self.add_contour_layer(layer, p, overview_content)
 
-        image = TiledGeolocatedImage(
-            overview_content,
-            layer[Info.ORIGIN_X],
-            layer[Info.ORIGIN_Y],
-            layer[Info.CELL_WIDTH],
-            layer[Info.CELL_HEIGHT],
-            name=str(uuid),
-            clim=p.climits,
-            gamma=p.gamma,
-            interpolation='nearest',
-            method='tiled',
-            cmap=self.document.find_colormap(p.colormap),
-            double=False,
-            texture_shape=DEFAULT_TEXTURE_SHAPE,
-            wrap_lon=False,
-            parent=self.main_map,
-            projection=layer[Info.PROJ],
-        )
-        image.transform = PROJ4Transform(layer[Info.PROJ], inverse=True)
-        image.transform *= STTransform(translate=(0, 0, -50.0))
+        if USE_TILED_GEOLOCATED_IMAGES:
+            image = TiledGeolocatedImage(
+                overview_content,
+                layer[Info.ORIGIN_X],
+                layer[Info.ORIGIN_Y],
+                layer[Info.CELL_WIDTH],
+                layer[Info.CELL_HEIGHT],
+                name=str(uuid),
+                clim=p.climits,
+                gamma=p.gamma,
+                interpolation='nearest',
+                method='tiled',
+                cmap=self.document.find_colormap(p.colormap),
+                double=False,
+                texture_shape=DEFAULT_TEXTURE_SHAPE,
+                wrap_lon=False,
+                parent=self.main_map,
+                projection=layer[Info.PROJ],
+            )
+            image.transform = PROJ4Transform(layer[Info.PROJ], inverse=True)
+            image.transform *= STTransform(translate=(0, 0, -50.0))
+            image.determine_reference_points()
+        else:
+            image = GammaImage(
+                overview_content,
+                name=str(uuid),
+                clim=p.climits,
+                gamma=p.gamma,
+                interpolation='nearest',
+                cmap=self.document.find_colormap(p.colormap),
+                parent=self.main_map_parent,
+            )
+            # TODO: We must use a ChainTransform, because of the assumption made
+            # in LayerSet.update_layers_z(): there it is assumed, that the
+            # (last) transformation of the layer can be overwritten incautiously
+            # since it would only carry z translation. So the question: why
+            # doesn't LayerSet.add_layer() take care to guarantee this?
+            # Anyhow, here we can't concatenate two STTransforms with *= because
+            # they would end up in *one* transform whose 'translate' part would
+            # be overwritten in LayerSet.update_layers_z(), i.e. any x,y-offset
+            # would be reset to 0.0,0.0.
+            calibration_transform = STTransform(
+                scale=(layer[Info.CELL_WIDTH], layer[Info.CELL_HEIGHT], 1),
+                translate=(layer[Info.ORIGIN_X], layer[Info.ORIGIN_Y], 0))
+            z_transform = STTransform(translate=(0, 0, -50))
+            image.transform = ChainTransform([calibration_transform,
+                                              z_transform])
+
         self.image_elements[uuid] = image
-        self.layer_set.add_layer(image)
-        image.determine_reference_points()
+        self.layer_set.add_layer(image)  # TODO This method should add a z-transform!
+
         self.on_view_change(None)
 
     def add_composite_layer(self, new_order: tuple, uuid: UUID, p: Presentation):
