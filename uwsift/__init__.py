@@ -78,6 +78,11 @@ DEFAULT_CONFIGURATION = {
             'level',
         ],
     },
+
+    # display options
+    'display': {
+        'use_tiled_geolocated_images': True
+    },
 }
 
 config = Config('uwsift', defaults=[DEFAULT_CONFIGURATION], paths=CONFIG_PATHS)
@@ -120,3 +125,6 @@ def overwrite_import(package_name: str, custom_import_path: str, *, verbose=True
 satpy_import_path = config.get("satpy_import_path", None)
 if satpy_import_path is not None:
     overwrite_import("satpy", satpy_import_path)
+
+
+USE_TILED_GEOLOCATED_IMAGES = config.get("display.use_tiled_geolocated_images")

@@ -24,6 +24,7 @@ REQUIRES
 
 import logging
 from datetime import datetime
+from typing import Optional
 
 import numpy as np
 import shapefile
@@ -1234,3 +1235,159 @@ class PrecomputedIsocurveVisual(IsocurveVisual):
 
 
 PrecomputedIsocurve = create_visual_node(PrecomputedIsocurveVisual)
+
+
+class GammaImageVisual(ImageVisual):
+    """ImageVisual subclass for displaying satellite images.
+
+        Parameters
+        ----------
+        data : ndarray
+            ImageVisual data. Can be shape (M, N), (M, N, 3), or (M, N, 4).
+        extents : Box
+            Coordinates in km of satellite image bounding box, expected in bottom,left, top, right
+            order.
+        cmap : str | ColorMap
+            Colormap to use for luminance images.
+        clim : str | tuple
+            Limits to use for the colormap. Can be 'auto' to auto-set bounds to
+            the min and max of the data.
+
+
+        **kwargs : dict
+            Keyword arguments to pass to `Visual`.
+
+        Notes
+        -----
+        ImageVisual creates 8bit integer textures, however, integer types do not have NaN.
+        In case of int textures the NaN values are substituted by zeros.
+        An issue regarding this can be found here: https://github.com/vispy/vispy/issues/1509
+        """
+
+    # TODO: Contains code copied from TiledGeolocatedImageVisual to assure
+    # conforming visualisation. Consider refactoring
+
+    def __init__(self, data=None, method='auto', grid=(1, 1),
+                 cmap='viridis', clim='auto',
+                 gamma: Optional[float] = 1.0,
+                 interpolation='nearest', **kwargs):
+        self._data = None
+
+        # FIXME: this is copied from TiledGeolocatedImageVisual, benefit
+        # unknown, very dubious, since the name attribute seem to exist always:
+        # visual nodes already have names, so be careful
+        if not hasattr(self, "name"):
+            self.name = kwargs.get("name", None)
+
+        # load 'float packed rgba8' interpolation kernel
+        # to load float interpolation kernel use
+        # `load_spatial_filters(packed=False)`
+        kernel, self._interpolation_names = load_spatial_filters()
+
+        self._kerneltex = Texture2D(kernel, interpolation='nearest')
+        # The unpacking can be debugged by changing "spatial-filters.frag"
+        # to have the "unpack" function just return the .r component. That
+        # combined with using the below as the _kerneltex allows debugging
+        # of the pipeline
+        # self._kerneltex = Texture2D(kernel, interpolation='linear',
+        #                             internalformat='r32f')
+
+        # create interpolation shader functions for available
+        # interpolations
+        fun = [Function(_interpolation_template % n)
+               for n in self._interpolation_names]
+        self._interpolation_names = [n.lower()
+                                     for n in self._interpolation_names]
+
+        self._interpolation_fun = dict(zip(self._interpolation_names, fun))
+        self._interpolation_names.sort()
+        self._interpolation_names = tuple(self._interpolation_names)
+
+        # overwrite "nearest" and "bilinear" spatial-filters
+        # with  "hardware" interpolation _data_lookup_fn
+        self._interpolation_fun['nearest'] = Function(_texture_lookup)
+        self._interpolation_fun['bilinear'] = Function(_texture_lookup)
+
+        if interpolation not in self._interpolation_names:
+            raise ValueError("interpolation must be one of %s" %
+                             ', '.join(self._interpolation_names))
+
+        self._interpolation = interpolation
+
+        # check texture interpolation
+        if self._interpolation == 'bilinear':
+            texture_interpolation = 'linear'
+        else:
+            texture_interpolation = 'nearest'
+
+        self._method = method
+        self._grid = grid
+        self._need_texture_upload = True
+        self._need_vertex_update = True
+        self._need_colortransform_update = True
+        self._need_interpolation_update = True
+        self._texture = Texture2D(np.zeros((1, 1, 1), dtype=np.int16),
+                                  interpolation=texture_interpolation,
+                                  format="LUMINANCE", internalformat="R32F")
+        self._subdiv_position = VertexBuffer()
+        self._subdiv_texcoord = VertexBuffer()
+
+        # impostor quad covers entire viewport
+        vertices = np.array([[-1, -1], [1, -1], [1, 1],
+                             [-1, -1], [1, 1], [-1, 1]],
+                            dtype=np.float32)
+        self._impostor_coords = VertexBuffer(vertices)
+        self._null_tr = NullTransform()
+
+        self._init_view(self)
+        super(ImageVisual, self).__init__(vcode=VERT_SHADER, fcode=FRAG_SHADER)
+        self.set_gl_state('translucent', cull_face=False)
+        self._draw_mode = 'triangles'
+
+        # define _data_lookup_fn as None, will be setup in
+        # self._build_interpolation()
+        self._data_lookup_fn = None
+
+        self.gamma = gamma
+        self.clim = clim if clim != 'auto' else (np.nanmin(data), np.nanmax(data))
+        self._texture_LUT = None
+        self.cmap = cmap
+        self.set_data(data)
+        self.freeze()
+
+    @property
+    def gamma(self):
+        return self._gamma
+
+    @gamma.setter
+    def gamma(self, gamma):
+        self._gamma = gamma if gamma is not None else 1.
+        self._need_texture_upload = True
+        self.update()
+
+    @property
+    def size(self):
+        return self._data.shape[:2][::-1]
+
+    def _normalize_data(self, data):
+        if data is not None and data.dtype == np.float64:
+            data = data.astype(np.float32)
+
+        return data
+
+    def _build_texture(self):
+        self._set_clim_vars()
+        # call below similar to process in TiledGeolocatedImageVisual._set_texture_tiles
+        # which calls a method in TextureAtlas where the Texture2D.set_data method is
+        # called.
+        self._texture.set_data(self._normalize_data(self._data))
+        self._need_texture_upload = False
+
+    def _set_clim_vars(self):
+        self._data_lookup_fn["vmin"] = self._clim[0]
+        self._data_lookup_fn["vmax"] = self._clim[1]
+        self._data_lookup_fn["gamma"] = self._gamma
+        # self._need_texture_upload = True
+
+
+GammaImage = create_visual_node(GammaImageVisual)

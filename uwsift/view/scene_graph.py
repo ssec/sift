@@ -1,18 +1,27 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-LayerRep.py
-~~~~~~~~~~~
+scene_graph.py
+~~~~~~~~~~~~~~
 
 PURPOSE
-Layer representation - the "physical" realization of content to draw on the map.
-A layer representation can have multiple levels of detail
+Provides a SceneGraphManager to handle display of visuals, in this case satellite imaging data,
+latitude/longitude lines and coastlines.
 
-A factory will convert URIs into LayerReps
-LayerReps are managed by document, and handed off to the MapWidget as part of a LayerDrawingPlan
+As per http://api.vispy.org/en/latest/scene.html (abridged)
+
+        - Vispy scene graph (SG) prerequisites:
+            1. create SceneCanvas -> this object's scene property is top level node in SG:
+                ```
+                    vispy_canvas = scene.SceneCanvas
+                    sg_root_node = vispy_canvas.scene
+                ```
+            2. create node instances (from vispy.scene.visuals)
+            3. add node instances to scene by making them children of canvas scene, or
+                of nodes already in the scene
 
 REFERENCES
-
+http://api.vispy.org/en/latest/scene.html
 
 REQUIRES
 
@@ -27,6 +36,7 @@ __author__ = 'davidh'
 import logging
 import os
 from numbers import Number
+from typing import Dict, Optional
 from uuid import UUID
 
 import numpy as np
@@ -41,15 +51,17 @@ from vispy.visuals import LineVisual
 from vispy.visuals.transforms import STTransform, MatrixTransform, ChainTransform
 from vispy.gloo.util import _screenshot
 
+from uwsift import config
+from uwsift import USE_TILED_GEOLOCATED_IMAGES
 from uwsift.common import DEFAULT_ANIMATION_DELAY, Info, Kind, Tool, Presentation
-from uwsift.model.document import DocLayerStack, DocBasicLayer
+from uwsift.model.document import DocLayerStack, DocBasicLayer, Document
 from uwsift.queue import TASK_DOING, TASK_PROGRESS
 from uwsift.util import get_package_data_dir
 from uwsift.view.cameras import PanZoomProbeCamera
 from uwsift.view.probes import DEFAULT_POINT_PROBE
 from uwsift.view.transform import PROJ4Transform
-from uwsift.view.visuals import (NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer, PrecomputedIsocurve)
-from uwsift import config
+from uwsift.view.visuals import (NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer,
+                                 PrecomputedIsocurve, GammaImage)
 
 LOG = logging.getLogger(__name__)
 DATA_DIR = get_package_data_dir()
@@ -446,6 +458,8 @@ class SceneGraphManager(QObject):
     in order to feed the display optimally.
     """
 
+    # TODO(ar) REVIEW: distinction between class and member/instance
+    # variables seems random (see below)
     document = None  # Document object we work with
     workspace = None  # where we get data arrays from
     queue = None  # background jobs go here
@@ -504,6 +518,15 @@ class SceneGraphManager(QObject):
             np.array([0., 0., 0., 0.], dtype=np.float32),  # transparent
         ]
 
+        # TODO(ar) REVIEW: distinction between class and member/instance
+        # variables seems random (see above)
+        # These following three were initialized in self.setup_initial_canvas()
+        # thus indirectly as instance/member variables.
+        # Why aren't they class variables like 'document', 'workspace', ...?
+        self.main_view = None
+        self.main_canvas = None
+        self.pz_camera = None
+
         self.setup_initial_canvas(center)
         self.pending_polygon = PendingPolygon(self.main_map)
 
@@ -551,7 +574,7 @@ class SceneGraphManager(QObject):
 
     def setup_initial_canvas(self, center=None):
         self.main_canvas = SIFTMainMapCanvas(parent=self.parent())
-        self.main_view = self.main_canvas.central_widget.add_view()
+        self.main_view = self.main_canvas.central_widget.add_view(name="MainView")
 
         # Camera Setup
         self.pz_camera = PanZoomProbeCamera(name=Tool.PAN_ZOOM.name, aspect=1, pan_limits=(-1., -1., 1., 1.),
@@ -586,11 +609,12 @@ class SceneGraphManager(QObject):
         self.conus_states.transform = STTransform(translate=(0, 0, 45))
 
         self._latlon_grid_color_idx = 1
-        latlon_grid_resolution = \
-            get_configured_latlon_grid_resolution()
-        self.latlon_grid = self._init_latlon_grid_layer(
-            resolution=latlon_grid_resolution,
-            color=self._color_choices[self._latlon_grid_color_idx])
+        latlon_grid_resolution = get_configured_latlon_grid_resolution()
+        latlon_grid_points = self._create_latlon_grid_points(
+            resolution=latlon_grid_resolution)
+        self.latlon_grid = Line(pos=latlon_grid_points, connect="strip",
+                                color=self._color_choices[self._latlon_grid_color_idx],
+                                parent=self.main_map)
         self.latlon_grid.transform = STTransform(translate=(0, 0, 45))
 
         self.create_test_image()
@@ -642,7 +666,7 @@ class SceneGraphManager(QObject):
         image.transform *= STTransform(translate=(0, 0, -50.0))
         self._test_img = image
 
-    def set_projection(self, projection_name, proj_info, center=None):
+    def set_projection(self, projection_name: str, proj_info: dict, center=None):
         self.main_map.transform = PROJ4Transform(proj_info['proj4_str'])
         center = center or proj_info["default_center"]
         width = proj_info["default_width"] / 2.
@@ -657,7 +681,8 @@ class SceneGraphManager(QObject):
                 img.determine_reference_points()
         self.on_view_change(None)
 
-    def _init_latlon_grid_layer(self, color=None, resolution=5.):
+    @staticmethod
+    def _create_latlon_grid_points(resolution=5.):
         """Create a series of line segments representing latitude and longitude lines.
 
         :param resolution: number of degrees between lines
@@ -690,9 +715,7 @@ class SceneGraphManager(QObject):
         points2[points.shape[0]:, :] = points
         points2[points.shape[0]:, 0] += offset
 
-        # return Line(pos=points2, connect="segments", color=color, parent=self.main_map)
-        return Line(pos=points2, connect="strip", color=color, parent=self.main_map)
-        # return Line(pos=points, connect="strip", color=color, parent=self.main_map)
+        return points2
 
     def on_mouse_press_point(self, event):
         """Handle mouse events that mean we are using the point probe.
@@ -829,7 +852,7 @@ class SceneGraphManager(QObject):
             self.latlon_grid.set_data(color=self._color_choices[self._latlon_grid_color_idx])
             self.latlon_grid.visible = True
 
-    def change_tool(self, name):
+    def change_tool(self, name: Tool):
         prev_tool = self._current_tool
         if name == prev_tool:
             # it's the same tool
@@ -878,7 +901,8 @@ class SceneGraphManager(QObject):
 
         for uuid in uuids:
             layer = self.image_elements[uuid]
-            if isinstance(layer, TiledGeolocatedImage):
+            if (isinstance(layer, TiledGeolocatedImage)
+                    or isinstance(layer, GammaImage)):
                 self.image_elements[uuid].cmap = colormap
             else:
                 self.image_elements[uuid].color = colormap
@@ -966,7 +990,10 @@ class SceneGraphManager(QObject):
                 LOG.warning("Contour layer already exists in scene")
                 return
             if p.kind == Kind.IMAGE and isinstance(image, TiledGeolocatedImage):
-                LOG.warning("Image layer already exists in scene")
+                LOG.warning("Image layer (geolocated) already exists in scene")
+                return
+            if p.kind == Kind.IMAGE and isinstance(image, GammaImage):
+                LOG.warning("Image layer (pixel matrix) already exists in scene")
                 return
             # we already have an image layer for it and it isn't what we want
             # remove the existing image object and create the proper type now
@@ -977,29 +1004,57 @@ class SceneGraphManager(QObject):
         if p.kind == Kind.CONTOUR:
             return self.add_contour_layer(layer, p, overview_content)
 
-        image = TiledGeolocatedImage(
-            overview_content,
-            layer[Info.ORIGIN_X],
-            layer[Info.ORIGIN_Y],
-            layer[Info.CELL_WIDTH],
-            layer[Info.CELL_HEIGHT],
-            name=str(uuid),
-            clim=p.climits,
-            gamma=p.gamma,
-            interpolation='nearest',
-            method='tiled',
-            cmap=self.document.find_colormap(p.colormap),
-            double=False,
-            texture_shape=DEFAULT_TEXTURE_SHAPE,
-            wrap_lon=False,
-            parent=self.main_map,
-            projection=layer[Info.PROJ],
-        )
-        image.transform = PROJ4Transform(layer[Info.PROJ], inverse=True)
-        image.transform *= STTransform(translate=(0, 0, -50.0))
+        if USE_TILED_GEOLOCATED_IMAGES:
+            image = TiledGeolocatedImage(
+                overview_content,
+                layer[Info.ORIGIN_X],
+                layer[Info.ORIGIN_Y],
+                layer[Info.CELL_WIDTH],
+                layer[Info.CELL_HEIGHT],
+                name=str(uuid),
+                clim=p.climits,
+                gamma=p.gamma,
+                interpolation='nearest',
+                method='tiled',
+                cmap=self.document.find_colormap(p.colormap),
+                double=False,
+                texture_shape=DEFAULT_TEXTURE_SHAPE,
+                wrap_lon=False,
+                parent=self.main_map,
+                projection=layer[Info.PROJ],
+            )
+            image.transform = PROJ4Transform(layer[Info.PROJ], inverse=True)
+            image.transform *= STTransform(translate=(0, 0, -50.0))
+            image.determine_reference_points()
+        else:
+            image = GammaImage(
+                overview_content,
+                name=str(uuid),
+                clim=p.climits,
+                gamma=p.gamma,
+                interpolation='nearest',
+                cmap=self.document.find_colormap(p.colormap),
+                parent=self.main_map_parent,
+            )
+            # TODO: We must use a ChainTransform, because of the assumption made
+            # in LayerSet.update_layers_z(): there it is assumed, that the
+            # (last) transformation of the layer can be overwritten incautiously
+            # since it would only carry z translation. So the question: why
+            # doesn't LayerSet.add_layer() take care to guarantee this?
+            # Anyhow, here we can't concatenate two STTransforms with *= because
+            # they would end up in *one* transform whose 'translate' part would
+            # be overwritten in LayerSet.update_layers_z(), i.e. any x,y-offset
+            # would be reset to 0.0,0.0.
+            calibration_transform = STTransform(
+                scale=(layer[Info.CELL_WIDTH], layer[Info.CELL_HEIGHT], 1),
+                translate=(layer[Info.ORIGIN_X], layer[Info.ORIGIN_Y], 0))
+            z_transform = STTransform(translate=(0, 0, -50))
+            image.transform = ChainTransform([calibration_transform,
+                                              z_transform])
+
         self.image_elements[uuid] = image
-        self.layer_set.add_layer(image)
-        image.determine_reference_points()
+        self.layer_set.add_layer(image)  # TODO This method should add a z-transform!
+
         self.on_view_change(None)
 
     def add_composite_layer(self, new_order: tuple, uuid: UUID, p: Presentation):
@@ -1127,7 +1182,7 @@ class SceneGraphManager(QObject):
         self.update()
         return res
 
-    def change_layers_visibility(self, layers_changed: dict):
+    def change_layers_visibility(self, layers_changed: Dict[UUID, bool]):
         for uuid, visible in layers_changed.items():
             self.set_layer_visible(uuid, visible)
 
@@ -1135,7 +1190,7 @@ class SceneGraphManager(QObject):
         self.rebuild_all()
         # raise NotImplementedError("layer set change not implemented in SceneGraphManager")
 
-    def _connect_doc_signals(self, document):
+    def _connect_doc_signals(self, document: Document):
         document.didReorderLayers.connect(self._rebuild_layer_order)  # current layer set changed z/anim order
         document.didAddBasicLayer.connect(self.add_basic_layer)  # layer added to one or more layer sets
         document.didAddCompositeLayer.connect(
@@ -1155,7 +1210,7 @@ class SceneGraphManager(QObject):
     def set_frame_number(self, frame_number=None):
         self.layer_set.next_frame(None, frame_number)
 
-    def set_layer_visible(self, uuid, visible=None):
+    def set_layer_visible(self, uuid: UUID, visible: Optional[bool] = None):
         image = self.image_elements.get(uuid, None)
         if image is None:
             return
