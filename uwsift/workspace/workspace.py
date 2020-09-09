@@ -44,7 +44,7 @@ import sys
 import unittest
 from collections import Mapping as ReadOnlyMapping, defaultdict, OrderedDict
 from datetime import datetime, timedelta
-from typing import Mapping, Generator, Tuple, Dict
+from typing import Mapping, Generator, Tuple, Dict, Optional
 from uuid import UUID, uuid1 as uuidgen
 
 import numba as nb
@@ -540,11 +540,11 @@ class Workspace(QObject):
     # often-used queries
     #
 
-    def _product_with_uuid(self, session, uuid) -> Product:
+    def _product_with_uuid(self, session, uuid: UUID) -> Product:
         return session.query(Product).filter_by(uuid_str=str(uuid)).first()
 
     def _product_overview_content(self, session, prod: Product = None, uuid: UUID = None,
-                                  kind: Kind = Kind.IMAGE) -> Content:
+                                  kind: Kind = Kind.IMAGE) -> Optional[Content]:
         if prod is None and uuid is not None:
             # Get Product object
             try:
@@ -557,7 +557,7 @@ class Workspace(QObject):
         return None if 0 == len(contents) else contents[0]
 
     def _product_native_content(self, session, prod: Product = None, uuid: UUID = None,
-                                kind: Kind = Kind.IMAGE) -> Content:
+                                kind: Kind = Kind.IMAGE) -> Optional[Content]:
         # NOTE: This assumes the last Content object is the best resolution
         #       but it is untested
         if prod is None and uuid is not None:
@@ -575,7 +575,8 @@ class Workspace(QObject):
     # combining queries with data content
     #
 
-    def _overview_content_for_uuid(self, uuid, kind=Kind.IMAGE):
+    def _overview_content_for_uuid(self, uuid: UUID, kind: Kind = Kind.IMAGE) \
+            -> np.memmap:
         # FUTURE: do a compound query for this to get the Content entry
         # prod = self._product_with_uuid(uuid)
         # assert(prod is not None)
@@ -585,7 +586,7 @@ class Workspace(QObject):
             arrays = self._cached_arrays_for_content(ovc)
             return arrays.data
 
-    def _native_content_for_uuid(self, uuid):
+    def _native_content_for_uuid(self, uuid: UUID) -> np.memmap:
         # FUTURE: do a compound query for this to get the Content entry
         # prod = self._product_with_uuid(uuid)
         with self._inventory as s:
@@ -611,12 +612,12 @@ class Workspace(QObject):
 
         return total
 
-    def _all_product_uuids(self):
+    def _all_product_uuids(self) -> list:
         with self._inventory as s:
             return [q.uuid for q in s.query(Product).all()]
 
     # ----------------------------------------------------------------------
-    def get_info(self, dsi_or_uuid, lod=None):
+    def get_info(self, dsi_or_uuid, lod=None) -> Optional[frozendict]:
         """
         :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
         :param lod: desired level of detail to focus
@@ -653,7 +654,7 @@ class Workspace(QObject):
             # flatten to one namespace and read-only
             return frozendict(prod.info)
 
-    def get_algebraic_namespace(self, uuid):
+    def get_algebraic_namespace(self, uuid: UUID):
         if uuid is None:
             return {}, ""
 
@@ -665,7 +666,7 @@ class Workspace(QObject):
             code = prod.expression
         return symbols, code
 
-    def _check_cache(self, path):
+    def _check_cache(self, path: str):
         """
         FIXME: does not work if more than one product inside a path
         :param path: file we're checking
@@ -696,7 +697,7 @@ class Workspace(QObject):
                     return content.product.uuid, content.product.info, data
 
     @property
-    def product_names_available_in_cache(self):
+    def product_names_available_in_cache(self) -> dict:
         """
         Returns: dictionary of {UUID: product name,...}
         typically used for add-from-cache dialog
@@ -744,7 +745,7 @@ class Workspace(QObject):
             S.commit()
         return total
 
-    def remove_all_workspace_content_for_resource_paths(self, paths):
+    def remove_all_workspace_content_for_resource_paths(self, paths: list):
         total = 0
         with self._inventory as s:
             for path in paths:
@@ -753,7 +754,7 @@ class Workspace(QObject):
                     total += self._purge_content_for_resource(rsr, defer_commit=True)
         return total
 
-    def purge_content_for_product_uuids(self, uuids, also_products=False):
+    def purge_content_for_product_uuids(self, uuids: list, also_products=False):
         """
         given one or more product uuids, purge the Content from the cache
         Note: this does not purge any ActiveContent that may still be using the files, but the files will be gone
@@ -924,7 +925,9 @@ class Workspace(QObject):
                     #     zult.get(Info.DISPLAY_NAME, '?? unknown name ??')))
                     yield num_products, zult
 
-    def import_product_content(self, uuid=None, prod=None, allow_cache=True, **importer_kwargs):
+    def import_product_content(self, uuid: UUID = None, prod: Product = None,
+                               allow_cache=True,
+                               **importer_kwargs) -> np.memmap:
         with self._inventory as S:
             # S = self._S
             if prod is None and uuid is not None:
@@ -1106,7 +1109,8 @@ class Workspace(QObject):
                                                            codeblock=operations)
         return uuid, info, data
 
-    def _create_product_from_array(self, info, data, namespace=None, codeblock=None):
+    def _create_product_from_array(self, info: Info, data, namespace=None, codeblock=None) \
+            -> Tuple[UUID, Optional[frozendict], np.memmap]:
         """
         update metadatabase to include Product and Content entries for this new dataset we've calculated
         this allows the calculated data to reside in the workspace
@@ -1164,7 +1168,7 @@ class Workspace(QObject):
         # prod = self._product_with_uuid(S, uuid)
         return uuid, self.get_info(uuid), overview_data
 
-    def _bgnd_remove(self, uuid):
+    def _bgnd_remove(self, uuid: UUID):
         from uwsift.queue import TASK_DOING, TASK_PROGRESS
         yield {TASK_DOING: 'purging memory', TASK_PROGRESS: 0.5}
         with self._inventory as s:
@@ -1188,7 +1192,8 @@ class Workspace(QObject):
             list(self._bgnd_remove(uuid))
         return True
 
-    def get_content(self, dsi_or_uuid, lod=None, kind=Kind.IMAGE):
+    def get_content(self, dsi_or_uuid, lod=None, kind: Kind = Kind.IMAGE) \
+            -> Optional[np.memmap]:
         """
         By default, get the best-available (closest to native) np.ndarray-compatible view of the full dataset
         :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
@@ -1335,7 +1340,7 @@ class Workspace(QObject):
         coords_mask = p(coords_mask[1], coords_mask[0], inverse=True)[::-1]
         return coords_mask, data
 
-    def get_content_coordinate_mask(self, uuid, coords_mask):
+    def get_content_coordinate_mask(self, uuid: UUID, coords_mask):
         data = self.get_content(uuid)
         trans = self._create_layer_affine(uuid)
         p = self.layer_proj(uuid)
@@ -1347,7 +1352,7 @@ class Workspace(QObject):
         )
         return data[index_mask]
 
-    def get_pyresample_area(self, uuid, y_slice=None, x_slice=None):
+    def get_pyresample_area(self, uuid: UUID, y_slice=None, x_slice=None):
         """Create a pyresample compatible AreaDefinition for this layer."""
         # WARNING: Untested!
         from pyresample.geometry import AreaDefinition
