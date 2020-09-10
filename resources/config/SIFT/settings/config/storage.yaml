@@ -1,0 +1,5 @@
+# Control the operations mode regarding inventory database and housekeeping of
+# intermediate data files
+storage:
+  use_inventory_db : True
+  cleanup_file_cache: False
