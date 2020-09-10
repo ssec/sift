@@ -19,7 +19,7 @@ from uwsift.model.document import Document, DocumentAsTrackStack, FrameInfo, Tra
 from uwsift.view.timeline.common import VisualState
 from uwsift.view.timeline.items import QTrackItem, QFrameItem
 from uwsift.view.timeline.scene import QFramesInTracksScene
-from uwsift.workspace import Workspace
+from uwsift.workspace import BaseWorkspace
 
 LOG = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
     """
     _doc: DocumentAsTrackStack = None
 
-    def __init__(self, doc: Document, ws: Workspace, *args, **kwargs):
+    def __init__(self, doc: Document, ws: BaseWorkspace, *args, **kwargs):
         """
 
         Args:
@@ -172,7 +172,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
     #     # .as_layer_list should have updated the document track order for us a didReorderTracks
     #     self._invalidate()
 
-    def _connect_signals(self, doc: Document, ws: Workspace):
+    def _connect_signals(self, doc: Document, ws: BaseWorkspace):
         """Connect document, workspace, signals in order to invalidate and update scene representation
         """
 

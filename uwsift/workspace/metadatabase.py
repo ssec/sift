@@ -5,7 +5,7 @@ metadatabase.py
 ===============
 
 PURPOSE
-SQLAlchemy database tables of metadata used by Workspace to manage its local cache.
+SQLAlchemy database tables of metadata used by CachingWorkspace to manage its local cache.
 
 
 OVERVIEW

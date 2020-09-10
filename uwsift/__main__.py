@@ -53,7 +53,7 @@ from uwsift.view.layer_details import SingleLayerInfoPane
 from uwsift.view.probes import ProbeGraphManager, DEFAULT_POINT_PROBE
 from uwsift.view.rgb_config import RGBLayerConfigPane
 from uwsift.view.scene_graph import SceneGraphManager
-from uwsift.workspace import Workspace
+from uwsift.workspace import CachingWorkspace
 from uwsift.workspace.collector import ResourceSearchPathCollector
 
 LOG = logging.getLogger(__name__)
@@ -692,8 +692,10 @@ class Main(QtGui.QMainWindow):
         self.queue.didMakeProgress.connect(self.update_progress_bar)
 
         # create manager and helper classes
-        self.workspace = Workspace(workspace_dir, max_size_gb=cache_size, queue=self.queue,
-                                   initial_clear=clear_workspace)
+        self.workspace = CachingWorkspace(workspace_dir,
+                                          max_size_gb=cache_size,
+                                          queue=self.queue,
+                                          initial_clear=clear_workspace)
         self.document = doc = Document(self.workspace, config_dir=config_dir, queue=self.queue)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
                                                border_shapefile=border_shapefile,

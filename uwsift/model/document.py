@@ -78,7 +78,7 @@ import warnings
 from uwsift.workspace.metadatabase import Product
 from uwsift.common import Kind, Info, Presentation, Span, FCS_SEP, ZList, Flags
 from uwsift.queue import TaskQueue
-from uwsift.workspace import Workspace
+from uwsift.workspace import BaseWorkspace
 from uwsift.util.default_paths import DOCUMENT_SETTINGS_DIR
 from uwsift.model.composite_recipes import RecipeManager, CompositeRecipe
 from uwsift.view.colormap import COLORMAP_MANAGER, PyQtGraphColormap, SITE_CATEGORY, USER_CATEGORY
@@ -1139,7 +1139,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     """
     config_dir: str = None
     queue: TaskQueue = None
-    _workspace: Workspace = None
+    _workspace: BaseWorkspace = None
 
     # timeline the user has specified:
     track_order: ZList = None  # (zorder, family-name) with higher z above lower z; z<0 should not occur
