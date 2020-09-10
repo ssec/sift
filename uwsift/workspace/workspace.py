@@ -58,9 +58,9 @@ from sqlalchemy.orm.exc import NoResultFound
 from uwsift.common import Info, Kind, Flags, State
 from uwsift.model.shapes import content_within_shape
 from uwsift.queue import TASK_PROGRESS, TASK_DOING
+from uwsift.workspace.utils import import_utils
 from .importer import aImporter, SatpyImporter, generate_guidebook_metadata
 from .metadatabase import Metadatabase, Content, Product, Resource
-from uwsift.workspace.utils import import_utils
 
 LOG = logging.getLogger(__name__)
 
