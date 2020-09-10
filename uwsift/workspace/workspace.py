@@ -310,7 +310,7 @@ class Workspace(QObject):
         return self._inventory
 
     @staticmethod
-    def defaultWorkspace():
+    def default_workspace():
         """
         return the default (global) workspace
         Currently no plans to have more than one workspace, but secondaries may eventually have some advantage.
