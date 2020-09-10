@@ -33,7 +33,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from vispy import app
 
 import uwsift.ui.open_cache_dialog_ui as open_cache_dialog_ui
-from uwsift import __version__
+from uwsift import __version__, USE_INVENTORY_DB
 from uwsift.common import Info, Tool, CompositeType
 from uwsift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
 from uwsift.control.layer_tree import LayerStackTreeViewModel
@@ -53,7 +53,7 @@ from uwsift.view.layer_details import SingleLayerInfoPane
 from uwsift.view.probes import ProbeGraphManager, DEFAULT_POINT_PROBE
 from uwsift.view.rgb_config import RGBLayerConfigPane
 from uwsift.view.scene_graph import SceneGraphManager
-from uwsift.workspace import CachingWorkspace
+from uwsift.workspace import CachingWorkspace, SimpleWorkspace
 from uwsift.workspace.collector import ResourceSearchPathCollector
 
 LOG = logging.getLogger(__name__)
@@ -656,8 +656,9 @@ class Main(QtGui.QMainWindow):
         # gv.setRenderHints(QtGui.QPainter.Antialiasing)
 
         # connect up the scene
-        doc.sync_potential_tracks_from_metadata()
-        LOG.debug("Potential tracks: {}".format(repr(doc.track_order)))
+        if USE_INVENTORY_DB:
+            doc.sync_potential_tracks_from_metadata()
+            LOG.debug("Potential tracks: {}".format(repr(doc.track_order)))
         self._timeline_scene = SiftDocumentAsFramesInTracks(doc, self.workspace)
         gv.setScene(self._timeline_scene)
         APP.aboutToQuit.connect(self._timeline_scene.clear)
@@ -692,10 +693,13 @@ class Main(QtGui.QMainWindow):
         self.queue.didMakeProgress.connect(self.update_progress_bar)
 
         # create manager and helper classes
-        self.workspace = CachingWorkspace(workspace_dir,
-                                          max_size_gb=cache_size,
-                                          queue=self.queue,
-                                          initial_clear=clear_workspace)
+        if USE_INVENTORY_DB:
+            self.workspace = CachingWorkspace(workspace_dir,
+                                              max_size_gb=cache_size,
+                                              queue=self.queue,
+                                              initial_clear=clear_workspace)
+        else:
+            self.workspace = SimpleWorkspace(workspace_dir)
         self.document = doc = Document(self.workspace, config_dir=config_dir, queue=self.queue)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
                                                border_shapefile=border_shapefile,
@@ -750,8 +754,8 @@ class Main(QtGui.QMainWindow):
         # Set the projection based on the document's default
         self.document.change_projection()
         self.ui.projectionComboBox.setCurrentIndex(self.document.current_projection_index())
-
-        self._init_metadata_background_collection(search_paths)
+        if USE_INVENTORY_DB:
+            self._init_metadata_background_collection(search_paths)
 
         # set up timeline
         # LOG.info("potential tracks already in database: {}".format(repr(doc.potential_tracks())))
