@@ -646,7 +646,7 @@ class Main(QtGui.QMainWindow):
         self.ui.cursorProbeLayer.setText(layer_str)
         self.ui.cursorProbeText.setText("{} ({}) [{}, {}]".format(data_str, probe_loc, col, row))
 
-    def _init_timeline(self, doc: Document, ws: Workspace):
+    def _init_timeline(self, doc: Document):
         gv = self.ui.timelineView
 
         # set up the widget itself
