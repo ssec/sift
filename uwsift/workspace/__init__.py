@@ -24,3 +24,4 @@ REQUIRES
 
 from .workspace import BaseWorkspace
 from .caching_workspace import CachingWorkspace
+from .simple_workspace import SimpleWorkspace
