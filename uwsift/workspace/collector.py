@@ -31,7 +31,7 @@ from PyQt5.QtCore import QObject
 from uwsift import config
 from satpy.readers import group_files
 from uwsift.queue import TASK_DOING, TASK_PROGRESS
-from .workspace import Workspace
+from .workspace import BaseWorkspace
 from .importer import available_satpy_readers
 from ..common import Info
 
@@ -60,7 +60,7 @@ class ResourceSearchPathCollector(QObject):
     update the metadatabase for new resources,
     and mark for purge any files no longer available.
     """
-    _ws: Workspace = None
+    _ws: BaseWorkspace = None
     _paths: List[str] = None
     _dir_mtimes: Mapping[str, datetime] = None
     _timestamp_path: str = None  # path which tracks the last time we skimmed the paths
@@ -130,7 +130,7 @@ class ResourceSearchPathCollector(QObject):
         os.utime(self._timestamp_path)
         return mtime
 
-    def __init__(self, ws: [Workspace, _workspace_test_proxy]):
+    def __init__(self, ws: [BaseWorkspace, _workspace_test_proxy]):
         super(ResourceSearchPathCollector, self).__init__()
         self._ws = ws
         self._paths = []

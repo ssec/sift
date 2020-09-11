@@ -17,14 +17,15 @@ import re
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from datetime import datetime, timedelta
-from typing import Iterable, Generator, Mapping
+from typing import Iterable, Generator, Mapping, Tuple
 
 import yaml
+import dask.array as da
 import numpy as np
 from pyproj import Proj
 from sqlalchemy.orm import Session
 
-from uwsift import config
+from uwsift import config, USE_INVENTORY_DB
 from uwsift.common import Platform, Info, Instrument, Kind, INSTRUMENT_MAP, PLATFORM_MAP
 from uwsift.util import USER_CACHE_DIR
 from uwsift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
@@ -75,7 +76,7 @@ GUIDEBOOKS = {
 }
 
 import_progress = namedtuple('import_progress',
-                             ['uuid', 'stages', 'current_stage', 'completion', 'stage_desc', 'dataset_info', 'data'])
+                             ['uuid', 'stages', 'current_stage', 'completion', 'stage_desc', 'dataset_info', 'data', 'content'])
 """
 # stages:int, number of stages this import requires
 # current_stage:int, 0..stages-1 , which stage we're on
@@ -927,6 +928,8 @@ class SatpyImporter(aImporter):
             self.dataset_ids = filter_dataset_ids(self.scn.available_dataset_ids())
         self.dataset_ids = sorted(self.dataset_ids)
 
+        self.use_inventory_db = USE_INVENTORY_DB
+
     @classmethod
     def from_product(cls, prod: Product, workspace_cwd, database_session, **kwargs):
         # this overrides the base class because we assume that the product
@@ -954,12 +957,12 @@ class SatpyImporter(aImporter):
     def merge_resources(self):
         if len(self._resources) == len(self.filenames):
             return self._resources
-
-        resources = self._S.query(Resource).filter(
-            Resource.path.in_(self.filenames)).all()
-        if len(resources) == len(self.filenames):
-            self._resources = resources
-            return self._resources
+        if (self.use_inventory_db):
+            resources = self._S.query(Resource).filter(
+                Resource.path.in_(self.filenames)).all()
+            if len(resources) == len(self.filenames):
+                self._resources = resources
+                return self._resources
 
         now = datetime.utcnow()
         res_dict = {r.path: r for r in self._resources}
@@ -973,7 +976,8 @@ class SatpyImporter(aImporter):
                 mtime=now,
                 atime=now,
             )
-            self._S.add(res)
+            if self.use_inventory_db:
+                self._S.add(res)
             res_dict[fn] = res
 
         self._resources = res_dict.values()
@@ -986,16 +990,17 @@ class SatpyImporter(aImporter):
             return
 
         existing_ids = {}
-        resources = list(resources)
-        for res in resources:
-            products = list(res.product)
-            existing_ids.update({DatasetID.from_dict(prod.info): prod for prod in products})
-        existing_prods = {x: existing_ids[x] for x in self.dataset_ids if x in existing_ids}
-        if products and len(existing_prods) == len(self.dataset_ids):
-            products = existing_prods.values()
-            LOG.debug('pre-existing products {}'.format(repr(products)))
-            yield from products
-            return
+        if self.use_inventory_db:
+            resources = list(resources)
+            for res in resources:
+                products = list(res.product)
+                existing_ids.update({DatasetID.from_dict(prod.info): prod for prod in products})
+            existing_prods = {x: existing_ids[x] for x in self.dataset_ids if x in existing_ids}
+            if products and len(existing_prods) == len(self.dataset_ids):
+                products = existing_prods.values()
+                LOG.debug('pre-existing products {}'.format(repr(products)))
+                yield from products
+                return
 
         from uuid import uuid1
         scn = self.load_all_datasets()
@@ -1022,8 +1027,9 @@ class SatpyImporter(aImporter):
             assert (prod.info[Info.OBS_TIME] is not None and prod.obs_time is not None)
             assert (prod.info[Info.VALID_RANGE] is not None)
             LOG.debug('new product: {}'.format(repr(prod)))
-            self._S.add(prod)
-            self._S.commit()
+            if self.use_inventory_db:
+                self._S.add(prod)
+                self._S.commit()
             yield prod
 
     @property
@@ -1160,16 +1166,17 @@ class SatpyImporter(aImporter):
         }
 
     def begin_import_products(self, *product_ids) -> Generator[import_progress, None, None]:
-        import dask.array as da
-
-        if product_ids:
-            products = [self._S.query(Product).filter_by(id=anid).one() for anid in product_ids]
-            assert products
+        if self.use_inventory_db:
+            if product_ids:
+                products = [self._S.query(Product).filter_by(id=anid).one() for anid in product_ids]
+                assert products
+            else:
+                products = list(self._S.query(Resource, Product).filter(
+                    Resource.path.in_(self.filenames)).filter(
+                    Product.resource_id == Resource.id).all())
+                assert products
         else:
-            products = list(self._S.query(Resource, Product).filter(
-                Resource.path.in_(self.filenames)).filter(
-                Product.resource_id == Resource.id).all())
-            assert products
+            products = product_ids
 
         # FIXME: Don't recreate the importer every time we want to load data
         dataset_ids = [DatasetID.from_dict(prod.info) for prod in products]
@@ -1213,11 +1220,10 @@ class SatpyImporter(aImporter):
                 shape = data.shape
                 origin_x -= am_index * cell_width
 
-            # shovel that data into the memmap incrementally
-            data_filename = '{}.image'.format(prod.uuid)
-            data_path = os.path.join(self._cwd, data_filename)
-            img_data = np.memmap(data_path, dtype=np.float32, shape=shape, mode='w+')
-            da.store(data, img_data)
+            # FIXME: UNDERSTAND WHAT'S GOING ON HERE. WAS THIS REFACTORING?
+            data_filename, img_data = self.create_image_file_cache_data(data,
+                                                                        prod,
+                                                                        shape)
 
             c = Content(
                 lod=0,
@@ -1245,10 +1251,9 @@ class SatpyImporter(aImporter):
             )
             c.info[Info.KIND] = Kind.IMAGE
             # c.info.update(prod.info) would just make everything leak together so let's not do it
-            self._S.add(c)
+
             prod.content.append(c)
-            # prod.touch()
-            self._S.commit()
+            self.add_content_to_cache(c)
 
             yield import_progress(uuid=prod.uuid,
                                   stages=num_stages,
@@ -1256,7 +1261,8 @@ class SatpyImporter(aImporter):
                                   completion=1. / num_contents,
                                   stage_desc="SatPy image data add to workspace",
                                   dataset_info=None,
-                                  data=img_data)
+                                  data=img_data,
+                                  content=c)
 
             if num_contents == 1:
                 continue
@@ -1267,8 +1273,7 @@ class SatpyImporter(aImporter):
 
             # XXX: Should/could 'lod' be used for different contour level data?
             levels = [x for y in prod.info['contour_levels'] for x in y]
-            data_filename = '{}.contour'.format(prod.uuid)
-            data_path = os.path.join(self._cwd, data_filename)
+
             try:
                 contour_data = self._compute_contours(
                     img_data, prod.info[Info.VALID_RANGE][0],
@@ -1282,7 +1287,8 @@ class SatpyImporter(aImporter):
             contour_data[:, 0] += origin_x
             contour_data[:, 1] *= cell_height
             contour_data[:, 1] += origin_y
-            contour_data.tofile(data_path)
+            data_filename: str = self.create_contour_file_cache_data(contour_data,
+                                                                prod)
             c = Content(
                 lod=0,
                 resolution=int(min(abs(cell_width), abs(cell_height))),
@@ -1304,9 +1310,7 @@ class SatpyImporter(aImporter):
             )
             c.info[Info.KIND] = Kind.CONTOUR
             # c.info["level_index"] = level_indexes
-            self._S.add(c)
-            prod.content.append(c)
-            self._S.commit()
+            self.add_content_to_cache(c)
 
             completion = 2. / num_contents
             yield import_progress(uuid=prod.uuid,
@@ -1315,7 +1319,41 @@ class SatpyImporter(aImporter):
                                   completion=completion,
                                   stage_desc="SatPy contour data add to workspace",
                                   dataset_info=None,
-                                  data=img_data)
+                                  data=img_data,
+                                  content=c)
+
+    def create_contour_file_cache_data(self, contour_data: np.ndarray,
+                                       prod: Product) -> str:
+        """
+        Creating a file in the current work directory for saving data in
+        '.contour' files
+        """
+        data_filename: str = '{}.contour'.format(prod.uuid)
+        data_path: str = os.path.join(self._cwd, data_filename)
+        contour_data.tofile(data_path)
+
+        return data_filename
+
+    def add_content_to_cache(self, c: Content) -> None:
+        if self.use_inventory_db:
+            self._S.add(c)
+            self._S.commit()
+
+    def create_image_file_cache_data(self, data: da.array, prod: Product,
+                                     shape: tuple) -> Tuple[str, np.memmap]:
+        """
+        Creating a file in the current work directory for saving data in
+        '.image' files
+        """
+        # shovel that data into the memmap incrementally
+
+        data_filename: str = '{}.image'.format(prod.uuid)
+        data_path: str = os.path.join(self._cwd, data_filename)
+        img_data: np.memmap = np.memmap(data_path, dtype=np.float32,
+                                        shape=shape, mode='w+')
+        da.store(data, img_data)
+
+        return data_filename, img_data
 
     def _get_verts_and_connect(self, paths):
         """ retrieve vertices and connects from given paths-list

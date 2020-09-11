@@ -78,7 +78,7 @@ import warnings
 from uwsift.workspace.metadatabase import Product
 from uwsift.common import Kind, Info, Presentation, Span, FCS_SEP, ZList, Flags
 from uwsift.queue import TaskQueue
-from uwsift.workspace import Workspace
+from uwsift.workspace import BaseWorkspace, CachingWorkspace, SimpleWorkspace
 from uwsift.util.default_paths import DOCUMENT_SETTINGS_DIR
 from uwsift.model.composite_recipes import RecipeManager, CompositeRecipe
 from uwsift.view.colormap import COLORMAP_MANAGER, PyQtGraphColormap, SITE_CATEGORY, USER_CATEGORY
@@ -1139,7 +1139,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     """
     config_dir: str = None
     queue: TaskQueue = None
-    _workspace: Workspace = None
+    _workspace: BaseWorkspace = None
 
     # timeline the user has specified:
     track_order: ZList = None  # (zorder, family-name) with higher z above lower z; z<0 should not occur
@@ -1227,7 +1227,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # content gets probes applied across points and regions
     as_region_probes: DocumentAsRegionProbes = None
 
-    def __init__(self, workspace, queue, config_dir=DOCUMENT_SETTINGS_DIR, layer_set_count=DEFAULT_LAYER_SET_COUNT,
+    def __init__(self, workspace: BaseWorkspace, queue, config_dir=DOCUMENT_SETTINGS_DIR, layer_set_count=DEFAULT_LAYER_SET_COUNT,
                  **kwargs):
         super(Document, self).__init__(**kwargs)
         self.config_dir = config_dir
@@ -1347,7 +1347,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # scan available metadata for initial state
         # FIXME: refresh this once background scan finishes and new products are found
         # self.timeline_span = self.playback_span = self.potential_product_span()
-        self.sync_potential_tracks_from_metadata()
+        if isinstance(self._workspace, CachingWorkspace):
+            self.sync_potential_tracks_from_metadata()
 
     def potential_product_span(self) -> typ.Optional[Span]:
         with self._workspace.metadatabase as S:
@@ -1505,8 +1506,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def family_for_product_or_layer(self, uuid_or_layer):
         if isinstance(uuid_or_layer, UUID):
-            with self._workspace.metadatabase as s:
-                fam = s.query(Product.family).filter_by(uuid_str=str(uuid_or_layer)).first()
+            if isinstance(self._workspace, CachingWorkspace):
+                with self._workspace.metadatabase as s:
+                    fam = s.query(Product.family).filter_by(
+                        uuid_str=str(uuid_or_layer)).first()
+            if isinstance(self._workspace, SimpleWorkspace):
+                fam = self._workspace.get_info(uuid_or_layer)[Info.FAMILY]
             if fam:
                 return fam[0]
             uuid_or_layer = self[uuid_or_layer]
@@ -1606,8 +1611,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if not total_products:
             raise ValueError('no products available in {}'.format(paths))
 
-        # reverse list since we always insert a top layer
-        uuids = list(reversed(self.sort_product_uuids(uuids)))
+        if isinstance(self._workspace, CachingWorkspace):
+            # reverse list since we always insert a top layer
+            uuids = list(reversed(self.sort_product_uuids(uuids)))
 
         # collect product and resource information but don't yet import content
         for dex, uuid in enumerate(uuids):

@@ -33,7 +33,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from vispy import app
 
 import uwsift.ui.open_cache_dialog_ui as open_cache_dialog_ui
-from uwsift import __version__
+from uwsift import __version__, USE_INVENTORY_DB
 from uwsift.common import Info, Tool, CompositeType
 from uwsift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
 from uwsift.control.layer_tree import LayerStackTreeViewModel
@@ -53,7 +53,7 @@ from uwsift.view.layer_details import SingleLayerInfoPane
 from uwsift.view.probes import ProbeGraphManager, DEFAULT_POINT_PROBE
 from uwsift.view.rgb_config import RGBLayerConfigPane
 from uwsift.view.scene_graph import SceneGraphManager
-from uwsift.workspace import Workspace
+from uwsift.workspace import CachingWorkspace, SimpleWorkspace
 from uwsift.workspace.collector import ResourceSearchPathCollector
 
 LOG = logging.getLogger(__name__)
@@ -477,7 +477,8 @@ class Main(QtGui.QMainWindow):
         self.queue.add("load_files", bop(paths), "Open {} files".format(len(paths)), and_then=bopf, interactive=False)
         # don't use <algebraic layer ...> type paths
         self._last_open_dir = _common_path_prefix([x for x in paths if x[0] != '<']) or self._last_open_dir
-        self.update_recent_file_menu()
+        if USE_INVENTORY_DB:
+            self.update_recent_file_menu()
 
     def activate_products_by_uuid(self, uuids):
         uuids = list(uuids)
@@ -646,7 +647,7 @@ class Main(QtGui.QMainWindow):
         self.ui.cursorProbeLayer.setText(layer_str)
         self.ui.cursorProbeText.setText("{} ({}) [{}, {}]".format(data_str, probe_loc, col, row))
 
-    def _init_timeline(self, doc: Document, ws: Workspace):
+    def _init_timeline(self, doc: Document):
         gv = self.ui.timelineView
 
         # set up the widget itself
@@ -656,8 +657,9 @@ class Main(QtGui.QMainWindow):
         # gv.setRenderHints(QtGui.QPainter.Antialiasing)
 
         # connect up the scene
-        doc.sync_potential_tracks_from_metadata()
-        LOG.debug("Potential tracks: {}".format(repr(doc.track_order)))
+        if USE_INVENTORY_DB:
+            doc.sync_potential_tracks_from_metadata()
+            LOG.debug("Potential tracks: {}".format(repr(doc.track_order)))
         self._timeline_scene = SiftDocumentAsFramesInTracks(doc, self.workspace)
         gv.setScene(self._timeline_scene)
         APP.aboutToQuit.connect(self._timeline_scene.clear)
@@ -692,8 +694,13 @@ class Main(QtGui.QMainWindow):
         self.queue.didMakeProgress.connect(self.update_progress_bar)
 
         # create manager and helper classes
-        self.workspace = Workspace(workspace_dir, max_size_gb=cache_size, queue=self.queue,
-                                   initial_clear=clear_workspace)
+        if USE_INVENTORY_DB:
+            self.workspace = CachingWorkspace(workspace_dir,
+                                              max_size_gb=cache_size,
+                                              queue=self.queue,
+                                              initial_clear=clear_workspace)
+        else:
+            self.workspace = SimpleWorkspace(workspace_dir)
         self.document = doc = Document(self.workspace, config_dir=config_dir, queue=self.queue)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
                                                border_shapefile=border_shapefile,
@@ -748,8 +755,8 @@ class Main(QtGui.QMainWindow):
         # Set the projection based on the document's default
         self.document.change_projection()
         self.ui.projectionComboBox.setCurrentIndex(self.document.current_projection_index())
-
-        self._init_metadata_background_collection(search_paths)
+        if USE_INVENTORY_DB:
+            self._init_metadata_background_collection(search_paths)
 
         # set up timeline
         # LOG.info("potential tracks already in database: {}".format(repr(doc.potential_tracks())))
@@ -897,7 +904,8 @@ class Main(QtGui.QMainWindow):
 
     def _remove_paths_from_cache(self, paths):
         self.workspace.remove_all_workspace_content_for_resource_paths(paths)
-        self.update_recent_file_menu()
+        if USE_INVENTORY_DB:
+            self.update_recent_file_menu()
 
     def open_from_cache(self, *args, **kwargs):
         def _activate_products_for_names(uuids):
@@ -907,7 +915,8 @@ class Main(QtGui.QMainWindow):
         def _purge_content_for_names(uuids):
             LOG.info('removing cached products with uuids: {}'.format(repr(uuids)))
             self.workspace.purge_content_for_product_uuids(uuids, also_products=False)
-            self.update_recent_file_menu()
+            if USE_INVENTORY_DB:
+                self.update_recent_file_menu()
 
         if not self._open_cache_dialog:
             self._open_cache_dialog = OpenCacheDialog(self,
@@ -973,9 +982,10 @@ class Main(QtGui.QMainWindow):
         exit_action.setShortcut("Ctrl+Q")
         exit_action.triggered.connect(QtWidgets.QApplication.quit)
 
-        open_cache_action = QtWidgets.QAction("Open from Cache...", self)
-        open_cache_action.setShortcut("Ctrl+A")
-        open_cache_action.triggered.connect(self.open_from_cache)
+        if USE_INVENTORY_DB:
+            open_cache_action = QtWidgets.QAction("Open from Cache...", self)
+            open_cache_action.setShortcut("Ctrl+A")
+            open_cache_action.triggered.connect(self.open_from_cache)
 
         # open_glob_action = QtWidgets.QAction("Open Filename Pattern...", self)
         # open_glob_action.setShortcut("Ctrl+Shift+O")
@@ -988,10 +998,12 @@ class Main(QtGui.QMainWindow):
         menubar = self.ui.menubar
         file_menu = menubar.addMenu('&File')
         self.addAction(open_action)  # add it to the main window, not the menu (hide it)
-        file_menu.addAction(open_cache_action)
-        # file_menu.addAction(open_glob_action)
+        if USE_INVENTORY_DB:
+            file_menu.addAction(open_cache_action)
         file_menu.addAction(open_wizard_action)
-        self._recent_files_menu = file_menu.addMenu('Open Recent')
+        if USE_INVENTORY_DB:
+            # file_menu.addAction(open_glob_action)
+            self._recent_files_menu = file_menu.addMenu('Open Recent')
 
         screenshot_action = QtWidgets.QAction("Export Image", self)
         screenshot_action.setShortcut("Ctrl+I")
@@ -1095,7 +1107,8 @@ class Main(QtGui.QMainWindow):
         view_menu.addAction(cycle_borders)
         view_menu.addAction(cycle_grid)
 
-        self.update_recent_file_menu()
+        if USE_INVENTORY_DB:
+            self.update_recent_file_menu()
         menubar.setEnabled(True)
 
     def _init_key_releases(self):
