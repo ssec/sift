@@ -335,53 +335,13 @@ class BaseWorkspace(QObject):
             self._init_create_workspace()
 
     @abstractmethod
-    def _init_create_workspace(self):
-        pass
-
-    @abstractmethod
     def clear_workspace_content(self):
         """Remove binary files from workspace and workspace database."""
-        pass
-
-    @abstractmethod
-    def _purge_missing_content(self):
-        pass
-
-    @abstractmethod
-    def _purge_inaccessible_resources(self):
-        pass
-
-    @abstractmethod
-    def _purge_orphan_products(self):
-        pass
-
-    @abstractmethod
-    def _migrate_metadata(self):
-        pass
-
-    @abstractmethod
-    def _bgnd_startup_purge(self):
-        pass
-
-    @abstractmethod
-    def _then_refresh_mdb_customers(self, *args, **kwargs):
-        pass
-
-    @abstractmethod
-    def _init_inventory_existing_datasets(self):
-        pass
-
-    @abstractmethod
-    def _store_inventory(self):
         pass
 
     #
     #  data array handling
     #
-
-    @abstractmethod
-    def _remove_content_files_from_workspace(self, c: Content):
-        pass
 
     @abstractmethod
     def _activate_content(self, c: Content) -> ActiveContent:
@@ -460,10 +420,6 @@ class BaseWorkspace(QObject):
     def get_algebraic_namespace(self, uuid: UUID):
         pass
 
-    @abstractmethod
-    def _check_cache(self, path: str):
-        pass
-
     @property
     @abstractmethod
     def product_names_available_in_cache(self) -> dict:
@@ -483,10 +439,6 @@ class BaseWorkspace(QObject):
         pass
 
     @abstractmethod
-    def _purge_content_for_resource(self, resource: Resource, session, defer_commit=False):
-        pass
-
-    @abstractmethod
     def remove_all_workspace_content_for_resource_paths(self, paths: list):
         pass
 
@@ -501,10 +453,6 @@ class BaseWorkspace(QObject):
         Returns:
 
         """
-        pass
-
-    @abstractmethod
-    def _clean_cache(self):
         pass
 
     @abstractmethod

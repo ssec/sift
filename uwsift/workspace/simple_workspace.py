@@ -52,45 +52,15 @@ class SimpleWorkspace(BaseWorkspace):
     def metadatabase(self) -> Metadatabase:
         return None
 
-    def _init_create_workspace(self):
-        pass
-
     def clear_workspace_content(self):
         """Remove binary files from workspace and workspace database."""
         LOG.info("Clearing workspace contents...")
         self.contents = {}
         self.products = {}
 
-    def _purge_missing_content(self):
-        pass
-
-    def _purge_inaccessible_resources(self):
-        pass
-
-    def _purge_orphan_products(self):
-        pass
-
-    def _migrate_metadata(self):
-        pass
-
-    def _bgnd_startup_purge(self):
-        pass
-
-    def _then_refresh_mdb_customers(self, *args, **kwargs):
-        pass
-
-    def _init_inventory_existing_datasets(self):
-        pass
-
-    def _store_inventory(self):
-        pass
-
     #
     #  data array handling
     #
-
-    def _remove_content_files_from_workspace(self, c: Content):
-        pass
 
     def _activate_content(self, c: Content) -> ActiveContent:
         self._available[c.uuid] = zult = ActiveContent(self.cache_dir, c)
@@ -212,9 +182,6 @@ class SimpleWorkspace(BaseWorkspace):
         code = prod.expression
         return symbols, code
 
-    def _check_cache(self, path: str):
-        pass
-
     @property
     def product_names_available_in_cache(self) -> dict:
         return None
@@ -226,16 +193,10 @@ class SimpleWorkspace(BaseWorkspace):
     def recently_used_products(self, n=32) -> Dict[UUID, str]:
         pass
 
-    def _purge_content_for_resource(self, resource: Resource, session, defer_commit=False):
-        pass
-
     def remove_all_workspace_content_for_resource_paths(self, paths: list):
         pass
 
     def purge_content_for_product_uuids(self, uuids: list, also_products=False):
-        pass
-
-    def _clean_cache(self):
         pass
 
     def close(self):
