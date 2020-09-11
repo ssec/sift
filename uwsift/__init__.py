@@ -42,6 +42,7 @@ DEFAULT_CONFIGURATION = {
             'ahi_hsd',
             'ami_l1b',
             'fci_l1c_fdhsi',
+            'fci_l1_geoobs',
             'glm_l2',
             'grib',
             'li_l2',
