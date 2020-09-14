@@ -675,18 +675,16 @@ class BaseWorkspace(QObject):
         )
         return affine
 
-    def position_to_sift_data_index(self, dsi_or_uuid, xy_pos):
+    def _position_to_index(self, dsi_or_uuid, xy_pos):
         """Calculate the sift-internal data index from lon/lat values"""
         info = self.get_info(dsi_or_uuid)
         if info is None:
             return None, None
-
         # Assume `xy_pos` is lon/lat value
         if '+proj=latlong' in info[Info.PROJ]:
             x, y = xy_pos[:2]
         else:
             x, y = Proj(info[Info.PROJ])(*xy_pos)
-
         col = (x - info[Info.ORIGIN_X]) / info[Info.CELL_WIDTH]
         row = (y - info[Info.ORIGIN_Y]) / info[Info.CELL_HEIGHT]
 
@@ -703,7 +701,7 @@ class BaseWorkspace(QObject):
         return points
 
     def get_content_point(self, dsi_or_uuid, xy_pos):
-        row, col = self.position_to_sift_data_index(dsi_or_uuid, xy_pos)
+        row, col = self._position_to_index(dsi_or_uuid, xy_pos)
         if row is None or col is None:
             return None
         data = self.get_content(dsi_or_uuid)
