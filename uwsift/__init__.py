@@ -9,13 +9,10 @@ from donfig import Config
 from .version import __version__  # noqa
 from .util.default_paths import DOCUMENT_SETTINGS_DIR
 
-BASE_CONFIG_DIR = os.path.join(DOCUMENT_SETTINGS_DIR, 'config')
-READERS_CONFIG_DIR = os.path.join(BASE_CONFIG_DIR, 'readers')
-os.environ.setdefault('UWSIFT_CONFIG', BASE_CONFIG_DIR)
-
+CONFIG_DIR = os.path.join(DOCUMENT_SETTINGS_DIR, 'config')
+os.environ.setdefault('UWSIFT_CONFIG', CONFIG_DIR)
 CONFIG_PATHS = [
-    BASE_CONFIG_DIR,
-    READERS_CONFIG_DIR,
+    CONFIG_DIR,
     os.path.join(os.path.expanduser('~'), '.config', 'uwsift'),
 ]
 
