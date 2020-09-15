@@ -17,13 +17,15 @@
 
 import os
 import logging
+from enum import Enum
 from PyQt5 import QtCore, QtWidgets, QtGui
 from PyQt5.QtCore import QPoint
 from PyQt5.QtWidgets import QMenu
 from collections import OrderedDict
 from typing import Generator, Tuple, Union
 
-from satpy import Scene, DatasetID
+from uwsift.satpy_compat import DataID, get_id_value
+from satpy import Scene
 from satpy.readers import group_files
 
 from uwsift import config
@@ -128,18 +130,12 @@ class OpenFileWizard(QtWidgets.QWizard):
     def select_all_products(self, select=True, prop_key: Union[str, None] = None,
                             prop_val: Union[str, None] = None):
         """Select products based on a specific property."""
-        if prop_key is not None:
-            prop_column = self.config['id_components'].index(prop_key)
-        else:
-            prop_column = 0
-
         for row_idx in range(self.ui.selectIDTable.rowCount()):
             # our check state goes on the name item (always)
             name_item = self.ui.selectIDTable.item(row_idx, 0)
             if prop_key is not None:
-                prop_item = self.ui.selectIDTable.item(row_idx, prop_column)
-                item_val = prop_item.data(QtCore.Qt.UserRole)
-                if item_val != prop_val:
+                item_id = name_item.data(QtCore.Qt.UserRole)
+                if get_id_value(item_id, prop_key) != get_id_value(prop_val, prop_key):
                     continue
             check_state = self._get_checked(select)
             name_item.setCheckState(check_state)
@@ -148,24 +144,25 @@ class OpenFileWizard(QtWidgets.QWizard):
         item = self.ui.selectIDTable.itemAt(position)
         col = item.column()
         id_comp = self.config['id_components'][col]
-        id_val = item.data(QtCore.Qt.UserRole)
+        # first column always has DataID
+        id_data = self.ui.selectIDTable.item(item.row(), 0).data(QtCore.Qt.UserRole)
         menu = QMenu()
         select_action = menu.addAction("Select all by '{}'".format(id_comp))
         deselect_action = menu.addAction("Deselect all by '{}'".format(id_comp))
         action = menu.exec_(self.ui.selectIDTable.mapToGlobal(position))
         if action == select_action or action == deselect_action:
             select = action == select_action
-            self.select_all_products(select=select, prop_key=id_comp, prop_val=id_val)
+            self.select_all_products(select=select, prop_key=id_comp, prop_val=id_data)
 
     def collect_selected_ids(self):
         selected_ids = []
+        prime_key = self.config['id_components'][0]
         for item_idx in range(self.ui.selectIDTable.rowCount()):
             id_items = OrderedDict((key, self.ui.selectIDTable.item(item_idx, id_idx))
                                    for id_idx, key in enumerate(self.config['id_components']))
-            if id_items['name'].checkState():
-                id_dict = {key: id_item.data(QtCore.Qt.UserRole)
-                           for key, id_item in id_items.items() if id_item is not None}
-                selected_ids.append(DatasetID(**id_dict))
+            if id_items[prime_key].checkState():
+                data_id = id_items[prime_key]
+                selected_ids.append(data_id.data(QtCore.Qt.UserRole))
         return selected_ids
 
     def initializePage(self, p_int):
@@ -267,10 +264,10 @@ class OpenFileWizard(QtWidgets.QWizard):
             if self.config['default_reader'] == reader_name:
                 self.ui.readerComboBox.setCurrentIndex(idx)
 
-    def _pretty_identifiers(self, ds_id: DatasetID) -> Generator[Tuple[str, object, str], None, None]:
+    def _pretty_identifiers(self, data_id: DataID) -> Generator[Tuple[str, object, str], None, None]:
         """Determine pretty version of each identifier."""
         for key in self.config['id_components']:
-            value = getattr(ds_id, key, None)
+            value = get_id_value(data_id, key)
             if value is None:
                 pretty_val = "N/A"
             elif key == 'wavelength':
@@ -279,6 +276,10 @@ class OpenFileWizard(QtWidgets.QWizard):
                 pretty_val = "{:d} hPa".format(int(value))
             elif key == 'resolution':
                 pretty_val = "{:d}m".format(int(value))
+            elif key == 'calibration' and isinstance(value, Enum):
+                # calibration is an enum in newer Satpy version
+                pretty_val = value.name
+                value = value.name
             else:
                 pretty_val = value
 
@@ -300,7 +301,10 @@ class OpenFileWizard(QtWidgets.QWizard):
 
                 self.ui.selectIDTable.setRowCount(idx + 1)
                 item = QtWidgets.QTableWidgetItem(pretty_val)
-                item.setData(QtCore.Qt.UserRole, id_val)
+                if col_idx == 0:
+                    item.setData(QtCore.Qt.UserRole, ds_id)
+                else:
+                    item.setData(QtCore.Qt.UserRole, id_val)
                 item.setFlags((item.flags() ^ QtCore.Qt.ItemIsEditable) | QtCore.Qt.ItemIsUserCheckable)
                 if id_key == 'name':
                     item.setCheckState(QtCore.Qt.Checked)
