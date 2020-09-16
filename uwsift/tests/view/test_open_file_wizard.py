@@ -59,13 +59,13 @@ def test_wizard_abi_l1b(qtbot, monkeypatch):
     from uwsift import config
     config.set({'data_reading.exclude_datasets.calibration': ['radiance', 'counts']})
 
-    from satpy import DatasetID
+    from satpy.tests.utils import make_dataid
     files = ['OR_ABI-L1b-RadM1-M3C01_G16_s20182541300210_e20182541300267_c20182541300308.nc']
     dataset_ids = [
         # test that floating point resolutions don't crash
-        DatasetID(name='C01', resolution=1000.5, calibration='reflectance'),
+        make_dataid(name='C01', resolution=1000.5, calibration='reflectance'),
         # radiance calibrations should be ignored by default
-        DatasetID(name='C01', resolution=1000.5, calibration='radiance'),
+        make_dataid(name='C01', resolution=1000.5, calibration='radiance'),
     ]
     # Don't actually talk to Satpy
     monkeypatch.setattr('uwsift.view.open_file_wizard.Scene', create_scene(dataset_ids))
