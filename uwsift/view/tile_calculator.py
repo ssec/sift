@@ -170,8 +170,7 @@ def calc_view_extents(image_extents_box: Box, canvas_point, image_point, canvas_
     top = clip(top, image_extents_box.bottom, image_extents_box.top)
 
     if (right - left) < CANVAS_EXTENTS_EPSILON or (top - bot) < CANVAS_EXTENTS_EPSILON:
-        # they are viewing essentially nothing or the image isn't in view
-        raise ValueError("Image can't be currently viewed")
+        raise ValueError("Image is outside of canvas or empty")
 
     return Box(left=left, right=right, bottom=bot, top=top)
 
