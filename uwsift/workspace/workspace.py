@@ -55,7 +55,6 @@ from shapely.geometry.polygon import LinearRing
 
 from uwsift.common import Info, Kind, Flags
 from uwsift.model.shapes import content_within_shape
-from uwsift.workspace.utils import import_utils
 from .importer import SatpyImporter, generate_guidebook_metadata
 from .metadatabase import Metadatabase, Content, Product, Resource
 
@@ -676,43 +675,18 @@ class BaseWorkspace(QObject):
         )
         return affine
 
-    def position_to_sift_data_index(self, dsi_or_uuid, xy_pos):
+    def _position_to_index(self, dsi_or_uuid, xy_pos):
         """Calculate the sift-internal data index from lon/lat values"""
         info = self.get_info(dsi_or_uuid)
         if info is None:
             return None, None
-
         # Assume `xy_pos` is lon/lat value
         if '+proj=latlong' in info[Info.PROJ]:
             x, y = xy_pos[:2]
         else:
             x, y = Proj(info[Info.PROJ])(*xy_pos)
-
         col = (x - info[Info.ORIGIN_X]) / info[Info.CELL_WIDTH]
         row = (y - info[Info.ORIGIN_Y]) / info[Info.CELL_HEIGHT]
-
-        return np.int64(np.round(row)), np.int64(np.round(col))
-
-    def position_to_original_data_index(self, dsi_or_uuid, xy_pos):
-        """Calculate the original data index from lon/lat values and consider data flipping"""
-        info = self.get_info(dsi_or_uuid)
-        if info is None:
-            return None, None
-
-        # Assume `xy_pos` is lon/lat value
-        if '+proj=latlong' in info[Info.PROJ]:
-            x, y = xy_pos[:2]
-        else:
-            x, y = Proj(info[Info.PROJ])(*xy_pos)
-
-        # consider data flipping
-        flip_left_right, flip_up_down, swap_axes =\
-            import_utils.get_flipping_parameters(info['reader'])
-        sign_x = -1 if flip_left_right else 1
-        sign_y = -1 if flip_up_down else 1
-
-        col = (sign_x * x - info[Info.ORIGIN_X]) / info[Info.CELL_WIDTH]
-        row = (sign_y * y - info[Info.ORIGIN_Y]) / info[Info.CELL_HEIGHT]
 
         return np.int64(np.round(row)), np.int64(np.round(col))
 
@@ -727,7 +701,7 @@ class BaseWorkspace(QObject):
         return points
 
     def get_content_point(self, dsi_or_uuid, xy_pos):
-        row, col = self.position_to_sift_data_index(dsi_or_uuid, xy_pos)
+        row, col = self._position_to_index(dsi_or_uuid, xy_pos)
         if row is None or col is None:
             return None
         data = self.get_content(dsi_or_uuid)
