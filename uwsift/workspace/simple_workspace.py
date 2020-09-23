@@ -94,15 +94,15 @@ class SimpleWorkspace(BaseWorkspace):
     #
 
     def _product_with_uuid(self, session, uuid: UUID) -> Product:
-        return self.products[uuid] if uuid in self.products else None
+        return self.products.get(uuid, None)
 
     def _product_overview_content(self, session, prod: Product = None, uuid: UUID = None,
                                   kind: Kind = Kind.IMAGE) -> Optional[Content]:
-            return self.contents[uuid] if uuid in self.contents else None
+        return self.contents.get(uuid, None)
 
     def _product_native_content(self, session, prod: Product = None, uuid: UUID = None,
                                 kind: Kind = Kind.IMAGE) -> Optional[Content]:
-        return self.contents[uuid] if uuid in self.contents else None
+        return self.contents.get(uuid, None)
 
     #
     # combining queries with data content
@@ -110,7 +110,7 @@ class SimpleWorkspace(BaseWorkspace):
 
     def _overview_content_for_uuid(self, uuid: UUID, kind: Kind = Kind.IMAGE) \
             -> np.memmap:
-        ovc = self._product_overview_content(None, uuid=uuid)
+        ovc = self._product_overview_content(None, uuid=uuid, kind=kind)
         assert (ovc is not None)
         arrays = self._cached_arrays_for_content(ovc)
         return arrays.data
