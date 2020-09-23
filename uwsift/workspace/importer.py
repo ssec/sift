@@ -1133,12 +1133,19 @@ class SatpyImporter(aImporter):
             ds.attrs[Info.SCENE] = ds.attrs.get('scene_id')
             if ds.attrs[Info.SCENE] is None:
                 # compute a "good enough" hash for this Scene
-                area = ds.attrs['area']
-                extents = area.area_extent
-                # round extents to nearest 100 meters
-                extents = tuple(int(np.round(x / 100.0) * 100.0) for x in extents)
-                proj_str = area.proj4_string
-                ds.attrs[Info.SCENE] = "{}-{}".format(str(extents), proj_str)
+                if 'area' in ds.attrs:
+                    area = ds.attrs['area']
+                    extents = area.area_extent
+                    # round extents to nearest 100 meters
+                    extents = tuple(int(np.round(x / 100.0) * 100.0) for x in extents)
+                    proj_str = area.proj4_string
+                    ds.attrs[Info.SCENE] = "{}-{}".format(str(extents), proj_str)
+                else:
+                    unix_start_time = time.mktime(ds.attrs["start_time"].timetuple())
+                    unix_end_time = time.mktime(ds.attrs["end_time"].timetuple())
+                    ds.attrs[Info.SCENE] = "{}-{}-{}-{}".format(
+                        ds.attrs["name"], ds.attrs["file_type"],
+                        unix_start_time, unix_end_time)
             if ds.attrs.get(Info.CENTRAL_WAVELENGTH) is None:
                 cw = ""
             else:
