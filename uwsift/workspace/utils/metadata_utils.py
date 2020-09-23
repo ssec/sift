@@ -20,18 +20,22 @@ def get_default_colormap(layer_info: dict,
     """
 
     layer_standard_name = layer_info[Info.STANDARD_NAME]
-    colormap_name = config.get('.'.join(["default_colormaps",
-                                        layer_standard_name]),
-                               None)
-    if colormap_name in COLORMAP_MANAGER:
-        LOG.debug(f"Returning color map '{colormap_name}' as configured for"
-                  f" layer standard name '{layer_standard_name}'.")
-        return colormap_name
+    if layer_standard_name is None:
+        LOG.debug("Cannot determine default colormap from configuration "
+                  "for layer which does not have a standard name.")
+    else:
+        colormap_name = config.get('.'.join(["default_colormaps",
+                                            layer_standard_name]),
+                                   None)
+        if colormap_name in COLORMAP_MANAGER:
+            LOG.debug(f"Returning color map '{colormap_name}' as configured for"
+                      f" layer standard name '{layer_standard_name}'.")
+            return colormap_name
 
-    if colormap_name:
-        LOG.warning(f"Unknown color map '{colormap_name}' configured for"
-                    f" layer standard name '{layer_standard_name}'. "
-                    f" Falling back to internal Guidebook mapping.")
+        if colormap_name:
+            LOG.warning(f"Unknown color map '{colormap_name}' configured for"
+                        f" layer standard name '{layer_standard_name}'. "
+                        f" Falling back to internal Guidebook mapping.")
 
     return guidebook.default_colormap(layer_info)
 
