@@ -186,8 +186,9 @@ class ActiveContent(QObject):
         # FIXME: beware the race conditions with this
         # FIXME: it would be better to lazy-eval the mask, assuming coverage and sparsity << data
         if self._mask is None:
-            # self._mask = mask = np.zeros_like(self._data, dtype=bool)
-            self._mask = mask = ~np.isfinite(self._data)
+            if self._data is not None:
+                # self._mask = mask = np.zeros_like(self._data, dtype=bool)
+                self._mask = mask = ~np.isfinite(self._data)
         else:
             mask = self._mask
             mask[:] = False

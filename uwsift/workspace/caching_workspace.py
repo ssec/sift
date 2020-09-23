@@ -685,6 +685,8 @@ class CachingWorkspace(BaseWorkspace):
 
         # make an ActiveContent object from the Content, now that we've imported it
         ac = self._overview_content_for_uuid(uuid, kind=default_prod_kind)
+        if ac is None:
+            return None
         return ac.data
 
     # def _preferred_cache_path(self, uuid):
