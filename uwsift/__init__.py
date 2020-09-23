@@ -135,8 +135,17 @@ satpy_import_path = config.get("satpy_import_path", None)
 if satpy_import_path is not None:
     overwrite_import("satpy", satpy_import_path)
 
+satpy_fci_l1_geoobs_import_path = \
+    config.get("satpy_fci_l1_geoobs_import_path", None)
+if satpy_fci_l1_geoobs_import_path is not None:
+    # See https://gitlab.eumetsat.int/Meraner/fci_l1_geoobs_satpy_reader/-/blob/master/README.md
+    sys.path.insert(0, satpy_fci_l1_geoobs_import_path)
+    os.environ["PPP_CONFIG_DIR"] = satpy_fci_l1_geoobs_import_path
+
 
 USE_TILED_GEOLOCATED_IMAGES = config.get("display.use_tiled_geolocated_images")
 
 USE_INVENTORY_DB = config.get("storage.use_inventory_db")
 CLEANUP_FILE_CACHE = config.get("storage.cleanup_file_cache")
+
+
