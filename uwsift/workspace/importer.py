@@ -14,10 +14,11 @@ REQUIRES
 import logging
 import os
 import re
+import time
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from datetime import datetime, timedelta
-from typing import Iterable, Generator, Mapping, Tuple
+from typing import Iterable, Generator, Mapping, Tuple, Optional
 
 import yaml
 import dask.array as da
@@ -1097,8 +1098,12 @@ class SatpyImporter(aImporter):
             ds.attrs[Info.OBS_DURATION] = duration
 
             # Handle GRIB platform/instrument
-            ds.attrs[Info.KIND] = Kind.IMAGE if self.reader != 'grib' else \
-                Kind.CONTOUR
+            if self.reader == 'grib':
+                ds.attrs[Info.KIND] = Kind.CONTOUR
+            elif self.reader == 'fci_l1_geoobs':
+                ds.attrs[Info.KIND] = Kind.VECTORS
+            else:
+                ds.attrs[Info.KIND] = Kind.IMAGE
             self._get_platform_instrument(ds.attrs)
             ds.attrs.setdefault(Info.STANDARD_NAME, ds.attrs.get('standard_name'))
             if 'wavelength' in ds.attrs:
@@ -1128,12 +1133,19 @@ class SatpyImporter(aImporter):
             ds.attrs[Info.SCENE] = ds.attrs.get('scene_id')
             if ds.attrs[Info.SCENE] is None:
                 # compute a "good enough" hash for this Scene
-                area = ds.attrs['area']
-                extents = area.area_extent
-                # round extents to nearest 100 meters
-                extents = tuple(int(np.round(x / 100.0) * 100.0) for x in extents)
-                proj_str = area.proj4_string
-                ds.attrs[Info.SCENE] = "{}-{}".format(str(extents), proj_str)
+                if 'area' in ds.attrs:
+                    area = ds.attrs['area']
+                    extents = area.area_extent
+                    # round extents to nearest 100 meters
+                    extents = tuple(int(np.round(x / 100.0) * 100.0) for x in extents)
+                    proj_str = area.proj4_string
+                    ds.attrs[Info.SCENE] = "{}-{}".format(str(extents), proj_str)
+                else:
+                    unix_start_time = time.mktime(ds.attrs["start_time"].timetuple())
+                    unix_end_time = time.mktime(ds.attrs["end_time"].timetuple())
+                    ds.attrs[Info.SCENE] = "{}-{}-{}-{}".format(
+                        ds.attrs["name"], ds.attrs["file_type"],
+                        unix_start_time, unix_end_time)
             if ds.attrs.get(Info.CENTRAL_WAVELENGTH) is None:
                 cw = ""
             else:
@@ -1196,6 +1208,35 @@ class SatpyImporter(aImporter):
                 continue
 
             now = datetime.utcnow()
+
+            if prod.info[Info.KIND] == Kind.VECTORS:
+                data_filename, lms_data = self.create_vectors_file_cache_data(dataset.data, prod, shape)
+                content = Content(
+                    lod=0,
+                    atime=now,
+                    mtime=now,
+
+                    # info about the data array memmap
+                    path=data_filename,
+                    rows=shape[0],
+                    cols=shape[1],
+                    dtype=dataset.dtype,
+                )
+                content.info[Info.KIND] = Kind.VECTORS
+                prod.content.append(content)
+                self.add_content_to_cache(content)
+
+                completion = 2. / num_contents
+                yield import_progress(uuid=prod.uuid,
+                                      stages=num_stages,
+                                      current_stage=idx,
+                                      completion=completion,
+                                      stage_desc="SatPy vectors data add to workspace",
+                                      dataset_info=None,
+                                      data=lms_data,
+                                      content=content)
+                continue
+
             area_info = self._area_to_sift_attrs(dataset.attrs['area'])
             cell_width = area_info[Info.CELL_WIDTH]
             cell_height = area_info[Info.CELL_HEIGHT]
@@ -1355,6 +1396,23 @@ class SatpyImporter(aImporter):
         da.store(data, img_data)
 
         return data_filename, img_data
+
+    def create_vectors_file_cache_data(self, data: da.array, prod: Product,
+                                       shape: tuple) \
+            -> Tuple[str, Optional[np.memmap]]:
+        """
+        Creating a file in the current work directory for saving data in
+        '.vectors' files
+        """
+        data_filename: str = '{}.vectors'.format(prod.uuid)
+        data_path: str = os.path.join(self._cwd, data_filename)
+        if data.size > 0:
+            lms_data = np.memmap(data_path, dtype=np.float64,
+                                 shape=shape, mode='w+')
+            da.store(data, lms_data)
+        else:
+            lms_data = None
+        return data_filename, lms_data
 
     def _get_verts_and_connect(self, paths):
         """ retrieve vertices and connects from given paths-list

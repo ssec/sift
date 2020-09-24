@@ -375,7 +375,8 @@ class CachingWorkspace(BaseWorkspace):
                 # if content is available, we want to provide native content metadata along with the product metadata
                 # specifically a lot of client code assumes that resource == product == content and
                 # that singular navigation (e.g. cell_size) is norm
-                assert (native_content.info[Info.CELL_WIDTH] is not None)  # FIXME DEBUG
+                assert (kind == Kind.VECTORS or
+                        native_content.info[Info.CELL_WIDTH] is not None)  # FIXME DEBUG
                 return frozendict(ChainMap(native_content.info, prod.info))
             # mapping semantics for database fields, as well as key-value fields;
             # flatten to one namespace and read-only
@@ -685,6 +686,8 @@ class CachingWorkspace(BaseWorkspace):
 
         # make an ActiveContent object from the Content, now that we've imported it
         ac = self._overview_content_for_uuid(uuid, kind=default_prod_kind)
+        if ac is None:
+            return None
         return ac.data
 
     # def _preferred_cache_path(self, uuid):
