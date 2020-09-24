@@ -1591,7 +1591,7 @@ class _TipAlignedArrowHeadVisual(_ArrowHeadVisual):
         if self._parent._arrows_changed:
             self._prepare_vertex_data(view)
         self.shared_program.bind(self._arrow_vbo)
-        self.shared_program['antialias'] = 1.0
+        self.shared_program['antialias'] = 0.0
         self.shared_program.frag['arrow_type'] = self._parent.arrow_type
         self.shared_program.frag['fill_type'] = "filled"
 
