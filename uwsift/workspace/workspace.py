@@ -335,12 +335,9 @@ class BaseWorkspace(QObject):
         :return: workspace_content_arrays
         """
         pass
-
+    @abstractmethod
     def _deactivate_content_for_product(self, p: Product):
-        if p is None:
-            return
-        for c in p.content:
-            self._available.pop(c.id, None)
+        pass
 
     #
     # often-used queries

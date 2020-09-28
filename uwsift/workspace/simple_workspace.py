@@ -34,6 +34,7 @@ class SimpleWorkspace(BaseWorkspace):
 
         self.products: dict = {}
         self.contents: dict = {}
+        self._available: dict = {}
 
         self._remove_content_data_from_cache_dir_checked()
 
@@ -348,6 +349,8 @@ class SimpleWorkspace(BaseWorkspace):
         yield {TASK_DOING: 'purging memory', TASK_PROGRESS: 0.5}
         self._deactivate_content_for_product(self._product_with_uuid(None,
                                                                      uuid))
+        self.contents.pop(uuid)
+        self.products.pop(uuid)
         yield {TASK_DOING: 'purging memory', TASK_PROGRESS: 1.0}
 
     def get_content(self, dsi_or_uuid, lod=None, kind: Kind = Kind.IMAGE) \
@@ -390,3 +393,8 @@ class SimpleWorkspace(BaseWorkspace):
         active_content = self._cached_arrays_for_content(content)
         return active_content.data
 
+    def _deactivate_content_for_product(self, p: Product):
+        if p is None:
+            return
+        for c in p.content:
+            self._available.pop(c.uuid, None)
