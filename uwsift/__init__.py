@@ -148,4 +148,5 @@ USE_TILED_GEOLOCATED_IMAGES = config.get("display.use_tiled_geolocated_images")
 USE_INVENTORY_DB = config.get("storage.use_inventory_db")
 CLEANUP_FILE_CACHE = config.get("storage.cleanup_file_cache")
 
+AUTO_UPDATE_MODE__ACTIVE = config.get('auto_update.active', False)
 
