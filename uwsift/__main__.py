@@ -692,6 +692,10 @@ class Main(QtGui.QMainWindow):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+        if AUTO_UPDATE_MODE__ACTIVE:
+            self.ui.animFrame.hide()
+        else:
+            self.ui.watchdogFrame.hide()
         # FIXME: Slider does not currently work as intended. Re-enable later
         self.ui.timelineScaleSlider.setDisabled(True)
 
