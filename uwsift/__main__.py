@@ -20,6 +20,7 @@ REQUIRES
 
 __author__ = 'rayg'
 
+import gc
 import logging
 import os
 import sys
@@ -44,7 +45,8 @@ from uwsift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from uwsift.ui.pov_main_ui import Ui_MainWindow
 from uwsift.util import (WORKSPACE_DB_DIR, DOCUMENT_SETTINGS_DIR,
-                         get_package_data_dir, check_grib_definition_dir, check_imageio_deps)
+                         get_package_data_dir, check_grib_definition_dir, check_imageio_deps,
+                         HeapProfiler)
 from uwsift.util.logger import configure_loggers
 from uwsift.view.colormap_editor import ColormapEditor
 from uwsift.view.create_algebraic import CreateAlgebraicDialog
@@ -676,6 +678,15 @@ class Main(QtGui.QMainWindow):
 
         self.layer_list_model.uuidSelectionChanged.connect(center_timeline_view_on_single_frame)
 
+    @staticmethod
+    def run_gc_after_layer_deletion(new_order: tuple, removed_uuids: list, first_removed_row: int, rows_removed: int):
+        """
+        Trigger a full garbage collection run after the deletion of a layer from the scene graph.
+        The code uses cyclic and weak references, which can only be freed by the GC.
+        """
+        unreachable_object_count = gc.collect()
+        LOG.debug(f"GC found {unreachable_object_count} unreachable objects")
+
     def __init__(self, config_dir=None, workspace_dir=None, cache_size=None, glob_pattern=None, search_paths=None,
                  border_shapefile=None, center=None, clear_workspace=False):
         super(Main, self).__init__()
@@ -702,6 +713,7 @@ class Main(QtGui.QMainWindow):
         else:
             self.workspace = SimpleWorkspace(workspace_dir)
         self.document = doc = Document(self.workspace, config_dir=config_dir, queue=self.queue)
+        self.document.didRemoveLayers.connect(self.run_gc_after_layer_deletion)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
                                                border_shapefile=border_shapefile,
                                                center=center,
@@ -1151,7 +1163,7 @@ def _search_paths(arglist):
             yield subpath
 
 
-def main():
+def main() -> int:
     import argparse
     parser = argparse.ArgumentParser(description="Run SIFT")
     parser.add_argument("-w", "--workspace-dir", default=WORKSPACE_DB_DIR,
@@ -1174,11 +1186,16 @@ def main():
                         help="Specify center longitude and latitude for camera")
     parser.add_argument("--desktop", type=int, default=0,
                         help="Number of monitor/display to show the main window on (0 for main, 1 for secondary, etc.)")
+    parser.add_argument("--profile-heap", type=float, help="take a snapshot of the heap in the given interval (in seconds)")
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count",
                         default=int(os.environ.get("VERBOSITY", 2)),
                         help='each occurrence increases verbosity 1 level through '
                              'ERROR-WARNING-Info-DEBUG (default Info)')
     args = parser.parse_args()
+
+    if args.profile_heap:
+        heap_profiler = HeapProfiler(args.profile_heap)
+        heap_profiler.start()
 
     # levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
     # level = levels[min(3, args.verbosity)]
@@ -1225,8 +1242,14 @@ def main():
     window.show()
     # bring window to front
     window.raise_()
-    # LOOP.run_forever()
-    app.run()
+    # run the event loop until the user closes the application
+    exit_code = app.run()
+    # Workaround PyCharm issue: The PyCharm dev console raises a TypeError if
+    # None is passed to 'sys.exit()'. Thus replace None by 0, both represent
+    # success for 'sys.exit()'.
+    if exit_code is not None:
+        return exit_code
+    return 0
 
 
 if __name__ == '__main__':

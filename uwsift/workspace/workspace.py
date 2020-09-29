@@ -118,7 +118,6 @@ class ActiveContent(QObject):
     _x = None
     _z = None
     _data = None
-    _mask = None
     _coverage = None
     _sparsity = None
 
@@ -178,24 +177,6 @@ class ActiveContent(QObject):
         # FIXME: apply sparsity, coverage, and missing value masks
         return self._data
 
-    def _update_mask(self):
-        """
-        merge sparsity and coverage mask to a standard maskedarray mask
-        :return:
-        """
-        # FIXME: beware the race conditions with this
-        # FIXME: it would be better to lazy-eval the mask, assuming coverage and sparsity << data
-        if self._mask is None:
-            if self._data is not None:
-                # self._mask = mask = np.zeros_like(self._data, dtype=bool)
-                self._mask = mask = ~np.isfinite(self._data)
-        else:
-            mask = self._mask
-            mask[:] = False
-        # LOG.warning('mask_from_coverage_sparsity needs inclusion')
-        # present = np.array([[1]], dtype=np.int8)
-        # mask_from_coverage_sparsity_2d(mask, self._coverage or present, self._sparsity or present)
-
     def _attach(self, c: Content, mode='c'):
         """
         attach content arrays, for holding by workspace in _available
@@ -222,8 +203,6 @@ class ActiveContent(QObject):
         _, sshape = self._rcls(c.coverage_cols, c.coverage_cols, c.coverage_levels)
         self._sparsity = mm(c.sparsity_path, dtype=np.int8, mode=mode, shape=sshape) if c.sparsity_path else np.array(
             [1])
-
-        self._update_mask()
 
 
 class BaseWorkspace(QObject):
@@ -356,12 +335,9 @@ class BaseWorkspace(QObject):
         :return: workspace_content_arrays
         """
         pass
-
+    @abstractmethod
     def _deactivate_content_for_product(self, p: Product):
-        if p is None:
-            return
-        for c in p.content:
-            self._available.pop(c.id, None)
+        pass
 
     #
     # often-used queries

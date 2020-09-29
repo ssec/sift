@@ -808,6 +808,12 @@ class CachingWorkspace(BaseWorkspace):
             active_content = self._cached_arrays_for_content(content)
             return active_content.data
 
+    def _deactivate_content_for_product(self, p: Product):
+        if p is None:
+            return
+        for c in p.content:
+            self._available.pop(c.id, None)
+
     # NOTE: when using this function in future, decide whether data flipping needs to be considered
     # def _create_position_to_index_transform(self, dsi_or_uuid):
     #     info = self.get_info(dsi_or_uuid)
