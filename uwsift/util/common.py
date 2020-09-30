@@ -5,6 +5,8 @@ from satpy import DataID, Scene
 
 
 def is_datetime_format(format_str):
+    if not format_str:
+        return False
     format_result = datetime.today().strftime(format_str)
     return format_str != format_result
 
