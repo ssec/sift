@@ -28,6 +28,8 @@ from datetime import datetime
 from numpy import long
 from satpy import Scene
 from satpy.readers import group_files
+
+from uwsift.util.common import create_scenes
 from uwsift.satpy_compat import DataID, get_id_value
 
 import trollsift.parser as fnparser
@@ -143,7 +145,8 @@ class OpenFileWizard(QtWidgets.QWizard):
 
             # try to create scenes
             try:
-                self._create_scenes()
+                self.all_available_products \
+                    = create_scenes(self.scenes, self.file_groups)
             except IOError as e:
                 self.ui.statusMessage.setText(f"ERROR: {e}")
                 self.ui.statusMessage.setStyleSheet('color: red')
@@ -228,43 +231,43 @@ class OpenFileWizard(QtWidgets.QWizard):
 
             yield key, value, pretty_val
 
-    def _create_scenes(self):
-        """Create Scene objects for the selected files."""
-        all_available_products = set()
-        for group_id, file_group in self.file_groups.items():
-            scn = self.scenes.get(group_id)
-            if scn is None:
-                # need to create the Scene for the first time
-                # file_group includes what reader to use
-                # NOTE: We only allow a single reader at a time
-                self.scenes[group_id] = scn = Scene(filenames=file_group)
-
-                # WORKAROUND: to decompress compressed SEVIRI HRIT files, an environment variable
-                # needs to be set. Check if decompression might have introduced errors when using
-                # the specific reader and loading a file with compression flag set.
-                # NOTE: in case this workaround-check fails data cannot be loaded in SIFT although
-                # creating the scene might have succeeded!
-                compressed_seviri = False
-                from satpy.readers.hrit_base import get_xritdecompress_cmd
-                # TODO: Scene may not provide information about reader in the
-                # future - here the "protected" variable '_readers' is used as
-                # workaround already
-                for r in scn._readers.values():
-                    # only perform check when using a relevant reader, so that this is not triggered
-                    # mistakenly when another reader uses the same meta data key for another purpose
-                    if r.name in ['seviri_l1b_hrit']:
-                        for fh in r.file_handlers.values():
-                            for fh2 in fh:
-                                if fh2.mda.get('compression_flag_for_data'):
-                                    compressed_seviri = True
-                if compressed_seviri:
-                    get_xritdecompress_cmd()
-                # END OF WORKAROUND
-
-            all_available_products.update(scn.available_dataset_ids())
-
-        # update the widgets
-        self.all_available_products = sorted(all_available_products)
+    # def _create_scenes(self):
+    #     """Create Scene objects for the selected files."""
+    #     all_available_products = set()
+    #     for group_id, file_group in self.file_groups.items():
+    #         scn = self.scenes.get(group_id)
+    #         if scn is None:
+    #             # need to create the Scene for the first time
+    #             # file_group includes what reader to use
+    #             # NOTE: We only allow a single reader at a time
+    #             self.scenes[group_id] = scn = Scene(filenames=file_group)
+    #
+    #             # WORKAROUND: to decompress compressed SEVIRI HRIT files, an environment variable
+    #             # needs to be set. Check if decompression might have introduced errors when using
+    #             # the specific reader and loading a file with compression flag set.
+    #             # NOTE: in case this workaround-check fails data cannot be loaded in SIFT although
+    #             # creating the scene might have succeeded!
+    #             compressed_seviri = False
+    #             from satpy.readers.hrit_base import get_xritdecompress_cmd
+    #             # TODO: Scene may not provide information about reader in the
+    #             # future - here the "protected" variable '_readers' is used as
+    #             # workaround already
+    #             for r in scn._readers.values():
+    #                 # only perform check when using a relevant reader, so that this is not triggered
+    #                 # mistakenly when another reader uses the same meta data key for another purpose
+    #                 if r.name in ['seviri_l1b_hrit']:
+    #                     for fh in r.file_handlers.values():
+    #                         for fh2 in fh:
+    #                             if fh2.mda.get('compression_flag_for_data'):
+    #                                 compressed_seviri = True
+    #             if compressed_seviri:
+    #                 get_xritdecompress_cmd()
+    #             # END OF WORKAROUND
+    #
+    #         all_available_products.update(scn.available_dataset_ids())
+    #
+    #     # update the widgets
+    #     self.all_available_products = sorted(all_available_products)
 
     # ==============================================================================================
     # PUBLIC CUSTOM INTERFACE
