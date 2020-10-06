@@ -62,6 +62,8 @@ from uwsift.view.probes import DEFAULT_POINT_PROBE
 from uwsift.view.transform import PROJ4Transform
 from uwsift.view.visuals import (NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer,
                                  PrecomputedIsocurve, GammaImage, Vectors)
+from uwsift.model.time_manager import TimeManager
+
 
 LOG = logging.getLogger(__name__)
 DATA_DIR = get_package_data_dir()
@@ -197,6 +199,9 @@ class LayerSet(object):
         self._frame_change_cb = frame_change_cb
         self._animation_speed = DEFAULT_ANIMATION_DELAY  # milliseconds
         self._animation_timer = app.Timer(self._animation_speed / 1000.0, connect=self.next_frame)
+        # (self, collection, animation_duration, matching_policy=find_nearest_past)
+        # collection supposed to be List[DataLayer]
+        self._time_manager = TimeManager(None, self._animation_speed)
 
         if layers is not None:
             self.set_layers(layers)
@@ -322,6 +327,7 @@ class LayerSet(object):
         self.animating = not self._animating
         return self.animating
 
+    # FIXME(mk): this is never used anyway?
     def _set_visible_node(self, node):
         """Set all nodes to invisible except for the `event.added` node.
         """
@@ -332,6 +338,7 @@ class LayerSet(object):
                 else:
                     child.visible = False
 
+    # FIXME(mk): not in use anymore
     def _set_visible_child(self, frame_number):
         for idx, uuid in enumerate(self._frame_order):
             child = self._layers[uuid]
@@ -342,6 +349,33 @@ class LayerSet(object):
                 else:
                     child.visible = False
 
+    def _set_uuid_visibility(self, uuid: UUID, visible: bool) -> None:
+        """
+        Convenience function to set a uuid's visibility.
+        :param uuid: UUID of layer whose visibility is to be set.
+        :param visible: Flag indicating wether uuid is supposed to be visible or not.
+        """
+        child = self._layers[uuid]
+        with child.events.blocker():
+            if visible:
+                child.visible = True
+            else:
+                child.visible = False
+
+    def _set_visible_from_data_layers(self):
+        for pfkey, data_layer in self._time_manager.collection.data_layers.items():
+            # Set all uuids in the current data layer to invisible
+            for _, im_uuid in data_layer.timeline.items():
+                self._set_uuid_visibility(im_uuid, False)
+            # If a time was matched turn that time's uuid visible
+            layer_uuid = data_layer.t_matched_uuid()
+            if layer_uuid is not None:
+                self._set_uuid_visibility(layer_uuid, True)
+
+    def tick(self):
+        # Advances through time and updates collection state
+        self._time_manager.tick()
+
     def next_frame(self, event=None, frame_number=None):
         """
         skip to the frame (from 0) or increment one frame and update
@@ -349,6 +383,7 @@ class LayerSet(object):
         :param frame_number: optional frame to go to, from 0
         :return:
         """
+        self.tick()
         lfo = len(self._frame_order)
         frame = self._frame_number
         if frame_number is None:
@@ -362,12 +397,19 @@ class LayerSet(object):
             frame %= lfo
         else:
             frame = 0
-        self._set_visible_child(frame)
+        # self._set_visible_child(frame)
+        self._set_visible_from_data_layers()
         self._frame_number = frame
         self.parent.update()
+        # TODO(mk): write adapter to generate frame_info tuple
+        #           {given below as: (self._frame_number, lfo, self._animating, uuid)}
+        #           to pass on to frame change callback (here: SGM's next_frame method)
         if self._frame_change_cb is not None and lfo:
             uuid = self._frame_order[self._frame_number]
             self._frame_change_cb((self._frame_number, lfo, self._animating, uuid))
+
+    def update_time_manager_collection(self, coll):
+        self._time_manager.collection = coll
 
 
 class ContourGroupNode(scene.Node):
@@ -1251,6 +1293,7 @@ class SceneGraphManager(QObject):
     def rebuild_frame_order(self, uuid_list: list, *args, **kwargs):
         LOG.debug('setting SGM new frame order to {0!r:s}'.format(uuid_list))
         self.layer_set.frame_order = uuid_list
+        self.layer_set.update_time_manager_collection(self.document.data_layer_collection)
 
     def _rebuild_frame_order(self, *args, **kwargs):
         res = self.rebuild_frame_order(*args, **kwargs)
@@ -1312,7 +1355,11 @@ class SceneGraphManager(QObject):
 
         for elem in remove_elements:
             self.purge_layer(elem)
+        # This is triggered, when the layer set is updated?
+        # import_product_content when data loaded?
+        self.layer_set.update_time_manager(self.document.data_layer_collection)
 
+        # Triggers main canvas update
         self.update()
 
     def on_view_change(self, scheduler):
