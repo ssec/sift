@@ -68,7 +68,7 @@ from collections import MutableSequence, OrderedDict, defaultdict
 from itertools import groupby, chain
 from uuid import UUID, uuid1 as uuidgen
 from datetime import datetime, timedelta
-from typing import List, Tuple, Dict
+from typing import List, Tuple
 import typing as typ
 import numpy as np
 from weakref import ref
@@ -1178,6 +1178,27 @@ class DataLayer:
         raise ValueError("Changing type of a DataLayer forbidden.")
 
 
+class DataLayerCollection:
+    """
+        Collection of data layers (representation of time series of images) with one data layer
+        as driving layer, designated by its ProductFamilyKey.
+    """
+    def __init__(self, data_layers: List[DataLayer], driving_layer_key: Tuple):
+        self.data_layers = {}
+        for data_layer in data_layers:
+            self.data_layers[data_layer.product_family_key] = data_layer
+
+    def remove_by_uuid(self, uuid_to_remove: UUID):
+        for _, data_layer in self.data_layers.items():
+            new_timeline = data_layer.timeline.copy()
+            for dt, uuid in data_layer.timeline.items():
+                if uuid_to_remove == uuid:
+                    del new_timeline[dt]
+                    # NOTE(mk): Able to exit prematurely here if guaranteed that
+                    # no uuid present in multiple data layers
+            data_layer.timeline = new_timeline
+
+
 class Document(QObject):  # base class is rightmost, mixins left of that
     """Storage for layer and user information.
 
@@ -1307,6 +1328,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         # data_layers represents time series of images ordered by product family
         self.data_layers: List[DataLayer] = []
+        self.data_layer_collection = None
 
         self.colormaps = COLORMAP_MANAGER
         self.available_projections = OrderedDict((
@@ -2491,6 +2513,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             self._remove_layer_from_family(uuid)
             # remove from the layer set
             self.remove_layer_prez(uuid)  # this will send signal and start purge
+            # remove from data layer collection
+            self.data_layer_collection.remove_by_uuid(uuid)
 
         # remove recipes for RGBs that were deleted
         # if we don't then they may be recreated below
@@ -2705,6 +2729,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :return: sorted list of sibling uuids in time order, index of where uuid is in the list
         """
         self.create_data_layers()
+        self.data_layer_collection = DataLayerCollection(self.data_layers,
+                                                         self.data_layers[0].product_family_key)
         if sibling_infos is None:
             sibling_infos = self._layer_with_uuid
         it = sibling_infos.get(uuid, None)
