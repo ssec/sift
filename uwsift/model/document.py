@@ -68,6 +68,7 @@ from collections import MutableSequence, OrderedDict, defaultdict
 from itertools import groupby, chain
 from uuid import UUID, uuid1 as uuidgen
 from datetime import datetime, timedelta
+from typing import List, Tuple, Dict
 import typing as typ
 import numpy as np
 from weakref import ref
@@ -1122,6 +1123,60 @@ class DocumentAsProductArrayCollection(DocumentAsContextBase):
 
 ###################################################################################################################
 
+class DataLayer:
+    """
+        A DataLayer is unique to a satellite, channel and calibration
+        over a certain period of time.
+
+        Represents images over time belonging to a certain (satellite, channel, calibration)
+                                for a given span of time
+    """
+
+    def __init__(self, uuids_timestamps: List, product_family_key: Tuple):
+        # metadata redundant w.r.t. satellite, channel, calibration, so any metadata object
+        #                           from the list of tuples will do
+        self._t_matched = None
+        self.product_family_key = product_family_key
+
+        # sort timestamps while keeping them synchronous with images
+        uuids_tstamps_asc = sorted(uuids_timestamps, key=lambda tup: tup[1])
+        # Create timeline according to temporal resolution
+
+        # maps: timestamp -> uuid
+        self.timeline = OrderedDict({uuid_dt_tup[1]: uuid_dt_tup[0]
+                                     for uuid_dt_tup in uuids_tstamps_asc})
+
+    def t_matched_uuid(self) -> typ.Optional[UUID]:
+        if self.t_matched is None:
+            return None
+        return self.timeline[self.t_matched]
+
+    @property
+    def t_matched(self):
+        return self._t_matched
+
+    @t_matched.setter
+    def t_matched(self, t_matched):
+        if not isinstance(t_matched, datetime):
+            raise ValueError("Matched time needs to be datetime object.")
+        self._t_matched = t_matched
+
+    @property
+    def satellite(self):
+        return self.product_family_key[0].value
+
+    @satellite.setter
+    def satellite(self, *args, **kwargs):
+        raise ValueError("Changing type of a DataLayer forbidden.")
+
+    @property
+    def product_str(self):
+        return self.product_family_key[2]
+
+    @product_str.setter
+    def product_str(self, *args, **kwargs):
+        raise ValueError("Changing type of a DataLayer forbidden.")
+
 
 class Document(QObject):  # base class is rightmost, mixins left of that
     """Storage for layer and user information.
@@ -1249,6 +1304,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self._workspace = workspace
         self._layer_sets = [DocLayerStack(self)] + [None] * (layer_set_count - 1)
         self._layer_with_uuid = {}
+
+        # data_layers represents time series of images ordered by product family
+        self.data_layers: List[DataLayer] = []
+
         self.colormaps = COLORMAP_MANAGER
         self.available_projections = OrderedDict((
             ('Mercator', {
@@ -2608,6 +2667,36 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             if not fail:
                 yield md
 
+    def get_unique_product_family_keys(self) -> List[Tuple]:
+        """
+        Return list of unique product_family_keys in i.e. document._layer_with_uuid's
+        DocBasicLayers.
+        :return: unique_product_family_keys
+        """
+        prod_fam_keys = [dbl.product_family_key for dbl in self._layer_with_uuid.values()]
+        unique_product_family_keys = []
+        for pf_key in prod_fam_keys:
+            if pf_key in unique_product_family_keys:
+                continue
+            unique_product_family_keys.append(pf_key)
+        return unique_product_family_keys
+
+    def create_data_layers(self) -> None:
+        """
+        Adds data layers to document, based on currently present
+            uuid -> DocBasicLayer (document._layer_with_uuid)
+        mappings.
+        """
+        unique_product_family_keys = self.get_unique_product_family_keys()
+        for curr_product_family_key in unique_product_family_keys:
+            curr_family_uuids_timestamps = []
+            for image_uuid, doc_basic_layer in self._layer_with_uuid.items():
+                if doc_basic_layer.product_family_key != curr_product_family_key:
+                    continue
+                curr_family_uuids_timestamps.append((image_uuid, doc_basic_layer.sched_time))
+            data_layer = DataLayer(curr_family_uuids_timestamps, curr_product_family_key)
+            self.data_layers.append(data_layer)
+
     def time_siblings(self, uuid, sibling_infos=None):
         """
         return time-ordered list of datasets which have the same band, in time order
@@ -2615,6 +2704,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param sibling_infos: dictionary of UUID -> Dataset Info to sort through
         :return: sorted list of sibling uuids in time order, index of where uuid is in the list
         """
+        self.create_data_layers()
         if sibling_infos is None:
             sibling_infos = self._layer_with_uuid
         it = sibling_infos.get(uuid, None)
