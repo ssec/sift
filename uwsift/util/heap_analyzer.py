@@ -1,16 +1,20 @@
 #!/usr/bin/env python
 
-import tracemalloc
+import logging
 import os
-import re
 import pickle
-from typing import List, Generator, Optional
+import re
+import sys
+import tracemalloc
 from collections import defaultdict, OrderedDict
-
-from uwsift.util.heap_profiler import format_byte_count
+from typing import List, Generator, Optional
 
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
+
+from uwsift.util.heap_profiler import format_byte_count
+
+LOG = logging.getLogger(__name__)
 
 
 class HeapAnalyzer:
@@ -39,15 +43,32 @@ class HeapAnalyzer:
 
     @staticmethod
     def get_python_stdlib_path() -> Optional[str]:
-        return "/var/local/miniconda3/envs/devel-default/lib/python3.7/"
+        dir_regex = re.compile(os.path.join(sys.exec_prefix, "lib", "python3.[0-9]+"))
+        for path in sys.path:
+            if dir_regex.match(path):
+                return path + os.path.sep
+        else:
+            LOG.warning("can't find the path to the Python standard library")
+            return None
 
     @staticmethod
-    def get_conda_packages_path() -> Optional[str]:
-        return "/var/local/miniconda3/envs/devel-default/lib/python3.7/site-packages/"
+    def get_conda_packages_path(stdlib_directory: str) -> Optional[str]:
+        conda_directory = os.path.join(stdlib_directory, "site-packages")
+        if os.path.isdir(conda_directory):
+            return conda_directory
+        else:
+            LOG.warning("can't find the path to the Conda packages")
+            return None
 
     @staticmethod
     def get_uwsift_project_path() -> Optional[str]:
-        return "/home/kellerer/Dokumente/eumSIFT/uwsift/"
+        util_directory = os.path.dirname(__file__)
+        uwsift_directory = os.path.dirname(util_directory)
+        if os.path.isdir(uwsift_directory):
+            return uwsift_directory
+        else:
+            LOG.warning("can't find the `uwsift` project directory")
+            return None
 
     def combine_snapshot(self, snapshot: List[tracemalloc.Statistic]):
         self._combined_snapshot_count += 1
@@ -122,9 +143,12 @@ class HeapAnalyzer:
         stacked_y_axis = []
         labels = []
 
-        conda_packages_path = self.get_conda_packages_path()
-        python_stdlib_path = self.get_python_stdlib_path()
         uwsift_project_path = self.get_uwsift_project_path()
+        python_stdlib_path = self.get_python_stdlib_path()
+        if python_stdlib_path is not None:
+            conda_packages_path = self.get_conda_packages_path(python_stdlib_path)
+        else:
+            conda_packages_path = None
 
         for rank, ((file_name, line_number), allocs) in enumerate(sorted_allocations.items()):
             if rank < limit:
