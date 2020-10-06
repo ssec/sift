@@ -1,19 +1,18 @@
 #!/usr/bin/env python
 
-import tracemalloc
+import logging
 import os
+import pickle
 import re
 import sys
-import pickle
-import logging
-from typing import List, Generator, Optional
+import tracemalloc
 from collections import defaultdict, OrderedDict
-
-from uwsift.util.heap_profiler import format_byte_count
+from typing import List, Generator, Optional
 
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 
+from uwsift.util.heap_profiler import format_byte_count
 
 LOG = logging.getLogger(__name__)
 

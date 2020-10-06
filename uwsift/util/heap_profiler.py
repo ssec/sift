@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 
-import tracemalloc
 import logging
 import os
-import psutil
-from datetime import datetime
+import tracemalloc
 from collections import OrderedDict
+from datetime import datetime
 from threading import Thread, Event
+
+import psutil
 
 LOG = logging.getLogger(__name__)
 
