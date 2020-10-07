@@ -51,8 +51,8 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser("PsAnalyzer")
-    parser.add_argument("csv-path", required=True)
+    parser.add_argument("input")
     args = parser.parse_args()
 
-    df = pd.read_csv(args.csv_path)
+    df = pd.read_csv(args.input)
     create_plot(df)
