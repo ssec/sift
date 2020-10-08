@@ -349,8 +349,8 @@ class SimpleWorkspace(BaseWorkspace):
         yield {TASK_DOING: 'purging memory', TASK_PROGRESS: 0.5}
         self._deactivate_content_for_product(self._product_with_uuid(None,
                                                                      uuid))
-        self.contents.pop(uuid)
-        self.products.pop(uuid)
+        self.contents.pop(uuid, None)
+        self.products.pop(uuid, None)
         yield {TASK_DOING: 'purging memory', TASK_PROGRESS: 1.0}
 
     def get_content(self, dsi_or_uuid, lod=None, kind: Kind = Kind.IMAGE) \
