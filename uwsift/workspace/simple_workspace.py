@@ -80,6 +80,7 @@ class SimpleWorkspace(BaseWorkspace):
         cache_entry = self._available.get(c.uuid)
         return cache_entry or self._activate_content(c)
 
+    # FIXME: Use code from CachingWorkspace._remove_content_files_from_workspace?
     def _remove_content_data_from_cache_dir_checked(self,
                                                     c: Optional[Content] = None):
         if CLEANUP_FILE_CACHE:
