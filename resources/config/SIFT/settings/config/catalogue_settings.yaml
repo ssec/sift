@@ -1,0 +1,28 @@
+# An example catalogue configuration for loading SEVIRI IR_108 product
+# "brightness temperature" for data times 2019-10-21T12:00 until
+# 2019-10-21T13:00 (exclusive) from the configured search path
+
+catalogue:
+
+  - reader: 'seviri_l1b_hrit'
+    # Just for reference because the *constraints* items must match; these are actually defined in readers/seviri_l1b_hrit.yaml:
+    #   filter_patterns: ['{rate:1s}-000-{hrit_format:_<6s}-{platform_shortname:4s}_{service:_<7s}-{channel:_<6s}___-{segment:_<6s}___-{start_time:%Y%m%d%H%M}-{c:1s}_']
+    #   group_keys: ['start_time', 'platform_shortname', 'service']
+    search_path: '/path/to/seviri/data/'
+    constraints:
+      platform_shortname:
+        - MSG4
+      channel:
+        - ______ # catch EPI and PRO files, for SEVIRI HRIT this must be given in addition when any channel is listed
+        - IR_108
+      start_time:
+        type: datetime
+        Y: 2019
+        m: 10
+        d: 21
+        H: 12
+
+    products:
+      IR_108: [brightness_temperature]
+
+

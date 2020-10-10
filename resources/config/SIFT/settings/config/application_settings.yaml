@@ -15,3 +15,6 @@ logging:
       level: DEBUG
     vispy:
       level: INFO
+
+# Activate auto loading at application startup
+auto_load: True

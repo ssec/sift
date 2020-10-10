@@ -1142,6 +1142,7 @@ class Main(QtGui.QMainWindow):
         self._cmap_editor.show()
 
 
+
 def set_default_geometry(window, desktop=0):
     screen = QtWidgets.QApplication.desktop()
     screen_geometry = screen.screenGeometry(desktop)
@@ -1242,6 +1243,33 @@ def main() -> int:
     window.show()
     # bring window to front
     window.raise_()
+
+    from uwsift import config
+    if config.get('auto_load', None):
+        from uwsift.model.catalogue import Catalogue
+        catalogue_config = config.get('catalogue', None)
+        first_query = catalogue_config[0]
+
+        (reader,
+         search_path,
+         filter_patterns,
+         group_keys,
+         constraints,
+         products
+         ) = Catalogue.extract_query_parameters(first_query)
+
+        (importer_kwargs,
+         files_to_load
+         ) = Catalogue.query_for_satpy_importer_kwargs_and_readers(
+            reader,
+            search_path,
+            filter_patterns,
+            group_keys,
+            constraints,
+            products)
+
+        window.open_paths(files_to_load, **importer_kwargs)
+        
     # run the event loop until the user closes the application
     exit_code = app.run()
     # Workaround PyCharm issue: The PyCharm dev console raises a TypeError if
