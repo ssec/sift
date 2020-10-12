@@ -1,0 +1,7 @@
+watchdog:
+  heartbeat_file: "$$CACHE_DIR$$/heartbeat.txt"
+  notification_cmd: "/path/to/raiseEvent.sh $$MACHINE$$ $$PROCESS_NAME$$ $$SEVERITY$$ $$TEXT$$"
+  # Unit of the following settings: seconds
+  heartbeat_check_interval: 60
+  max_tolerable_dataset_age: 600
+  max_tolerable_idle_time: 600
