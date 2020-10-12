@@ -4,9 +4,9 @@ import logging
 import os
 import shlex
 import subprocess
-from datetime import datetime
+from datetime import datetime, timezone
 from socket import gethostname
-from time import strptime, sleep, mktime
+from time import sleep
 from typing import List
 
 import appdirs
@@ -17,7 +17,8 @@ LOG = logging.getLogger(__name__)
 APPLICATION_DIR = "SIFT"
 APPLICATION_AUTHOR = "CIMSS-SSEC"
 
-WATCHDOG_DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+WATCHDOG_DATETIME_FORMAT_STORE = "%Y-%m-%d %H:%M:%S %z"
+
 
 class Watchdog:
     def __init__(self, config_dirs: List[str], cache_dir: str):
@@ -61,9 +62,8 @@ class Watchdog:
         with open(self.heartbeat_file) as file:
             content = file.read()
 
-        timestamp = mktime(strptime(content.rstrip("\n"),
-                                    WATCHDOG_DATETIME_FORMAT))
-        return datetime.fromtimestamp(timestamp)
+        return datetime.strptime(content.rstrip("\n"),
+                                 WATCHDOG_DATETIME_FORMAT_STORE)
 
     def _notify(self, level: int, text: str):
         if not self.notification_cmd:
@@ -103,10 +103,11 @@ class Watchdog:
             # time. It is possible to approximate this time by checking whether
             # the file content changes, but if the user loads the same dataset
             # again, then this update won't be detected.
-            modification_time = datetime.fromtimestamp(os.path.getmtime(self.heartbeat_file))
+            modification_time = datetime.fromtimestamp(
+                os.path.getmtime(self.heartbeat_file), tz=timezone.utc)
 
-            now = datetime.now()
-            idle_time = now - modification_time
+            now_utc = datetime.now(tz=timezone.utc)
+            idle_time = now_utc - modification_time
             if idle_time.total_seconds() > self.max_tolerable_idle_time:
                 self._notify(logging.WARNING, f"Dataset was not updated"
                                               f" since {modification_time}")
@@ -115,7 +116,7 @@ class Watchdog:
                              f"Dataset was updated {idle_time.total_seconds()}"
                              f" seconds ago at: {modification_time}")
 
-            dataset_age = now - latest_dataset_time
+            dataset_age = now_utc - latest_dataset_time
             if dataset_age.total_seconds() > self.max_tolerable_dataset_age:
                 overdue_time = \
                     dataset_age.total_seconds() - self.max_tolerable_dataset_age
