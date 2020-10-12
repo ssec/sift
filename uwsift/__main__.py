@@ -34,7 +34,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from vispy import app
 
 import uwsift.ui.open_cache_dialog_ui as open_cache_dialog_ui
-from uwsift import __version__, USE_INVENTORY_DB
+from uwsift import __version__, AUTO_UPDATE_MODE__ACTIVE, USE_INVENTORY_DB
 from uwsift.common import Info, Tool, CompositeType
 from uwsift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
 from uwsift.control.layer_tree import LayerStackTreeViewModel
@@ -1142,7 +1142,6 @@ class Main(QtGui.QMainWindow):
         self._cmap_editor.show()
 
 
-
 def set_default_geometry(window, desktop=0):
     screen = QtWidgets.QApplication.desktop()
     screen_geometry = screen.screenGeometry(desktop)
@@ -1244,32 +1243,16 @@ def main() -> int:
     # bring window to front
     window.raise_()
 
-    from uwsift import config
-    if config.get('auto_load', None):
-        from uwsift.model.catalogue import Catalogue
-        catalogue_config = config.get('catalogue', None)
-        first_query = catalogue_config[0]
+    if AUTO_UPDATE_MODE__ACTIVE:
 
-        (reader,
-         search_path,
-         filter_patterns,
-         group_keys,
-         constraints,
-         products
-         ) = Catalogue.extract_query_parameters(first_query)
+        # FIXME: let the AutoUpdateManager be in control...
+        from uwsift import config
+        from uwsift.control.auto_update import AutoUpdateManager
+        minimum_interval = config.get("auto_update.interval", None)
+        if minimum_interval is None:
+            raise ValueError("Auto update interval needs to be set!")
+        auto_update_manager = AutoUpdateManager(window, minimum_interval)
 
-        (importer_kwargs,
-         files_to_load
-         ) = Catalogue.query_for_satpy_importer_kwargs_and_readers(
-            reader,
-            search_path,
-            filter_patterns,
-            group_keys,
-            constraints,
-            products)
-
-        window.open_paths(files_to_load, **importer_kwargs)
-        
     # run the event loop until the user closes the application
     exit_code = app.run()
     # Workaround PyCharm issue: The PyCharm dev console raises a TypeError if
