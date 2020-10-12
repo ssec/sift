@@ -24,7 +24,7 @@ import gc
 import logging
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from collections import OrderedDict
 from functools import partial
 from glob import glob
@@ -70,7 +70,8 @@ APP: QtGui.QApplication = app_object.native
 PROGRESS_BAR_MAX = 1000
 STATUS_BAR_DURATION = 2000  # ms
 
-WATCHDOG_DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+WATCHDOG_DATETIME_FORMAT_DISPLAY = "%Y-%m-%d %H:%M:%S %Z"
+WATCHDOG_DATETIME_FORMAT_STORE = "%Y-%m-%d %H:%M:%S %z"
 
 def test_layers_from_directory(doc, layer_tiff_glob):
     return doc.open_file(glob(layer_tiff_glob))
@@ -704,7 +705,8 @@ class Main(QtGui.QMainWindow):
         :param uuid: UUID of the new layer
         """
         dataset = self.document[uuid]
-        fmt_time = dataset.sched_time.strftime(WATCHDOG_DATETIME_FORMAT).rstrip()
+        fmt_time = \
+            dataset.sched_time.strftime(WATCHDOG_DATETIME_FORMAT_STORE).rstrip()
 
         journal_path = self._heartbeat_file + "-journal"
         with open(journal_path, "w") as file:
@@ -729,12 +731,12 @@ class Main(QtGui.QMainWindow):
         self._last_imported_dataset_uuid = uuid
         dataset = self.document[uuid]
         self._last_imported_dataset_import_time = \
-            dataset_import_time = datetime.now()
+            dataset_import_time = datetime.now(tz=timezone.utc)
 
         self.ui.timeLastDatasetCreationLineEdit.setText(
-            dataset.sched_time.strftime(WATCHDOG_DATETIME_FORMAT))
+            dataset.sched_time.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY))
         self.ui.timeLastDatasetImportLineEdit.setText(
-            dataset_import_time.strftime(WATCHDOG_DATETIME_FORMAT))
+            dataset_import_time.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY))
 
     def _clear_last_dataset_creation_time(self, reordered_layers: tuple,
                                           removed_uuids: typ.List[UUID],
@@ -752,9 +754,9 @@ class Main(QtGui.QMainWindow):
         """
         Update currentTimeLineEdit with the current local time.
         """
-        now = datetime.now()
+        now_utc = datetime.now(tz=timezone.utc)
         self.ui.currentTimeLineEdit.setText(
-            now.strftime(WATCHDOG_DATETIME_FORMAT))
+            now_utc.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY))
 
         if not self._last_imported_dataset_uuid:
             return
@@ -762,7 +764,7 @@ class Main(QtGui.QMainWindow):
         if self._max_tolerable_dataset_age > 0:
             dataset = self.document[self._last_imported_dataset_uuid]
 
-            dataset_age = now - dataset.sched_time
+            dataset_age = now_utc - dataset.sched_time
             if dataset_age.total_seconds() > self._max_tolerable_dataset_age:
                 palette = self._palette_text_red
             else:
@@ -770,7 +772,7 @@ class Main(QtGui.QMainWindow):
             self.ui.timeLastDatasetCreationLineEdit.setPalette(palette)
 
         if self._max_tolerable_idle_time > 0:
-            idle_time = now - self._last_imported_dataset_import_time
+            idle_time = now_utc - self._last_imported_dataset_import_time
             if idle_time.total_seconds() > self._max_tolerable_idle_time:
                 palette = self._palette_text_red
             else:
