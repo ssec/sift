@@ -34,7 +34,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from vispy import app
 
 import uwsift.ui.open_cache_dialog_ui as open_cache_dialog_ui
-from uwsift import __version__, USE_INVENTORY_DB
+from uwsift import __version__, AUTO_UPDATE_MODE__ACTIVE, USE_INVENTORY_DB
 from uwsift.common import Info, Tool, CompositeType
 from uwsift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
 from uwsift.control.layer_tree import LayerStackTreeViewModel
@@ -1242,6 +1242,17 @@ def main() -> int:
     window.show()
     # bring window to front
     window.raise_()
+
+    if AUTO_UPDATE_MODE__ACTIVE:
+
+        # FIXME: let the AutoUpdateManager be in control...
+        from uwsift import config
+        from uwsift.control.auto_update import AutoUpdateManager
+        minimum_interval = config.get("auto_update.interval", None)
+        if minimum_interval is None:
+            raise ValueError("Auto update interval needs to be set!")
+        auto_update_manager = AutoUpdateManager(window, minimum_interval)
+
     # run the event loop until the user closes the application
     exit_code = app.run()
     # Workaround PyCharm issue: The PyCharm dev console raises a TypeError if

@@ -2514,7 +2514,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             # remove from the layer set
             self.remove_layer_prez(uuid)  # this will send signal and start purge
             # remove from data layer collection
-            self.data_layer_collection.remove_by_uuid(uuid)
+            if self.data_layer_collection is not None:
+                self.data_layer_collection.remove_by_uuid(uuid)
 
         # remove recipes for RGBs that were deleted
         # if we don't then they may be recreated below
@@ -2525,6 +2526,16 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         # Remove data from the workspace
         self.purge_layer_prez(uuids)
+
+    def get_uuids(self):
+        return list(self._layer_with_uuid.keys())
+
+    def clear(self):
+        """
+        Convenience function to clear document
+        """
+        all_uuids = self.get_uuids()
+        self.remove_layers_from_all_sets(all_uuids)
 
     def animate_siblings_of_layer(self, row_or_uuid):
         uuid = self.current_layer_set[row_or_uuid].uuid if not isinstance(row_or_uuid, UUID) else row_or_uuid
