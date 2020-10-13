@@ -705,8 +705,9 @@ class Main(QtGui.QMainWindow):
         :param uuid: UUID of the new layer
         """
         dataset = self.document[uuid]
-        fmt_time = \
-            dataset.sched_time.strftime(WATCHDOG_DATETIME_FORMAT_STORE).rstrip()
+        dataset_sched_time_utc = dataset.sched_time.replace(tzinfo=timezone.utc)
+        fmt_time = dataset_sched_time_utc.strftime(
+            WATCHDOG_DATETIME_FORMAT_STORE).rstrip()
 
         journal_path = self._heartbeat_file + "-journal"
         with open(journal_path, "w") as file:
@@ -730,11 +731,13 @@ class Main(QtGui.QMainWindow):
         """
         self._last_imported_dataset_uuid = uuid
         dataset = self.document[uuid]
+        dataset_sched_time_utc = dataset.sched_time.replace(tzinfo=timezone.utc)
+
         self._last_imported_dataset_import_time = \
             dataset_import_time = datetime.now(tz=timezone.utc)
 
         self.ui.timeLastDatasetCreationLineEdit.setText(
-            dataset.sched_time.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY))
+            dataset_sched_time_utc.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY))
         self.ui.timeLastDatasetImportLineEdit.setText(
             dataset_import_time.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY))
 
@@ -764,7 +767,9 @@ class Main(QtGui.QMainWindow):
         if self._max_tolerable_dataset_age > 0:
             dataset = self.document[self._last_imported_dataset_uuid]
 
-            dataset_age = now_utc - dataset.sched_time
+            dataset_sched_time_utc = \
+                dataset.sched_time.replace(tzinfo=timezone.utc)
+            dataset_age = now_utc - dataset_sched_time_utc
             if dataset_age.total_seconds() > self._max_tolerable_dataset_age:
                 palette = self._palette_text_red
             else:
