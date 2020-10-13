@@ -44,8 +44,8 @@ extensions = [
     'sphinx.ext.ifconfig',
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
-    'sphinxcontrib.seqdiag',
-    'sphinxcontrib.blockdiag',
+#    'sphinxcontrib.seqdiag',
+#    'sphinxcontrib.blockdiag',
 ]
 
 autodoc_mock_imports = [
