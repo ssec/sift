@@ -2,6 +2,7 @@
 
 import logging
 import os
+import shlex
 import subprocess
 from datetime import datetime
 from socket import gethostname
@@ -29,8 +30,9 @@ class Watchdog:
                                " in the watchdog config")
         self.heartbeat_file = heartbeat_file.replace("$$CACHE_DIR$$", cache_dir)
 
-        self.notification_cmd = config.get("watchdog.notification_cmd", None)
-        if self.notification_cmd is None:
+        notification_cmd = config.get("watchdog.notification_cmd", None)
+        self.notification_cmd = shlex.quote(notification_cmd)
+        if not self.notification_cmd:
             LOG.warning("Can't send notifications"
                         " because `notification_cmd` isn't configured")
 
@@ -64,13 +66,15 @@ class Watchdog:
         return datetime.fromtimestamp(timestamp)
 
     def _notify(self, level: int, text: str):
-        if self.notification_cmd is None:
+        if not self.notification_cmd:
             LOG.log(level, text)
         else:
-            cmd = self.notification_cmd.replace("$$MACHINE$$", self.hostname)
-            cmd = cmd.replace("$$PROCESS_NAME$$", f"{APPLICATION_DIR}-watchdog")
-            cmd = cmd.replace("$$SEVERITY$$", logging.getLevelName(level))
-            cmd = cmd.replace("$$TEXT$$", text)
+            machine = shlex.quote(self.hostname)
+            process_name = shlex.quote(f"{APPLICATION_DIR}-watchdog")
+            severity = shlex.quote(logging.getLevelName(level))
+            text = shlex.quote(text)
+            cmd = (f"{self.notification_cmd}"
+                   f" {machine} {process_name} {severity} {text}")
 
             try:
                 subprocess.run(cmd, shell=True, check=True)
