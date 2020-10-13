@@ -24,6 +24,7 @@ will slowly replace the low-level documents on the wiki.
    Contributing <CONTRIBUTING>
    Installation options for MTG-Sift <INSTALLATION-mtgsift>
    Initial setup for packaging MTG-Sift with CMake <PACKAGING-mtgsift>
+   Configuring MTG-Sift <configuration>
 
 
 Indices and tables
