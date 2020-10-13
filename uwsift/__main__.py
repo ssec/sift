@@ -24,6 +24,7 @@ import gc
 import logging
 import os
 import sys
+from datetime import datetime, timezone
 from collections import OrderedDict
 from functools import partial
 from glob import glob
@@ -34,8 +35,8 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from vispy import app
 
 import uwsift.ui.open_cache_dialog_ui as open_cache_dialog_ui
-from uwsift import __version__, AUTO_UPDATE_MODE__ACTIVE, USE_INVENTORY_DB
-from uwsift.common import Info, Tool, CompositeType
+from uwsift import __version__,  AUTO_UPDATE_MODE__ACTIVE, USE_INVENTORY_DB, config
+from uwsift.common import Info, Tool, CompositeType, Presentation
 from uwsift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
 from uwsift.control.layer_tree import LayerStackTreeViewModel
 from uwsift.control.rgb_behaviors import UserModifiesRGBLayers
@@ -44,7 +45,7 @@ from uwsift.model.layer import DocRGBLayer
 from uwsift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from uwsift.ui.pov_main_ui import Ui_MainWindow
-from uwsift.util import (WORKSPACE_DB_DIR, DOCUMENT_SETTINGS_DIR,
+from uwsift.util import (WORKSPACE_DB_DIR, DOCUMENT_SETTINGS_DIR, USER_CACHE_DIR,
                          get_package_data_dir, check_grib_definition_dir, check_imageio_deps,
                          HeapProfiler)
 from uwsift.util.logger import configure_loggers
@@ -69,6 +70,8 @@ APP: QtGui.QApplication = app_object.native
 PROGRESS_BAR_MAX = 1000
 STATUS_BAR_DURATION = 2000  # ms
 
+WATCHDOG_DATETIME_FORMAT_DISPLAY = "%Y-%m-%d %H:%M:%S %Z"
+WATCHDOG_DATETIME_FORMAT_STORE = "%Y-%m-%d %H:%M:%S %z"
 
 def test_layers_from_directory(doc, layer_tiff_glob):
     return doc.open_file(glob(layer_tiff_glob))
@@ -427,6 +430,12 @@ class Main(QtGui.QMainWindow):
     _resource_collector: ResourceSearchPathCollector = None
     _resource_collector_timer: QtCore.QTimer = None
     _timeline_scene: SiftDocumentAsFramesInTracks = None
+    _last_imported_dataset_uuid: typ.Optional[UUID] = None
+    _palette_text_green: QtGui.QPalette = None
+    _palette_text_red: QtGui.QPalette = None
+    _max_tolerable_idle_time: float = -1
+    _max_tolerable_dataset_age: float = -1
+    _heartbeat_file = None
 
     def interactive_open_files(self, *args, files=None, **kwargs):
         self.scene_manager.layer_set.animating = False
@@ -686,12 +695,104 @@ class Main(QtGui.QMainWindow):
         """
         unreachable_object_count = gc.collect()
         LOG.debug(f"GC found {unreachable_object_count} unreachable objects")
+        
+    def _update_heartbeat_file(self, reordered_layers: tuple, uuid: UUID,
+                               p: Presentation):
+        """
+        Write the dataset creation time into the heartbeat file. The time of
+        last dataset update can be retrieved as the file modification time.
+
+        :param uuid: UUID of the new layer
+        """
+        dataset = self.document[uuid]
+        dataset_sched_time_utc = dataset.sched_time.replace(tzinfo=timezone.utc)
+        fmt_time = dataset_sched_time_utc.strftime(
+            WATCHDOG_DATETIME_FORMAT_STORE).rstrip()
+
+        journal_path = self._heartbeat_file + "-journal"
+        with open(journal_path, "w") as file:
+            file.write(fmt_time + "\n")
+            file.flush()
+
+        os.rename(journal_path, self._heartbeat_file)
+
+    def _update_dataset_timestamps(self, reordered_layers: tuple,
+                                   uuid: UUID, p: Presentation):
+        """
+        Update the timestamp displayed in timeLastDatasetCreationLineEdit and
+        timeLastDatasetImportLineEdit. The import time is the current local
+        time.
+
+        If max_update_interval isn't None, then the dataset import time will be
+        colored green if the time between now and last import time is smaller
+        than max_update_interval. Otherwise it will be colored red.
+
+        :param uuid: UUID of the new layer
+        """
+        self._last_imported_dataset_uuid = uuid
+        dataset = self.document[uuid]
+        dataset_sched_time_utc = dataset.sched_time.replace(tzinfo=timezone.utc)
+
+        self._last_imported_dataset_import_time = \
+            dataset_import_time = datetime.now(tz=timezone.utc)
+
+        self.ui.timeLastDatasetCreationLineEdit.setText(
+            dataset_sched_time_utc.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY))
+        self.ui.timeLastDatasetImportLineEdit.setText(
+            dataset_import_time.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY))
+
+    def _clear_last_dataset_creation_time(self, reordered_layers: tuple,
+                                          removed_uuids: typ.List[UUID],
+                                          first_row_removed: int,
+                                          num_rows_removed: int):
+        """
+        Clear the LineEdit if the layer, from which the creation time was
+        extracted, is deleted from the scene graph.
+        """
+        if self._last_imported_dataset_uuid in removed_uuids:
+            self.ui.timeLastDatasetCreationLineEdit.clear()
+            self._last_imported_dataset_uuid = None
+
+    def _update_current_time(self):
+        """
+        Update currentTimeLineEdit with the current local time.
+        """
+        now_utc = datetime.now(tz=timezone.utc)
+        self.ui.currentTimeLineEdit.setText(
+            now_utc.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY))
+
+        if not self._last_imported_dataset_uuid:
+            return
+
+        if self._max_tolerable_dataset_age > 0:
+            dataset = self.document[self._last_imported_dataset_uuid]
+
+            dataset_sched_time_utc = \
+                dataset.sched_time.replace(tzinfo=timezone.utc)
+            dataset_age = now_utc - dataset_sched_time_utc
+            if dataset_age.total_seconds() > self._max_tolerable_dataset_age:
+                palette = self._palette_text_red
+            else:
+                palette = self._palette_text_green
+            self.ui.timeLastDatasetCreationLineEdit.setPalette(palette)
+
+        if self._max_tolerable_idle_time > 0:
+            idle_time = now_utc - self._last_imported_dataset_import_time
+            if idle_time.total_seconds() > self._max_tolerable_idle_time:
+                palette = self._palette_text_red
+            else:
+                palette = self._palette_text_green
+            self.ui.timeLastDatasetImportLineEdit.setPalette(palette)
 
     def __init__(self, config_dir=None, workspace_dir=None, cache_size=None, glob_pattern=None, search_paths=None,
                  border_shapefile=None, center=None, clear_workspace=False):
         super(Main, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+        if AUTO_UPDATE_MODE__ACTIVE:
+            self.ui.animFrame.hide()
+        else:
+            self.ui.watchdogFrame.hide()
         # FIXME: Slider does not currently work as intended. Re-enable later
         self.ui.timelineScaleSlider.setDisabled(True)
 
@@ -724,6 +825,9 @@ class Main(QtGui.QMainWindow):
         self._init_layer_panes()
         self._init_rgb_pane()
         self._init_map_widget()
+
+        if AUTO_UPDATE_MODE__ACTIVE:
+            self._init_update_times_display()
 
         self.animation = UserControlsAnimation(self.ui,
                                                self.scene_manager,
@@ -893,6 +997,57 @@ class Main(QtGui.QMainWindow):
         font.setPointSizeF(14)
         self.ui.cursorProbeLayer.setFont(font)
         self.ui.cursorProbeText.setFont(font)
+
+    def _init_update_times_display(self):
+        self._palette_text_green = QtGui.QPalette()
+        self._palette_text_green.setColor(QtGui.QPalette.Text,
+                                          QtGui.QColor(23, 193, 23))
+        self._palette_text_red = QtGui.QPalette()
+        self._palette_text_red.setColor(QtGui.QPalette.Text,
+                                        QtGui.QColor(220, 0, 0))
+
+        self._max_tolerable_idle_time = \
+            config.get("watchdog.max_tolerable_idle_time", -1)
+        if self._max_tolerable_idle_time <= 0:
+            LOG.warning("No valid configuration for"
+                        " 'watchdog.max_tolerable_idle_time'. Can't highlight"
+                        " last import time display when delayed.")
+        else:
+            LOG.info(f"Highlighting last import time display when delayed for"
+                     f" more than {self._max_tolerable_idle_time} seconds.")
+
+        self._max_tolerable_dataset_age = \
+            config.get("watchdog.max_tolerable_dataset_age", -1)
+        if self._max_tolerable_dataset_age <= 0:
+            LOG.warning("No valid configuration for"
+                        " 'watchdog.max_tolerable_dataset_age'. Can't highlight"
+                        " last data time display when delayed.")
+        else:
+            LOG.info(f"Highlighting last data time display when delayed for"
+                     f" more than {self._max_tolerable_dataset_age} seconds.")
+
+        self.document.didAddBasicLayer.connect(self._update_dataset_timestamps)
+        self.document.didAddCompositeLayer.connect(self._update_dataset_timestamps)
+
+        # don't clear the time of last import when the layers are removed
+        self.document.didRemoveLayers.connect(
+            self._clear_last_dataset_creation_time)
+
+        self.currentTimeTimer = QtCore.QTimer(parent=self)
+        self.currentTimeTimer.timeout.connect(self._update_current_time)
+        self.currentTimeTimer.start(250)
+
+        heartbeat_file = config.get("watchdog.heartbeat_file", None)
+        if heartbeat_file is None:
+            LOG.warning("No configuration for 'watchdog.heartbeat_file'."
+                        " Can't send heartbeats to the watchdog.")
+        else:
+            LOG.info(f"Communication with watchdog via heartbeat file "
+                     f" '{self._heartbeat_file}' configured.")
+            self._heartbeat_file = \
+                heartbeat_file.replace("$$CACHE_DIR$$", USER_CACHE_DIR)
+            self.document.didAddBasicLayer.connect(self._update_heartbeat_file)
+            self.document.didAddCompositeLayer.connect(self._update_heartbeat_file)
 
     def _timer_collect_resources(self):
         if self._resource_collector:
