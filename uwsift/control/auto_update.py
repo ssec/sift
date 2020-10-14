@@ -70,7 +70,7 @@ class AutoUpdateManager:
         self.timer = None
         # State
         self._files_loaded = None
-        self._old_uuids = None
+        self._old_uuids = []
 
         self._init_catalogue()
         # connect to didAddBasicLayer --> signal starts timer anew when loading is done
