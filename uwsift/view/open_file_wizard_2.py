@@ -14,7 +14,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with SIFT.  If not, see <http://www.gnu.org/licenses/>.
-
+import copy
 import os
 import logging
 from enum import Enum
@@ -22,13 +22,16 @@ from PyQt5 import QtCore, QtWidgets, QtGui
 from PyQt5.QtCore import QPoint
 from PyQt5.QtWidgets import QMenu
 from collections import OrderedDict
-from typing import Generator, Tuple, Union
+from typing import Generator, Tuple, Union, Dict
 from datetime import datetime
 
 from numpy import long
+from pyresample import AreaDefinition
 from satpy import Scene
 from satpy.readers import group_files
+import satpy.resample
 
+from uwsift.model.area_defnitions_manager import AreaDefinitionsManager
 from uwsift.util.common import create_scenes
 from uwsift.satpy_compat import DataID, get_id_value
 
@@ -47,6 +50,19 @@ CHECKMARK = '✔️'
 
 FILE_PAGE = 0
 PRODUCT_PAGE = 1
+
+RESAMPLING_METHODS = {  # use None to filter a resampling method
+            # 'kd_tree': None,  # synonym for `nearest`
+            'nearest': 'Nearest Neighbor',
+            'ewa': 'Elliptical Weighted Averaging',
+            'bilinear': 'Bilinear',
+            'native': 'Native',
+            'gradient_search': 'Gradient Search',
+            'bucket_avg': 'Bucket Average',
+            'bucket_sum': 'Bucket Sum',
+            'bucket_count': 'Bucket Count',
+            'bucket_fraction': 'Bucket Fraction',
+        }
 
 
 class OpenFileWizard(QtWidgets.QWizard):
@@ -93,6 +109,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         # On reader index change: update filter patterns. Also triggers
         # input_parameters_changed in the end so that file table is updated with the new pattern.
         self.ui.readerComboBox.currentIndexChanged.connect(self._update_filter_patterns)
+
         # on filter pattern (displayed value, as this is editable) change: update file table
         self.ui.filterPatternComboBox.currentTextChanged.connect(self.inputParametersChanged.emit)
         # on folder change: update file table
@@ -113,8 +130,33 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.selectIDTable.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.ui.selectIDTable.customContextMenuRequested.connect(self._product_context_menu)
 
+        self.update_resampling_method_combobox(satpy.resample.RESAMPLERS)
+        self.ui.resamplingMethodComboBox\
+            .currentIndexChanged.connect(self.update_resampling_info)
+        self.ui.resamplingMethodComboBox.currentIndexChanged\
+            .connect(self.update_activation_of_projection_combobox)
+
+        self.ui.projectionComboBox.addItems(
+            AreaDefinitionsManager.available_area_def_names())
+        self.ui.projectionComboBox.setCurrentIndex(
+            parent.document.current_projection_index())
+        self.ui.projectionComboBox.currentIndexChanged.\
+            connect(self.update_resampling_info)
+
+        self.update_resolution_spin_boxes()
+        self.ui.projectionComboBox.currentIndexChanged\
+            .connect(self.update_resolution_spin_boxes)
+        self.ui.resolutionXSpinBox.valueChanged.connect(self.update_resampling_info)
+        self.ui.resolutionYSpinBox.valueChanged.connect(self.update_resampling_info)
+
+        # GUI has been initialized, make sure we have a consistent
+        # resampling_info
+        self.resampling_info = None
+        self.update_resampling_info()
+
         # on cell change: check if page is complete
-        self.ui.selectIDTable.cellChanged.connect(self._check_product_page_completeness)
+        self.ui.selectIDTable.cellChanged\
+            .connect(self._check_product_page_completeness)
 
     # ==============================================================================================
     # PUBLIC GENERAL WIZARD INTERFACE
@@ -569,3 +611,66 @@ class OpenFileWizard(QtWidgets.QWizard):
                 break
 
         self.ui.productSelectionPage.completeChanged.emit()
+
+    def update_resampling_method_combobox(self, resampling_methods):
+
+        self.ui.resamplingMethodComboBox.clear()
+        self.ui.resamplingMethodComboBox.addItem('None', userData='None')
+
+        for resampling_method in resampling_methods:
+            # By not listing the resampler id in RESAMPLING_METHODS we can skip
+            # it from the choice:
+            resampling_method_beautiful_name = \
+                RESAMPLING_METHODS.get(resampling_method)
+            if resampling_method_beautiful_name:
+                self.ui.resamplingMethodComboBox\
+                    .addItem(resampling_method_beautiful_name,
+                             userData=resampling_method)
+
+        self.ui.resamplingMethodComboBox.currentIndexChanged\
+            .connect(self.update_activation_of_projection_combobox)
+        self.ui.resamplingMethodComboBox.currentIndexChanged\
+            .connect(self.update_resampling_info)
+        self._set_opts_disabled(True)
+
+    def update_activation_of_projection_combobox(self):
+        if self.ui.resamplingMethodComboBox.currentIndex() != 0:
+            self._set_opts_disabled(False)
+        else:
+            self._set_opts_disabled(True)
+            self._reset_fields()
+
+    def update_resampling_info(self):
+        area_def_name = self.ui.projectionComboBox.currentText()
+        area_def = AreaDefinitionsManager.area_def_by_name(area_def_name)
+
+        self.resampling_info = {
+            'resampler': self.ui.resamplingMethodComboBox.currentData(),
+            'projection': area_def.proj_str,
+            'resolution': (self.ui.resolutionXSpinBox.value(),
+                           self.ui.resolutionYSpinBox.value())
+        }
+
+    def _set_opts_disabled(self, is_disabled):
+        self.ui.projectionComboBox.setDisabled(is_disabled)
+        self.ui.resolutionXSpinBox.setDisabled(is_disabled)
+        self.ui.resolutionYSpinBox.setDisabled(is_disabled)
+
+    def _reset_fields(self):
+        self.ui.resamplingMethodComboBox.setCurrentIndex(0)
+        self.ui.projectionComboBox.setCurrentIndex(self.parent().document
+                                                   .current_projection_index())
+        self._set_opts_disabled(True)
+
+    def update_resolution_spin_boxes(self):
+        area_def_name = self.ui.projectionComboBox.currentText()
+        area_def = \
+            AreaDefinitionsManager.area_def_by_name(area_def_name)
+        # Note: the term 'resolution' for resampling defines the number of grid
+        # points (per dimension) whereas in an AreaDefinition it defines the
+        # size of a grid point in (world) coordinate system units
+        resolution: Tuple[int, int] = \
+            (area_def.shape[1], area_def.shape[0])
+        self.ui.resolutionXSpinBox.setValue(resolution[0])
+        self.ui.resolutionYSpinBox.setValue(resolution[1])
+
