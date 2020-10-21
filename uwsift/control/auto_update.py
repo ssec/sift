@@ -96,7 +96,12 @@ class AutoUpdateManager:
 
     def _init_catalogue(self):
         catalogue_config = config.get('catalogue', None)
-        first_query = catalogue_config[0]
+        try:
+            first_query = catalogue_config[0]
+        except (TypeError, IndexError):
+            msg = "No catalogue query found in configuration."
+            raise RuntimeError(msg)
+
         (self.reader,
          self.search_path,
          self.filter_patterns,
