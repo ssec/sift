@@ -5,4 +5,4 @@ satpy_import_path: "path/to/satpy/satpy"
 # Make special fci_l1_geoobs reader (see
 # https://gitlab.eumetsat.int/Meraner/fci_l1_geoobs_satpy_reader) available
 # NOTE: this option may be a temporary solution
-satpy_fci_l1_geoobs_import_path: "path/to/fci_l1_geoobs_satpy_reader"
+satpy_extra_readers_import_path: "path/to/fci_l1_geoobs_satpy_reader"
