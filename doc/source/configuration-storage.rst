@@ -31,7 +31,7 @@ otherwise they are `not` housekept anyways.
 For interactive sessions this configuration is most user-friendly::
 
     storage:
-        file_caching_active: True
+        use_inventory_db: True
 
 In automated environments the following configuration is recommended (which is
 the default)::
