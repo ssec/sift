@@ -95,7 +95,7 @@ class SimpleWorkspace(BaseWorkspace):
     # often-used queries
     #
 
-    def _product_with_uuid(self, session, uuid: UUID) -> Product:
+    def _product_with_uuid(self, session, uuid: UUID) -> Optional[Product]:
         return self.products.get(uuid, None)
 
     def _product_overview_content(self, session, prod: Product = None, uuid: UUID = None,
