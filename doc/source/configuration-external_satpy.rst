@@ -38,3 +38,4 @@ When set properly, e.g. to the root directory
 becomes available for selection in MTG-SIFT, thus e.g. with::
 
   satpy_fci_l1_geoobs_import_path: /home/me/development/fci_l1_geoobs_satpy_reader
+
