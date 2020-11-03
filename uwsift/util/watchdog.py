@@ -31,11 +31,13 @@ class Watchdog:
                                " in the watchdog config")
         self.heartbeat_file = heartbeat_file.replace("$$CACHE_DIR$$", cache_dir)
 
+        self.notification_cmd = None
         notification_cmd = config.get("watchdog.notification_cmd", None)
-        self.notification_cmd = shlex.quote(notification_cmd)
-        if not self.notification_cmd:
+        if not notification_cmd:
             LOG.warning("Can't send notifications"
                         " because `notification_cmd` isn't configured")
+        else:
+            self.notification_cmd = shlex.quote(notification_cmd)
 
         heartbeat_check_interval = config.get(
             "watchdog.heartbeat_check_interval", None)
