@@ -55,6 +55,7 @@ class Ui_MainWindow(object):
         sizePolicy.setHeightForWidth(self.regionSelectButton.sizePolicy().hasHeightForWidth())
         self.regionSelectButton.setSizePolicy(sizePolicy)
         self.regionSelectButton.setCheckable(True)
+        self.regionSelectButton.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
         self.regionSelectButton.setObjectName("regionSelectButton")
         self.buttonGroup.addButton(self.regionSelectButton)
         self.horizontalLayout_2.addWidget(self.regionSelectButton)

@@ -957,6 +957,17 @@ class Main(QtGui.QMainWindow):
         self.ui.regionSelectButton.toggled.connect(partial(self.change_tool, name=Tool.REGION_PROBE))
         self.change_tool(True)
 
+        # self.graphManager isn't initialized yet so we use this wrapper
+        # function to lazily access the function
+        def select_full_data():
+            self.graphManager.currentFullDataSelectionChanged(True)
+
+        menu = QtWidgets.QMenu(parent=self)
+        select_full_data_action = QtWidgets.QAction("Select Full Data", parent=menu)
+        select_full_data_action.triggered.connect(select_full_data)
+        menu.addAction(select_full_data_action)
+        self.ui.regionSelectButton.setMenu(menu)
+
     def _init_rgb_pane(self):
         self.rgb_config_pane = RGBLayerConfigPane(self.ui, self.ui.layersPaneWidget)
         self.user_rgb_behavior = UserModifiesRGBLayers(self.document,
@@ -1123,15 +1134,18 @@ class Main(QtGui.QMainWindow):
             LOG.debug("Wizard closed, nothing to load")
         self._wizard_dialog = None
 
-    def remove_region_polygon(self, action: QtGui.QAction = None, *args):
+    def remove_region_polygon_or_full_data_selection(self, action: QtGui.QAction = None, *args):
         if self.scene_manager.has_pending_polygon():
             self.scene_manager.clear_pending_polygon()
             return
 
-        # Remove the polygon from other locations
-        removed_name = self.graphManager.currentPolygonChanged(None)
-        LOG.info("Clearing polygon with name '%s'", removed_name)
-        self.scene_manager.remove_polygon(removed_name)
+        if self.graphManager.isFullDataSelectionEnabled():
+            self.graphManager.currentFullDataSelectionChanged(False)
+        else:
+            # Remove the polygon from other locations
+            removed_name = self.graphManager.currentPolygonChanged(None)
+            LOG.info("Clearing polygon with name '%s'", removed_name)
+            self.scene_manager.remove_polygon(removed_name)
 
     def create_algebraic(self, action: QtGui.QAction = None, uuids=None, composite_type=CompositeType.ARITHMETIC):
         if uuids is None:
@@ -1235,7 +1249,7 @@ class Main(QtGui.QMainWindow):
 
         clear = QtWidgets.QAction("Clear Region Selection", self)
         clear.setShortcut(QtCore.Qt.Key_Escape)
-        clear.triggered.connect(self.remove_region_polygon)
+        clear.triggered.connect(self.remove_region_polygon_or_full_data_selection)
 
         composite = QtWidgets.QAction("Create Composite", self)
         composite.setShortcut('C')
