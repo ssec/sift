@@ -20,6 +20,7 @@ from collections import namedtuple
 from datetime import datetime, timedelta
 from typing import Iterable, Generator, Mapping, Tuple, Optional
 
+import pyresample
 import yaml
 import dask.array as da
 import numpy as np
@@ -913,6 +914,7 @@ class SatpyImporter(aImporter):
                               "an importer")
         self.filenames = list(source_paths)
         self.reader = reader
+        self.resampling_info = kwargs.get('resampling_info')
         self.scn = kwargs.get('scene')
         if self.scn is None:
             self.scn = Scene(reader=self.reader, filenames=self.filenames)
@@ -1203,6 +1205,19 @@ class SatpyImporter(aImporter):
         # FIXME: Don't recreate the importer every time we want to load data
         dataset_ids = [prod.info['_satpy_id'] for prod in products]
         self.scn.load(dataset_ids, pad_data=True, upper_right_corner="NE")
+
+        resampler: str = self.resampling_info.get('resampler', 'None')
+        if resampler != 'None':
+            target_area_def = pyresample.geometry.DynamicAreaDefinition(
+                projection=self.resampling_info['projection'])
+            target_area_def = target_area_def.freeze(
+                self.scn.max_area().get_lonlats(),
+                resolution=self.resampling_info['resolution'])
+            self.scn = self.scn.resample(
+                target_area_def,
+                resampler=resampler,
+                radius_of_influence=5000)
+
         num_stages = len(products)
         for idx, (prod, ds_id) in enumerate(zip(products, dataset_ids)):
             dataset = self.scn[ds_id]

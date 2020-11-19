@@ -1157,6 +1157,7 @@ class Main(QtGui.QMainWindow):
                 'reader': wizard_dialog.get_reader_name(),
                 'scenes': scenes,
                 'dataset_ids': wizard_dialog.collect_selected_ids(),
+                'resampling_info': wizard_dialog.resampling_info,
             }
             self._last_open_dir = wizard_dialog.current_dir
             self.open_paths(wizard_dialog.files_to_load,
