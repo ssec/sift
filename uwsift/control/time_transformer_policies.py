@@ -14,6 +14,7 @@ class WrappingDrivingPolicy:
     def __init__(self, collection, driving_layer_pfkey):
         self._collection = collection
         self._driving_idx = 0
+        self._timeline_length = None
         self._driving_layer_pfkey = None
         self.timeline = None
         self.set_driving_layer(driving_layer_pfkey)
@@ -33,12 +34,14 @@ class WrappingDrivingPolicy:
         if self.timeline is None:
             self.timeline = list(self._collection.data_layers[self._driving_layer_pfkey]
                                  .timeline.keys())
+            self._timeline_length = len(self.timeline)
             self._driving_idx = 0
         else:
             # Store timestamp of old timeline to retrieve analogous timestamp of new timeline.
             curr_tstamp = self.timeline[self._driving_idx]
             self.timeline = list(self._collection.data_layers[self._driving_layer_pfkey]
                                  .timeline.keys())
+            self._timeline_length = len(self.timeline)
             self._driving_idx = self._find_nearest_past(curr_tstamp)
 
     def _find_nearest_past(self, tstamp: datetime) -> int:
@@ -52,11 +55,16 @@ class WrappingDrivingPolicy:
         distances = np.abs(other_timeline_np[past_idcs] - old_tstamp_np)
         return np.argmin(distances)[0]
 
-    def compute_t_sim(self, tick_time: int) -> datetime:
-        if self._driving_idx >= len(self.timeline):
-            self._driving_idx = 0
-        t_sim = self.timeline[self._driving_idx]
-        self._driving_idx += 1
+    def compute_t_sim(self, tick_time: int, backwards=False) -> datetime:
+        if backwards:
+            self._driving_idx = \
+                (self._driving_idx + (self._timeline_length - 1)) % self._timeline_length
+            t_sim = self.timeline[self._driving_idx]
+        else:
+            self._driving_idx += 1
+            if self._driving_idx >= self._timeline_length:
+                self._driving_idx = 0
+            t_sim = self.timeline[self._driving_idx]
         return t_sim
 
 

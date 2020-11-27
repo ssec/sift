@@ -199,8 +199,7 @@ class LayerSet(object):
         self._frame_change_cb = frame_change_cb
         self._animation_speed = DEFAULT_ANIMATION_DELAY  # milliseconds
         self._animation_timer = app.Timer(self._animation_speed / 1000.0, connect=self.next_frame)
-        # (self, collection, animation_duration, matching_policy=find_nearest_past)
-        # collection supposed to be List[DataLayer]
+        self._animation_timer.connect(self.tick)
         self._time_manager = TimeManager(None, self._animation_speed)
 
         if layers is not None:
@@ -372,9 +371,11 @@ class LayerSet(object):
             if layer_uuid is not None:
                 self._set_uuid_visibility(layer_uuid, True)
 
-    def tick(self):
-        # Advances through time and updates collection state
-        self._time_manager.tick()
+    def tick(self, event=None, backwards=False):
+        # Slot that triggers the time manager's tick in the relevant direction
+        # and subsequently makes the appropriate layer visible.
+        self._time_manager.tick(backwards=backwards)
+        self._set_visible_from_data_layers()
 
     def next_frame(self, event=None, frame_number=None):
         """
@@ -383,7 +384,6 @@ class LayerSet(object):
         :param frame_number: optional frame to go to, from 0
         :return:
         """
-        self.tick()
         lfo = len(self._frame_order)
         frame = self._frame_number
         if frame_number is None:
@@ -398,12 +398,8 @@ class LayerSet(object):
         else:
             frame = 0
         # self._set_visible_child(frame)
-        self._set_visible_from_data_layers()
         self._frame_number = frame
         self.parent.update()
-        # TODO(mk): write adapter to generate frame_info tuple
-        #           {given below as: (self._frame_number, lfo, self._animating, uuid)}
-        #           to pass on to frame change callback (here: SGM's next_frame method)
         if self._frame_change_cb is not None and lfo:
             uuid = self._frame_order[self._frame_number]
             self._frame_change_cb((self._frame_number, lfo, self._animating, uuid))

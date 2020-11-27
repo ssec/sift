@@ -20,10 +20,10 @@ class TimeTransformer:
         self.prev_tick_time: float = -1.0
         self._tick_delta: float = -1.0
         self._tick_accum: float = 0.
+        self.t_sim = None
 
-        self.t_sim = self._translation_policy.compute_t_sim(self.curr_tick_time)
-
-    def tick(self):
+    def tick(self, backwards=False):
         # tick times in milliseconds since Epoch
         self.curr_tick_time = time.time_ns()//1000000
-        self.t_sim = self._translation_policy.compute_t_sim(self.curr_tick_time)
+        self.t_sim = self._translation_policy.compute_t_sim(self.curr_tick_time,
+                                                            backwards=backwards)
