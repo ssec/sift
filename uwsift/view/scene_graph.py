@@ -199,7 +199,7 @@ class LayerSet(object):
         self._frame_change_cb = frame_change_cb
         self._animation_speed = DEFAULT_ANIMATION_DELAY  # milliseconds
         self._animation_timer = app.Timer(self._animation_speed / 1000.0, connect=self.next_frame)
-        self._animation_timer.connect(self.tick)
+        self._animation_timer.connect(self.step)
         self._time_manager = TimeManager(None, self._animation_speed)
 
         if layers is not None:
@@ -371,9 +371,9 @@ class LayerSet(object):
             if layer_uuid is not None:
                 self._set_uuid_visibility(layer_uuid, True)
 
-    def tick(self, event=None, backwards=False):
+    def step(self, event=None, backwards=False):
         # Slot that triggers the time manager's tick in the relevant direction
-        # and subsequently makes the appropriate layer visible.
+        # and subsequently makes the appropriate layers visible.
         self._time_manager.tick(backwards=backwards)
         self._set_visible_from_data_layers()
 
