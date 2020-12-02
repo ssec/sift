@@ -330,7 +330,9 @@ class UserControlsAnimation(QtCore.QObject):
         self.ui.animPlayPause.setDown(animating)
         self.ui.animationSlider.repaint()
         if animating:
-            self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
+            t_sim = self.scene_manager.layer_set.time_manager.create_formatted_t_sim()
+            self.ui.animationLabel.setText(t_sim)
+            #self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
         else:
             self.update_frame_time_to_top_visible()
 

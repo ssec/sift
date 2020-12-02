@@ -58,6 +58,12 @@ class TimeManager:
         t_sim = self._time_transformer.t_sim
         self.update_collection_state(t_sim)
 
+    def create_formatted_t_sim(self):
+        """
+        Used for updating the animation label during animation.
+        """
+        return self._time_transformer.create_formatted_time_stamp()
+
     def update_collection_state(self, t_sim):
         """
             Iterate over data layers in collection to match times to t_sim and set the t_matched

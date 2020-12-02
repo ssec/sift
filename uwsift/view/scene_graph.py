@@ -204,7 +204,7 @@ class LayerSet(object):
         self._animation_speed = DEFAULT_ANIMATION_DELAY  # milliseconds
         self._animation_timer = app.Timer(self._animation_speed / 1000.0, connect=self.next_frame)
         self._animation_timer.connect(self.step)
-        self._time_manager = TimeManager(None, self._animation_speed)
+        self.time_manager = TimeManager(None, self._animation_speed)
 
         if layers is not None:
             self.set_layers(layers)
@@ -366,7 +366,7 @@ class LayerSet(object):
                 child.visible = False
 
     def _set_visible_from_data_layers(self):
-        for pfkey, data_layer in self._time_manager.collection.data_layers.items():
+        for pfkey, data_layer in self.time_manager.collection.data_layers.items():
             # Set all uuids in the current data layer to invisible
             for _, im_uuid in data_layer.timeline.items():
                 self._set_uuid_visibility(im_uuid, False)
@@ -378,7 +378,7 @@ class LayerSet(object):
     def step(self, event=None, backwards=False):
         # Slot that triggers the time manager's tick in the relevant direction
         # and subsequently makes the appropriate layers visible.
-        self._time_manager.tick(backwards=backwards)
+        self.time_manager.tick(backwards=backwards)
         self._set_visible_from_data_layers()
 
     def next_frame(self, event=None, frame_number=None):
@@ -410,7 +410,8 @@ class LayerSet(object):
 
     def update_time_manager_collection(self, coll):
         # TODO(mk): Trigger Policy collection updates, rename this function in the process
-        self._time_manager.collection = coll
+        self.time_manager.collection = coll
+        self._set_visible_from_data_layers()
 
 
 class ContourGroupNode(scene.Node):
