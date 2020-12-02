@@ -1189,6 +1189,21 @@ class DataLayerCollection:
         for data_layer in data_layers:
             self.data_layers[data_layer.product_family_key] = data_layer
 
+    def get_most_frequent_data_layer(self) -> DataLayer:
+        temporal_differences = np.zeros(len(self.data_layers.values()))
+        for i, data_layer in enumerate(self.data_layers.values()):
+            tl = list(data_layer.timeline.keys())
+            t_diffs = [tl[i + 1] - tl[i] for i in range(len(tl) - 1)]
+            # Calculate mean difference in timeline in seconds to support
+            # comparing timelines with non-regularly occurring timestamps
+            temporal_differences[i] = np.mean(list(map(lambda td: td.total_seconds(), t_diffs)))
+        most_frequent_data_layer_idx = np.argmin(temporal_differences)
+        if len(most_frequent_data_layer_idx) > 1:
+            # If there exist multiple timelines at the same sampling rate just take the first one.
+            most_frequent_data_layer_idx = most_frequent_data_layer_idx[0]
+        most_frequent_data_layer_pfkey = list(self.data_layers.keys())[most_frequent_data_layer_idx]
+        return self.data_layers[most_frequent_data_layer_pfkey]
+
     def remove_by_uuid(self, uuid_to_remove: UUID):
         for _, data_layer in self.data_layers.items():
             new_timeline = data_layer.timeline.copy()
