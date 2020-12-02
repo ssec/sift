@@ -1,5 +1,7 @@
 from datetime import datetime
-from typing import Tuple
+from typing import Tuple, List
+
+from uwsift.model.document import DataLayer
 
 import numpy as np
 
@@ -11,38 +13,54 @@ class WrappingDrivingPolicy:
         Each successive call will return the driving layer's next timestamp. If there are
         no more timestamps in the driving layer it starts over from the first timestamp.
     """
-    def __init__(self, collection, driving_layer_pfkey):
+    def __init__(self, collection):
         self._collection = collection
         self._driving_idx = 0
+        self._timeline = None
         self._timeline_length = None
+        self._driving_layer = None
         self._driving_layer_pfkey = None
-        self.timeline = None
-        self.set_driving_layer(driving_layer_pfkey)
+        # Set first loaded layer as driving layer
+        self.driving_layer = list(self._collection.data_layers.values())[0]
 
-    def set_driving_layer(self, driving_layer_pfkey: Tuple) -> None:
-        """
-        Sets a new driving layer by product family key.
-        Throws KeyError if that Product Family Key is not found in collection.
-        """
-        if driving_layer_pfkey is None:
+    @property
+    def driving_layer(self):
+        return self._driving_layer
+
+    @driving_layer.setter
+    def driving_layer(self, data_layer: DataLayer):
+        if not data_layer:
             raise ValueError("Driving layer needs to be a valid Product Family Key.")
-        try:
-            self._collection.data_layers[driving_layer_pfkey]
-        except KeyError:
-            raise KeyError(f"Driving layer {driving_layer_pfkey} not found in current collection.")
-        self._driving_layer_pfkey = driving_layer_pfkey
-        if self.timeline is None:
+        self._driving_layer_pfkey = data_layer.product_family_key
+        if not self._driving_layer:
+            try:
+                self._collection.data_layers[data_layer.product_family_key]
+            except KeyError:
+                raise KeyError(
+                    f"Driving layer {data_layer.product_family_key} "
+                    f"not found in current collection.")
             self.timeline = list(self._collection.data_layers[self._driving_layer_pfkey]
                                  .timeline.keys())
-            self._timeline_length = len(self.timeline)
             self._driving_idx = 0
         else:
             # Store timestamp of old timeline to retrieve analogous timestamp of new timeline.
-            curr_tstamp = self.timeline[self._driving_idx]
-            self.timeline = list(self._collection.data_layers[self._driving_layer_pfkey]
-                                 .timeline.keys())
-            self._timeline_length = len(self.timeline)
+            curr_tstamp = list(self._driving_layer.timeline.keys())[self._driving_idx]
+            self.timeline = list(self._driving_layer.timeline.keys())
             self._driving_idx = self._find_nearest_past(curr_tstamp)
+
+    @property
+    def timeline(self):
+        return self._timeline
+
+    @timeline.setter
+    def timeline(self, timeline: List[datetime]):
+        self._timeline = list(self._collection.data_layers[self._driving_layer_pfkey]
+                              .timeline.keys())
+        self._timeline_length = len(self._timeline)
+
+    @property
+    def driving_layer_pfkey(self):
+        return self._driving_layer_pfkey
 
     def _find_nearest_past(self, tstamp: datetime) -> int:
         """
@@ -53,7 +71,7 @@ class WrappingDrivingPolicy:
         other_timeline_np = np.asarray(self.timeline)
         past_idcs = other_timeline_np <= old_tstamp_np
         distances = np.abs(other_timeline_np[past_idcs] - old_tstamp_np)
-        return np.argmin(distances)[0]
+        return np.argmin(distances)
 
     def compute_t_sim(self, tick_time: int, backwards=False) -> datetime:
         if backwards:

@@ -409,6 +409,7 @@ class LayerSet(object):
             self._frame_change_cb((self._frame_number, lfo, self._animating, uuid))
 
     def update_time_manager_collection(self, coll):
+        # TODO(mk): Trigger Policy collection updates, rename this function in the process
         self._time_manager.collection = coll
 
 

@@ -30,6 +30,9 @@ class TimeManager:
         if self._collection is not None:
             self._time_transformer = TimeTransformer(self._collection, self._animation_speed)
         self._time_matcher = TimeMatcher(matching_policy)
+    # TODO(mk): persist TimeTransformer and Policy across collection changes / in general
+    # TODO(mk): implement policy property of time manager OR pass ref to policy to time transformer
+    #           and do not save it as TimeManager's state
 
     @property
     def collection(self):
@@ -38,9 +41,16 @@ class TimeManager:
     @collection.setter
     def collection(self, coll: DataLayerCollection):
         self._collection = coll
-        driving_layer_pfkey = list(coll.data_layers.keys())[0]
-        policy = WrappingDrivingPolicy(self._collection,
-                                       driving_layer_pfkey)
+        # TODO(mk): persist state and keep old driving layer if it still exists in new collection
+        #           do this in collection property setter of policy
+        #           pick first layer of user selection from FileWizard as driving layer if no
+        #           previous driving layer existed
+        #           give GUI capability for user to change driving layer -> lower left of
+        #           Timeline QQuickWidget opens ComboBox, 'Most Frequent' as one of the entries?
+        policy = WrappingDrivingPolicy(self._collection)
+        # WrappingDrivingPolicy.make_new_policy(policy, collection)
+        # TODO(mk): parsing driving_layer_pfkey in layerToDisplay's setter may be brittle code for
+        #           other types of satellite data
         self._time_transformer = TimeTransformer(policy)
 
     def tick(self, backwards=False):

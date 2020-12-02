@@ -1184,7 +1184,7 @@ class DataLayerCollection:
         Collection of data layers (representation of time series of images) with one data layer
         as driving layer, designated by its ProductFamilyKey.
     """
-    def __init__(self, data_layers: List[DataLayer], driving_layer_key: Tuple):
+    def __init__(self, data_layers: List[DataLayer]):
         self.data_layers = {}
         for data_layer in data_layers:
             self.data_layers[data_layer.product_family_key] = data_layer
@@ -2685,8 +2685,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :return: sorted list of sibling uuids in time order, index of where uuid is in the list
         """
         self.create_data_layers()
-        self.data_layer_collection = DataLayerCollection(self.data_layers,
-                                                         self.data_layers[0].product_family_key)
+        # TODO(mk) pull create_data_layers into DataLayerCollection
+        self.data_layer_collection = DataLayerCollection(self.data_layers)
         if sibling_infos is None:
             sibling_infos = self._layer_with_uuid
         it = sibling_infos.get(uuid, None)
