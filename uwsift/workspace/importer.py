@@ -1098,10 +1098,7 @@ class SatpyImporter(aImporter):
             ds.attrs[Info.OBS_DURATION] = duration
 
             reader_kind = config.get(f"data_reading.{self.reader}.kind", None)
-            # Handle GRIB platform/instrument
-            if self.reader == 'grib':
-                ds.attrs[Info.KIND] = Kind.CONTOUR
-            elif reader_kind:
+            if reader_kind:
                 try:
                     ds.attrs[Info.KIND] = Kind[reader_kind]
                 except KeyError:
