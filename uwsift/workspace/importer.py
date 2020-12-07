@@ -1206,16 +1206,17 @@ class SatpyImporter(aImporter):
         for idx, (prod, ds_id) in enumerate(zip(products, dataset_ids)):
             dataset = self.scn[ds_id]
             shape = dataset.shape
+            kind = prod.info[Info.KIND]
             # TODO (Alexander Rettig): Review this, best with David Hoese:
             #  The line (exactly speaking, code equivalent to it) was
             #  introduced in commit bba8d73f but looked very suspicious - it
             #  seems to assume, that the only kinds here could be IMAGE or
             #  CONTOUR:
-            #     num_contents = 1 if prod.info[Info.KIND] == Kind.IMAGE else 2
+            #     num_contents = 1 if kind == Kind.IMAGE else 2
             #  Assuming that num_contents == 2 is the right setting only for
             #  kind == Kind.CONTOUR, the following implementation is supposed to
             #  do better:
-            num_contents = 2 if prod.info[Info.KIND] == Kind.CONTOUR else 1
+            num_contents = 2 if kind == Kind.CONTOUR else 1
 
             if prod.content:
                 LOG.warning('content was already available, skipping import')
@@ -1223,8 +1224,8 @@ class SatpyImporter(aImporter):
 
             now = datetime.utcnow()
 
-            if prod.info[Info.KIND] == Kind.VECTORS:
-                data_filename, lms_data = \
+            if prod.info[Info.KIND] in [Kind.VECTORS, Kind.POINTS]:
+                data_filename, data_memmap = \
                     self._create_data_memmap_file(dataset.data, prod)
                 content = Content(
                     lod=0,
@@ -1237,7 +1238,7 @@ class SatpyImporter(aImporter):
                     cols=shape[1],
                     dtype=dataset.dtype,
                 )
-                content.info[Info.KIND] = Kind.VECTORS
+                content.info[Info.KIND] = kind
                 prod.content.append(content)
                 self.add_content_to_cache(content)
 
@@ -1246,9 +1247,9 @@ class SatpyImporter(aImporter):
                                       stages=num_stages,
                                       current_stage=idx,
                                       completion=completion,
-                                      stage_desc="SatPy vectors data add to workspace",
+                                      stage_desc=f"SatPy {kind.name} data add to workspace",
                                       dataset_info=None,
-                                      data=lms_data,
+                                      data=data_memmap,
                                       content=content)
                 continue
 
@@ -1313,7 +1314,7 @@ class SatpyImporter(aImporter):
                                   stages=num_stages,
                                   current_stage=idx,
                                   completion=1. / num_contents,
-                                  stage_desc="SatPy image data add to workspace",
+                                  stage_desc="SatPy IMAGE data add to workspace",
                                   dataset_info=None,
                                   data=img_data,
                                   content=c)
@@ -1371,7 +1372,7 @@ class SatpyImporter(aImporter):
                                   stages=num_stages,
                                   current_stage=idx,
                                   completion=completion,
-                                  stage_desc="SatPy contour data add to workspace",
+                                  stage_desc="SatPy CONTOUR data add to workspace",
                                   dataset_info=None,
                                   data=img_data,
                                   content=c)
