@@ -1201,7 +1201,16 @@ class SatpyImporter(aImporter):
         for idx, (prod, ds_id) in enumerate(zip(products, dataset_ids)):
             dataset = self.scn[ds_id]
             shape = dataset.shape
-            num_contents = 1 if prod.info[Info.KIND] == Kind.IMAGE else 2
+            # TODO (Alexander Rettig): Review this, best with David Hoese:
+            #  The line (exactly speaking, code equivalent to it) was
+            #  introduced in commit bba8d73f but looked very suspicious - it
+            #  seems to assume, that the only kinds here could be IMAGE or
+            #  CONTOUR:
+            #     num_contents = 1 if prod.info[Info.KIND] == Kind.IMAGE else 2
+            #  Assuming that num_contents == 2 is the right setting only for
+            #  kind == Kind.CONTOUR, the following implementation is supposed to
+            #  do better:
+            num_contents = 2 if prod.info[Info.KIND] == Kind.CONTOUR else 1
 
             if prod.content:
                 LOG.warning('content was already available, skipping import')
