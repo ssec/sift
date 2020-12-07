@@ -1097,13 +1097,21 @@ class SatpyImporter(aImporter):
                 duration = timedelta(minutes=60)
             ds.attrs[Info.OBS_DURATION] = duration
 
+            reader_kind = config.get(f"data_reading.{self.reader}.kind", None)
             # Handle GRIB platform/instrument
             if self.reader == 'grib':
                 ds.attrs[Info.KIND] = Kind.CONTOUR
-            elif self.reader == 'fci_l1_geoobs':
-                ds.attrs[Info.KIND] = Kind.VECTORS
+            elif reader_kind:
+                try:
+                    ds.attrs[Info.KIND] = Kind[reader_kind]
+                except KeyError:
+                    raise KeyError(f"Unknown data kind '{reader_kind}'"
+                                   f" configured for reader {self.reader}.")
             else:
+                LOG.info(f"No data kind configured for reader '{self.reader}'."
+                         f" Falling back to 'IMAGE'.")
                 ds.attrs[Info.KIND] = Kind.IMAGE
+
             self._get_platform_instrument(ds.attrs)
             ds.attrs.setdefault(Info.STANDARD_NAME, ds.attrs.get('standard_name'))
             if 'wavelength' in ds.attrs:
