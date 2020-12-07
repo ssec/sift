@@ -1210,7 +1210,8 @@ class SatpyImporter(aImporter):
             now = datetime.utcnow()
 
             if prod.info[Info.KIND] == Kind.VECTORS:
-                data_filename, lms_data = self.create_vectors_file_cache_data(dataset.data, prod, shape)
+                data_filename, lms_data = \
+                    self._create_data_memmap_file(dataset.data, prod)
                 content = Content(
                     lod=0,
                     atime=now,
@@ -1397,22 +1398,27 @@ class SatpyImporter(aImporter):
 
         return data_filename, img_data
 
-    def create_vectors_file_cache_data(self, data: da.array, prod: Product,
-                                       shape: tuple) \
+    def _create_data_memmap_file(self, data: da.array, prod: Product) \
             -> Tuple[str, Optional[np.memmap]]:
         """
-        Creating a file in the current work directory for saving data in
-        '.vectors' files
+        Create *binary* file in the current working directory to cache `data`
+        as numpy memmap. The filename extension of the file is derived from the
+        kind of the given `prod`.
         """
-        data_filename: str = '{}.vectors'.format(prod.uuid)
-        data_path: str = os.path.join(self._cwd, data_filename)
-        if data.size > 0:
-            lms_data = np.memmap(data_path, dtype=np.float64,
-                                 shape=shape, mode='w+')
-            da.store(data, lms_data)
-        else:
-            lms_data = None
-        return data_filename, lms_data
+        # shovel that data into the memmap incrementally
+
+        kind = prod.info[Info.KIND]
+        data_filename = '{}.{}'.format(prod.uuid, kind.name.lower())
+        data_path = os.path.join(self._cwd, data_filename)
+        if data is None or data.size == 0:
+            # For empty data memmap is not possible
+            return data_filename, None
+
+        data_memmap = np.memmap(data_path, dtype=data.dtype, shape=data.shape,
+                                mode='w+')
+        da.store(data, data_memmap)
+
+        return data_filename, data_memmap
 
     def _get_verts_and_connect(self, paths):
         """ retrieve vertices and connects from given paths-list
