@@ -202,9 +202,12 @@ class LayerSet(object):
         self._frame_number = 0
         self._frame_change_cb = frame_change_cb
         self._animation_speed = DEFAULT_ANIMATION_DELAY  # milliseconds
+
+        doc = parent.document
+        self.time_manager = TimeManager(doc.data_layer_collection, self._animation_speed)
+
         self._animation_timer = app.Timer(self._animation_speed / 1000.0, connect=self.next_frame)
         self._animation_timer.connect(self.step)
-        self.time_manager = TimeManager(None, self._animation_speed)
 
         if layers is not None:
             self.set_layers(layers)
@@ -409,8 +412,7 @@ class LayerSet(object):
             self._frame_change_cb((self._frame_number, lfo, self._animating, uuid))
 
     def update_time_manager_collection(self, coll):
-        # TODO(mk): Trigger Policy collection updates, rename this function in the process
-        self.time_manager.collection = coll
+        self.time_manager.collection.didUpdateCollection.emit()
         self._set_visible_from_data_layers()
 
 

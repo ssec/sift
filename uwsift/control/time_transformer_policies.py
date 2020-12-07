@@ -20,8 +20,16 @@ class WrappingDrivingPolicy:
         self._timeline_length = None
         self._driving_layer = None
         self._driving_layer_pfkey = None
-        # Set first loaded layer as driving layer
-        self.driving_layer = list(self._collection.data_layers.values())[0]
+
+    def on_collection_update(self):
+        """
+        Slot connected to Collection's didUpdateCollection signal. Takes the first loaded data layer
+        if the old driving layer is not in the collection anymore.
+        """
+        if self._driving_layer_pfkey not in self._collection.product_family_keys:
+            self.driving_layer = list(self._collection.data_layers.values())[0]
+        else:
+            self.driving_layer = self._collection.data_layers[self._driving_layer_pfkey]
 
     @property
     def driving_layer(self):

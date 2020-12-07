@@ -21,37 +21,26 @@ class TimeManager:
               from collection
             - Image is displayed
     """
-    def __init__(self, collection: List[DataLayer], animation_speed,
+    def __init__(self, collection: DataLayerCollection, animation_speed,
                  matching_policy=find_nearest_past):
 
-        self._collection = collection
-        self._animation_speed = animation_speed
         self._time_transformer = None
-        if self._collection is not None:
-            self._time_transformer = TimeTransformer(self._collection, self._animation_speed)
+        self._init_collection(collection)
+        self._animation_speed = animation_speed
+
         self._time_matcher = TimeMatcher(matching_policy)
-    # TODO(mk): persist TimeTransformer and Policy across collection changes / in general
-    # TODO(mk): implement policy property of time manager OR pass ref to policy to time transformer
-    #           and do not save it as TimeManager's state
+
+    def _init_collection(self, collection: DataLayerCollection):
+        self._collection = collection
+        # TODO(mk): Give GUI capability for user to change driving layer -> lower left of
+        #           Timeline QQuickWidget opens ComboBox, 'Most Frequent' as one of the entries?
+        policy = WrappingDrivingPolicy(self._collection)
+        self._collection.didUpdateCollection.connect(policy.on_collection_update)
+        self._time_transformer = TimeTransformer(policy)
 
     @property
     def collection(self):
         return self._collection
-
-    @collection.setter
-    def collection(self, coll: DataLayerCollection):
-        self._collection = coll
-        # TODO(mk): persist state and keep old driving layer if it still exists in new collection
-        #           do this in collection property setter of policy
-        #           pick first layer of user selection from FileWizard as driving layer if no
-        #           previous driving layer existed
-        #           give GUI capability for user to change driving layer -> lower left of
-        #           Timeline QQuickWidget opens ComboBox, 'Most Frequent' as one of the entries?
-        policy = WrappingDrivingPolicy(self._collection)
-        # WrappingDrivingPolicy.make_new_policy(policy, collection)
-        # TODO(mk): parsing driving_layer_pfkey in layerToDisplay's setter may be brittle code for
-        #           other types of satellite data
-        self._time_transformer = TimeTransformer(policy)
 
     def tick(self, backwards=False):
         self._time_transformer.tick(backwards=backwards)
