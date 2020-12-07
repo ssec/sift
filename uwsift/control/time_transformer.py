@@ -32,7 +32,7 @@ class TimeTransformer:
         self.prev_tick_time: float = -1.0
         self._tick_delta: float = -1.0
         self._tick_accum: float = 0.
-        self.t_sim = None
+        self.t_sim = self._translation_policy.curr_t_sim()
 
     def create_formatted_time_stamp(self, fmt=DEFAULT_TIME_FORMAT):
         return self.t_sim.strftime(fmt)

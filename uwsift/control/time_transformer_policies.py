@@ -73,6 +73,12 @@ class WrappingDrivingPolicy:
         distances = np.abs(other_timeline_np[past_idcs] - old_tstamp_np)
         return np.argmin(distances)
 
+    def curr_t_sim(self):
+        if not self.timeline:
+            return None
+        else:
+            return self.timeline[self._driving_idx]
+
     def compute_t_sim(self, tick_time: int, backwards=False) -> datetime:
         if backwards:
             self._driving_idx = \
