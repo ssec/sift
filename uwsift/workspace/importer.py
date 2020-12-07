@@ -1263,10 +1263,7 @@ class SatpyImporter(aImporter):
                 shape = data.shape
                 origin_x -= am_index * cell_width
 
-            # FIXME: UNDERSTAND WHAT'S GOING ON HERE. WAS THIS REFACTORING?
-            data_filename, img_data = self.create_image_file_cache_data(data,
-                                                                        prod,
-                                                                        shape)
+            data_filename, img_data = self._create_data_memmap_file(data, prod)
 
             c = Content(
                 lod=0,
@@ -1381,22 +1378,6 @@ class SatpyImporter(aImporter):
         if self.use_inventory_db:
             self._S.add(c)
             self._S.commit()
-
-    def create_image_file_cache_data(self, data: da.array, prod: Product,
-                                     shape: tuple) -> Tuple[str, np.memmap]:
-        """
-        Creating a file in the current work directory for saving data in
-        '.image' files
-        """
-        # shovel that data into the memmap incrementally
-
-        data_filename: str = '{}.image'.format(prod.uuid)
-        data_path: str = os.path.join(self._cwd, data_filename)
-        img_data: np.memmap = np.memmap(data_path, dtype=np.float32,
-                                        shape=shape, mode='w+')
-        da.store(data, img_data)
-
-        return data_filename, img_data
 
     def _create_data_memmap_file(self, data: da.array, prod: Product) \
             -> Tuple[str, Optional[np.memmap]]:
