@@ -167,7 +167,7 @@ class SimpleWorkspace(BaseWorkspace):
             # specifically a lot of client code assumes that resource
             # == product == content and
             # that singular navigation (e.g. cell_size) is norm
-            assert (kind == Kind.VECTORS or
+            assert (kind in [Kind.VECTORS, Kind.POINTS] or
                     native_content.info[Info.CELL_WIDTH] is not None)  # FIXME DEBUG
             return frozendict(ChainMap(native_content.info, prod.info))
         # mapping semantics for database fields, as well as key-value fields;
