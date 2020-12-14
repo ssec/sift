@@ -80,6 +80,7 @@ class SimpleWorkspace(BaseWorkspace):
         cache_entry = self._available.get(c.uuid)
         return cache_entry or self._activate_content(c)
 
+    # FIXME: Use code from CachingWorkspace._remove_content_files_from_workspace?
     def _remove_content_data_from_cache_dir_checked(self,
                                                     c: Optional[Content] = None):
         if CLEANUP_FILE_CACHE:
@@ -94,7 +95,7 @@ class SimpleWorkspace(BaseWorkspace):
     # often-used queries
     #
 
-    def _product_with_uuid(self, session, uuid: UUID) -> Product:
+    def _product_with_uuid(self, session, uuid: UUID) -> Optional[Product]:
         return self.products.get(uuid, None)
 
     def _product_overview_content(self, session, prod: Product = None, uuid: UUID = None,
@@ -349,8 +350,8 @@ class SimpleWorkspace(BaseWorkspace):
         yield {TASK_DOING: 'purging memory', TASK_PROGRESS: 0.5}
         self._deactivate_content_for_product(self._product_with_uuid(None,
                                                                      uuid))
-        self.contents.pop(uuid)
-        self.products.pop(uuid)
+        self.contents.pop(uuid, None)
+        self.products.pop(uuid, None)
         yield {TASK_DOING: 'purging memory', TASK_PROGRESS: 1.0}
 
     def get_content(self, dsi_or_uuid, lod=None, kind: Kind = Kind.IMAGE) \
