@@ -43,8 +43,8 @@ class TimeManager:
                                        driving_layer_pfkey)
         self._time_transformer = TimeTransformer(policy)
 
-    def tick(self):
-        self._time_transformer.tick()
+    def tick(self, backwards=False):
+        self._time_transformer.tick(backwards=backwards)
         t_sim = self._time_transformer.t_sim
         self.update_collection_state(t_sim)
 
