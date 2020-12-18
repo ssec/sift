@@ -271,6 +271,9 @@ class Info(Enum):
     SHAPE = 'shape'  # (rows, columns) or (rows, columns, levels) data shape
     COLORMAP = 'colormap'  # name or UUID of a color map
 
+    # glyph (marker) or line styling
+    STYLE = 'style'  # name (or FUTURE: UUID?) of a SVG/HTML-like style
+
     SCHED_TIME = 'timeline'  # scheduled time for observation
     OBS_TIME = 'obstime'  # actual time for observation
     OBS_DURATION = 'obsduration'  # time from start of observation to end of observation
@@ -341,6 +344,7 @@ class Presentation(NamedTuple):
     visible: bool  # whether it's visible or not
     a_order: int  # None for non-animating, 0..n-1 what order to draw in during animation
     colormap: object  # name or uuid: color map to use; name for default, uuid for user-specified
+    style: object  # name or uuid: SVG/HTML style to use; name for default, (FUTURE?) uuid for user-specified
     climits: tuple  # valid min and valid max used for color mapping normalization
     gamma: float  # valid (0 to 5) for gamma correction (default should be 1.0)
     mixing: object  # mixing mode constant

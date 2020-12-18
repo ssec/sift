@@ -63,7 +63,8 @@ from uwsift.view.transform import PROJ4Transform
 from uwsift.view.visuals import (NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer,
                                  PrecomputedIsocurve, GammaImage, Vectors)
 from uwsift.model.time_manager import TimeManager
-
+from uwsift.workspace.utils.metadata_utils import (
+    map_point_style_to_marker_kwargs, get_point_style_by_name)
 
 LOG = logging.getLogger(__name__)
 DATA_DIR = get_package_data_dir()
@@ -1171,7 +1172,9 @@ class SceneGraphManager(QObject):
             pos = np.hsplit(content, np.array([2]))[0]
         else:
             pos = content
-        points = Markers(pos=pos, parent=self.main_map)
+
+        kwargs = map_point_style_to_marker_kwargs(get_point_style_by_name(p.style))
+        points = Markers(pos=pos, parent=self.main_map, **kwargs)
         points.transform *= STTransform(translate=(0., 0., 50.))
         points.name = str(uuid)
         self.image_elements[uuid] = points
