@@ -1,8 +1,8 @@
 data_reading:
   readers:
     - abi_l1b
+    - fci_l1_geoobs_lmk_nav_err
     - fci_l1c_fdhsi
-    - fci_l1_geoobs
     - seviri_l1b_hrit
   exclude_datasets:
     calibration:
