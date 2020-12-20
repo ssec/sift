@@ -1,6 +1,7 @@
 data_reading:
   readers:
     - abi_l1b
+    - fci_l1_cat_lmk_loc
     - fci_l1_geoobs_lmk_loc
     - fci_l1_geoobs_lmk_nav_err
     - fci_l1c_fdhsi
