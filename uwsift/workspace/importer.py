@@ -86,15 +86,22 @@ def _load_satpy_readers_cache(force_refresh=None):
         readers = available_readers(as_dict=True)
         # sort list of readers just in case we depend on this in the future
         readers = sorted(readers, key=lambda x: x['name'])
-        # filter out known python objects to simplify YAML serialization
-        for reader_info in readers:
-            reader_info.pop('reader')
+        readers = list(_sanitize_reader_info_for_yaml(readers))
         cache_contents = {
             'satpy_version': satpy_version,
             'readers': readers,
         }
         _save_satpy_readers_cache(cache_contents)
     return cache_contents['readers']
+
+
+def _sanitize_reader_info_for_yaml(readers):
+    # filter out known python objects to simplify YAML serialization
+    for reader_info in readers:
+        reader_info.pop('reader')
+        reader_info.pop('data_identification_keys', None)
+        reader_info['config_files'] = list(reader_info['config_files'])
+        yield reader_info
 
 
 def _save_satpy_readers_cache(cache_contents):
@@ -977,7 +984,8 @@ class SatpyImporter(aImporter):
 
         from uuid import uuid1
         scn = self.load_all_datasets()
-        for ds_id, ds in scn.datasets.items():
+        for ds_id in scn.keys():
+            ds = scn[ds_id]
             # don't recreate a Product for one we already have
             if ds_id in existing_ids:
                 yield existing_ids[ds_id]
