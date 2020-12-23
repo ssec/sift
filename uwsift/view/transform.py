@@ -559,6 +559,13 @@ adjlon_func = Function("""
     }
     """)
 
+# handle prime meridian shifts
+pm_func_str = """
+    float adjlon(float lon) {{
+        return lon + radians({pm});
+    }}
+"""
+
 pj_msfn = Function("""
     float pj_msfn(float sinphi, float cosphi, float es) {
         return (cosphi / sqrt (1. - es * sinphi * sinphi));
@@ -662,7 +669,11 @@ class PROJ4Transform(BaseTransform):
         proj_init = proj_funcs[0]
         proj_args = proj_init(proj_dict)
 
-        if proj_args.get('over'):
+        if 'pm' in proj_args:
+            # force to float
+            proj_args['pm'] = float(proj_args['pm'])
+            proj_args['over'] = 'lambda = adjlon(lambda);'
+        elif proj_args.get('over'):
             proj_args['over'] = ''
         else:
             proj_args['over'] = 'lambda = adjlon(lambda);'
@@ -693,7 +704,11 @@ class PROJ4Transform(BaseTransform):
             self._shader_map._add_dep(d)
             self._shader_imap._add_dep(d)
 
-        if proj_args['over']:
+        if 'pm' in proj_args:
+            pm_func = Function(pm_func_str.format(**proj_args))
+            self._shader_map._add_dep(pm_func)
+            self._shader_imap._add_dep(pm_func)
+        elif proj_args['over']:
             self._shader_map._add_dep(adjlon_func)
             self._shader_imap._add_dep(adjlon_func)
 
@@ -726,6 +741,10 @@ class PROJ4Transform(BaseTransform):
         d['proj4_str'] = proj_str
 
         # if they haven't provided a radius then they must have provided a datum or ellps
+        if 'R' in d:
+            # spheroid
+            d.setdefault('a', d['R'])
+            d.setdefault('b', d['R'])
         if 'a' not in d:
             if 'datum' not in d:
                 d.setdefault('ellps', d.setdefault('datum', 'WGS84'))

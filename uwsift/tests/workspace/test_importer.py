@@ -11,7 +11,7 @@ from datetime import datetime
 from satpy import DatasetID, Scene
 from pyresample.geometry import AreaDefinition
 from uwsift.workspace.importer import available_satpy_readers, SatpyImporter
-from uwsift.common import Info
+from uwsift.common import Info, Kind
 
 
 def test_available_satpy_readers_defaults():
@@ -121,3 +121,57 @@ def test_satpy_importer_basic(tmpdir, monkeypatch, mocker):
     assert len(products) == 1
     assert products[0].info[Info.CENTRAL_WAVELENGTH] == 2.0
     assert products[0].info[Info.STANDARD_NAME] == 'toa_bidirectional_reflectance'
+
+
+def test_satpy_importer_contour_0_360(tmpdir, monkeypatch, mocker):
+    """Test import of grib contour data using Satpy."""
+    db_sess = mocker.MagicMock()
+    attrs = {
+        'name': 'gh',
+        'level': 125,
+        'area': AreaDefinition(
+            'test', 'test', 'test',
+            {
+                'proj': 'eqc',
+                'lon_0': 0,
+                'pm': 180,
+                'R': 6371229,
+            }, 240, 120,
+            (-20015806.220738243, -10007903.110369122, 20015806.220738243, 10007903.110369122)
+        ),
+        'start_time': datetime(2018, 9, 10, 17, 0, 31, 100000),
+        'end_time': datetime(2018, 9, 10, 17, 11, 7, 800000),
+        'model_time': datetime(2018, 9, 10, 17, 11, 7, 800000),
+        'standard_name': 'geopotential_height',
+    }
+    data_arr = xr.DataArray(da.from_array(np.random.random((120, 240)).astype(np.float64), chunks='auto'),
+                            attrs=attrs)
+    scn = Scene()
+    scn['gh'] = data_arr
+    scn.load = mocker.MagicMock()  # don't do anything on load
+
+    imp = SatpyImporter(['/test/file.nc'], tmpdir, db_sess,
+                        scene=scn,
+                        reader='grib',
+                        dataset_ids=[DatasetID(name='gh', level=125)])
+    imp.merge_resources()
+    assert imp.num_products == 1
+    products = list(imp.merge_products())
+    assert len(products) == 1
+    assert products[0].info[Info.STANDARD_NAME] == 'geopotential_height'
+    assert products[0].info[Info.KIND] == Kind.CONTOUR
+
+    query_mock = mocker.MagicMock(name='query')
+    filter1_mock = mocker.MagicMock(name='filter1')
+    filter2_mock = mocker.MagicMock(name='filter2')
+    db_sess.query.return_value = query_mock
+    query_mock.filter.return_value = filter1_mock
+    filter1_mock.filter.return_value = filter2_mock
+    filter2_mock.all.return_value = products
+    import_gen = imp.begin_import_products()
+    content_progresses = list(import_gen)
+    # image and contour content
+    assert len(content_progresses) == 2
+    # make sure data was swapped to -180/180 space
+    assert (content_progresses[0].data[:, :120] == data_arr.data[:, 120:].astype(np.float32)).all()
+    assert (content_progresses[0].data[:, 120:] == data_arr.data[:, :120].astype(np.float32)).all()
