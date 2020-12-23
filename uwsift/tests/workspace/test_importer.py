@@ -8,7 +8,8 @@ import xarray as xr
 import numpy as np
 import dask.array as da
 from datetime import datetime
-from satpy import DatasetID, Scene
+from satpy import Scene
+from satpy.tests.utils import make_dataid
 from pyresample.geometry import AreaDefinition
 from uwsift.workspace.importer import available_satpy_readers, SatpyImporter
 from uwsift.common import Info, Kind
@@ -114,7 +115,7 @@ def test_satpy_importer_basic(tmpdir, monkeypatch, mocker):
     imp = SatpyImporter(['/test/file.nc'], tmpdir, db_sess,
                         scene=scn,
                         reader='abi_l1b',
-                        dataset_ids=[DatasetID(name='C01')])
+                        dataset_ids=[make_dataid(name='C01')])
     imp.merge_resources()
     assert imp.num_products == 1
     products = list(imp.merge_products())
@@ -153,7 +154,7 @@ def test_satpy_importer_contour_0_360(tmpdir, monkeypatch, mocker):
     imp = SatpyImporter(['/test/file.nc'], tmpdir, db_sess,
                         scene=scn,
                         reader='grib',
-                        dataset_ids=[DatasetID(name='gh', level=125)])
+                        dataset_ids=[make_dataid(name='gh', level=125)])
     imp.merge_resources()
     assert imp.num_products == 1
     products = list(imp.merge_products())
