@@ -47,9 +47,22 @@ DEFAULT_POINT_STYLE_UNKNOWN = "unknown"
 
 
 def get_default_point_style_name(layer_info: dict) -> str:
-    layer_identifying_name = layer_info[Info.STANDARD_NAME]
+    # FIXME actually to have this consistent with IMAGE layer default colormap
+    #  selection the name chosen should be layer_info[Info.STANDARD_NAME] only
+    #  as done by the Guidebook, but the STANDARD_NAME is not set for points
+    #  data (yet).
+    #  It needs to be clarified which approach is the right one - either making
+    #  sure the STANDARD_NAME is always set or implementing a common fallback
+    #  strategy.
+    layer_identifying_name = layer_info.get(Info.STANDARD_NAME, None)
     if not layer_identifying_name:
-        LOG.warning(f"Layer has no standard name."
+        layer_identifying_name = layer_info.get(Info.SHORT_NAME, None)
+    if not layer_identifying_name:
+        layer_identifying_name = layer_info.get(Info.LONG_NAME, None)
+    if not layer_identifying_name:
+        layer_identifying_name = layer_info.get("name", None)
+    if not layer_identifying_name:
+        LOG.warning(f"Layer has no name."
                     f" Cannot determine a default point style."
                     f" Layer info: {layer_info}")
         return DEFAULT_POINT_STYLE_UNKNOWN
