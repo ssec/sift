@@ -1263,6 +1263,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # comp layer is derived from multiple basic layers and has its own UUID
     didAddCompositeLayer = pyqtSignal(tuple, UUID, Presentation)
     didAddVectorsLayer = pyqtSignal(tuple, UUID, Presentation)
+    didAddPointsLayer = pyqtSignal(tuple, UUID, Presentation)
     # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
     didRemoveLayers = pyqtSignal(tuple, list, int, int)
     willPurgeLayer = pyqtSignal(UUID)  # UUID of the layer being removed
@@ -1522,13 +1523,16 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         assert (isinstance(cls, DocLayerStack))
         return cls
 
-    def _insert_layer_with_info(self, info: DocLayer, cmap=None, insert_before=0):
+    def _insert_layer_with_info(self, info: DocLayer, cmap=None, style=None,
+                                insert_before=0):
         """
         insert a layer into the presentations but do not signal
         :return: new Presentation tuple, new reordered indices tuple
         """
         if cmap is None:
             cmap = info.get(Info.COLORMAP)
+        if style is None:
+            style = info.get(Info.STYLE)
         gamma = 1.
         if isinstance(info, DocRGBLayer):
             gamma = (1.,) * 3
@@ -1543,6 +1547,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                          visible=True,
                          a_order=None,
                          colormap=cmap if family_prez is None else family_prez.colormap,
+                         style=style if family_prez is None else family_prez.style,
                          climits=info[Info.CLIM] if family_prez is None else family_prez.climits,
                          gamma=gamma if family_prez is None else family_prez.gamma,
                          mixing=Mixing.NORMAL)
@@ -1580,6 +1585,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         if dataset[Info.KIND] == Kind.VECTORS:
             self.didAddVectorsLayer.emit(reordered_indices, dataset.uuid, presentation)
+            self._add_layer_family(dataset)
+        elif dataset[Info.KIND] == Kind.POINTS:
+            self.didAddPointsLayer.emit(reordered_indices, dataset.uuid, presentation)
             self._add_layer_family(dataset)
         else:
             # signal updates from the document

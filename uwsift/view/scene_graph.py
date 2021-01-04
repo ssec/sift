@@ -63,7 +63,8 @@ from uwsift.view.transform import PROJ4Transform
 from uwsift.view.visuals import (NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer,
                                  PrecomputedIsocurve, GammaImage, Vectors)
 from uwsift.model.time_manager import TimeManager
-
+from uwsift.workspace.utils.metadata_utils import (
+    map_point_style_to_marker_kwargs, get_point_style_by_name)
 
 LOG = logging.getLogger(__name__)
 DATA_DIR = get_package_data_dir()
@@ -1154,6 +1155,32 @@ class SceneGraphManager(QObject):
         self.layer_set.add_layer(vectors)
         self.on_view_change(None)
 
+    def add_points_layer(self, new_order: tuple, uuid: UUID, p: Presentation):
+        layer = self.document[uuid]
+        if not layer.is_valid:
+            LOG.info('unable to add an invalid points layer, will try again later when layer changes')
+            return
+        content = self.workspace.get_content(uuid, kind=p.kind)
+        if content is None:
+            LOG.info('layer contains no points: {}'.format(uuid))
+            return
+        if not (content.ndim == 2 and content.shape[1] in (2, 3)):
+            # Try to accept data which is not actually a list of points but may
+            # be a list of tuples of points by shaving off everything but the
+            # first item of each entry.
+            # See vispy.MarkersVisual.set_data() regarding the check criterion.
+            pos = np.hsplit(content, np.array([2]))[0]
+        else:
+            pos = content
+
+        kwargs = map_point_style_to_marker_kwargs(get_point_style_by_name(p.style))
+        points = Markers(pos=pos, parent=self.main_map, **kwargs)
+        points.transform *= STTransform(translate=(0., 0., 50.))
+        points.name = str(uuid)
+        self.image_elements[uuid] = points
+        self.layer_set.add_layer(points)
+        self.on_view_change(None)
+
     def change_composite_layers(self, new_order: tuple, uuid_list: list, presentations: list):
         for uuid, presentation in zip(uuid_list, presentations):
             self.change_composite_layer(None, uuid, presentation)
@@ -1250,6 +1277,7 @@ class SceneGraphManager(QObject):
         document.didAddCompositeLayer.connect(
             self.add_composite_layer)  # layer derived from other layers (either basic or composite themselves)
         document.didAddVectorsLayer.connect(self.add_vectors_layer)
+        document.didAddPointsLayer.connect(self.add_points_layer)
         document.didRemoveLayers.connect(self._remove_layer)  # layer removed from current layer set
         document.willPurgeLayer.connect(self._purge_layer)  # layer removed from document
         document.didSwitchLayerSet.connect(self.rebuild_new_layer_set)

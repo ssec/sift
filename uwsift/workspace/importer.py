@@ -32,7 +32,7 @@ from uwsift.satpy_compat import DataID, get_id_value, get_id_items
 from uwsift.util import USER_CACHE_DIR
 from uwsift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
 from .metadatabase import Resource, Product, Content
-from .utils.metadata_utils import get_default_colormap
+from .utils import metadata_utils
 
 _SATPY_READERS = None  # cache: see `available_satpy_readers()` below
 SATPY_READER_CACHE_FILE = os.path.join(USER_CACHE_DIR,
@@ -240,7 +240,8 @@ def generate_guidebook_metadata(layer_info) -> Mapping:
     layer_info.update(gbinfo)  # FUTURE: should guidebook be integrated into DocBasicLayer?
 
     # add as visible to the front of the current set, and invisible to the rest of the available sets
-    layer_info[Info.COLORMAP] = get_default_colormap(layer_info, guidebook)
+    layer_info[Info.COLORMAP] = metadata_utils.get_default_colormap(layer_info, guidebook)
+    layer_info[Info.STYLE] = metadata_utils.get_default_point_style_name(layer_info)
     layer_info[Info.CLIM] = guidebook.climits(layer_info)
     layer_info[Info.VALID_RANGE] = guidebook.valid_range(layer_info)
     if Info.DISPLAY_TIME not in layer_info:
@@ -1097,13 +1098,18 @@ class SatpyImporter(aImporter):
                 duration = timedelta(minutes=60)
             ds.attrs[Info.OBS_DURATION] = duration
 
-            # Handle GRIB platform/instrument
-            if self.reader == 'grib':
-                ds.attrs[Info.KIND] = Kind.CONTOUR
-            elif self.reader == 'fci_l1_geoobs':
-                ds.attrs[Info.KIND] = Kind.VECTORS
+            reader_kind = config.get(f"data_reading.{self.reader}.kind", None)
+            if reader_kind:
+                try:
+                    ds.attrs[Info.KIND] = Kind[reader_kind]
+                except KeyError:
+                    raise KeyError(f"Unknown data kind '{reader_kind}'"
+                                   f" configured for reader {self.reader}.")
             else:
+                LOG.info(f"No data kind configured for reader '{self.reader}'."
+                         f" Falling back to 'IMAGE'.")
                 ds.attrs[Info.KIND] = Kind.IMAGE
+
             self._get_platform_instrument(ds.attrs)
             ds.attrs.setdefault(Info.STANDARD_NAME, ds.attrs.get('standard_name'))
             if 'wavelength' in ds.attrs:
@@ -1201,7 +1207,17 @@ class SatpyImporter(aImporter):
         for idx, (prod, ds_id) in enumerate(zip(products, dataset_ids)):
             dataset = self.scn[ds_id]
             shape = dataset.shape
-            num_contents = 1 if prod.info[Info.KIND] == Kind.IMAGE else 2
+            kind = prod.info[Info.KIND]
+            # TODO (Alexander Rettig): Review this, best with David Hoese:
+            #  The line (exactly speaking, code equivalent to it) was
+            #  introduced in commit bba8d73f but looked very suspicious - it
+            #  seems to assume, that the only kinds here could be IMAGE or
+            #  CONTOUR:
+            #     num_contents = 1 if kind == Kind.IMAGE else 2
+            #  Assuming that num_contents == 2 is the right setting only for
+            #  kind == Kind.CONTOUR, the following implementation is supposed to
+            #  do better:
+            num_contents = 2 if kind == Kind.CONTOUR else 1
 
             if prod.content:
                 LOG.warning('content was already available, skipping import')
@@ -1209,8 +1225,9 @@ class SatpyImporter(aImporter):
 
             now = datetime.utcnow()
 
-            if prod.info[Info.KIND] == Kind.VECTORS:
-                data_filename, lms_data = self.create_vectors_file_cache_data(dataset.data, prod, shape)
+            if prod.info[Info.KIND] in [Kind.VECTORS, Kind.POINTS]:
+                data_filename, data_memmap = \
+                    self._create_data_memmap_file(dataset.data, prod)
                 content = Content(
                     lod=0,
                     atime=now,
@@ -1222,7 +1239,7 @@ class SatpyImporter(aImporter):
                     cols=shape[1],
                     dtype=dataset.dtype,
                 )
-                content.info[Info.KIND] = Kind.VECTORS
+                content.info[Info.KIND] = kind
                 prod.content.append(content)
                 self.add_content_to_cache(content)
 
@@ -1231,9 +1248,9 @@ class SatpyImporter(aImporter):
                                       stages=num_stages,
                                       current_stage=idx,
                                       completion=completion,
-                                      stage_desc="SatPy vectors data add to workspace",
+                                      stage_desc=f"SatPy {kind.name} data add to workspace",
                                       dataset_info=None,
-                                      data=lms_data,
+                                      data=data_memmap,
                                       content=content)
                 continue
 
@@ -1262,10 +1279,7 @@ class SatpyImporter(aImporter):
                 shape = data.shape
                 origin_x -= am_index * cell_width
 
-            # FIXME: UNDERSTAND WHAT'S GOING ON HERE. WAS THIS REFACTORING?
-            data_filename, img_data = self.create_image_file_cache_data(data,
-                                                                        prod,
-                                                                        shape)
+            data_filename, img_data = self._create_data_memmap_file(data, prod)
 
             c = Content(
                 lod=0,
@@ -1301,7 +1315,7 @@ class SatpyImporter(aImporter):
                                   stages=num_stages,
                                   current_stage=idx,
                                   completion=1. / num_contents,
-                                  stage_desc="SatPy image data add to workspace",
+                                  stage_desc="SatPy IMAGE data add to workspace",
                                   dataset_info=None,
                                   data=img_data,
                                   content=c)
@@ -1359,7 +1373,7 @@ class SatpyImporter(aImporter):
                                   stages=num_stages,
                                   current_stage=idx,
                                   completion=completion,
-                                  stage_desc="SatPy contour data add to workspace",
+                                  stage_desc="SatPy CONTOUR data add to workspace",
                                   dataset_info=None,
                                   data=img_data,
                                   content=c)
@@ -1381,38 +1395,27 @@ class SatpyImporter(aImporter):
             self._S.add(c)
             self._S.commit()
 
-    def create_image_file_cache_data(self, data: da.array, prod: Product,
-                                     shape: tuple) -> Tuple[str, np.memmap]:
+    def _create_data_memmap_file(self, data: da.array, prod: Product) \
+            -> Tuple[str, Optional[np.memmap]]:
         """
-        Creating a file in the current work directory for saving data in
-        '.image' files
+        Create *binary* file in the current working directory to cache `data`
+        as numpy memmap. The filename extension of the file is derived from the
+        kind of the given `prod`.
         """
         # shovel that data into the memmap incrementally
 
-        data_filename: str = '{}.image'.format(prod.uuid)
-        data_path: str = os.path.join(self._cwd, data_filename)
-        img_data: np.memmap = np.memmap(data_path, dtype=np.float32,
-                                        shape=shape, mode='w+')
-        da.store(data, img_data)
+        kind = prod.info[Info.KIND]
+        data_filename = '{}.{}'.format(prod.uuid, kind.name.lower())
+        data_path = os.path.join(self._cwd, data_filename)
+        if data is None or data.size == 0:
+            # For empty data memmap is not possible
+            return data_filename, None
 
-        return data_filename, img_data
+        data_memmap = np.memmap(data_path, dtype=data.dtype, shape=data.shape,
+                                mode='w+')
+        da.store(data, data_memmap)
 
-    def create_vectors_file_cache_data(self, data: da.array, prod: Product,
-                                       shape: tuple) \
-            -> Tuple[str, Optional[np.memmap]]:
-        """
-        Creating a file in the current work directory for saving data in
-        '.vectors' files
-        """
-        data_filename: str = '{}.vectors'.format(prod.uuid)
-        data_path: str = os.path.join(self._cwd, data_filename)
-        if data.size > 0:
-            lms_data = np.memmap(data_path, dtype=np.float64,
-                                 shape=shape, mode='w+')
-            da.store(data, lms_data)
-        else:
-            lms_data = None
-        return data_filename, lms_data
+        return data_filename, data_memmap
 
     def _get_verts_and_connect(self, paths):
         """ retrieve vertices and connects from given paths-list
