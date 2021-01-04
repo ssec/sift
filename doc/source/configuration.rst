@@ -23,6 +23,7 @@ configurations have a look here: https://donfig.readthedocs.io/en/latest/.
    Catalogue and Auto Update Mode <configuration-catalogue-auto_update_mode.rst>
    Watchdog <configuration-watchdog.rst>
    Default Colormaps <configuration-default_colormaps.rst>
+   Points Styles <configuration-points_styles.rst>
    Display <configuration-display.rst>
    External Satpy <configuration-external_satpy.rst>
    Latlon Grid Resolution <configuration-latlon-grid-resolution.rst>
