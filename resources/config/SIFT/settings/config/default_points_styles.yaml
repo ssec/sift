@@ -31,3 +31,5 @@ default_point_styles:
   observed_lmk_locations_vis_09: 'red_x'
   observed_lmk_locations_wv_63: 'red_x'
   observed_lmk_locations_wv_73: 'red_x'
+
+  catalogue_landmarks_locations: 'red_empty_square'
