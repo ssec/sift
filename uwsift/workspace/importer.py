@@ -1227,7 +1227,8 @@ class SatpyImporter(aImporter):
 
             if prod.info[Info.KIND] in [Kind.VECTORS, Kind.POINTS]:
                 data_filename, data_memmap = \
-                    self._create_data_memmap_file(dataset.data, prod)
+                    self._create_data_memmap_file(dataset.data, dataset.dtype,
+                                                  prod)
                 content = Content(
                     lod=0,
                     atime=now,
@@ -1279,7 +1280,14 @@ class SatpyImporter(aImporter):
                 shape = data.shape
                 origin_x -= am_index * cell_width
 
-            data_filename, img_data = self._create_data_memmap_file(data, prod)
+            # For kind IMAGE the dtype must be float32 seemingly, see class
+            # Column, comment for 'dtype' and the construction of c = Content
+            # just below.
+            # FIXME: It is dubious to enforce that type conversion to happen in
+            #  _create_data_memmap_file, but otherwise IMAGES of pixel counts
+            #  data (dtype = np.uint16) crash.
+            data_filename, img_data = \
+                self._create_data_memmap_file(data, np.float32, prod)
 
             c = Content(
                 lod=0,
@@ -1395,12 +1403,15 @@ class SatpyImporter(aImporter):
             self._S.add(c)
             self._S.commit()
 
-    def _create_data_memmap_file(self, data: da.array, prod: Product) \
+    def _create_data_memmap_file(self, data: da.array, dtype, prod: Product) \
             -> Tuple[str, Optional[np.memmap]]:
         """
         Create *binary* file in the current working directory to cache `data`
         as numpy memmap. The filename extension of the file is derived from the
         kind of the given `prod`.
+
+        'dtype' must be given explicitly because it is not necessarily
+        ``dtype == data.dtype`` (caller decides).
         """
         # shovel that data into the memmap incrementally
 
@@ -1411,7 +1422,7 @@ class SatpyImporter(aImporter):
             # For empty data memmap is not possible
             return data_filename, None
 
-        data_memmap = np.memmap(data_path, dtype=data.dtype, shape=data.shape,
+        data_memmap = np.memmap(data_path, dtype=dtype, shape=data.shape,
                                 mode='w+')
         da.store(data, data_memmap)
 
