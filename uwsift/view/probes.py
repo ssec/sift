@@ -562,19 +562,23 @@ class ProbeGraphDisplay(object):
         # should be be plotting vs Y?
         doPlotVS = self.yCheckBox.isChecked()
         task_name = "%s_%s_region_plotting" % (self.xSelectedUUID, self.ySelectedUUID)
+        task_description = "Creating plot for full data" if self.full_data_selection else \
+            "Creating plot for region probe data"
         self.queue.add(task_name,
                        self._rebuild_plot_task(self.xSelectedUUID, self.ySelectedUUID, self.polygon, self.point,
                                                plot_versus=doPlotVS, plot_full_data=self.full_data_selection),
-                       "Creating plot for region probe data",
+                       task_description,
                        interactive=True)
         # Assume that the task gets resolved otherwise we might try to draw multiple times
         self._stale = False
 
     def _rebuild_plot_task(self, x_uuid, y_uuid, polygon, point_xy, plot_versus=False, plot_full_data=True):
 
+        data_source_description = "full data" if plot_full_data \
+            else "polygon data"
         # if we are plotting only x and we have a selected x and a polygon
         if not plot_versus and x_uuid is not None and (polygon is not None or plot_full_data):
-            yield {TASK_DOING: 'Probe Plot: Collecting polygon data...', TASK_PROGRESS: 0.0}
+            yield {TASK_DOING: f'Probe Plot: Collecting {data_source_description}...', TASK_PROGRESS: 0.0}
 
             # get the data and info we need for this plot
             if plot_full_data:
@@ -598,7 +602,7 @@ class ProbeGraphDisplay(object):
 
         # if we are plotting x vs y and have x, y, and a polygon
         elif plot_versus and x_uuid is not None and y_uuid is not None and (polygon is not None or plot_full_data):
-            yield {TASK_DOING: 'Probe Plot: Collecting polygon data (layer 1)...', TASK_PROGRESS: 0.0}
+            yield {TASK_DOING: f'Probe Plot: Collecting {data_source_description} (layer 1)...', TASK_PROGRESS: 0.0}
 
             # get the data and info we need for this plot
             x_info = self.document[x_uuid]
@@ -618,7 +622,7 @@ class ProbeGraphDisplay(object):
             x_conv_func = x_info[Info.UNIT_CONVERSION][1]
             y_conv_func = y_info[Info.UNIT_CONVERSION][1]
             hires_data = hires_conv_func(hires_data)
-            yield {TASK_DOING: 'Probe Plot: Collecting polygon data (layer 2)...', TASK_PROGRESS: 0.15}
+            yield {TASK_DOING: f'Probe Plot: Collecting {data_source_description} (layer 2)...', TASK_PROGRESS: 0.15}
             if hires_uuid == x_uuid:
                 # the hires data was from the X UUID
                 data1 = hires_data
