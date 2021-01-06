@@ -168,9 +168,11 @@ class ProbeGraphManager(QObject):
             graph.set_default_layer_selections(current_graph.xSelectedUUID, current_graph.ySelectedUUID)
             # give it a copy of the current full_data_selection or polygon
             if current_graph.full_data_selection:
-                graph.setFullDataSelection(graph.full_data_selection)
+                graph.setRegion(select_full_data=graph.full_data_selection)
             else:
-                graph.setPolygon(current_graph.polygon[:] if current_graph.polygon is not None else None)
+                graph.setRegion(
+                    polygon_points=current_graph.polygon[:] if
+                    current_graph.polygon is not None else None)
             graph.checked = current_graph.checked
             point_status, point_xy = self.point_probes.get(DEFAULT_POINT_PROBE, (None, None))
             point_xy = point_xy if point_status else None
@@ -192,24 +194,20 @@ class ProbeGraphManager(QObject):
             doRebuild = graphObj is self.graphs[self.selected_graph_index]
             graphObj.set_possible_layers(uuid_list, do_rebuild_plot=doRebuild)  # FIXME
 
-    def currentPolygonChanged(self, polygonPoints):
-        """Update the current polygon in the selected graph and rebuild its plot
+    def current_graph_set_region(self, polygon_points=None, select_full_data=False):
+        """Update the current region in the selected graph and rebuild its plot
 
+        :return: Name of the current probe graph ('A', 'B', ...)
+
+        Probably outdated comment (TODO):
         FUTURE, once the polygon is a layer, this signal will be unnecessary
         """
 
-        return self.graphs[self.selected_graph_index].setPolygon(polygonPoints)
+        return self.graphs[self.selected_graph_index].setRegion(
+            polygon_points=polygon_points, select_full_data=select_full_data)
 
-    def isFullDataSelectionEnabled(self) -> bool:
-        return self.graphs[self.selected_graph_index].full_data_selection
-
-    def currentFullDataSelectionChanged(self, enabled: bool):
-        """Enable or disable the full data selection in the current graph and
-         rebuild its plot.
-
-         :return: Name of the current probe graph ('A', 'B', ...)
-         """
-        return self.graphs[self.selected_graph_index].setFullDataSelection(enabled)
+    def current_graph_has_polygon(self) -> bool:
+        return self.graphs[self.selected_graph_index].polygon is not None
 
     def update_point_probe(self, probe_name, xy_pos=None, state=None):
         if xy_pos is None and state is None:
@@ -519,10 +517,20 @@ class ProbeGraphDisplay(object):
         self._stale = True
         self.rebuildPlot()
 
-    def setPolygon(self, polygonPoints):
-        """Set the polygon selection for this graph."""
+    def setRegion(self, polygon_points=None, select_full_data=False):
+        """Set the region for this graph as polygon selection or full data."""
 
-        self.polygon = polygonPoints
+        assert polygon_points is None or not select_full_data, (
+            "Must not give both 'polygon_points' and True for 'select_full_data':"
+            " Defining region by polygon and as full data are mutually exclusive.")
+
+        # Even with assertions switched off we will get a valid state here: a
+        # polygonal region wins over the full data selection: the first one will
+        # have a visual echo, the second one not, so this is more likely to give
+        # a consistent state.
+        self.polygon = polygon_points
+        self.full_data_selection = \
+            False if self.polygon is not None else select_full_data
 
         # regenerate the plot
         self._stale = True
@@ -537,15 +545,6 @@ class ProbeGraphDisplay(object):
         # sometimes we set the point to be redrawn later
         if rebuild:
             self.rebuildPlot()
-
-    def setFullDataSelection(self, enabled: bool):
-        """Set the full data as selection for this graph."""
-        self.full_data_selection = enabled
-        self._stale = True
-        self.rebuildPlot()
-
-        # return our name for notifications
-        return self.myName
 
     def getName(self):
         """Accessor method for the graph's name."""

@@ -937,8 +937,9 @@ class Main(QtGui.QMainWindow):
             # new tabs should clone the information from the currently selected tab
             # the call below will check if this is a new polygon
             self.graphManager.set_default_layer_selections(*top_uuids)
+
             # update our current plot with the new polygon
-            polygon_name = self.graphManager.currentPolygonChanged(polygonPoints=points)
+            polygon_name = self.graphManager.current_graph_set_region(polygon_points=points)
 
             # do whatever other updates the scene manager needs
             self.scene_manager.on_new_polygon(polygon_name, points)
@@ -957,14 +958,34 @@ class Main(QtGui.QMainWindow):
         self.ui.regionSelectButton.toggled.connect(partial(self.change_tool, name=Tool.REGION_PROBE))
         self.change_tool(True)
 
-        # self.graphManager isn't initialized yet so we use this wrapper
-        # function to lazily access the function
-        def select_full_data():
-            self.graphManager.currentFullDataSelectionChanged(True)
+        def update_full_data_selection():
+            # TODO: this slot implementation should be revised, parts of it
+            #  should be merged into method provided by SceneManager, then
+            #  called from here and in remove_region_polygon() and
+            #  update_probe_polygon()
+
+            # Reset graph X layer and Y layer to the two top visible layers,
+            # see update_probe_polygon(), copied from there
+            top_uuids = list(self.document.current_visible_layer_uuids)
+            LOG.debug("top visible UUID is {0!r:s}".format(top_uuids))
+            # TODO, when the plots manage their own layer selection, change this
+            #  call (see update_probe_polygon())
+            self.graphManager.set_default_layer_selections(*top_uuids)
+
+            must_remove_polygon = self.graphManager.current_graph_has_polygon()
+            current_graph_name = self.graphManager.current_graph_set_region(select_full_data=True)
+            if must_remove_polygon:
+                self.scene_manager.remove_polygon(current_graph_name)
+
+            if self.scene_manager._current_tool == Tool.REGION_PROBE:
+                self.ui.panZoomToolButton.click()
+
+            if self.scene_manager.has_pending_polygon():
+                self.scene_manager.clear_pending_polygon()
 
         menu = QtWidgets.QMenu(parent=self)
         select_full_data_action = QtWidgets.QAction("Select Full Data", parent=menu)
-        select_full_data_action.triggered.connect(select_full_data)
+        select_full_data_action.triggered.connect(update_full_data_selection)
         menu.addAction(select_full_data_action)
         self.ui.regionSelectButton.setMenu(menu)
 
@@ -1134,16 +1155,19 @@ class Main(QtGui.QMainWindow):
             LOG.debug("Wizard closed, nothing to load")
         self._wizard_dialog = None
 
-    def remove_region_polygon_or_full_data_selection(self, action: QtGui.QAction = None, *args):
+    def remove_region_polygon(self, action: QtGui.QAction = None, *args):
+        if self.scene_manager._current_tool == Tool.REGION_PROBE:
+            self.ui.panZoomToolButton.click()
+
         if self.scene_manager.has_pending_polygon():
             self.scene_manager.clear_pending_polygon()
             return
 
-        if self.graphManager.isFullDataSelectionEnabled():
-            self.graphManager.currentFullDataSelectionChanged(False)
-        else:
+        must_remove_polygon = self.graphManager.current_graph_has_polygon()
+        removed_name = self.graphManager.current_graph_set_region(None)
+
+        if must_remove_polygon:
             # Remove the polygon from other locations
-            removed_name = self.graphManager.currentPolygonChanged(None)
             LOG.info("Clearing polygon with name '%s'", removed_name)
             self.scene_manager.remove_polygon(removed_name)
 
@@ -1249,7 +1273,7 @@ class Main(QtGui.QMainWindow):
 
         clear = QtWidgets.QAction("Clear Region Selection", self)
         clear.setShortcut(QtCore.Qt.Key_Escape)
-        clear.triggered.connect(self.remove_region_polygon_or_full_data_selection)
+        clear.triggered.connect(self.remove_region_polygon)
 
         composite = QtWidgets.QAction("Create Composite", self)
         composite.setShortcut('C')
