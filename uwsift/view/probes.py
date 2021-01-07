@@ -166,8 +166,13 @@ class ProbeGraphManager(QObject):
             # if we aren't setting up the initial tab, clone the current tab
             current_graph = self.graphs[self.selected_graph_index]
             graph.set_default_layer_selections(current_graph.xSelectedUUID, current_graph.ySelectedUUID)
-            # give it a copy of the current polygon
-            graph.setPolygon(current_graph.polygon[:] if current_graph.polygon is not None else None)
+            # give it a copy of the current full_data_selection or polygon
+            if current_graph.full_data_selection:
+                graph.setRegion(select_full_data=graph.full_data_selection)
+            else:
+                graph.setRegion(
+                    polygon_points=current_graph.polygon[:] if
+                    current_graph.polygon is not None else None)
             graph.checked = current_graph.checked
             point_status, point_xy = self.point_probes.get(DEFAULT_POINT_PROBE, (None, None))
             point_xy = point_xy if point_status else None
@@ -189,13 +194,20 @@ class ProbeGraphManager(QObject):
             doRebuild = graphObj is self.graphs[self.selected_graph_index]
             graphObj.set_possible_layers(uuid_list, do_rebuild_plot=doRebuild)  # FIXME
 
-    def currentPolygonChanged(self, polygonPoints):
-        """Update the current polygon in the selected graph and rebuild it's plot
+    def current_graph_set_region(self, polygon_points=None, select_full_data=False):
+        """Update the current region in the selected graph and rebuild its plot
 
+        :return: Name of the current probe graph ('A', 'B', ...)
+
+        Probably outdated comment (TODO):
         FUTURE, once the polygon is a layer, this signal will be unnecessary
         """
 
-        return self.graphs[self.selected_graph_index].setPolygon(polygonPoints)
+        return self.graphs[self.selected_graph_index].setRegion(
+            polygon_points=polygon_points, select_full_data=select_full_data)
+
+    def current_graph_has_polygon(self) -> bool:
+        return self.graphs[self.selected_graph_index].polygon is not None
 
     def update_point_probe(self, probe_name, xy_pos=None, state=None):
         if xy_pos is None and state is None:
@@ -315,6 +327,7 @@ class ProbeGraphDisplay(object):
     # internal objects to reference for info and data
     polygon = None
     point = None
+    full_data_selection = False
     manager = None
     workspace = None
     queue = None
@@ -504,10 +517,20 @@ class ProbeGraphDisplay(object):
         self._stale = True
         self.rebuildPlot()
 
-    def setPolygon(self, polygonPoints):
-        """Set the polygon selection for this graph."""
+    def setRegion(self, polygon_points=None, select_full_data=False):
+        """Set the region for this graph as polygon selection or full data."""
 
-        self.polygon = polygonPoints
+        assert polygon_points is None or not select_full_data, (
+            "Must not give both 'polygon_points' and True for 'select_full_data':"
+            " Defining region by polygon and as full data are mutually exclusive.")
+
+        # Even with assertions switched off we will get a valid state here: a
+        # polygonal region wins over the full data selection: the first one will
+        # have a visual echo, the second one not, so this is more likely to give
+        # a consistent state.
+        self.polygon = polygon_points
+        self.full_data_selection = \
+            False if self.polygon is not None else select_full_data
 
         # regenerate the plot
         self._stale = True
@@ -539,21 +562,29 @@ class ProbeGraphDisplay(object):
         # should be be plotting vs Y?
         doPlotVS = self.yCheckBox.isChecked()
         task_name = "%s_%s_region_plotting" % (self.xSelectedUUID, self.ySelectedUUID)
+        task_description = "Creating plot for full data" if self.full_data_selection else \
+            "Creating plot for region probe data"
         self.queue.add(task_name,
                        self._rebuild_plot_task(self.xSelectedUUID, self.ySelectedUUID, self.polygon, self.point,
-                                               plot_versus=doPlotVS), "Creating plot for region probe data",
+                                               plot_versus=doPlotVS, plot_full_data=self.full_data_selection),
+                       task_description,
                        interactive=True)
         # Assume that the task gets resolved otherwise we might try to draw multiple times
         self._stale = False
 
-    def _rebuild_plot_task(self, x_uuid, y_uuid, polygon, point_xy, plot_versus=False):
+    def _rebuild_plot_task(self, x_uuid, y_uuid, polygon, point_xy, plot_versus=False, plot_full_data=True):
 
+        data_source_description = "full data" if plot_full_data \
+            else "polygon data"
         # if we are plotting only x and we have a selected x and a polygon
-        if not plot_versus and x_uuid is not None and polygon is not None:
-            yield {TASK_DOING: 'Probe Plot: Collecting polygon data...', TASK_PROGRESS: 0.0}
+        if not plot_versus and x_uuid is not None and (polygon is not None or plot_full_data):
+            yield {TASK_DOING: f'Probe Plot: Collecting {data_source_description}...', TASK_PROGRESS: 0.0}
 
             # get the data and info we need for this plot
-            data_polygon = self.workspace.get_content_polygon(x_uuid, polygon)
+            if plot_full_data:
+                data_polygon = self.workspace.get_content(x_uuid)
+            else:
+                data_polygon = self.workspace.get_content_polygon(x_uuid, polygon)
             unit_info = self.document[x_uuid][Info.UNIT_CONVERSION]
             data_polygon = unit_info[1](data_polygon)
             title = self.document[x_uuid][Info.DISPLAY_NAME]
@@ -570,8 +601,8 @@ class ProbeGraphDisplay(object):
             self.plotHistogram(data_polygon, title, x_point)
 
         # if we are plotting x vs y and have x, y, and a polygon
-        elif plot_versus and x_uuid is not None and y_uuid is not None and polygon is not None:
-            yield {TASK_DOING: 'Probe Plot: Collecting polygon data (layer 1)...', TASK_PROGRESS: 0.0}
+        elif plot_versus and x_uuid is not None and y_uuid is not None and (polygon is not None or plot_full_data):
+            yield {TASK_DOING: f'Probe Plot: Collecting {data_source_description} (layer 1)...', TASK_PROGRESS: 0.0}
 
             # get the data and info we need for this plot
             x_info = self.document[x_uuid]
@@ -582,21 +613,31 @@ class ProbeGraphDisplay(object):
             # hires_coord_mask are the lat/lon coordinates of each of the
             # pixels in hires_data. The coordinates are (lat, lon) to resemble
             # the (Y, X) indexing of numpy arrays
-            hires_coord_mask, hires_data = self.workspace.get_coordinate_mask_polygon(hires_uuid, polygon)
+            if plot_full_data:
+                hires_coord_mask = None
+                hires_data = self.workspace.get_content(hires_uuid)
+            else:
+                hires_coord_mask, hires_data = self.workspace.get_coordinate_mask_polygon(hires_uuid, polygon)
             hires_conv_func = self.document[hires_uuid][Info.UNIT_CONVERSION][1]
             x_conv_func = x_info[Info.UNIT_CONVERSION][1]
             y_conv_func = y_info[Info.UNIT_CONVERSION][1]
             hires_data = hires_conv_func(hires_data)
-            yield {TASK_DOING: 'Probe Plot: Collecting polygon data (layer 2)...', TASK_PROGRESS: 0.15}
+            yield {TASK_DOING: f'Probe Plot: Collecting {data_source_description} (layer 2)...', TASK_PROGRESS: 0.15}
             if hires_uuid == x_uuid:
                 # the hires data was from the X UUID
                 data1 = hires_data
-                data2 = self.workspace.get_content_coordinate_mask(y_uuid, hires_coord_mask)
+                if plot_full_data:
+                    data2 = self.workspace.get_content(y_uuid)
+                else:
+                    data2 = self.workspace.get_content_coordinate_mask(y_uuid, hires_coord_mask)
                 data2 = y_conv_func(data2)
             else:
                 # the hires data was from the Y UUID
                 data2 = hires_data
-                data1 = self.workspace.get_content_coordinate_mask(x_uuid, hires_coord_mask)
+                if plot_full_data:
+                    data1 = self.workspace.get_content(x_uuid)
+                else:
+                    data1 = self.workspace.get_content_coordinate_mask(x_uuid, hires_coord_mask)
                 data1 = x_conv_func(data1)
             yield {TASK_DOING: 'Probe Plot: Creating scatter plot...', TASK_PROGRESS: 0.25}
 
@@ -709,7 +750,7 @@ class ProbeGraphDisplay(object):
     def clearPlot(self):
         """Clear our plot
         """
-
+        self.full_data_selection = False
         self.figure.clf()
 
     def _draw_xy_line(self, axes):
