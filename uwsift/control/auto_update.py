@@ -8,6 +8,7 @@ from vispy import app
 from uwsift import config
 from uwsift.common import Presentation
 from uwsift.model.catalogue import Catalogue
+from uwsift.queue import TheQueue, TASK_DOING, TASK_PROGRESS
 
 LOG = logging.getLogger(__name__)
 
@@ -76,10 +77,13 @@ class AutoUpdateManager:
         # connect to didAddBasicLayer --> signal starts timer anew when loading is done
         self._window.document.didAddBasicLayer.connect(self.on_loading_done)
 
+        def update_in_background(event):
+            TheQueue.add("auto update", self.update(), None)
+
         # Set up auto update mode timer, with minimum waiting time between update cycles.
         # Minimum is exceeded if data loading time exceeds minimum_wait time.
         # Timer is paused until end of data loading to account for this.
-        self.timer = app.Timer(minimum_interval, connect=self.update)
+        self.timer = app.Timer(minimum_interval, connect=update_in_background)
         self.timer.start()
 
         self._auto_update_policy = StartTimeGranuleUpdatePolicy(
@@ -116,10 +120,11 @@ class AutoUpdateManager:
         self._old_uuids = []
         self.timer.start()
 
-    def update(self, event):
+    def update(self):
         """
         Called by self.timer's tick
         """
+        yield {TASK_DOING: 'Run auto update', TASK_PROGRESS: 0.0}
         # remove all but the "newest" (with respect to 'start_time') scene from
         # importer_kwargs and according reader entries in readers_to_use
         readers_importer_tup = self._auto_update_policy.update(self.filter)
@@ -131,4 +136,4 @@ class AutoUpdateManager:
             # loaded or still loading data
             self.timer.stop()
             self._window.open_paths(files_to_load, **importer_kwargs)
-
+        yield {TASK_DOING: 'Auto update finished', TASK_PROGRESS: 1.0}
