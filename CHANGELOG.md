@@ -1,3 +1,21 @@
+## Version 1.1.4 (2021/01/07)
+
+### Issues Closed
+
+* [Issue 297](https://github.com/ssec/sift/issues/297) - SIFT 1.1.3 windows experimental builds do not start ([PR 302](https://github.com/ssec/sift/pull/302))
+
+In this release 1 issue was closed.
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 307](https://github.com/ssec/sift/pull/307) - Fix issues related with newer versions of Satpy and Pyyaml
+* [PR 301](https://github.com/ssec/sift/pull/301) - Add support for Satpy 0.23+ and PROJ 6.0+
+
+In this release 2 pull requests were closed.
+
+
 ## Version 1.1.3 (2020/06/12)
 
 ### Pull Requests Merged
