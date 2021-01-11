@@ -1,3 +1,16 @@
+## Version 1.1.5 (2021/01/11)
+
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 310](https://github.com/ssec/sift/pull/310) - Replace / with \\ throughout Prefix where present in qt.conf, to fix …
+* [PR 309](https://github.com/ssec/sift/pull/309) - Fix importing data with newer versions of Satpy
+
+In this release 2 pull requests were closed.
+
+
 ## Version 1.1.4 (2021/01/07)
 
 ### Issues Closed
