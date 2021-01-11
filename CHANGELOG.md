@@ -1,5 +1,15 @@
-## Version 1.1.5 (2021/01/11)
+## Version 1.1.6 (2021/01/11)
 
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 311](https://github.com/ssec/sift/pull/311) - Retain forward slash before Libary in prefix
+
+In this release 1 pull request was closed.
+
+
+## Version 1.1.5 (2021/01/11)
 
 ### Pull Requests Merged
 
