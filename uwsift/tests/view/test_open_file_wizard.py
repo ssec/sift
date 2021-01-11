@@ -102,5 +102,6 @@ def test_wizard_abi_l1b(qtbot, monkeypatch):
 
     # Verify the wizard is left in a usable state for the MainWindow
     assert len(wiz.scenes) == 1
+    assert wiz.previous_reader == 'abi_l1b'
     sel_ids = wiz.collect_selected_ids()
     assert len(sel_ids) == 1

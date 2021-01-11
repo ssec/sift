@@ -922,7 +922,7 @@ class Main(QtGui.QMainWindow):
         if wizard_dialog.exec_():
             LOG.info("Loading products from open wizard...")
             scenes = wizard_dialog.scenes
-            reader = list(list(scenes.values())[0].readers.keys())[0]
+            reader = wizard_dialog.previous_reader
             importer_kwargs = {
                 'reader': reader,
                 'scenes': scenes,
