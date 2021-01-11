@@ -54,7 +54,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         # tuple(filenames) -> scene object
         self.scenes = {}
         self.all_available_products = None
-        self._previous_reader = None
+        self.previous_reader = None
         self.file_groups = {}
         self.unknown_files = set()
         app = QtWidgets.QApplication.instance()
@@ -200,13 +200,13 @@ class OpenFileWizard(QtWidgets.QWizard):
     def _group_files(self, reader) -> bool:
         """Group provided files by time step."""
         # the files haven't changed since we were last run
-        if not self._filelist_changed and self._previous_reader == reader:
+        if not self._filelist_changed and self.previous_reader == reader:
             return False
 
         self._filelist_changed = False
         self.file_groups = {}  # reset the list, just in case
         selected_files = self._all_filenames.copy()
-        self._previous_reader = reader
+        self.previous_reader = reader
         file_groups = group_files(selected_files, reader=reader)
         if not file_groups:
             self.unknown_files = selected_files
