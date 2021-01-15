@@ -20,6 +20,13 @@ gives alarm, when the data timestamp stored is older than
 updated is longer ago than the ``max_tolerable_idle_time``. These three time
 span related configurations are in seconds.
 
+To work around the memory leak in MTG-SIFT, the watchdog is able to issue a
+restart request once the ``auto_restart_interval`` is over. If the user denies
+this request by cklicking on the *cancel* button in the popup window, the
+watchdog will send another request every ``auto_restart_ask_again_interval``
+seconds. Both configuration options are in seconds and can be disabled with
+the value *0*.
+
 A complete watchdog configuration looks as follows:
 
 .. code-block:: yaml
@@ -30,6 +37,8 @@ A complete watchdog configuration looks as follows:
     heartbeat_check_interval: 30
     max_tolerable_dataset_age: 120
     max_tolerable_idle_time: 60
+    auto_restart_interval: 86400
+    auto_restart_ask_again_interval: 60
 
 Note the part ``$$CACHE_DIR$$`` of the path for the heartbeat file. When used,
 this part is expanded to the default cache directory for the application
