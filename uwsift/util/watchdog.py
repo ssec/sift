@@ -76,6 +76,41 @@ class Watchdog:
         else:
             self.ask_again_interval = timedelta(seconds=ask_again_interval)
 
+        self.allowed_mem_usage = None
+        allowed_max_mem = config.get("watchdog.max_memory_consumption", None)
+        if allowed_max_mem:
+            self.allowed_mem_usage = self._parse_byte_count(allowed_max_mem)
+        else:
+            LOG.warning("Memory consumption won't be checked")
+
+    @staticmethod
+    def _parse_byte_count(byte_count: str) -> int:
+        """
+        Parses the str representation of a byte count and converts the units
+        `M` (*Mebibytes*) and `G` (*Gibibytes*) into the appropriate byte count.
+
+        **Note:** To be compatible with *systemd* the units are interpreted with
+        the base 1024 (not 1000) although they are called *Megabytes* and
+        *Gigabytes* there, see e.g.
+        https://www.freedesktop.org/software/systemd/man/systemd.resource-control.html#MemoryHigh=bytes
+
+        :param byte_count: str of the byte count with unit suffix
+        :return: number of bytes as int
+        """
+        if not byte_count:
+            raise ValueError("expected a unit like `M` or `G`")
+        byte_count, unit = int(byte_count[:-1]), byte_count[-1]
+
+        MEBIBYTE_BYTES = 1024 ** 2
+        GIBIBYTE_BYTES = 1024 ** 3
+
+        if unit == "M":
+            return byte_count * MEBIBYTE_BYTES
+        elif unit == "G":
+            return byte_count * GIBIBYTE_BYTES
+        else:
+            raise ValueError(f"byte count contains unknown unit: {unit}")
+
     def _read_watchdog_file(self) -> Tuple[int, datetime]:
         with open(self.heartbeat_file) as file:
             content = file.read()
@@ -100,6 +135,68 @@ class Watchdog:
             except subprocess.CalledProcessError as err:
                 LOG.error(f"Can't run the notification command: {err}")
                 LOG.log(level, text)
+
+    def _get_process_tree(self, pid: int) -> List[Process]:
+        """
+        Traverse the process tree recursively and get all child
+        processes of the specified process.
+
+        :param pid: PID of process which may have child processes
+        :return: list of specified process with all child processes
+        """
+        try:
+            process = Process(pid)
+        except NoSuchProcess:
+            return []
+        processes = [process]
+        for child_process in process.children():
+            processes.extend(self._get_process_tree(child_process))
+        return processes
+
+    def _get_memory_consumption(self, pid: int) -> int:
+        """
+        Calculates the memory consumption in bytes of the specified
+        process and all its child processes. Shared memory will only
+        be counted once.
+
+        :param pid: PID of the process
+        :return: memory consumption in bytes or 0 if the process isn't
+            alive any more
+        """
+        pss_sum = 0
+        for process in self._get_process_tree(pid):
+            try:
+                mem_info = process.memory_full_info()
+                pss_sum += mem_info.pss
+            except NoSuchProcess:
+                pass
+        return pss_sum
+
+    def _restart_application(self, pid: int):
+        """
+        Issue a restart request using the SIGUSR1 signal. The process
+        may choose to ignore this request.
+
+        Don't use SIGTERM, because ``systemctl --user stop uwsift`` should
+        terminate MTG-SIFT without asking the user. However the application
+        should be able to save its state, so don't use SIGKILL either.
+
+        This function doesn't use the command ``systemctl restart uwsift``,
+        because the application may choose to ignore the restart request.
+        Systemd first sends SIGTERM and then SIGKILL if the application is
+        still alive. The wait time between SIGTERM and SIGKILL could be
+        configured by ``TimeoutStopSec=infinity`` in order to accommodate this
+        use case, but by doing so the ``systemctl stop uwsift`` command can't
+        reliably terminate the program in case of a hang.
+
+        :param pid: PID of MTG-SIFT as int
+        """
+        try:
+            os.kill(pid, signal.SIGUSR1)
+            self._notify(logging.INFO, f"Sent restart request to {pid}")
+        except ProcessLookupError:
+            self._notify(logging.WARNING, f"Can't issue restart request because"
+                                          f" the PID {pid} doesn't exist")
 
     def run(self):
         old_pid = None
@@ -167,12 +264,16 @@ class Watchdog:
                 application_start_time = now_utc
                 old_pid = pid
 
+            if self.allowed_mem_usage:
+                mem_usage = self._get_memory_consumption(pid)
+                if mem_usage > self.allowed_mem_usage:
+                    LOG.warning(f"program uses too much memory: {mem_usage}")
+                    self._restart_application(pid)
 
             if self.restart_interval is not None and not sent_restart_request:
                 runtime = now_utc - application_start_time
                 if runtime > self.restart_interval:
-                    os.kill(pid, signal.SIGHUP)
-                    self._notify(logging.INFO, f"Sent restart request to {pid}")
+                    self._restart_application(pid)
                     if self.ask_again_interval is None:
                         # send the restart request only once
                         sent_restart_request = True
