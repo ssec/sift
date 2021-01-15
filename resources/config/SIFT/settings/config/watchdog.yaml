@@ -17,3 +17,10 @@ watchdog:
   # to cancel the restart
   # Set this option to 0 in order to disable the deadline
   auto_restart_popup_deadline: 30
+
+  # If the memory consumption of MTG-SIFT exceeds this value,
+  # then the watchdog will issue a restart request.
+  # Possible units: M -> Mebibyte, G -> Gibibyte (with base 1024 to be
+  # consistent with systemd).
+  # Leave this option empty in order to disable it
+  max_memory_consumption: 5G
