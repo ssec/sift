@@ -83,6 +83,9 @@ STATUS_BAR_DURATION = 2000  # ms
 WATCHDOG_DATETIME_FORMAT_DISPLAY = "%Y-%m-%d %H:%M:%S %Z"
 WATCHDOG_DATETIME_FORMAT_STORE = "%Y-%m-%d %H:%M:%S %z"
 
+UWSIFT_ANIM_INDICATOR_DISABLED = True
+
+
 def test_layers_from_directory(doc, layer_tiff_glob):
     return doc.open_file(glob(layer_tiff_glob))
 
@@ -331,8 +334,9 @@ class UserControlsAnimation(QtCore.QObject):
         self.ui.animPlayPause.setDown(animating)
         self.ui.animationSlider.repaint()
         if animating:
-            t_sim = self.scene_manager.layer_set.time_manager.create_formatted_t_sim()
-            self.ui.animationLabel.setText(t_sim)
+            if not UWSIFT_ANIM_INDICATOR_DISABLED:
+                t_sim = self.scene_manager.layer_set.time_manager.create_formatted_t_sim()
+                self.ui.animationLabel.setText(t_sim)
             #self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
         else:
             self.update_frame_time_to_top_visible()
@@ -812,7 +816,8 @@ class Main(QtGui.QMainWindow):
             self.ui.watchdogFrame.hide()
         # FIXME: Slider does not currently work as intended. Re-enable later
         self.ui.timelineScaleSlider.setDisabled(True)
-
+        if UWSIFT_ANIM_INDICATOR_DISABLED:
+            self.ui.animSliderFrame.hide()
         self._init_font_sizes()
 
         self.setWindowTitle(self.windowTitle().replace("|X.X.X|", __version__))
