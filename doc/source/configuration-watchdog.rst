@@ -27,6 +27,18 @@ watchdog will send another request every ``auto_restart_ask_again_interval``
 seconds. Both configuration options are in seconds and can be disabled with
 the value *0*.
 
+Furthermore the watchdog is capable of monitoring the memory consumption of the
+MTG-SIFT application. If the application exceeds the amount specified by
+``max_memory_consumption``, a restart request is issued. The units ``M``
+(*Mebibytes*) and ``G`` (*Gibiabytes*) can be used. If this setting is not
+given, the watchdog won't trigger a restart based on excessive memory
+consumption.
+
+**Note:** The units are interpreted with base 1024 to be compatible with
+analogous configuration options of `systemd` (see `systemd.resource-control:
+MemoryHigh
+<https://www.freedesktop.org/software/systemd/man/systemd.resource-control.html#MemoryHigh=bytes>`_)
+
 A complete watchdog configuration looks as follows:
 
 .. code-block:: yaml
@@ -39,6 +51,7 @@ A complete watchdog configuration looks as follows:
     max_tolerable_idle_time: 60
     auto_restart_interval: 86400
     auto_restart_ask_again_interval: 60
+    max_memory_consumption: 5G
 
 Note the part ``$$CACHE_DIR$$`` of the path for the heartbeat file. When used,
 this part is expanded to the default cache directory for the application
