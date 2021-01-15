@@ -12,7 +12,6 @@ from typing import List, Tuple
 
 import appdirs
 from donfig import Config
-from psutil import Process, NoSuchProcess
 
 LOG = logging.getLogger(__name__)
 
@@ -107,9 +106,6 @@ class Watchdog:
         application_start_time = None
         sent_restart_request = False
 
-        process_cwd = None
-        process_cmdline = None
-
         while True:
             if self.restart_interval is None:
                 sleep(self.heartbeat_check_interval)
@@ -171,27 +167,6 @@ class Watchdog:
                 application_start_time = now_utc
                 old_pid = pid
 
-            try:
-                process = Process(pid)
-                process_cwd = process.cwd()
-                process_cmdline = process.cmdline()
-            except NoSuchProcess:
-                if process_cwd is None or process_cmdline is None:
-                    self._notify(logging.ERROR, "Can't restart the application "
-                                 "because the current working directory and "
-                                 "command line could not be retrieved")
-                    continue
-
-                # this doesn't race because the uwsift process died
-                # prevent auto restart from spawning multiple subprocesses
-                os.remove(self.heartbeat_file)
-
-                # don't wait for the subprocess to finish
-                # the subprocess will be terminated when the watchdog exits
-                process = subprocess.Popen(process_cmdline, cwd=process_cwd)
-                application_start_time = now_utc
-                old_pid = process.pid
-                continue
 
             if self.restart_interval is not None and not sent_restart_request:
                 runtime = now_utc - application_start_time
