@@ -1037,14 +1037,6 @@ class Main(QtGui.QMainWindow):
         from uwsift.control.qml_utils import QmlBackend
 
         root_context = self.ui.timelineQuickWidget.engine().rootContext()
-        root_context.setContextProperty("numberGenerator", self.number_generator)
-        root_context.setContextProperty("testQStringModel", self.test_qstring_model)
-
-        self.mymodel = MyModel()
-        test_dts = list(map(lambda dt: dt.replace(tzinfo=pytz.UTC).strftime("%H:%M"),
-                        [datetime.now() + relativedelta(hours=i) for i in range(5)]))
-
-        test_dates = [QDate(datetime.now() + relativedelta(hours=i)) for i in range(5)]
 
         time_manager = self.scene_manager.layer_set.time_manager
         time_manager.qml_engine = self.ui.timelineQuickWidget.engine()
@@ -1056,11 +1048,8 @@ class Main(QtGui.QMainWindow):
         #           instance -> communication between TimeManager and QMLBackend via Signal/Slot?
         time_manager.qml_backend.qml_layer_manager = time_manager.qml_layer_manager
 
-        root_context.setContextProperty("timeStampQStringModel",
-                                        time_manager.qml_timeline_manager.timeStampQStringModel)
         root_context.setContextProperty("LayerManager", time_manager.qml_layer_manager)
-        root_context.setContextProperty("TimelineManager", time_manager.qml_timeline_manager)
-        root_context.setContextProperty("testMyModel", time_manager.qml_test_model)
+        root_context.setContextProperty("timebaseModel", time_manager.qml_timestamps_model)
         root_context.setContextProperty("backend", time_manager.qml_backend)
 
         self.ui.timelineQuickWidget.setSource(QtCore.QUrl(str(QML_PATH / "timeline.qml")))

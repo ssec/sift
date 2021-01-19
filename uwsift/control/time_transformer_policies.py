@@ -1,7 +1,7 @@
 from datetime import datetime
 import logging
 
-from typing import List
+from typing import List, Optional
 
 from PyQt5.QtCore import QObject, pyqtSignal
 
@@ -43,7 +43,6 @@ class WrappingDrivingPolicy(QObject):
 
     def change_timebase(self, data_layer):
         self.driving_layer = data_layer
-        print(f"Timebase changed to: {data_layer.product_family_key}")
 
     @property
     def driving_layer(self):
@@ -68,10 +67,13 @@ class WrappingDrivingPolicy(QObject):
         else:
             # Store timestamp of old timeline to retrieve analogous timestamp of new timeline.
             curr_tstamp = list(self._driving_layer.timeline.keys())[self._driving_idx]
-            self.timeline = list(self._driving_layer.timeline.keys())
+            self.timeline = list(data_layer.timeline.keys())
             self._driving_layer = data_layer
-            # TODO(mk): breaks if overlapping but non-identical timelines are selected
-            self._driving_idx = self._find_nearest_past(curr_tstamp)
+            nearest_past_idx = self._find_nearest_past(curr_tstamp)
+            if nearest_past_idx:
+                self._driving_idx = nearest_past_idx
+            else:
+                self._driving_idx = 0
         self.didUpdatePolicy.emit(data_layer)
 
     @property
@@ -88,7 +90,7 @@ class WrappingDrivingPolicy(QObject):
     def driving_layer_pfkey(self):
         return self._driving_layer_pfkey
 
-    def _find_nearest_past(self, tstamp: datetime) -> int:
+    def _find_nearest_past(self, tstamp: datetime) -> Optional[int]:
         """
         Upon driving layer change find the nearest past tstamp in the new driving
         layer and return its index.
@@ -97,7 +99,10 @@ class WrappingDrivingPolicy(QObject):
         other_timeline_np = np.asarray(self.timeline)
         past_idcs = other_timeline_np <= old_tstamp_np
         distances = np.abs(other_timeline_np[past_idcs] - old_tstamp_np)
-        return np.argmin(distances)
+        if distances.size > 0:
+            return np.argmin(distances)
+        else:
+            return None
 
     def curr_t_sim(self):
         if not self.timeline:

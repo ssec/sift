@@ -1254,7 +1254,6 @@ class DataLayerCollection(QObject):
             else:
                 self.product_family_keys.add(data_layer.product_family_key)
                 self.data_layers[data_layer.product_family_key] = data_layer
-        print(f"NOTIFY UPDATE GOT CALLED!")
         self.didUpdateCollection.emit()
 
     @staticmethod

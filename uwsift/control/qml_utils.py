@@ -1,7 +1,9 @@
+from typing import List
+
 from uwsift.common import DEFAULT_TIME_FORMAT
 
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtProperty, pyqtSlot, QAbstractListModel
-from PyQt5.QtCore import QStringListModel, Qt, QModelIndex
+from PyQt5.QtCore import Qt, QModelIndex, QDateTime
 
 
 class QmlLayerManager(QObject):
@@ -118,54 +120,6 @@ class QmlLayerManager(QObject):
         self._date_to_display = new_date.strftime(self._format_str)
         self.dateToDisplayChanged.emit(self._date_to_display)
 
-    @pyqtProperty(int, notify=testChanged)
-    def test(self):
-        return self._test
-
-    @test.setter
-    def test(self, val):
-        self._test = val
-        self.testChanged.emit(self._test)
-
-
-class QmlTimelineManager(QObject):
-    def __init__(self):
-        super().__init__()
-        self._timeline_index = 0
-        self.timeStampQStringModel = QStringListModel()
-
-    timelineIndexChanged = pyqtSignal(int)
-
-    @pyqtProperty(int, notify=timelineIndexChanged)
-    def timelineIndex(self):
-        return self._timeline_index
-
-    @timelineIndex.setter
-    def timelineIndex(self, val):
-        self._timeline_index = val
-        self.timelineIndexChanged.emit(self._timeline_index)
-
-    def update(self, timeline, format_str="%d %h %Y %H:%M"):
-        timeline_string_iterable = map(lambda dt: dt.strftime(format_str), timeline)
-        self.timeStampQStringModel.setStringList(timeline_string_iterable)
-
-
-# TODO(mk): delete this soon!
-class MyModel(QObject):
-    modelChanged = pyqtSignal()
-
-    def __init__(self, parent=None):
-        super().__init__()
-        self.propertyList = [1, 2, 3]
-
-    # def model(self):
-    #     return self.propertyList
-    #model = QtCore.Property("QVariantList", fget=model, notify=modelChanged)
-
-    @pyqtProperty(int, notify=modelChanged)
-    def model(self):
-        return self.propertyList
-
 
 class LayerModel(QAbstractListModel):
     modelChanged = pyqtSignal()
@@ -211,31 +165,63 @@ class LayerModel(QAbstractListModel):
         return len(self.layer_strings)
 
 
-class MyTestModel2(QAbstractListModel):
+class TimebaseModel(QAbstractListModel):
     modelChanged = pyqtSignal()
+    timebaseChanged = pyqtSignal()
+    currentTimestampChanged = pyqtSignal(str)
 
-    def __init__(self, *args, vals=None, **kwargs):
+    def __init__(self, *args, timestamps: List[QDateTime] = None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.vals = vals or []
-
-    # @property
-    # def vals(self):
-    #     return self.vals
-    # @vals.setter
-    # def vals(self, new_vals):
-    #     self.vals = new_vals
-    #     onDataChanged.emit()
+        if timestamps is None:
+            timestamps = []
+        self._timestamps = None
+        self.timestamps = timestamps
+        self._current_timestamp = None
+        self._format_str = DEFAULT_TIME_FORMAT
 
     @pyqtProperty("QVariantList", notify=modelChanged)
     def model(self):
-        return self.vals
+        return self._timestamps
 
-    def data(self, index, role):
+    def data(self, index, role=Qt.DisplayRole):
         if role == Qt.DisplayRole:
-            return self.vals[index.row()]
+            return self._timestamps[index.row()]
 
-    def rowCount(self, index):
-        return len(self.vals)
+    def rowCount(self, parent=QModelIndex()):
+        return len(self._timestamps)
+
+    @pyqtSlot(int, result=QDateTime)
+    def at(self, i):
+        return self._timestamps[i]
+
+    @pyqtProperty(str, notify=currentTimestampChanged)
+    def currentTimestamp(self):
+        if not self._current_timestamp:
+            return self._format_str.strip("%")
+        else:
+            return self._current_timestamp
+
+    @currentTimestamp.setter
+    def currentTimestamp(self, new_date):
+        self._current_timestamp = new_date.strftime(self._format_str)
+        self.currentTimestampChanged.emit(self._current_timestamp)
+
+    @property
+    def timestamps(self):
+        return self._timestamps
+
+    @timestamps.setter
+    def timestamps(self, new_timetamps):
+        self.layoutAboutToBeChanged.emit()
+        self._timestamps = new_timetamps
+        # upd. persistent indexes
+        from_index_list = self.persistentIndexList()
+        to_index_list = []
+        for i, _ in enumerate(new_timetamps):
+            to_index_list.append(self.index(i, parent=QModelIndex()))
+        self.changePersistentIndexList(from_index_list, to_index_list)
+        self.layoutChanged.emit()
+        self.timebaseChanged.emit()
 
 
 class QmlBackend(QObject):
