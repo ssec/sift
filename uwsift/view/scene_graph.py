@@ -634,9 +634,7 @@ class SceneGraphManager(QObject):
         self.main_map_parent.transform = z_level_transform
 
         # Head node of the map graph
-        proj_info = self.document.projection_info()
         self.main_map = MainMap(name="MainMap", parent=self.main_map_parent)
-        self.main_map.transform = PROJ4Transform(proj_info['proj4_str'])
         self.proxy_nodes = {}
 
         self._borders_color_idx = 0
@@ -660,14 +658,8 @@ class SceneGraphManager(QObject):
 
         # Make the camera center on Guam
         # center = (144.8, 13.5)
-        center = center or proj_info["default_center"]
-        width = proj_info["default_width"] / 2.
-        height = proj_info["default_height"] / 2.
-        ll_xy = self.borders.transforms.get_transform(map_to="scene").map(
-            [(center[0] - width, center[1] - height)])[0][:2]
-        ur_xy = self.borders.transforms.get_transform(map_to="scene").map(
-            [(center[0] + width, center[1] + height)])[0][:2]
-        self.main_view.camera.rect = Rect(ll_xy, (ur_xy[0] - ll_xy[0], ur_xy[1] - ll_xy[1]))
+        proj_info = self.document.projection_info()
+        self._set_projection(proj_info)
 
     def create_test_image(self):
         proj4_str = os.getenv("SIFT_DEBUG_IMAGE_PROJ", None)
@@ -706,6 +698,14 @@ class SceneGraphManager(QObject):
         self._test_img = image
 
     def set_projection(self, projection_name: str, proj_info: dict, center=None):
+        self._set_projection(proj_info, center)
+
+        for img in self.image_elements.values():
+            if hasattr(img, 'determine_reference_points'):
+                img.determine_reference_points()
+        self.on_view_change(None)
+
+    def _set_projection(self, proj_info: dict, center=None):
         self.main_map.transform = PROJ4Transform(proj_info['proj4_str'])
         center = center or proj_info["default_center"]
         width = proj_info["default_width"] / 2.
@@ -715,10 +715,6 @@ class SceneGraphManager(QObject):
         ur_xy = self.borders.transforms.get_transform(map_to="scene").map(
             [(center[0] + width, center[1] + height)])[0][:2]
         self.main_view.camera.rect = Rect(ll_xy, (ur_xy[0] - ll_xy[0], ur_xy[1] - ll_xy[1]))
-        for img in self.image_elements.values():
-            if hasattr(img, 'determine_reference_points'):
-                img.determine_reference_points()
-        self.on_view_change(None)
 
     @staticmethod
     def _create_latlon_grid_points(resolution=5.):
