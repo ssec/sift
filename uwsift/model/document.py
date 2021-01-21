@@ -1395,8 +1395,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 'default_height': 20.,  # degrees from bottom edge to top edge
             }),
         ))
-        self.default_projection = 'SEVIRI FES'
-        self.current_projection = self.default_projection
+        self.default_projection_name = 'SEVIRI FES'
+        self.current_projection_name = self.default_projection_name
         self.recipe_manager = RecipeManager(self.config_dir)
         self._recipe_layers = {}
         # HACK: This should probably be part of the metadata database in the future
@@ -1472,18 +1472,18 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         return colormap
 
     def projection_info(self, projection_name=None):
-        return self.available_projections[projection_name or self.current_projection]
+        return self.available_projections[projection_name or self.current_projection_name]
 
     def change_projection(self, projection_name=None):
         if projection_name is None:
-            projection_name = self.default_projection
+            projection_name = self.default_projection_name
         assert projection_name in self.available_projections
-        if projection_name != self.current_projection:
-            LOG.debug("Changing projection from '{}' to '{}'".format(self.current_projection, projection_name))
-            self.current_projection = projection_name
+        if projection_name != self.current_projection_name:
+            LOG.debug("Changing projection from '{}' to '{}'".format(self.current_projection_name,projection_name))
+            self.current_projection_name = projection_name
             self.didChangeProjection.emit(
-                self.current_projection,
-                self.projection_info(self.current_projection)
+                self.current_projection_name,
+                self.projection_info(self.current_projection_name)
             )
 
     def update_user_colormap(self, colormap, name):
@@ -1512,7 +1512,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         del self.colormaps[name]
 
     def current_projection_index(self):
-        return list(self.available_projections.keys()).index(self.current_projection)
+        return list(self.available_projections.keys()).index(self.current_projection_name)
 
     def change_projection_index(self, idx):
         return self.change_projection(tuple(self.available_projections.keys())[idx])
