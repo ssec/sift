@@ -1,0 +1,407 @@
+import QtQml 2.12
+import QtQuick 2.12
+import QtQuick.Controls 2.3
+
+/*
+Blueprint:
+    id
+    property declarations
+    signal declarations
+    JavaScript functions
+    object properties
+    child objects
+    states
+    transitions
+
+*/
+Rectangle{
+    id: timelineRuler
+
+    property var timelinepointsArr : []
+    property var gDelegateWidth;
+    property var gDelegateHeight;
+
+    property date minDate: new Date("2011-01-01")
+    property date maxDate: new Date("2030-12-31")
+    property date oldDate: new Date("2011-01-01")
+
+    signal siftTimelinePosChanged(real xPosition, real yPosition)
+
+    anchors.fill: parent
+    border.color: Qt.rgba(1, 0, 0, 0)//default_gray
+    color: Qt.rgba(0, 0, 0, 0)
+
+    Canvas{
+        // ID
+        id: timelineRulerCanvas
+        // Property declarations
+        property date oldDate: new Date("1990-01-01");
+        /*  TODO: define minimumTickWidth, if too many ticks are in timebaseModel
+                  display ticks as they fit on canvas
+
+        property int numVisibleTicks;
+        property int widthVisibleTick;
+        */
+        property real tickWidth;
+        property int maxNumTicks: 10;
+        property int temp_idx: -1;
+        property var tickBlueprints: [];
+        property var tickDates: [];
+        property var tickMargin: 10;
+        property var resolution: 30;
+        property var resolutionMode: "Minutes";
+        // Signal declarations
+        // Javascript functions
+        function clear_canvas(context) {
+            context.reset();
+        }
+
+        function debugCanvas(context){
+            context.strokeStyle = 'black';
+            context.lineWidth = 5;
+            context.beginPath();
+            context.moveTo(0,0);
+            context.lineTo(width, height);
+            context.stroke();
+            context.lineWidth = 1;
+        }
+
+        function nextDateByResolution(date, resolution, resolutionMode){
+            let retDate = new Date(date);
+            if (resolutionMode === "Minutes"){
+                retDate.setMinutes(date.getMinutes()+resolution);
+            }else if(resolutionMode === "Hours"){
+                retDate.setHours(date.getHours()+resolution);
+            }else if(resolutionMode === "Days"){
+                retDate.setDays(date.getDays()+resolution);
+            }
+            return retDate;
+        }
+
+        function previousDateByResolution(date, resolution, resolutionMode){
+            return nextDateByResolution(date, -resolution, resolutionMode);
+        }
+
+        function buildTickBlueprints(){
+            timelineRulerCanvas.tickBlueprints = []
+
+            //TODO(mk): make these three properties of TimelineRulerCanvas?
+            // Assume temporally sorted timebaseModel
+            let currMinDate = timebaseModel.at(0);
+            let currMaxDate = timebaseModel.at(timebaseModel.rowCount()-1);
+
+            let firstDate = new Date(currMinDate)
+            firstDate.setSeconds(0);
+            firstDate.setMinutes(0);
+            let tickDts = [firstDate];
+            // TODO(mk):
+            // create enough timestamps to reach currMaxDate
+            // if all fit within maxNumTicks -> good
+            // else --> only draw up to maxNumTicks
+            for(var k=1; k<maxNumTicks; k++){
+                tickDts.push(
+                            nextDateByResolution(tickDts[k-1], resolution, resolutionMode)
+                );
+            }
+            // in case of ruler featuring a wider timespan than timebaseModel, cut off extraneous ticks
+            let tickDtsCut = [];
+            if (tickDts[tickDts.length-1]>currMaxDate){
+                tickDtsCut =  tickDts.filter((tickDt)=>{return tickDt <= currMaxDate});
+            }
+            timelineRulerCanvas.tickDates = tickDtsCut;
+            if (tickDtsCut.length < tickDts.length){
+                timelineRulerCanvas.tickWidth = timelineRulerCanvas.width / tickDtsCut.length;
+            }
+            // figure out temporal res. and scale accordingly
+            let ticks = timelineRulerCanvas.tickDates
+            for(var i=0; i < ticks.length; i++){
+                let tickBP = {"X": 1.0,"Y":1.0,"TextX":1.0,"TextY":1.0,"Length":1.0,"Major":false, "Text":""};
+                // major or minor tick
+                let dCurr = ticks[i];
+                let dCurrDay = dCurr.getDate();
+                let dPrev;
+                if (i === 0){
+                    dPrev = previousDateByResolution(dCurr, resolution, resolutionMode);
+                }else{
+                    dPrev = ticks[i-1];
+                }
+                let dprevDay = dPrev.getDate();
+                if ((dPrev < dCurr) && (dprevDay < dCurrDay)){
+                    // Major tick
+                    // Event handlers (such as onWidthChanged may be called more than once,
+                    // thus no mutating global state
+                    tickBP = createTickBlueprint(i, dCurr, true);
+                }else{
+                    tickBP = createTickBlueprint(i, dCurr, false);
+                }
+                timelineRulerCanvas.tickBlueprints.push(tickBP);
+            }
+        }
+
+        function createTickBlueprint(index, tickDate, majorTick){
+            let tickBP = {"X": 1.0,"Y":1.0,"TextX":1.0,"TextY":1.0,"Length":1.0,"Major":false, "Text":""};
+            if (majorTick || index===0){
+                tickBP.Major = true;
+                tickBP.MajorText += Qt.formatDateTime(tickDate, "d MMM yyyy");
+                tickBP.Y = 0;
+                tickBP.Length = height;
+            }else{
+                // Minor tick
+                tickBP.Y = height/4;
+                tickBP.Length = height-tickBP.Y;
+            }
+            return tickBP;
+        }
+
+        function drawTicks(context){
+            //let tickBP = {"X": 1.0,"Y":1.0,"TextX":1.0,"TextY":1.0,"Length":1.0,"Major":false, "Text":""};
+            //Font size in px
+            let fontSize = 16;
+            let textPaddingBottom = 3;
+            context.font= fontSize+'px "%1"'.arg(siftFont.name);
+            // TODO: the below does not work, as a child object would be necessary
+            //context.font= fontSize+'px "%1"'.arg(root.siftFont.name);
+            //       Solution: Create a Resources.qml (or any compatible name, must start with Capital letter)
+            //                 and include it as a child object wherever resources of some kind are needed.
+
+            timelineRulerCanvas.tickBlueprints.forEach((item, index) => {
+                context.beginPath();
+                context.moveTo(item.X, item.Y);
+                context.lineTo(item.X, item.Y + item.Length);
+                if (item.Major){
+                    let MajorTickText = item.Text.split("\n");
+                    let textMesurement = context.measureText(MajorTickText[0]);
+                    context.fillText(MajorTickText[0], item.TextX, item.TextY-fontSize-textPaddingBottom);
+                    context.fillText(MajorTickText[1], item.TextX, item.TextY-textPaddingBottom);
+                }else{
+                    context.fillText(item.Text, item.TextX, item.TextY-textPaddingBottom);
+                }
+
+                context.stroke();
+            });
+        }
+
+        // Object properties
+        anchors.fill: parent
+        renderStrategy: Canvas.Threaded
+
+        onPaint:{
+            var context = getContext("2d");
+            context.reset()
+            context.strokeStyle = Qt.darker(timeline_rect.color, 2.0)
+            context.lineWidth = 2;
+            // Draw horizontal ray
+            context.moveTo(0, height/2);
+            context.lineTo(width, height/2);
+            context.stroke();
+            let margin = 10;
+            drawTicks(context);
+        }
+        /*
+            backend holds resolution: minutes, hours, etc....
+            ruler gets drawn until timeline is full
+                - redraw ruler to region of interest on data load
+                    - draw one tick before/after data time if maxNumTicks allows this?
+                        -> what are the different modes regarding too many/very few ticks that can occur?
+            on data load, chevron markers are drawn at points on timeline where data occurs
+            on anim outlined chevron (with whisker?) moves over these points
+        */
+        Connections {
+            target: timebaseModel
+            onTimebaseChanged:{
+                timelineRulerCanvas.calculate_resolution();
+                timelineRulerCanvas.buildTickBlueprints();
+                timelineRulerCanvas.requestPaint();
+            }
+        }
+        onWidthChanged: {
+            //timelineRulerCanvas.tickWidth = timelineRulerCanvas.width / timebaseModel.rowCount();
+            timelineRulerCanvas.tickWidth = timelineRulerCanvas.width / timelineRulerCanvas.maxNumTicks;
+            //buildTickBlueprints("onWidthCH");
+            buildTickBlueprints();
+            requestPaint();
+        }
+        FontLoader {
+            id: siftFont;
+            source: Qt.resolvedUrl("../data/fonts/Andale Mono.ttf");//"qrc:/AndaleMono.ttf"
+        }
+        /*
+            child objects
+            states
+            transitions
+        */
+    }
+    Canvas{
+        // Id
+        id: timelineMarkerCanvas;
+
+        // Property declarations
+        property var currIndex: 0
+        property var cursorX: 0
+        property var cursorY: 0
+        // marker radius actually used to define bounding box of rounded rect
+        property var markerRadius: 10
+        property var markerYPosition: (3/4)*(height) - (markerRadius / 2);
+        property bool dataLoaded: false;
+        property var markerBluePrints: []
+
+        // signals
+        signal reemittedTimelineIndexChanged(var idx);
+        // JS functions
+        function updateTimelineCursorPosition(){
+            let resolution = timelineRulerCanvas.resolution;
+            let resolutionMode = timelineRulerCanvas.resolutionMode;
+            // MAKE THIS A FUNCTION
+            let ticks = timelineRulerCanvas.tickDates;
+            let tickWidthPerTime;
+            if (ticks.length === 1){
+                let nextTick = timelineRulerCanvas.nextDateByResolution(ticks[0], timelineRulerCanvas.resolution,timelineRulerCanvas.resolutionMode);
+                tickWidthPerTime = timelineRulerCanvas.tickWidth/(nextTick.getTime()-ticks[0].getTime());
+            }else{
+                tickWidthPerTime = timelineRulerCanvas.tickWidth/(ticks[1].getTime()-ticks[0].getTime());
+            }
+            //----------------------------------------
+            let markerDate = timebaseModel.at(currIndex);
+            let timeOffset = markerDate.getTime()-ticks[0].getTime();
+            let markerWidth = timelineMarkerCanvas.markerBluePrints[0].W;
+            timelineMarkerCanvas.cursorX = (tickWidthPerTime*timeOffset) + timelineRulerCanvas.tickMargin;// + (markerWidth / 2);
+            timelineMarkerCanvas.cursorY = timelineRulerCanvas.height/2;
+        }
+
+        function createMarkerBlueprint(index, markerDate){
+            let markerBP = {"X": 1.0,"Y":1.0,"W": 1.0, "H":1.0, "R": 1.0};
+            markerBP.W = markerRadius;
+            markerBP.H = markerBP.W;
+            markerBP.R = markerBP.W*2.0;
+
+            let resolution = timelineRulerCanvas.resolution;
+            let resolutionMode = timelineRulerCanvas.resolutionMode;
+            let ticks = timelineRulerCanvas.tickDates;
+
+            let tickWidthPerTime;
+            if (ticks.length === 1){
+                let nextTick = timelineRulerCanvas.nextDateByResolution(ticks[0], timelineRulerCanvas.resolution,timelineRulerCanvas.resolutionMode);
+                tickWidthPerTime = timelineRulerCanvas.tickWidth/(nextTick.getTime()-ticks[0].getTime());
+            }else{
+                tickWidthPerTime = timelineRulerCanvas.tickWidth/(ticks[1].getTime()-ticks[0].getTime());
+            }
+
+
+
+            //let tickWidthPerTime = timelineRulerCanvas.tickWidth/(ticks[1].getTime()-ticks[0].getTime());
+
+
+            let timeOffset = markerDate.getTime()-ticks[0].getTime();
+            //markerBP.X = timelineRulerCanvas.tickMargin + index*timelineRulerCanvas.tickWidth - (markerBP.W / 2);
+            markerBP.X = (tickWidthPerTime*timeOffset) + timelineRulerCanvas.tickMargin - (markerBP.W/2);
+            markerBP.Y = markerYPosition;
+            return markerBP;
+        }
+
+        function updateMarkerBlueprints(){
+            timelineMarkerCanvas.markerBluePrints = [];
+
+            for(var i=0; i < timebaseModel.rowCount(); i++){
+                timelineMarkerCanvas.markerBluePrints.push(createMarkerBlueprint(i, timebaseModel.at(i)));
+            }
+        }
+
+        // object properties
+        anchors.fill: parent;
+        renderStrategy: Canvas.Threaded
+
+        onPaint: {
+            updateTimelineCursorPosition()
+            var context = getContext("2d");
+            context.reset();
+            let markerColor = Qt.darker(Qt.rgba(1, 0, 0, 1), 1);
+            context.strokeStyle = markerColor;
+            context.fillStyle = markerColor;
+            context.lineWidth = 2;
+            markerBluePrints.forEach((bp)=>{
+                context.beginPath();
+                context.roundedRect(bp.X, bp.Y, bp.W, bp.H, bp.R, bp.R);
+                context.stroke();
+            });
+            context.beginPath();
+            // line
+            //let markerX = markerBluePrints[currIndex].X
+            context.moveTo(cursorX, cursorY);
+            context.lineTo(cursorX, cursorY+height/4);
+            context.fillRect(cursorX-5, cursorY-10, 10, 10);
+            context.stroke();
+        }
+
+        onReemittedTimelineIndexChanged: {
+            currIndex = idx;
+            requestPaint();
+        }
+
+        Connections{
+            target: timelineRulerCanvas
+            onWidthChanged: {
+                //timelineMarkerCanvas.markerX = timelineRulerCanvas.tickWidth*timelineMarkerCanvas.currIndex + timelineRulerCanvas.tickMargin;
+                //timelineMarkerCanvas.markerY = timelineRulerCanvas.height/2;
+                timelineMarkerCanvas.updateMarkerBlueprints();
+                timelineMarkerCanvas.requestPaint();
+            }
+        }
+        Connections{
+            target: timebaseModel
+            onTimebaseChanged: {
+                timelineMarkerCanvas.currIndex = 0;
+                timelineMarkerCanvas.updateMarkerBlueprints();
+                timelineMarkerCanvas.requestPaint();
+            }
+        }
+
+        Component.onCompleted: {
+            backend.doNotifyTimelineIndexChanged.connect(reemittedTimelineIndexChanged)
+        }
+
+    }
+    MouseArea{
+        id: mouse_area
+        //anchors.fill: parent
+        property var prevIndex: 0;
+
+        hoverEnabled: true
+        // add some more height to allow clicks in the area of marker canvas
+        // being handled
+        anchors.fill: parent;
+
+        onClicked: {
+            let numTicks = 1;
+            let tickWidth = 1;
+            //let clickedIndex = parseInt((mouseX-timelineRulerCanvas.tickMargin) / timelineRulerCanvas.tickWidth);
+            let markerXs = []
+            for (var i=0; i<timelineMarkerCanvas.markerBluePrints.length;i++){
+                markerXs.push(timelineMarkerCanvas.markerBluePrints[i].X);
+            }
+
+            let thresh = (markerXs[1]-markerXs[0])/2;
+
+            let distVals = markerXs.filter((markerX)=>{
+                return (Math.abs(mouseX-markerX) < thresh)
+            });
+            let val;
+            if (distVals.length > 1){
+                val = Math.min(...distVals);
+            }else{
+                val = distVals[0];
+            }
+            let clickedIndex = markerXs.indexOf(val)
+            if (clickedIndex===-1){
+                clickedIndex = prevIndex;
+            }else{
+                prevIndex = clickedIndex;
+            }
+
+
+            backend.clickTimelineAtIndex(clickedIndex);
+            timelineMarkerCanvas.currIndex = clickedIndex;
+            timelineMarkerCanvas.requestPaint();
+        }
+    }
+}
+
