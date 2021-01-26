@@ -20,15 +20,21 @@ REQUIRES
 
 __author__ = 'rayg'
 
+# To have consistent logging for all modules (also for their static
+# initialization) it must be set up before importing them.
+from uwsift.util.logger import configure_loggers
+
+configure_loggers()  # we rerun this later to post-config
+
 import gc
 import logging
 import os
 import sys
-from datetime import datetime, timezone
+import typing as typ
 from collections import OrderedDict
+from datetime import datetime, timezone
 from functools import partial
 from glob import glob
-import typing as typ
 from uuid import UUID
 
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -48,7 +54,6 @@ from uwsift.ui.pov_main_ui import Ui_MainWindow
 from uwsift.util import (WORKSPACE_DB_DIR, DOCUMENT_SETTINGS_DIR, USER_CACHE_DIR,
                          get_package_data_dir, check_grib_definition_dir, check_imageio_deps,
                          HeapProfiler)
-from uwsift.util.logger import configure_loggers
 from uwsift.view.colormap_editor import ColormapEditor
 from uwsift.view.create_algebraic import CreateAlgebraicDialog
 from uwsift.view.export_image import ExportImageHelper
@@ -60,6 +65,9 @@ from uwsift.workspace import CachingWorkspace, SimpleWorkspace
 from uwsift.workspace.collector import ResourceSearchPathCollector
 
 LOG = logging.getLogger(__name__)
+
+# re-configure loggers instantiated meanwhile
+configure_loggers()
 
 app_object = app.use_app('pyqt5')
 APP: QtGui.QApplication = app_object.native
@@ -1396,8 +1404,6 @@ def main() -> int:
     # level = levels[min(3, args.verbosity)]
     # logging.basicConfig(level=level, datefmt='%H:%M:%S',
     #                     format='%(levelname)s %(asctime)s %(module)s:%(funcName)s:L%(lineno)d %(message)s')
-
-    configure_loggers()
 
     check_grib_definition_dir()
     check_imageio_deps()
