@@ -38,6 +38,7 @@ import os
 from numbers import Number
 from typing import Dict, Optional
 from uuid import UUID
+from enum import Enum
 
 import numpy as np
 from PyQt5.QtCore import QObject, pyqtSignal, Qt
@@ -1001,6 +1002,74 @@ class SceneGraphManager(QObject):
             LOG.info('changing {} to kind {}'.format(uuid, new_pz.kind.name))
             self.add_basic_layer(None, uuid, new_pz)
 
+    @staticmethod
+    def _overwrite_with_test_pattern(data):
+        """
+        Fill given data with distinct test data.
+
+        Fill the given data array with zeros except for some selected cells
+        which are set to distinct values: 5 cells at each corner and 6 cells
+        around the center which form asymmetrical patterns to make them clearly
+        distinguishable.
+
+        When the data is visualized with the color table 'Rainbow (IR Default)'
+        these cells are colored as named in Enum RainbowValue.
+
+        This function must only be called during development for calibration/
+        validation purposes.
+        """
+        max_x, max_y = data.shape
+        data[:, :] = 0
+
+        class RainbowValue(Enum):
+            BROWN = 320.
+            RED = 300.
+            LIGHT_GREEN = 280.
+            GREEN = 260.
+            LIGHT_BLUE = 240.
+            DARK_BLUE = 220.
+            PINK = 200.
+
+        center_x, center_y = max_x // 2, max_y // 2
+        pixels = [
+            {"x": center_x,     "y": center_y,     "color": RainbowValue.RED,         "desc": "center"},
+            {"x": center_x - 1, "y": center_y - 1, "color": RainbowValue.GREEN,       "desc": "upper left"},
+            {"x": center_x - 1, "y": center_y + 1, "color": RainbowValue.LIGHT_BLUE,  "desc": "bottom left"},
+            {"x": center_x - 1, "y": center_y + 2, "color": RainbowValue.LIGHT_GREEN, "desc": "below bottom left"},
+            {"x": center_x + 1, "y": center_y - 1, "color": RainbowValue.DARK_BLUE,   "desc": "upper right"},
+            {"x": center_x + 1, "y": center_y + 1, "color": RainbowValue.PINK,        "desc": "bottom right"},
+
+            {"x": max_x - 1, "y": max_y - 1, "color": RainbowValue.RED,        "desc": "bottom right corner"},
+            {"x": max_x - 2, "y": max_y - 1, "color": RainbowValue.GREEN,      "desc": "bottom right corner"},
+            {"x": max_x - 3, "y": max_y - 1, "color": RainbowValue.LIGHT_BLUE, "desc": "bottom right corner"},
+            {"x": max_x - 1, "y": max_y - 2, "color": RainbowValue.PINK,       "desc": "bottom right corner"},
+            {"x": max_x - 2, "y": max_y - 2, "color": RainbowValue.BROWN,      "desc": "bottom right corner"},
+
+            {"x": 0, "y": max_y - 1, "color": RainbowValue.PINK,       "desc": "bottom left corner"},
+            {"x": 1, "y": max_y - 1, "color": RainbowValue.LIGHT_BLUE, "desc": "bottom left corner"},
+            {"x": 0, "y": max_y - 2, "color": RainbowValue.BROWN,      "desc": "bottom left corner"},
+            {"x": 0, "y": max_y - 3, "color": RainbowValue.RED,        "desc": "bottom left corner"},
+            {"x": 1, "y": max_y - 2, "color": RainbowValue.GREEN,      "desc": "bottom left corner"},
+
+            {"x": max_x - 1, "y": 0, "color": RainbowValue.LIGHT_BLUE,  "desc": "upper right corner"},
+            {"x": max_x - 2, "y": 0, "color": RainbowValue.LIGHT_GREEN, "desc": "upper right corner"},
+            {"x": max_x - 3, "y": 0, "color": RainbowValue.RED,         "desc": "upper right corner"},
+            {"x": max_x - 1, "y": 1, "color": RainbowValue.BROWN,       "desc": "upper right corner"},
+            {"x": max_x - 2, "y": 1, "color": RainbowValue.PINK,        "desc": "upper right corner"},
+
+            {"x": 0, "y": 0, "color": RainbowValue.BROWN,       "desc": "upper left corner"},
+            {"x": 1, "y": 0, "color": RainbowValue.RED,         "desc": "upper left corner"},
+            {"x": 0, "y": 1, "color": RainbowValue.PINK,        "desc": "upper left corner"},
+            {"x": 0, "y": 2, "color": RainbowValue.DARK_BLUE,   "desc": "upper left corner"},
+            {"x": 1, "y": 1, "color": RainbowValue.LIGHT_GREEN, "desc": "upper left corner"},
+        ]
+
+        for pixel in pixels:
+            data[pixel["y"], pixel["x"]] = pixel["color"].value
+            print(f'{pixel["desc"]} ({pixel["color"].name}) -> x: {pixel["x"]} y: {pixel["y"]}')
+
+        return data
+
     def add_contour_layer(self, layer: DocBasicLayer, p: Presentation, overview_content: np.ndarray):
         verts = overview_content[:, :2]
         connects = overview_content[:, 2].astype(np.bool)
@@ -1051,6 +1120,9 @@ class SceneGraphManager(QObject):
         overview_content = self.workspace.get_content(layer.uuid, kind=p.kind)
         if p.kind == Kind.CONTOUR:
             return self.add_contour_layer(layer, p, overview_content)
+
+        if True:  # FIXME: Set to False except for experiments/tests
+            self._overwrite_with_test_pattern(overview_content)
 
         if USE_TILED_GEOLOCATED_IMAGES:
             image = TiledGeolocatedImage(
