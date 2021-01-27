@@ -26,6 +26,7 @@ import sys
 import unittest
 from pathlib import Path
 
+# Expose path to qml files.
 QML_PATH = Path(__file__).parent.absolute()
 
 LOG = logging.getLogger(__name__)

@@ -408,6 +408,7 @@ class LayerSet(object):
         self._frame_number = frame
         self.parent.update()
         if self._frame_change_cb is not None and lfo:
+
             uuid = self._frame_order[self._frame_number]
             self._frame_change_cb((self._frame_number, lfo, self._animating, uuid))
 

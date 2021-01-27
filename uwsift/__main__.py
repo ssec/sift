@@ -39,6 +39,7 @@ from glob import glob
 from uuid import UUID
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import QObject
 from vispy import app
 
 import uwsift.ui.open_cache_dialog_ui as open_cache_dialog_ui
@@ -1025,7 +1026,47 @@ class Main(QtGui.QMainWindow):
 
     def _init_qml_timeline(self):
         from uwsift.ui import QML_PATH
+        from uwsift.model.number_generator import NumberGenerator, ListModel
+        from uwsift.control.qml_utils import MyModel, MyTestModel2
+        from PyQt5.QtCore import QStringListModel, QDate
+        from dateutil.relativedelta import relativedelta
+        import pytz
+
+        self.number_generator = NumberGenerator()
+
+        self.test_qstring_model = QStringListModel()
+        self.test_qstring_model.setStringList(["Test #1", "Test #2", "Test #3"])
+
+        root_context = self.ui.timelineQuickWidget.engine().rootContext()
+        root_context.setContextProperty("numberGenerator", self.number_generator)
+        root_context.setContextProperty("testQStringModel", self.test_qstring_model)
+
+        self.mymodel = MyModel()
+        test_dts = list(map(lambda dt: dt.replace(tzinfo=pytz.UTC).strftime("%H:%M"),
+                        [datetime.now() + relativedelta(hours=i) for i in range(5)]))
+
+        test_dates = [QDate(datetime.now() + relativedelta(hours=i)) for i in range(5)]
+
+
+        time_manager = self.scene_manager.layer_set.time_manager
+        root_context.setContextProperty("timeStampQStringModel",
+                                        time_manager.qml_timestamp_manager.timeStampQStringModel)
+        root_context.setContextProperty("LayerManager", time_manager.qml_layer_manager)
+        root_context.setContextProperty("testMyModel", time_manager.qml_test_model)
+
+        from uwsift.control.qml_utils import QmlBackend
+        time_manager.qml_backend = QmlBackend()
+        root_context.setContextProperty("backend", time_manager.qml_backend)
+
         self.ui.timelineQuickWidget.setSource(QtCore.QUrl(str(QML_PATH / "timeline.qml")))
+
+        time_manager.qml_root_object = self.ui.timelineQuickWidget.rootObject()
+        repeater = time_manager.qml_root_object.findChild(QObject, name="segment_repeater")
+
+    # TODO(mk): replace with method to set all relevant ContextProperties?
+    def _get_qml_context(self):
+        engine = self.ui.timelineQuickWidget.engine()
+        return engine.rootContext()
 
     def _init_arrange_panes(self):
         self.tabifyDockWidget(self.ui.layersPane, self.ui.areaProbePane)
