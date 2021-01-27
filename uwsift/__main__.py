@@ -485,6 +485,9 @@ class Main(QtGui.QMainWindow):
             raise ValueError("no UUIDs provided by background open in _bgnd_open_paths_when_done")
         if not isok:
             raise ValueError("background open did not succeed")
+        # Populate data layer collection
+        data_layers = self.document.create_data_layers()
+        self.document.data_layer_collection.notify_update_collection(data_layers)
         uuid = uuid_list[-1]
         self.layer_list_model.select([uuid])
         # set the animation based on the last added (topmost) layer
@@ -1026,16 +1029,7 @@ class Main(QtGui.QMainWindow):
 
     def _init_qml_timeline(self):
         from uwsift.ui import QML_PATH
-        from uwsift.model.number_generator import NumberGenerator, ListModel
-        from uwsift.control.qml_utils import MyModel, MyTestModel2
-        from PyQt5.QtCore import QStringListModel, QDate
-        from dateutil.relativedelta import relativedelta
-        import pytz
-
-        self.number_generator = NumberGenerator()
-
-        self.test_qstring_model = QStringListModel()
-        self.test_qstring_model.setStringList(["Test #1", "Test #2", "Test #3"])
+        from uwsift.control.qml_utils import QmlBackend
 
         root_context = self.ui.timelineQuickWidget.engine().rootContext()
         root_context.setContextProperty("numberGenerator", self.number_generator)
@@ -1047,21 +1041,24 @@ class Main(QtGui.QMainWindow):
 
         test_dates = [QDate(datetime.now() + relativedelta(hours=i)) for i in range(5)]
 
-
         time_manager = self.scene_manager.layer_set.time_manager
-        root_context.setContextProperty("timeStampQStringModel",
-                                        time_manager.qml_timestamp_manager.timeStampQStringModel)
-        root_context.setContextProperty("LayerManager", time_manager.qml_layer_manager)
-        root_context.setContextProperty("testMyModel", time_manager.qml_test_model)
-
-        from uwsift.control.qml_utils import QmlBackend
+        time_manager.qml_engine = self.ui.timelineQuickWidget.engine()
+        time_manager.qml_root_object = self.ui.timelineQuickWidget.rootObject()
         time_manager.qml_backend = QmlBackend()
+        time_manager.qml_backend.didJumpInTimeline.connect(self.scene_manager.layer_set.jump)
+        time_manager.qml_backend.didChangeTimebase.connect(time_manager.on_timebase_change)
+        # TODO(mk): refactor all QML related objects as belonging to TimeManager's QMLBackend
+        #           instance -> communication between TimeManager and QMLBackend via Signal/Slot?
+        time_manager.qml_backend.qml_layer_manager = time_manager.qml_layer_manager
+
+        root_context.setContextProperty("timeStampQStringModel",
+                                        time_manager.qml_timeline_manager.timeStampQStringModel)
+        root_context.setContextProperty("LayerManager", time_manager.qml_layer_manager)
+        root_context.setContextProperty("TimelineManager", time_manager.qml_timeline_manager)
+        root_context.setContextProperty("testMyModel", time_manager.qml_test_model)
         root_context.setContextProperty("backend", time_manager.qml_backend)
 
         self.ui.timelineQuickWidget.setSource(QtCore.QUrl(str(QML_PATH / "timeline.qml")))
-
-        time_manager.qml_root_object = self.ui.timelineQuickWidget.rootObject()
-        repeater = time_manager.qml_root_object.findChild(QObject, name="segment_repeater")
 
     # TODO(mk): replace with method to set all relevant ContextProperties?
     def _get_qml_context(self):

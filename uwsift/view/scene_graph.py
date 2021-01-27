@@ -378,6 +378,10 @@ class LayerSet(object):
             if layer_uuid is not None:
                 self._set_uuid_visibility(layer_uuid, True)
 
+    def jump(self, index):
+        self.time_manager.jump(index)
+        self._set_visible_from_data_layers()
+
     def step(self, event=None, backwards=False):
         # Slot that triggers the time manager's tick in the relevant direction
         # and subsequently makes the appropriate layers visible.
@@ -1403,7 +1407,7 @@ class SceneGraphManager(QObject):
     def rebuild_frame_order(self, uuid_list: list, *args, **kwargs):
         LOG.debug('setting SGM new frame order to {0!r:s}'.format(uuid_list))
         self.layer_set.frame_order = uuid_list
-        self.layer_set.update_time_manager_collection(self.document.data_layer_collection)
+        #self.layer_set.update_time_manager_collection(self.document.data_layer_collection)
 
     def _rebuild_frame_order(self, *args, **kwargs):
         res = self.rebuild_frame_order(*args, **kwargs)

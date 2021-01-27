@@ -1,20 +1,97 @@
+from uwsift.common import DEFAULT_TIME_FORMAT
+
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtProperty, pyqtSlot, QAbstractListModel
-from PyQt5.QtCore import QStringListModel, Qt, QModelIndex, QVariant
+from PyQt5.QtCore import QStringListModel, Qt, QModelIndex
 
 
 class QmlLayerManager(QObject):
+
+    layerToDisplayChanged = pyqtSignal()
+    currentIndexChanged = pyqtSignal(int)
+    layerModelChanged = pyqtSignal()
+    convFuncModelChanged = pyqtSignal()
+    dateToDisplayChanged = pyqtSignal(str)
+    testChanged = pyqtSignal(int)
+
     def __init__(self):
         super().__init__()
         self._layer_to_display = ""
         self._date_to_display = None
         self._test = 0
-        # TODO(mk): make this configurable if the user wants to display dates differently?
-        self._format_str = "%Y-%m-%d %H:%M%Z"
-        self.testModel = QStringListModel()
+        self._currentIndex = 0
 
-    layerToDisplayChanged = pyqtSignal()
-    dateToDisplayChanged = pyqtSignal(str)
-    testChanged = pyqtSignal(int)
+        self._convenience_functions = {}
+        self._conv_func_model: LayerModel = LayerModel(layer_strings=[])
+        self.convenience_functions = {}
+
+        # TODO(mk): make this configurable if the user wants to display dates differently?
+        self._format_str = DEFAULT_TIME_FORMAT
+        self._layer_model: LayerModel = LayerModel(layer_strings=["No Layers loaded."])
+
+        # self._conv_func_model: LayerModel = LayerModel(
+        #     layer_strings=list(self._convenience_functions.keys()))
+
+    @property
+    def convenience_functions(self):
+        return self._convenience_functions
+
+    @convenience_functions.setter
+    def convenience_functions(self, conv_funcs):
+        self._convenience_functions = conv_funcs
+        self.convFuncModel = LayerModel(layer_strings=list(conv_funcs.keys()))
+
+    @pyqtProperty(int, notify=currentIndexChanged)
+    def currentIndex(self):
+        return self._currentIndex
+
+    @currentIndex.setter
+    def currentIndex(self, idx):
+        self._currentIndex = idx
+        self.currentIndexChanged.emit(self._currentIndex)
+
+    @pyqtProperty(QObject, notify=layerModelChanged)
+    def layerModel(self):
+        return self._layer_model
+
+    @layerModel.setter
+    def layerModel(self, new_model):
+        self._layer_model = new_model
+        self.layerModelChanged.emit()
+
+    @pyqtProperty(QObject, notify=convFuncModelChanged)
+    def convFuncModel(self):
+        return self._conv_func_model
+
+    @convFuncModel.setter
+    def convFuncModel(self, new_model):
+        self._conv_func_model = new_model
+        self.convFuncModelChanged.emit()
+
+    # TODO(mk): deprecated methods, remove?
+    def change_layer_model(self, idx, elem):
+        insert_idx = idx + self.num_convenience_functions
+        if insert_idx < len(self._layer_model.layer_strings):
+            self._layer_model.layer_strings[insert_idx] = elem
+        else:
+            self._layer_model.layer_strings.append(elem)
+        for el in self._layer_model.layer_strings:
+            print(f"{el}")
+        self.layerModelChanged.emit()
+
+    def clear_layer_model(self):
+        topIdx = len(self._layer_model.layer_strings) - 1
+        while topIdx > self.num_convenience_functions:
+            del self._layer_model.layer_strings[topIdx]
+            topIdx -= 1
+        self.layerModelChanged.emit()
+
+
+
+    # TODO(mk): this only works for SEVIRI data like this, make this more general!
+    @staticmethod
+    def format_product_family_key(product_family_key):
+        return product_family_key[0].name + "-" + product_family_key[1].name + "-" + \
+               product_family_key[2]
 
     # number = pyqtProperty(int, get_number, notify=numberChanged)
     # Define the getter of the 'name' property.  The C++ type of the
@@ -25,10 +102,8 @@ class QmlLayerManager(QObject):
 
     # Define the setter of the 'name' property.
     @layerToDisplay.setter
-    def layerToDisplay(self, driving_layer_pfkey):
-        layer_name = driving_layer_pfkey[0].name + "-" + driving_layer_pfkey[1].name + "-" +\
-                     driving_layer_pfkey[2].split(":")[0]
-        self._layer_to_display = layer_name
+    def layerToDisplay(self, data_layer_str):
+        self._layer_to_display = data_layer_str
         self.layerToDisplayChanged.emit()
 
     @pyqtProperty(str, notify=dateToDisplayChanged)
@@ -37,8 +112,6 @@ class QmlLayerManager(QObject):
             return self._format_str.strip("%")
         else:
             return self._date_to_display
-            #date_str = self._date_to_display.strftime(self._format_str)
-            #return date_str
 
     @dateToDisplay.setter
     def dateToDisplay(self, new_date):
@@ -58,62 +131,26 @@ class QmlLayerManager(QObject):
 class QmlTimelineManager(QObject):
     def __init__(self):
         super().__init__()
+        self._timeline_index = 0
         self.timeStampQStringModel = QStringListModel()
+
+    timelineIndexChanged = pyqtSignal(int)
+
+    @pyqtProperty(int, notify=timelineIndexChanged)
+    def timelineIndex(self):
+        return self._timeline_index
+
+    @timelineIndex.setter
+    def timelineIndex(self, val):
+        self._timeline_index = val
+        self.timelineIndexChanged.emit(self._timeline_index)
 
     def update(self, timeline, format_str="%d %h %Y %H:%M"):
         timeline_string_iterable = map(lambda dt: dt.strftime(format_str), timeline)
         self.timeStampQStringModel.setStringList(timeline_string_iterable)
 
 
-# class NumberGenerator(QObject):
-#
-#     def __init__(self):
-#         super().__init__()
-#         self.__number = 42
-#         self.__max_number = 99
-#
-#     maxNumberChanged = pyqtSignal()
-#     numberChanged = pyqtSignal(int)
-#
-#     #number = pyqtProperty(int, get_number, notify=numberChanged)
-#     # Define the getter of the 'name' property.  The C++ type of the
-#     # property is QString which Python will convert to and from a string.
-#     @pyqtProperty(int, notify=numberChanged)
-#     def number(self):
-#         return self.__number
-#
-#     # Define the setter of the 'name' property.
-#     @number.setter
-#     def number(self, val):
-#         if self.__number != val:
-#             self.__number = val
-#             self.numberChanged.emit(self.__number)
-#
-#     @pyqtProperty(int, notify=maxNumberChanged)
-#     def maxNumber(self):
-#         return self.__max_number
-#
-#     @maxNumber.setter
-#     def maxNumber(self, val):
-#         if val < 0:
-#             val = 0
-#
-#         if self.__max_number != val:
-#             self.__max_number = val
-#             self.maxNumberChanged.emit()
-#
-#         if self.__number > self.__max_number:
-#             self.number = self.__max_number
-#
-#     @pyqtSlot()
-#     def updateNumber(self):
-#         new_num = randint(0, self.__max_number)
-#         self.number = new_num
-#
-#     @pyqtSlot(int)
-#     def updateMaxNumber(self, val):
-#         self.maxNumber = val
-
+# TODO(mk): delete this soon!
 class MyModel(QObject):
     modelChanged = pyqtSignal()
 
@@ -128,6 +165,50 @@ class MyModel(QObject):
     @pyqtProperty(int, notify=modelChanged)
     def model(self):
         return self.propertyList
+
+
+class LayerModel(QAbstractListModel):
+    modelChanged = pyqtSignal()
+    pushedOrPopped = pyqtSignal()
+
+    def __init__(self, *args, layer_strings=[], **kwargs):
+        super().__init__(*args, **kwargs)
+        self.layer_strings = layer_strings
+
+    @pyqtProperty("QVariantList", notify=modelChanged)
+    def model(self):
+        return self.layer_strings
+
+    def push(self, data):
+        data_size = len(data)
+        if data_size > 1:
+            start_idx = self.rowCount()
+            end_idx = start_idx + data_size
+            self.beginInsertRows(QModelIndex(), start_idx, end_idx)
+            self.layer_strings.extend(data)
+            self.endInsertRows()
+        else:
+            self.beginInsertRows(QModelIndex(), self.rowCount(), self.rowCount())
+            self.layer_strings.extend(data)
+            self.endInsertRows()
+        self.pushedOrPopped.emit()
+
+    def pop(self, row):
+        self.beginRemoveColumns(QModelIndex(), row, row)
+        del self.layer_strings[row]
+        self.endRemoveRows()
+        self.pushedOrPopped.emit()
+
+    def clear(self):
+        for row, _ in enumerate(self.layer_strings):
+            self.pop(row)
+
+    def data(self, index, role=Qt.DisplayRole):
+        if role == Qt.DisplayRole:
+            return self.layer_strings[index.row()]
+
+    def rowCount(self, parent=QModelIndex()):
+        return len(self.layer_strings)
 
 
 class MyTestModel2(QAbstractListModel):
@@ -151,9 +232,7 @@ class MyTestModel2(QAbstractListModel):
 
     def data(self, index, role):
         if role == Qt.DisplayRole:
-            #status, text
-            text = self.vals[index.row()]
-            return text
+            return self.vals[index.row()]
 
     def rowCount(self, index):
         return len(self.vals)
@@ -161,28 +240,61 @@ class MyTestModel2(QAbstractListModel):
 
 class QmlBackend(QObject):
 
-    # doAddPin = pyqtSignal()
     doRefreshTimeline = pyqtSignal()
+    doLoadTimeline = pyqtSignal()
+    doClearTimeline = pyqtSignal()
+    doNotifyTimelineIndexChanged = pyqtSignal(int)
+    didJumpInTimeline = pyqtSignal(int)
+    # The timebase of the animation/display might be a driving layer or a timeline generated
+    # according to some policy. didChangeTimebase is emitted when i.e. the driving layer is supposed
+    # to change.
+    didChangeTimebase = pyqtSignal(int)
 
     def __init__(self):
         super().__init__()
+        self.qml_layer_manager: QmlLayerManager = None
+
+    def notify_tidx_changed(self, idx):
+        self.doNotifyTimelineIndexChanged.emit(idx)
+
+    def clear_timeline(self):
+        self.doClearTimeline.emit()
+
+    def load_timeline(self):
+        self.doLoadTimeline.emit()
 
     def refresh_timeline(self):
         self.doRefreshTimeline.emit()
 
+    @pyqtSlot(int)
+    def clickTimelineAtIndex(self, idx):
+        """
+        Slot that gets triggered if the user clicks the timeline at a position. The index
+        corresponding to that position is passed to this slot which then forwards it via
+        emittance of the didJumpInTimeline signal.
+        :param idx: Timebase index of the clicked location on the UI timeline
+        """
+        self.didJumpInTimeline.emit(idx)
 
-        # class Backend: public
-        #
-        # QObject
-        # {
-        #     signals:
-        #         void doAddPin(float latitude, float longitude, QString name, QString address);
-        #
-        # ........
-        #     void
-        # callAddPinInQML()
-        # {
-        #     emit
-        # doAddPin(12.34, 45.67, "hello", "world");
-        # }
-        # }
+    @pyqtSlot(int)
+    def clickComboBoxAtIndex(self, idx):
+        """
+        Slot triggered by the user clicking an entry in the timebase selection Combo Box. A timebase
+        change is then triggered by emitting the didChangeTimebase signal with the corresponding
+        index.
+        :param idx: Timebase index of the clicked combo box item
+        """
+        self.didChangeTimebase.emit(idx)
+
+    @pyqtSlot(str)
+    def clickConvFuncMenu(self, conv_func_name):
+        """
+        Slot triggered by the user clicking an entry in the convenience function popup menu.
+        A convenience function is then selected by it's index in the popup menu and executed. The
+        resulting data_layer_index is then emitted via the didChangeTimebase signal.
+        :param conv_func_name: Name of the clicked convenience function as a string
+        """
+        if self.qml_layer_manager:
+            data_layer_idx = self.qml_layer_manager.convenience_functions[conv_func_name]()
+            if data_layer_idx:
+                self.didChangeTimebase.emit(data_layer_idx)
