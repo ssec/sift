@@ -24,6 +24,9 @@ import argparse
 import logging
 import sys
 import unittest
+from pathlib import Path
+
+QML_PATH = Path(__file__).parent.absolute()
 
 LOG = logging.getLogger(__name__)
 

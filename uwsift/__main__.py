@@ -838,6 +838,7 @@ class Main(QtGui.QMainWindow):
         self._init_layer_panes()
         self._init_rgb_pane()
         self._init_map_widget()
+        self._init_qml_timeline()
 
         if AUTO_UPDATE_MODE__ACTIVE:
             self._init_update_times_display()
@@ -1021,6 +1022,10 @@ class Main(QtGui.QMainWindow):
         self.ui.projectionComboBox.addItems(tuple(AreaDefinitionsManager.available_area_def_names()))
         self.ui.projectionComboBox.currentIndexChanged.connect(self.document.change_projection_index)
         self.document.didChangeProjection.connect(self.scene_manager.set_projection)
+
+    def _init_qml_timeline(self):
+        from uwsift.ui import QML_PATH
+        self.ui.timelineQuickWidget.setSource(QtCore.QUrl(str(QML_PATH / "timeline.qml")))
 
     def _init_arrange_panes(self):
         self.tabifyDockWidget(self.ui.layersPane, self.ui.areaProbePane)
