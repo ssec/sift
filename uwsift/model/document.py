@@ -82,6 +82,7 @@ from uwsift.queue import TaskQueue
 from uwsift.workspace import BaseWorkspace, CachingWorkspace, SimpleWorkspace
 from uwsift.util.default_paths import DOCUMENT_SETTINGS_DIR
 from uwsift.model.composite_recipes import RecipeManager, CompositeRecipe
+from uwsift.model.area_defnitions_manager import AreaDefinitionsManager
 from uwsift.view.colormap import COLORMAP_MANAGER, PyQtGraphColormap, SITE_CATEGORY, USER_CATEGORY
 from uwsift.queue import TASK_PROGRESS, TASK_DOING
 from PyQt5.QtCore import QObject, pyqtSignal
@@ -1281,7 +1282,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didChangeCompositions = pyqtSignal(tuple, tuple, tuple)  # new-layer-order, changed-layers, new-prezs
     didCalculateLayerEqualizerValues = pyqtSignal(
         dict)  # dict of {uuid: (value, normalized_value_within_clim)} for equalizer display
-    didChangeProjection = pyqtSignal(str, dict)  # name of projection, dict of projection information
+    didChangeProjection = pyqtSignal(str)  # name of projection
     # didChangeShapeLayer = pyqtSignal(dict)
     didAddFamily = pyqtSignal(str, dict)  # name of the newly added family and dict of family info
     didRemoveFamily = pyqtSignal(str)  # name of the newly added family and dict of family info
@@ -1332,70 +1333,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.data_layer_collection = None
 
         self.colormaps = COLORMAP_MANAGER
-        self.available_projections = OrderedDict((
-            ('Mercator', {
-                'proj4_str': '+proj=merc +datum=WGS84 +ellps=WGS84 +over',
-                'default_center': (144.8, 13.5),  # lon, lat center point (Guam)
-                'default_width': 20.,  # degrees from left edge to right edge
-                'default_height': 20.,  # degrees from bottom edge to top edge
-            }),
-            ('SEVIRI FES', {
-                'proj4_str': '+proj=geos +lon_0=0.0 +h=35786023.0 +a=6378137.0 +b=6356752.31414 +sweep=x +units=m',
-                'default_center': (0., 0.),  # lon, lat center point
-                'default_width': 134.,  # degrees from left edge to right edge
-                'default_height': 134.,  # degrees from bottom edge to top edge
-            }),
-            ('SEVIRI IODC', {
-                'proj4_str': '+proj=geos +lon_0=41.4 +h=35786023.0 +a=6378137.0 +b=6356752.31414 +sweep=x +units=m',
-                'default_center': (41.5, 0.),  # lon, lat center point
-                'default_width': 134.,  # degrees from left edge to right edge
-                'default_height': 134.,  # degrees from bottom edge to top edge
-            }),
-            ('LCC (CONUS)', {
-                'proj4_str': '+proj=lcc +a=6371200 +b=6371200 +lat_0=25 +lat_1=25 +lon_0=-95 +units=m +no_defs +over',
-                'default_center': (-95, 35.),
-                'default_width': 25.,
-                'default_height': 25.,
-            }),
-            # ('Platte Carre', {}),
-            ('Himawari Geos', {
-                'proj4_str': '+proj=geos +a=6378137 +b=6356752.299581327 +lon_0=140.7 +h=35785863 +over',
-                'default_center': (144.8, 13.5),  # lon, lat center point (Guam)
-                'default_width': 20.,  # degrees from left edge to right edge
-                'default_height': 20.,  # degrees from bottom edge to top edge
-            }),
-            ('GOES East', {
-                'proj4_str': '+proj=geos +lon_0=-75 +h=35786023.0 +a=6378137.0 +b=6356752.31414 +sweep=x +units=m',
-                'default_center': (-75, 13.5),  # lon, lat center point (Guam)
-                'default_width': 20.,  # degrees from left edge to right edge
-                'default_height': 20.,  # degrees from bottom edge to top edge
-            }),
-            ('GOES Test', {
-                'proj4_str': '+proj=geos +lon_0=-89.5 +h=35786023.0 +a=6378137.0 +b=6356752.31414 +sweep=x +units=m',
-                'default_center': (-89.5, 13.5),  # lon, lat center point (Guam)
-                'default_width': 20.,  # degrees from left edge to right edge
-                'default_height': 20.,  # degrees from bottom edge to top edge
-            }),
-            ('GOES Central', {
-                'proj4_str': '+proj=geos +lon_0=-105 +h=35786023.0 +a=6378137.0 +b=6356752.31414 +sweep=x +units=m',
-                'default_center': (-105, 13.5),  # lon, lat center point (Guam)
-                'default_width': 20.,  # degrees from left edge to right edge
-                'default_height': 20.,  # degrees from bottom edge to top edge
-            }),
-            ('GOES West', {
-                'proj4_str': '+proj=geos +lon_0=-137 +h=35786023.0 +a=6378137.0 +b=6356752.31414 +sweep=x +units=m',
-                'default_center': (-137, 13.5),  # lon, lat center point (Guam)
-                'default_width': 20.,  # degrees from left edge to right edge
-                'default_height': 20.,  # degrees from bottom edge to top edge
-            }),
-            ('Polar (Alaska)', {
-                'proj4_str': '+proj=stere +datum=WGS84 +ellps=WGS84 +lat_0=90 +lat_ts=60.0 +lon_0=-150 +units=m +over',
-                'default_center': (-150., 61.2),  # lon, lat center point (Anchorage)
-                'default_width': 20.,  # degrees from left edge to right edge
-                'default_height': 20.,  # degrees from bottom edge to top edge
-            }),
-        ))
-        self.default_projection_name = 'SEVIRI FES'
+        self.default_projection_name = AreaDefinitionsManager.default_area_def_name()
         self.current_projection_name = self.default_projection_name
         self.recipe_manager = RecipeManager(self.config_dir)
         self._recipe_layers = {}
@@ -1471,20 +1409,18 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             colormap = self.colormaps[colormap]
         return colormap
 
-    def projection_info(self, projection_name=None):
-        return self.available_projections[projection_name or self.current_projection_name]
+    def area_definition(self, area_definition_name=None):
+        return AreaDefinitionsManager.area_def_by_name(area_definition_name or
+                                                       self.current_projection_name)
 
     def change_projection(self, projection_name=None):
         if projection_name is None:
             projection_name = self.default_projection_name
-        assert projection_name in self.available_projections
+        assert projection_name in AreaDefinitionsManager.available_area_def_names()
         if projection_name != self.current_projection_name:
             LOG.debug("Changing projection from '{}' to '{}'".format(self.current_projection_name,projection_name))
             self.current_projection_name = projection_name
-            self.didChangeProjection.emit(
-                self.current_projection_name,
-                self.projection_info(self.current_projection_name)
-            )
+            self.didChangeProjection.emit(self.current_projection_name)
 
     def update_user_colormap(self, colormap, name):
         # Update new gradient into save location
@@ -1512,10 +1448,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         del self.colormaps[name]
 
     def current_projection_index(self):
-        return list(self.available_projections.keys()).index(self.current_projection_name)
+        return list(AreaDefinitionsManager.available_area_def_names()).index(self.current_projection_name)
 
     def change_projection_index(self, idx):
-        return self.change_projection(tuple(self.available_projections.keys())[idx])
+        return self.change_projection(tuple(AreaDefinitionsManager.available_area_def_names())[idx])
 
     @property
     def current_layer_set(self):
