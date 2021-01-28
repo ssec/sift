@@ -273,13 +273,13 @@ def latlong_init(proj_dict):
 # and 'imap' is X/Y to lon/lat
 # WARNING: Need double {{ }} for functions for string formatting to work properly
 PROJECTIONS = {
-    'latlong': (
+    'longlat': (
         latlong_init,
         """vec4 latlong_map(vec4 pos) {{
-            return vec4(pos.x + {offset}, y, pos.z, pos.w);
+            return vec4(pos.x + {offset}, pos.y, pos.z, pos.w);
         }}""",
         """vec4 latlong_map(vec4 pos) {{
-            return vec4(pos.x + {offset}, y, pos.z, pos.w);
+            return vec4(pos.x + {offset}, pos.y, pos.z, pos.w);
         }}""",
         """vec4 latlong_imap(vec4 pos) {{
             return pos;
