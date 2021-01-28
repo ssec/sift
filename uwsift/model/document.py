@@ -1282,7 +1282,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didChangeCompositions = pyqtSignal(tuple, tuple, tuple)  # new-layer-order, changed-layers, new-prezs
     didCalculateLayerEqualizerValues = pyqtSignal(
         dict)  # dict of {uuid: (value, normalized_value_within_clim)} for equalizer display
-    didChangeProjection = pyqtSignal(str)  # name of projection
+    didChangeProjection = pyqtSignal(str)  # name of projection (area definition)
     # didChangeShapeLayer = pyqtSignal(dict)
     didAddFamily = pyqtSignal(str, dict)  # name of the newly added family and dict of family info
     didRemoveFamily = pyqtSignal(str)  # name of the newly added family and dict of family info
@@ -1333,8 +1333,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.data_layer_collection = None
 
         self.colormaps = COLORMAP_MANAGER
-        self.default_projection_name = AreaDefinitionsManager.default_area_def_name()
-        self.current_projection_name = self.default_projection_name
+        self.default_area_def_name = AreaDefinitionsManager.default_area_def_name()
+        self.current_area_def_name = self.default_area_def_name
         self.recipe_manager = RecipeManager(self.config_dir)
         self._recipe_layers = {}
         # HACK: This should probably be part of the metadata database in the future
@@ -1411,16 +1411,17 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def area_definition(self, area_definition_name=None):
         return AreaDefinitionsManager.area_def_by_name(area_definition_name or
-                                                       self.current_projection_name)
+                                                       self.current_area_def_name)
 
-    def change_projection(self, projection_name=None):
-        if projection_name is None:
-            projection_name = self.default_projection_name
-        assert projection_name in AreaDefinitionsManager.available_area_def_names()
-        if projection_name != self.current_projection_name:
-            LOG.debug("Changing projection from '{}' to '{}'".format(self.current_projection_name,projection_name))
-            self.current_projection_name = projection_name
-            self.didChangeProjection.emit(self.current_projection_name)
+    def change_projection(self, area_def_name=None):
+        if area_def_name is None:
+            area_def_name = self.default_area_def_name
+        assert area_def_name in AreaDefinitionsManager.available_area_def_names()
+        if area_def_name != self.current_area_def_name:
+            LOG.debug(f"Changing projection (area definition) from"
+                      f" '{self.current_area_def_name}' to '{area_def_name}'")
+            self.current_area_def_name = area_def_name
+            self.didChangeProjection.emit(self.current_area_def_name)
 
     def update_user_colormap(self, colormap, name):
         # Update new gradient into save location
@@ -1448,7 +1449,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         del self.colormaps[name]
 
     def current_projection_index(self):
-        return list(AreaDefinitionsManager.available_area_def_names()).index(self.current_projection_name)
+        return list(AreaDefinitionsManager.available_area_def_names()).index(self.current_area_def_name)
 
     def change_projection_index(self, idx):
         return self.change_projection(tuple(AreaDefinitionsManager.available_area_def_names())[idx])
