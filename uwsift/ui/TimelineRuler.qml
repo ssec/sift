@@ -153,6 +153,7 @@ Rectangle{
             //              {"X": 1.0,"Y":1.0,"TextX":1.0,"TextY":1.0,"Length":1.0,"Major":false, "Text":""};
             // Font size in px
 
+            let fontSize = 16;
             let textPaddingBottom = 3;
             context.font= tickFontSize+'px "%1"'.arg("sans-serif");//.arg(siftFont.name);
             // TODO: the below does not work, as a child object would be necessary
