@@ -41,7 +41,7 @@ Rectangle{
         property var resolution: 30;
         property var resolutionMode: "Minutes";
         property var majorTickFontsize: 14;
-        property var tickFontsize: 16;
+        property var tickFontSize: 14;
         property var rulerYPosition: timestamp_rect.height;
         // Signal declarations
         // Javascript functions
@@ -154,9 +154,9 @@ Rectangle{
             // Structure of tickBP:
             //              {"X": 1.0,"Y":1.0,"TextX":1.0,"TextY":1.0,"Length":1.0,"Major":false, "Text":""};
             // Font size in px
-            let fontSize = 16;
+
             let textPaddingBottom = 3;
-            context.font= fontSize+'px "%1"'.arg(siftFont.name);
+            context.font= tickFontSize+'px "%1"'.arg("sans-serif");//.arg(siftFont.name);
             // TODO: the below does not work, as a child object would be necessary
             //context.font= fontSize+'px "%1"'.arg(root.siftFont.name);
             //       Solution: Create a Resources.qml (or any compatible name, must start with Capital letter)
@@ -217,7 +217,7 @@ Rectangle{
             requestPaint();
         }
         FontLoader {
-            id: siftFont;
+            id: siftFont;//"Sans Serif"
             source: Qt.resolvedUrl("../data/fonts/Andale Mono.ttf");//"qrc:/AndaleMono.ttf"
         }
         /*
@@ -319,7 +319,7 @@ Rectangle{
                 let cursorWidth = 11
                 let cursorYOffset = Math.round(cursorWidth/2)-1
                 context.moveTo(cursorX, cursorY-cursorYOffset);
-                context.lineTo(cursorX, cursorY-cursorYOffset+markerYPosition);
+                context.lineTo(cursorX, markerYPosition+1.5*markerRadius);
                 context.fillRect(cursorX-5, cursorY-cursorYOffset, cursorWidth, cursorWidth);
                 context.stroke();
             }
