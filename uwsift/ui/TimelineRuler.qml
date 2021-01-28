@@ -17,10 +17,6 @@ Blueprint:
 Rectangle{
     id: timelineRuler
 
-    property var timelinepointsArr : []
-    property var gDelegateWidth;
-    property var gDelegateHeight;
-
     property date minDate: new Date("2011-01-01")
     property date maxDate: new Date("2030-12-31")
     property date oldDate: new Date("2011-01-01")
@@ -36,12 +32,6 @@ Rectangle{
         id: timelineRulerCanvas
         // Property declarations
         property date oldDate: new Date("1990-01-01");
-        /*  TODO: define minimumTickWidth, if too many ticks are in timebaseModel
-                  display ticks as they fit on canvas
-
-        property int numVisibleTicks;
-        property int widthVisibleTick;
-        */
         property real tickWidth;
         property int maxNumTicks: 10;
         property int temp_idx: -1;
@@ -50,6 +40,9 @@ Rectangle{
         property var tickMargin: 10;
         property var resolution: 30;
         property var resolutionMode: "Minutes";
+        property var majorTickFontsize: 14;
+        property var tickFontsize: 16;
+        property var rulerYPosition: timestamp_rect.height;
         // Signal declarations
         // Javascript functions
         function clear_canvas(context) {
@@ -139,23 +132,28 @@ Rectangle{
         }
 
         function createTickBlueprint(index, tickDate, majorTick){
-            let tickBP = {"X": 1.0,"Y":1.0,"TextX":1.0,"TextY":1.0,"Length":1.0,"Major":false, "Text":""};
-            if (majorTick || index===0){
+            let tickBP = {"X": 1.0,"Y":1.0,"TextX":1.0,"TextY":1.0,"Length":1.0,"Major":false, "Text":"", "MajorText":"","MajorTextY":timelineRulerCanvas.majorTickFontsize};
+            if (majorTick || (index === 0)){
                 tickBP.Major = true;
                 tickBP.MajorText += Qt.formatDateTime(tickDate, "d MMM yyyy");
                 tickBP.Y = 0;
-                tickBP.Length = height;
+                tickBP.Length = (3/4)*height;
             }else{
                 // Minor tick
-                tickBP.Y = height/4;
-                tickBP.Length = height-tickBP.Y;
+                tickBP.Y = height/8;
+                tickBP.Length = height/2;
             }
+            tickBP.X = timelineRulerCanvas.tickMargin + index*tickWidth;
+            tickBP.Text += Qt.formatDateTime(tickDate, "hh:mm");
+            tickBP.TextX = tickBP.X+1;
+            tickBP.TextY = rulerYPosition-1;
             return tickBP;
         }
 
         function drawTicks(context){
-            //let tickBP = {"X": 1.0,"Y":1.0,"TextX":1.0,"TextY":1.0,"Length":1.0,"Major":false, "Text":""};
-            //Font size in px
+            // Structure of tickBP:
+            //              {"X": 1.0,"Y":1.0,"TextX":1.0,"TextY":1.0,"Length":1.0,"Major":false, "Text":""};
+            // Font size in px
             let fontSize = 16;
             let textPaddingBottom = 3;
             context.font= fontSize+'px "%1"'.arg(siftFont.name);
@@ -169,10 +167,9 @@ Rectangle{
                 context.moveTo(item.X, item.Y);
                 context.lineTo(item.X, item.Y + item.Length);
                 if (item.Major){
-                    let MajorTickText = item.Text.split("\n");
-                    let textMesurement = context.measureText(MajorTickText[0]);
-                    context.fillText(MajorTickText[0], item.TextX, item.TextY-fontSize-textPaddingBottom);
-                    context.fillText(MajorTickText[1], item.TextX, item.TextY-textPaddingBottom);
+                    let majorTickText = item.MajorText;
+                    context.fillText(majorTickText, item.TextX, item.MajorTextY);
+                    context.fillText(item.Text, item.TextX, item.TextY-textPaddingBottom);
                 }else{
                     context.fillText(item.Text, item.TextX, item.TextY-textPaddingBottom);
                 }
@@ -191,8 +188,8 @@ Rectangle{
             context.strokeStyle = Qt.darker(timeline_rect.color, 2.0)
             context.lineWidth = 2;
             // Draw horizontal ray
-            context.moveTo(0, height/2);
-            context.lineTo(width, height/2);
+            context.moveTo(0, rulerYPosition);
+            context.lineTo(width, rulerYPosition);
             context.stroke();
             let margin = 10;
             drawTicks(context);
@@ -215,9 +212,7 @@ Rectangle{
             }
         }
         onWidthChanged: {
-            //timelineRulerCanvas.tickWidth = timelineRulerCanvas.width / timebaseModel.rowCount();
             timelineRulerCanvas.tickWidth = timelineRulerCanvas.width / timelineRulerCanvas.maxNumTicks;
-            //buildTickBlueprints("onWidthCH");
             buildTickBlueprints();
             requestPaint();
         }
@@ -241,7 +236,7 @@ Rectangle{
         property var cursorY: 0
         // marker radius actually used to define bounding box of rounded rect
         property var markerRadius: 10
-        property var markerYPosition: (3/4)*(height) - (markerRadius / 2);
+        property var markerYPosition: (height/2) - (markerRadius / 2);
         property bool dataLoaded: false;
         property var markerBluePrints: []
 
@@ -265,7 +260,7 @@ Rectangle{
             let timeOffset = markerDate.getTime()-ticks[0].getTime();
             let markerWidth = timelineMarkerCanvas.markerBluePrints[0].W;
             timelineMarkerCanvas.cursorX = (tickWidthPerTime*timeOffset) + timelineRulerCanvas.tickMargin;// + (markerWidth / 2);
-            timelineMarkerCanvas.cursorY = timelineRulerCanvas.height/2;
+            timelineMarkerCanvas.cursorY = timelineRulerCanvas.rulerYPosition;//timelineRulerCanvas.height/2;
         }
 
         function createMarkerBlueprint(index, markerDate){
@@ -285,16 +280,10 @@ Rectangle{
             }else{
                 tickWidthPerTime = timelineRulerCanvas.tickWidth/(ticks[1].getTime()-ticks[0].getTime());
             }
-
-
-
-            //let tickWidthPerTime = timelineRulerCanvas.tickWidth/(ticks[1].getTime()-ticks[0].getTime());
-
-
             let timeOffset = markerDate.getTime()-ticks[0].getTime();
-            //markerBP.X = timelineRulerCanvas.tickMargin + index*timelineRulerCanvas.tickWidth - (markerBP.W / 2);
             markerBP.X = (tickWidthPerTime*timeOffset) + timelineRulerCanvas.tickMargin - (markerBP.W/2);
             markerBP.Y = markerYPosition;
+
             return markerBP;
         }
 
@@ -311,25 +300,30 @@ Rectangle{
         renderStrategy: Canvas.Threaded
 
         onPaint: {
-            updateTimelineCursorPosition()
-            var context = getContext("2d");
-            context.reset();
-            let markerColor = Qt.darker(Qt.rgba(1, 0, 0, 1), 1);
-            context.strokeStyle = markerColor;
-            context.fillStyle = markerColor;
-            context.lineWidth = 2;
-            markerBluePrints.forEach((bp)=>{
+            if (dataLoaded){
+                updateTimelineCursorPosition()
+                var context = getContext("2d");
+                context.reset();
+                let markerColor = Qt.darker(Qt.rgba(1, 0, 0, 1), 1);
+                context.strokeStyle = markerColor;
+                context.fillStyle = markerColor;
+                context.lineWidth = 2;
+                markerBluePrints.forEach((bp)=>{
+                    context.beginPath();
+                    context.roundedRect(bp.X, bp.Y, bp.W, bp.H, bp.R, bp.R);
+                    context.stroke();
+                });
                 context.beginPath();
-                context.roundedRect(bp.X, bp.Y, bp.W, bp.H, bp.R, bp.R);
+
+                // draw Cursor
+                let cursorWidth = 11
+                let cursorYOffset = Math.round(cursorWidth/2)-1
+                context.moveTo(cursorX, cursorY-cursorYOffset);
+                context.lineTo(cursorX, cursorY-cursorYOffset+markerYPosition);
+                context.fillRect(cursorX-5, cursorY-cursorYOffset, cursorWidth, cursorWidth);
                 context.stroke();
-            });
-            context.beginPath();
-            // line
-            //let markerX = markerBluePrints[currIndex].X
-            context.moveTo(cursorX, cursorY);
-            context.lineTo(cursorX, cursorY+height/4);
-            context.fillRect(cursorX-5, cursorY-10, 10, 10);
-            context.stroke();
+            }
+
         }
 
         onReemittedTimelineIndexChanged: {
@@ -340,8 +334,6 @@ Rectangle{
         Connections{
             target: timelineRulerCanvas
             onWidthChanged: {
-                //timelineMarkerCanvas.markerX = timelineRulerCanvas.tickWidth*timelineMarkerCanvas.currIndex + timelineRulerCanvas.tickMargin;
-                //timelineMarkerCanvas.markerY = timelineRulerCanvas.height/2;
                 timelineMarkerCanvas.updateMarkerBlueprints();
                 timelineMarkerCanvas.requestPaint();
             }
@@ -349,6 +341,7 @@ Rectangle{
         Connections{
             target: timebaseModel
             onTimebaseChanged: {
+                timelineMarkerCanvas.dataLoaded = true
                 timelineMarkerCanvas.currIndex = 0;
                 timelineMarkerCanvas.updateMarkerBlueprints();
                 timelineMarkerCanvas.requestPaint();
@@ -362,7 +355,6 @@ Rectangle{
     }
     MouseArea{
         id: mouse_area
-        //anchors.fill: parent
         property var prevIndex: 0;
 
         hoverEnabled: true
@@ -373,7 +365,6 @@ Rectangle{
         onClicked: {
             let numTicks = 1;
             let tickWidth = 1;
-            //let clickedIndex = parseInt((mouseX-timelineRulerCanvas.tickMargin) / timelineRulerCanvas.tickWidth);
             let markerXs = []
             for (var i=0; i<timelineMarkerCanvas.markerBluePrints.length;i++){
                 markerXs.push(timelineMarkerCanvas.markerBluePrints[i].X);

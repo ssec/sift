@@ -54,7 +54,8 @@ Item{
 
                 Label{
                     id: current_dt_label
-                    text: timebaseModel.currentTimestamp//LayerManager.dateToDisplay
+                    font: siftFont.name;
+                    text: timebaseModel.currentTimestamp;
 
                 }
             }
@@ -194,9 +195,9 @@ Item{
             border.color: default_gray;
 
             Layout.row       : 0
-
             Layout.column    : 2
             Layout.rowSpan : 2
+
             Layout.columnSpan : 7
             Layout.preferredWidth  : grid.prefWidth(this)
             Layout.preferredHeight : grid.prefHeight(this)
