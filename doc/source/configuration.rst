@@ -27,4 +27,5 @@ configurations have a look here: https://donfig.readthedocs.io/en/latest/.
    Display <configuration-display.rst>
    External Satpy <configuration-external_satpy.rst>
    Latlon Grid Resolution <configuration-latlon-grid-resolution.rst>
+   Projections / Area Definitions <configuration-area_definitions.rst>
    Storage <configuration-storage.rst>

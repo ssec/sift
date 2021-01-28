@@ -22,6 +22,7 @@ __author__ = 'rayg'
 
 # To have consistent logging for all modules (also for their static
 # initialization) it must be set up before importing them.
+from uwsift.model.area_defnitions_manager import AreaDefinitionsManager
 from uwsift.util.logger import configure_loggers
 
 configure_loggers()  # we rerun this later to post-config
@@ -1014,7 +1015,8 @@ class Main(QtGui.QMainWindow):
     def _init_map_widget(self):
         # connect canvas and projection pieces
         self.ui.mainMapWidget.layout().addWidget(self.scene_manager.main_canvas.native)
-        self.ui.projectionComboBox.addItems(tuple(self.document.available_projections.keys()))
+        # self.ui.projectionComboBox.addItems(tuple(self.document.available_projections.keys()))
+        self.ui.projectionComboBox.addItems(tuple(AreaDefinitionsManager.available_area_def_names()))
         self.ui.projectionComboBox.currentIndexChanged.connect(self.document.change_projection_index)
         self.document.didChangeProjection.connect(self.scene_manager.set_projection)
 

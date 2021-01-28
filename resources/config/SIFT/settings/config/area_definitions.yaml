@@ -1,0 +1,21 @@
+area_definitions:
+
+  MSG SEVIRI FES 3km: msg_seviri_fes_3km
+
+  MSG SEVIRI FES 1km: msg_seviri_fes_1km
+
+  MSG SEVIRI RSS 3km: msg_seviri_rss_3km
+
+  MSG SEVIRI RSS 1km: msg_seviri_rss_1km
+
+  MSG SEVIRI IODC 3km: msg_seviri_iodc_3km
+
+  MSG SEVIRI IODC 1km: msg_seviri_iodc_1km
+
+  MTG FCI FDSS 1km: mtg_fci_fdss_1km
+
+  MTG FCI FDSS 2km: mtg_fci_fdss_2km
+
+#---- MTG-SIFT doesn't implement proj=eqc correctly/completely ----
+#  Plate Carree 3km: worldeqc3km
+

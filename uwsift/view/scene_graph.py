@@ -42,6 +42,7 @@ from uuid import UUID
 import numpy as np
 from PyQt5.QtCore import QObject, pyqtSignal, Qt
 from PyQt5.QtGui import QCursor
+from pyresample import AreaDefinition
 from vispy import app
 from vispy import scene
 from vispy.geometry import Rect
@@ -54,6 +55,7 @@ from vispy.gloo.util import _screenshot
 from uwsift import config
 from uwsift import USE_TILED_GEOLOCATED_IMAGES
 from uwsift.common import DEFAULT_ANIMATION_DELAY, Info, Kind, Tool, Presentation
+from uwsift.model.area_defnitions_manager import AreaDefinitionsManager
 from uwsift.model.document import DocLayerStack, DocBasicLayer, Document
 from uwsift.queue import TASK_DOING, TASK_PROGRESS
 from uwsift.util import get_package_data_dir
@@ -634,9 +636,7 @@ class SceneGraphManager(QObject):
         self.main_map_parent.transform = z_level_transform
 
         # Head node of the map graph
-        proj_info = self.document.projection_info()
         self.main_map = MainMap(name="MainMap", parent=self.main_map_parent)
-        self.main_map.transform = PROJ4Transform(proj_info['proj4_str'])
         self.proxy_nodes = {}
 
         self._borders_color_idx = 0
@@ -660,14 +660,11 @@ class SceneGraphManager(QObject):
 
         # Make the camera center on Guam
         # center = (144.8, 13.5)
-        center = center or proj_info["default_center"]
-        width = proj_info["default_width"] / 2.
-        height = proj_info["default_height"] / 2.
-        ll_xy = self.borders.transforms.get_transform(map_to="scene").map(
-            [(center[0] - width, center[1] - height)])[0][:2]
-        ur_xy = self.borders.transforms.get_transform(map_to="scene").map(
-            [(center[0] + width, center[1] + height)])[0][:2]
-        self.main_view.camera.rect = Rect(ll_xy, (ur_xy[0] - ll_xy[0], ur_xy[1] - ll_xy[1]))
+        ##proj_info = self.document.projection_info()
+        ##self._set_projection(proj_info)
+
+        area_def = self.document.area_definition()
+        self._set_projection(area_def)
 
     def create_test_image(self):
         proj4_str = os.getenv("SIFT_DEBUG_IMAGE_PROJ", None)
@@ -705,20 +702,32 @@ class SceneGraphManager(QObject):
         image.transform *= STTransform(translate=(0, 0, -50.0))
         self._test_img = image
 
-    def set_projection(self, projection_name: str, proj_info: dict, center=None):
-        self.main_map.transform = PROJ4Transform(proj_info['proj4_str'])
-        center = center or proj_info["default_center"]
-        width = proj_info["default_width"] / 2.
-        height = proj_info["default_height"] / 2.
-        ll_xy = self.borders.transforms.get_transform(map_to="scene").map(
-            [(center[0] - width, center[1] - height)])[0][:2]
-        ur_xy = self.borders.transforms.get_transform(map_to="scene").map(
-            [(center[0] + width, center[1] + height)])[0][:2]
-        self.main_view.camera.rect = Rect(ll_xy, (ur_xy[0] - ll_xy[0], ur_xy[1] - ll_xy[1]))
+    def set_projection(self, area_display_name: str, center=None):
+        area_def = AreaDefinitionsManager.area_def_by_name(area_display_name)
+        assert area_def is not None
+        self._set_projection(area_def, center)
+
         for img in self.image_elements.values():
             if hasattr(img, 'determine_reference_points'):
                 img.determine_reference_points()
         self.on_view_change(None)
+
+    def _set_projection(self, area_def: AreaDefinition, center=None):
+        self.main_map.transform = PROJ4Transform(area_def.proj_str)
+
+        ll_xy = area_def.area_extent[:2]
+        ur_xy = area_def.area_extent[2:]
+
+        if center:
+            mapped_center = \
+                self.borders.transforms \
+                    .get_transform(map_to="scene").map([center])[0][:2]
+            ll_xy += mapped_center
+            ur_xy += mapped_center
+
+        self.main_view.camera.rect = \
+            Rect(ll_xy, (ur_xy[0] - ll_xy[0], ur_xy[1] - ll_xy[1]))
+
 
     @staticmethod
     def _create_latlon_grid_points(resolution=5.):
