@@ -54,7 +54,6 @@ Item{
 
                 Label{
                     id: current_dt_label
-                    font: siftFont.name;
                     text: timebaseModel.currentTimestamp;
                 }
             }
