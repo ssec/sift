@@ -180,7 +180,6 @@ Item{
 
                       text: model.display;
                       onTriggered: {
-                        console.debug("FF: " + font)
                         backend.clickComboBoxAtIndex(model.index);
                         dataLayerComboBox.currentIndex = model.index;
                         LayerManager.currentIndex = model.index;
@@ -205,11 +204,6 @@ Item{
         }
     }
     FontLoader {
-//        Label{id: lab1}
-//        property var ff: lab1.fontInfo;
-//        Component.onCompleted: {
-//            console.debug("FF: " + ff)
-//        }
         id: siftFont;
         source: Qt.resolvedUrl("../data/fonts/Andale Mono.ttf");
     }

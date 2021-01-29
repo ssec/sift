@@ -80,8 +80,9 @@ Rectangle{
 
             //TODO(mk): make these three properties of TimelineRulerCanvas?
             // Assume temporally sorted timebaseModel
+            let numDts = timebaseModel.rowCount()
             let currMinDate = timebaseModel.at(0);
-            let currMaxDate = timebaseModel.at(timebaseModel.rowCount()-1);
+            let currMaxDate = timebaseModel.at(numDts-1);
 
             let firstDate = new Date(currMinDate)
             firstDate.setSeconds(0);
@@ -91,20 +92,18 @@ Rectangle{
             // create enough timestamps to reach currMaxDate
             // if all fit within maxNumTicks -> good
             // else --> only draw up to maxNumTicks
-            for(var k=1; k<maxNumTicks; k++){
-                tickDts.push(
-                            nextDateByResolution(tickDts[k-1], resolution, resolutionMode)
-                );
+            for(var k=1; k<numDts; k++){
+                let nextTickDt = nextDateByResolution(tickDts[k-1], resolution, resolutionMode);
+                if (nextTickDt > currMaxDate){
+                    break;
+                }
+                tickDts.push(nextTickDt);
+
             }
-            // in case of ruler featuring a wider timespan than timebaseModel, cut off extraneous ticks
-            let tickDtsCut = [];
-            if (tickDts[tickDts.length-1]>currMaxDate){
-                tickDtsCut =  tickDts.filter((tickDt)=>{return tickDt <= currMaxDate});
-            }
-            timelineRulerCanvas.tickDates = tickDtsCut;
-            if (tickDtsCut.length < tickDts.length){
-                timelineRulerCanvas.tickWidth = timelineRulerCanvas.width / tickDtsCut.length;
-            }
+
+            timelineRulerCanvas.tickDates = tickDts;
+            timelineRulerCanvas.tickWidth = timelineRulerCanvas.width / tickDts.length;
+
             // figure out temporal res. and scale accordingly
             let ticks = timelineRulerCanvas.tickDates
             for(var i=0; i < ticks.length; i++){
@@ -203,10 +202,18 @@ Rectangle{
             on data load, chevron markers are drawn at points on timeline where data occurs
             on anim outlined chevron (with whisker?) moves over these points
         */
+
+        function calculate_resolution(){
+            let possibleResolutions = [5,15,30,60,90,120];
+            let numDts =  timebaseModel.rowCount();
+            let totalDeltaDt = timebaseModel.at(numDts-1).getTime() - timebaseModel.at(0).getTime();
+        }
+
         Connections {
             target: timebaseModel
             onTimebaseChanged:{
                 timelineRulerCanvas.calculate_resolution();
+
                 timelineRulerCanvas.buildTickBlueprints();
                 timelineRulerCanvas.requestPaint();
             }
