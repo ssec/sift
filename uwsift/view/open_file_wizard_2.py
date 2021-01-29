@@ -657,9 +657,11 @@ class OpenFileWizard(QtWidgets.QWizard):
 
     def _set_opts_disabled(self, is_disabled):
         self.ui.radiusOfInfluenceSpinBox.setDisabled(is_disabled)
-        self.ui.projectionComboBox.setDisabled(is_disabled)
-        self.ui.resolutionXSpinBox.setDisabled(is_disabled)
-        self.ui.resolutionYSpinBox.setDisabled(is_disabled)
+        # The user should not change the projection nor the resampling
+        # resolution, thus:
+        self.ui.projectionComboBox.setDisabled(True)  # instead of 'is_disabled'
+        self.ui.resolutionXSpinBox.setDisabled(True)  # instead of 'is_disabled'
+        self.ui.resolutionYSpinBox.setDisabled(True)  # instead of 'is_disabled'
 
     def _reset_fields(self):
         self.ui.resamplingMethodComboBox.setCurrentIndex(0)
