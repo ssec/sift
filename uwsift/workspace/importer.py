@@ -1216,7 +1216,7 @@ class SatpyImporter(aImporter):
             self.scn = self.scn.resample(
                 target_area_def,
                 resampler=resampler,
-                radius_of_influence=5000)
+                radius_of_influence=self.resampling_info['radius_of_influence'])
 
         num_stages = len(products)
         for idx, (prod, ds_id) in enumerate(zip(products, dataset_ids)):

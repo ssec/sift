@@ -136,6 +136,9 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.resamplingMethodComboBox.currentIndexChanged\
             .connect(self.update_activation_of_projection_combobox)
 
+        self.ui.radiusOfInfluenceSpinBox.valueChanged\
+            .connect(self.update_resampling_info)
+
         self.ui.projectionComboBox.addItems(
             AreaDefinitionsManager.available_area_def_names())
         self.ui.projectionComboBox.setCurrentIndex(
@@ -647,17 +650,20 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.resampling_info = {
             'resampler': self.ui.resamplingMethodComboBox.currentData(),
             'projection': area_def.proj_str,
+            'radius_of_influence': self.ui.radiusOfInfluenceSpinBox.value(),
             'resolution': (self.ui.resolutionXSpinBox.value(),
                            self.ui.resolutionYSpinBox.value())
         }
 
     def _set_opts_disabled(self, is_disabled):
+        self.ui.radiusOfInfluenceSpinBox.setDisabled(is_disabled)
         self.ui.projectionComboBox.setDisabled(is_disabled)
         self.ui.resolutionXSpinBox.setDisabled(is_disabled)
         self.ui.resolutionYSpinBox.setDisabled(is_disabled)
 
     def _reset_fields(self):
         self.ui.resamplingMethodComboBox.setCurrentIndex(0)
+        self.ui.radiusOfInfluenceSpinBox.setValue(5000)
         self.ui.projectionComboBox.setCurrentIndex(self.parent().document
                                                    .current_projection_index())
         self._set_opts_disabled(True)
