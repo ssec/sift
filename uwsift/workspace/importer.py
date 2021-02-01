@@ -1208,22 +1208,29 @@ class SatpyImporter(aImporter):
 
         resampler: str = self.resampling_info.get('resampler', 'None')
         if resampler != 'None':
-            # Use as many processes for resampling as the number of CPUs the
-            # application can use.
-            # See https://pyresample.readthedocs.io/en/latest/multi.html
-            #  and https://docs.python.org/3/library/os.html#os.cpu_count
-            nprocs = len(os.sched_getaffinity(0))
+            if self.scn.max_area().area_id == self.resampling_info['area_id']:
+                LOG.info(f"Source and target area ID are identical:"
+                         f" '{self.resampling_info['area_id']}'."
+                         f" Skipping resampling.")
+            else:
+                LOG.info(f"Resampling to area ID"
+                         f" '{self.resampling_info['area_id']}'")
+                # Use as many processes for resampling as the number of CPUs
+                # the application can use.
+                # See https://pyresample.readthedocs.io/en/latest/multi.html
+                #  and https://docs.python.org/3/library/os.html#os.cpu_count
+                nprocs = len(os.sched_getaffinity(0))
 
-            target_area_def = pyresample.geometry.DynamicAreaDefinition(
-                projection=self.resampling_info['projection'])
-            target_area_def = target_area_def.freeze(
-                self.scn.max_area().get_lonlats(),
-                resolution=self.resampling_info['resolution'])
-            self.scn = self.scn.resample(
-                target_area_def,
-                resampler=resampler,
-                nprocs=nprocs,
-                radius_of_influence=self.resampling_info['radius_of_influence'])
+                target_area_def = pyresample.geometry.DynamicAreaDefinition(
+                    projection=self.resampling_info['projection'])
+                target_area_def = target_area_def.freeze(
+                    self.scn.max_area().get_lonlats(),
+                    resolution=self.resampling_info['resolution'])
+                self.scn = self.scn.resample(
+                    target_area_def,
+                    resampler=resampler,
+                    nprocs=nprocs,
+                    radius_of_influence=self.resampling_info['radius_of_influence'])
 
         num_stages = len(products)
         for idx, (prod, ds_id) in enumerate(zip(products, dataset_ids)):

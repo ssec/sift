@@ -649,6 +649,7 @@ class OpenFileWizard(QtWidgets.QWizard):
 
         self.resampling_info = {
             'resampler': self.ui.resamplingMethodComboBox.currentData(),
+            'area_id': area_def.area_id,
             'projection': area_def.proj_str,
             'radius_of_influence': self.ui.radiusOfInfluenceSpinBox.value(),
             'resolution': (self.ui.resolutionXSpinBox.value(),
