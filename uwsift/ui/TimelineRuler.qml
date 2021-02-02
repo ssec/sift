@@ -42,6 +42,9 @@ Rectangle{
         property var resolutionMode: "Minutes";
         property var majorTickFontsize: 14;
         property var tickFontSize: 14;
+        // textMargin chosen to be 90 based on font and fontsize
+        // TODO(mk): attach signal/event handler to tickFontSize to recalculate textMargin
+        property var textMargin: 90;
         property var rulerYPosition: timestamp_rect.height;
         // Signal declarations
         // Javascript functions
@@ -78,7 +81,6 @@ Rectangle{
         function buildTickBlueprints(){
             timelineRulerCanvas.tickBlueprints = []
 
-            //TODO(mk): make these three properties of TimelineRulerCanvas?
             // Assume temporally sorted timebaseModel
             let numDts = timebaseModel.rowCount()
             let currMinDate = timebaseModel.at(0);
@@ -87,22 +89,19 @@ Rectangle{
             let firstDate = new Date(currMinDate)
             firstDate.setSeconds(0);
             firstDate.setMinutes(0);
+            let secondDate = nextDateByResolution(firstDate, resolution, resolutionMode);
+            let resolutionSeconds = (secondDate.getTime() - firstDate.getTime())/1000;
+            let dataTimeSpanSeconds = (currMaxDate.getTime()-currMinDate.getTime())/1000;
+            let numTicks = Math.ceil(dataTimeSpanSeconds/resolutionSeconds);
+            timelineRulerCanvas.tickWidth = ((timelineRulerCanvas.width-timelineRulerCanvas.textMargin) / numTicks);
             let tickDts = [firstDate];
-            // TODO(mk):
-            // create enough timestamps to reach currMaxDate
-            // if all fit within maxNumTicks -> good
-            // else --> only draw up to maxNumTicks
-            for(var k=1; k<numDts; k++){
+            for(var k=1; k<=numTicks; k++){
                 let nextTickDt = nextDateByResolution(tickDts[k-1], resolution, resolutionMode);
-                if (nextTickDt > currMaxDate){
-                    break;
-                }
                 tickDts.push(nextTickDt);
 
             }
 
             timelineRulerCanvas.tickDates = tickDts;
-            timelineRulerCanvas.tickWidth = timelineRulerCanvas.width / tickDts.length;
 
             // figure out temporal res. and scale accordingly
             let ticks = timelineRulerCanvas.tickDates
@@ -131,7 +130,7 @@ Rectangle{
         }
 
         function createTickBlueprint(index, tickDate, majorTick){
-            let tickBP = {"X": 1.0,"Y":1.0,"TextX":1.0,"TextY":1.0,"Length":1.0,"Major":false, "Text":"", "MajorText":"","MajorTextY":timelineRulerCanvas.majorTickFontsize};
+            let tickBP = {"X": 1.0,"Y":1.0,"TextX":1.0,"TextY":1.0,"Length":1.0,"Major":false, "Text":"", "MajorText":"","MajorTextY": timelineRulerCanvas.majorTickFontsize};
             if (majorTick || (index === 0)){
                 tickBP.Major = true;
                 tickBP.MajorText += Qt.formatDateTime(tickDate, "d MMM yyyy");
@@ -213,13 +212,11 @@ Rectangle{
             target: timebaseModel
             onTimebaseChanged:{
                 timelineRulerCanvas.calculate_resolution();
-
                 timelineRulerCanvas.buildTickBlueprints();
                 timelineRulerCanvas.requestPaint();
             }
         }
         onWidthChanged: {
-            timelineRulerCanvas.tickWidth = timelineRulerCanvas.width / timelineRulerCanvas.maxNumTicks;
             buildTickBlueprints();
             requestPaint();
         }
@@ -250,24 +247,27 @@ Rectangle{
         // signals
         signal reemittedTimelineIndexChanged(var idx);
         // JS functions
-        function updateTimelineCursorPosition(){
-            let resolution = timelineRulerCanvas.resolution;
-            let resolutionMode = timelineRulerCanvas.resolutionMode;
-            // MAKE THIS A FUNCTION
-            let ticks = timelineRulerCanvas.tickDates;
+        function calculateTickWidthPerTime(ticks){
             let tickWidthPerTime;
             if (ticks.length === 1){
-                let nextTick = timelineRulerCanvas.nextDateByResolution(ticks[0], timelineRulerCanvas.resolution,timelineRulerCanvas.resolutionMode);
+                let nextTick = timelineRulerCanvas.nextDateByResolution(ticks[0], timelineRulerCanvas.resolution, timelineRulerCanvas.resolutionMode);
                 tickWidthPerTime = timelineRulerCanvas.tickWidth/(nextTick.getTime()-ticks[0].getTime());
             }else{
                 tickWidthPerTime = timelineRulerCanvas.tickWidth/(ticks[1].getTime()-ticks[0].getTime());
             }
-            //----------------------------------------
+            return tickWidthPerTime;
+        }
+
+        function updateTimelineCursorPosition(){
+            let resolution = timelineRulerCanvas.resolution;
+            let resolutionMode = timelineRulerCanvas.resolutionMode;
+            let ticks = timelineRulerCanvas.tickDates;
+            let tickWidthPerTime = calculateTickWidthPerTime(ticks);
             let markerDate = timebaseModel.at(currIndex);
             let timeOffset = markerDate.getTime()-ticks[0].getTime();
             let markerWidth = timelineMarkerCanvas.markerBluePrints[0].W;
-            timelineMarkerCanvas.cursorX = (tickWidthPerTime*timeOffset) + timelineRulerCanvas.tickMargin;// + (markerWidth / 2);
-            timelineMarkerCanvas.cursorY = timelineRulerCanvas.rulerYPosition;//timelineRulerCanvas.height/2;
+            timelineMarkerCanvas.cursorX = (tickWidthPerTime*timeOffset) + timelineRulerCanvas.tickMargin;
+            timelineMarkerCanvas.cursorY = timelineRulerCanvas.rulerYPosition;
         }
 
         function createMarkerBlueprint(index, markerDate){
@@ -279,14 +279,7 @@ Rectangle{
             let resolution = timelineRulerCanvas.resolution;
             let resolutionMode = timelineRulerCanvas.resolutionMode;
             let ticks = timelineRulerCanvas.tickDates;
-
-            let tickWidthPerTime;
-            if (ticks.length === 1){
-                let nextTick = timelineRulerCanvas.nextDateByResolution(ticks[0], timelineRulerCanvas.resolution,timelineRulerCanvas.resolutionMode);
-                tickWidthPerTime = timelineRulerCanvas.tickWidth/(nextTick.getTime()-ticks[0].getTime());
-            }else{
-                tickWidthPerTime = timelineRulerCanvas.tickWidth/(ticks[1].getTime()-ticks[0].getTime());
-            }
+            let tickWidthPerTime = calculateTickWidthPerTime(ticks);
             let timeOffset = markerDate.getTime()-ticks[0].getTime();
             markerBP.X = (tickWidthPerTime*timeOffset) + timelineRulerCanvas.tickMargin - (markerBP.W/2);
             markerBP.Y = markerYPosition;
