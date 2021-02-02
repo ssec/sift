@@ -1121,7 +1121,7 @@ class SceneGraphManager(QObject):
         if p.kind == Kind.CONTOUR:
             return self.add_contour_layer(layer, p, overview_content)
 
-        if True:  # FIXME: Set to False except for experiments/tests
+        if False:  # Set to True FOR TESTING ONLY
             self._overwrite_with_test_pattern(overview_content)
 
         if USE_TILED_GEOLOCATED_IMAGES:
