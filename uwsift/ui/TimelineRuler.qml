@@ -103,7 +103,6 @@ Rectangle{
 
             timelineRulerCanvas.tickDates = tickDts;
 
-
             // figure out temporal res. and scale accordingly
             let ticks = timelineRulerCanvas.tickDates
             for(var i=0; i < ticks.length; i++){
@@ -136,11 +135,11 @@ Rectangle{
                 tickBP.Major = true;
                 tickBP.MajorText += Qt.formatDateTime(tickDate, "d MMM yyyy");
                 tickBP.Y = 0;
-                tickBP.Length = (3/4)*height;
+                tickBP.Length = height;
             }else{
                 // Minor tick
-                tickBP.Y = height/8;
-                tickBP.Length = height/2;
+                tickBP.Y = height/4;
+                tickBP.Length = height;
             }
             tickBP.X = timelineRulerCanvas.tickMargin + index*tickWidth;
             tickBP.Text += Qt.formatDateTime(tickDate, "hh:mm");
@@ -241,7 +240,7 @@ Rectangle{
         property var cursorY: 0
         // marker radius actually used to define bounding box of rounded rect
         property var markerRadius: 10
-        property var markerYPosition: (height/2) - (markerRadius / 2);
+        property var markerYPosition: (3/4)*(height) - (markerRadius / 2);
         property bool dataLoaded: false;
         property var markerBluePrints: []
 
