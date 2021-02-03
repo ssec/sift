@@ -128,8 +128,8 @@ class Watchdog:
             process_name = shlex.quote(f"{APPLICATION_DIR}-watchdog")
             severity = shlex.quote(logging.getLevelName(level))
             text = shlex.quote(text)
-            cmd = (f"{self.notification_cmd}"
-                   f" {machine} {process_name} {severity} {text}")
+            cmd = [self.notification_cmd, machine, process_name,
+                   severity, text]
 
             try:
                 subprocess.run(cmd, shell=True, check=True)
