@@ -20,7 +20,9 @@ gives alarm, when the data timestamp stored is older than
 updated is longer ago than the ``max_tolerable_idle_time``. These three time
 span related configurations are in seconds.
 
-A complete watchdog configuration looks as follows::
+A complete watchdog configuration looks as follows:
+
+.. code-block:: yaml
 
   watchdog:
     heartbeat_file: "$$CACHE_DIR$$/heartbeat.txt"
@@ -34,7 +36,3 @@ this part is expanded to the default cache directory for the application
 according to the XDG standard (MTG-SIFT calls itself still ``SIFT``, thus for
 now ``$$CACHE_DIR$$`` expands to ``~/.cache/SIFT`` on Linux systems). A normal
 absolute file path works too.
-
-
-
-
