@@ -12,7 +12,7 @@ monitors a file to be configured as ``heartbeat_file``, which MTG-SIFT updates
 with the data timestamp (i.e. the ``start_time`` is written into the file) every
 time it loads new data. From this information and the filesystem change time of
 the heartbeat file the Watchdog can determine, when the monitoring system is not
-alive any more and/or it does not succeed to ingest up to date satellite
+alive anymore and/or it does not succeed to ingest up to date satellite
 data. With the frequency configured by ``heartbeat_check_interval`` the Watchdog
 reads the file and compares the time information against the current time and
 gives alarm, when the data timestamp stored is older than
