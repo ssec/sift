@@ -8,7 +8,7 @@ import subprocess
 from datetime import datetime, timezone, timedelta
 from socket import gethostname
 from time import sleep
-from typing import List, Tuple
+from typing import List, Tuple, Union, Optional
 
 import appdirs
 from donfig import Config
@@ -21,18 +21,34 @@ APPLICATION_AUTHOR = "CIMSS-SSEC"
 WATCHDOG_DATETIME_FORMAT_STORE = "%Y-%m-%d %H:%M:%S %z"
 
 
+def get_config_value(config: Config, key: str) -> Union[str, dict]:
+    """
+    Wrapper for the `get` method from the donfig library, which provides
+    a more friendly error message if the key doesn't exist.
+
+    :param config: Config object from donfig
+    :param key: key to the config value
+    :return: str or dict with the config value
+    """
+    try:
+        return config.get(key)
+    except KeyError:
+        raise KeyError(f"Can't find `{key}` in the watchdog config")
+
+
 class Watchdog:
+    ask_again_interval: Optional[timedelta] = None
+    restart_interval: Optional[timedelta] = None
+    allowed_mem_usage: Optional[int] = None
+    notification_cmd: Optional[str] = None
+
     def __init__(self, config_dirs: List[str], cache_dir: str):
         self.hostname = gethostname()
         config = Config('uwsift', paths=config_dirs)
 
-        heartbeat_file = config.get("watchdog.heartbeat_file", None)
-        if heartbeat_file is None:
-            raise RuntimeError("Can't find `heartbeat_file`"
-                               " in the watchdog config")
+        heartbeat_file = get_config_value(config, "watchdog.heartbeat_file")
         self.heartbeat_file = heartbeat_file.replace("$$CACHE_DIR$$", cache_dir)
 
-        self.notification_cmd = None
         notification_cmd = config.get("watchdog.notification_cmd", None)
         if not notification_cmd:
             LOG.warning("Can't send notifications"
@@ -40,31 +56,18 @@ class Watchdog:
         else:
             self.notification_cmd = shlex.quote(notification_cmd)
 
-        heartbeat_check_interval = config.get(
-            "watchdog.heartbeat_check_interval", None)
-        if heartbeat_check_interval is None:
-            raise RuntimeError("Can't find `heartbeat_check_interval`"
-                               " in the watchdog config")
-        self.heartbeat_check_interval = float(heartbeat_check_interval)
+        self.heartbeat_check_interval = float(get_config_value(config,
+            "watchdog.heartbeat_check_interval"))
 
-        max_tolerable_dataset_age = config.get(
-            "watchdog.max_tolerable_dataset_age", None)
-        if max_tolerable_dataset_age is None:
-            raise RuntimeError("Can't find `max_tolerable_dataset_age`"
-                               " in the watchdog config")
-        self.max_tolerable_dataset_age = float(max_tolerable_dataset_age)
+        self.max_tolerable_dataset_age = float(get_config_value(config,
+            "watchdog.max_tolerable_dataset_age"))
 
-        max_tolerable_idle_time = config.get(
-            "watchdog.max_tolerable_idle_time", None)
-        if max_tolerable_dataset_age is None:
-            raise RuntimeError("Can't find `max_tolerable_idle_time`"
-                               " in the  watchdog config")
-        self.max_tolerable_idle_time = float(max_tolerable_idle_time)
+        self.max_tolerable_idle_time = float(get_config_value(config,
+            "watchdog.max_tolerable_idle_time"))
 
         restart_interval = int(config.get("watchdog.auto_restart_interval", 0))
         if restart_interval == 0:
             LOG.warning("Auto Restart is disabled")
-            self.restart_interval = None
         else:
             self.restart_interval = timedelta(seconds=restart_interval)
 
@@ -72,11 +75,9 @@ class Watchdog:
             "watchdog.auto_restart_ask_again_interval", 0))
         if ask_again_interval == 0:
             LOG.warning("Auto Restart will ask the user only once")
-            self.ask_again_interval = None
         else:
             self.ask_again_interval = timedelta(seconds=ask_again_interval)
 
-        self.allowed_mem_usage = None
         allowed_max_mem = config.get("watchdog.max_memory_consumption", None)
         if allowed_max_mem:
             self.allowed_mem_usage = self._parse_byte_count(allowed_max_mem)
