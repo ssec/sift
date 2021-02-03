@@ -1126,10 +1126,10 @@ class Main(QtGui.QMainWindow):
             LOG.warning("No configuration for 'watchdog.heartbeat_file'."
                         " Can't send heartbeats to the watchdog.")
         else:
-            LOG.info(f"Communication with watchdog via heartbeat file "
-                     f" '{self._heartbeat_file}' configured.")
             self._heartbeat_file = \
                 heartbeat_file.replace("$$CACHE_DIR$$", USER_CACHE_DIR)
+            LOG.info(f"Communication with watchdog via heartbeat file "
+                     f" '{self._heartbeat_file}' configured.")
             self.document.didAddBasicLayer.connect(self._update_heartbeat_file)
             self.document.didAddCompositeLayer.connect(self._update_heartbeat_file)
 
