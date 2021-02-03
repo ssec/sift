@@ -15,9 +15,14 @@ from donfig import Config
 
 LOG = logging.getLogger(__name__)
 
+# These two constants are used to locate the application specific cache
+# directory and must be kept in sync with the definition in the following
+# file: uwsift/util/default_paths.py
 APPLICATION_DIR = "SIFT"
 APPLICATION_AUTHOR = "CIMSS-SSEC"
 
+# This constant must be kept in sync with the definition in the following
+# file: uwsift/__main__.py
 WATCHDOG_DATETIME_FORMAT_STORE = "%Y-%m-%d %H:%M:%S %z"
 
 
@@ -43,6 +48,14 @@ class Watchdog:
     notification_cmd: Optional[str] = None
 
     def __init__(self, config_dirs: List[str], cache_dir: str):
+        """
+        Create a new Watchdog object.
+
+        :param config_dirs: List of search paths for the watchdog YAML
+             configuration files
+        :param cache_dir: Path to the MTG-SIFT caching directory, which is
+             used as the default location of the heartbeat file.
+        """
         self.hostname = gethostname()
         config = Config('uwsift', paths=config_dirs)
 
@@ -113,6 +126,11 @@ class Watchdog:
             raise ValueError(f"byte count contains unknown unit: {unit}")
 
     def _read_watchdog_file(self) -> Tuple[int, datetime]:
+        """
+        Open the watchdog file and parse it.
+
+        :return: tuple of the PID as int and datetime of the dataset creation
+        """
         with open(self.heartbeat_file) as file:
             content = file.read()
 
@@ -121,6 +139,14 @@ class Watchdog:
                                            WATCHDOG_DATETIME_FORMAT_STORE)
 
     def _notify(self, level: int, text: str):
+        """
+        If the notification_cmd was defined in the config, then invoke the
+        command using the subprocess API. Otherwise print text with the
+        specified level using the logging API.
+
+        :param level: int as defined in the logging package
+        :param text: message to log
+        """
         if not self.notification_cmd:
             LOG.log(level, text)
         else:
@@ -200,6 +226,13 @@ class Watchdog:
                                           f" the PID {pid} doesn't exist")
 
     def run(self):
+        """
+        Run the watchdog in blocking mode. The watchdog will read the
+        heartbeat file periodically and check whether the timestamp of
+        the dataset creation is too old. Additional it will ensure that
+        the application is restarted from time to time and that the
+        memory consumption isn't too high.
+        """
         old_pid = None
         application_start_time = None
         sent_restart_request = False
