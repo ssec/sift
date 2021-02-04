@@ -39,6 +39,7 @@ from glob import glob
 from uuid import UUID
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import QObject
 from vispy import app
 
 import uwsift.ui.open_cache_dialog_ui as open_cache_dialog_ui
@@ -81,6 +82,9 @@ STATUS_BAR_DURATION = 2000  # ms
 
 WATCHDOG_DATETIME_FORMAT_DISPLAY = "%Y-%m-%d %H:%M:%S %Z"
 WATCHDOG_DATETIME_FORMAT_STORE = "%Y-%m-%d %H:%M:%S %z"
+
+UWSIFT_ANIM_INDICATOR_DISABLED = True
+
 
 def test_layers_from_directory(doc, layer_tiff_glob):
     return doc.open_file(glob(layer_tiff_glob))
@@ -330,7 +334,10 @@ class UserControlsAnimation(QtCore.QObject):
         self.ui.animPlayPause.setDown(animating)
         self.ui.animationSlider.repaint()
         if animating:
-            self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
+            if not UWSIFT_ANIM_INDICATOR_DISABLED:
+                t_sim = self.scene_manager.layer_set.time_manager.create_formatted_t_sim()
+                self.ui.animationLabel.setText(t_sim)
+            #self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
         else:
             self.update_frame_time_to_top_visible()
 
@@ -482,6 +489,9 @@ class Main(QtGui.QMainWindow):
             raise ValueError("no UUIDs provided by background open in _bgnd_open_paths_when_done")
         if not isok:
             raise ValueError("background open did not succeed")
+        # Populate data layer collection
+        data_layers = self.document.create_data_layers()
+        self.document.data_layer_collection.notify_update_collection(data_layers)
         uuid = uuid_list[-1]
         self.layer_list_model.select([uuid])
         # set the animation based on the last added (topmost) layer
@@ -802,11 +812,13 @@ class Main(QtGui.QMainWindow):
         self.ui.setupUi(self)
         if AUTO_UPDATE_MODE__ACTIVE:
             self.ui.animFrame.hide()
+            self.ui.timelineFrame.hide()
         else:
             self.ui.watchdogFrame.hide()
         # FIXME: Slider does not currently work as intended. Re-enable later
         self.ui.timelineScaleSlider.setDisabled(True)
-
+        if UWSIFT_ANIM_INDICATOR_DISABLED:
+            self.ui.animSliderFrame.hide()
         self._init_font_sizes()
 
         self.setWindowTitle(self.windowTitle().replace("|X.X.X|", __version__))
@@ -836,6 +848,7 @@ class Main(QtGui.QMainWindow):
         self._init_layer_panes()
         self._init_rgb_pane()
         self._init_map_widget()
+        self._init_qml_timeline()
 
         if AUTO_UPDATE_MODE__ACTIVE:
             self._init_update_times_display()
@@ -1019,6 +1032,33 @@ class Main(QtGui.QMainWindow):
         self.ui.projectionComboBox.addItems(tuple(AreaDefinitionsManager.available_area_def_names()))
         self.ui.projectionComboBox.currentIndexChanged.connect(self.document.change_projection_index)
         self.document.didChangeProjection.connect(self.scene_manager.set_projection)
+
+    def _init_qml_timeline(self):
+        from uwsift.ui import QML_PATH
+        from uwsift.control.qml_utils import QmlBackend
+
+        root_context = self.ui.timelineQuickWidget.engine().rootContext()
+
+        time_manager = self.scene_manager.layer_set.time_manager
+        time_manager.qml_engine = self.ui.timelineQuickWidget.engine()
+        time_manager.qml_root_object = self.ui.timelineQuickWidget.rootObject()
+        time_manager.qml_backend = QmlBackend()
+        time_manager.qml_backend.didJumpInTimeline.connect(self.scene_manager.layer_set.jump)
+        time_manager.qml_backend.didChangeTimebase.connect(time_manager.on_timebase_change)
+        # TODO(mk): refactor all QML related objects as belonging to TimeManager's QMLBackend
+        #           instance -> communication between TimeManager and QMLBackend via Signal/Slot?
+        time_manager.qml_backend.qml_layer_manager = time_manager.qml_layer_manager
+
+        root_context.setContextProperty("LayerManager", time_manager.qml_layer_manager)
+        root_context.setContextProperty("timebaseModel", time_manager.qml_timestamps_model)
+        root_context.setContextProperty("backend", time_manager.qml_backend)
+
+        self.ui.timelineQuickWidget.setSource(QtCore.QUrl(str(QML_PATH / "timeline.qml")))
+
+    # TODO(mk): replace with method to set all relevant ContextProperties?
+    def _get_qml_context(self):
+        engine = self.ui.timelineQuickWidget.engine()
+        return engine.rootContext()
 
     def _init_arrange_panes(self):
         self.tabifyDockWidget(self.ui.layersPane, self.ui.areaProbePane)

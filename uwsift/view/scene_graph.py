@@ -202,9 +202,12 @@ class LayerSet(object):
         self._frame_number = 0
         self._frame_change_cb = frame_change_cb
         self._animation_speed = DEFAULT_ANIMATION_DELAY  # milliseconds
+
+        doc = parent.document
+        self.time_manager = TimeManager(doc.data_layer_collection, self._animation_speed)
+
         self._animation_timer = app.Timer(self._animation_speed / 1000.0, connect=self.next_frame)
         self._animation_timer.connect(self.step)
-        self._time_manager = TimeManager(None, self._animation_speed)
 
         if layers is not None:
             self.set_layers(layers)
@@ -366,7 +369,7 @@ class LayerSet(object):
                 child.visible = False
 
     def _set_visible_from_data_layers(self):
-        for pfkey, data_layer in self._time_manager.collection.data_layers.items():
+        for pfkey, data_layer in self.time_manager.collection.data_layers.items():
             # Set all uuids in the current data layer to invisible
             for _, im_uuid in data_layer.timeline.items():
                 self._set_uuid_visibility(im_uuid, False)
@@ -375,10 +378,14 @@ class LayerSet(object):
             if layer_uuid is not None:
                 self._set_uuid_visibility(layer_uuid, True)
 
+    def jump(self, index):
+        self.time_manager.jump(index)
+        self._set_visible_from_data_layers()
+
     def step(self, event=None, backwards=False):
         # Slot that triggers the time manager's tick in the relevant direction
         # and subsequently makes the appropriate layers visible.
-        self._time_manager.tick(backwards=backwards)
+        self.time_manager.tick(backwards=backwards)
         self._set_visible_from_data_layers()
 
     def next_frame(self, event=None, frame_number=None):
@@ -405,11 +412,13 @@ class LayerSet(object):
         self._frame_number = frame
         self.parent.update()
         if self._frame_change_cb is not None and lfo:
+
             uuid = self._frame_order[self._frame_number]
             self._frame_change_cb((self._frame_number, lfo, self._animating, uuid))
 
     def update_time_manager_collection(self, coll):
-        self._time_manager.collection = coll
+        self.time_manager.collection.didUpdateCollection.emit()
+        self._set_visible_from_data_layers()
 
 
 class ContourGroupNode(scene.Node):
@@ -1398,7 +1407,7 @@ class SceneGraphManager(QObject):
     def rebuild_frame_order(self, uuid_list: list, *args, **kwargs):
         LOG.debug('setting SGM new frame order to {0!r:s}'.format(uuid_list))
         self.layer_set.frame_order = uuid_list
-        self.layer_set.update_time_manager_collection(self.document.data_layer_collection)
+        #self.layer_set.update_time_manager_collection(self.document.data_layer_collection)
 
     def _rebuild_frame_order(self, *args, **kwargs):
         res = self.rebuild_frame_order(*args, **kwargs)

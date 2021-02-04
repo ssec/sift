@@ -86,6 +86,7 @@ IMAGE_MESH_SIZE = 100
 # before the image is considered "out of view"
 CANVAS_EXTENTS_EPSILON = 1e-4
 
+DEFAULT_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 # R_EQ = 6378.1370  # km
 # R_POL = 6356.7523142  # km

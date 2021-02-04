@@ -68,7 +68,7 @@ from collections import MutableSequence, OrderedDict, defaultdict
 from itertools import groupby, chain
 from uuid import UUID, uuid1 as uuidgen
 from datetime import datetime, timedelta
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Optional
 import typing as typ
 import numpy as np
 from weakref import ref
@@ -1179,15 +1179,93 @@ class DataLayer:
         raise ValueError("Changing type of a DataLayer forbidden.")
 
 
-class DataLayerCollection:
+class DataLayerCollection(QObject):
     """
         Collection of data layers (representation of time series of images) with one data layer
         as driving layer, designated by its ProductFamilyKey.
     """
-    def __init__(self, data_layers: List[DataLayer], driving_layer_key: Tuple):
+
+    didUpdateCollection = pyqtSignal()
+
+    def __init__(self, data_layers: List[DataLayer]):
+        super().__init__()
+        # dict mapping product family keys to data layers
         self.data_layers = {}
-        for data_layer in data_layers:
-            self.data_layers[data_layer.product_family_key] = data_layer
+        # Convenience functions must return a data layer. This is used by caller code to i.e. set a
+        # new driving layer either according to some policy or an index
+        self.convenience_functions: Dict[str: typ.Callable] =\
+            {"Most Frequent": self.get_most_frequent_data_layer_index}
+        self.product_family_keys = set()
+        if data_layers:
+            self.notify_update_collection(data_layers)
+
+    def get_most_frequent_data_layer_index(self) -> Optional[int]:
+        num_data_layers = len(self.data_layers.values())
+        if not num_data_layers:
+            return None
+        else:
+            temporal_differences = np.zeros(num_data_layers)
+            for i, data_layer in enumerate(self.data_layers.values()):
+                tl = list(data_layer.timeline.keys())
+                t_diffs = [tl[i + 1] - tl[i] for i in range(len(tl) - 1)]
+                # Calculate mean difference in timeline in seconds to support
+                # comparing timelines with non-regularly occurring timestamps
+                temporal_differences[i] = np.mean(list(map(lambda td: td.total_seconds(), t_diffs)))
+            most_frequent_data_layer_idx = np.argmin(temporal_differences)
+            if not isinstance(most_frequent_data_layer_idx, np.int64):
+                # If there exist multiple timelines at the same sampling rate, take the first one.
+                most_frequent_data_layer_idx = most_frequent_data_layer_idx[0]
+            return most_frequent_data_layer_idx
+
+    def get_data_layer_by_index(self, idx) -> Optional[DataLayer]:
+        curr_data_layers = list(self.data_layers.values())
+        if curr_data_layers:
+            dl = curr_data_layers[idx]
+            if dl:
+                return dl
+            else:
+                return None
+
+    @property
+    def num_data_layers(self):
+        return len(list(self.data_layers.values()))
+
+    def notify_update_collection(self, new_data_layers: List[DataLayer]):
+        """
+        Update state of collection when new data is being loaded or old data is discarded and
+        notify dependants via Qt signal.
+        Two cases need to be taken into account:
+            1) entirely new data layer as shown by previously unknown product family key
+
+            2)data layer with same pfkey already exists
+                   -> add new timesteps without duplication
+        :return:
+        """
+        for data_layer in new_data_layers:
+
+            if data_layer.product_family_key in self.product_family_keys:
+                old_data_layer = self.data_layers[data_layer.product_family_key]
+                # Timeline maps: timestamp -> uuid
+                for tstamp, uuid in data_layer.timeline.items():
+                    if uuid not in old_data_layer.timeline.values():
+                        old_data_layer.timeline[tstamp] = uuid
+                self.data_layers[data_layer.product_family_key].timeline = \
+                    self._sort_timeline(old_data_layer.timeline)
+            else:
+                self.product_family_keys.add(data_layer.product_family_key)
+                self.data_layers[data_layer.product_family_key] = data_layer
+        self.didUpdateCollection.emit()
+
+    @staticmethod
+    def _sort_timeline(timeline):
+        """
+        Convenience method to sort timelines of data layers by ordered
+        ascending by their timestamps.
+        :param timeline: Dict mapping datetime objects to uuids
+        :return: Sorted timeline dict
+        """
+        sorted_tl = sorted(timeline.items(), key=lambda kv: kv[0])
+        return {k: v for k, v in sorted_tl}
 
     def remove_by_uuid(self, uuid_to_remove: UUID):
         for _, data_layer in self.data_layers.items():
@@ -1197,7 +1275,8 @@ class DataLayerCollection:
                     del new_timeline[dt]
                     # NOTE(mk): Able to exit prematurely here if guaranteed that
                     # no uuid present in multiple data layers
-            data_layer.timeline = new_timeline
+            data_layer.timeline = self._sort_timeline(new_timeline)
+        self.didUpdateCollection.emit()
 
 
 class Document(QObject):  # base class is rightmost, mixins left of that
@@ -1330,7 +1409,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         # data_layers represents time series of images ordered by product family
         self.data_layers: List[DataLayer] = []
-        self.data_layer_collection = None
+        self.data_layer_collection: DataLayerCollection = DataLayerCollection([])
 
         self.colormaps = COLORMAP_MANAGER
         self.default_area_def_name = AreaDefinitionsManager.default_area_def_name()
@@ -2661,21 +2740,23 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             unique_product_family_keys.append(pf_key)
         return unique_product_family_keys
 
-    def create_data_layers(self) -> None:
+    def create_data_layers(self) -> List[DataLayer]:
         """
-        Adds data layers to document, based on currently present
-            uuid -> DocBasicLayer (document._layer_with_uuid)
-        mappings.
+            Adds data layers to document, based on currently present
+            uuid -> DocBasicLayer (document._layer_with_uuid) mappings.
+            :return: data_layers: List of data layers to be incorporated into DataLayerCollection.
         """
-        unique_product_family_keys = self.get_unique_product_family_keys()
-        for curr_product_family_key in unique_product_family_keys:
-            curr_family_uuids_timestamps = []
+        pf_keys: List[Tuple] = [dbl.product_family_key for dbl in self._layer_with_uuid.values()]
+        unique_pf_keys = set(pf_keys)
+        data_layers: List[DataLayer] = []
+        for curr_pf_key in unique_pf_keys:
+            curr_pf_uuids_timestamps: List[Tuple] = []
             for image_uuid, doc_basic_layer in self._layer_with_uuid.items():
-                if doc_basic_layer.product_family_key != curr_product_family_key:
+                if doc_basic_layer.product_family_key != curr_pf_key:
                     continue
-                curr_family_uuids_timestamps.append((image_uuid, doc_basic_layer.sched_time))
-            data_layer = DataLayer(curr_family_uuids_timestamps, curr_product_family_key)
-            self.data_layers.append(data_layer)
+                curr_pf_uuids_timestamps.append((image_uuid, doc_basic_layer.sched_time))
+            data_layers.append(DataLayer(curr_pf_uuids_timestamps, curr_pf_key))
+        return data_layers
 
     def time_siblings(self, uuid, sibling_infos=None):
         """
@@ -2684,9 +2765,13 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :param sibling_infos: dictionary of UUID -> Dataset Info to sort through
         :return: sorted list of sibling uuids in time order, index of where uuid is in the list
         """
-        self.create_data_layers()
-        self.data_layer_collection = DataLayerCollection(self.data_layers,
-                                                         self.data_layers[0].product_family_key)
+        # NOTE(mk): create_data_layers is the bridge between document and collection
+        # as it uses state from document to create a list of data_layers that can then
+        # be passed to methods of data_layer_collection
+        #self.create_data_layers()
+        # TODO(mk) pull create_data_layers into DataLayerCollection
+        #self.data_layer_collection = DataLayerCollection(self.data_layers)
+        #self.data_layer_collection.notify_extend_collection(self.data_layers)
         if sibling_infos is None:
             sibling_infos = self._layer_with_uuid
         it = sibling_infos.get(uuid, None)
