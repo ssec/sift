@@ -25,6 +25,7 @@ import yaml
 import dask.array as da
 import numpy as np
 from pyproj import Proj
+from pyresample import AreaDefinition
 from sqlalchemy.orm import Session
 
 from uwsift import config, USE_INVENTORY_DB
@@ -1141,14 +1142,14 @@ class SatpyImporter(aImporter):
             ds.attrs[Info.SCENE] = ds.attrs.get('scene_id')
             if ds.attrs[Info.SCENE] is None:
                 # compute a "good enough" hash for this Scene
-                if 'area' in ds.attrs:
+                try:
                     area = ds.attrs['area']
                     extents = area.area_extent
                     # round extents to nearest 100 meters
                     extents = tuple(int(np.round(x / 100.0) * 100.0) for x in extents)
                     proj_str = area.proj4_string
                     ds.attrs[Info.SCENE] = "{}-{}".format(str(extents), proj_str)
-                else:
+                except (AttributeError, KeyError):
                     unix_start_time = time.mktime(ds.attrs["start_time"].timetuple())
                     unix_end_time = time.mktime(ds.attrs["end_time"].timetuple())
                     ds.attrs[Info.SCENE] = "{}-{}-{}-{}".format(
@@ -1206,9 +1207,11 @@ class SatpyImporter(aImporter):
         dataset_ids = [prod.info['_satpy_id'] for prod in products]
         self.scn.load(dataset_ids, pad_data=True, upper_right_corner="NE")
 
-        resampler: str = self.resampling_info.get('resampler', 'None')
-        if resampler != 'None':
-            if self.scn.max_area().area_id == self.resampling_info['area_id']:
+        resampler: str = self.resampling_info['resampler']
+        if resampler and resampler.lower() != 'none':  # gracefully accept variants of None
+            max_area = self.scn.max_area()
+            if isinstance(max_area, AreaDefinition) and \
+                    max_area.area_id == self.resampling_info['area_id']:
                 LOG.info(f"Source and target area ID are identical:"
                          f" '{self.resampling_info['area_id']}'."
                          f" Skipping resampling.")
@@ -1225,7 +1228,7 @@ class SatpyImporter(aImporter):
                 target_area_def = pyresample.geometry.DynamicAreaDefinition(
                     projection=self.resampling_info['projection'])
                 target_area_def = target_area_def.freeze(
-                    self.scn.max_area().get_lonlats(),
+                    max_area.get_lonlats(),
                     resolution=self.resampling_info['resolution'])
                 self.scn = self.scn.resample(
                     target_area_def,
