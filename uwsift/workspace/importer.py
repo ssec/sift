@@ -1214,7 +1214,8 @@ class SatpyImporter(aImporter):
                          f" Skipping resampling.")
             else:
                 LOG.info(f"Resampling to area ID"
-                         f" '{self.resampling_info['area_id']}'")
+                         f" '{self.resampling_info['area_id']}'"
+                         f" with method '{resampler}'")
                 # Use as many processes for resampling as the number of CPUs
                 # the application can use.
                 # See https://pyresample.readthedocs.io/en/latest/multi.html
