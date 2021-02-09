@@ -125,7 +125,7 @@ class OpenFileWizard(QtWidgets.QWizard):
 
         # Page 2 - Product selection
 
-        self._all_selected = True
+        self._all_selected = False
         self.ui.selectAllButton.clicked.connect(self.select_all_products_state)
         self.ui.selectIDTable.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.ui.selectIDTable.customContextMenuRequested.connect(self._product_context_menu)
@@ -251,7 +251,7 @@ class OpenFileWizard(QtWidgets.QWizard):
                 item.setFlags(
                     (item.flags() ^ QtCore.Qt.ItemIsEditable) | QtCore.Qt.ItemIsUserCheckable)
                 if id_key == 'name':
-                    item.setCheckState(QtCore.Qt.Checked)
+                    item.setCheckState(_to_Qt_CheckState(self._all_selected))
                 self.ui.selectIDTable.setItem(idx, col_idx, item)
                 col_idx += 1
 
@@ -578,14 +578,7 @@ class OpenFileWizard(QtWidgets.QWizard):
                 item_id = name_item.data(QtCore.Qt.UserRole)
                 if get_id_value(item_id, prop_key) != get_id_value(prop_val, prop_key):
                     continue
-            check_state = self._get_checked(select)
-            name_item.setCheckState(check_state)
-
-    def _get_checked(self, bool_val):
-        if bool_val:
-            return QtCore.Qt.Checked
-        else:
-            return QtCore.Qt.Unchecked
+            name_item.setCheckState(_to_Qt_CheckState(select))
 
     def _product_context_menu(self, position: QPoint):
         item = self.ui.selectIDTable.itemAt(position)
@@ -682,4 +675,8 @@ class OpenFileWizard(QtWidgets.QWizard):
             (area_def.shape[1], area_def.shape[0])
         self.ui.resolutionXSpinBox.setValue(resolution[0])
         self.ui.resolutionYSpinBox.setValue(resolution[1])
+
+
+def _to_Qt_CheckState(value: bool):
+    return QtCore.Qt.Checked if value else QtCore.Qt.Unchecked
 
