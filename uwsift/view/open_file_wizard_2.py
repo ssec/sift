@@ -51,18 +51,44 @@ CHECKMARK = '✔️'
 FILE_PAGE = 0
 PRODUCT_PAGE = 1
 
-RESAMPLING_METHODS = {  # use None to filter a resampling method
-            # 'kd_tree': None,  # synonym for `nearest`
-            'nearest': 'Nearest Neighbor',
-            'ewa': 'Elliptical Weighted Averaging',
-            'bilinear': 'Bilinear',
-            'native': 'Native',
-            'gradient_search': 'Gradient Search',
-            'bucket_avg': 'Bucket Average',
-            'bucket_sum': 'Bucket Sum',
-            'bucket_count': 'Bucket Count',
-            'bucket_fraction': 'Bucket Fraction',
-        }
+
+class Conf(Enum):
+    # Just to have a well defined constant to express "skip this resampler"
+    SKIP = 1
+
+
+RESAMPLING_METHODS = {
+    # Configure a display name for each resampling method ID as well as for
+    # which geometry definition (AreaDefinition or SwathDefinition for now) it
+    # works by associating an according tuple of strings where the first item is
+    # the display name followed by any suitable geometry definition.
+    #
+    # To hide a resampling method just associate Conf.SKIP with its ID.
+    #
+    # This configuration is evaluated in
+    # OpenFileWizard.update_resampling_method_combobox().
+    'none':            ('None',
+                        'AreaDefinition'),
+    'kd_tree':           Conf.SKIP,  # synonym for `nearest`, don't show both
+    'nearest':         ('Nearest Neighbor',
+                        'AreaDefinition', 'SwathDefinition'),
+    'ewa':             ('Elliptical Weighted Averaging',
+                        'AreaDefinition', 'SwathDefinition'),
+    'bilinear':        ('Bilinear',
+                        'AreaDefinition', 'SwathDefinition'),
+    'native':          ('Native',
+                        'AreaDefinition'),
+    'gradient_search': ('Gradient Search',
+                        'AreaDefinition'),
+    'bucket_avg':      ('Bucket Average',
+                        'AreaDefinition', 'SwathDefinition'),
+    'bucket_sum':      ('Bucket Sum',
+                        'AreaDefinition'),
+    'bucket_count':    ('Bucket Count',
+                        'AreaDefinition'),
+    'bucket_fraction': ('Bucket Fraction',
+                        'AreaDefinition'),
+}
 
 
 class OpenFileWizard(QtWidgets.QWizard):
@@ -125,12 +151,13 @@ class OpenFileWizard(QtWidgets.QWizard):
 
         # Page 2 - Product selection
 
-        self._all_selected = True
+        self._all_selected = False
         self.ui.selectAllButton.clicked.connect(self.select_all_products_state)
         self.ui.selectIDTable.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.ui.selectIDTable.customContextMenuRequested.connect(self._product_context_menu)
 
-        self.update_resampling_method_combobox(satpy.resample.RESAMPLERS)
+        self.currentIdChanged.connect(self.on_page_changed)
+
         self.ui.resamplingMethodComboBox\
             .currentIndexChanged.connect(self.update_resampling_info)
         self.ui.resamplingMethodComboBox.currentIndexChanged\
@@ -165,10 +192,10 @@ class OpenFileWizard(QtWidgets.QWizard):
     # PUBLIC GENERAL WIZARD INTERFACE
     # ==============================================================================================
 
-    def initializePage(self, p_int):
-        if p_int == FILE_PAGE:
+    def initializePage(self, page_id: int):
+        if page_id == FILE_PAGE:
             self._init_file_page()
-        elif p_int == PRODUCT_PAGE:
+        elif page_id == PRODUCT_PAGE:
             self._init_product_select_page()
 
     def validateCurrentPage(self) -> bool:
@@ -180,8 +207,8 @@ class OpenFileWizard(QtWidgets.QWizard):
             self.ui.statusMessage.setText('')
             return valid
 
-        p_int = self.currentId()
-        if p_int == FILE_PAGE:
+        page_id: int = self.currentId()
+        if page_id == FILE_PAGE:
             # Check for completeness when pressing NEXT, and not a lot of times when selection
             # changes. In case the check fails 'page_complete' is set to False.
             self._check_selected_files_for_compatibility_with_reader()
@@ -251,7 +278,7 @@ class OpenFileWizard(QtWidgets.QWizard):
                 item.setFlags(
                     (item.flags() ^ QtCore.Qt.ItemIsEditable) | QtCore.Qt.ItemIsUserCheckable)
                 if id_key == 'name':
-                    item.setCheckState(QtCore.Qt.Checked)
+                    item.setCheckState(_to_Qt_CheckState(self._all_selected))
                 self.ui.selectIDTable.setItem(idx, col_idx, item)
                 col_idx += 1
 
@@ -578,14 +605,7 @@ class OpenFileWizard(QtWidgets.QWizard):
                 item_id = name_item.data(QtCore.Qt.UserRole)
                 if get_id_value(item_id, prop_key) != get_id_value(prop_val, prop_key):
                     continue
-            check_state = self._get_checked(select)
-            name_item.setCheckState(check_state)
-
-    def _get_checked(self, bool_val):
-        if bool_val:
-            return QtCore.Qt.Checked
-        else:
-            return QtCore.Qt.Unchecked
+            name_item.setCheckState(_to_Qt_CheckState(select))
 
     def _product_context_menu(self, position: QPoint):
         item = self.ui.selectIDTable.itemAt(position)
@@ -615,29 +635,58 @@ class OpenFileWizard(QtWidgets.QWizard):
 
         self.ui.productSelectionPage.completeChanged.emit()
 
-    def update_resampling_method_combobox(self, resampling_methods):
+    def on_page_changed(self, page_id: int):
+        # TODO: consider to overwrite self.initializePage()
+        if page_id == PRODUCT_PAGE:
+            self.update_resampling_method_combobox()
 
+    def update_resampling_method_combobox(self):
+        reader = self.get_reader_name()
+        geometry_definition: str = config.get(f'data_reading.{reader}'
+                                              f'.geometry_definition',
+                                              'AreaDefinition')
+
+        self.ui.resamplingMethodComboBox.blockSignals(True)
         self.ui.resamplingMethodComboBox.clear()
-        self.ui.resamplingMethodComboBox.addItem('None', userData='None')
 
-        for resampling_method in resampling_methods:
-            # By not listing the resampler id in RESAMPLING_METHODS we can skip
-            # it from the choice:
-            resampling_method_beautiful_name = \
-                RESAMPLING_METHODS.get(resampling_method)
-            if resampling_method_beautiful_name:
+        cb_model = self.ui.resamplingMethodComboBox.model()
+
+        known_resampling_methods = ['none']
+        known_resampling_methods.extend(satpy.resample.RESAMPLERS)
+        first_enabled_item_index = -1
+        for resampling_method in known_resampling_methods:
+            configuration = RESAMPLING_METHODS.get(resampling_method, None)
+            if configuration == Conf.SKIP:
+                continue
+            # If not explicitly skipped but also not "configured" in
+            # RESAMPLING_METHODS add the resampler's ID, disabled (see below).
+            # This makes "unknown" (newly added to Satpy) resamplers show up
+            # drawing attention to ask a developer to test and enable them.
+            resampling_method_name = \
+                configuration[0] if configuration else resampling_method
+            self.ui.resamplingMethodComboBox.addItem(
+                resampling_method_name,
+                userData=resampling_method)
+
+            # Check, whether current item is approved for detected geometry
+            # (area or swath). Disable if not and make sure the first enabled
+            # item is preselected
+            item_index = self.ui.resamplingMethodComboBox.count() - 1
+            if not configuration or geometry_definition not in configuration:
+                item = cb_model.item(item_index)
+                item.setEnabled(False)
+            elif first_enabled_item_index < 0:
+                first_enabled_item_index = item_index
                 self.ui.resamplingMethodComboBox\
-                    .addItem(resampling_method_beautiful_name,
-                             userData=resampling_method)
+                    .setCurrentIndex(first_enabled_item_index)
 
-        self.ui.resamplingMethodComboBox.currentIndexChanged\
-            .connect(self.update_activation_of_projection_combobox)
-        self.ui.resamplingMethodComboBox.currentIndexChanged\
-            .connect(self.update_resampling_info)
-        self._set_opts_disabled(True)
+        self.update_resampling_info()
+        self._set_opts_disabled(
+            self.ui.resamplingMethodComboBox.currentData() == 'none')
+        self.ui.resamplingMethodComboBox.blockSignals(False)
 
     def update_activation_of_projection_combobox(self):
-        if self.ui.resamplingMethodComboBox.currentIndex() != 0:
+        if self.ui.resamplingMethodComboBox.currentData() != 'none':
             self._set_opts_disabled(False)
         else:
             self._set_opts_disabled(True)
@@ -682,4 +731,8 @@ class OpenFileWizard(QtWidgets.QWizard):
             (area_def.shape[1], area_def.shape[0])
         self.ui.resolutionXSpinBox.setValue(resolution[0])
         self.ui.resolutionYSpinBox.setValue(resolution[1])
+
+
+def _to_Qt_CheckState(value: bool):
+    return QtCore.Qt.Checked if value else QtCore.Qt.Unchecked
 
