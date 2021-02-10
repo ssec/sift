@@ -1231,7 +1231,7 @@ class SatpyImporter(aImporter):
                     projection=self.resampling_info['projection'])
                 target_area_def = target_area_def.freeze(
                     max_area.get_lonlats(),
-                    resolution=self.resampling_info['resolution'])
+                    shape=self.resampling_info['shape'])
                 self.scn = self.scn.resample(
                     target_area_def,
                     resampler=resampler,

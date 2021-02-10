@@ -173,11 +173,11 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.projectionComboBox.currentIndexChanged.\
             connect(self.update_resampling_info)
 
-        self.update_resolution_spin_boxes()
+        self._update_resampling_shape_spin_boxes()
         self.ui.projectionComboBox.currentIndexChanged\
-            .connect(self.update_resolution_spin_boxes)
-        self.ui.resolutionXSpinBox.valueChanged.connect(self.update_resampling_info)
-        self.ui.resolutionYSpinBox.valueChanged.connect(self.update_resampling_info)
+            .connect(self._update_resampling_shape_spin_boxes)
+        self.ui.resamplingShapeRowSpinBox.valueChanged.connect(self.update_resampling_info)
+        self.ui.resamplingShapeColumnSpinBox.valueChanged.connect(self.update_resampling_info)
 
         # GUI has been initialized, make sure we have a consistent
         # resampling_info
@@ -701,17 +701,17 @@ class OpenFileWizard(QtWidgets.QWizard):
             'area_id': area_def.area_id,
             'projection': area_def.proj_str,
             'radius_of_influence': self.ui.radiusOfInfluenceSpinBox.value(),
-            'resolution': (self.ui.resolutionXSpinBox.value(),
-                           self.ui.resolutionYSpinBox.value())
+            'shape': (self.ui.resamplingShapeRowSpinBox.value(),
+                      self.ui.resamplingShapeColumnSpinBox.value())
         }
 
     def _set_opts_disabled(self, is_disabled):
         self.ui.radiusOfInfluenceSpinBox.setDisabled(is_disabled)
-        # The user should not change the projection nor the resampling
-        # resolution, thus:
+        # The user should not change the projection nor the resampling shape,
+        # thus:
         self.ui.projectionComboBox.setDisabled(True)  # instead of 'is_disabled'
-        self.ui.resolutionXSpinBox.setDisabled(True)  # instead of 'is_disabled'
-        self.ui.resolutionYSpinBox.setDisabled(True)  # instead of 'is_disabled'
+        self.ui.resamplingShapeRowSpinBox.setDisabled(True)  # instead of 'is_disabled'
+        self.ui.resamplingShapeColumnSpinBox.setDisabled(True)  # instead of 'is_disabled'
 
     def _reset_fields(self):
         self.ui.resamplingMethodComboBox.setCurrentIndex(0)
@@ -720,17 +720,12 @@ class OpenFileWizard(QtWidgets.QWizard):
                                                    .current_projection_index())
         self._set_opts_disabled(True)
 
-    def update_resolution_spin_boxes(self):
+    def _update_resampling_shape_spin_boxes(self):
         area_def_name = self.ui.projectionComboBox.currentText()
         area_def = \
             AreaDefinitionsManager.area_def_by_name(area_def_name)
-        # Note: the term 'resolution' for resampling defines the number of grid
-        # points (per dimension) whereas in an AreaDefinition it defines the
-        # size of a grid point in (world) coordinate system units
-        resolution: Tuple[int, int] = \
-            (area_def.shape[1], area_def.shape[0])
-        self.ui.resolutionXSpinBox.setValue(resolution[0])
-        self.ui.resolutionYSpinBox.setValue(resolution[1])
+        self.ui.resamplingShapeRowSpinBox.setValue(area_def.shape[0])
+        self.ui.resamplingShapeColumnSpinBox.setValue(area_def.shape[1])
 
 
 def _to_Qt_CheckState(value: bool):
