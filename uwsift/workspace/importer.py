@@ -1216,8 +1216,10 @@ class SatpyImporter(aImporter):
                          f" '{self.resampling_info['area_id']}'."
                          f" Skipping resampling.")
             else:
-                LOG.info(f"Resampling to area ID"
-                         f" '{self.resampling_info['area_id']}'"
+                area_name = max_area.area_id if hasattr(max_area, 'area_id') \
+                    else max_area.name
+                LOG.info(f"Resampling from area ID/name '{area_name}'"
+                         f" to area ID '{self.resampling_info['area_id']}'"
                          f" with method '{resampler}'")
                 # Use as many processes for resampling as the number of CPUs
                 # the application can use.
