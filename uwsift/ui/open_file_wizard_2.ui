@@ -269,14 +269,14 @@
        </widget>
       </item>
       <item>
-       <widget class="QLabel" name="resolutionLabel">
+       <widget class="QLabel" name="resamplingShapeLabel">
         <property name="text">
-         <string>Resolution:</string>
+         <string>Shape:</string>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QSpinBox" name="resolutionXSpinBox">
+       <widget class="QSpinBox" name="resamplingShapeRowSpinBox">
         <property name="minimum">
          <number>1</number>
         </property>
@@ -289,7 +289,7 @@
        </widget>
       </item>
       <item>
-       <widget class="QSpinBox" name="resolutionYSpinBox">
+       <widget class="QSpinBox" name="resamplingShapeColumnSpinBox">
         <property name="minimum">
          <number>1</number>
         </property>
