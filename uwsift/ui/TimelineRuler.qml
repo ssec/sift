@@ -92,10 +92,14 @@ Rectangle{
             let secondDate = nextDateByResolution(firstDate, resolution, resolutionMode);
             let resolutionSeconds = (secondDate.getTime() - firstDate.getTime())/1000;
             let dataTimeSpanSeconds = (currMaxDate.getTime()-currMinDate.getTime())/1000;
-            let numTicks = Math.ceil(dataTimeSpanSeconds/resolutionSeconds);
-            timelineRulerCanvas.tickWidth = ((timelineRulerCanvas.width-timelineRulerCanvas.textMargin) / numTicks);
+            let maxTickIndex = Math.ceil(dataTimeSpanSeconds/resolutionSeconds);
+            // If only one timestep is loaded draw 2 ticks regardless.
+            if (maxTickIndex === 0){
+                maxTickIndex = 1;
+            }
+            timelineRulerCanvas.tickWidth = ((timelineRulerCanvas.width-timelineRulerCanvas.textMargin) / maxTickIndex);
             let tickDts = [firstDate];
-            for(var k=1; k<=numTicks; k++){
+            for(var k=1; k<=maxTickIndex; k++){
                 let nextTickDt = nextDateByResolution(tickDts[k-1], resolution, resolutionMode);
                 tickDts.push(nextTickDt);
 

@@ -72,18 +72,18 @@ class QmlLayerManager(QObject):
     # TODO(mk): deprecated methods, remove?
     def change_layer_model(self, idx, elem):
         insert_idx = idx + self.num_convenience_functions
-        if insert_idx < len(self._layer_model.layer_strings):
-            self._layer_model.layer_strings[insert_idx] = elem
+        if insert_idx < len(self._layer_model._layer_strings):
+            self._layer_model._layer_strings[insert_idx] = elem
         else:
-            self._layer_model.layer_strings.append(elem)
-        for el in self._layer_model.layer_strings:
+            self._layer_model._layer_strings.append(elem)
+        for el in self._layer_model._layer_strings:
             print(f"{el}")
         self.layerModelChanged.emit()
 
     def clear_layer_model(self):
-        topIdx = len(self._layer_model.layer_strings) - 1
+        topIdx = len(self._layer_model._layer_strings) - 1
         while topIdx > self.num_convenience_functions:
-            del self._layer_model.layer_strings[topIdx]
+            del self._layer_model._layer_strings[topIdx]
             topIdx -= 1
         self.layerModelChanged.emit()
 
@@ -127,11 +127,11 @@ class LayerModel(QAbstractListModel):
 
     def __init__(self, *args, layer_strings=[], **kwargs):
         super().__init__(*args, **kwargs)
-        self.layer_strings = layer_strings
+        self._layer_strings = layer_strings
 
     @pyqtProperty("QVariantList", notify=modelChanged)
     def model(self):
-        return self.layer_strings
+        return self._layer_strings
 
     def push(self, data):
         data_size = len(data)
@@ -139,30 +139,48 @@ class LayerModel(QAbstractListModel):
             start_idx = self.rowCount()
             end_idx = start_idx + data_size
             self.beginInsertRows(QModelIndex(), start_idx, end_idx)
-            self.layer_strings.extend(data)
+            self._layer_strings.extend(data)
             self.endInsertRows()
         else:
             self.beginInsertRows(QModelIndex(), self.rowCount(), self.rowCount())
-            self.layer_strings.extend(data)
+            self._layer_strings.extend(data)
             self.endInsertRows()
         self.pushedOrPopped.emit()
 
     def pop(self, row):
         self.beginRemoveColumns(QModelIndex(), row, row)
-        del self.layer_strings[row]
+        del self._layer_strings[row]
         self.endRemoveRows()
         self.pushedOrPopped.emit()
 
     def clear(self):
-        for row, _ in enumerate(self.layer_strings):
+        for row, _ in enumerate(self._layer_strings):
             self.pop(row)
+
+    @property
+    def layer_strings(self):
+        return self._layer_strings
+
+    @layer_strings.setter
+    def layer_strings(self, new_layer_strings):
+        self.layoutAboutToBeChanged.emit()
+        self._layer_strings = new_layer_strings
+        # upd. persistent indexes
+        from_index_list = self.persistentIndexList()
+        to_index_list = []
+        for i, _ in enumerate(new_layer_strings):
+            to_index_list.append(self.index(i, parent=QModelIndex()))
+        self.changePersistentIndexList(from_index_list, to_index_list)
+        self.layoutChanged.emit()
+        # TODO(mk): rename this signal to indicate that the list of combo box options changed
+        self.pushedOrPopped.emit()
 
     def data(self, index, role=Qt.DisplayRole):
         if role == Qt.DisplayRole:
-            return self.layer_strings[index.row()]
+            return self._layer_strings[index.row()]
 
     def rowCount(self, parent=QModelIndex()):
-        return len(self.layer_strings)
+        return len(self._layer_strings)
 
 
 class TimebaseModel(QAbstractListModel):

@@ -112,11 +112,14 @@ class TimeManager:
         combo box contents
         """
         data_layers_str = []
-        self.qml_layer_manager.layerModel.clear()
         for i, pfkey in enumerate(self._collection.data_layers):
             dl_str = self.qml_layer_manager.format_product_family_key(pfkey)
             data_layers_str.append(dl_str)
-        self.qml_layer_manager.layerModel.push(data_layers_str)
+        self.qml_layer_manager.layerModel.layer_strings = data_layers_str
+        # TODO(mk): create cleaner interface to get timebase index, should not directly
+        #           access policy, expose via transformer?
+        time_index = self._time_transformer._translation_policy._driving_idx
+        self.qml_backend.didChangeTimebase.emit(time_index)
 
     def tick_qml_state(self, t_sim, timeline_idx):
         # TODO(mk): if TimeManager is subclassed the behavior below must be adapted:
