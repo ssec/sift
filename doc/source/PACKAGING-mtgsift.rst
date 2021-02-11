@@ -10,7 +10,7 @@ workflows. Experienced users may change single steps to better fit their
 workflows of course.
 
 It is assumed that the reader knows how to install and initialize a Conda
-environment (refer to :ref:`_install-conda-packages` otherwise) and how to get
+environment (refer to :ref:`install-conda-packages` otherwise) and how to get
 the MTG-SIFT sources from the Git repository or from an archive.
 
 Bootstrapping
