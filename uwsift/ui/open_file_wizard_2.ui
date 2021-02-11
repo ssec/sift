@@ -162,6 +162,38 @@
         </property>
        </spacer>
       </item>
+      <item>
+       <widget class="QLabel" name="groupingModeLabel">
+        <property name="text">
+         <string>Grouping:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="groupingModeComboBox">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <item>
+         <property name="text">
+          <string>By Group Keys</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Keep Separate</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Merge All</string>
+         </property>
+        </item>
+       </widget>
+      </item>
      </layout>
     </item>
    </layout>

@@ -22,7 +22,7 @@ from PyQt5 import QtCore, QtWidgets, QtGui
 from PyQt5.QtCore import QPoint
 from PyQt5.QtWidgets import QMenu
 from collections import OrderedDict
-from typing import Generator, Tuple, Union, Dict
+from typing import Generator, Tuple, Union, Dict, List
 from datetime import datetime
 
 from numpy import long
@@ -91,6 +91,14 @@ RESAMPLING_METHODS = {
 }
 
 
+class GroupingMode(Enum):
+    # Keep in sync with uwsift/ui/open_file_wizard_2.ui
+    # TODO initialize groupingModeComboBox programmatically
+    BY_GROUP_KEYS = 0
+    KEEP_SEPARATE = 1
+    MERGE_ALL = 2
+
+
 class OpenFileWizard(QtWidgets.QWizard):
     AVAILABLE_READERS = OrderedDict()
     inputParametersChanged = QtCore.pyqtSignal()
@@ -135,6 +143,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         # On reader index change: update filter patterns. Also triggers
         # input_parameters_changed in the end so that file table is updated with the new pattern.
         self.ui.readerComboBox.currentIndexChanged.connect(self._update_filter_patterns)
+        self.ui.readerComboBox.currentIndexChanged.connect(self._update_grouping_mode_combobox)
 
         # on filter pattern (displayed value, as this is editable) change: update file table
         self.ui.filterPatternComboBox.currentTextChanged.connect(self.inputParametersChanged.emit)
@@ -155,8 +164,6 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.selectAllButton.clicked.connect(self.select_all_products_state)
         self.ui.selectIDTable.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.ui.selectIDTable.customContextMenuRequested.connect(self._product_context_menu)
-
-        self.currentIdChanged.connect(self.on_page_changed)
 
         self.ui.resamplingMethodComboBox\
             .currentIndexChanged.connect(self.update_resampling_info)
@@ -261,6 +268,8 @@ class OpenFileWizard(QtWidgets.QWizard):
             if self.config['default_reader'] == reader_name:
                 self.ui.readerComboBox.setCurrentIndex(idx)
 
+        self._update_grouping_mode_combobox()
+
     def _init_product_select_page(self):
         # name and level
         id_components = self.config['id_components']
@@ -281,6 +290,8 @@ class OpenFileWizard(QtWidgets.QWizard):
                     item.setCheckState(_to_Qt_CheckState(self._all_selected))
                 self.ui.selectIDTable.setItem(idx, col_idx, item)
                 col_idx += 1
+
+        self.update_resampling_method_combobox()
 
     def _pretty_identifiers(self, data_id: DataID) -> Generator[Tuple[str, object, str], None, None]:
         """Determine pretty version of each identifier."""
@@ -546,7 +557,18 @@ class OpenFileWizard(QtWidgets.QWizard):
         # Read group_keys from SIFT reader-specific config. If not present, Satpy's config is used.
         group_keys = config.get(DATA_READING_CONFIG_KEY + '.' + reader + '.group_keys', None)
 
-        file_groups = group_files(selected_files, reader=reader, group_keys=group_keys)
+        grouping_mode = GroupingMode(
+            self.ui.groupingModeComboBox.currentIndex())
+
+        file_groups = None
+        if grouping_mode == GroupingMode.BY_GROUP_KEYS:
+            file_groups = group_files(selected_files, reader=reader,
+                                      group_keys=group_keys)
+        elif grouping_mode == GroupingMode.MERGE_ALL:
+            file_groups = [{reader: list(selected_files)}]
+        else:  # elif grouping_mode == GroupingModes.KEEP_SEPARATE:
+            file_groups = [{reader: [file]} for file in selected_files]
+
         if not file_groups:
             self.unknown_files = selected_files
             self.file_groups = {}
@@ -635,11 +657,6 @@ class OpenFileWizard(QtWidgets.QWizard):
 
         self.ui.productSelectionPage.completeChanged.emit()
 
-    def on_page_changed(self, page_id: int):
-        # TODO: consider to overwrite self.initializePage()
-        if page_id == PRODUCT_PAGE:
-            self.update_resampling_method_combobox()
-
     def update_resampling_method_combobox(self):
         reader = self.get_reader_name()
         geometry_definition: str = config.get(f'data_reading.{reader}'
@@ -727,7 +744,29 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.resamplingShapeRowSpinBox.setValue(area_def.shape[0])
         self.ui.resamplingShapeColumnSpinBox.setValue(area_def.shape[1])
 
+    def _update_grouping_mode_combobox(self):
+        reader = self.get_reader_name()
+        geometry_definition: str = config.get(f'data_reading.{reader}'
+                                              f'.geometry_definition',
+                                              'AreaDefinition')
+
+        self.ui.groupingModeComboBox.blockSignals(True)
+
+        cb_model = self.ui.groupingModeComboBox.model()
+
+        if geometry_definition == 'SwathDefinition':
+            # cb_model.item(GroupingModes.BY_GROUP_KEYS.value).setEnabled(True)
+            cb_model.item(GroupingMode.KEEP_SEPARATE.value).setEnabled(True)
+            cb_model.item(GroupingMode.MERGE_ALL.value).setEnabled(True)
+        else:
+            # cb_model.item(GroupingModes.BY_GROUP_KEYS.value).setEnabled(True)
+            cb_model.item(GroupingMode.KEEP_SEPARATE.value).setEnabled(False)
+            cb_model.item(GroupingMode.MERGE_ALL.value).setEnabled(False)
+            self.ui.groupingModeComboBox.setCurrentIndex(
+                GroupingMode.BY_GROUP_KEYS.value)
+
+        self.ui.groupingModeComboBox.blockSignals(False)
+
 
 def _to_Qt_CheckState(value: bool):
     return QtCore.Qt.Checked if value else QtCore.Qt.Unchecked
-
