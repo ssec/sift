@@ -30,13 +30,15 @@ configure_loggers()  # we rerun this later to post-config
 import gc
 import logging
 import os
+import signal
 import sys
 import typing as typ
 from collections import OrderedDict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from functools import partial
 from glob import glob
 from uuid import UUID
+from types import FrameType
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QObject
@@ -84,6 +86,9 @@ WATCHDOG_DATETIME_FORMAT_DISPLAY = "%Y-%m-%d %H:%M:%S %Z"
 WATCHDOG_DATETIME_FORMAT_STORE = "%Y-%m-%d %H:%M:%S %z"
 
 UWSIFT_ANIM_INDICATOR_DISABLED = True
+
+EXIT_FORCED_SHUTDOWN = 101
+EXIT_CONFIRMED_SHUTDOWN = 102
 
 
 def test_layers_from_directory(doc, layer_tiff_glob):
@@ -732,6 +737,7 @@ class Main(QtGui.QMainWindow):
 
         journal_path = self._heartbeat_file + "-journal"
         with open(journal_path, "w") as file:
+            file.write(f"{self.pid}\n")
             file.write(fmt_time + "\n")
             file.flush()
 
@@ -805,9 +811,74 @@ class Main(QtGui.QMainWindow):
                 palette = self._palette_text_green
             self.ui.timeLastDatasetImportLineEdit.setPalette(palette)
 
+    def _restart_handler(self, signal: int, frame: FrameType):
+        if self._restart_handler_active:
+            return
+        self._restart_handler_active = True
+
+        if self._restart_ask_again_interval is not None:
+            if self._last_restart_request is None:
+                self._last_restart_request = datetime.now()
+            else:
+                since_last_restart = datetime.now() - self._last_restart_request
+                if since_last_restart < self._restart_ask_again_interval:
+                    LOG.debug("Ignoring restart request because last restart "
+                              "request was denied recently")
+                    return
+
+        msg_box = QtWidgets.QMessageBox()
+        msg_box.setIcon(QtWidgets.QMessageBox.Information)
+        msg_box.setText("Do you want to perform the requested restart?")
+        msg_box.setWindowTitle("Restart Request")
+        msg_box.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+
+        def force_restart():
+            msg_box.close()
+            LOG.info("forced shutdown after restart request")
+            sys.exit(EXIT_FORCED_SHUTDOWN)
+
+        if self._restart_popup_deadline is not None:
+            timer = QtCore.QTimer()
+            timer.setSingleShot(True)
+            timer.timeout.connect(force_restart)
+            timer.start(self._restart_popup_deadline * 1000)
+
+        if msg_box.exec() == QtWidgets.QMessageBox.Yes:
+            LOG.info("shutdown in order to comply with restart request")
+            sys.exit(EXIT_CONFIRMED_SHUTDOWN)
+        else:
+            LOG.info("ignored restart request")
+            self._last_restart_request = datetime.now()
+            self._restart_handler_active = False
+
+    def _init_auto_restart(self):
+        restart_popup_deadline = config.get(
+            "watchdog.auto_restart_popup_deadline", 0)
+        if restart_popup_deadline == 0:
+            LOG.warning("deadline for the auto restart is disabled")
+            self._restart_popup_deadline = None
+        else:
+            self._restart_popup_deadline = int(restart_popup_deadline)
+
+        restart_ask_again_interval = config.get(
+            "watchdog.auto_restart_ask_again_interval", 0)
+        if restart_ask_again_interval == 0:
+            LOG.warning("User won't be asked again to restart")
+            self._restart_ask_again_interval = None
+        else:
+            self._restart_ask_again_interval = timedelta(seconds=int(
+                restart_ask_again_interval))
+
+        self._restart_handler_active = False
+        self._last_restart_request = None
+        signal.signal(signal.SIGUSR1, self._restart_handler)
+
     def __init__(self, config_dir=None, workspace_dir=None, cache_size=None, glob_pattern=None, search_paths=None,
                  border_shapefile=None, center=None, clear_workspace=False):
         super(Main, self).__init__()
+
+        self._init_auto_restart()
+
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
         if AUTO_UPDATE_MODE__ACTIVE:
@@ -1126,10 +1197,11 @@ class Main(QtGui.QMainWindow):
             LOG.warning("No configuration for 'watchdog.heartbeat_file'."
                         " Can't send heartbeats to the watchdog.")
         else:
-            LOG.info(f"Communication with watchdog via heartbeat file "
-                     f" '{self._heartbeat_file}' configured.")
+            self.pid = os.getpid()
             self._heartbeat_file = \
                 heartbeat_file.replace("$$CACHE_DIR$$", USER_CACHE_DIR)
+            LOG.info(f"Communication with watchdog via heartbeat file "
+                     f" '{self._heartbeat_file}' configured.")
             self.document.didAddBasicLayer.connect(self._update_heartbeat_file)
             self.document.didAddCompositeLayer.connect(self._update_heartbeat_file)
 
