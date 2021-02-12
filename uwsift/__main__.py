@@ -41,7 +41,6 @@ from uuid import UUID
 from types import FrameType
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import QObject
 from vispy import app
 
 import uwsift.ui.open_cache_dialog_ui as open_cache_dialog_ui

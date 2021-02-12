@@ -1,8 +1,7 @@
 import logging
 import os
 from collections import ChainMap
-from typing import Generator, Tuple, Dict
-from typing import Optional
+from typing import Dict, Generator, Optional, Tuple
 from uuid import UUID
 
 import numpy as np
@@ -10,7 +9,7 @@ import numpy as np
 from uwsift import CLEANUP_FILE_CACHE
 from uwsift.common import Info, Kind, Flags, State
 from .importer import aImporter, SatpyImporter
-from .metadatabase import Metadatabase, Resource, Product, Content
+from .metadatabase import Metadatabase, Product, Content
 from .workspace import BaseWorkspace, frozendict, ActiveContent
 
 LOG = logging.getLogger(__name__)
