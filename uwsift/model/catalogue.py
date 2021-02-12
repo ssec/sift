@@ -1,15 +1,13 @@
 import collections
-import copy
 import logging
 import os
-import re
 from datetime import datetime, timezone
 from glob import glob
 from typing import Dict, List, Optional, Set, Tuple, Union
 
 import trollsift
 from dateutil.relativedelta import relativedelta
-from satpy import DataID, Scene
+from satpy import DataID
 from satpy.readers import group_files
 
 from uwsift import config

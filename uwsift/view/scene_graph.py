@@ -35,10 +35,10 @@ __author__ = 'davidh'
 
 import logging
 import os
+from enum import Enum
 from numbers import Number
 from typing import Dict, Optional
 from uuid import UUID
-from enum import Enum
 
 import numpy as np
 from PyQt5.QtCore import QObject, pyqtSignal, Qt
@@ -47,17 +47,18 @@ from pyresample import AreaDefinition
 from vispy import app
 from vispy import scene
 from vispy.geometry import Rect
+from vispy.gloo.util import _screenshot
 from vispy.scene.visuals import Markers, Polygon, Compound, Line
 from vispy.util.keys import SHIFT
 from vispy.visuals import LineVisual
 from vispy.visuals.transforms import STTransform, MatrixTransform, ChainTransform
-from vispy.gloo.util import _screenshot
 
-from uwsift import config
 from uwsift import USE_TILED_GEOLOCATED_IMAGES
+from uwsift import config
 from uwsift.common import DEFAULT_ANIMATION_DELAY, Info, Kind, Tool, Presentation
 from uwsift.model.area_defnitions_manager import AreaDefinitionsManager
 from uwsift.model.document import DocLayerStack, DocBasicLayer, Document
+from uwsift.model.time_manager import TimeManager
 from uwsift.queue import TASK_DOING, TASK_PROGRESS
 from uwsift.util import get_package_data_dir
 from uwsift.view.cameras import PanZoomProbeCamera
@@ -65,7 +66,6 @@ from uwsift.view.probes import DEFAULT_POINT_PROBE
 from uwsift.view.transform import PROJ4Transform
 from uwsift.view.visuals import (NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer,
                                  PrecomputedIsocurve, GammaImage, Vectors)
-from uwsift.model.time_manager import TimeManager
 from uwsift.workspace.utils.metadata_utils import (
     map_point_style_to_marker_kwargs, get_point_style_by_name)
 

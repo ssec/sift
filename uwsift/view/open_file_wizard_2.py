@@ -14,31 +14,24 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with SIFT.  If not, see <http://www.gnu.org/licenses/>.
-import copy
-import os
 import logging
+import os
+from collections import OrderedDict
 from enum import Enum
+from typing import Generator, Tuple, Union
+
+import satpy.resample
+import trollsift.parser as fnparser
 from PyQt5 import QtCore, QtWidgets, QtGui
 from PyQt5.QtCore import QPoint
 from PyQt5.QtWidgets import QMenu
-from collections import OrderedDict
-from typing import Generator, Tuple, Union, Dict, List
-from datetime import datetime
-
-from numpy import long
-from pyresample import AreaDefinition
-from satpy import Scene
 from satpy.readers import group_files
-import satpy.resample
-
-from uwsift.model.area_defnitions_manager import AreaDefinitionsManager
-from uwsift.util.common import create_scenes
-from uwsift.satpy_compat import DataID, get_id_value
-
-import trollsift.parser as fnparser
 
 from uwsift import config
+from uwsift.model.area_defnitions_manager import AreaDefinitionsManager
+from uwsift.satpy_compat import DataID, get_id_value
 from uwsift.ui.open_file_wizard_2_ui import Ui_openFileWizard
+from uwsift.util.common import create_scenes
 from uwsift.workspace.importer import available_satpy_readers, filter_dataset_ids
 
 LOG = logging.getLogger(__name__)

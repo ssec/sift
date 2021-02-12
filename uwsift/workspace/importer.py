@@ -20,10 +20,10 @@ from collections import namedtuple
 from datetime import datetime, timedelta
 from typing import Iterable, Generator, Mapping, Tuple, Optional
 
-import pyresample
-import yaml
 import dask.array as da
 import numpy as np
+import pyresample
+import yaml
 from pyproj import Proj
 from pyresample import AreaDefinition
 from sqlalchemy.orm import Session
