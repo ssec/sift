@@ -19,6 +19,7 @@ import satpy
 import vispy.glsl
 import vispy.io
 import xarray
+import zarr
 
 block_cipher = None
 exe_name = "mtgsift"
@@ -43,6 +44,13 @@ for shape_dir in ["ne_50m_admin_0_countries",
                   "grib_definitions"]:
     data_files.append((os.path.join("uwsift", "data", shape_dir), os.path.join("sift_data", shape_dir)))
 
+# Append qml files and icons used therein to data_files
+for qml_file in ["timeline.qml", "TimelineRuler.qml"]:
+    data_files.append((os.path.join("uwsift", "ui", qml_file), os.path.join("uwsift","ui")))
+
+icon_dir = os.path.join("uwsift", "data", "icons")
+data_files.append((os.path.join(icon_dir, "menu.svg"), icon_dir))
+
 # For Cython support (see
 # https://pyinstaller.readthedocs.io/en/stable/feature-notes.html#cython-support):
 hidden_imports = [
@@ -62,6 +70,7 @@ hidden_imports += collect_submodules("pkg_resources")
 hidden_imports += collect_submodules("pyproj")
 hidden_imports += collect_submodules("rasterio")
 hidden_imports += collect_submodules("satpy") 
+hidden_imports += collect_submodules("numcodecs") 
 hidden_imports += collect_submodules("shapely")
 if is_win:
     hidden_imports += collect_submodules("PyQt5")
