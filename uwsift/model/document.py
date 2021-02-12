@@ -68,7 +68,6 @@ from collections import MutableSequence, OrderedDict, defaultdict
 from itertools import groupby, chain
 from uuid import UUID, uuid1 as uuidgen
 from datetime import datetime, timedelta
-from typing import List, Tuple, Dict, Optional
 import typing as typ
 import numpy as np
 from weakref import ref
@@ -1133,7 +1132,7 @@ class DataLayer:
                                 for a given span of time
     """
 
-    def __init__(self, uuids_timestamps: List, product_family_key: Tuple):
+    def __init__(self, uuids_timestamps: typ.List, product_family_key: typ.Tuple):
         # metadata redundant w.r.t. satellite, channel, calibration, so any metadata object
         #                           from the list of tuples will do
         self._t_matched = None
@@ -1187,19 +1186,19 @@ class DataLayerCollection(QObject):
 
     didUpdateCollection = pyqtSignal()
 
-    def __init__(self, data_layers: List[DataLayer]):
+    def __init__(self, data_layers: typ.List[DataLayer]):
         super().__init__()
         # dict mapping product family keys to data layers
         self.data_layers = {}
         # Convenience functions must return a data layer. This is used by caller code to i.e. set a
         # new driving layer either according to some policy or an index
-        self.convenience_functions: Dict[str: typ.Callable] =\
+        self.convenience_functions: typ.Dict[str, typ.Callable] =\
             {"Most Frequent": self.get_most_frequent_data_layer_index}
         self.product_family_keys = set()
         if data_layers:
             self.notify_update_collection(data_layers)
 
-    def get_most_frequent_data_layer_index(self) -> Optional[int]:
+    def get_most_frequent_data_layer_index(self) -> typ.Optional[int]:
         num_data_layers = len(self.data_layers.values())
         if not num_data_layers:
             return None
@@ -1217,7 +1216,7 @@ class DataLayerCollection(QObject):
                 most_frequent_data_layer_idx = most_frequent_data_layer_idx[0]
             return most_frequent_data_layer_idx
 
-    def get_data_layer_by_index(self, idx) -> Optional[DataLayer]:
+    def get_data_layer_by_index(self, idx) -> typ.Optional[DataLayer]:
         curr_data_layers = list(self.data_layers.values())
         if curr_data_layers:
             dl = curr_data_layers[idx]
@@ -1230,7 +1229,7 @@ class DataLayerCollection(QObject):
     def num_data_layers(self):
         return len(list(self.data_layers.values()))
 
-    def notify_update_collection(self, new_data_layers: List[DataLayer]):
+    def notify_update_collection(self, new_data_layers: typ.List[DataLayer]):
         """
         Update state of collection when new data is being loaded or old data is discarded and
         notify dependants via Qt signal.
@@ -1408,7 +1407,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self._layer_with_uuid = {}
 
         # data_layers represents time series of images ordered by product family
-        self.data_layers: List[DataLayer] = []
+        self.data_layers: typ.List[DataLayer] = []
         self.data_layer_collection: DataLayerCollection = DataLayerCollection([])
 
         self.colormaps = COLORMAP_MANAGER
@@ -2726,7 +2725,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             if not fail:
                 yield md
 
-    def get_unique_product_family_keys(self) -> List[Tuple]:
+    def get_unique_product_family_keys(self) -> typ.List[typ.Tuple]:
         """
         Return list of unique product_family_keys in i.e. document._layer_with_uuid's
         DocBasicLayers.
@@ -2740,17 +2739,17 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             unique_product_family_keys.append(pf_key)
         return unique_product_family_keys
 
-    def create_data_layers(self) -> List[DataLayer]:
+    def create_data_layers(self) -> typ.List[DataLayer]:
         """
             Adds data layers to document, based on currently present
             uuid -> DocBasicLayer (document._layer_with_uuid) mappings.
-            :return: data_layers: List of data layers to be incorporated into DataLayerCollection.
+            :return: data_layers: typ.List of data layers to be incorporated into DataLayerCollection.
         """
-        pf_keys: List[Tuple] = [dbl.product_family_key for dbl in self._layer_with_uuid.values()]
+        pf_keys: typ.List[typ.Tuple] = [dbl.product_family_key for dbl in self._layer_with_uuid.values()]
         unique_pf_keys = set(pf_keys)
-        data_layers: List[DataLayer] = []
+        data_layers: typ.List[DataLayer] = []
         for curr_pf_key in unique_pf_keys:
-            curr_pf_uuids_timestamps: List[Tuple] = []
+            curr_pf_uuids_timestamps: typ.List[typ.Tuple] = []
             for image_uuid, doc_basic_layer in self._layer_with_uuid.items():
                 if doc_basic_layer.product_family_key != curr_pf_key:
                     continue
