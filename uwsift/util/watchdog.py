@@ -12,6 +12,7 @@ from typing import List, Tuple, Union, Optional
 
 import appdirs
 from donfig import Config
+from psutil import Process, NoSuchProcess
 
 LOG = logging.getLogger(__name__)
 
