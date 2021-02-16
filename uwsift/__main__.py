@@ -876,13 +876,13 @@ class Main(QtGui.QMainWindow):
                  border_shapefile=None, center=None, clear_workspace=False):
         super(Main, self).__init__()
 
-        self._init_auto_restart()
-
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
         if AUTO_UPDATE_MODE__ACTIVE:
             self.ui.animFrame.hide()
             self.ui.timelineFrame.hide()
+
+            self._init_auto_restart()
         else:
             self.ui.watchdogFrame.hide()
         # FIXME: Slider does not currently work as intended. Re-enable later
