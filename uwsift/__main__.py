@@ -1075,12 +1075,15 @@ class Main(QtWidgets.QMainWindow):
     def open_wizard(self, *args, **kwargs):
         from uwsift.view.open_file_wizard import OpenFileWizard
 
-        wizard_dialog = OpenFileWizard(base_dir=self._last_open_dir, base_reader=self._last_reader, parent=self)
-        self._wizard_dialog = wizard_dialog
-        if wizard_dialog.exec_():
+        if not self._wizard_dialog:
+            self._wizard_dialog = OpenFileWizard(
+                base_dir=self._last_open_dir, base_reader=self._last_reader, parent=self
+            )
+
+        if self._wizard_dialog.exec_():
             LOG.info("Loading products from open wizard...")
-            scenes = wizard_dialog.scenes
-            reader = wizard_dialog.get_reader()
+            scenes = self._wizard_dialog.scenes
+            reader = self._wizard_dialog.get_reader()
 
             merge_with_existing = config.get("data_reading.merge_with_existing", True)
             if USE_INVENTORY_DB and merge_with_existing:
@@ -1108,17 +1111,16 @@ class Main(QtWidgets.QMainWindow):
             importer_kwargs = {
                 "reader": reader,
                 "scenes": scenes,
-                "dataset_ids": wizard_dialog.collect_selected_ids(),
-                "resampling_info": wizard_dialog.resampling_info,
+                "dataset_ids": self._wizard_dialog.collect_selected_ids(),
+                "resampling_info": self._wizard_dialog.resampling_info,
                 "merge_with_existing": merge_with_existing,
             }
             self._last_reader = reader
-            self._last_open_dir = wizard_dialog.get_directory()
+            self._last_open_dir = self._wizard_dialog.get_directory()
 
-            self.open_paths(wizard_dialog.files_to_load, **importer_kwargs)
+            self.open_paths(self._wizard_dialog.files_to_load, **importer_kwargs)
         else:
             LOG.debug("Wizard closed, nothing to load")
-        self._wizard_dialog = None
 
     def reload_config(self):
         config.refresh()
