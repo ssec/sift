@@ -85,8 +85,10 @@ class GroupingMode(Enum):
 class OpenFileWizard(QtWidgets.QWizard):
     AVAILABLE_READERS = OrderedDict()
     inputParametersChanged = QtCore.pyqtSignal()
+    directoryChanged = QtCore.pyqtSignal(str)
 
     def __init__(self, base_dir=None, base_reader=None, parent=None):
+        super(OpenFileWizard, self).__init__(parent)
         super(OpenFileWizard, self).__init__(parent)
 
         self._initial_directory = base_dir
@@ -138,6 +140,8 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.folderTextBox.textChanged.connect(self.inputParametersChanged.emit)
         # on input parameter change (e.g.: filter pattern, folder): update file table
         self.inputParametersChanged.connect(self._update_file_table)
+        # directory was entered or selected with the QFileDialog
+        self.directoryChanged.connect(self._update_input_directory)
         # on change of selection: group files and check if selection is valid
         self.ui.fileTable.itemSelectionChanged.connect(self._synchronize_checkmarks_and_check_file_page_completeness)
         # on change of sorting: temporarily pause sorting while sorted by checked state
@@ -324,15 +328,36 @@ class OpenFileWizard(QtWidgets.QWizard):
 
     def _open_select_folder_dialog(self):
         """Show folder chooser and update table with files"""
+        file_dialog = QtWidgets.QFileDialog(self, "Select folder to open")
+        file_dialog.setOption(QtWidgets.QFileDialog.ShowDirsOnly, True)
+        file_dialog.setFileMode(QtWidgets.QFileDialog.Directory)
 
-        folder = QtWidgets.QFileDialog.getExistingDirectory(
-            self, "Select folder to open", self.ui.folderTextBox.text() or os.getenv("HOME")
-        )
-        if not folder:
+        if self._initial_directory:
+            file_dialog.setDirectory(self._initial_directory)
+        else:
+            home_dir = os.getenv("HOME")
+            if home_dir:
+                file_dialog.setDirectory(home_dir)
+
+        file_dialog.currentChanged.connect(self.directoryChanged)
+        file_dialog.directoryEntered.connect(self.directoryChanged)
+        file_dialog.open()
+
+    def _update_input_directory(self, path: str):
+        # The DirectoryOnly FileMode is obsolete and the Directory FileMode
+        # doesn't work with the ShowDirsOnly option. Thus the user is able to
+        # select regular files. Filter these paths from the currentChanged
+        # event.
+        if not os.path.isdir(path):
             return
 
-        if os.path.exists(folder):
-            self.ui.folderTextBox.setText(folder)
+        # Don't update the table twice in the following case: The user may
+        # select the directory with a single click (currentChanged) and then
+        # enter the directory with a double click (directoryEntered).
+        if path != self._initial_directory:
+            self._initial_directory = path
+            self.ui.folderTextBox.setText(path)
+            self.inputParametersChanged.emit()
 
     def _update_filter_patterns(self):
         """Updates available file filter patterns by reading the config. Selects first entry."""
