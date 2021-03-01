@@ -1207,7 +1207,8 @@ class SatpyImporter(aImporter):
         dataset_ids = [prod.info['_satpy_id'] for prod in products]
         self.scn.load(dataset_ids, pad_data=True, upper_right_corner="NE")
 
-        resampler: str = self.resampling_info['resampler']
+        resampler: str = None if not self.resampling_info \
+            else self.resampling_info['resampler']
         if resampler and resampler.lower() != 'none':  # gracefully accept variants of None
             max_area = self.scn.max_area()
             if isinstance(max_area, AreaDefinition) and \
