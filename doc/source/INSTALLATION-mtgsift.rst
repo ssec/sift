@@ -11,7 +11,7 @@ How to Install MTG-SIFT from Conda Packages
 
 To get MTG-SIFT in a Conda environment you can choose from two packages.
 
-The fist one - *mtgsift* - installs the software ready to be run. It is
+The first one - *mtgsift* - installs the software ready to be run. It is
 intended for "end" users of the software who are not interested in developing
 it.
 
