@@ -59,7 +59,7 @@ catalogue:
       start_time:
         type: recent_datetime
         H: [0, -1]
-	
+
     products:
       ir_105: [brightness_temperature]
 
