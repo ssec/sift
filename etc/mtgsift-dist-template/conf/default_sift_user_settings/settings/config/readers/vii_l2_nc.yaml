@@ -1,0 +1,3 @@
+data_reading:
+  vii_l2_nc:
+    geometry_definition: SwathDefinition  # Default: AreaDefinition
