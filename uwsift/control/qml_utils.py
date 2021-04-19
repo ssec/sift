@@ -287,6 +287,6 @@ class QmlBackend(QObject):
         :param conv_func_name: Name of the clicked convenience function as a string
         """
         if self.qml_layer_manager:
-            data_layer_idx = self.qml_layer_manager.convenience_functions[conv_func_name]()
-            if data_layer_idx:
-                self.didChangeTimebase.emit(data_layer_idx)
+            data_layer_index = self.qml_layer_manager.convenience_functions[conv_func_name]()
+            if data_layer_index >= 0:
+                self.didChangeTimebase.emit(data_layer_index)

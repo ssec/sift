@@ -1198,10 +1198,14 @@ class DataLayerCollection(QObject):
         if data_layers:
             self.notify_update_collection(data_layers)
 
-    def get_most_frequent_data_layer_index(self) -> typ.Optional[int]:
+    def get_most_frequent_data_layer_index(self) -> int:
+        """
+        Get index of the data layer with the least mean difference between timestamps.
+        :return: -1 if no data layers exist, index of most frequent data layer otherwise.
+        """
         num_data_layers = len(self.data_layers.values())
-        if not num_data_layers:
-            return None
+        if num_data_layers == 0:
+            return -1
         else:
             temporal_differences = np.zeros(num_data_layers)
             for i, data_layer in enumerate(self.data_layers.values()):
