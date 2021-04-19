@@ -1,5 +1,6 @@
 import QtQuick 2.12
 import QtQuick.Controls 2.3
+import QtQuick.Controls.Styles 1.3
 import QtQuick.Extras 1.4
 import QtQuick.Layouts 1.3
 import QtCharts 2.3
@@ -124,12 +125,13 @@ Item{
                 signal reemittedPushedOrPopped;
                 signal reemittedTimebaseChanged(var idx);
 
-                anchors {left:convFuncPicker.right ; right: parent.right; top: parent.top}
+                anchors {left:convFuncPicker.right ; right: parent.right; }//top: parent.top
 
                 ToolTip.visible: hovered
                 ToolTip.delay: toolTipDelay
                 ToolTip.timeout: toolTipTimeout
                 ToolTip.text: qsTr("Choose a data layer as timebase")
+
 
                 property var textWidths: []
                 property int maxPopupWidth: 300;
@@ -146,6 +148,8 @@ Item{
                     currentIndex = 0;
                     LayerManager.layerModel.pushedOrPopped.connect(reemittedPushedOrPopped);
                     backend.didChangeTimebase.connect(reemittedTimebaseChanged);
+                    activated.connect(backend.clickComboBoxAtIndex)
+
                 }
 
                 onReemittedTimebaseChanged: {
@@ -172,20 +176,52 @@ Item{
                     if (dataLayerComboBox.currentIndex === -1){
                         backend.clickComboBoxAtIndex(0);
                         dataLayerComboBox.currentIndex = 0;
-                        LayerManager.currentIndex = 0;
                     }
                 }
 
-                delegate: MenuItem{
+                delegate: ItemDelegate {
+                    id: cb_delegate
+                    text: model.display
+                    width: parent.width
+                    property alias fontPointSize: del_text.font.pointSize;
 
-                      text: model.display;
-                      onTriggered: {
-                        backend.clickComboBoxAtIndex(model.index);
-                        dataLayerComboBox.currentIndex = model.index;
-                        LayerManager.currentIndex = model.index;
-                      }
+                    // padding controls space between contentItem and backgroundItem
+                    topPadding: fontPointSize/4
+                    bottomPadding: 0
+                    highlighted: dataLayerComboBox.highlightedIndex === index
+
+                    contentItem: Text{
+                        id: del_text
+                        font.pointSize: 10
+                        text: cb_delegate.text
+                    }
+                    background: Rectangle{
+                        color: cb_delegate.highlighted ? "#308cc6":"white"
+                        border.color: cb_delegate.highlighted ? Qt.darker("#308cc6"):"white"
+                        anchors.fill: cb_delegate
+                    }
+                }
+
+                popup: Popup {
+                    y: 0
+                    width: dataLayerComboBox.width
+                    implicitHeight: contentItem.implicitHeight//500
+                    padding: 1
+
+                    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
+
+                    contentItem: ListView {
+                        clip: true
+                        implicitHeight: contentHeight
+                        model: dataLayerComboBox.popup.visible ? dataLayerComboBox.delegateModel : null
+
+                        currentIndex: dataLayerComboBox.highlightedIndex
+                        spacing: 0
+                        ScrollIndicator.vertical: ScrollIndicator { }
+                    }
                 }
             }
+
         }
         Rectangle {
             id : timeline_rect

@@ -306,13 +306,11 @@ class UserControlsAnimation(QtCore.QObject):
     def next_frame(self, *args, **kwargs):
         """Advance a frame along the animation order."""
         self.scene_manager.layer_set.animating = False
-        self.scene_manager.layer_set.next_frame()
         self.scene_manager.layer_set.step(backwards=False)
 
     def prev_frame(self, *args, **kwargs):
         """Retreat a frame along the animation list."""
         self.scene_manager.layer_set.animating = False
-        self.scene_manager.layer_set.next_frame(frame_number=-1)
         self.scene_manager.layer_set.step(backwards=True)
 
     def reset_frame_slider(self, *args, **kwargs):

@@ -206,7 +206,7 @@ class LayerSet(object):
         doc = parent.document
         self.time_manager = TimeManager(doc.data_layer_collection, self._animation_speed)
 
-        self._animation_timer = app.Timer(self._animation_speed / 1000.0, connect=self.next_frame)
+        self._animation_timer = app.Timer(self._animation_speed / 1000.0)
         self._animation_timer.connect(self.step)
 
         if layers is not None:
@@ -369,6 +369,7 @@ class LayerSet(object):
                 child.visible = False
 
     def _set_visible_from_data_layers(self):
+        layer_visibility = dict((uuid, False) for uuid in self._layers.keys())
         for pfkey, data_layer in self.time_manager.collection.data_layers.items():
             # Set all uuids in the current data layer to invisible
             for _, im_uuid in data_layer.timeline.items():
@@ -376,7 +377,9 @@ class LayerSet(object):
             # If a time was matched turn that time's uuid visible
             layer_uuid = data_layer.t_matched_uuid()
             if layer_uuid is not None:
+                layer_visibility[layer_uuid] = True
                 self._set_uuid_visibility(layer_uuid, True)
+        self.parent.didChangeLayerVisibility.emit(layer_visibility)
 
     def jump(self, index):
         self.time_manager.jump(index)

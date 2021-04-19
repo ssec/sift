@@ -85,10 +85,8 @@ Rectangle{
             let numDts = timebaseModel.rowCount()
             let currMinDate = timebaseModel.at(0);
             let currMaxDate = timebaseModel.at(numDts-1);
-
             let firstDate = new Date(currMinDate)
             firstDate.setSeconds(0);
-            firstDate.setMinutes(0);
             let secondDate = nextDateByResolution(firstDate, resolution, resolutionMode);
             let resolutionSeconds = (secondDate.getTime() - firstDate.getTime())/1000;
             let dataTimeSpanSeconds = (currMaxDate.getTime()-currMinDate.getTime())/1000;
