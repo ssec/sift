@@ -56,7 +56,7 @@ from vispy.visuals.transforms import STTransform, MatrixTransform, ChainTransfor
 from uwsift import USE_TILED_GEOLOCATED_IMAGES
 from uwsift import config
 from uwsift.common import DEFAULT_ANIMATION_DELAY, Info, Kind, Tool, Presentation
-from uwsift.model.area_defnitions_manager import AreaDefinitionsManager
+from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.model.document import DocLayerStack, DocBasicLayer, Document
 from uwsift.model.time_manager import TimeManager
 from uwsift.queue import TASK_DOING, TASK_PROGRESS

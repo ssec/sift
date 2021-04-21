@@ -28,7 +28,7 @@ from PyQt5.QtWidgets import QMenu
 from satpy.readers import group_files
 
 from uwsift import config
-from uwsift.model.area_defnitions_manager import AreaDefinitionsManager
+from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.satpy_compat import DataID, get_id_value
 from uwsift.ui.open_file_wizard_2_ui import Ui_openFileWizard
 from uwsift.util.common import create_scenes

@@ -81,7 +81,7 @@ from uwsift.queue import TaskQueue
 from uwsift.workspace import BaseWorkspace, CachingWorkspace, SimpleWorkspace
 from uwsift.util.default_paths import DOCUMENT_SETTINGS_DIR
 from uwsift.model.composite_recipes import RecipeManager, CompositeRecipe
-from uwsift.model.area_defnitions_manager import AreaDefinitionsManager
+from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.view.colormap import COLORMAP_MANAGER, PyQtGraphColormap, SITE_CATEGORY, USER_CATEGORY
 from uwsift.queue import TASK_PROGRESS, TASK_DOING
 from PyQt5.QtCore import QObject, pyqtSignal
