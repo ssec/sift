@@ -22,7 +22,7 @@ __author__ = 'rayg'
 
 # To have consistent logging for all modules (also for their static
 # initialization) it must be set up before importing them.
-from uwsift.model.area_defnitions_manager import AreaDefinitionsManager
+from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.util.logger import configure_loggers
 
 configure_loggers()  # we rerun this later to post-config
