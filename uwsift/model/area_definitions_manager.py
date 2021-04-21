@@ -54,12 +54,15 @@ class AreaDefinitionsManager:
     than the *area_id* and shorter than the *description* provided in the
     AreaDefinition object.
     """
-    _available_area_defs = None
+    _available_area_defs_by_id = None
+    _available_area_defs_id_by_name = None
 
     @classmethod
     def init_available_area_defs(cls):
 
-        cls._available_area_defs: typ.Dict[str, AreaDefinition] = {}
+        cls._available_area_defs_by_id: typ.Dict[str, AreaDefinition] = {}
+        cls._available_area_defs_id_by_name: typ.Dict[str, str] = {}
+
         desired_area_defs = config.get("area_definitions", {})
 
         for area_def_name, area_id in desired_area_defs.items():
@@ -71,11 +74,12 @@ class AreaDefinitionsManager:
                 continue
 
             LOG.info(f"Adding area definition: {area_def_name} -> {area_id}")
-            cls._available_area_defs[area_def_name] = area_def
+            cls._available_area_defs_by_id[area_id] = area_def
+            cls._available_area_defs_id_by_name[area_def_name] = area_id
 
         # Check for existence of at least one 'latlong' projection
         # (https://proj.org/operations/conversions/latlon.html)
-        for area_def in cls._available_area_defs.values():
+        for area_def in cls._available_area_defs_by_id.values():
             proj: str = area_def.proj_dict["proj"]
             if proj in ("latlon", "latlong", "lonlat", "longlat"):
                 print(f"FOUND {proj}")
@@ -88,21 +92,26 @@ class AreaDefinitionsManager:
 
             LOG.info(f"Adding default area definition:"
                      f" {area_def_name} -> {area_id}")
-            cls._available_area_defs[area_def_name] = area_def
+            cls._available_area_defs_by_id[area_id] = area_def
+            cls._available_area_defs_id_by_name[area_def_name] = area_id
 
     @classmethod
     def available_area_def_names(cls):
-        return cls._available_area_defs.keys()
+        return cls._available_area_defs_id_by_name.keys()
+
+    @classmethod
+    def area_def_by_id(cls, id):
+        return cls._available_area_defs_by_id.get(id)
 
     @classmethod
     def area_def_by_name(cls, name):
-        return cls._available_area_defs.get(name)
+        return cls.area_def_by_id(cls._available_area_defs_id_by_name.get(name))
 
     @classmethod
     def default_area_def_name(cls):  # TODO: take from configuration, make robust
         # Since nothing has been configured, take the first key (i.e. the
         # display_name) of the known area definitions
-        return next(iter(cls._available_area_defs))
+        return next(iter(cls._available_area_defs_id_by_name))
 
 
 AreaDefinitionsManager.init_available_area_defs()
