@@ -86,8 +86,9 @@ class AreaDefinitionsManager:
             area_def = \
                 load_area_from_string(DEFAULT_AREA_DEFINITIONS_YAML, area_id)
 
-        LOG.info(f"Adding default area definition: {area_def_name} -> {area_id}")
-        cls._available_area_defs[area_def_name] = area_def
+            LOG.info(f"Adding default area definition:"
+                     f" {area_def_name} -> {area_id}")
+            cls._available_area_defs[area_def_name] = area_def
 
     @classmethod
     def available_area_def_names(cls):
