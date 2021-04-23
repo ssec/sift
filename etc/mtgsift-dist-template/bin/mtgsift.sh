@@ -1,4 +1,12 @@
 #!/bin/bash
+set -Eeuo pipefail
+
+notify () {
+  FAILED_COMMAND="$(caller): ${BASH_COMMAND}" \
+    # perform notification here
+}
+
+trap notify ERR
 
 # force a friendly umask
 umask 002
@@ -6,7 +14,11 @@ umask 002
 #set font config path
 export FONTCONFIG_PATH=/etc/fonts
 
-MTGSIFT_HOME="/opt/mtg-sift/mtgsift-0.8"
+#get script path and then one directory up
+SCRIPT_PATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+MTGSIFT_HOME="$(dirname "$SCRIPT_PATH")"
+
+echo "MTGSIFT_HOME directory is $MTGSIFT_HOME."
 
 #set XRIT_DECOMPRESS_PATH
 export XRIT_DECOMPRESS_PATH="$MTGSIFT_HOME/etc/xRITDecompress/xRITDecompress"
