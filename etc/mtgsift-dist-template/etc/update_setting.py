@@ -145,7 +145,7 @@ def run():
 
    if setting_file and os.path.exists(setting_file) and os.path.isfile(setting_file):
       #replace dir if it is an older version
-      print("The settings.version file exists. Do not do anything.")
+      print("The settings.version file exists. Nothing to do.")
    else:
       #copy the content of the default setting dir in CONF_ROOT_DIR
       print("The file doesn't exist.")
