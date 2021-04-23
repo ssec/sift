@@ -22,7 +22,6 @@ from typing import Iterable, Generator, Mapping, Tuple, Optional
 
 import dask.array as da
 import numpy as np
-import pyresample
 import yaml
 from pyproj import Proj
 from pyresample import AreaDefinition
@@ -30,6 +29,7 @@ from sqlalchemy.orm import Session
 
 from uwsift import config, USE_INVENTORY_DB
 from uwsift.common import Platform, Info, Instrument, Kind, INSTRUMENT_MAP, PLATFORM_MAP
+from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.satpy_compat import DataID, get_id_value, get_id_items
 from uwsift.util import USER_CACHE_DIR
 from uwsift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
@@ -1228,11 +1228,9 @@ class SatpyImporter(aImporter):
                 #  and https://docs.python.org/3/library/os.html#os.cpu_count
                 nprocs = len(os.sched_getaffinity(0))
 
-                target_area_def = pyresample.geometry.DynamicAreaDefinition(
-                    projection=self.resampling_info['projection'])
-                target_area_def = target_area_def.freeze(
-                    max_area.get_lonlats(),
-                    shape=self.resampling_info['shape'])
+                target_area_def = AreaDefinitionsManager.area_def_by_id(
+                    self.resampling_info['area_id'])
+
                 self.scn = self.scn.resample(
                     target_area_def,
                     resampler=resampler,

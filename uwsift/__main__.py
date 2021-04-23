@@ -22,7 +22,7 @@ __author__ = 'rayg'
 
 # To have consistent logging for all modules (also for their static
 # initialization) it must be set up before importing them.
-from uwsift.model.area_defnitions_manager import AreaDefinitionsManager
+from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.util.logger import configure_loggers
 
 configure_loggers()  # we rerun this later to post-config
@@ -306,13 +306,11 @@ class UserControlsAnimation(QtCore.QObject):
     def next_frame(self, *args, **kwargs):
         """Advance a frame along the animation order."""
         self.scene_manager.layer_set.animating = False
-        self.scene_manager.layer_set.next_frame()
         self.scene_manager.layer_set.step(backwards=False)
 
     def prev_frame(self, *args, **kwargs):
         """Retreat a frame along the animation list."""
         self.scene_manager.layer_set.animating = False
-        self.scene_manager.layer_set.next_frame(frame_number=-1)
         self.scene_manager.layer_set.step(backwards=True)
 
     def reset_frame_slider(self, *args, **kwargs):
@@ -881,6 +879,8 @@ class Main(QtGui.QMainWindow):
         if AUTO_UPDATE_MODE__ACTIVE:
             self.ui.animFrame.hide()
             self.ui.timelineFrame.hide()
+            self.ui.progressBar.hide()
+            self.ui.progressText.hide()
 
             self._init_auto_restart()
         else:

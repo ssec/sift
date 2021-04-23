@@ -9,7 +9,6 @@ from PyQt5.QtCore import Qt, QModelIndex, QDateTime
 class QmlLayerManager(QObject):
 
     layerToDisplayChanged = pyqtSignal()
-    currentIndexChanged = pyqtSignal(int)
     layerModelChanged = pyqtSignal()
     convFuncModelChanged = pyqtSignal()
     dateToDisplayChanged = pyqtSignal(str)
@@ -19,8 +18,6 @@ class QmlLayerManager(QObject):
         super().__init__()
         self._layer_to_display = ""
         self._date_to_display = None
-        self._test = 0
-        self._currentIndex = 0
 
         self._convenience_functions = {}
         self._conv_func_model: LayerModel = LayerModel(layer_strings=[])
@@ -41,15 +38,6 @@ class QmlLayerManager(QObject):
     def convenience_functions(self, conv_funcs):
         self._convenience_functions = conv_funcs
         self.convFuncModel = LayerModel(layer_strings=list(conv_funcs.keys()))
-
-    @pyqtProperty(int, notify=currentIndexChanged)
-    def currentIndex(self):
-        return self._currentIndex
-
-    @currentIndex.setter
-    def currentIndex(self, idx):
-        self._currentIndex = idx
-        self.currentIndexChanged.emit(self._currentIndex)
 
     @pyqtProperty(QObject, notify=layerModelChanged)
     def layerModel(self):
@@ -299,6 +287,6 @@ class QmlBackend(QObject):
         :param conv_func_name: Name of the clicked convenience function as a string
         """
         if self.qml_layer_manager:
-            data_layer_idx = self.qml_layer_manager.convenience_functions[conv_func_name]()
-            if data_layer_idx:
-                self.didChangeTimebase.emit(data_layer_idx)
+            data_layer_index = self.qml_layer_manager.convenience_functions[conv_func_name]()
+            if data_layer_index >= 0:
+                self.didChangeTimebase.emit(data_layer_index)
