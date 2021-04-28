@@ -1222,12 +1222,10 @@ class DataLayerCollection(QObject):
 
     def get_data_layer_by_index(self, idx) -> typ.Optional[DataLayer]:
         curr_data_layers = list(self.data_layers.values())
-        if curr_data_layers:
-            dl = curr_data_layers[idx]
-            if dl:
-                return dl
-            else:
-                return None
+        try:
+            return curr_data_layers[idx]
+        except IndexError:
+            return None
 
     @property
     def num_data_layers(self):
