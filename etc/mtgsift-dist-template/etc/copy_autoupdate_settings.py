@@ -8,8 +8,8 @@ import os
 import tempfile
 import datetime
 import calendar
+import shutil
 
-import shutils
 import distutils.dir_util as dt
 from distutils.dir_util import copy_tree
 
@@ -156,19 +156,20 @@ def copy_and_backup():
 
    if auto_update_file and os.path.exists(auto_update_file) and os.path.isfile(auto_update_file):
       #copy the content of the setting dir in WORK_DIR
-      print("Backup {} into {}".format(auto_update_file, WORK_DIR))
+      print("Backup {} into {}".format(auto_update_file, work_dir))
 
-      makedirs(WORK_DIR)
-      shutil.copy(auto_udate_file, WORK_DIR)
+      makedirs(work_dir)
+      shutil.copy(auto_update_file, work_dir)
 
    if catalogue_file and os.path.exists(catalogue_file) and os.path.isfile(catalogue_file):
       #copy the content of the setting dir in WORK_DIR
-      print("Backup {} into {}".format(catalogue_file, WORK_DIR))
+      print("Backup {} into {}".format(catalogue_file, work_dir))
 
-      makedirs(WORK_DIR)
-      shutil.copy(catalogue_file, WORK_DIR)
+      makedirs(work_dir)
+      shutil.copy(catalogue_file, work_dir)
 
-   print("Copying auto_update mode files to the user env in {}".format(home_dir))
+   print("Copying auto_update mode files to the user env in {}".format(setting_root_dir))
+   #print("defaut_catalogue = {}, catalogue_file = {}".format(default_catalogue, catalogue_file))
    shutil.copy(default_catalogue, catalogue_file) 
    shutil.copy(default_auto_update, auto_update_file) 
 
@@ -180,8 +181,8 @@ def restore():
 
    mtgsift_root_dir = get_home_dir_path()
    work_dir         = WORK_DIR.format(mtgsift_root_dir)
-   work_auto_update = AUTO_UPDATE_FILE.format(work_dir)
-   work_catalogue   = CATALOGUE_FILE.format(work_dir)
+   work_auto_update = "{}/auto_update.yaml".format(work_dir)
+   work_catalogue   = "{}/catalogue.yaml".format(work_dir)
 
    #settings directory in ~/.config/SIFT
    setting_root_dir = CONF_ROOT_DIR.format(home_dir)
@@ -190,37 +191,49 @@ def restore():
 
    print("Restore the auto_update settings, namely auto_update.yaml and catalogue.yaml of the user.")
 
-   print("Looking for auto update files in {}".format(home_dir))
+   print("Looking for auto update files in {}".format(setting_root_dir))
+
+   print("work_auto_update = {}".format(work_auto_update))
 
    if work_auto_update and os.path.exists(work_auto_update) and os.path.isfile(work_auto_update):
       #copy the content of the setting dir in WORK_DIR
-      print("Restore {} into {}".format(work_auto_update, setting_root_dir))
+      print("Restore {} into {}".format(work_auto_update, auto_update_file))
 
-      shutil.copy(work_udate_file, setting_root_dir)
+      shutil.copy(work_auto_update, auto_update_file)
+      ## Try to delete the file ##
+      try:
+         os.remove(work_auto_update)
+      except OSError as e:  ## if failed, report it back to the user ##
+         print ("Ignore Error: %s - %s." % (e.filename, e.strerror))
 
    if work_catalogue and os.path.exists(work_catalogue) and os.path.isfile(work_catalogue):
       #copy the content of the setting dir in WORK_DIR
-      print("Restore {} into {}".format(work_catalogue, setting_root_dir))
+      print("Restore {} into {}".format(work_catalogue, catalogue_file))
 
-      shutil.copy(catalogue_file, setting_root_dir)
+      shutil.copy(work_catalogue, catalogue_file)
+      ## Try to delete the file ##
+      try:
+         os.remove(work_catalogue)
+      except OSError as e:  ## if failed, report it back to the user ##
+         print ("Ignore Error: %s - %s." % (e.filename, e.strerror))
 
    print("Copying auto_update mode files to the user env in {}".format(setting_root_dir))
-   
 
 if __name__ == '__main__':
 
-    if sys.argv != 1:
+    #print("Len(sys.argv): {}".format(len(sys.argv)))
+    if len(sys.argv) != 2:
         print("Error. need one argument\n copy_autoupdate_settings.py (restore|update)\n - restore: restore the files saved in work.\n - update: update the files with the default auto_update.\n")
         res = 1
     else:
         if sys.argv[1] == "restore":
            restore()
            res = 0
-       elif sys.argv[1] == "update":
+        elif sys.argv[1] == "update":
            copy_and_backup()
            res = 0
-       else:
-        print("Uncorrect argument {}.\n copy_autoupdate_settings.py (restore|update)\n - restore: restore the files saved in work.\n - update: update the files with the default auto_update.\n".format(sys.argv[1])) 
-        res = 1
+        else:
+           print("Uncorrect argument {}.\n copy_autoupdate_settings.py (restore|update)\n - restore: restore the files saved in work.\n - update: update the files with the default auto_update.\n".format(sys.argv[1])) 
+           res = 1
 
     sys.exit(res)
