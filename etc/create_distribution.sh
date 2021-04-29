@@ -17,7 +17,7 @@ cp -R "$HOME_PYINSTALLER_BUILD/dist/mtgsift" "$DIST_OUTPUT/mtgsift-dist/lib"
 
 #move out the libraries creating some dependencies conflicts (keep them for the moment)
 mv "$DIST_OUTPUT/mtgsift-dist/lib/libudev.so.1" "$DIST_OUTPUT/mtgsift-dist/etc/extra-libs"
-mv "$DIST_OUTPUT/mtgsift-dist/lib/lib/libxcb-shm.so.0" "$DIST_OUTPUT/mtgsift-dist/etc/extra-libs"
+mv "$DIST_OUTPUT/mtgsift-dist/lib/libxcb-shm.so.0" "$DIST_OUTPUT/mtgsift-dist/etc/extra-libs"
 
 #Adapt Qt5 if necessary
 PYQT5LIB="$DIST_OUTPUT/mtgsift-dist/lib/PyQt5/Qt"
