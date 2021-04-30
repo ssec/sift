@@ -88,7 +88,7 @@ echo ""
 echo "Launching MTGSift in AUTO UPDATE MODE"
 
 cd "$MTGSIFT_HOME"/lib
-./mtgsift >"$MTGSIFT_LOGS/mtgsift.log" 2>&1
+#./mtgsift >"$MTGSIFT_LOGS/mtgsift.log" 2>&1
 ./mtgsift 
 res="$?"
 
