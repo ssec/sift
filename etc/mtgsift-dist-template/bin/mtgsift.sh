@@ -58,12 +58,20 @@ export MTGSIFT_HOME=$(unset CDPATH; cd "$HERE/.."; pwd)
 #MTGSIFT_HOME="/tcenas/home/gaubert/mtg-sift/mtgsift-distrib"
 MTGSIFT_LOGS="$MTGSIFT_HOME/logs"
 
-
 #run update settings file
+echo "Create default settings if necessary:"
+echo "--------------------------------------------"
 "$MTGSIFT_HOME"/etc/update_setting.py
+echo "--------------------------------------------"
+echo ""
+
+echo "Check if there is a backup available of auto_update.yaml and catalogue.yaml to restore:"
+echo "--------------------------------------------"
+"$MTGSIFT_HOME"/etc/copy_autoupdate_settings.py restore_interactive
+echo "--------------------------------------------"
+echo ""
 
 cd "$MTGSIFT_HOME"/lib
-
 echo "Launching MTGSift"
 
 #./mtgsift >"$MTGSIFT_LOGS/mtgsift.log" 2>&1

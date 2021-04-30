@@ -9,8 +9,12 @@ notify () {
 trap notify ERR
 
 function restore_backup {
-     echo "Restoring the user auto_update.yaml and catalogue.yaml settings"
-     "$MTGSIFT_HOME/etc/copy_autoupdate_settings.py" restore
+     echo ""
+     echo "Restoring the default auto_update.yaml and catalogue.yaml settings:"
+     echo "--------------------------------------------"
+     "$MTGSIFT_HOME"/etc/copy_autoupdate_settings.py restore
+     echo "--------------------------------------------"
+     echo ""
 }
 
 # Call the restore_backup function
@@ -68,23 +72,25 @@ MTGSIFT_LOGS="$MTGSIFT_HOME/logs"
 
 
 #run update settings file
+echo "Create default settings if necessary:"
+echo "--------------------------------------------"
 "$MTGSIFT_HOME"/etc/update_setting.py
+echo "--------------------------------------------"
+echo ""
 
 #run the back of file before setting the auto_update
-echo "Backuping the default auto_update.yaml and catalogue.yaml settings"
+echo "Backuping the default auto_update.yaml and catalogue.yaml settings:"
 echo "--------------------------------------------"
-
 "$MTGSIFT_HOME"/etc/copy_autoupdate_settings.py update
+echo "--------------------------------------------"
+echo ""
 
 echo "Launching MTGSift in AUTO UPDATE MODE"
 
 cd "$MTGSIFT_HOME"/lib
-#./mtgsift >"$MTGSIFT_LOGS/mtgsift.log" 2>&1
-#./mtgsift 
-#res="$?"
+./mtgsift >"$MTGSIFT_LOGS/mtgsift.log" 2>&1
+./mtgsift 
+res="$?"
 
 
-echo "Restoring the default auto_update.yaml and catalogue.yaml settings"
-echo "--------------------------------------------"
-
-#exit $res
+exit $res
