@@ -2,5 +2,5 @@
 # the search path specified in catalogue settings is queried.
 
 auto_update:
-  active: False
-  interval: 5
+  active: True
+  interval: 15
