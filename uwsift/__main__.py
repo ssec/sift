@@ -494,7 +494,7 @@ class Main(QtGui.QMainWindow):
         # Populate data layer collection
         data_layers = self.document.create_data_layers()
         self.document.data_layer_collection.notify_update_collection(data_layers)
-        uuid = uuid_list[-1]
+        uuid = uuid_list[0]
         self.layer_list_model.select([uuid])
         # set the animation based on the last added (topmost) layer
         self.document.animate_siblings_of_layer(uuid)
