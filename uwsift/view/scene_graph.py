@@ -355,6 +355,7 @@ class LayerSet(object):
                 else:
                     child.visible = False
 
+    # FIXME(mk): not in use anymore
     def _set_uuid_visibility(self, uuid: UUID, visible: bool) -> None:
         """
         Convenience function to set a uuid's visibility.
@@ -368,18 +369,22 @@ class LayerSet(object):
             else:
                 child.visible = False
 
-    def _set_visible_from_data_layers(self):
-        layer_visibility = dict((uuid, False) for uuid in self._layers.keys())
+    def _set_visible_from_data_layers(self) -> None:
+        """
+        Set layer (original SIFT layer meant here) visibility per data_layer according to matched
+        datetime.
+
+        """
         for pfkey, data_layer in self.time_manager.collection.data_layers.items():
             # Set all uuids in the current data layer to invisible
-            for _, im_uuid in data_layer.timeline.items():
-                self._set_uuid_visibility(im_uuid, False)
             # If a time was matched turn that time's uuid visible
+            data_layer_uuids = list(data_layer.timeline.values())
+            self.parent.document.toggle_layer_visibility(data_layer_uuids, visible=False)
             layer_uuid = data_layer.t_matched_uuid()
+            layer_uuid_idx = data_layer.get_index_of_uuid(layer_uuid)
+            self._frame_number = layer_uuid_idx
             if layer_uuid is not None:
-                layer_visibility[layer_uuid] = True
-                self._set_uuid_visibility(layer_uuid, True)
-        self.parent.didChangeLayerVisibility.emit(layer_visibility)
+                self.parent.document.toggle_layer_visibility([layer_uuid])
 
     def jump(self, index):
         self.time_manager.jump(index)
