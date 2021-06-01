@@ -373,6 +373,8 @@ class TiledGeolocatedImageVisual(ImageVisual):
 
         self.overview_info = None
         self.init_overview(data)
+        # FIXME(mk): quick-fix for Andrea Meraner to remove the overview image
+        self.overview_info = None
         # self.transform = PROJ4Transform(projection, inverse=True)
 
         self.freeze()
