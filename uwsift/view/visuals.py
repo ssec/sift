@@ -27,7 +27,6 @@ from datetime import datetime
 
 import numpy as np
 import shapefile
-from vispy.ext.six import string_types
 from vispy.gloo import VertexBuffer
 from vispy.io.datasets import load_spatial_filters
 from vispy.scene.visuals import create_visual_node
@@ -385,12 +384,12 @@ class TiledGeolocatedImageVisual(ImageVisual):
 
     # @property
     # def clim(self):
-    #     return (self._clim if isinstance(self._clim, string_types) else
+    #     return (self._clim if isinstance(self._clim, str) else
     #             tuple(self._clim))
     #
     # @clim.setter
     # def clim(self, clim):
-    #     if isinstance(clim, string_types):
+    #     if isinstance(clim, str):
     #         if clim != 'auto':
     #             raise ValueError('clim must be "auto" if a string')
     #     else:
@@ -957,12 +956,12 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
 
     @property
     def clim(self):
-        return (self._clim if isinstance(self._clim, string_types) else
+        return (self._clim if isinstance(self._clim, str) else
                 tuple(self._clim))
 
     @clim.setter
     def clim(self, clim):
-        if isinstance(clim, string_types):
+        if isinstance(clim, str):
             if clim != 'auto':
                 raise ValueError('clim must be "auto" if a string')
         else:
