@@ -34,6 +34,7 @@ from vispy.visuals import LineVisual, ImageVisual, IsocurveVisual
 # The below imports are needed because we subclassed the ImageVisual
 from vispy.visuals.shaders import Function
 from vispy.visuals.transforms import NullTransform
+from vispy.gloo import Texture2D
 
 
 from uwsift.common import (
@@ -45,7 +46,7 @@ from uwsift.common import (
     TESS_LEVEL,
     Box, Point, Resolution, ViewBox,
 )
-from uwsift.view.texture_atlas import TextureAtlas2D, Texture2D
+from uwsift.view.texture_atlas import TextureAtlas2D
 from uwsift.view.tile_calculator import TileCalculator, calc_pixel_size, get_reference_points
 
 __author__ = 'rayg'
@@ -258,43 +259,23 @@ class TiledGeolocatedImageVisual(ImageVisual):
         # visual nodes already have names, so be careful
         if not hasattr(self, "name"):
             self.name = kwargs.get("name", None)
-        self._viewable_mesh_mask = None
-        self._ref1 = None
-        self._ref2 = None
-
-        self.origin_x = origin_x
-        self.origin_y = origin_y
-        self.cell_width = cell_width
-        self.cell_height = cell_height  # Note: cell_height is usually negative
-        self.texture_shape = texture_shape
-        self.tile_shape = tile_shape
-        self.num_tex_tiles = self.texture_shape[0] * self.texture_shape[1]
-        self._stride = (0, 0)  # Current stride is None when we are showing the overview
-        self._latest_tile_box = None
-        self.wrap_lon = wrap_lon
-        self._tiles = {}
-        assert (shape or data is not None), "`data` or `shape` must be provided"
-        self.shape = shape or data.shape
-        self.ndim = len(self.shape) or data.ndim
-
-        # Where does this image lie in this lonely world
-        self.calc = TileCalculator(
-            self.name,
-            self.shape,
-            Point(x=self.origin_x, y=self.origin_y),
-            Resolution(dy=abs(self.cell_height), dx=abs(self.cell_width)),
-            self.tile_shape,
-            self.texture_shape,
-            wrap_lon=self.wrap_lon,
-            projection=projection,
+        self._init_geo_parameters(
+            origin_x,
+            origin_y,
+            cell_width,
+            cell_height,
+            projection,
+            texture_shape,
+            tile_shape,
+            wrap_lon,
+            shape,
+            data,
         )
-        # What tiles have we used and can we use
-        self.texture_state = TextureTileState(self.num_tex_tiles)
 
         # load 'float packed rgba8' interpolation kernel
         # to load float interpolation kernel use
         # `load_spatial_filters(packed=False)`
-        kernel, self._interpolation_names = load_spatial_filters()
+        kernel, interpolation_names = load_spatial_filters()
 
         self._kerneltex = Texture2D(kernel, interpolation='nearest')
         # The unpacking can be debugged by changing "spatial-filters.frag"
@@ -304,27 +285,14 @@ class TiledGeolocatedImageVisual(ImageVisual):
         # self._kerneltex = Texture2D(kernel, interpolation='linear',
         #                             internalformat='r32f')
 
-        # create interpolation shader functions for available
-        # interpolations
-        fun = [Function(_interpolation_template % n)
-               for n in self._interpolation_names]
-        self._interpolation_names = [n.lower()
-                                     for n in self._interpolation_names]
-
-        self._interpolation_fun = dict(zip(self._interpolation_names, fun))
-        self._interpolation_names.sort()
-        self._interpolation_names = tuple(self._interpolation_names)
-
-        # overwrite "nearest" and "bilinear" spatial-filters
-        # with  "hardware" interpolation _data_lookup_fn
-        self._interpolation_fun['nearest'] = Function(_texture_lookup)
-        self._interpolation_fun['bilinear'] = Function(_texture_lookup)
-
-        if interpolation not in self._interpolation_names:
+        interpolation_names, interpolation_fun = self._init_interpolation(
+            interpolation_names)
+        self._interpolation_names = interpolation_names
+        self._interpolation_fun = interpolation_fun
+        self._interpolation = interpolation
+        if self._interpolation not in self._interpolation_names:
             raise ValueError("interpolation must be one of %s" %
                              ', '.join(self._interpolation_names))
-
-        self._interpolation = interpolation
 
         # check texture interpolation
         if self._interpolation == 'bilinear':
@@ -368,39 +336,53 @@ class TiledGeolocatedImageVisual(ImageVisual):
 
         self.overview_info = None
         self.init_overview(data)
-        # self.transform = PROJ4Transform(projection, inverse=True)
-
         self.freeze()
 
-    @property
-    def gamma(self):
-        return self._gamma
+    def _init_geo_parameters(
+            self,
+            origin_x,
+            origin_y,
+            cell_width,
+            cell_height,
+            projection,
+            texture_shape,
+            tile_shape,
+            wrap_lon,
+            shape,
+            data
+    ):
+        self._viewable_mesh_mask = None
+        self._ref1 = None
+        self._ref2 = None
 
-    @gamma.setter
-    def gamma(self, gamma):
-        self._gamma = gamma if gamma is not None else 1.
-        self._need_texture_upload = True
-        self.update()
+        self.origin_x = origin_x
+        self.origin_y = origin_y
+        self.cell_width = cell_width
+        self.cell_height = cell_height  # Note: cell_height is usually negative
+        self.texture_shape = texture_shape
+        self.tile_shape = tile_shape
+        self.num_tex_tiles = self.texture_shape[0] * self.texture_shape[1]
+        self._stride = (0, 0)  # Current stride is None when we are showing the overview
+        self._latest_tile_box = None
+        self.wrap_lon = wrap_lon
+        self._tiles = {}
+        assert (shape or data is not None), "`data` or `shape` must be provided"
+        self.shape = shape or data.shape
+        self.ndim = len(self.shape) or data.ndim
 
-    # @property
-    # def clim(self):
-    #     return (self._clim if isinstance(self._clim, str) else
-    #             tuple(self._clim))
-    #
-    # @clim.setter
-    # def clim(self, clim):
-    #     if isinstance(clim, str):
-    #         if clim != 'auto':
-    #             raise ValueError('clim must be "auto" if a string')
-    #     else:
-    #         clim = np.array(clim, float)
-    #         if clim.shape != (2,):
-    #             raise ValueError('clim must have two elements')
-    #     self._clim = clim
-    #     # FIXME: Is this supposed to be assigned to something?:
-    #     self._data_lookup_fn
-    #     self._need_clim_update = True
-    #     self.update()
+        # Where does this image lie in this lonely world
+        self.calc = TileCalculator(
+            self.name,
+            self.shape,
+            Point(x=self.origin_x, y=self.origin_y),
+            Resolution(dy=abs(self.cell_height), dx=abs(self.cell_width)),
+            self.tile_shape,
+            self.texture_shape,
+            wrap_lon=self.wrap_lon,
+            projection=projection,
+        )
+        # What tiles have we used and can we use
+        self.texture_state = TextureTileState(self.num_tex_tiles)
 
     @property
     def size(self):
@@ -659,19 +641,12 @@ class TiledGeolocatedImageVisual(ImageVisual):
     def _build_texture(self):
         # _build_texture should not be used in this class, use the 2-step
         # process of '_build_texture_tiles' and '_set_texture_tiles'
-        self._set_clim_vars()
         self._need_texture_upload = False
 
     def _build_vertex_data(self):
         # _build_vertex_data should not be used in this class, use the 2-step
         # process of '_build_vertex_tiles' and '_set_vertex_tiles'
         return
-
-    def _set_clim_vars(self):
-        self._data_lookup_fn["vmin"] = self._clim[0]
-        self._data_lookup_fn["vmax"] = self._clim[1]
-        self._data_lookup_fn["gamma"] = self._gamma
-        # self._need_texture_upload = True
 
 
 TiledGeolocatedImage = create_visual_node(TiledGeolocatedImageVisual)

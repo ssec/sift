@@ -22,7 +22,7 @@ import logging
 import os
 
 import numpy as np
-from vispy.gloo import Texture2D
+from vispy.visuals._scalable_textures import GPUScaledTexture2D
 
 from uwsift.common import DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH
 
@@ -34,14 +34,13 @@ __docformat__ = 'reStructuredText'
 LOG = logging.getLogger(__name__)
 
 
-class TextureAtlas2D(Texture2D):
+class TextureAtlas2D(GPUScaledTexture2D):
     """A 2D Texture Array structure implemented as a 2D Texture Atlas.
     """
 
-    def __init__(self, texture_shape, tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH),
-                 format=None, resizable=True,
-                 interpolation=None, wrapping=None,
-                 internalformat=None, resizeable=None):
+    def __init__(self, texture_shape,
+                 tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH),
+                 **texture_kwargs):
         assert len(texture_shape) == 2
         # Number of tiles in each direction (y, x)
         self.texture_shape = texture_shape
@@ -50,10 +49,14 @@ class TextureAtlas2D(Texture2D):
         # Number of rows and columns to hold all of these tiles in one texture
         shape = (self.texture_shape[0] * self.tile_shape[0], self.texture_shape[1] * self.tile_shape[1])
         self.texture_size = shape
-        self._fill_array = np.tile(np.nan, self.tile_shape).astype(np.float32)
+        self._fill_array = np.tile(np.float32(np.nan), self.tile_shape)
+        # create a representative array so the texture can be initialized properly with the right dtype
+        rep_arr = np.zeros((10, 10), dtype=np.float32)
         # will add self.shape:
-        super(TextureAtlas2D, self).__init__(None, format, resizable, interpolation,
-                                             wrapping, shape, internalformat, resizeable)
+        super(TextureAtlas2D, self).__init__(data=rep_arr, **texture_kwargs)
+        # GPUScaledTexture2D always uses a "representative" size
+        # we need to force the shape to our final size so we can start setting tiles right away
+        self._resize(shape)
 
     def _tex_offset(self, idx):
         """Return the X, Y texture index offset for the 1D tile index.
@@ -88,4 +91,4 @@ class TextureAtlas2D(Texture2D):
             data[-5:, :] = 1000.
             data[:, :5] = 1000.
             data[:, -5:] = 1000.
-        super(TextureAtlas2D, self).set_data(data, offset=offset, copy=copy)
+        super(TextureAtlas2D, self).scale_and_set_data(data, offset=offset, copy=copy)
