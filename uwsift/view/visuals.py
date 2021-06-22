@@ -68,96 +68,6 @@ class ArrayProxy(object):
         self.shape = shape
 
 
-VERT_SHADER = """
-uniform int method;  // 0=subdivide, 1=impostor
-attribute vec2 a_position;
-attribute vec2 a_texcoord;
-varying vec2 v_texcoord;
-
-void main() {
-    v_texcoord = a_texcoord;
-    gl_Position = $transform(vec4(a_position, 0., 1.));
-}
-"""
-
-FRAG_SHADER = """
-uniform vec2 image_size;
-uniform int method;  // 0=subdivide, 1=impostor
-uniform sampler2D u_texture;
-varying vec2 v_texcoord;
-
-vec4 map_local_to_tex(vec4 x) {
-    // Cast ray from 3D viewport to surface of image
-    // (if $transform does not affect z values, then this
-    // can be optimized as simply $transform.map(x) )
-    vec4 p1 = $transform(x);
-    vec4 p2 = $transform(x + vec4(0, 0, 0.5, 0));
-    p1 /= p1.w;
-    p2 /= p2.w;
-    vec4 d = p2 - p1;
-    float f = p2.z / d.z;
-    vec4 p3 = p2 - d * f;
-
-    // finally map local to texture coords
-    return vec4(p3.xy / image_size, 0, 1);
-}
-
-
-void main()
-{
-    vec2 texcoord;
-    if( method == 0 ) {
-        texcoord = v_texcoord;
-    }
-    else {
-        // vertex shader ouptuts clip coordinates;
-        // fragment shader maps to texture coordinates
-        texcoord = map_local_to_tex(vec4(v_texcoord, 0, 1)).xy;
-    }
-
-    gl_FragColor = $color_transform($get_data(texcoord));
-}
-"""  # noqa
-
-_null_color_transform = 'vec4 pass(vec4 color) { return color; }'
-_c2l = 'float cmap(vec4 color) { return (color.r + color.g + color.b) / 3.; }'
-
-_interpolation_template = """
-    #include "misc/spatial-filters.frag"
-    vec4 texture_lookup_filtered(vec2 texcoord) {
-        if(texcoord.x < 0.0 || texcoord.x > 1.0 ||
-        texcoord.y < 0.0 || texcoord.y > 1.0) {
-            discard;
-        }
-        return %s($texture, $shape, texcoord);
-    }"""
-
-_texture_lookup = """
-    vec4 texture_lookup(vec2 texcoord) {
-        if(texcoord.x < 0.0 || texcoord.x > 1.0 ||
-        texcoord.y < 0.0 || texcoord.y > 1.0) {
-            discard;
-        }
-        vec4 val = texture2D($texture, texcoord);
-        // http://stackoverflow.com/questions/11810158/how-to-deal-with-nan-or-inf-in-opengl-es-2-0-shaders
-        if (!(val.r <= 0.0 || 0.0 <= val.r)) {
-            discard;
-        }
-
-        if ($vmin < $vmax) {
-            val.r = clamp(val.r, $vmin, $vmax);
-        } else {
-            val.r = clamp(val.r, $vmax, $vmin);
-        }
-        val.r = (val.r-$vmin)/($vmax-$vmin);
-        val.r = pow(val.r, $gamma);
-        val.g = val.r;
-        val.b = val.r;
-
-        return val;
-    }"""
-
-
 class TextureTileState(object):
     """Object to hold the state of the current tile texture.
 
@@ -321,7 +231,9 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self._null_tr = NullTransform()
 
         self._init_view(self)
-        super(ImageVisual, self).__init__(vcode=VERT_SHADER, fcode=FRAG_SHADER)
+        # use vispy upstream shader
+        super(ImageVisual, self).__init__(vcode=self.VERTEX_SHADER,
+                                          fcode=self.FRAGMENT_SHADER)
         self.set_gl_state('translucent', cull_face=False)
         self._draw_mode = 'triangles'
 
@@ -383,11 +295,6 @@ class TiledGeolocatedImageVisual(ImageVisual):
         )
         # What tiles have we used and can we use
         self.texture_state = TextureTileState(self.num_tex_tiles)
-
-    @property
-    def size(self):
-        # Added to shader program, but not used by subdivide/tiled method
-        return self.shape[-2:][::-1]
 
     def init_overview(self, data):
         """Create and add a low resolution version of the data that is always
