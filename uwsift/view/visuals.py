@@ -32,7 +32,7 @@ from vispy.io.datasets import load_spatial_filters
 from vispy.scene.visuals import create_visual_node
 from vispy.visuals import LineVisual, ImageVisual, IsocurveVisual
 # The below imports are needed because we subclassed the ImageVisual
-from vispy.visuals.shaders import Function
+from vispy.visuals.shaders import Function, FunctionChain
 from vispy.visuals.transforms import NullTransform
 from vispy.gloo import Texture2D
 
@@ -564,33 +564,56 @@ _rgb_texture_lookup = """
         texcoord.y < 0.0 || texcoord.y > 1.0) {
             discard;
         }
-        vec4 val = texture2D($texture, texcoord);
-        // http://stackoverflow.com/questions/11810158/how-to-deal-with-nan-or-inf-in-opengl-es-2-0-shaders
-        if (!(val.r <= 0.0 || 0.0 <= val.r)) {
-            val.r = 0;
-            val.g = 0;
-            val.b = 0;
-            val.a = 0;
-            return val;
-        }
-
-        if ($vmin < $vmax) {
-            val.r = clamp(val.r, $vmin, $vmax);
-        } else {
-            val.r = clamp(val.r, $vmax, $vmin);
-        }
-        val.r = (val.r-$vmin)/($vmax-$vmin);
-        val.r = pow(val.r, $gamma);
-        val.g = val.r;
-        val.b = val.r;
-
+        vec4 val;
+        val.r = texture2D($texture_r, texcoord).r;
+        val.g = texture2D($texture_g, texcoord).r;
+        val.b = texture2D($texture_b, texcoord).r;
+        val.a = 1.0;
         return val;
     }"""
 
+_apply_clim = """
+    vec4 apply_clim(vec4 color) {
+        // If all the pixels are NaN make it completely transparent
+        // http://stackoverflow.com/questions/11810158/how-to-deal-with-nan-or-inf-in-opengl-es-2-0-shaders
+        if (
+            !(color.r <= 0.0 || 0.0 <= color.r) &&
+            !(color.g <= 0.0 || 0.0 <= color.g) &&
+            !(color.b <= 0.0 || 0.0 <= color.b)) {
+            color.a = 0;
+        }
+        
+        // if color is NaN, set to minimum possible value
+        color.r = !(color.r <= 0.0 || 0.0 <= color.r) ? min($clim_r.x, $clim_r.y) : color.r;
+        color.g = !(color.g <= 0.0 || 0.0 <= color.g) ? min($clim_g.x, $clim_g.y) : color.g;
+        color.b = !(color.b <= 0.0 || 0.0 <= color.b) ? min($clim_b.x, $clim_b.y) : color.b;
+        // clamp data to minimum and maximum of clims
+        color.r = clamp(color.r, min($clim_r.x, $clim_r.y), max($clim_r.x, $clim_r.y));
+        color.g = clamp(color.g, min($clim_g.x, $clim_g.y), max($clim_g.x, $clim_g.y));
+        color.b = clamp(color.b, min($clim_b.x, $clim_b.y), max($clim_b.x, $clim_b.y));
+        // linearly scale data between clims
+        color.r = (color.r - $clim_r.x) / ($clim_r.y - $clim_r.x);
+        color.g = (color.g - $clim_g.x) / ($clim_g.y - $clim_g.x);
+        color.b = (color.b - $clim_b.x) / ($clim_b.y - $clim_b.x);
+        return max(color, 0);
+    }
+"""
+
+_apply_gamma = """
+    vec4 apply_gamma(vec4 color) {
+        color.r = pow(color.r, $gamma_r);
+        color.g = pow(color.g, $gamma_g);
+        color.b = pow(color.b, $gamma_b);
+        return color;
+    }
+"""
+
+_null_color_transform = 'vec4 pass(vec4 color) { return color; }'
+
 
 class CompositeLayerVisual(TiledGeolocatedImageVisual):
-    VERT_SHADER = None
-    FRAG_SHADER = None
+    VERTEX_SHADER = None
+    FRAGMENT_SHADER = None
 
     def __init__(self, data_arrays, origin_x, origin_y, cell_width, cell_height,
                  shape=None,
@@ -638,7 +661,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         # load 'float packed rgba8' interpolation kernel
         # to load float interpolation kernel use
         # `load_spatial_filters(packed=False)`
-        kernel, self._interpolation_names = load_spatial_filters()
+        kernel, interpolation_names = load_spatial_filters()
 
         self._kerneltex = Texture2D(kernel, interpolation='nearest')
         # The unpacking can be debugged by changing "spatial-filters.frag"
@@ -648,27 +671,14 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         # self._kerneltex = Texture2D(kernel, interpolation='linear',
         #                             internalformat='r32f')
 
-        # create interpolation shader functions for available
-        # interpolations
-        fun = [Function(_interpolation_template % n)
-               for n in self._interpolation_names]
-        self._interpolation_names = [n.lower()
-                                     for n in self._interpolation_names]
-
-        self._interpolation_fun = dict(zip(self._interpolation_names, fun))
-        self._interpolation_names.sort()
-        self._interpolation_names = tuple(self._interpolation_names)
-
-        # overwrite "nearest" and "bilinear" spatial-filters
-        # with  "hardware" interpolation _data_lookup_fn
-        self._interpolation_fun['nearest'] = Function(_texture_lookup)
-        self._interpolation_fun['bilinear'] = Function(_texture_lookup)
-
-        if interpolation not in self._interpolation_names:
+        interpolation_names, interpolation_fun = self._init_interpolation(
+            interpolation_names)
+        self._interpolation_names = interpolation_names
+        self._interpolation_fun = interpolation_fun
+        self._interpolation = interpolation
+        if self._interpolation not in self._interpolation_names:
             raise ValueError("interpolation must be one of %s" %
                              ', '.join(self._interpolation_names))
-
-        self._interpolation = interpolation
 
         # check texture interpolation
         if self._interpolation == 'bilinear':
@@ -680,7 +690,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         self._grid = grid
         self._need_texture_upload = True
         self._need_vertex_update = True
-        self._need_colortransform_update = False
+        self._need_colortransform_update = True
         self._need_interpolation_update = True
         self._textures = [TextureAtlas2D(self.texture_shape, tile_shape=self.tile_shape,
                                          interpolation=texture_interpolation,
@@ -698,22 +708,22 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         self._null_tr = NullTransform()
 
         self._init_view(self)
-        if self.VERT_SHADER is None or self.FRAG_SHADER is None:
+        if self.VERTEX_SHADER is None or self.FRAGMENT_SHADER is None:
             raise RuntimeError("No shader specified for this subclass")
-        super(ImageVisual, self).__init__(vcode=self.VERT_SHADER, fcode=self.FRAG_SHADER)
+        super(ImageVisual, self).__init__(vcode=self.VERTEX_SHADER, fcode=self.FRAGMENT_SHADER)
         self.set_gl_state('translucent', cull_face=False)
         self._draw_mode = 'triangles'
 
         # define _data_lookup_fn as None, will be setup in
         # self._build_interpolation()
-        self._data_lookup_fns = [Function(_rgb_texture_lookup) for i in range(self.num_channels)]
+        self._data_lookup_fn = None
 
         if isinstance(clim, str):
             if clim != 'auto':
                 raise ValueError("C-limits can only be 'auto' or 2 floats for each provided channel")
             clim = [clim] * self.num_channels
         if not isinstance(cmap, (tuple, list)):
-            cmap = [cmap] * self.num_channels
+            cmap = [cmap or 'viridis'] * self.num_channels
 
         assert (len(clim) == self.num_channels)
         assert (len(cmap) == self.num_channels)
@@ -825,51 +835,86 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         self._set_vertex_tiles(nfo["vertex_coordinates"], nfo["texture_coordinates"])
 
     @property
-    def gamma(self):
-        return self._gamma
+    def clim(self):
+        """Get color limits used when rendering the image (cmin, cmax)."""
+        return tuple(t.clim for t in self._textures)
 
-    @gamma.setter
-    def gamma(self, gamma):
-        assert isinstance(gamma, (tuple, list))
-        assert len(gamma) == self.num_channels
-        self._gamma = tuple(x if x is not None else 1. for x in gamma)
-        self._need_texture_upload = True
+    @clim.setter
+    def clim(self, clims):
+        if isinstance(clims, str):
+            clims = [clims] * self.num_channels
+
+        clim_names = ('clim_r', 'clim_g', 'clim_b')
+        for clim_name, clim, tex in zip(clim_names, clims, self._textures):
+            if clim[0] is None:
+                clim = (0., 1.)  # 'empty' layer, no data
+            if tex.set_clim(clim):
+                self._need_texture_upload = True
+            # shortcut so we don't have to rebuild the whole color transform
+            if not self._need_colortransform_update:
+                self.shared_program.frag['color_transform'][1][clim_name] = tex.clim_normalized
         self.update()
 
     @property
-    def clim(self):
-        return (self._clim if isinstance(self._clim, str) else
-                tuple(self._clim))
+    def gamma(self):
+        """Get the gamma used when rendering the image."""
+        return self._gamma
 
-    @clim.setter
-    def clim(self, clim):
-        if isinstance(clim, str):
-            if clim != 'auto':
-                raise ValueError('clim must be "auto" if a string')
-        else:
-            # set clim to 0 and 1 for non-existent arrays
-            clim = [c if c is not None else (0., 1.) for c in clim]
-            clim = np.array(clim, float)
-            if clim.shape != (self.num_channels, 2) and clim.shape != (2,):
-                raise ValueError('clim must have either 2 elements or 6 (2 for each channel)')
-            elif clim.shape == (2,):
-                clim = np.array([clim, clim, clim], float)
-        self._clim = clim
-        self._need_texture_upload = True
+    @gamma.setter
+    def gamma(self, value):
+        """Set gamma used when rendering the image."""
+        if any(val <= 0 for val in value):
+            raise ValueError("gamma must be > 0")
+        self._gamma = tuple(float(x) for x in value)
+
+        gamma_names = ('gamma_r', 'gamma_g', 'gamma_b')
+        for gamma_name, gam, tex in zip(gamma_names, self._gamma, self._textures):
+            # shortcut so we don't have to rebuild the color transform
+            if not self._need_colortransform_update:
+                self.shared_program.frag['color_transform'][2][gamma_name] = gam
         self.update()
-
-    def _set_clim_vars(self):
-        for idx, lookup_fn in enumerate(self._data_lookup_fns):
-            lookup_fn["vmin"] = self._clim[idx, 0]
-            lookup_fn["vmax"] = self._clim[idx, 1]
-            lookup_fn["gamma"] = self._gamma[idx]
 
     def _build_interpolation(self):
         # assumes 'nearest' interpolation
-        for idx, lookup_fn in enumerate(self._data_lookup_fns):
-            self.shared_program.frag['get_data_%d' % (idx + 1,)] = lookup_fn
-            lookup_fn['texture'] = self._textures[idx]
+        interpolation = self._interpolation
+        if interpolation != 'nearest':
+            raise NotImplementedError("Composite visuals only support 'nearest' interpolation.")
+        texture_interpolation = 'nearest'
+
+        self._data_lookup_fn = Function(_rgb_texture_lookup)
+        self.shared_program.frag['get_data'] = self._data_lookup_fn
+        for texture in self._textures:
+            if texture.interpolation != texture_interpolation:
+                self._texture.interpolation = texture_interpolation
+        self._data_lookup_fn['texture_r'] = self._textures[0]
+        self._data_lookup_fn['texture_g'] = self._textures[1]
+        self._data_lookup_fn['texture_b'] = self._textures[2]
+
         self._need_interpolation_update = False
+
+    def _build_color_transform(self):
+        if self.num_channels != 3:
+            raise RuntimeError("Composite visuals should have more than one 2D image.")
+            # # luminance data
+            # fclim = Function(_apply_clim_float)
+            # fgamma = Function(_apply_gamma_float)
+            # # NOTE: _c2l_red only uses the red component, fancy internalformats
+            # #   may need to use the other components or a different function chain
+            # fun = FunctionChain(
+            #     None, [Function(_c2l_red), fclim, fgamma, Function(self.cmap.glsl_map)]
+            # )
+        else:
+            # RGB/A image data (no colormap)
+            fclim = Function(_apply_clim)
+            fgamma = Function(_apply_gamma)
+            fun = FunctionChain(None, [Function(_null_color_transform), fclim, fgamma])
+        fclim['clim_r'] = self._textures[0].clim_normalized
+        fclim['clim_g'] = self._textures[1].clim_normalized
+        fclim['clim_b'] = self._textures[2].clim_normalized
+        fgamma['gamma_r'] = self.gamma[0]
+        fgamma['gamma_g'] = self.gamma[1]
+        fgamma['gamma_b'] = self.gamma[2]
+        return fun
 
     def _build_texture_tiles(self, data, stride, tile_box):
         """Prepare and organize strided data in to individual tiles with associated information.
@@ -922,74 +967,10 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
 
 CompositeLayer = create_visual_node(CompositeLayerVisual)
 
-RGB_VERT_SHADER = """
-uniform int method;  // 0=subdivide, 1=impostor
-attribute vec2 a_position;
-attribute vec2 a_texcoord;
-varying vec2 v_texcoord;
-
-void main() {
-    v_texcoord = a_texcoord;
-    gl_Position = $transform(vec4(a_position, 0., 1.));
-}
-"""
-
-RGB_FRAG_SHADER = """
-uniform vec2 image_size;
-uniform int method;  // 0=subdivide, 1=impostor
-uniform sampler2D u_texture;
-varying vec2 v_texcoord;
-
-vec4 map_local_to_tex(vec4 x) {
-    // Cast ray from 3D viewport to surface of image
-    // (if $transform does not affect z values, then this
-    // can be optimized as simply $transform.map(x) )
-    vec4 p1 = $transform(x);
-    vec4 p2 = $transform(x + vec4(0, 0, 0.5, 0));
-    p1 /= p1.w;
-    p2 /= p2.w;
-    vec4 d = p2 - p1;
-    float f = p2.z / d.z;
-    vec4 p3 = p2 - d * f;
-
-    // finally map local to texture coords
-    return vec4(p3.xy / image_size, 0, 1);
-}
-
-
-void main()
-{
-    vec2 texcoord;
-    if( method == 0 ) {
-        texcoord = v_texcoord;
-    }
-    else {
-        // vertex shader ouptuts clip coordinates;
-        // fragment shader maps to texture coordinates
-        texcoord = map_local_to_tex(vec4(v_texcoord, 0, 1)).xy;
-    }
-
-    vec4 r_tmp, g_tmp, b_tmp;
-    r_tmp = $get_data_1(texcoord);
-    g_tmp = $get_data_2(texcoord);
-    b_tmp = $get_data_3(texcoord);
-
-    // Make the pixel transparent if all of the values are NaN/fill values
-    if (r_tmp.a == 0 && g_tmp.a == 0 && b_tmp.a == 0) {
-        gl_FragColor.a = 0;
-    } else {
-        gl_FragColor.a = 1;
-    }
-    gl_FragColor.r = r_tmp.r;
-    gl_FragColor.g = g_tmp.r;
-    gl_FragColor.b = b_tmp.r;
-}
-"""  # noqa
-
 
 class RGBCompositeLayerVisual(CompositeLayerVisual):
-    VERT_SHADER = RGB_VERT_SHADER
-    FRAG_SHADER = RGB_FRAG_SHADER
+    VERTEX_SHADER = ImageVisual.VERTEX_SHADER
+    FRAGMENT_SHADER = ImageVisual.FRAGMENT_SHADER
 
 
 RGBCompositeLayer = create_visual_node(RGBCompositeLayerVisual)
