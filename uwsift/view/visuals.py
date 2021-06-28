@@ -153,22 +153,23 @@ class TextureTileState(object):
         return ttile_idx
 
 
-class TiledGeolocatedImageVisual(ImageVisual):
-    def __init__(self, data, origin_x, origin_y, cell_width, cell_height,
-                 shape=None,
+class SIFTTiledGeolocatedMixin:
+    def __init__(self, data, *area_params,
                  tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH),
                  texture_shape=(DEFAULT_TEXTURE_HEIGHT, DEFAULT_TEXTURE_WIDTH),
                  wrap_lon=False, projection=DEFAULT_PROJECTION,
-                 cmap='viridis', method='tiled', clim='auto', gamma=1.,
-                 interpolation='nearest', **kwargs):
-        if method != 'tiled':
-            raise ValueError("Only 'tiled' method is currently supported")
-        method = 'subdivide'
-        grid = (1, 1)
+                 **visual_kwargs):
+        origin_x, origin_y, cell_width, cell_height = area_params
+        if visual_kwargs.get("method", "subdivide") != "subdivide":
+            raise ValueError("Only 'subdivide' drawing method is supported.")
+        visual_kwargs["method"] = "subdivide"
+        if "grid" in visual_kwargs:
+            raise ValueError("The 'grid' keyword argument is not supported with the tiled mixin.")
 
         # visual nodes already have names, so be careful
         if not hasattr(self, "name"):
-            self.name = kwargs.get("name", None)
+            self.name = visual_kwargs.pop("name", None)
+
         self._init_geo_parameters(
             origin_x,
             origin_y,
@@ -178,74 +179,14 @@ class TiledGeolocatedImageVisual(ImageVisual):
             texture_shape,
             tile_shape,
             wrap_lon,
-            shape,
+            visual_kwargs.get('shape'),
             data,
         )
 
-        # load 'float packed rgba8' interpolation kernel
-        # to load float interpolation kernel use
-        # `load_spatial_filters(packed=False)`
-        kernel, interpolation_names = load_spatial_filters()
+        # Call the init of the Visual
+        super().__init__(data, **visual_kwargs)
 
-        self._kerneltex = Texture2D(kernel, interpolation='nearest')
-        # The unpacking can be debugged by changing "spatial-filters.frag"
-        # to have the "unpack" function just return the .r component. That
-        # combined with using the below as the _kerneltex allows debugging
-        # of the pipeline
-        # self._kerneltex = Texture2D(kernel, interpolation='linear',
-        #                             internalformat='r32f')
-
-        interpolation_names, interpolation_fun = self._init_interpolation(
-            interpolation_names)
-        self._interpolation_names = interpolation_names
-        self._interpolation_fun = interpolation_fun
-        self._interpolation = interpolation
-        if self._interpolation not in self._interpolation_names:
-            raise ValueError("interpolation must be one of %s" %
-                             ', '.join(self._interpolation_names))
-
-        # check texture interpolation
-        if self._interpolation == 'bilinear':
-            texture_interpolation = 'linear'
-        else:
-            texture_interpolation = 'nearest'
-
-        self._method = method
-        self._grid = grid
-        self._need_texture_upload = True
-        self._need_vertex_update = True
-        self._need_colortransform_update = True
-        self._need_interpolation_update = True
-        self._texture = TextureAtlas2D(self.texture_shape, tile_shape=self.tile_shape,
-                                       interpolation=texture_interpolation,
-                                       format="LUMINANCE", internalformat="R32F",
-                                       )
-        self._subdiv_position = VertexBuffer()
-        self._subdiv_texcoord = VertexBuffer()
-
-        # impostor quad covers entire viewport
-        vertices = np.array([[-1, -1], [1, -1], [1, 1],
-                             [-1, -1], [1, 1], [-1, 1]],
-                            dtype=np.float32)
-        self._impostor_coords = VertexBuffer(vertices)
-        self._null_tr = NullTransform()
-
-        self._init_view(self)
-        # use vispy upstream shader
-        super(ImageVisual, self).__init__(vcode=self.VERTEX_SHADER,
-                                          fcode=self.FRAGMENT_SHADER)
-        self.set_gl_state('translucent', cull_face=False)
-        self._draw_mode = 'triangles'
-
-        # define _data_lookup_fn as None, will be setup in
-        # self._build_interpolation()
-        self._data_lookup_fn = None
-
-        self.gamma = gamma
-        self.clim = clim if clim != 'auto' else (np.nanmin(data), np.nanmax(data))
-        self._texture_LUT = None
-        self.cmap = cmap
-
+        self.unfreeze()
         self.overview_info = None
         self.init_overview(data)
         self.freeze()
@@ -305,13 +246,12 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self._data = ArrayProxy(self.ndim, self.shape)
         self.overview_info = nfo = {}
         y_slice, x_slice = self.calc.overview_stride
-        nfo["data"] = data[y_slice, x_slice]
         # Update kwargs to reflect the new spatial resolution of the overview image
         nfo["cell_width"] = self.cell_width * x_slice.step
         nfo["cell_height"] = self.cell_height * y_slice.step
         # Tell the texture state that we are adding a tile that should never expire and should always exist
         nfo["texture_tile_index"] = ttile_idx = self.texture_state.add_tile((0, 0, 0), expires=False)
-        self._texture.set_tile_data(ttile_idx, self._normalize_data(nfo["data"]))
+        self._init_overview_data(ttile_idx, data)
 
         # Handle wrapping around the anti-meridian so there is a -180/180 continuous image
         num_tiles = 1 if not self.wrap_lon else 2
@@ -327,10 +267,13 @@ class TiledGeolocatedImageVisual(ImageVisual):
                                                                                    tessellation_level=TESS_LEVEL)
         self._set_vertex_tiles(nfo["vertex_coordinates"], nfo["texture_coordinates"])
 
+    def _init_overview_data(self, ttile_idx, data):
+        _y_slice, _x_slice = self.calc.calc_overview_stride(image_shape=Point(data.shape[0], data.shape[1]))
+        self._texture.set_tile_data(ttile_idx, self._normalize_data(data[_y_slice, _x_slice]))
+
     def _normalize_data(self, data):
         if data is not None and data.dtype == np.float64:
             data = data.astype(np.float32)
-
         return data
 
     def _build_texture_tiles(self, data, stride, tile_box: Box):
@@ -354,15 +297,18 @@ class TiledGeolocatedImageVisual(ImageVisual):
 
                 # Assume we were given a total image worth of this stride
                 y_slice, x_slice = self.calc.calc_tile_slice(tiy, tix, stride)
-                # force a copy of the data from the content array (provided by the workspace)
-                # to a vispy-compatible contiguous float array
-                # this can be a potentially time-expensive operation since content array is
-                # often huge and always memory-mapped, so paging may occur
-                # we don't want this paging deferred until we're back in the GUI thread pushing data to OpenGL!
-                tile_data = np.array(data[y_slice, x_slice], dtype=np.float32)
+                tile_data = self._slice_texture_tile(data, y_slice, x_slice)
                 tiles_info.append((stride, tiy, tix, tex_tile_idx, tile_data))
 
         return tiles_info
+
+    def _slice_texture_tile(self, data, y_slice, x_slice):
+        # force a copy of the data from the content array (provided by the workspace)
+        # to a vispy-compatible contiguous float array
+        # this can be a potentially time-expensive operation since content array is
+        # often huge and always memory-mapped, so paging may occur
+        # we don't want this paging deferred until we're back in the GUI thread pushing data to OpenGL!
+        return np.array(data[y_slice, x_slice], dtype=np.float32)
 
     def _set_texture_tiles(self, tiles_info):
         for tile_info in tiles_info:
@@ -535,6 +481,25 @@ class TiledGeolocatedImageVisual(ImageVisual):
         self._stride = preferred_stride
         self._latest_tile_box = tile_box
 
+
+
+class TiledGeolocatedImageVisual(SIFTTiledGeolocatedMixin, ImageVisual):
+    def __init__(self, data, origin_x, origin_y, cell_width, cell_height,
+                 **image_kwargs):
+        super().__init__(data, origin_x, origin_y, cell_width, cell_height, **image_kwargs)
+
+    def _init_texture(self, data, texture_format):
+        if self._interpolation == 'bilinear':
+            texture_interpolation = 'linear'
+        else:
+            texture_interpolation = 'nearest'
+
+        tex = TextureAtlas2D(self.texture_shape, tile_shape=self.tile_shape,
+                             interpolation=texture_interpolation,
+                             format="LUMINANCE", internalformat="R32F",
+                             )
+        return tex
+
     def set_data(self, image):
         """Set the data
 
@@ -543,7 +508,10 @@ class TiledGeolocatedImageVisual(ImageVisual):
         image : array-like
             The image data.
         """
-        raise NotImplementedError("This image subclass does not support the 'set_data' method")
+        if self._data is not None:
+            raise NotImplementedError("This image subclass does not support the 'set_data' method.")
+        # only do this on __init__
+        super().set_data(image)
 
     def _build_texture(self):
         # _build_texture should not be used in this class, use the 2-step
@@ -611,154 +579,140 @@ _apply_gamma = """
 _null_color_transform = 'vec4 pass(vec4 color) { return color; }'
 
 
-class CompositeLayerVisual(TiledGeolocatedImageVisual):
-    VERTEX_SHADER = None
-    FRAGMENT_SHADER = None
+class _MultiBandTextureAtlas2D:
+    def __init__(self, num_bands, texture_shape, **texture_kwargs):
+        self.num_channels = num_bands
+        self._textures = [
+            TextureAtlas2D(texture_shape, **texture_kwargs)
+            for i in range(self.num_channels)
+        ]
 
-    def __init__(self, data_arrays, origin_x, origin_y, cell_width, cell_height,
-                 shape=None,
-                 tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH),
-                 texture_shape=(DEFAULT_TEXTURE_HEIGHT, DEFAULT_TEXTURE_WIDTH),
-                 wrap_lon=False,
-                 cmap='viridis', method='tiled', clim='auto', gamma=None,
-                 interpolation='nearest', **kwargs):
-        # projection properties to be filled in later
-        self.cell_width = None
-        self.cell_height = None
-        self.origin_x = None
-        self.origin_y = None
-        self.shape = None
+    @property
+    def textures(self):
+        return self._textures
 
-        if method != 'tiled':
-            raise ValueError("Only 'tiled' method is currently supported")
-        method = 'subdivide'
-        grid = (1, 1)
+    @property
+    def clim(self):
+        """Get color limits used when rendering the image (cmin, cmax)."""
+        return tuple(t.clim for t in self._textures)
 
-        # visual nodes already have names, so be careful
-        if not hasattr(self, "name"):
-            self.name = kwargs.get("name", None)
-        self._viewable_mesh_mask = None
-        self._ref1 = None
-        self._ref2 = None
-
-        self.texture_shape = texture_shape
-        self.tile_shape = tile_shape
-        self.num_tex_tiles = self.texture_shape[0] * self.texture_shape[1]
-        self._stride = 0  # Current stride is None when we are showing the overview
-        self._latest_tile_box = None
-        self.wrap_lon = wrap_lon
-        self._tiles = {}
-
-        # What tiles have we used and can we use (each texture uses the same 'state')
-        self.texture_state = TextureTileState(self.num_tex_tiles)
-
-        self.set_channels(data_arrays, shape=shape,
-                          cell_width=cell_width, cell_height=cell_height,
-                          origin_x=origin_x, origin_y=origin_y)
-        self.ndim = len(self.shape) or [x for x in data_arrays if x is not None][0].ndim
-        self.num_channels = len(data_arrays)
-
-        # load 'float packed rgba8' interpolation kernel
-        # to load float interpolation kernel use
-        # `load_spatial_filters(packed=False)`
-        kernel, interpolation_names = load_spatial_filters()
-
-        self._kerneltex = Texture2D(kernel, interpolation='nearest')
-        # The unpacking can be debugged by changing "spatial-filters.frag"
-        # to have the "unpack" function just return the .r component. That
-        # combined with using the below as the _kerneltex allows debugging
-        # of the pipeline
-        # self._kerneltex = Texture2D(kernel, interpolation='linear',
-        #                             internalformat='r32f')
-
-        interpolation_names, interpolation_fun = self._init_interpolation(
-            interpolation_names)
-        self._interpolation_names = interpolation_names
-        self._interpolation_fun = interpolation_fun
-        self._interpolation = interpolation
-        if self._interpolation not in self._interpolation_names:
-            raise ValueError("interpolation must be one of %s" %
-                             ', '.join(self._interpolation_names))
-
-        # check texture interpolation
-        if self._interpolation == 'bilinear':
-            texture_interpolation = 'linear'
-        else:
-            texture_interpolation = 'nearest'
-
-        self._method = method
-        self._grid = grid
-        self._need_texture_upload = True
-        self._need_vertex_update = True
-        self._need_colortransform_update = True
-        self._need_interpolation_update = True
-        self._textures = [TextureAtlas2D(self.texture_shape, tile_shape=self.tile_shape,
-                                         interpolation=texture_interpolation,
-                                         format="LUMINANCE", internalformat="R32F",
-                                         ) for i in range(self.num_channels)
-                          ]
-        self._subdiv_position = VertexBuffer()
-        self._subdiv_texcoord = VertexBuffer()
-
-        # impostor quad covers entire viewport
-        vertices = np.array([[-1, -1], [1, -1], [1, 1],
-                             [-1, -1], [1, 1], [-1, 1]],
-                            dtype=np.float32)
-        self._impostor_coords = VertexBuffer(vertices)
-        self._null_tr = NullTransform()
-
-        self._init_view(self)
-        if self.VERTEX_SHADER is None or self.FRAGMENT_SHADER is None:
-            raise RuntimeError("No shader specified for this subclass")
-        super(ImageVisual, self).__init__(vcode=self.VERTEX_SHADER, fcode=self.FRAGMENT_SHADER)
-        self.set_gl_state('translucent', cull_face=False)
-        self._draw_mode = 'triangles'
-
-        # define _data_lookup_fn as None, will be setup in
-        # self._build_interpolation()
-        self._data_lookup_fn = None
-
-        if isinstance(clim, str):
-            if clim != 'auto':
-                raise ValueError("C-limits can only be 'auto' or 2 floats for each provided channel")
+    def set_clim(self, clim):
+        if isinstance(clim, str) or len(clim) == 2:
             clim = [clim] * self.num_channels
-        if not isinstance(cmap, (tuple, list)):
-            cmap = [cmap or 'viridis'] * self.num_channels
 
-        assert (len(clim) == self.num_channels)
-        assert (len(cmap) == self.num_channels)
-        _clim = []
-        _cmap = []
-        for idx in range(self.num_channels):
-            cl = clim[idx]
-            if cl == 'auto':
-                _clim.append((np.nanmin(data_arrays[idx]), np.nanmax(data_arrays[idx])))
-            elif cl is None:
-                # Color limits don't matter (either empty channel array or other)
-                _clim.append((0., 1.))
-            elif isinstance(cl, tuple) and len(cl) == 2:
-                _clim.append(cl)
-            else:
-                raise ValueError("C-limits must be a 2-element tuple or the string 'auto' for each channel provided")
+        need_tex_upload = False
+        for tex, single_clim in zip(self._textures, clim):
+            if single_clim is None or single_clim[0] is None:
+                single_clim = (0, 0)  # let VisPy decide what to do with unusable clims
+            if tex.set_clim(single_clim):
+                need_tex_upload = True
+        return need_tex_upload
 
-            cm = cmap[idx]
-            _cmap.append(cm)
-        self.clim = _clim
-        self._texture_LUT = None
-        self.gamma = gamma if gamma is not None else (1.,) * self.num_channels
-        # only set colormap if it isn't None
-        # (useful when a subclass's shader doesn't expect a colormap)
-        if _cmap[0] is not None:
-            self.cmap = _cmap[0]
+    @property
+    def clim_normalized(self):
+        return tuple(tex.clim_normalized for tex in self._textures)
 
-        self.overview_info = None
-        self.init_overview(data_arrays)
+    @property
+    def internalformat(self):
+        return self._textures[0].internalformat
 
-        self.freeze()
+    @internalformat.setter
+    def internalformat(self, value):
+        for tex in self._textures:
+            tex.internalformat = value
+
+    @property
+    def interpolation(self):
+        return self._textures[0].interpolation
+
+    @interpolation.setter
+    def interpolation(self, value):
+        for tex in self._textures:
+            self._texture.interpolation = value
+
+    # TODO: Add 'scale_and_set_data' so this can be moved to VisPy
+    def set_tile_data(self, tile_idx, data_arrays, copy=False):
+        for idx, data in enumerate(data_arrays):
+            self._textures[idx].set_tile_data(tile_idx, data, copy=copy)
+
+    def check_data_format(self, data_arrays):
+        if len(data_arrays) != self.num_channels:
+            raise ValueError(f"Expected {self.num_channels} number of channels, got {len(data_arrays)}.")
+        for tex, data in zip(self._textures, data_arrays):
+            if data is not None:
+                tex.check_data_format(data)
+
+
+class MultiBandTextureAtlas2D:
+    def __init__(self, *args, **kwargs):
+        self._texture = _MultiBandTextureAtlas2D(*args, **kwargs)
+
+    def __getattr__(self, name):
+        x = getattr(self._texture, name, None)
+        if x is None:
+            x = getattr(self._texture.textures[0], name)
+        return x
+
+
+class SIFTMultiBandTiledGeolocatedMixin(SIFTTiledGeolocatedMixin):
+    def _normalize_data(self, data_arrays):
+        if not isinstance(data_arrays, (list, tuple)):
+            return super()._normalize_data(data_arrays)
+
+        new_data = []
+        for data in data_arrays:
+            new_data.append(super()._normalize_data(data))
+        return new_data
+
+    def _init_overview_data(self, ttile_idx, data_arrays):
+        new_arrays = []
+        for idx, data in enumerate(data_arrays):
+            if data is None:
+                new_arrays.append(None)
+                continue
+            _y_slice, _x_slice = self.calc.calc_overview_stride(image_shape=Point(data.shape[0], data.shape[1]))
+            overview_data = self._normalize_data(data[_y_slice, _x_slice])
+            new_arrays.append(overview_data)
+        self._texture.set_tile_data(ttile_idx, new_arrays)
+
+    def _init_geo_parameters(
+            self,
+            origin_x,
+            origin_y,
+            cell_width,
+            cell_height,
+            projection,
+            texture_shape,
+            tile_shape,
+            wrap_lon,
+            shape,
+            data_arrays
+    ):
+        if shape is None:
+            shape = self._compute_shape(shape, data_arrays)
+        ndim = len(shape) or [x for x in data_arrays if x is not None][0].ndim
+        data = ArrayProxy(ndim, shape)
+        super()._init_geo_parameters(
+            origin_x,
+            origin_y,
+            cell_width,
+            cell_height,
+            projection,
+            texture_shape,
+            tile_shape,
+            wrap_lon,
+            shape,
+            data,
+        )
+
+        self.set_channels(
+            data_arrays, shape=shape, cell_width=cell_width,
+            cell_height=cell_height, origin_x=origin_x, origin_y=origin_y,
+        )
 
     def set_channels(self, data_arrays, shape=None,
                      cell_width=None, cell_height=None,
-                     origin_x=None, origin_y=None, **kwargs):
+                     origin_x=None, origin_y=None):
         assert (shape or data_arrays is not None), "`data` or `shape` must be provided"
         if cell_width is not None:
             self.cell_width = cell_width
@@ -768,7 +722,7 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
             self.origin_x = origin_x
         if origin_y:
             self.origin_y = origin_y
-        self.shape = shape or max(data.shape for data in data_arrays if data is not None)
+        self.shape = self._compute_shape(shape, data_arrays)
         assert None not in (self.cell_width, self.cell_height, self.origin_x, self.origin_y, self.shape)
         # how many of the higher resolution channel tiles (smaller geographic area) make
         # up a low resolution channel tile
@@ -798,61 +752,60 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         # even though we might be looking at the exact same spot
         self._latest_tile_box = None
 
-    def init_overview(self, data_arrays):
-        """Create and add a low resolution version of the data that is always
-        shown behind the higher resolution image tiles.
-        """
-        # FUTURE: Actually use this data attribute. For now let the base
-        #         think there is data (not None)
-        self._data = ArrayProxy(self.ndim, self.shape)
-        self.overview_info = nfo = {}
-        y_slice, x_slice = self.calc.overview_stride
-        # Update kwargs to reflect the new spatial resolution of the overview image
-        nfo["cell_width"] = self.cell_width * x_slice.step
-        nfo["cell_height"] = self.cell_height * y_slice.step
-        # Tell the texture state that we are adding a tile that should never expire and should always exist
-        nfo["texture_tile_index"] = ttile_idx = self.texture_state.add_tile((0, 0, 0), expires=False)
-        for idx, data in enumerate(data_arrays):
-            if data is not None:
-                _y_slice, _x_slice = self.calc.calc_overview_stride(image_shape=Point(data.shape[0], data.shape[1]))
-                overview_data = data[_y_slice, _x_slice]
-            else:
-                overview_data = None
-            self._textures[idx].set_tile_data(ttile_idx, self._normalize_data(overview_data))
+    @staticmethod
+    def _compute_shape(shape, data_arrays):
+        return shape or max(data.shape for data in data_arrays if data is not None)
 
-        # Handle wrapping around the anti-meridian so there is a -180/180 continuous image
-        num_tiles = 1 if not self.wrap_lon else 2
-        tl = TESS_LEVEL * TESS_LEVEL
-        nfo["texture_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
-        nfo["vertex_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
-        factor_rez, offset_rez = self.calc.calc_tile_fraction(
-            0, 0, Point(np.int64(y_slice.step), np.int64(x_slice.step)))
-        nfo["texture_coordinates"][:6 * tl, :2] = self.calc.calc_texture_coordinates(ttile_idx, factor_rez, offset_rez,
-                                                                                     tessellation_level=TESS_LEVEL)
-        nfo["vertex_coordinates"][:6 * tl, :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step,
-                                                                                   factor_rez, offset_rez,
-                                                                                   tessellation_level=TESS_LEVEL)
-        self._set_vertex_tiles(nfo["vertex_coordinates"], nfo["texture_coordinates"])
+    def _get_stride(self, view_box):
+        s = self.calc.calc_stride(view_box, texture=self._lowest_rez)
+        return Point(np.int64(s[0] * self._lowest_factor), np.int64(s[1] * self._lowest_factor))
+
+    def _slice_texture_tile(self, data_arrays, y_slice, x_slice):
+        new_data = []
+        for data in data_arrays:
+            if data is not None:
+                # explicitly ask for the parent class of MultiBandTextureAtlas2D
+                data = super()._slice_texture_tile(data, y_slice, x_slice)
+            new_data.append(data)
+        return new_data
+
+
+class CompositeLayerVisual(SIFTMultiBandTiledGeolocatedMixin, TiledGeolocatedImageVisual):
+    VERTEX_SHADER = None
+    FRAGMENT_SHADER = None
+
+    def __init__(self, data_arrays, *args, **kwargs):
+        self.num_channels = len(data_arrays)
+        super().__init__(data_arrays, *args, **kwargs)
+
+    def _init_texture(self, data, texture_format):
+        if self._interpolation == 'bilinear':
+            texture_interpolation = 'linear'
+        else:
+            texture_interpolation = 'nearest'
+
+        tex = MultiBandTextureAtlas2D(
+            self.num_channels, self.texture_shape, tile_shape=self.tile_shape,
+            interpolation=texture_interpolation, format="LUMINANCE", internalformat="R32F"
+        )
+        return tex
 
     @property
     def clim(self):
         """Get color limits used when rendering the image (cmin, cmax)."""
-        return tuple(t.clim for t in self._textures)
+        return self._texture.clim
 
     @clim.setter
     def clim(self, clims):
-        if isinstance(clims, str):
+        if isinstance(clims, str) or len(clims) == 2:
             clims = [clims] * self.num_channels
-
+        if self._texture.set_clim(clims):
+            self._need_texture_upload = True
         clim_names = ('clim_r', 'clim_g', 'clim_b')
-        for clim_name, clim, tex in zip(clim_names, clims, self._textures):
-            if clim[0] is None:
-                clim = (0., 1.)  # 'empty' layer, no data
-            if tex.set_clim(clim):
-                self._need_texture_upload = True
+        for clim_name, clim in zip(clim_names, self._texture.clim_normalized):
             # shortcut so we don't have to rebuild the whole color transform
             if not self._need_colortransform_update:
-                self.shared_program.frag['color_transform'][1][clim_name] = tex.clim_normalized
+                self.shared_program.frag['color_transform'][1][clim_name] = clim
         self.update()
 
     @property
@@ -865,14 +818,22 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
         """Set gamma used when rendering the image."""
         if any(val <= 0 for val in value):
             raise ValueError("gamma must be > 0")
+        if not isinstance(value, (list, tuple)):
+            value = [value] * self.num_channels
         self._gamma = tuple(float(x) for x in value)
 
         gamma_names = ('gamma_r', 'gamma_g', 'gamma_b')
-        for gamma_name, gam, tex in zip(gamma_names, self._gamma, self._textures):
+        for gamma_name, gam in zip(gamma_names, self._gamma):
             # shortcut so we don't have to rebuild the color transform
             if not self._need_colortransform_update:
                 self.shared_program.frag['color_transform'][2][gamma_name] = gam
         self.update()
+
+    @ImageVisual.cmap.setter
+    def cmap(self, cmap):
+        if cmap is not None:
+            raise ValueError("MultiBandImageVisual does not support a colormap.")
+        self._cmap = None
 
     def _build_interpolation(self):
         # assumes 'nearest' interpolation
@@ -883,12 +844,11 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
 
         self._data_lookup_fn = Function(_rgb_texture_lookup)
         self.shared_program.frag['get_data'] = self._data_lookup_fn
-        for texture in self._textures:
-            if texture.interpolation != texture_interpolation:
-                self._texture.interpolation = texture_interpolation
-        self._data_lookup_fn['texture_r'] = self._textures[0]
-        self._data_lookup_fn['texture_g'] = self._textures[1]
-        self._data_lookup_fn['texture_b'] = self._textures[2]
+        if self._texture.interpolation != texture_interpolation:
+            self._texture.interpolation = texture_interpolation
+        self._data_lookup_fn['texture_r'] = self._texture.textures[0]
+        self._data_lookup_fn['texture_g'] = self._texture.textures[1]
+        self._data_lookup_fn['texture_b'] = self._texture.textures[2]
 
         self._need_interpolation_update = False
 
@@ -908,61 +868,36 @@ class CompositeLayerVisual(TiledGeolocatedImageVisual):
             fclim = Function(_apply_clim)
             fgamma = Function(_apply_gamma)
             fun = FunctionChain(None, [Function(_null_color_transform), fclim, fgamma])
-        fclim['clim_r'] = self._textures[0].clim_normalized
-        fclim['clim_g'] = self._textures[1].clim_normalized
-        fclim['clim_b'] = self._textures[2].clim_normalized
+        fclim['clim_r'] = self._texture.textures[0].clim_normalized
+        fclim['clim_g'] = self._texture.textures[1].clim_normalized
+        fclim['clim_b'] = self._texture.textures[2].clim_normalized
         fgamma['gamma_r'] = self.gamma[0]
         fgamma['gamma_g'] = self.gamma[1]
         fgamma['gamma_b'] = self.gamma[2]
         return fun
 
-    def _build_texture_tiles(self, data, stride, tile_box):
-        """Prepare and organize strided data in to individual tiles with associated information.
+    def set_data(self, data_arrays):
+        """Set the data
+
+        Parameters
+        ----------
+        image : array-like
+            The image data.
         """
-        data = [self._normalize_data(d) for d in data]
+        if self._data is not None and any(self._shape_differs(x1, x2) for x1, x2 in zip(self._data, data_arrays)):
+            self._need_vertex_update = True
+        self._texture.check_data_format(data_arrays)
+        self._data = data_arrays
+        self._need_texture_upload = True
 
-        LOG.debug("Uploading texture data for %d tiles (%r)",
-                  (tile_box.bottom - tile_box.top) * (tile_box.right - tile_box.left), tile_box)
-        # Tiles start at upper-left so go from top to bottom
-        tiles_info = []
-        for tiy in range(tile_box.top, tile_box.bottom):
-            for tix in range(tile_box.left, tile_box.right):
-                already_in = (stride, tiy, tix) in self.texture_state
-                # Update the age if already in there
-                # Assume that texture_state does not change from the main thread if this is run in another
-                tex_tile_idx = self.texture_state.add_tile((stride, tiy, tix))
-                if already_in:
-                    # FIXME: we should make a list/set of the tiles we need to add before this
-                    continue
-
-                # Assume we were given a total image worth of this stride
-                y_slice, x_slice = self.calc.calc_tile_slice(tiy, tix, tuple(stride))
-                textures_data = []
-                for chn_idx in range(self.num_channels):
-                    # force a copy of the data from the content array (provided by the workspace)
-                    # to a vispy-compatible contiguous float array
-                    # this can be a potentially time-expensive operation since content array is often huge and
-                    # always memory-mapped, so paging may occur
-                    # we don't want this paging deferred until we're back in the GUI thread pushing data to OpenGL!
-                    if data[chn_idx] is None:
-                        # we need to fill the texture with NaNs instead of actual data
-                        tile_data = None
-                    else:
-                        tile_data = np.array(data[chn_idx][y_slice, x_slice], dtype=np.float32)
-                    textures_data.append(tile_data)
-                tiles_info.append((stride, tiy, tix, tex_tile_idx, textures_data))
-
-        return tiles_info
-
-    def _set_texture_tiles(self, tiles_info):
-        for tile_info in tiles_info:
-            stride, tiy, tix, tex_tile_idx, data_arrays = tile_info
-            for idx, data in enumerate(data_arrays):
-                self._textures[idx].set_tile_data(tex_tile_idx, data)
-
-    def _get_stride(self, view_box):
-        s = self.calc.calc_stride(view_box, texture=self._lowest_rez)
-        return Point(np.int64(s[0] * self._lowest_factor), np.int64(s[1] * self._lowest_factor))
+    @staticmethod
+    def _shape_differs(arr1, arr2):
+        none_change1 = arr1 is not None and arr2 is None
+        none_change2 = arr1 is None and arr2 is not None
+        shape_change = False
+        if arr1 is not None and arr2 is not None:
+            shape_change = arr1.shape[:2] != arr2.shape[:2]
+        return none_change1 or none_change2 or shape_change
 
 
 CompositeLayer = create_visual_node(CompositeLayerVisual)
