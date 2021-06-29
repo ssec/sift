@@ -579,7 +579,7 @@ _apply_gamma = """
 _null_color_transform = 'vec4 pass(vec4 color) { return color; }'
 
 
-class _MultiBandTextureAtlas2D:
+class MultiBandTextureAtlas2D:
     def __init__(self, num_bands, texture_shape, **texture_kwargs):
         self.num_channels = num_bands
         self._textures = [
@@ -641,17 +641,6 @@ class _MultiBandTextureAtlas2D:
         for tex, data in zip(self._textures, data_arrays):
             if data is not None:
                 tex.check_data_format(data)
-
-
-class MultiBandTextureAtlas2D:
-    def __init__(self, *args, **kwargs):
-        self._texture = _MultiBandTextureAtlas2D(*args, **kwargs)
-
-    def __getattr__(self, name):
-        x = getattr(self._texture, name, None)
-        if x is None:
-            x = getattr(self._texture.textures[0], name)
-        return x
 
 
 class SIFTMultiBandTiledGeolocatedMixin(SIFTTiledGeolocatedMixin):
