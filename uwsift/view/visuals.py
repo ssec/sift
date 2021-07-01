@@ -46,7 +46,7 @@ from uwsift.common import (
     TESS_LEVEL,
     Box, Point, Resolution, ViewBox,
 )
-from uwsift.view.texture_atlas import TextureAtlas2D
+from uwsift.view.texture_atlas import TextureAtlas2D, MultiChannelTextureAtlas2D, MultiChannelGPUScaledTexture2D
 from uwsift.view.tile_calculator import TileCalculator, calc_pixel_size, get_reference_points
 
 __author__ = 'rayg'
@@ -579,71 +579,7 @@ _apply_gamma = """
 _null_color_transform = 'vec4 pass(vec4 color) { return color; }'
 
 
-class MultiBandTextureAtlas2D:
-    def __init__(self, num_bands, texture_shape, **texture_kwargs):
-        self.num_channels = num_bands
-        self._textures = [
-            TextureAtlas2D(texture_shape, **texture_kwargs)
-            for i in range(self.num_channels)
-        ]
-
-    @property
-    def textures(self):
-        return self._textures
-
-    @property
-    def clim(self):
-        """Get color limits used when rendering the image (cmin, cmax)."""
-        return tuple(t.clim for t in self._textures)
-
-    def set_clim(self, clim):
-        if isinstance(clim, str) or len(clim) == 2:
-            clim = [clim] * self.num_channels
-
-        need_tex_upload = False
-        for tex, single_clim in zip(self._textures, clim):
-            if single_clim is None or single_clim[0] is None:
-                single_clim = (0, 0)  # let VisPy decide what to do with unusable clims
-            if tex.set_clim(single_clim):
-                need_tex_upload = True
-        return need_tex_upload
-
-    @property
-    def clim_normalized(self):
-        return tuple(tex.clim_normalized for tex in self._textures)
-
-    @property
-    def internalformat(self):
-        return self._textures[0].internalformat
-
-    @internalformat.setter
-    def internalformat(self, value):
-        for tex in self._textures:
-            tex.internalformat = value
-
-    @property
-    def interpolation(self):
-        return self._textures[0].interpolation
-
-    @interpolation.setter
-    def interpolation(self, value):
-        for tex in self._textures:
-            self._texture.interpolation = value
-
-    # TODO: Add 'scale_and_set_data' so this can be moved to VisPy
-    def set_tile_data(self, tile_idx, data_arrays, copy=False):
-        for idx, data in enumerate(data_arrays):
-            self._textures[idx].set_tile_data(tile_idx, data, copy=copy)
-
-    def check_data_format(self, data_arrays):
-        if len(data_arrays) != self.num_channels:
-            raise ValueError(f"Expected {self.num_channels} number of channels, got {len(data_arrays)}.")
-        for tex, data in zip(self._textures, data_arrays):
-            if data is not None:
-                tex.check_data_format(data)
-
-
-class SIFTMultiBandTiledGeolocatedMixin(SIFTTiledGeolocatedMixin):
+class SIFTMultiChannelTiledGeolocatedMixin(SIFTTiledGeolocatedMixin):
     def _normalize_data(self, data_arrays):
         if not isinstance(data_arrays, (list, tuple)):
             return super()._normalize_data(data_arrays)
@@ -759,25 +695,83 @@ class SIFTMultiBandTiledGeolocatedMixin(SIFTTiledGeolocatedMixin):
         return new_data
 
 
-class CompositeLayerVisual(SIFTMultiBandTiledGeolocatedMixin, TiledGeolocatedImageVisual):
-    VERTEX_SHADER = None
-    FRAGMENT_SHADER = None
+class MultiChannelImageVisual(ImageVisual):
+    """Visual subclass displaying an image from three separate arrays.
 
-    def __init__(self, data_arrays, *args, **kwargs):
+    Note this Visual uses only GPU scaling, unlike the ImageVisual base
+    class which allows for CPU or GPU scaling.
+
+    Parameters
+    ----------
+    data : list
+        A 3-element list of numpy arrays with 2 dimensons where the
+        arrays are sorted by (R, G, B) order. These will be put together
+        to make an RGB image. The list can contain ``None`` meaning there
+        is no value for this channel currently, but it may be filled in
+        later. In this case the underlying GPU storage is still allocated,
+        but pre-filled with NaNs. Note that each channel may have different
+        shapes.
+    cmap : str | Colormap
+        Unused by this Visual, but is still provided to the ImageVisual base
+        class.
+    clim : str | tuple | list | None
+        Limits of each RGB data array. If provided as a string it must be
+        "auto" and the limits will be computed on the fly. If a 2-element
+        tuple then it will be considered the color limits for all channel
+        arrays. If provided as a 3-element list of 2-element tuples then
+        they represent the color limits of each channel array.
+    gamma : float | list
+        Gamma to use during colormap lookup.  Final value will be computed
+        ``val**gamma` for each RGB channel array. If provided as a float then
+        it will be used for each channel. If provided as a 3-element tuple
+        then each value is used for the separate channel arrays. Default is
+        1.0 for each channel.
+    **kwargs : dict
+        Keyword arguments to pass to :class:`~vispy.visuals.ImageVisual`. Note
+        that this Visual does not allow for ``texture_format`` to be specified
+        and is hardcoded to ``r32f`` internal texture format.
+
+    """
+
+    VERTEX_SHADER = ImageVisual.VERTEX_SHADER
+    FRAGMENT_SHADER = ImageVisual.FRAGMENT_SHADER
+
+    def __init__(self, data_arrays, clim='auto', gamma=1.0, **kwargs):
+        if kwargs.get("texture_format") is not None:
+            raise ValueError("'texture_format' can't be specified with the "
+                             "'MultiChannelImageVisual'.")
+        kwargs["texture_format"] = "R32F"
+        data_arrays = self._init_data_arrays(data_arrays)
         self.num_channels = len(data_arrays)
-        super().__init__(data_arrays, *args, **kwargs)
+        super().__init__(data_arrays, clim=clim, gamma=gamma, **kwargs)
 
-    def _init_texture(self, data, texture_format):
+    def _init_texture(self, data_arrays, texture_format):
         if self._interpolation == 'bilinear':
             texture_interpolation = 'linear'
         else:
             texture_interpolation = 'nearest'
 
-        tex = MultiBandTextureAtlas2D(
-            self.num_channels, self.texture_shape, tile_shape=self.tile_shape,
-            interpolation=texture_interpolation, format="LUMINANCE", internalformat="R32F"
+        tex = MultiChannelGPUScaledTexture2D(
+            data_arrays,
+            internalformat=texture_format,
+            format="LUMINANCE",
+            interpolation=texture_interpolation,
         )
         return tex
+
+    def _init_data_arrays(self, data_arrays):
+        shapes = [x.shape for x in data_arrays if x is not None]
+        if not shapes:
+            raise ValueError("List of data arrays must contain at least one "
+                             "numpy array.")
+        rep_shape = min(shapes)
+        new_arrays = []
+        for data in data_arrays:
+            if data is None:
+                data = np.full(rep_shape, np.float32(np.nan),
+                               dtype=np.float32)
+            new_arrays.append(data)
+        return new_arrays
 
     @property
     def clim(self):
@@ -821,14 +815,14 @@ class CompositeLayerVisual(SIFTMultiBandTiledGeolocatedMixin, TiledGeolocatedIma
     @ImageVisual.cmap.setter
     def cmap(self, cmap):
         if cmap is not None:
-            raise ValueError("MultiBandImageVisual does not support a colormap.")
+            raise ValueError("MultiChannelImageVisual does not support a colormap.")
         self._cmap = None
 
     def _build_interpolation(self):
         # assumes 'nearest' interpolation
         interpolation = self._interpolation
         if interpolation != 'nearest':
-            raise NotImplementedError("Composite visuals only support 'nearest' interpolation.")
+            raise NotImplementedError("MultiChannelImageVisual only supports 'nearest' interpolation.")
         texture_interpolation = 'nearest'
 
         self._data_lookup_fn = Function(_rgb_texture_lookup)
@@ -843,15 +837,7 @@ class CompositeLayerVisual(SIFTMultiBandTiledGeolocatedMixin, TiledGeolocatedIma
 
     def _build_color_transform(self):
         if self.num_channels != 3:
-            raise RuntimeError("Composite visuals should have more than one 2D image.")
-            # # luminance data
-            # fclim = Function(_apply_clim_float)
-            # fgamma = Function(_apply_gamma_float)
-            # # NOTE: _c2l_red only uses the red component, fancy internalformats
-            # #   may need to use the other components or a different function chain
-            # fun = FunctionChain(
-            #     None, [Function(_c2l_red), fclim, fgamma, Function(self.cmap.glsl_map)]
-            # )
+            raise NotImplementedError("MultiChannelimageVisuals only support 3 channels.")
         else:
             # RGB/A image data (no colormap)
             fclim = Function(_apply_clim)
@@ -889,12 +875,19 @@ class CompositeLayerVisual(SIFTMultiBandTiledGeolocatedMixin, TiledGeolocatedIma
         return none_change1 or none_change2 or shape_change
 
 
-CompositeLayer = create_visual_node(CompositeLayerVisual)
+class RGBCompositeLayerVisual(SIFTMultiChannelTiledGeolocatedMixin, TiledGeolocatedImageVisual, MultiChannelImageVisual):
+    def _init_texture(self, data_arrays, texture_format):
+        if self._interpolation == 'bilinear':
+            texture_interpolation = 'linear'
+        else:
+            texture_interpolation = 'nearest'
 
-
-class RGBCompositeLayerVisual(CompositeLayerVisual):
-    VERTEX_SHADER = ImageVisual.VERTEX_SHADER
-    FRAGMENT_SHADER = ImageVisual.FRAGMENT_SHADER
+        tex_shapes = [self.texture_shape] * len(data_arrays)
+        tex = MultiChannelTextureAtlas2D(
+            tex_shapes, tile_shape=self.tile_shape,
+            interpolation=texture_interpolation, format="LUMINANCE", internalformat="R32F"
+        )
+        return tex
 
 
 RGBCompositeLayer = create_visual_node(RGBCompositeLayerVisual)
