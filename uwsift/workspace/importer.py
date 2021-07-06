@@ -1231,6 +1231,7 @@ class SatpyImporter(aImporter):
                 target_area_def = AreaDefinitionsManager.area_def_by_id(
                     self.resampling_info['area_id'])
 
+                self.scn_original = self.scn
                 self.scn = self.scn.resample(
                     target_area_def,
                     resampler=resampler,
