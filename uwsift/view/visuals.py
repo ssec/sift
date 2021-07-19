@@ -27,14 +27,11 @@ from datetime import datetime
 
 import numpy as np
 import shapefile
-from vispy.gloo import VertexBuffer
-from vispy.io.datasets import load_spatial_filters
 from vispy.scene.visuals import create_visual_node
 from vispy.visuals import LineVisual, ImageVisual, IsocurveVisual
 # The below imports are needed because we subclassed the ImageVisual
 from vispy.visuals.shaders import Function, FunctionChain
-from vispy.visuals.transforms import NullTransform
-from vispy.gloo import Texture2D
+from vispy.gloo.texture import should_cast_to_f32
 
 
 from uwsift.common import (
@@ -741,6 +738,10 @@ class MultiChannelImageVisual(ImageVisual):
             raise ValueError("'texture_format' can't be specified with the "
                              "'MultiChannelImageVisual'.")
         kwargs["texture_format"] = "R32F"
+        if kwargs.get("cmap") is not None:
+            raise ValueError("'cmap' can't be specified with the"
+                             "'MultiChannelImageVisual'.")
+        kwargs["cmap"] = None
         data_arrays = self._init_data_arrays(data_arrays)
         self.num_channels = len(data_arrays)
         super().__init__(data_arrays, clim=clim, gamma=gamma, **kwargs)
@@ -760,11 +761,7 @@ class MultiChannelImageVisual(ImageVisual):
         return tex
 
     def _init_data_arrays(self, data_arrays):
-        shapes = [x.shape for x in data_arrays if x is not None]
-        if not shapes:
-            raise ValueError("List of data arrays must contain at least one "
-                             "numpy array.")
-        rep_shape = min(shapes)
+        rep_shape = self._get_min_shape(data_arrays)
         new_arrays = []
         for data in data_arrays:
             if data is None:
@@ -772,6 +769,24 @@ class MultiChannelImageVisual(ImageVisual):
                                dtype=np.float32)
             new_arrays.append(data)
         return new_arrays
+
+    def _get_shapes(self, data_arrays):
+        shapes = [x.shape for x in data_arrays if x is not None]
+        if not shapes:
+            raise ValueError("List of data arrays must contain at least one "
+                             "numpy array.")
+        return shapes
+
+    def _get_min_shape(self, data_arrays):
+        return min(self._get_shapes(data_arrays))
+
+    def _get_max_shape(self, data_arrays):
+        return max(self._get_shapes(data_arrays))
+
+    @property
+    def size(self):
+        """Get size of the image (width, height)."""
+        return self._get_max_shape(self._data)
 
     @property
     def clim(self):
@@ -784,12 +799,23 @@ class MultiChannelImageVisual(ImageVisual):
             clims = [clims] * self.num_channels
         if self._texture.set_clim(clims):
             self._need_texture_upload = True
-        clim_names = ('clim_r', 'clim_g', 'clim_b')
-        for clim_name, clim in zip(clim_names, self._texture.clim_normalized):
-            # shortcut so we don't have to rebuild the whole color transform
-            if not self._need_colortransform_update:
-                self.shared_program.frag['color_transform'][1][clim_name] = clim
+        self._update_colortransform_clim()
         self.update()
+
+    def _update_colortransform_clim(self):
+        if self._need_colortransform_update:
+            # we are going to rebuild anyway so just do it later
+            return
+        try:
+            norm_clims = self._texture.clim_normalized
+        except RuntimeError:
+            return
+        else:
+            clim_names = ('clim_r', 'clim_g', 'clim_b')
+            # shortcut so we don't have to rebuild the whole color transform
+            for clim_name, clim in zip(clim_names, norm_clims):
+                # shortcut so we don't have to rebuild the whole color transform
+                self.shared_program.frag['color_transform'][1][clim_name] = clim
 
     @property
     def gamma(self):
@@ -799,10 +825,10 @@ class MultiChannelImageVisual(ImageVisual):
     @gamma.setter
     def gamma(self, value):
         """Set gamma used when rendering the image."""
-        if any(val <= 0 for val in value):
-            raise ValueError("gamma must be > 0")
         if not isinstance(value, (list, tuple)):
             value = [value] * self.num_channels
+        if any(val <= 0 for val in value):
+            raise ValueError("gamma must be > 0")
         self._gamma = tuple(float(x) for x in value)
 
         gamma_names = ('gamma_r', 'gamma_g', 'gamma_b')
@@ -861,6 +887,7 @@ class MultiChannelImageVisual(ImageVisual):
         """
         if self._data is not None and any(self._shape_differs(x1, x2) for x1, x2 in zip(self._data, data_arrays)):
             self._need_vertex_update = True
+        data_arrays = [data.astype(np.float32) if data is not None and should_cast_to_f32(data.dtype) else data for data in data_arrays]
         self._texture.check_data_format(data_arrays)
         self._data = data_arrays
         self._need_texture_upload = True
@@ -873,6 +900,25 @@ class MultiChannelImageVisual(ImageVisual):
         if arr1 is not None and arr2 is not None:
             shape_change = arr1.shape[:2] != arr2.shape[:2]
         return none_change1 or none_change2 or shape_change
+
+    def _build_texture(self):
+        pre_clims = self._texture.clim
+        pre_internalformat = self._texture.internalformat
+        self._texture.scale_and_set_data(self._data)
+        post_clims = self._texture.clim
+        post_internalformat = self._texture.internalformat
+        # color transform needs rebuilding if the internalformat was changed
+        # new color limits need to be assigned if the normalized clims changed
+        # otherwise, the original color transform should be fine
+        # Note that this assumes that if clim changed, clim_normalized changed
+        new_if = post_internalformat != pre_internalformat
+        new_cl = post_clims != pre_clims
+        if new_if or new_cl:
+            self._need_colortransform_update = True
+        self._need_texture_upload = False
+
+
+MultiChannelImage = create_visual_node(MultiChannelImageVisual)
 
 
 class RGBCompositeLayerVisual(SIFTMultiChannelTiledGeolocatedMixin, TiledGeolocatedImageVisual, MultiChannelImageVisual):

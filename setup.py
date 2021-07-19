@@ -190,7 +190,7 @@ setup(
                  "Topic :: Scientific/Engineering"],
     zip_safe=False,
     include_package_data=True,
-    install_requires=['numpy', 'pillow', 'numba', 'vispy>=0.7.0',
+    install_requires=['numpy', 'pillow', 'numba', 'vispy>=0.7.1',
                       'netCDF4', 'h5py', 'pyproj',
                       'pyshp', 'shapely', 'rasterio', 'sqlalchemy',
                       'appdirs', 'pyyaml', 'pyqtgraph', 'satpy', 'matplotlib',

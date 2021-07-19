@@ -20,6 +20,7 @@ REQUIRES
 
 import logging
 import os
+import warnings
 
 import numpy as np
 from vispy.visuals._scalable_textures import GPUScaledTexture2D
@@ -218,7 +219,9 @@ class MultiChannelGPUScaledTexture2D:
 
         for tex_idx, _data in zip(tex_indexes, data):
             if _data is None:
-                continue
+                _data = np.full(self._textures[tex_idx].shape[:-1],
+                                np.float32(np.nan),
+                                dtype=np.float32)
             self._textures[tex_idx].scale_and_set_data(_data, offset=offset, copy=copy)
 
 
@@ -226,12 +229,6 @@ class MultiChannelTextureAtlas2D(MultiChannelGPUScaledTexture2D):
     """Helper texture for working with RGB images in SIFT."""
 
     _singular_texture_class = TextureAtlas2D
-
-    # def _create_textures(self, num_channels, data, **texture_kwargs):
-    #     return [
-    #         self._singular_texture_class(data, **texture_kwargs)
-    #         for i in range(num_channels)
-    #     ]
 
     def set_tile_data(self, tile_idx, data_arrays, copy=False):
         for idx, data in enumerate(data_arrays):
