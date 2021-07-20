@@ -238,9 +238,6 @@ class SIFTTiledGeolocatedMixin:
         """Create and add a low resolution version of the data that is always
         shown behind the higher resolution image tiles.
         """
-        # FUTURE: Actually use this data attribute. For now let the base
-        #         think there is data (not None)
-        self._data = ArrayProxy(self.ndim, self.shape)
         self.overview_info = nfo = {}
         y_slice, x_slice = self.calc.overview_stride
         # Update kwargs to reflect the new spatial resolution of the overview image
@@ -477,7 +474,6 @@ class SIFTTiledGeolocatedMixin:
         # Store the most recent level of detail that we've done
         self._stride = preferred_stride
         self._latest_tile_box = tile_box
-
 
 
 class TiledGeolocatedImageVisual(SIFTTiledGeolocatedMixin, ImageVisual):
