@@ -51,5 +51,4 @@ def test_multiband_visual():
         assert not np.allclose(b_result, 0)
 
 
-
 run_tests_if_main()

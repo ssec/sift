@@ -872,10 +872,17 @@ class MultiChannelImageVisual(ImageVisual):
         """
         if self._data is not None and any(self._shape_differs(x1, x2) for x1, x2 in zip(self._data, data_arrays)):
             self._need_vertex_update = True
-        data_arrays = [data.astype(np.float32) if data is not None and should_cast_to_f32(data.dtype) else data for data in data_arrays]
+        data_arrays = list(self._cast_arrays_if_needed(data_arrays))
         self._texture.check_data_format(data_arrays)
         self._data = data_arrays
         self._need_texture_upload = True
+
+    @staticmethod
+    def _cast_arrays_if_needed(data_arrays):
+        for data in data_arrays:
+            if data is not None and should_cast_to_f32(data.dtype):
+                data = data.astype(np.float32)
+            yield data
 
     @staticmethod
     def _shape_differs(arr1, arr2):
@@ -906,7 +913,9 @@ class MultiChannelImageVisual(ImageVisual):
 MultiChannelImage = create_visual_node(MultiChannelImageVisual)
 
 
-class RGBCompositeLayerVisual(SIFTMultiChannelTiledGeolocatedMixin, TiledGeolocatedImageVisual, MultiChannelImageVisual):
+class RGBCompositeLayerVisual(SIFTMultiChannelTiledGeolocatedMixin,
+                              TiledGeolocatedImageVisual,
+                              MultiChannelImageVisual):
     def _init_texture(self, data_arrays, texture_format):
         if self._interpolation == 'bilinear':
             texture_interpolation = 'linear'
