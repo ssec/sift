@@ -738,7 +738,6 @@ class MultiChannelImageVisual(ImageVisual):
             raise ValueError("'cmap' can't be specified with the"
                              "'MultiChannelImageVisual'.")
         kwargs["cmap"] = None
-        data_arrays = self._init_data_arrays(data_arrays)
         self.num_channels = len(data_arrays)
         super().__init__(data_arrays, clim=clim, gamma=gamma, **kwargs)
 
@@ -755,16 +754,6 @@ class MultiChannelImageVisual(ImageVisual):
             interpolation=texture_interpolation,
         )
         return tex
-
-    def _init_data_arrays(self, data_arrays):
-        rep_shape = self._get_min_shape(data_arrays)
-        new_arrays = []
-        for data in data_arrays:
-            if data is None:
-                data = np.full(rep_shape, np.float32(np.nan),
-                               dtype=np.float32)
-            new_arrays.append(data)
-        return new_arrays
 
     def _get_shapes(self, data_arrays):
         shapes = [x.shape for x in data_arrays if x is not None]

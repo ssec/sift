@@ -114,7 +114,12 @@ class MultiChannelGPUScaledTexture2D:
     _ndim = 2
 
     def __init__(self, data, **texture_kwargs):
+        # data to sent to texture when not being used
+        self._fill_arr = np.full((10, 10), np.float32(np.nan),
+                                 dtype=np.float32)
+
         self.num_channels = len(data)
+        data = [x if x is not None else self._fill_arr for x in data]
         self._textures = self._create_textures(self.num_channels, data,
                                                **texture_kwargs)
 
@@ -219,9 +224,7 @@ class MultiChannelGPUScaledTexture2D:
 
         for tex_idx, _data in zip(tex_indexes, data):
             if _data is None:
-                _data = np.full(self._textures[tex_idx].shape[:-1],
-                                np.float32(np.nan),
-                                dtype=np.float32)
+                _data = self._fill_arr
             self._textures[tex_idx].scale_and_set_data(_data, offset=offset, copy=copy)
 
 
