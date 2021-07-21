@@ -639,7 +639,7 @@ class Main(QtWidgets.QMainWindow):
         gv = self.ui.timelineView
 
         # set up the widget itself
-        gv.setViewportUpdateMode(QtGui.QGraphicsView.FullViewportUpdate)
+        gv.setViewportUpdateMode(QtWidgets.QGraphicsView.FullViewportUpdate)
         gv.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
         gv.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
         # gv.setRenderHints(QtGui.QPainter.Antialiasing)
