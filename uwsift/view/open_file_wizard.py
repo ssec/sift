@@ -58,7 +58,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.file_groups = {}
         self.unknown_files = set()
         app = QtWidgets.QApplication.instance()
-        self._unknown_icon = app.style().standardIcon(QtGui.QStyle.SP_DialogCancelButton)
+        self._unknown_icon = app.style().standardIcon(QtWidgets.QStyle.SP_DialogCancelButton)
         self._known_icon = QtGui.QIcon()
         # self._known_icon = app.style().standardIcon(QtGui.QStyle.SP_DialogApplyButton)
 
