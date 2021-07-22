@@ -402,17 +402,17 @@ class UserControlsAnimation(QtCore.QObject):
             self.ui.statusbar.showMessage("ERROR: Layer with time steps or band siblings needed", STATUS_BAR_DURATION)
         LOG.info('using siblings of {} for animation loop'.format(uuids[0] if uuids else '-unknown-'))
 
-    def toggle_animation(self, action: QtGui.QAction = None, *args):
+    def toggle_animation(self, action: QtWidgets.QAction = None, *args):
         """Toggle animation on/off."""
         new_state = self.scene_manager.layer_set.toggle_animation()
         self.ui.animPlayPause.setChecked(new_state)
 
 
-class Main(QtGui.QMainWindow):
+class Main(QtWidgets.QMainWindow):
     _last_open_dir: str = None  # directory to open files in
-    _recent_files_menu: QtGui.QMenu = None  # QMenu
-    _open_cache_dialog: QtGui.QDialog = None
-    _screenshot_dialog: QtGui.QDialog = None
+    _recent_files_menu: QtWidgets.QMenu = None  # QMenu
+    _open_cache_dialog: QtWidgets.QDialog = None
+    _screenshot_dialog: QtWidgets.QDialog = None
     _cmap_editor = None  # Gradient editor widget
     _resource_collector: ResourceSearchPathCollector = None
     _resource_collector_timer: QtCore.QTimer = None
@@ -639,7 +639,7 @@ class Main(QtGui.QMainWindow):
         gv = self.ui.timelineView
 
         # set up the widget itself
-        gv.setViewportUpdateMode(QtGui.QGraphicsView.FullViewportUpdate)
+        gv.setViewportUpdateMode(QtWidgets.QGraphicsView.FullViewportUpdate)
         gv.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
         gv.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
         # gv.setRenderHints(QtGui.QPainter.Antialiasing)
@@ -935,7 +935,7 @@ class Main(QtGui.QMainWindow):
             LOG.debug("Wizard closed, nothing to load")
         self._wizard_dialog = None
 
-    def remove_region_polygon(self, action: QtGui.QAction = None, *args):
+    def remove_region_polygon(self, action: QtWidgets.QAction = None, *args):
         if self.scene_manager.has_pending_polygon():
             self.scene_manager.clear_pending_polygon()
             return
@@ -945,7 +945,7 @@ class Main(QtGui.QMainWindow):
         LOG.info("Clearing polygon with name '%s'", removed_name)
         self.scene_manager.remove_polygon(removed_name)
 
-    def create_algebraic(self, action: QtGui.QAction = None, uuids=None, composite_type=CompositeType.ARITHMETIC):
+    def create_algebraic(self, action: QtWidgets.QAction = None, uuids=None, composite_type=CompositeType.ARITHMETIC):
         if uuids is None:
             uuids = list(self.layer_list_model.current_selected_uuids())
         dialog = CreateAlgebraicDialog(self.document, uuids, parent=self)
