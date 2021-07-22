@@ -4,7 +4,7 @@ env:
   - NUMPY_VERSION=stable
   - MAIN_CMD='python setup.py'
   - CONDA_DEPENDENCIES='hdf5 rasterio matplotlib numba pyproj coveralls pytest pytest-mock
-    pytest-cov coverage pytest-qt vispy<0.7 netcdf4 h5py imageio imageio-ffmpeg ffmpeg
+    pytest-cov coverage pytest-qt vispy netcdf4 h5py imageio imageio-ffmpeg ffmpeg
     pillow pyshp pyqtgraph shapely sqlalchemy pyqt appdirs pyyaml satpy eccodes scikit-image
     donfig conda-pack'
   - PIP_DEPENDENCIES='pytest-xvfb'
