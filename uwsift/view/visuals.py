@@ -183,11 +183,6 @@ class SIFTTiledGeolocatedMixin:
         # Call the init of the Visual
         super().__init__(data, **visual_kwargs)
 
-        self.unfreeze()
-        self.overview_info = None
-        self.init_overview(data)
-        self.freeze()
-
     def _init_geo_parameters(
             self,
             origin_x,
@@ -212,7 +207,7 @@ class SIFTTiledGeolocatedMixin:
         self.texture_shape = texture_shape
         self.tile_shape = tile_shape
         self.num_tex_tiles = self.texture_shape[0] * self.texture_shape[1]
-        self._stride = (0, 0)  # Current stride is None when we are showing the overview
+        self._stride = (0, 0)
         self._latest_tile_box = None
         self.wrap_lon = wrap_lon
         self._tiles = {}
@@ -233,37 +228,6 @@ class SIFTTiledGeolocatedMixin:
         )
         # What tiles have we used and can we use
         self.texture_state = TextureTileState(self.num_tex_tiles)
-
-    def init_overview(self, data):
-        """Create and add a low resolution version of the data that is always
-        shown behind the higher resolution image tiles.
-        """
-        self.overview_info = nfo = {}
-        y_slice, x_slice = self.calc.overview_stride
-        # Update kwargs to reflect the new spatial resolution of the overview image
-        nfo["cell_width"] = self.cell_width * x_slice.step
-        nfo["cell_height"] = self.cell_height * y_slice.step
-        # Tell the texture state that we are adding a tile that should never expire and should always exist
-        nfo["texture_tile_index"] = ttile_idx = self.texture_state.add_tile((0, 0, 0), expires=False)
-        self._init_overview_data(ttile_idx, data)
-
-        # Handle wrapping around the anti-meridian so there is a -180/180 continuous image
-        num_tiles = 1 if not self.wrap_lon else 2
-        tl = TESS_LEVEL * TESS_LEVEL
-        nfo["texture_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
-        nfo["vertex_coordinates"] = np.empty((6 * num_tiles * tl, 2), dtype=np.float32)
-        factor_rez, offset_rez = self.calc.calc_tile_fraction(0, 0,
-                                                              Point(np.int64(y_slice.step), np.int64(x_slice.step)))
-        nfo["texture_coordinates"][:6 * tl, :2] = self.calc.calc_texture_coordinates(ttile_idx, factor_rez, offset_rez,
-                                                                                     tessellation_level=TESS_LEVEL)
-        nfo["vertex_coordinates"][:6 * tl, :2] = self.calc.calc_vertex_coordinates(0, 0, y_slice.step, x_slice.step,
-                                                                                   factor_rez, offset_rez,
-                                                                                   tessellation_level=TESS_LEVEL)
-        self._set_vertex_tiles(nfo["vertex_coordinates"], nfo["texture_coordinates"])
-
-    def _init_overview_data(self, ttile_idx, data):
-        _y_slice, _x_slice = self.calc.calc_overview_stride(image_shape=Point(data.shape[0], data.shape[1]))
-        self._texture.set_tile_data(ttile_idx, self._normalize_data(data[_y_slice, _x_slice]))
 
     def _normalize_data(self, data):
         if data is not None and data.dtype == np.float64:
@@ -316,34 +280,20 @@ class SIFTTiledGeolocatedMixin:
         SIFT Note: Copied from 0.5.0dev original ImageVisual class
         """
         total_num_tiles = (tile_box.bottom - tile_box.top) * (tile_box.right - tile_box.left)
-        total_overview_tiles = 0
-        if self.overview_info is not None:
-            # we should be providing an overview image
-            total_overview_tiles = int(
-                self.overview_info["vertex_coordinates"].shape[0] / 6 / (TESS_LEVEL * TESS_LEVEL))
 
         if total_num_tiles <= 0:
             # we aren't looking at this image
             # FIXME: What's the correct way to stop drawing here
             raise RuntimeError("View calculations determined a negative number of tiles are visible")
-        elif total_num_tiles > self.num_tex_tiles - total_overview_tiles:
+        elif total_num_tiles > self.num_tex_tiles:
             LOG.warning("Current view sees more tiles than can be held in the GPU")
-            # We continue on because there should be an overview image for any tiles that can't be drawn
-        total_num_tiles += total_overview_tiles
+            # We continue on, showing as many tiles as we can
 
         tex_coords = np.empty((6 * total_num_tiles * (TESS_LEVEL * TESS_LEVEL), 2), dtype=np.float32)
         vertices = np.empty((6 * total_num_tiles * (TESS_LEVEL * TESS_LEVEL), 2), dtype=np.float32)
 
         # What tile are we currently describing out of all the tiles being viewed
         used_tile_idx = -1
-        # Set up the overview tile
-        if self.overview_info is not None:
-            # XXX: This completely depends on drawing order, putting it at the end seems to work
-            tex_coords[-6 * total_overview_tiles * TESS_LEVEL * TESS_LEVEL:, :] = \
-                self.overview_info["texture_coordinates"]
-            vertices[-6 * total_overview_tiles * TESS_LEVEL * TESS_LEVEL:, :] = \
-                self.overview_info["vertex_coordinates"]
-
         LOG.debug("Building vertex data for %d tiles (%r)", total_num_tiles, tile_box)
         tl = TESS_LEVEL * TESS_LEVEL
         # Tiles start at upper-left so go from top to bottom
@@ -581,17 +531,6 @@ class SIFTMultiChannelTiledGeolocatedMixin(SIFTTiledGeolocatedMixin):
         for data in data_arrays:
             new_data.append(super()._normalize_data(data))
         return new_data
-
-    def _init_overview_data(self, ttile_idx, data_arrays):
-        new_arrays = []
-        for idx, data in enumerate(data_arrays):
-            if data is None:
-                new_arrays.append(None)
-                continue
-            _y_slice, _x_slice = self.calc.calc_overview_stride(image_shape=Point(data.shape[0], data.shape[1]))
-            overview_data = self._normalize_data(data[_y_slice, _x_slice])
-            new_arrays.append(overview_data)
-        self._texture.set_tile_data(ttile_idx, new_arrays)
 
     def _init_geo_parameters(
             self,

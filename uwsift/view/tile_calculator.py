@@ -384,7 +384,6 @@ def calc_stride(v_dx, v_dy, t_dx, t_dy, overview_stride_y, overview_stride_x):
     nb_types.NamedUniTuple(int64, 2, Point)
 ), nopython=True, cache=True, nogil=True)
 def calc_overview_stride(image_shape_y, image_shape_x, tile_shape):
-    # FUTURE: Come up with a fancier way of doing overviews like averaging each strided section, if needed
     tsy = max(1, int(np.floor(image_shape_y / tile_shape[0])))
     tsx = max(1, int(np.floor(image_shape_x / tile_shape[1])))
     return tsy, tsx
@@ -538,6 +537,7 @@ class TileCalculator(object):
                                   self.ul_origin.x + self.image_shape[1] / 2. * self.pixel_rez.dx)
         # size of tile in image projection
         self.tile_size = Resolution(self.pixel_rez.dy * self.tile_shape[0], self.pixel_rez.dx * self.tile_shape[1])
+        # maximum stride that we shouldn't lower resolution beyond
         self.overview_stride = self.calc_overview_stride()
 
     def visible_tiles(self, visible_geom, stride=Point(1, 1), extra_tiles_box=Box(0, 0, 0, 0)) -> Box:
