@@ -1260,7 +1260,8 @@ class Workspace(QObject):
             x, y = Proj(info[Info.PROJ])(*xy_pos)
         col = (x - info[Info.ORIGIN_X]) / info[Info.CELL_WIDTH]
         row = (y - info[Info.ORIGIN_Y]) / info[Info.CELL_HEIGHT]
-        return np.int64(np.round(row)), np.int64(np.round(col))
+
+        return np.int64(np.floor(row)), np.int64(np.floor(col))
 
     def layer_proj(self, dsi_or_uuid):
         """Project lon/lat probe points to image X/Y"""
