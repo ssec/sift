@@ -53,8 +53,8 @@ jobs:
       - name: Install SIFT
         shell: bash -l {0}
         run: |
-          pip install sphinx sphinx_rtd_theme sphinxcontrib-apidoc
-          pip install --no-deps -e .[docs]
+          pip install sphinx sphinx_rtd_theme sphinxcontrib-apidoc sphinxcontrib-seqdiag sphinxcontrib-blockdiag blockdiag
+          pip install --no-deps -e .
 
       - name: Run Sphinx Build
         shell: bash -l {0}
