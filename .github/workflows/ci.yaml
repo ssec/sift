@@ -28,40 +28,39 @@ jobs:
   website:
     name: build website
     runs-on: ubuntu-latest
-    container: quay.io/condaforge/mambaforge
+    defaults:
+      run:
+        shell: "bash -l {0}"
     steps:
       - name: Checkout source
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
 
-#      - name: Setup Conda Environment
-#        uses: conda-incubator/setup-miniconda@v2
-#        with:
-#          miniconda-version: "latest"
-#          python-version: "3.9"
-#          mamba-version: "*"
-#          channels: conda-forge,defaults
-#          environment-file: continuous_integration/environment.yaml
-#          activate-environment: test-environment
-
-      - name: Setup Mamba Environment
-        shell: bash -l {0}
-        run: |
-          mamba env update --file continuous_integration/environment.yaml
-          conda init bash
+      - name: Setup Conda Environment
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          miniconda-version: "latest"
+          python-version: "3.9"
+          mamba-version: "*"
+          channels: conda-forge
+          channel-priority: true
+          environment-file: continuous_integration/environment.yaml
+          activate-environment: test-environment
+          installer-url: https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-Linux-x86_64.sh
+          allow-softlinks: true
+          show-channel-urls: true
+          use-only-tar-bz2: true
 
       - name: Install SIFT
         shell: bash -l {0}
         run: |
-          conda activate test-environment
           pip install sphinx sphinx_rtd_theme sphinxcontrib-apidoc
           pip install --no-deps -e .
 
       - name: Run Sphinx Build
         shell: bash -l {0}
         run: |
-          conda activate test-environment
           cd doc
           sphinx-build -b html -W source build/html
 
