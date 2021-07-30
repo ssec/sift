@@ -60,7 +60,7 @@ jobs:
         shell: bash -l {0}
         run: |
           cd doc; \
-          make html SPHINXOPTS="-W"
+          sphinx-build -b html -W source build/html
 
 #  test:
 #    runs-on: ${{ matrix.os }}
