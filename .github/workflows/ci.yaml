@@ -50,18 +50,19 @@ jobs:
         run: |
           mamba env update --file continuous_integration/environment.yaml
           conda init bash
-          conda activate test-environment
 
       - name: Install SIFT
         shell: bash -l {0}
         run: |
-          pip install sphinx sphinx_rtd_theme sphinxcontrib-apidoc; \
+          conda activate test-environment
+          pip install sphinx sphinx_rtd_theme sphinxcontrib-apidoc
           pip install --no-deps -e .
 
       - name: Run Sphinx Build
         shell: bash -l {0}
         run: |
-          cd doc; \
+          conda activate test-environment
+          cd doc
           sphinx-build -b html -W source build/html
 
 #  test:
