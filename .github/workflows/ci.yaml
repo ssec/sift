@@ -49,7 +49,7 @@ jobs:
         shell: bash -l {0}
         run: |
           mamba env update --file continuous_integration/environment.yaml
-          mamba activate test-environment
+          conda activate test-environment
 
       - name: Install SIFT
         shell: bash -l {0}
