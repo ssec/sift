@@ -75,7 +75,6 @@ def test_get_reference_points_bad_points(ic, iv):
     """Test that error is thrown if given invalid mesh points."""
     with pytest.raises(ValueError):
         get_reference_points(np.array(ic), np.array(iv))
-        assert False
 
 
 @pytest.mark.parametrize("cp,ip,num_p,mpp,exp", [
@@ -114,7 +113,6 @@ def test_calc_view_extents_bad_box(iebox, cp, ip, cs, dx, dy):
     """Test that error is thrown given zero-sized box."""
     with pytest.raises(ValueError):
         calc_view_extents(iebox, np.array(cp), np.array(ip), cs, dx, dy)
-        assert False
 
 
 @pytest.mark.parametrize("ims,ts,s,exp", [

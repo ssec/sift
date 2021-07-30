@@ -419,7 +419,7 @@ class ExportImageHelper(QtCore.QObject):
 
         for filename, file_images in filenames:
             writer = imageio.get_writer(filename, format_name, **params)
-            for u, x in file_images:
+            for _, x in file_images:
                 writer.append_data(numpy.array(x))
 
         writer.close()

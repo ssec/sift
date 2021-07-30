@@ -169,7 +169,7 @@ class MultiChannelGPUScaledTexture2D:
 
     @interpolation.setter
     def interpolation(self, value):
-        for tex in self._textures:
+        for _ in self._textures:
             self._texture.interpolation = value
 
     def check_data_format(self, data_arrays):

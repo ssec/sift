@@ -113,7 +113,7 @@ class CoordTransform(QObject):
         self._time_base = new_settings.t
         self._time_unit = new_settings.d
 
-    def __init__(self, time_base: datetime = None, time_unit: timedelta = timedelta(seconds=1), track_height=None):
+    def __init__(self, time_base: datetime = None, time_unit: timedelta = None, track_height=None):
         """
 
         Args:
@@ -121,6 +121,8 @@ class CoordTransform(QObject):
             time_unit: time width corresponding to delta-X=1.0, defaults to 1.0s
             track_height: pixels high to display individual ttracks
         """
+        if time_unit is None:
+            time_unit = timedelta(seconds=1)
         super(CoordTransform, self).__init__()
         self._time_base = time_base or datetime.utcnow()
         self._time_unit = time_unit

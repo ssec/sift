@@ -882,12 +882,12 @@ class ShapefileLinesVisual(LineVisual):
         # Prepare the arrays
         total_points = 0
         total_parts = 0
-        for idx, one_shape in enumerate(self.sf.iterShapes()):
+        for one_shape in self.sf.iterShapes():
             total_points += len(one_shape.points)
             total_parts += len(one_shape.parts)
         vertex_buffer = np.empty((total_points * 2 - total_parts * 2, 2), dtype=np.float32)
         prev_idx = 0
-        for idx, one_shape in enumerate(self.sf.iterShapes()):
+        for one_shape in self.sf.iterShapes():
             # end_idx = prev_idx + len(one_shape.points) * 2 - len(one_shape.parts) * 2
             # vertex_buffer[prev_idx:end_idx:2] = one_shape.points[:-1]
             # for part_idx in one_shape.parts:

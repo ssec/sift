@@ -36,12 +36,10 @@ FUTURE import sequence:
 :license: GPLv3, see LICENSE for more details
 
 """
-import argparse
+
 import logging
 import os
 import shutil
-import sys
-import unittest
 from collections import Mapping as ReadOnlyMapping, defaultdict, OrderedDict
 from datetime import datetime, timedelta
 from typing import Mapping, Generator, Tuple, Dict
@@ -146,15 +144,15 @@ class ActiveContent(QObject):
         co[2:4] = 1  # and of that, only the bottom half of the image
 
     @staticmethod
-    def _rcls(r: int, c: int, l: int):
+    def _rcls(rows: int, columns: int, levels: int):
         """
-        :param r: rows or None
-        :param c: columns or None
-        :param l: levels or None
+        :param rows: rows or None
+        :param columns: columns or None
+        :param levels: levels or None
         :return: condensed tuple(string with 'rcl', 'rc', 'rl', dimension tuple corresponding to string)
         """
         rcl_shape = tuple(
-            (name, dimension) for (name, dimension) in zip('rcl', (r, c, l)) if dimension)
+            (name, dimension) for (name, dimension) in zip('rcl', (rows, columns, levels)) if dimension)
         rcl = tuple(x[0] for x in rcl_shape)
         shape = tuple(x[1] for x in rcl_shape)
         return rcl, shape
@@ -454,19 +452,19 @@ class Workspace(QObject):
     def _bgnd_startup_purge(self):
         ntot = 5
         n = 1
-        yield {TASK_DOING: "DB pruning cache entries".format(n, ntot), TASK_PROGRESS: float(n) / float(ntot)}
+        yield {TASK_DOING: "DB pruning cache entries", TASK_PROGRESS: float(n) / float(ntot)}
         self._purge_missing_content()
         n += 1
-        yield {TASK_DOING: "DB pruning stale resources".format(n, ntot), TASK_PROGRESS: float(n) / float(ntot)}
+        yield {TASK_DOING: "DB pruning stale resources", TASK_PROGRESS: float(n) / float(ntot)}
         self._purge_inaccessible_resources()
         n += 1
-        yield {TASK_DOING: "DB pruning orphan products".format(n, ntot), TASK_PROGRESS: float(n) / float(ntot)}
+        yield {TASK_DOING: "DB pruning orphan products", TASK_PROGRESS: float(n) / float(ntot)}
         self._purge_orphan_products()
         n += 1
-        yield {TASK_DOING: "DB migrating metadata".format(n, ntot), TASK_PROGRESS: float(n) / float(ntot)}
+        yield {TASK_DOING: "DB migrating metadata", TASK_PROGRESS: float(n) / float(ntot)}
         self._migrate_metadata()
         n += 1
-        yield {TASK_DOING: "DB ready".format(n, ntot), TASK_PROGRESS: float(n) / float(ntot)}
+        yield {TASK_DOING: "DB ready", TASK_PROGRESS: float(n) / float(ntot)}
 
     def _then_refresh_mdb_customers(self, *args, **kwargs):
         self.didUpdateProductsMetadata.emit(set())
@@ -603,7 +601,7 @@ class Workspace(QObject):
         :return:
         """
         total = 0
-        for root, dirs, files in os.walk(self.cache_dir):
+        for root, _, files in os.walk(self.cache_dir):
             sz = sum(os.path.getsize(os.path.join(root, name)) for name in files)
             total += sz
             LOG.debug('%d bytes in %s' % (sz, root))
@@ -1358,34 +1356,3 @@ class Workspace(QObject):
         :return: sliceable object returning numpy arrays
         """
         pass
-
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="PURPOSE",
-        epilog="",
-        fromfile_prefix_chars='@')
-    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG')
-    # http://docs.python.org/2.7/library/argparse.html#nargs
-    # parser.add_argument('--stuff', nargs='5', dest='my_stuff',
-    #                    help="one or more random things")
-    parser.add_argument('pos_args', nargs='*',
-                        help="positional arguments don't have the '-' prefix")
-    args = parser.parse_args()
-
-    levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
-    logging.basicConfig(level=levels[min(3, args.verbosity)])
-
-    if not args.pos_args:
-        unittest.main()
-        return 0
-
-    for pn in args.pos_args:
-        pass
-
-    return 0
-
-
-if __name__ == '__main__':
-    sys.exit(main())

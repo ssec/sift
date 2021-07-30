@@ -396,6 +396,6 @@ class RGBLayerConfigPane(QObject):
                 sbox.setDisabled(recipe.input_ids[idx] is None)
                 sbox.setValue(recipe.gammas[idx])
         else:
-            for idx, sbox in enumerate(self.gamma_boxes):
+            for sbox in self.gamma_boxes:
                 sbox.setDisabled(True)
                 sbox.setValue(1.)

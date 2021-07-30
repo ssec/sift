@@ -86,7 +86,7 @@ def test_wizard_abi_l1b(qtbot, monkeypatch):
     # HACK: Bug in Windows, no enum's by name
     assert wiz.button(getattr(QWizard.WizardButton, 'NextButton', 1)).isEnabled()
     # Go to the next page
-    wiz.next()
+    wiz.next()  # noqa: B305
 
     ## Page 2
     # One product should be listed from our mocking above
@@ -98,7 +98,7 @@ def test_wizard_abi_l1b(qtbot, monkeypatch):
     # HACK: Bug in Windows, no enum's by name
     assert wiz.button(getattr(QWizard.WizardButton, 'FinishButton', 3)).isEnabled()
     # Go to the next page
-    wiz.next()
+    wiz.next()  # noqa: B305
 
     # Verify the wizard is left in a usable state for the MainWindow
     assert len(wiz.scenes) == 1

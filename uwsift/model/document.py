@@ -60,10 +60,7 @@ from uwsift.model.layer import Mixing, DocLayer, DocBasicLayer, DocRGBLayer, Doc
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import sys
 import logging
-import unittest
-import argparse
 from collections import MutableSequence, OrderedDict, defaultdict
 from itertools import groupby, chain
 from uuid import UUID, uuid1 as uuidgen
@@ -2149,8 +2146,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def _uuids_for_recipe(self, recipe, valid_only=True):
         prez_uuids = self.current_layer_uuid_order
-        for inst_key, time_layers in self._recipe_layers[recipe.name].items():
-            for t, rgb_layer in time_layers.items():
+        for time_layers in self._recipe_layers[recipe.name].values():
+            for rgb_layer in time_layers.values():
                 u = rgb_layer[Info.UUID]
                 if not valid_only:
                     yield u
@@ -2273,14 +2270,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 # return empty `None` layers since we don't know what is wanted right now
                 # we look at all possible times
                 inst_layers = {
-                    k: {l[Info.SCHED_TIME]: None for l in g}
+                    k: {layer[Info.SCHED_TIME]: None for layer in g}
                     for k, g in groupby(sorted(layers, key=_key_func), _key_func)}
                 return inst_layers
             else:
                 family_uuids = self._families[family]
                 family_layers = [self[u] for u in family_uuids]
             # (sat, inst) -> {time -> layer}
-            inst_layers = {k: {l[Info.SCHED_TIME]: l for l in g} for k, g in
+            inst_layers = {k: {layer[Info.SCHED_TIME]: layer for layer in g} for k, g in
                            groupby(sorted(family_layers, key=_key_func), _key_func)}
             return inst_layers
 
@@ -2318,7 +2315,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # update the layer object with newly available layers if possible
         # add the layer object to the document if it should be included with
         # the rest of them
-        for recipe_name, inst_rgbs in self._recipe_layers.items():
+        for recipe_name in self._recipe_layers.keys():
             recipe = self.recipe_manager[recipe_name]
             self.update_rgb_composite_layers(recipe, times=new_times)
 
@@ -2653,34 +2650,3 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 #
 #     def
 #
-
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="PURPOSE",
-        epilog="",
-        fromfile_prefix_chars='@')
-    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG')
-    # http://docs.python.org/2.7/library/argparse.html#nargs
-    # parser.add_argument('--stuff', nargs='5', dest='my_stuff',
-    #                    help="one or more random things")
-    parser.add_argument('pos_args', nargs='*',
-                        help="positional arguments don't have the '-' prefix")
-    args = parser.parse_args()
-
-    levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
-    logging.basicConfig(level=levels[min(3, args.verbosity)])
-
-    if not args.pos_args:
-        unittest.main()
-        return 0
-
-    for pn in args.pos_args:
-        pass
-
-    return 0
-
-
-if __name__ == '__main__':
-    sys.exit(main())
