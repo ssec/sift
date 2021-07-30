@@ -40,17 +40,15 @@ jobs:
       - name: Setup Conda Environment
         uses: conda-incubator/setup-miniconda@v2
         with:
-          miniconda-version: "latest"
-          python-version: "3.9"
+          installer-url: https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-Linux-x86_64.sh
+          allow-softlinks: true
+          show-channel-urls: true
+          use-only-tar-bz2: true
           mamba-version: "*"
           channels: conda-forge
           channel-priority: true
           environment-file: continuous_integration/environment.yaml
           activate-environment: test-environment
-          installer-url: https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-Linux-x86_64.sh
-          allow-softlinks: true
-          show-channel-urls: true
-          use-only-tar-bz2: true
 
       - name: Install SIFT
         shell: bash -l {0}
