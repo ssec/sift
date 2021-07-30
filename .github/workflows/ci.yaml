@@ -54,13 +54,13 @@ jobs:
         shell: bash -l {0}
         run: |
           pip install sphinx sphinx_rtd_theme sphinxcontrib-apidoc
-          pip install --no-deps -e .
+          pip install --no-deps -e .[docs]
 
       - name: Run Sphinx Build
         shell: bash -l {0}
         run: |
           cd doc
-          sphinx-build -b html -W source build/html
+          make html
 
 #  test:
 #    runs-on: ${{ matrix.os }}
