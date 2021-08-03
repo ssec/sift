@@ -92,7 +92,7 @@ jobs:
       - name: Prepare System Environment
         run: |
           # opengl system libraries
-          sudo apt-get update;
+          sudo apt-get update
           cat continuous_integration/linux_full_deps_apt.txt | xargs sudo apt-get -y install
           # Start xvfb daemon
           export DISPLAY=:99.0
