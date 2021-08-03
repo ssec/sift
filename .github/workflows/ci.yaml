@@ -1,4 +1,9 @@
 name: CI
+# https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#concurrency
+# https://docs.github.com/en/developers/webhooks-and-events/events/github-event-types#pullrequestevent
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number }}-${{ github.event.type }}
+  cancel-in-progress: true
 
 on: [push, pull_request]
 
@@ -64,7 +69,9 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: ["windows-latest", "ubuntu-latest", "macos-latest"]
+        # XXX: We don't currently have OpenGL installation on other platforms
+        #os: ["windows-latest", "ubuntu-latest", "macos-latest"]
+        os: ["ubuntu-latest"]
         python-version: ["3.7", "3.9"]
         experimental: [false]
         include:
@@ -81,6 +88,19 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v2
+
+      - name: Prepare System Environment
+        run: |
+          # opengl system libraries
+          sudo apt-get update;
+          cat continuous_integration/linux_full_deps_apt.txt | xargs sudo apt-get -y install
+          # Start xvfb daemon
+          export DISPLAY=:99.0
+          /sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -screen 0 1400x900x24 -ac +extension GLX +render
+          sleep 5
+          # export python_version
+          PY_VER=${{ matrix.python-version }}
+          echo ::set-output name=python-version::${PY_VER//.}
 
       - name: Setup Conda Environment
         uses: conda-incubator/setup-miniconda@v2
@@ -118,6 +138,7 @@ jobs:
 
       - name: Run unit tests
         run: |
+          export DISPLAY=:99.0
           pytest --cov=uwsift uwsift/tests
 
       - name: Coveralls Parallel
