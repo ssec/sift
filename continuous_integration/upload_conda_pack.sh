@@ -9,8 +9,8 @@ else
     odir="experimental/"
 fi
 # Upload the new bundle
-curl -k --ftp-create-dirs -T SIFT_*.*.*_*.* --key ~/.ssh/id_rsa_sftp sftp://sift@ftp.ssec.wisc.edu/${odir}
+curl --ftp-create-dirs -T SIFT_*.*.*_*.* --key ~/.ssh/id_rsa_sftp sftp://sift@ftp.ssec.wisc.edu/${odir}
 # Delete any old
 if [[ $GIT_TAG =~ [0-9]+.[0-9]+.[0-9]+ ]]; then
-    curl -k -l --key ~/.ssh/id_rsa_sftp sftp://sift@ftp.ssec.wisc.edu/experimental/ | grep SIFT_*.*.*_*.* | xargs -I{} -- curl -k -v --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/experimental/ -Q "RM experimental/{}"
+    curl -l --key ~/.ssh/id_rsa_sftp sftp://sift@ftp.ssec.wisc.edu/experimental/ | grep SIFT_*.*.*_*.* | xargs -I{} -- curl -v --key /tmp/sftp_rsa sftp://sift@ftp.ssec.wisc.edu/experimental/ -Q "RM experimental/{}"
 fi

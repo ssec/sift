@@ -57,6 +57,7 @@ jobs:
         with:
           key: ${{ secrets.SIFT_SFTP_UPLOAD_KEY }}
           name: id_rsa_sftp
+          known_hosts: ${{ secrets.SIFT_SFTP_UPLOAD_KNOWN_HOSTS }}
 
       - name: Setup Conda Environment
         uses: conda-incubator/setup-miniconda@v2
