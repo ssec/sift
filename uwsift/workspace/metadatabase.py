@@ -10,15 +10,17 @@ SQLAlchemy database tables of metadata used by Workspace to manage its local cac
 
 OVERVIEW
 
-Resource : a file containing products, somewhere in the filesystem,
- |         or a resource on a remote system we can access (openDAP etc)
- |_ Product* : product stored in a resource
-     |_ Content* : workspace cache content corresponding to a product,
-     |   |         may be one of many available views (e.g. projections)
-     |   |_ ContentKeyValue* : additional information on content
-     |_ ProductKeyValue* : additional information on product
-     |_ SymbolKeyValue* : if product is derived from other products,
-                          symbol table for that expression is in this kv table
+::
+
+    Resource : a file containing products, somewhere in the filesystem,
+     |         or a resource on a remote system we can access (openDAP etc)
+     |_ Product* : product stored in a resource
+         |_ Content* : workspace cache content corresponding to a product,
+         |   |         may be one of many available views (e.g. projections)
+         |   |_ ContentKeyValue* : additional information on content
+         |_ ProductKeyValue* : additional information on product
+         |_ SymbolKeyValue* : if product is derived from other products,
+                              symbol table for that expression is in this kv table
 
 A typical baseline product will have two content: and overview (lod==0) and a native resolution (lod>0)
 

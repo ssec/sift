@@ -41,12 +41,12 @@ class Guidebook(object):
         return None, None
 
     def time_siblings(self, uuid, infos):
-        """
-        determine the time siblings of a given dataset
+        """Determine the time siblings of a given dataset.
+
         :param uuid: uuid of the dataset we're interested in
         :param infos: datasetinfo_dict sequence, available datasets
         :return: (list,offset:int): list of [uuid,uuid,uuid] for siblings in order;
-                 offset of where the input is found in list
+            offset of where the input is found in list
         """
         return None, None
 
