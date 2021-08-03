@@ -55,7 +55,7 @@ and is often used as shorthand between subsystems. Document rarely deals directl
 :copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-from uwsift.model.layer import Mixing, DocLayer, DocBasicLayer, DocRGBLayer, DocCompositeLayer
+from __future__ import annotations
 
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
@@ -78,6 +78,7 @@ from uwsift.queue import TaskQueue
 from uwsift.workspace import Workspace
 from uwsift.util.default_paths import DOCUMENT_SETTINGS_DIR
 from uwsift.model.composite_recipes import RecipeManager, CompositeRecipe
+from uwsift.model.layer import Mixing, DocLayer, DocBasicLayer, DocRGBLayer, DocCompositeLayer
 from uwsift.view.colormap import COLORMAP_MANAGER, PyQtGraphColormap, SITE_CATEGORY, USER_CATEGORY
 from uwsift.queue import TASK_PROGRESS, TASK_DOING
 from PyQt5.QtCore import QObject, pyqtSignal
@@ -447,7 +448,7 @@ class DocumentAsLayerStack(DocumentAsContextBase):
         """
         raise NotImplementedError("need to consult mdb to get product info dictionary under playhead")
 
-    def get_info(self, dex: [int, UUID]):
+    def get_info(self, dex: typ.Union[int, UUID]):
         """return info dictionary with top z-order at 0, going downward
         """
         if isinstance(dex, UUID):

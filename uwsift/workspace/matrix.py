@@ -11,19 +11,17 @@ Some states have UUIDs and therefore data
 Search directories and create index of what data is where
 Used by Workspace to respond to adjacency queries / product matrix requests
 
-USAGE
+USAGE::
 
-dm = DataAdjacencyMatrix('/data', recurse=True)
-# search through files
-for _ in dm.finditer():
-    pass
-ds = dm.ix['myproduct', 0]
-if ds.state!=state.CACHED:
-    for _ in ds.loaditer(my_workspace):
+    dm = DataAdjacencyMatrix('/data', recurse=True)
+    # search through files
+    for _ in dm.finditer():
         pass
-uuid = ds.uuid
-
-
+    ds = dm.ix['myproduct', 0]
+    if ds.state!=state.CACHED:
+        for _ in ds.loaditer(my_workspace):
+            pass
+    uuid = ds.uuid
 
 REFERENCES
 

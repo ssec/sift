@@ -66,7 +66,7 @@ https://stackoverflow.com/questions/4216139/python-object-in-qmimedata
 :license: GPLv3, see LICENSE for more details
 """
 import logging
-from typing import Mapping, Any, Tuple
+from typing import Mapping, Any, Tuple, Union
 from uuid import UUID
 from weakref import ref
 import pickle as pkl
@@ -131,7 +131,7 @@ class QTrackItem(QGraphicsObject):
     _metadata: Mapping = None
     _tooltip: str = None
     _state: Flags = None  # VisualState Flags determine how it's being presented
-    _colormap: [QGradient, QImage, QPixmap] = None
+    _colormap: Union[QGradient, QImage, QPixmap] = None
     _min: float = None
     _max: float = None
     _dragging: bool = False  # whether or not a drag is in progress across this item
@@ -146,7 +146,7 @@ class QTrackItem(QGraphicsObject):
 
     def __init__(self, scene, scale: CoordTransform, track: str, z: int,
                  title: str, subtitle: str = None, icon: QIcon = None, metadata: dict = None,
-                 tooltip: str = None, state: Flags = None, colormap: [QGradient, QImage] = None,
+                 tooltip: str = None, state: Flags = None, colormap: Union[QGradient, QImage, QPixmap] = None,
                  min: float = None, max: float = None):
         """Create a track and connect it to its Scene
         """

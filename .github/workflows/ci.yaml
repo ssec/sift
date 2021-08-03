@@ -1,0 +1,160 @@
+name: CI
+# https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#concurrency
+# https://docs.github.com/en/developers/webhooks-and-events/events/github-event-types#pullrequestevent
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number }}-${{ github.event.type }}
+  cancel-in-progress: true
+
+on: [push, pull_request]
+
+jobs:
+  lint:
+    name: lint and style checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v2
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 flake8-docstrings flake8-debugger flake8-bugbear pytest
+      - name: Run linting
+        run: |
+          flake8 uwsift/
+
+  website:
+    name: build website
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: "bash -l {0}"
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Setup Conda Environment
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          use-mamba: true
+          environment-file: continuous_integration/environment.yaml
+          activate-environment: test-environment
+
+      - name: Install SIFT
+        shell: bash -l {0}
+        run: |
+          pip install sphinx sphinx_rtd_theme sphinxcontrib-apidoc sphinxcontrib-seqdiag sphinxcontrib-blockdiag blockdiag
+          pip install --no-deps -e .
+
+      - name: Run Sphinx Build
+        shell: bash -l {0}
+        run: |
+          cd doc
+          make html SPHINXOPTS="-W"
+
+  test:
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: "bash -l {0}"
+    continue-on-error: ${{ matrix.experimental }}
+    needs: [lint]
+    strategy:
+      fail-fast: true
+      matrix:
+        # XXX: We don't currently have OpenGL installation on other platforms
+        #os: ["windows-latest", "ubuntu-latest", "macos-latest"]
+        os: ["ubuntu-latest"]
+        python-version: ["3.7", "3.9"]
+        experimental: [false]
+        include:
+          - python-version: "3.9"
+            os: "ubuntu-latest"
+            experimental: true
+
+    env:
+      PYTHON_VERSION: ${{ matrix.python-version }}
+      OS: ${{ matrix.os }}
+      UNSTABLE: ${{ matrix.experimental }}
+      ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v2
+
+      - name: Prepare System Environment
+        run: |
+          # opengl system libraries
+          sudo apt-get update
+          cat continuous_integration/linux_full_deps_apt.txt | xargs sudo apt-get -y install
+          # Start xvfb daemon
+          export DISPLAY=:99.0
+          /sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -screen 0 1400x900x24 -ac +extension GLX +render
+          sleep 5
+          # export python_version
+          PY_VER=${{ matrix.python-version }}
+          echo ::set-output name=python-version::${PY_VER//.}
+
+      - name: Setup Conda Environment
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          use-mamba: true
+          environment-file: continuous_integration/environment.yaml
+          activate-environment: test-environment
+
+      - name: Install unstable dependencies
+        if: matrix.experimental == true
+        run: |
+          python -m pip install \
+          --index-url https://pypi.anaconda.org/scipy-wheels-nightly/simple/ \
+          --trusted-host pypi.anaconda.org \
+          --no-deps --pre --upgrade \
+          matplotlib \
+          numpy \
+          pandas \
+          scipy; \
+          python -m pip install \
+          --no-deps --upgrade \
+          git+https://github.com/dask/dask \
+          git+https://github.com/dask/distributed \
+          git+https://github.com/zarr-developers/zarr \
+          git+https://github.com/Unidata/cftime \
+          git+https://github.com/mapbox/rasterio \
+          git+https://github.com/pydata/bottleneck \
+          git+https://github.com/pydata/xarray \
+          git+https://github.com/pytroll/satpy;
+
+      - name: Install uwsift
+        run: |
+          pip install --no-deps -e .
+
+      - name: Run unit tests
+        run: |
+          export DISPLAY=:99.0
+          pytest --cov=uwsift uwsift/tests
+
+      - name: Coveralls Parallel
+        uses: AndreMiras/coveralls-python-action@develop
+        with:
+          flag-name: run-${{ matrix.test_number }}
+          parallel: true
+        if: runner.os == 'Linux'
+
+  coveralls:
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Coveralls Finished
+        uses: AndreMiras/coveralls-python-action@develop
+        with:
+          parallel-finished: true
+
