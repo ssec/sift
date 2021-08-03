@@ -60,6 +60,9 @@ jobs:
 
   test:
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: "bash -l {0}"
     continue-on-error: ${{ matrix.experimental }}
     needs: [lint]
     strategy:
@@ -98,7 +101,6 @@ jobs:
 
       - name: Install unstable dependencies
         if: matrix.experimental == true
-        shell: bash -l {0}
         run: |
           python -m pip install \
           --index-url https://pypi.anaconda.org/scipy-wheels-nightly/simple/ \
@@ -119,12 +121,10 @@ jobs:
           git+https://github.com/pydata/xarray;
 
       - name: Install uwsift
-        shell: bash -l {0}
         run: |
           pip install --no-deps -e .
 
       - name: Run unit tests
-        shell: bash -l {0}
         run: |
           pytest --cov=uwsift uwsift/tests
 
