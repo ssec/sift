@@ -24,7 +24,7 @@ import os
 import sys
 import unittest
 from datetime import datetime
-from typing import List, Iterable, Mapping
+from typing import List, Iterable, Mapping, Union
 
 from PyQt5.QtCore import QObject
 
@@ -130,7 +130,7 @@ class ResourceSearchPathCollector(QObject):
         os.utime(self._timestamp_path)
         return mtime
 
-    def __init__(self, ws: [Workspace, _workspace_test_proxy]):
+    def __init__(self, ws: Union[Workspace, _workspace_test_proxy]):
         super(ResourceSearchPathCollector, self).__init__()
         self._ws = ws
         self._paths = []

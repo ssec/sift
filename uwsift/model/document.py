@@ -448,7 +448,7 @@ class DocumentAsLayerStack(DocumentAsContextBase):
         """
         raise NotImplementedError("need to consult mdb to get product info dictionary under playhead")
 
-    def get_info(self, dex: list[int, UUID]):
+    def get_info(self, dex: typ.Union[int, UUID]):
         """return info dictionary with top z-order at 0, going downward
         """
         if isinstance(dex, UUID):

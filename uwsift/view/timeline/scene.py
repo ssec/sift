@@ -15,7 +15,7 @@ import logging
 import sys
 import unittest
 from datetime import datetime, timedelta
-from typing import Tuple, Optional, Mapping, List, Callable, Set, Iterable, Sequence, Any
+from typing import Tuple, Optional, Mapping, List, Callable, Set, Iterable, Sequence, Any, Union
 from uuid import UUID
 
 from PyQt5.QtCore import QRectF, Qt, pyqtSignal
@@ -421,7 +421,7 @@ class QFramesInTracksScene(QGraphicsScene):
         """Yield series of track information tuples which will be used to generate/update QTrackItems
         """
 
-    def get(self, item: [UUID, str]) -> [QTrackItem, QFrameItem, None]:
+    def get(self, item: Union[UUID, str]) -> Union[QTrackItem, QFrameItem, None]:
         if isinstance(item, UUID):
             z = self._frame_items.get(item)
         elif isinstance(item, str):
@@ -469,7 +469,7 @@ class QFramesInTracksScene(QGraphicsScene):
         LOG.warning("using base class menu_for_track which does nothing")
         return None
 
-    def update(self, changed_tracks: [Set[str], None] = None, changed_frame_uuids: [Set[UUID], None] = None):
+    def update(self, changed_tracks: Optional[Set[str]] = None, changed_frame_uuids: Optional[Set[UUID]] = None):
         """Populate or update scene, returning number of items changed in scene
         Does not add new items for tracks and frames already present
         Parameters serve only as hints
@@ -485,7 +485,9 @@ class TestScene(QFramesInTracksScene):
         super(TestScene, self).__init__(*args, **kwargs)
         # assert(hasattr(self, '_track_order'))
 
-    def update(self, changed_tracks: [Set[str], None] = None, changed_frame_uuids: [Set[UUID], None] = None) -> int:
+    def update(self,
+               changed_tracks: Optional[Set[str]] = None,
+               changed_frame_uuids: Optional[Set[UUID]] = None) -> int:
         if self._did_populate:
             return 0
         self._test_populate()
