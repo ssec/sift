@@ -36,7 +36,7 @@ jobs:
     defaults:
       run:
         shell: "bash -l {0}"
-    continue-on-error: ${{ matrix.experimental }}
+    continue-on-error: false
     strategy:
       fail-fast: true
       matrix:
