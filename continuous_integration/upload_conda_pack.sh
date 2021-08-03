@@ -11,6 +11,10 @@ else
     odir="experimental/"
 fi
 # Upload the new bundle
+set +e
+ls -l $HOME/.ssh
+cat $HOME/.ssh/known_hosts
+set -e
 curl --ftp-create-dirs -T SIFT_*.*.*_*.* --key $HOME/.ssh/id_rsa_sftp sftp://sift@ftp.ssec.wisc.edu/${odir}
 set +e
 # Delete any old
