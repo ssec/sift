@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+set -ex
 GIT_TAG="${GITHUB_REF##*/}"
 
 if [[ $GIT_TAG =~ [0-9]+.[0-9]+.[0-9]+ ]]; then
@@ -25,3 +26,5 @@ fi
 
 python build_conda_pack.py -j -1 $oflag
 ls -l
+
+set +ex
