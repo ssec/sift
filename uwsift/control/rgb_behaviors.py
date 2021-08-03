@@ -66,8 +66,8 @@ class UserModifiesRGBLayers(QObject):
                 families.append(None)
         self.create_rgb(families=families)
 
-    def create_rgb(self, action=None, families=[]):
-        if len(families) == 0:
+    def create_rgb(self, action=None, families=None):
+        if families is None or len(families) == 0:
             # get the layers to composite from current selection
             uuids = [u for u in self.layer_list_model.current_selected_uuids() if
                      self.doc[u][Info.KIND] in [Kind.IMAGE, Kind.COMPOSITE]]

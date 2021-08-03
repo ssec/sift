@@ -886,7 +886,7 @@ def _debug(type, value, tb):
         sys.__excepthook__(type, value, tb)
     else:
         import traceback
-        import pdb
+        import pdb  # noqa
         traceback.print_exception(type, value, tb)
         # …then start the debugger in post-mortem mode.
         pdb.post_mortem(tb)  # more “modern”
@@ -918,9 +918,6 @@ def main():
 
     levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
     logging.basicConfig(level=levels[min(3, args.verbosity)])
-
-    for pn in args.inputs:
-        pass
 
     return 0
 

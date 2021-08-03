@@ -539,7 +539,7 @@ class TileCalculator(object):
         # maximum stride that we shouldn't lower resolution beyond
         self.overview_stride = self.calc_overview_stride()
 
-    def visible_tiles(self, visible_geom, stride=Point(1, 1), extra_tiles_box=Box(0, 0, 0, 0)) -> Box:
+    def visible_tiles(self, visible_geom, stride=None, extra_tiles_box=None) -> Box:
         """
         given a visible world geometry and sampling, return (sampling-state, [Box-of-tiles-to-draw])
         sampling state is WELLSAMPLED/OVERSAMPLED/UNDERSAMPLED
@@ -547,6 +547,10 @@ class TileCalculator(object):
         tiles are specified as (iy,ix) integer pairs
         extra_box value says how many extra tiles to include around each edge
         """
+        if stride is None:
+            stride = Point(1, 1)
+        if extra_tiles_box is None:
+            extra_tiles_box = Box(0, 0, 0, 0)
         v = visible_geom
         e = extra_tiles_box
         return visible_tiles(

@@ -88,7 +88,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         """Remove QTrackItem and QFrameItem instances that no longer correspond to document content
         """
         LOG.debug("purging {} orphan tracks and {} orphan frames from timeline scene".format(len(tracks), len(frames)))
-        for frid in frames:
+        for _ in frames:
             self.removeItem()
         self._frame_items = dict((k, v) for (k, v) in self._frame_items.items() if k not in frames)
         self._track_items = dict((k, v) for (k, v) in self._track_items.items() if k not in tracks)

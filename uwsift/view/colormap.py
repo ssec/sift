@@ -787,7 +787,7 @@ class ColormapManager(OrderedDict):
                 super(ColormapManager, self).__setitem__(k, v)
 
     def __iter__(self):
-        for cat, cat_dict in self._category_dict.items():
+        for cat_dict in self._category_dict.values():
             for cmap_name in cat_dict:
                 yield cmap_name
 
@@ -797,7 +797,7 @@ class ColormapManager(OrderedDict):
     def iter_colormaps(self, writeable_first=True):
         all_cmaps = [(self.is_writeable_colormap(name), name) for name in self]
         all_cmaps = sorted(all_cmaps, reverse=writeable_first)  # writeable first
-        for editable, cmap in all_cmaps:
+        for _, cmap in all_cmaps:
             try:
                 cmap_obj = self[cmap]
             except KeyError:
@@ -809,7 +809,7 @@ class ColormapManager(OrderedDict):
                 yield cmap
 
     def _files_for_dir(self, base_dir, recursive=True):
-        for subdir, dirs, files in os.walk(base_dir):
+        for subdir, _, files in os.walk(base_dir):
             for file_to_import in files:
                 nfp = os.path.join(subdir, file_to_import)
                 file_stem, file_ext = os.path.splitext(file_to_import)
@@ -873,7 +873,7 @@ class ColormapManager(OrderedDict):
         if category is not None:
             return self[category][cmap_name]
 
-        for cat, cat_dict in self.items():
+        for cat_dict in self.values():
             if cmap_name in cat_dict:
                 val = cat_dict[cmap_name]
                 self._cmap_cache[cmap_name] = val
@@ -906,7 +906,7 @@ class ColormapManager(OrderedDict):
 
     def __delitem__(self, key):
         super(ColormapManager, self).__delitem__(key)
-        for cat_name, cat_list in self._category_dict.items():
+        for cat_list in self._category_dict.values():
             try:
                 cat_list.remove(key)
             except ValueError:
