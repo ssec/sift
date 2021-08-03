@@ -37,7 +37,6 @@ jobs:
       run:
         shell: "bash -l {0}"
     continue-on-error: ${{ matrix.experimental }}
-    needs: [lint]
     strategy:
       fail-fast: true
       matrix:
