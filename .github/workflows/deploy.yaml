@@ -9,7 +9,7 @@ on:
   push:
     branches:
       - master
-      #- feature-github-actions  # FIXME: Remove this before merge
+      - feature-github-actions  # FIXME: Remove this before merge
   release:
     types:
       - published
