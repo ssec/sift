@@ -29,10 +29,7 @@ See [semver.org](http://semver.org/) on how to write a version number.
 
 6. Push changes to github `git push --follow-tags`
 
-7. This step is no longer needed as installers are automatically built with
-   Travis CI and made available on ftp://ftp.ssec.wisc.edu/pub/sift/dist.
-
-8. Create a release of the package on
+7. Create a release of the package on
    [github](https://github.com/ssec/sift/releases) by drafting a new release
    and copying the release notes from the changelog (see above).
    
