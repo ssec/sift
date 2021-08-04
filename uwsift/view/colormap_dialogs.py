@@ -50,8 +50,8 @@ class ChangeColormapDialog(QtWidgets.QDialog):
         self.ui.buttons.rejected.disconnect()
 
         self.ui.cmap_combobox.currentIndexChanged.connect(self._cmap_changed)
-        self.ui.vmin_slider.sliderReleased.connect(partial(self._slider_changed, is_max=False))
-        self.ui.vmax_slider.sliderReleased.connect(partial(self._slider_changed, is_max=True))
+        self.ui.vmin_slider.valueChanged.connect(partial(self._slider_changed, is_max=False))
+        self.ui.vmax_slider.valueChanged.connect(partial(self._slider_changed, is_max=True))
         self.ui.vmin_edit.editingFinished.connect(partial(self._edit_changed, is_max=False))
         self.ui.vmax_edit.editingFinished.connect(partial(self._edit_changed, is_max=True))
 
@@ -85,15 +85,16 @@ class ChangeColormapDialog(QtWidgets.QDialog):
             self._current_clims = (val, self._current_clims[1])
         self.doc.change_clims_for_siblings(self.uuid, self._current_clims)
 
-    def _slider_changed(self, is_max=True):
-        slider = self.ui.vmax_slider if is_max else self.ui.vmin_slider
+    def _slider_changed(self, value=None, is_max=True):
         edit = self.ui.vmax_edit if is_max else self.ui.vmin_edit
-
-        val = self._get_slider_value(slider.value())
-        LOG.debug('slider %s %s => %f' % (self.uuid, 'max' if is_max else 'min', val))
-        display_val = self.doc[self.uuid][Info.UNIT_CONVERSION][1](val)
+        if value is None:
+            slider = self.ui.vmax_slider if is_max else self.ui.vmin_slider
+            value = slider.value()
+        value = self._get_slider_value(value)
+        LOG.debug('slider %s %s => %f' % (self.uuid, 'max' if is_max else 'min', value))
+        display_val = self.doc[self.uuid][Info.UNIT_CONVERSION][1](value)
         edit.setText('{:0.03f}'.format(display_val))
-        return self._set_new_clims(val, is_max)
+        return self._set_new_clims(value, is_max)
 
     def _edit_changed(self, is_max=True):
         slider = self.ui.vmax_slider if is_max else self.ui.vmin_slider
