@@ -7,7 +7,6 @@ from uwsift.view.rgb_config import RGBLayerConfigPane
 from uwsift.ui.pov_main_ui import Ui_MainWindow
 
 from PyQt5.QtWidgets import QMainWindow
-from PyQt5.QtCore import QPoint, Qt
 
 
 class _PaneWrapper(QMainWindow):
