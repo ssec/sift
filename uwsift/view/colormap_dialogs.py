@@ -1,7 +1,6 @@
 import logging
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtGui, QtWidgets
 from functools import partial
-from uuid import UUID
 
 from uwsift.common import Info, Kind
 from uwsift.ui.change_colormap_dialog_ui import Ui_changeColormapDialog
