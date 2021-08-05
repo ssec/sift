@@ -10,7 +10,6 @@ LOG = logging.getLogger(__name__)
 
 
 class ChangeColormapDialog(QtWidgets.QDialog):
-    userDidChangeColorLimits = QtCore.pyqtSignal(UUID, tuple)  # layer being changed, char from 'rgba', new-min, new-max
 
     def __init__(self, doc, uuid, parent=None):
         super(ChangeColormapDialog, self).__init__(parent)
