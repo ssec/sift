@@ -36,8 +36,7 @@ class RGBLayerConfigPane(QObject):
     def __init__(self, ui, parent):
         super(RGBLayerConfigPane, self).__init__(parent)
         self.ui = ui
-        self._valid_ranges = [None, None, None]
-        self._selected_family = [None, None, None]
+        self._valid_ranges = [(None, None), (None, None), (None, None)]
         self._families = {}
         self.recipe = None
 
@@ -51,11 +50,17 @@ class RGBLayerConfigPane(QObject):
 
         self._double_validator = qdoba = QDoubleValidator()
         self.ui.editMinRed.setValidator(qdoba)
+        self.ui.editMinRed.setText("0.0")
         self.ui.editMaxRed.setValidator(qdoba)
+        self.ui.editMaxRed.setText("0.0")
         self.ui.editMinGreen.setValidator(qdoba)
+        self.ui.editMinGreen.setText("0.0")
         self.ui.editMaxGreen.setValidator(qdoba)
+        self.ui.editMaxGreen.setText("0.0")
         self.ui.editMinBlue.setValidator(qdoba)
+        self.ui.editMinBlue.setText("0.0")
         self.ui.editMaxBlue.setValidator(qdoba)
+        self.ui.editMaxBlue.setText("0.0")
 
         [x.currentIndexChanged.connect(partial(self._combo_changed, combo=x, color=rgb))
          for rgb, x in zip(('b', 'g', 'r'), (self.ui.comboBlue, self.ui.comboGreen, self.ui.comboRed))]
@@ -306,7 +311,7 @@ class RGBLayerConfigPane(QObject):
                 "Could not find {} in families {}".format(repr(family), repr(list(sorted(self._families.keys())))))
         if clims is None or clims == (None, None) or \
                 family not in self._families:
-            self._valid_ranges[idx] = None
+            self._valid_ranges[idx] = (None, None)
             slider[0].setSliderPosition(0)
             slider[1].setSliderPosition(0)
             editn.setText('0.0')
