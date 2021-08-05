@@ -210,6 +210,7 @@ class Platform(Enum):
     GOES_16 = 'G16'
     GOES_17 = 'G17'
     GOES_18 = 'G18'
+    GOES_19 = 'G19'
     NWP = 'NWP'
     MSG8 = 'Meteosat-8'
     MSG9 = 'Meteosat-9'
@@ -224,6 +225,7 @@ PLATFORM_MAP['h9'] = Platform.HIMAWARI_9
 PLATFORM_MAP['goes16'] = Platform.GOES_16
 PLATFORM_MAP['goes17'] = Platform.GOES_17
 PLATFORM_MAP['goes18'] = Platform.GOES_18
+PLATFORM_MAP['goes19'] = Platform.GOES_19
 
 
 class Info(Enum):

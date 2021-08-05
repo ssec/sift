@@ -50,6 +50,8 @@ DEFAULT_GUIDEBOOK = ABI_AHI_Guidebook
 GUIDEBOOKS = {
     Platform.GOES_16: ABI_AHI_Guidebook,
     Platform.GOES_17: ABI_AHI_Guidebook,
+    Platform.GOES_18: ABI_AHI_Guidebook,
+    Platform.GOES_19: ABI_AHI_Guidebook,
     Platform.HIMAWARI_8: ABI_AHI_Guidebook,
     Platform.HIMAWARI_9: ABI_AHI_Guidebook,
 }
@@ -674,6 +676,8 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
 PLATFORM_ID_TO_PLATFORM = {
     'G16': Platform.GOES_16,
     'G17': Platform.GOES_17,
+    'G18': Platform.GOES_18,
+    'G19': Platform.GOES_19,
     # hsd2nc export of AHI data as PUG format
     'Himawari-8': Platform.HIMAWARI_8,
     'Himawari-9': Platform.HIMAWARI_9,
@@ -1022,7 +1026,7 @@ class SatpyImporter(aImporter):
     def _get_platform_instrument(attrs: dict):
         """Convert SatPy platform_name/sensor to """
         attrs[Info.INSTRUMENT] = attrs.get('sensor')
-        attrs[Info.PLATFORM] = attrs.get('platform_name')
+        attrs[Info.PLATFORM] = attrs.get('platform_name') or attrs.get('platform_shortname')
 
         # Special handling of GRIB forecast data
         if 'centreDescription' in attrs and \

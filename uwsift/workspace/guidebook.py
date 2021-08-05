@@ -110,6 +110,8 @@ NOMINAL_WAVELENGTHS = {
 
     Platform.GOES_16: _NW_GOESR_ABI,
     Platform.GOES_17: _NW_GOESR_ABI,
+    Platform.GOES_18: _NW_GOESR_ABI,
+    Platform.GOES_19: _NW_GOESR_ABI,
 }
 
 # CF compliant Standard Names (should be provided by input files or the workspace)
