@@ -905,12 +905,12 @@ class SceneGraphManager(QObject):
 
     def change_layers_color_limits(self, change_dict):
         for uuid, clims in change_dict.items():
-            LOG.info('changing {} to color limits {}'.format(uuid, clims))
+            LOG.debug('changing {} to color limits {}'.format(uuid, clims))
             self.set_color_limits(clims, uuid)
 
     def change_layers_gamma(self, change_dict):
         for uuid, gamma in change_dict.items():
-            LOG.info('changing {} to gamma {}'.format(uuid, gamma))
+            LOG.debug('changing {} to gamma {}'.format(uuid, gamma))
             self.set_gamma(gamma, uuid)
 
     def change_layers_image_kind(self, change_dict):

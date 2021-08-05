@@ -36,8 +36,7 @@ class RGBLayerConfigPane(QObject):
     def __init__(self, ui, parent):
         super(RGBLayerConfigPane, self).__init__(parent)
         self.ui = ui
-        self._valid_ranges = [None, None, None]
-        self._selected_family = [None, None, None]
+        self._valid_ranges = [(None, None), (None, None), (None, None)]
         self._families = {}
         self.recipe = None
 
@@ -51,17 +50,27 @@ class RGBLayerConfigPane(QObject):
 
         self._double_validator = qdoba = QDoubleValidator()
         self.ui.editMinRed.setValidator(qdoba)
+        self.ui.editMinRed.setText("0.0")
         self.ui.editMaxRed.setValidator(qdoba)
+        self.ui.editMaxRed.setText("0.0")
         self.ui.editMinGreen.setValidator(qdoba)
+        self.ui.editMinGreen.setText("0.0")
         self.ui.editMaxGreen.setValidator(qdoba)
+        self.ui.editMaxGreen.setText("0.0")
         self.ui.editMinBlue.setValidator(qdoba)
+        self.ui.editMinBlue.setText("0.0")
         self.ui.editMaxBlue.setValidator(qdoba)
+        self.ui.editMaxBlue.setText("0.0")
 
         [x.currentIndexChanged.connect(partial(self._combo_changed, combo=x, color=rgb))
          for rgb, x in zip(('b', 'g', 'r'), (self.ui.comboBlue, self.ui.comboGreen, self.ui.comboRed))]
-        [x.sliderReleased.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=False))
+        # [x.sliderReleased.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=False))
+        #  for rgb, x in zip(('b', 'g', 'r'), (self.ui.slideMinBlue, self.ui.slideMinGreen, self.ui.slideMinRed))]
+        # [x.sliderReleased.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=True))
+        #  for rgb, x in zip(('b', 'g', 'r'), (self.ui.slideMaxBlue, self.ui.slideMaxGreen, self.ui.slideMaxRed))]
+        [x.valueChanged.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=False))
          for rgb, x in zip(('b', 'g', 'r'), (self.ui.slideMinBlue, self.ui.slideMinGreen, self.ui.slideMinRed))]
-        [x.sliderReleased.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=True))
+        [x.valueChanged.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=True))
          for rgb, x in zip(('b', 'g', 'r'), (self.ui.slideMaxBlue, self.ui.slideMaxGreen, self.ui.slideMaxRed))]
         [x.editingFinished.connect(partial(self._edit_changed, line_edit=x, color=rgb, is_max=False))
          for rgb, x in zip(('b', 'g', 'r'), (self.ui.editMinBlue, self.ui.editMinGreen, self.ui.editMinRed))]
@@ -213,7 +222,7 @@ class RGBLayerConfigPane(QObject):
         new_limits[idx] = (n, x)
         self.didChangeRGBComponentLimits.emit(self.recipe, tuple(new_limits))
 
-    def _slider_changed(self, slider=None, color: str = None, is_max: bool = False):
+    def _slider_changed(self, value=None, slider=None, color: str = None, is_max: bool = False):
         """
         handle slider update event from user
         :param slider: control
@@ -223,9 +232,11 @@ class RGBLayerConfigPane(QObject):
         """
         idx = RGBA2IDX[color]
         valid_min, valid_max = self._valid_ranges[idx]
-        val = self._get_slider_value(valid_min, valid_max, slider.value())
-        LOG.debug('slider %s %s => %f' % (color, 'max' if is_max else 'min', val))
-        n, x = self._update_line_edits(color, val if not is_max else None, val if is_max else None)
+        if value is None:
+            value = slider.value()
+        value = self._get_slider_value(valid_min, valid_max, value)
+        LOG.debug('slider %s %s => %f' % (color, 'max' if is_max else 'min', value))
+        n, x = self._update_line_edits(color, value if not is_max else None, value if is_max else None)
         self._signal_color_changing_range(color, n, x)
 
     def _edit_changed(self, line_edit: QLineEdit, color: str, is_max: bool):
@@ -242,6 +253,7 @@ class RGBLayerConfigPane(QObject):
         val = self._display_to_data(color, vdis)
         LOG.debug('line edit %s %s => %f => %f' % (color, 'max' if is_max else 'min', vdis, val))
         sv = self._create_slider_value(vn, vx, val)
+        print("Edit changed and updating slider to: ", sv)
         slider = self.sliders[idx][1 if is_max else 0]
         slider.setValue(sv)
         self._signal_color_changing_range(color, *self._update_line_edits(color))
@@ -299,7 +311,7 @@ class RGBLayerConfigPane(QObject):
                 "Could not find {} in families {}".format(repr(family), repr(list(sorted(self._families.keys())))))
         if clims is None or clims == (None, None) or \
                 family not in self._families:
-            self._valid_ranges[idx] = None
+            self._valid_ranges[idx] = (None, None)
             slider[0].setSliderPosition(0)
             slider[1].setSliderPosition(0)
             editn.setText('0.0')
