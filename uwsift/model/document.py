@@ -76,6 +76,7 @@ import json
 import warnings
 
 from uwsift.workspace.metadatabase import Product
+from uwsift import config as config
 from uwsift.common import Kind, Info, Presentation, Span, FCS_SEP, ZList, Flags
 from uwsift.queue import TaskQueue
 from uwsift.workspace import BaseWorkspace, CachingWorkspace, SimpleWorkspace
@@ -90,6 +91,24 @@ LOG = logging.getLogger(__name__)
 
 DEFAULT_LAYER_SET_COUNT = 1  # this should match the ui configuration!
 
+# TODO: use cf-units or cfunits or SIUnits or other package or: put all these
+#  units and their accepted spellings into a dictionary. Also try to stay in
+#  sync with Satpy, but note, that Satpy doesn't seem to have a well designed
+#  units handling concept either
+#
+# First entry is the standard symbol used for display
+Unit_Strings_Kelvin = [
+    'K', 'Kelvin', 'kelvin'
+]
+Unit_Strings_degC = [
+    '°C', 'C', 'degrees_Celsius'
+]
+
+# TODO: this may be taken from the units config too in the future?!?
+Temperature_Quantities = [
+    'brightness_temperature',
+    'toa_brightness_temperature'
+]
 
 def unit_symbol(unit):
     # FUTURE: Use cfunits or cf_units package
@@ -98,10 +117,10 @@ def unit_symbol(unit):
         return ''
     elif unit == '%':
         return '%'
-    elif unit == 'degrees_Celsius' or unit == 'C':
-        return '°C'
-    elif unit == 'kelvin' or unit == 'K':
-        return 'K'
+    elif unit in Unit_Strings_degC:
+        return Unit_Strings_degC[0]
+    elif unit in Unit_Strings_Kelvin:
+        return Unit_Strings_Kelvin[0]
     else:
         return unit or ""
 
@@ -109,7 +128,7 @@ def unit_symbol(unit):
 def _unit_format_func(layer, units):
     units = unit_symbol(units)
 
-    if layer[Info.STANDARD_NAME] in ('toa_brightness_temperature', 'brightness_temperature'):
+    if layer[Info.STANDARD_NAME] in Temperature_Quantities:
         # BT data limits, Kelvin to degC
         def _format_unit(val, numeric=True, include_units=True):
             return '{:.02f}{units}'.format(val, units=units if include_units else "")
@@ -142,23 +161,47 @@ def _unit_format_func(layer, units):
 
 def preferred_units(dsi):
     # FUTURE: Use cfunits or cf_units package
-    if dsi[Info.STANDARD_NAME] == 'toa_bidirectional_reflectance':
+
+    default_temperature_unit = Unit_Strings_Kelvin[0]
+    lookup_name = dsi[Info.STANDARD_NAME]
+    if lookup_name == 'toa_bidirectional_reflectance':
         return '1'
-    elif dsi[Info.STANDARD_NAME] in ('toa_brightness_temperature', 'brightness_temperature'):
-        return 'degrees_Celsius'
+    elif lookup_name in Temperature_Quantities:
+        calibration_to_temperature_unit_map = config.get("units.temperature",
+                                                         default=None)
+        if calibration_to_temperature_unit_map is None:
+            LOG.info(f"No configuration for unit of temperature found..."
+                     f" Reverting to {default_temperature_unit}.")
+            return default_temperature_unit
+        elif lookup_name in calibration_to_temperature_unit_map:
+            temperature_unit = calibration_to_temperature_unit_map[lookup_name]
+        else:
+            lookup_name = 'all'  # For the warning message below
+            temperature_unit = \
+                calibration_to_temperature_unit_map.get(lookup_name,
+                                                        default_temperature_unit)
+        if temperature_unit not in Unit_Strings_Kelvin and \
+                temperature_unit not in Unit_Strings_degC:
+            LOG.warning(f"Unit '{temperature_unit}' as configured for"
+                        f" '{lookup_name}' is not a known temperature unit."
+                        f" Reverting to {default_temperature_unit}.")
+            return default_temperature_unit
+        return temperature_unit
+
     else:
         return dsi.get(Info.UNITS, None)
 
 
 def units_conversion(dsi):
-    "return UTF8 unit string, lambda v,inverse=False: convert-raw-data-to-unis"
+    """return UTF8 unit string, lambda v,inverse=False: convert-raw-data-to-unit,
+    format string for converted value with unit."""
     # the dataset might be in one unit, but the user may want something else
     # FUTURE: Use cfunits or cf_units package
     punits = preferred_units(dsi)
 
     # Conversion functions
     # FUTURE: Use cfunits or cf_units package
-    if dsi.get(Info.UNITS) in ('kelvin', 'K') and punits in ('degrees_Celsius', 'C'):
+    if dsi.get(Info.UNITS) in Unit_Strings_Kelvin and punits in Unit_Strings_degC:
         def conv_func(x, inverse=False):
             return x - 273.15 if not inverse else x + 273.15
     elif dsi.get(Info.UNITS) == '%' and punits == '1':
