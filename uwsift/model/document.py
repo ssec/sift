@@ -127,8 +127,9 @@ def unit_symbol(unit):
 
 def _unit_format_func(layer, units):
     units = unit_symbol(units)
-
-    if layer[Info.STANDARD_NAME] in Temperature_Quantities:
+    standard_name = layer.get(Info.STANDARD_NAME)
+    if (standard_name is not None) and \
+            (standard_name in Temperature_Quantities):
         # BT data limits, Kelvin to degC
         def _format_unit(val, numeric=True, include_units=True):
             return '{:.02f}{units}'.format(val, units=units if include_units else "")
@@ -168,7 +169,7 @@ def preferred_units(dsi: DocBasicLayer) -> str:
     # FUTURE: Use cfunits or cf_units package
 
     default_temperature_unit = Unit_Strings_Kelvin[0]
-    lookup_name = dsi[Info.STANDARD_NAME]
+    lookup_name = dsi.get(Info.STANDARD_NAME)  # may return 'None', that's OK
     if lookup_name == 'toa_bidirectional_reflectance':
         return '1'
     elif lookup_name in Temperature_Quantities:
