@@ -159,7 +159,12 @@ def _unit_format_func(layer, units):
     return _format_unit
 
 
-def preferred_units(dsi):
+def preferred_units(dsi: DocBasicLayer) -> str:
+    """
+    Return unit string (i.e.: Kelvin) for a Product currently being loaded.
+    :param dsi: DocBasicLayer describing the product currently being added.
+    :return: String describing the preferred unit for the product described in dsi.
+    """
     # FUTURE: Use cfunits or cf_units package
 
     default_temperature_unit = Unit_Strings_Kelvin[0]
