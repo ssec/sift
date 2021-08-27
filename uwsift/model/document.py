@@ -1135,7 +1135,7 @@ class DataLayer:
     def __init__(self, uuids_timestamps: typ.List, product_family_key: typ.Tuple):
         # metadata redundant w.r.t. satellite, channel, calibration, so any metadata object
         #                           from the list of tuples will do
-        self._t_matched = None
+        self._t_matched: typ.Optional[datetime] = None
         self.product_family_key = product_family_key
 
         # sort timestamps while keeping them synchronous with images
@@ -1147,9 +1147,24 @@ class DataLayer:
                                      for uuid_dt_tup in uuids_tstamps_asc})
 
     def t_matched_uuid(self) -> typ.Optional[UUID]:
+        """
+        Helper function for accessing the timeline of a data_layer
+        :return: UUID of image with datetime matching t_matched or None if t_matched is not set.
+        """
         if self.t_matched is None:
             return None
         return self.timeline[self.t_matched]
+
+    def get_index_of_uuid(self, uuid: UUID) -> int:
+        """
+        Helper function for getting the index of a UUID within the data_layer's timeline.
+        :param uuid: UUID to get index for.
+        :return: Index of queried UUID.
+        """
+        try:
+            return list(self.timeline.values()).index(uuid)
+        except ValueError:
+            raise ValueError(f"UUID not found in timeline of: {str(self)}.")
 
     @property
     def t_matched(self):
