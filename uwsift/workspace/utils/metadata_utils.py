@@ -21,7 +21,7 @@ def get_default_colormap(layer_info: dict,
     provided by the `guidebook` is returned.
     """
 
-    layer_standard_name = layer_info[Info.STANDARD_NAME]
+    layer_standard_name = layer_info.get(Info.STANDARD_NAME)
     if layer_standard_name is None:
         LOG.debug("Cannot determine default colormap from configuration "
                   "for layer which does not have a standard name.")

@@ -1,6 +1,7 @@
 import logging
 import os
 from collections import ChainMap
+from datetime import datetime
 from typing import Dict, Generator, Optional, Tuple
 from uuid import UUID
 
@@ -342,7 +343,63 @@ class SimpleWorkspace(BaseWorkspace):
 
     def _create_product_from_array(self, info: Info, data, namespace=None, codeblock=None) \
             -> Tuple[UUID, Optional[frozendict], np.memmap]:
-        pass
+        """
+        Puts created image array into resp. data structures within workspace and returns
+        uuid, updated info, as well as the memmap of the created array.
+
+        Side effects include:
+            Write np.memmap to disk for later retrieval by workspace. Also updates metadata Product
+            object by path to .image memmap file and adds created Content to workspace's `contents`.
+            Finally, imports product into workspace.
+
+        Args:
+            info: mapping of key-value metadata for new product
+            data: ndarray with content to store, typically 2D float32
+            namespace: {variable: uuid, } for calculation of this data
+            codeblock: text, code to run to recalculate this data within namespace
+
+        Returns:
+            uuid, info, data: uuid of the new product, its official read-only metadata, and cached
+            content ndarray
+        """
+        if Info.UUID not in info:
+            raise ValueError('currently require an Info.UUID be included in product')
+        parms = dict(info)
+        now = datetime.utcnow()
+        parms.update(dict(
+            atime=now,
+            mtime=now,
+        ))
+        P = Product.from_info(parms, symbols=namespace, codeblock=codeblock)
+        uuid = P.uuid
+        # FUTURE: add expression and namespace information, which would require additional parameters
+        ws_filename = '{}.image'.format(str(uuid))
+        ws_path = os.path.join(self.cache_dir, ws_filename)
+        # Write memmap to disk, for later reference by workspace
+        with open(ws_path, 'wb+') as fp:
+           mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
+           mm[:] = data[:]
+        # Update metadata to contain path to cached memmap .image file
+        parms.update(dict(
+            lod=Content.LOD_OVERVIEW,
+            path=ws_filename,
+            dtype=str(data.dtype),
+            proj4=info[Info.PROJ],
+            resolution=min(info[Info.CELL_WIDTH], info[Info.CELL_HEIGHT])
+        ))
+        rcls = dict(zip(('rows', 'cols', 'levels'), data.shape))
+        parms.update(rcls)
+        LOG.debug("about to create Content with this: {}".format(repr(parms)))
+
+        C = Content.from_info(parms, only_fields=True)
+        P.content.append(C)
+
+        self.contents[uuid] = C
+        self.products[uuid] = P
+        # activate the content we just loaded into the workspace
+        overview_data = self._overview_content_for_uuid(uuid)
+
+        return uuid, self.get_info(uuid), overview_data
 
     def _bgnd_remove(self, uuid: UUID):
         from uwsift.queue import TASK_DOING, TASK_PROGRESS
