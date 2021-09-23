@@ -181,7 +181,7 @@ class Kind(Enum):
     RGB = 4
     COMPOSITE = 1  # deprecated: use Kind.IMAGE instead
     CONTOUR = 6
-    VECTORS = 7
+    LINES = 7
     POINTS = 8
 
 

@@ -1335,7 +1335,7 @@ class TipAlignedArrowVisual(ArrowVisual):
         self.add_subvisual(self.arrow_head)
 
 
-class VectorsVisual(TipAlignedArrowVisual):
+class LinesVisual(TipAlignedArrowVisual):
     default_colors = {
         "red": (1., 0., 0., 1.),
         "green": (0., 1., 0., 1.),
@@ -1373,4 +1373,4 @@ class VectorsVisual(TipAlignedArrowVisual):
                          connect='segments', method='gl')
 
 
-Vectors = create_visual_node(VectorsVisual)
+Lines = create_visual_node(LinesVisual)

@@ -1438,7 +1438,7 @@ class SatpyImporter(aImporter):
 
             now = datetime.utcnow()
 
-            if prod.info[Info.KIND] in [Kind.VECTORS, Kind.POINTS]:
+            if prod.info[Info.KIND] in [Kind.LINES, Kind.POINTS]:
                 data_filename, data_memmap = \
                     self._create_data_memmap_file(dataset.data, dataset.dtype,
                                                   prod)

@@ -67,7 +67,7 @@ from uwsift.view.transform import PROJ4Transform
 from uwsift.view.visuals import (NEShapefileLines, TiledGeolocatedImage,
                                  MultiChannelImage,
                                  RGBCompositeLayer,
-                                 PrecomputedIsocurve, Vectors)
+                                 PrecomputedIsocurve, Lines)
 from uwsift.workspace.utils.metadata_utils import (
     map_point_style_to_marker_kwargs, get_point_style_by_name)
 
@@ -1270,20 +1270,20 @@ class SceneGraphManager(QObject):
             # algebraic layer
             return self.add_basic_layer(new_order, uuid, p)
 
-    def add_vectors_layer(self, new_order: tuple, uuid: UUID, p: Presentation):
+    def add_lines_layer(self, new_order: tuple, uuid: UUID, p: Presentation):
         layer = self.document[uuid]
         if not layer.is_valid:
-            LOG.info('unable to add an invalid vectors layer, will try again later when layer changes')
+            LOG.info('unable to add an invalid lines layer, will try again later when layer changes')
             return
         points = self.workspace.get_content(uuid, kind=p.kind)
         if points is None:
-            LOG.info('layer contains no vectors: {}'.format(uuid))
+            LOG.info('layer contains no lines: {}'.format(uuid))
             return
-        vectors = Vectors(points, parent=self.main_map)
-        vectors.transform *= STTransform(translate=(0., 0., 50.))
-        vectors.name = str(uuid)
-        self.image_elements[uuid] = vectors
-        self.layer_set.add_layer(vectors)
+        lines = Lines(points, parent=self.main_map)
+        lines.transform *= STTransform(translate=(0., 0., 50.))
+        lines.name = str(uuid)
+        self.image_elements[uuid] = lines
+        self.layer_set.add_layer(lines)
         self.on_view_change(None)
 
     def add_points_layer(self, new_order: tuple, uuid: UUID, p: Presentation):
@@ -1448,7 +1448,7 @@ class SceneGraphManager(QObject):
         document.didUpdateBasicLayer.connect(self.update_basic_layer)  # new data integrated in existing layer
         document.didAddCompositeLayer.connect(
             self.add_composite_layer)  # layer derived from other layers (either basic or composite themselves)
-        document.didAddVectorsLayer.connect(self.add_vectors_layer)
+        document.didAddLinesLayer.connect(self.add_lines_layer)
         document.didAddPointsLayer.connect(self.add_points_layer)
         document.didRemoveLayers.connect(self._remove_layer)  # layer removed from current layer set
         document.willPurgeLayer.connect(self._purge_layer)  # layer removed from document
