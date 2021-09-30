@@ -51,6 +51,7 @@ jobs:
         shell: bash -l {0}
         run: |
           pip install sphinx sphinx_rtd_theme sphinxcontrib-apidoc sphinxcontrib-seqdiag sphinxcontrib-blockdiag blockdiag
+          pip install -U --pre funcparserlib
           pip install --no-deps -e .
 
       - name: Run Sphinx Build
