@@ -1275,11 +1275,13 @@ class SceneGraphManager(QObject):
         if not layer.is_valid:
             LOG.info('unable to add an invalid lines layer, will try again later when layer changes')
             return
-        points = self.workspace.get_content(uuid, kind=p.kind)
-        if points is None:
-            LOG.info('layer contains no lines: {}'.format(uuid))
+
+        content, _ = self.workspace.get_lines_arrays(uuid)
+        if content is None:
+            LOG.info(f"layer contains no lines: {uuid}")
             return
-        lines = Lines(points, parent=self.main_map)
+
+        lines = Lines(content, parent=self.main_map)
         lines.transform *= STTransform(translate=(0., 0., 50.))
         lines.name = str(uuid)
         self.image_elements[uuid] = lines
@@ -1291,20 +1293,21 @@ class SceneGraphManager(QObject):
         if not layer.is_valid:
             LOG.info('unable to add an invalid points layer, will try again later when layer changes')
             return
-        content = self.workspace.get_content(uuid, kind=p.kind)
-        if content is None:
-            LOG.info('layer contains no points: {}'.format(uuid))
+
+        pos, values = self.workspace.get_points_arrays(uuid)
+        if pos is None:
+            LOG.info(f"layer contains no points: {uuid}")
             return
-        if not (content.ndim == 2 and content.shape[1] in (2, 3)):
-            # Try to accept data which is not actually a list of points but may
-            # be a list of tuples of points by shaving off everything but the
-            # first item of each entry.
-            # See vispy.MarkersVisual.set_data() regarding the check criterion.
-            pos = np.hsplit(content, np.array([2]))[0]
-        else:
-            pos = content
 
         kwargs = map_point_style_to_marker_kwargs(get_point_style_by_name(p.style))
+
+        if values is not None:
+            assert len(pos) == len(values)
+            # TODO use p.climits instead of min and max
+            colormap = self.document.find_colormap(p.colormap)
+            scaled_attr = np.interp(values, [values.min(), values.max()], (0, 1))
+            kwargs["face_color"] = colormap.map(scaled_attr)
+
         points = Markers(pos=pos, parent=self.main_map, **kwargs)
         points.transform *= STTransform(translate=(0., 0., 50.))
         points.name = str(uuid)

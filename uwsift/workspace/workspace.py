@@ -799,3 +799,44 @@ class BaseWorkspace(QObject):
 
     def find_merge_target(self, uuid: UUID, info) -> Optional[Product]:
         pass
+
+    def get_points_arrays(self, uuid: UUID) \
+            -> Tuple[Optional[np.array], Optional[np.array]]:
+        """
+        Get the DataArrays from a ``POINTS`` product. The first ``DataArray``
+        contains the positions of the points. The second array represents the
+        attribute.
+
+        :param uuid: UUID of the layer
+        :return: Tuple of a position array and maybe an attribute array
+        """
+        content = self.get_content(uuid, kind=Kind.POINTS)
+        if content is None:
+            return None, None
+
+        if not (content.ndim == 2 and content.shape[1] in (2, 3)):
+            # Try to accept data which is not actually a list of points but may
+            # be a list of tuples of points by shaving off everything but the
+            # first item of each entry.
+            # See vispy.MarkersVisual.set_data() regarding the check criterion.
+            return np.hsplit(content, np.array([2]))[0] # TODO when is this called?
+        elif content.ndim == 2 and content.shape[1] == 3:
+            return np.hsplit(content, [2])
+        return content, None
+
+    def get_lines_arrays(self, uuid: UUID) -> Tuple[Optional[np.array], Optional[np.array]]:
+        """
+        Get the DataArrays from a ``LINES`` product. The first ``DataArray``
+        contains positions for the tip and base of the lines. The second array
+        represents the attribute.
+
+        :param uuid: UUID of the layer
+        :return: Tuple of a lines array and maybe an attribute array
+        """
+        content = self.get_content(uuid, kind=Kind.LINES)
+        if content is None:
+            return None, None
+
+        if content.shape[1] > 4:
+            content, _ = np.hsplit(content, [4])
+        return content, None

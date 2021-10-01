@@ -17,8 +17,8 @@ import re
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from datetime import datetime, timedelta
-from typing import (Callable, Generator, Iterable, List, Mapping, Optional, Set,
-                    Tuple, Union)
+from typing import (Callable, Dict, Generator, Iterable, List, Mapping,
+                    Optional, Set, Tuple, Union)
 
 import dask.array as da
 import numpy as np
@@ -27,7 +27,9 @@ import satpy.readers.yaml_reader
 import yaml
 from pyproj import Proj
 from pyresample.geometry import AreaDefinition, StackedAreaDefinition
+from satpy.dataset import DatasetDict
 from sqlalchemy.orm import Session
+from xarray import DataArray
 
 from uwsift import config, USE_INVENTORY_DB
 from uwsift.common import Platform, Info, Instrument, Kind, INSTRUMENT_MAP, PLATFORM_MAP
@@ -1092,9 +1094,9 @@ class SatpyImporter(aImporter):
                 return
 
         from uuid import uuid1
-        scn = self.load_all_datasets()
-        for ds_id in scn.keys():
-            ds = scn[ds_id]
+        self.load_all_datasets()
+        revised_datasets = self._revise_all_datasets()
+        for ds_id, ds in revised_datasets.items():
             # don't recreate a Product for one we already have
             if ds_id in existing_ids:
                 yield existing_ids[ds_id]
@@ -1197,7 +1199,7 @@ class SatpyImporter(aImporter):
         if not attrs[Info.INSTRUMENT] or isinstance(attrs[Info.INSTRUMENT], str):
             attrs[Info.INSTRUMENT] = Instrument.UNKNOWN
 
-    def load_all_datasets(self) -> Scene:
+    def load_all_datasets(self) -> None:
         self.scn.load(self.dataset_ids, pad_data=False,
                       upper_right_corner="NE", **self.product_filters)
         # copy satpy metadata keys to SIFT keys
@@ -1357,6 +1359,230 @@ class SatpyImporter(aImporter):
             # Scattered data, this is not suitable to define a scene
             attrs[Info.SCENE] = None
 
+    def _stack_data_arrays(self, datasets: List[DataArray], attrs: dict,
+                           name_prefix: str = None) -> DataArray:
+        """
+        Merge multiple DataArrays into a single ``DataArray``. Use the
+        ``attrs`` dict for the DataArray metadata. This method also copies
+        the Satpy metadata fields into SIFT fields. The ``attrs`` dict won't
+        be modified.
+
+        :param datasets: List of DataArrays
+        :param attrs: metadata for the resulting DataArray
+        :param name_prefix: if given, a prefix for the name of the new DataArray
+        :return: stacked Dask array
+        """
+        combined_data = da.stack(datasets, axis=1)
+
+        attrs = attrs.copy()
+        ds_id = attrs["_satpy_id"]
+        name = f"{name_prefix or ''}{attrs['name']}"
+        attrs["_satpy_id"] = DataID(ds_id.id_keys, name=name)
+        self._set_name_metadata(attrs, name)
+        self._set_time_metadata(attrs)
+        self._set_kind_metadata(attrs)
+        self._set_wavelength_metadata(attrs)
+        self._set_shape_metadata(attrs, combined_data.shape)
+
+        guidebook = get_guidebook_class(attrs)
+        attrs[Info.DISPLAY_NAME] = guidebook._default_display_name(attrs)
+
+        self._set_scene_metadata(attrs)
+        self._set_family_metadata(attrs)
+        self._set_category_metadata(attrs)
+
+        return DataArray(combined_data, attrs=attrs)
+
+    def _parse_style_attr_config(self) -> Dict[str, List[str]]:
+        """
+        Extract the ``style_attributes`` section from the reader config.
+        This function doesn't validate whether the style attributes or the
+        product names exist.
+
+        :return: mapping of style attributes to products
+        """
+        style_config = config.get(f"data_reading.{self.reader}.style_attributes", None)
+        if not style_config:
+            return {}
+
+        style_attrs = {}
+        for attr_name, product_names in style_config.items():
+            if attr_name in style_attrs:
+                LOG.warning(f"duplicate style attribute: {attr_name}")
+                continue
+
+            if not isinstance(product_names, list):
+                # a single product is allowed
+                product_names = [product_names]
+
+            distinct_products = []
+            for product_name in product_names:
+                if product_name in distinct_products:
+                    LOG.warning(f"duplicate product {product_name} for "
+                                f"style attribute: {attr_name}")
+                    continue
+                if product_name:
+                    distinct_products.append(product_name)
+
+            style_attrs[attr_name] = distinct_products
+        return style_attrs
+
+    def _combine_points(self, datasets: DatasetDict, converter) \
+            -> Dict[DataID, DataArray]:
+        """
+        Find convertible POINTS datasets in the ``DatasetDict``. The ``converter``
+        function is then used to generate new DataArrays.
+
+        The latitude and longitude for the points are extracted from the dataset
+        metadata. If configured in the reader config, the dataset itself will be
+        used for the ``fill`` style attribute.
+
+        :param datasets: all loaded datasets and previously converted datasets
+        :param converter: function to convert a list of DataArrays
+        :return: mapping of converted DataID to new DataArray
+        """
+        style_attrs = self._parse_style_attr_config()
+        allowed_style_attrs = ["fill"]
+
+        converted_datasets = {}
+        for style_attr, product_names in style_attrs.items():
+            if style_attr not in allowed_style_attrs:
+                LOG.error(f"unknown style attribute: {style_attr}")
+                continue
+
+            for product_name in product_names:
+                try:
+                    ds = datasets[product_name]
+                except KeyError:
+                    LOG.debug(f"product wasn't selected in ImportWizard: {product_name}")
+                    continue
+
+                kind = ds.attrs[Info.KIND]
+                if kind != Kind.POINTS:
+                    LOG.error(f"dataset {product_name} isn't of POINTS kind: {kind}")
+                    continue
+
+                try:
+                    convertable_ds = [ds.area.lons, ds.area.lats, ds]
+                except AttributeError:
+                    # Some products (e.g. `latitude` and `longitude`) may not
+                    # (for whatever reason) have an associated SwathDefinition.
+                    # Without it, there is no geo-location information per data
+                    # point, because it is taken from its fields 'lats', 'lons'.
+                    # This cannot be healed, point data loading fails.
+                    LOG.error(f"Dataset has no point coordinates (lats, lons):"
+                              f" {product_name} (Most likely due to missing"
+                              f" SwathDefinition)")
+                    continue
+
+                ds_id = DataID.from_dataarray(ds)
+                converted_datasets[ds_id] = converter(convertable_ds, ds.attrs)
+
+        # All unused Datasets aren't defined in the style attributes config.
+        # If one of them has an area, use it to display uncolored points.
+        for ds_id, ds in datasets.items():
+            if ds_id in converted_datasets:
+                continue
+            if ds.attrs[Info.KIND] == Kind.POINTS:
+                try:
+                    convertable_ds = [ds.area.lons, ds.area.lats]
+                except AttributeError:
+                    LOG.error(f"Dataset has no point coordinates (lats, lons):"
+                              f" {ds.attrs['name']} (Most likely due to missing"
+                              f" SwathDefinition)")
+                    continue
+                converted_datasets[ds_id] = converter(convertable_ds, ds.attrs)
+
+        return converted_datasets
+
+    def _parse_coords_end_config(self) -> List[str]:
+        """
+        Parse the ``coordinates_end`` section of the reader config.
+
+        :return: List of ``coords`` identifiers
+        """
+        coords_end = config.get(f"data_reading.{self.reader}.coordinates_end", None)
+        if not coords_end:
+            return []
+
+        if len(coords_end) < 2 or len(coords_end) > 2:
+            LOG.warning("expected 2 end coordinates for LINES")
+        return coords_end
+
+    def _combine_lines(self, datasets: DatasetDict, converter) \
+            -> Dict[DataID, DataArray]:
+        """
+        Find convertible LINES datasets in the ``DatasetDict``. The ``converter``
+        function is then used to generate new DataArrays.
+
+        The positions for the tip and base of the lines are extracted from the
+        dataset metadata. The dataset itself will be discarded.
+
+        :param datasets: all loaded datasets and previously converted datasets
+        :param converter: function to convert a list of DataArrays
+        :return: mapping of converted DataID to new DataArray
+        """
+        coords_end = self._parse_coords_end_config()
+
+        converted_datasets = {}
+        for ds_id, ds in datasets.items():
+            if ds.attrs[Info.KIND] != Kind.LINES:
+                continue
+
+            convertable_ds = []
+            try:
+                for coord in coords_end:
+                    convertable_ds.append(ds.coords[coord])  # base
+            except KeyError:
+                LOG.error(f"dataset has no coordinates: {ds.attrs['name']}")
+                continue
+            if len(convertable_ds) < 2:
+                LOG.error(f"LINES dataset needs 4 coordinates: {ds.attrs['name']}")
+                continue
+
+            convertable_ds.extend([ds.area.lons, ds.area.lats])  # tip
+            converted_datasets[ds_id] = converter(convertable_ds, ds.attrs)
+        return converted_datasets
+
+    def _revise_all_datasets(self) -> DatasetDict:
+        """
+        Revise all datasets and convert the data representation of the POINTS
+        and LINES records found to the data format VisPy needs to display them
+        as such.
+
+        The original datasets are not kept in the scene but replaced by the
+        converted datasets.
+
+        :return: ``DatasetDict`` with the loaded and converted datasets
+        """
+        loaded_datasets = DatasetDict()
+        for ds_id in self.scn.keys():
+            ds = self.scn[ds_id]
+            loaded_datasets[ds_id] = ds
+
+        # Note: If you do not want the converted data sets to overwrite the
+        # original data sets in a future development of this software,
+        # you can pass a suitable prefix to self._stack_data_arrays() (which
+        # will be used to create a new name for the converted data set) by
+        # defining the appropriate converters, for example, as follows:
+        #   self._combine_points: lambda *args: self._stack_data_arrays(*args, "POINTS-"),
+        converters = {
+            self._combine_points: lambda *args: self._stack_data_arrays(*args),
+            self._combine_lines: lambda *args: self._stack_data_arrays(*args),
+        }
+
+        for detector, converter in converters.items():
+            converted_datasets = detector(loaded_datasets, converter)
+            for old_ds_id, new_ds in converted_datasets.items():
+                del loaded_datasets[old_ds_id]
+
+                new_ds_id = DataID.from_dataarray(new_ds)
+                loaded_datasets[new_ds_id] = new_ds
+
+        for ds_id, ds in loaded_datasets.items():
+            self.scn[ds_id] = ds
+        return loaded_datasets
+
     @staticmethod
     def _area_to_sift_attrs(area):
         """Area to uwsift keys"""
@@ -1473,6 +1699,10 @@ class SatpyImporter(aImporter):
             now = datetime.utcnow()
 
             if prod.info[Info.KIND] in [Kind.LINES, Kind.POINTS]:
+                if len(shape) == 1:
+                    LOG.error(f"one dimensional dataset can't be loaded: {ds_id['name']}")
+                    continue
+
                 data_filename, data_memmap = \
                     self._create_data_memmap_file(dataset.data, dataset.dtype,
                                                   prod)
