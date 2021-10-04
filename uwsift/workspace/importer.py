@@ -372,6 +372,27 @@ class aImporter(ABC):
                     return None
                 paths.extend(list(required_files))  # TODO
 
+        # In order to "load" converted datasets, we have to reuse the existing
+        # scene from the first instantiation of SatpyImporter instead of loading
+        # the data again, of course: we need to 'rescue across' the converted
+        # data from the first SatpyImporter instantiation to the second one
+        # (which will be created in the very last statement of this method).
+        # The correct scene can be identified based on the `paths` list, which
+        # contains the input files for a single scene. The keyword argument
+        # `scenes` is mapping of a tuple of input files to a Scene object.
+        # We reuse the Scene only if the `paths` list and the input files for
+        # the Scene are the same. Since only products of the kinds POINTS, LINES
+        # and VECTORS need conversion (at this time), the mechanism is only
+        # applied for these. For an unknown reason reusing the scene breaks for
+        # FCI data, this Importer data reading magic is too confused.
+        if prod.info[Info.KIND] in (Kind.POINTS, Kind.LINES, Kind.VECTORS):
+            for scene_files, scene in kwargs["scenes"].items():
+                if list(scene_files) == paths:
+                    del kwargs["scenes"]
+                    assert "scene" not in kwargs
+                    kwargs["scene"] = scene
+                    break
+
         return cls(paths, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
 
     @classmethod
