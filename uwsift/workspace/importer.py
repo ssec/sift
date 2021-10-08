@@ -1202,74 +1202,108 @@ class SatpyImporter(aImporter):
                       upper_right_corner="NE", **self.product_filters)
         # copy satpy metadata keys to SIFT keys
         for ds in self.scn:
-            start_time = ds.attrs['start_time']
-            id_str = ":".join(str(v[1]) for v in get_id_items(id_from_attrs(ds.attrs)))
-            ds.attrs[Info.DATASET_NAME] = id_str
-            ds.attrs[Info.OBS_TIME] = start_time
-            ds.attrs[Info.SCHED_TIME] = start_time
-            duration = ds.attrs.get('end_time', start_time) - start_time
-            if duration.total_seconds() <= 0:
-                duration = timedelta(minutes=60)
-            ds.attrs[Info.OBS_DURATION] = duration
-
-            reader_kind = config.get(f"data_reading.{self.reader}.kind", None)
-            if reader_kind:
-                try:
-                    ds.attrs[Info.KIND] = Kind[reader_kind]
-                except KeyError:
-                    raise KeyError(f"Unknown data kind '{reader_kind}'"
-                                   f" configured for reader {self.reader}.")
-            else:
-                LOG.info(f"No data kind configured for reader '{self.reader}'."
-                         f" Falling back to 'IMAGE'.")
-                ds.attrs[Info.KIND] = Kind.IMAGE
-
-            self._get_platform_instrument(ds.attrs)
-            ds.attrs.setdefault(Info.STANDARD_NAME, ds.attrs.get('standard_name'))
-            if 'wavelength' in ds.attrs:
-                ds.attrs.setdefault(Info.CENTRAL_WAVELENGTH,
-                                    ds.attrs['wavelength'][1])
-
-            # Resolve anything else needed by SIFT
-            model_time = ds.attrs.get('model_time')
-            if model_time is not None:
-                ds.attrs[Info.DATASET_NAME] += " " + model_time.isoformat()
-            ds.attrs[Info.SHORT_NAME] = ds.attrs['name']
-            if ds.attrs.get('level') is not None:
-                ds.attrs[Info.SHORT_NAME] = "{} @ {}hPa".format(
-                    ds.attrs['name'], ds.attrs['level'])
-            ds.attrs[Info.SHAPE] = ds.shape \
-                if not self.resampling_info else self.resampling_info['shape']
-            ds.attrs[Info.UNITS] = ds.attrs.get('units')
-            if ds.attrs[Info.UNITS] == 'unknown':
-                LOG.warning("Layer units are unknown, using '1'")
-                ds.attrs[Info.UNITS] = 1
-            generate_guidebook_metadata(ds.attrs)
-
-            # Generate FAMILY and CATEGORY
-            if 'model_time' in ds.attrs:
-                model_time = ds.attrs['model_time'].isoformat()
-            else:
-                model_time = None
-            ds.attrs[Info.SCENE] = ds.attrs.get('scene_id')
-            if ds.attrs[Info.SCENE] is None:
-                self._compute_scene_hash(ds)
-            if ds.attrs.get(Info.CENTRAL_WAVELENGTH) is None:
-                cw = ""
-            else:
-                cw = ":{:5.2f}µm".format(ds.attrs[Info.CENTRAL_WAVELENGTH])
-            ds.attrs[Info.FAMILY] = '{}:{}:{}{}'.format(
-                ds.attrs[Info.KIND].name, ds.attrs[Info.STANDARD_NAME],
-                ds.attrs[Info.SHORT_NAME], cw)
-            ds.attrs[Info.CATEGORY] = 'SatPy:{}:{}:{}'.format(
-                ds.attrs[Info.PLATFORM].name, ds.attrs[Info.INSTRUMENT].name,
-                ds.attrs[Info.SCENE])  # system:platform:instrument:target
-            # TODO: Include level or something else in addition to time?
-            start_str = ds.attrs['start_time'].isoformat()
-            ds.attrs[Info.SERIAL] = start_str if model_time is None else model_time + ":" + start_str
+            self._set_name_metadata(ds.attrs)
+            self._set_time_metadata(ds.attrs)
+            self._set_kind_metadata(ds.attrs)
+            self._set_wavelength_metadata(ds.attrs)
+            self._set_shape_metadata(ds.attrs, ds.shape)
+            self._set_scene_metadata(ds.attrs)
+            self._set_family_metadata(ds.attrs)
+            self._set_category_metadata(ds.attrs)
+            self._set_serial_metadata(ds.attrs)
             ds.attrs.setdefault('reader', self.reader)
 
-        return self.scn
+    @staticmethod
+    def _set_name_metadata(attrs: dict, name: Optional[str] = None,
+                           short_name: Optional[str] = None,
+                           long_name: Optional[str] = None) -> None:
+        if not name:
+            name = attrs['name'] or attrs.get(Info.STANDARD_NAME)
+
+        id_str = ":".join(str(v[1]) for v in get_id_items(id_from_attrs(attrs)))
+        attrs[Info.DATASET_NAME] = id_str
+
+        model_time = attrs.get('model_time')
+        if model_time is not None:
+            attrs[Info.DATASET_NAME] += " " + model_time.isoformat()
+
+        level = attrs.get('level')
+        if level is None:
+            attrs[Info.SHORT_NAME] = short_name or name
+        else:
+            attrs[Info.SHORT_NAME] = f"{short_name or name} @ {level}hPa"
+
+        attrs[Info.LONG_NAME] = long_name or name
+        attrs[Info.STANDARD_NAME] = attrs.get('standard_name') or name
+
+    @staticmethod
+    def _set_time_metadata(attrs: dict) -> None:
+        start_time = attrs['start_time']
+        attrs[Info.OBS_TIME] = start_time
+        attrs[Info.SCHED_TIME] = start_time
+        duration = attrs.get('end_time', start_time) - start_time
+        if duration.total_seconds() <= 0:
+            duration = timedelta(minutes=60)
+        attrs[Info.OBS_DURATION] = duration
+
+    def _set_kind_metadata(self, attrs: dict) -> None:
+        reader_kind = config.get(f"data_reading.{self.reader}.kind", None)
+        if reader_kind:
+            try:
+                attrs[Info.KIND] = Kind[reader_kind]
+            except KeyError:
+                raise KeyError(f"Unknown data kind '{reader_kind}'"
+                               f" configured for reader {self.reader}.")
+        else:
+            LOG.info(f"No data kind configured for reader '{self.reader}'."
+                     f" Falling back to 'IMAGE'.")
+            attrs[Info.KIND] = Kind.IMAGE
+
+    def _set_wavelength_metadata(self, attrs: dict) -> None:
+        self._get_platform_instrument(attrs)
+        if 'wavelength' in attrs:
+            attrs.setdefault(Info.CENTRAL_WAVELENGTH, attrs['wavelength'][1])
+
+    def _set_shape_metadata(self, attrs: dict, shape) -> None:
+        attrs[Info.SHAPE] = shape \
+            if not self.resampling_info else self.resampling_info['shape']
+        attrs[Info.UNITS] = attrs.get('units')
+        if attrs[Info.UNITS] == 'unknown':
+            LOG.warning("Layer units are unknown, using '1'")
+            attrs[Info.UNITS] = 1
+        generate_guidebook_metadata(attrs)
+
+    def _set_scene_metadata(self, attrs: dict) -> None:
+        attrs[Info.SCENE] = attrs.get('scene_id')
+        if attrs[Info.SCENE] is None:
+            self._compute_scene_hash(attrs)
+
+    @staticmethod
+    def _set_family_metadata(attrs: dict) -> None:
+        if attrs.get(Info.CENTRAL_WAVELENGTH) is None:
+            cw = ""
+        else:
+            cw = ":{:5.2f}µm".format(attrs[Info.CENTRAL_WAVELENGTH])
+        attrs[Info.FAMILY] = '{}:{}:{}{}'.format(
+            attrs[Info.KIND].name, attrs[Info.STANDARD_NAME],
+            attrs[Info.SHORT_NAME], cw)
+
+    @staticmethod
+    def _set_category_metadata(attrs: dict) -> None:
+        # system:platform:instrument:target
+        attrs[Info.CATEGORY] = 'SatPy:{}:{}:{}'.format(
+            attrs[Info.PLATFORM].name, attrs[Info.INSTRUMENT].name,
+            attrs[Info.SCENE])
+
+    @staticmethod
+    def _set_serial_metadata(attrs: dict) -> None:
+        # TODO: Include level or something else in addition to time?
+        start_str = attrs['start_time'].isoformat()
+        if 'model_time' in attrs:
+            model_time = attrs['model_time'].isoformat()
+            attrs[Info.SERIAL] = f"{model_time}:{start_str}"
+        else:
+            attrs[Info.SERIAL] = start_str
 
     @staticmethod
     def _get_area_extent(area: Union[AreaDefinition, StackedAreaDefinition]) \
@@ -1297,7 +1331,7 @@ class SatpyImporter(aImporter):
             area = satpy.resample.get_area_def(any_area_def.area_id)
         return area.area_extent
 
-    def _compute_scene_hash(self, ds):
+    def _compute_scene_hash(self, attrs: dict):
         """ Compute a "good enough" hash and store it as
         SCENE information.
 
@@ -1311,17 +1345,17 @@ class SatpyImporter(aImporter):
         surface) cannot clearly be determined for it.
         """
         try:
-            area = ds.attrs['area'] if not self.resampling_info \
+            area = attrs['area'] if not self.resampling_info \
                 else AreaDefinitionsManager.area_def_by_id(
                 self.resampling_info['area_id'])
             # round extents to nearest 100 meters
             extents = tuple(int(np.round(x / 100.0) * 100.0)
                             for x in self._get_area_extent(area))
-            ds.attrs[Info.SCENE] = \
+            attrs[Info.SCENE] = \
                 "{}-{}".format(str(extents), area.proj_str)
         except (KeyError, AttributeError):
             # Scattered data, this is not suitable to define a scene
-            ds.attrs[Info.SCENE] = None
+            attrs[Info.SCENE] = None
 
     @staticmethod
     def _area_to_sift_attrs(area):
