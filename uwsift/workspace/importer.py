@@ -35,7 +35,7 @@ from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.satpy_compat import DataID, get_id_value, get_id_items, id_from_attrs
 from uwsift.util import USER_CACHE_DIR
 from uwsift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
-from .metadatabase import Resource, Product, Content
+from .metadatabase import Resource, Product, Content, ContentImage, ContentUnstructuredPoints
 from .utils import metadata_utils
 
 from satpy import Scene, available_readers
@@ -701,7 +701,7 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
             "cell size in geotiff product: {} x {}".format(prod.info[Info.CELL_HEIGHT], prod.info[Info.CELL_WIDTH]))
 
         # create and commit a Content entry pointing to where the content is in the workspace, even if coverage is empty
-        c = Content(
+        c = ContentImage(
             lod=0,
             resolution=int(min(abs(info[Info.CELL_WIDTH]), abs(info[Info.CELL_HEIGHT]))),
             atime=now,
@@ -709,8 +709,8 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
 
             # info about the data array memmap
             path=data_filename,
-            rows=rows,
-            cols=cols,
+            n_rows=rows,
+            n_cols=cols,
             levels=0,
             dtype='float32',
 
@@ -943,7 +943,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         img_data[:] = np.ma.fix_invalid(image, copy=False, fill_value=np.NAN)  # FIXME: expensive
 
         # create and commit a Content entry pointing to where the content is in the workspace, even if coverage is empty
-        c = Content(
+        c = ContentImage(
             lod=0,
             resolution=int(min(abs(cell_width), abs(cell_height))),
             atime=now,
@@ -951,8 +951,8 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
 
             # info about the data array memmap
             path=data_filename,
-            rows=rows,
-            cols=cols,
+            n_rows=rows,
+            n_cols=cols,
             proj4=proj4,
             # levels = 0,
             dtype='float32',
@@ -1442,15 +1442,14 @@ class SatpyImporter(aImporter):
                 data_filename, data_memmap = \
                     self._create_data_memmap_file(dataset.data, dataset.dtype,
                                                   prod)
-                content = Content(
-                    lod=0,
+                content = ContentUnstructuredPoints(
                     atime=now,
                     mtime=now,
 
                     # info about the data array memmap
                     path=data_filename,
-                    rows=shape[0],
-                    cols=shape[1],
+                    n_points=shape[0],
+                    n_dimensions=shape[1],
                     dtype=dataset.dtype,
                 )
                 content.info[Info.KIND] = kind
@@ -1532,7 +1531,7 @@ class SatpyImporter(aImporter):
                 data_filename, img_data = \
                     self._create_data_memmap_file(data, np.float32, prod)
 
-                c = Content(
+                c = ContentImage(
                     lod=0,
                     resolution=int(min(abs(cell_width), abs(cell_height))),
                     atime=now,
@@ -1540,8 +1539,8 @@ class SatpyImporter(aImporter):
 
                     # info about the data array memmap
                     path=data_filename,
-                    rows=shape[0],
-                    cols=shape[1],
+                    n_rows=shape[0],
+                    n_cols=shape[1],
                     proj4=proj4,
                     # levels = 0,
                     dtype='float32',
@@ -1608,7 +1607,7 @@ class SatpyImporter(aImporter):
             contour_data[:, 1] += origin_y
             data_filename: str = self.create_contour_file_cache_data(contour_data,
                                                                 prod)
-            c = Content(
+            c = ContentImage(
                 lod=0,
                 resolution=int(min(abs(cell_width), abs(cell_height))),
                 atime=now,
@@ -1616,8 +1615,8 @@ class SatpyImporter(aImporter):
 
                 # info about the data array memmap
                 path=data_filename,
-                rows=contour_data.shape[0],  # number of vertices
-                cols=contour_data.shape[1],  # col (x), row (y), "connect", num_points_for_level
+                n_rows=contour_data.shape[0],  # number of vertices
+                n_cols=contour_data.shape[1],  # col (x), row (y), "connect", num_points_for_level
                 proj4=proj4,
                 # levels = 0,
                 dtype='float32',
