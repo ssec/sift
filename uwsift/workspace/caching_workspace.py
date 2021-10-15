@@ -802,15 +802,18 @@ class CachingWorkspace(BaseWorkspace):
                 (Product.uuid_str == str(uuid)) & (Content.product_id == Product.id)).order_by(Content.lod.desc()).all()
             content = [x for x in content if x.info.get(Info.KIND, Kind.IMAGE) == kind]
             if len(content) != 1:
-                LOG.warning("More than one matching Content object for '{}'".format(dsi_or_uuid))
+                LOG.warning("More than one matching Content object for '{}'"
+                            .format(dsi_or_uuid))
             if not len(content) or not content[0]:
-                raise AssertionError('no content in workspace for {}, must re-import'.format(uuid))
+                raise AssertionError(
+                    'no content in workspace for {}, must re-import'.format(uuid))
             content = content[0]
             # content.touch()
             # self._S.commit()  # flush any pending updates to workspace db file
 
-            # FIXME: find the content for the requested LOD, then return its ActiveContent - or attach one
-            # for now, just work with assumption of one product one content
+            # FIXME: find the content for the requested LOD, then return its
+            #  ActiveContent - or attach one
+            #  for now, just work with assumption of one product one content
             active_content = self._cached_arrays_for_content(content)
             return active_content.data
 
