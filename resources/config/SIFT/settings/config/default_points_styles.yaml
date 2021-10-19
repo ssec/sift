@@ -5,7 +5,7 @@ point_styles:
     symbol: 'x'
     size: '9px'
     fill: '#FF0000'
-    stroke: #000000
+    stroke: '#000000'
     stroke-width: '2px'
     
   red_empty_square:
