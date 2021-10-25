@@ -97,6 +97,33 @@ DEFAULT_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 # MAX_EXCURSION_Y = C_POL/4.0
 # MAX_EXCURSION_X = C_EQ/2.0
 
+N_A = 'n/a'
+
+# LayerModel column display names
+VISIBILITY = "Vis"
+SOURCE = "Satellite & Instrument"
+NAME = "Name"
+WAVELENGTH = "Wavelength"
+PROBE_VALUE = "Probe Value"
+PROBE_UNIT = "Probe Unit"
+
+LAYER_TREE_VIEW_HEADER = [VISIBILITY,
+                          SOURCE,
+                          NAME,
+                          WAVELENGTH,
+                          PROBE_VALUE,
+                          PROBE_UNIT]
+
+
+# Calculate and provide LayerModel column indices from LAYER_TREE_VIEW_HEADER
+class LayerModelColumns:
+    VISIBILITY  = LAYER_TREE_VIEW_HEADER.index(VISIBILITY)   # noqa
+    SOURCE      = LAYER_TREE_VIEW_HEADER.index(SOURCE)       # noqa
+    NAME        = LAYER_TREE_VIEW_HEADER.index(NAME)         # noqa
+    WAVELENGTH  = LAYER_TREE_VIEW_HEADER.index(WAVELENGTH)   # noqa
+    PROBE_VALUE = LAYER_TREE_VIEW_HEADER.index(PROBE_VALUE)  # noqa
+    PROBE_UNIT  = LAYER_TREE_VIEW_HEADER.index(PROBE_UNIT)   # noqa
+
 
 class Box(NamedTuple):
     bottom: float
