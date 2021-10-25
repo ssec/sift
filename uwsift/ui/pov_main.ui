@@ -1211,7 +1211,7 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>274</width>
+          <width>276</width>
           <height>68</height>
          </rect>
         </property>
@@ -1273,8 +1273,8 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>260</width>
-          <height>492</height>
+          <width>262</width>
+          <height>537</height>
          </rect>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_33">
@@ -1717,6 +1717,41 @@
         <number>100</number>
        </property>
       </widget>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+  <widget class="QDockWidget" name="LayerModelDockWidget">
+   <property name="minimumSize">
+    <size>
+     <width>90</width>
+     <height>109</height>
+    </size>
+   </property>
+   <property name="features">
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
+   </property>
+   <property name="windowTitle">
+    <string>Layer Manager</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>2</number>
+   </attribute>
+   <widget class="QWidget" name="dockWidgetContents_3">
+    <layout class="QHBoxLayout" name="horizontalLayout_10">
+     <item>
+      <layout class="QVBoxLayout" name="verticalLayout_11">
+       <item>
+        <widget class="QTreeView" name="treeView">
+         <property name="dragDropMode">
+          <enum>QAbstractItemView::InternalMove</enum>
+         </property>
+         <property name="alternatingRowColors">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+      </layout>
      </item>
     </layout>
    </widget>
