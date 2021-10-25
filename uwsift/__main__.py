@@ -70,6 +70,8 @@ from uwsift.view.scene_graph import SceneGraphManager
 from uwsift.workspace import CachingWorkspace, SimpleWorkspace
 from uwsift.workspace.collector import ResourceSearchPathCollector
 
+from uwsift.model.layer_model import LayerModel
+
 LOG = logging.getLogger(__name__)
 # re-configure loggers instantiated meanwhile
 configure_loggers()
@@ -915,6 +917,7 @@ class Main(QtWidgets.QMainWindow):
         self.export_image = ExportImageHelper(self, self.document, self.scene_manager)
         self._wizard_dialog = None
 
+        self._init_layer_model()
         self._init_layer_panes()
         self._init_rgb_pane()
         self._init_map_widget()
@@ -1010,6 +1013,7 @@ class Main(QtWidgets.QMainWindow):
         self.document.didAddCompositeDataset.connect(_blackhole)
         self.document.didRemoveDatasets.connect(_blackhole)
         self.document.didReorderDatasets.connect(_blackhole)
+
         if False:
             # XXX: Disable the below line if updating during animation is too much work
             # self.scene_manager.didChangeFrame.connect(lambda frame_info: update_probe_point(uuid=frame_info[-1]))
@@ -1080,6 +1084,26 @@ class Main(QtWidgets.QMainWindow):
         select_full_data_action.triggered.connect(update_full_data_selection)
         menu.addAction(select_full_data_action)
         self.ui.regionSelectButton.setMenu(menu)
+
+    def _init_layer_model(self):
+
+        self.layer_model = LayerModel()
+
+        self.document.didAddDataset.connect(self.layer_model.add_dataset)
+
+        self.layer_model.didCreateLayer.connect(
+            self.scene_manager.add_node_for_layer)
+        self.layer_model.didAddProductDataset.connect(
+            self.scene_manager.add_node_for_product_dataset)
+
+        self.ui.treeView.setModel(self.layer_model)
+        self.ui.treeView.setHeaderHidden(False)
+
+        for column in range(self.layer_model.columnCount()):
+            self.ui.treeView.resizeColumnToContents(column)
+
+        self.ui.treeView.setRootIsDecorated(False)
+        self.ui.treeView.setSelectionMode(self.ui.treeView.SingleSelection)
 
     def _init_rgb_pane(self):
         self.rgb_config_pane = RGBLayerConfigPane(self.ui, self.ui.layersPaneWidget)
