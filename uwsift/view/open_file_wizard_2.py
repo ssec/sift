@@ -96,11 +96,11 @@ class OpenFileWizard(QtWidgets.QWizard):
     AVAILABLE_READERS = OrderedDict()
     inputParametersChanged = QtCore.pyqtSignal()
 
-    def __init__(self, base_dir=None, parent=None):
+    def __init__(self, base_dir=None, base_reader=None, parent=None):
         super(OpenFileWizard, self).__init__(parent)
 
-        self.current_dir = base_dir
-        self.previous_reader = None
+        self._initial_directory = base_dir
+        self._initial_reader = base_reader
 
         # tuple(filenames) -> scene object
         self.scenes = {}
@@ -256,11 +256,13 @@ class OpenFileWizard(QtWidgets.QWizard):
             readers = OrderedDict((ri.get('long_name', ri['name']), ri['name']) for ri in readers)
             OpenFileWizard.AVAILABLE_READERS = readers
 
+        reader_to_preselect = self._initial_reader or self.config['default_reader']
         for idx, (reader_short_name, reader_name) in enumerate(readers.items()):
             self.ui.readerComboBox.addItem(reader_short_name, reader_name)
-            if self.config['default_reader'] == reader_name:
+            if reader_name == reader_to_preselect:
                 self.ui.readerComboBox.setCurrentIndex(idx)
 
+        self.ui.folderTextBox.setText(self._initial_directory)
         self._update_grouping_mode_combobox()
 
     def _init_product_select_page(self):
@@ -365,8 +367,11 @@ class OpenFileWizard(QtWidgets.QWizard):
         """Return files that should be used by the Document/Workspace."""
         return [fn for fgroup in self.file_groups.values() for fn in fgroup]
 
-    def get_reader_name(self) -> str:
+    def get_reader(self) -> str:
         return self.ui.readerComboBox.currentData()
+
+    def get_directory(self) -> str:
+        return self.ui.folderTextBox.text()
 
     # ==============================================================================================
     # PAGE 1 RELATED FUNCTIONALITY
@@ -376,13 +381,13 @@ class OpenFileWizard(QtWidgets.QWizard):
         """Show folder chooser and update table with files"""
 
         folder = QtWidgets.QFileDialog.getExistingDirectory(
-            self, "Select folder to open", self.current_dir or os.getenv("HOME"))
+            self, "Select folder to open",
+            self.ui.folderTextBox.text() or os.getenv("HOME"))
         if not folder:
             return
 
         if os.path.exists(folder):
-            self.current_dir = folder
-            self.ui.folderTextBox.setText(self.current_dir)
+            self.ui.folderTextBox.setText(folder)
 
     def _update_filter_patterns(self):
         """Updates available file filter patterns by reading the config. Selects first entry."""
@@ -651,7 +656,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.productSelectionPage.completeChanged.emit()
 
     def update_resampling_method_combobox(self):
-        reader = self.get_reader_name()
+        reader = self.get_reader()
         geometry_definition: str = config.get(f'data_reading.{reader}'
                                               f'.geometry_definition',
                                               'AreaDefinition')
@@ -744,7 +749,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.resamplingShapeColumnSpinBox.setValue(area_def.shape[1])
 
     def _update_grouping_mode_combobox(self):
-        reader = self.get_reader_name()
+        reader = self.get_reader()
         geometry_definition: str = config.get(f'data_reading.{reader}'
                                               f'.geometry_definition',
                                               'AreaDefinition')
