@@ -14,7 +14,7 @@
    <bool>true</bool>
   </property>
   <property name="windowTitle">
-   <string>SIFT |X.X.X|</string>
+   <string>MTG-SIFT |X.X.X|</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -1096,7 +1096,7 @@
      <x>0</x>
      <y>0</y>
      <width>1296</width>
-     <height>22</height>
+     <height>19</height>
     </rect>
    </property>
   </widget>
