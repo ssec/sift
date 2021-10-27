@@ -1271,6 +1271,9 @@ class Main(QtWidgets.QMainWindow):
             LOG.debug("Wizard closed, nothing to load")
         self._wizard_dialog = None
 
+    def reload_config(self):
+        config.refresh()
+
     def remove_region_polygon(self, action: QtWidgets.QAction = None, *args):
         if self.scene_manager._current_tool == Tool.REGION_PROBE:
             self.ui.panZoomToolButton.click()
@@ -1317,6 +1320,10 @@ class Main(QtWidgets.QMainWindow):
         open_wizard_action.setShortcuts(["Ctrl+O", "Ctrl+Alt+O"])
         open_wizard_action.triggered.connect(self.open_wizard)
 
+        reload_config_action = QtWidgets.QAction("Reload Configuration", self)
+        reload_config_action.setShortcuts(["Ctrl+K", "Ctrl+Alt+K"])
+        reload_config_action.triggered.connect(self.reload_config)
+
         menubar = self.ui.menubar
         file_menu = menubar.addMenu('&File')
         self.addAction(open_action)  # add it to the main window, not the menu (hide it)
@@ -1331,6 +1338,10 @@ class Main(QtWidgets.QMainWindow):
         screenshot_action.setShortcut("Ctrl+I")
         screenshot_action.triggered.connect(self.export_image.take_screenshot)
         file_menu.addAction(screenshot_action)
+
+        file_menu.addSeparator()
+        file_menu.addAction(reload_config_action)
+        file_menu.addSeparator()
 
         file_menu.addAction(exit_action)
 
