@@ -1088,6 +1088,40 @@ class SatpyImporter(aImporter):
                 self._S.commit()
             yield prod
 
+    def _extract_segment_number(self):
+        """
+        Load the segment numbers loaded by this scene.
+        :return: list of all the segment numbers of all segments loaded by the scene
+        """
+        segments = []
+        for reader in self.scn._readers.values():
+            for file_handlers in reader.file_handlers.values():
+                for file_handler in file_handlers:
+                    if file_handler.filetype_info['file_type'] in self.requires:
+                        continue
+                    seg = file_handler.filename_info['segment']
+                    segments.append(seg)
+        return segments
+
+    def _extract_expected_segments(self) -> Optional[int]:
+        """
+        Load the number of expected segments for the products loaded by the given scene.
+        :return: number of expected segments or None if not found or products in scene
+        have different numbers of expected segments
+        """
+        expected_segments = None
+        for reader in self.scn._readers.values():
+            for file_handlers in reader.file_handlers.values():
+                for file_handler in file_handlers:
+                    if file_handler.filetype_info['file_type'] in self.requires:
+                        continue
+                    es = file_handler.filetype_info['expected_segments']
+                    if expected_segments is None:
+                        expected_segments = es
+                    if expected_segments != es:
+                        return None
+        return expected_segments
+
     @property
     def num_products(self) -> int:
         # WARNING: This could provide radiances and higher level products
