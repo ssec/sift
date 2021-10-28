@@ -24,7 +24,7 @@ import dask.array as da
 import numpy as np
 import yaml
 from pyproj import Proj
-from pyresample import AreaDefinition
+from pyresample.geometry import AreaDefinition
 from sqlalchemy.orm import Session
 
 from uwsift import config, USE_INVENTORY_DB
@@ -1169,7 +1169,6 @@ class SatpyImporter(aImporter):
 
     def _area_to_sift_attrs(self, area):
         """Area to uwsift keys"""
-        from pyresample.geometry import AreaDefinition
         if not isinstance(area, AreaDefinition):
             raise NotImplementedError("Only AreaDefinition datasets can "
                                       "be loaded at this time.")
