@@ -64,10 +64,6 @@ class RGBLayerConfigPane(QObject):
 
         [x.currentIndexChanged.connect(partial(self._combo_changed, combo=x, color=rgb))
          for rgb, x in zip(('b', 'g', 'r'), (self.ui.comboBlue, self.ui.comboGreen, self.ui.comboRed))]
-        # [x.sliderReleased.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=False))
-        #  for rgb, x in zip(('b', 'g', 'r'), (self.ui.slideMinBlue, self.ui.slideMinGreen, self.ui.slideMinRed))]
-        # [x.sliderReleased.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=True))
-        #  for rgb, x in zip(('b', 'g', 'r'), (self.ui.slideMaxBlue, self.ui.slideMaxGreen, self.ui.slideMaxRed))]
         [x.valueChanged.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=False))
          for rgb, x in zip(('b', 'g', 'r'), (self.ui.slideMinBlue, self.ui.slideMinGreen, self.ui.slideMinRed))]
         [x.valueChanged.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=True))
@@ -329,18 +325,28 @@ class RGBLayerConfigPane(QObject):
             valid_range = self._families[family][Info.VALID_RANGE]
             self._valid_ranges[idx] = valid_range
 
+            # block signals so the changed sliders don't trigger updates
+            slider[0].blockSignals(True)
+            slider[1].blockSignals(True)
             slider_val = self._create_slider_value(valid_range[0], valid_range[1], clims[0])
             slider[0].setSliderPosition(max(slider_val, 0))
             slider_val = self._create_slider_value(valid_range[0], valid_range[1], clims[1])
             slider[1].setSliderPosition(min(slider_val, self._slider_steps))
+            slider[0].blockSignals(False)
+            slider[1].blockSignals(False)
+
             self._update_line_edits(color, *clims)
 
     def _set_minmax_sliders(self, recipe):
         if recipe:
+            print("Setting sliders with a recipe: ", recipe)
             for idx, (color, clim) in enumerate(zip("rgb", recipe.color_limits)):
                 family = recipe.input_ids[idx]
+                print("About to set individual slider for ", color, clim, family)
                 self._set_minmax_slider(color, family, clim)
+                print("done setting individual slider for ", color)
         else:
+            print("Setting sliders with no recipe")
             self._set_minmax_slider("r", None)
             self._set_minmax_slider("g", None)
             self._set_minmax_slider("b", None)

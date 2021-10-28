@@ -628,6 +628,14 @@ class SIFTMultiChannelTiledGeolocatedMixin(SIFTTiledGeolocatedMixin):
         return new_data
 
 
+class _NoColormap:
+    """Placeholder colormap class to make MultiChannelImageVisual compatible with ImageVisual."""
+
+    def texture_lut(self):
+        """Get empty (None) colormap data."""
+        return None
+
+
 class MultiChannelImageVisual(ImageVisual):
     """Visual subclass displaying an image from three separate arrays.
 
@@ -665,9 +673,6 @@ class MultiChannelImageVisual(ImageVisual):
         and is hardcoded to ``r32f`` internal texture format.
 
     """
-
-    VERTEX_SHADER = ImageVisual.VERTEX_SHADER
-    FRAGMENT_SHADER = ImageVisual.FRAGMENT_SHADER
 
     def __init__(self, data_arrays, clim='auto', gamma=1.0, **kwargs):
         if kwargs.get("texture_format") is not None:
@@ -767,7 +772,7 @@ class MultiChannelImageVisual(ImageVisual):
     def cmap(self, cmap):
         if cmap is not None:
             raise ValueError("MultiChannelImageVisual does not support a colormap.")
-        self._cmap = None
+        self._cmap = _NoColormap()
 
     def _build_interpolation(self):
         # assumes 'nearest' interpolation
