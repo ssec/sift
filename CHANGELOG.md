@@ -1,3 +1,14 @@
+## Version 1.2.1 (2021/10/28)
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 329](https://github.com/ssec/sift/pull/329) - Fix compatibility with vispy 0.8.0+
+
+In this release 1 pull request was closed.
+
+
 ## Version 1.2.0 (2021/09/18)
 
 ### Issues Closed
