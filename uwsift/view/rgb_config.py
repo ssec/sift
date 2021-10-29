@@ -198,6 +198,8 @@ class RGBLayerConfigPane(QObject):
         """
         idx = RGBA2IDX[color]
         edn, edx = self.line_edits[idx]
+        edn.blockSignals(True)
+        edx.blockSignals(True)
         if n is not None:
             ndis = self._data_to_display(color, n)
             edn.setText('%f' % ndis)
@@ -210,6 +212,8 @@ class RGBLayerConfigPane(QObject):
         else:
             xdis = float(edx.text())
             x = self._display_to_data(color, xdis)
+        edn.blockSignals(False)
+        edx.blockSignals(False)
         return n, x
 
     def _signal_color_changing_range(self, color: str, n: float, x: float):
@@ -249,9 +253,10 @@ class RGBLayerConfigPane(QObject):
         val = self._display_to_data(color, vdis)
         LOG.debug('line edit %s %s => %f => %f' % (color, 'max' if is_max else 'min', vdis, val))
         sv = self._create_slider_value(vn, vx, val)
-        print("Edit changed and updating slider to: ", sv)
         slider = self.sliders[idx][1 if is_max else 0]
+        slider.blockSignals(True)
         slider.setValue(sv)
+        slider.blockSignals(False)
         self._signal_color_changing_range(color, *self._update_line_edits(color))
 
     def selection_did_change(self, recipe):
@@ -305,13 +310,20 @@ class RGBLayerConfigPane(QObject):
         if family not in self._families:
             LOG.debug(
                 "Could not find {} in families {}".format(repr(family), repr(list(sorted(self._families.keys())))))
+        # block signals so the changed sliders don't trigger updates
+        slider[0].blockSignals(True)
+        slider[1].blockSignals(True)
         if clims is None or clims == (None, None) or \
                 family not in self._families:
             self._valid_ranges[idx] = (None, None)
             slider[0].setSliderPosition(0)
             slider[1].setSliderPosition(0)
+            editn.blockSignals(True)
+            editx.blockSignals(True)
             editn.setText('0.0')
             editx.setText('0.0')
+            editn.blockSignals(False)
+            editx.blockSignals(False)
             slider[0].setDisabled(True)
             slider[1].setDisabled(True)
             editn.setDisabled(True)
@@ -325,28 +337,21 @@ class RGBLayerConfigPane(QObject):
             valid_range = self._families[family][Info.VALID_RANGE]
             self._valid_ranges[idx] = valid_range
 
-            # block signals so the changed sliders don't trigger updates
-            slider[0].blockSignals(True)
-            slider[1].blockSignals(True)
             slider_val = self._create_slider_value(valid_range[0], valid_range[1], clims[0])
             slider[0].setSliderPosition(max(slider_val, 0))
             slider_val = self._create_slider_value(valid_range[0], valid_range[1], clims[1])
             slider[1].setSliderPosition(min(slider_val, self._slider_steps))
-            slider[0].blockSignals(False)
-            slider[1].blockSignals(False)
 
             self._update_line_edits(color, *clims)
+        slider[0].blockSignals(False)
+        slider[1].blockSignals(False)
 
     def _set_minmax_sliders(self, recipe):
         if recipe:
-            print("Setting sliders with a recipe: ", recipe)
             for idx, (color, clim) in enumerate(zip("rgb", recipe.color_limits)):
                 family = recipe.input_ids[idx]
-                print("About to set individual slider for ", color, clim, family)
                 self._set_minmax_slider(color, family, clim)
-                print("done setting individual slider for ", color)
         else:
-            print("Setting sliders with no recipe")
             self._set_minmax_slider("r", None)
             self._set_minmax_slider("g", None)
             self._set_minmax_slider("b", None)
