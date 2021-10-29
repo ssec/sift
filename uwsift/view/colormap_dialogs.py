@@ -91,7 +91,9 @@ class ChangeColormapDialog(QtWidgets.QDialog):
         value = self._get_slider_value(value)
         LOG.debug('slider %s %s => %f' % (self.uuid, 'max' if is_max else 'min', value))
         display_val = self.doc[self.uuid][Info.UNIT_CONVERSION][1](value)
+        edit.blockSignals(True)
         edit.setText('{:0.03f}'.format(display_val))
+        edit.blockSignals(False)
         return self._set_new_clims(value, is_max)
 
     def _edit_changed(self, is_max=True):
@@ -102,7 +104,9 @@ class ChangeColormapDialog(QtWidgets.QDialog):
         val = self.doc[self.uuid][Info.UNIT_CONVERSION][1](vdis, inverse=True)
         LOG.debug('line edit %s %s => %f => %f' % (self.uuid, 'max' if is_max else 'min', vdis, val))
         sv = self._create_slider_value(val)
+        slider.blockSignals(True)
         slider.setValue(sv)
+        slider.blockSignals(False)
         return self._set_new_clims(val, is_max)
 
     def _init_cmap_combo(self):
