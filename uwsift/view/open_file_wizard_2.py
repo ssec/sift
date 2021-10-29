@@ -706,14 +706,20 @@ class OpenFileWizard(QtWidgets.QWizard):
         area_def_name = self.ui.projectionComboBox.currentText()
         area_def = AreaDefinitionsManager.area_def_by_name(area_def_name)
 
-        self.resampling_info = {
-            'resampler': self.ui.resamplingMethodComboBox.currentData(),
-            'area_id': area_def.area_id,
-            'projection': area_def.proj_str,
-            'radius_of_influence': self.ui.radiusOfInfluenceSpinBox.value(),
-            'shape': (self.ui.resamplingShapeRowSpinBox.value(),
-                      self.ui.resamplingShapeColumnSpinBox.value())
-        }
+        resampler = self.ui.resamplingMethodComboBox.currentData()
+        if not resampler or resampler.lower() == 'none':
+            # gracefully interpret capitalization variants of 'None' as:
+            # "do not resample"
+            self.resampling_info = None
+        else:
+            self.resampling_info = {
+                'resampler': resampler,
+                'area_id': area_def.area_id,
+                'projection': area_def.proj_str,
+                'radius_of_influence': self.ui.radiusOfInfluenceSpinBox.value(),
+                'shape': (self.ui.resamplingShapeRowSpinBox.value(),
+                          self.ui.resamplingShapeColumnSpinBox.value())
+            }
 
     def _set_opts_disabled(self, is_disabled):
         self.ui.radiusOfInfluenceSpinBox.setDisabled(is_disabled)

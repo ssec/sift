@@ -18,7 +18,7 @@ import time
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from datetime import datetime, timedelta
-from typing import Iterable, Generator, Mapping, Tuple, Optional
+from typing import Dict, Iterable, Generator, Mapping, Tuple, Optional
 
 import dask.array as da
 import numpy as np
@@ -1123,7 +1123,8 @@ class SatpyImporter(aImporter):
             if ds.attrs.get('level') is not None:
                 ds.attrs[Info.SHORT_NAME] = "{} @ {}hPa".format(
                     ds.attrs['name'], ds.attrs['level'])
-            ds.attrs[Info.SHAPE] = ds.shape
+            ds.attrs[Info.SHAPE] = ds.shape \
+                if not self.resampling_info else self.resampling_info['shape']
             ds.attrs[Info.UNITS] = ds.attrs.get('units')
             if ds.attrs[Info.UNITS] == 'unknown':
                 LOG.warning("Layer units are unknown, using '1'")
@@ -1138,20 +1139,17 @@ class SatpyImporter(aImporter):
             ds.attrs[Info.SCENE] = ds.attrs.get('scene_id')
             if ds.attrs[Info.SCENE] is None:
                 # compute a "good enough" hash for this Scene
-                try:
-                    area = ds.attrs['area']
-                    extents = area.area_extent
-                except (AttributeError, KeyError):
-                    area = AreaDefinitionsManager.area_def_by_id(
-                        self.resampling_info['area_id']
-                    )
-                    extents = area.area_extent
-                    ds.attrs[Info.SHAPE] = area.shape
+                area = ds.attrs['area'] if not self.resampling_info \
+                    else AreaDefinitionsManager.area_def_by_id(
+                        self.resampling_info['area_id'])
+                assert isinstance(area, AreaDefinition), \
+                    "BUG: OpenFileWizard must not allow to load SwathDefinition" \
+                    " data without resampling! Please contact the developers."
                 # round extents to nearest 100 meters
                 extents = tuple(int(np.round(x / 100.0) * 100.0)
-                                for x in extents)
-                proj_str = area.proj4_string
-                ds.attrs[Info.SCENE] = "{}-{}".format(str(extents), proj_str)
+                                for x in area.area_extent)
+                ds.attrs[Info.SCENE] = \
+                    "{}-{}".format(str(extents), area.proj_str)
             if ds.attrs.get(Info.CENTRAL_WAVELENGTH) is None:
                 cw = ""
             else:
@@ -1204,9 +1202,8 @@ class SatpyImporter(aImporter):
         dataset_ids = [prod.info['_satpy_id'] for prod in products]
         self.scn.load(dataset_ids, pad_data=True, upper_right_corner="NE")
 
-        resampler: str = None if not self.resampling_info \
-            else self.resampling_info['resampler']
-        if resampler and resampler.lower() != 'none':  # gracefully accept variants of None
+        if self.resampling_info:
+            resampler: str = self.resampling_info['resampler']
             max_area = self.scn.max_area()
             if isinstance(max_area, AreaDefinition) and \
                     max_area.area_id == self.resampling_info['area_id']:
