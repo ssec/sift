@@ -1,3 +1,14 @@
+## Version 1.2.2 (2021/10/29)
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 330](https://github.com/ssec/sift/pull/330) - Fix line edits changing to unwanted value
+
+In this release 1 pull request was closed.
+
+
 ## Version 1.2.1 (2021/10/28)
 
 ### Pull Requests Merged
