@@ -1141,16 +1141,17 @@ class SatpyImporter(aImporter):
                 try:
                     area = ds.attrs['area']
                     extents = area.area_extent
-                    # round extents to nearest 100 meters
-                    extents = tuple(int(np.round(x / 100.0) * 100.0) for x in extents)
-                    proj_str = area.proj4_string
-                    ds.attrs[Info.SCENE] = "{}-{}".format(str(extents), proj_str)
                 except (AttributeError, KeyError):
-                    unix_start_time = time.mktime(ds.attrs["start_time"].timetuple())
-                    unix_end_time = time.mktime(ds.attrs["end_time"].timetuple())
-                    ds.attrs[Info.SCENE] = "{}-{}-{}-{}".format(
-                        ds.attrs["name"], ds.attrs["file_type"],
-                        unix_start_time, unix_end_time)
+                    area = AreaDefinitionsManager.area_def_by_id(
+                        self.resampling_info['area_id']
+                    )
+                    extents = area.area_extent
+                    ds.attrs[Info.SHAPE] = area.shape
+                # round extents to nearest 100 meters
+                extents = tuple(int(np.round(x / 100.0) * 100.0)
+                                for x in extents)
+                proj_str = area.proj4_string
+                ds.attrs[Info.SCENE] = "{}-{}".format(str(extents), proj_str)
             if ds.attrs.get(Info.CENTRAL_WAVELENGTH) is None:
                 cw = ""
             else:
