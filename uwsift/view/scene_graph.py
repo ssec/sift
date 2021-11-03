@@ -1199,7 +1199,7 @@ class SceneGraphManager(QObject):
         layer = self.document[uuid]
         LOG.debug("SceneGraphManager.add_composite_layer %s" % repr(layer))
         if not layer.is_valid:
-            LOG.info('unable to add an invalid layer, will try again later when layer changes')
+            LOG.info('unable to add an invalid composite layer, will try again later when layer changes')
             return
         if p.kind == Kind.RGB:
             dep_uuids = r, g, b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
@@ -1351,7 +1351,7 @@ class SceneGraphManager(QObject):
                     # Add this now valid layer
                     self.add_composite_layer(new_order, layer.uuid, presentation)
                 else:
-                    LOG.info('unable to add an invalid layer, will try again later when layer changes')
+                    LOG.info('unable to add an changed invalid composite layer, will try again later when layer changes')
                     return
         else:
             raise ValueError("Unknown or unimplemented composite type")
