@@ -2259,7 +2259,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         time_master = max(namespace_siblings.values(), key=lambda v: len(v))
         for idx in range(len(time_master)):
             t = self[time_master[idx]][Info.SCHED_TIME]
-            channel_siblings = [(self[u][Info.SHORT_NAME], u) for u in self.channel_siblings(time_master[idx])[0]]
+            cs = self.channel_siblings(time_master[idx])
+            channel_siblings = [(self[u][Info.SHORT_NAME], u) for u in cs[0]]
             temp_namespace = {}
             for sn, u in channel_siblings:
                 if sn not in short_name_to_ns_name:
