@@ -40,9 +40,9 @@ FUTURE import sequence:
 import logging
 import os
 from abc import abstractmethod
-from collections import defaultdict
+from collections import Mapping as ReadOnlyMapping, defaultdict
 from datetime import timedelta
-from typing import Mapping, Generator, Tuple, Dict, Optional, Mapping as ReadOnlyMapping
+from typing import Mapping, Generator, Tuple, Dict, Optional
 from uuid import UUID, uuid1 as uuidgen
 
 import numba as nb
