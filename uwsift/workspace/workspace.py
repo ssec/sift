@@ -36,6 +36,7 @@ FUTURE import sequence:
 :license: GPLv3, see LICENSE for more details
 
 """
+
 import logging
 import os
 from abc import abstractmethod
@@ -142,15 +143,15 @@ class ActiveContent(QObject):
         co[2:4] = 1  # and of that, only the bottom half of the image
 
     @staticmethod
-    def _rcls(r: int, c: int, l: int):
+    def _rcls(rows: int, columns: int, levels: int):
         """
-        :param r: rows or None
-        :param c: columns or None
-        :param l: levels or None
+        :param rows: rows or None
+        :param columns: columns or None
+        :param levels: levels or None
         :return: condensed tuple(string with 'rcl', 'rc', 'rl', dimension tuple corresponding to string)
         """
         rcl_shape = tuple(
-            (name, dimension) for (name, dimension) in zip('rcl', (r, c, l)) if dimension)
+            (name, dimension) for (name, dimension) in zip('rcl', (rows, columns, levels)) if dimension)
         rcl = tuple(x[0] for x in rcl_shape)
         shape = tuple(x[1] for x in rcl_shape)
         return rcl, shape

@@ -24,7 +24,7 @@ import os
 import sys
 import unittest
 from datetime import datetime
-from typing import List, Iterable, Mapping
+from typing import List, Iterable, Mapping, Union
 
 from PyQt5.QtCore import QObject
 
@@ -108,7 +108,7 @@ class ResourceSearchPathCollector(QObject):
             if not os.path.isdir(path):
                 LOG.warning("{} is not a directory".format(path))
                 continue
-            for dirpath, dirnames, filenames in os.walk(path):
+            for dirpath, _, filenames in os.walk(path):
                 if self._is_posix and (os.stat(dirpath).st_mtime < last_checked):
                     skipped_dirs += 1
                     continue
@@ -130,7 +130,7 @@ class ResourceSearchPathCollector(QObject):
         os.utime(self._timestamp_path)
         return mtime
 
-    def __init__(self, ws: [BaseWorkspace, _workspace_test_proxy]):
+    def __init__(self, ws: Union[BaseWorkspace, _workspace_test_proxy]):
         super(ResourceSearchPathCollector, self).__init__()
         self._ws = ws
         self._paths = []
@@ -173,7 +173,7 @@ class ResourceSearchPathCollector(QObject):
         for reader_and_files in readers_and_files:
             for reader_name, filenames in reader_and_files.items():
                 product_infos = self._ws.collect_product_metadata_for_paths(filenames, reader=reader_name)
-                for num_prods, product_info in product_infos:
+                for _, product_info in product_infos:
                     changed_uuids.add(product_info[Info.UUID])
                     num_seen += len(filenames)
                     status = {TASK_DOING: 'collecting metadata {}/{}'.format(num_seen, ntodo),
@@ -187,12 +187,12 @@ class ResourceSearchPathCollector(QObject):
 
 
 def _debug(type, value, tb):
-    "enable with sys.excepthook = debug"
+    """Enable with sys.excepthook = debug."""
     if not sys.stdin.isatty():
         sys.__excepthook__(type, value, tb)
     else:
         import traceback
-        import pdb
+        import pdb  # noqa
         traceback.print_exception(type, value, tb)
         # …then start the debugger in post-mortem mode.
         pdb.post_mortem(tb)  # more “modern”

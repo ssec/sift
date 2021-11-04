@@ -10,6 +10,9 @@ try:
 
     def get_id_items(id_obj):
         return id_obj.items()
+
+    def id_from_attrs(attrs):
+        return attrs['_satpy_id']
 except ImportError:
     import warnings
     warnings.warn("Satpy <0.23.0 will not be supported in future versions. "
@@ -21,3 +24,6 @@ except ImportError:
 
     def get_id_items(id_obj):
         return id_obj._asdict().items()
+
+    def id_from_attrs(attrs):
+        return DataID.from_dict(attrs)

@@ -294,7 +294,7 @@ class ColormapEditor(QtWidgets.QDialog):
 
             for cmap_name in cmap_content:
                 if cmap_name in self.builtin_colormap_states:
-                    QtGui.QMessageBox.information(
+                    QtWidgets.QMessageBox.information(
                         self, "Error", "You cannot import a colormap with "
                                        "the same name as one of the internal "
                                        "colormaps: {}".format(cmap_name))

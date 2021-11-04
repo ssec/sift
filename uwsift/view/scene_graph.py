@@ -708,7 +708,7 @@ class SceneGraphManager(QObject):
             clim=(0., 1.),
             gamma=1.,
             interpolation='nearest',
-            method='tiled',
+            method='subdivide',
             cmap=self.document.find_colormap('grays'),
             double=False,
             texture_shape=DEFAULT_TEXTURE_SHAPE,
@@ -1006,12 +1006,12 @@ class SceneGraphManager(QObject):
 
     def change_layers_color_limits(self, change_dict):
         for uuid, clims in change_dict.items():
-            LOG.info('changing {} to color limits {}'.format(uuid, clims))
+            LOG.debug('changing {} to color limits {}'.format(uuid, clims))
             self.set_color_limits(clims, uuid)
 
     def change_layers_gamma(self, change_dict):
         for uuid, gamma in change_dict.items():
-            LOG.info('changing {} to gamma {}'.format(uuid, gamma))
+            LOG.debug('changing {} to gamma {}'.format(uuid, gamma))
             self.set_gamma(gamma, uuid)
 
     def change_layers_image_kind(self, change_dict):
@@ -1134,16 +1134,16 @@ class SceneGraphManager(QObject):
             image.parent = None
             del self.image_elements[layer[Info.UUID]]
 
-        overview_content = self.workspace.get_content(layer.uuid, kind=p.kind)
+        image_data = self.workspace.get_content(layer.uuid, kind=p.kind)
         if p.kind == Kind.CONTOUR:
-            return self.add_contour_layer(layer, p, overview_content)
+            return self.add_contour_layer(layer, p, image_data)
 
         if False:  # Set to True FOR TESTING ONLY
-            self._overwrite_with_test_pattern(overview_content)
+            self._overwrite_with_test_pattern(image_data)
 
         if USE_TILED_GEOLOCATED_IMAGES:
             image = TiledGeolocatedImage(
-                overview_content,
+                image_data,
                 layer[Info.ORIGIN_X],
                 layer[Info.ORIGIN_Y],
                 layer[Info.CELL_WIDTH],
@@ -1152,7 +1152,7 @@ class SceneGraphManager(QObject):
                 clim=p.climits,
                 gamma=p.gamma,
                 interpolation='nearest',
-                method='tiled',
+                method='subdivide',
                 cmap=self.document.find_colormap(p.colormap),
                 double=False,
                 texture_shape=DEFAULT_TEXTURE_SHAPE,
@@ -1165,7 +1165,7 @@ class SceneGraphManager(QObject):
             image.determine_reference_points()
         else:
             image = GammaImage(
-                overview_content,
+                image_data,
                 name=str(uuid),
                 clim=p.climits,
                 gamma=p.gamma,
@@ -1202,11 +1202,11 @@ class SceneGraphManager(QObject):
             return
         if p.kind == Kind.RGB:
             dep_uuids = r, g, b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
-            overview_content = list(self.workspace.get_content(cuuid, kind=Kind.IMAGE) for cuuid in dep_uuids)
+            image_data = list(self.workspace.get_content(cuuid, kind=Kind.IMAGE) for cuuid in dep_uuids)
             uuid = layer.uuid
             LOG.debug("Adding composite layer to Scene Graph Manager with UUID: %s", uuid)
             self.image_elements[uuid] = element = RGBCompositeLayer(
-                overview_content,
+                image_data,
                 layer[Info.ORIGIN_X],
                 layer[Info.ORIGIN_Y],
                 layer[Info.CELL_WIDTH],
@@ -1215,7 +1215,7 @@ class SceneGraphManager(QObject):
                 clim=p.climits,
                 gamma=p.gamma,
                 interpolation='nearest',
-                method='tiled',
+                method='subdivide',
                 cmap=None,
                 double=False,
                 texture_shape=DEFAULT_TEXTURE_SHAPE,
@@ -1294,15 +1294,14 @@ class SceneGraphManager(QObject):
                     # RGB selection has changed, rebuild the layer
                     LOG.debug("Changing existing composite layer to Scene Graph Manager with UUID: %s", layer.uuid)
                     dep_uuids = r, g, b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
-                    overview_content = list(self.workspace.get_content(cuuid) for cuuid in dep_uuids)
+                    image_arrays = list(self.workspace.get_content(cuuid) for cuuid in dep_uuids)
                     self.composite_element_dependencies[layer.uuid] = dep_uuids
                     elem = self.image_elements[layer.uuid]
-                    elem.set_channels(overview_content,
+                    elem.set_channels(image_arrays,
                                       cell_width=layer[Info.CELL_WIDTH],
                                       cell_height=layer[Info.CELL_HEIGHT],
                                       origin_x=layer[Info.ORIGIN_X],
                                       origin_y=layer[Info.ORIGIN_Y])
-                    elem.init_overview(overview_content)
                     elem.clim = presentation.climits
                     elem.gamma = presentation.gamma
                     self.on_view_change(None)

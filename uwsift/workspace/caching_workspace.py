@@ -188,19 +188,19 @@ class CachingWorkspace(BaseWorkspace):
     def _bgnd_startup_purge(self):
         ntot = 5
         n = 1
-        yield {TASK_DOING: "DB pruning cache entries".format(n, ntot), TASK_PROGRESS: float(n) / float(ntot)}
+        yield {TASK_DOING: "DB pruning cache entries", TASK_PROGRESS: float(n) / float(ntot)}
         self._purge_missing_content()
         n += 1
-        yield {TASK_DOING: "DB pruning stale resources".format(n, ntot), TASK_PROGRESS: float(n) / float(ntot)}
+        yield {TASK_DOING: "DB pruning stale resources", TASK_PROGRESS: float(n) / float(ntot)}
         self._purge_inaccessible_resources()
         n += 1
-        yield {TASK_DOING: "DB pruning orphan products".format(n, ntot), TASK_PROGRESS: float(n) / float(ntot)}
+        yield {TASK_DOING: "DB pruning orphan products", TASK_PROGRESS: float(n) / float(ntot)}
         self._purge_orphan_products()
         n += 1
-        yield {TASK_DOING: "DB migrating metadata".format(n, ntot), TASK_PROGRESS: float(n) / float(ntot)}
+        yield {TASK_DOING: "DB migrating metadata", TASK_PROGRESS: float(n) / float(ntot)}
         self._migrate_metadata()
         n += 1
-        yield {TASK_DOING: "DB ready".format(n, ntot), TASK_PROGRESS: float(n) / float(ntot)}
+        yield {TASK_DOING: "DB ready", TASK_PROGRESS: float(n) / float(ntot)}
 
     def _then_refresh_mdb_customers(self, *args, **kwargs):
         self.didUpdateProductsMetadata.emit(set())
@@ -332,7 +332,7 @@ class CachingWorkspace(BaseWorkspace):
         :return:
         """
         total = 0
-        for root, dirs, files in os.walk(self.cache_dir):
+        for root, _, files in os.walk(self.cache_dir):
             sz = sum(os.path.getsize(os.path.join(root, name)) for name in files)
             total += sz
             LOG.debug('%d bytes in %s' % (sz, root))

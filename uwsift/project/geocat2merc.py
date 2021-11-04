@@ -166,8 +166,8 @@ def ahi_dataset_metadata(input_filename, dataset_name):
         metadata["valid_max"] = valid_max * scale_factor + add_offset
 
     # mimic satpy metadata
-    metadata["start_time"] = getattr(nc, "Image_Date_Time")
-    metadata["end_time"] = getattr(nc, "Image_Date_Time")
+    metadata["start_time"] = nc.Image_Date_Time
+    metadata["end_time"] = nc.Image_Date_Time
     if "standard_name" not in metadata:
         for k, v in VAR_NAME_STANDARD_NAME.items():
             if dataset_name.endswith(k):

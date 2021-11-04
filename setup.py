@@ -190,7 +190,7 @@ setup(
                  "Topic :: Scientific/Engineering"],
     zip_safe=False,
     include_package_data=True,
-    install_requires=['numpy', 'pillow', 'numba', 'vispy>=0.6.0',
+    install_requires=['numpy', 'pillow', 'numba', 'vispy>=0.7.1',
                       'netCDF4', 'h5py', 'pyproj',
                       'pyshp', 'shapely', 'rasterio', 'sqlalchemy',
                       'appdirs', 'pyyaml', 'pyqtgraph', 'satpy', 'matplotlib',
@@ -199,10 +199,14 @@ setup(
                       'trollsift'
                       ],
     tests_requires=['pytest', 'pytest-qt', 'pytest-mock'],
-    python_requires='>=3.6',
+    python_requires='>=3.7',
     extras_require=extras_require,
     packages=find_packages(),
-    # entry_points={},
+    entry_points={
+        "console_scripts": [
+            "SIFT = uwsift.__main__:main",
+        ],
+    },
     cmdclass={
         'bump': BumpCommand,
     }

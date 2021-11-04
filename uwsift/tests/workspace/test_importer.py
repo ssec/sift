@@ -12,7 +12,9 @@ from satpy import Scene
 from satpy.tests.utils import make_dataid
 from pyresample.geometry import AreaDefinition
 from uwsift.workspace.importer import available_satpy_readers, SatpyImporter
-from uwsift.common import Info
+from uwsift.common import Info, Kind, Platform, Instrument
+
+import pytest
 
 
 def test_available_satpy_readers_defaults():
@@ -84,9 +86,7 @@ def _get_data_array_generator(data_arrs):
     yield from data_arrs
 
 
-def test_satpy_importer_basic(tmpdir, monkeypatch, mocker):
-    """Basic import test using Satpy."""
-    db_sess = mocker.MagicMock()
+def _get_fake_g16_abi_c01_scene(mocker):
     attrs = {
         'name': 'C01',
         'wavelength': (1.0, 2.0, 3.0),
@@ -104,13 +104,45 @@ def test_satpy_importer_basic(tmpdir, monkeypatch, mocker):
         ),
         'start_time': datetime(2018, 9, 10, 17, 0, 31, 100000),
         'end_time': datetime(2018, 9, 10, 17, 11, 7, 800000),
+        'standard_name': 'toa_bidirectional_reflectance',
+        'sensor': 'abi',
+        'platform_name': 'GOES-16',
+        'platform_shortname': 'G16',
     }
     data_arr = xr.DataArray(da.from_array(np.empty((5, 5), dtype=np.float64), chunks='auto'),
                             attrs=attrs)
     scn = Scene()
     scn['C01'] = data_arr
     scn.load = mocker.MagicMock()  # don't do anything on load
+    return scn
 
+
+def _get_fake_g18_abi_c01_scene(mocker):
+    scn = _get_fake_g16_abi_c01_scene(mocker)
+    scn['C01'].attrs['platform_name'] = 'GOES-18'
+    scn['C01'].attrs['platform_shortname'] = 'G18'
+    return scn
+
+
+def _get_fake_g18_abi_c01_scene_no_pname(mocker):
+    # old versions of satpy didn't assign a proper platform_name
+    scn = _get_fake_g18_abi_c01_scene(mocker)
+    scn['C01'].attrs['platform_name'] = None
+    return scn
+
+
+@pytest.mark.parametrize(
+    ["get_scene", "exp_platform"],
+    [
+        (_get_fake_g16_abi_c01_scene, Platform.GOES_16),
+        (_get_fake_g18_abi_c01_scene, Platform.GOES_18),
+        (_get_fake_g18_abi_c01_scene_no_pname, Platform.GOES_18),
+    ]
+)
+def test_satpy_importer_basic(get_scene, exp_platform, tmpdir, monkeypatch, mocker):
+    """Basic import test using Satpy."""
+    db_sess = mocker.MagicMock()
+    scn = get_scene(mocker)
     imp = SatpyImporter(['/test/file.nc'], tmpdir, db_sess,
                         scene=scn,
                         reader='abi_l1b',
@@ -120,3 +152,60 @@ def test_satpy_importer_basic(tmpdir, monkeypatch, mocker):
     products = list(imp.merge_products())
     assert len(products) == 1
     assert products[0].info[Info.CENTRAL_WAVELENGTH] == 2.0
+    assert products[0].info[Info.STANDARD_NAME] == 'toa_bidirectional_reflectance'
+    assert products[0].info[Info.PLATFORM] == exp_platform
+    assert products[0].info[Info.INSTRUMENT] == Instrument.ABI
+
+
+def test_satpy_importer_contour_0_360(tmpdir, monkeypatch, mocker):
+    """Test import of grib contour data using Satpy."""
+    db_sess = mocker.MagicMock()
+    attrs = {
+        'name': 'gh',
+        'level': 125,
+        'area': AreaDefinition(
+            'test', 'test', 'test',
+            {
+                'proj': 'eqc',
+                'lon_0': 0,
+                'pm': 180,
+                'R': 6371229,
+            }, 240, 120,
+            (-20015806.220738243, -10007903.110369122, 20015806.220738243, 10007903.110369122)
+        ),
+        'start_time': datetime(2018, 9, 10, 17, 0, 31, 100000),
+        'end_time': datetime(2018, 9, 10, 17, 11, 7, 800000),
+        'model_time': datetime(2018, 9, 10, 17, 11, 7, 800000),
+        'standard_name': 'geopotential_height',
+    }
+    data_arr = xr.DataArray(da.from_array(np.random.random((120, 240)).astype(np.float64), chunks='auto'),
+                            attrs=attrs)
+    scn = Scene()
+    scn['gh'] = data_arr
+    scn.load = mocker.MagicMock()  # don't do anything on load
+
+    imp = SatpyImporter(['/test/file.nc'], tmpdir, db_sess,
+                        scene=scn,
+                        reader='grib',
+                        dataset_ids=[make_dataid(name='gh', level=125)])
+    imp.merge_resources()
+    assert imp.num_products == 1
+    products = list(imp.merge_products())
+    assert len(products) == 1
+    assert products[0].info[Info.STANDARD_NAME] == 'geopotential_height'
+    assert products[0].info[Info.KIND] == Kind.CONTOUR
+
+    query_mock = mocker.MagicMock(name='query')
+    filter1_mock = mocker.MagicMock(name='filter1')
+    filter2_mock = mocker.MagicMock(name='filter2')
+    db_sess.query.return_value = query_mock
+    query_mock.filter.return_value = filter1_mock
+    filter1_mock.filter.return_value = filter2_mock
+    filter2_mock.all.return_value = products
+    import_gen = imp.begin_import_products()
+    content_progresses = list(import_gen)
+    # image and contour content
+    assert len(content_progresses) == 2
+    # make sure data was swapped to -180/180 space
+    assert (content_progresses[0].data[:, :120] == data_arr.data[:, 120:].astype(np.float32)).all()
+    assert (content_progresses[0].data[:, 120:] == data_arr.data[:, :120].astype(np.float32)).all()

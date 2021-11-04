@@ -10,15 +10,17 @@ SQLAlchemy database tables of metadata used by CachingWorkspace to manage its lo
 
 OVERVIEW
 
-Resource : a file containing products, somewhere in the filesystem,
- |         or a resource on a remote system we can access (openDAP etc)
- |_ Product* : product stored in a resource
-     |_ Content* : workspace cache content corresponding to a product,
-     |   |         may be one of many available views (e.g. projections)
-     |   |_ ContentKeyValue* : additional information on content
-     |_ ProductKeyValue* : additional information on product
-     |_ SymbolKeyValue* : if product is derived from other products,
-                          symbol table for that expression is in this kv table
+::
+
+    Resource : a file containing products, somewhere in the filesystem,
+     |         or a resource on a remote system we can access (openDAP etc)
+     |_ Product* : product stored in a resource
+         |_ Content* : workspace cache content corresponding to a product,
+         |   |         may be one of many available views (e.g. projections)
+         |   |_ ContentKeyValue* : additional information on content
+         |_ ProductKeyValue* : additional information on product
+         |_ SymbolKeyValue* : if product is derived from other products,
+                              symbol table for that expression is in this kv table
 
 A typical baseline product will have two content: and overview (lod==0) and a native resolution (lod>0)
 
@@ -886,7 +888,7 @@ def _debug(type, value, tb):
         sys.__excepthook__(type, value, tb)
     else:
         import traceback
-        import pdb
+        import pdb  # noqa
         traceback.print_exception(type, value, tb)
         # …then start the debugger in post-mortem mode.
         pdb.post_mortem(tb)  # more “modern”
@@ -918,9 +920,6 @@ def main():
 
     levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
     logging.basicConfig(level=levels[min(3, args.verbosity)])
-
-    for pn in args.inputs:
-        pass
 
     return 0
 

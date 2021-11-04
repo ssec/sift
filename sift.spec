@@ -2,7 +2,7 @@
 
 import sys
 from PyInstaller.compat import is_win, is_darwin, is_linux
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 import vispy.glsl
 import vispy.io
 import satpy
@@ -23,14 +23,16 @@ data_files = [
 for shape_dir in ["ne_50m_admin_0_countries", "ne_110m_admin_0_countries", "ne_50m_admin_1_states_provinces_lakes",
                   "fonts", "colormaps", "grib_definitions"]:
     data_files.append((os.path.join("uwsift", "data", shape_dir), os.path.join("sift_data", shape_dir)))
+data_files.extend(collect_data_files('pyspectral'))
 
 hidden_imports = [
     "vispy.ext._bundled.six",
-    "vispy.app.backends._pyqt4",
+    "vispy.app.backends._pyqt5",
     "sqlalchemy.ext.baked",
     "satpy",
     "skimage",
     "skimage.measure",
+    "pyproj.datadir",
 ] + collect_submodules("rasterio") + collect_submodules('satpy')
 if is_win:
     hidden_imports += collect_submodules("encodings")
@@ -51,13 +53,15 @@ def _include_if_exists(binaries, lib_dir, lib_pattern):
 # Add missing shared libraries
 binaries = []
 if is_linux:
-    lib_dir = sys.executable.replace(os.path.join("bin", "python"), "lib")
+    bin_idx = sys.executable.rfind("/bin")
+    lib_dir = os.path.join(sys.executable[:bin_idx], "lib")
     binaries += [(os.path.join(lib_dir, 'libfontconfig*.so'), '.')]
 if not is_win:
     # Add extra pygrib .def files
-    share_dir = sys.executable.replace(os.path.join("bin", "python"), "share")
-    lib_dir = sys.executable.replace(os.path.join("bin", "python"), "lib")
-    bin_dir = sys.executable.replace(os.path.join("bin", "python"), "bin")
+    bin_idx = sys.executable.rfind("/bin")
+    share_dir = os.path.join(sys.executable[:bin_idx], "share")
+    lib_dir = os.path.join(sys.executable[:bin_idx], "lib")
+    bin_dir = os.path.join(sys.executable[:bin_idx], "bin")
     data_files.append((os.path.join(share_dir, 'eccodes'), os.path.join('share', 'eccodes')))
     # Add ffmpeg
     binaries += [(os.path.join(bin_dir, 'ffmpeg'), '.')]
