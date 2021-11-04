@@ -1087,10 +1087,10 @@ class SceneGraphManager(QObject):
 
         return data
 
-    def add_contour_layer(self, layer: DocBasicLayer, p: Presentation, overview_content: np.ndarray):
-        verts = overview_content[:, :2]
-        connects = overview_content[:, 2].astype(np.bool)
-        level_indexes = overview_content[:, 3]
+    def add_contour_layer(self, layer: DocBasicLayer, p: Presentation, image_data: np.ndarray):
+        verts = image_data[:, :2]
+        connects = image_data[:, 2].astype(np.bool)
+        level_indexes = image_data[:, 3]
         level_indexes = level_indexes[~np.isnan(level_indexes)].astype(np.int)
         levels = layer["contour_levels"]
         cmap = self.document.find_colormap(p.colormap)
