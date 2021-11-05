@@ -48,7 +48,7 @@ from vispy import app
 from vispy import scene
 from vispy.geometry import Rect
 from vispy.gloo.util import _screenshot
-from vispy.scene.visuals import Markers, Polygon, Compound, Line
+from vispy.scene.visuals import Image, Markers, Polygon, Compound, Line
 from vispy.util.keys import SHIFT
 from vispy.visuals import LineVisual
 from vispy.visuals.transforms import STTransform, MatrixTransform, ChainTransform
@@ -65,7 +65,7 @@ from uwsift.view.cameras import PanZoomProbeCamera
 from uwsift.view.probes import DEFAULT_POINT_PROBE
 from uwsift.view.transform import PROJ4Transform
 from uwsift.view.visuals import (NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer,
-                                 PrecomputedIsocurve, GammaImage, Vectors)
+                                 PrecomputedIsocurve, Vectors)
 from uwsift.workspace.utils.metadata_utils import (
     map_point_style_to_marker_kwargs, get_point_style_by_name)
 
@@ -968,7 +968,7 @@ class SceneGraphManager(QObject):
         for uuid in uuids:
             layer = self.image_elements[uuid]
             if (isinstance(layer, TiledGeolocatedImage)
-                    or isinstance(layer, GammaImage)):
+                    or isinstance(layer, Image)):
                 self.image_elements[uuid].cmap = colormap
             else:
                 self.image_elements[uuid].color = colormap
@@ -1126,7 +1126,7 @@ class SceneGraphManager(QObject):
             if p.kind == Kind.IMAGE and isinstance(image, TiledGeolocatedImage):
                 LOG.warning("Image layer (geolocated) already exists in scene")
                 return
-            if p.kind == Kind.IMAGE and isinstance(image, GammaImage):
+            if p.kind == Kind.IMAGE and isinstance(image, Image):
                 LOG.warning("Image layer (pixel matrix) already exists in scene")
                 return
             # we already have an image layer for it and it isn't what we want
@@ -1164,7 +1164,7 @@ class SceneGraphManager(QObject):
             image.transform *= STTransform(translate=(0, 0, -50.0))
             image.determine_reference_points()
         else:
-            image = GammaImage(
+            image = Image(
                 image_data,
                 name=str(uuid),
                 clim=p.climits,
@@ -1188,7 +1188,6 @@ class SceneGraphManager(QObject):
             z_transform = STTransform(translate=(0, 0, -50))
             image.transform = ChainTransform([calibration_transform,
                                               z_transform])
-
         self.image_elements[uuid] = image
         self.layer_set.add_layer(image)  # TODO This method should add a z-transform!
 
