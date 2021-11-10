@@ -4,7 +4,7 @@ data_reading:
     - fci_l1_cat_lmk_loc
     - fci_l1_geoobs_lmk_loc
     - fci_l1_geoobs_lmk_nav_err
-    - fci_l1c_fdhsi
+    - fci_l1c_nc
     - li_l1b_bck_nc
     - seviri_l1b_hrit
     - avhrr_l1b_eps
