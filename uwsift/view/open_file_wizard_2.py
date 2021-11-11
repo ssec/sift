@@ -448,7 +448,7 @@ class OpenFileWizard(QtWidgets.QWizard):
             table.setSortingEnabled(False)
             for file in os.listdir(folder):
                 try:
-                    if  len(pattern_convert_dict) == 0:
+                    if len(pattern_convert_dict) == 0:
                         # if pattern is empty, show all files
                         table.insertRow(table.rowCount())
                         table.setItem(table.rowCount() - 1, 1, QtWidgets.QTableWidgetItem(file))
