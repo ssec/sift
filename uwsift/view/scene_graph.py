@@ -48,7 +48,7 @@ from vispy import app
 from vispy import scene
 from vispy.geometry import Rect
 from vispy.gloo.util import _screenshot
-from vispy.scene.visuals import Markers, Polygon, Compound, Line
+from vispy.scene.visuals import Image, Markers, Polygon, Compound, Line
 from vispy.util.keys import SHIFT
 from vispy.visuals import LineVisual
 from vispy.visuals.transforms import STTransform, MatrixTransform, ChainTransform
@@ -64,8 +64,10 @@ from uwsift.util import get_package_data_dir
 from uwsift.view.cameras import PanZoomProbeCamera
 from uwsift.view.probes import DEFAULT_POINT_PROBE
 from uwsift.view.transform import PROJ4Transform
-from uwsift.view.visuals import (NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer,
-                                 PrecomputedIsocurve, GammaImage, Vectors)
+from uwsift.view.visuals import (NEShapefileLines, TiledGeolocatedImage,
+                                 MultiChannelImage,
+                                 RGBCompositeLayer,
+                                 PrecomputedIsocurve, Vectors)
 from uwsift.workspace.utils.metadata_utils import (
     map_point_style_to_marker_kwargs, get_point_style_by_name)
 
@@ -708,7 +710,7 @@ class SceneGraphManager(QObject):
             clim=(0., 1.),
             gamma=1.,
             interpolation='nearest',
-            method='tiled',
+            method='subdivide',
             cmap=self.document.find_colormap('grays'),
             double=False,
             texture_shape=DEFAULT_TEXTURE_SHAPE,
@@ -968,7 +970,7 @@ class SceneGraphManager(QObject):
         for uuid in uuids:
             layer = self.image_elements[uuid]
             if (isinstance(layer, TiledGeolocatedImage)
-                    or isinstance(layer, GammaImage)):
+                    or isinstance(layer, Image)):
                 self.image_elements[uuid].cmap = colormap
             else:
                 self.image_elements[uuid].color = colormap
@@ -1006,12 +1008,12 @@ class SceneGraphManager(QObject):
 
     def change_layers_color_limits(self, change_dict):
         for uuid, clims in change_dict.items():
-            LOG.info('changing {} to color limits {}'.format(uuid, clims))
+            LOG.debug('changing {} to color limits {}'.format(uuid, clims))
             self.set_color_limits(clims, uuid)
 
     def change_layers_gamma(self, change_dict):
         for uuid, gamma in change_dict.items():
-            LOG.info('changing {} to gamma {}'.format(uuid, gamma))
+            LOG.debug('changing {} to gamma {}'.format(uuid, gamma))
             self.set_gamma(gamma, uuid)
 
     def change_layers_image_kind(self, change_dict):
@@ -1087,10 +1089,10 @@ class SceneGraphManager(QObject):
 
         return data
 
-    def add_contour_layer(self, layer: DocBasicLayer, p: Presentation, overview_content: np.ndarray):
-        verts = overview_content[:, :2]
-        connects = overview_content[:, 2].astype(np.bool)
-        level_indexes = overview_content[:, 3]
+    def add_contour_layer(self, layer: DocBasicLayer, p: Presentation, image_data: np.ndarray):
+        verts = image_data[:, :2]
+        connects = image_data[:, 2].astype(np.bool)
+        level_indexes = image_data[:, 3]
         level_indexes = level_indexes[~np.isnan(level_indexes)].astype(np.int)
         levels = layer["contour_levels"]
         cmap = self.document.find_colormap(p.colormap)
@@ -1126,7 +1128,7 @@ class SceneGraphManager(QObject):
             if p.kind == Kind.IMAGE and isinstance(image, TiledGeolocatedImage):
                 LOG.warning("Image layer (geolocated) already exists in scene")
                 return
-            if p.kind == Kind.IMAGE and isinstance(image, GammaImage):
+            if p.kind == Kind.IMAGE and isinstance(image, Image):
                 LOG.warning("Image layer (pixel matrix) already exists in scene")
                 return
             # we already have an image layer for it and it isn't what we want
@@ -1134,16 +1136,16 @@ class SceneGraphManager(QObject):
             image.parent = None
             del self.image_elements[layer[Info.UUID]]
 
-        overview_content = self.workspace.get_content(layer.uuid, kind=p.kind)
+        image_data = self.workspace.get_content(layer.uuid, kind=p.kind)
         if p.kind == Kind.CONTOUR:
-            return self.add_contour_layer(layer, p, overview_content)
+            return self.add_contour_layer(layer, p, image_data)
 
         if False:  # Set to True FOR TESTING ONLY
-            self._overwrite_with_test_pattern(overview_content)
+            self._overwrite_with_test_pattern(image_data)
 
         if USE_TILED_GEOLOCATED_IMAGES:
             image = TiledGeolocatedImage(
-                overview_content,
+                image_data,
                 layer[Info.ORIGIN_X],
                 layer[Info.ORIGIN_Y],
                 layer[Info.CELL_WIDTH],
@@ -1152,7 +1154,7 @@ class SceneGraphManager(QObject):
                 clim=p.climits,
                 gamma=p.gamma,
                 interpolation='nearest',
-                method='tiled',
+                method='subdivide',
                 cmap=self.document.find_colormap(p.colormap),
                 double=False,
                 texture_shape=DEFAULT_TEXTURE_SHAPE,
@@ -1164,8 +1166,8 @@ class SceneGraphManager(QObject):
             image.transform *= STTransform(translate=(0, 0, -50.0))
             image.determine_reference_points()
         else:
-            image = GammaImage(
-                overview_content,
+            image = Image(
+                image_data,
                 name=str(uuid),
                 clim=p.climits,
                 gamma=p.gamma,
@@ -1188,7 +1190,6 @@ class SceneGraphManager(QObject):
             z_transform = STTransform(translate=(0, 0, -50))
             image.transform = ChainTransform([calibration_transform,
                                               z_transform])
-
         self.image_elements[uuid] = image
         self.layer_set.add_layer(image)  # TODO This method should add a z-transform!
 
@@ -1202,35 +1203,67 @@ class SceneGraphManager(QObject):
             return
         if p.kind == Kind.RGB:
             dep_uuids = r, g, b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
-            overview_content = list(self.workspace.get_content(cuuid, kind=Kind.IMAGE) for cuuid in dep_uuids)
+            image_data = list(self.workspace.get_content(cuuid, kind=Kind.IMAGE) for cuuid in dep_uuids)
             uuid = layer.uuid
             LOG.debug("Adding composite layer to Scene Graph Manager with UUID: %s", uuid)
-            self.image_elements[uuid] = element = RGBCompositeLayer(
-                overview_content,
-                layer[Info.ORIGIN_X],
-                layer[Info.ORIGIN_Y],
-                layer[Info.CELL_WIDTH],
-                layer[Info.CELL_HEIGHT],
-                name=str(uuid),
-                clim=p.climits,
-                gamma=p.gamma,
-                interpolation='nearest',
-                method='tiled',
-                cmap=None,
-                double=False,
-                texture_shape=DEFAULT_TEXTURE_SHAPE,
-                wrap_lon=False,
-                parent=self.main_map,
-                projection=layer[Info.PROJ],
-            )
-            element.transform = PROJ4Transform(layer[Info.PROJ], inverse=True)
-            element.transform *= STTransform(translate=(0, 0, -50.0))
-            self.composite_element_dependencies[uuid] = dep_uuids
-            self.layer_set.add_layer(element)
-            if new_order:
-                self.layer_set.set_layer_order(new_order)
-            self.on_view_change(None)
-            element.determine_reference_points()
+            if USE_TILED_GEOLOCATED_IMAGES:
+                self.image_elements[uuid] = element = RGBCompositeLayer(
+                    image_data,
+                    layer[Info.ORIGIN_X],
+                    layer[Info.ORIGIN_Y],
+                    layer[Info.CELL_WIDTH],
+                    layer[Info.CELL_HEIGHT],
+                    name=str(uuid),
+                    clim=p.climits,
+                    gamma=p.gamma,
+                    interpolation='nearest',
+                    method='subdivide',
+                    cmap=None,
+                    double=False,
+                    texture_shape=DEFAULT_TEXTURE_SHAPE,
+                    wrap_lon=False,
+                    parent=self.main_map,
+                    projection=layer[Info.PROJ],
+                )
+                element.transform = PROJ4Transform(layer[Info.PROJ], inverse=True)
+                element.transform *= STTransform(translate=(0, 0, -50.0))
+                self.composite_element_dependencies[uuid] = dep_uuids
+                self.layer_set.add_layer(element)
+                if new_order:
+                    self.layer_set.set_layer_order(new_order)
+                self.on_view_change(None)
+                element.determine_reference_points()
+            else:
+                self.image_elements[uuid] = element = MultiChannelImage(
+                    image_data,
+                    name=str(uuid),
+                    clim=p.climits,
+                    gamma=p.gamma,
+                    interpolation='nearest',
+                    cmap=None,
+                    parent=self.main_map_parent
+                )
+                # TODO: We must use a ChainTransform, because of the assumption made
+                # in LayerSet.update_layers_z(): there it is assumed, that the
+                # (last) transformation of the layer can be overwritten incautiously
+                # since it would only carry z translation. So the question: why
+                # doesn't LayerSet.add_layer() take care to guarantee this?
+                # Anyhow, here we can't concatenate two STTransforms with *= because
+                # they would end up in *one* transform whose 'translate' part would
+                # be overwritten in LayerSet.update_layers_z(), i.e. any x,y-offset
+                # would be reset to 0.0,0.0.
+                calibration_transform = STTransform(
+                    scale=(layer[Info.CELL_WIDTH], layer[Info.CELL_HEIGHT], 1),
+                    translate=(layer[Info.ORIGIN_X], layer[Info.ORIGIN_Y], 0))
+                z_transform = STTransform(translate=(0, 0, -50))
+                element.transform = ChainTransform([calibration_transform,
+                                                    z_transform])
+                self.composite_element_dependencies[uuid] = dep_uuids
+                self.layer_set.add_layer(element)
+                if new_order:
+                    self.layer_set.set_layer_order(new_order)
+                self.on_view_change(None)
+
             self.update()
             return True
         elif p.kind in [Kind.COMPOSITE, Kind.IMAGE]:
@@ -1294,19 +1327,20 @@ class SceneGraphManager(QObject):
                     # RGB selection has changed, rebuild the layer
                     LOG.debug("Changing existing composite layer to Scene Graph Manager with UUID: %s", layer.uuid)
                     dep_uuids = r, g, b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
-                    overview_content = list(self.workspace.get_content(cuuid) for cuuid in dep_uuids)
+                    image_arrays = list(self.workspace.get_content(cuuid) for cuuid in dep_uuids)
                     self.composite_element_dependencies[layer.uuid] = dep_uuids
                     elem = self.image_elements[layer.uuid]
-                    elem.set_channels(overview_content,
-                                      cell_width=layer[Info.CELL_WIDTH],
-                                      cell_height=layer[Info.CELL_HEIGHT],
-                                      origin_x=layer[Info.ORIGIN_X],
-                                      origin_y=layer[Info.ORIGIN_Y])
-                    elem.init_overview(overview_content)
+                    if isinstance(elem, RGBCompositeLayer):
+                        elem.set_channels(image_arrays,
+                                          cell_width=layer[Info.CELL_WIDTH],
+                                          cell_height=layer[Info.CELL_HEIGHT],
+                                          origin_x=layer[Info.ORIGIN_X],
+                                          origin_y=layer[Info.ORIGIN_Y])
                     elem.clim = presentation.climits
                     elem.gamma = presentation.gamma
                     self.on_view_change(None)
-                    elem.determine_reference_points()
+                    if isinstance(elem, RGBCompositeLayer):
+                        elem.determine_reference_points()
                 else:
                     # layer is no longer valid and has to be removed
                     LOG.debug("Purging composite ")

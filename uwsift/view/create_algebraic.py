@@ -31,7 +31,7 @@ class CreateAlgebraicDialog(QtWidgets.QDialog):
         available_short_names = []
         selected_short_names = []
         # use DATASET_NAME as unique group identifier
-        for idx, prez, layer in self.doc.current_layers_where(kinds=(Kind.IMAGE, Kind.COMPOSITE)):
+        for _, _, layer in self.doc.current_layers_where(kinds=(Kind.IMAGE, Kind.COMPOSITE)):
             # use the UUID as a representative when talking to the document
             available_info.setdefault(layer[Info.SHORT_NAME],
                                       layer[Info.UUID])

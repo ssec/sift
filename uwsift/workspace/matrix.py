@@ -11,19 +11,17 @@ Some states have UUIDs and therefore data
 Search directories and create index of what data is where
 Used by Workspace to respond to adjacency queries / product matrix requests
 
-USAGE
+USAGE::
 
-dm = DataAdjacencyMatrix('/data', recurse=True)
-# search through files
-for _ in dm.finditer():
-    pass
-ds = dm.ix['myproduct', 0]
-if ds.state!=state.CACHED:
-    for _ in ds.loaditer(my_workspace):
+    dm = DataAdjacencyMatrix('/data', recurse=True)
+    # search through files
+    for _ in dm.finditer():
         pass
-uuid = ds.uuid
-
-
+    ds = dm.ix['myproduct', 0]
+    if ds.state!=state.CACHED:
+        for _ in ds.loaditer(my_workspace):
+            pass
+    uuid = ds.uuid
 
 REFERENCES
 
@@ -38,11 +36,7 @@ REQUIRES
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
-import argparse
 import logging
-import os
-import sys
-import unittest
 from collections import namedtuple
 from datetime import timedelta
 from enum import Enum
@@ -83,9 +77,6 @@ class DataAdjacencyMatrix(QObject):
     - manages default presentation on a per-product basis
     - allows re-ordering of products, resulting in z-order scenegraph changes
     """
-
-    def __init__(self, initial_search_paths=[]):
-        super(DataAdjacencyMatrix, self).__init__()
 
     def add_search_paths(self, *paths):
         pass
@@ -130,61 +121,3 @@ class DataAdjacencyMatrix(QObject):
         :param do_signal: whether or not to propagate a Qt refresh signal
         :return: True if dimensionality changed
         """
-
-
-class tests(unittest.TestCase):
-    data_file = os.environ.get('TEST_DATA', os.path.expanduser("~/Data/test_files/thing.dat"))
-
-    def setUp(self):
-        pass
-
-    def test_something(self):
-        pass
-
-
-def _debug(type, value, tb):
-    "enable with sys.excepthook = debug"
-    if not sys.stdin.isatty():
-        sys.__excepthook__(type, value, tb)
-    else:
-        import traceback
-        import pdb
-        traceback.print_exception(type, value, tb)
-        # …then start the debugger in post-mortem mode.
-        pdb.post_mortem(tb)  # more “modern”
-
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="PURPOSE",
-        epilog="",
-        fromfile_prefix_chars='@')
-    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG')
-    parser.add_argument('-d', '--debug', dest='debug', action='store_true',
-                        help="enable interactive PDB debugger on exception")
-    # http://docs.python.org/2.7/library/argparse.html#nargs
-    # parser.add_argument('--stuff', nargs='5', dest='my_stuff',
-    #                    help="one or more random things")
-    parser.add_argument('inputs', nargs='*',
-                        help="input files to process")
-    args = parser.parse_args()
-
-    levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
-    logging.basicConfig(level=levels[min(3, args.verbosity)])
-
-    if args.debug:
-        sys.excepthook = _debug
-
-    if not args.inputs:
-        unittest.main()
-        return 0
-
-    for pn in args.inputs:
-        pass
-
-    return 0
-
-
-if __name__ == '__main__':
-    sys.exit(main())

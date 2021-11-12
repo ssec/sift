@@ -68,15 +68,8 @@ from uwsift.workspace import CachingWorkspace, SimpleWorkspace
 from uwsift.workspace.collector import ResourceSearchPathCollector
 
 LOG = logging.getLogger(__name__)
-
 # re-configure loggers instantiated meanwhile
 configure_loggers()
-
-app_object = app.use_app('pyqt5')
-APP: QtGui.QApplication = app_object.native
-# LOOP = QEventLoop(APP)
-# asyncio.set_event_loop(LOOP)  # NEW must set the event loop
-
 
 PROGRESS_BAR_MAX = 1000
 STATUS_BAR_DURATION = 2000  # ms
@@ -435,17 +428,17 @@ class UserControlsAnimation(QtCore.QObject):
             self.ui.statusbar.showMessage("ERROR: Layer with time steps or band siblings needed", STATUS_BAR_DURATION)
         LOG.info('using siblings of {} for animation loop'.format(uuids[0] if uuids else '-unknown-'))
 
-    def toggle_animation(self, action: QtGui.QAction = None, *args):
+    def toggle_animation(self, action: QtWidgets.QAction = None, *args):
         """Toggle animation on/off."""
         new_state = self.scene_manager.layer_set.toggle_animation()
         self.ui.animPlayPause.setChecked(new_state)
 
 
-class Main(QtGui.QMainWindow):
+class Main(QtWidgets.QMainWindow):
     _last_open_dir: str = None  # directory to open files in
-    _recent_files_menu: QtGui.QMenu = None  # QMenu
-    _open_cache_dialog: QtGui.QDialog = None
-    _screenshot_dialog: QtGui.QDialog = None
+    _recent_files_menu: QtWidgets.QMenu = None  # QMenu
+    _open_cache_dialog: QtWidgets.QDialog = None
+    _screenshot_dialog: QtWidgets.QDialog = None
     _cmap_editor = None  # Gradient editor widget
     _resource_collector: ResourceSearchPathCollector = None
     _resource_collector_timer: QtCore.QTimer = None
@@ -685,7 +678,7 @@ class Main(QtGui.QMainWindow):
         gv = self.ui.timelineView
 
         # set up the widget itself
-        gv.setViewportUpdateMode(QtGui.QGraphicsView.FullViewportUpdate)
+        gv.setViewportUpdateMode(QtWidgets.QGraphicsView.FullViewportUpdate)
         gv.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
         gv.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
         # gv.setRenderHints(QtGui.QPainter.Antialiasing)
@@ -696,7 +689,7 @@ class Main(QtGui.QMainWindow):
             LOG.debug("Potential tracks: {}".format(repr(doc.track_order)))
         self._timeline_scene = SiftDocumentAsFramesInTracks(doc, self.workspace)
         gv.setScene(self._timeline_scene)
-        APP.aboutToQuit.connect(self._timeline_scene.clear)
+        QtWidgets.QApplication.instance().aboutToQuit.connect(self._timeline_scene.clear)
 
         self._timeline_scene.sync_items()
 
@@ -718,7 +711,7 @@ class Main(QtGui.QMainWindow):
         """
         unreachable_object_count = gc.collect()
         LOG.debug(f"GC found {unreachable_object_count} unreachable objects")
-        
+
     def _update_heartbeat_file(self, reordered_layers: tuple, uuid: UUID,
                                p: Presentation):
         """
@@ -1264,6 +1257,7 @@ class Main(QtGui.QMainWindow):
         if wizard_dialog.exec_():
             LOG.info("Loading products from open wizard...")
             scenes = wizard_dialog.scenes
+            reader = wizard_dialog.previous_reader
             importer_kwargs = {
                 'reader': wizard_dialog.get_reader_name(),
                 'scenes': scenes,
@@ -1277,7 +1271,7 @@ class Main(QtGui.QMainWindow):
             LOG.debug("Wizard closed, nothing to load")
         self._wizard_dialog = None
 
-    def remove_region_polygon(self, action: QtGui.QAction = None, *args):
+    def remove_region_polygon(self, action: QtWidgets.QAction = None, *args):
         if self.scene_manager._current_tool == Tool.REGION_PROBE:
             self.ui.panZoomToolButton.click()
 
@@ -1293,7 +1287,7 @@ class Main(QtGui.QMainWindow):
             LOG.info("Clearing polygon with name '%s'", removed_name)
             self.scene_manager.remove_polygon(removed_name)
 
-    def create_algebraic(self, action: QtGui.QAction = None, uuids=None, composite_type=CompositeType.ARITHMETIC):
+    def create_algebraic(self, action: QtWidgets.QAction = None, uuids=None, composite_type=CompositeType.ARITHMETIC):
         if uuids is None:
             uuids = list(self.layer_list_model.current_selected_uuids())
         dialog = CreateAlgebraicDialog(self.document, uuids, parent=self)
@@ -1480,6 +1474,15 @@ def _search_paths(arglist):
             yield subpath
 
 
+def create_app() -> (app.Application, QtWidgets.QApplication):
+    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+    vispy_app = app.use_app('pyqt5')
+    qt_app = vispy_app.create()
+    if hasattr(QtWidgets.QStyleFactory, 'AA_UseHighDpiPixmaps'):
+        qt_app.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
+    return vispy_app, qt_app
+
+
 def main() -> int:
     import argparse
     parser = argparse.ArgumentParser(description="Run SIFT")
@@ -1529,10 +1532,7 @@ def main() -> int:
 
     LOG.info("Using configuration directory: %s", args.config_dir)
     LOG.info("Using cache directory: %s", args.cache_dir)
-    app.create()
-    APP.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
-    if hasattr(QtWidgets.QStyleFactory, 'AA_UseHighDpiPixmaps'):
-        APP.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
+    vispy_app, qt_app = create_app()
 
     # Add our own fonts to Qt windowing system
     font_pattern = os.path.join(get_package_data_dir(), 'fonts', '*')
@@ -1569,7 +1569,7 @@ def main() -> int:
         auto_update_manager = AutoUpdateManager(window, minimum_interval)
 
     # run the event loop until the user closes the application
-    exit_code = app.run()
+    exit_code = vispy_app.run()
     # Workaround PyCharm issue: The PyCharm dev console raises a TypeError if
     # None is passed to 'sys.exit()'. Thus replace None by 0, both represent
     # success for 'sys.exit()'.

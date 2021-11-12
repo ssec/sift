@@ -100,7 +100,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         super(OpenFileWizard, self).__init__(parent)
 
         self.current_dir = base_dir
-        self._previous_reader = None
+        self.previous_reader = None
 
         # tuple(filenames) -> scene object
         self.scenes = {}

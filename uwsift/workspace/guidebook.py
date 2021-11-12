@@ -41,12 +41,12 @@ class Guidebook(object):
         return None, None
 
     def time_siblings(self, uuid, infos):
-        """
-        determine the time siblings of a given dataset
+        """Determine the time siblings of a given dataset.
+
         :param uuid: uuid of the dataset we're interested in
         :param infos: datasetinfo_dict sequence, available datasets
         :return: (list,offset:int): list of [uuid,uuid,uuid] for siblings in order;
-                 offset of where the input is found in list
+            offset of where the input is found in list
         """
         return None, None
 
@@ -110,6 +110,8 @@ NOMINAL_WAVELENGTHS = {
 
     Platform.GOES_16: _NW_GOESR_ABI,
     Platform.GOES_17: _NW_GOESR_ABI,
+    Platform.GOES_18: _NW_GOESR_ABI,
+    Platform.GOES_19: _NW_GOESR_ABI,
 }
 
 # CF compliant Standard Names (should be provided by input files or the workspace)
@@ -185,6 +187,8 @@ class ABI_AHI_Guidebook(Guidebook):
         z = {}
 
         band_short_name = info.get(Info.DATASET_NAME, '???')
+        # FIXME: Don't use pure DATASET_NAME since resolution should not be part of the SHORT_NAME
+        #        And/or don't use SHORT_NAME for grouping
         if Info.SHORT_NAME not in info:
             z[Info.SHORT_NAME] = band_short_name
         else:
@@ -192,7 +196,7 @@ class ABI_AHI_Guidebook(Guidebook):
         if Info.LONG_NAME not in info:
             z[Info.LONG_NAME] = info.get(Info.SHORT_NAME, z[Info.SHORT_NAME])
 
-        z.setdefault(info.get(Info.STANDARD_NAME, 'unknown'))
+        z.setdefault(Info.STANDARD_NAME, info.get(Info.STANDARD_NAME, 'unknown'))
         if info.get(Info.UNITS, z.get(Info.UNITS)) in ['K', 'Kelvin']:
             z[Info.UNITS] = 'kelvin'
 

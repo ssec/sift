@@ -1,0 +1,57 @@
+name: test-environment
+channels:
+  - conda-forge
+dependencies:
+  - appdirs
+  - Cython
+  - imageio
+  - imageio-ffmpeg
+  - matplotlib
+  - numba
+  - numpy
+  - pyproj
+  - pyshp
+  - pyqt
+  - pyqtgraph
+  - satpy
+  - scikit-image
+  - shapely
+  - sqlalchemy
+  - vispy
+  ### Satpy-only Optional Deps
+  - bottleneck
+  - dask
+  - donfig
+  # 2.19.1 seems to cause library linking issues
+  - eccodes>=2.20
+  - fsspec
+  - h5netcdf
+  - h5py
+  - netcdf4
+  - pillow
+  - pooch
+  - pyhdf
+  - pyresample
+  - python-eccodes
+  - python-geotiepoints
+  - pyyaml
+  - rasterio
+  - rioxarray
+  - xarray
+  - zarr
+  ### Development/Test dependencies
+  - coveralls
+  - coverage
+  - codecov
+  - pytest
+  - pytest-cov
+  - pytest-mock
+  - pytest-qt
+  - pip
+  - sphinx
+  ### Pip Dependencies
+  - pip:
+    - trollsift
+    - trollimage
+    - pyspectral
+    - pyorbital

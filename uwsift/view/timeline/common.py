@@ -113,7 +113,7 @@ class CoordTransform(QObject):
         self._time_base = new_settings.t
         self._time_unit = new_settings.d
 
-    def __init__(self, time_base: datetime = None, time_unit: timedelta = timedelta(seconds=1), track_height=None):
+    def __init__(self, time_base: datetime = None, time_unit: timedelta = None, track_height=None):
         """
 
         Args:
@@ -121,13 +121,15 @@ class CoordTransform(QObject):
             time_unit: time width corresponding to delta-X=1.0, defaults to 1.0s
             track_height: pixels high to display individual ttracks
         """
+        if time_unit is None:
+            time_unit = timedelta(seconds=1)
         super(CoordTransform, self).__init__()
         self._time_base = time_base or datetime.utcnow()
         self._time_unit = time_unit
         self._track_height = track_height or GFXC.track_height
 
-    def calc_time_duration(self, scene_x: [float, None], scene_w: [float, None]) -> Tuple[
-            Optional[datetime], Optional[timedelta]]:
+    def calc_time_duration(self, scene_x: Optional[float], scene_w: Optional[float]
+                           ) -> Tuple[Optional[datetime], Optional[timedelta]]:
         """Calculate time and duration given scene X coordinate and width (from QRectF typically)
 
         Args:
@@ -149,8 +151,8 @@ class CoordTransform(QObject):
         """
         return self._track_height * (0.5 + float(self._max_z - z))
 
-    def calc_scene_rect(self, ztd: ztdtup = None, z: int = None, t: datetime = None, d: timedelta = None) -> [QRectF,
-                                                                                                              None]:
+    def calc_scene_rect(self, ztd: ztdtup = None, z: int = None, t: datetime = None, d: timedelta = None
+                        ) -> Optional[QRectF]:
         """
         calculate scene coordinates given time and Z
         Args:

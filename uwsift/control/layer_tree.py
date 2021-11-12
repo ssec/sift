@@ -712,12 +712,14 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             return True
         elif role == Qt.DisplayRole:
             if index.isValid():
-                LOG.debug("changing row {} name to {0!r:s}".format(index.row(), data))
+                LOG.debug("changing row {0} name to {1!r:s}".format(index.row(), data))
                 self.doc.change_layer_name(index.row(), data)
                 return True
         return False
 
-    def insertRows(self, row, count, parent=QModelIndex()):
+    def insertRows(self, row, count, parent=None):
+        if parent is None:
+            parent = QModelIndex()
         self.beginInsertRows(QModelIndex(), row, row + count - 1)
         LOG.debug(">>>> INSERT {} rows".format(count))
         # TODO: insert 'count' empty rows into document

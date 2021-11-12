@@ -1,3 +1,111 @@
+## Version 1.2.2 (2021/10/29)
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 330](https://github.com/ssec/sift/pull/330) - Fix line edits changing to unwanted value
+
+In this release 1 pull request was closed.
+
+
+## Version 1.2.1 (2021/10/28)
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 329](https://github.com/ssec/sift/pull/329) - Fix compatibility with vispy 0.8.0+
+
+In this release 1 pull request was closed.
+
+
+## Version 1.2.0 (2021/09/18)
+
+### Issues Closed
+
+* [Issue 325](https://github.com/ssec/sift/issues/325) - GOES-18 ([PR 326](https://github.com/ssec/sift/pull/326) by [@djhoese](https://github.com/djhoese))
+* [Issue 323](https://github.com/ssec/sift/issues/323) - Color limit sliders only respond to direct click events ([PR 324](https://github.com/ssec/sift/pull/324) by [@djhoese](https://github.com/djhoese))
+
+In this release 2 issues were closed.
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 326](https://github.com/ssec/sift/pull/326) - Fix GOES-18 platform not being recognized properly ([325](https://github.com/ssec/sift/issues/325))
+* [PR 319](https://github.com/ssec/sift/pull/319) - Fix half pixel offset for point probing
+* [PR 317](https://github.com/ssec/sift/pull/317) - Fix validity check of reprojected mesh in TiledGelocatedImageVisual
+* [PR 316](https://github.com/ssec/sift/pull/316) - Improve log message when tiled image isn't displayed
+
+#### Features added
+
+* [PR 324](https://github.com/ssec/sift/pull/324) - Update color limit sliders to update display instantly ([323](https://github.com/ssec/sift/issues/323))
+* [PR 318](https://github.com/ssec/sift/pull/318) - Remove background/overview image tile
+* [PR 312](https://github.com/ssec/sift/pull/312) - Update to work with VisPy 0.7
+
+In this release 7 pull requests were closed.
+
+
+## Version 1.1.6 (2021/01/11)
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 311](https://github.com/ssec/sift/pull/311) - Retain forward slash before Libary in prefix
+
+In this release 1 pull request was closed.
+
+
+## Version 1.1.5 (2021/01/11)
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 310](https://github.com/ssec/sift/pull/310) - Replace / with \\ throughout Prefix where present in qt.conf, to fix …
+* [PR 309](https://github.com/ssec/sift/pull/309) - Fix importing data with newer versions of Satpy
+
+In this release 2 pull requests were closed.
+
+
+## Version 1.1.4 (2021/01/07)
+
+### Issues Closed
+
+* [Issue 297](https://github.com/ssec/sift/issues/297) - SIFT 1.1.3 windows experimental builds do not start ([PR 302](https://github.com/ssec/sift/pull/302))
+
+In this release 1 issue was closed.
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 307](https://github.com/ssec/sift/pull/307) - Fix issues related with newer versions of Satpy and Pyyaml
+* [PR 301](https://github.com/ssec/sift/pull/301) - Add support for Satpy 0.23+ and PROJ 6.0+
+
+In this release 2 pull requests were closed.
+
+
+## Version 1.1.3 (2020/06/12)
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 296](https://github.com/ssec/sift/pull/296) - Update bundle scripts to handle installation directory being moved
+* [PR 293](https://github.com/ssec/sift/pull/293) - Fix HiDPI setting being set too late
+* [PR 292](https://github.com/ssec/sift/pull/292) - Fix bundle script having wrong permissions and activation path
+* [PR 288](https://github.com/ssec/sift/pull/288) - Fix STANDARD_NAME not being set correctly
+
+#### Features added
+
+* [PR 282](https://github.com/ssec/sift/pull/282) - Add SIFT script to python package installation
+
+In this release 5 pull requests were closed.
+
+
 ## Version 1.1.2 (2020/01/10)
 
 ### Issues Closed
