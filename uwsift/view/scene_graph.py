@@ -64,7 +64,9 @@ from uwsift.util import get_package_data_dir
 from uwsift.view.cameras import PanZoomProbeCamera
 from uwsift.view.probes import DEFAULT_POINT_PROBE
 from uwsift.view.transform import PROJ4Transform
-from uwsift.view.visuals import (NEShapefileLines, TiledGeolocatedImage, RGBCompositeLayer,
+from uwsift.view.visuals import (NEShapefileLines, TiledGeolocatedImage,
+                                 MultiChannelImage,
+                                 RGBCompositeLayer,
                                  PrecomputedIsocurve, Vectors)
 from uwsift.workspace.utils.metadata_utils import (
     map_point_style_to_marker_kwargs, get_point_style_by_name)
@@ -1204,32 +1206,64 @@ class SceneGraphManager(QObject):
             image_data = list(self.workspace.get_content(cuuid, kind=Kind.IMAGE) for cuuid in dep_uuids)
             uuid = layer.uuid
             LOG.debug("Adding composite layer to Scene Graph Manager with UUID: %s", uuid)
-            self.image_elements[uuid] = element = RGBCompositeLayer(
-                image_data,
-                layer[Info.ORIGIN_X],
-                layer[Info.ORIGIN_Y],
-                layer[Info.CELL_WIDTH],
-                layer[Info.CELL_HEIGHT],
-                name=str(uuid),
-                clim=p.climits,
-                gamma=p.gamma,
-                interpolation='nearest',
-                method='subdivide',
-                cmap=None,
-                double=False,
-                texture_shape=DEFAULT_TEXTURE_SHAPE,
-                wrap_lon=False,
-                parent=self.main_map,
-                projection=layer[Info.PROJ],
-            )
-            element.transform = PROJ4Transform(layer[Info.PROJ], inverse=True)
-            element.transform *= STTransform(translate=(0, 0, -50.0))
-            self.composite_element_dependencies[uuid] = dep_uuids
-            self.layer_set.add_layer(element)
-            if new_order:
-                self.layer_set.set_layer_order(new_order)
-            self.on_view_change(None)
-            element.determine_reference_points()
+            if USE_TILED_GEOLOCATED_IMAGES:
+                self.image_elements[uuid] = element = RGBCompositeLayer(
+                    image_data,
+                    layer[Info.ORIGIN_X],
+                    layer[Info.ORIGIN_Y],
+                    layer[Info.CELL_WIDTH],
+                    layer[Info.CELL_HEIGHT],
+                    name=str(uuid),
+                    clim=p.climits,
+                    gamma=p.gamma,
+                    interpolation='nearest',
+                    method='subdivide',
+                    cmap=None,
+                    double=False,
+                    texture_shape=DEFAULT_TEXTURE_SHAPE,
+                    wrap_lon=False,
+                    parent=self.main_map,
+                    projection=layer[Info.PROJ],
+                )
+                element.transform = PROJ4Transform(layer[Info.PROJ], inverse=True)
+                element.transform *= STTransform(translate=(0, 0, -50.0))
+                self.composite_element_dependencies[uuid] = dep_uuids
+                self.layer_set.add_layer(element)
+                if new_order:
+                    self.layer_set.set_layer_order(new_order)
+                self.on_view_change(None)
+                element.determine_reference_points()
+            else:
+                self.image_elements[uuid] = element = MultiChannelImage(
+                    image_data,
+                    name=str(uuid),
+                    clim=p.climits,
+                    gamma=p.gamma,
+                    interpolation='nearest',
+                    cmap=None,
+                    parent=self.main_map_parent
+                )
+                # TODO: We must use a ChainTransform, because of the assumption made
+                # in LayerSet.update_layers_z(): there it is assumed, that the
+                # (last) transformation of the layer can be overwritten incautiously
+                # since it would only carry z translation. So the question: why
+                # doesn't LayerSet.add_layer() take care to guarantee this?
+                # Anyhow, here we can't concatenate two STTransforms with *= because
+                # they would end up in *one* transform whose 'translate' part would
+                # be overwritten in LayerSet.update_layers_z(), i.e. any x,y-offset
+                # would be reset to 0.0,0.0.
+                calibration_transform = STTransform(
+                    scale=(layer[Info.CELL_WIDTH], layer[Info.CELL_HEIGHT], 1),
+                    translate=(layer[Info.ORIGIN_X], layer[Info.ORIGIN_Y], 0))
+                z_transform = STTransform(translate=(0, 0, -50))
+                element.transform = ChainTransform([calibration_transform,
+                                                    z_transform])
+                self.composite_element_dependencies[uuid] = dep_uuids
+                self.layer_set.add_layer(element)
+                if new_order:
+                    self.layer_set.set_layer_order(new_order)
+                self.on_view_change(None)
+
             self.update()
             return True
         elif p.kind in [Kind.COMPOSITE, Kind.IMAGE]:
@@ -1296,15 +1330,17 @@ class SceneGraphManager(QObject):
                     image_arrays = list(self.workspace.get_content(cuuid) for cuuid in dep_uuids)
                     self.composite_element_dependencies[layer.uuid] = dep_uuids
                     elem = self.image_elements[layer.uuid]
-                    elem.set_channels(image_arrays,
-                                      cell_width=layer[Info.CELL_WIDTH],
-                                      cell_height=layer[Info.CELL_HEIGHT],
-                                      origin_x=layer[Info.ORIGIN_X],
-                                      origin_y=layer[Info.ORIGIN_Y])
+                    if isinstance(elem, RGBCompositeLayer):
+                        elem.set_channels(image_arrays,
+                                          cell_width=layer[Info.CELL_WIDTH],
+                                          cell_height=layer[Info.CELL_HEIGHT],
+                                          origin_x=layer[Info.ORIGIN_X],
+                                          origin_y=layer[Info.ORIGIN_Y])
                     elem.clim = presentation.climits
                     elem.gamma = presentation.gamma
                     self.on_view_change(None)
-                    elem.determine_reference_points()
+                    if isinstance(elem, RGBCompositeLayer):
+                        elem.determine_reference_points()
                 else:
                     # layer is no longer valid and has to be removed
                     LOG.debug("Purging composite ")
