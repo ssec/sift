@@ -272,6 +272,11 @@ class Info(Enum):
     CELL_HEIGHT = 'cell_height'
     PROJ = 'proj4'
 
+    # original data grid layout
+    GRID_ORIGIN = 'grid_layout_origin'
+    GRID_FIRST_INDEX_X = 'grid_first_index_x'
+    GRID_FIRST_INDEX_Y = 'grid_first_index_y'
+
     # colormap amd data range
     CLIM = 'clim'  # (min,max) color map limits
     VALID_RANGE = 'valid_range'

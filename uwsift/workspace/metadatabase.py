@@ -426,6 +426,33 @@ class Product(Base):
     def origin_y(self, value):
         LOG.debug('DEPRECATED: setting origin_y on resource')
 
+    @property
+    def grid_origin(self):
+        nat = self.content[-1] if len(self.content) else None
+        return nat.grid_origin if nat else None
+
+    @grid_origin.setter
+    def grid_origin(self, value):
+        LOG.debug('DEPRECATED: setting grid_origin on resource')
+
+    @property
+    def grid_first_index_x(self):
+        nat = self.content[-1] if len(self.content) else None
+        return nat.grid_first_index_x if nat else None
+
+    @grid_first_index_x.setter
+    def grid_first_index_x(self, value):
+        LOG.debug('DEPRECATED: setting grid_first_index_x on resource')
+
+    @property
+    def grid_first_index_y(self):
+        nat = self.content[-1] if len(self.content) else None
+        return nat.grid_first_index_y if nat else None
+
+    @grid_first_index_y.setter
+    def grid_first_index_y(self, value):
+        LOG.debug('DEPRECATED: setting grid_first_index_y on resource')
+
     def can_be_activated_without_importing(self):
         return len(self.content) > 0
 
@@ -439,6 +466,9 @@ class Product(Base):
         Info.CELL_HEIGHT: 'cell_height',
         Info.ORIGIN_X: 'origin_x',
         Info.ORIGIN_Y: 'origin_y',
+        Info.GRID_ORIGIN: 'grid_origin',
+        Info.GRID_FIRST_INDEX_X: 'grid_first_index_x',
+        Info.GRID_FIRST_INDEX_Y: 'grid_first_index_y',
         Info.FAMILY: 'family',
         Info.CATEGORY: 'category',
         Info.SERIAL: 'serial'
@@ -520,6 +550,11 @@ class Content(Base):
     cell_height = Column(Float, nullable=True)
     origin_x = Column(Float, nullable=True)
     origin_y = Column(Float, nullable=True)
+
+    # original grid layout information
+    grid_origin = Column(String, nullable=True)
+    grid_first_index_x = Column(Integer, nullable=True)
+    grid_first_index_y = Column(Integer, nullable=True)
 
     # sparsity and coverage, int8 arrays if needed to show incremental availability of the data
     # dimensionality is always a reduction factor of rows/cols/levels

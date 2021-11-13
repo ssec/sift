@@ -1181,6 +1181,23 @@ class SatpyImporter(aImporter):
             Info.CELL_HEIGHT: -area.pixel_size_y,
         }
 
+    def _get_grid_info(self):
+        grid_origin = \
+            config.get(f"data_reading.{self.reader}.grid.origin",
+                       "NW")
+        grid_first_index_x = \
+            config.get(f"data_reading.{self.reader}.grid.first_index_x",
+                       0)
+        grid_first_index_y = \
+            config.get(f"data_reading.{self.reader}.grid.first_index_x",
+                       0)
+
+        return {
+            Info.GRID_ORIGIN:  grid_origin,
+            Info.GRID_FIRST_INDEX_X: grid_first_index_x,
+            Info.GRID_FIRST_INDEX_Y: grid_first_index_y,
+        }
+
     def begin_import_products(self, *product_ids) -> Generator[import_progress, None, None]:
         if self.use_inventory_db:
             if product_ids:
@@ -1286,6 +1303,12 @@ class SatpyImporter(aImporter):
             proj4 = area_info[Info.PROJ]
             origin_x = area_info[Info.ORIGIN_X]
             origin_y = area_info[Info.ORIGIN_Y]
+
+            grid_info = self._get_grid_info()
+            grid_origin = grid_info[Info.GRID_ORIGIN]
+            grid_first_index_x = grid_info[Info.GRID_FIRST_INDEX_X]
+            grid_first_index_y = grid_info[Info.GRID_FIRST_INDEX_Y]
+
             data = dataset.data
 
             # Handle building contours for data from 0 to 360 longitude
@@ -1351,6 +1374,10 @@ class SatpyImporter(aImporter):
                 cell_height=cell_height,
                 origin_x=origin_x,
                 origin_y=origin_y,
+
+                grid_origin=grid_origin,
+                grid_first_index_x=grid_first_index_x,
+                grid_first_index_y=grid_first_index_y
             )
             c.info[Info.KIND] = Kind.IMAGE
             # c.info.update(prod.info) would just make everything leak together so let's not do it
