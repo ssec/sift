@@ -1,4 +1,4 @@
-from datetime import  datetime
+from datetime import datetime
 from typing import List, Set
 
 from satpy import DataID, Scene

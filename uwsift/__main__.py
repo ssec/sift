@@ -435,7 +435,11 @@ class UserControlsAnimation(QtCore.QObject):
 
 
 class Main(QtWidgets.QMainWindow):
-    _last_open_dir: str = None  # directory to open files in
+    # TODO: the following settings, is this actually the best place to store
+    #  them here?
+    _last_open_dir: str = None  # directory to open files in (preselection)
+    _last_reader: str = None  # reader to open files with (preselection)
+
     _recent_files_menu: QtWidgets.QMenu = None  # QMenu
     _open_cache_dialog: QtWidgets.QDialog = None
     _screenshot_dialog: QtWidgets.QDialog = None
@@ -1252,24 +1256,31 @@ class Main(QtWidgets.QMainWindow):
 
     def open_wizard(self, *args, **kwargs):
         from uwsift.view.open_file_wizard_2 import OpenFileWizard
-        wizard_dialog = OpenFileWizard(base_dir=self._last_open_dir, parent=self)
+        wizard_dialog = OpenFileWizard(base_dir=self._last_open_dir,
+                                       base_reader=self._last_reader,
+                                       parent=self)
         self._wizard_dialog = wizard_dialog
         if wizard_dialog.exec_():
             LOG.info("Loading products from open wizard...")
             scenes = wizard_dialog.scenes
-            reader = wizard_dialog.previous_reader
+            reader = wizard_dialog.get_reader()
             importer_kwargs = {
-                'reader': wizard_dialog.get_reader_name(),
+                'reader': reader,
                 'scenes': scenes,
                 'dataset_ids': wizard_dialog.collect_selected_ids(),
                 'resampling_info': wizard_dialog.resampling_info,
             }
-            self._last_open_dir = wizard_dialog.current_dir
+            self._last_reader = reader
+            self._last_open_dir = wizard_dialog.get_directory()
+
             self.open_paths(wizard_dialog.files_to_load,
                             **importer_kwargs)
         else:
             LOG.debug("Wizard closed, nothing to load")
         self._wizard_dialog = None
+
+    def reload_config(self):
+        config.refresh()
 
     def remove_region_polygon(self, action: QtWidgets.QAction = None, *args):
         if self.scene_manager._current_tool == Tool.REGION_PROBE:
@@ -1317,6 +1328,10 @@ class Main(QtWidgets.QMainWindow):
         open_wizard_action.setShortcuts(["Ctrl+O", "Ctrl+Alt+O"])
         open_wizard_action.triggered.connect(self.open_wizard)
 
+        reload_config_action = QtWidgets.QAction("Reload Configuration", self)
+        reload_config_action.setShortcuts(["Ctrl+K", "Ctrl+Alt+K"])
+        reload_config_action.triggered.connect(self.reload_config)
+
         menubar = self.ui.menubar
         file_menu = menubar.addMenu('&File')
         self.addAction(open_action)  # add it to the main window, not the menu (hide it)
@@ -1331,6 +1346,10 @@ class Main(QtWidgets.QMainWindow):
         screenshot_action.setShortcut("Ctrl+I")
         screenshot_action.triggered.connect(self.export_image.take_screenshot)
         file_menu.addAction(screenshot_action)
+
+        file_menu.addSeparator()
+        file_menu.addAction(reload_config_action)
+        file_menu.addSeparator()
 
         file_menu.addAction(exit_action)
 

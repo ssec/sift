@@ -377,8 +377,8 @@ class SimpleWorkspace(BaseWorkspace):
         ws_path = os.path.join(self.cache_dir, ws_filename)
         # Write memmap to disk, for later reference by workspace
         with open(ws_path, 'wb+') as fp:
-           mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
-           mm[:] = data[:]
+            mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
+            mm[:] = data[:]
         # Update metadata to contain path to cached memmap .image file
         parms.update(dict(
             lod=Content.LOD_OVERVIEW,

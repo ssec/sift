@@ -140,7 +140,7 @@ satpy_extra_readers_import_path = \
 if satpy_extra_readers_import_path is not None:
     # See https://gitlab.eumetsat.int/Meraner/fci_l1_geoobs_satpy_reader/-/blob/master/README.md
     sys.path.insert(0, satpy_extra_readers_import_path)
-    os.environ["PPP_CONFIG_DIR"] = satpy_extra_readers_import_path
+    os.environ["SATPY_CONFIG_PATH"] = satpy_extra_readers_import_path
 
 
 USE_TILED_GEOLOCATED_IMAGES = config.get("display.use_tiled_geolocated_images")

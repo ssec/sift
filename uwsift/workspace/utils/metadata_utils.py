@@ -149,7 +149,7 @@ def map_point_style_to_marker_kwargs(point_style: dict):
         else:
             kwargs["edge_width"] = float(stroke_width_match.group(1))
     else:
-        raise ValueError(f"Unrecognized value for 'border_width':"
+        raise ValueError(f"Unrecognized value for '{STYLE_KEYWORD_STROKE_WIDTH}':"
                          f" {stroke_width_value}")
 
     # TODO
