@@ -663,10 +663,29 @@ class BaseWorkspace(QObject):
             x, y = xy_pos[:2]
         else:
             x, y = Proj(info[Info.PROJ])(*xy_pos)
-        col = (x - info[Info.ORIGIN_X]) / info[Info.CELL_WIDTH]
-        row = (y - info[Info.ORIGIN_Y]) / info[Info.CELL_HEIGHT]
 
-        return np.int64(np.floor(row)), np.int64(np.floor(col))
+        column = np.int64(np.floor(
+            (x - info[Info.ORIGIN_X]) / info[Info.CELL_WIDTH])
+        )
+        row = np.int64(np.floor(
+            (y - info[Info.ORIGIN_Y]) / info[Info.CELL_HEIGHT])
+        )
+
+        grid_origin = info[Info.GRID_ORIGIN]
+        grid_first_index_of_rows = info[Info.GRID_FIRST_INDEX_Y]
+        grid_first_index_of_columns = info[Info.GRID_FIRST_INDEX_X]
+
+        rows, columns = info[Info.SHAPE]
+
+        if grid_origin[0].upper() == "S":
+            row = rows - 1 - row
+        row += grid_first_index_of_rows
+
+        if grid_origin[1].upper() == "E":
+            column = columns - 1 - column
+        column += grid_first_index_of_columns
+
+        return row, column
 
     def layer_proj(self, dsi_or_uuid):
         """Project lon/lat probe points to image X/Y"""

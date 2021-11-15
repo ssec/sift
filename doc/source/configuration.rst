@@ -26,6 +26,7 @@ configurations have a look here: https://donfig.readthedocs.io/en/latest/.
    Points Styles <configuration-points_styles.rst>
    Display <configuration-display.rst>
    External Satpy <configuration-external_satpy.rst>
+   Readers <configuration-readers.rst>
    Latlon Grid Resolution <configuration-latlon-grid-resolution.rst>
    Projections / Area Definitions <configuration-area_definitions.rst>
    Units <configuration-units.rst>

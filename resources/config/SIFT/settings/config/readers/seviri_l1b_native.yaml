@@ -6,3 +6,8 @@ data_reading:
       '{satid:4s}-{instr:4s}-MSG{product_level:2d}-0100-NA-{end_time:%Y%m%d%H%M%S.%f}000Z-{order_id:s}.nat',
       '{satid:4s}-{instr:4s}-MSG{product_level:2d}-0100-NA-{end_time:%Y%m%d%H%M%S.%f}000Z'
     ]
+    
+    grid:
+      origin: "SE"
+      first_index_x: 1
+      first_index_y: 1
