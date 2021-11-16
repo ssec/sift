@@ -1256,7 +1256,11 @@ class SatpyImporter(aImporter):
                 target_area_def = AreaDefinitionsManager.area_def_by_id(
                     self.resampling_info['area_id'])
 
-                self.scn_original = self.scn
+                # About the next strange line of code: keep a reference to the
+                # original scene to work around an issue in the resampling
+                # implementation for NetCDF data: otherwise the original data
+                # would be garbage collected too early.
+                self.scn_original = self.scn  # noqa - Do not simply remove
                 self.scn = self.scn.resample(
                     target_area_def,
                     resampler=resampler,
