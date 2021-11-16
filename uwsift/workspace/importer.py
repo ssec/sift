@@ -17,10 +17,13 @@ import re
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from datetime import datetime, timedelta
-from typing import Iterable, Generator, Mapping, Set, Tuple, Optional
+from typing import (Callable, Generator, Iterable, List, Mapping, Optional, Set,
+                    Tuple)
 
 import dask.array as da
 import numpy as np
+import satpy.resample
+import satpy.readers.yaml_reader
 import yaml
 from pyproj import Proj
 from pyresample.geometry import AreaDefinition
@@ -338,6 +341,35 @@ class aImporter(ABC):
         # HACK for Satpy importer
         if 'reader' in prod.info:
             kwargs.setdefault('reader', prod.info['reader'])
+
+        if 'scenes' in kwargs:
+            scn = kwargs['scenes'].get(tuple(paths), None)
+            if scn and '_satpy_id' in prod.info:
+                # filter out files not required to load dataset for given product
+                # extraneous files interfere with the merging process
+                superfluous_files = _superfluous_data_files(scn, prod.info['_satpy_id'].name)
+                paths = [path for path in paths if path not in superfluous_files]
+
+        merge_target = kwargs.get('merge_target')
+        if merge_target:
+            # filter out all segments which are already loaded in the target product
+            new_filenames = []
+            existing_content = merge_target.content[0]
+            for fn in paths:
+                if fn not in existing_content.source_files:
+                    new_filenames.append(fn)
+            if new_filenames != paths:
+                required_files = set()
+                if scn:
+                    requires = _get_requires(scn)
+                    required_files = _required_files_set(scn, requires)
+                paths = new_filenames
+                if not paths:
+                    return None
+                if set(paths) == required_files:
+                    return None
+                paths.extend(list(required_files))  # TODO
+
         return cls(paths, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
 
     @classmethod
@@ -968,6 +1000,7 @@ class SatpyImporter(aImporter):
         self.reader = reader
         self.resampling_info = kwargs.get('resampling_info')
         self.scn = kwargs.get('scene')
+        self.merge_target = kwargs.get('merge_target')
         if self.scn is None:
             self.scn = Scene(reader=self.reader, filenames=self.filenames)
         self._resources = []
@@ -984,6 +1017,7 @@ class SatpyImporter(aImporter):
         self.dataset_ids = sorted(self.dataset_ids)
 
         self.use_inventory_db = USE_INVENTORY_DB
+        self.requires = _get_requires(self.scn)
 
     @classmethod
     def from_product(cls, prod: Product, workspace_cwd, database_session, **kwargs):
@@ -1164,7 +1198,7 @@ class SatpyImporter(aImporter):
             attrs[Info.INSTRUMENT] = Instrument.UNKNOWN
 
     def load_all_datasets(self) -> Scene:
-        self.scn.load(self.dataset_ids, **self.product_filters)
+        self.scn.load(self.dataset_ids, pad_data=True, **self.product_filters)
         # copy satpy metadata keys to SIFT keys
         for ds in self.scn:
             start_time = ds.attrs['start_time']
@@ -1253,9 +1287,6 @@ class SatpyImporter(aImporter):
             area = ds.attrs['area'] if not self.resampling_info \
                 else AreaDefinitionsManager.area_def_by_id(
                 self.resampling_info['area_id'])
-            assert isinstance(area, AreaDefinition), \
-                "BUG: OpenFileWizard must not allow to load SwathDefinition" \
-                " data without resampling! Please contact the developers."
             # round extents to nearest 100 meters
             extents = tuple(int(np.round(x / 100.0) * 100.0)
                             for x in area.area_extent)
@@ -1265,7 +1296,8 @@ class SatpyImporter(aImporter):
             # Scattered data, this is not suitable to define a scene
             ds.attrs[Info.SCENE] = None
 
-    def _area_to_sift_attrs(self, area):
+    @staticmethod
+    def _area_to_sift_attrs(area):
         """Area to uwsift keys"""
         if not isinstance(area, AreaDefinition):
             raise NotImplementedError("Only AreaDefinition datasets can "
@@ -1309,9 +1341,11 @@ class SatpyImporter(aImporter):
         else:
             products = product_ids
 
+        merge_with_existing = self.merge_target is not None
+
         # FIXME: Don't recreate the importer every time we want to load data
         dataset_ids = [prod.info['_satpy_id'] for prod in products]
-        self.scn.load(dataset_ids, pad_data=True, upper_right_corner="NE")
+        self.scn.load(dataset_ids, pad_data=not merge_with_existing, upper_right_corner="NE")
 
         if self.resampling_info:
             resampler: str = self.resampling_info['resampler']
@@ -1399,95 +1433,113 @@ class SatpyImporter(aImporter):
                                       content=content)
                 continue
 
-            area_info = self._area_to_sift_attrs(dataset.attrs['area'])
-            cell_width = area_info[Info.CELL_WIDTH]
-            cell_height = area_info[Info.CELL_HEIGHT]
-            proj4 = area_info[Info.PROJ]
-            origin_x = area_info[Info.ORIGIN_X]
-            origin_y = area_info[Info.ORIGIN_Y]
-
-            grid_info = self._get_grid_info()
-            grid_origin = grid_info[Info.GRID_ORIGIN]
-            grid_first_index_x = grid_info[Info.GRID_FIRST_INDEX_X]
-            grid_first_index_y = grid_info[Info.GRID_FIRST_INDEX_Y]
-
             data = dataset.data
+            uuid = prod.uuid
 
-            # Handle building contours for data from 0 to 360 longitude
-            # our map's antimeridian is 180
-            antimeridian = 179.999
-            # find out if there is data beyond 180 in this data
-            if '+proj=latlong' not in proj4:
-                # the x coordinate for the antimeridian in this projection
-                am = Proj(proj4)(antimeridian, 0)[0]
-                if am >= 1e30:
-                    am_index = -1
-                else:
-                    am_index = int(np.ceil((am - origin_x) / cell_width))
+            if merge_with_existing:
+                existing_product = self.merge_target
+                segments = self._extract_segment_number()
+                uuid = existing_product.uuid
+                c = existing_product.content[0]
+                img_data = c.img_data
+                self.merge_data_into_memmap(data, img_data, segments)
             else:
-                am_index = int(np.ceil((antimeridian - origin_x) / cell_width))
-            # if there is data beyond 180, let's copy it to the beginning of the
-            # array so it shows up in the primary -180/0 portion of the SIFT map
-            if prod.info[Info.KIND] == Kind.CONTOUR and 0 < am_index < shape[1]:
-                # Previous implementation:
-                # Prepend a copy of the last half of the data (180 to 360 -> -180 to 0)
-                # data = da.concatenate((data[:, am_index:], data), axis=1)
-                # adjust X origin to be -180
-                # origin_x -= (shape[1] - am_index) * cell_width
-                # The above no longer works with newer PROJ because +over is deprecated
-                #
-                # New implementation:
-                # Swap the 180 to 360 portion to be -180 to 0
-                # if we have data from 0 to 360 longitude, we want -180 to 360
-                data = da.concatenate((data[:, am_index:], data[:, :am_index]), axis=1)
-                # remove the custom 180 prime meridian in the projection
-                proj4 = proj4.replace("+pm=180 ", "")
-                area_info[Info.PROJ] = proj4
+                area_info = self._area_to_sift_attrs(dataset.attrs['area'])
+                cell_width = area_info[Info.CELL_WIDTH]
+                cell_height = area_info[Info.CELL_HEIGHT]
+                proj4 = area_info[Info.PROJ]
+                origin_x = area_info[Info.ORIGIN_X]
+                origin_y = area_info[Info.ORIGIN_Y]
 
-            # For kind IMAGE the dtype must be float32 seemingly, see class
-            # Column, comment for 'dtype' and the construction of c = Content
-            # just below.
-            # FIXME: It is dubious to enforce that type conversion to happen in
-            #  _create_data_memmap_file, but otherwise IMAGES of pixel counts
-            #  data (dtype = np.uint16) crash.
-            data_filename, img_data = \
-                self._create_data_memmap_file(data, np.float32, prod)
+                grid_info = self._get_grid_info()
+                grid_origin = grid_info[Info.GRID_ORIGIN]
+                grid_first_index_x = grid_info[Info.GRID_FIRST_INDEX_X]
+                grid_first_index_y = grid_info[Info.GRID_FIRST_INDEX_Y]
 
-            c = Content(
-                lod=0,
-                resolution=int(min(abs(cell_width), abs(cell_height))),
-                atime=now,
-                mtime=now,
+                # Handle building contours for data from 0 to 360 longitude
+                # Handle building contours for data from 0 to 360 longitude
+                # our map's antimeridian is 180
+                antimeridian = 179.999
+                # find out if there is data beyond 180 in this data
+                if '+proj=latlong' not in proj4:
+                    # the x coordinate for the antimeridian in this projection
+                    am = Proj(proj4)(antimeridian, 0)[0]
+                    if am >= 1e30:
+                        am_index = -1
+                    else:
+                        am_index = int(np.ceil((am - origin_x) / cell_width))
+                else:
+                    am_index = int(np.ceil((antimeridian - origin_x) / cell_width))
+                # if there is data beyond 180, let's copy it to the beginning of the
+                # array so it shows up in the primary -180/0 portion of the SIFT map
+                if prod.info[Info.KIND] == Kind.CONTOUR and 0 < am_index < shape[1]:
+                    # Previous implementation:
+                    # Prepend a copy of the last half of the data (180 to 360 -> -180 to 0)
+                    # data = da.concatenate((data[:, am_index:], data), axis=1)
+                    # adjust X origin to be -180
+                    # origin_x -= (shape[1] - am_index) * cell_width
+                    # The above no longer works with newer PROJ because +over is deprecated
+                    #
+                    # New implementation:
+                    # Swap the 180 to 360 portion to    be -180 to 0
+                    # if we have data from 0 to 360 longitude, we want -180 to 360
+                    data = da.concatenate((data[:, am_index:], data[:, :am_index]), axis=1)
+                    # remove the custom 180 prime meridian in the projection
+                    proj4 = proj4.replace("+pm=180 ", "")
+                    area_info[Info.PROJ] = proj4
 
-                # info about the data array memmap
-                path=data_filename,
-                rows=shape[0],
-                cols=shape[1],
-                proj4=proj4,
-                # levels = 0,
-                dtype='float32',
+                # For kind IMAGE the dtype must be float32 seemingly, see class
+                # Column, comment for 'dtype' and the construction of c = Content
+                # just below.
+                # FIXME: It is dubious to enforce that type conversion to happen in
+                #  _create_data_memmap_file, but otherwise IMAGES of pixel counts
+                #  data (dtype = np.uint16) crash.
+                data_filename, img_data = \
+                    self._create_data_memmap_file(data, np.float32, prod)
 
-                # info about the coverage array memmap, which in our case just tells what rows are ready
-                # coverage_rows = rows,
-                # coverage_cols = 1,
-                # coverage_path = coverage_filename
+                c = Content(
+                    lod=0,
+                    resolution=int(min(abs(cell_width), abs(cell_height))),
+                    atime=now,
+                    mtime=now,
 
-                cell_width=cell_width,
-                cell_height=cell_height,
-                origin_x=origin_x,
-                origin_y=origin_y,
+                    # info about the data array memmap
+                    path=data_filename,
+                    rows=shape[0],
+                    cols=shape[1],
+                    proj4=proj4,
+                    # levels = 0,
+                    dtype='float32',
 
-                grid_origin=grid_origin,
-                grid_first_index_x=grid_first_index_x,
-                grid_first_index_y=grid_first_index_y
-            )
-            c.info[Info.KIND] = Kind.IMAGE
-            # c.info.update(prod.info) would just make everything leak together so let's not do it
+                    # info about the coverage array memmap, which in our case just tells what rows are ready
+                    # coverage_rows = rows,
+                    # coverage_cols = 1,
+                    # coverage_path = coverage_filename
 
-            prod.content.append(c)
-            self.add_content_to_cache(c)
+                    cell_width=cell_width,
+                    cell_height=cell_height,
+                    origin_x=origin_x,
+                    origin_y=origin_y,
 
-            yield import_progress(uuid=prod.uuid,
+                    grid_origin=grid_origin,
+                    grid_first_index_x=grid_first_index_x,
+                    grid_first_index_y=grid_first_index_y
+                )
+                c.info[Info.KIND] = Kind.IMAGE
+                c.img_data = img_data
+                c.source_files = set()  # FIXME(AR) is this correct?
+                # c.info.update(prod.info) would just make everything leak together so let's not do it
+
+                prod.content.append(c)
+                self.add_content_to_cache(c)
+
+            required_files = _required_files_set(self.scn, self.requires)
+            # Note loaded source files but not required files. This is necessary
+            # because the merger will try to not load already loaded files again
+            # but might need to reload required files.
+            c.source_files |= (set(self.filenames) - required_files)
+
+            yield import_progress(uuid=uuid,
                                   stages=num_stages,
                                   current_stage=idx,
                                   completion=1. / num_contents,
@@ -1545,7 +1597,7 @@ class SatpyImporter(aImporter):
             self.add_content_to_cache(c)
 
             completion = 2. / num_contents
-            yield import_progress(uuid=prod.uuid,
+            yield import_progress(uuid=uuid,
                                   stages=num_stages,
                                   current_stage=idx,
                                   completion=completion,
@@ -1553,6 +1605,79 @@ class SatpyImporter(aImporter):
                                   dataset_info=None,
                                   data=img_data,
                                   content=c)
+
+    @staticmethod
+    def get_fci_segment_height(segment_number: int, segment_width: int) -> int:
+        return satpy.readers.yaml_reader._get_FCI_L1c_FDHSI_chunk_height(
+            segment_width, segment_number)
+
+    def _calc_segment_heights(self, segments_data, segments_indices):
+        def get_segment_height_calculator() -> Callable:
+            if self.reader in ['fci_l1c_nc', 'fci_l1c_fdhsi']:
+                return self.get_fci_segment_height
+            else:
+                return lambda x, y: segments_data.shape[0] // len(segments_indices)
+
+        calc_segment_height = get_segment_height_calculator()
+        expected_num_segments = self._extract_expected_segments()
+        segment_heights = np.zeros((expected_num_segments,))
+        for i in range(1, expected_num_segments + 1):
+            segment_heights[i - 1] = calc_segment_height(i, segments_data.shape[1])
+        return segment_heights.astype(int)
+
+    def _determine_segments_to_image_mapping(self, segments_data, segments_indices)\
+            -> Tuple[List, List]:
+
+        segment_heights = self._calc_segment_heights(segments_data, segments_indices)
+
+        segment_starts_stops = []
+        image_starts_stops = []
+        visited_segments = []
+        for segment_idx, segment_num in enumerate(segments_indices):
+            curr_segment_height_idx = segment_num - 1
+            curr_segment_height = segment_heights[curr_segment_height_idx]
+
+            image_stop_pos = segment_heights[curr_segment_height_idx:].sum()
+            image_start_pos = image_stop_pos - curr_segment_height
+
+            curr_segment_stop = segments_data.shape[0]
+            if visited_segments:
+                curr_segment_stop -= segment_heights[visited_segments].sum()
+            curr_segment_start = curr_segment_stop - curr_segment_height
+
+            visited_segments.append(curr_segment_height_idx)
+            segment_starts_stops.append((curr_segment_start, curr_segment_stop))
+            image_starts_stops.append((image_start_pos, image_stop_pos))
+        return segment_starts_stops, image_starts_stops
+
+    def merge_data_into_memmap(self, segments_data, image_data, segments_indices):
+        """
+        Merge new segments from data into img_data. The data is expected to
+        contain the data for all segments with the last segment (highest segment
+        number) as first in the data array.
+        The segments list defines which chunk of data belongs to which segment.
+        The list must be sorted ascending.
+        Those requirements match the current Satpy behavior which loads segments
+        in ascending order and produce an data array with the last segments data
+        first.
+        :param segments_data: the segments data as provided by Satpy importer
+        :param image_data: the layer data where the segments are merged into
+        :param segments_indices: list of segments whose data is to be merged
+        Note: this is not the highest segment number in the current segments
+        list but the highest segment number which can appear for the product.
+        """
+
+        segment_starts_stops, image_starts_stops = \
+            self._determine_segments_to_image_mapping(segments_data,
+                                                      segments_indices)
+
+        for i in range(len(segment_starts_stops)):
+            segment_start = segment_starts_stops[i][0]
+            segment_stop = segment_starts_stops[i][1]
+            image_start = image_starts_stops[i][0]
+            image_stop = image_starts_stops[i][1]
+            image_data[image_start:image_stop, :] = \
+                segments_data[segment_start:segment_stop, :]
 
     def create_contour_file_cache_data(self, contour_data: np.ndarray,
                                        prod: Product) -> str:

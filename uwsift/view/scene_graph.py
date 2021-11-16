@@ -1356,6 +1356,13 @@ class SceneGraphManager(QObject):
         else:
             raise ValueError("Unknown or unimplemented composite type")
 
+    def reload_basic_layer(self, uuid: UUID, kind: Kind):
+        layer = self.document[uuid]
+        image = self.image_elements[layer[Info.UUID]]
+        image_data = self.workspace.get_content(layer[Info.UUID], kind=kind)
+        image.set_data(image_data)
+        self.on_view_change(None)
+
     def remove_layer(self, new_order: tuple, uuids_removed: tuple, row: int, count: int):
         """
         remove (disable) a layer, though this may be temporary due to a move.
@@ -1406,6 +1413,7 @@ class SceneGraphManager(QObject):
     def _connect_doc_signals(self, document: Document):
         document.didReorderLayers.connect(self._rebuild_layer_order)  # current layer set changed z/anim order
         document.didAddBasicLayer.connect(self.add_basic_layer)  # layer added to one or more layer sets
+        document.didReloadBasicLayer.connect(self.reload_basic_layer)  # new data integrated in existing layer
         document.didAddCompositeLayer.connect(
             self.add_composite_layer)  # layer derived from other layers (either basic or composite themselves)
         document.didAddVectorsLayer.connect(self.add_vectors_layer)

@@ -1404,6 +1404,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # Clarification: Layer interfaces migrate to layer meaning "current active products under the playhead"
     # new order list with None for new layer; info-dictionary, overview-content-ndarray
     didAddBasicLayer = pyqtSignal(tuple, UUID, Presentation)
+    didReloadBasicLayer = pyqtSignal(UUID, Kind)
     # comp layer is derived from multiple basic layers and has its own UUID
     didAddCompositeLayer = pyqtSignal(tuple, UUID, Presentation)
     didAddVectorsLayer = pyqtSignal(tuple, UUID, Presentation)
@@ -1765,22 +1766,42 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :return:
         
         """
+
+        # NOTE: the importer argument 'merge_with_existing' is not yet set at any point.
+        # It might be changeable via UI or config in the future but at the moment the
+        # segment merging feature is enabled/disabled by setting the following default
+        # value to True/False.
+        try_merge_product = importer_kwargs.get("merge_with_existing", True)
+
         # Load all the metadata so we can sort the files
         # assume metadata collection is in the most user-friendly order
         infos = self._workspace.collect_product_metadata_for_paths(paths, **importer_kwargs)
         uuids = []
+        merge_uuids = []
         total_products = 0
         for dex, (num_prods, info) in enumerate(infos):
             assert info is not None
+
+            uuid = info[Info.UUID]
+            merge_uuid = uuid
+            if try_merge_product:
+                # real_paths because for satpy imports the methods paths parameter actually
+                # contains the reader names
+                real_paths = info['paths']
+                merge_target = self._workspace.find_merge_target(uuid, real_paths, info)
+                if merge_target:
+                    merge_uuid = merge_target.uuid
+
             yield {
                 TASK_DOING: 'Collecting metadata {}/{}'.format(dex + 1, num_prods),
                 TASK_PROGRESS: float(dex + 1) / float(num_prods),
-                'uuid': info[Info.UUID],
+                'uuid': merge_uuid,
                 'num_products': num_prods,
             }
             # redundant but also more explicit than depending on num_prods
             total_products = num_prods
-            uuids.append(info[Info.UUID])
+            uuids.append(uuid)
+            merge_uuids.append(merge_uuid)
 
         if not total_products:
             raise ValueError('no products available in {}'.format(paths))
@@ -1790,8 +1811,18 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             uuids = list(reversed(self.sort_product_uuids(uuids)))
 
         # collect product and resource information but don't yet import content
-        for dex, uuid in enumerate(uuids):
-            if uuid in self._layer_with_uuid:
+        for dex, (uuid, merge_uuid) in enumerate(zip(uuids, merge_uuids)):
+            if uuid != merge_uuid:  # merge products
+                active_content_data = \
+                    self._workspace.import_product_content(uuid,
+                                                           merge_uuid=merge_uuid,
+                                                           **importer_kwargs)
+                # active_content_data is none if all segments are already loaded
+                # and there is nothing new to import
+                if active_content_data:
+                    dataset = self[merge_uuid]
+                    self.didReloadBasicLayer.emit(merge_uuid, dataset[Info.KIND])
+            elif uuid in self._layer_with_uuid:
                 LOG.warning("layer with UUID {} already in document?".format(uuid))
                 self._workspace.get_content(uuid)
             else:
@@ -1800,7 +1831,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             yield {
                 TASK_DOING: 'Loading content {}/{}'.format(dex + 1, total_products),
                 TASK_PROGRESS: float(dex + 1) / float(total_products),
-                'uuid': uuid,
+                'uuid': merge_uuid,
                 'num_products': total_products,
             }
 

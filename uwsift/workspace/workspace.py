@@ -482,7 +482,7 @@ class BaseWorkspace(QObject):
 
     @abstractmethod
     def import_product_content(self, uuid: UUID = None, prod: Product = None,
-                               allow_cache=True,
+                               allow_cache=True, merge_uuid: Optional[UUID] = None,
                                **importer_kwargs) -> np.memmap:
         pass
 
@@ -779,4 +779,7 @@ class BaseWorkspace(QObject):
         :param datasetinfo_or_uuid: metadata or key for the dataset
         :return: sliceable object returning numpy arrays
         """
+        pass
+
+    def find_merge_target(self, uuid: UUID, info) -> Optional[Product]:
         pass

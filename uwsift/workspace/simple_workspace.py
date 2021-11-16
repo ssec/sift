@@ -6,8 +6,9 @@ from typing import Dict, Generator, Optional, Tuple
 from uuid import UUID
 
 import numpy as np
+import satpy.readers
 
-from uwsift import CLEANUP_FILE_CACHE
+from uwsift import config, CLEANUP_FILE_CACHE
 from uwsift.common import Info, Kind, Flags, State
 from .importer import aImporter, SatpyImporter
 from .metadatabase import Metadatabase, Product, Content
@@ -281,24 +282,36 @@ class SimpleWorkspace(BaseWorkspace):
         for hauler in importers:
             for prod in hauler.merge_products():
                 assert (prod is not None)
+                # add to-be-imported filenames to check for possible merge targets but
+                # do not include this filenames in the product info
+                extended_prod_info = dict(prod.info)
+                extended_prod_info['paths'] = hauler.filenames
+                zult = frozendict(extended_prod_info)
                 # merge the product into our database session, since it may
                 # belong to import_session
-                zult = frozendict(prod.info)  # self._S.merge(prod)
+                # self._S.merge(prod)
                 self.products[prod.uuid] = prod
                 # LOG.debug('yielding product metadata for {}'.format(
                 #     zult.get(Info.DISPLAY_NAME, '?? unknown name ??')))
                 yield num_products, zult
 
     def import_product_content(self, uuid: UUID = None, prod: Product = None,
-                               allow_cache=True,
+                               allow_cache=True, merge_uuid: Optional[UUID] = None,
                                **importer_kwargs) -> np.memmap:
         if prod is None and uuid is not None:
             prod = self._product_with_uuid(None, uuid)
 
+        if merge_uuid:
+            merge_target = self._product_with_uuid(None, merge_uuid)
+            importer_kwargs["merge_target"] = merge_target
+            self.products.pop(uuid, None)
+        else:
+            importer_kwargs["merge_target"] = None
+
         self.set_product_state_flag(prod.uuid, State.ARRIVING)
         default_prod_kind = prod.info[Info.KIND]
 
-        if len(prod.content):
+        if merge_uuid and len(prod.content):
             LOG.info(
                 'product already has content available, using that '
                 'rather than re-importing')
@@ -311,6 +324,12 @@ class SimpleWorkspace(BaseWorkspace):
         truck = aImporter.from_product(prod, workspace_cwd=self.cache_dir,
                                        database_session=None,
                                        **importer_kwargs)
+        if not truck:
+            # aImporter.from_product() didn't return an Importer instance
+            # since all files represent data granules, which are already
+            # loaded and merged into existing datasets.
+            # Thus: nothing to do.
+            return None
         metadata = prod.info
         name = metadata[Info.SHORT_NAME]
 
@@ -330,16 +349,51 @@ class SimpleWorkspace(BaseWorkspace):
                 self.contents[update.uuid] = update.content
         # self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
         LOG.debug('received {} updates during import'.format(nupd))
-        uuid = prod.uuid
         self.clear_product_state_flag(prod.uuid, State.ARRIVING)
         # S.commit()
         # S.flush()
 
         # make an ActiveContent object from the Content, now that we've imported it
-        ac = self._overview_content_for_uuid(uuid, kind=default_prod_kind)
+        ac = self._overview_content_for_uuid(merge_uuid if merge_uuid else prod.uuid,
+                                             kind=default_prod_kind)
         if ac is None:
             return None
         return ac.data
+
+    def find_merge_target(self, uuid: UUID, paths, info) -> Optional[Product]:
+        """
+        Try to find an existing product where the to-be-imported files could
+        be merged into.
+
+        :param uuid: uuid of the product which is about to be imported and
+                     might be merged with an existing product
+        :param paths: the paths which should be imported or merged
+        :param info: metadata for the to-be-imported product
+        :return: the existing product to merge new content into or None if no
+                 existing product is compatible
+        """
+        reader = info['reader']
+        group_keys = config.get(f"data_reading.{reader}.group_keys", None)
+        for existing_uuid, existing_prod in self.products.items():
+            # exclude all products which are incomplete (products which are imported right now)
+            # and products with different kind or parameter
+            if not existing_prod.content \
+                    or reader != existing_prod.info['reader'] \
+                    or info[Info.FAMILY] != existing_prod.info[Info.FAMILY]:
+                continue
+
+            # if to-be-imported product seem to be compatible with an existing product check
+            # if satpy would group together the to-be-imported files and the already loaded files in
+            # the existing merge candidate
+            all_files = set(existing_prod.content[0].source_files) if existing_prod.content[0] else set()
+            all_files |= set(paths)
+            grouped_files = satpy.readers.group_files(all_files, reader=reader, group_keys=group_keys)
+            if len(grouped_files) == 1 \
+                    and len(grouped_files[0]) == 1 \
+                    and reader in grouped_files[0] \
+                    and len(all_files) == len(grouped_files[0][reader]):
+                return existing_prod
+        return None
 
     def _create_product_from_array(self, info: Info, data, namespace=None, codeblock=None) \
             -> Tuple[UUID, Optional[frozendict], np.memmap]:
