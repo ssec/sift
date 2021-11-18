@@ -296,21 +296,21 @@ def _required_files_set(scn: Scene, requires) -> Set[str]:
     return required_files
 
 
-def _superfluous_data_files(scn: Scene, ds_name: str) -> Set[str]:
+def _wanted_paths(scn: Scene, ds_name: str) -> Set[str]:
     """
-    Get set of files in scene which are not required to load given dataset name.
+    Get list of paths in scene which are actually required to load given dataset name.
     :param scn: scene object to analyse
     :param ds_name: dataset name
-    :return: files included in scene but not required to load dataset
+    :return: paths in scene which are required to load given dataset
     """
-    superfluous_files = set()
-    if ds_name:
-        for reader in scn._readers.values():
-            for file_handlers in reader.file_handlers.values():
-                for file_handler in file_handlers:
-                    if hasattr(file_handler, 'channel_name') and file_handler.channel_name != ds_name:
-                        superfluous_files.add(file_handler.filename)
-    return superfluous_files
+    wanted_paths = []
+    for reader in scn._readers.values():
+        for file_handlers in reader.file_handlers.values():
+            for file_handler in file_handlers:
+                if not ds_name or not hasattr(file_handler, 'channel_name') \
+                        or file_handler.channel_name == ds_name:
+                    wanted_paths.append(file_handler.filename)
+    return wanted_paths
 
 
 class aImporter(ABC):
@@ -347,8 +347,7 @@ class aImporter(ABC):
             if scn and '_satpy_id' in prod.info:
                 # filter out files not required to load dataset for given product
                 # extraneous files interfere with the merging process
-                superfluous_files = _superfluous_data_files(scn, prod.info['_satpy_id'].name)
-                paths = [path for path in paths if path not in superfluous_files]
+                paths = _wanted_paths(scn, prod.info['_satpy_id'].name)
 
         merge_target = kwargs.get('merge_target')
         if merge_target:
