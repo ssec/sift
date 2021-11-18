@@ -17,6 +17,7 @@ __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
 import logging
+from typing import Dict, Tuple
 
 from uwsift.common import Info, Platform, Instrument
 from uwsift.view.colormap import DEFAULT_IR, DEFAULT_VIS, DEFAULT_UNKNOWN
@@ -208,7 +209,7 @@ class ABI_AHI_Guidebook(Guidebook):
     def _is_bt(self, dsi):
         return dsi.get(Info.STANDARD_NAME) in BT_STANDARD_NAMES
 
-    def climits(self, dsi):
+    def climits(self, dsi: Dict) -> Tuple:
         # Valid min and max for colormap use for data values in file (unconverted)
         if self._is_refl(dsi):
             lims = (-0.012, 1.192)
@@ -224,9 +225,9 @@ class ABI_AHI_Guidebook(Guidebook):
         elif "flag_values" in dsi:
             return min(dsi["flag_values"]), max(dsi["flag_values"])
         elif "valid_range" in dsi:
-            return dsi['valid_range']
+            return tuple(dsi['valid_range'])
         elif Info.VALID_RANGE in dsi:
-            return dsi[Info.VALID_RANGE]
+            return tuple(dsi[Info.VALID_RANGE])
         else:
             # some kind of default
             return 0., 255.
