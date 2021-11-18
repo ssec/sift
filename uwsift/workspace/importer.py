@@ -1138,18 +1138,7 @@ class SatpyImporter(aImporter):
                 model_time = None
             ds.attrs[Info.SCENE] = ds.attrs.get('scene_id')
             if ds.attrs[Info.SCENE] is None:
-                # compute a "good enough" hash for this Scene
-                area = ds.attrs['area'] if not self.resampling_info \
-                    else AreaDefinitionsManager.area_def_by_id(
-                        self.resampling_info['area_id'])
-                assert isinstance(area, AreaDefinition), \
-                    "BUG: OpenFileWizard must not allow to load SwathDefinition" \
-                    " data without resampling! Please contact the developers."
-                # round extents to nearest 100 meters
-                extents = tuple(int(np.round(x / 100.0) * 100.0)
-                                for x in area.area_extent)
-                ds.attrs[Info.SCENE] = \
-                    "{}-{}".format(str(extents), area.proj_str)
+                self._compute_scene_hash(ds)
             if ds.attrs.get(Info.CENTRAL_WAVELENGTH) is None:
                 cw = ""
             else:
@@ -1166,6 +1155,35 @@ class SatpyImporter(aImporter):
             ds.attrs.setdefault('reader', self.reader)
 
         return self.scn
+
+    def _compute_scene_hash(self, ds):
+        """ Compute a "good enough" hash and store it as
+        SCENE information.
+
+        The SCENE information is used at other locations to identify data that
+        has the roughly the same extent and projection. That is a  pre-requisite
+        to allow to derive algebraics and compositions from them.
+
+        Unstructured data has no clear extent and not an intrinsic projection
+        (data locations are in latitude / longitude), thus something like a
+        SCENE (in the sense of describing a view on a section of the earth's
+        surface) cannot clearly be determined for it.
+        """
+        try:
+            area = ds.attrs['area'] if not self.resampling_info \
+                else AreaDefinitionsManager.area_def_by_id(
+                self.resampling_info['area_id'])
+            assert isinstance(area, AreaDefinition), \
+                "BUG: OpenFileWizard must not allow to load SwathDefinition" \
+                " data without resampling! Please contact the developers."
+            # round extents to nearest 100 meters
+            extents = tuple(int(np.round(x / 100.0) * 100.0)
+                            for x in area.area_extent)
+            ds.attrs[Info.SCENE] = \
+                "{}-{}".format(str(extents), area.proj_str)
+        except KeyError:
+            # Scattered data, this is not suitable to define a scene
+            ds.attrs[Info.SCENE] = None
 
     def _area_to_sift_attrs(self, area):
         """Area to uwsift keys"""
