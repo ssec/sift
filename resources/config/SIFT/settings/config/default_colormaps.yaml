@@ -6,3 +6,7 @@ default_colormaps:
   air_temperature: Rainbow (IR Default)
   relative_humidity: Rainbow (IR Default)
   # thermodynamic_phase_of_cloud_water_particles_at_cloud_top: Cloud Phase
+  vis_08_east_sector:  Square Root (Vis Default)
+  vis_08_north_sector: Square Root (Vis Default)
+  vis_08_south_sector: Square Root (Vis Default)
+  vis_08_west_sector:  Square Root (Vis Default)
