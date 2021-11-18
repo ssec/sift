@@ -17,7 +17,7 @@ import re
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from datetime import datetime, timedelta
-from typing import Iterable, Generator, Mapping, Tuple, Optional
+from typing import Iterable, Generator, Mapping, Set, Tuple, Optional
 
 import dask.array as da
 import numpy as np
@@ -260,6 +260,54 @@ def generate_guidebook_metadata(layer_info) -> Mapping:
         layer_info['contour_levels'] = contour_levels
 
     return layer_info
+
+
+def _get_requires(scn: Scene) -> Set[str]:
+    """
+    Get the required file types for this scene. E.g. Seviri Prolog/Epilog.
+    :param scn: scene object to analyse
+    :return: set of required file types
+    """
+    requires = set()
+    for reader in scn._readers.values():
+        for file_handlers in reader.file_handlers.values():
+            for file_handler in file_handlers:
+                requires |= set(file_handler.filetype_info.get('requires', ()))
+    return requires
+
+
+def _required_files_set(scn: Scene, requires) -> Set[str]:
+    """
+    Get set of files additional required to load data. E.g. Seviri Prolog/Epilog files.
+    :param scn: scene object to analyse
+    :param requires: the file types which are required
+    :return: set of required files
+    """
+    required_files = set()
+    if requires:
+        for reader in scn._readers.values():
+            for file_handlers in reader.file_handlers.values():
+                for file_handler in file_handlers:
+                    if file_handler.filetype_info['file_type'] in requires:
+                        required_files.add(file_handler.filename)
+    return required_files
+
+
+def _superfluous_data_files(scn: Scene, ds_name: str) -> Set[str]:
+    """
+    Get set of files in scene which are not required to load given dataset name.
+    :param scn: scene object to analyse
+    :param ds_name: dataset name
+    :return: files included in scene but not required to load dataset
+    """
+    superfluous_files = set()
+    if ds_name:
+        for reader in scn._readers.values():
+            for file_handlers in reader.file_handlers.values():
+                for file_handler in file_handlers:
+                    if hasattr(file_handler, 'channel_name') and file_handler.channel_name != ds_name:
+                        superfluous_files.add(file_handler.filename)
+    return superfluous_files
 
 
 class aImporter(ABC):
