@@ -1771,8 +1771,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # It might be changeable via UI or config in the future but at the moment the
         # segment merging feature is enabled/disabled by setting the following default
         # value to True/False.
-        try_merge_product = importer_kwargs.get("merge_with_existing", True)
-
+        try_merge_product = importer_kwargs.get("merge_with_existing", True) \
+            and not importer_kwargs.get("resampling_info")
         # Load all the metadata so we can sort the files
         # assume metadata collection is in the most user-friendly order
         infos = self._workspace.collect_product_metadata_for_paths(paths, **importer_kwargs)
