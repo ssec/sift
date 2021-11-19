@@ -14,11 +14,10 @@ REQUIRES
 import logging
 import os
 import re
-import time
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from datetime import datetime, timedelta
-from typing import Dict, Iterable, Generator, Mapping, Tuple, Optional
+from typing import Iterable, Generator, Mapping, Tuple, Optional
 
 import dask.array as da
 import numpy as np
@@ -30,14 +29,13 @@ from sqlalchemy.orm import Session
 from uwsift import config, USE_INVENTORY_DB
 from uwsift.common import Platform, Info, Instrument, Kind, INSTRUMENT_MAP, PLATFORM_MAP
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
-from uwsift.satpy_compat import DataID, get_id_value, get_id_items
+from uwsift.satpy_compat import DataID, get_id_value, get_id_items, id_from_attrs
 from uwsift.util import USER_CACHE_DIR
 from uwsift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
 from .metadatabase import Resource, Product, Content
 from .utils import metadata_utils
 
 from satpy import Scene, available_readers
-from uwsift.satpy_compat import DataID, get_id_value, get_id_items, id_from_attrs
 
 _SATPY_READERS = None  # cache: see `available_satpy_readers()` below
 SATPY_READER_CACHE_FILE = os.path.join(USER_CACHE_DIR,
