@@ -1039,6 +1039,22 @@ class SceneGraphManager(QObject):
     #         LOG.info('changing {} to kind {}'.format(uuid, new_pz.kind.name))
     #         self.add_basic_dataset(None, uuid, new_pz)
 
+    def change_layer_visible(self, layer_uuid: UUID, visible: bool):
+        self.layer_nodes[layer_uuid].visible = visible
+
+    def change_layer_opacity(self, layer_uuid: UUID, opacity: float):
+        # According to
+        #   https://vispy.org/api/vispy.scene.node.html#vispy.scene.node.Node.parent
+        # this should be sufficient, but it seems to be not:
+        #   self.layer_nodes[uuid].opacity = opacity
+        # Thus opacity must be set for all layer node children:
+        for child in self.layer_nodes[layer_uuid].children:
+            child.opacity = opacity
+        # TODO in case a dataset has its own Presentation simply overwriting
+        #  the opacity of the 'child' node representing it is wrong:
+        #  opacities have to be mixed then. This cannot be done here though
+        self.update()
+
     @staticmethod
     def _overwrite_with_test_pattern(data):
         """

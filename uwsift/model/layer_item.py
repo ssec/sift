@@ -4,7 +4,8 @@ from typing import Optional, Tuple
 from uuid import uuid1
 
 from uwsift import config
-from uwsift.common import Presentation, N_A, Info, LayerModelColumns as LMC
+from uwsift.common import Presentation, N_A, Info, LayerModelColumns as LMC, \
+    LayerVisibility
 from uwsift.model.composite_recipes import Recipe
 from uwsift.model.product_dataset import ProductDataset
 from uwsift.workspace.workspace import frozendict
@@ -80,7 +81,7 @@ class LayerItem:
         if column in self._invariable_display_data:
             return self._invariable_display_data.get(column)
         if column == LMC.VISIBILITY:
-            return self.visible, self.opacity
+            return LayerVisibility(self.visible, self.opacity)
         if column == LMC.PROBE_VALUE:
             return N_A  # point probing not yet implemented
         return None
