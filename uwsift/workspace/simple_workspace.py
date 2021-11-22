@@ -377,8 +377,17 @@ class SimpleWorkspace(BaseWorkspace):
         for existing_uuid, existing_prod in self.products.items():
             # exclude all products which are incomplete (products which are imported right now)
             # and products with different kind or parameter
+            # TODO: when loading granules without resampling after granules of
+            #  of same FAMILY have been loaded *with* resampling already,
+            #  merging must be prevented.
+            #  As an attempt to achieve this the SHAPE size comparison checks,
+            #  whether they are compatible for array broadcasting, but that is
+            #  only a necessary, but not sufficient condition.
+            #  Idea: modify the FAMILY info by adding grid information?
             if not existing_prod.content \
                     or reader != existing_prod.info['reader'] \
+                    or info[Info.SHAPE][0] > existing_prod.info[Info.SHAPE][0] \
+                    or info[Info.SHAPE][1] != existing_prod.info[Info.SHAPE][1] \
                     or info[Info.FAMILY] != existing_prod.info[Info.FAMILY]:
                 continue
 
