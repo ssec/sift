@@ -1632,7 +1632,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                          style=style if family_prez is None else family_prez.style,
                          climits=info[Info.CLIM] if family_prez is None else family_prez.climits,
                          gamma=gamma if family_prez is None else family_prez.gamma,
-                         mixing=Mixing.NORMAL)
+                         mixing=Mixing.NORMAL,
+                         opacity=1.0,)
 
         q = dataclasses.replace(p, visible=False)  # make it available but not visible in other layer sets
         old_layer_count = len(self._layer_sets[self.current_set_index])

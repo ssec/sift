@@ -367,6 +367,7 @@ class Presentation:
     climits: tuple  # valid min and valid max used for color mapping normalization
     gamma: float  # valid (0 to 5) for gamma correction (default should be 1.0)
     mixing: object  # mixing mode constant
+    opacity: float
 
 
 class ZList(MutableSequence):
