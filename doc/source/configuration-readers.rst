@@ -35,10 +35,24 @@ parameters can be set:
   from for columns and rows. Usually this value is 0 or 1 and the same for both
   parameters and defaults to 0 if not given.
 
+For segmented file formats (such as MSG SEVIRI HRIT and MTG FCI NetCDF), it is
+usually preferable to merge segments that are loaded in separate load operations
+but belong to the same data set into one data set, rather than creating a
+separate data set for each load operation. This is especially important when
+incrementally loading stripes in auto update mode.
+
+To control this behaviour the ``data_reading``-setting ``merge_with_existing``
+can be configured as either ``True`` (the default) or ``False``.
+
+.. note:: Currently, dataset merging does not work together with the caching
+          database, so make sure you set ``storage.use_inventory_db:
+          False``, otherwise caching will take precedence and disable merging.
+
 As example for a complete configuration for a reader this is one for SEVIRI
 Level 1B in HRIT format::
 
   data_reading:
+    merge_with_existing: True
     seviri_l1b_hrit:
       group_keys: ['start_time', 'platform_shortname', 'service']
       filter_patterns: ['{rate:1s}-000-{hrit_format:_<6s}-{platform_shortname:4s}_{service:_<7s}-{channel:_<6s}___-{segment:_<6s}___-{start_time:%Y%m%d%H%M}-{c:1s}_']
