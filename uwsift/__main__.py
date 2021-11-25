@@ -1264,11 +1264,28 @@ class Main(QtWidgets.QMainWindow):
             LOG.info("Loading products from open wizard...")
             scenes = wizard_dialog.scenes
             reader = wizard_dialog.get_reader()
+
+            merge_with_existing = \
+                config.get("data_reading.merge_with_existing", True)
+            if USE_INVENTORY_DB and merge_with_existing:
+                # TODO(AR): provide a choice in the wizard for
+                #  'merge_with_existing' but only, if caching is off. The latter
+                #  condition becomes obsolete, when the CachingWorkspace becomes
+                #  able to merge too.
+                LOG.error(
+                    "Merging new data granules into existing data does not work"
+                    " when the caching database is active, i.e. not both"
+                    " 'storage.use_inventory_db' and"
+                    " 'data_reading.merge_with_existing' can be True."
+                    "  Deactivating merging, the caching database wins.")
+                merge_with_existing = False
+
             importer_kwargs = {
                 'reader': reader,
                 'scenes': scenes,
                 'dataset_ids': wizard_dialog.collect_selected_ids(),
                 'resampling_info': wizard_dialog.resampling_info,
+                'merge_with_existing': merge_with_existing,
             }
             self._last_reader = reader
             self._last_open_dir = wizard_dialog.get_directory()

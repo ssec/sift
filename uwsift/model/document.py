@@ -1767,11 +1767,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         
         """
 
-        # NOTE: the importer argument 'merge_with_existing' is not yet set at any point.
-        # It might be changeable via UI or config in the future but at the moment the
-        # segment merging feature is enabled/disabled by setting the following default
-        # value to True/False.
-        try_merge_product = importer_kwargs.get("merge_with_existing", True) \
+        # NOTE: if the importer argument 'merge_with_existing' is not set it
+        # defaults to True here.
+        # TODO(AR) make 'merge_with_existing' an explicit argument to this
+        #  method.
+        try_merge_product = \
+            importer_kwargs.get("merge_with_existing", True) \
             and not importer_kwargs.get("resampling_info")
         # Load all the metadata so we can sort the files
         # assume metadata collection is in the most user-friendly order
