@@ -1,4 +1,5 @@
 data_reading:
+  merge_with_existing: True
   readers:
     - abi_l1b
     - fci_l1_cat_lmk_loc
