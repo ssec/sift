@@ -18,7 +18,7 @@ from abc import ABC, abstractmethod
 from collections import namedtuple
 from datetime import datetime, timedelta
 from typing import (Callable, Generator, Iterable, List, Mapping, Optional, Set,
-                    Tuple)
+                    Tuple, Union)
 
 import dask.array as da
 import numpy as np
@@ -26,7 +26,7 @@ import satpy.resample
 import satpy.readers.yaml_reader
 import yaml
 from pyproj import Proj
-from pyresample.geometry import AreaDefinition
+from pyresample.geometry import AreaDefinition, StackedAreaDefinition
 from sqlalchemy.orm import Session
 
 from uwsift import config, USE_INVENTORY_DB
@@ -1198,7 +1198,7 @@ class SatpyImporter(aImporter):
             attrs[Info.INSTRUMENT] = Instrument.UNKNOWN
 
     def load_all_datasets(self) -> Scene:
-        self.scn.load(self.dataset_ids, pad_data=True, **self.product_filters)
+        self.scn.load(self.dataset_ids, pad_data=False, **self.product_filters)
         # copy satpy metadata keys to SIFT keys
         for ds in self.scn:
             start_time = ds.attrs['start_time']
@@ -1270,6 +1270,32 @@ class SatpyImporter(aImporter):
 
         return self.scn
 
+    @staticmethod
+    def _get_area_extent(area: Union[AreaDefinition, StackedAreaDefinition]) \
+            -> List:
+        """
+        Return the area extent of the AreaDefinition or of the nominal
+        AreaDefinition of the StackedAreaDefinition. The nominal AreaDefinition
+        is the one referenced via 'area_id' by all AreaDefinitions listed in the
+        StackedAreaDefinition. If there are different 'area_id's in the
+        StackedAreaDefinition this function fails throwing an exception.
+
+        Use case: Get the extent of the full-disk to which a non-contiguous set
+        of segments loaded from a segmented GEOS file format (e.g. HRIT) belongs.
+
+        :param area: AreaDefinition ar StackedAreaDefinition
+        :return: Extent of the nominal AreaDefinition.
+        :raises ValueError: when a StackedAreaDefinition with incompatible
+        AreaDefinitions is passed
+        """
+        if isinstance(area, StackedAreaDefinition):
+            any_area_def = area.defs[0]
+            for area_def in area.defs:
+                if area_def.area_id != any_area_def.area_id:
+                    raise ValueError(f"Different area_ids found in StackedAreaDefinition: {area}.")
+            area = satpy.resample.get_area_def(any_area_def.area_id)
+        return area.area_extent
+
     def _compute_scene_hash(self, ds):
         """ Compute a "good enough" hash and store it as
         SCENE information.
@@ -1289,7 +1315,7 @@ class SatpyImporter(aImporter):
                 self.resampling_info['area_id'])
             # round extents to nearest 100 meters
             extents = tuple(int(np.round(x / 100.0) * 100.0)
-                            for x in area.area_extent)
+                            for x in self._get_area_extent(area))
             ds.attrs[Info.SCENE] = \
                 "{}-{}".format(str(extents), area.proj_str)
         except KeyError:
@@ -1385,6 +1411,13 @@ class SatpyImporter(aImporter):
         for idx, (prod, ds_id) in enumerate(zip(products, dataset_ids)):
             dataset = self.scn[ds_id]
             shape = dataset.shape
+            # Since in the first SatpyImporter loading pass (see
+            # load_all_datasets()) no padding is applied (pad_data=False), the
+            # Info.SHAPE stored at that time may not be the same as it is now if
+            # we load with padding now. In that case we must update the
+            # prod.info[Info.SHAPE] with the actual shape, but let's do this in
+            # any case, it doesn't hurt.
+            prod.info[Info.SHAPE] = shape
             kind = prod.info[Info.KIND]
             # TODO (Alexander Rettig): Review this, best with David Hoese:
             #  The line (exactly speaking, code equivalent to it) was
