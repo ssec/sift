@@ -22,10 +22,9 @@ __author__ = 'rayg'
 
 # To have consistent logging for all modules (also for their static
 # initialization) it must be set up before importing them.
-from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.util.logger import configure_loggers
 
-configure_loggers()  # we rerun this later to post-config
+configure_loggers()  # noqa - we rerun this later again to post-config
 
 import gc
 import logging
@@ -44,11 +43,12 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from vispy import app
 
 import uwsift.ui.open_cache_dialog_ui as open_cache_dialog_ui
-from uwsift import __version__,  AUTO_UPDATE_MODE__ACTIVE, USE_INVENTORY_DB, config
+from uwsift import __version__, config, AUTO_UPDATE_MODE__ACTIVE, USE_INVENTORY_DB
 from uwsift.common import Info, Tool, CompositeType, Presentation
 from uwsift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
 from uwsift.control.layer_tree import LayerStackTreeViewModel
 from uwsift.control.rgb_behaviors import UserModifiesRGBLayers
+from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.model.document import Document
 from uwsift.model.layer import DocRGBLayer
 from uwsift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
