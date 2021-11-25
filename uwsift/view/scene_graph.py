@@ -1356,7 +1356,19 @@ class SceneGraphManager(QObject):
         else:
             raise ValueError("Unknown or unimplemented composite type")
 
-    def reload_basic_layer(self, uuid: UUID, kind: Kind):
+    def update_basic_layer(self, uuid: UUID, kind: Kind):
+        """
+        Push the data (content) of a basic layer again to the associated scene
+        graph node.
+
+        This method shall be called whenever the data of a basic layer changes.
+        :param uuid: identifier of the layer
+        :param kind: kind of the layer / data content.
+        """
+        # TODO (AR): for kinds other than IMAGE the variables 'image' and
+        #  'image_data' are misleading, but so is the name of the member
+        #  'self.image_elements' too. Consider consistent renaming i.e. to
+        #  'scenegraph_node', 'content'/'content_data', 'self.scenegraph_nodes'
         layer = self.document[uuid]
         image = self.image_elements[layer[Info.UUID]]
         image_data = self.workspace.get_content(layer[Info.UUID], kind=kind)
@@ -1413,7 +1425,7 @@ class SceneGraphManager(QObject):
     def _connect_doc_signals(self, document: Document):
         document.didReorderLayers.connect(self._rebuild_layer_order)  # current layer set changed z/anim order
         document.didAddBasicLayer.connect(self.add_basic_layer)  # layer added to one or more layer sets
-        document.didReloadBasicLayer.connect(self.reload_basic_layer)  # new data integrated in existing layer
+        document.didUpdateBasicLayer.connect(self.update_basic_layer)  # new data integrated in existing layer
         document.didAddCompositeLayer.connect(
             self.add_composite_layer)  # layer derived from other layers (either basic or composite themselves)
         document.didAddVectorsLayer.connect(self.add_vectors_layer)

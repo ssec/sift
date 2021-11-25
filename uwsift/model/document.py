@@ -1404,7 +1404,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # Clarification: Layer interfaces migrate to layer meaning "current active products under the playhead"
     # new order list with None for new layer; info-dictionary, overview-content-ndarray
     didAddBasicLayer = pyqtSignal(tuple, UUID, Presentation)
-    didReloadBasicLayer = pyqtSignal(UUID, Kind)
+    didUpdateBasicLayer = pyqtSignal(UUID, Kind)
     # comp layer is derived from multiple basic layers and has its own UUID
     didAddCompositeLayer = pyqtSignal(tuple, UUID, Presentation)
     didAddVectorsLayer = pyqtSignal(tuple, UUID, Presentation)
@@ -1821,7 +1821,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 # and there is nothing new to import
                 if active_content_data:
                     dataset = self[merge_uuid]
-                    self.didReloadBasicLayer.emit(merge_uuid, dataset[Info.KIND])
+                    self.didUpdateBasicLayer.emit(merge_uuid, dataset[Info.KIND])
             elif uuid in self._layer_with_uuid:
                 LOG.warning("layer with UUID {} already in document?".format(uuid))
                 self._workspace.get_content(uuid)
