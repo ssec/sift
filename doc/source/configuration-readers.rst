@@ -58,11 +58,7 @@ Level 1B in HRIT format::
       filter_patterns: ['{rate:1s}-000-{hrit_format:_<6s}-{platform_shortname:4s}_{service:_<7s}-{channel:_<6s}___-{segment:_<6s}___-{start_time:%Y%m%d%H%M}-{c:1s}_']
 
       grid:
-	origin: "SE"
-	first_index_x: 1
-	first_index_y: 1
-
-
-
-  
+        origin: "SE"
+        first_index_x: 1
+        first_index_y: 1
 
