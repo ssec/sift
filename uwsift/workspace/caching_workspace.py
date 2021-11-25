@@ -644,7 +644,7 @@ class CachingWorkspace(BaseWorkspace):
                     yield num_products, zult
 
     def import_product_content(self, uuid: UUID = None, prod: Product = None,
-                               allow_cache=True,
+                               allow_cache=True, merge_uuid: Optional[UUID] = None,
                                **importer_kwargs) -> np.memmap:
         with self._inventory as S:
             # S = self._S
@@ -662,6 +662,12 @@ class CachingWorkspace(BaseWorkspace):
                 return arrays.data
 
             truck = aImporter.from_product(prod, workspace_cwd=self.cache_dir, database_session=S, **importer_kwargs)
+            if not truck:
+                # aImporter.from_product() didn't return an Importer instance
+                # since all files represent data granules, which are already
+                # loaded and merged into existing datasets.
+                # Thus: nothing to do.
+                return None
             metadata = prod.info
             name = metadata[Info.SHORT_NAME]
 

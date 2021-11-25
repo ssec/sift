@@ -22,10 +22,9 @@ __author__ = 'rayg'
 
 # To have consistent logging for all modules (also for their static
 # initialization) it must be set up before importing them.
-from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.util.logger import configure_loggers
 
-configure_loggers()  # we rerun this later to post-config
+configure_loggers()  # noqa - we rerun this later again to post-config
 
 import gc
 import logging
@@ -44,11 +43,12 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from vispy import app
 
 import uwsift.ui.open_cache_dialog_ui as open_cache_dialog_ui
-from uwsift import __version__,  AUTO_UPDATE_MODE__ACTIVE, USE_INVENTORY_DB, config
+from uwsift import __version__, config, AUTO_UPDATE_MODE__ACTIVE, USE_INVENTORY_DB
 from uwsift.common import Info, Tool, CompositeType, Presentation
 from uwsift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
 from uwsift.control.layer_tree import LayerStackTreeViewModel
 from uwsift.control.rgb_behaviors import UserModifiesRGBLayers
+from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.model.document import Document
 from uwsift.model.layer import DocRGBLayer
 from uwsift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
@@ -1264,11 +1264,28 @@ class Main(QtWidgets.QMainWindow):
             LOG.info("Loading products from open wizard...")
             scenes = wizard_dialog.scenes
             reader = wizard_dialog.get_reader()
+
+            merge_with_existing = \
+                config.get("data_reading.merge_with_existing", True)
+            if USE_INVENTORY_DB and merge_with_existing:
+                # TODO(AR): provide a choice in the wizard for
+                #  'merge_with_existing' but only, if caching is off. The latter
+                #  condition becomes obsolete, when the CachingWorkspace becomes
+                #  able to merge too.
+                LOG.error(
+                    "Merging new data granules into existing data does not work"
+                    " when the caching database is active, i.e. not both"
+                    " 'storage.use_inventory_db' and"
+                    " 'data_reading.merge_with_existing' can be True."
+                    "  Deactivating merging, the caching database wins.")
+                merge_with_existing = False
+
             importer_kwargs = {
                 'reader': reader,
                 'scenes': scenes,
                 'dataset_ids': wizard_dialog.collect_selected_ids(),
                 'resampling_info': wizard_dialog.resampling_info,
+                'merge_with_existing': merge_with_existing,
             }
             self._last_reader = reader
             self._last_open_dir = wizard_dialog.get_directory()
