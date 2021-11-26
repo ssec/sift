@@ -347,7 +347,7 @@ class aImporter(ABC):
             if scn and '_satpy_id' in prod.info:
                 # filter out files not required to load dataset for given product
                 # extraneous files interfere with the merging process
-                paths = _wanted_paths(scn, prod.info['_satpy_id'].name)
+                paths = _wanted_paths(scn, prod.info['_satpy_id'].get('name'))
 
         merge_target = kwargs.get('merge_target')
         if merge_target:
