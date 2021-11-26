@@ -1317,7 +1317,7 @@ class SatpyImporter(aImporter):
                             for x in self._get_area_extent(area))
             ds.attrs[Info.SCENE] = \
                 "{}-{}".format(str(extents), area.proj_str)
-        except KeyError:
+        except (KeyError, AttributeError):
             # Scattered data, this is not suitable to define a scene
             ds.attrs[Info.SCENE] = None
 
