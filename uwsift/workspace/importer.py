@@ -296,7 +296,7 @@ def _required_files_set(scn: Scene, requires) -> Set[str]:
     return required_files
 
 
-def _wanted_paths(scn: Scene, ds_name: str) -> Set[str]:
+def _wanted_paths(scn: Scene, ds_name: str) -> List[str]:
     """
     Get list of paths in scene which are actually required to load given dataset name.
     :param scn: scene object to analyse
