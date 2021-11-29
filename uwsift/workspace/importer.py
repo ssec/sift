@@ -1381,7 +1381,7 @@ class SatpyImporter(aImporter):
             attrs[Info.SCENE] = None
 
     def _stack_data_arrays(self, datasets: List[DataArray], attrs: dict,
-                           name_prefix: str = None) -> DataArray:
+                           name_prefix: str = None, axis: int = 1) -> DataArray:
         """
         Merge multiple DataArrays into a single ``DataArray``. Use the
         ``attrs`` dict for the DataArray metadata. This method also copies
@@ -1391,9 +1391,16 @@ class SatpyImporter(aImporter):
         :param datasets: List of DataArrays
         :param attrs: metadata for the resulting DataArray
         :param name_prefix: if given, a prefix for the name of the new DataArray
+        :param axis: numpy axis index
         :return: stacked Dask array
         """
-        combined_data = da.stack(datasets, axis=1)
+        # Workaround for a Dask bug: Convert all DataArrays to float32
+        # before calling into dask, because an int16 DataArray will be
+        # converted into a Series instead of a dask Array with newer
+        # versions. This then causes a TypeError.
+        meta = np.stack([da.utils.meta_from_array(ds) for ds in datasets], axis=axis)
+        datasets = [ds.astype(meta.dtype) for ds in datasets]
+        combined_data = da.stack(datasets, axis=axis)
 
         attrs = attrs.copy()
         ds_id = attrs["_satpy_id"]
