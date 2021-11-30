@@ -1303,10 +1303,10 @@ class SceneGraphManager(QObject):
 
         if values is not None:
             assert len(pos) == len(values)
-            # TODO use p.climits instead of min and max
+            # TODO use p.climits instead of autoscaling?
             colormap = self.document.find_colormap(p.colormap)
-            scaled_attr = np.interp(values, [values.min(), values.max()], (0, 1))
-            kwargs["face_color"] = colormap.map(scaled_attr)
+            kwargs["face_color"] = \
+                self.map_to_colors_autoscaled(colormap, values)
 
         points = Markers(pos=pos, parent=self.main_map, **kwargs)
         points.transform *= STTransform(translate=(0., 0., 50.))
@@ -1314,6 +1314,32 @@ class SceneGraphManager(QObject):
         self.image_elements[uuid] = points
         self.layer_set.add_layer(points)
         self.on_view_change(None)
+
+    def map_to_colors_autoscaled(self, colormap, values, m=2):
+        """
+        Get a list of colors by mapping each entry in values by the given
+        colormap.
+
+        The mapping range is adjusted automatically to m times the standard
+        deviation from the mean. This ignores outliers in the calculation of
+        the mapping range.
+
+        Caution: this is an expensive operation and must not be called in tight
+        loops.
+
+        :param colormap: the colormap to apply
+        :param values: the values to map to colors
+        :param m: factor to stretch the standard deviation around the mean to
+        define the mapping range
+        :return: list of mapped colors in the same order as the input values
+        """
+        std_dev = np.std(values)
+        mean = np.mean(values)
+        min = mean - m * std_dev  # noqa: calm down PyCharm's spelling check, ...
+        max = mean + m * std_dev  # noqa: ... 'min' and 'max' are fine!
+        scaled_attr = np.interp(values, (min, max), (0, 1))
+        colors = colormap.map(scaled_attr)
+        return colors
 
     def change_composite_layers(self, new_order: tuple, uuid_list: list, presentations: list):
         for uuid, presentation in zip(uuid_list, presentations):
