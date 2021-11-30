@@ -1197,7 +1197,8 @@ class SatpyImporter(aImporter):
             attrs[Info.INSTRUMENT] = Instrument.UNKNOWN
 
     def load_all_datasets(self) -> Scene:
-        self.scn.load(self.dataset_ids, pad_data=False, **self.product_filters)
+        self.scn.load(self.dataset_ids, pad_data=False,
+                      upper_right_corner="NE", **self.product_filters)
         # copy satpy metadata keys to SIFT keys
         for ds in self.scn:
             start_time = ds.attrs['start_time']
@@ -1370,7 +1371,8 @@ class SatpyImporter(aImporter):
 
         # FIXME: Don't recreate the importer every time we want to load data
         dataset_ids = [prod.info['_satpy_id'] for prod in products]
-        self.scn.load(dataset_ids, pad_data=not merge_with_existing, upper_right_corner="NE")
+        self.scn.load(dataset_ids, pad_data=not merge_with_existing,
+                      upper_right_corner="NE")
 
         if self.resampling_info:
             resampler: str = self.resampling_info['resampler']
