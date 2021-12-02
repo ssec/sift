@@ -296,7 +296,7 @@ def _required_files_set(scn: Scene, requires) -> Set[str]:
     return required_files
 
 
-def _wanted_paths(scn: Scene, ds_name: str) -> Set[str]:
+def _wanted_paths(scn: Scene, ds_name: str) -> List[str]:
     """
     Get list of paths in scene which are actually required to load given dataset name.
     :param scn: scene object to analyse
@@ -347,7 +347,7 @@ class aImporter(ABC):
             if scn and '_satpy_id' in prod.info:
                 # filter out files not required to load dataset for given product
                 # extraneous files interfere with the merging process
-                paths = _wanted_paths(scn, prod.info['_satpy_id'].name)
+                paths = _wanted_paths(scn, prod.info['_satpy_id'].get('name'))
 
         merge_target = kwargs.get('merge_target')
         if merge_target:
@@ -1197,7 +1197,8 @@ class SatpyImporter(aImporter):
             attrs[Info.INSTRUMENT] = Instrument.UNKNOWN
 
     def load_all_datasets(self) -> Scene:
-        self.scn.load(self.dataset_ids, pad_data=False, **self.product_filters)
+        self.scn.load(self.dataset_ids, pad_data=False,
+                      upper_right_corner="NE", **self.product_filters)
         # copy satpy metadata keys to SIFT keys
         for ds in self.scn:
             start_time = ds.attrs['start_time']
@@ -1317,7 +1318,7 @@ class SatpyImporter(aImporter):
                             for x in self._get_area_extent(area))
             ds.attrs[Info.SCENE] = \
                 "{}-{}".format(str(extents), area.proj_str)
-        except KeyError:
+        except (KeyError, AttributeError):
             # Scattered data, this is not suitable to define a scene
             ds.attrs[Info.SCENE] = None
 
@@ -1370,7 +1371,8 @@ class SatpyImporter(aImporter):
 
         # FIXME: Don't recreate the importer every time we want to load data
         dataset_ids = [prod.info['_satpy_id'] for prod in products]
-        self.scn.load(dataset_ids, pad_data=not merge_with_existing, upper_right_corner="NE")
+        self.scn.load(dataset_ids, pad_data=not merge_with_existing,
+                      upper_right_corner="NE")
 
         if self.resampling_info:
             resampler: str = self.resampling_info['resampler']

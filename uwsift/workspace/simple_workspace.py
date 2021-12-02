@@ -491,25 +491,24 @@ class SimpleWorkspace(BaseWorkspace):
         else:
             uuid = dsi_or_uuid[Info.UUID]
 
-        content = [self.contents[uuid] if uuid in self.contents else None]
-        content = [x for x in content if
-                   x.info.get(Info.KIND, Kind.IMAGE) == kind]
+        # The current implementation, where self.contents is a dict, cannot
+        # support multiple contents per Product/UUID which seems to be prepared
+        # in the original implementation, now found in
+        # CachingWorkspace.get_content().
+        # TODO(FUTURE): Update this in case CachingWorkspace is dropped and/or
+        #  multiple contents per Product/UUID are implemented, see below.
+        content = self.contents.get(uuid)
+        content = content \
+            if content and content.info.get(Info.KIND, Kind.IMAGE) == kind \
+            else None
 
-        if len(content) != 1:
-            LOG.warning(
-                "More than one matching Content object for '{}'".format(
-                    dsi_or_uuid))
-        if not len(content) or content[0] is None:
+        if content is None:
             raise AssertionError(
-                'no content in workspace for {}, must re-import'.format(
-                    uuid))
-        content = content[0]
-        # content.touch()
-        # self._S.commit()  # flush any pending updates to workspace db file
+                'no content in workspace for {}, must re-import'.format(uuid))
 
         # FIXME: find the content for the requested LOD, then return its
         #  ActiveContent - or attach one
-        # for now, just work with assumption of one product one content
+        #  for now, just work with assumption of one product one content
         active_content = self._cached_arrays_for_content(content)
         return active_content.data
 
