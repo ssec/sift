@@ -1372,7 +1372,27 @@ class SceneGraphManager(QObject):
         layer = self.document[uuid]
         image = self.image_elements[layer[Info.UUID]]
         image_data = self.workspace.get_content(layer[Info.UUID], kind=kind)
-        image.set_data(image_data)
+        try:
+            image.set_data(image_data)
+        except NotImplementedError:
+            if isinstance(image, TiledGeolocatedImage):
+                LOG.debug(f"Updating data for UUID {uuid} on its associated"
+                          f" scenegraph TiledGeolocatedImage node is not"
+                          f" possible, hopefully the data was modified in-place"
+                          f" (e.g. when merging new granules).")
+                # TODO: How to detect the case that the data was not changed in
+                #  place but a new reference was given? In this case, we must
+                #  re-raise the NotImplementedError exception (as in the 'else'
+                #  path)
+                # TODO: TiledGeolocatedImage does not provide a way to tell it
+                #  that it should drop all retiled data and start from scratch.
+            else:
+                # This is a unforeseen case: at the moment this method
+                # should only be called when merging data segments into existing
+                # image(!) data, looks like it was called for a node of another
+                # type not having set_data() too.
+                raise
+
         self.on_view_change(None)
 
     def remove_layer(self, new_order: tuple, uuids_removed: tuple, row: int, count: int):

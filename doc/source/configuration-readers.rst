@@ -48,6 +48,12 @@ can be configured as either ``True`` (the default) or ``False``.
           database, so make sure you set ``storage.use_inventory_db:
           False``, otherwise caching will take precedence and disable merging.
 
+.. note:: Currently, dataset merging does not work well together with the
+	  adaptively retiling image display. Consider switching it off by
+	  setting ``display.use_tiled_geolocated_images: False``, otherwise
+	  for some zoom levels the data segments loaded later may not be
+	  visible.
+
 As example for a complete configuration for a reader this is one for SEVIRI
 Level 1B in HRIT format::
 

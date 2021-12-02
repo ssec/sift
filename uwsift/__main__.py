@@ -43,7 +43,10 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from vispy import app
 
 import uwsift.ui.open_cache_dialog_ui as open_cache_dialog_ui
-from uwsift import __version__, config, AUTO_UPDATE_MODE__ACTIVE, USE_INVENTORY_DB
+from uwsift import (__version__, config,
+                    AUTO_UPDATE_MODE__ACTIVE,
+                    USE_INVENTORY_DB,
+                    USE_TILED_GEOLOCATED_IMAGES)
 from uwsift.common import Info, Tool, CompositeType, Presentation
 from uwsift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
 from uwsift.control.layer_tree import LayerStackTreeViewModel
@@ -1279,6 +1282,12 @@ class Main(QtWidgets.QMainWindow):
                     " 'data_reading.merge_with_existing' can be True."
                     "  Deactivating merging, the caching database wins.")
                 merge_with_existing = False
+
+            if USE_TILED_GEOLOCATED_IMAGES and merge_with_existing:
+                LOG.warning("Merging of new data segments into existing data"
+                            " does not work well with adaptive tiled image"
+                            " rendering. Consider switching it of by configuring"
+                            " 'display.use_tiled_geolocated_images: False'")
 
             importer_kwargs = {
                 'reader': reader,
