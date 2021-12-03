@@ -11,7 +11,7 @@ import satpy.readers
 from uwsift import config, CLEANUP_FILE_CACHE
 from uwsift.common import Info, Kind, Flags, State
 from .importer import aImporter, SatpyImporter
-from .metadatabase import Metadatabase, Product, Content
+from .metadatabase import Metadatabase, Product, Content, ContentImage
 from .workspace import BaseWorkspace, frozendict, ActiveContent
 
 LOG = logging.getLogger(__name__)
@@ -168,7 +168,7 @@ class SimpleWorkspace(BaseWorkspace):
             # specifically a lot of client code assumes that resource
             # == product == content and
             # that singular navigation (e.g. cell_size) is norm
-            assert (kind in [Kind.VECTORS, Kind.POINTS] or
+            assert (kind in [Kind.LINES, Kind.POINTS] or
                     native_content.info[Info.CELL_WIDTH] is not None)  # FIXME DEBUG
             return frozendict(ChainMap(native_content.info, prod.info))
         # mapping semantics for database fields, as well as key-value fields;
@@ -444,7 +444,7 @@ class SimpleWorkspace(BaseWorkspace):
             mm[:] = data[:]
         # Update metadata to contain path to cached memmap .image file
         parms.update(dict(
-            lod=Content.LOD_OVERVIEW,
+            lod=ContentImage.LOD_OVERVIEW,
             path=ws_filename,
             dtype=str(data.dtype),
             proj4=info[Info.PROJ],
@@ -454,7 +454,7 @@ class SimpleWorkspace(BaseWorkspace):
         parms.update(rcls)
         LOG.debug("about to create Content with this: {}".format(repr(parms)))
 
-        C = Content.from_info(parms, only_fields=True)
+        C = ContentImage.from_info(parms, only_fields=True)
         P.content.append(C)
 
         self.contents[uuid] = C

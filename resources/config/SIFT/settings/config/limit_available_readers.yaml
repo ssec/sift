@@ -14,3 +14,6 @@ data_reading:
     calibration:
       - radiance
       - counts
+    name:
+      - latitude # must not be loaded
+      - longitude # must not be loaded
