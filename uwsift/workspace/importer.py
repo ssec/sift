@@ -247,7 +247,8 @@ def generate_guidebook_metadata(layer_info) -> Mapping:
 
     # add as visible to the front of the current set, and invisible to the rest of the available sets
     layer_info[Info.COLORMAP] = metadata_utils.get_default_colormap(layer_info, guidebook)
-    layer_info[Info.STYLE] = metadata_utils.get_default_point_style_name(layer_info)
+    if layer_info[Info.KIND] == Kind.POINTS:
+        layer_info[Info.STYLE] = metadata_utils.get_default_point_style_name(layer_info)
     layer_info[Info.CLIM] = guidebook.climits(layer_info)
     layer_info[Info.VALID_RANGE] = guidebook.valid_range(layer_info)
     if Info.DISPLAY_TIME not in layer_info:
