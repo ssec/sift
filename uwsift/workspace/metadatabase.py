@@ -42,9 +42,10 @@ import sys
 import unittest
 from collections import MutableMapping, defaultdict
 from datetime import datetime
-from functools import reduce
+from typing import Optional, Tuple
 from uuid import UUID
 
+import numpy as np
 from sqlalchemy import Table, Column, Integer, String, Unicode, ForeignKey, DateTime, Interval, PickleType, \
     Float, create_engine
 from sqlalchemy.ext.associationproxy import association_proxy
@@ -287,8 +288,8 @@ class Product(Base):
     # label = Column(Unicode, nullable=True)  # "AHI Refl B11"
     # description = Column(UnicodeText, nullable=True)
 
-    # link to workspace cache files representing this data, not lod=0 is overview
-    content = relationship("Content", backref=backref("product"), cascade="all", order_by=lambda: Content.lod)
+    # link to workspace cache files representing this data
+    content = relationship("Content", backref=backref("product"), cascade="all")
 
     # link to key-value further information
     # this provides dictionary style access to key-value pairs
@@ -392,8 +393,12 @@ class Product(Base):
 
     @property
     def cell_height(self):
-        nat = self.content[-1] if len(self.content) else None
-        return nat.cell_height if nat else None
+        if not self.content:
+            return None
+        nat = self.content[-1]
+        if isinstance(nat, ContentImage):
+            return nat.cell_height
+        return None
 
     @cell_height.setter
     def cell_height(self, value):
@@ -401,8 +406,12 @@ class Product(Base):
 
     @property
     def cell_width(self):
-        nat = self.content[-1] if len(self.content) else None
-        return nat.cell_width if nat else None
+        if not self.content:
+            return None
+        nat = self.content[-1]
+        if isinstance(nat, ContentImage):
+            return nat.cell_width
+        return None
 
     @cell_width.setter
     def cell_width(self, value):
@@ -410,8 +419,12 @@ class Product(Base):
 
     @property
     def origin_x(self):
-        nat = self.content[-1] if len(self.content) else None
-        return nat.origin_x if nat else None
+        if not self.content:
+            return None
+        nat = self.content[-1]
+        if isinstance(nat, ContentImage):
+            return nat.origin_x
+        return None
 
     @origin_x.setter
     def origin_x(self, value):
@@ -419,8 +432,12 @@ class Product(Base):
 
     @property
     def origin_y(self):
-        nat = self.content[-1] if len(self.content) else None
-        return nat.origin_y if nat else None
+        if not self.content:
+            return None
+        nat = self.content[-1]
+        if isinstance(nat, ContentImage):
+            return nat.origin_y
+        return None
 
     @origin_y.setter
     def origin_y(self, value):
@@ -428,8 +445,12 @@ class Product(Base):
 
     @property
     def grid_origin(self):
-        nat = self.content[-1] if len(self.content) else None
-        return nat.grid_origin if nat else None
+        if not self.content:
+            return None
+        nat = self.content[-1]
+        if isinstance(nat, ContentImage):
+            return nat.grid_origin
+        return None
 
     @grid_origin.setter
     def grid_origin(self, value):
@@ -437,8 +458,12 @@ class Product(Base):
 
     @property
     def grid_first_index_x(self):
-        nat = self.content[-1] if len(self.content) else None
-        return nat.grid_first_index_x if nat else None
+        if not self.content:
+            return None
+        nat = self.content[-1]
+        if isinstance(nat, ContentImage):
+            return nat.grid_first_index_x
+        return None
 
     @grid_first_index_x.setter
     def grid_first_index_x(self, value):
@@ -446,8 +471,12 @@ class Product(Base):
 
     @property
     def grid_first_index_y(self):
-        nat = self.content[-1] if len(self.content) else None
-        return nat.grid_first_index_y if nat else None
+        if not self.content:
+            return None
+        nat = self.content[-1]
+        if isinstance(nat, ContentImage):
+            return nat.grid_first_index_y
+        return None
 
     @grid_first_index_y.setter
     def grid_first_index_y(self, value):
@@ -513,16 +542,15 @@ class Content(Base):
     additional information is stored in a key-value table addressable as content[key:str]
     """
     # _array = None  # when attached, this is a np.memmap
-
-    __tablename__ = 'contents_v1'
+    __tablename__ = "content_v1"
     id = Column(Integer, primary_key=True)
+    type = Column(String)
+    __mapper_args__ = {
+        "polymorphic_identity": "base",
+        "polymorphic_on": type,
+    }
+
     product_id = Column(Integer, ForeignKey(Product.id))
-
-    # handle overview versus detailed data
-    lod = Column(Integer)  # power of 2 level of detail; 0 for coarse-resolution overview
-    LOD_OVERVIEW = 0
-
-    resolution = Column(Integer)  # maximum resolution in meters for this representation of the dataset
 
     # time accounting, used to check if data needs to be re-imported to workspace,
     # or whether data is LRU and can be removed from a crowded workspace
@@ -533,50 +561,26 @@ class Content(Base):
     # NaNs are used to signify missing data; NaNs can include integer category fields in significand;
     # please ref IEEE 754
     path = Column(String, unique=True)  # relative to workspace, binary array of data
-    rows, cols, levels = Column(Integer), Column(Integer, nullable=True), Column(Integer, nullable=True)
+
+    # TODO Anzahl der Attribute pro Punkt: n_attributes (z.B. Blitzstärke); Datentyp der Attribute? -> basisklasse (bei Image = 1)
+    n_attributes = Column(Integer) #  immer 1, Erweiterung in Zukunft
+
+    # TODO alle Attribute müssen gleichen Datentyp haben wie Punkte selbst -> daher geht nur float
+    # lat, lon immer float -> attributes nur anderen Datentyp als float32
     # default float32; can be int16 in the future for scaled integer images for instance; should be a numpy type name
     dtype = Column(String, nullable=True)
+
     # json for numpy array with polynomial coefficients for transforming native data to natural units
     # (e.g. for scaled integers), c[0] + c[1]*x + c[2]*x**2 ...
     # coeffs = Column(String, nullable=True)
+
     # json for optional dict {int:string} lookup table for NaN flag fields
     # (when dtype is float32 or float64) or integer values (when dtype is an int8/16/32/64)
     # values = Column(String, nullable=True)
 
     # projection information for this representation of the data
     # proj4 projection string for the data in this array, if one exists; else assume y=lat/x=lon
-    proj4 = Column(String, nullable=True)
-    cell_width = Column(Float, nullable=True)
-    cell_height = Column(Float, nullable=True)
-    origin_x = Column(Float, nullable=True)
-    origin_y = Column(Float, nullable=True)
-
-    # original grid layout information
-    grid_origin = Column(String, nullable=True)
-    grid_first_index_x = Column(Integer, nullable=True)
-    grid_first_index_y = Column(Integer, nullable=True)
-
-    # sparsity and coverage, int8 arrays if needed to show incremental availability of the data
-    # dimensionality is always a reduction factor of rows/cols/levels
-    # coverage is stretched across the data array
-    #   e.g. for loading data sectioned or blocked across multiple files
-    # sparsity is broadcast over the data array
-    #   e.g. for incrementally loading sparse data into a dense array
-    # a zero value indicates data is not available, nonzero signifies availability
-    coverage_rows = Column(Integer, nullable=True)
-    coverage_cols = Column(Integer, nullable=True)
-    coverage_levels = Column(Integer, nullable=True)
-    coverage_path = Column(String, nullable=True)
-    sparsity_rows = Column(Integer, nullable=True)
-    sparsity_cols = Column(Integer, nullable=True)
-    sparsity_levels = Column(Integer, nullable=True)
-    sparsity_path = Column(String, nullable=True)
-
-    # navigation information, if required
-    xyz_dtype = Column(String, nullable=True)  # dtype of x,y,z arrays, default float32
-    y_path = Column(String, nullable=True)  # if needed, y location cache path relative to workspace
-    x_path = Column(String, nullable=True)  # if needed, x location cache path relative to workspace
-    z_path = Column(String, nullable=True)  # if needed, z location cache path relative to workspace
+    proj4 = Column(String, nullable=True) # TODO maybe basis
 
     # link to key-value further information; primarily a hedge in case specific information
     # has to be squirreled away for later consideration for main content table
@@ -587,10 +591,6 @@ class Content(Base):
                                 creator=lambda key, value: ContentKeyValue(key=key, value=value))
 
     INFO_TO_FIELD = {
-        Info.CELL_HEIGHT: 'cell_height',
-        Info.CELL_WIDTH: 'cell_width',
-        Info.ORIGIN_X: 'origin_x',
-        Info.ORIGIN_Y: 'origin_y',
         Info.PROJ: 'proj4',
         Info.PATHNAME: 'path'
     }
@@ -686,31 +686,21 @@ class Content(Base):
     def uuid(self):
         return self.product.uuid
 
-    @property
-    def is_overview(self):
-        return self.lod == self.LOD_OVERVIEW
-
     def __str__(self):
         product = "%s:%s.%s" % (self.product.source.name or '?',
                                 self.product.platform or '?',
                                 self.product.identifier or '?')
-        isoverview = ' overview' if self.is_overview else ''
         dtype = self.dtype or 'float32'
         xyzcs = ' '.join(
             q for (q, p) in
             zip('XYZCS', (self.x_path, self.y_path, self.z_path, self.coverage_path, self.sparsity_path)) if p
         )
-        return "<{uuid} product {product} content{isoverview} with path={path} dtype={dtype} {xyzcs}>".format(
-            uuid=self.uuid, product=product, isoverview=isoverview, path=self.path, dtype=dtype, xyzcs=xyzcs)
+        return "<{uuid} product {product} content with path={path} dtype={dtype} {xyzcs}>".format(
+            uuid=self.uuid, product=product, path=self.path, dtype=dtype, xyzcs=xyzcs)
 
-    def touch(self, when=None):
+    def touch(self, when: Optional[datetime] = None) -> None:
         self.atime = when = when or datetime.utcnow()
         self.product.touch(when)
-
-    @property
-    def shape(self):
-        rcl = reduce(lambda a, b: a + [b] if b else a, [self.rows, self.cols, self.levels], [])
-        return tuple(rcl)
 
     # this doesn't belong here, database routines only plz
     # @property
@@ -728,6 +718,96 @@ class Content(Base):
     # def close(self):
     #     if self._array is not None:
     #         self._array = None
+
+
+class ContentImage(Content):
+    __tablename__ = "content_image_v1"
+    id = Column(Integer, ForeignKey(Content.id), primary_key=True)
+    __mapper_args__ = { "polymorphic_identity": "image" }
+
+    # handle overview versus detailed data
+    lod = Column(Integer)  # power of 2 level of detail; 0 for coarse-resolution overview
+    LOD_OVERVIEW = 0
+
+    resolution = Column(Integer)  # maximum resolution in meters for this representation of the dataset
+
+    n_rows = Column(Integer)
+    n_cols = Column(Integer, nullable=True)
+    n_levels = Column(Integer, nullable=True)
+
+    cell_width = Column(Float, nullable=True)
+    cell_height = Column(Float, nullable=True)
+    origin_x = Column(Float, nullable=True)
+    origin_y = Column(Float, nullable=True)
+
+    # original grid layout information
+    grid_origin = Column(String, nullable=True)
+    grid_first_index_x = Column(Integer, nullable=True)
+    grid_first_index_y = Column(Integer, nullable=True)
+
+    # sparsity and coverage, int8 arrays if needed to show incremental availability of the data
+    # dimensionality is always a reduction factor of rows/cols/levels
+    # coverage is stretched across the data array
+    #   e.g. for loading data sectioned or blocked across multiple files
+    # sparsity is broadcast over the data array
+    #   e.g. for incrementally loading sparse data into a dense array
+    # a zero value indicates data is not available, nonzero signifies availability
+    coverage_rows = Column(Integer, nullable=True)
+    coverage_cols = Column(Integer, nullable=True)
+    coverage_levels = Column(Integer, nullable=True)
+    coverage_path = Column(String, nullable=True)
+    sparsity_rows = Column(Integer, nullable=True)
+    sparsity_cols = Column(Integer, nullable=True)
+    sparsity_levels = Column(Integer, nullable=True)
+    sparsity_path = Column(String, nullable=True)
+
+    # navigation information, if required
+    xyz_dtype = Column(String, nullable=True)  # dtype of x,y,z arrays, default float32
+    y_path = Column(String, nullable=True)  # if needed, y location cache path relative to workspace
+    x_path = Column(String, nullable=True)  # if needed, x location cache path relative to workspace
+    z_path = Column(String, nullable=True)  # if needed, z location cache path relative to workspace
+
+    @property
+    def is_overview(self):
+        return self.lod == self.LOD_OVERVIEW
+
+    @property
+    def shape(self):
+        return tuple(filter(lambda x: x, [self.n_rows, self.n_cols, self.n_levels]))
+
+    @property
+    def INFO_TO_FIELD(self):
+        fields = {
+            Info.CELL_HEIGHT: 'cell_height',
+            Info.CELL_WIDTH: 'cell_width',
+            Info.ORIGIN_X: 'origin_x',
+            Info.ORIGIN_Y: 'origin_y',
+            Info.GRID_ORIGIN: 'grid_origin',
+            Info.GRID_FIRST_INDEX_X: 'grid_first_index_x',
+            Info.GRID_FIRST_INDEX_Y: 'grid_first_index_y',
+        }
+        fields.update(super().INFO_TO_FIELD)
+        return fields
+
+
+class ContentUnstructuredPoints(Content):
+    __tablename__ = "content_unstructured_points_v1"
+    id = Column(Integer, ForeignKey(Content.id), primary_key=True)
+    __mapper_args__ = {"polymorphic_identity": "unstructured_points"}
+
+    n_points = Column(Integer)
+    # Points may have 2 or 3 spatial dimensions
+    n_dimensions = Column(Integer)
+
+
+class ContentLines(Content):
+    __tablename__ = "content_lines_v1"
+    id = Column(Integer, ForeignKey(Content.id), primary_key=True)
+    __mapper_args__ = {"polymorphic_identity": "lines"}
+
+    n_lines = Column(Integer)
+    # Points have 4 spatial dimensions
+    n_dimensions = Column(Integer)
 
 
 class ContentKeyValue(Base):

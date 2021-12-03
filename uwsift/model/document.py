@@ -1407,7 +1407,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didUpdateBasicLayer = pyqtSignal(UUID, Kind)
     # comp layer is derived from multiple basic layers and has its own UUID
     didAddCompositeLayer = pyqtSignal(tuple, UUID, Presentation)
-    didAddVectorsLayer = pyqtSignal(tuple, UUID, Presentation)
+    didAddLinesLayer = pyqtSignal(tuple, UUID, Presentation)
     didAddPointsLayer = pyqtSignal(tuple, UUID, Presentation)
     # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
     didRemoveLayers = pyqtSignal(tuple, list, int, int)
@@ -1664,8 +1664,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             dataset[Info.FAMILY] = self.family_for_product_or_layer(dataset)
         presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
 
-        if dataset[Info.KIND] == Kind.VECTORS:
-            self.didAddVectorsLayer.emit(reordered_indices, dataset.uuid, presentation)
+        if dataset[Info.KIND] == Kind.LINES:
+            self.didAddLinesLayer.emit(reordered_indices, dataset.uuid, presentation)
             self._add_layer_family(dataset)
         elif dataset[Info.KIND] == Kind.POINTS:
             self.didAddPointsLayer.emit(reordered_indices, dataset.uuid, presentation)

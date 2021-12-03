@@ -17,8 +17,8 @@ import re
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from datetime import datetime, timedelta
-from typing import (Callable, Generator, Iterable, List, Mapping, Optional, Set,
-                    Tuple, Union)
+from typing import (Callable, Dict, Generator, Iterable, List, Mapping,
+                    Optional, Set, Tuple, Union)
 
 import dask.array as da
 import numpy as np
@@ -27,7 +27,9 @@ import satpy.readers.yaml_reader
 import yaml
 from pyproj import Proj
 from pyresample.geometry import AreaDefinition, StackedAreaDefinition
+from satpy.dataset import DatasetDict
 from sqlalchemy.orm import Session
+from xarray import DataArray
 
 from uwsift import config, USE_INVENTORY_DB
 from uwsift.common import Platform, Info, Instrument, Kind, INSTRUMENT_MAP, PLATFORM_MAP
@@ -35,7 +37,7 @@ from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.satpy_compat import DataID, get_id_value, get_id_items, id_from_attrs
 from uwsift.util import USER_CACHE_DIR
 from uwsift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
-from .metadatabase import Resource, Product, Content
+from .metadatabase import Resource, Product, Content, ContentImage, ContentUnstructuredPoints
 from .utils import metadata_utils
 
 from satpy import Scene, available_readers
@@ -370,6 +372,27 @@ class aImporter(ABC):
                     return None
                 paths.extend(list(required_files))  # TODO
 
+        # In order to "load" converted datasets, we have to reuse the existing
+        # scene from the first instantiation of SatpyImporter instead of loading
+        # the data again, of course: we need to 'rescue across' the converted
+        # data from the first SatpyImporter instantiation to the second one
+        # (which will be created in the very last statement of this method).
+        # The correct scene can be identified based on the `paths` list, which
+        # contains the input files for a single scene. The keyword argument
+        # `scenes` is mapping of a tuple of input files to a Scene object.
+        # We reuse the Scene only if the `paths` list and the input files for
+        # the Scene are the same. Since only products of the kinds POINTS, LINES
+        # and VECTORS need conversion (at this time), the mechanism is only
+        # applied for these. For an unknown reason reusing the scene breaks for
+        # FCI data, this Importer data reading magic is too confused.
+        if prod.info[Info.KIND] in (Kind.POINTS, Kind.LINES, Kind.VECTORS):
+            for scene_files, scene in kwargs["scenes"].items():
+                if list(scene_files) == paths:
+                    del kwargs["scenes"]
+                    assert "scene" not in kwargs
+                    kwargs["scene"] = scene
+                    break
+
         return cls(paths, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
 
     @classmethod
@@ -701,7 +724,7 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
             "cell size in geotiff product: {} x {}".format(prod.info[Info.CELL_HEIGHT], prod.info[Info.CELL_WIDTH]))
 
         # create and commit a Content entry pointing to where the content is in the workspace, even if coverage is empty
-        c = Content(
+        c = ContentImage(
             lod=0,
             resolution=int(min(abs(info[Info.CELL_WIDTH]), abs(info[Info.CELL_HEIGHT]))),
             atime=now,
@@ -709,8 +732,8 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
 
             # info about the data array memmap
             path=data_filename,
-            rows=rows,
-            cols=cols,
+            n_rows=rows,
+            n_cols=cols,
             levels=0,
             dtype='float32',
 
@@ -943,7 +966,7 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         img_data[:] = np.ma.fix_invalid(image, copy=False, fill_value=np.NAN)  # FIXME: expensive
 
         # create and commit a Content entry pointing to where the content is in the workspace, even if coverage is empty
-        c = Content(
+        c = ContentImage(
             lod=0,
             resolution=int(min(abs(cell_width), abs(cell_height))),
             atime=now,
@@ -951,8 +974,8 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
 
             # info about the data array memmap
             path=data_filename,
-            rows=rows,
-            cols=cols,
+            n_rows=rows,
+            n_cols=cols,
             proj4=proj4,
             # levels = 0,
             dtype='float32',
@@ -1092,9 +1115,9 @@ class SatpyImporter(aImporter):
                 return
 
         from uuid import uuid1
-        scn = self.load_all_datasets()
-        for ds_id in scn.keys():
-            ds = scn[ds_id]
+        self.load_all_datasets()
+        revised_datasets = self._revise_all_datasets()
+        for ds_id, ds in revised_datasets.items():
             # don't recreate a Product for one we already have
             if ds_id in existing_ids:
                 yield existing_ids[ds_id]
@@ -1197,79 +1220,113 @@ class SatpyImporter(aImporter):
         if not attrs[Info.INSTRUMENT] or isinstance(attrs[Info.INSTRUMENT], str):
             attrs[Info.INSTRUMENT] = Instrument.UNKNOWN
 
-    def load_all_datasets(self) -> Scene:
+    def load_all_datasets(self) -> None:
         self.scn.load(self.dataset_ids, pad_data=False,
                       upper_right_corner="NE", **self.product_filters)
         # copy satpy metadata keys to SIFT keys
         for ds in self.scn:
-            start_time = ds.attrs['start_time']
-            id_str = ":".join(str(v[1]) for v in get_id_items(id_from_attrs(ds.attrs)))
-            ds.attrs[Info.DATASET_NAME] = id_str
-            ds.attrs[Info.OBS_TIME] = start_time
-            ds.attrs[Info.SCHED_TIME] = start_time
-            duration = ds.attrs.get('end_time', start_time) - start_time
-            if duration.total_seconds() <= 0:
-                duration = timedelta(minutes=60)
-            ds.attrs[Info.OBS_DURATION] = duration
-
-            reader_kind = config.get(f"data_reading.{self.reader}.kind", None)
-            if reader_kind:
-                try:
-                    ds.attrs[Info.KIND] = Kind[reader_kind]
-                except KeyError:
-                    raise KeyError(f"Unknown data kind '{reader_kind}'"
-                                   f" configured for reader {self.reader}.")
-            else:
-                LOG.info(f"No data kind configured for reader '{self.reader}'."
-                         f" Falling back to 'IMAGE'.")
-                ds.attrs[Info.KIND] = Kind.IMAGE
-
-            self._get_platform_instrument(ds.attrs)
-            ds.attrs.setdefault(Info.STANDARD_NAME, ds.attrs.get('standard_name'))
-            if 'wavelength' in ds.attrs:
-                ds.attrs.setdefault(Info.CENTRAL_WAVELENGTH,
-                                    ds.attrs['wavelength'][1])
-
-            # Resolve anything else needed by SIFT
-            model_time = ds.attrs.get('model_time')
-            if model_time is not None:
-                ds.attrs[Info.DATASET_NAME] += " " + model_time.isoformat()
-            ds.attrs[Info.SHORT_NAME] = ds.attrs['name']
-            if ds.attrs.get('level') is not None:
-                ds.attrs[Info.SHORT_NAME] = "{} @ {}hPa".format(
-                    ds.attrs['name'], ds.attrs['level'])
-            ds.attrs[Info.SHAPE] = ds.shape \
-                if not self.resampling_info else self.resampling_info['shape']
-            ds.attrs[Info.UNITS] = ds.attrs.get('units')
-            if ds.attrs[Info.UNITS] == 'unknown':
-                LOG.warning("Layer units are unknown, using '1'")
-                ds.attrs[Info.UNITS] = 1
-            generate_guidebook_metadata(ds.attrs)
-
-            # Generate FAMILY and CATEGORY
-            if 'model_time' in ds.attrs:
-                model_time = ds.attrs['model_time'].isoformat()
-            else:
-                model_time = None
-            ds.attrs[Info.SCENE] = ds.attrs.get('scene_id')
-            if ds.attrs[Info.SCENE] is None:
-                self._compute_scene_hash(ds)
-            if ds.attrs.get(Info.CENTRAL_WAVELENGTH) is None:
-                cw = ""
-            else:
-                cw = ":{:5.2f}µm".format(ds.attrs[Info.CENTRAL_WAVELENGTH])
-            ds.attrs[Info.FAMILY] = '{}:{}:{}{}'.format(
-                ds.attrs[Info.KIND].name, ds.attrs[Info.STANDARD_NAME],
-                ds.attrs[Info.SHORT_NAME], cw)
-            ds.attrs[Info.CATEGORY] = 'SatPy:{}:{}:{}'.format(
-                ds.attrs[Info.PLATFORM].name, ds.attrs[Info.INSTRUMENT].name,
-                ds.attrs[Info.SCENE])  # system:platform:instrument:target
-            # TODO: Include level or something else in addition to time?
-            start_str = ds.attrs['start_time'].isoformat()
-            ds.attrs[Info.SERIAL] = start_str if model_time is None else model_time + ":" + start_str
+            self._set_name_metadata(ds.attrs)
+            self._set_time_metadata(ds.attrs)
+            self._set_kind_metadata(ds.attrs)
+            self._set_wavelength_metadata(ds.attrs)
+            self._set_shape_metadata(ds.attrs, ds.shape)
+            self._set_scene_metadata(ds.attrs)
+            self._set_family_metadata(ds.attrs)
+            self._set_category_metadata(ds.attrs)
+            self._set_serial_metadata(ds.attrs)
             ds.attrs.setdefault('reader', self.reader)
 
-        return self.scn
+    @staticmethod
+    def _set_name_metadata(attrs: dict, name: Optional[str] = None,
+                           short_name: Optional[str] = None,
+                           long_name: Optional[str] = None) -> None:
+        if not name:
+            name = attrs['name'] or attrs.get(Info.STANDARD_NAME)
+
+        id_str = ":".join(str(v[1]) for v in get_id_items(id_from_attrs(attrs)))
+        attrs[Info.DATASET_NAME] = id_str
+
+        model_time = attrs.get('model_time')
+        if model_time is not None:
+            attrs[Info.DATASET_NAME] += " " + model_time.isoformat()
+
+        level = attrs.get('level')
+        if level is None:
+            attrs[Info.SHORT_NAME] = short_name or name
+        else:
+            attrs[Info.SHORT_NAME] = f"{short_name or name} @ {level}hPa"
+
+        attrs[Info.LONG_NAME] = long_name or name
+        attrs[Info.STANDARD_NAME] = attrs.get('standard_name') or name
+
+    @staticmethod
+    def _set_time_metadata(attrs: dict) -> None:
+        start_time = attrs['start_time']
+        attrs[Info.OBS_TIME] = start_time
+        attrs[Info.SCHED_TIME] = start_time
+        duration = attrs.get('end_time', start_time) - start_time
+        if duration.total_seconds() <= 0:
+            duration = timedelta(minutes=60)
+        attrs[Info.OBS_DURATION] = duration
+
+    def _set_kind_metadata(self, attrs: dict) -> None:
+        reader_kind = config.get(f"data_reading.{self.reader}.kind", None)
+        if reader_kind:
+            try:
+                attrs[Info.KIND] = Kind[reader_kind]
+            except KeyError:
+                raise KeyError(f"Unknown data kind '{reader_kind}'"
+                               f" configured for reader {self.reader}.")
+        else:
+            LOG.info(f"No data kind configured for reader '{self.reader}'."
+                     f" Falling back to 'IMAGE'.")
+            attrs[Info.KIND] = Kind.IMAGE
+
+    def _set_wavelength_metadata(self, attrs: dict) -> None:
+        self._get_platform_instrument(attrs)
+        if 'wavelength' in attrs:
+            attrs.setdefault(Info.CENTRAL_WAVELENGTH, attrs['wavelength'][1])
+
+    def _set_shape_metadata(self, attrs: dict, shape) -> None:
+        attrs[Info.SHAPE] = shape \
+            if not self.resampling_info else self.resampling_info['shape']
+        attrs[Info.UNITS] = attrs.get('units')
+        if attrs[Info.UNITS] == 'unknown':
+            LOG.warning("Layer units are unknown, using '1'")
+            attrs[Info.UNITS] = 1
+        generate_guidebook_metadata(attrs)
+
+    def _set_scene_metadata(self, attrs: dict) -> None:
+        attrs[Info.SCENE] = attrs.get('scene_id')
+        if attrs[Info.SCENE] is None:
+            self._compute_scene_hash(attrs)
+
+    @staticmethod
+    def _set_family_metadata(attrs: dict) -> None:
+        if attrs.get(Info.CENTRAL_WAVELENGTH) is None:
+            cw = ""
+        else:
+            cw = ":{:5.2f}µm".format(attrs[Info.CENTRAL_WAVELENGTH])
+        attrs[Info.FAMILY] = '{}:{}:{}{}'.format(
+            attrs[Info.KIND].name, attrs[Info.STANDARD_NAME],
+            attrs[Info.SHORT_NAME], cw)
+
+    @staticmethod
+    def _set_category_metadata(attrs: dict) -> None:
+        # system:platform:instrument:target
+        attrs[Info.CATEGORY] = 'SatPy:{}:{}:{}'.format(
+            attrs[Info.PLATFORM].name, attrs[Info.INSTRUMENT].name,
+            attrs[Info.SCENE])
+
+    @staticmethod
+    def _set_serial_metadata(attrs: dict) -> None:
+        # TODO: Include level or something else in addition to time?
+        start_str = attrs['start_time'].isoformat()
+        if 'model_time' in attrs:
+            model_time = attrs['model_time'].isoformat()
+            attrs[Info.SERIAL] = f"{model_time}:{start_str}"
+        else:
+            attrs[Info.SERIAL] = start_str
 
     @staticmethod
     def _get_area_extent(area: Union[AreaDefinition, StackedAreaDefinition]) \
@@ -1297,7 +1354,7 @@ class SatpyImporter(aImporter):
             area = satpy.resample.get_area_def(any_area_def.area_id)
         return area.area_extent
 
-    def _compute_scene_hash(self, ds):
+    def _compute_scene_hash(self, attrs: dict):
         """ Compute a "good enough" hash and store it as
         SCENE information.
 
@@ -1311,17 +1368,248 @@ class SatpyImporter(aImporter):
         surface) cannot clearly be determined for it.
         """
         try:
-            area = ds.attrs['area'] if not self.resampling_info \
+            area = attrs['area'] if not self.resampling_info \
                 else AreaDefinitionsManager.area_def_by_id(
                 self.resampling_info['area_id'])
             # round extents to nearest 100 meters
             extents = tuple(int(np.round(x / 100.0) * 100.0)
                             for x in self._get_area_extent(area))
-            ds.attrs[Info.SCENE] = \
+            attrs[Info.SCENE] = \
                 "{}-{}".format(str(extents), area.proj_str)
         except (KeyError, AttributeError):
             # Scattered data, this is not suitable to define a scene
-            ds.attrs[Info.SCENE] = None
+            attrs[Info.SCENE] = None
+
+    def _stack_data_arrays(self, datasets: List[DataArray], attrs: dict,
+                           name_prefix: str = None, axis: int = 1) -> DataArray:
+        """
+        Merge multiple DataArrays into a single ``DataArray``. Use the
+        ``attrs`` dict for the DataArray metadata. This method also copies
+        the Satpy metadata fields into SIFT fields. The ``attrs`` dict won't
+        be modified.
+
+        :param datasets: List of DataArrays
+        :param attrs: metadata for the resulting DataArray
+        :param name_prefix: if given, a prefix for the name of the new DataArray
+        :param axis: numpy axis index
+        :return: stacked Dask array
+        """
+        # Workaround for a Dask bug: Convert all DataArrays to float32
+        # before calling into dask, because an int16 DataArray will be
+        # converted into a Series instead of a dask Array with newer
+        # versions. This then causes a TypeError.
+        meta = np.stack([da.utils.meta_from_array(ds) for ds in datasets], axis=axis)
+        datasets = [ds.astype(meta.dtype) for ds in datasets]
+        combined_data = da.stack(datasets, axis=axis)
+
+        attrs = attrs.copy()
+        ds_id = attrs["_satpy_id"]
+        name = f"{name_prefix or ''}{attrs['name']}"
+        attrs["_satpy_id"] = DataID(ds_id.id_keys, name=name)
+        self._set_name_metadata(attrs, name)
+        self._set_time_metadata(attrs)
+        self._set_kind_metadata(attrs)
+        self._set_wavelength_metadata(attrs)
+        self._set_shape_metadata(attrs, combined_data.shape)
+
+        guidebook = get_guidebook_class(attrs)
+        attrs[Info.DISPLAY_NAME] = guidebook._default_display_name(attrs)
+
+        self._set_scene_metadata(attrs)
+        self._set_family_metadata(attrs)
+        self._set_category_metadata(attrs)
+
+        return DataArray(combined_data, attrs=attrs)
+
+    def _parse_style_attr_config(self) -> Dict[str, List[str]]:
+        """
+        Extract the ``style_attributes`` section from the reader config.
+        This function doesn't validate whether the style attributes or the
+        product names exist.
+
+        :return: mapping of style attributes to products
+        """
+        style_config = config.get(f"data_reading.{self.reader}.style_attributes", None)
+        if not style_config:
+            return {}
+
+        style_attrs = {}
+        for attr_name, product_names in style_config.items():
+            if attr_name in style_attrs:
+                LOG.warning(f"duplicate style attribute: {attr_name}")
+                continue
+
+            if not isinstance(product_names, list):
+                # a single product is allowed
+                product_names = [product_names]
+
+            distinct_products = []
+            for product_name in product_names:
+                if product_name in distinct_products:
+                    LOG.warning(f"duplicate product {product_name} for "
+                                f"style attribute: {attr_name}")
+                    continue
+                if product_name:
+                    distinct_products.append(product_name)
+
+            style_attrs[attr_name] = distinct_products
+        return style_attrs
+
+    def _combine_points(self, datasets: DatasetDict, converter) \
+            -> Dict[DataID, DataArray]:
+        """
+        Find convertible POINTS datasets in the ``DatasetDict``. The ``converter``
+        function is then used to generate new DataArrays.
+
+        The latitude and longitude for the points are extracted from the dataset
+        metadata. If configured in the reader config, the dataset itself will be
+        used for the ``fill`` style attribute.
+
+        :param datasets: all loaded datasets and previously converted datasets
+        :param converter: function to convert a list of DataArrays
+        :return: mapping of converted DataID to new DataArray
+        """
+        style_attrs = self._parse_style_attr_config()
+        allowed_style_attrs = ["fill"]
+
+        converted_datasets = {}
+        for style_attr, product_names in style_attrs.items():
+            if style_attr not in allowed_style_attrs:
+                LOG.error(f"unknown style attribute: {style_attr}")
+                continue
+
+            for product_name in product_names:
+                try:
+                    ds = datasets[product_name]
+                except KeyError:
+                    LOG.debug(f"product wasn't selected in ImportWizard: {product_name}")
+                    continue
+
+                kind = ds.attrs[Info.KIND]
+                if kind != Kind.POINTS:
+                    LOG.error(f"dataset {product_name} isn't of POINTS kind: {kind}")
+                    continue
+
+                try:
+                    convertable_ds = [ds.area.lons, ds.area.lats, ds]
+                except AttributeError:
+                    # Some products (e.g. `latitude` and `longitude`) may not
+                    # (for whatever reason) have an associated SwathDefinition.
+                    # Without it, there is no geo-location information per data
+                    # point, because it is taken from its fields 'lats', 'lons'.
+                    # This cannot be healed, point data loading fails.
+                    LOG.error(f"Dataset has no point coordinates (lats, lons):"
+                              f" {product_name} (Most likely due to missing"
+                              f" SwathDefinition)")
+                    continue
+
+                ds_id = DataID.from_dataarray(ds)
+                converted_datasets[ds_id] = converter(convertable_ds, ds.attrs)
+
+        # All unused Datasets aren't defined in the style attributes config.
+        # If one of them has an area, use it to display uncolored points.
+        for ds_id, ds in datasets.items():
+            if ds_id in converted_datasets:
+                continue
+            if ds.attrs[Info.KIND] == Kind.POINTS:
+                try:
+                    convertable_ds = [ds.area.lons, ds.area.lats]
+                except AttributeError:
+                    LOG.error(f"Dataset has no point coordinates (lats, lons):"
+                              f" {ds.attrs['name']} (Most likely due to missing"
+                              f" SwathDefinition)")
+                    continue
+                converted_datasets[ds_id] = converter(convertable_ds, ds.attrs)
+
+        return converted_datasets
+
+    def _parse_coords_end_config(self) -> List[str]:
+        """
+        Parse the ``coordinates_end`` section of the reader config.
+
+        :return: List of ``coords`` identifiers
+        """
+        coords_end = config.get(f"data_reading.{self.reader}.coordinates_end", None)
+        if not coords_end:
+            return []
+
+        if len(coords_end) < 2 or len(coords_end) > 2:
+            LOG.warning("expected 2 end coordinates for LINES")
+        return coords_end
+
+    def _combine_lines(self, datasets: DatasetDict, converter) \
+            -> Dict[DataID, DataArray]:
+        """
+        Find convertible LINES datasets in the ``DatasetDict``. The ``converter``
+        function is then used to generate new DataArrays.
+
+        The positions for the tip and base of the lines are extracted from the
+        dataset metadata. The dataset itself will be discarded.
+
+        :param datasets: all loaded datasets and previously converted datasets
+        :param converter: function to convert a list of DataArrays
+        :return: mapping of converted DataID to new DataArray
+        """
+        coords_end = self._parse_coords_end_config()
+
+        converted_datasets = {}
+        for ds_id, ds in datasets.items():
+            if ds.attrs[Info.KIND] != Kind.LINES:
+                continue
+
+            convertable_ds = []
+            try:
+                for coord in coords_end:
+                    convertable_ds.append(ds.coords[coord])  # base
+            except KeyError:
+                LOG.error(f"dataset has no coordinates: {ds.attrs['name']}")
+                continue
+            if len(convertable_ds) < 2:
+                LOG.error(f"LINES dataset needs 4 coordinates: {ds.attrs['name']}")
+                continue
+
+            convertable_ds.extend([ds.area.lons, ds.area.lats])  # tip
+            converted_datasets[ds_id] = converter(convertable_ds, ds.attrs)
+        return converted_datasets
+
+    def _revise_all_datasets(self) -> DatasetDict:
+        """
+        Revise all datasets and convert the data representation of the POINTS
+        and LINES records found to the data format VisPy needs to display them
+        as such.
+
+        The original datasets are not kept in the scene but replaced by the
+        converted datasets.
+
+        :return: ``DatasetDict`` with the loaded and converted datasets
+        """
+        loaded_datasets = DatasetDict()
+        for ds_id in self.scn.keys():
+            ds = self.scn[ds_id]
+            loaded_datasets[ds_id] = ds
+
+        # Note: If you do not want the converted data sets to overwrite the
+        # original data sets in a future development of this software,
+        # you can pass a suitable prefix to self._stack_data_arrays() (which
+        # will be used to create a new name for the converted data set) by
+        # defining the appropriate converters, for example, as follows:
+        #   self._combine_points: lambda *args: self._stack_data_arrays(*args, "POINTS-"),
+        converters = {
+            self._combine_points: lambda *args: self._stack_data_arrays(*args),
+            self._combine_lines: lambda *args: self._stack_data_arrays(*args),
+        }
+
+        for detector, converter in converters.items():
+            converted_datasets = detector(loaded_datasets, converter)
+            for old_ds_id, new_ds in converted_datasets.items():
+                del loaded_datasets[old_ds_id]
+
+                new_ds_id = DataID.from_dataarray(new_ds)
+                loaded_datasets[new_ds_id] = new_ds
+
+        for ds_id, ds in loaded_datasets.items():
+            self.scn[ds_id] = ds
+        return loaded_datasets
 
     @staticmethod
     def _area_to_sift_attrs(area):
@@ -1438,19 +1726,22 @@ class SatpyImporter(aImporter):
 
             now = datetime.utcnow()
 
-            if prod.info[Info.KIND] in [Kind.VECTORS, Kind.POINTS]:
+            if prod.info[Info.KIND] in [Kind.LINES, Kind.POINTS]:
+                if len(shape) == 1:
+                    LOG.error(f"one dimensional dataset can't be loaded: {ds_id['name']}")
+                    continue
+
                 data_filename, data_memmap = \
                     self._create_data_memmap_file(dataset.data, dataset.dtype,
                                                   prod)
-                content = Content(
-                    lod=0,
+                content = ContentUnstructuredPoints(
                     atime=now,
                     mtime=now,
 
                     # info about the data array memmap
                     path=data_filename,
-                    rows=shape[0],
-                    cols=shape[1],
+                    n_points=shape[0],
+                    n_dimensions=shape[1],
                     dtype=dataset.dtype,
                 )
                 content.info[Info.KIND] = kind
@@ -1532,7 +1823,7 @@ class SatpyImporter(aImporter):
                 data_filename, img_data = \
                     self._create_data_memmap_file(data, np.float32, prod)
 
-                c = Content(
+                c = ContentImage(
                     lod=0,
                     resolution=int(min(abs(cell_width), abs(cell_height))),
                     atime=now,
@@ -1540,8 +1831,8 @@ class SatpyImporter(aImporter):
 
                     # info about the data array memmap
                     path=data_filename,
-                    rows=shape[0],
-                    cols=shape[1],
+                    n_rows=shape[0],
+                    n_cols=shape[1],
                     proj4=proj4,
                     # levels = 0,
                     dtype='float32',
@@ -1608,7 +1899,7 @@ class SatpyImporter(aImporter):
             contour_data[:, 1] += origin_y
             data_filename: str = self.create_contour_file_cache_data(contour_data,
                                                                 prod)
-            c = Content(
+            c = ContentImage(
                 lod=0,
                 resolution=int(min(abs(cell_width), abs(cell_height))),
                 atime=now,
@@ -1616,8 +1907,8 @@ class SatpyImporter(aImporter):
 
                 # info about the data array memmap
                 path=data_filename,
-                rows=contour_data.shape[0],  # number of vertices
-                cols=contour_data.shape[1],  # col (x), row (y), "connect", num_points_for_level
+                n_rows=contour_data.shape[0],  # number of vertices
+                n_cols=contour_data.shape[1],  # col (x), row (y), "connect", num_points_for_level
                 proj4=proj4,
                 # levels = 0,
                 dtype='float32',

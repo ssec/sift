@@ -57,7 +57,8 @@ from shapely.geometry.polygon import LinearRing
 from uwsift.common import Info, Kind, Flags
 from uwsift.model.shapes import content_within_shape
 from .importer import SatpyImporter, generate_guidebook_metadata
-from .metadatabase import Metadatabase, Content, Product, Resource
+from .metadatabase import Metadatabase, Product, Content, \
+    ContentImage, ContentUnstructuredPoints
 
 LOG = logging.getLogger(__name__)
 
@@ -143,7 +144,8 @@ class ActiveContent(QObject):
         co[2:4] = 1  # and of that, only the bottom half of the image
 
     @staticmethod
-    def _rcls(rows: int, columns: int, levels: int):
+    def _rcls(rows: Optional[int], columns: Optional[int], levels: Optional[int]) \
+            -> Tuple[tuple, tuple]:
         """
         :param rows: rows or None
         :param columns: columns or None
@@ -184,7 +186,14 @@ class ActiveContent(QObject):
         :param c: Content entity from database
         :return: workspace_data_arrays instance
         """
-        self._rcl, self._shape = rcl, shape = self._rcls(c.rows, c.cols, c.levels)
+        if isinstance(c, ContentImage):
+            rcl, shape = self._rcls(c.n_rows, c.n_cols, c.n_levels)
+        elif isinstance(c, ContentUnstructuredPoints):
+            rcl, shape = self._rcls(c.n_points, c.n_dimensions, None)
+        else:
+            raise NotImplementedError
+
+        self._rcl, self._shape = rcl, shape
 
         def mm(path, *args, **kwargs):
             full_path = os.path.join(self._wsd, path)
@@ -194,16 +203,23 @@ class ActiveContent(QObject):
             return np.memmap(full_path, *args, **kwargs)
 
         self._data = mm(c.path, dtype=c.dtype or np.float32, mode=mode, shape=shape)  # potentially very very large
-        self._y = mm(c.y_path, dtype=c.dtype or np.float32, mode=mode, shape=shape) if c.y_path else None
-        self._x = mm(c.x_path, dtype=c.dtype or np.float32, mode=mode, shape=shape) if c.x_path else None
-        self._z = mm(c.z_path, dtype=c.dtype or np.float32, mode=mode, shape=shape) if c.z_path else None
 
-        _, cshape = self._rcls(c.coverage_cols, c.coverage_cols, c.coverage_levels)
-        self._coverage = mm(c.coverage_path, dtype=np.int8, mode=mode, shape=cshape) if c.coverage_path else np.array(
-            [1])
-        _, sshape = self._rcls(c.coverage_cols, c.coverage_cols, c.coverage_levels)
-        self._sparsity = mm(c.sparsity_path, dtype=np.int8, mode=mode, shape=sshape) if c.sparsity_path else np.array(
-            [1])
+        if isinstance(c, ContentImage):
+            self._y = mm(c.y_path, dtype=c.dtype or np.float32, mode=mode, shape=shape) if c.y_path else None
+            self._x = mm(c.x_path, dtype=c.dtype or np.float32, mode=mode, shape=shape) if c.x_path else None
+            self._z = mm(c.z_path, dtype=c.dtype or np.float32, mode=mode, shape=shape) if c.z_path else None
+
+            if c.coverage_path:
+                _, cshape = self._rcls(c.coverage_cols, c.coverage_cols, c.coverage_levels)
+                self._coverage = mm(c.coverage_path, dtype=np.int8, mode=mode, shape=cshape)
+            else:
+                self._coverage = np.array([1])
+
+            if c.sparsity_path:
+                _, sshape = self._rcls(c.coverage_cols, c.coverage_cols, c.coverage_levels)
+                self._sparsity = mm(c.sparsity_path, dtype=np.int8, mode=mode, shape=sshape)
+            else:
+                self._sparsity = np.array([1])
 
 
 class BaseWorkspace(QObject):
@@ -783,3 +799,44 @@ class BaseWorkspace(QObject):
 
     def find_merge_target(self, uuid: UUID, info) -> Optional[Product]:
         pass
+
+    def get_points_arrays(self, uuid: UUID) \
+            -> Tuple[Optional[np.array], Optional[np.array]]:
+        """
+        Get the DataArrays from a ``POINTS`` product. The first ``DataArray``
+        contains the positions of the points. The second array represents the
+        attribute.
+
+        :param uuid: UUID of the layer
+        :return: Tuple of a position array and maybe an attribute array
+        """
+        content = self.get_content(uuid, kind=Kind.POINTS)
+        if content is None:
+            return None, None
+
+        if not (content.ndim == 2 and content.shape[1] in (2, 3)):
+            # Try to accept data which is not actually a list of points but may
+            # be a list of tuples of points by shaving off everything but the
+            # first item of each entry.
+            # See vispy.MarkersVisual.set_data() regarding the check criterion.
+            return np.hsplit(content, np.array([2]))[0] # TODO when is this called?
+        elif content.ndim == 2 and content.shape[1] == 3:
+            return np.hsplit(content, [2])
+        return content, None
+
+    def get_lines_arrays(self, uuid: UUID) -> Tuple[Optional[np.array], Optional[np.array]]:
+        """
+        Get the DataArrays from a ``LINES`` product. The first ``DataArray``
+        contains positions for the tip and base of the lines. The second array
+        represents the attribute.
+
+        :param uuid: UUID of the layer
+        :return: Tuple of a lines array and maybe an attribute array
+        """
+        content = self.get_content(uuid, kind=Kind.LINES)
+        if content is None:
+            return None, None
+
+        if content.shape[1] > 4:
+            content, _ = np.hsplit(content, [4])
+        return content, None

@@ -67,7 +67,7 @@ from uwsift.view.transform import PROJ4Transform
 from uwsift.view.visuals import (NEShapefileLines, TiledGeolocatedImage,
                                  MultiChannelImage,
                                  RGBCompositeLayer,
-                                 PrecomputedIsocurve, Vectors)
+                                 PrecomputedIsocurve, Lines)
 from uwsift.workspace.utils.metadata_utils import (
     map_point_style_to_marker_kwargs, get_point_style_by_name)
 
@@ -1270,20 +1270,22 @@ class SceneGraphManager(QObject):
             # algebraic layer
             return self.add_basic_layer(new_order, uuid, p)
 
-    def add_vectors_layer(self, new_order: tuple, uuid: UUID, p: Presentation):
+    def add_lines_layer(self, new_order: tuple, uuid: UUID, p: Presentation):
         layer = self.document[uuid]
         if not layer.is_valid:
-            LOG.info('unable to add an invalid vectors layer, will try again later when layer changes')
+            LOG.info('unable to add an invalid lines layer, will try again later when layer changes')
             return
-        points = self.workspace.get_content(uuid, kind=p.kind)
-        if points is None:
-            LOG.info('layer contains no vectors: {}'.format(uuid))
+
+        content, _ = self.workspace.get_lines_arrays(uuid)
+        if content is None:
+            LOG.info(f"layer contains no lines: {uuid}")
             return
-        vectors = Vectors(points, parent=self.main_map)
-        vectors.transform *= STTransform(translate=(0., 0., 50.))
-        vectors.name = str(uuid)
-        self.image_elements[uuid] = vectors
-        self.layer_set.add_layer(vectors)
+
+        lines = Lines(content, parent=self.main_map)
+        lines.transform *= STTransform(translate=(0., 0., 50.))
+        lines.name = str(uuid)
+        self.image_elements[uuid] = lines
+        self.layer_set.add_layer(lines)
         self.on_view_change(None)
 
     def add_points_layer(self, new_order: tuple, uuid: UUID, p: Presentation):
@@ -1291,26 +1293,53 @@ class SceneGraphManager(QObject):
         if not layer.is_valid:
             LOG.info('unable to add an invalid points layer, will try again later when layer changes')
             return
-        content = self.workspace.get_content(uuid, kind=p.kind)
-        if content is None:
-            LOG.info('layer contains no points: {}'.format(uuid))
+
+        pos, values = self.workspace.get_points_arrays(uuid)
+        if pos is None:
+            LOG.info(f"layer contains no points: {uuid}")
             return
-        if not (content.ndim == 2 and content.shape[1] in (2, 3)):
-            # Try to accept data which is not actually a list of points but may
-            # be a list of tuples of points by shaving off everything but the
-            # first item of each entry.
-            # See vispy.MarkersVisual.set_data() regarding the check criterion.
-            pos = np.hsplit(content, np.array([2]))[0]
-        else:
-            pos = content
 
         kwargs = map_point_style_to_marker_kwargs(get_point_style_by_name(p.style))
+
+        if values is not None:
+            assert len(pos) == len(values)
+            # TODO use p.climits instead of autoscaling?
+            colormap = self.document.find_colormap(p.colormap)
+            kwargs["face_color"] = \
+                self.map_to_colors_autoscaled(colormap, values)
+
         points = Markers(pos=pos, parent=self.main_map, **kwargs)
         points.transform *= STTransform(translate=(0., 0., 50.))
         points.name = str(uuid)
         self.image_elements[uuid] = points
         self.layer_set.add_layer(points)
         self.on_view_change(None)
+
+    def map_to_colors_autoscaled(self, colormap, values, m=2):
+        """
+        Get a list of colors by mapping each entry in values by the given
+        colormap.
+
+        The mapping range is adjusted automatically to m times the standard
+        deviation from the mean. This ignores outliers in the calculation of
+        the mapping range.
+
+        Caution: this is an expensive operation and must not be called in tight
+        loops.
+
+        :param colormap: the colormap to apply
+        :param values: the values to map to colors
+        :param m: factor to stretch the standard deviation around the mean to
+        define the mapping range
+        :return: list of mapped colors in the same order as the input values
+        """
+        std_dev = np.std(values)
+        mean = np.mean(values)
+        min = mean - m * std_dev  # noqa: calm down PyCharm's spelling check, ...
+        max = mean + m * std_dev  # noqa: ... 'min' and 'max' are fine!
+        scaled_attr = np.interp(values, (min, max), (0, 1))
+        colors = colormap.map(scaled_attr)
+        return colors
 
     def change_composite_layers(self, new_order: tuple, uuid_list: list, presentations: list):
         for uuid, presentation in zip(uuid_list, presentations):
@@ -1448,7 +1477,7 @@ class SceneGraphManager(QObject):
         document.didUpdateBasicLayer.connect(self.update_basic_layer)  # new data integrated in existing layer
         document.didAddCompositeLayer.connect(
             self.add_composite_layer)  # layer derived from other layers (either basic or composite themselves)
-        document.didAddVectorsLayer.connect(self.add_vectors_layer)
+        document.didAddLinesLayer.connect(self.add_lines_layer)
         document.didAddPointsLayer.connect(self.add_points_layer)
         document.didRemoveLayers.connect(self._remove_layer)  # layer removed from current layer set
         document.willPurgeLayer.connect(self._purge_layer)  # layer removed from document

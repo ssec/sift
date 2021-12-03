@@ -181,8 +181,9 @@ class Kind(Enum):
     RGB = 4
     COMPOSITE = 1  # deprecated: use Kind.IMAGE instead
     CONTOUR = 6
-    VECTORS = 7
-    POINTS = 8
+    LINES = 7
+    VECTORS = 8
+    POINTS = 9
 
 
 class CompositeType(Enum):
