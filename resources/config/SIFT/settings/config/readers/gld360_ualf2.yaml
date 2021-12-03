@@ -1,0 +1,10 @@
+data_reading:
+  gld360_ualf2:
+    group_keys: ['start_time']
+    filter_patterns:
+      - '{start_time:%Y.%m.%d.%H.%M}.txt'
+      - 'gld360_{start_time:%Y%m%d}_{south}S-{north}N_{west}W-{east}E_ualf2.asc'
+      - 'GLD_{start_time:%Y%m%d}_{north_south}NS_{east_west}EW.ualf2'
+    kind: 'POINTS'
+    style_attributes:
+      fill: ['peak_current', 'altitude']
