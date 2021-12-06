@@ -24,7 +24,7 @@ configure:
 
 These settings are configured in the same way as in the Satpy reader
 configuration YAML files.
-  
+
 In addition for GEOS files the grid layout can be configured to enable correct
 index display according to their PUGs. In the ``grid`` sub-config three
 parameters can be set:
