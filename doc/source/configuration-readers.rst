@@ -49,10 +49,10 @@ can be configured as either ``True`` (the default) or ``False``.
           False``, otherwise caching will take precedence and disable merging.
 
 .. note:: Currently, dataset merging does not work well together with the
-	  adaptively retiling image display. Consider switching it off by
-	  setting ``display.use_tiled_geolocated_images: False``, otherwise
-	  for some zoom levels the data segments loaded later may not be
-	  visible.
+          adaptively retiling image display. Consider switching it off by
+          setting ``display.use_tiled_geolocated_images: False``, otherwise
+          for some zoom levels the data segments loaded later may not be
+          visible.
 
 As example for a complete configuration for a reader this is one for SEVIRI
 Level 1B in HRIT format::
@@ -67,4 +67,36 @@ Level 1B in HRIT format::
         origin: "SE"
         first_index_x: 1
         first_index_y: 1
+
+Readers with the kind ``POINTS`` or ``LINES`` also support the
+``style_attributes`` option. It is used to control which product is used for a
+certain style attribute. Currently only the attribute ``fill`` is supported,
+which influences the colour of ``POINTS``.
+
+Therefore, in the following example from the ``gld360_ualf2`` reader, the colour
+of the marker of each point is controlled by the value of the product
+``peak_current`` or ``altitude``, if one of them is selected in the file wizard
+for loading (the colour map to be used must be configured for the chosen product in the
+``default_colormaps`` list)::
+
+    data_reading:
+      gld360_ualf2:
+        ...
+        kind: POINTS
+        style_attributes:
+          fill: ['peak_current', 'altitude']
+
+For the correct configuration for displaying data of kind ``LINES`` the
+following must be done: While the location of the start point of a line is
+always given by the fields ``lons`` and ``lats`` guaranteed to be provided by
+the reader, the end points of the lines may come in different fields depending
+on the loaded file format. Therefore, the coordinates of the end point must be
+named in the configuration ``coordinates_end``, which has to be a list of two
+field names, as for example for the ``fci_l1_geoobs_lmk_nav_err`` reader::
+
+    data_reading:
+      fci_l1_geoobs_lmk_nav_err:
+        ...
+        kind: LINES
+        coordinates_end: ['longitude_reference', 'latitude_reference']
 
