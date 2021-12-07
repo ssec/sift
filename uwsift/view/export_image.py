@@ -213,7 +213,7 @@ class ExportImageHelper(QtCore.QObject):
         if not self._screenshot_dialog:
             self._screenshot_dialog = ExportImageDialog(self.parent())
             self._screenshot_dialog.accepted.connect(self._save_screenshot)
-        self._screenshot_dialog.set_total_frames(max(self.sgm.layer_set.max_frame, 1))
+        self._screenshot_dialog.set_total_frames(max(self.sgm.animation_controller.max_frame, 1))
         self._screenshot_dialog.show()
 
     def _add_screenshot_footer(self, im, banner_text, font_size=11):
@@ -361,7 +361,7 @@ class ExportImageHelper(QtCore.QObject):
         if s is None:
             s = 1
         if e is None:
-            e = max(self.sgm.layer_set.max_frame, 1)
+            e = max(self.sgm.animation_controller.max_frame, 1)
         return s - 1, e - 1
 
     def _save_screenshot(self):
@@ -370,9 +370,9 @@ class ExportImageHelper(QtCore.QObject):
         info['frame_range'] = self._convert_frame_range(info['frame_range'])
         if info['frame_range']:
             s, e = info['frame_range']
-            uuids = self.sgm.layer_set.frame_order[s: e + 1]
+            uuids = self.sgm.animation_controller.frame_order[s: e + 1]
         else:
-            uuids = [self.sgm.layer_set.top_layer_uuid()]
+            uuids = [self.sgm.animation_controller.top_layer_uuid()]
         uuids, filenames = self._create_filenames(uuids, info['filename'])
 
         # check for existing filenames

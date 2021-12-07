@@ -301,13 +301,13 @@ class UserControlsAnimation(QtCore.QObject):
 
     def next_frame(self, *args, **kwargs):
         """Advance a frame along the animation order."""
-        self.scene_manager.layer_set.animating = False
-        self.scene_manager.layer_set.step(backwards=False)
+        self.scene_manager.animation_controller.animating = False
+        self.scene_manager.animation_controller.step(backwards=False)
 
     def prev_frame(self, *args, **kwargs):
         """Retreat a frame along the animation list."""
-        self.scene_manager.layer_set.animating = False
-        self.scene_manager.layer_set.step(backwards=True)
+        self.scene_manager.animation_controller.animating = False
+        self.scene_manager.animation_controller.step(backwards=True)
 
     def reset_frame_slider(self, *args, **kwargs):
         """Reset frame slider to show current animation state in document when aniamtion list changes."""
@@ -333,7 +333,7 @@ class UserControlsAnimation(QtCore.QObject):
         self.ui.animationSlider.repaint()
         if animating:
             if not UWSIFT_ANIM_INDICATOR_DISABLED:
-                t_sim = self.scene_manager.layer_set.time_manager.create_formatted_t_sim()
+                t_sim = self.scene_manager.animation_controller.time_manager.create_formatted_t_sim()
                 self.ui.animationLabel.setText(t_sim)
             #self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
         else:
@@ -373,7 +373,7 @@ class UserControlsAnimation(QtCore.QObject):
 
     def next_last_time(self, direction=0, *args, **kwargs):
         """Move forward (direction=+1) or backward (-1) a time step in animation order."""
-        self.scene_manager.layer_set.animating = False
+        self.scene_manager.animation_controller.animating = False
         new_focus = self._next_last_time_visibility(direction=direction)
         self.layer_list_model.select([new_focus])
         # if this part of the animation cycle, update the animation slider and displayed time as well
@@ -397,7 +397,7 @@ class UserControlsAnimation(QtCore.QObject):
     def set_animation_speed(self, milliseconds):
         """Change frame rate as measured in milliseconds."""
         LOG.info('animation speed set to {}ms'.format(milliseconds))
-        self.scene_manager.layer_set.animation_speed = milliseconds
+        self.scene_manager.animation_controller.animation_speed = milliseconds
 
     def show_animation_speed_slider(self, pos: QtCore.QPoint, *args):
         """Show frame-rate slider as a pop-up control, at current mouse position."""
@@ -409,7 +409,7 @@ class UserControlsAnimation(QtCore.QObject):
         else:
             popup = self._animation_speed_popup
         if not popup.isVisible():
-            popup.show_at(gpos, self.scene_manager.layer_set.animation_speed)
+            popup.show_at(gpos, self.scene_manager.animation_controller.animation_speed)
 
     def animation_reset_by_layer_set_switch(self, *args, **kwargs):
         """Perform necessary control resets when document layer set is swapped."""
@@ -433,7 +433,7 @@ class UserControlsAnimation(QtCore.QObject):
 
     def toggle_animation(self, action: QtWidgets.QAction = None, *args):
         """Toggle animation on/off."""
-        new_state = self.scene_manager.layer_set.toggle_animation()
+        new_state = self.scene_manager.animation_controller.toggle_animation()
         self.ui.animPlayPause.setChecked(new_state)
 
 
@@ -458,7 +458,7 @@ class Main(QtWidgets.QMainWindow):
     _heartbeat_file = None
 
     def interactive_open_files(self, *args, files=None, **kwargs):
-        self.scene_manager.layer_set.animating = False
+        self.scene_manager.animation_controller.animating = False
         # http://pyqt.sourceforge.net/Docs/PyQt4/qfiledialog.html#getOpenFileNames
         filename_filters = [
             # 'All files (*.*)',
@@ -551,7 +551,7 @@ class Main(QtWidgets.QMainWindow):
         for uuid, p_name in uuid_to_name.items():
             def openit(checked=False, uuid=uuid):
                 LOG.debug('open recent product {}'.format(uuid))
-                self.scene_manager.layer_set.animating = False
+                self.scene_manager.animation_controller.animating = False
                 self.activate_products_by_uuid([uuid])
 
             open_action = QtWidgets.QAction(p_name, self)
@@ -1109,11 +1109,11 @@ class Main(QtWidgets.QMainWindow):
 
         root_context = self.ui.timelineQuickWidget.engine().rootContext()
 
-        time_manager = self.scene_manager.layer_set.time_manager
+        time_manager = self.scene_manager.animation_controller.time_manager
         time_manager.qml_engine = self.ui.timelineQuickWidget.engine()
         time_manager.qml_root_object = self.ui.timelineQuickWidget.rootObject()
         time_manager.qml_backend = QmlBackend()
-        time_manager.qml_backend.didJumpInTimeline.connect(self.scene_manager.layer_set.jump)
+        time_manager.qml_backend.didJumpInTimeline.connect(self.scene_manager.animation_controller.jump)
         time_manager.qml_backend.didChangeTimebase.connect(time_manager.on_timebase_change)
         # TODO(mk): refactor all QML related objects as belonging to TimeManager's QMLBackend
         #           instance -> communication between TimeManager and QMLBackend via Signal/Slot?

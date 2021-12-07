@@ -183,7 +183,7 @@ class PendingPolygon(object):
         self.points = []
 
 
-class LayerSet(object):
+class AnimationController(object):
     """Basic bookkeeping object for each layer set (A, B, C, D) from the UI.
 
     Each LayerSet has its own:
@@ -534,7 +534,7 @@ class SceneGraphManager(QObject):
     composite_element_dependencies = None  # {layer_uuid:set-of-dependent-uuids}
     datasets = None
     colormaps = None
-    layer_set = None
+    animation_controller = None
 
     _current_tool = None
     _color_choices = None
@@ -565,7 +565,7 @@ class SceneGraphManager(QObject):
 
         self.image_elements = {}
         self.composite_element_dependencies = {}
-        self.layer_set = LayerSet(self, frame_change_cb=self.frame_changed)
+        self.animation_controller = AnimationController(self, frame_change_cb=self.frame_changed)
         self._current_tool = None
 
         self._connect_doc_signals(self.document)
@@ -595,17 +595,17 @@ class SceneGraphManager(QObject):
         """Get numpy arrays representing the current canvas."""
         if frame_range is None:
             self.main_canvas.on_draw(None)
-            return [(self.layer_set.top_layer_uuid(), _screenshot())]
+            return [(self.animation_controller.top_layer_uuid(), _screenshot())]
         s, e = frame_range
 
         # reset the view once we are done
-        c = self.layer_set.current_frame
+        c = self.animation_controller.current_frame
         images = []
         for i in range(s, e + 1):
             self.set_frame_number(i)
             self.update()
             self.main_canvas.on_draw(None)
-            u = self.layer_set.frame_order[i] if self.layer_set.frame_order else None
+            u = self.animation_controller.frame_order[i] if self.animation_controller.frame_order else None
             images.append((u, _screenshot()))
         self.set_frame_number(c)
         self.update()
@@ -628,7 +628,7 @@ class SceneGraphManager(QObject):
             # except that visibility is being changed by animation interactions
             # only do this when we're not animating, however
             # watch out for signal loops!
-            uuids = self.layer_set.frame_order
+            uuids = self.animation_controller.frame_order
             # note that all the layers in the layer_order but the current one are now invisible
             vis = dict((u, u == frame_info[3]) for u in uuids)
             self.didChangeLayerVisibility.emit(vis)
@@ -818,7 +818,7 @@ class SceneGraphManager(QObject):
             if self.pending_polygon.add_point(event.pos[:2], map_pos[:2], 60):
                 points = self.pending_polygon.points + [self.pending_polygon.points[0]]
                 self.clear_pending_polygon()
-                self.newProbePolygon.emit(self.layer_set.top_layer_uuid(), points)
+                self.newProbePolygon.emit(self.animation_controller.top_layer_uuid(), points)
 
     def clear_pending_polygon(self):
         for marker in self.pending_polygon.markers:
@@ -1111,7 +1111,7 @@ class SceneGraphManager(QObject):
                                              name=str(layer[Info.UUID]))
         contour_visual.transform *= STTransform(translate=(0, 0, -50.0))
         self.image_elements[layer[Info.UUID]] = contour_visual
-        self.layer_set.add_layer(contour_visual)
+        self.animation_controller.add_layer(contour_visual)
         self.on_view_change(None)
 
     def add_basic_layer(self, new_order: tuple, uuid: UUID, p: Presentation):
@@ -1191,7 +1191,7 @@ class SceneGraphManager(QObject):
             image.transform = ChainTransform([calibration_transform,
                                               z_transform])
         self.image_elements[uuid] = image
-        self.layer_set.add_layer(image)  # TODO This method should add a z-transform!
+        self.animation_controller.add_layer(image)  # TODO This method should add a z-transform!
 
         self.on_view_change(None)
 
@@ -1228,9 +1228,9 @@ class SceneGraphManager(QObject):
                 element.transform = PROJ4Transform(layer[Info.PROJ], inverse=True)
                 element.transform *= STTransform(translate=(0, 0, -50.0))
                 self.composite_element_dependencies[uuid] = dep_uuids
-                self.layer_set.add_layer(element)
+                self.animation_controller.add_layer(element)
                 if new_order:
-                    self.layer_set.set_layer_order(new_order)
+                    self.animation_controller.set_layer_order(new_order)
                 self.on_view_change(None)
                 element.determine_reference_points()
             else:
@@ -1259,9 +1259,9 @@ class SceneGraphManager(QObject):
                 element.transform = ChainTransform([calibration_transform,
                                                     z_transform])
                 self.composite_element_dependencies[uuid] = dep_uuids
-                self.layer_set.add_layer(element)
+                self.animation_controller.add_layer(element)
                 if new_order:
-                    self.layer_set.set_layer_order(new_order)
+                    self.animation_controller.set_layer_order(new_order)
                 self.on_view_change(None)
 
             self.update()
@@ -1285,7 +1285,7 @@ class SceneGraphManager(QObject):
         lines.transform *= STTransform(translate=(0., 0., 50.))
         lines.name = str(uuid)
         self.image_elements[uuid] = lines
-        self.layer_set.add_layer(lines)
+        self.animation_controller.add_layer(lines)
         self.on_view_change(None)
 
     def add_points_layer(self, new_order: tuple, uuid: UUID, p: Presentation):
@@ -1312,7 +1312,7 @@ class SceneGraphManager(QObject):
         points.transform *= STTransform(translate=(0., 0., 50.))
         points.name = str(uuid)
         self.image_elements[uuid] = points
-        self.layer_set.add_layer(points)
+        self.animation_controller.add_layer(points)
         self.on_view_change(None)
 
     def map_to_colors_autoscaled(self, colormap, values, m=2):
@@ -1346,7 +1346,7 @@ class SceneGraphManager(QObject):
             self.change_composite_layer(None, uuid, presentation)
         # set the order after we've updated and created all the new layers
         if new_order:
-            self.layer_set.set_layer_order(new_order)
+            self.animation_controller.set_layer_order(new_order)
 
     def change_composite_layer(self, new_order: tuple, uuid: UUID, presentation: Presentation):
         layer = self.document[uuid]
@@ -1492,7 +1492,7 @@ class SceneGraphManager(QObject):
         document.didChangeImageKind.connect(self.change_layers_image_kind)
 
     def set_frame_number(self, frame_number=None):
-        self.layer_set.next_frame(None, frame_number)
+        self.animation_controller.next_frame(None, frame_number)
 
     def set_layer_visible(self, uuid: UUID, visible: Optional[bool] = None):
         image = self.image_elements.get(uuid, None)
@@ -1508,7 +1508,7 @@ class SceneGraphManager(QObject):
         :return:
         """
         # TODO this is the lazy implementation, eventually just change z order on affected layers
-        self.layer_set.set_layer_order(self.document.current_layer_uuid_order)
+        self.animation_controller.set_layer_order(self.document.current_layer_uuid_order)
 
     def _rebuild_layer_order(self, *args, **kwargs):
         res = self.rebuild_layer_order(*args, **kwargs)
@@ -1517,7 +1517,7 @@ class SceneGraphManager(QObject):
 
     def rebuild_frame_order(self, uuid_list: list, *args, **kwargs):
         LOG.debug('setting SGM new frame order to {0!r:s}'.format(uuid_list))
-        self.layer_set.frame_order = uuid_list
+        self.animation_controller.frame_order = uuid_list
         #self.layer_set.update_time_manager_collection(self.document.data_layer_collection)
 
     def _rebuild_frame_order(self, *args, **kwargs):
@@ -1574,15 +1574,15 @@ class SceneGraphManager(QObject):
                 remove_elements.append(uuid)
 
         # get info on the new order
-        self.layer_set.set_layer_order(current_uuid_order)
-        self.layer_set.frame_order = self.document.current_animation_order
+        self.animation_controller.set_layer_order(current_uuid_order)
+        self.animation_controller.frame_order = self.document.current_animation_order
         self.rebuild_presentation(prez_lookup)
 
         for elem in remove_elements:
             self.purge_layer(elem)
         # This is triggered, when the layer set is updated?
         # import_product_content when data loaded?
-        self.layer_set.update_time_manager(self.document.data_layer_collection)
+        self.animation_controller.update_time_manager(self.document.data_layer_collection)
 
         # Triggers main canvas update
         self.update()
