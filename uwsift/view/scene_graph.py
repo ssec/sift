@@ -58,6 +58,8 @@ from uwsift import config
 from uwsift.common import DEFAULT_ANIMATION_DELAY, Info, Kind, Tool, Presentation
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.model.document import DocLayerStack, DocBasicDataset, Document
+from uwsift.model.layer_item import LayerItem
+from uwsift.model.product_dataset import ProductDataset
 from uwsift.model.time_manager import TimeManager
 from uwsift.queue import TASK_DOING, TASK_PROGRESS
 from uwsift.util import get_package_data_dir
@@ -530,6 +532,7 @@ class SceneGraphManager(QObject):
     polygon_probes = None
     point_probes = None
 
+    layer_nodes = None  # {layer_uuid: layer_node}
     dataset_nodes = None  # {dataset_uuid: dataset_node}
     composite_element_dependencies = None  # {dataset_uuid:set-of-dependent-uuids}
     datasets = None
@@ -563,6 +566,7 @@ class SceneGraphManager(QObject):
         self.polygon_probes = {}
         self.point_probes = {}
 
+        self.layer_nodes = {}
         self.dataset_nodes = {}
         self.composite_element_dependencies = {}
         self.animation_controller = AnimationController(self, frame_change_cb=self.frame_changed)
@@ -1114,86 +1118,70 @@ class SceneGraphManager(QObject):
         self.animation_controller.add_layer(contour_visual)
         self.on_view_change(None)
 
-    def add_basic_dataset(self, new_order: tuple, uuid: UUID, p: Presentation):
-        layer = self.document[uuid]
-        # create a new layer in the imagelist
-        if not layer.is_valid:
-            LOG.warning('unable to add an invalid layer, will try again later when layer changes')
-            return
-        if layer[Info.UUID] in self.dataset_nodes:
-            image = self.dataset_nodes[layer[Info.UUID]]
-            if p.kind == Kind.CONTOUR and isinstance(image, PrecomputedIsocurve):
-                LOG.warning("Contour layer already exists in scene")
-                return
-            if p.kind == Kind.IMAGE and isinstance(image, TiledGeolocatedImage):
-                LOG.warning("Image layer (geolocated) already exists in scene")
-                return
-            if p.kind == Kind.IMAGE and isinstance(image, Image):
-                LOG.warning("Image layer (pixel matrix) already exists in scene")
-                return
-            # we already have an image layer for it and it isn't what we want
-            # remove the existing image object and create the proper type now
-            image.parent = None
-            del self.dataset_nodes[layer[Info.UUID]]
+    def add_node_for_layer(self, layer: LayerItem):
+        if not USE_TILED_GEOLOCATED_IMAGES and layer.kind == Kind.IMAGE:
+            layer_node = scene.Node(parent=self.main_map_parent,
+                                    name=str(layer.uuid))
+        else:
+            layer_node = scene.Node(parent=self.main_map,
+                                    name=str(layer.uuid))
 
-        image_data = self.workspace.get_content(layer.uuid, kind=p.kind)
-        if p.kind == Kind.CONTOUR:
-            return self.add_contour_dataset(layer, p, image_data)
+        z_transform = STTransform(translate=(0, 0, 0))
+        layer_node.transform = z_transform
 
-        if False:  # Set to True FOR TESTING ONLY
-            self._overwrite_with_test_pattern(image_data)
+        self.layer_nodes[layer.uuid] = layer_node
+
+    def add_node_for_product_dataset(self, layer: LayerItem, product_dataset: ProductDataset):
+
+        image_data = self.workspace.get_content(product_dataset.uuid, kind=product_dataset.kind)
+
+        # TODO(LR): Deprecate this and instead route a signal per kind to a dedicated slot?
+        #if product_dataset.kind == Kind.CONTOUR:
+        #    return self.add_contour_layer(layer, p, image_data)
+
+        assert self.layer_nodes[layer.uuid] is not None
 
         if USE_TILED_GEOLOCATED_IMAGES:
             image = TiledGeolocatedImage(
                 image_data,
-                layer[Info.ORIGIN_X],
-                layer[Info.ORIGIN_Y],
-                layer[Info.CELL_WIDTH],
-                layer[Info.CELL_HEIGHT],
-                name=str(uuid),
-                clim=p.climits,
-                gamma=p.gamma,
+                product_dataset.info[Info.ORIGIN_X],
+                product_dataset.info[Info.ORIGIN_Y],
+                product_dataset.info[Info.CELL_WIDTH],
+                product_dataset.info[Info.CELL_HEIGHT],
+                name=str(product_dataset.uuid),
+                clim=layer.presentation.climits,
+                gamma=layer.presentation.gamma,
                 interpolation='nearest',
                 method='subdivide',
-                cmap=self.document.find_colormap(p.colormap),
+                cmap=self.document.find_colormap(layer.presentation.colormap),
                 double=False,
                 texture_shape=DEFAULT_TEXTURE_SHAPE,
                 wrap_lon=False,
-                parent=self.main_map,
-                projection=layer[Info.PROJ],
+                parent=self.layer_nodes[layer.uuid],
+                projection=product_dataset.info[Info.PROJ],
             )
-            image.transform = PROJ4Transform(layer[Info.PROJ], inverse=True)
-            image.transform *= STTransform(translate=(0, 0, -50.0))
+            image.transform = PROJ4Transform(product_dataset.info[Info.PROJ],
+                                             inverse=True)
             image.determine_reference_points()
         else:
             image = Image(
                 image_data,
-                name=str(uuid),
-                clim=p.climits,
-                gamma=p.gamma,
+                name=str(product_dataset.uuid),
+                clim=layer.presentation.climits,
+                gamma=layer.presentation.gamma,
                 interpolation='nearest',
-                cmap=self.document.find_colormap(p.colormap),
-                parent=self.main_map_parent,
+                cmap=self.document.find_colormap(layer.presentation.colormap),
+                parent=self.layer_nodes[layer.uuid],
             )
-            # TODO: We must use a ChainTransform, because of the assumption made
-            # in LayerSet.update_layers_z(): there it is assumed, that the
-            # (last) transformation of the layer can be overwritten incautiously
-            # since it would only carry z translation. So the question: why
-            # doesn't LayerSet.add_layer() take care to guarantee this?
-            # Anyhow, here we can't concatenate two STTransforms with *= because
-            # they would end up in *one* transform whose 'translate' part would
-            # be overwritten in LayerSet.update_layers_z(), i.e. any x,y-offset
-            # would be reset to 0.0,0.0.
-            calibration_transform = STTransform(
-                scale=(layer[Info.CELL_WIDTH], layer[Info.CELL_HEIGHT], 1),
-                translate=(layer[Info.ORIGIN_X], layer[Info.ORIGIN_Y], 0))
-            z_transform = STTransform(translate=(0, 0, -50))
-            image.transform = ChainTransform([calibration_transform,
-                                              z_transform])
-        self.dataset_nodes[uuid] = image
-        self.animation_controller.add_layer(image)  # TODO This method should add a z-transform!
-
+            image.transform = STTransform(
+                scale=(product_dataset.info[Info.CELL_WIDTH],
+                       product_dataset.info[Info.CELL_HEIGHT], 1),
+                translate=(product_dataset.info[Info.ORIGIN_X],
+                           product_dataset.info[Info.ORIGIN_Y], 0))
+        self.dataset_nodes[product_dataset.uuid] = image
         self.on_view_change(None)
+        LOG.debug("Scene Graph after Dataset insertion:")
+        LOG.debug(self.main_view.describe_tree(with_transform=True))
 
     def add_composite_dataset(self, new_order: tuple, uuid: UUID, p: Presentation):
         layer = self.document[uuid]
