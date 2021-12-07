@@ -15,7 +15,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from uwsift.common import Info, Kind, Flags, State
 from uwsift.queue import TASK_PROGRESS, TASK_DOING
 from .importer import aImporter, SatpyImporter
-from .metadatabase import Metadatabase, Content, Product, Resource
+from .metadatabase import Metadatabase, Content, Product, Resource, ContentImage
 from .workspace import BaseWorkspace, frozendict, ActiveContent
 
 LOG = logging.getLogger(__name__)
@@ -279,7 +279,14 @@ class CachingWorkspace(BaseWorkspace):
             except NoResultFound:
                 LOG.error("No product with UUID {} found".format(uuid))
                 return None
-        contents = session.query(Content).filter(Content.product_id == prod.id).order_by(Content.lod).all()
+        if kind == Kind.IMAGE:
+            contents = session.query(ContentImage).filter(ContentImage
+                                                          .product_id
+                                                          == prod.id)\
+                .order_by(ContentImage.lod).all()
+        else:
+            contents = session.query(Content).filter(
+                Content.product_id == prod.id)
         contents = [c for c in contents if c.info.get(Info.KIND, Kind.IMAGE) == kind]
         return None if 0 == len(contents) else contents[0]
 
@@ -294,7 +301,15 @@ class CachingWorkspace(BaseWorkspace):
             except NoResultFound:
                 LOG.error("No product with UUID {} found".format(uuid))
                 return None
-        contents = session.query(Content).filter(Content.product_id == prod.id).order_by(Content.lod.desc()).all()
+
+        if kind == Kind.IMAGE:
+            contents = session.query(ContentImage).filter(ContentImage
+                                                          .product_id
+                                                          == prod.id)\
+                .order_by(ContentImage.lod.desc()).all()
+        else:
+            contents = session.query(Content).filter(
+                Content.product_id == prod.id)
         contents = [c for c in contents if c.info.get(Info.KIND, Kind.IMAGE) == kind]
         return None if 0 == len(contents) else contents[-1]
 
@@ -798,8 +813,20 @@ class CachingWorkspace(BaseWorkspace):
         #  Keeping background operations lightweight makes sense however, so just review this
         # prod.touch()
         with self._inventory as s:
-            content = s.query(Content).filter(
-                (Product.uuid_str == str(uuid)) & (Content.product_id == Product.id)).order_by(Content.lod.desc()).all()
+
+            if kind == Kind.IMAGE:
+                content = s.query(ContentImage).filter((Product.uuid_str
+                                                        == str(uuid))
+                                                       & (ContentImage
+                                                           .product_id
+                                                           == Product.id))\
+                    .order_by(ContentImage.lod.desc()).all()
+            else:
+                content = s.query(Content).filter((Product.uuid_str
+                                                   == str(uuid))
+                                                  & (Content.product_id
+                                                     == Product.id))
+
             content = [x for x in content if x.info.get(Info.KIND, Kind.IMAGE) == kind]
             if len(content) != 1:
                 LOG.warning("More than one matching Content object for '{}'"
