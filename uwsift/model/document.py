@@ -60,6 +60,7 @@ from __future__ import annotations
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
+import dataclasses
 import logging
 from collections import MutableSequence, OrderedDict, defaultdict
 from itertools import groupby, chain
@@ -285,7 +286,7 @@ class DocLayerStack(MutableSequence):
 
     def clear_animation_order(self):
         for i, q in enumerate(self._store):
-            self._store[i] = q._replace(a_order=None)
+            self._store[i] = dataclasses.replace(q, a_order=None)
 
     def index(self, uuid):
         assert (isinstance(uuid, UUID))
@@ -314,7 +315,7 @@ class DocLayerStack(MutableSequence):
             except ValueError:
                 LOG.warning('unable to find layer in LayerStack')
                 raise
-            self._store[idx] = self._store[idx]._replace(a_order=nth)
+            self._store[idx] = dataclasses.replace(self._store[idx], a_order=nth)
 
 
 # FUTURE: move these into separate modules
@@ -1633,7 +1634,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                          gamma=gamma if family_prez is None else family_prez.gamma,
                          mixing=Mixing.NORMAL)
 
-        q = p._replace(visible=False)  # make it available but not visible in other layer sets
+        q = dataclasses.replace(p, visible=False)  # make it available but not visible in other layer sets
         old_layer_count = len(self._layer_sets[self.current_set_index])
         for dex, lset in enumerate(self._layer_sets):
             if lset is not None:  # uninitialized layer sets will be None
@@ -2109,7 +2110,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 dex = L.index(dex)  # returns row index
             old = L[dex]
             vis = (not old.visible) if visible is None else visible
-            nu = old._replace(visible=vis)
+            nu = dataclasses.replace(old, visible=vis)
             L[dex] = nu
             zult[nu.uuid] = nu.visible
         self.didChangeLayerVisibility.emit(zult)
@@ -2126,7 +2127,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for uuid, visible in changes.items():
             dex = curr_set[uuid]
             old = curr_set[dex]
-            curr_set[dex] = old._replace(visible=visible)
+            curr_set[dex] = dataclasses.replace(old, visible=visible)
         self.didChangeLayerVisibility.emit(changes)
 
     def next_last_step(self, uuid, delta=0, bandwise=False):
@@ -2187,7 +2188,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for uuid in uuids:
             for dex, pinfo in enumerate(L):
                 if pinfo.uuid == uuid:
-                    L[dex] = pinfo._replace(colormap=name)
+                    L[dex] = dataclasses.replace(pinfo, colormap=name)
                     nfo[uuid] = name
         self.didChangeColormap.emit(nfo)
 
@@ -2219,7 +2220,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         nfo = {}
         L = self.current_layer_set
         for idx, pz, layer in self.current_layers_where(**query):
-            new_pz = pz._replace(climits=clims)
+            new_pz = dataclasses.replace(pz, climits=clims)
             nfo[layer.uuid] = new_pz.climits
             L[idx] = new_pz
         self.didChangeColorLimits.emit(nfo)
@@ -2240,14 +2241,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             for dex, pinfo in enumerate(L):
                 if pinfo.uuid == uuid:
                     nfo[uuid] = pinfo.climits[::-1]
-                    L[dex] = pinfo._replace(climits=nfo[uuid])
+                    L[dex] = dataclasses.replace(pinfo, climits=nfo[uuid])
         self.didChangeColorLimits.emit(nfo)
 
     def change_gamma_for_layers_where(self, gamma, **query):
         nfo = {}
         L = self.current_layer_set
         for idx, pz, layer in self.current_layers_where(**query):
-            new_pz = pz._replace(gamma=gamma)
+            new_pz = dataclasses.replace(pz, gamma=gamma)
             nfo[layer.uuid] = new_pz.gamma
             L[idx] = new_pz
         self.didChangeGamma.emit(nfo)
@@ -2269,7 +2270,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             if pz.kind not in [Kind.IMAGE, Kind.CONTOUR]:
                 LOG.warning("Can't change image kind for Kind: %s", pz.kind.name)
                 continue
-            new_pz = pz._replace(kind=new_kind)
+            new_pz = dataclasses.replace(pz, kind=new_kind)
             nfo[layer.uuid] = new_pz
             layer_set[idx] = new_pz
         self.didChangeImageKind.emit(nfo)
