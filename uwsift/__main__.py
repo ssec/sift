@@ -294,10 +294,10 @@ class UserControlsAnimation(QtCore.QObject):
 
         self.document.didSwitchLayerSet.connect(self.animation_reset_by_layer_set_switch)
         self.document.didChangeLayerVisibility.connect(self.update_frame_time_to_top_visible)
-        self.document.didReorderLayers.connect(self.update_frame_time_to_top_visible)
-        self.document.didRemoveLayers.connect(self.update_frame_time_to_top_visible)
-        self.document.didAddBasicLayer.connect(self.update_frame_time_to_top_visible)
-        self.document.didAddCompositeLayer.connect(self.update_frame_time_to_top_visible)
+        self.document.didReorderDatasets.connect(self.update_frame_time_to_top_visible)
+        self.document.didRemoveDatasets.connect(self.update_frame_time_to_top_visible)
+        self.document.didAddBasicDataset.connect(self.update_frame_time_to_top_visible)
+        self.document.didAddCompositeDataset.connect(self.update_frame_time_to_top_visible)
 
     def next_frame(self, *args, **kwargs):
         """Advance a frame along the animation order."""
@@ -907,7 +907,7 @@ class Main(QtWidgets.QMainWindow):
         else:
             self.workspace = SimpleWorkspace(workspace_dir)
         self.document = doc = Document(self.workspace, config_dir=config_dir, queue=self.queue)
-        self.document.didRemoveLayers.connect(self.run_gc_after_layer_deletion)
+        self.document.didRemoveDatasets.connect(self.run_gc_after_layer_deletion)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
                                                border_shapefile=border_shapefile,
                                                center=center,
@@ -997,8 +997,8 @@ class Main(QtWidgets.QMainWindow):
 
         def _update_point_probe_slot(*args):
             return self.graphManager.update_point_probe(DEFAULT_POINT_PROBE)
-        self.document.didAddBasicLayer.connect(_update_point_probe_slot)
-        self.document.didAddCompositeLayer.connect(_update_point_probe_slot)
+        self.document.didAddBasicDataset.connect(_update_point_probe_slot)
+        self.document.didAddCompositeDataset.connect(_update_point_probe_slot)
 
         # FIXME: These were added as a simple fix to update the probe value on layer changes, but this should really
         #        have its own manager-like object
@@ -1006,10 +1006,10 @@ class Main(QtWidgets.QMainWindow):
             return self.update_point_probe_text(DEFAULT_POINT_PROBE)
 
         self.document.didChangeLayerVisibility.connect(_blackhole)
-        self.document.didAddBasicLayer.connect(_blackhole)
-        self.document.didAddCompositeLayer.connect(_blackhole)
-        self.document.didRemoveLayers.connect(_blackhole)
-        self.document.didReorderLayers.connect(_blackhole)
+        self.document.didAddBasicDataset.connect(_blackhole)
+        self.document.didAddCompositeDataset.connect(_blackhole)
+        self.document.didRemoveDatasets.connect(_blackhole)
+        self.document.didReorderDatasets.connect(_blackhole)
         if False:
             # XXX: Disable the below line if updating during animation is too much work
             # self.scene_manager.didChangeFrame.connect(lambda frame_info: update_probe_point(uuid=frame_info[-1]))
@@ -1180,11 +1180,11 @@ class Main(QtWidgets.QMainWindow):
             LOG.info(f"Highlighting last data time display when delayed for"
                      f" more than {self._max_tolerable_dataset_age} seconds.")
 
-        self.document.didAddBasicLayer.connect(self._update_dataset_timestamps)
-        self.document.didAddCompositeLayer.connect(self._update_dataset_timestamps)
+        self.document.didAddBasicDataset.connect(self._update_dataset_timestamps)
+        self.document.didAddCompositeDataset.connect(self._update_dataset_timestamps)
 
         # don't clear the time of last import when the layers are removed
-        self.document.didRemoveLayers.connect(
+        self.document.didRemoveDatasets.connect(
             self._clear_last_dataset_creation_time)
 
         self.currentTimeTimer = QtCore.QTimer(parent=self)
@@ -1201,8 +1201,8 @@ class Main(QtWidgets.QMainWindow):
                 heartbeat_file.replace("$$CACHE_DIR$$", USER_CACHE_DIR)
             LOG.info(f"Communication with watchdog via heartbeat file "
                      f" '{self._heartbeat_file}' configured.")
-            self.document.didAddBasicLayer.connect(self._update_heartbeat_file)
-            self.document.didAddCompositeLayer.connect(self._update_heartbeat_file)
+            self.document.didAddBasicDataset.connect(self._update_heartbeat_file)
+            self.document.didAddCompositeDataset.connect(self._update_heartbeat_file)
 
     def _timer_collect_resources(self):
         if self._resource_collector:

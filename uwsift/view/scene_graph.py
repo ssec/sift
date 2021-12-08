@@ -1019,7 +1019,7 @@ class SceneGraphManager(QObject):
     def change_layers_image_kind(self, change_dict):
         for uuid, new_pz in change_dict.items():
             LOG.info('changing {} to kind {}'.format(uuid, new_pz.kind.name))
-            self.add_basic_layer(None, uuid, new_pz)
+            self.add_basic_dataset(None, uuid, new_pz)
 
     @staticmethod
     def _overwrite_with_test_pattern(data):
@@ -1089,32 +1089,32 @@ class SceneGraphManager(QObject):
 
         return data
 
-    def add_contour_layer(self, layer: DocBasicDataset, p: Presentation, image_data: np.ndarray):
+    def add_contour_dataset(self, dataset: DocBasicDataset, p: Presentation, image_data: np.ndarray):
         verts = image_data[:, :2]
         connects = image_data[:, 2].astype(np.bool)
         level_indexes = image_data[:, 3]
         level_indexes = level_indexes[~np.isnan(level_indexes)].astype(np.int)
-        levels = layer["contour_levels"]
+        levels = dataset["contour_levels"]
         cmap = self.document.find_colormap(p.colormap)
 
-        proj4_str = layer[Info.PROJ]
+        proj4_str = dataset[Info.PROJ]
         parent = self.proxy_nodes.get(proj4_str)
         if parent is None:
             parent = ContourGroupNode(parent=self.main_map)
-            parent.transform = PROJ4Transform(layer[Info.PROJ], inverse=True)
+            parent.transform = PROJ4Transform(dataset[Info.PROJ], inverse=True)
             self.proxy_nodes[proj4_str] = parent
 
         contour_visual = PrecomputedIsocurve(verts, connects, level_indexes,
                                              levels=levels, color_lev=cmap,
                                              clim=p.climits,
                                              parent=parent,
-                                             name=str(layer[Info.UUID]))
+                                             name=str(dataset[Info.UUID]))
         contour_visual.transform *= STTransform(translate=(0, 0, -50.0))
-        self.image_elements[layer[Info.UUID]] = contour_visual
+        self.image_elements[dataset[Info.UUID]] = contour_visual
         self.animation_controller.add_layer(contour_visual)
         self.on_view_change(None)
 
-    def add_basic_layer(self, new_order: tuple, uuid: UUID, p: Presentation):
+    def add_basic_dataset(self, new_order: tuple, uuid: UUID, p: Presentation):
         layer = self.document[uuid]
         # create a new layer in the imagelist
         if not layer.is_valid:
@@ -1138,7 +1138,7 @@ class SceneGraphManager(QObject):
 
         image_data = self.workspace.get_content(layer.uuid, kind=p.kind)
         if p.kind == Kind.CONTOUR:
-            return self.add_contour_layer(layer, p, image_data)
+            return self.add_contour_dataset(layer, p, image_data)
 
         if False:  # Set to True FOR TESTING ONLY
             self._overwrite_with_test_pattern(image_data)
@@ -1195,7 +1195,7 @@ class SceneGraphManager(QObject):
 
         self.on_view_change(None)
 
-    def add_composite_layer(self, new_order: tuple, uuid: UUID, p: Presentation):
+    def add_composite_dataset(self, new_order: tuple, uuid: UUID, p: Presentation):
         layer = self.document[uuid]
         LOG.debug("SceneGraphManager.add_composite_layer %s" % repr(layer))
         if not layer.is_valid:
@@ -1268,9 +1268,9 @@ class SceneGraphManager(QObject):
             return True
         elif p.kind in [Kind.COMPOSITE, Kind.IMAGE]:
             # algebraic layer
-            return self.add_basic_layer(new_order, uuid, p)
+            return self.add_basic_dataset(new_order, uuid, p)
 
-    def add_lines_layer(self, new_order: tuple, uuid: UUID, p: Presentation):
+    def add_lines_dataset(self, new_order: tuple, uuid: UUID, p: Presentation):
         layer = self.document[uuid]
         if not layer.is_valid:
             LOG.info('unable to add an invalid lines layer, will try again later when layer changes')
@@ -1288,7 +1288,7 @@ class SceneGraphManager(QObject):
         self.animation_controller.add_layer(lines)
         self.on_view_change(None)
 
-    def add_points_layer(self, new_order: tuple, uuid: UUID, p: Presentation):
+    def add_points_dataset(self, new_order: tuple, uuid: UUID, p: Presentation):
         layer = self.document[uuid]
         if not layer.is_valid:
             LOG.info('unable to add an invalid points layer, will try again later when layer changes')
@@ -1341,14 +1341,14 @@ class SceneGraphManager(QObject):
         colors = colormap.map(scaled_attr)
         return colors
 
-    def change_composite_layers(self, new_order: tuple, uuid_list: list, presentations: list):
+    def change_composite_datasets(self, new_order: tuple, uuid_list: list, presentations: list):
         for uuid, presentation in zip(uuid_list, presentations):
-            self.change_composite_layer(None, uuid, presentation)
+            self.change_composite_dataset(None, uuid, presentation)
         # set the order after we've updated and created all the new layers
         if new_order:
             self.animation_controller.set_layer_order(new_order)
 
-    def change_composite_layer(self, new_order: tuple, uuid: UUID, presentation: Presentation):
+    def change_composite_dataset(self, new_order: tuple, uuid: UUID, presentation: Presentation):
         layer = self.document[uuid]
         if presentation.kind == Kind.RGB:
             if layer.uuid in self.image_elements:
@@ -1373,19 +1373,19 @@ class SceneGraphManager(QObject):
                 else:
                     # layer is no longer valid and has to be removed
                     LOG.debug("Purging composite ")
-                    self.purge_layer(layer.uuid)
+                    self.purge_dataset(layer.uuid)
                 self.update()
             else:
                 if layer.is_valid:
                     # Add this now valid layer
-                    self.add_composite_layer(new_order, layer.uuid, presentation)
+                    self.add_composite_dataset(new_order, layer.uuid, presentation)
                 else:
                     LOG.info('unable to add an changed invalid composite layer, will try again later when layer changes')
                     return
         else:
             raise ValueError("Unknown or unimplemented composite type")
 
-    def update_basic_layer(self, uuid: UUID, kind: Kind):
+    def update_basic_dataset(self, uuid: UUID, kind: Kind):
         """
         Push the data (content) of a basic layer again to the associated scene
         graph node.
@@ -1424,7 +1424,7 @@ class SceneGraphManager(QObject):
 
         self.on_view_change(None)
 
-    def remove_layer(self, new_order: tuple, uuids_removed: tuple, row: int, count: int):
+    def remove_dataset(self, new_order: tuple, uuids_removed: tuple, row: int, count: int):
         """
         remove (disable) a layer, though this may be temporary due to a move.
         wait for purge to truly flush out this puppy
@@ -1437,12 +1437,12 @@ class SceneGraphManager(QObject):
         # XXX: Used to rebuild_all instead of just update, is that actually needed?
         # self.rebuild_all()
 
-    def _remove_layer(self, *args, **kwargs):
-        self.remove_layer(*args, **kwargs)
+    def _remove_dataset(self, *args, **kwargs):
+        self.remove_dataset(*args, **kwargs)
         # when removing the layer is the only operation being performed then update when we are done
         self.update()
 
-    def purge_layer(self, uuid_removed: UUID):
+    def purge_dataset(self, uuid_removed: UUID):
         """
         Layer has been purged from document (no longer used anywhere) - flush it all out
         :param uuid_removed: UUID of the layer that is to be removed
@@ -1457,13 +1457,13 @@ class SceneGraphManager(QObject):
         else:
             LOG.debug("Layer {} already purged from Scene Graph".format(uuid_removed))
 
-    def _purge_layer(self, *args, **kwargs):
-        res = self.purge_layer(*args, **kwargs)
+    def _purge_dataset(self, *args, **kwargs):
+        res = self.purge_dataset(*args, **kwargs)
         # when purging the layer is the only operation being performed then update when we are done
         self.update()
         return res
 
-    def change_layers_visibility(self, layers_changed: Dict[UUID, bool]):
+    def change_datasets_visibility(self, layers_changed: Dict[UUID, bool]):
         for uuid, visible in layers_changed.items():
             self.set_layer_visible(uuid, visible)
 
@@ -1472,21 +1472,21 @@ class SceneGraphManager(QObject):
         # raise NotImplementedError("layer set change not implemented in SceneGraphManager")
 
     def _connect_doc_signals(self, document: Document):
-        document.didReorderLayers.connect(self._rebuild_layer_order)  # current layer set changed z/anim order
-        document.didAddBasicLayer.connect(self.add_basic_layer)  # layer added to one or more layer sets
-        document.didUpdateBasicLayer.connect(self.update_basic_layer)  # new data integrated in existing layer
-        document.didAddCompositeLayer.connect(
-            self.add_composite_layer)  # layer derived from other layers (either basic or composite themselves)
-        document.didAddLinesLayer.connect(self.add_lines_layer)
-        document.didAddPointsLayer.connect(self.add_points_layer)
-        document.didRemoveLayers.connect(self._remove_layer)  # layer removed from current layer set
-        document.willPurgeLayer.connect(self._purge_layer)  # layer removed from document
+        document.didReorderDatasets.connect(self._rebuild_dataset_order)  # current layer set changed z/anim order
+        document.didAddBasicDataset.connect(self.add_basic_dataset)  # layer added to one or more layer sets
+        document.didUpdateBasicDataset.connect(self.update_basic_dataset)  # new data integrated in existing layer
+        document.didAddCompositeDataset.connect(
+            self.add_composite_dataset)  # layer derived from other layers (either basic or composite themselves)
+        document.didAddLinesDataset.connect(self.add_lines_dataset)
+        document.didAddPointsDataset.connect(self.add_points_dataset)
+        document.didRemoveDatasets.connect(self._remove_dataset)  # layer removed from current layer set
+        document.willPurgeDataset.connect(self._purge_dataset)  # layer removed from document
         document.didSwitchLayerSet.connect(self.rebuild_new_layer_set)
         document.didChangeColormap.connect(self.change_layers_colormap)
-        document.didChangeLayerVisibility.connect(self.change_layers_visibility)
+        document.didChangeLayerVisibility.connect(self.change_datasets_visibility)
         document.didReorderAnimation.connect(self._rebuild_frame_order)
-        document.didChangeComposition.connect(self.change_composite_layer)
-        document.didChangeCompositions.connect(self.change_composite_layers)
+        document.didChangeComposition.connect(self.change_composite_dataset)
+        document.didChangeCompositions.connect(self.change_composite_datasets)
         document.didChangeColorLimits.connect(self.change_layers_color_limits)
         document.didChangeGamma.connect(self.change_layers_gamma)
         document.didChangeImageKind.connect(self.change_layers_image_kind)
@@ -1500,7 +1500,7 @@ class SceneGraphManager(QObject):
             return
         image.visible = not image.visible if visible is None else visible
 
-    def rebuild_layer_order(self, new_layer_index_order, *args, **kwargs):
+    def rebuild_dataset_order(self, new_layer_index_order, *args, **kwargs):
         """
         layer order has changed; shift layers around.
         an empty list is sent if the whole layer order has been changed
@@ -1510,8 +1510,8 @@ class SceneGraphManager(QObject):
         # TODO this is the lazy implementation, eventually just change z order on affected layers
         self.animation_controller.set_layer_order(self.document.current_layer_uuid_order)
 
-    def _rebuild_layer_order(self, *args, **kwargs):
-        res = self.rebuild_layer_order(*args, **kwargs)
+    def _rebuild_dataset_order(self, *args, **kwargs):
+        res = self.rebuild_dataset_order(*args, **kwargs)
         self.update()
         return res
 
@@ -1565,7 +1565,7 @@ class SceneGraphManager(QObject):
                 LOG.debug('creating deferred element for layer %s' % layer.uuid)
                 if layer.kind in [Kind.COMPOSITE, Kind.RGB]:
                     # create an invisible element with the RGB
-                    self.change_composite_layer(current_uuid_order, layer, prez_lookup[uuid])
+                    self.change_composite_dataset(current_uuid_order, layer, prez_lookup[uuid])
                 else:
                     # FIXME this was previously a NotImplementedError
                     LOG.warning('unable to create deferred scenegraph element for %s' % repr(layer))
@@ -1579,7 +1579,7 @@ class SceneGraphManager(QObject):
         self.rebuild_presentation(prez_lookup)
 
         for elem in remove_elements:
-            self.purge_layer(elem)
+            self.purge_dataset(elem)
         # This is triggered, when the layer set is updated?
         # import_product_content when data loaded?
         self.animation_controller.update_time_manager(self.document.data_layer_collection)

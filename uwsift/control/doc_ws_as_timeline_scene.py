@@ -184,8 +184,8 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
                 ts.sync_available_tracks()
                 ts.sync_items()
 
-        doc.didAddBasicLayer.connect(refresh_with_new_product)
-        doc.didAddCompositeLayer.connect(refresh_with_new_product)
+        doc.didAddBasicDataset.connect(refresh_with_new_product)
+        doc.didAddCompositeDataset.connect(refresh_with_new_product)
 
         doc.didChangeLayerVisibility.connect(self._update_visibility_for_products)
 
@@ -201,7 +201,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         #     pass
         # doc.didReorderTracks.connect(refresh_track_order)
 
-        # doc.didReorderLayers.connect(self._reorder_tracks_given_layer_order)
+        # doc.didReorderDatasets.connect(self._reorder_tracks_given_layer_order)
         # doc.didChangeComposition.connect(self._invalidate)
 
         def refresh(changed_uuids, ts=self, *args, **kwargs):

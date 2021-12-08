@@ -1404,16 +1404,16 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # signals
     # Clarification: Layer interfaces migrate to layer meaning "current active products under the playhead"
     # new order list with None for new layer; info-dictionary, overview-content-ndarray
-    didAddBasicLayer = pyqtSignal(tuple, UUID, Presentation)
-    didUpdateBasicLayer = pyqtSignal(UUID, Kind)
+    didAddBasicDataset = pyqtSignal(tuple, UUID, Presentation)
+    didUpdateBasicDataset = pyqtSignal(UUID, Kind)
     # comp layer is derived from multiple basic layers and has its own UUID
-    didAddCompositeLayer = pyqtSignal(tuple, UUID, Presentation)
-    didAddLinesLayer = pyqtSignal(tuple, UUID, Presentation)
-    didAddPointsLayer = pyqtSignal(tuple, UUID, Presentation)
+    didAddCompositeDataset = pyqtSignal(tuple, UUID, Presentation)
+    didAddLinesDataset = pyqtSignal(tuple, UUID, Presentation)
+    didAddPointsDataset = pyqtSignal(tuple, UUID, Presentation)
     # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
-    didRemoveLayers = pyqtSignal(tuple, list, int, int)
-    willPurgeLayer = pyqtSignal(UUID)  # UUID of the layer being removed
-    didReorderLayers = pyqtSignal(tuple)  # list of original indices in their new order, None for new layers
+    didRemoveDatasets = pyqtSignal(tuple, list, int, int)
+    willPurgeDataset = pyqtSignal(UUID)  # UUID of the layer being removed
+    didReorderDatasets = pyqtSignal(tuple)  # list of original indices in their new order, None for new layers
     didChangeLayerVisibility = pyqtSignal(dict)  # {UUID: new-visibility, ...} for changed layers
     didReorderAnimation = pyqtSignal(tuple)  # list of UUIDs representing new animation order
     didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
@@ -1666,14 +1666,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
 
         if dataset[Info.KIND] == Kind.LINES:
-            self.didAddLinesLayer.emit(reordered_indices, dataset.uuid, presentation)
+            self.didAddLinesDataset.emit(reordered_indices, dataset.uuid, presentation)
             self._add_layer_family(dataset)
         elif dataset[Info.KIND] == Kind.POINTS:
-            self.didAddPointsLayer.emit(reordered_indices, dataset.uuid, presentation)
+            self.didAddPointsDataset.emit(reordered_indices, dataset.uuid, presentation)
             self._add_layer_family(dataset)
         else:
             # signal updates from the document
-            self.didAddBasicLayer.emit(reordered_indices, dataset.uuid, presentation)
+            self.didAddBasicDataset.emit(reordered_indices, dataset.uuid, presentation)
             self._add_layer_family(dataset)
             # update any RGBs that could use this to make an RGB
             self.sync_composite_layer_prereqs([dataset[Info.SCHED_TIME]])
@@ -1824,8 +1824,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 # and there is nothing new to import
                 if active_content_data:
                     dataset = self[merge_target_uuid]
-                    self.didUpdateBasicLayer.emit(merge_target_uuid,
-                                                  dataset[Info.KIND])
+                    self.didUpdateBasicDataset.emit(merge_target_uuid,
+                                                    dataset[Info.KIND])
             elif uuid in self._layer_with_uuid:
                 LOG.warning("layer with UUID {} already in document?".format(uuid))
                 self._workspace.get_content(uuid)
@@ -2318,7 +2318,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             if Info.FAMILY not in dataset:
                 dataset[Info.FAMILY] = self.family_for_product_or_layer(dataset)
             self._add_layer_family(dataset)
-            self.didAddCompositeLayer.emit(reordered_indices, dataset.uuid, presentation)
+            self.didAddCompositeDataset.emit(reordered_indices, dataset.uuid, presentation)
 
     def available_rgb_components(self):
         non_rgb_classes = [DocBasicDataset, DocCompositeDataset]
@@ -2449,7 +2449,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             if rgb_layer[Info.UUID] not in prez_uuids:
                 if should_show:
                     presentation, reordered_indices = self._insert_layer_with_info(rgb_layer)
-                    self.didAddCompositeLayer.emit(reordered_indices, rgb_layer[Info.UUID], presentation)
+                    self.didAddCompositeDataset.emit(reordered_indices, rgb_layer[Info.UUID], presentation)
                 else:
                     continue
             elif not should_show:
@@ -2727,7 +2727,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         assert (len(new_order) == len(self._layer_sets[layer_set_index]))
         new_layer_set = DocLayerStack(self, [self._layer_sets[layer_set_index][n] for n in new_order])
         self._layer_sets[layer_set_index] = new_layer_set
-        self.didReorderLayers.emit(tuple(new_order))
+        self.didReorderDatasets.emit(tuple(new_order))
 
     def insert_layer_prez(self, row: int, layer_prez_seq):
         cls = self.current_layer_set
@@ -2781,14 +2781,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         clo = list(range(len(self.current_layer_set)))
         del clo[row:row + count]
         del self.current_layer_set[row:row + count]
-        self.didRemoveLayers.emit(tuple(clo), uuids, row, count)
+        self.didRemoveDatasets.emit(tuple(clo), uuids, row, count)
 
     def purge_layer_prez(self, uuids):
         """Purge layers from the workspace"""
         for uuid in uuids:
             if not self.is_using(uuid):
                 LOG.debug('purging layer {}, no longer in use'.format(uuid))
-                self.willPurgeLayer.emit(uuid)
+                self.willPurgeDataset.emit(uuid)
                 # remove from our bookkeeping
                 del self._layer_with_uuid[uuid]
                 # remove from workspace
