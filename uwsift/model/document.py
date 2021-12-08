@@ -1778,7 +1778,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # assume metadata collection is in the most user-friendly order
         infos = self._workspace.collect_product_metadata_for_paths(paths, **importer_kwargs)
         uuids = []
-        merge_uuids = []
+        merge_uuids = {}  # map new files uuids to merge target uuids
         total_products = 0
         for dex, (num_prods, info) in enumerate(infos):
             assert info is not None
@@ -1802,7 +1802,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             # redundant but also more explicit than depending on num_prods
             total_products = num_prods
             uuids.append(uuid)
-            merge_uuids.append(merge_uuid)
+            merge_uuids[uuid] = merge_uuid
 
         if not total_products:
             raise ValueError('no products available in {}'.format(paths))
@@ -1812,8 +1812,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             uuids = list(reversed(self.sort_product_uuids(uuids)))
 
         # collect product and resource information but don't yet import content
-        for dex, (uuid, merge_uuid) in enumerate(zip(uuids, merge_uuids)):
-            if uuid != merge_uuid:  # merge products
+        for dex, uuid in enumerate(uuids):
+            merge_uuid = merge_uuids[uuid]
+            if try_merge_product and uuid != merge_uuid:  # merge products
                 active_content_data = \
                     self._workspace.import_product_content(uuid,
                                                            merge_uuid=merge_uuid,
