@@ -11,6 +11,7 @@ from PyQt5.QtGui import QDoubleValidator
 from PyQt5.QtWidgets import QComboBox, QLineEdit
 
 from uwsift.common import Info, Kind
+from uwsift.model.composite_recipes import CompositeRecipe
 
 LOG = logging.getLogger(__name__)
 RGBA2IDX: Mapping[str, int] = dict(r=0, g=1, b=2, a=3)
@@ -21,11 +22,11 @@ class RGBLayerConfigPane(QObject):
     Document in turn generates update signals which cause the SceneGraph to refresh.
     """
     # recipe being changed, character from 'rgba', layer being assigned
-    didChangeRGBComponentSelection = pyqtSignal(tuple, str, object)
+    didChangeRGBComponentSelection = pyqtSignal(CompositeRecipe, str, object)
     # recipe being changed, ((min, max), (min, max), (min, max))
-    didChangeRGBComponentLimits = pyqtSignal(tuple, tuple)
+    didChangeRGBComponentLimits = pyqtSignal(CompositeRecipe, tuple)
     # recipe being changed, (new-gamma, new-gamma, new-gamma)
-    didChangeRGBComponentGamma = pyqtSignal(tuple, tuple)
+    didChangeRGBComponentGamma = pyqtSignal(CompositeRecipe, tuple)
 
     _rgb = None  # combo boxes in r,g,b order; cache
     _sliders = None  # sliders in r,g,b order; cache
