@@ -296,13 +296,13 @@ class SimpleWorkspace(BaseWorkspace):
                 yield num_products, zult
 
     def import_product_content(self, uuid: UUID = None, prod: Product = None,
-                               allow_cache=True, merge_uuid: Optional[UUID] = None,
+                               allow_cache=True, merge_target_uuid: Optional[UUID] = None,
                                **importer_kwargs) -> np.memmap:
         if prod is None and uuid is not None:
             prod = self._product_with_uuid(None, uuid)
 
-        if merge_uuid:
-            merge_target = self._product_with_uuid(None, merge_uuid)
+        if merge_target_uuid:
+            merge_target = self._product_with_uuid(None, merge_target_uuid)
             importer_kwargs["merge_target"] = merge_target
             self.products.pop(uuid, None)
         else:
@@ -311,7 +311,7 @@ class SimpleWorkspace(BaseWorkspace):
         self.set_product_state_flag(prod.uuid, State.ARRIVING)
         default_prod_kind = prod.info[Info.KIND]
 
-        if merge_uuid and len(prod.content):
+        if merge_target_uuid and len(prod.content):
             LOG.info(
                 'product already has content available, using that '
                 'rather than re-importing')
@@ -354,7 +354,7 @@ class SimpleWorkspace(BaseWorkspace):
         # S.flush()
 
         # make an ActiveContent object from the Content, now that we've imported it
-        ac = self._overview_content_for_uuid(merge_uuid if merge_uuid else prod.uuid,
+        ac = self._overview_content_for_uuid(merge_target_uuid if merge_target_uuid else prod.uuid,
                                              kind=default_prod_kind)
         if ac is None:
             return None

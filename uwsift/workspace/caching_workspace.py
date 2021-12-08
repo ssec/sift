@@ -659,7 +659,7 @@ class CachingWorkspace(BaseWorkspace):
                     yield num_products, zult
 
     def import_product_content(self, uuid: UUID = None, prod: Product = None,
-                               allow_cache=True, merge_uuid: Optional[UUID] = None,
+                               allow_cache=True, merge_target_uuid: Optional[UUID] = None,
                                **importer_kwargs) -> np.memmap:
         with self._inventory as S:
             # S = self._S

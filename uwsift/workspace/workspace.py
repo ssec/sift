@@ -498,7 +498,7 @@ class BaseWorkspace(QObject):
 
     @abstractmethod
     def import_product_content(self, uuid: UUID = None, prod: Product = None,
-                               allow_cache=True, merge_uuid: Optional[UUID] = None,
+                               allow_cache=True, merge_target_uuid: Optional[UUID] = None,
                                **importer_kwargs) -> np.memmap:
         pass
 
