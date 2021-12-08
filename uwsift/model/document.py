@@ -86,6 +86,8 @@ from uwsift.view.colormap import COLORMAP_MANAGER, PyQtGraphColormap, SITE_CATEG
 from uwsift.queue import TASK_PROGRESS, TASK_DOING
 from PyQt5.QtCore import QObject, pyqtSignal
 
+from uwsift.workspace.workspace import frozendict
+
 LOG = logging.getLogger(__name__)
 
 DEFAULT_LAYER_SET_COUNT = 1  # this should match the ui configuration!
@@ -1192,8 +1194,8 @@ class DataLayer:
         # Create timeline according to temporal resolution
 
         # maps: timestamp -> uuid
-        self.timeline = OrderedDict({uuid_dt_tup[1]: uuid_dt_tup[0]
-                                     for uuid_dt_tup in uuids_tstamps_asc})
+        self.timeline = {uuid_dt_tup[1]: uuid_dt_tup[0] for uuid_dt_tup in uuids_tstamps_asc}
+
 
     def t_matched_uuid(self) -> typ.Optional[UUID]:
         """
@@ -1404,7 +1406,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # signals
     # Clarification: Layer interfaces migrate to layer meaning "current active products under the playhead"
     # new order list with None for new layer; info-dictionary, overview-content-ndarray
-    didAddBasicDataset = pyqtSignal(tuple, UUID, Presentation)
+    didAddDataset = pyqtSignal(frozendict, Presentation)
+    didAddBasicDataset = pyqtSignal(tuple, UUID, Presentation)  # FIXME: not emitted anywhere anymore, remove!
     didUpdateBasicDataset = pyqtSignal(UUID, Kind)
     # comp layer is derived from multiple basic layers and has its own UUID
     didAddCompositeDataset = pyqtSignal(tuple, UUID, Presentation)
@@ -1672,18 +1675,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         presentation, reordered_indices = \
             self._insert_layer_with_info(dataset, insert_before=insert_before)
 
-        if dataset[Info.KIND] == Kind.LINES:
-            self.didAddLinesDataset.emit(reordered_indices, dataset.uuid, presentation)
-            self._add_layer_family(dataset)
-        elif dataset[Info.KIND] == Kind.POINTS:
-            self.didAddPointsDataset.emit(reordered_indices, dataset.uuid, presentation)
-            self._add_layer_family(dataset)
-        else:
-            # signal updates from the document
-            self.didAddBasicDataset.emit(reordered_indices, dataset.uuid, presentation)
-            self._add_layer_family(dataset)
-            # update any RGBs that could use this to make an RGB
-            self.sync_composite_layer_prereqs([dataset[Info.SCHED_TIME]])
+        # signal updates from the document
+        self.didAddDataset.emit(info, presentation)
 
         return uuid, dataset, active_content_data
 
