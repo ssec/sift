@@ -19,9 +19,10 @@ they can be recreated in the future.
 
 """
 
+import dataclasses
 import logging
 import os
-from collections import namedtuple
+from dataclasses import dataclass
 from glob import glob
 
 import yaml
@@ -30,18 +31,23 @@ from uwsift.util.default_paths import DOCUMENT_SETTINGS_DIR
 
 LOG = logging.getLogger(__name__)
 
-_CompositeRecipe = namedtuple('CompositeRecipe', ['name', 'input_ids', 'color_limits', 'gammas', 'read_only'])
 
+@dataclass
+class CompositeRecipe:
 
-class CompositeRecipe(_CompositeRecipe):
-    def __new__(cls, name, input_ids=None, color_limits=None, gammas=None, read_only=False):
+    name: str
+    input_ids: list = dataclasses.field(default_factory=list)
+    color_limits: list = dataclasses.field(default_factory=list)
+    gammas: list = dataclasses.field(default_factory=list)
+    read_only: bool = False
+
+    def __post_init__(self):
         def _normalize_list(x, default=None):
             return [x[idx] if x and len(x) > idx and x[idx] else default for idx in range(3)]
 
-        input_ids = _normalize_list(input_ids)
-        color_limits = _normalize_list(color_limits, (None, None))
-        gammas = _normalize_list(gammas, 1.0)
-        return super(CompositeRecipe, cls).__new__(cls, name, input_ids, color_limits, gammas, read_only)
+        self.input_ids = _normalize_list(self.input_ids)
+        self.color_limits = _normalize_list(self.color_limits, (None, None))
+        self.gammas = _normalize_list(self.gammas, 1.0)
 
     @classmethod
     def from_rgb(cls, name, r=None, g=None, b=None, color_limits=None, gammas=None):
@@ -91,7 +97,7 @@ class CompositeRecipe(_CompositeRecipe):
 
     def copy(self, new_name):
         """Get a copy of this recipe with a new name"""
-        return self._replace(name=new_name)
+        return dataclasses.replace(self, name=new_name)
 
 
 class RecipeManager(object):
