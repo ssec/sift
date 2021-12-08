@@ -53,7 +53,7 @@ from uwsift.control.layer_tree import LayerStackTreeViewModel
 from uwsift.control.rgb_behaviors import UserModifiesRGBLayers
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.model.document import Document
-from uwsift.model.layer import DocRGBLayer
+from uwsift.model.layer import DocRGBDataset
 from uwsift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from uwsift.ui.pov_main_ui import Ui_MainWindow
@@ -581,7 +581,7 @@ class Main(QtWidgets.QMainWindow):
         uuids = list(uuids)
         for uuid in uuids:
             layer = self.document[uuid]
-            if not isinstance(layer, DocRGBLayer):
+            if not isinstance(layer, DocRGBDataset):
                 uuids_to_remove.add(uuid)
                 continue
             elif uuid in rgb_uuids_handled:

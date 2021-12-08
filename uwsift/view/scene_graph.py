@@ -57,7 +57,7 @@ from uwsift import USE_TILED_GEOLOCATED_IMAGES
 from uwsift import config
 from uwsift.common import DEFAULT_ANIMATION_DELAY, Info, Kind, Tool, Presentation
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
-from uwsift.model.document import DocLayerStack, DocBasicLayer, Document
+from uwsift.model.document import DocLayerStack, DocBasicDataset, Document
 from uwsift.model.time_manager import TimeManager
 from uwsift.queue import TASK_DOING, TASK_PROGRESS
 from uwsift.util import get_package_data_dir
@@ -1089,7 +1089,7 @@ class SceneGraphManager(QObject):
 
         return data
 
-    def add_contour_layer(self, layer: DocBasicLayer, p: Presentation, image_data: np.ndarray):
+    def add_contour_layer(self, layer: DocBasicDataset, p: Presentation, image_data: np.ndarray):
         verts = image_data[:, :2]
         connects = image_data[:, 2].astype(np.bool)
         level_indexes = image_data[:, 3]
