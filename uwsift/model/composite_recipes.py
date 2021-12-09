@@ -34,7 +34,11 @@ LOG = logging.getLogger(__name__)
 
 @dataclass
 class Recipe:
-
+    """
+    Recipe base class. All recipes belong to a Layer and store information
+    which input Layers provide the image data that is used to generate the
+    images of their Layer.
+    """
     name: str
     input_layer_ids: list = dataclasses.field(default_factory=list)
     read_only: bool = False
@@ -50,7 +54,12 @@ class Recipe:
 
 @dataclass
 class CompositeRecipe(Recipe):
-
+    """
+    Recipe class responsible for storing the combination of 1-3 layers as red,
+    green and blue channel image to produce a colorful RGB image. These
+    composites are typically generated on-the-fly by the GPU by providing
+    all inputs as textures.
+    """
     color_limits: list = dataclasses.field(default_factory=list)
     gammas: list = dataclasses.field(default_factory=list)
 
@@ -67,6 +76,12 @@ class CompositeRecipe(Recipe):
         return cls(name, input_layer_ids=[r, g, b], color_limits=color_limits, gammas=gammas)
 
     def _channel_info(self, idx):
+        """
+        Get the control parameters for one of the composite channels as a dict.
+
+        :param idx: Index of the channel (0 = red, 1 = green, 2 = blue).
+        :return: Info dict for the channel
+        """
         return {
             'name': self.input_layer_ids[idx],
             'color_limits': self.color_limits[idx],
@@ -89,14 +104,17 @@ class CompositeRecipe(Recipe):
 
     @property
     def red(self):
+        """Get the control parameters for the red channel as a dict."""
         return self._channel_info(0)
 
     @property
     def green(self):
+        """Get the control parameters for the green channel as a dict."""
         return self._channel_info(1)
 
     @property
     def blue(self):
+        """Get the control parameters for the blue channel as a dict."""
         return self._channel_info(2)
 
 
