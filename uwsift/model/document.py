@@ -2348,9 +2348,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         recipe = CompositeRecipe.from_rgb(uuidgen(), r=r, g=g, b=b, color_limits=clim, gammas=gamma)
         self.recipe_manager.add_recipe(recipe)
         # recipe.name -> (sat, inst) -> {t: layer}
-        self._recipe_layers[recipe.name] = {}
+        self._recipe_layers[recipe.id] = {}
         self.update_rgb_composite_layers(recipe)
-        return chain(*(x.values() for x in self._recipe_layers[recipe.name].values()))
+        return chain(*(x.values() for x in self._recipe_layers[recipe.id].values()))
 
     def change_rgb_recipe_components(self, recipe, update=True, **rgba):
         if recipe.read_only:
@@ -2365,7 +2365,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def _uuids_for_recipe(self, recipe, valid_only=True):
         prez_uuids = self.current_layer_uuid_order
-        for time_layers in self._recipe_layers[recipe.name].values():
+        for time_layers in self._recipe_layers[recipe.id].values():
             for rgb_layer in time_layers.values():
                 u = rgb_layer[Info.UUID]
                 if not valid_only:
@@ -2403,7 +2403,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         prez_uuids = self.current_layer_uuid_order
         for t, category, r, g, b in self._composite_layers(recipe, times=times, rgba=rgba):
             # (sat, inst) -> {time -> layer}
-            layers = self._recipe_layers[recipe.name].setdefault(category, {})
+            layers = self._recipe_layers[recipe.id].setdefault(category, {})
             # NOTE: combinations may be returned that don't match the recipe
             if t not in layers:
                 # create a new blank RGB
@@ -2515,14 +2515,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         g_layers = _component_generator(recipe.input_layer_ids[1], 'g')
         b_layers = _component_generator(recipe.input_layer_ids[2], 'b')
         categories = (r_layers.keys() | g_layers.keys() | b_layers.keys() |
-                      self._recipe_layers[recipe.name].keys())
+                      self._recipe_layers[recipe.id].keys())
 
         for category in categories:
             # any new times plus existing times if RGBs already exist
             rgb_times = (r_layers.setdefault(category, {}).keys() |
                          g_layers.setdefault(category, {}).keys() |
                          b_layers.setdefault(category, {}).keys() |
-                         self._recipe_layers[recipe.name].setdefault(category, {}).keys())
+                         self._recipe_layers[recipe.id].setdefault(category, {}).keys())
             if times:
                 rgb_times &= times
             # time order doesn't really matter
@@ -2612,10 +2612,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # put this in a separate method in case things change in the future
         return self[uuid]['recipe']
 
-    def remove_rgb_recipes(self, recipe_names):
-        for recipe_name in recipe_names:
-            del self.recipe_manager[recipe_name]
-            del self._recipe_layers[recipe_name]
+    def remove_rgb_recipes(self, recipe_ids):
+        for recipe_id in recipe_ids:
+            del self.recipe_manager[recipe_id]
+            del self._recipe_layers[recipe_id]
 
     def remove_layers_from_all_sets(self, uuids):
         # find RGB layers family
@@ -2625,7 +2625,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             all_uuids.add(uuid)
             if isinstance(self[uuid], DocRGBDataset):
                 all_uuids.update(self.family_uuids_for_uuid(uuid))
-                recipes_to_remove.add(self.recipe_for_uuid(uuid).name)
+                recipes_to_remove.add(self.recipe_for_uuid(uuid).id)
 
         # collect all times for these layers to update RGBs later
         times = [self[u][Info.SCHED_TIME] for u in all_uuids]

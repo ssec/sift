@@ -22,8 +22,10 @@ they can be recreated in the future.
 import dataclasses
 import logging
 import os
+import uuid
 from dataclasses import dataclass
 from glob import glob
+from uuid import uuid1 as uuidgen
 
 import yaml
 
@@ -40,6 +42,8 @@ class Recipe:
     images of their Layer.
     """
     name: str
+    id: uuid.UUID = dataclasses.field(default_factory=uuidgen,
+                                      init=False, repr=False)
     input_layer_ids: list = dataclasses.field(default_factory=list)
     read_only: bool = False
 
@@ -143,13 +147,13 @@ class RecipeManager(object):
             self._stored_recipes[recipe.name] = (pathname, recipe)
 
     def add_recipe(self, recipe):
-        self.recipes[recipe.name] = recipe
+        self.recipes[recipe.id] = recipe
 
-    def __getitem__(self, recipe_name):
-        return self.recipes[recipe_name]
+    def __getitem__(self, recipe_id):
+        return self.recipes[recipe_id]
 
-    def __delitem__(self, recipe_name):
-        del self.recipes[recipe_name]
+    def __delitem__(self, recipe_id):
+        del self.recipes[recipe_id]
 
     def save_recipe(self, recipe, filename=None, overwrite=False):
         if not filename:
