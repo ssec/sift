@@ -33,13 +33,26 @@ LOG = logging.getLogger(__name__)
 
 
 @dataclass
-class CompositeRecipe:
+class Recipe:
 
     name: str
     input_ids: list = dataclasses.field(default_factory=list)
+    read_only: bool = False
+
+    def to_dict(self):
+        """Convert to YAML-compatible dict."""
+        return dataclasses.asdict(self)
+
+    def copy(self, new_name):
+        """Get a copy of this recipe with a new name"""
+        return dataclasses.replace(self, name=new_name)
+
+
+@dataclass
+class CompositeRecipe(Recipe):
+
     color_limits: list = dataclasses.field(default_factory=list)
     gammas: list = dataclasses.field(default_factory=list)
-    read_only: bool = False
 
     def __post_init__(self):
         def _normalize_list(x, default=None):
@@ -85,19 +98,6 @@ class CompositeRecipe:
     @property
     def blue(self):
         return self._channel_info(2)
-
-    def to_dict(self):
-        """Convert to YAML-compatible dict."""
-        return {
-            'name': self.name,
-            'red': self.red,
-            'green': self.green,
-            'blue': self.blue,
-        }
-
-    def copy(self, new_name):
-        """Get a copy of this recipe with a new name"""
-        return dataclasses.replace(self, name=new_name)
 
 
 class RecipeManager(object):
