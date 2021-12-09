@@ -36,7 +36,7 @@ LOG = logging.getLogger(__name__)
 class Recipe:
 
     name: str
-    input_ids: list = dataclasses.field(default_factory=list)
+    input_layer_ids: list = dataclasses.field(default_factory=list)
     read_only: bool = False
 
     def to_dict(self):
@@ -58,17 +58,17 @@ class CompositeRecipe(Recipe):
         def _normalize_list(x, default=None):
             return [x[idx] if x and len(x) > idx and x[idx] else default for idx in range(3)]
 
-        self.input_ids = _normalize_list(self.input_ids)
+        self.input_layer_ids = _normalize_list(self.input_layer_ids)
         self.color_limits = _normalize_list(self.color_limits, (None, None))
         self.gammas = _normalize_list(self.gammas, 1.0)
 
     @classmethod
     def from_rgb(cls, name, r=None, g=None, b=None, color_limits=None, gammas=None):
-        return cls(name, input_ids=[r, g, b], color_limits=color_limits, gammas=gammas)
+        return cls(name, input_layer_ids=[r, g, b], color_limits=color_limits, gammas=gammas)
 
     def _channel_info(self, idx):
         return {
-            'name': self.input_ids[idx],
+            'name': self.input_layer_ids[idx],
             'color_limits': self.color_limits[idx],
             'gamma': self.gammas[idx],
         }
@@ -81,7 +81,7 @@ class CompositeRecipe(Recipe):
             if comp is None:
                 # component was not updated
                 continue
-            if self.input_ids[idx] is None:
+            if self.input_layer_ids[idx] is None:
                 # our component is None
                 self.color_limits[idx] = (None, None)
             else:
@@ -155,7 +155,7 @@ class RecipeManager(object):
         try:
             for recipe_content in yaml.safe_load_all(pathname):
                 name = recipe_content['name']
-                input_ids = [
+                input_layer_ids = [
                     recipe_content['red']['name'],
                     recipe_content['green']['name'],
                     recipe_content['blue']['name'],
@@ -172,7 +172,7 @@ class RecipeManager(object):
                 ]
                 recipe = CompositeRecipe(
                     name=name,
-                    input_ids=input_ids,
+                    input_layer_ids=input_layer_ids,
                     color_limits=color_limits,
                     gammas=gammas,
                     read_only=True,

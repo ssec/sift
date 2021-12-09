@@ -154,7 +154,7 @@ class RGBLayerConfigPane(QObject):
         if self.recipe is None:
             # No recipe has been set yet
             return values
-        family = self.recipe.input_ids[RGBA2IDX[color]]
+        family = self.recipe.input_layer_ids[RGBA2IDX[color]]
         if family is None:
             return values
         family_info = self._families[family]
@@ -162,7 +162,7 @@ class RGBLayerConfigPane(QObject):
 
     def _data_to_display(self, color: str, values):
         "convert data value to display value"
-        family = self.recipe.input_ids[RGBA2IDX[color]]
+        family = self.recipe.input_layer_ids[RGBA2IDX[color]]
         if family is None:
             return values
         family_info = self._families[family]
@@ -350,7 +350,7 @@ class RGBLayerConfigPane(QObject):
     def _set_minmax_sliders(self, recipe):
         if recipe:
             for idx, (color, clim) in enumerate(zip("rgb", recipe.color_limits)):
-                family = recipe.input_ids[idx]
+                family = recipe.input_layer_ids[idx]
                 self._set_minmax_slider(color, family, clim)
         else:
             self._set_minmax_slider("r", None)
@@ -359,7 +359,7 @@ class RGBLayerConfigPane(QObject):
 
     def _select_components_for_recipe(self, recipe=None):
         if recipe is not None:
-            for family_name, widget in zip(recipe.input_ids, self.rgb):
+            for family_name, widget in zip(recipe.input_layer_ids, self.rgb):
                 if family_name is None:
                     widget.setCurrentIndex(0)
                 else:
@@ -417,7 +417,7 @@ class RGBLayerConfigPane(QObject):
     def _set_gamma_boxes(self, recipe=None):
         if recipe is not None:
             for idx, sbox in enumerate(self.gamma_boxes):
-                sbox.setDisabled(recipe.input_ids[idx] is None)
+                sbox.setDisabled(recipe.input_layer_ids[idx] is None)
                 sbox.setValue(recipe.gammas[idx])
         else:
             for sbox in self.gamma_boxes:
