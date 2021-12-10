@@ -74,8 +74,8 @@ class AutoUpdateManager:
         self._old_uuids = []
 
         self._init_catalogue()
-        # connect to didAddBasicLayer --> signal starts timer anew when loading is done
-        self._window.document.didAddBasicLayer.connect(self.on_loading_done)
+        # connect to didAddBasicDataset --> signal starts timer anew when loading is done
+        self._window.document.didAddBasicDataset.connect(self.on_loading_done)
 
         def update_in_background(event):
             TheQueue.add("auto update", self.update(), None)

@@ -39,7 +39,7 @@ class Mixing(Enum):
     SUBTRACT = 3
 
 
-class DocLayer(ChainMap):
+class DocDataset(ChainMap):
     """Container for layer metadata
     
     Use dictionary-like access for metadata information.
@@ -53,7 +53,7 @@ class DocLayer(ChainMap):
         self._definitive = info  # definitive information provided by workspace, read-only from our perspective
         self._additional = dict(*args, **kwargs)  # FUTURE: can we deprecate this?
         self._user_modified = {}
-        super(DocLayer, self).__init__(self._user_modified, self._additional, self._definitive)
+        super(DocDataset, self).__init__(self._user_modified, self._additional, self._definitive)
 
     @property
     def product_family_key(self):
@@ -143,14 +143,14 @@ class DocLayer(ChainMap):
         return True
 
 
-class DocBasicLayer(DocLayer):
+class DocBasicDataset(DocDataset):
     """
     A layer consistent of a simple scalar floating point value field, which can have color maps applied
     """
     pass
 
 
-class DocCompositeLayer(DocLayer):
+class DocCompositeDataset(DocDataset):
     """
     A layer which combines other layers, be they basic or composite themselves
     """
@@ -166,7 +166,7 @@ def _concurring(*q, remove_none=False):
         return False
 
 
-class DocRGBLayer(DocCompositeLayer):
+class DocRGBDataset(DocCompositeDataset):
     def __init__(self, doc, recipe, info, *args, **kwargs):
         self.layers = [None, None, None, None]  # RGBA upstream layers
         self.mins = [None, None, None, None]  # RGBA minimum value from upstream layers
@@ -421,7 +421,7 @@ class DocRGBLayer(DocCompositeLayer):
         return ds_info
 
 
-class DocAlgebraicLayer(DocCompositeLayer):
+class DocAlgebraicDataset(DocCompositeDataset):
     """
     A value field derived from other value fields algebraically
     """

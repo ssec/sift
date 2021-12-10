@@ -60,6 +60,7 @@ from __future__ import annotations
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
+import dataclasses
 import logging
 from collections import MutableSequence, OrderedDict, defaultdict
 from itertools import groupby, chain
@@ -80,7 +81,7 @@ from uwsift.workspace import BaseWorkspace, CachingWorkspace, SimpleWorkspace
 from uwsift.util.default_paths import DOCUMENT_SETTINGS_DIR
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.model.composite_recipes import RecipeManager, CompositeRecipe
-from uwsift.model.layer import Mixing, DocLayer, DocBasicLayer, DocRGBLayer, DocCompositeLayer
+from uwsift.model.layer import Mixing, DocDataset, DocBasicDataset, DocRGBDataset, DocCompositeDataset
 from uwsift.view.colormap import COLORMAP_MANAGER, PyQtGraphColormap, SITE_CATEGORY, USER_CATEGORY
 from uwsift.queue import TASK_PROGRESS, TASK_DOING
 from PyQt5.QtCore import QObject, pyqtSignal
@@ -159,7 +160,7 @@ def _unit_format_func(layer, units):
     return _format_unit
 
 
-def preferred_units(dsi: DocBasicLayer) -> str:
+def preferred_units(dsi: DocBasicDataset) -> str:
     """
     Return unit string (i.e.: Kelvin) for a Product currently being loaded.
     :param dsi: DocBasicLayer describing the product currently being added.
@@ -261,7 +262,7 @@ class DocLayerStack(MutableSequence):
             return self._store[index]
         elif isinstance(index, UUID):  # then return 0..n-1 index in stack
             return self.uuid2row.get(index, None)
-        elif isinstance(index, DocLayer):
+        elif isinstance(index, DocDataset):
             return self.uuid2row.get(index.uuid, None)
         elif isinstance(index, Presentation):
             return self.uuid2row.get(index.uuid, None)
@@ -285,7 +286,7 @@ class DocLayerStack(MutableSequence):
 
     def clear_animation_order(self):
         for i, q in enumerate(self._store):
-            self._store[i] = q._replace(a_order=None)
+            self._store[i] = dataclasses.replace(q, a_order=None)
 
     def index(self, uuid):
         assert (isinstance(uuid, UUID))
@@ -314,7 +315,7 @@ class DocLayerStack(MutableSequence):
             except ValueError:
                 LOG.warning('unable to find layer in LayerStack')
                 raise
-            self._store[idx] = self._store[idx]._replace(a_order=nth)
+            self._store[idx] = dataclasses.replace(self._store[idx], a_order=nth)
 
 
 # FUTURE: move these into separate modules
@@ -1403,16 +1404,16 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # signals
     # Clarification: Layer interfaces migrate to layer meaning "current active products under the playhead"
     # new order list with None for new layer; info-dictionary, overview-content-ndarray
-    didAddBasicLayer = pyqtSignal(tuple, UUID, Presentation)
-    didUpdateBasicLayer = pyqtSignal(UUID, Kind)
+    didAddBasicDataset = pyqtSignal(tuple, UUID, Presentation)
+    didUpdateBasicDataset = pyqtSignal(UUID, Kind)
     # comp layer is derived from multiple basic layers and has its own UUID
-    didAddCompositeLayer = pyqtSignal(tuple, UUID, Presentation)
-    didAddLinesLayer = pyqtSignal(tuple, UUID, Presentation)
-    didAddPointsLayer = pyqtSignal(tuple, UUID, Presentation)
+    didAddCompositeDataset = pyqtSignal(tuple, UUID, Presentation)
+    didAddLinesDataset = pyqtSignal(tuple, UUID, Presentation)
+    didAddPointsDataset = pyqtSignal(tuple, UUID, Presentation)
     # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
-    didRemoveLayers = pyqtSignal(tuple, list, int, int)
-    willPurgeLayer = pyqtSignal(UUID)  # UUID of the layer being removed
-    didReorderLayers = pyqtSignal(tuple)  # list of original indices in their new order, None for new layers
+    didRemoveDatasets = pyqtSignal(tuple, list, int, int)
+    willPurgeDataset = pyqtSignal(UUID)  # UUID of the layer being removed
+    didReorderDatasets = pyqtSignal(tuple)  # list of original indices in their new order, None for new layers
     didChangeLayerVisibility = pyqtSignal(dict)  # {UUID: new-visibility, ...} for changed layers
     didReorderAnimation = pyqtSignal(tuple)  # list of UUIDs representing new animation order
     didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
@@ -1604,7 +1605,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         assert (isinstance(cls, DocLayerStack))
         return cls
 
-    def _insert_layer_with_info(self, info: DocLayer, cmap=None, style=None,
+    def _insert_layer_with_info(self, info: DocDataset, cmap=None, style=None,
                                 insert_before=0):
         """
         insert a layer into the presentations but do not signal
@@ -1615,7 +1616,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if style is None:
             style = info.get(Info.STYLE)
         gamma = 1.
-        if isinstance(info, DocRGBLayer):
+        if isinstance(info, DocRGBDataset):
             gamma = (1.,) * 3
         elif hasattr(info, 'layers'):
             gamma = (1.,) * len(info.layers)
@@ -1633,7 +1634,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                          gamma=gamma if family_prez is None else family_prez.gamma,
                          mixing=Mixing.NORMAL)
 
-        q = p._replace(visible=False)  # make it available but not visible in other layer sets
+        q = dataclasses.replace(p, visible=False)  # make it available but not visible in other layer sets
         old_layer_count = len(self._layer_sets[self.current_set_index])
         for dex, lset in enumerate(self._layer_sets):
             if lset is not None:  # uninitialized layer sets will be None
@@ -1657,7 +1658,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         LOG.debug('cell_width: {}'.format(repr(info[Info.CELL_WIDTH])))
 
         LOG.debug('new layer info: {}'.format(repr(info)))
-        self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, info)
+        self._layer_with_uuid[uuid] = dataset = DocBasicDataset(self, info)
         if Info.UNIT_CONVERSION not in dataset:
             dataset[Info.UNIT_CONVERSION] = units_conversion(dataset)
         if Info.FAMILY not in dataset:
@@ -1665,14 +1666,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
 
         if dataset[Info.KIND] == Kind.LINES:
-            self.didAddLinesLayer.emit(reordered_indices, dataset.uuid, presentation)
+            self.didAddLinesDataset.emit(reordered_indices, dataset.uuid, presentation)
             self._add_layer_family(dataset)
         elif dataset[Info.KIND] == Kind.POINTS:
-            self.didAddPointsLayer.emit(reordered_indices, dataset.uuid, presentation)
+            self.didAddPointsDataset.emit(reordered_indices, dataset.uuid, presentation)
             self._add_layer_family(dataset)
         else:
             # signal updates from the document
-            self.didAddBasicLayer.emit(reordered_indices, dataset.uuid, presentation)
+            self.didAddBasicDataset.emit(reordered_indices, dataset.uuid, presentation)
             self._add_layer_family(dataset)
             # update any RGBs that could use this to make an RGB
             self.sync_composite_layer_prereqs([dataset[Info.SCHED_TIME]])
@@ -1730,7 +1731,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         family = layer = family_or_layer_or_uuid
         if isinstance(family_or_layer_or_uuid, UUID):
             layer = self[family_or_layer_or_uuid]
-        if isinstance(layer, DocBasicLayer):
+        if isinstance(layer, DocBasicDataset):
             family = layer[Info.FAMILY]
 
         # one layer that represents all the layers in this family
@@ -1823,8 +1824,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 # and there is nothing new to import
                 if active_content_data:
                     dataset = self[merge_target_uuid]
-                    self.didUpdateBasicLayer.emit(merge_target_uuid,
-                                                  dataset[Info.KIND])
+                    self.didUpdateBasicDataset.emit(merge_target_uuid,
+                                                    dataset[Info.KIND])
             elif uuid in self._layer_with_uuid:
                 LOG.warning("layer with UUID {} already in document?".format(uuid))
                 self._workspace.get_content(uuid)
@@ -2109,7 +2110,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 dex = L.index(dex)  # returns row index
             old = L[dex]
             vis = (not old.visible) if visible is None else visible
-            nu = old._replace(visible=vis)
+            nu = dataclasses.replace(old, visible=vis)
             L[dex] = nu
             zult[nu.uuid] = nu.visible
         self.didChangeLayerVisibility.emit(zult)
@@ -2126,7 +2127,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for uuid, visible in changes.items():
             dex = curr_set[uuid]
             old = curr_set[dex]
-            curr_set[dex] = old._replace(visible=visible)
+            curr_set[dex] = dataclasses.replace(old, visible=visible)
         self.didChangeLayerVisibility.emit(changes)
 
     def next_last_step(self, uuid, delta=0, bandwise=False):
@@ -2187,7 +2188,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for uuid in uuids:
             for dex, pinfo in enumerate(L):
                 if pinfo.uuid == uuid:
-                    L[dex] = pinfo._replace(colormap=name)
+                    L[dex] = dataclasses.replace(pinfo, colormap=name)
                     nfo[uuid] = name
         self.didChangeColormap.emit(nfo)
 
@@ -2219,7 +2220,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         nfo = {}
         L = self.current_layer_set
         for idx, pz, layer in self.current_layers_where(**query):
-            new_pz = pz._replace(climits=clims)
+            new_pz = dataclasses.replace(pz, climits=clims)
             nfo[layer.uuid] = new_pz.climits
             L[idx] = new_pz
         self.didChangeColorLimits.emit(nfo)
@@ -2240,14 +2241,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             for dex, pinfo in enumerate(L):
                 if pinfo.uuid == uuid:
                     nfo[uuid] = pinfo.climits[::-1]
-                    L[dex] = pinfo._replace(climits=nfo[uuid])
+                    L[dex] = dataclasses.replace(pinfo, climits=nfo[uuid])
         self.didChangeColorLimits.emit(nfo)
 
     def change_gamma_for_layers_where(self, gamma, **query):
         nfo = {}
         L = self.current_layer_set
         for idx, pz, layer in self.current_layers_where(**query):
-            new_pz = pz._replace(gamma=gamma)
+            new_pz = dataclasses.replace(pz, gamma=gamma)
             nfo[layer.uuid] = new_pz.gamma
             L[idx] = new_pz
         self.didChangeGamma.emit(nfo)
@@ -2269,7 +2270,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             if pz.kind not in [Kind.IMAGE, Kind.CONTOUR]:
                 LOG.warning("Can't change image kind for Kind: %s", pz.kind.name)
                 continue
-            new_pz = pz._replace(kind=new_kind)
+            new_pz = dataclasses.replace(pz, kind=new_kind)
             nfo[layer.uuid] = new_pz
             layer_set[idx] = new_pz
         self.didChangeImageKind.emit(nfo)
@@ -2310,17 +2311,17 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                                                                                               Info.SCHED_TIME)))
 
             uuid, layer_info, data = self._workspace.create_algebraic_composite(operations, temp_namespace, info.copy())
-            self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, layer_info)
+            self._layer_with_uuid[uuid] = dataset = DocBasicDataset(self, layer_info)
             presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
             if Info.UNIT_CONVERSION not in dataset:
                 dataset[Info.UNIT_CONVERSION] = units_conversion(dataset)
             if Info.FAMILY not in dataset:
                 dataset[Info.FAMILY] = self.family_for_product_or_layer(dataset)
             self._add_layer_family(dataset)
-            self.didAddCompositeLayer.emit(reordered_indices, dataset.uuid, presentation)
+            self.didAddCompositeDataset.emit(reordered_indices, dataset.uuid, presentation)
 
     def available_rgb_components(self):
-        non_rgb_classes = [DocBasicLayer, DocCompositeLayer]
+        non_rgb_classes = [DocBasicDataset, DocCompositeDataset]
         valid_ranges = {}
         for layer in self.layers_where(is_valid=True, in_type_set=non_rgb_classes):
             sname = layer.get(Info.CENTRAL_WAVELENGTH, layer[Info.DATASET_NAME])
@@ -2415,7 +2416,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 # better place for this?
                 ds_info[Info.FAMILY] = self.family_for_product_or_layer(ds_info)
                 LOG.debug("Creating new RGB layer for recipe '{}'".format(recipe.name))
-                rgb_layer = layers[t] = DocRGBLayer(self, recipe, ds_info)
+                rgb_layer = layers[t] = DocRGBDataset(self, recipe, ds_info)
                 self._layer_with_uuid[uuid] = rgb_layer
                 layers[t].update_metadata_from_dependencies()
                 # maybe we shouldn't add the family until the layers are set
@@ -2448,7 +2449,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             if rgb_layer[Info.UUID] not in prez_uuids:
                 if should_show:
                     presentation, reordered_indices = self._insert_layer_with_info(rgb_layer)
-                    self.didAddCompositeLayer.emit(reordered_indices, rgb_layer[Info.UUID], presentation)
+                    self.didAddCompositeDataset.emit(reordered_indices, rgb_layer[Info.UUID], presentation)
                 else:
                     continue
             elif not should_show:
@@ -2538,7 +2539,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             recipe = self.recipe_manager[recipe_name]
             self.update_rgb_composite_layers(recipe, times=new_times)
 
-    def _change_rgb_component_layer(self, layer: DocRGBLayer, **rgba):
+    def _change_rgb_component_layer(self, layer: DocRGBDataset, **rgba):
         """Update RGB Layer with specified components
 
         If the layer is not valid
@@ -2622,7 +2623,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         recipes_to_remove = set()
         for uuid in list(uuids):
             all_uuids.add(uuid)
-            if isinstance(self[uuid], DocRGBLayer):
+            if isinstance(self[uuid], DocRGBDataset):
                 all_uuids.update(self.family_uuids_for_uuid(uuid))
                 recipes_to_remove.add(self.recipe_for_uuid(uuid).name)
 
@@ -2665,7 +2666,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         layer = self._layer_with_uuid[uuid]
         L = self.current_layer_set
 
-        if isinstance(layer, DocRGBLayer):
+        if isinstance(layer, DocRGBDataset):
             new_anim_uuids = tuple(self._uuids_for_recipe(layer.recipe))
         else:
             new_anim_uuids, _ = self.time_siblings(uuid)
@@ -2681,7 +2682,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.didReorderAnimation.emit(tuple(new_anim_uuids))
         return new_anim_uuids
 
-    def get_info(self, row: int = None, uuid: UUID = None) -> typ.Optional[DocBasicLayer]:
+    def get_info(self, row: int = None, uuid: UUID = None) -> typ.Optional[DocBasicDataset]:
         if row is not None:
             uuid_temp = self.current_layer_set[row].uuid
             nfo = self._layer_with_uuid[uuid_temp]
@@ -2726,7 +2727,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         assert (len(new_order) == len(self._layer_sets[layer_set_index]))
         new_layer_set = DocLayerStack(self, [self._layer_sets[layer_set_index][n] for n in new_order])
         self._layer_sets[layer_set_index] = new_layer_set
-        self.didReorderLayers.emit(tuple(new_order))
+        self.didReorderDatasets.emit(tuple(new_order))
 
     def insert_layer_prez(self, row: int, layer_prez_seq):
         cls = self.current_layer_set
@@ -2780,14 +2781,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         clo = list(range(len(self.current_layer_set)))
         del clo[row:row + count]
         del self.current_layer_set[row:row + count]
-        self.didRemoveLayers.emit(tuple(clo), uuids, row, count)
+        self.didRemoveDatasets.emit(tuple(clo), uuids, row, count)
 
     def purge_layer_prez(self, uuids):
         """Purge layers from the workspace"""
         for uuid in uuids:
             if not self.is_using(uuid):
                 LOG.debug('purging layer {}, no longer in use'.format(uuid))
-                self.willPurgeLayer.emit(uuid)
+                self.willPurgeDataset.emit(uuid)
                 # remove from our bookkeeping
                 del self._layer_with_uuid[uuid]
                 # remove from workspace

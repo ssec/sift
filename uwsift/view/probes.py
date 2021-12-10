@@ -128,11 +128,11 @@ class ProbeGraphManager(QObject):
         self.drawChildGraph.connect(self.draw_child)
 
         # hook up the various document signals that would mean we need to reload things
-        self.document.didReorderLayers.connect(self.handleLayersChanged)
+        self.document.didReorderDatasets.connect(self.handleLayersChanged)
         self.document.didChangeLayerName.connect(self.handleLayersChanged)
-        self.document.didAddBasicLayer.connect(self.handleLayersChanged)
-        self.document.didAddCompositeLayer.connect(self.handleLayersChanged)
-        self.document.willPurgeLayer.connect(self.handleLayersChanged)
+        self.document.didAddBasicDataset.connect(self.handleLayersChanged)
+        self.document.didAddCompositeDataset.connect(self.handleLayersChanged)
+        self.document.willPurgeDataset.connect(self.handleLayersChanged)
         self.document.didSwitchLayerSet.connect(self.handleLayersChanged)
 
     def draw_child(self, child_name):

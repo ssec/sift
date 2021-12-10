@@ -25,6 +25,7 @@ from uuid import UUID
 import os
 import sys
 from datetime import datetime, timedelta
+from dataclasses import dataclass
 import logging
 from pyproj import Proj
 
@@ -346,7 +347,8 @@ class Info(Enum):
         raise ValueError("cannot compare {} == {}".format(repr(self), repr(other)))
 
 
-class Presentation(NamedTuple):
+@dataclass
+class Presentation:
     """Presentation information for a layer.
 
     z_order comes from the layerset

@@ -27,7 +27,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QGridLayout, QLabel, QTextEdit, QSizePolicy, QWidget, QVBoxLayout
 
-from uwsift.model.layer import DocBasicLayer
+from uwsift.model.layer import DocBasicDataset
 from uwsift.common import Info, Kind, Presentation
 from uwsift.ui.custom_widgets import QNoScrollWebView
 from uwsift.view.colormap import COLORMAP_MANAGER
@@ -119,7 +119,7 @@ class SingleLayerInfoPane(QWidget):
             self.cmap_vis.setHtml(
                 """<html><head></head><body style="margin: 0px"><div>%s</div></body></html>""" % (cmap_html,))
 
-    def _update_if_different(self, shared_info: defaultdict, layer_info: typ.Union[DocBasicLayer, Presentation],
+    def _update_if_different(self, shared_info: defaultdict, layer_info: typ.Union[DocBasicDataset, Presentation],
                              key: typ.Hashable = None, attr: str = None, default=""):
         """Get information from the provided layer or presentation.
 
@@ -141,7 +141,7 @@ class SingleLayerInfoPane(QWidget):
         else:
             shared_info[key] = default if shared_info[key] != new_name else new_name
 
-    def _get_shared_color_limits(self, shared_info: defaultdict, layer_info: DocBasicLayer, this_prez: Presentation):
+    def _get_shared_color_limits(self, shared_info: defaultdict, layer_info: DocBasicDataset, this_prez: Presentation):
         new_clims = ""
         if this_prez is not None:
             new_clims = np.array(this_prez.climits)

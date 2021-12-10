@@ -53,7 +53,7 @@ from uwsift.control.layer_tree import LayerStackTreeViewModel
 from uwsift.control.rgb_behaviors import UserModifiesRGBLayers
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.model.document import Document
-from uwsift.model.layer import DocRGBLayer
+from uwsift.model.layer import DocRGBDataset
 from uwsift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from uwsift.ui.pov_main_ui import Ui_MainWindow
@@ -294,20 +294,20 @@ class UserControlsAnimation(QtCore.QObject):
 
         self.document.didSwitchLayerSet.connect(self.animation_reset_by_layer_set_switch)
         self.document.didChangeLayerVisibility.connect(self.update_frame_time_to_top_visible)
-        self.document.didReorderLayers.connect(self.update_frame_time_to_top_visible)
-        self.document.didRemoveLayers.connect(self.update_frame_time_to_top_visible)
-        self.document.didAddBasicLayer.connect(self.update_frame_time_to_top_visible)
-        self.document.didAddCompositeLayer.connect(self.update_frame_time_to_top_visible)
+        self.document.didReorderDatasets.connect(self.update_frame_time_to_top_visible)
+        self.document.didRemoveDatasets.connect(self.update_frame_time_to_top_visible)
+        self.document.didAddBasicDataset.connect(self.update_frame_time_to_top_visible)
+        self.document.didAddCompositeDataset.connect(self.update_frame_time_to_top_visible)
 
     def next_frame(self, *args, **kwargs):
         """Advance a frame along the animation order."""
-        self.scene_manager.layer_set.animating = False
-        self.scene_manager.layer_set.step(backwards=False)
+        self.scene_manager.animation_controller.animating = False
+        self.scene_manager.animation_controller.step(backwards=False)
 
     def prev_frame(self, *args, **kwargs):
         """Retreat a frame along the animation list."""
-        self.scene_manager.layer_set.animating = False
-        self.scene_manager.layer_set.step(backwards=True)
+        self.scene_manager.animation_controller.animating = False
+        self.scene_manager.animation_controller.step(backwards=True)
 
     def reset_frame_slider(self, *args, **kwargs):
         """Reset frame slider to show current animation state in document when aniamtion list changes."""
@@ -333,7 +333,7 @@ class UserControlsAnimation(QtCore.QObject):
         self.ui.animationSlider.repaint()
         if animating:
             if not UWSIFT_ANIM_INDICATOR_DISABLED:
-                t_sim = self.scene_manager.layer_set.time_manager.create_formatted_t_sim()
+                t_sim = self.scene_manager.animation_controller.time_manager.create_formatted_t_sim()
                 self.ui.animationLabel.setText(t_sim)
             #self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
         else:
@@ -373,7 +373,7 @@ class UserControlsAnimation(QtCore.QObject):
 
     def next_last_time(self, direction=0, *args, **kwargs):
         """Move forward (direction=+1) or backward (-1) a time step in animation order."""
-        self.scene_manager.layer_set.animating = False
+        self.scene_manager.animation_controller.animating = False
         new_focus = self._next_last_time_visibility(direction=direction)
         self.layer_list_model.select([new_focus])
         # if this part of the animation cycle, update the animation slider and displayed time as well
@@ -397,7 +397,7 @@ class UserControlsAnimation(QtCore.QObject):
     def set_animation_speed(self, milliseconds):
         """Change frame rate as measured in milliseconds."""
         LOG.info('animation speed set to {}ms'.format(milliseconds))
-        self.scene_manager.layer_set.animation_speed = milliseconds
+        self.scene_manager.animation_controller.animation_speed = milliseconds
 
     def show_animation_speed_slider(self, pos: QtCore.QPoint, *args):
         """Show frame-rate slider as a pop-up control, at current mouse position."""
@@ -409,7 +409,7 @@ class UserControlsAnimation(QtCore.QObject):
         else:
             popup = self._animation_speed_popup
         if not popup.isVisible():
-            popup.show_at(gpos, self.scene_manager.layer_set.animation_speed)
+            popup.show_at(gpos, self.scene_manager.animation_controller.animation_speed)
 
     def animation_reset_by_layer_set_switch(self, *args, **kwargs):
         """Perform necessary control resets when document layer set is swapped."""
@@ -433,7 +433,7 @@ class UserControlsAnimation(QtCore.QObject):
 
     def toggle_animation(self, action: QtWidgets.QAction = None, *args):
         """Toggle animation on/off."""
-        new_state = self.scene_manager.layer_set.toggle_animation()
+        new_state = self.scene_manager.animation_controller.toggle_animation()
         self.ui.animPlayPause.setChecked(new_state)
 
 
@@ -458,7 +458,7 @@ class Main(QtWidgets.QMainWindow):
     _heartbeat_file = None
 
     def interactive_open_files(self, *args, files=None, **kwargs):
-        self.scene_manager.layer_set.animating = False
+        self.scene_manager.animation_controller.animating = False
         # http://pyqt.sourceforge.net/Docs/PyQt4/qfiledialog.html#getOpenFileNames
         filename_filters = [
             # 'All files (*.*)',
@@ -551,7 +551,7 @@ class Main(QtWidgets.QMainWindow):
         for uuid, p_name in uuid_to_name.items():
             def openit(checked=False, uuid=uuid):
                 LOG.debug('open recent product {}'.format(uuid))
-                self.scene_manager.layer_set.animating = False
+                self.scene_manager.animation_controller.animating = False
                 self.activate_products_by_uuid([uuid])
 
             open_action = QtWidgets.QAction(p_name, self)
@@ -581,7 +581,7 @@ class Main(QtWidgets.QMainWindow):
         uuids = list(uuids)
         for uuid in uuids:
             layer = self.document[uuid]
-            if not isinstance(layer, DocRGBLayer):
+            if not isinstance(layer, DocRGBDataset):
                 uuids_to_remove.add(uuid)
                 continue
             elif uuid in rgb_uuids_handled:
@@ -907,7 +907,7 @@ class Main(QtWidgets.QMainWindow):
         else:
             self.workspace = SimpleWorkspace(workspace_dir)
         self.document = doc = Document(self.workspace, config_dir=config_dir, queue=self.queue)
-        self.document.didRemoveLayers.connect(self.run_gc_after_layer_deletion)
+        self.document.didRemoveDatasets.connect(self.run_gc_after_layer_deletion)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
                                                border_shapefile=border_shapefile,
                                                center=center,
@@ -997,8 +997,8 @@ class Main(QtWidgets.QMainWindow):
 
         def _update_point_probe_slot(*args):
             return self.graphManager.update_point_probe(DEFAULT_POINT_PROBE)
-        self.document.didAddBasicLayer.connect(_update_point_probe_slot)
-        self.document.didAddCompositeLayer.connect(_update_point_probe_slot)
+        self.document.didAddBasicDataset.connect(_update_point_probe_slot)
+        self.document.didAddCompositeDataset.connect(_update_point_probe_slot)
 
         # FIXME: These were added as a simple fix to update the probe value on layer changes, but this should really
         #        have its own manager-like object
@@ -1006,10 +1006,10 @@ class Main(QtWidgets.QMainWindow):
             return self.update_point_probe_text(DEFAULT_POINT_PROBE)
 
         self.document.didChangeLayerVisibility.connect(_blackhole)
-        self.document.didAddBasicLayer.connect(_blackhole)
-        self.document.didAddCompositeLayer.connect(_blackhole)
-        self.document.didRemoveLayers.connect(_blackhole)
-        self.document.didReorderLayers.connect(_blackhole)
+        self.document.didAddBasicDataset.connect(_blackhole)
+        self.document.didAddCompositeDataset.connect(_blackhole)
+        self.document.didRemoveDatasets.connect(_blackhole)
+        self.document.didReorderDatasets.connect(_blackhole)
         if False:
             # XXX: Disable the below line if updating during animation is too much work
             # self.scene_manager.didChangeFrame.connect(lambda frame_info: update_probe_point(uuid=frame_info[-1]))
@@ -1109,11 +1109,11 @@ class Main(QtWidgets.QMainWindow):
 
         root_context = self.ui.timelineQuickWidget.engine().rootContext()
 
-        time_manager = self.scene_manager.layer_set.time_manager
+        time_manager = self.scene_manager.animation_controller.time_manager
         time_manager.qml_engine = self.ui.timelineQuickWidget.engine()
         time_manager.qml_root_object = self.ui.timelineQuickWidget.rootObject()
         time_manager.qml_backend = QmlBackend()
-        time_manager.qml_backend.didJumpInTimeline.connect(self.scene_manager.layer_set.jump)
+        time_manager.qml_backend.didJumpInTimeline.connect(self.scene_manager.animation_controller.jump)
         time_manager.qml_backend.didChangeTimebase.connect(time_manager.on_timebase_change)
         # TODO(mk): refactor all QML related objects as belonging to TimeManager's QMLBackend
         #           instance -> communication between TimeManager and QMLBackend via Signal/Slot?
@@ -1180,11 +1180,11 @@ class Main(QtWidgets.QMainWindow):
             LOG.info(f"Highlighting last data time display when delayed for"
                      f" more than {self._max_tolerable_dataset_age} seconds.")
 
-        self.document.didAddBasicLayer.connect(self._update_dataset_timestamps)
-        self.document.didAddCompositeLayer.connect(self._update_dataset_timestamps)
+        self.document.didAddBasicDataset.connect(self._update_dataset_timestamps)
+        self.document.didAddCompositeDataset.connect(self._update_dataset_timestamps)
 
         # don't clear the time of last import when the layers are removed
-        self.document.didRemoveLayers.connect(
+        self.document.didRemoveDatasets.connect(
             self._clear_last_dataset_creation_time)
 
         self.currentTimeTimer = QtCore.QTimer(parent=self)
@@ -1201,8 +1201,8 @@ class Main(QtWidgets.QMainWindow):
                 heartbeat_file.replace("$$CACHE_DIR$$", USER_CACHE_DIR)
             LOG.info(f"Communication with watchdog via heartbeat file "
                      f" '{self._heartbeat_file}' configured.")
-            self.document.didAddBasicLayer.connect(self._update_heartbeat_file)
-            self.document.didAddCompositeLayer.connect(self._update_heartbeat_file)
+            self.document.didAddBasicDataset.connect(self._update_heartbeat_file)
+            self.document.didAddCompositeDataset.connect(self._update_heartbeat_file)
 
     def _timer_collect_resources(self):
         if self._resource_collector:
