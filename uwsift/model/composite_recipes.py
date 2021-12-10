@@ -42,10 +42,15 @@ class Recipe:
     images of their Layer.
     """
     name: str
-    id: uuid.UUID = dataclasses.field(default_factory=uuidgen,
-                                      init=False, repr=False)
     input_layer_ids: list = dataclasses.field(default_factory=list)
     read_only: bool = False
+
+    def __post_init__(self):
+        self.__id: uuid.UUID = uuidgen()
+
+    @property
+    def id(self):
+        return self.__id
 
     def to_dict(self):
         """Convert to YAML-compatible dict."""
@@ -63,11 +68,15 @@ class CompositeRecipe(Recipe):
     green and blue channel image to produce a colorful RGB image. These
     composites are typically generated on-the-fly by the GPU by providing
     all inputs as textures.
+
+    Do not instantiate this class directly but use `CompositeRecipe.from_rgb()`.
     """
     color_limits: list = dataclasses.field(default_factory=list)
     gammas: list = dataclasses.field(default_factory=list)
 
     def __post_init__(self):
+        super().__post_init__()
+        
         def _normalize_list(x, default=None):
             return [x[idx] if x and len(x) > idx and x[idx] else default for idx in range(3)]
 
