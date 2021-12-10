@@ -19,10 +19,13 @@ they can be recreated in the future.
 
 """
 
+import dataclasses
 import logging
 import os
-from collections import namedtuple
+import uuid
+from dataclasses import dataclass
 from glob import glob
+from uuid import uuid1 as uuidgen
 
 import yaml
 
@@ -30,26 +33,70 @@ from uwsift.util.default_paths import DOCUMENT_SETTINGS_DIR
 
 LOG = logging.getLogger(__name__)
 
-_CompositeRecipe = namedtuple('CompositeRecipe', ['name', 'input_ids', 'color_limits', 'gammas', 'read_only'])
+
+@dataclass
+class Recipe:
+    """
+    Recipe base class. All recipes belong to a Layer and store information
+    which input Layers provide the image data that is used to generate the
+    images of their Layer.
+    """
+    name: str
+    input_layer_ids: list = dataclasses.field(default_factory=list)
+    read_only: bool = False
+
+    def __post_init__(self):
+        self.__id: uuid.UUID = uuidgen()
+
+    @property
+    def id(self):
+        return self.__id
+
+    def to_dict(self):
+        """Convert to YAML-compatible dict."""
+        return dataclasses.asdict(self)
+
+    def copy(self, new_name):
+        """Get a copy of this recipe with a new name"""
+        return dataclasses.replace(self, name=new_name)
 
 
-class CompositeRecipe(_CompositeRecipe):
-    def __new__(cls, name, input_ids=None, color_limits=None, gammas=None, read_only=False):
+@dataclass
+class CompositeRecipe(Recipe):
+    """
+    Recipe class responsible for storing the combination of 1-3 layers as red,
+    green and blue channel image to produce a colorful RGB image. These
+    composites are typically generated on-the-fly by the GPU by providing
+    all inputs as textures.
+
+    Do not instantiate this class directly but use `CompositeRecipe.from_rgb()`.
+    """
+    color_limits: list = dataclasses.field(default_factory=list)
+    gammas: list = dataclasses.field(default_factory=list)
+
+    def __post_init__(self):
+        super().__post_init__()
+        
         def _normalize_list(x, default=None):
             return [x[idx] if x and len(x) > idx and x[idx] else default for idx in range(3)]
 
-        input_ids = _normalize_list(input_ids)
-        color_limits = _normalize_list(color_limits, (None, None))
-        gammas = _normalize_list(gammas, 1.0)
-        return super(CompositeRecipe, cls).__new__(cls, name, input_ids, color_limits, gammas, read_only)
+        self.input_layer_ids = _normalize_list(self.input_layer_ids)
+        self.color_limits = _normalize_list(self.color_limits, (None, None))
+        self.gammas = _normalize_list(self.gammas, 1.0)
 
     @classmethod
     def from_rgb(cls, name, r=None, g=None, b=None, color_limits=None, gammas=None):
-        return cls(name, input_ids=[r, g, b], color_limits=color_limits, gammas=gammas)
+        return cls(name, input_layer_ids=[r, g, b], color_limits=color_limits, gammas=gammas)
 
     def _channel_info(self, idx):
+        """
+        Get the control parameters for one of the composite channels as a dict.
+
+        :param idx: Index of the channel (0 = red, 1 = green, 2 = blue).
+        :return: Info dict for the channel
+        """
         return {
-            'name': self.input_ids[idx],
+            'name': self.input_layer_ids[idx],
             'color_limits': self.color_limits[idx],
             'gamma': self.gammas[idx],
         }
@@ -62,7 +109,7 @@ class CompositeRecipe(_CompositeRecipe):
             if comp is None:
                 # component was not updated
                 continue
-            if self.input_ids[idx] is None:
+            if self.input_layer_ids[idx] is None:
                 # our component is None
                 self.color_limits[idx] = (None, None)
             else:
@@ -70,28 +117,18 @@ class CompositeRecipe(_CompositeRecipe):
 
     @property
     def red(self):
+        """Get the control parameters for the red channel as a dict."""
         return self._channel_info(0)
 
     @property
     def green(self):
+        """Get the control parameters for the green channel as a dict."""
         return self._channel_info(1)
 
     @property
     def blue(self):
+        """Get the control parameters for the blue channel as a dict."""
         return self._channel_info(2)
-
-    def to_dict(self):
-        """Convert to YAML-compatible dict."""
-        return {
-            'name': self.name,
-            'red': self.red,
-            'green': self.green,
-            'blue': self.blue,
-        }
-
-    def copy(self, new_name):
-        """Get a copy of this recipe with a new name"""
-        return self._replace(name=new_name)
 
 
 class RecipeManager(object):
@@ -119,13 +156,13 @@ class RecipeManager(object):
             self._stored_recipes[recipe.name] = (pathname, recipe)
 
     def add_recipe(self, recipe):
-        self.recipes[recipe.name] = recipe
+        self.recipes[recipe.id] = recipe
 
-    def __getitem__(self, recipe_name):
-        return self.recipes[recipe_name]
+    def __getitem__(self, recipe_id):
+        return self.recipes[recipe_id]
 
-    def __delitem__(self, recipe_name):
-        del self.recipes[recipe_name]
+    def __delitem__(self, recipe_id):
+        del self.recipes[recipe_id]
 
     def save_recipe(self, recipe, filename=None, overwrite=False):
         if not filename:
@@ -149,7 +186,7 @@ class RecipeManager(object):
         try:
             for recipe_content in yaml.safe_load_all(pathname):
                 name = recipe_content['name']
-                input_ids = [
+                input_layer_ids = [
                     recipe_content['red']['name'],
                     recipe_content['green']['name'],
                     recipe_content['blue']['name'],
@@ -166,7 +203,7 @@ class RecipeManager(object):
                 ]
                 recipe = CompositeRecipe(
                     name=name,
-                    input_ids=input_ids,
+                    input_layer_ids=input_layer_ids,
                     color_limits=color_limits,
                     gammas=gammas,
                     read_only=True,

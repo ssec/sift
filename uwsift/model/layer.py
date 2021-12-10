@@ -259,7 +259,7 @@ class DocRGBDataset(DocCompositeDataset):
         def _get_family(layer):
             return layer[Info.FAMILY] if layer else None
 
-        return all([_get_family(x) == self.recipe.input_ids[idx] for idx, x in enumerate(self.layers[:3])])
+        return all([_get_family(x) == self.recipe.input_layer_ids[idx] for idx, x in enumerate(self.layers[:3])])
 
     @property
     def is_valid(self):
