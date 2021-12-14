@@ -30,6 +30,7 @@ from typing import Mapping
 from uuid import uuid1 as uuidgen
 
 import yaml
+from PyQt5.QtCore import QObject
 
 from uwsift.util.default_paths import DOCUMENT_SETTINGS_DIR
 
@@ -152,8 +153,9 @@ class CompositeRecipe(Recipe):
         return "RGB Composite"
 
 
-class RecipeManager(object):
-    def __init__(self, config_dir=None):
+class RecipeManager(QObject):
+    def __init__(self, parent=None, config_dir=None):
+        super(RecipeManager, self).__init__(parent)
         if config_dir is None:
             config_dir = DOCUMENT_SETTINGS_DIR
 
