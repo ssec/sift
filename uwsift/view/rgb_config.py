@@ -31,6 +31,8 @@ class RGBLayerConfigPane(QObject):
     # Recipe, Channel (RGB), gamma
     didChangeRGBGamma = pyqtSignal(CompositeRecipe, str, float)
 
+    didChangeRecipeName = pyqtSignal(CompositeRecipe, str)
+
     _rgb = None  # combo boxes in r,g,b order; cache
     _sliders = None  # sliders in r,g,b order; cache
     _edits = None
@@ -81,6 +83,10 @@ class RGBLayerConfigPane(QObject):
          for rgb, x in
          zip(('b', 'g', 'r'), (self.ui.blueGammaSpinBox, self.ui.greenGammaSpinBox, self.ui.redGammaSpinBox))]
 
+        self.ui.nameEdit.textEdited.connect(self._rgb_name_edit_changed)
+
+        self._rgb_name_edit = self.ui.nameEdit
+
         # initialize the combo boxes
         self._set_combos_to_layer_names()
         # disable all UI elements to start
@@ -113,6 +119,10 @@ class RGBLayerConfigPane(QObject):
                 (self.ui.editMinBlue, self.ui.editMaxBlue),
             ]
         return self._edits
+
+    @property
+    def rgb_name_edit(self):
+        return self._rgb_name_edit
 
     @property
     def gamma_boxes(self):
@@ -169,6 +179,9 @@ class RGBLayerConfigPane(QObject):
                                           DEFAULT_GAMMA_VALUE)
 
         self._show_settings_for_layer(self.recipe)
+
+    def _rgb_name_edit_changed(self, text):
+        self.didChangeRecipeName.emit(self.recipe, text)
 
     def _display_to_data(self, color: str, values):
         """Convert display value to data value."""
@@ -304,6 +317,7 @@ class RGBLayerConfigPane(QObject):
                 edit[1].setDisabled(True)
             for sbox in self.gamma_boxes:
                 sbox.setDisabled(True)
+            self.rgb_name_edit.setDisabled(True)
             return
         else:
             # re-enable all the widgets
@@ -317,6 +331,7 @@ class RGBLayerConfigPane(QObject):
                 edit[1].setDisabled(False)
             for sbox in self.gamma_boxes:
                 sbox.setDisabled(False)
+            self.rgb_name_edit.setDisabled(False)
 
         for widget in self.rgb:
             # block signals so an existing RGB layer doesn't get overwritten with new layer selections
@@ -326,10 +341,17 @@ class RGBLayerConfigPane(QObject):
         self._select_components_for_recipe(recipe)
         self._set_minmax_sliders(recipe)
         self._set_gamma_boxes(recipe)
+        self._set_rgb_name_edit(recipe)
 
         for widget in self.rgb:
             # block signals so an existing RGB layer doesn't get overwritten with new layer selections
             widget.blockSignals(False)
+
+    def _set_rgb_name_edit(self, recipe):
+        if recipe is not None:
+            self.rgb_name_edit.setText(recipe.name)
+        else:
+            self.rgb_name_edit.setText("")
 
     def _set_minmax_slider(self, color: str, layer_uuid: uuid.UUID, clims: Optional[Tuple[float, float]] = None):
         idx = RGBA2IDX[color]
