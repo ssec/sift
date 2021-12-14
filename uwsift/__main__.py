@@ -51,7 +51,6 @@ from uwsift import (__version__, config,
 from uwsift.common import Info, Tool, CompositeType, Presentation
 from uwsift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
 from uwsift.control.layer_tree import LayerStackTreeViewModel
-from uwsift.control.rgb_behaviors import UserModifiesRGBLayers
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.model.document import Document
 from uwsift.model.layer import DocRGBDataset
@@ -1123,10 +1122,6 @@ class Main(QtWidgets.QMainWindow):
 
     def _init_rgb_pane(self):
         self.rgb_config_pane = RGBLayerConfigPane(self.ui, self.ui.layersPaneWidget)
-        self.user_rgb_behavior = UserModifiesRGBLayers(self.document,
-                                                       self.rgb_config_pane,
-                                                       self.layer_list_model,
-                                                       parent=self)
 
     def _init_layer_panes(self):
         # convey action between document and layer list view
@@ -1479,7 +1474,7 @@ class Main(QtWidgets.QMainWindow):
 
         composite = QtWidgets.QAction("Create Composite", self)
         composite.setShortcut('C')
-        composite.triggered.connect(self.user_rgb_behavior.create_rgb)
+
 
         algebraic = QtWidgets.QAction("Create Algebraic", self)
         algebraic.triggered.connect(self.create_algebraic)
