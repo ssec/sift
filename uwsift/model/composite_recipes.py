@@ -25,6 +25,7 @@ import os
 import uuid
 from dataclasses import dataclass
 from glob import glob
+from typing import Mapping
 from uuid import uuid1 as uuidgen
 
 import yaml
@@ -32,6 +33,8 @@ import yaml
 from uwsift.util.default_paths import DOCUMENT_SETTINGS_DIR
 
 LOG = logging.getLogger(__name__)
+
+RGBA2IDX: Mapping[str, int] = dict(r=0, g=1, b=2, a=3)
 
 
 @dataclass

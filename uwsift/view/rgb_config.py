@@ -11,10 +11,9 @@ from PyQt5.QtGui import QDoubleValidator
 from PyQt5.QtWidgets import QComboBox, QLineEdit
 
 from uwsift.common import Info, Kind
-from uwsift.model.composite_recipes import CompositeRecipe
+from uwsift.model.composite_recipes import CompositeRecipe, RGBA2IDX
 
 LOG = logging.getLogger(__name__)
-RGBA2IDX: Mapping[str, int] = dict(r=0, g=1, b=2, a=3)
 
 
 class RGBLayerConfigPane(QObject):
