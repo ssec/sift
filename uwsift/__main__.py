@@ -1121,7 +1121,9 @@ class Main(QtWidgets.QMainWindow):
         self.layer_model.init_system_layers()
 
     def _init_rgb_pane(self):
-        self.rgb_config_pane = RGBLayerConfigPane(self.ui, self.ui.layersPaneWidget)
+        self.rgb_config_pane = RGBLayerConfigPane(self.ui,
+                                                  self.ui.layersPaneWidget,
+                                                  self.layer_model)
 
     def _init_layer_panes(self):
         # convey action between document and layer list view
