@@ -75,7 +75,7 @@ class RGBLayerConfigPane(QObject):
          for rgb, x in zip(('b', 'g', 'r'), (self.ui.editMaxBlue, self.ui.editMaxGreen, self.ui.editMaxRed))]
         [x.valueChanged.connect(self._gamma_changed)
          for rgb, x in
-         zip(('b', 'g', 'r'), (self.ui.redGammaSpinBox, self.ui.greenGammaSpinBox, self.ui.blueGammaSpinBox))]
+         zip(('b', 'g', 'r'), (self.ui.blueGammaSpinBox, self.ui.greenGammaSpinBox, self.ui.redGammaSpinBox))]
 
         # initialize the combo boxes
         self._set_combos_to_family_names()
