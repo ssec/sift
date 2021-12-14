@@ -11,7 +11,7 @@ from PyQt5.QtCore import QObject, pyqtSignal
 from PyQt5.QtGui import QDoubleValidator
 from PyQt5.QtWidgets import QComboBox, QLineEdit
 
-from uwsift.common import Info, Kind
+from uwsift.common import Info, Kind, DEFAULT_GAMMA_VALUE
 from uwsift.model.composite_recipes import CompositeRecipe, RGBA2IDX
 from uwsift.model.layer_item import LayerItem
 from uwsift.model.layer_model import LayerModel
@@ -23,12 +23,13 @@ class RGBLayerConfigPane(QObject):
     """Configures RGB channel selection and ranges on behalf of document.
     Document in turn generates update signals which cause the SceneGraph to refresh.
     """
-    # recipe being changed, character from 'rgba', layer being assigned
-    didChangeRGBComponentSelection = pyqtSignal(CompositeRecipe, str, object)
-    # recipe being changed, ((min, max), (min, max), (min, max))
-    didChangeRGBComponentLimits = pyqtSignal(CompositeRecipe, tuple)
-    # recipe being changed, (new-gamma, new-gamma, new-gamma)
-    didChangeRGBComponentGamma = pyqtSignal(CompositeRecipe, tuple)
+    # Recipe, Channel (RGB), layer uuid, color limits, gamma
+    didChangeRGBInputLayers = pyqtSignal(CompositeRecipe, str, object,
+                                         tuple, float)
+    # Recipe, Channel (RGB), color limits
+    didChangeRGBColorLimits = pyqtSignal(CompositeRecipe, str, tuple)
+    # Recipe, Channel (RGB), gamma
+    didChangeRGBGamma = pyqtSignal(CompositeRecipe, str, float)
 
     _rgb = None  # combo boxes in r,g,b order; cache
     _sliders = None  # sliders in r,g,b order; cache
@@ -140,7 +141,16 @@ class RGBLayerConfigPane(QObject):
 
     def _gamma_changed(self, value):
         gamma = tuple(x.value() for x in self.gamma_boxes)
-        self.didChangeRGBComponentGamma.emit(self.recipe, gamma)
+        recipe_gamma = self.recipe.gammas
+        channels = ['r', 'g', 'b']
+
+        changed_channel = ''
+
+        for idx in range(len(channels)):
+            if gamma[idx] != recipe_gamma[idx]:
+                changed_channel = channels[idx]
+
+        self.didChangeRGBGamma.emit(self.recipe, changed_channel, value)
 
     def _combo_changed(self, index, combo: QComboBox = None, color=None):
         layer_uuid = combo.itemData(index)
@@ -151,7 +161,17 @@ class RGBLayerConfigPane(QObject):
         LOG.debug("RGB: user selected %s for %s" % (repr(layer_uuid), color))
         # reset slider position to min and max for layer
         self._set_minmax_slider(color, layer_uuid)
-        self.didChangeRGBComponentSelection.emit(self.recipe, color, layer_uuid)
+        layer_info \
+            = self.model.get_layer_by_uuid(layer_uuid).info \
+            if layer_uuid else None
+
+        clim = layer_info.get(Info.CLIM) if layer_info else (None, None)
+
+        self.didChangeRGBInputLayers.emit(self.recipe, color, layer_uuid,
+                                          clim,
+                                          DEFAULT_GAMMA_VALUE)
+
+        self._show_settings_for_layer(self.recipe)
 
     def _display_to_data(self, color: str, values):
         """Convert display value to data value."""
@@ -228,10 +248,8 @@ class RGBLayerConfigPane(QObject):
         return n, x
 
     def _signal_color_changing_range(self, color: str, n: float, x: float):
-        idx = RGBA2IDX[color]
-        new_limits = list(self.recipe.color_limits)
-        new_limits[idx] = (n, x)
-        self.didChangeRGBComponentLimits.emit(self.recipe, tuple(new_limits))
+        new_limits = (n, x)
+        self.didChangeRGBColorLimits.emit(self.recipe, color, new_limits)
 
     def _slider_changed(self, value=None, slider=None, color: str = None, is_max: bool = False):
         """
