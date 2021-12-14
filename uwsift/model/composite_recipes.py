@@ -34,7 +34,15 @@ from uwsift.util.default_paths import DOCUMENT_SETTINGS_DIR
 
 LOG = logging.getLogger(__name__)
 
-RGBA2IDX: Mapping[str, int] = dict(r=0, g=1, b=2, a=3)
+CHANNEL_RED = 0
+CHANNEL_GREEN = 1
+CHANNEL_BLUE = 2
+CHANNEL_ALPHA = 3
+
+RGBA2IDX: Mapping[str, int] = dict(r=CHANNEL_RED,
+                                   g=CHANNEL_GREEN,
+                                   b=CHANNEL_BLUE,
+                                   a=CHANNEL_ALPHA)
 
 
 @dataclass
@@ -121,17 +129,17 @@ class CompositeRecipe(Recipe):
     @property
     def red(self):
         """Get the control parameters for the red channel as a dict."""
-        return self._channel_info(0)
+        return self._channel_info(CHANNEL_RED)
 
     @property
     def green(self):
         """Get the control parameters for the green channel as a dict."""
-        return self._channel_info(1)
+        return self._channel_info(CHANNEL_GREEN)
 
     @property
     def blue(self):
         """Get the control parameters for the blue channel as a dict."""
-        return self._channel_info(2)
+        return self._channel_info(CHANNEL_BLUE)
 
 
 class RecipeManager(object):
