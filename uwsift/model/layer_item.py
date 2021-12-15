@@ -70,7 +70,7 @@ class LayerItem:
         platform = info.get(Info.PLATFORM)
         instrument = info.get(Info.INSTRUMENT)
         return {
-            LMC.SOURCE: f"{platform.name} {instrument.name}",
+            LMC.SOURCE: f"{platform.value} {instrument.value}",
             LMC.NAME: name,
             LMC.WAVELENGTH: wavelength,
             LMC.PROBE_UNIT: unit
