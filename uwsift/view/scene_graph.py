@@ -1020,10 +1020,12 @@ class SceneGraphManager(QObject):
             LOG.debug('changing {} to gamma {}'.format(uuid, gamma))
             self.set_gamma(gamma, uuid)
 
-    def change_layers_image_kind(self, change_dict):
-        for uuid, new_pz in change_dict.items():
-            LOG.info('changing {} to kind {}'.format(uuid, new_pz.kind.name))
-            self.add_basic_dataset(None, uuid, new_pz)
+    # This method may be revived again in case CONTOURS should be supported
+    # (again)
+    # def change_layers_image_kind(self, change_dict):
+    #     for uuid, new_pz in change_dict.items():
+    #         LOG.info('changing {} to kind {}'.format(uuid, new_pz.kind.name))
+    #         self.add_basic_dataset(None, uuid, new_pz)
 
     @staticmethod
     def _overwrite_with_test_pattern(data):
@@ -1131,15 +1133,16 @@ class SceneGraphManager(QObject):
 
         self.layer_nodes[layer.uuid] = layer_node
 
-    def add_node_for_product_dataset(self, layer: LayerItem, product_dataset: ProductDataset):
-
-        image_data = self.workspace.get_content(product_dataset.uuid, kind=product_dataset.kind)
-
-        # TODO(LR): Deprecate this and instead route a signal per kind to a dedicated slot?
-        #if product_dataset.kind == Kind.CONTOUR:
-        #    return self.add_contour_layer(layer, p, image_data)
-
+    def add_node_for_image_dataset(self, layer: LayerItem,
+                                   product_dataset: ProductDataset):
         assert self.layer_nodes[layer.uuid] is not None
+        assert product_dataset.kind == Kind.IMAGE
+
+        image_data = self.workspace.get_content(product_dataset.uuid,
+                                                kind=product_dataset.kind)
+
+        if False:  # Set to True FOR TESTING ONLY
+            self._overwrite_with_test_pattern(image_data)
 
         if USE_TILED_GEOLOCATED_IMAGES:
             image = TiledGeolocatedImage(
@@ -1180,7 +1183,7 @@ class SceneGraphManager(QObject):
                            product_dataset.info[Info.ORIGIN_Y], 0))
         self.dataset_nodes[product_dataset.uuid] = image
         self.on_view_change(None)
-        LOG.debug("Scene Graph after Dataset insertion:")
+        LOG.debug("Scene Graph after IMAGE dataset insertion:")
         LOG.debug(self.main_view.describe_tree(with_transform=True))
 
     def add_composite_dataset(self, new_order: tuple, uuid: UUID, p: Presentation):
@@ -1258,50 +1261,56 @@ class SceneGraphManager(QObject):
             # algebraic layer
             return self.add_basic_dataset(new_order, uuid, p)
 
-    def add_lines_dataset(self, new_order: tuple, uuid: UUID, p: Presentation):
-        layer = self.document[uuid]
-        if not layer.is_valid:
-            LOG.info('unable to add an invalid lines layer, will try again later when layer changes')
-            return
+    def add_node_for_lines_dataset(self, layer: LayerItem,
+                                   product_dataset: ProductDataset) \
+            -> scene.VisualNode:
+        assert self.layer_nodes[layer.uuid] is not None
+        assert product_dataset.kind == Kind.LINES
 
-        content, _ = self.workspace.get_lines_arrays(uuid)
+        content, _ = self.workspace.get_lines_arrays(product_dataset.uuid)
         if content is None:
-            LOG.info(f"layer contains no lines: {uuid}")
+            LOG.info(f"Dataset contains no lines: {product_dataset.uuid}")
             return
 
-        lines = Lines(content, parent=self.main_map)
-        lines.transform *= STTransform(translate=(0., 0., 50.))
-        lines.name = str(uuid)
-        self.dataset_nodes[uuid] = lines
-        self.animation_controller.add_layer(lines)
+        lines = Lines(content,
+                      parent=self.layer_nodes[layer.uuid])
+        lines.name = str(product_dataset.uuid)
+
+        self.dataset_nodes[product_dataset.uuid] = lines
         self.on_view_change(None)
+        LOG.debug("Scene Graph after LINES dataset insertion:")
+        LOG.debug(self.main_view.describe_tree(with_transform=True))
 
-    def add_points_dataset(self, new_order: tuple, uuid: UUID, p: Presentation):
-        layer = self.document[uuid]
-        if not layer.is_valid:
-            LOG.info('unable to add an invalid points layer, will try again later when layer changes')
-            return
+    def add_node_for_points_dataset(self, layer: LayerItem,
+                                    product_dataset: ProductDataset) \
+            -> scene.VisualNode:
+        assert self.layer_nodes[layer.uuid] is not None
+        assert product_dataset.kind == Kind.POINTS
 
-        pos, values = self.workspace.get_points_arrays(uuid)
+        pos, values = self.workspace.get_points_arrays(product_dataset.uuid)
         if pos is None:
-            LOG.info(f"layer contains no points: {uuid}")
+            LOG.info(f"layer contains no points: {product_dataset.uuid}")
             return
 
-        kwargs = map_point_style_to_marker_kwargs(get_point_style_by_name(p.style))
+        kwargs = map_point_style_to_marker_kwargs(
+            get_point_style_by_name(layer.presentation.style))
 
         if values is not None:
             assert len(pos) == len(values)
-            # TODO use p.climits instead of autoscaling?
-            colormap = self.document.find_colormap(p.colormap)
+            # TODO use climits of the presentation instead of autoscaling?
+            colormap = self.document.find_colormap(layer.presentation.colormap)
             kwargs["face_color"] = \
                 self.map_to_colors_autoscaled(colormap, values)
 
-        points = Markers(pos=pos, parent=self.main_map, **kwargs)
-        points.transform *= STTransform(translate=(0., 0., 50.))
-        points.name = str(uuid)
-        self.dataset_nodes[uuid] = points
-        self.animation_controller.add_layer(points)
+        points = Markers(pos=pos,
+                         parent=self.layer_nodes[layer.uuid],
+                         **kwargs)
+        points.name = str(product_dataset.uuid)
+
+        self.dataset_nodes[product_dataset.uuid] = points
         self.on_view_change(None)
+        LOG.debug("Scene Graph after POINTS dataset insertion:")
+        LOG.debug(self.main_view.describe_tree(with_transform=True))
 
     def map_to_colors_autoscaled(self, colormap, values, m=2):
         """
@@ -1459,12 +1468,12 @@ class SceneGraphManager(QObject):
 
     def _connect_doc_signals(self, document: Document):
         document.didReorderDatasets.connect(self._rebuild_dataset_order)  # current layer set changed z/anim order
-        document.didAddBasicDataset.connect(self.add_basic_dataset)  # layer added to one or more layer sets
+        # REMOVE document.didAddBasicDataset.connect(self.add_basic_dataset)  # layer added to one or more layer sets
         document.didUpdateBasicDataset.connect(self.update_basic_dataset)  # new data integrated in existing layer
         document.didAddCompositeDataset.connect(
             self.add_composite_dataset)  # layer derived from other layers (either basic or composite themselves)
-        document.didAddLinesDataset.connect(self.add_lines_dataset)
-        document.didAddPointsDataset.connect(self.add_points_dataset)
+        # REMOVE document.didAddLinesDataset.connect(self.add_lines_dataset)
+        # REMOVE document.didAddPointsDataset.connect(self.add_points_dataset)
         document.didRemoveDatasets.connect(self._remove_dataset)  # layer removed from current layer set
         document.willPurgeDataset.connect(self._purge_dataset)  # layer removed from document
         document.didSwitchLayerSet.connect(self.rebuild_new_layer_set)
@@ -1475,7 +1484,7 @@ class SceneGraphManager(QObject):
         document.didChangeCompositions.connect(self.change_composite_datasets)
         document.didChangeColorLimits.connect(self.change_layers_color_limits)
         document.didChangeGamma.connect(self.change_layers_gamma)
-        document.didChangeImageKind.connect(self.change_layers_image_kind)
+        # document.didChangeImageKind.connect(self.change_layers_image_kind)
 
     def set_frame_number(self, frame_number=None):
         self.animation_controller.next_frame(None, frame_number)

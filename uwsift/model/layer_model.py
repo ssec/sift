@@ -3,7 +3,7 @@ from typing import List
 
 from PyQt5.QtCore import (QAbstractItemModel, Qt, QModelIndex, pyqtSignal)
 
-from uwsift.common import LAYER_TREE_VIEW_HEADER, Presentation, Info
+from uwsift.common import LAYER_TREE_VIEW_HEADER, Presentation, Info, Kind
 from uwsift.model.layer_item import LayerItem
 from uwsift.model.product_dataset import ProductDataset
 from uwsift.workspace.workspace import frozendict
@@ -14,7 +14,9 @@ LOG = logging.getLogger(__name__)
 class LayerModel(QAbstractItemModel):
     # ------------------- Creating layers and product datasets -----------------
     didCreateLayer = pyqtSignal(LayerItem)
-    didAddProductDataset = pyqtSignal(LayerItem, ProductDataset)
+    didAddImageDataset = pyqtSignal(LayerItem, ProductDataset)
+    didAddLinesDataset = pyqtSignal(LayerItem, ProductDataset)
+    didAddPointsDataset = pyqtSignal(LayerItem, ProductDataset)
 
     # ------------------ Changing properties of existing layers ----------------
     # didChangeColormap = pyqtSignal(dict)
@@ -173,7 +175,16 @@ class LayerModel(QAbstractItemModel):
         #  according control flow that could be chosen by the user.
         product_dataset = layer.add_dataset(info)
         if product_dataset is not None:
-            self.didAddProductDataset.emit(layer, product_dataset)
+            if product_dataset.kind == Kind.IMAGE:
+                self.didAddImageDataset.emit(layer, product_dataset)
+            elif product_dataset.kind == Kind.LINES:
+                self.didAddLinesDataset.emit(layer, product_dataset)
+            elif product_dataset.kind == Kind.POINTS:
+                self.didAddPointsDataset.emit(layer, product_dataset)
+            else:
+                raise NotImplementedError(
+                    f"Managing datasets of kind {product_dataset.kind}"
+                    f" not (yet) supported.")
 
 
 class ProductFamilyKeyMappingPolicy:

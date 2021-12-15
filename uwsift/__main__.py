@@ -1093,8 +1093,12 @@ class Main(QtWidgets.QMainWindow):
 
         self.layer_model.didCreateLayer.connect(
             self.scene_manager.add_node_for_layer)
-        self.layer_model.didAddProductDataset.connect(
-            self.scene_manager.add_node_for_product_dataset)
+        self.layer_model.didAddImageDataset.connect(
+            self.scene_manager.add_node_for_image_dataset)
+        self.layer_model.didAddLinesDataset.connect(
+            self.scene_manager.add_node_for_lines_dataset)
+        self.layer_model.didAddPointsDataset.connect(
+            self.scene_manager.add_node_for_points_dataset)
 
         self.ui.treeView.setModel(self.layer_model)
         self.ui.treeView.setHeaderHidden(False)
