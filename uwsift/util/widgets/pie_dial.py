@@ -173,7 +173,7 @@ class PieDialEditor(QtWidgets.QWidget):
         if self.pie_dial:
             self.pie_dial.paint(painter, self.rect())
 
-    def mouseReleaseEvent(self, event: QtGui.QMouseEvent) -> None:
+    def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
         """
 
         :param event:
@@ -187,6 +187,22 @@ class PieDialEditor(QtWidgets.QWidget):
                 and not self._layer_opacity_popup.active:
             self.pie_dial.visible = not self.pie_dial.visible
             self.editingFinished.emit()
+
+        # The event must not fall through to the parent ItemView, which might
+        # react to it otherwise, which would feel strange, thus:
+        event.accept()
+
+    def mouseReleaseEvent(self, event: QtGui.QMouseEvent) -> None:
+        # The event must not fall through to the parent ItemView, which might
+        # react to it otherwise, which would feel strange, thus:
+        event.accept()
+
+    def mouseMoveEvent(self, event: QtGui.QMouseEvent) -> None:
+        # The event must not fall through to the parent ItemView, which might
+        # react to it otherwise, which would feel strange.
+        # TODO here the feature to directly modify visibility/opacity by mouse
+        #  moving could be implemented.
+        event.accept()
 
     def wheelEvent(self, event: QtGui.QWheelEvent) -> None:
         """
