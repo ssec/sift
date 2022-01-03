@@ -1112,6 +1112,9 @@ class Main(QtWidgets.QMainWindow):
         self.layer_model.didChangeLayerOpacity.connect(
             self.scene_manager.change_layer_opacity)
 
+        self.scene_manager.animation_controller.connect_to_model(
+            self.layer_model)
+
         self.ui.treeView.setModel(self.layer_model)
 
         self.layer_model.init_system_layers()

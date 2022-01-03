@@ -62,6 +62,7 @@ from uwsift.common import DEFAULT_ANIMATION_DELAY, Info, Kind, Tool, \
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.model.document import DocLayerStack, DocBasicDataset, Document
 from uwsift.model.layer_item import LayerItem
+from uwsift.model.layer_model import LayerModel
 from uwsift.model.product_dataset import ProductDataset
 from uwsift.model.time_manager import TimeManager
 from uwsift.queue import TASK_DOING, TASK_PROGRESS
@@ -204,8 +205,12 @@ class AnimationController(object):
 
         self.time_manager = TimeManager(self._animation_speed)
 
-        self._animation_timer = app.Timer(self._animation_speed / 1000.0)
-        self._animation_timer.connect(self.step)
+        self._animation_timer = app.Timer(self._convert_ms_to_s(self._animation_speed))
+        self._animation_timer.connect(self.time_manager.tick)
+
+    @staticmethod
+    def _convert_ms_to_s(time_ms: float) -> float:
+        return time_ms / 1000.0
 
     @property
     def animation_speed(self):
@@ -219,13 +224,9 @@ class AnimationController(object):
             return
         self._animation_timer.stop()
         self._animation_speed = milliseconds
-        self._animation_timer.interval = milliseconds / 1000.0
-        if self._frame_order:
-            self._animating = True
+        self._animation_timer.interval = self._convert_ms_to_s(milliseconds)
+        if self.animating:
             self._animation_timer.start()
-        if self._frame_change_cb is not None and self._frame_order:
-            uuid = self._frame_order[self._frame_number]
-            self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating, uuid))
 
     @property
     def animating(self):
@@ -237,17 +238,13 @@ class AnimationController(object):
             # Don't update anything if nothing about the animation has changed
             return
         elif self._animating and not animate:
-            # We are currently, but don't want to be
+            # Stop animation
             self._animating = False
             self._animation_timer.stop()
-        elif not self._animating and animate and self._frame_order:
-            # We are not currently, but want to be
+        elif not self._animating and animate:
+            # Start animation
             self._animating = True
             self._animation_timer.start()
-            # TODO: Add a proper AnimationEvent to self.events
-        if self._frame_change_cb is not None and self._frame_order:
-            uuid = self._frame_order[self._frame_number]
-            self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating, uuid))
 
     def toggle_animation(self, *args):
         self.animating = not self._animating
@@ -256,6 +253,9 @@ class AnimationController(object):
     def jump(self, index):
         self.time_manager.jump(index)
 
+    def connect_to_model(self, model: LayerModel):
+        self.time_manager.connect_to_model(model)
+
     def next_frame(self, event=None, frame_number=None):
         """
         skip to the frame (from 0) or increment one frame and update
@@ -263,6 +263,7 @@ class AnimationController(object):
         :param frame_number: optional frame to go to, from 0
         :return:
         """
+        raise ValueError("AnimationController.next_frame should not be called, ever!!!")
         lfo = len(self._frame_order)
         frame = self._frame_number
         if frame_number is None:
@@ -424,7 +425,8 @@ class SceneGraphManager(QObject):
         self.borders_nodes = []
 
         self.composite_element_dependencies = {}
-        self.animation_controller = AnimationController(self, frame_change_cb=self.frame_changed)
+        self.animation_controller = AnimationController()
+
         self._current_tool = None
 
         self._connect_doc_signals(self.document)
