@@ -32,6 +32,7 @@ class LayerModel(QAbstractItemModel):
     didChangeLayerVisible = pyqtSignal(UUID, bool)
     didChangeLayerOpacity = pyqtSignal(UUID, float)
 
+    didUpdateLayers = pyqtSignal()
     didReorderLayers = pyqtSignal(list)
     # didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
 
@@ -297,6 +298,8 @@ class LayerModel(QAbstractItemModel):
                 raise NotImplementedError(
                     f"Managing datasets of kind {product_dataset.kind}"
                     f" not (yet) supported.")
+
+            self.didUpdateLayers.emit()
 
     def mimeTypes(self):
         return ['text/plain', 'text/xml']
