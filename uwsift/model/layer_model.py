@@ -96,6 +96,9 @@ class LayerModel(QAbstractItemModel):
         for dataset_name in [LATLON_GRID_DATASET_NAME, BORDERS_DATASET_NAME]:
             self._init_system_layer(dataset_name)
 
+    def get_dynamic_layers(self):
+        return [layer for layer in self.layers if layer.dynamic]
+
     def data(self, index: QModelIndex, role: int = None):
         if not index.isValid():
             return None

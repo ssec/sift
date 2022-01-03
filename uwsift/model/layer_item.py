@@ -156,6 +156,10 @@ class LayerItem:
     def timeline(self):
         return MappingProxyType(self._timeline)
 
+    @property
+    def dynamic(self):
+        return len(self._timeline) != 0
+
     def add_dataset(self, info: frozendict,
                     presentation: Optional[Presentation] = None) \
             -> Optional[ProductDataset]:
