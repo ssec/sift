@@ -1103,6 +1103,9 @@ class Main(QtWidgets.QMainWindow):
         self.layer_model.didAddSystemLayer.connect(
             self.scene_manager.add_node_for_system_generated_data)
 
+        self.layer_model.didReorderLayers.connect(
+            self.scene_manager.update_layers_z)
+
         self.ui.treeView.setModel(self.layer_model)
         self.ui.treeView.setHeaderHidden(False)
 
