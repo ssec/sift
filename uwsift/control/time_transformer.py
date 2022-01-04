@@ -28,8 +28,8 @@ class TimeTransformer:
     def create_formatted_time_stamp(self, fmt=DEFAULT_TIME_FORMAT):
         return self.t_sim.strftime(fmt)
 
-    def change_timebase(self, data_layer):
-        self._translation_policy.change_timebase(data_layer)
+    def change_timebase(self, layer):
+        self._translation_policy.change_timebase(layer)
         self.t_sim = self._translation_policy.curr_t_sim()
         self.timeline_index = self._translation_policy.curr_timeline_index()
 
