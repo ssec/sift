@@ -62,6 +62,7 @@ class TimeManager(QObject):
 
     def connect_to_model(self, layer_model: LayerModel):
         self._layer_model: LayerModel = layer_model
+        self.qml_layer_manager._layer_model = layer_model
 
         policy = WrappingDrivingPolicy(self._layer_model.layers)
         layer_model.didUpdateLayers.connect(policy.on_layers_update)
@@ -165,7 +166,7 @@ class TimeManager(QObject):
         for layer in self._layer_model.get_dynamic_layers():
             dynamic_layers_descriptors.append(layer.descriptor)
 
-        self.qml_layer_manager.layerModel.layer_strings = \
+        self.qml_layer_manager._qml_layer_model.layer_strings = \
             dynamic_layers_descriptors
         # TODO(mk): create cleaner interface to get timebase index, should not directly
         #           access policy, expose via transformer?

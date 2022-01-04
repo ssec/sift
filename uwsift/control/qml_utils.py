@@ -1,9 +1,11 @@
-from typing import List
+import numpy as np
+from typing import List, Dict, Callable, Optional
 
-from uwsift.common import DEFAULT_TIME_FORMAT
-
+import numpy as np
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtProperty, pyqtSlot, QAbstractListModel
 from PyQt5.QtCore import Qt, QModelIndex, QDateTime
+
+from uwsift.common import DEFAULT_TIME_FORMAT
 
 
 class QmlLayerManager(QObject):
@@ -19,33 +21,55 @@ class QmlLayerManager(QObject):
         self._layer_to_display = ""
         self._date_to_display = None
 
-        self._convenience_functions = {}
-        self._conv_func_model: LayerModel = LayerModel(layer_strings=[])
-        self.convenience_functions = {}
+        self._layer_model = None
+
+        self._convenience_functions: Dict[str, Callable] = None
+        self.set_convenience_functions(
+            {"Most Frequent": self.get_most_frequent_data_layer_index}
+        )
 
         # TODO(mk): make this configurable if the user wants to display dates differently?
         self._format_str = DEFAULT_TIME_FORMAT
-        self._layer_model: LayerModel = LayerModel(layer_strings=["No Layers loaded."])
+        self._qml_layer_model: LayerModel = LayerModel(layer_strings=["No Layers loaded."])
 
-        # self._conv_func_model: LayerModel = LayerModel(
-        #     layer_strings=list(self._convenience_functions.keys()))
+    def get_most_frequent_data_layer_index(self) -> int:
+        """
+        Get index of the data layer with the least mean difference between timestamps.
+        :return: -1 if no data layers exist, index of most frequent data layer otherwise.
+        """
+        dynamic_layers = self._layer_model.get_dynamic_layers()
+        num_data_layers = len(dynamic_layers)
+        if num_data_layers == 0:
+            return -1
+        else:
+            temporal_differences = np.zeros(num_data_layers)
+            for i, dynamic_layer in enumerate(dynamic_layers):
+                tl = list(dynamic_layer.timeline.keys())
+                t_diffs = [tl[i + 1] - tl[i] for i in range(len(tl) - 1)]
+                # Calculate mean difference in timeline in seconds to support
+                # comparing timelines with non-regularly occurring timestamps
+                temporal_differences[i] = np.mean(list(map(lambda td: td.total_seconds(), t_diffs)))
+            most_frequent_data_layer_idx = np.argmin(temporal_differences)
+            if not isinstance(most_frequent_data_layer_idx, np.int64):
+                # If there exist multiple timelines at the same sampling rate, take the first one.
+                most_frequent_data_layer_idx = most_frequent_data_layer_idx[0]
+            return most_frequent_data_layer_idx
 
-    @property
-    def convenience_functions(self):
-        return self._convenience_functions
+    def get_convenience_function(self, function_name: str) -> Optional[Callable]:
+        conv_fun = self._convenience_functions.get(function_name, None)
+        return conv_fun
 
-    @convenience_functions.setter
-    def convenience_functions(self, conv_funcs):
+    def set_convenience_functions(self, conv_funcs):
         self._convenience_functions = conv_funcs
         self.convFuncModel = LayerModel(layer_strings=list(conv_funcs.keys()))
 
     @pyqtProperty(QObject, notify=layerModelChanged)
     def layerModel(self):
-        return self._layer_model
+        return self._qml_layer_model
 
     @layerModel.setter
     def layerModel(self, new_model):
-        self._layer_model = new_model
+        self._qml_layer_model = new_model
         self.layerModelChanged.emit()
 
     @pyqtProperty(QObject, notify=convFuncModelChanged)
@@ -60,18 +84,18 @@ class QmlLayerManager(QObject):
     # TODO(mk): deprecated methods, remove?
     def change_layer_model(self, idx, elem):
         insert_idx = idx + self.num_convenience_functions
-        if insert_idx < len(self._layer_model._layer_strings):
-            self._layer_model._layer_strings[insert_idx] = elem
+        if insert_idx < len(self._qml_layer_model._layer_strings):
+            self._qml_layer_model._layer_strings[insert_idx] = elem
         else:
-            self._layer_model._layer_strings.append(elem)
-        for el in self._layer_model._layer_strings:
+            self._qml_layer_model._layer_strings.append(elem)
+        for el in self._qml_layer_model._layer_strings:
             print(f"{el}")
         self.layerModelChanged.emit()
 
     def clear_layer_model(self):
-        topIdx = len(self._layer_model._layer_strings) - 1
+        topIdx = len(self._qml_layer_model._layer_strings) - 1
         while topIdx > self.num_convenience_functions:
-            del self._layer_model._layer_strings[topIdx]
+            del self._qml_layer_model._layer_strings[topIdx]
             topIdx -= 1
         self.layerModelChanged.emit()
 
@@ -113,9 +137,9 @@ class LayerModel(QAbstractListModel):
     modelChanged = pyqtSignal()
     pushedOrPopped = pyqtSignal()
 
-    def __init__(self, *args, layer_strings=[], **kwargs):
+    def __init__(self, *args, layer_strings=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self._layer_strings = layer_strings
+        self._layer_strings = layer_strings if layer_strings is not None else []
 
     @pyqtProperty("QVariantList", notify=modelChanged)
     def model(self):
@@ -284,6 +308,6 @@ class QmlBackend(QObject):
         :param conv_func_name: Name of the clicked convenience function as a string
         """
         if self.qml_layer_manager:
-            data_layer_index = self.qml_layer_manager.convenience_functions[conv_func_name]()
+            data_layer_index = self.qml_layer_manager.get_convenience_function(conv_func_name)()
             if data_layer_index >= 0:
                 self.didChangeTimebase.emit(data_layer_index)
