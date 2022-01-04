@@ -50,7 +50,7 @@ class TimeManager(QObject):
         test_qdts = list(map(lambda dt: QDateTime(dt),
                              [dummy_dt + relativedelta(hours=i) for i in range(5)]))
         self.qml_timestamps_model = TimebaseModel(timestamps=test_qdts)
-        self._time_transformer = None
+        self._time_transformer: Optional[TimeTransformer] = None
 
     @property
     def qml_backend(self) -> QmlBackend:
@@ -66,28 +66,73 @@ class TimeManager(QObject):
         policy = WrappingDrivingPolicy(self._layer_model.layers)
         layer_model.didUpdateLayers.connect(policy.on_layers_update)
         layer_model.didUpdateLayers.connect(self.update_qml_layer_model)
+        layer_model.didUpdateLayers.connect(self.sync_to_time_transformer)
 
         self.didMatchTimes.connect(self._layer_model.on_didMatchTimes)
 
         policy.didUpdatePolicy.connect(self.update_qml_timeline)
         self._time_transformer = TimeTransformer(policy)
 
+    def tick(self, event):
+        """
+        Proxy function for `TimeManager.step()`, which cannot directly
+        receive a signal from the animation timer signal because the latter
+        passes an `event` that `step()` cannot deal with. Thus connect to
+        this method to actually trigger `step()`.
+
+        :param event: Event passed by `AnimationController.animation_timer` on
+        expiry, simply dropped.
+        """
+        self.step()
+
+    def step(self, backwards: bool = False):
+        """
+        Method allowing advancement of time, either forwards or backwards, by
+        one time step, as determined by the currently active time base.
+
+        :param backwards: Flag which sets advancement either to `forwards` or
+        `backwards`.
+        """
+        self._time_transformer.step(backwards=backwards)
+        self.sync_to_time_transformer()
+
     def jump(self, index):
         self._time_transformer.jump(index)
+        self.sync_to_time_transformer()
+
+    def sync_to_time_transformer(self):
         t_sim = self._time_transformer.t_sim
         t_idx = self._time_transformer.timeline_index
+
+        t_matched_dict = self._match_times(t_sim)
+        self.didMatchTimes.emit(t_matched_dict)
+
         self.tick_qml_state(t_sim, t_idx)
 
-    def tick(self, event):  # , backwards=False
-        self._time_transformer.tick()  # backwards=backwards
-        t_sim = self._time_transformer.t_sim
-        t_idx = self._time_transformer.timeline_index
+    def _match_times(self, t_sim: datetime) -> dict:
+        """
+        Match time steps of available data in LayerModel's dynamic layers to
+        `t_sim` of i.e.: a driving layer.
+
+        A mapping of one layer to multiple soon-to-be visible ProductDatasets is
+        made possible to support products (i.e.: Lightning) where multiple
+        ProductDatasets may accumulate and must thus be made visible to the
+        user.
+
+        :param t_sim: Datetime of current active time step of time base.
+        :return: Dictionary of possibly multiple tuples of
+        (layer_uuid -> [product_dataset_uuid0,..,product_dataset_uuidN]),
+        describing all ProductDatasets within a layer that are to be set
+        visible.
+        """
         t_matched_dict = {}
         for layer in self._layer_model.get_dynamic_layers():
             t_matched = self._time_matcher.match(layer.timeline, t_sim)
-            t_matched_dict[layer.uuid] = [layer.timeline[t_matched].uuid]
-        self.didMatchTimes.emit(t_matched_dict)
-        self.tick_qml_state(t_sim, t_idx)
+            if t_matched:
+                t_matched_dict[layer.uuid] = [layer.timeline[t_matched].uuid]
+            else:
+                t_matched_dict[layer.uuid] = [None]
+        return t_matched_dict
 
     def update_qml_timeline(self, layer: LayerItem):
         """
@@ -141,14 +186,16 @@ class TimeManager(QObject):
 
     def on_timebase_change(self, index):
         """
-        Slot to trigger timebase change by looking up data layer at specified index.
-         Then calls time transformer to execute change of the timebase.
-        :param index: DataLayer index obtained by either: clicking an item in the ComboBox or
-                      by clicking a convenience function in the convenience function popup menu
+        Slot to trigger timebase change by looking up data layer at specified
+        index. Then calls time transformer to execute change of the timebase.
+
+        :param index: DataLayer index obtained by either: clicking an item in
+                      the ComboBox or by clicking a convenience function in the
+                      convenience function popup menu
         """
-        # data_layer = self._collection.get_data_layer_by_index(index)
-        layer = self._layer_model.layers[index]
+        layer = self._layer_model.get_dynamic_layers()[index]
         if layer:
             self._time_transformer.change_timebase(layer)
             self.update_qml_timeline(layer)
             self.qml_backend.refresh_timeline()
+            self.sync_to_time_transformer()

@@ -37,7 +37,7 @@ class TimeTransformer:
         self.t_sim = self._translation_policy.jump_to_t_sim(index=index)
         self.timeline_index = self._translation_policy.curr_timeline_index()
 
-    def tick(self, backwards=False):
+    def step(self, backwards=False):
         # tick times in milliseconds since Epoch
         self.curr_tick_time = time.time_ns()//1000000
         self.t_sim = self._translation_policy.compute_t_sim(self.curr_tick_time,
