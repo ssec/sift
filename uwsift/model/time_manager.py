@@ -116,7 +116,7 @@ class TimeManager:
         # TODO(mk): if TimeManager is subclassed the behavior below must be adapted:
         #           it may no longer be desirable to show t_sim as the current time step
         self.qml_timestamps_model.currentTimestamp = self._time_transformer.t_sim
-        self.qml_backend.notify_tidx_changed(timeline_idx)
+        self.qml_backend.doNotifyTimelineIndexChanged.emit(timeline_idx)
 
     def create_formatted_t_sim(self):
         """

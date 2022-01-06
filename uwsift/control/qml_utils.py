@@ -246,9 +246,6 @@ class QmlBackend(QObject):
         super().__init__()
         self.qml_layer_manager: QmlLayerManager = None
 
-    def notify_tidx_changed(self, idx):
-        self.doNotifyTimelineIndexChanged.emit(idx)
-
     def clear_timeline(self):
         self.doClearTimeline.emit()
 
