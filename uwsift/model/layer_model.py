@@ -3,7 +3,8 @@ from typing import List
 
 from PyQt5.QtCore import (QAbstractItemModel, Qt, QModelIndex, pyqtSignal)
 
-from uwsift.common import LAYER_TREE_VIEW_HEADER, Presentation, Info, Kind
+from uwsift.common import LAYER_TREE_VIEW_HEADER, Presentation, Info, Kind, \
+    LATLON_GRID_DATASET_NAME, BORDERS_DATASET_NAME, Platform, Instrument
 from uwsift.model.layer_item import LayerItem
 from uwsift.model.product_dataset import ProductDataset
 from uwsift.workspace.workspace import frozendict
@@ -17,6 +18,8 @@ class LayerModel(QAbstractItemModel):
     didAddImageDataset = pyqtSignal(LayerItem, ProductDataset)
     didAddLinesDataset = pyqtSignal(LayerItem, ProductDataset)
     didAddPointsDataset = pyqtSignal(LayerItem, ProductDataset)
+
+    didAddSystemLayer = pyqtSignal(LayerItem)
 
     # ------------------ Changing properties of existing layers ----------------
     # didChangeColormap = pyqtSignal(dict)
@@ -60,6 +63,32 @@ class LayerModel(QAbstractItemModel):
         self.layers: List[LayerItem] = []
 
         self._supportedRoles = [Qt.DisplayRole]
+
+    def _init_system_layer(self, name):
+        # The minimal 'dataset' information required by LayerItem
+        # initialization:
+        pseudo_info = frozendict({Info.KIND: Kind.LINES,
+                                  Info.PLATFORM: Platform.SYSTEM,
+                                  Info.INSTRUMENT: Instrument.GENERATED,
+                                  "name": name})
+
+        presentation = Presentation(uuid=None, kind=Kind.LINES)
+
+        system_layer = LayerItem(self, pseudo_info, presentation)
+
+        self.didCreateLayer.emit(system_layer)
+        self.add_layer(system_layer)
+        self.didAddSystemLayer.emit(system_layer)
+
+    def init_system_layers(self):
+        """ Create layers whose existence is controlled by the system, not
+        by the user.
+
+        Currently two system layers are set up, one for a latitude/longitude
+        grid, the second for political borders.
+        """
+        for dataset_name in [LATLON_GRID_DATASET_NAME, BORDERS_DATASET_NAME]:
+            self._init_system_layer(dataset_name)
 
     def data(self, index: QModelIndex, role: int = None):
         if not index.isValid():
