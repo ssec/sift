@@ -1,6 +1,6 @@
 import logging
 import struct
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from uuid import UUID
 
 from PyQt5.QtCore import (QAbstractItemModel, Qt, QModelIndex, pyqtSignal,
@@ -368,6 +368,14 @@ class LayerModel(QAbstractItemModel):
                     product_dataset.is_active = False
                 self.didActivateProductDataset.emit(product_dataset.uuid,
                                                     product_dataset.is_active)
+
+    def get_active_datasets(self) -> List[ProductDataset]:
+        datasets = []
+        for layer in self.layers:
+            pds = [pd for pd in layer.timeline.values()
+                   if pd.is_active]
+            datasets.extend(pds)
+        return datasets
 
     @staticmethod
     def _build_presentation_change_dict(layer: LayerItem,
