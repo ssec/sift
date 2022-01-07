@@ -1113,6 +1113,8 @@ class Main(QtWidgets.QMainWindow):
 
         self.scene_manager.animation_controller.connect_to_model(
             self.layer_model)
+        self.layer_model.didActivateProductDataset.connect(
+            self.scene_manager.change_dataset_visible)
 
         self.ui.treeView.setModel(self.layer_model)
 

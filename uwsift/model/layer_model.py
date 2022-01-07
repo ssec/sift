@@ -46,6 +46,8 @@ class LayerModel(QAbstractItemModel):
     # --------------------------------------------------------------------------
     # didChangeImageKind = pyqtSignal(dict)
 
+    didActivateProductDataset = pyqtSignal(UUID, bool)
+
     def __init__(self, parent=None, policy=None):
         """
         Model for a "flat" layer tree (list/table of layers)

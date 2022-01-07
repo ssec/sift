@@ -906,6 +906,9 @@ class SceneGraphManager(QObject):
         #  opacities have to be mixed then. This cannot be done here though
         self.update()
 
+    def change_dataset_visible(self, dataset_uuid: UUID, visible: bool):
+        self.dataset_nodes[dataset_uuid].visible = visible
+
     @staticmethod
     def _overwrite_with_test_pattern(data):
         """
