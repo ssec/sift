@@ -784,7 +784,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         def _then_show_frames_in_document(doc=self.doc, frames=frames):
             """finally-do-this section back on UI thread
             """
-            [self.doc.activate_product_uuid_as_new_layer(frame) for frame in frames]
+            [self.doc.activate_product_uuid_as_new_dataset(frame) for frame in frames]
             return
             # ensure that the track these frames belongs to is activated itself
             # update the timeline view states of these frames to show them as active as well
@@ -1644,15 +1644,20 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             range(old_layer_count)))  # FIXME: this should obey insert_before, currently assumes always insert at top
         return p, reordered_indices
 
-    def activate_product_uuid_as_new_layer(self, uuid: UUID, insert_before=0, **importer_kwargs):
+    def activate_product_uuid_as_new_dataset(self, uuid: UUID, insert_before=0,
+                                             **importer_kwargs):
         if uuid in self._layer_with_uuid:
             LOG.debug("Layer already loaded: {}".format(uuid))
-            active_content_data = self._workspace.import_product_content(uuid, **importer_kwargs)
+            active_content_data = \
+                self._workspace.import_product_content(uuid, **importer_kwargs)
             return uuid, self[uuid], active_content_data
 
-        # FUTURE: Load this async, the slots for the below signal need to be OK with that
-        active_content_data = self._workspace.import_product_content(uuid, **importer_kwargs)
-        # updated metadata with content information (most importantly nav information)
+        # FUTURE: Load this async, the slots for the below signal need to be OK
+        # with that
+        active_content_data = \
+            self._workspace.import_product_content(uuid, **importer_kwargs)
+        # updated metadata with content information (most importantly navigation
+        # information)
         info = self._workspace.get_info(uuid)
         assert (info is not None)
         LOG.debug('cell_width: {}'.format(repr(info[Info.CELL_WIDTH])))
@@ -1663,7 +1668,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             dataset[Info.UNIT_CONVERSION] = units_conversion(dataset)
         if Info.FAMILY not in dataset:
             dataset[Info.FAMILY] = self.family_for_product_or_layer(dataset)
-        presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
+        presentation, reordered_indices = \
+            self._insert_layer_with_info(dataset, insert_before=insert_before)
 
         if dataset[Info.KIND] == Kind.LINES:
             self.didAddLinesDataset.emit(reordered_indices, dataset.uuid, presentation)
@@ -1830,7 +1836,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 LOG.warning("layer with UUID {} already in document?".format(uuid))
                 self._workspace.get_content(uuid)
             else:
-                self.activate_product_uuid_as_new_layer(uuid, insert_before=insert_before, **importer_kwargs)
+                self.activate_product_uuid_as_new_dataset(uuid, insert_before=insert_before, **importer_kwargs)
 
             yield {
                 TASK_DOING: 'Loading content {}/{}'.format(dex + 1, total_products),

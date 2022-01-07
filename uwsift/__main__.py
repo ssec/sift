@@ -519,7 +519,7 @@ class Main(QtWidgets.QMainWindow):
         if not uuids:
             return
         for uuid in uuids:
-            self.document.activate_product_uuid_as_new_layer(uuid)
+            self.document.activate_product_uuid_as_new_dataset(uuid)
         uuid = uuids[-1]
         self.layer_list_model.select([uuid])
         # set the animation based on the last added (topmost) layer
