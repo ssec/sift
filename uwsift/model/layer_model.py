@@ -356,6 +356,17 @@ class LayerModel(QAbstractItemModel):
         self.revert()
         self.layoutChanged.emit()
 
+    def on_didMatchTimes(self, t_matched_dict: dict):  # noqa
+        for layer_uuid, active_dataset_uuids in t_matched_dict.items():
+            layer = self.get_layer_by_uuid(layer_uuid)
+            for product_dataset in layer.timeline.values():
+                if product_dataset.uuid in active_dataset_uuids:
+                    product_dataset.is_active = True
+                else:
+                    product_dataset.is_active = False
+                self.didActivateProductDataset.emit(product_dataset.uuid,
+                                                    product_dataset.is_active)
+
 
 class ProductFamilyKeyMappingPolicy:
     def __init__(self, model: LayerModel):

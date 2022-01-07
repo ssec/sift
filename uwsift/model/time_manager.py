@@ -66,6 +66,9 @@ class TimeManager(QObject):
         policy = WrappingDrivingPolicy(self._layer_model.layers)
         layer_model.didUpdateLayers.connect(policy.on_layers_update)
         layer_model.didUpdateLayers.connect(self.update_qml_layer_model)
+
+        self.didMatchTimes.connect(self._layer_model.on_didMatchTimes)
+
         policy.didUpdatePolicy.connect(self.update_qml_timeline)
         self._time_transformer = TimeTransformer(policy)
 
