@@ -27,9 +27,10 @@ class TimeManager:
               from collection
             - Image is displayed
     """
-    def __init__(self, collection: DataLayerCollection, animation_speed,
-                 matching_policy=find_nearest_past):
-        self._collection = collection
+    def __init__(self, animation_speed, matching_policy=find_nearest_past):
+        self._animation_speed = animation_speed
+        self._time_matcher = TimeMatcher(matching_policy)
+
         self.qml_root_object = None
         self.qml_engine = None
         self._qml_backend = None
@@ -44,10 +45,6 @@ class TimeManager:
         self.timeStampQStringModel = QStringListModel()
         self._animation_speed = animation_speed
         self._time_transformer = None
-        self._init_collection(collection)
-        self._animation_speed = animation_speed
-
-        self._time_matcher = TimeMatcher(matching_policy)
 
     @property
     def qml_backend(self) -> QmlBackend:
@@ -67,10 +64,6 @@ class TimeManager:
         self._collection.didUpdateCollection.connect(self.update_qml_collection_representation)
         policy.didUpdatePolicy.connect(self.update_qml_timeline)
         self._time_transformer = TimeTransformer(policy)
-
-    @property
-    def collection(self):
-        return self._collection
 
     def jump(self, index):
         self._time_transformer.jump(index)
