@@ -1,6 +1,6 @@
 import logging
 import struct
-from typing import List, Optional, Tuple
+from typing import List, Optional
 from uuid import UUID
 
 from PyQt5.QtCore import (QAbstractItemModel, Qt, QModelIndex, pyqtSignal,
@@ -369,13 +369,28 @@ class LayerModel(QAbstractItemModel):
                 self.didActivateProductDataset.emit(product_dataset.uuid,
                                                     product_dataset.is_active)
 
-    def get_active_datasets(self) -> List[ProductDataset]:
-        datasets = []
-        for layer in self.layers:
-            pds = [pd for pd in layer.timeline.values()
-                   if pd.is_active]
-            datasets.extend(pds)
-        return datasets
+    def get_probeable_layers(self) -> List[LayerItem]:
+        """ Get LayerItems which may contain data suitable for probing
+        operations.
+
+        Currently only single channel raster data can be point or region probed,
+        thus the layer must be one capable of carrying datasets of kind IMAGE or
+        COMPOSITE.
+        """
+        return [layer for layer in self.layers
+                if layer.kind in [Kind.IMAGE, Kind.COMPOSITE]]
+
+    def get_top_probeable_layer(self) -> Optional[LayerItem]:
+        probeable_layers = self.get_probeable_layers()
+        return None if len(probeable_layers) == 0 \
+            else probeable_layers[0]
+
+    def get_top_probeable_layer_with_active_product_dataset(self) \
+            -> Tuple[Optional[LayerItem], Optional[ProductDataset]]:
+        top_probeable_layer = self.get_top_probeable_layer()
+        return (None, None) if top_probeable_layer is None \
+            else (top_probeable_layer,
+                  top_probeable_layer.get_first_active_product_dataset())
 
     @staticmethod
     def _build_presentation_change_dict(layer: LayerItem,

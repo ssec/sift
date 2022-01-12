@@ -247,3 +247,18 @@ class LayerItem:
 
     def get_datasets_uuids(self) -> List[UUID]:
         return [pd.uuid for pd in self.timeline.values()]
+
+    def get_active_product_datasets(self) -> List[ProductDataset]:
+        return [pd for pd in self.timeline.values() if pd.is_active]
+
+    def get_first_active_product_dataset(self) -> Optional[ProductDataset]:
+        active_product_datasets = self.get_active_product_datasets()
+        num_active_product_datasets = len(active_product_datasets)
+        # TODO: For now we do not support multiple active datasets per layer
+        #  but this is likely to change in the future (e.g. for Lightning
+        #  products). Let's make sure that any change in this regard doesn't
+        #  go unnoticed here, thus:
+        assert num_active_product_datasets <= 1
+
+        return None if num_active_product_datasets == 0 \
+            else active_product_datasets[0]

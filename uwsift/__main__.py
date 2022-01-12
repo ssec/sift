@@ -629,7 +629,10 @@ class Main(QtWidgets.QMainWindow):
 
     def update_point_probe_text(self, probe_name, state=None, xy_pos=None, uuid=None, animating=None):
         if uuid is None:
-            uuid = self.document.current_visible_layer_uuid
+            top_probeable_layer, product_dataset = self.layer_model\
+                .get_top_probeable_layer_with_active_product_dataset()
+            uuid = None if product_dataset is None \
+                else product_dataset.uuid
         if state is None or xy_pos is None:
             _state, _xy_pos = self.graphManager.current_point_probe_status(probe_name)
             if state is None:
@@ -663,7 +666,7 @@ class Main(QtWidgets.QMainWindow):
                 data_str = "N/A"
                 layer_str = "N/A"
             else:
-                info = self.document[uuid]
+                info = top_probeable_layer.info
                 unit_info = info[Info.UNIT_CONVERSION]
                 data_point = unit_info[1](data_point)
                 data_str = unit_info[2](data_point, numeric=False)
