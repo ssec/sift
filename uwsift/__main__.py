@@ -652,7 +652,7 @@ class Main(QtWidgets.QMainWindow):
         elif state and uuid is not None:
             try:
                 data_point = self.workspace.get_content_point(uuid, xy_pos)
-                col, row = self.workspace._position_to_grid_index(uuid, xy_pos)
+                col, row = self.workspace.position_to_grid_index(uuid, xy_pos)
             except ValueError:
                 LOG.debug("Could not get data value", exc_info=True)
                 data_point = None

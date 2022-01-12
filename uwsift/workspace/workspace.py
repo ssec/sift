@@ -688,7 +688,7 @@ class BaseWorkspace(QObject):
         )
         return row, column
 
-    def _position_to_grid_index(self, dsi_or_uuid, xy_pos) -> Tuple[int, int]:
+    def position_to_grid_index(self, dsi_or_uuid, xy_pos) -> Tuple[int, int]:
         """Calculate the satellite grid index from lon/lat values"""
         info = self.get_info(dsi_or_uuid)
         if info is None:
