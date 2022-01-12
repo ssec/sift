@@ -669,7 +669,7 @@ class BaseWorkspace(QObject):
         )
         return affine
 
-    def _position_to_index(self, dsi_or_uuid, xy_pos):
+    def _position_to_data_index(self, dsi_or_uuid, xy_pos) -> Tuple[int, int]:
         """Calculate the sift-internal data index from lon/lat values"""
         info = self.get_info(dsi_or_uuid)
         if info is None:
@@ -686,6 +686,15 @@ class BaseWorkspace(QObject):
         row = np.int64(np.floor(
             (y - info[Info.ORIGIN_Y]) / info[Info.CELL_HEIGHT])
         )
+        return row, column
+
+    def _position_to_grid_index(self, dsi_or_uuid, xy_pos) -> Tuple[int, int]:
+        """Calculate the satellite grid index from lon/lat values"""
+        info = self.get_info(dsi_or_uuid)
+        if info is None:
+            return None, None
+
+        row, column = self._position_to_data_index(dsi_or_uuid, xy_pos)
 
         grid_origin = info[Info.GRID_ORIGIN]
         grid_first_index_of_rows = info[Info.GRID_FIRST_INDEX_Y]
@@ -714,7 +723,7 @@ class BaseWorkspace(QObject):
         return points
 
     def get_content_point(self, dsi_or_uuid, xy_pos):
-        row, col = self._position_to_index(dsi_or_uuid, xy_pos)
+        row, col = self._position_to_data_index(dsi_or_uuid, xy_pos)
         if row is None or col is None:
             return None
         data = self.get_content(dsi_or_uuid)
