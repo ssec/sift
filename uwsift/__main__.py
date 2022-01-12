@@ -995,7 +995,7 @@ class Main(QtWidgets.QMainWindow):
         self.graphManager.didChangeTab.connect(self.scene_manager.show_only_polygons)
         self.graphManager.didClonePolygon.connect(self.scene_manager.copy_polygon)
         self.graphManager.pointProbeChanged.connect(self.scene_manager.on_point_probe_set)
-        self.graphManager.pointProbeChanged.connect(self.document.update_equalizer_values)
+        self.graphManager.pointProbeChanged.connect(self.layer_model.on_point_probe_set)
         self.graphManager.pointProbeChanged.connect(self.update_point_probe_text)
         self.graphManager.pointProbeChanged.connect(self.graphManager.update_point_probe_graph)
 
@@ -1090,7 +1090,7 @@ class Main(QtWidgets.QMainWindow):
 
     def _init_layer_model(self):
 
-        self.layer_model = LayerModel()
+        self.layer_model = LayerModel(self.workspace)
 
         self.document.didAddDataset.connect(self.layer_model.add_dataset)
 
