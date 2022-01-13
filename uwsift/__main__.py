@@ -1006,6 +1006,10 @@ class Main(QtWidgets.QMainWindow):
         self.document.didAddBasicDataset.connect(_update_point_probe_slot)
         self.document.didAddCompositeDataset.connect(_update_point_probe_slot)
 
+        self.layer_model.didReorderLayers.connect(_update_point_probe_slot)
+        self.scene_manager.animation_controller.time_manager.didMatchTimes\
+            .connect(_update_point_probe_slot)
+
         # FIXME: These were added as a simple fix to update the probe value on layer changes, but this should really
         #        have its own manager-like object
         def _blackhole(*args, **kwargs):
