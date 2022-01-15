@@ -124,7 +124,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
         bounds = painter.drawText(rect.left() + LEFT_OFFSET,
                                   rect.top() + TOP_OFFSET,
                                   rect.width() - LEFT_OFFSET,
-                                  CELL_HEIGHT / 2 - TOP_OFFSET,
+                                  int(CELL_HEIGHT / 2 - TOP_OFFSET),
                                   Qt.AlignLeft,
                                   text,
                                   )
@@ -135,7 +135,7 @@ class LayerWidgetDelegate(QStyledItemDelegate):
             ao_rect = QRect(bounds.right(),
                             rect.top() + TOP_OFFSET,
                             rect.width() - bounds.right(),
-                            CELL_HEIGHT / 2 - TOP_OFFSET,
+                            int(CELL_HEIGHT / 2 - TOP_OFFSET),
                             )
             # draw the text once to get the bounding rectangle
             bounds = painter.drawText(ao_rect,
