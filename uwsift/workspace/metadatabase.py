@@ -40,7 +40,8 @@ import logging
 import os
 import sys
 import unittest
-from collections import MutableMapping, defaultdict
+from collections import defaultdict
+from collections.abc import MutableMapping
 from datetime import datetime
 from functools import reduce
 from uuid import UUID

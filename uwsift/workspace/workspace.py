@@ -40,7 +40,8 @@ FUTURE import sequence:
 import logging
 import os
 import shutil
-from collections import Mapping as ReadOnlyMapping, defaultdict, OrderedDict
+from collections import defaultdict, OrderedDict
+from collections.abc import Mapping as ReadOnlyMapping
 from datetime import datetime, timedelta
 from typing import Mapping, Generator, Tuple, Dict
 from uuid import UUID, uuid1 as uuidgen
