@@ -1017,7 +1017,7 @@ class Main(QtWidgets.QMainWindow):
             # set the selection for the probe plot to the top visible layer(s)
             # new tabs should clone the information from the currently selected tab
             # the call below will check if this is a new polygon
-            self.graphManager.set_default_layer_selections(*top_uuids)
+            self.graphManager.set_default_layer_selections(top_uuids)
 
             # update our current plot with the new polygon
             polygon_name = self.graphManager.current_graph_set_region(polygon_points=points)
@@ -1048,7 +1048,7 @@ class Main(QtWidgets.QMainWindow):
             LOG.debug("top visible UUID is {0!r:s}".format(top_uuids))
             # TODO, when the plots manage their own layer selection, change this
             #  call (see update_probe_polygon())
-            self.graphManager.set_default_layer_selections(*top_uuids)
+            self.graphManager.set_default_layer_selections(top_uuids)
 
             must_remove_polygon = self.graphManager.current_graph_has_polygon()
             current_graph_name = self.graphManager.current_graph_set_region(select_full_data=True)

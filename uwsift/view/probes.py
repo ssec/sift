@@ -165,7 +165,8 @@ class ProbeGraphManager(QObject):
         if self.selected_graph_index != tab_index:
             # if we aren't setting up the initial tab, clone the current tab
             current_graph = self.graphs[self.selected_graph_index]
-            graph.set_default_layer_selections(current_graph.xSelectedUUID, current_graph.ySelectedUUID)
+            graph.set_default_layer_selections([current_graph.xSelectedUUID,
+                                                current_graph.ySelectedUUID])
             # give it a copy of the current full_data_selection or polygon
             if current_graph.full_data_selection:
                 graph.setRegion(select_full_data=graph.full_data_selection)
@@ -270,10 +271,10 @@ class ProbeGraphManager(QObject):
         state = state if state is not None else not old_state
         self.update_point_probe(probe_name, state=state)
 
-    def set_default_layer_selections(self, *uuids):
+    def set_default_layer_selections(self, uuids):
         """Set the UUIDs for the current graph if it doesn't have a polygon
         """
-        return self.graphs[self.selected_graph_index].set_default_layer_selections(*uuids)
+        return self.graphs[self.selected_graph_index].set_default_layer_selections(uuids)
 
     def handle_tab_change(self):
         """deal with the fact that the tab changed in the tab widget
@@ -456,7 +457,7 @@ class ProbeGraphDisplay(object):
             # Rebuild the plot (stale is used to determine if actual rebuild is needed)
             self.rebuildPlot()
 
-    def set_default_layer_selections(self, *layer_uuids):
+    def set_default_layer_selections(self, layer_uuids):
         # only set the defaults if we don't have a polygon yet
         if self.polygon is not None:
             return
