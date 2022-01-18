@@ -1008,7 +1008,7 @@ class Main(QtWidgets.QMainWindow):
         self.scene_manager.animation_controller.time_manager.didMatchTimes\
             .connect(lambda *args: self.graphManager.update_point_probe())
 
-        def update_probe_polygon(uuid, points, layerlist=self.layer_list_model):
+        def update_probe_polygon(points):
             top_uuids = list(self.document.current_visible_layer_uuids)
             LOG.debug("top visible UUID is {0!r:s}".format(top_uuids))
 
