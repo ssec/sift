@@ -163,7 +163,7 @@ def _unit_format_func(layer, units):
 def preferred_units(dsi: DocBasicDataset) -> str:
     """
     Return unit string (i.e.: Kelvin) for a Product currently being loaded.
-    :param dsi: DocBasicLayer describing the product currently being added.
+    :param dsi: DocBasicDataset describing the product currently being added.
     :return: String describing the preferred unit for the product described in dsi.
     """
     # FUTURE: Use cfunits or cf_units package
@@ -2829,7 +2829,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def get_unique_product_family_keys(self) -> typ.List[typ.Tuple]:
         """
         Return list of unique product_family_keys in i.e. document._layer_with_uuid's
-        DocBasicLayers.
+        DocBasicDatasets.
         :return: unique_product_family_keys
         """
         prod_fam_keys = [dbl.product_family_key for dbl in self._layer_with_uuid.values()]
@@ -2843,7 +2843,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def create_data_layers(self) -> typ.List[DataLayer]:
         """
             Adds data layers to document, based on currently present
-            uuid -> DocBasicLayer (document._layer_with_uuid) mappings.
+            uuid -> DocBasicDataset (document._layer_with_uuid) mappings.
             :return: data_layers: typ.List of data layers to be incorporated into DataLayerCollection.
         """
         pf_keys: typ.List[typ.Tuple] = [dbl.product_family_key for dbl in self._layer_with_uuid.values()]
