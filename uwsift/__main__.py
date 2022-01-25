@@ -992,6 +992,8 @@ class Main(QtWidgets.QMainWindow):
 
     def _init_point_polygon_probes(self):
         self.graphManager = ProbeGraphManager(self.ui.probeTabWidget,
+                                              self.ui.autoUpdateCheckbox,
+                                              self.ui.updateButton,
                                               self.workspace, self.layer_model,
                                               self.queue)
         self.graphManager.didChangeTab.connect(self.scene_manager.show_only_polygons)

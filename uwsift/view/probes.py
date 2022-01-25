@@ -16,7 +16,7 @@ import logging
 from PyQt5 import QtWidgets
 
 import numpy as np
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt5.QtCore import QObject, pyqtSignal, Qt
 # http://stackoverflow.com/questions/12459811/how-to-embed-matplotib-in-pyqt-for-dummies
 # see also: http://matplotlib.org/users/navigation_toolbar.html
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -90,10 +90,21 @@ class ProbeGraphManager(QObject):
     drawChildGraph = pyqtSignal(str, )
     pointProbeChanged = pyqtSignal(str, bool, tuple)
 
-    def __init__(self, tab_widget, workspace, layer_model: LayerModel, queue):
-        """Setup our tab widget with an appropriate graph object in the first tab.
+    def __init__(self, tab_widget, auto_update_checkbox, update_button,
+                 workspace, layer_model: LayerModel, queue):
+        """Setup our tab widget with an appropriate graph object in the first
+        tab.
 
-        FUTURE, once we are saving our graph configurations, load those instead of setting up this default.
+        FUTURE, once we are saving our graph configurations, load those instead
+        of setting up this default.
+
+        :param auto_update_checkbox: the QCheckBox defined in the pov_main.ui
+               file. It's logic - to switch on/off automatic update of graphs
+               is managed here
+
+        :param update_button: the QButton defined in the pov_main.ui
+               file to trigger manual graph updates in case auto_update_checkbox
+               is off.
         """
 
         super(ProbeGraphManager, self).__init__(tab_widget)
@@ -107,6 +118,8 @@ class ProbeGraphManager(QObject):
         self.tab_widget_object = tab_widget
         if self.tab_widget_object.count() != 1:
             LOG.info("Unexpected number of tabs in the QTabWidget used for the Area Probe Graphs.")
+        self.auto_update_checkbox = auto_update_checkbox
+        self.update_button = update_button
         # hold on to point probe locations (point probes are shared across tabs)
         self.point_probes = {}
 
@@ -122,10 +135,15 @@ class ProbeGraphManager(QObject):
 
         # hook up the various layer_model signals that would mean we need to
         # reload things
-        self.layer_model.didUpdateLayers.connect(
+        #self.layer_model.didUpdateLayers.connect(
+        #    self.handleActiveProductDatasetsChanged)
+        auto_update_checkbox.setCheckState(Qt.Checked)
+
+        # hook up auto update vs manual update changes
+        self.update_button.clicked.connect(
             self.handleActiveProductDatasetsChanged)
-        self.layer_model.didFinishActivateProductDatasets.connect(
-            self.handleActiveProductDatasetsChanged)
+        self.auto_update_checkbox.stateChanged.connect(
+            self.autoUpdateStateChanged)
 
     def draw_child(self, child_name):
         for child in self.graphs:
@@ -294,6 +312,20 @@ class ProbeGraphManager(QObject):
 
         currentName = self.graphs[self.selected_graph_index].getName()
         self.didChangeTab.emit((currentName,))
+
+    def autoUpdateStateChanged(self, state):
+        if self.auto_update_checkbox.isChecked():
+            self.update_button.setEnabled(False)
+            self.layer_model.didFinishActivateProductDatasets.connect(
+                self.handleActiveProductDatasetsChanged
+            )
+            self.pointProbeChanged.connect(self.update_point_probe_graph)
+        else:
+            self.layer_model.didFinishActivateProductDatasets.disconnect(
+                self.handleActiveProductDatasetsChanged
+            )
+            self.pointProbeChanged.disconnect(self.update_point_probe_graph)
+            self.update_button.setEnabled(True)
 
 
 class ProbeGraphDisplay(object):
