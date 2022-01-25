@@ -1312,10 +1312,22 @@ Checking this deactivates the Update button.</string>
           <x>0</x>
           <y>0</y>
           <width>262</width>
-          <height>537</height>
+          <height>612</height>
          </rect>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_33">
+         <item>
+          <widget class="QGroupBox" name="nameGroupBox">
+           <property name="title">
+            <string>Name</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_13">
+            <item>
+             <widget class="QLineEdit" name="nameEdit"/>
+            </item>
+           </layout>
+          </widget>
+         </item>
          <item>
           <widget class="QGroupBox" name="redGroupBox">
            <property name="title">
