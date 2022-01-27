@@ -30,6 +30,8 @@ class LayerTreeView(QTreeView):
                                       self.visibility_delegate)
         self.setEditTriggers(QAbstractItemView.AllEditTriggers)
 
+        self.customContextMenuRequested.connect(self.openMenu)
+
     def resizeColumnsToContents(self) -> None:  # noqa
         """Resize all columns to their current contents of the model."""
         # Note:  Currently this method is useless because of the
