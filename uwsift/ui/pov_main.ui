@@ -1743,6 +1743,9 @@
       <layout class="QVBoxLayout" name="verticalLayout_11">
        <item>
         <widget class="LayerTreeView" name="treeView">
+         <property name="contextMenuPolicy">
+          <enum>Qt::CustomContextMenu</enum>
+         </property>
          <property name="dragDropMode">
           <enum>QAbstractItemView::InternalMove</enum>
          </property>

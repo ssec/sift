@@ -770,6 +770,7 @@ class Ui_MainWindow(object):
         self.verticalLayout_11 = QtWidgets.QVBoxLayout()
         self.verticalLayout_11.setObjectName("verticalLayout_11")
         self.treeView = LayerTreeView(self.dockWidgetContents_3)
+        self.treeView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.treeView.setDragDropMode(QtWidgets.QAbstractItemView.InternalMove)
         self.treeView.setAlternatingRowColors(True)
         self.treeView.setObjectName("treeView")
