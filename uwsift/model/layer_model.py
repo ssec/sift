@@ -26,9 +26,9 @@ class LayerModel(QAbstractItemModel):
     didAddSystemLayer = pyqtSignal(LayerItem)
 
     # ------------------ Changing properties of existing layers ----------------
-    # didChangeColormap = pyqtSignal(dict)
-    # didChangeColorLimits = pyqtSignal(dict)
-    # didChangeGamma = pyqtSignal(dict)
+    didChangeColormap = pyqtSignal(dict)
+    didChangeColorLimits = pyqtSignal(dict)
+    didChangeGamma = pyqtSignal(dict)
     didChangeLayerVisible = pyqtSignal(UUID, bool)
     didChangeLayerOpacity = pyqtSignal(UUID, float)
 
@@ -368,6 +368,31 @@ class LayerModel(QAbstractItemModel):
                     product_dataset.is_active = False
                 self.didActivateProductDataset.emit(product_dataset.uuid,
                                                     product_dataset.is_active)
+
+    @staticmethod
+    def _build_presentation_change_dict(layer: LayerItem,
+                                        presentation_element: object):
+        product_datasets_uuids = layer.get_datasets_uuids()
+        return {pd_uuid: presentation_element
+                for pd_uuid in product_datasets_uuids}
+
+    def change_colormap_for_layer(self, uuid: UUID, colormap: object):
+        layer = self.get_layer_by_uuid(uuid)
+        layer.colormap = colormap
+        change_dict = self._build_presentation_change_dict(layer, colormap)
+        self.didChangeColormap.emit(change_dict)
+
+    def change_color_limits_for_layer(self, uuid: UUID, color_limits: object):
+        layer = self.get_layer_by_uuid(uuid)
+        layer.climits = color_limits
+        change_dict = self._build_presentation_change_dict(layer, color_limits)
+        self.didChangeColorLimits.emit(change_dict)
+
+    def change_gamma_for_layer(self, uuid: UUID, gamma: float):
+        layer = self.get_layer_by_uuid(uuid)
+        layer.gamma = gamma
+        change_dict = self._build_presentation_change_dict(layer, gamma)
+        self.didChangeGamma.emit(change_dict)
 
 
 class ProductFamilyKeyMappingPolicy:

@@ -1,7 +1,7 @@
 import logging
 from types import MappingProxyType
-from typing import Optional, Tuple
-from uuid import uuid1
+from typing import List, Optional, Tuple
+from uuid import uuid1, UUID
 
 from uwsift import config
 from uwsift.common import Presentation, N_A, Info, LayerModelColumns as LMC, \
@@ -200,3 +200,6 @@ class LayerItem:
     def _sort_timeline(self):
         self._timeline = {kv[0]: kv[1] for kv in sorted(self._timeline.items(),
                                                         key=lambda kv: kv[0])}
+
+    def get_datasets_uuids(self) -> List[UUID]:
+        return [pd.uuid for pd in self.timeline.values()]
