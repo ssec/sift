@@ -1,7 +1,9 @@
 import logging
+import struct
 from typing import List
 
-from PyQt5.QtCore import (QAbstractItemModel, Qt, QModelIndex, pyqtSignal)
+from PyQt5.QtCore import (QAbstractItemModel, Qt, QModelIndex, pyqtSignal,
+                          QMimeData)
 
 from uwsift.common import LAYER_TREE_VIEW_HEADER, Presentation, Info, Kind, \
     LATLON_GRID_DATASET_NAME, BORDERS_DATASET_NAME, Platform, Instrument
@@ -103,10 +105,14 @@ class LayerModel(QAbstractItemModel):
     def flags(self, index):
         if index.isValid():
             flags = (Qt.ItemIsEnabled |
-                     Qt.ItemIsSelectable)
+                     Qt.ItemIsSelectable |
+                     Qt.ItemIsDragEnabled)
         else:
-            flags = Qt.NoItemFlags
+            flags = Qt.ItemIsDropEnabled
         return flags
+
+    def supportedDropActions(self):
+        return Qt.MoveAction
 
     def headerData(self, section: int, orientation, role=None):
 
@@ -214,6 +220,59 @@ class LayerModel(QAbstractItemModel):
                 raise NotImplementedError(
                     f"Managing datasets of kind {product_dataset.kind}"
                     f" not (yet) supported.")
+
+    def mimeTypes(self):
+        return ['text/plain', 'text/xml']
+
+    def mimeData(self, indexes):
+        mime_data = QMimeData()
+        rows = list(set([index.row() for index in indexes]))
+        row_bytes = struct.pack("<I", rows[0])
+        mime_data.setData('text/plain', row_bytes)
+        return mime_data
+
+    def dropMimeData(self, mime_data, action, row, column, parentIndex):
+        if action == Qt.IgnoreAction:
+            return True
+        if action != Qt.MoveAction:
+            return False
+
+        source_row = struct.unpack("<I", mime_data.data('text/plain'))[0]
+
+        if row != -1:  # we may also interpret this as put to the end
+            target_row = row
+        elif parentIndex.isValid():
+            assert not parentIndex.isValid(), \
+                "BUG: hierarchical layers not implemented," \
+                " dropping on a parent must not yet occur!"
+            # This case needs modification when hierarchical layers are
+            # introduced.
+            target_row = parentIndex.row()  # just to keep the linter calm
+        else:
+            target_row = self.rowCount(QModelIndex())
+
+        move_is_possible = \
+            self.beginMoveRows(QModelIndex(), source_row, source_row,
+                               parentIndex, target_row)
+        if not move_is_possible:
+            return False
+
+        # According to https://doc.qt.io/qt-5/qabstractitemmodel.html#beginMoveRows
+        # now we can assert ...
+        assert not source_row <= target_row <= source_row + 1
+
+        if source_row < target_row:
+            target_row -= 1
+        self.layers.insert(target_row, self.layers.pop(source_row))
+        self.endMoveRows()
+        self._refresh()
+
+        return True
+
+    def _refresh(self):
+        self.layoutAboutToBeChanged.emit()
+        self.revert()
+        self.layoutChanged.emit()
 
 
 class ProductFamilyKeyMappingPolicy:

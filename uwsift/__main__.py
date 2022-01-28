@@ -1109,8 +1109,12 @@ class Main(QtWidgets.QMainWindow):
         for column in range(self.layer_model.columnCount()):
             self.ui.treeView.resizeColumnToContents(column)
 
+        self.ui.treeView.setDragEnabled(True)
         self.ui.treeView.setRootIsDecorated(False)
+        self.ui.treeView.setAcceptDrops(True)
+        self.ui.treeView.setDropIndicatorShown(True)
         self.ui.treeView.setSelectionMode(self.ui.treeView.SingleSelection)
+        self.ui.treeView.setDragDropMode(self.ui.treeView.InternalMove)
 
         self.layer_model.init_system_layers()
 
