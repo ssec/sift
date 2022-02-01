@@ -120,7 +120,7 @@ class ChangeColormapDialog(QtWidgets.QDialog):
         return (slider_val / self._slider_steps) * (self.valid_max - self.valid_min) + self.valid_min
 
     def _create_slider_value(self, channel_val):
-        return ((channel_val - self.valid_min) / (self.valid_max - self.valid_min)) * self._slider_steps
+        return int((channel_val - self.valid_min) / (self.valid_max - self.valid_min)) * self._slider_steps
 
     def _init_vmin_slider(self):
         current_vmin = self._initial_clims[0]
