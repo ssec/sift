@@ -164,6 +164,7 @@ class QFramesInTracksScene(QGraphicsScene):
         pass
 
     def sceneRectChanged(self, new_rect: QRectF):
+        """Update tracks when scene rect changes."""
         self._align_tracks_to_scene_rect(new_rect, False)
         super(QFramesInTracksScene, self).sceneRectChanged(new_rect)
 

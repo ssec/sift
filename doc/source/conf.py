@@ -54,6 +54,23 @@ autodoc_mock_imports = [
 seqdiag_fontpath = os.path.abspath('./source/fonts/DejaVuSerif.ttf')
 
 
+def _skip_pyqtsignal_doc(app, what, name, obj, skip, options):
+    # see https://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html#event-autodoc-skip-member
+    if what == "class" and "pyqtSignal" in obj.__class__.__name__:
+        return True
+    # fallback to other handlers or autodoc default
+    return None
+
+
+def setup(app):
+    """Global setup function for sphinx documentation.
+
+    Connect to autodoc event so invalid pyqtSignal docs can be skipped.
+
+    """
+    app.connect('autodoc-skip-member', _skip_pyqtsignal_doc)
+
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
@@ -228,25 +245,25 @@ htmlhelp_basename = 'SIFTdoc'
 # -- Options for LaTeX output ---------------------------------------------
 
 latex_elements = {
-# The paper size ('letterpaper' or 'a4paper').
-#'papersize': 'letterpaper',
+    # The paper size ('letterpaper' or 'a4paper').
+    #'papersize': 'letterpaper',
 
-# The font size ('10pt', '11pt' or '12pt').
-#'pointsize': '10pt',
+    # The font size ('10pt', '11pt' or '12pt').
+    #'pointsize': '10pt',
 
-# Additional stuff for the LaTeX preamble.
-#'preamble': '',
+    # Additional stuff for the LaTeX preamble.
+    #'preamble': '',
 
-# Latex figure (float) alignment
-#'figure_align': 'htbp',
+    # Latex figure (float) alignment
+    #'figure_align': 'htbp',
 }
 
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-  (master_doc, 'SIFT.tex', 'SIFT Documentation',
-   'SIFT Developers', 'manual'),
+    (master_doc, 'SIFT.tex', 'SIFT Documentation',
+     'SIFT Developers', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -289,9 +306,9 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  (master_doc, 'SIFT', 'SIFT Documentation',
-   author, 'SIFT', 'One line description of project.',
-   'Miscellaneous'),
+    (master_doc, 'SIFT', 'SIFT Documentation',
+     author, 'SIFT', 'One line description of project.',
+     'Miscellaneous'),
 ]
 
 # Documents to append as an appendix to all manuals.
