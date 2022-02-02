@@ -28,7 +28,7 @@ class Ui_ExportImageDialog(object):
         self.buttonBox.setObjectName("buttonBox")
         self.frameRangeGroupBox = QtWidgets.QGroupBox(ExportImageDialog)
         self.frameRangeGroupBox.setGeometry(QtCore.QRect(10, 30, 251, 111))
-        self.frameRangeGroupBox.setAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
+        self.frameRangeGroupBox.setAlignment(int(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop))
         self.frameRangeGroupBox.setFlat(False)
         self.frameRangeGroupBox.setCheckable(False)
         self.frameRangeGroupBox.setObjectName("frameRangeGroupBox")

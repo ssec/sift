@@ -61,7 +61,8 @@ __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
 import logging
-from collections import MutableSequence, OrderedDict, defaultdict
+from collections import OrderedDict, defaultdict
+from collections.abc import MutableSequence
 from itertools import groupby, chain
 from uuid import UUID, uuid1 as uuidgen
 from datetime import datetime, timedelta

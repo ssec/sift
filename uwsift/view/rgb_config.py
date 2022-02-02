@@ -171,7 +171,7 @@ class RGBLayerConfigPane(QObject):
         return (slider_val / self._slider_steps) * (valid_max - valid_min) + valid_min
 
     def _create_slider_value(self, valid_min, valid_max, channel_val):
-        return ((channel_val - valid_min) / (valid_max - valid_min)) * self._slider_steps
+        return int((channel_val - valid_min) / (valid_max - valid_min)) * self._slider_steps
 
     def _min_max_for_color(self, rgba: str):
         """

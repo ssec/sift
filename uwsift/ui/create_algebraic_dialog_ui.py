@@ -42,7 +42,7 @@ class Ui_create_algebraic_dialog(object):
         self.formLayout.setFormAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
         self.formLayout.setObjectName("formLayout")
         self.name_label = QtWidgets.QLabel(self.formLayoutWidget)
-        self.name_label.setAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        self.name_label.setAlignment(int(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter))
         self.name_label.setObjectName("name_label")
         self.formLayout.setWidget(0, QtWidgets.QFormLayout.LabelRole, self.name_label)
         self.layer_name_edit = QtWidgets.QLineEdit(self.formLayoutWidget)

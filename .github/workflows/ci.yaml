@@ -43,6 +43,7 @@ jobs:
         with:
           miniforge-variant: Mambaforge
           miniforge-version: latest
+          python-version: "3.10"
           use-mamba: true
           environment-file: continuous_integration/environment.yaml
           activate-environment: test-environment
@@ -73,7 +74,7 @@ jobs:
         # XXX: We don't currently have OpenGL installation on other platforms
         #os: ["windows-latest", "ubuntu-latest", "macos-latest"]
         os: ["ubuntu-latest"]
-        python-version: ["3.7", "3.9"]
+        python-version: ["3.7", "3.10"]
         experimental: [false]
         include:
           - python-version: "3.9"
@@ -109,6 +110,7 @@ jobs:
           miniforge-variant: Mambaforge
           miniforge-version: latest
           use-mamba: true
+          python-version: ${{ matrix.python-version }}
           environment-file: continuous_integration/environment.yaml
           activate-environment: test-environment
 
