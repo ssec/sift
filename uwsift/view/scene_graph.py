@@ -1185,6 +1185,7 @@ class SceneGraphManager(QObject):
             color=self._color_choices[self._latlon_grid_color_idx],
             parent=layer_node
         )
+        self.latlon_grid_node.set_gl_state('translucent')
 
     def _build_borders_nodes(self, layer_node):
         """ Helper function for setting up the VisualNodes for the system
@@ -1202,6 +1203,7 @@ class SceneGraphManager(QObject):
                 color=self._color_choices[self._borders_color_idx],
                 parent=layer_node
             )
+            node.set_gl_state('translucent')
             self.borders_nodes.append(node)
 
     def add_node_for_image_dataset(self, layer: LayerItem,
@@ -1345,6 +1347,7 @@ class SceneGraphManager(QObject):
 
         lines = Lines(content,
                       parent=self.layer_nodes[layer.uuid])
+        lines.set_gl_state('translucent')
         lines.name = str(product_dataset.uuid)
 
         self.dataset_nodes[product_dataset.uuid] = lines
@@ -1376,6 +1379,7 @@ class SceneGraphManager(QObject):
         points = Markers(pos=pos,
                          parent=self.layer_nodes[layer.uuid],
                          **kwargs)
+        points.set_gl_state('translucent')  # makes no difference though
         points.name = str(product_dataset.uuid)
 
         self.dataset_nodes[product_dataset.uuid] = points
@@ -1492,9 +1496,15 @@ class SceneGraphManager(QObject):
 
     def update_layers_z(self, uuids: list):
         if self.layer_nodes:
+            # Rendering order must be set analogous to z order
+            # (higher z values -> further away), render back to front
+            # https://vispy.org/faq.html#how-to-achieve-transparency-with-2d-objects
+            z_counter = 0
             for z_level, uuid in enumerate(uuids):
                 layer_node = self.layer_nodes[uuid]
                 layer_node.transform.translate = (0, 0, 0 - z_level)
+                layer_node.order = z_counter
+                z_counter -= 1
             self.update()
 
     def remove_dataset(self, new_order: tuple, uuids_removed: tuple, row: int, count: int):
