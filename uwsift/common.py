@@ -129,6 +129,12 @@ LATLON_GRID_DATASET_NAME = "Geo-Grid"  # noqa
 BORDERS_DATASET_NAME = "Borders"
 
 
+class LayerVisibility(NamedTuple):
+    """ Combine the two parameters controlling the visibility of layers. """
+    visible: bool
+    opacity: float
+
+
 class Box(NamedTuple):
     bottom: float
     left: float
