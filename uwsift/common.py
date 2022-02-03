@@ -100,12 +100,12 @@ DEFAULT_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 N_A = 'n/a'
 
 # LayerModel column display names
-VISIBILITY = "Vis"
+VISIBILITY = ""
 SOURCE = "Satellite & Instrument"
 NAME = "Name"
-WAVELENGTH = "Wavelength"
-PROBE_VALUE = "Probe Value"
-PROBE_UNIT = "Probe Unit"
+WAVELENGTH = "λ"
+PROBE_VALUE = "Probe"
+PROBE_UNIT = "Unit"
 
 LAYER_TREE_VIEW_HEADER = [VISIBILITY,
                           SOURCE,
