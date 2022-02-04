@@ -1,6 +1,6 @@
 import logging
 import struct
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 from PyQt5.QtCore import (QAbstractItemModel, Qt, QModelIndex, pyqtSignal,
@@ -237,6 +237,17 @@ class LayerModel(QAbstractItemModel):
             self.didChangeLayerVisible.emit(layer.uuid, layer.visible)
         self.dataChanged.emit(index, index)
         return True
+
+    def get_layer_by_uuid(self, uuid: UUID) -> Optional[LayerItem]:
+        layers = [layer for layer in self.layers if layer.uuid == uuid]
+        if len(layers) > 1:
+            raise ValueError(f"Multiple Layers with UUID: {uuid} found"
+                             f" with product_family_key:"
+                             f" {self.product_family_key}!")
+        elif len(layers) == 0:
+            return None
+        else:
+            return layers[0]
 
     def _get_layer_for_dataset(self, info: frozendict,
                                presentation: Presentation) -> LayerItem:
