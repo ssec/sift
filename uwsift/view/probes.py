@@ -209,7 +209,8 @@ class ProbeGraphManager(QObject):
     def current_graph_has_polygon(self) -> bool:
         return self.graphs[self.selected_graph_index].polygon is not None
 
-    def update_point_probe(self, probe_name, xy_pos=None, state=None):
+    def update_point_probe(self, probe_name=DEFAULT_POINT_PROBE, xy_pos=None,
+                           state=None):
         if xy_pos is None and state is None:
             if probe_name not in self.point_probes:
                 # nothing to do

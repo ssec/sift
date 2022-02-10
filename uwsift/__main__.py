@@ -1001,34 +1001,12 @@ class Main(QtWidgets.QMainWindow):
 
         self.scene_manager.newPointProbe.connect(self.graphManager.update_point_probe)
 
-        def _update_point_probe_slot(*args):
-            return self.graphManager.update_point_probe(DEFAULT_POINT_PROBE)
-        self.document.didAddBasicDataset.connect(_update_point_probe_slot)
-        self.document.didAddCompositeDataset.connect(_update_point_probe_slot)
-
-        self.layer_model.didReorderLayers.connect(_update_point_probe_slot)
+        self.layer_model.didReorderLayers.connect(
+            self.graphManager.update_point_probe)
+        # Connect to an unnamed slot (lambda: ...) to strip off the argument
+        # (of type dict) from the signal 'didMatchTimes'
         self.scene_manager.animation_controller.time_manager.didMatchTimes\
-            .connect(_update_point_probe_slot)
-
-        # FIXME: These were added as a simple fix to update the probe value on layer changes, but this should really
-        #        have its own manager-like object
-        def _blackhole(*args, **kwargs):
-            return self.update_point_probe_text(DEFAULT_POINT_PROBE)
-
-        self.document.didChangeLayerVisibility.connect(_blackhole)
-        self.document.didAddBasicDataset.connect(_blackhole)
-        self.document.didAddCompositeDataset.connect(_blackhole)
-        self.document.didRemoveDatasets.connect(_blackhole)
-        self.document.didReorderDatasets.connect(_blackhole)
-
-        if False:
-            # XXX: Disable the below line if updating during animation is too much work
-            # self.scene_manager.didChangeFrame.connect(lambda frame_info: update_probe_point(uuid=frame_info[-1]))
-            pass
-        else:
-            # XXX: Disable the below line if updating the probe value during animation isn't a performance problem
-            self.scene_manager.didChangeFrame.connect(
-                lambda frame_info: self.ui.cursorProbeText.setText("Probe Value: <animating>"))
+            .connect(lambda *args: self.graphManager.update_point_probe())
 
         def update_probe_polygon(uuid, points, layerlist=self.layer_list_model):
             top_uuids = list(self.document.current_visible_layer_uuids)
@@ -1051,9 +1029,6 @@ class Main(QtWidgets.QMainWindow):
                 self.ui.panZoomToolButton.click()
 
         self.scene_manager.newProbePolygon.connect(update_probe_polygon)
-        # setup RGB configuration
-        self.document.didChangeComposition.connect(lambda *args: self._refresh_probe_results(*args[1:]))
-        self.document.didChangeColorLimits.connect(self._refresh_probe_results)
 
     def _init_tool_controls(self):
         self.ui.panZoomToolButton.toggled.connect(partial(self.change_tool, name=Tool.PAN_ZOOM))
