@@ -19,10 +19,13 @@ LOG = logging.getLogger(__name__)
 class LayerModel(QAbstractItemModel):
     # ------------------- Creating layers and product datasets -----------------
     didCreateLayer = pyqtSignal(LayerItem)
+
+    didAddCompositeDataset = pyqtSignal(LayerItem, ProductDataset)
     didAddImageDataset = pyqtSignal(LayerItem, ProductDataset)
     didAddLinesDataset = pyqtSignal(LayerItem, ProductDataset)
     didAddPointsDataset = pyqtSignal(LayerItem, ProductDataset)
 
+    didAddImageLayer = pyqtSignal(LayerItem)
     didAddSystemLayer = pyqtSignal(LayerItem)
 
     # ------------------ Changing properties of existing layers ----------------
@@ -42,12 +45,26 @@ class LayerModel(QAbstractItemModel):
 
     # ----------------------- Removing existing layers -------------------------
     # didDeleteLayer = pyqtSignal(UUID)
-    # didDeleteProductDataset = pyqtSignal(UUID)
+    didDeleteProductDataset = pyqtSignal(UUID)
+    # ---------------------- Request creation of Recipes -----------------------
+    # object should be a List[Optional[UUID]]
+    didRequestCompositeRecipeCreation = pyqtSignal(object)
 
     # --------------------------------------------------------------------------
     # didChangeImageKind = pyqtSignal(dict)
 
     didActivateProductDataset = pyqtSignal(UUID, bool)
+    # The parameter here should be a list, but in some cases PyQt has problems
+    # with this. If the list is only filled with Nones, then sending this
+    # signal will cause a 139 error and the application will crash. But if
+    # the parameter is of type object, then the crash does not occur if the
+    # list is only filled with None. This is only a workaround and needs to be
+    # fixed when the problem with PyQT no longer occurs.
+    # See also:
+    # https://stackoverflow.com/questions/12050397/pyqt-signal-emit-with-object-instance-or-none
+    didChangeCompositeProductDataset = pyqtSignal(LayerItem, ProductDataset)
+
+    didRequestSelectionOfLayer = pyqtSignal(QModelIndex)
 
     def __init__(self, workspace, parent=None, policy=None):
         """
