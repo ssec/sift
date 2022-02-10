@@ -23,6 +23,7 @@ import dataclasses
 import logging
 import os
 import uuid
+from abc import abstractmethod
 from dataclasses import dataclass
 from glob import glob
 from typing import Mapping
@@ -70,6 +71,11 @@ class Recipe:
     def copy(self, new_name):
         """Get a copy of this recipe with a new name"""
         return dataclasses.replace(self, name=new_name)
+
+    @classmethod
+    @abstractmethod
+    def kind(cls):
+        pass
 
 
 @dataclass
@@ -140,6 +146,10 @@ class CompositeRecipe(Recipe):
     def blue(self):
         """Get the control parameters for the blue channel as a dict."""
         return self._channel_info(CHANNEL_BLUE)
+
+    @classmethod
+    def kind(cls):
+        return "RGB Composite"
 
 
 class RecipeManager(object):
