@@ -26,6 +26,7 @@ from matplotlib.figure import Figure
 
 # a useful constant
 from uwsift.common import Info, Kind
+from uwsift.model.layer_model import LayerModel
 from uwsift.queue import TASK_PROGRESS, TASK_DOING
 
 # Stuff for custom toolbars
@@ -89,7 +90,7 @@ class ProbeGraphManager(QObject):
     drawChildGraph = pyqtSignal(str, )
     pointProbeChanged = pyqtSignal(str, bool, tuple)
 
-    def __init__(self, tab_widget, workspace, queue):
+    def __init__(self, tab_widget, workspace, layer_model: LayerModel, queue):
         """Setup our tab widget with an appropriate graph object in the first tab.
 
         FUTURE, once we are saving our graph configurations, load those instead of setting up this default.
@@ -99,6 +100,7 @@ class ProbeGraphManager(QObject):
 
         # hang on to the workspace
         self.workspace = workspace
+        self.layer_model = layer_model
         self.queue = queue
 
         # hang on to the tab widget
@@ -118,7 +120,10 @@ class ProbeGraphManager(QObject):
         self.tab_widget_object.currentChanged[int].connect(self.handle_tab_change)
         self.drawChildGraph.connect(self.draw_child)
 
-        # hook up the various document signals that would mean we need to reload things
+        # hook up the various layer_model signals that would mean we need to
+        # reload things
+        self.layer_model.didUpdateLayers.connect(
+            self.handleActiveProductDatasetsChanged)
 
     def draw_child(self, child_name):
         for child in self.graphs:
@@ -139,13 +144,13 @@ class ProbeGraphManager(QObject):
         self.tab_widget_object.insertTab(tab_index, temp_widget, self.max_tab_letter)
 
         # create the associated graph display object
-        graph = ProbeGraphDisplay(self, temp_widget, self.workspace, self.queue,
+        graph = ProbeGraphDisplay(self, temp_widget, self.workspace,
+                                  self.layer_model, self.queue,
                                   self.max_tab_letter)
         self.graphs.append(graph)
 
         # load up the layers for this new tab
-        uuid_list = self.document.current_layer_uuid_order
-        graph.set_possible_layers(uuid_list)
+        graph.set_possible_layers()
 
         # clone the previous tab
         if self.selected_graph_index != tab_index:
@@ -172,14 +177,14 @@ class ProbeGraphManager(QObject):
         self.tab_widget_object.setCurrentIndex(tab_index)
 
     def handleActiveProductDatasetsChanged(self):
-        """Used when the document signals that something about the layers has changed
+        """Used when the layer model signals that something about the layers
+        has changed
         """
 
         # reload the layer list for the existing graphs
-        uuid_list = self.document.current_layer_uuid_order
         for graphObj in self.graphs:
             doRebuild = graphObj is self.graphs[self.selected_graph_index]
-            graphObj.set_possible_layers(uuid_list, do_rebuild_plot=doRebuild)  # FIXME
+            graphObj.set_possible_layers(do_rebuild_plot=doRebuild)  # FIXME
 
     def current_graph_set_region(self, polygon_points=None, select_full_data=False):
         """Update the current region in the selected graph and rebuild its plot
@@ -257,10 +262,10 @@ class ProbeGraphManager(QObject):
         state = state if state is not None else not old_state
         self.update_point_probe(probe_name, state=state)
 
-    def set_default_layer_selections(self, uuids):
+    def set_default_layer_selections(self, layer_uuids):
         """Set the UUIDs for the current graph if it doesn't have a polygon
         """
-        return self.graphs[self.selected_graph_index].set_default_layer_selections(uuids)
+        return self.graphs[self.selected_graph_index].set_default_layer_selections(layer_uuids)
 
     def handle_tab_change(self):
         """deal with the fact that the tab changed in the tab widget
@@ -301,8 +306,10 @@ class ProbeGraphDisplay(object):
     # the default number of bins for the histogram and density scatter plot
     DEFAULT_NUM_BINS = 100
 
-    def __init__(self, manager, qt_parent, workspace, queue, name_str):
+    def __init__(self, manager, qt_parent, workspace, layer_model: LayerModel,
+                 queue, name_str):
         """build the graph tab controls
+        :param layer_model:
         :return:
         """
 
@@ -323,6 +330,7 @@ class ProbeGraphDisplay(object):
         # save the workspace and queue for use later
         self.manager = manager
         self.workspace = workspace
+        self.layer_model = layer_model
         self.queue = queue
 
         # internal values that control the behavior of plotting and controls
@@ -375,7 +383,7 @@ class ProbeGraphDisplay(object):
         layout.addWidget(self.yDropDown, 4, 2, 1, 2)
         qt_parent.setLayout(layout)
 
-    def set_possible_layers(self, uuid_list, do_rebuild_plot=False):
+    def set_possible_layers(self, do_rebuild_plot=False):
         """Given a list of layer UUIDs, set the names and UUIDs in the drop downs
         """
 
@@ -387,16 +395,12 @@ class ProbeGraphDisplay(object):
         self.yDropDown.clear()
 
         # fill up our lists of layers
-        for uuid in uuid_list:
-            layer = self.document[uuid]
-            layer_name = layer.get(Info.DISPLAY_NAME, "??unknown layer??")
-            if layer.get(Info.KIND, None) == Kind.RGB:  # skip RGB layers
-                continue
-            uuid_string = str(uuid)
-            self.xDropDown.addItem(layer_name, uuid_string)
-            self.yDropDown.addItem(layer_name, uuid_string)
+        for layer in self.layer_model.get_probeable_layers():
+            uuid_string = str(layer.uuid)
+            self.xDropDown.addItem(layer.descriptor, uuid_string)
+            self.yDropDown.addItem(layer.descriptor, uuid_string)
 
-            self.uuidMap[uuid_string] = uuid
+            self.uuidMap[uuid_string] = layer.uuid
 
         # if possible, set the selections back to the way they were
         need_rebuild = False
@@ -550,27 +554,48 @@ class ProbeGraphDisplay(object):
         # Assume that the task gets resolved otherwise we might try to draw multiple times
         self._stale = False
 
-    def _rebuild_plot_task(self, x_uuid, y_uuid, polygon, point_xy, plot_versus=False, plot_full_data=True):
+    def _rebuild_plot_task(self, x_layer_uuid, y_layer_uuid, polygon, point_xy,
+                           plot_versus=False, plot_full_data=True):
 
         data_source_description = "full data" if plot_full_data \
             else "polygon data"
+
+        x_layer = self.layer_model.get_layer_by_uuid(x_layer_uuid)
+        x_active_product_dataset = None if not x_layer else \
+            x_layer.get_first_active_product_dataset()
+        x_uuid = None if not x_active_product_dataset else \
+            x_active_product_dataset.uuid
+
+        y_layer = self.layer_model.get_layer_by_uuid(y_layer_uuid)
+        y_active_product_dataset = None if not y_layer else \
+            y_layer.get_first_active_product_dataset()
+        y_uuid = None if not y_active_product_dataset else \
+            y_active_product_dataset.uuid
+
         # if we are plotting only x and we have a selected x and a polygon
-        if not plot_versus and x_uuid is not None and (polygon is not None or plot_full_data):
+        if not plot_versus and x_layer_uuid is not None and (polygon is not None or plot_full_data):
             yield {TASK_DOING: f'Probe Plot: Collecting {data_source_description}...', TASK_PROGRESS: 0.0}
 
             # get the data and info we need for this plot
-            if plot_full_data:
-                data_polygon = self.workspace.get_content(x_uuid)
+            if x_active_product_dataset:
+                if plot_full_data:
+                    data_polygon = self.workspace.get_content(
+                        x_active_product_dataset.uuid)
+                else:
+                    data_polygon = self.workspace.get_content_polygon(
+                        x_active_product_dataset.uuid, polygon)
             else:
-                data_polygon = self.workspace.get_content_polygon(x_uuid, polygon)
-            unit_info = self.document[x_uuid][Info.UNIT_CONVERSION]
-            data_polygon = unit_info[1](data_polygon)
-            title = self.document[x_uuid][Info.DISPLAY_NAME]
+                data_polygon = []
+
+            x_conv_func = x_layer.info[Info.UNIT_CONVERSION][1]
+            data_polygon = x_conv_func(data_polygon)
+            title = x_layer.descriptor
 
             # get point probe value
             if point_xy:
-                x_point = self.workspace.get_content_point(x_uuid, point_xy)
-                x_point = unit_info[1](x_point)
+                x_point = self.workspace.get_content_point(
+                    x_active_product_dataset.uuid, point_xy)
+                x_point = x_conv_func(x_point)
             else:
                 x_point = None
 
@@ -579,14 +604,14 @@ class ProbeGraphDisplay(object):
             self.plotHistogram(data_polygon, title, x_point)
 
         # if we are plotting x vs y and have x, y, and a polygon
-        elif plot_versus and x_uuid is not None and y_uuid is not None and (polygon is not None or plot_full_data):
+        elif plot_versus and x_layer_uuid is not None and y_layer_uuid is not None and (polygon is not None or plot_full_data):
             yield {TASK_DOING: f'Probe Plot: Collecting {data_source_description} (layer 1)...', TASK_PROGRESS: 0.0}
 
             # get the data and info we need for this plot
-            x_info = self.document[x_uuid]
-            y_info = self.document[y_uuid]
-            name1 = x_info[Info.DISPLAY_NAME]
-            name2 = y_info[Info.DISPLAY_NAME]
+            x_info = x_active_product_dataset.info
+            y_info = y_active_product_dataset.info
+            name1 = f"{x_layer.descriptor} {x_info[Info.DISPLAY_TIME]}"
+            name2 = f"{y_layer.descriptor} {y_info[Info.DISPLAY_TIME]}"
             hires_uuid = self.workspace.lowest_resolution_uuid(x_uuid, y_uuid)
             # hires_coord_mask are the lat/lon coordinates of each of the
             # pixels in hires_data. The coordinates are (lat, lon) to resemble
@@ -596,14 +621,13 @@ class ProbeGraphDisplay(object):
                 hires_data = self.workspace.get_content(hires_uuid)
             else:
                 hires_coord_mask, hires_data = self.workspace.get_coordinate_mask_polygon(hires_uuid, polygon)
-            hires_conv_func = self.document[hires_uuid][Info.UNIT_CONVERSION][1]
-            x_conv_func = x_info[Info.UNIT_CONVERSION][1]
-            y_conv_func = y_info[Info.UNIT_CONVERSION][1]
-            hires_data = hires_conv_func(hires_data)
+
+            x_conv_func = x_layer.info[Info.UNIT_CONVERSION][1]
+            y_conv_func = y_layer.info[Info.UNIT_CONVERSION][1]
             yield {TASK_DOING: f'Probe Plot: Collecting {data_source_description} (layer 2)...', TASK_PROGRESS: 0.15}
             if hires_uuid == x_uuid:
                 # the hires data was from the X UUID
-                data1 = hires_data
+                data1 = x_conv_func(hires_data)
                 if plot_full_data:
                     data2 = self.workspace.get_content(y_uuid)
                 else:
@@ -611,7 +635,7 @@ class ProbeGraphDisplay(object):
                 data2 = y_conv_func(data2)
             else:
                 # the hires data was from the Y UUID
-                data2 = hires_data
+                data2 = y_conv_func(hires_data)
                 if plot_full_data:
                     data1 = self.workspace.get_content(x_uuid)
                 else:

@@ -992,7 +992,8 @@ class Main(QtWidgets.QMainWindow):
 
     def _init_point_polygon_probes(self):
         self.graphManager = ProbeGraphManager(self.ui.probeTabWidget,
-                                              self.workspace, self.queue)
+                                              self.workspace, self.layer_model,
+                                              self.queue)
         self.graphManager.didChangeTab.connect(self.scene_manager.show_only_polygons)
         self.graphManager.didClonePolygon.connect(self.scene_manager.copy_polygon)
         self.graphManager.pointProbeChanged.connect(self.scene_manager.on_point_probe_set)
@@ -1002,23 +1003,28 @@ class Main(QtWidgets.QMainWindow):
 
         self.scene_manager.newPointProbe.connect(self.graphManager.update_point_probe)
 
-        self.layer_model.didReorderLayers.connect(
+        self.layer_model.didUpdateLayers.connect(
             self.graphManager.update_point_probe)
+        self.layer_model.didUpdateLayers.connect(
+            self.graphManager.handleActiveProductDatasetsChanged)
+
         # Connect to an unnamed slot (lambda: ...) to strip off the argument
         # (of type dict) from the signal 'didMatchTimes'
         self.scene_manager.animation_controller.time_manager.didMatchTimes\
             .connect(lambda *args: self.graphManager.update_point_probe())
 
-        def update_probe_polygon(points):
-            top_uuids = list(self.document.current_visible_layer_uuids)
-            LOG.debug("top visible UUID is {0!r:s}".format(top_uuids))
+        def update_probe_polygon(points: list):
+            probeable_layers = self.layer_model.get_probeable_layers()
+            probeable_layers_uuids = [layer.uuid for layer in probeable_layers]
+            LOG.debug("top visible UUID is {0!r:s}"
+                      .format(probeable_layers_uuids[0]))
 
             # TODO, when the plots manage their own layer selection, change this call
             # FUTURE, once the polygon is a layer, this will need to change
             # set the selection for the probe plot to the top visible layer(s)
             # new tabs should clone the information from the currently selected tab
             # the call below will check if this is a new polygon
-            self.graphManager.set_default_layer_selections(top_uuids)
+            self.graphManager.set_default_layer_selections(probeable_layers_uuids)
 
             # update our current plot with the new polygon
             polygon_name = self.graphManager.current_graph_set_region(polygon_points=points)
