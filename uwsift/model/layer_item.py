@@ -47,8 +47,9 @@ class LayerItem:
         self.recipe = recipe
 
         self.grouping_key = grouping_key
-        self._invariable_display_data = \
-            self._generate_invariable_display_data()
+
+        self._invariable_display_data = None
+        self.update_invariable_display_data()
 
     @staticmethod
     def extract_layer_info(info: frozendict) -> frozendict:
@@ -94,20 +95,21 @@ class LayerItem:
                f"{self._invariable_display_data[LMC.NAME]} " \
                f"{self._invariable_display_data[LMC.WAVELENGTH]}"
 
-    def _generate_invariable_display_data(self) -> dict:
+    def update_invariable_display_data(self) -> None:
         if self.recipe:
-            return {
+            self._invariable_display_data = {
                 LMC.SOURCE: self.recipe.kind(),
                 LMC.NAME: self.recipe.name,
                 LMC.WAVELENGTH: N_A,
                 LMC.PROBE_UNIT: N_A
             }
+            return
 
         name, wavelength, unit = LayerItem._get_dataset_info_labels(self.info)
 
         platform = self.info.get(Info.PLATFORM)
         instrument = self.info.get(Info.INSTRUMENT)
-        return {
+        self._invariable_display_data = {
             LMC.SOURCE: f"{platform.value} {instrument.value}",
             LMC.NAME: name,
             LMC.WAVELENGTH: wavelength,
