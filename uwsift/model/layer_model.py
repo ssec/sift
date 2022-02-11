@@ -34,6 +34,7 @@ class LayerModel(QAbstractItemModel):
 
     didUpdateLayers = pyqtSignal()
     didReorderLayers = pyqtSignal(list)
+    didFinishActivateProductDatasets = pyqtSignal()
     # didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
 
     # --------------- Adding layers derived from existing layers ---------------
@@ -370,6 +371,7 @@ class LayerModel(QAbstractItemModel):
                     product_dataset.is_active = False
                 self.didActivateProductDataset.emit(product_dataset.uuid,
                                                     product_dataset.is_active)
+        self.didFinishActivateProductDatasets.emit()
 
     def get_probeable_layers(self) -> List[LayerItem]:
         """ Get LayerItems which may contain data suitable for probing

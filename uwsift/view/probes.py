@@ -124,6 +124,8 @@ class ProbeGraphManager(QObject):
         # reload things
         self.layer_model.didUpdateLayers.connect(
             self.handleActiveProductDatasetsChanged)
+        self.layer_model.didFinishActivateProductDatasets.connect(
+            self.handleActiveProductDatasetsChanged)
 
     def draw_child(self, child_name):
         for child in self.graphs:
@@ -336,6 +338,10 @@ class ProbeGraphDisplay(object):
         # internal values that control the behavior of plotting and controls
         self.xSelectedUUID = None
         self.ySelectedUUID = None
+
+        self.xCurrentDatasetUUID = None
+        self.yCurrentDatasetUUID = None
+
         self.uuidMap = None  # this is needed because the drop downs can't properly handle objects as ids
         self._stale = True  # whether or not the plot needs to be redrawn
 
@@ -431,10 +437,34 @@ class ProbeGraphDisplay(object):
             need_rebuild = need_rebuild or self.ySelectedUUID is not None
             self.ySelectedUUID = None
 
+        # check whether active datasets have changed
+        x_layer = self.layer_model.get_layer_by_uuid(self.xSelectedUUID)
+        x_active_product_dataset = None if not x_layer \
+            else x_layer.get_first_active_product_dataset()
+        if not x_active_product_dataset:
+            if self.xCurrentDatasetUUID is not None:
+                need_rebuild = True
+                self.xCurrentDatasetUUID = None
+        elif x_active_product_dataset.uuid != self.xCurrentDatasetUUID:
+            need_rebuild = True
+            self.xCurrentDatasetUUID = x_active_product_dataset.uuid
+
+        y_layer = self.layer_model.get_layer_by_uuid(self.ySelectedUUID)
+        y_active_product_dataset = None if not y_layer \
+            else y_layer.get_first_active_product_dataset()
+        if not y_active_product_dataset:
+            if self.yCurrentDatasetUUID is not None:
+                need_rebuild |= self.yCheckBox.isChecked()
+                self.yCurrentDatasetUUID = None
+        elif y_active_product_dataset.uuid != self.yCurrentDatasetUUID:
+            need_rebuild |= self.yCheckBox.isChecked()
+            self.yCurrentDatasetUUID = y_active_product_dataset.uuid
+
         # refresh the plot
         self._stale = need_rebuild
         if do_rebuild_plot:
-            # Rebuild the plot (stale is used to determine if actual rebuild is needed)
+            # Rebuild the plot (stale is used to determine if actual rebuild
+            # is needed)
             self.rebuildPlot()
 
     def set_default_layer_selections(self, layer_uuids):
@@ -585,14 +615,14 @@ class ProbeGraphDisplay(object):
                     data_polygon = self.workspace.get_content_polygon(
                         x_active_product_dataset.uuid, polygon)
             else:
-                data_polygon = []
+                data_polygon = np.array([])
 
             x_conv_func = x_layer.info[Info.UNIT_CONVERSION][1]
             data_polygon = x_conv_func(data_polygon)
             title = x_layer.descriptor
 
             # get point probe value
-            if point_xy:
+            if x_active_product_dataset and point_xy:
                 x_point = self.workspace.get_content_point(
                     x_active_product_dataset.uuid, point_xy)
                 x_point = x_conv_func(x_point)
