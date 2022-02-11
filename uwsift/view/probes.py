@@ -308,31 +308,6 @@ class ProbeGraphDisplay(object):
     # the default number of bins for the histogram and density scatter plot
     DEFAULT_NUM_BINS = 100
 
-    # the display name of the probe, should be unique across all probes
-    myName = None
-
-    # plotting related controls
-    figure = None
-    canvas = None
-    toolbar = None
-    yCheckBox = None
-    xDropDown = None
-    yDropDown = None
-
-    # internal objects to reference for info and data
-    polygon = None
-    point = None
-    full_data_selection = False
-    manager = None
-    workspace = None
-    queue = None
-
-    # internal values that control the behavior of plotting and controls
-    xSelectedUUID = None
-    ySelectedUUID = None
-    uuidMap = None  # this is needed because the drop downs can't properly handle objects as ids
-    _stale = True  # whether or not the plot needs to be redrawn
-
     def __init__(self, manager, qt_parent, workspace, queue, name_str):
         """build the graph tab controls
         :return:
@@ -341,10 +316,27 @@ class ProbeGraphDisplay(object):
         # hang on to our name
         self.myName = name_str
 
+        # plotting related controls
+        self.toolbar = None
+        self.yCheckBox = None
+        self.xDropDown = None
+        self.yDropDown = None
+
+        # internal objects to reference for info and data
+        self.polygon = None
+        self.point = None
+        self.full_data_selection = False
+
         # save the workspace and queue for use later
         self.manager = manager
         self.workspace = workspace
         self.queue = queue
+
+        # internal values that control the behavior of plotting and controls
+        self.xSelectedUUID = None
+        self.ySelectedUUID = None
+        self.uuidMap = None  # this is needed because the drop downs can't properly handle objects as ids
+        self._stale = True  # whether or not the plot needs to be redrawn
 
         # a figure instance to plot on
         self.figure = Figure(figsize=(3, 3), dpi=72)
