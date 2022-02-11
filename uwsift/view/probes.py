@@ -89,13 +89,6 @@ class ProbeGraphManager(QObject):
     drawChildGraph = pyqtSignal(str, )
     pointProbeChanged = pyqtSignal(str, bool, tuple)
 
-    graphs = None
-    selected_graph_index = -1
-    workspace = None
-    queue = None
-    tab_widget_object = None
-    max_tab_letter = None
-
     def __init__(self, tab_widget, workspace, queue):
         """Setup our tab widget with an appropriate graph object in the first tab.
 
