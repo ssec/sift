@@ -637,55 +637,64 @@ class ProbeGraphDisplay(object):
         elif plot_versus and x_layer_uuid is not None and y_layer_uuid is not None and (polygon is not None or plot_full_data):
             yield {TASK_DOING: f'Probe Plot: Collecting {data_source_description} (layer 1)...', TASK_PROGRESS: 0.0}
 
-            # get the data and info we need for this plot
-            x_info = x_active_product_dataset.info
-            y_info = y_active_product_dataset.info
-            name1 = f"{x_layer.descriptor} {x_info[Info.DISPLAY_TIME]}"
-            name2 = f"{y_layer.descriptor} {y_info[Info.DISPLAY_TIME]}"
-            hires_uuid = self.workspace.lowest_resolution_uuid(x_uuid, y_uuid)
-            # hires_coord_mask are the lat/lon coordinates of each of the
-            # pixels in hires_data. The coordinates are (lat, lon) to resemble
-            # the (Y, X) indexing of numpy arrays
-            if plot_full_data:
-                hires_coord_mask = None
-                hires_data = self.workspace.get_content(hires_uuid)
-            else:
-                hires_coord_mask, hires_data = self.workspace.get_coordinate_mask_polygon(hires_uuid, polygon)
-
-            x_conv_func = x_layer.info[Info.UNIT_CONVERSION][1]
-            y_conv_func = y_layer.info[Info.UNIT_CONVERSION][1]
-            yield {TASK_DOING: f'Probe Plot: Collecting {data_source_description} (layer 2)...', TASK_PROGRESS: 0.15}
-            if hires_uuid == x_uuid:
-                # the hires data was from the X UUID
-                data1 = x_conv_func(hires_data)
-                if plot_full_data:
-                    data2 = self.workspace.get_content(y_uuid)
-                else:
-                    data2 = self.workspace.get_content_coordinate_mask(y_uuid, hires_coord_mask)
-                data2 = y_conv_func(data2)
-            else:
-                # the hires data was from the Y UUID
-                data2 = y_conv_func(hires_data)
-                if plot_full_data:
-                    data1 = self.workspace.get_content(x_uuid)
-                else:
-                    data1 = self.workspace.get_content_coordinate_mask(x_uuid, hires_coord_mask)
-                data1 = x_conv_func(data1)
-            yield {TASK_DOING: 'Probe Plot: Creating scatter plot...', TASK_PROGRESS: 0.25}
-
-            if point_xy:
-                x_point = self.workspace.get_content_point(x_uuid, point_xy)
-                x_point = x_conv_func(x_point)
-                y_point = self.workspace.get_content_point(y_uuid, point_xy)
-                y_point = y_conv_func(y_point)
-            else:
+            if not x_active_product_dataset or not y_active_product_dataset:
+                name1 = f"{x_layer.descriptor}"
+                name2 = f"{y_layer.descriptor}"
                 x_point = None
                 y_point = None
+                data1 = np.array([0])
+                data2 = np.array([0])
+            else:
+                # get the data and info we need for this plot
+                x_info = x_active_product_dataset.info
+                y_info = y_active_product_dataset.info
+                name1 = f"{x_layer.descriptor} {x_info[Info.DISPLAY_TIME]}"
+                name2 = f"{y_layer.descriptor} {y_info[Info.DISPLAY_TIME]}"
+                hires_uuid = self.workspace.lowest_resolution_uuid(x_uuid, y_uuid)
+                # hires_coord_mask are the lat/lon coordinates of each of the
+                # pixels in hires_data. The coordinates are (lat, lon) to resemble
+                # the (Y, X) indexing of numpy arrays
+                if plot_full_data:
+                    hires_coord_mask = None
+                    hires_data = self.workspace.get_content(hires_uuid)
+                else:
+                    hires_coord_mask, hires_data = self.workspace.get_coordinate_mask_polygon(hires_uuid, polygon)
 
-            # plot a scatter plot
-            good_mask = ~(np.isnan(data1) | np.isnan(data2))
-            data1 = data1[good_mask]
-            data2 = data2[good_mask]
+                x_conv_func = x_layer.info[Info.UNIT_CONVERSION][1]
+                y_conv_func = y_layer.info[Info.UNIT_CONVERSION][1]
+                yield {TASK_DOING: f'Probe Plot: Collecting {data_source_description} (layer 2)...', TASK_PROGRESS: 0.15}
+                if hires_uuid == x_uuid:
+                    # the hires data was from the X UUID
+                    data1 = x_conv_func(hires_data)
+                    if plot_full_data:
+                        data2 = self.workspace.get_content(y_uuid)
+                    else:
+                        data2 = self.workspace.get_content_coordinate_mask(y_uuid, hires_coord_mask)
+                    data2 = y_conv_func(data2)
+                else:
+                    # the hires data was from the Y UUID
+                    data2 = y_conv_func(hires_data)
+                    if plot_full_data:
+                        data1 = self.workspace.get_content(x_uuid)
+                    else:
+                        data1 = self.workspace.get_content_coordinate_mask(x_uuid, hires_coord_mask)
+                    data1 = x_conv_func(data1)
+                yield {TASK_DOING: 'Probe Plot: Creating scatter plot...', TASK_PROGRESS: 0.25}
+
+                if point_xy:
+                    x_point = self.workspace.get_content_point(x_uuid, point_xy)
+                    x_point = x_conv_func(x_point)
+                    y_point = self.workspace.get_content_point(y_uuid, point_xy)
+                    y_point = y_conv_func(y_point)
+                else:
+                    x_point = None
+                    y_point = None
+
+                # plot a scatter plot
+                good_mask = ~(np.isnan(data1) | np.isnan(data2))
+                data1 = data1[good_mask]
+                data2 = data2[good_mask]
+
             self.plotDensityScatterplot(data1, name1, data2, name2, x_point, y_point)
 
         # if we have some combination of selections we don't understand, clear the figure
