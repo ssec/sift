@@ -44,13 +44,20 @@ class TimeManager(QObject):
         self.qml_engine = None
         self._qml_backend = None
         self.qml_layer_manager: QmlLayerManager = QmlLayerManager()
+        self.current_timebase_uuid = None
 
-        dummy_dt = datetime.now()
-        dummy_dt = datetime(dummy_dt.year, dummy_dt.month, dummy_dt.day, dummy_dt.hour)
-        test_qdts = list(map(lambda dt: QDateTime(dt),
-                             [dummy_dt + relativedelta(hours=i) for i in range(5)]))
-        self.qml_timestamps_model = TimebaseModel(timestamps=test_qdts)
+        self.qml_timestamps_model = \
+            TimebaseModel(timestamps=self._get_default_qdts())
         self._time_transformer: Optional[TimeTransformer] = None
+
+    @staticmethod
+    def _get_default_qdts(steps=5):
+        now_dt = datetime.now()
+        now_dt = datetime(now_dt.year, now_dt.month, now_dt.day, now_dt.hour)
+        return list(
+            map(lambda dt: QDateTime(dt),
+                [now_dt + relativedelta(hours=i) for i in range(steps)])
+        )
 
     @property
     def qml_backend(self) -> QmlBackend:
@@ -68,6 +75,7 @@ class TimeManager(QObject):
         layer_model.didUpdateLayers.connect(policy.on_layers_update)
         layer_model.didUpdateLayers.connect(self.update_qml_layer_model)
         layer_model.didUpdateLayers.connect(self.sync_to_time_transformer)
+        layer_model.didReorderLayers.connect(self.update_layer_order)
 
         self.didMatchTimes.connect(self._layer_model.on_didMatchTimes)
 
@@ -145,15 +153,16 @@ class TimeManager(QObject):
                         that ingests a policy and handles UI based on that?
         """
         if not layer or not layer.dynamic:
-            return
-        if not self._time_transformer.t_sim:
-            self.qml_timestamps_model.currentTimestamp = list(layer.timeline.keys())[0]
+            new_timestamp_qdts = self._get_default_qdts()
         else:
-            self.qml_timestamps_model.currentTimestamp = self._time_transformer.t_sim
+            new_timestamp_qdts = list(map(lambda dt: QDateTime(dt), layer.timeline.keys()))
+
+            if not self._time_transformer.t_sim:
+                self.qml_timestamps_model.currentTimestamp = list(layer.timeline.keys())[0]
+            else:
+                self.qml_timestamps_model.currentTimestamp = self._time_transformer.t_sim
 
         self.qml_engine.clearComponentCache()
-
-        new_timestamp_qdts = list(map(lambda dt: QDateTime(dt), layer.timeline.keys()))
         self.qml_timestamps_model.timestamps = new_timestamp_qdts
         self.qml_backend.refresh_timeline()
 
@@ -163,15 +172,26 @@ class TimeManager(QObject):
         managing the data layer combo box contents
         """
         dynamic_layers_descriptors = []
-        for layer in self._layer_model.get_dynamic_layers():
+        # In case the current timebase layer isn't found again (it may have
+        # been removed), select the first, therefore initialize to 0:
+        new_index_of_current_timebase = 0
+        for idx, layer in enumerate(self._layer_model.get_dynamic_layers()):
             dynamic_layers_descriptors.append(layer.descriptor)
+            if layer.uuid == self.current_timebase_uuid:
+                new_index_of_current_timebase = idx
 
         self.qml_layer_manager._qml_layer_model.layer_strings = \
             dynamic_layers_descriptors
-        # TODO(mk): create cleaner interface to get timebase index, should not directly
-        #           access policy, expose via transformer?
-        time_index = self._time_transformer._translation_policy._driving_idx
-        self.qml_backend.didChangeTimebase.emit(time_index)
+
+        self.qml_backend.didChangeTimebase.emit(new_index_of_current_timebase)
+
+    def update_layer_order(self):
+        dynamic_layers = self._layer_model.get_dynamic_layers()
+        dynamic_layers_descriptors = \
+            [layer.descriptor for layer in dynamic_layers]
+
+        self.qml_layer_manager._qml_layer_model.layer_strings = \
+            dynamic_layers_descriptors
 
     def tick_qml_state(self, t_sim, timeline_idx):
         # TODO(mk): if TimeManager is subclassed the behavior below must be adapted:
@@ -194,9 +214,19 @@ class TimeManager(QObject):
                       the ComboBox or by clicking a convenience function in the
                       convenience function popup menu
         """
+
+        dynamic_layers = self._layer_model.get_dynamic_layers()
+
+        if not dynamic_layers:
+            # FIXME: reset to initial state when last dynamic layer has been
+            #  removed (as soon as layer removal becomes possible)
+            # self.update_qml_timeline(None)
+            return
+
+        assert 0 <= index < len(dynamic_layers)
+
         layer = self._layer_model.get_dynamic_layers()[index]
-        if layer:
-            self._time_transformer.change_timebase(layer)
-            self.update_qml_timeline(layer)
-            self.qml_backend.refresh_timeline()
-            self.sync_to_time_transformer()
+        self.current_timebase_uuid = layer.uuid
+        self._time_transformer.change_timebase(layer)
+        self.update_qml_timeline(layer)
+        self.sync_to_time_transformer()
