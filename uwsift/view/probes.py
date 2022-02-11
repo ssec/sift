@@ -93,11 +93,10 @@ class ProbeGraphManager(QObject):
     selected_graph_index = -1
     workspace = None
     queue = None
-    document = None
     tab_widget_object = None
     max_tab_letter = None
 
-    def __init__(self, tab_widget, workspace, document, queue):
+    def __init__(self, tab_widget, workspace, queue):
         """Setup our tab widget with an appropriate graph object in the first tab.
 
         FUTURE, once we are saving our graph configurations, load those instead of setting up this default.
@@ -105,9 +104,8 @@ class ProbeGraphManager(QObject):
 
         super(ProbeGraphManager, self).__init__(tab_widget)
 
-        # hang on to the workspace and document
+        # hang on to the workspace
         self.workspace = workspace
-        self.document = document
         self.queue = queue
 
         # hang on to the tab widget
@@ -128,12 +126,6 @@ class ProbeGraphManager(QObject):
         self.drawChildGraph.connect(self.draw_child)
 
         # hook up the various document signals that would mean we need to reload things
-        self.document.didReorderDatasets.connect(self.handleActiveProductDatasetsChanged)
-        self.document.didChangeLayerName.connect(self.handleActiveProductDatasetsChanged)
-        self.document.didAddBasicDataset.connect(self.handleActiveProductDatasetsChanged)
-        self.document.didAddCompositeDataset.connect(self.handleActiveProductDatasetsChanged)
-        self.document.willPurgeDataset.connect(self.handleActiveProductDatasetsChanged)
-        self.document.didSwitchLayerSet.connect(self.handleActiveProductDatasetsChanged)
 
     def draw_child(self, child_name):
         for child in self.graphs:
@@ -154,7 +146,8 @@ class ProbeGraphManager(QObject):
         self.tab_widget_object.insertTab(tab_index, temp_widget, self.max_tab_letter)
 
         # create the associated graph display object
-        graph = ProbeGraphDisplay(self, temp_widget, self.workspace, self.queue, self.document, self.max_tab_letter)
+        graph = ProbeGraphDisplay(self, temp_widget, self.workspace, self.queue,
+                                  self.max_tab_letter)
         self.graphs.append(graph)
 
         # load up the layers for this new tab
@@ -333,7 +326,6 @@ class ProbeGraphDisplay(object):
     manager = None
     workspace = None
     queue = None
-    document = None
 
     # internal values that control the behavior of plotting and controls
     xSelectedUUID = None
@@ -341,7 +333,7 @@ class ProbeGraphDisplay(object):
     uuidMap = None  # this is needed because the drop downs can't properly handle objects as ids
     _stale = True  # whether or not the plot needs to be redrawn
 
-    def __init__(self, manager, qt_parent, workspace, queue, document, name_str):
+    def __init__(self, manager, qt_parent, workspace, queue, name_str):
         """build the graph tab controls
         :return:
         """
@@ -353,7 +345,6 @@ class ProbeGraphDisplay(object):
         self.manager = manager
         self.workspace = workspace
         self.queue = queue
-        self.document = document
 
         # a figure instance to plot on
         self.figure = Figure(figsize=(3, 3), dpi=72)

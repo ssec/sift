@@ -991,7 +991,8 @@ class Main(QtWidgets.QMainWindow):
         timer.start(60000)
 
     def _init_point_polygon_probes(self):
-        self.graphManager = ProbeGraphManager(self.ui.probeTabWidget, self.workspace, self.document, self.queue)
+        self.graphManager = ProbeGraphManager(self.ui.probeTabWidget,
+                                              self.workspace, self.queue)
         self.graphManager.didChangeTab.connect(self.scene_manager.show_only_polygons)
         self.graphManager.didClonePolygon.connect(self.scene_manager.copy_polygon)
         self.graphManager.pointProbeChanged.connect(self.scene_manager.on_point_probe_set)
