@@ -22,7 +22,7 @@ __author__ = 'rayg'
 
 # To have consistent logging for all modules (also for their static
 # initialization) it must be set up before importing them.
-
+from uwsift.model.composite_recipes import RecipeManager
 from uwsift.util.logger import configure_loggers
 
 configure_loggers()  # noqa - we rerun this later again to post-config
@@ -922,6 +922,7 @@ class Main(QtWidgets.QMainWindow):
         self._init_layer_model()
         self._init_layer_panes()
         self._init_rgb_pane()
+        self._init_recipe_manager()
         self._init_map_widget()
         self._init_qml_timeline()
 
@@ -1115,6 +1116,18 @@ class Main(QtWidgets.QMainWindow):
             self.layer_model)
         self.layer_model.didActivateProductDataset.connect(
             self.scene_manager.change_dataset_visible)
+        self.layer_model.didAddCompositeDataset.connect(
+            self.scene_manager.add_node_for_composite_dataset
+        )
+        self.layer_model.didChangeCompositeProductDataset.connect(
+            self.scene_manager.change_node_for_composite_dataset
+        )
+        self.layer_model.didDeleteProductDataset.connect(
+            self.scene_manager.purge_dataset
+        )
+        self.layer_model.didRequestSelectionOfLayer.connect(
+            self.ui.treeView.setCurrentIndex
+        )
 
         self.ui.treeView.setModel(self.layer_model)
 
@@ -1124,6 +1137,45 @@ class Main(QtWidgets.QMainWindow):
         self.rgb_config_pane = RGBLayerConfigPane(self.ui,
                                                   self.ui.layersPaneWidget,
                                                   self.layer_model)
+        self.ui.treeView.layerSelectionChanged.connect(
+            self.rgb_config_pane.selection_did_change
+        )
+        self.layer_model.didAddImageLayer.connect(
+            self.rgb_config_pane.layer_added
+        )
+
+    def _init_recipe_manager(self):
+        self.recipe_manager = RecipeManager()
+        self.layer_model.didRequestCompositeRecipeCreation.connect(
+            self.recipe_manager.create_rgb_recipe
+        )
+        self.recipe_manager.didCreateRGBCompositeRecipe.connect(
+            self.layer_model.create_rgb_composite_layer
+        )
+        self.rgb_config_pane.didChangeRGBInputLayers.connect(
+            self.recipe_manager.update_rgb_recipe_input_layers
+        )
+        self.recipe_manager.didUpdateRGBInputLayers.connect(
+            self.layer_model.update_recipe_layer_timeline
+        )
+        self.rgb_config_pane.didChangeRGBColorLimits.connect(
+            self.recipe_manager.update_rgb_recipe_color_limits
+        )
+        self.recipe_manager.didUpdateRGBColorLimits.connect(
+            self.layer_model.update_rgb_layer_color_limits
+        )
+        self.rgb_config_pane.didChangeRGBGamma.connect(
+            self.recipe_manager.update_rgb_recipe_gammas
+        )
+        self.recipe_manager.didUpdateRGBGamma.connect(
+            self.layer_model.update_rgb_layer_gamma
+        )
+        self.rgb_config_pane.didChangeRecipeName.connect(
+            self.recipe_manager.update_recipe_name
+        )
+        self.recipe_manager.didUpdateRecipeName.connect(
+            self.layer_model.update_rgb_layer_name
+        )
 
     def _init_layer_panes(self):
         # convey action between document and layer list view
@@ -1476,6 +1528,9 @@ class Main(QtWidgets.QMainWindow):
 
         composite = QtWidgets.QAction("Create Composite", self)
         composite.setShortcut('C')
+        composite.triggered.connect(
+            self.layer_model.start_rgb_composite_creation
+        )
 
 
         algebraic = QtWidgets.QAction("Create Algebraic", self)
