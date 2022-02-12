@@ -669,19 +669,21 @@ class ProbeGraphDisplay(object):
         elif plot_versus and x_layer_uuid is not None and y_layer_uuid is not None and (polygon is not None or plot_full_data):
             yield {TASK_DOING: f'Probe Plot: Collecting {data_source_description} (layer 1)...', TASK_PROGRESS: 0.0}
 
+            name1 = x_layer.descriptor
+            name2 = y_layer.descriptor
             if not x_active_product_dataset or not y_active_product_dataset:
-                name1 = f"{x_layer.descriptor}"
-                name2 = f"{y_layer.descriptor}"
                 x_point = None
                 y_point = None
+                time1 = None
+                time2 = None
                 data1 = np.array([0])
                 data2 = np.array([0])
             else:
                 # get the data and info we need for this plot
                 x_info = x_active_product_dataset.info
                 y_info = y_active_product_dataset.info
-                name1 = f"{x_layer.descriptor} {x_info[Info.DISPLAY_TIME]}"
-                name2 = f"{y_layer.descriptor} {y_info[Info.DISPLAY_TIME]}"
+                time1 = x_info[Info.DISPLAY_TIME]
+                time2 = y_info[Info.DISPLAY_TIME]
                 hires_uuid = self.workspace.lowest_resolution_uuid(x_uuid, y_uuid)
                 # hires_coord_mask are the lat/lon coordinates of each of the
                 # pixels in hires_data. The coordinates are (lat, lon) to resemble
@@ -727,7 +729,9 @@ class ProbeGraphDisplay(object):
                 data1 = data1[good_mask]
                 data2 = data2[good_mask]
 
-            self.plotDensityScatterplot(data1, name1, data2, name2, x_point, y_point)
+            self.plotDensityScatterplot(data1, name1, time1,
+                                        data2, name2, time2,
+                                        x_point, y_point)
 
         # if we have some combination of selections we don't understand, clear the figure
         else:
@@ -777,8 +781,11 @@ class ProbeGraphDisplay(object):
             axes.set_title(nameX + " vs " + nameY)
             self._draw_xy_line(axes)
 
-    def plotDensityScatterplot(self, dataX, nameX, dataY, nameY, pointX, pointY):
+    def plotDensityScatterplot(self, dataX, nameX, timeX, dataY, nameY, timeY,
+                               pointX, pointY):
         """Make a density scatter plot for the given data
+        :param timeX:
+        :param timeY:
         """
 
         # clear the figure and make a new subplot
@@ -813,8 +820,8 @@ class ProbeGraphDisplay(object):
         colorbar.set_label('log(count of data points)')
 
         # set the various text labels
-        axes.set_xlabel(nameX)
-        axes.set_ylabel(nameY)
+        axes.set_xlabel(f"{nameX} {timeX}")
+        axes.set_ylabel(f"{nameY} {timeY}")
         axes.set_title(nameX + " vs " + nameY)
 
         # draw the x vs y line
