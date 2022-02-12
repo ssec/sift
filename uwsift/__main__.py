@@ -1051,14 +1051,17 @@ class Main(QtWidgets.QMainWindow):
 
             # Reset graph X layer and Y layer to the two top visible layers,
             # see update_probe_polygon(), copied from there
-            top_uuids = list(self.document.current_visible_layer_uuids)
-            LOG.debug("top visible UUID is {0!r:s}".format(top_uuids))
+            probeable_layers = self.layer_model.get_probeable_layers()
+            probeable_layers_uuids = [layer.uuid for layer in probeable_layers]
+            LOG.debug(f"Probeable layer UUIDs are {probeable_layers_uuids!r:s}")
             # TODO, when the plots manage their own layer selection, change this
             #  call (see update_probe_polygon())
-            self.graphManager.set_default_layer_selections(top_uuids)
+            self.graphManager\
+                .set_default_layer_selections(probeable_layers_uuids)
 
             must_remove_polygon = self.graphManager.current_graph_has_polygon()
-            current_graph_name = self.graphManager.current_graph_set_region(select_full_data=True)
+            current_graph_name = self.graphManager\
+                .current_graph_set_region(select_full_data=True)
             if must_remove_polygon:
                 self.scene_manager.remove_polygon(current_graph_name)
 
