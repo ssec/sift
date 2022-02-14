@@ -723,7 +723,7 @@ class MultiChannelImageVisual(ImageVisual):
     @property
     def size(self):
         """Get size of the image (width, height)."""
-        return self._get_max_shape(self._data)
+        return self._get_max_shape(self._data)[:2][::-1]
 
     @property
     def clim(self):
