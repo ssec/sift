@@ -219,10 +219,10 @@ class Platform(Enum):
     GOES_18 = 'G18'
     GOES_19 = 'G19'
     NWP = 'NWP'
-    MSG8 = 'Meteosat-8'
-    MSG9 = 'Meteosat-9'
-    MSG10 = 'Meteosat-10'
-    MSG11 = 'Meteosat-11'
+    MSG1 = 'Meteosat-8'
+    MSG2 = 'Meteosat-9'
+    MSG3 = 'Meteosat-10'
+    MSG4 = 'Meteosat-11'
     GK2A = "GEO-KOMPSAT-2A"
     MTGI1 = 'MTG-I1'
     M01 = "Metop-B"
@@ -237,6 +237,10 @@ PLATFORM_MAP['goes16'] = Platform.GOES_16
 PLATFORM_MAP['goes17'] = Platform.GOES_17
 PLATFORM_MAP['goes18'] = Platform.GOES_18
 PLATFORM_MAP['goes19'] = Platform.GOES_19
+PLATFORM_MAP['met8'] = Platform.MSG1
+PLATFORM_MAP['met9'] = Platform.MSG2
+PLATFORM_MAP['met10'] = Platform.MSG3
+PLATFORM_MAP['met11'] = Platform.MSG4
 
 
 class Info(Enum):

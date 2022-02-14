@@ -1365,6 +1365,8 @@ class SceneGraphManager(QObject):
                                           cell_height=layer[Info.CELL_HEIGHT],
                                           origin_x=layer[Info.ORIGIN_X],
                                           origin_y=layer[Info.ORIGIN_Y])
+                    elif isinstance(elem, MultiChannelImage):
+                        elem.set_data(image_arrays)
                     elem.clim = presentation.climits
                     elem.gamma = presentation.gamma
                     self.on_view_change(None)
