@@ -161,6 +161,49 @@ class CompositeRecipe(Recipe):
         return "RGB Composite"
 
 
+@dataclass
+class AlgebraicRecipe(Recipe):
+    operation_kind: str = dataclasses.field(default_factory=str)
+    operation_formula: str = dataclasses.field(default_factory=str)
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        self.__modified = True
+
+        def _normalize_list(x, default=None):
+            return [x[idx] if x and len(x) > idx and x[idx] else default for idx
+                    in range(3)]
+
+        self.input_layer_ids = _normalize_list(self.input_layer_ids)
+
+        if self.operation_kind not in [DIFF_OP_NAME, NDI_OP_NAME, CUSTOM_OP_NAME]:
+            self.operation_kind = DIFF_OP_NAME
+
+        if self.operation_formula is None:
+            self.operation_formula = PRESET_OPERATIONS.get(
+                self.operation_kind, PRESET_OPERATIONS.get(DIFF_OP_NAME))
+
+    @classmethod
+    def from_algebraic(cls, name, x=None, y=None, z=None, operation_kind=None,
+                       operation_formula=None):
+        return cls(name, input_layer_ids=[x, y, z],
+                   operation_kind=operation_kind,
+                   operation_formula=operation_formula)
+
+    @classmethod
+    def kind(cls):
+        return "Algebraic"
+
+    @property
+    def modified(self) -> bool:
+        return self.__modified
+
+    @modified.setter
+    def modified(self, status: bool):
+        self.__modified = status  # noqa
+
+
 class RecipeManager(QObject):
     didCreateRGBCompositeRecipe = pyqtSignal(CompositeRecipe)
     didUpdateRGBCompositeRecipe = pyqtSignal(CompositeRecipe, object)
