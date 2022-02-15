@@ -911,7 +911,7 @@ class Main(QtWidgets.QMainWindow):
         self.document = doc = Document(self.workspace, config_dir=config_dir, queue=self.queue)
         self.document.didRemoveDatasets.connect(self.run_gc_after_layer_deletion)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
-                                               border_shapefile=border_shapefile,
+                                               borders_shapefiles=border_shapefile,
                                                center=center,
                                                parent=self)
         self.export_image = ExportImageHelper(self, self.document, self.scene_manager)
@@ -1100,6 +1100,9 @@ class Main(QtWidgets.QMainWindow):
         self.layer_model.didAddPointsDataset.connect(
             self.scene_manager.add_node_for_points_dataset)
 
+        self.layer_model.didAddSystemLayer.connect(
+            self.scene_manager.add_node_for_system_generated_data)
+
         self.ui.treeView.setModel(self.layer_model)
         self.ui.treeView.setHeaderHidden(False)
 
@@ -1108,6 +1111,8 @@ class Main(QtWidgets.QMainWindow):
 
         self.ui.treeView.setRootIsDecorated(False)
         self.ui.treeView.setSelectionMode(self.ui.treeView.SingleSelection)
+
+        self.layer_model.init_system_layers()
 
     def _init_rgb_pane(self):
         self.rgb_config_pane = RGBLayerConfigPane(self.ui, self.ui.layersPaneWidget)
@@ -1454,7 +1459,7 @@ class Main(QtWidgets.QMainWindow):
 
         cycle_grid = QtWidgets.QAction("Cycle &Lat/Lon Grid", self)
         cycle_grid.setShortcut('L')
-        cycle_grid.triggered.connect(self.scene_manager.cycle_grid_color)
+        cycle_grid.triggered.connect(self.scene_manager.cycle_latlon_grid_color)
 
         remove = QtWidgets.QAction("Remove Layer", self)
         remove.setShortcut(QtCore.Qt.Key_Delete)

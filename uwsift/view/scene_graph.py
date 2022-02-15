@@ -51,11 +51,14 @@ from vispy.gloo.util import _screenshot
 from vispy.scene.visuals import Image, Markers, Polygon, Compound, Line
 from vispy.util.keys import SHIFT
 from vispy.visuals import LineVisual
-from vispy.visuals.transforms import STTransform, MatrixTransform, ChainTransform
+from vispy.visuals.transforms import STTransform, MatrixTransform, \
+    ChainTransform
 
 from uwsift import USE_TILED_GEOLOCATED_IMAGES
 from uwsift import config
-from uwsift.common import DEFAULT_ANIMATION_DELAY, Info, Kind, Tool, Presentation
+from uwsift.common import DEFAULT_ANIMATION_DELAY, Info, Kind, Tool, \
+    Presentation, \
+    LATLON_GRID_DATASET_NAME, BORDERS_DATASET_NAME
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.model.document import DocLayerStack, DocBasicDataset, Document
 from uwsift.model.layer_item import LayerItem
@@ -522,12 +525,12 @@ class SceneGraphManager(QObject):
     """
 
     # TODO(ar) REVIEW: distinction between class and member/instance
-    # variables seems random (see below)
+    #  variables seems random (see below)
     document = None  # Document object we work with
     workspace = None  # where we get data arrays from
     queue = None  # background jobs go here
 
-    border_shapefile = None  # background political map
+    borders_shapefiles = None  # political map overlay
     texture_shape = None
     polygon_probes = None
     point_probes = None
@@ -551,7 +554,7 @@ class SceneGraphManager(QObject):
     newProbePolygon = pyqtSignal(object, object)
 
     def __init__(self, doc, workspace, queue,
-                 border_shapefile=None, states_shapefile=None,
+                 borders_shapefiles: list = None, states_shapefile=None,
                  parent=None, texture_shape=(4, 16), center=None):
         super(SceneGraphManager, self).__init__(parent)
         self.didRetilingCalcs.connect(self._set_retiled)
@@ -560,14 +563,17 @@ class SceneGraphManager(QObject):
         self.document = doc
         self.workspace = workspace
         self.queue = queue
-        self.border_shapefile = border_shapefile or DEFAULT_SHAPE_FILE
-        self.conus_states_shapefile = states_shapefile or DEFAULT_STATES_SHAPE_FILE
+        self.borders_shapefiles = borders_shapefiles or \
+            [DEFAULT_SHAPE_FILE, DEFAULT_STATES_SHAPE_FILE]
         self.texture_shape = texture_shape
         self.polygon_probes = {}
         self.point_probes = {}
 
         self.layer_nodes = {}
         self.dataset_nodes = {}
+        self.latlon_grid_node = None  # noqa
+        self.borders_nodes = []
+
         self.composite_element_dependencies = {}
         self.animation_controller = AnimationController(self, frame_change_cb=self.frame_changed)
         self._current_tool = None
@@ -582,6 +588,8 @@ class SceneGraphManager(QObject):
             np.array([0., 0., 0., 1.], dtype=np.float32),  # black
             np.array([0., 0., 0., 0.], dtype=np.float32),  # transparent
         ]
+        self._latlon_grid_color_idx = 1
+        self._borders_color_idx = 0
 
         # TODO(ar) REVIEW: distinction between class and member/instance
         # variables seems random (see above)
@@ -663,23 +671,6 @@ class SceneGraphManager(QObject):
         self.main_map = MainMap(name="MainMap", parent=self.main_map_parent)
         self.proxy_nodes = {}
 
-        self._borders_color_idx = 0
-        self.borders = NEShapefileLines(self.border_shapefile, double=True,
-                                        color=self._color_choices[self._borders_color_idx], parent=self.main_map)
-        self.borders.transform = STTransform(translate=(0, 0, 40))
-        self.conus_states = NEShapefileLines(self.conus_states_shapefile, double=True,
-                                             color=self._color_choices[self._borders_color_idx], parent=self.main_map)
-        self.conus_states.transform = STTransform(translate=(0, 0, 45))
-
-        self._latlon_grid_color_idx = 1
-        latlon_grid_resolution = get_configured_latlon_grid_resolution()
-        latlon_grid_points = self._create_latlon_grid_points(
-            resolution=latlon_grid_resolution)
-        self.latlon_grid = Line(pos=latlon_grid_points, connect="strip",
-                                color=self._color_choices[self._latlon_grid_color_idx],
-                                parent=self.main_map)
-        self.latlon_grid.transform = STTransform(translate=(0, 0, 45))
-
         self.create_test_image()
 
         # Make the camera center on Guam
@@ -742,10 +733,23 @@ class SceneGraphManager(QObject):
         ll_xy = area_def.area_extent[:2]
         ur_xy = area_def.area_extent[2:]
 
+        # FIXME: This method is called via setup_initial_canvas() before the
+        #  system layer(s) and their nodes (here: self.latlon_grid_node) have
+        #  been initialized.  When 'center' is not None in that case
+        #  calculating 'mapped_center' will crash. Therefore as long as there
+        #  is no solution for the next FIX-ME this must be prevented by
+        #  revising the application setup process.  For the moment, we assume
+        #  that no one wants to use 'center' already when the application is
+        #  started and therefore we ...
+        assert center is None or self.latlon_grid_node is not None
+
         if center:
-            mapped_center = \
-                self.borders.transforms \
-                    .get_transform(map_to="scene").map([center])[0][:2]
+            # FIXME: We should be able to use the main_map object to do the
+            #  transform but it doesn't work (waiting on vispy developers)
+            # mapped_center = self.main_map.transforms\
+            #    .get_transform(map_to="scene").map([center])[0][:2]
+            mapped_center = self.latlon_grid_node.transforms \
+                .get_transform(map_to="scene").map([center])[0][:2]
             ll_xy += mapped_center
             ur_xy += mapped_center
 
@@ -800,7 +804,8 @@ class SceneGraphManager(QObject):
             # FIXME: We should be able to use the main_map object to do the transform
             #  but it doesn't work (waiting on vispy developers)
             # map_pos = self.main_map.transforms.get_transform().imap(buffer_pos)
-            map_pos = self.borders.transforms.get_transform().imap(buffer_pos)
+            map_pos = self.latlon_grid_node.transforms\
+                .get_transform().imap(buffer_pos)
             if np.any(np.abs(map_pos[:2]) > 1e25):
                 LOG.error("Invalid point probe location")
                 return
@@ -815,7 +820,11 @@ class SceneGraphManager(QObject):
         if (event.button == 2 and modifiers == (SHIFT,)) or (
                 self._current_tool == Tool.REGION_PROBE and event.button == 1):
             buffer_pos = event.sources[0].transforms.get_transform().map(event.pos)
-            map_pos = self.borders.transforms.get_transform().imap(buffer_pos)
+            # FIXME: We should be able to use the main_map object to do the transform
+            #  but it doesn't work (waiting on vispy developers)
+            # map_pos = self.main_map.transforms.get_transform().imap(buffer_pos)
+            map_pos = self.latlon_grid_node.transforms\
+                .get_transform().imap(buffer_pos)
             if np.any(np.abs(map_pos[:2]) > 1e25):
                 LOG.error("Invalid region probe location")
                 return
@@ -906,23 +915,26 @@ class SceneGraphManager(QObject):
         return self.main_canvas.update()
 
     def cycle_borders_color(self):
-        self._borders_color_idx = (self._borders_color_idx + 1) % len(self._color_choices)
+        self._borders_color_idx = \
+            (self._borders_color_idx + 1) % len(self._color_choices)
         if self._borders_color_idx + 1 == len(self._color_choices):
-            self.borders.visible = False
-            self.conus_states.visible = False
+            for borders_node in self.borders_nodes:
+                borders_node.visible = False
         else:
-            self.borders.set_data(color=self._color_choices[self._borders_color_idx])
-            self.borders.visible = True
-            self.conus_states.set_data(color=self._color_choices[self._borders_color_idx])
-            self.conus_states.visible = True
+            for borders_node in self.borders_nodes:
+                borders_node.set_data(
+                    color=self._color_choices[self._borders_color_idx])
+                borders_node.visible = True
 
-    def cycle_grid_color(self):
-        self._latlon_grid_color_idx = (self._latlon_grid_color_idx + 1) % len(self._color_choices)
+    def cycle_latlon_grid_color(self):
+        self._latlon_grid_color_idx = \
+            (self._latlon_grid_color_idx + 1) % len(self._color_choices)
         if self._latlon_grid_color_idx + 1 == len(self._color_choices):
-            self.latlon_grid.visible = False
+            self.latlon_grid_node.visible = False
         else:
-            self.latlon_grid.set_data(color=self._color_choices[self._latlon_grid_color_idx])
-            self.latlon_grid.visible = True
+            self.latlon_grid_node.set_data(
+                color=self._color_choices[self._latlon_grid_color_idx])
+            self.latlon_grid_node.visible = True
 
     def change_tool(self, name: Tool):
         prev_tool = self._current_tool
@@ -1132,6 +1144,49 @@ class SceneGraphManager(QObject):
         layer_node.transform = z_transform
 
         self.layer_nodes[layer.uuid] = layer_node
+
+    def add_node_for_system_generated_data(self, layer: LayerItem):
+        layer_node = self.layer_nodes[layer.uuid]
+        if layer.name == LATLON_GRID_DATASET_NAME:
+            self._build_latlon_grid_node(layer_node)
+        elif layer.name == BORDERS_DATASET_NAME:
+            self._build_borders_nodes(layer_node)
+        else:
+            raise ValueError(f"Unsupported generated layer: {layer.name}")
+
+    def _build_latlon_grid_node(self, layer_node):
+        """ Helper function for setting up the VisualNode for the system
+        layer for latitude/longitude grid.
+
+        :param layer_node: Scene graph node to be used as parent for the grid
+                           node.
+        """
+        latlon_grid_resolution = get_configured_latlon_grid_resolution()
+        latlon_grid_points = \
+            self._create_latlon_grid_points(resolution=latlon_grid_resolution)
+        self.latlon_grid_node = Line(
+            pos=latlon_grid_points, connect="strip",
+            color=self._color_choices[self._latlon_grid_color_idx],
+            parent=layer_node
+        )
+
+    def _build_borders_nodes(self, layer_node):
+        """ Helper function for setting up the VisualNodes for the system
+        layer for political borders.
+
+        One node is generated for each file stored in the (currently) internal
+        list of political borders shapefiles.
+
+        :param layer_node: Scene graph node to be used as parent for the
+                           borders node(s).
+        """
+        for shapefile in self.borders_shapefiles:
+            node = NEShapefileLines(
+                shapefile, double=True,
+                color=self._color_choices[self._borders_color_idx],
+                parent=layer_node
+            )
+            self.borders_nodes.append(node)
 
     def add_node_for_image_dataset(self, layer: LayerItem,
                                    product_dataset: ProductDataset):
