@@ -125,12 +125,9 @@ class RGBLayerConfigPane(QObject):
         return self._gamma_boxes
 
     def layer_added(self, layer: LayerItem):
-        if layer.kind in [Kind.RGB, Kind.CONTOUR]:
-            # can't choose RGBs as components of RGBs
-            return
-        self._layer_uuids.append(layer.uuid)
-
-        self._set_combos_to_layer_names()
+        if layer.kind in [Kind.IMAGE, Kind.COMPOSITE]:
+            self._layer_uuids.append(layer.uuid)
+            self._set_combos_to_layer_names()
 
     def layer_removed(self, layer_uuid):
         for idx in range(len(self._layer_uuids)):
