@@ -1,6 +1,6 @@
 import logging
 
-from PyQt5.QtCore import QStringListModel, QDateTime
+from PyQt5.QtCore import QDateTime
 
 from uwsift.control.time_matcher import TimeMatcher
 from uwsift.control.time_matcher_policies import find_nearest_past
@@ -41,8 +41,6 @@ class TimeManager:
         test_qdts = list(map(lambda dt: QDateTime(dt),
                              [dummy_dt + relativedelta(hours=i) for i in range(5)]))
         self.qml_timestamps_model = TimebaseModel(timestamps=test_qdts)
-        # TODO(mk): remove the below as soon as the 2 above are working
-        self.timeStampQStringModel = QStringListModel()
         self._animation_speed = animation_speed
         self._time_transformer = None
 
@@ -61,7 +59,7 @@ class TimeManager:
             self.qml_layer_manager.convenience_functions = self._collection.convenience_functions
         policy = WrappingDrivingPolicy(self._collection)
         self._collection.didUpdateCollection.connect(policy.on_collection_update)
-        self._collection.didUpdateCollection.connect(self.update_qml_collection_representation)
+        self._collection.didUpdateCollection.connect(self.update_qml_layer_model)
         policy.didUpdatePolicy.connect(self.update_qml_timeline)
         self._time_transformer = TimeTransformer(policy)
 
@@ -99,7 +97,7 @@ class TimeManager:
         self.qml_timestamps_model.timestamps = new_timestamp_qdts
         self.qml_backend.refresh_timeline()
 
-    def update_qml_collection_representation(self):
+    def update_qml_layer_model(self):
         """
         Slot connected to didUpdateCollection signal, responsible for managing the data layer
         combo box contents
