@@ -58,6 +58,8 @@ from uwsift import config
 from uwsift.common import DEFAULT_ANIMATION_DELAY, Info, Kind, Tool, Presentation
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.model.document import DocLayerStack, DocBasicDataset, Document
+from uwsift.model.layer_item import LayerItem
+from uwsift.model.product_dataset import ProductDataset
 from uwsift.model.time_manager import TimeManager
 from uwsift.queue import TASK_DOING, TASK_PROGRESS
 from uwsift.util import get_package_data_dir
@@ -530,8 +532,9 @@ class SceneGraphManager(QObject):
     polygon_probes = None
     point_probes = None
 
-    image_elements = None  # {layer_uuid:element}
-    composite_element_dependencies = None  # {layer_uuid:set-of-dependent-uuids}
+    layer_nodes = None  # {layer_uuid: layer_node}
+    dataset_nodes = None  # {dataset_uuid: dataset_node}
+    composite_element_dependencies = None  # {dataset_uuid:set-of-dependent-uuids}
     datasets = None
     colormaps = None
     animation_controller = None
@@ -563,7 +566,8 @@ class SceneGraphManager(QObject):
         self.polygon_probes = {}
         self.point_probes = {}
 
-        self.image_elements = {}
+        self.layer_nodes = {}
+        self.dataset_nodes = {}
         self.composite_element_dependencies = {}
         self.animation_controller = AnimationController(self, frame_change_cb=self.frame_changed)
         self._current_tool = None
@@ -727,9 +731,9 @@ class SceneGraphManager(QObject):
         assert area_def is not None
         self._set_projection(area_def, center)
 
-        for img in self.image_elements.values():
-            if hasattr(img, 'determine_reference_points'):
-                img.determine_reference_points()
+        for dataset_node in self.dataset_nodes.values():
+            if hasattr(dataset_node, 'determine_reference_points'):
+                dataset_node.determine_reference_points()
         self.on_view_change(None)
 
     def _set_projection(self, area_def: AreaDefinition, center=None):
@@ -963,43 +967,43 @@ class SceneGraphManager(QObject):
 
         uuids = uuid
         if uuid is None:
-            uuids = self.image_elements.keys()
+            uuids = self.dataset_nodes.keys()
         elif not isinstance(uuid, (list, tuple)):
             uuids = [uuid]
 
         for uuid in uuids:
-            layer = self.image_elements[uuid]
-            if (isinstance(layer, TiledGeolocatedImage)
-                    or isinstance(layer, Image)):
-                self.image_elements[uuid].cmap = colormap
+            dataset_node = self.dataset_nodes[uuid]
+            if (isinstance(dataset_node, TiledGeolocatedImage)
+                    or isinstance(dataset_node, Image)):
+                self.dataset_nodes[uuid].cmap = colormap
             else:
-                self.image_elements[uuid].color = colormap
+                self.dataset_nodes[uuid].color = colormap
 
     def set_color_limits(self, clims, uuid=None):
         """Update the color limits for the specified UUID
         """
         uuids = uuid
         if uuid is None:
-            uuids = self.image_elements.keys()
+            uuids = self.dataset_nodes.keys()
         elif not isinstance(uuid, (list, tuple)):
             uuids = [uuid]
 
         for uuid in uuids:
-            element = self.image_elements.get(uuid, None)
-            if element is not None:
-                self.image_elements[uuid].clim = clims
+            dataset_node = self.dataset_nodes.get(uuid, None)
+            if dataset_node is not None:
+                self.dataset_nodes[uuid].clim = clims
 
     def set_gamma(self, gamma, uuid):
         uuids = uuid
         if uuid is None:
-            uuids = self.image_elements.keys()
+            uuids = self.dataset_nodes.keys()
         elif not isinstance(uuid, (list, tuple)):
             uuids = [uuid]
 
         for uuid in uuids:
-            element = self.image_elements.get(uuid, None)
-            if element is not None and hasattr(element, 'gamma'):
-                self.image_elements[uuid].gamma = gamma
+            dataset_node = self.dataset_nodes.get(uuid, None)
+            if dataset_node is not None and hasattr(dataset_node, 'gamma'):
+                self.dataset_nodes[uuid].gamma = gamma
 
     def change_layers_colormap(self, change_dict):
         for uuid, cmapid in change_dict.items():
@@ -1016,10 +1020,12 @@ class SceneGraphManager(QObject):
             LOG.debug('changing {} to gamma {}'.format(uuid, gamma))
             self.set_gamma(gamma, uuid)
 
-    def change_layers_image_kind(self, change_dict):
-        for uuid, new_pz in change_dict.items():
-            LOG.info('changing {} to kind {}'.format(uuid, new_pz.kind.name))
-            self.add_basic_dataset(None, uuid, new_pz)
+    # This method may be revived again in case CONTOURS should be supported
+    # (again)
+    # def change_layers_image_kind(self, change_dict):
+    #     for uuid, new_pz in change_dict.items():
+    #         LOG.info('changing {} to kind {}'.format(uuid, new_pz.kind.name))
+    #         self.add_basic_dataset(None, uuid, new_pz)
 
     @staticmethod
     def _overwrite_with_test_pattern(data):
@@ -1110,35 +1116,30 @@ class SceneGraphManager(QObject):
                                              parent=parent,
                                              name=str(dataset[Info.UUID]))
         contour_visual.transform *= STTransform(translate=(0, 0, -50.0))
-        self.image_elements[dataset[Info.UUID]] = contour_visual
+        self.dataset_nodes[dataset[Info.UUID]] = contour_visual
         self.animation_controller.add_layer(contour_visual)
         self.on_view_change(None)
 
-    def add_basic_dataset(self, new_order: tuple, uuid: UUID, p: Presentation):
-        layer = self.document[uuid]
-        # create a new layer in the imagelist
-        if not layer.is_valid:
-            LOG.warning('unable to add an invalid layer, will try again later when layer changes')
-            return
-        if layer[Info.UUID] in self.image_elements:
-            image = self.image_elements[layer[Info.UUID]]
-            if p.kind == Kind.CONTOUR and isinstance(image, PrecomputedIsocurve):
-                LOG.warning("Contour layer already exists in scene")
-                return
-            if p.kind == Kind.IMAGE and isinstance(image, TiledGeolocatedImage):
-                LOG.warning("Image layer (geolocated) already exists in scene")
-                return
-            if p.kind == Kind.IMAGE and isinstance(image, Image):
-                LOG.warning("Image layer (pixel matrix) already exists in scene")
-                return
-            # we already have an image layer for it and it isn't what we want
-            # remove the existing image object and create the proper type now
-            image.parent = None
-            del self.image_elements[layer[Info.UUID]]
+    def add_node_for_layer(self, layer: LayerItem):
+        if not USE_TILED_GEOLOCATED_IMAGES and layer.kind == Kind.IMAGE:
+            layer_node = scene.Node(parent=self.main_map_parent,
+                                    name=str(layer.uuid))
+        else:
+            layer_node = scene.Node(parent=self.main_map,
+                                    name=str(layer.uuid))
 
-        image_data = self.workspace.get_content(layer.uuid, kind=p.kind)
-        if p.kind == Kind.CONTOUR:
-            return self.add_contour_dataset(layer, p, image_data)
+        z_transform = STTransform(translate=(0, 0, 0))
+        layer_node.transform = z_transform
+
+        self.layer_nodes[layer.uuid] = layer_node
+
+    def add_node_for_image_dataset(self, layer: LayerItem,
+                                   product_dataset: ProductDataset):
+        assert self.layer_nodes[layer.uuid] is not None
+        assert product_dataset.kind == Kind.IMAGE
+
+        image_data = self.workspace.get_content(product_dataset.uuid,
+                                                kind=product_dataset.kind)
 
         if False:  # Set to True FOR TESTING ONLY
             self._overwrite_with_test_pattern(image_data)
@@ -1146,54 +1147,44 @@ class SceneGraphManager(QObject):
         if USE_TILED_GEOLOCATED_IMAGES:
             image = TiledGeolocatedImage(
                 image_data,
-                layer[Info.ORIGIN_X],
-                layer[Info.ORIGIN_Y],
-                layer[Info.CELL_WIDTH],
-                layer[Info.CELL_HEIGHT],
-                name=str(uuid),
-                clim=p.climits,
-                gamma=p.gamma,
+                product_dataset.info[Info.ORIGIN_X],
+                product_dataset.info[Info.ORIGIN_Y],
+                product_dataset.info[Info.CELL_WIDTH],
+                product_dataset.info[Info.CELL_HEIGHT],
+                name=str(product_dataset.uuid),
+                clim=layer.presentation.climits,
+                gamma=layer.presentation.gamma,
                 interpolation='nearest',
                 method='subdivide',
-                cmap=self.document.find_colormap(p.colormap),
+                cmap=self.document.find_colormap(layer.presentation.colormap),
                 double=False,
                 texture_shape=DEFAULT_TEXTURE_SHAPE,
                 wrap_lon=False,
-                parent=self.main_map,
-                projection=layer[Info.PROJ],
+                parent=self.layer_nodes[layer.uuid],
+                projection=product_dataset.info[Info.PROJ],
             )
-            image.transform = PROJ4Transform(layer[Info.PROJ], inverse=True)
-            image.transform *= STTransform(translate=(0, 0, -50.0))
+            image.transform = PROJ4Transform(product_dataset.info[Info.PROJ],
+                                             inverse=True)
             image.determine_reference_points()
         else:
             image = Image(
                 image_data,
-                name=str(uuid),
-                clim=p.climits,
-                gamma=p.gamma,
+                name=str(product_dataset.uuid),
+                clim=layer.presentation.climits,
+                gamma=layer.presentation.gamma,
                 interpolation='nearest',
-                cmap=self.document.find_colormap(p.colormap),
-                parent=self.main_map_parent,
+                cmap=self.document.find_colormap(layer.presentation.colormap),
+                parent=self.layer_nodes[layer.uuid],
             )
-            # TODO: We must use a ChainTransform, because of the assumption made
-            # in LayerSet.update_layers_z(): there it is assumed, that the
-            # (last) transformation of the layer can be overwritten incautiously
-            # since it would only carry z translation. So the question: why
-            # doesn't LayerSet.add_layer() take care to guarantee this?
-            # Anyhow, here we can't concatenate two STTransforms with *= because
-            # they would end up in *one* transform whose 'translate' part would
-            # be overwritten in LayerSet.update_layers_z(), i.e. any x,y-offset
-            # would be reset to 0.0,0.0.
-            calibration_transform = STTransform(
-                scale=(layer[Info.CELL_WIDTH], layer[Info.CELL_HEIGHT], 1),
-                translate=(layer[Info.ORIGIN_X], layer[Info.ORIGIN_Y], 0))
-            z_transform = STTransform(translate=(0, 0, -50))
-            image.transform = ChainTransform([calibration_transform,
-                                              z_transform])
-        self.image_elements[uuid] = image
-        self.animation_controller.add_layer(image)  # TODO This method should add a z-transform!
-
+            image.transform = STTransform(
+                scale=(product_dataset.info[Info.CELL_WIDTH],
+                       product_dataset.info[Info.CELL_HEIGHT], 1),
+                translate=(product_dataset.info[Info.ORIGIN_X],
+                           product_dataset.info[Info.ORIGIN_Y], 0))
+        self.dataset_nodes[product_dataset.uuid] = image
         self.on_view_change(None)
+        LOG.debug("Scene Graph after IMAGE dataset insertion:")
+        LOG.debug(self.main_view.describe_tree(with_transform=True))
 
     def add_composite_dataset(self, new_order: tuple, uuid: UUID, p: Presentation):
         layer = self.document[uuid]
@@ -1207,7 +1198,7 @@ class SceneGraphManager(QObject):
             uuid = layer.uuid
             LOG.debug("Adding composite layer to Scene Graph Manager with UUID: %s", uuid)
             if USE_TILED_GEOLOCATED_IMAGES:
-                self.image_elements[uuid] = element = RGBCompositeLayer(
+                self.dataset_nodes[uuid] = dataset_node = RGBCompositeLayer(
                     image_data,
                     layer[Info.ORIGIN_X],
                     layer[Info.ORIGIN_Y],
@@ -1225,16 +1216,16 @@ class SceneGraphManager(QObject):
                     parent=self.main_map,
                     projection=layer[Info.PROJ],
                 )
-                element.transform = PROJ4Transform(layer[Info.PROJ], inverse=True)
-                element.transform *= STTransform(translate=(0, 0, -50.0))
+                dataset_node.transform = PROJ4Transform(layer[Info.PROJ], inverse=True)
+                dataset_node.transform *= STTransform(translate=(0, 0, -50.0))
                 self.composite_element_dependencies[uuid] = dep_uuids
-                self.animation_controller.add_layer(element)
+                self.animation_controller.add_layer(dataset_node)
                 if new_order:
                     self.animation_controller.set_layer_order(new_order)
                 self.on_view_change(None)
-                element.determine_reference_points()
+                dataset_node.determine_reference_points()
             else:
-                self.image_elements[uuid] = element = MultiChannelImage(
+                self.dataset_nodes[uuid] = dataset_node = MultiChannelImage(
                     image_data,
                     name=str(uuid),
                     clim=p.climits,
@@ -1256,10 +1247,10 @@ class SceneGraphManager(QObject):
                     scale=(layer[Info.CELL_WIDTH], layer[Info.CELL_HEIGHT], 1),
                     translate=(layer[Info.ORIGIN_X], layer[Info.ORIGIN_Y], 0))
                 z_transform = STTransform(translate=(0, 0, -50))
-                element.transform = ChainTransform([calibration_transform,
+                dataset_node.transform = ChainTransform([calibration_transform,
                                                     z_transform])
                 self.composite_element_dependencies[uuid] = dep_uuids
-                self.animation_controller.add_layer(element)
+                self.animation_controller.add_layer(dataset_node)
                 if new_order:
                     self.animation_controller.set_layer_order(new_order)
                 self.on_view_change(None)
@@ -1270,50 +1261,56 @@ class SceneGraphManager(QObject):
             # algebraic layer
             return self.add_basic_dataset(new_order, uuid, p)
 
-    def add_lines_dataset(self, new_order: tuple, uuid: UUID, p: Presentation):
-        layer = self.document[uuid]
-        if not layer.is_valid:
-            LOG.info('unable to add an invalid lines layer, will try again later when layer changes')
-            return
+    def add_node_for_lines_dataset(self, layer: LayerItem,
+                                   product_dataset: ProductDataset) \
+            -> scene.VisualNode:
+        assert self.layer_nodes[layer.uuid] is not None
+        assert product_dataset.kind == Kind.LINES
 
-        content, _ = self.workspace.get_lines_arrays(uuid)
+        content, _ = self.workspace.get_lines_arrays(product_dataset.uuid)
         if content is None:
-            LOG.info(f"layer contains no lines: {uuid}")
+            LOG.info(f"Dataset contains no lines: {product_dataset.uuid}")
             return
 
-        lines = Lines(content, parent=self.main_map)
-        lines.transform *= STTransform(translate=(0., 0., 50.))
-        lines.name = str(uuid)
-        self.image_elements[uuid] = lines
-        self.animation_controller.add_layer(lines)
+        lines = Lines(content,
+                      parent=self.layer_nodes[layer.uuid])
+        lines.name = str(product_dataset.uuid)
+
+        self.dataset_nodes[product_dataset.uuid] = lines
         self.on_view_change(None)
+        LOG.debug("Scene Graph after LINES dataset insertion:")
+        LOG.debug(self.main_view.describe_tree(with_transform=True))
 
-    def add_points_dataset(self, new_order: tuple, uuid: UUID, p: Presentation):
-        layer = self.document[uuid]
-        if not layer.is_valid:
-            LOG.info('unable to add an invalid points layer, will try again later when layer changes')
-            return
+    def add_node_for_points_dataset(self, layer: LayerItem,
+                                    product_dataset: ProductDataset) \
+            -> scene.VisualNode:
+        assert self.layer_nodes[layer.uuid] is not None
+        assert product_dataset.kind == Kind.POINTS
 
-        pos, values = self.workspace.get_points_arrays(uuid)
+        pos, values = self.workspace.get_points_arrays(product_dataset.uuid)
         if pos is None:
-            LOG.info(f"layer contains no points: {uuid}")
+            LOG.info(f"layer contains no points: {product_dataset.uuid}")
             return
 
-        kwargs = map_point_style_to_marker_kwargs(get_point_style_by_name(p.style))
+        kwargs = map_point_style_to_marker_kwargs(
+            get_point_style_by_name(layer.presentation.style))
 
         if values is not None:
             assert len(pos) == len(values)
-            # TODO use p.climits instead of autoscaling?
-            colormap = self.document.find_colormap(p.colormap)
+            # TODO use climits of the presentation instead of autoscaling?
+            colormap = self.document.find_colormap(layer.presentation.colormap)
             kwargs["face_color"] = \
                 self.map_to_colors_autoscaled(colormap, values)
 
-        points = Markers(pos=pos, parent=self.main_map, **kwargs)
-        points.transform *= STTransform(translate=(0., 0., 50.))
-        points.name = str(uuid)
-        self.image_elements[uuid] = points
-        self.animation_controller.add_layer(points)
+        points = Markers(pos=pos,
+                         parent=self.layer_nodes[layer.uuid],
+                         **kwargs)
+        points.name = str(product_dataset.uuid)
+
+        self.dataset_nodes[product_dataset.uuid] = points
         self.on_view_change(None)
+        LOG.debug("Scene Graph after POINTS dataset insertion:")
+        LOG.debug(self.main_view.describe_tree(with_transform=True))
 
     def map_to_colors_autoscaled(self, colormap, values, m=2):
         """
@@ -1351,14 +1348,14 @@ class SceneGraphManager(QObject):
     def change_composite_dataset(self, new_order: tuple, uuid: UUID, presentation: Presentation):
         layer = self.document[uuid]
         if presentation.kind == Kind.RGB:
-            if layer.uuid in self.image_elements:
+            if layer.uuid in self.dataset_nodes:
                 if layer.is_valid:
                     # RGB selection has changed, rebuild the layer
                     LOG.debug("Changing existing composite layer to Scene Graph Manager with UUID: %s", layer.uuid)
                     dep_uuids = r, g, b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
                     image_arrays = list(self.workspace.get_content(cuuid) for cuuid in dep_uuids)
                     self.composite_element_dependencies[layer.uuid] = dep_uuids
-                    elem = self.image_elements[layer.uuid]
+                    elem = self.dataset_nodes[layer.uuid]
                     if isinstance(elem, RGBCompositeLayer):
                         elem.set_channels(image_arrays,
                                           cell_width=layer[Info.CELL_WIDTH],
@@ -1396,17 +1393,13 @@ class SceneGraphManager(QObject):
         :param uuid: identifier of the layer
         :param kind: kind of the layer / data content.
         """
-        # TODO (AR): for kinds other than IMAGE the variables 'image' and
-        #  'image_data' are misleading, but so is the name of the member
-        #  'self.image_elements' too. Consider consistent renaming i.e. to
-        #  'scenegraph_node', 'content'/'content_data', 'self.scenegraph_nodes'
         layer = self.document[uuid]
-        image = self.image_elements[layer[Info.UUID]]
-        image_data = self.workspace.get_content(layer[Info.UUID], kind=kind)
+        dataset_node = self.dataset_nodes[layer[Info.UUID]]
+        dataset_content = self.workspace.get_content(layer[Info.UUID], kind=kind)
         try:
-            image.set_data(image_data)
+            dataset_node.set_data(dataset_content)
         except NotImplementedError:
-            if isinstance(image, TiledGeolocatedImage):
+            if isinstance(dataset_node, TiledGeolocatedImage):
                 LOG.debug(f"Updating data for UUID {uuid} on its associated"
                           f" scenegraph TiledGeolocatedImage node is not"
                           f" possible, hopefully the data was modified in-place"
@@ -1451,10 +1444,10 @@ class SceneGraphManager(QObject):
         :return:
         """
         self.set_layer_visible(uuid_removed, False)
-        if uuid_removed in self.image_elements:
-            image_layer = self.image_elements[uuid_removed]
+        if uuid_removed in self.dataset_nodes:
+            image_layer = self.dataset_nodes[uuid_removed]
             image_layer.parent = None
-            del self.image_elements[uuid_removed]
+            del self.dataset_nodes[uuid_removed]
             LOG.info("layer {} purge from scenegraphmanager".format(uuid_removed))
         else:
             LOG.debug("Layer {} already purged from Scene Graph".format(uuid_removed))
@@ -1475,12 +1468,12 @@ class SceneGraphManager(QObject):
 
     def _connect_doc_signals(self, document: Document):
         document.didReorderDatasets.connect(self._rebuild_dataset_order)  # current layer set changed z/anim order
-        document.didAddBasicDataset.connect(self.add_basic_dataset)  # layer added to one or more layer sets
+        # REMOVE document.didAddBasicDataset.connect(self.add_basic_dataset)  # layer added to one or more layer sets
         document.didUpdateBasicDataset.connect(self.update_basic_dataset)  # new data integrated in existing layer
         document.didAddCompositeDataset.connect(
             self.add_composite_dataset)  # layer derived from other layers (either basic or composite themselves)
-        document.didAddLinesDataset.connect(self.add_lines_dataset)
-        document.didAddPointsDataset.connect(self.add_points_dataset)
+        # REMOVE document.didAddLinesDataset.connect(self.add_lines_dataset)
+        # REMOVE document.didAddPointsDataset.connect(self.add_points_dataset)
         document.didRemoveDatasets.connect(self._remove_dataset)  # layer removed from current layer set
         document.willPurgeDataset.connect(self._purge_dataset)  # layer removed from document
         document.didSwitchLayerSet.connect(self.rebuild_new_layer_set)
@@ -1491,16 +1484,16 @@ class SceneGraphManager(QObject):
         document.didChangeCompositions.connect(self.change_composite_datasets)
         document.didChangeColorLimits.connect(self.change_layers_color_limits)
         document.didChangeGamma.connect(self.change_layers_gamma)
-        document.didChangeImageKind.connect(self.change_layers_image_kind)
+        # document.didChangeImageKind.connect(self.change_layers_image_kind)
 
     def set_frame_number(self, frame_number=None):
         self.animation_controller.next_frame(None, frame_number)
 
     def set_layer_visible(self, uuid: UUID, visible: Optional[bool] = None):
-        image = self.image_elements.get(uuid, None)
-        if image is None:
+        dataset_node = self.dataset_nodes.get(uuid, None)
+        if dataset_node is None:
             return
-        image.visible = not image.visible if visible is None else visible
+        dataset_node.visible = not dataset_node.visible if visible is None else visible
 
     def rebuild_dataset_order(self, new_layer_index_order, *args, **kwargs):
         """
@@ -1552,7 +1545,7 @@ class SceneGraphManager(QObject):
         active_lookup = dict((x.uuid, x) for x in active_layers)
         prez_lookup = dict((x.uuid, x) for x in presentation_info)
 
-        uuids_w_elements = set(self.image_elements.keys())
+        uuids_w_elements = set(self.dataset_nodes.keys())
         # get set of valid layers not having elements and invalid layers having elements
         inconsistent_uuids = uuids_w_elements ^ active_uuids
 
@@ -1601,21 +1594,23 @@ class SceneGraphManager(QObject):
             if need_retile:
                 self.start_retiling_task(uuid, preferred_stride, tile_box)
 
-        current_visible_layers = [p.uuid for (p, l) in self.document.active_layer_order if p.visible]
-        current_invisible_layers = set(self.image_elements.keys()) - set(current_visible_layers)
+        current_visible_datasets_uuids = \
+            [p.uuid for (p, l) in self.document.active_layer_order if p.visible]
+        current_invisible_datasets_uuids = \
+            set(self.dataset_nodes.keys()) - set(current_visible_datasets_uuids)
 
         def _assess_if_active(uuid):
-            element = self.image_elements.get(uuid, None)
-            if element is not None and hasattr(element, 'assess'):
-                _assess(uuid, element)
+            dataset_node = self.dataset_nodes.get(uuid, None)
+            if dataset_node is not None and hasattr(dataset_node, 'assess'):
+                _assess(uuid, dataset_node)
 
-        for uuid in current_visible_layers:
+        for uuid in current_visible_datasets_uuids:
             _assess_if_active(uuid)
         # update contours
         for node in self.proxy_nodes.values():
             node.on_view_change()
-        # update invisible layers
-        for uuid in current_invisible_layers:
+        # update invisible datasets
+        for uuid in current_invisible_datasets_uuids:
             _assess_if_active(uuid)
 
     def start_retiling_task(self, uuid, preferred_stride, tile_box):
@@ -1627,7 +1622,7 @@ class SceneGraphManager(QObject):
         LOG.debug("Retiling child with UUID: '%s'", uuid)
         yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.0}
         if uuid not in self.composite_element_dependencies:
-            child = self.image_elements[uuid]
+            child = self.dataset_nodes[uuid]
             data = self.workspace.get_content(uuid, lod=preferred_stride)
             yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.5}
             # FIXME: Use LOD instead of stride and provide the lod to the workspace
@@ -1636,7 +1631,7 @@ class SceneGraphManager(QObject):
             yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 1.0}
             self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)
         else:
-            child = self.image_elements[uuid]
+            child = self.dataset_nodes[uuid]
             data = [self.workspace.get_content(d_uuid, lod=preferred_stride) for d_uuid in
                     self.composite_element_dependencies[uuid]]
             yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.5}
@@ -1652,9 +1647,9 @@ class SceneGraphManager(QObject):
     def _set_retiled(self, uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords):
         """Slot to take data from background thread and apply it to the layer living in the image layer.
         """
-        child = self.image_elements.get(uuid, None)
+        child = self.dataset_nodes.get(uuid, None)
         if child is None:
-            LOG.warning('unable to find uuid %s in image_elements' % uuid)
+            LOG.warning('unable to find uuid %s in dataset_nodes' % uuid)
             return
         child.set_retiled(preferred_stride, tile_box, tiles_info, vertices, tex_coords)
         child.update()

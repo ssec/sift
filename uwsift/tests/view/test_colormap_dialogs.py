@@ -18,6 +18,7 @@ def test_slider_change(qtbot):
         climits=(0.0, 50.0),
         gamma=1.0,
         mixing=None,
+        opacity=1.0,
     )
     layer_info = {
         Info.VALID_RANGE: (0.0, 150.0),

@@ -86,6 +86,8 @@ from uwsift.view.colormap import COLORMAP_MANAGER, PyQtGraphColormap, SITE_CATEG
 from uwsift.queue import TASK_PROGRESS, TASK_DOING
 from PyQt5.QtCore import QObject, pyqtSignal
 
+from uwsift.workspace.workspace import frozendict
+
 LOG = logging.getLogger(__name__)
 
 DEFAULT_LAYER_SET_COUNT = 1  # this should match the ui configuration!
@@ -163,7 +165,7 @@ def _unit_format_func(layer, units):
 def preferred_units(dsi: DocBasicDataset) -> str:
     """
     Return unit string (i.e.: Kelvin) for a Product currently being loaded.
-    :param dsi: DocBasicLayer describing the product currently being added.
+    :param dsi: DocBasicDataset describing the product currently being added.
     :return: String describing the preferred unit for the product described in dsi.
     """
     # FUTURE: Use cfunits or cf_units package
@@ -784,7 +786,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         def _then_show_frames_in_document(doc=self.doc, frames=frames):
             """finally-do-this section back on UI thread
             """
-            [self.doc.activate_product_uuid_as_new_layer(frame) for frame in frames]
+            [self.doc.activate_product_uuid_as_new_dataset(frame) for frame in frames]
             return
             # ensure that the track these frames belongs to is activated itself
             # update the timeline view states of these frames to show them as active as well
@@ -1192,8 +1194,8 @@ class DataLayer:
         # Create timeline according to temporal resolution
 
         # maps: timestamp -> uuid
-        self.timeline = OrderedDict({uuid_dt_tup[1]: uuid_dt_tup[0]
-                                     for uuid_dt_tup in uuids_tstamps_asc})
+        self.timeline = {uuid_dt_tup[1]: uuid_dt_tup[0] for uuid_dt_tup in uuids_tstamps_asc}
+
 
     def t_matched_uuid(self) -> typ.Optional[UUID]:
         """
@@ -1404,12 +1406,13 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # signals
     # Clarification: Layer interfaces migrate to layer meaning "current active products under the playhead"
     # new order list with None for new layer; info-dictionary, overview-content-ndarray
-    didAddBasicDataset = pyqtSignal(tuple, UUID, Presentation)
+    didAddDataset = pyqtSignal(frozendict, Presentation)
+    didAddBasicDataset = pyqtSignal(tuple, UUID, Presentation)  # REMOVE: not emitted anywhere anymore
     didUpdateBasicDataset = pyqtSignal(UUID, Kind)
     # comp layer is derived from multiple basic layers and has its own UUID
     didAddCompositeDataset = pyqtSignal(tuple, UUID, Presentation)
-    didAddLinesDataset = pyqtSignal(tuple, UUID, Presentation)
-    didAddPointsDataset = pyqtSignal(tuple, UUID, Presentation)
+    didAddLinesDataset = pyqtSignal(tuple, UUID, Presentation)  # REMOVE: not emitted anywhere anymore
+    didAddPointsDataset = pyqtSignal(tuple, UUID, Presentation)  # REMOVE: not emitted anywhere anymore
     # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
     didRemoveDatasets = pyqtSignal(tuple, list, int, int)
     willPurgeDataset = pyqtSignal(UUID)  # UUID of the layer being removed
@@ -1632,7 +1635,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                          style=style if family_prez is None else family_prez.style,
                          climits=info[Info.CLIM] if family_prez is None else family_prez.climits,
                          gamma=gamma if family_prez is None else family_prez.gamma,
-                         mixing=Mixing.NORMAL)
+                         mixing=Mixing.NORMAL,
+                         opacity=1.0,)
 
         q = dataclasses.replace(p, visible=False)  # make it available but not visible in other layer sets
         old_layer_count = len(self._layer_sets[self.current_set_index])
@@ -1644,15 +1648,20 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             range(old_layer_count)))  # FIXME: this should obey insert_before, currently assumes always insert at top
         return p, reordered_indices
 
-    def activate_product_uuid_as_new_layer(self, uuid: UUID, insert_before=0, **importer_kwargs):
+    def activate_product_uuid_as_new_dataset(self, uuid: UUID, insert_before=0,
+                                             **importer_kwargs):
         if uuid in self._layer_with_uuid:
             LOG.debug("Layer already loaded: {}".format(uuid))
-            active_content_data = self._workspace.import_product_content(uuid, **importer_kwargs)
+            active_content_data = \
+                self._workspace.import_product_content(uuid, **importer_kwargs)
             return uuid, self[uuid], active_content_data
 
-        # FUTURE: Load this async, the slots for the below signal need to be OK with that
-        active_content_data = self._workspace.import_product_content(uuid, **importer_kwargs)
-        # updated metadata with content information (most importantly nav information)
+        # FUTURE: Load this async, the slots for the below signal need to be OK
+        # with that
+        active_content_data = \
+            self._workspace.import_product_content(uuid, **importer_kwargs)
+        # updated metadata with content information (most importantly navigation
+        # information)
         info = self._workspace.get_info(uuid)
         assert (info is not None)
         LOG.debug('cell_width: {}'.format(repr(info[Info.CELL_WIDTH])))
@@ -1663,20 +1672,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             dataset[Info.UNIT_CONVERSION] = units_conversion(dataset)
         if Info.FAMILY not in dataset:
             dataset[Info.FAMILY] = self.family_for_product_or_layer(dataset)
-        presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
+        presentation, reordered_indices = \
+            self._insert_layer_with_info(dataset, insert_before=insert_before)
 
-        if dataset[Info.KIND] == Kind.LINES:
-            self.didAddLinesDataset.emit(reordered_indices, dataset.uuid, presentation)
-            self._add_layer_family(dataset)
-        elif dataset[Info.KIND] == Kind.POINTS:
-            self.didAddPointsDataset.emit(reordered_indices, dataset.uuid, presentation)
-            self._add_layer_family(dataset)
-        else:
-            # signal updates from the document
-            self.didAddBasicDataset.emit(reordered_indices, dataset.uuid, presentation)
-            self._add_layer_family(dataset)
-            # update any RGBs that could use this to make an RGB
-            self.sync_composite_layer_prereqs([dataset[Info.SCHED_TIME]])
+        # signal updates from the document
+        self.didAddDataset.emit(info, presentation)
 
         return uuid, dataset, active_content_data
 
@@ -1830,7 +1830,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 LOG.warning("layer with UUID {} already in document?".format(uuid))
                 self._workspace.get_content(uuid)
             else:
-                self.activate_product_uuid_as_new_layer(uuid, insert_before=insert_before, **importer_kwargs)
+                self.activate_product_uuid_as_new_dataset(uuid, insert_before=insert_before, **importer_kwargs)
 
             yield {
                 TASK_DOING: 'Loading content {}/{}'.format(dex + 1, total_products),
@@ -2829,7 +2829,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def get_unique_product_family_keys(self) -> typ.List[typ.Tuple]:
         """
         Return list of unique product_family_keys in i.e. document._layer_with_uuid's
-        DocBasicLayers.
+        DocBasicDatasets.
         :return: unique_product_family_keys
         """
         prod_fam_keys = [dbl.product_family_key for dbl in self._layer_with_uuid.values()]
@@ -2843,7 +2843,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def create_data_layers(self) -> typ.List[DataLayer]:
         """
             Adds data layers to document, based on currently present
-            uuid -> DocBasicLayer (document._layer_with_uuid) mappings.
+            uuid -> DocBasicDataset (document._layer_with_uuid) mappings.
             :return: data_layers: typ.List of data layers to be incorporated into DataLayerCollection.
         """
         pf_keys: typ.List[typ.Tuple] = [dbl.product_family_key for dbl in self._layer_with_uuid.values()]
