@@ -1474,6 +1474,13 @@ class SceneGraphManager(QObject):
 
         self.on_view_change(None)
 
+    def update_layers_z(self, uuids: list):
+        if self.layer_nodes:
+            for z_level, uuid in enumerate(uuids):
+                layer_node = self.layer_nodes[uuid]
+                layer_node.transform.translate = (0, 0, 0 - z_level)
+            self.update()
+
     def remove_dataset(self, new_order: tuple, uuids_removed: tuple, row: int, count: int):
         """
         remove (disable) a layer, though this may be temporary due to a move.

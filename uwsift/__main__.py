@@ -1103,14 +1103,21 @@ class Main(QtWidgets.QMainWindow):
         self.layer_model.didAddSystemLayer.connect(
             self.scene_manager.add_node_for_system_generated_data)
 
+        self.layer_model.didReorderLayers.connect(
+            self.scene_manager.update_layers_z)
+
         self.ui.treeView.setModel(self.layer_model)
         self.ui.treeView.setHeaderHidden(False)
 
         for column in range(self.layer_model.columnCount()):
             self.ui.treeView.resizeColumnToContents(column)
 
+        self.ui.treeView.setDragEnabled(True)
         self.ui.treeView.setRootIsDecorated(False)
+        self.ui.treeView.setAcceptDrops(True)
+        self.ui.treeView.setDropIndicatorShown(True)
         self.ui.treeView.setSelectionMode(self.ui.treeView.SingleSelection)
+        self.ui.treeView.setDragDropMode(self.ui.treeView.InternalMove)
 
         self.layer_model.init_system_layers()
 

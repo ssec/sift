@@ -1,7 +1,9 @@
 import logging
+import struct
 from typing import List
 
-from PyQt5.QtCore import (QAbstractItemModel, Qt, QModelIndex, pyqtSignal)
+from PyQt5.QtCore import (QAbstractItemModel, Qt, QModelIndex, pyqtSignal,
+                          QMimeData)
 
 from uwsift.common import LAYER_TREE_VIEW_HEADER, Presentation, Info, Kind, \
     LATLON_GRID_DATASET_NAME, BORDERS_DATASET_NAME, Platform, Instrument
@@ -26,7 +28,7 @@ class LayerModel(QAbstractItemModel):
     # didChangeColorLimits = pyqtSignal(dict)
     # didChangeGamma = pyqtSignal(dict)
 
-    # didUpdateZOrder = pyqtSignal(list)
+    didReorderLayers = pyqtSignal(list)
     # didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
 
     # --------------- Adding layers derived from existing layers ---------------
@@ -77,7 +79,7 @@ class LayerModel(QAbstractItemModel):
         system_layer = LayerItem(self, pseudo_info, presentation)
 
         self.didCreateLayer.emit(system_layer)
-        self.add_layer(system_layer)
+        self._add_layer(system_layer)
         self.didAddSystemLayer.emit(system_layer)
 
     def init_system_layers(self):
@@ -103,10 +105,14 @@ class LayerModel(QAbstractItemModel):
     def flags(self, index):
         if index.isValid():
             flags = (Qt.ItemIsEnabled |
-                     Qt.ItemIsSelectable)
+                     Qt.ItemIsSelectable |
+                     Qt.ItemIsDragEnabled)
         else:
-            flags = Qt.NoItemFlags
+            flags = Qt.ItemIsDropEnabled
         return flags
+
+    def supportedDropActions(self):
+        return Qt.MoveAction
 
     def headerData(self, section: int, orientation, role=None):
 
@@ -114,19 +120,51 @@ class LayerModel(QAbstractItemModel):
             return self._headers[section]
         return None
 
-    def add_layer(self, layer: LayerItem) -> None:
+    def _add_layer(self, layer: LayerItem) -> None:
         """
-        Calling this method with a specified layer will insert that layer
-        into the LayerModel's `layers` collection and emit the correct
-        signals for QT to register the change that occurred to the model.
+        Insert given layer into the LayerModel's `layers` list.
 
         :param layer: Layer to be inserted into LayerModel.
+
+        The position of the new layer in the layer stack is determined by the
+        kind of the layer: Layers of kinds LINES and POINTS are put in front,
+        layers of other kinds are placed in front of the first existing layer,
+        which is also neither of kind LINES nor POINTS.
+
+        Emits the didReorderLayers() signal and (indirectly) other
+        QAbstractItemModel signals notifying about the model change.
         """
-        row = self.rowCount()
-        count = 1
-        self.beginInsertRows(QModelIndex(), row, row + count - 1)
-        self.layers.append(layer)
+        if layer in self.layers:
+            raise ValueError(f"LayerItem {layer} is already in LayerModel.")
+
+        # Determine the row to put the new layer into: layers of kinds POINTS
+        # and LINES (for now) should be put on top of all existing layers (be
+        # "favoured"), others should be on top of the existing layers of the
+        # other kinds but below layers of a "favoured" kind.
+        favoured_kinds = [
+            Kind.LINES,
+            Kind.POINTS,
+        ]
+
+        row = 0
+        if layer.kind not in favoured_kinds:
+            row = self.rowCount()  # fallback position: append
+            for idx, existing_layer in enumerate(self.layers):
+                if existing_layer.kind not in favoured_kinds:
+                    # Found the first layer not of favoured kind: insert new
+                    # layer right here putting it in front of the found one.
+                    row = idx
+                    break
+
+        self.beginInsertRows(QModelIndex(), row, row)
+        self.layers.insert(row, layer)
         self.endInsertRows()
+
+        self._emit_didReorderLayers()
+
+    def _emit_didReorderLayers(self):  # noqa
+        uuids = [layer.uuid for layer in self.layers]
+        self.didReorderLayers.emit(uuids)
 
     def hasChildren(self, parent=QModelIndex()) -> bool:
         """
@@ -180,8 +218,8 @@ class LayerModel(QAbstractItemModel):
             # ensure that the new layer is compatible with the dataset in
             # terms of the policy.
             layer = LayerItem(self, info, presentation, grouping_key)
-            self.add_layer(layer)
             self.didCreateLayer.emit(layer)
+            self._add_layer(layer)
 
         return layer
 
@@ -214,6 +252,61 @@ class LayerModel(QAbstractItemModel):
                 raise NotImplementedError(
                     f"Managing datasets of kind {product_dataset.kind}"
                     f" not (yet) supported.")
+
+    def mimeTypes(self):
+        return ['text/plain', 'text/xml']
+
+    def mimeData(self, indexes):
+        mime_data = QMimeData()
+        rows = list(set([index.row() for index in indexes]))
+        row_bytes = struct.pack("<I", rows[0])
+        mime_data.setData('text/plain', row_bytes)
+        return mime_data
+
+    def dropMimeData(self, mime_data, action, row, column, parentIndex):
+        if action == Qt.IgnoreAction:
+            return True
+        if action != Qt.MoveAction:
+            return False
+
+        source_row = struct.unpack("<I", mime_data.data('text/plain'))[0]
+
+        if row != -1:  # we may also interpret this as put to the end
+            target_row = row
+        elif parentIndex.isValid():
+            assert not parentIndex.isValid(), \
+                "BUG: hierarchical layers not implemented," \
+                " dropping on a parent must not yet occur!"
+            # This case needs modification when hierarchical layers are
+            # introduced.
+            target_row = parentIndex.row()  # just to keep the linter calm
+        else:
+            target_row = self.rowCount(QModelIndex())
+
+        move_is_possible = \
+            self.beginMoveRows(QModelIndex(), source_row, source_row,
+                               parentIndex, target_row)
+        if not move_is_possible:
+            return False
+
+        # According to https://doc.qt.io/qt-5/qabstractitemmodel.html#beginMoveRows
+        # now we can assert ...
+        assert not source_row <= target_row <= source_row + 1
+
+        if source_row < target_row:
+            target_row -= 1
+        self.layers.insert(target_row, self.layers.pop(source_row))
+        self.endMoveRows()
+
+        self._emit_didReorderLayers()
+        self._refresh()
+
+        return True
+
+    def _refresh(self):
+        self.layoutAboutToBeChanged.emit()
+        self.revert()
+        self.layoutChanged.emit()
 
 
 class ProductFamilyKeyMappingPolicy:
