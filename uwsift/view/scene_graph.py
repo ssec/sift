@@ -1039,6 +1039,22 @@ class SceneGraphManager(QObject):
     #         LOG.info('changing {} to kind {}'.format(uuid, new_pz.kind.name))
     #         self.add_basic_dataset(None, uuid, new_pz)
 
+    def change_layer_visible(self, layer_uuid: UUID, visible: bool):
+        self.layer_nodes[layer_uuid].visible = visible
+
+    def change_layer_opacity(self, layer_uuid: UUID, opacity: float):
+        # According to
+        #   https://vispy.org/api/vispy.scene.node.html#vispy.scene.node.Node.parent
+        # this should be sufficient, but it seems to be not:
+        #   self.layer_nodes[uuid].opacity = opacity
+        # Thus opacity must be set for all layer node children:
+        for child in self.layer_nodes[layer_uuid].children:
+            child.opacity = opacity
+        # TODO in case a dataset has its own Presentation simply overwriting
+        #  the opacity of the 'child' node representing it is wrong:
+        #  opacities have to be mixed then. This cannot be done here though
+        self.update()
+
     @staticmethod
     def _overwrite_with_test_pattern(data):
         """
@@ -1169,6 +1185,7 @@ class SceneGraphManager(QObject):
             color=self._color_choices[self._latlon_grid_color_idx],
             parent=layer_node
         )
+        self.latlon_grid_node.set_gl_state('translucent')
 
     def _build_borders_nodes(self, layer_node):
         """ Helper function for setting up the VisualNodes for the system
@@ -1186,6 +1203,7 @@ class SceneGraphManager(QObject):
                 color=self._color_choices[self._borders_color_idx],
                 parent=layer_node
             )
+            node.set_gl_state('translucent')
             self.borders_nodes.append(node)
 
     def add_node_for_image_dataset(self, layer: LayerItem,
@@ -1329,6 +1347,7 @@ class SceneGraphManager(QObject):
 
         lines = Lines(content,
                       parent=self.layer_nodes[layer.uuid])
+        lines.set_gl_state('translucent')
         lines.name = str(product_dataset.uuid)
 
         self.dataset_nodes[product_dataset.uuid] = lines
@@ -1360,6 +1379,7 @@ class SceneGraphManager(QObject):
         points = Markers(pos=pos,
                          parent=self.layer_nodes[layer.uuid],
                          **kwargs)
+        points.set_gl_state('translucent')  # makes no difference though
         points.name = str(product_dataset.uuid)
 
         self.dataset_nodes[product_dataset.uuid] = points
@@ -1476,9 +1496,15 @@ class SceneGraphManager(QObject):
 
     def update_layers_z(self, uuids: list):
         if self.layer_nodes:
+            # Rendering order must be set analogous to z order
+            # (higher z values -> further away), render back to front
+            # https://vispy.org/faq.html#how-to-achieve-transparency-with-2d-objects
+            z_counter = 0
             for z_level, uuid in enumerate(uuids):
                 layer_node = self.layer_nodes[uuid]
                 layer_node.transform.translate = (0, 0, 0 - z_level)
+                layer_node.order = z_counter
+                z_counter -= 1
             self.update()
 
     def remove_dataset(self, new_order: tuple, uuids_removed: tuple, row: int, count: int):

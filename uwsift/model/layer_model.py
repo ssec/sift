@@ -1,12 +1,14 @@
 import logging
 import struct
 from typing import List
+from uuid import UUID
 
 from PyQt5.QtCore import (QAbstractItemModel, Qt, QModelIndex, pyqtSignal,
                           QMimeData)
 
 from uwsift.common import LAYER_TREE_VIEW_HEADER, Presentation, Info, Kind, \
-    LATLON_GRID_DATASET_NAME, BORDERS_DATASET_NAME, Platform, Instrument
+    LATLON_GRID_DATASET_NAME, BORDERS_DATASET_NAME, Platform, Instrument, \
+    LayerModelColumns as LMC, LayerVisibility
 from uwsift.model.layer_item import LayerItem
 from uwsift.model.product_dataset import ProductDataset
 from uwsift.workspace.workspace import frozendict
@@ -27,6 +29,8 @@ class LayerModel(QAbstractItemModel):
     # didChangeColormap = pyqtSignal(dict)
     # didChangeColorLimits = pyqtSignal(dict)
     # didChangeGamma = pyqtSignal(dict)
+    didChangeLayerVisible = pyqtSignal(UUID, bool)
+    didChangeLayerOpacity = pyqtSignal(UUID, float)
 
     didReorderLayers = pyqtSignal(list)
     # didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
@@ -64,7 +68,7 @@ class LayerModel(QAbstractItemModel):
 
         self.layers: List[LayerItem] = []
 
-        self._supportedRoles = [Qt.DisplayRole]
+        self._supportedRoles = [Qt.DisplayRole, Qt.EditRole]
 
     def _init_system_layer(self, name):
         # The minimal 'dataset' information required by LayerItem
@@ -206,6 +210,33 @@ class LayerModel(QAbstractItemModel):
         :return: Integer representing the order of queried layer.
         """
         return self.layers.index(layer)
+
+    def setData(self, index: QModelIndex, data, role: int = Qt.EditRole):
+        if not index.isValid():
+            return False
+
+        assert role == Qt.EditRole, \
+            f"Unexpected role {role} for changing data."
+        assert index.column() == LMC.VISIBILITY, \
+            f"Attempt to edit immutable column {index.column()}."
+
+        LOG.debug(f"Changing row {index.row()}, column {index.column()}"
+                  f" to {data}.")
+
+        layer = self.layers[index.row()]
+        layer_visibility: LayerVisibility = data
+        if layer.opacity != layer_visibility.opacity:
+            layer.opacity = layer_visibility.opacity
+            LOG.debug(f"Layer opacity changed to:"
+                      f" {self.layers[index.row()].opacity}")
+            self.didChangeLayerOpacity.emit(layer.uuid, layer.opacity)
+        if layer.visible != layer_visibility.visible:
+            layer.visible = layer_visibility.visible
+            LOG.debug(f"Layer visible changed to:"
+                      f" {self.layers[index.row()].visible}")
+            self.didChangeLayerVisible.emit(layer.uuid, layer.visible)
+        self.dataChanged.emit(index, index)
+        return True
 
     def _get_layer_for_dataset(self, info: frozendict,
                                presentation: Presentation) -> LayerItem:

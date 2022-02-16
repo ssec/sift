@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'pov_main.ui'
 #
-# Created by: PyQt5 UI code generator 5.15.5
+# Created by: PyQt5 UI code generator 5.12.3
 #
 # WARNING! All changes made in this file will be lost!
 
@@ -769,7 +769,7 @@ class Ui_MainWindow(object):
         self.horizontalLayout_10.setObjectName("horizontalLayout_10")
         self.verticalLayout_11 = QtWidgets.QVBoxLayout()
         self.verticalLayout_11.setObjectName("verticalLayout_11")
-        self.treeView = QtWidgets.QTreeView(self.dockWidgetContents_3)
+        self.treeView = LayerTreeView(self.dockWidgetContents_3)
         self.treeView.setDragDropMode(QtWidgets.QAbstractItemView.InternalMove)
         self.treeView.setAlternatingRowColors(True)
         self.treeView.setObjectName("treeView")
@@ -841,3 +841,4 @@ class Ui_MainWindow(object):
         self.LayerModelDockWidget.setWindowTitle(_translate("MainWindow", "Layer Manager"))
 from PyQt5 import QtQuickWidgets
 from uwsift.ui.custom_widgets import QNoScrollComboBox, QNoScrollDoubleSpinBox, QNoScrollSlider
+from uwsift.view.layer_tree_view import LayerTreeView

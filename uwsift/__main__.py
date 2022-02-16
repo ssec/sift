@@ -22,6 +22,7 @@ __author__ = 'rayg'
 
 # To have consistent logging for all modules (also for their static
 # initialization) it must be set up before importing them.
+
 from uwsift.util.logger import configure_loggers
 
 configure_loggers()  # noqa - we rerun this later again to post-config
@@ -1106,18 +1107,12 @@ class Main(QtWidgets.QMainWindow):
         self.layer_model.didReorderLayers.connect(
             self.scene_manager.update_layers_z)
 
+        self.layer_model.didChangeLayerVisible.connect(
+            self.scene_manager.change_layer_visible)
+        self.layer_model.didChangeLayerOpacity.connect(
+            self.scene_manager.change_layer_opacity)
+
         self.ui.treeView.setModel(self.layer_model)
-        self.ui.treeView.setHeaderHidden(False)
-
-        for column in range(self.layer_model.columnCount()):
-            self.ui.treeView.resizeColumnToContents(column)
-
-        self.ui.treeView.setDragEnabled(True)
-        self.ui.treeView.setRootIsDecorated(False)
-        self.ui.treeView.setAcceptDrops(True)
-        self.ui.treeView.setDropIndicatorShown(True)
-        self.ui.treeView.setSelectionMode(self.ui.treeView.SingleSelection)
-        self.ui.treeView.setDragDropMode(self.ui.treeView.InternalMove)
 
         self.layer_model.init_system_layers()
 
