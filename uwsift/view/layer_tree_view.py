@@ -10,6 +10,8 @@ class LayerTreeView(QTreeView):
         super(LayerTreeView, self).__init__(*args, **kwargs)
 
         self.setHeaderHidden(False)
+        self.header().setStretchLastSection(False)
+        self.header().setSectionResizeMode(QHeaderView.ResizeToContents)
 
         self.setRootIsDecorated(False)
 
