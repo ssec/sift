@@ -765,17 +765,9 @@ class ContentImage(Content):
     x_path = Column(String, nullable=True)  # if needed, x location cache path relative to workspace
     z_path = Column(String, nullable=True)  # if needed, z location cache path relative to workspace
 
-    @property
-    def is_overview(self):
-        return self.lod == self.LOD_OVERVIEW
-
-    @property
-    def shape(self):
-        return tuple(filter(lambda x: x, [self.rows, self.cols, self.levels]))
-
-    @property
-    def INFO_TO_FIELD(self):
-        fields = {
+    INFO_TO_FIELD = {
+            Info.PROJ: 'proj4',
+            Info.PATHNAME: 'path',
             Info.CELL_HEIGHT: 'cell_height',
             Info.CELL_WIDTH: 'cell_width',
             Info.ORIGIN_X: 'origin_x',
@@ -784,8 +776,17 @@ class ContentImage(Content):
             Info.GRID_FIRST_INDEX_X: 'grid_first_index_x',
             Info.GRID_FIRST_INDEX_Y: 'grid_first_index_y',
         }
-        fields.update(super().INFO_TO_FIELD)
-        return fields
+
+    def __init__(self, *args, **kwargs):
+        super(ContentImage, self).__init__(*args, **kwargs)
+
+    @property
+    def is_overview(self):
+        return self.lod == self.LOD_OVERVIEW
+
+    @property
+    def shape(self):
+        return tuple(filter(lambda x: x, [self.rows, self.cols, self.levels]))
 
 
 class ContentUnstructuredPoints(Content):
