@@ -24,6 +24,7 @@ __author__ = 'rayg'
 # initialization) it must be set up before importing them.
 from uwsift.model.composite_recipes import RecipeManager
 from uwsift.util.logger import configure_loggers
+from uwsift.view.algebraic_config import AlgebraicLayerConfigPane
 
 configure_loggers()  # noqa - we rerun this later again to post-config
 
@@ -921,6 +922,7 @@ class Main(QtWidgets.QMainWindow):
 
         self._init_layer_model()
         self._init_layer_panes()
+        self._init_algebraic_pane()
         self._init_rgb_pane()
         self._init_recipe_manager()
         self._init_map_widget()
@@ -936,7 +938,7 @@ class Main(QtWidgets.QMainWindow):
                                                )
 
         # disable close button on panes
-        panes = [self.ui.areaProbePane, self.ui.layersPane, self.ui.layerDetailsPane, self.ui.rgbConfigPane]
+        panes = [self.ui.areaProbePane, self.ui.layersPane, self.ui.layerDetailsPane, self.ui.rgbConfigPane, self.ui.algebraicConfigPane]
         for pane in panes:
             pane.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable |
                              QtWidgets.QDockWidget.DockWidgetMovable)
@@ -1133,6 +1135,21 @@ class Main(QtWidgets.QMainWindow):
 
         self.layer_model.init_system_layers()
 
+    def _init_algebraic_pane(self):
+        self.algebraic_config_pane = AlgebraicLayerConfigPane(
+            self.ui, self.ui.layersPaneWidget, self.layer_model
+        )
+
+        self.ui.treeView.layerSelectionChanged.connect(
+            self.algebraic_config_pane.selection_did_change
+        )
+        self.layer_model.didAddImageLayer.connect(
+            self.algebraic_config_pane.layer_added
+        )
+        self.algebraic_config_pane.didTriggeredUpdate.connect(
+            self.layer_model.update_recipe_layer_timeline
+        )
+
     def _init_rgb_pane(self):
         self.rgb_config_pane = RGBLayerConfigPane(self.ui,
                                                   self.ui.layersPaneWidget,
@@ -1149,8 +1166,14 @@ class Main(QtWidgets.QMainWindow):
         self.layer_model.didRequestCompositeRecipeCreation.connect(
             self.recipe_manager.create_rgb_recipe
         )
+        self.layer_model.didRequestAlgebraicRecipeCreation.connect(
+            self.recipe_manager.create_algebraic_recipe
+        )
         self.recipe_manager.didCreateRGBCompositeRecipe.connect(
             self.layer_model.create_rgb_composite_layer
+        )
+        self.recipe_manager.didCreateAlgebraicRecipe.connect(
+            self.layer_model.create_algebraic_composite_layer
         )
         self.rgb_config_pane.didChangeRGBInputLayers.connect(
             self.recipe_manager.update_rgb_recipe_input_layers
@@ -1173,8 +1196,20 @@ class Main(QtWidgets.QMainWindow):
         self.rgb_config_pane.didChangeRecipeName.connect(
             self.recipe_manager.update_recipe_name
         )
+        self.algebraic_config_pane.didChangeRecipeName.connect(
+            self.recipe_manager.update_recipe_name
+        )
         self.recipe_manager.didUpdateRecipeName.connect(
             self.layer_model.update_rgb_layer_name
+        )
+        self.algebraic_config_pane.didChangeAlgebraicInputLayers.connect(
+            self.recipe_manager.update_algebraic_recipe_input_layers
+        )
+        self.algebraic_config_pane.didChangeAlgebraicOperationKind.connect(
+            self.recipe_manager.update_algebraic_recipe_operation_kind
+        )
+        self.algebraic_config_pane.didChangeAlgebraicOperationFormula.connect(
+            self.recipe_manager.update_algebraic_recipe_operation_formula
         )
 
     def _init_layer_panes(self):
@@ -1223,6 +1258,8 @@ class Main(QtWidgets.QMainWindow):
     def _init_arrange_panes(self):
         self.tabifyDockWidget(self.ui.layersPane, self.ui.areaProbePane)
         self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.rgbConfigPane)
+        self.tabifyDockWidget(self.ui.layerDetailsPane,
+                              self.ui.algebraicConfigPane)
         # self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.timelinePane)
         self.layout().removeWidget(self.ui.timelinePane)
         self.ui.timelinePane.deleteLater()
@@ -1534,7 +1571,9 @@ class Main(QtWidgets.QMainWindow):
 
 
         algebraic = QtWidgets.QAction("Create Algebraic", self)
-        algebraic.triggered.connect(self.create_algebraic)
+        algebraic.triggered.connect(
+            self.layer_model.start_algebraic_composite_creation
+        )
 
         toggle_point = QtWidgets.QAction("Toggle Point Probe", self)
         toggle_point.setShortcut('X')
