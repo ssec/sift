@@ -1,3 +1,5 @@
+import sys
+
 import numpy as np
 from typing import List, Dict, Callable, Optional
 
@@ -47,11 +49,19 @@ class QmlLayerManager(QObject):
                 tl = list(dynamic_layer.timeline.keys())
                 t_diffs = [tl[i + 1] - tl[i] for i in range(len(tl) - 1)]
                 # Calculate mean difference in timeline in seconds to support
-                # comparing timelines with non-regularly occurring timestamps
-                temporal_differences[i] = np.mean(list(map(lambda td: td.total_seconds(), t_diffs)))
+                # comparing timelines with non-regularly occurring
+                # timestamps. Timelines with zero or one entries (=> t_diffs
+                # is empty) are not suitable, assign largest possible mean
+                # value for them!
+                temporal_differences[i] = \
+                    sys.float_info.max if not t_diffs else \
+                    np.mean(list(map(lambda td: td.total_seconds(), t_diffs)))
             most_frequent_data_layer_idx = np.argmin(temporal_differences)
             if not isinstance(most_frequent_data_layer_idx, np.int64):
-                # If there exist multiple timelines at the same sampling rate, take the first one.
+                # If there exist multiple timelines at the same sampling rate,
+                # take the first one.
+                # TODO: better: take one with most datasets (= 'longest'
+                #  timeline)
                 most_frequent_data_layer_idx = most_frequent_data_layer_idx[0]
             return most_frequent_data_layer_idx
 
