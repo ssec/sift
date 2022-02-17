@@ -401,7 +401,10 @@ class SceneGraphManager(QObject):
     didChangeFrame = pyqtSignal(tuple)
     didChangeLayerVisibility = pyqtSignal(dict)  # similar to document didChangeLayerVisibility
     newPointProbe = pyqtSignal(str, tuple)
-    newProbePolygon = pyqtSignal(object, object)
+    # REMARK: PyQT tends to fail if a signal with an argument of type 'list' is
+    # passed an empty list or the 'None' object. By declaring the signal as
+    # having an argument of type 'object' is avoided.
+    newProbePolygon = pyqtSignal(object)
 
     def __init__(self, doc, workspace, queue,
                  borders_shapefiles: list = None, states_shapefile=None,
@@ -682,7 +685,7 @@ class SceneGraphManager(QObject):
             if self.pending_polygon.add_point(event.pos[:2], map_pos[:2], 60):
                 points = self.pending_polygon.points + [self.pending_polygon.points[0]]
                 self.clear_pending_polygon()
-                self.newProbePolygon.emit(self.animation_controller.top_layer_uuid(), points)
+                self.newProbePolygon.emit(points)
 
     def clear_pending_polygon(self):
         for marker in self.pending_polygon.markers:
