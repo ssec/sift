@@ -46,6 +46,14 @@ RGBA2IDX: Mapping[str, int] = dict(r=CHANNEL_RED,
                                    b=CHANNEL_BLUE,
                                    a=CHANNEL_ALPHA)
 
+CHANNEL_X = 0
+CHANNEL_Y = 1
+CHANNEL_Z = 2
+
+XYZ2IDX: Mapping[str, int] = dict(x=CHANNEL_X,
+                                  y=CHANNEL_Y,
+                                  z=CHANNEL_Z)
+
 DIFF_OP_NAME = 'Difference'
 NDI_OP_NAME = 'Normalized Difference Index'
 CUSTOM_OP_NAME = "Custom..."
@@ -206,6 +214,7 @@ class AlgebraicRecipe(Recipe):
 
 class RecipeManager(QObject):
     didCreateRGBCompositeRecipe = pyqtSignal(CompositeRecipe)
+    didCreateAlgebraicRecipe = pyqtSignal(AlgebraicRecipe)
     didUpdateRGBCompositeRecipe = pyqtSignal(CompositeRecipe, object)
 
     didUpdateRGBInputLayers = pyqtSignal(CompositeRecipe)
@@ -313,6 +322,43 @@ class RecipeManager(QObject):
 
         self.recipes[recipe.id] = recipe
         self.didUpdateRecipeName.emit(recipe)
+
+    def create_algebraic_recipe(self, layers):
+        recipe_name = AlgebraicRecipe.kind()
+        recipe = AlgebraicRecipe.from_algebraic(
+            recipe_name,
+            x=None if layers[0] is None else layers[0].uuid,
+            y=None if layers[1] is None else layers[1].uuid,
+            z=None if layers[2] is None else layers[2].uuid,
+            operation_kind=DIFF_OP_NAME
+        )
+        self.add_recipe(recipe)
+
+        self.didCreateAlgebraicRecipe.emit(recipe)
+
+    def update_algebraic_recipe_operation_kind(self, recipe: AlgebraicRecipe,
+                                               operation_kind: str):
+        recipe.operation_kind = operation_kind
+        recipe.modified = True
+        self.recipes[recipe.id] = recipe
+
+    def update_algebraic_recipe_operation_formula(self,
+                                                  recipe: AlgebraicRecipe,
+                                                  operation_formula: str):
+        recipe.operation_formula = operation_formula
+        recipe.modified = True
+        self.recipes[recipe.id] = recipe
+
+    def update_algebraic_recipe_input_layers(self, recipe: AlgebraicRecipe,
+                                             channel: str,
+                                             layer_uuid: uuid.UUID):
+        channel_idx = XYZ2IDX.get(channel)
+
+        assert channel_idx is not None, f"Given channel '{channel}' is invalid"
+
+        recipe.input_layer_ids[channel_idx] = layer_uuid
+        recipe.modified = True
+        self.recipes[recipe.id] = recipe
 
     def __getitem__(self, recipe_id):
         return self.recipes[recipe_id]
