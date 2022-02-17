@@ -1,0 +1,8 @@
+# Overwrite the default import path for the Sapty package
+# This can be used during development to load a different version of Satpy without the need to package it first
+#satpy_import_path: "/tcenas/home/andream/code/satpy_latest/satpy/satpy"
+
+# Make special fci_l1_geoobs reader (see
+# https://gitlab.eumetsat.int/Meraner/fci_l1_geoobs_satpy_reader) available
+# NOTE: this option may be a temporary solution
+#satpy_extra_readers_import_path: "/tcenas/home/andream/src/local_readers"

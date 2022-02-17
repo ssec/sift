@@ -1,0 +1,8 @@
+
+# Configuration of display features
+display:
+
+  # Activate reprojected image display using tiled geolocated image nodes,
+  # otherwise pixel matrix display with ordinary (albeit gamma correction
+  # capable) image nodes becomes active. Default: True
+  use_tiled_geolocated_images: True

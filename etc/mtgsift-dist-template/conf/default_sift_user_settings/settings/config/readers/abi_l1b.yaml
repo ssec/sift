@@ -1,0 +1,4 @@
+data_reading:
+  abi_l1b:
+    group_keys: ['start_time', 'platform_shortname']
+    filter_patterns: ['{env:2s}_{mission:3s}-L1b-{obs_type:3s}{scene:s}-{scan_mode:2s}{channel:3s}_{platform_shortname:3s}_s{start_time:%Y%j%H%M%S%f}_e{end_time:%Y%j%H%M%S%f}_c{creation_time:%Y%j%H%M%S%f}{appendix}.nc{nc_version}']

@@ -60,6 +60,7 @@ hidden_imports = [
     "shapely",
     "skimage",
     "skimage.measure",
+    "sqlalchemy",
     "sqlalchemy.ext.baked",
     "vispy.app.backends._pyqt5",
     "vispy.ext._bundled.six",
@@ -71,6 +72,8 @@ hidden_imports += collect_submodules("rasterio")
 hidden_imports += collect_submodules("satpy")
 hidden_imports += collect_submodules("numcodecs") 
 hidden_imports += collect_submodules("shapely")
+hidden_imports += collect_submodules("sqlalchemy")
+hidden_imports += collect_submodules("pyqtgraph")
 if is_win:
     hidden_imports += collect_submodules("PyQt5")
     hidden_imports += collect_submodules("encodings")
