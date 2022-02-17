@@ -248,6 +248,7 @@ Rectangle{
 
         // signals
         signal reemittedTimelineIndexChanged(var idx);
+        signal reemittedRefreshTimeline();
         // JS functions
         function calculateTickWidthPerTime(ticks){
             let tickWidthPerTime;
@@ -332,7 +333,11 @@ Rectangle{
             currIndex = idx;
             requestPaint();
         }
-
+        onReemittedRefreshTimeline: {
+            timelineMarkerCanvas.updateMarkerBlueprints();
+            timelineMarkerCanvas.requestPaint();
+        }
+        // Connections
         Connections{
             target: timelineRulerCanvas
             onWidthChanged: {
@@ -351,9 +356,9 @@ Rectangle{
         }
 
         Component.onCompleted: {
-            backend.doNotifyTimelineIndexChanged.connect(reemittedTimelineIndexChanged)
+            backend.doNotifyTimelineIndexChanged.connect(reemittedTimelineIndexChanged);
+            backend.doRefreshTimeline.connect(reemittedRefreshTimeline);
         }
-
     }
     MouseArea{
         id: mouse_area

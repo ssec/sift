@@ -305,12 +305,12 @@ class UserControlsAnimation(QtCore.QObject):
     def next_frame(self, *args, **kwargs):
         """Advance a frame along the animation order."""
         self.scene_manager.animation_controller.animating = False
-        self.scene_manager.animation_controller.step(backwards=False)
+        self.scene_manager.animation_controller.time_manager.step()
 
     def prev_frame(self, *args, **kwargs):
         """Retreat a frame along the animation list."""
         self.scene_manager.animation_controller.animating = False
-        self.scene_manager.animation_controller.step(backwards=True)
+        self.scene_manager.animation_controller.time_manager.step(backwards=True)
 
     def reset_frame_slider(self, *args, **kwargs):
         """Reset frame slider to show current animation state in document when aniamtion list changes."""
@@ -338,7 +338,6 @@ class UserControlsAnimation(QtCore.QObject):
             if not UWSIFT_ANIM_INDICATOR_DISABLED:
                 t_sim = self.scene_manager.animation_controller.time_manager.create_formatted_t_sim()
                 self.ui.animationLabel.setText(t_sim)
-            #self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
         else:
             self.update_frame_time_to_top_visible()
 
@@ -1112,6 +1111,11 @@ class Main(QtWidgets.QMainWindow):
         self.layer_model.didChangeLayerOpacity.connect(
             self.scene_manager.change_layer_opacity)
 
+        self.scene_manager.animation_controller.connect_to_model(
+            self.layer_model)
+        self.layer_model.didActivateProductDataset.connect(
+            self.scene_manager.change_dataset_visible)
+
         self.ui.treeView.setModel(self.layer_model)
 
         self.layer_model.init_system_layers()
@@ -1148,7 +1152,8 @@ class Main(QtWidgets.QMainWindow):
         time_manager.qml_engine = self.ui.timelineQuickWidget.engine()
         time_manager.qml_root_object = self.ui.timelineQuickWidget.rootObject()
         time_manager.qml_backend = QmlBackend()
-        time_manager.qml_backend.didJumpInTimeline.connect(self.scene_manager.animation_controller.jump)
+        time_manager.qml_backend.\
+            didJumpInTimeline.connect(self.scene_manager.animation_controller.jump)
         time_manager.qml_backend.didChangeTimebase.connect(time_manager.on_timebase_change)
         # TODO(mk): refactor all QML related objects as belonging to TimeManager's QMLBackend
         #           instance -> communication between TimeManager and QMLBackend via Signal/Slot?

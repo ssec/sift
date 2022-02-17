@@ -1,13 +1,11 @@
-from datetime import datetime
 import logging
-
+from datetime import datetime
 from typing import List, Optional
 
+import numpy as np
 from PyQt5.QtCore import QObject, pyqtSignal
 
-from uwsift.model.document import DataLayer
-
-import numpy as np
+from uwsift.model.layer_item import LayerItem
 
 LOG = logging.getLogger(__name__)
 
@@ -20,61 +18,79 @@ class WrappingDrivingPolicy(QObject):
         no more timestamps in the driving layer it starts over from the first timestamp.
     """
 
-    didUpdatePolicy = pyqtSignal(DataLayer)
+    didUpdatePolicy = pyqtSignal(LayerItem)
 
-    def __init__(self, collection):
+    def __init__(self, layers: List[LayerItem]):
         super().__init__()
-        self._collection = collection
+        self._layers: List[LayerItem] = layers
         self._driving_idx = 0
         self._timeline = None
-        self._timeline_length = None
         self._driving_layer = None
-        self._driving_layer_pfkey = None
+        self._driving_layer_uuid = None
 
-    def on_collection_update(self):
+    def _get_dynamic_layers(self):
+        return [layer for layer in self._layers if layer.dynamic]
+
+    def _driving_layer_index_in_layers(self) -> Optional[int]:
+        try:
+            idx = self._get_dynamic_layers().index(self._driving_layer_uuid)
+            return idx
+        except ValueError:
+            return None
+
+    def get_next_possible_driving_layer(self) -> Optional[LayerItem]:
+        for layer in self._get_dynamic_layers():
+            return layer
+        LOG.info("No suitable driving layer found!")
+        return None
+
+    def on_layers_update(self):
         """
-        Slot connected to Collection's didUpdateCollection signal. Takes the first loaded data layer
-        if the old driving layer is not in the collection anymore.
+        Slot connected to LayerModel's 'didUpdateLayers' signal. Takes the first loaded layer, of
+        a suitable kind, if the old driving layer is not in LayerModel's layers anymore.
         """
-        if self._driving_layer_pfkey not in self._collection.product_family_keys:
-            self.driving_layer = list(self._collection.data_layers.values())[0]
+        driving_layer_index = self._driving_layer_index_in_layers()
+        if driving_layer_index:
+            return
+            # self.driving_layer = self._layers[driving_layer_index]
         else:
-            self.driving_layer = self._collection.data_layers[self._driving_layer_pfkey]
+            self.driving_layer = self.get_next_possible_driving_layer()
+            self.didUpdatePolicy.emit(self.driving_layer)
 
-    def change_timebase(self, data_layer):
-        self.driving_layer = data_layer
+    def change_timebase(self, layer):
+        self.driving_layer = layer
+        self.didUpdatePolicy.emit(layer)
+
+    @property
+    def timeline_length(self):
+        return len(self._timeline)
 
     @property
     def driving_layer(self):
         return self._driving_layer
 
     @driving_layer.setter
-    def driving_layer(self, data_layer: DataLayer):
-        if not data_layer:
-            raise ValueError("Driving layer needs to be a valid Product Family Key.")
-        self._driving_layer_pfkey = data_layer.product_family_key
-        if not self._driving_layer:
-            try:
-                self._collection.data_layers[data_layer.product_family_key]
-            except KeyError:
-                raise KeyError(
-                    f"Driving layer {data_layer.product_family_key} "
-                    f"not found in current collection.")
-            self.timeline = list(self._collection.data_layers[self._driving_layer_pfkey]
-                                 .timeline.keys())
-            self._driving_layer = data_layer
+    def driving_layer(self, layer: LayerItem):
+        if not layer or not layer.dynamic:
+            self._driving_layer = None
+            # raise ValueError("No valid Driving layer")
+        elif not self._driving_layer:
+            self._driving_layer = layer
+            self.timeline = list(self._driving_layer.timeline.keys())
+
             self._driving_idx = 0
         else:
-            # Store timestamp of old timeline to retrieve analogous timestamp of new timeline.
-            curr_tstamp = list(self._driving_layer.timeline.keys())[self._driving_idx]
-            self.timeline = list(data_layer.timeline.keys())
-            self._driving_layer = data_layer
-            nearest_past_idx = self._find_nearest_past(curr_tstamp)
+            # Store time step of old timeline to retrieve analogous time step
+            # of new timeline.
+            current_time_step = \
+                list(self._driving_layer.timeline.keys())[self._driving_idx]
+            self.timeline = list(layer.timeline.keys())
+            self._driving_layer = layer
+            nearest_past_idx = self._find_nearest_past(current_time_step)
             if nearest_past_idx:
                 self._driving_idx = nearest_past_idx
             else:
                 self._driving_idx = 0
-        self.didUpdatePolicy.emit(data_layer)
 
     @property
     def timeline(self):
@@ -82,13 +98,7 @@ class WrappingDrivingPolicy(QObject):
 
     @timeline.setter
     def timeline(self, timeline: List[datetime]):
-        self._timeline = list(self._collection.data_layers[self._driving_layer_pfkey]
-                              .timeline.keys())
-        self._timeline_length = len(self._timeline)
-
-    @property
-    def driving_layer_pfkey(self):
-        return self._driving_layer_pfkey
+        self._timeline = timeline
 
     def _find_nearest_past(self, tstamp: datetime) -> Optional[int]:
         """
@@ -123,7 +133,6 @@ class WrappingDrivingPolicy(QObject):
         try:
             self._driving_idx = index
             t_sim = self.timeline[self._driving_idx]
-            test = 5
         except Exception as e:
             LOG.error(f"Invalid index passed to driving layer timeline: "
                       f"index={index}\n", exc_info=True)
@@ -133,23 +142,28 @@ class WrappingDrivingPolicy(QObject):
     def compute_t_sim(self, tick_time: int, backwards: bool = False) -> datetime:
         """
         Returns timestamp t_sim by:
+
             1) backwards set to False and index is None:
-                incrementing the index of the current driving layer and returning the timestamp
-                of the driving layer timeline at the index location
+               incrementing the index of the current driving layer and
+               returning the timestamp of the driving layer timeline at the
+               index location
+
             2) backwards set to True and index is None:
-                decrementing the index of the current driving layer...(see 1)
-            3) backwards set to False but providing setting the index kwarg to a valid integer:
-                looking up the driving layer's timestamp at the provided index location
+               decrementing the index of the current driving layer...(see 1)
+
+            3) backwards set to False but providing setting the index kwarg
+               to a valid integer:
+               looking up the driving layer's timestamp at the provided index
+               location
         """
         if backwards:
             self._driving_idx = \
-                (self._driving_idx + (self._timeline_length - 1)) % self._timeline_length
+                (self._driving_idx + (self.timeline_length - 1)) \
+                % self.timeline_length
             t_sim = self.timeline[self._driving_idx]
         else:
             self._driving_idx += 1
-            if self._driving_idx >= self._timeline_length:
+            if self._driving_idx >= self.timeline_length:
                 self._driving_idx = 0
             t_sim = self.timeline[self._driving_idx]
         return t_sim
-
-

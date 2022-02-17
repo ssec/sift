@@ -1,6 +1,6 @@
 import logging
 import struct
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 from PyQt5.QtCore import (QAbstractItemModel, Qt, QModelIndex, pyqtSignal,
@@ -32,6 +32,7 @@ class LayerModel(QAbstractItemModel):
     didChangeLayerVisible = pyqtSignal(UUID, bool)
     didChangeLayerOpacity = pyqtSignal(UUID, float)
 
+    didUpdateLayers = pyqtSignal()
     didReorderLayers = pyqtSignal(list)
     # didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
 
@@ -44,6 +45,8 @@ class LayerModel(QAbstractItemModel):
 
     # --------------------------------------------------------------------------
     # didChangeImageKind = pyqtSignal(dict)
+
+    didActivateProductDataset = pyqtSignal(UUID, bool)
 
     def __init__(self, parent=None, policy=None):
         """
@@ -95,6 +98,9 @@ class LayerModel(QAbstractItemModel):
         """
         for dataset_name in [LATLON_GRID_DATASET_NAME, BORDERS_DATASET_NAME]:
             self._init_system_layer(dataset_name)
+
+    def get_dynamic_layers(self):
+        return [layer for layer in self.layers if layer.dynamic]
 
     def data(self, index: QModelIndex, role: int = None):
         if not index.isValid():
@@ -238,6 +244,17 @@ class LayerModel(QAbstractItemModel):
         self.dataChanged.emit(index, index)
         return True
 
+    def get_layer_by_uuid(self, uuid: UUID) -> Optional[LayerItem]:
+        layers = [layer for layer in self.layers if layer.uuid == uuid]
+        if len(layers) > 1:
+            raise ValueError(f"Multiple Layers with UUID: {uuid} found"
+                             f" with product_family_key:"
+                             f" {self.product_family_key}!")
+        elif len(layers) == 0:
+            return None
+        else:
+            return layers[0]
+
     def _get_layer_for_dataset(self, info: frozendict,
                                presentation: Presentation) -> LayerItem:
         layer, grouping_key = self.policy.get_existing_layer_for_dataset(info)
@@ -283,6 +300,8 @@ class LayerModel(QAbstractItemModel):
                 raise NotImplementedError(
                     f"Managing datasets of kind {product_dataset.kind}"
                     f" not (yet) supported.")
+
+            self.didUpdateLayers.emit()
 
     def mimeTypes(self):
         return ['text/plain', 'text/xml']
@@ -338,6 +357,17 @@ class LayerModel(QAbstractItemModel):
         self.layoutAboutToBeChanged.emit()
         self.revert()
         self.layoutChanged.emit()
+
+    def on_didMatchTimes(self, t_matched_dict: dict):  # noqa
+        for layer_uuid, active_dataset_uuids in t_matched_dict.items():
+            layer = self.get_layer_by_uuid(layer_uuid)
+            for product_dataset in layer.timeline.values():
+                if product_dataset.uuid in active_dataset_uuids:
+                    product_dataset.is_active = True
+                else:
+                    product_dataset.is_active = False
+                self.didActivateProductDataset.emit(product_dataset.uuid,
+                                                    product_dataset.is_active)
 
 
 class ProductFamilyKeyMappingPolicy:

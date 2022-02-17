@@ -156,6 +156,10 @@ class LayerItem:
     def timeline(self):
         return MappingProxyType(self._timeline)
 
+    @property
+    def dynamic(self):
+        return len(self._timeline) != 0
+
     def add_dataset(self, info: frozendict,
                     presentation: Optional[Presentation] = None) \
             -> Optional[ProductDataset]:
@@ -187,7 +191,12 @@ class LayerItem:
 
         product_dataset = ProductDataset(self.uuid, info, presentation)
         self._timeline[sched_time] = product_dataset
+        self._sort_timeline()
         return product_dataset
 
     def has_in_timeline(self, dataset_uuid) -> bool:
         return dataset_uuid in [pds.uuid for pds in self._timeline.values()]
+
+    def _sort_timeline(self):
+        self._timeline = {kv[0]: kv[1] for kv in sorted(self._timeline.items(),
+                                                        key=lambda kv: kv[0])}

@@ -62,6 +62,7 @@ from uwsift.common import DEFAULT_ANIMATION_DELAY, Info, Kind, Tool, \
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.model.document import DocLayerStack, DocBasicDataset, Document
 from uwsift.model.layer_item import LayerItem
+from uwsift.model.layer_model import LayerModel
 from uwsift.model.product_dataset import ProductDataset
 from uwsift.model.time_manager import TimeManager
 from uwsift.queue import TASK_DOING, TASK_PROGRESS
@@ -197,43 +198,19 @@ class AnimationController(object):
      - Layer Order
     """
 
-    def __init__(self, parent, layers=None, layer_order=None, frame_order=None, frame_change_cb=None):
-        if layers is None and (layer_order is not None or frame_order is not None):
-            raise ValueError("'layers' required when 'layer_order' or 'frame_order' is specified")
+    def __init__(self):
 
-        self.parent = parent
-        self._layers = {}
-        self._layer_order = []  # display (z) order, top to bottom
-        self._frame_order = []  # animation order, first to last
-        self._animating = False
-        self._frame_number = 0
-        self._frame_change_cb = frame_change_cb
         self._animation_speed = DEFAULT_ANIMATION_DELAY  # milliseconds
+        self._animating = False
 
-        doc = parent.document
-        self.time_manager = TimeManager(doc.data_layer_collection, self._animation_speed)
+        self.time_manager = TimeManager(self._animation_speed)
 
-        self._animation_timer = app.Timer(self._animation_speed / 1000.0)
-        self._animation_timer.connect(self.step)
+        self._animation_timer = app.Timer(self._convert_ms_to_s(self._animation_speed))
+        self._animation_timer.connect(self.time_manager.tick)
 
-        if layers is not None:
-            self.set_layers(layers)
-
-            if layer_order is None:
-                layer_order = [x.name for x in layers.keys()]
-            self.set_layer_order(layer_order)
-
-            if frame_order is None:
-                frame_order = [x.name for x in layers.keys()]
-            self.frame_order = frame_order
-
-    @property
-    def current_frame(self):
-        return self._frame_number
-
-    @property
-    def max_frame(self):
-        return len(self._frame_order)
+    @staticmethod
+    def _convert_ms_to_s(time_ms: float) -> float:
+        return time_ms / 1000.0
 
     @property
     def animation_speed(self):
@@ -247,72 +224,9 @@ class AnimationController(object):
             return
         self._animation_timer.stop()
         self._animation_speed = milliseconds
-        self._animation_timer.interval = milliseconds / 1000.0
-        if self._frame_order:
-            self._animating = True
+        self._animation_timer.interval = self._convert_ms_to_s(milliseconds)
+        if self.animating:
             self._animation_timer.start()
-        if self._frame_change_cb is not None and self._frame_order:
-            uuid = self._frame_order[self._frame_number]
-            self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating, uuid))
-
-    def set_layers(self, layers):
-        # FIXME clear the existing layers
-        for layer in layers:
-            self.add_layer(layer)
-
-    def add_layer(self, layer):
-        LOG.debug('add layer {}'.format(layer))
-        uuid = UUID(layer.name)  # we backitty-forth this because
-        self._layers[uuid] = layer
-        self._layer_order.insert(0, uuid)
-        self.update_layers_z()
-        # self._frame_order.append(uuid)
-
-    def set_layer_order(self, layer_order):
-        for o in layer_order:
-            # Layer names are UUIDs
-            if o not in self._layers and o is not None:
-                LOG.error('set_layer_order cannot deal with unknown layer {}'.format(o))
-                return
-        self._layer_order = list(layer_order)
-        self.update_layers_z()
-
-    @property
-    def frame_order(self):
-        return self._frame_order
-
-    @frame_order.setter
-    def frame_order(self, frame_order):
-        for o in frame_order:
-            if o not in self._layers:
-                LOG.error('set_frame_order cannot deal with unknown layer {}'.format(o))
-                return
-        self._frame_order = frame_order
-        # FIXME: ticket #92: this is not a good idea
-        self._frame_number = 0
-        # LOG.debug('accepted new frame order of length {}'.format(len(frame_order)))
-        # if self._frame_change_cb is not None and self._frame_order:
-        #     uuid = self._frame_order[self._frame_number]
-        #     self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating, uuid))
-
-    def update_layers_z(self):
-        for z_level, uuid in enumerate(self._layer_order):
-            transform = self._layers[uuid].transform
-            if isinstance(transform, ChainTransform):
-                # assume ChainTransform where the last transform is STTransform for Z level
-                transform = transform.transforms[-1]
-            transform.translate = (0, 0, 0 - int(z_level))
-            self._layers[uuid].order = len(self._layer_order) - int(z_level)
-        # Need to tell the scene to recalculate the drawing order (HACK, but it works)
-        # FIXME: This should probably be accomplished by overriding the right method from the Node or Visual class
-        self.parent.main_canvas._update_scenegraph(None)
-
-    def top_layer_uuid(self):
-        for layer_uuid in self._layer_order:
-            if self._layers[layer_uuid].visible:
-                return layer_uuid
-        # None of the image layers are visible
-        return None
 
     @property
     def animating(self):
@@ -324,84 +238,23 @@ class AnimationController(object):
             # Don't update anything if nothing about the animation has changed
             return
         elif self._animating and not animate:
-            # We are currently, but don't want to be
+            # Stop animation
             self._animating = False
             self._animation_timer.stop()
-        elif not self._animating and animate and self._frame_order:
-            # We are not currently, but want to be
+        elif not self._animating and animate:
+            # Start animation
             self._animating = True
             self._animation_timer.start()
-            # TODO: Add a proper AnimationEvent to self.events
-        if self._frame_change_cb is not None and self._frame_order:
-            uuid = self._frame_order[self._frame_number]
-            self._frame_change_cb((self._frame_number, len(self._frame_order), self._animating, uuid))
 
     def toggle_animation(self, *args):
         self.animating = not self._animating
         return self.animating
 
-    # FIXME(mk): this is never used anyway?
-    def _set_visible_node(self, node):
-        """Set all nodes to invisible except for the `event.added` node.
-        """
-        for child in self._layers.values():
-            with child.events.blocker():
-                if child is node.added:
-                    child.visible = True
-                else:
-                    child.visible = False
-
-    # FIXME(mk): not in use anymore
-    def _set_visible_child(self, frame_number):
-        for idx, uuid in enumerate(self._frame_order):
-            child = self._layers[uuid]
-            # not sure if this is actually doing anything
-            with child.events.blocker():
-                if idx == frame_number:
-                    child.visible = True
-                else:
-                    child.visible = False
-
-    # FIXME(mk): not in use anymore
-    def _set_uuid_visibility(self, uuid: UUID, visible: bool) -> None:
-        """
-        Convenience function to set a uuid's visibility.
-        :param uuid: UUID of layer whose visibility is to be set.
-        :param visible: Flag indicating wether uuid is supposed to be visible or not.
-        """
-        child = self._layers[uuid]
-        with child.events.blocker():
-            if visible:
-                child.visible = True
-            else:
-                child.visible = False
-
-    def _set_visible_from_data_layers(self) -> None:
-        """
-        Set layer (original SIFT layer meant here) visibility per data_layer according to matched
-        datetime.
-
-        """
-        for pfkey, data_layer in self.time_manager.collection.data_layers.items():
-            # Set all uuids in the current data layer to invisible
-            # If a time was matched turn that time's uuid visible
-            data_layer_uuids = list(data_layer.timeline.values())
-            self.parent.document.toggle_layer_visibility(data_layer_uuids, visible=False)
-            layer_uuid = data_layer.t_matched_uuid()
-            layer_uuid_idx = data_layer.get_index_of_uuid(layer_uuid)
-            self._frame_number = layer_uuid_idx
-            if layer_uuid is not None:
-                self.parent.document.toggle_layer_visibility([layer_uuid])
-
     def jump(self, index):
         self.time_manager.jump(index)
-        self._set_visible_from_data_layers()
 
-    def step(self, event=None, backwards=False):
-        # Slot that triggers the time manager's tick in the relevant direction
-        # and subsequently makes the appropriate layers visible.
-        self.time_manager.tick(backwards=backwards)
-        self._set_visible_from_data_layers()
+    def connect_to_model(self, model: LayerModel):
+        self.time_manager.connect_to_model(model)
 
     def next_frame(self, event=None, frame_number=None):
         """
@@ -410,6 +263,7 @@ class AnimationController(object):
         :param frame_number: optional frame to go to, from 0
         :return:
         """
+        raise ValueError("AnimationController.next_frame should not be called, ever!!!")
         lfo = len(self._frame_order)
         frame = self._frame_number
         if frame_number is None:
@@ -430,10 +284,6 @@ class AnimationController(object):
 
             uuid = self._frame_order[self._frame_number]
             self._frame_change_cb((self._frame_number, lfo, self._animating, uuid))
-
-    def update_time_manager_collection(self, coll):
-        self.time_manager.collection.didUpdateCollection.emit()
-        self._set_visible_from_data_layers()
 
 
 class ContourGroupNode(scene.Node):
@@ -575,7 +425,8 @@ class SceneGraphManager(QObject):
         self.borders_nodes = []
 
         self.composite_element_dependencies = {}
-        self.animation_controller = AnimationController(self, frame_change_cb=self.frame_changed)
+        self.animation_controller = AnimationController()
+
         self._current_tool = None
 
         self._connect_doc_signals(self.document)
@@ -1054,6 +905,9 @@ class SceneGraphManager(QObject):
         #  the opacity of the 'child' node representing it is wrong:
         #  opacities have to be mixed then. This cannot be done here though
         self.update()
+
+    def change_dataset_visible(self, dataset_uuid: UUID, visible: bool):
+        self.dataset_nodes[dataset_uuid].visible = visible
 
     @staticmethod
     def _overwrite_with_test_pattern(data):
