@@ -1,6 +1,6 @@
 import logging
 import struct
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 
 from PyQt5.QtCore import (QAbstractItemModel, Qt, QModelIndex, pyqtSignal,
@@ -48,7 +48,7 @@ class LayerModel(QAbstractItemModel):
 
     didActivateProductDataset = pyqtSignal(UUID, bool)
 
-    def __init__(self, parent=None, policy=None):
+    def __init__(self, workspace, parent=None, policy=None):
         """
         Model for a "flat" layer tree (list/table of layers)
         (Note: For hierarchies the `parent` and `index` methods, among others,
@@ -61,6 +61,8 @@ class LayerModel(QAbstractItemModel):
         """
 
         super().__init__(parent)
+
+        self._workspace = workspace
 
         self._headers = LAYER_TREE_VIEW_HEADER
 
@@ -369,6 +371,29 @@ class LayerModel(QAbstractItemModel):
                 self.didActivateProductDataset.emit(product_dataset.uuid,
                                                     product_dataset.is_active)
 
+    def get_probeable_layers(self) -> List[LayerItem]:
+        """ Get LayerItems which may contain data suitable for probing
+        operations.
+
+        Currently only single channel raster data can be point or region probed,
+        thus the layer must be one capable of carrying datasets of kind IMAGE or
+        COMPOSITE.
+        """
+        return [layer for layer in self.layers
+                if layer.kind in [Kind.IMAGE, Kind.COMPOSITE]]
+
+    def get_top_probeable_layer(self) -> Optional[LayerItem]:
+        probeable_layers = self.get_probeable_layers()
+        return None if len(probeable_layers) == 0 \
+            else probeable_layers[0]
+
+    def get_top_probeable_layer_with_active_product_dataset(self) \
+            -> Tuple[Optional[LayerItem], Optional[ProductDataset]]:
+        top_probeable_layer = self.get_top_probeable_layer()
+        return (None, None) if top_probeable_layer is None \
+            else (top_probeable_layer,
+                  top_probeable_layer.get_first_active_product_dataset())
+
     @staticmethod
     def _build_presentation_change_dict(layer: LayerItem,
                                         presentation_element: object):
@@ -393,6 +418,24 @@ class LayerModel(QAbstractItemModel):
         layer.gamma = gamma
         change_dict = self._build_presentation_change_dict(layer, gamma)
         self.didChangeGamma.emit(change_dict)
+
+    def on_point_probe_set(self, probe_name, state, xy_pos, uuids=None):
+        """user has clicked on a point probe; determine relative and absolute
+        values for all document image layers
+        """
+        # if the point probe was turned off then we don't want to have the
+        # equalizer
+        if not state:
+            return
+
+        for layer in self.get_probeable_layers():
+            product_dataset = layer.get_first_active_product_dataset()
+
+            layer.probe_value = None if not product_dataset \
+                else \
+                self._workspace.get_content_point(product_dataset.uuid, xy_pos)
+
+        self._refresh()
 
 
 class ProductFamilyKeyMappingPolicy:

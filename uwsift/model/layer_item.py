@@ -41,6 +41,8 @@ class LayerItem:
         self._presentation = presentation
         self.info = self.extract_layer_info(info)
 
+        self._probe_value: Optional[float] = None
+
         self.recipe = recipe
 
         self.grouping_key = grouping_key
@@ -65,7 +67,6 @@ class LayerItem:
             # for _get_dataset_info_labels()
             "name",
             "standard_name",
-            "units",
             "wavelength"
         ]:
             if key in info:
@@ -110,8 +111,24 @@ class LayerItem:
         if column == LMC.VISIBILITY:
             return LayerVisibility(self.visible, self.opacity)
         if column == LMC.PROBE_VALUE:
-            return N_A  # point probing not yet implemented
+            if self.probe_value is None:
+                return N_A
+            uc_info = self.info[Info.UNIT_CONVERSION]
+            uc_probe_value = uc_info[1](self.probe_value)
+            # TODO: We cannot used uc_info[2](uc_probe_value) to get the
+            #  formatted string (as in Main.update_point_probe_text()) because
+            #  it would contain the unit. Thus for now we have to do our own
+            #  formatting:
+            return f"{uc_probe_value:.02f}"
         return None
+
+    @property
+    def probe_value(self):
+        return self._probe_value
+
+    @probe_value.setter
+    def probe_value(self, probe_value: Optional[float]):
+        self._probe_value = probe_value
 
     @property
     def visible(self):
@@ -173,7 +190,7 @@ class LayerItem:
             ds_wl = N_A
 
         try:
-            ds_unit = info["units"]
+            ds_unit = info[Info.UNIT_CONVERSION][0]
         except KeyError:
             ds_unit = N_A
 
@@ -230,3 +247,18 @@ class LayerItem:
 
     def get_datasets_uuids(self) -> List[UUID]:
         return [pd.uuid for pd in self.timeline.values()]
+
+    def get_active_product_datasets(self) -> List[ProductDataset]:
+        return [pd for pd in self.timeline.values() if pd.is_active]
+
+    def get_first_active_product_dataset(self) -> Optional[ProductDataset]:
+        active_product_datasets = self.get_active_product_datasets()
+        num_active_product_datasets = len(active_product_datasets)
+        # TODO: For now we do not support multiple active datasets per layer
+        #  but this is likely to change in the future (e.g. for Lightning
+        #  products). Let's make sure that any change in this regard doesn't
+        #  go unnoticed here, thus:
+        assert num_active_product_datasets <= 1
+
+        return None if num_active_product_datasets == 0 \
+            else active_product_datasets[0]

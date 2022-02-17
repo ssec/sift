@@ -73,8 +73,8 @@ import os
 import json
 import warnings
 
+from uwsift.util.common import units_conversion
 from uwsift.workspace.metadatabase import Product
-from uwsift import config as config
 from uwsift.common import Kind, Info, Presentation, Span, FCS_SEP, ZList, Flags
 from uwsift.queue import TaskQueue
 from uwsift.workspace import BaseWorkspace, CachingWorkspace, SimpleWorkspace
@@ -91,137 +91,6 @@ from uwsift.workspace.workspace import frozendict
 LOG = logging.getLogger(__name__)
 
 DEFAULT_LAYER_SET_COUNT = 1  # this should match the ui configuration!
-
-# TODO: use cf-units or cfunits or SIUnits or other package or: put all these
-#  units and their accepted spellings into a dictionary. Also try to stay in
-#  sync with Satpy, but note, that Satpy doesn't seem to have a well designed
-#  units handling concept either
-#
-# First entry is the standard symbol used for display
-Unit_Strings_Kelvin = [
-    'K', 'Kelvin', 'kelvin'
-]
-Unit_Strings_degC = [
-    '°C', 'C', 'degrees_Celsius'
-]
-
-# TODO: this may be taken from the units config too in the future?!?
-Temperature_Quantities = [
-    'brightness_temperature',
-    'toa_brightness_temperature'
-]
-
-
-def unit_symbol(unit):
-    # FUTURE: Use cfunits or cf_units package
-    # cf_units gives the wrong symbol for celsius
-    if unit == '1':
-        return ''
-    elif unit == '%':
-        return '%'
-    elif unit in Unit_Strings_degC:
-        return Unit_Strings_degC[0]
-    elif unit in Unit_Strings_Kelvin:
-        return Unit_Strings_Kelvin[0]
-    else:
-        return unit or ""
-
-
-def _unit_format_func(layer, units):
-    units = unit_symbol(units)
-    standard_name = layer.get(Info.STANDARD_NAME)
-    if (standard_name is not None) and \
-            (standard_name in Temperature_Quantities):
-        # BT data limits, Kelvin to degC
-        def _format_unit(val, numeric=True, include_units=True):
-            return '{:.02f}{units}'.format(val, units=units if include_units else "")
-    elif "flag_values" in layer:
-        # flag values don't have units
-        if "flag_meanings" in layer:
-            flag_masks = layer["flag_masks"] if "flag_masks" in layer else [-1] * len(layer["flag_values"])
-            flag_info = tuple(zip(layer["flag_meanings"], layer["flag_values"], flag_masks))
-
-            def _format_unit(val, numeric=True, include_units=True, flag_info=flag_info):
-                val = int(val)
-                if numeric:
-                    return '{:d}'.format(val)
-
-                meanings = []
-                for fmean, fval, fmask in flag_info:
-                    if (val & fmask) == fval:
-                        meanings.append(fmean)
-                return "{:d} ({:s})".format(val, ", ".join(meanings))
-        else:
-            def _format_unit(val, numeric=True, include_units=True):
-                return '{:d}'.format(int(val))
-    else:
-        # default formatting string
-        def _format_unit(val, numeric=True, include_units=True):
-            return '{:.03f} {units:s}'.format(val, units=units if include_units else "")
-
-    return _format_unit
-
-
-def preferred_units(dsi: DocBasicDataset) -> str:
-    """
-    Return unit string (i.e.: Kelvin) for a Product currently being loaded.
-    :param dsi: DocBasicDataset describing the product currently being added.
-    :return: String describing the preferred unit for the product described in dsi.
-    """
-    # FUTURE: Use cfunits or cf_units package
-
-    default_temperature_unit = Unit_Strings_Kelvin[0]
-    lookup_name = dsi.get(Info.STANDARD_NAME)  # may return 'None', that's OK
-    if lookup_name == 'toa_bidirectional_reflectance':
-        return '1'
-    elif lookup_name in Temperature_Quantities:
-        calibration_to_temperature_unit_map = config.get("units.temperature",
-                                                         default=None)
-        if calibration_to_temperature_unit_map is None:
-            LOG.info(f"No configuration for unit of temperature found..."
-                     f" Reverting to {default_temperature_unit}.")
-            return default_temperature_unit
-        elif lookup_name in calibration_to_temperature_unit_map:
-            temperature_unit = calibration_to_temperature_unit_map[lookup_name]
-        else:
-            lookup_name = 'all'  # For the warning message below
-            temperature_unit = \
-                calibration_to_temperature_unit_map.get(lookup_name,
-                                                        default_temperature_unit)
-        if temperature_unit not in Unit_Strings_Kelvin and \
-                temperature_unit not in Unit_Strings_degC:
-            LOG.warning(f"Unit '{temperature_unit}' as configured for"
-                        f" '{lookup_name}' is not a known temperature unit."
-                        f" Reverting to {default_temperature_unit}.")
-            return default_temperature_unit
-        return temperature_unit
-
-    else:
-        return dsi.get(Info.UNITS, None)
-
-
-def units_conversion(dsi):
-    """return UTF8 unit string, lambda v,inverse=False: convert-raw-data-to-unit,
-    format string for converted value with unit."""
-    # the dataset might be in one unit, but the user may want something else
-    # FUTURE: Use cfunits or cf_units package
-    punits = preferred_units(dsi)
-
-    # Conversion functions
-    # FUTURE: Use cfunits or cf_units package
-    if dsi.get(Info.UNITS) in Unit_Strings_Kelvin and punits in Unit_Strings_degC:
-        def conv_func(x, inverse=False):
-            return x - 273.15 if not inverse else x + 273.15
-    elif dsi.get(Info.UNITS) == '%' and punits == '1':
-        def conv_func(x, inverse=False):
-            return x / 100. if not inverse else x * 100.
-    else:
-        def conv_func(x, inverse=False):
-            return x
-
-    # Format strings
-    format_func = _unit_format_func(dsi, punits)
-    return punits, conv_func, format_func
 
 
 class DocLayerStack(MutableSequence):
@@ -1668,7 +1537,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         LOG.debug('new layer info: {}'.format(repr(info)))
         self._layer_with_uuid[uuid] = dataset = DocBasicDataset(self, info)
-        if Info.UNIT_CONVERSION not in dataset:
+        if Info.UNIT_CONVERSION not in info:
             dataset[Info.UNIT_CONVERSION] = units_conversion(dataset)
         if Info.FAMILY not in dataset:
             dataset[Info.FAMILY] = self.family_for_product_or_layer(dataset)

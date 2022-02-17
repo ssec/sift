@@ -629,7 +629,10 @@ class Main(QtWidgets.QMainWindow):
 
     def update_point_probe_text(self, probe_name, state=None, xy_pos=None, uuid=None, animating=None):
         if uuid is None:
-            uuid = self.document.current_visible_layer_uuid
+            top_probeable_layer, product_dataset = self.layer_model\
+                .get_top_probeable_layer_with_active_product_dataset()
+            uuid = None if product_dataset is None \
+                else product_dataset.uuid
         if state is None or xy_pos is None:
             _state, _xy_pos = self.graphManager.current_point_probe_status(probe_name)
             if state is None:
@@ -663,7 +666,7 @@ class Main(QtWidgets.QMainWindow):
                 data_str = "N/A"
                 layer_str = "N/A"
             else:
-                info = self.document[uuid]
+                info = top_probeable_layer.info
                 unit_info = info[Info.UNIT_CONVERSION]
                 data_point = unit_info[1](data_point)
                 data_str = unit_info[2](data_point, numeric=False)
@@ -992,36 +995,18 @@ class Main(QtWidgets.QMainWindow):
         self.graphManager.didChangeTab.connect(self.scene_manager.show_only_polygons)
         self.graphManager.didClonePolygon.connect(self.scene_manager.copy_polygon)
         self.graphManager.pointProbeChanged.connect(self.scene_manager.on_point_probe_set)
-        self.graphManager.pointProbeChanged.connect(self.document.update_equalizer_values)
+        self.graphManager.pointProbeChanged.connect(self.layer_model.on_point_probe_set)
         self.graphManager.pointProbeChanged.connect(self.update_point_probe_text)
         self.graphManager.pointProbeChanged.connect(self.graphManager.update_point_probe_graph)
 
         self.scene_manager.newPointProbe.connect(self.graphManager.update_point_probe)
 
-        def _update_point_probe_slot(*args):
-            return self.graphManager.update_point_probe(DEFAULT_POINT_PROBE)
-        self.document.didAddBasicDataset.connect(_update_point_probe_slot)
-        self.document.didAddCompositeDataset.connect(_update_point_probe_slot)
-
-        # FIXME: These were added as a simple fix to update the probe value on layer changes, but this should really
-        #        have its own manager-like object
-        def _blackhole(*args, **kwargs):
-            return self.update_point_probe_text(DEFAULT_POINT_PROBE)
-
-        self.document.didChangeLayerVisibility.connect(_blackhole)
-        self.document.didAddBasicDataset.connect(_blackhole)
-        self.document.didAddCompositeDataset.connect(_blackhole)
-        self.document.didRemoveDatasets.connect(_blackhole)
-        self.document.didReorderDatasets.connect(_blackhole)
-
-        if False:
-            # XXX: Disable the below line if updating during animation is too much work
-            # self.scene_manager.didChangeFrame.connect(lambda frame_info: update_probe_point(uuid=frame_info[-1]))
-            pass
-        else:
-            # XXX: Disable the below line if updating the probe value during animation isn't a performance problem
-            self.scene_manager.didChangeFrame.connect(
-                lambda frame_info: self.ui.cursorProbeText.setText("Probe Value: <animating>"))
+        self.layer_model.didReorderLayers.connect(
+            self.graphManager.update_point_probe)
+        # Connect to an unnamed slot (lambda: ...) to strip off the argument
+        # (of type dict) from the signal 'didMatchTimes'
+        self.scene_manager.animation_controller.time_manager.didMatchTimes\
+            .connect(lambda *args: self.graphManager.update_point_probe())
 
         def update_probe_polygon(uuid, points, layerlist=self.layer_list_model):
             top_uuids = list(self.document.current_visible_layer_uuids)
@@ -1044,9 +1029,6 @@ class Main(QtWidgets.QMainWindow):
                 self.ui.panZoomToolButton.click()
 
         self.scene_manager.newProbePolygon.connect(update_probe_polygon)
-        # setup RGB configuration
-        self.document.didChangeComposition.connect(lambda *args: self._refresh_probe_results(*args[1:]))
-        self.document.didChangeColorLimits.connect(self._refresh_probe_results)
 
     def _init_tool_controls(self):
         self.ui.panZoomToolButton.toggled.connect(partial(self.change_tool, name=Tool.PAN_ZOOM))
@@ -1087,7 +1069,7 @@ class Main(QtWidgets.QMainWindow):
 
     def _init_layer_model(self):
 
-        self.layer_model = LayerModel()
+        self.layer_model = LayerModel(self.workspace)
 
         self.document.didAddDataset.connect(self.layer_model.add_dataset)
 
