@@ -11,7 +11,8 @@ from PyQt5.QtCore import (QAbstractItemModel, Qt, QModelIndex, pyqtSignal,
 from uwsift.common import LAYER_TREE_VIEW_HEADER, Presentation, Info, Kind, \
     LATLON_GRID_DATASET_NAME, BORDERS_DATASET_NAME, Platform, Instrument, \
     LayerModelColumns as LMC, LayerVisibility
-from uwsift.model.composite_recipes import CompositeRecipe, Recipe
+from uwsift.model.composite_recipes import AlgebraicRecipe, CompositeRecipe, \
+    Recipe
 from uwsift.model.layer_item import LayerItem
 from uwsift.model.product_dataset import ProductDataset
 from uwsift.workspace.workspace import frozendict
@@ -52,6 +53,8 @@ class LayerModel(QAbstractItemModel):
     # ---------------------- Request creation of Recipes -----------------------
     # object should be a List[Optional[UUID]]
     didRequestCompositeRecipeCreation = pyqtSignal(object)
+    # object should be a List[Optional[UUID]]
+    didRequestAlgebraicRecipeCreation = pyqtSignal(object)
 
     # --------------------------------------------------------------------------
     # didChangeImageKind = pyqtSignal(dict)
@@ -648,18 +651,28 @@ class LayerModel(QAbstractItemModel):
             self._add_rgb_datasets(sched_times_to_add, input_layers,
                                    recipe_layer)
 
+        elif isinstance(recipe, AlgebraicRecipe):
+            self._update_algebraic_datasets(sched_times_to_update, input_layers,
+                                            recipe_layer)
+            self._add_algebraic_datasets(sched_times_to_add, input_layers,
+                                         recipe_layer)
+            recipe_layer.recipe.modified = False
+
         self.didUpdateLayers.emit()
 
     def _check_recipe_layer_sched_times_to_update(self, existing_sched_times,
                                                   input_layers,
                                                   recipe_layer):
+        if isinstance(recipe_layer.recipe, AlgebraicRecipe):
+            if recipe_layer.recipe.modified:
+                return existing_sched_times
+
         sched_times_to_update = []
         for sched_time in existing_sched_times:
             dataset: ProductDataset = recipe_layer.timeline.get(sched_time)
             input_datasets_uuids \
                 = self._get_datasets_uuids_of_multichannel_dataset(sched_time,
                                                                    input_layers)
-
             if dataset.input_datasets_uuids != input_datasets_uuids:
                 sched_times_to_update.append(sched_time)
         return sched_times_to_update
@@ -728,6 +741,101 @@ class LayerModel(QAbstractItemModel):
 
         index = self.index(rgb_layer.order, LMC.NAME)
         self.dataChanged.emit(index, index)
+
+    @staticmethod
+    def create_reasonable_algebraic_composite_default():
+        """Creates a reasonable default layer list for algebraic composites
+        :return: the reasonable default layer list
+        """
+        return [None, None, None]
+
+    def start_algebraic_composite_creation(self, layers=None):
+        """starts creation of an algebraic composite recipe.
+
+        :param layers: The layers which will be used to create a rgb composite.
+            - Layer at the index 0 will be used for the x component
+            of the algebraic.
+            - Layer at the index 1 will be used for the y component
+            of the algebraic.
+            - Layer at the index 2 will be used for the z component
+            of the algebraic.
+        """
+
+        if not layers or len(layers) == 0:
+            layers = self.create_reasonable_algebraic_composite_default()
+
+        self.didRequestAlgebraicRecipeCreation.emit(layers)
+
+    def create_algebraic_composite_layer(self, recipe: AlgebraicRecipe):
+        """Creates a layer which has an algebraic composite recipe
+
+        :param recipe: the algebraic composite recipe which the created layer
+         gets as recipe
+        """
+        algebraic_layer = self._get_empty_algebraic_layer(recipe)
+
+        if algebraic_layer:
+            index = self.index(algebraic_layer.order, 0)
+            self.didRequestSelectionOfLayer.emit(index)
+
+    def _get_empty_algebraic_layer(self, recipe: AlgebraicRecipe):
+        info = {
+            Info.KIND: Kind.COMPOSITE,
+        }
+
+        prez = Presentation(
+            uuid=None,
+            kind=Kind.COMPOSITE,
+            colormap='grays',
+            climits=(-100, 100)
+        )
+
+        algebraic_layer = LayerItem(self, info, prez, recipe=recipe)
+
+        self.didCreateLayer.emit(algebraic_layer)
+        self._add_layer(algebraic_layer)
+        return algebraic_layer
+
+    def _add_algebraic_datasets(self, sched_times: List[datetime],
+                                input_layers: List[LayerItem],
+                                algebraic_layer: LayerItem):
+        assert isinstance(algebraic_layer.recipe, AlgebraicRecipe)
+
+        dataset_info = None
+        for sched_time in sched_times:
+            input_datasets_uuids \
+                = self._get_datasets_uuids_of_multichannel_dataset(sched_time,
+                                                                   input_layers)
+
+            info = {
+                Info.SHORT_NAME: algebraic_layer.recipe.name,
+            }
+            # Skip if input dataset uuid is None
+            # and assign placeholders to the others
+            assignment \
+                = dict([p for p in zip('xyz', input_datasets_uuids) if p[1]])
+
+            operations = algebraic_layer.recipe.operation_formula
+
+            uuid, info, data = self._workspace.create_algebraic_composite(
+                operations, assignment, info
+            )
+
+            dataset = algebraic_layer.add_algebraic_dataset(
+                None, info, sched_time, input_datasets_uuids
+            )
+
+            self.didAddImageDataset.emit(algebraic_layer, dataset)
+            dataset_info = info
+        if dataset_info:
+            algebraic_layer.info = LayerItem.extract_layer_info(dataset_info)
+
+    def _update_algebraic_datasets(self, sched_times: List[datetime],
+                                   input_layers: List[LayerItem],
+                                   algebraic_layer: LayerItem):
+        self._remove_datasets(sched_times, algebraic_layer)
+        self._add_algebraic_datasets(sched_times, input_layers,
+                                     algebraic_layer)
 
 
 class ProductFamilyKeyMappingPolicy:
