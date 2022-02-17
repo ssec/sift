@@ -49,7 +49,7 @@ import numpy as np
 from sqlalchemy import Table, Column, Integer, String, Unicode, ForeignKey, DateTime, Interval, PickleType, \
     Float, create_engine
 from sqlalchemy.ext.associationproxy import association_proxy
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.orm import Session, relationship, sessionmaker, backref, scoped_session
 from sqlalchemy.orm.collections import attribute_mapped_collection
 
@@ -721,8 +721,6 @@ class Content(Base):
 
 
 class ContentImage(Content):
-    __tablename__ = "content_image_v1"
-    id = Column(Integer, ForeignKey(Content.id), primary_key=True)
     __mapper_args__ = { "polymorphic_identity": "image" }
 
     # handle overview versus detailed data
@@ -791,23 +789,23 @@ class ContentImage(Content):
 
 
 class ContentUnstructuredPoints(Content):
-    __tablename__ = "content_unstructured_points_v1"
-    id = Column(Integer, ForeignKey(Content.id), primary_key=True)
     __mapper_args__ = {"polymorphic_identity": "unstructured_points"}
 
     n_points = Column(Integer)
     # Points may have 2 or 3 spatial dimensions
-    n_dimensions = Column(Integer)
+    @declared_attr
+    def n_dimensions(cls):
+        return Content.__table__.c.get('n_dimensions', Column(Integer))
 
 
 class ContentLines(Content):
-    __tablename__ = "content_lines_v1"
-    id = Column(Integer, ForeignKey(Content.id), primary_key=True)
     __mapper_args__ = {"polymorphic_identity": "lines"}
 
     n_lines = Column(Integer)
     # Points have 4 spatial dimensions
-    n_dimensions = Column(Integer)
+    @declared_attr
+    def n_dimensions(cls):
+        return Content.__table__.c.get('n_dimensions', Column(Integer))
 
 
 class ContentKeyValue(Base):
