@@ -46,6 +46,14 @@ RGBA2IDX: Mapping[str, int] = dict(r=CHANNEL_RED,
                                    b=CHANNEL_BLUE,
                                    a=CHANNEL_ALPHA)
 
+DIFF_OP_NAME = 'Difference'
+NDI_OP_NAME = 'Normalized Difference Index'
+CUSTOM_OP_NAME = "Custom..."
+PRESET_OPERATIONS = {
+    DIFF_OP_NAME: ('result = x - y', 2),
+    NDI_OP_NAME: ('result = (x - y) / (x + y)', 2),
+}
+
 
 @dataclass
 class Recipe:
