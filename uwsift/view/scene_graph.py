@@ -868,17 +868,17 @@ class SceneGraphManager(QObject):
             if dataset_node is not None and hasattr(dataset_node, 'gamma'):
                 self.dataset_nodes[uuid].gamma = gamma
 
-    def change_layers_colormap(self, change_dict):
+    def change_dataset_nodes_colormap(self, change_dict):
         for uuid, cmapid in change_dict.items():
             LOG.info('changing {} to colormap {}'.format(uuid, cmapid))
             self.set_colormap(cmapid, uuid)
 
-    def change_layers_color_limits(self, change_dict):
+    def change_dataset_nodes_color_limits(self, change_dict):
         for uuid, clims in change_dict.items():
             LOG.debug('changing {} to color limits {}'.format(uuid, clims))
             self.set_color_limits(clims, uuid)
 
-    def change_layers_gamma(self, change_dict):
+    def change_dataset_nodes_gamma(self, change_dict):
         for uuid, gamma in change_dict.items():
             LOG.debug('changing {} to gamma {}'.format(uuid, gamma))
             self.set_gamma(gamma, uuid)
@@ -1419,13 +1419,13 @@ class SceneGraphManager(QObject):
         document.didRemoveDatasets.connect(self._remove_dataset)  # layer removed from current layer set
         document.willPurgeDataset.connect(self._purge_dataset)  # layer removed from document
         document.didSwitchLayerSet.connect(self.rebuild_new_layer_set)
-        document.didChangeColormap.connect(self.change_layers_colormap)
+        document.didChangeColormap.connect(self.change_dataset_nodes_colormap)
         document.didChangeLayerVisibility.connect(self.change_datasets_visibility)
         document.didReorderAnimation.connect(self._rebuild_frame_order)
         document.didChangeComposition.connect(self.change_composite_dataset)
         document.didChangeCompositions.connect(self.change_composite_datasets)
-        document.didChangeColorLimits.connect(self.change_layers_color_limits)
-        document.didChangeGamma.connect(self.change_layers_gamma)
+        document.didChangeColorLimits.connect(self.change_dataset_nodes_color_limits)
+        document.didChangeGamma.connect(self.change_dataset_nodes_gamma)
         # document.didChangeImageKind.connect(self.change_layers_image_kind)
 
     def set_frame_number(self, frame_number=None):

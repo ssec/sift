@@ -1111,6 +1111,13 @@ class Main(QtWidgets.QMainWindow):
         self.layer_model.didChangeLayerOpacity.connect(
             self.scene_manager.change_layer_opacity)
 
+        self.layer_model.didChangeColormap.connect(
+            self.scene_manager.change_dataset_nodes_colormap)
+        self.layer_model.didChangeGamma.connect(
+            self.scene_manager.change_dataset_nodes_gamma)
+        self.layer_model.didChangeColorLimits.connect(
+            self.scene_manager.change_dataset_nodes_color_limits)
+
         self.scene_manager.animation_controller.connect_to_model(
             self.layer_model)
         self.layer_model.didActivateProductDataset.connect(

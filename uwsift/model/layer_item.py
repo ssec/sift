@@ -1,12 +1,13 @@
 import logging
 from types import MappingProxyType
-from typing import Optional, Tuple
-from uuid import uuid1
+from typing import List, Optional, Tuple
+from uuid import uuid1, UUID
 
 from uwsift import config
 from uwsift.common import Presentation, N_A, Info, LayerModelColumns as LMC, \
     LayerVisibility
 from uwsift.model.composite_recipes import Recipe
+from uwsift.model.document import units_conversion
 from uwsift.model.product_dataset import ProductDataset
 from uwsift.workspace.workspace import frozendict
 
@@ -38,17 +39,43 @@ class LayerItem:
 
         self._timeline = {}
         self._presentation = presentation
-        self._kind = info[Info.KIND]
+        self.info = self.extract_layer_info(info)
 
         self.recipe = recipe
 
         self.grouping_key = grouping_key
         self._invariable_display_data = \
-            self._generate_invariable_display_data(info)
+            self._generate_invariable_display_data(self.info)
+
+    @staticmethod
+    def extract_layer_info(info: frozendict) -> frozendict:
+
+        layer_info = {}
+        unit_conversion = units_conversion(info)
+        layer_info[Info.UNIT_CONVERSION] = unit_conversion
+
+        for key in [
+            Info.CLIM,
+            Info.CENTRAL_WAVELENGTH,
+            Info.INSTRUMENT,
+            Info.KIND,
+            Info.PLATFORM,
+            Info.SHORT_NAME,
+            Info.UNITS,
+            # for _get_dataset_info_labels()
+            "name",
+            "standard_name",
+            "units",
+            "wavelength"
+        ]:
+            if key in info:
+                layer_info[key] = info[key]
+
+        return frozendict(layer_info)
 
     @property
     def kind(self):
-        return self._kind
+        return self.info[Info.KIND]
 
     @property
     def order(self):
@@ -200,3 +227,6 @@ class LayerItem:
     def _sort_timeline(self):
         self._timeline = {kv[0]: kv[1] for kv in sorted(self._timeline.items(),
                                                         key=lambda kv: kv[0])}
+
+    def get_datasets_uuids(self) -> List[UUID]:
+        return [pd.uuid for pd in self.timeline.values()]
