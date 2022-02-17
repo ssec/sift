@@ -306,32 +306,11 @@ class RGBLayerConfigPane(QObject):
             self._show_settings_for_layer(self.recipe)
 
     def _show_settings_for_layer(self, recipe=None):
-        if recipe is None:
-            for slider in self.sliders:
-                slider[0].setDisabled(True)
-                slider[1].setDisabled(True)
-            for combo in self.rgb:
-                combo.setDisabled(True)
-            for edit in self.line_edits:
-                edit[0].setDisabled(True)
-                edit[1].setDisabled(True)
-            for sbox in self.gamma_boxes:
-                sbox.setDisabled(True)
-            self.rgb_name_edit.setDisabled(True)
+        if not isinstance(recipe, CompositeRecipe):
+            self.ui.rgbScrollAreaWidgetContents.setDisabled(True)
             return
         else:
-            # re-enable all the widgets
-            for slider in self.sliders:
-                slider[0].setDisabled(False)
-                slider[1].setDisabled(False)
-            for combo in self.rgb:
-                combo.setDisabled(False)
-            for edit in self.line_edits:
-                edit[0].setDisabled(False)
-                edit[1].setDisabled(False)
-            for sbox in self.gamma_boxes:
-                sbox.setDisabled(False)
-            self.rgb_name_edit.setDisabled(False)
+            self.ui.rgbScrollAreaWidgetContents.setDisabled(False)
 
         for widget in self.rgb:
             # block signals so an existing RGB layer doesn't get overwritten with new layer selections
