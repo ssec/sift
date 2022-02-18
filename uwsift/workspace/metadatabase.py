@@ -729,9 +729,9 @@ class ContentImage(Content):
 
     resolution = Column(Integer)  # maximum resolution in meters for this representation of the dataset
 
-    n_rows = Column(Integer)
-    n_cols = Column(Integer, nullable=True)
-    n_levels = Column(Integer, nullable=True)
+    rows = Column(Integer)
+    cols = Column(Integer, nullable=True)
+    levels = Column(Integer, nullable=True)
 
     cell_width = Column(Float, nullable=True)
     cell_height = Column(Float, nullable=True)
@@ -771,7 +771,7 @@ class ContentImage(Content):
 
     @property
     def shape(self):
-        return tuple(filter(lambda x: x, [self.n_rows, self.n_cols, self.n_levels]))
+        return tuple(filter(lambda x: x, [self.rows, self.cols, self.levels]))
 
     @property
     def INFO_TO_FIELD(self):

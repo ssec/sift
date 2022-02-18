@@ -187,7 +187,7 @@ class ActiveContent(QObject):
         :return: workspace_data_arrays instance
         """
         if isinstance(c, ContentImage):
-            rcl, shape = self._rcls(c.n_rows, c.n_cols, c.n_levels)
+            rcl, shape = self._rcls(c.rows, c.cols, c.levels)
         elif isinstance(c, ContentUnstructuredPoints):
             rcl, shape = self._rcls(c.n_points, c.n_dimensions, None)
         else:
