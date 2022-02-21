@@ -49,7 +49,7 @@ import numpy as np
 from sqlalchemy import Table, Column, Integer, String, Unicode, ForeignKey, DateTime, Interval, PickleType, \
     Float, create_engine
 from sqlalchemy.ext.associationproxy import association_proxy
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.orm import Session, relationship, sessionmaker, backref, scoped_session
 from sqlalchemy.orm.collections import attribute_mapped_collection
 
@@ -721,8 +721,6 @@ class Content(Base):
 
 
 class ContentImage(Content):
-    __tablename__ = "content_image_v1"
-    id = Column(Integer, ForeignKey(Content.id), primary_key=True)
     __mapper_args__ = { "polymorphic_identity": "image" }
 
     # handle overview versus detailed data
@@ -731,9 +729,9 @@ class ContentImage(Content):
 
     resolution = Column(Integer)  # maximum resolution in meters for this representation of the dataset
 
-    n_rows = Column(Integer)
-    n_cols = Column(Integer, nullable=True)
-    n_levels = Column(Integer, nullable=True)
+    rows = Column(Integer)
+    cols = Column(Integer, nullable=True)
+    levels = Column(Integer, nullable=True)
 
     cell_width = Column(Float, nullable=True)
     cell_height = Column(Float, nullable=True)
@@ -767,17 +765,9 @@ class ContentImage(Content):
     x_path = Column(String, nullable=True)  # if needed, x location cache path relative to workspace
     z_path = Column(String, nullable=True)  # if needed, z location cache path relative to workspace
 
-    @property
-    def is_overview(self):
-        return self.lod == self.LOD_OVERVIEW
-
-    @property
-    def shape(self):
-        return tuple(filter(lambda x: x, [self.n_rows, self.n_cols, self.n_levels]))
-
-    @property
-    def INFO_TO_FIELD(self):
-        fields = {
+    INFO_TO_FIELD = {
+            Info.PROJ: 'proj4',
+            Info.PATHNAME: 'path',
             Info.CELL_HEIGHT: 'cell_height',
             Info.CELL_WIDTH: 'cell_width',
             Info.ORIGIN_X: 'origin_x',
@@ -786,28 +776,37 @@ class ContentImage(Content):
             Info.GRID_FIRST_INDEX_X: 'grid_first_index_x',
             Info.GRID_FIRST_INDEX_Y: 'grid_first_index_y',
         }
-        fields.update(super().INFO_TO_FIELD)
-        return fields
+
+    def __init__(self, *args, **kwargs):
+        super(ContentImage, self).__init__(*args, **kwargs)
+
+    @property
+    def is_overview(self):
+        return self.lod == self.LOD_OVERVIEW
+
+    @property
+    def shape(self):
+        return tuple(filter(lambda x: x, [self.rows, self.cols, self.levels]))
 
 
 class ContentUnstructuredPoints(Content):
-    __tablename__ = "content_unstructured_points_v1"
-    id = Column(Integer, ForeignKey(Content.id), primary_key=True)
     __mapper_args__ = {"polymorphic_identity": "unstructured_points"}
 
     n_points = Column(Integer)
     # Points may have 2 or 3 spatial dimensions
-    n_dimensions = Column(Integer)
+    @declared_attr
+    def n_dimensions(cls):
+        return Content.__table__.c.get('n_dimensions', Column(Integer))
 
 
 class ContentLines(Content):
-    __tablename__ = "content_lines_v1"
-    id = Column(Integer, ForeignKey(Content.id), primary_key=True)
     __mapper_args__ = {"polymorphic_identity": "lines"}
 
     n_lines = Column(Integer)
     # Points have 4 spatial dimensions
-    n_dimensions = Column(Integer)
+    @declared_attr
+    def n_dimensions(cls):
+        return Content.__table__.c.get('n_dimensions', Column(Integer))
 
 
 class ContentKeyValue(Base):

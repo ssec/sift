@@ -315,3 +315,20 @@ class LayerItem:
         """
         self._timeline.pop(sched_time, None)
 
+    def add_algebraic_dataset(self, presentation: Optional[Presentation],
+                              info: frozendict, sched_time: datetime,
+                              input_datasets_uuids: Optional[List[UUID]]
+                              ):
+        if sched_time in self._timeline:
+            LOG.warning(f"Other  multichannel dataset for {sched_time}"
+                        f" is already in layer '{self.descriptor}',"
+                        f" ignoring the new one.")
+            return None
+
+        product_dataset = ProductDataset.get_algebraic_dataset(
+            self.uuid, info, presentation, input_datasets_uuids
+        )
+
+        self._timeline[sched_time] = product_dataset
+        self._sort_timeline()
+        return product_dataset

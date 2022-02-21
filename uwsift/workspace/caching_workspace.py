@@ -759,7 +759,7 @@ class CachingWorkspace(BaseWorkspace):
             mm[:] = data[:]
 
         parms.update(dict(
-            lod=Content.LOD_OVERVIEW,
+            lod=ContentImage.LOD_OVERVIEW,
             path=ws_filename,
             dtype=str(data.dtype),
             proj4=info[Info.PROJ],
@@ -769,7 +769,7 @@ class CachingWorkspace(BaseWorkspace):
         parms.update(rcls)
         LOG.debug("about to create Content with this: {}".format(repr(parms)))
 
-        C = Content.from_info(parms, only_fields=True)
+        C = ContentImage.from_info(parms, only_fields=True)
         P.content.append(C)
         # FUTURE: do we identify a Resource to go with this? Probably not
 

@@ -732,8 +732,8 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
 
             # info about the data array memmap
             path=data_filename,
-            n_rows=rows,
-            n_cols=cols,
+            rows=rows,
+            cols=cols,
             levels=0,
             dtype='float32',
 
@@ -974,8 +974,8 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
 
             # info about the data array memmap
             path=data_filename,
-            n_rows=rows,
-            n_cols=cols,
+            rows=rows,
+            cols=cols,
             proj4=proj4,
             # levels = 0,
             dtype='float32',
@@ -1831,8 +1831,8 @@ class SatpyImporter(aImporter):
 
                     # info about the data array memmap
                     path=data_filename,
-                    n_rows=shape[0],
-                    n_cols=shape[1],
+                    rows=shape[0],
+                    cols=shape[1],
                     proj4=proj4,
                     # levels = 0,
                     dtype='float32',
@@ -1907,8 +1907,8 @@ class SatpyImporter(aImporter):
 
                 # info about the data array memmap
                 path=data_filename,
-                n_rows=contour_data.shape[0],  # number of vertices
-                n_cols=contour_data.shape[1],  # col (x), row (y), "connect", num_points_for_level
+                rows=contour_data.shape[0],  # number of vertices
+                cols=contour_data.shape[1],  # col (x), row (y), "connect", num_points_for_level
                 proj4=proj4,
                 # levels = 0,
                 dtype='float32',

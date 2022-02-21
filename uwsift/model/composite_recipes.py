@@ -46,6 +46,22 @@ RGBA2IDX: Mapping[str, int] = dict(r=CHANNEL_RED,
                                    b=CHANNEL_BLUE,
                                    a=CHANNEL_ALPHA)
 
+CHANNEL_X = 0
+CHANNEL_Y = 1
+CHANNEL_Z = 2
+
+XYZ2IDX: Mapping[str, int] = dict(x=CHANNEL_X,
+                                  y=CHANNEL_Y,
+                                  z=CHANNEL_Z)
+
+DIFF_OP_NAME = 'Difference'
+NDI_OP_NAME = 'Normalized Difference Index'
+CUSTOM_OP_NAME = "Custom..."
+PRESET_OPERATIONS = {
+    DIFF_OP_NAME: ('result = x - y', 2),
+    NDI_OP_NAME: ('result = (x - y) / (x + y)', 2),
+}
+
 
 @dataclass
 class Recipe:
@@ -153,8 +169,52 @@ class CompositeRecipe(Recipe):
         return "RGB Composite"
 
 
+@dataclass
+class AlgebraicRecipe(Recipe):
+    operation_kind: str = dataclasses.field(default_factory=str)
+    operation_formula: str = dataclasses.field(default_factory=str)
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        self.__modified = True
+
+        def _normalize_list(x, default=None):
+            return [x[idx] if x and len(x) > idx and x[idx] else default for idx
+                    in range(3)]
+
+        self.input_layer_ids = _normalize_list(self.input_layer_ids)
+
+        if self.operation_kind not in [DIFF_OP_NAME, NDI_OP_NAME, CUSTOM_OP_NAME]:
+            self.operation_kind = DIFF_OP_NAME
+
+        if self.operation_formula is None:
+            self.operation_formula = PRESET_OPERATIONS.get(
+                self.operation_kind, PRESET_OPERATIONS.get(DIFF_OP_NAME))
+
+    @classmethod
+    def from_algebraic(cls, name, x=None, y=None, z=None, operation_kind=None,
+                       operation_formula=None):
+        return cls(name, input_layer_ids=[x, y, z],
+                   operation_kind=operation_kind,
+                   operation_formula=operation_formula)
+
+    @classmethod
+    def kind(cls):
+        return "Algebraic"
+
+    @property
+    def modified(self) -> bool:
+        return self.__modified
+
+    @modified.setter
+    def modified(self, status: bool):
+        self.__modified = status  # noqa
+
+
 class RecipeManager(QObject):
     didCreateRGBCompositeRecipe = pyqtSignal(CompositeRecipe)
+    didCreateAlgebraicRecipe = pyqtSignal(AlgebraicRecipe)
     didUpdateRGBCompositeRecipe = pyqtSignal(CompositeRecipe, object)
 
     didUpdateRGBInputLayers = pyqtSignal(CompositeRecipe)
@@ -262,6 +322,43 @@ class RecipeManager(QObject):
 
         self.recipes[recipe.id] = recipe
         self.didUpdateRecipeName.emit(recipe)
+
+    def create_algebraic_recipe(self, layers):
+        recipe_name = AlgebraicRecipe.kind()
+        recipe = AlgebraicRecipe.from_algebraic(
+            recipe_name,
+            x=None if layers[0] is None else layers[0].uuid,
+            y=None if layers[1] is None else layers[1].uuid,
+            z=None if layers[2] is None else layers[2].uuid,
+            operation_kind=DIFF_OP_NAME
+        )
+        self.add_recipe(recipe)
+
+        self.didCreateAlgebraicRecipe.emit(recipe)
+
+    def update_algebraic_recipe_operation_kind(self, recipe: AlgebraicRecipe,
+                                               operation_kind: str):
+        recipe.operation_kind = operation_kind
+        recipe.modified = True
+        self.recipes[recipe.id] = recipe
+
+    def update_algebraic_recipe_operation_formula(self,
+                                                  recipe: AlgebraicRecipe,
+                                                  operation_formula: str):
+        recipe.operation_formula = operation_formula
+        recipe.modified = True
+        self.recipes[recipe.id] = recipe
+
+    def update_algebraic_recipe_input_layers(self, recipe: AlgebraicRecipe,
+                                             channel: str,
+                                             layer_uuid: uuid.UUID):
+        channel_idx = XYZ2IDX.get(channel)
+
+        assert channel_idx is not None, f"Given channel '{channel}' is invalid"
+
+        recipe.input_layer_ids[channel_idx] = layer_uuid
+        recipe.modified = True
+        self.recipes[recipe.id] = recipe
 
     def __getitem__(self, recipe_id):
         return self.recipes[recipe_id]

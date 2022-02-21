@@ -115,3 +115,20 @@ class ProductDataset:
                                                           input_datasets_infos)
 
         self.info = dataset_info
+
+    @classmethod
+    def get_algebraic_dataset(
+            cls, layer_uuid: UUID, info: frozendict,
+            presentation: Presentation,
+            input_datasets_uuids: List[Optional[UUID]]
+    ):
+        if not any(input_datasets_uuids):
+            LOG.debug(f"Could not create a algebraic ProductDataset,"
+                      f" when no input ProductDatasets exist.")
+            return None
+
+        dataset = cls(layer_uuid=layer_uuid, info=info,
+                      presentation=presentation,
+                      input_datasets_uuids=input_datasets_uuids)
+
+        return dataset
