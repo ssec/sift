@@ -562,11 +562,15 @@ class Content(Base):
     # please ref IEEE 754
     path = Column(String, unique=True)  # relative to workspace, binary array of data
 
-    # TODO Anzahl der Attribute pro Punkt: n_attributes (z.B. Blitzstärke); Datentyp der Attribute? -> basisklasse (bei Image = 1)
-    n_attributes = Column(Integer) #  immer 1, Erweiterung in Zukunft
+    # TODO Number of attributes per point: n_attributes (e.g. lightning peak
+    #  current) but then, what are the datatypes of the attributes?
+    n_attributes = Column(Integer) #  always 1, reserverd for future extensions
 
-    # TODO alle Attribute müssen gleichen Datentyp haben wie Punkte selbst -> daher geht nur float
-    # lat, lon immer float -> attributes nur anderen Datentyp als float32
+    # TODO Currently all attributes must have the same datatype as the points,
+    #  because there is no way yet to define them differently
+    #  therefore only float32 is possible.
+    #  lat, lon (from SwathDefinition) are always float, thus dtype must be
+    #  float for now, only attributes could have a different dtype in the future
     # default float32; can be int16 in the future for scaled integer images for instance; should be a numpy type name
     dtype = Column(String, nullable=True)
 

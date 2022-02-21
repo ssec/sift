@@ -62,7 +62,6 @@ from uwsift.util import (WORKSPACE_DB_DIR, DOCUMENT_SETTINGS_DIR, USER_CACHE_DIR
                          get_package_data_dir, check_grib_definition_dir, check_imageio_deps,
                          HeapProfiler)
 from uwsift.view.colormap_editor import ColormapEditor
-from uwsift.view.create_algebraic import CreateAlgebraicDialog
 from uwsift.view.export_image import ExportImageHelper
 from uwsift.view.layer_details import SingleLayerInfoPane
 from uwsift.view.probes import ProbeGraphManager, DEFAULT_POINT_PROBE
@@ -938,7 +937,11 @@ class Main(QtWidgets.QMainWindow):
                                                )
 
         # disable close button on panes
-        panes = [self.ui.areaProbePane, self.ui.layersPane, self.ui.layerDetailsPane, self.ui.rgbConfigPane, self.ui.algebraicConfigPane]
+        panes = [self.ui.areaProbePane,
+                 self.ui.layerDetailsPane,
+                 self.ui.rgbConfigPane,
+                 self.ui.algebraicConfigPane,
+                 ]
         for pane in panes:
             pane.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable |
                              QtWidgets.QDockWidget.DockWidgetMovable)
@@ -1266,7 +1269,12 @@ class Main(QtWidgets.QMainWindow):
         self.ui.timelinePane = None
         # self.tabifyDockWidget(self.ui.rgbConfigPane, self.ui.layerDetailsPane)
         # Make the layer list and layer details shown
-        self.ui.layersPane.raise_()
+        # FIXME remove layerPane finally from the system, for now we only kind
+        #  of hide it
+        self.layout().removeWidget(self.ui.layersPane)
+        self.ui.layersPane.deleteLater()
+        self.ui.layersPane = None
+
         self.ui.layerDetailsPane.raise_()
         # refer to objectName'd entities as self.ui.objectName
         self.setAcceptDrops(True)
@@ -1450,14 +1458,6 @@ class Main(QtWidgets.QMainWindow):
             # Remove the polygon from other locations
             LOG.info("Clearing polygon with name '%s'", removed_name)
             self.scene_manager.remove_polygon(removed_name)
-
-    def create_algebraic(self, action: QtWidgets.QAction = None, uuids=None, composite_type=CompositeType.ARITHMETIC):
-        if uuids is None:
-            uuids = list(self.layer_list_model.current_selected_uuids())
-        dialog = CreateAlgebraicDialog(self.document, uuids, parent=self)
-        dialog.show()
-        dialog.raise_()
-        dialog.activateWindow()
 
     def _init_menu(self):
         open_action = QtWidgets.QAction("&Open...", self)

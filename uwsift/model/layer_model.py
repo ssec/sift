@@ -97,7 +97,9 @@ class LayerModel(QAbstractItemModel):
 
         self.layers: List[LayerItem] = []
 
-        self._supportedRoles = [Qt.DisplayRole, Qt.EditRole]
+        self._supportedRoles = [Qt.DisplayRole,
+                                Qt.EditRole,
+                                Qt.TextAlignmentRole]
 
     def _init_system_layer(self, name):
         # The minimal 'dataset' information required by LayerItem
@@ -134,9 +136,17 @@ class LayerModel(QAbstractItemModel):
         if role not in self._supportedRoles:
             return None
 
-        layer: LayerItem = self.layers[index.row()]
+        if role == Qt.DisplayRole:
+            layer: LayerItem = self.layers[index.row()]
+            return layer.data(index.column())
 
-        return layer.data(index.column())
+        if role == Qt.TextAlignmentRole:
+            if index.column() in [LMC.WAVELENGTH, LMC.PROBE_VALUE]:
+                return Qt.AlignRight
+            return Qt.AlignLeft
+
+        raise NotImplementedError(f"Missing implementation for supported"
+                                  f" Qt.ItemDataRole {role}")
 
     def flags(self, index):
         if index.isValid():
