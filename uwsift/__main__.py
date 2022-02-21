@@ -62,7 +62,6 @@ from uwsift.util import (WORKSPACE_DB_DIR, DOCUMENT_SETTINGS_DIR, USER_CACHE_DIR
                          get_package_data_dir, check_grib_definition_dir, check_imageio_deps,
                          HeapProfiler)
 from uwsift.view.colormap_editor import ColormapEditor
-from uwsift.view.create_algebraic import CreateAlgebraicDialog
 from uwsift.view.export_image import ExportImageHelper
 from uwsift.view.layer_details import SingleLayerInfoPane
 from uwsift.view.probes import ProbeGraphManager, DEFAULT_POINT_PROBE
@@ -1450,14 +1449,6 @@ class Main(QtWidgets.QMainWindow):
             # Remove the polygon from other locations
             LOG.info("Clearing polygon with name '%s'", removed_name)
             self.scene_manager.remove_polygon(removed_name)
-
-    def create_algebraic(self, action: QtWidgets.QAction = None, uuids=None, composite_type=CompositeType.ARITHMETIC):
-        if uuids is None:
-            uuids = list(self.layer_list_model.current_selected_uuids())
-        dialog = CreateAlgebraicDialog(self.document, uuids, parent=self)
-        dialog.show()
-        dialog.raise_()
-        dialog.activateWindow()
 
     def _init_menu(self):
         open_action = QtWidgets.QAction("&Open...", self)
