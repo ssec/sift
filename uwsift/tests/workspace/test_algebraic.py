@@ -15,7 +15,7 @@ def _get_data_array_generator(data_arrs):
 def test_satpy_importer_basic(tmpdir, monkeypatch, mocker):
     """Basic import test using Satpy."""
     from uwsift.workspace import Workspace
-    from uwsift.model.layer import DocBasicLayer
+    from uwsift.model.layer import DocBasicDataset
     from uuid import uuid1 as uuidgen
     ws = Workspace(str(tmpdir))
     c01_attrs = {
@@ -47,8 +47,8 @@ def test_satpy_importer_basic(tmpdir, monkeypatch, mocker):
         ds[Info.PLATFORM] = Platform.GOES_16
         ds[Info.INSTRUMENT] = Instrument.ABI
 
-    c01 = DocBasicLayer(doc, c01_attrs)
-    c03 = DocBasicLayer(doc, c03_attrs)
+    c01 = DocBasicDataset(doc, c01_attrs)
+    c03 = DocBasicDataset(doc, c03_attrs)
     ops = "z = x - y"
     ns = {'y': c03_attrs[Info.UUID], 'x': c01_attrs[Info.UUID]}
 

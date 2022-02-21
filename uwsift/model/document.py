@@ -60,6 +60,7 @@ from __future__ import annotations
 __author__ = 'rayg'
 __docformat__ = 'reStructuredText'
 
+import dataclasses
 import logging
 from collections import MutableSequence, OrderedDict, defaultdict
 from itertools import groupby, chain
@@ -72,153 +73,23 @@ import os
 import json
 import warnings
 
+from uwsift.util.common import units_conversion
 from uwsift.workspace.metadatabase import Product
-from uwsift import config as config
 from uwsift.common import Kind, Info, Presentation, Span, FCS_SEP, ZList, Flags
 from uwsift.queue import TaskQueue
 from uwsift.workspace import BaseWorkspace, CachingWorkspace, SimpleWorkspace
 from uwsift.util.default_paths import DOCUMENT_SETTINGS_DIR
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
-from uwsift.model.composite_recipes import RecipeManager, CompositeRecipe
-from uwsift.model.layer import Mixing, DocLayer, DocBasicLayer, DocRGBLayer, DocCompositeLayer
+from uwsift.model.layer import Mixing, DocDataset, DocBasicDataset, DocRGBDataset, DocCompositeDataset
 from uwsift.view.colormap import COLORMAP_MANAGER, PyQtGraphColormap, SITE_CATEGORY, USER_CATEGORY
 from uwsift.queue import TASK_PROGRESS, TASK_DOING
 from PyQt5.QtCore import QObject, pyqtSignal
 
+from uwsift.workspace.workspace import frozendict
+
 LOG = logging.getLogger(__name__)
 
 DEFAULT_LAYER_SET_COUNT = 1  # this should match the ui configuration!
-
-# TODO: use cf-units or cfunits or SIUnits or other package or: put all these
-#  units and their accepted spellings into a dictionary. Also try to stay in
-#  sync with Satpy, but note, that Satpy doesn't seem to have a well designed
-#  units handling concept either
-#
-# First entry is the standard symbol used for display
-Unit_Strings_Kelvin = [
-    'K', 'Kelvin', 'kelvin'
-]
-Unit_Strings_degC = [
-    '°C', 'C', 'degrees_Celsius'
-]
-
-# TODO: this may be taken from the units config too in the future?!?
-Temperature_Quantities = [
-    'brightness_temperature',
-    'toa_brightness_temperature'
-]
-
-
-def unit_symbol(unit):
-    # FUTURE: Use cfunits or cf_units package
-    # cf_units gives the wrong symbol for celsius
-    if unit == '1':
-        return ''
-    elif unit == '%':
-        return '%'
-    elif unit in Unit_Strings_degC:
-        return Unit_Strings_degC[0]
-    elif unit in Unit_Strings_Kelvin:
-        return Unit_Strings_Kelvin[0]
-    else:
-        return unit or ""
-
-
-def _unit_format_func(layer, units):
-    units = unit_symbol(units)
-    standard_name = layer.get(Info.STANDARD_NAME)
-    if (standard_name is not None) and \
-            (standard_name in Temperature_Quantities):
-        # BT data limits, Kelvin to degC
-        def _format_unit(val, numeric=True, include_units=True):
-            return '{:.02f}{units}'.format(val, units=units if include_units else "")
-    elif "flag_values" in layer:
-        # flag values don't have units
-        if "flag_meanings" in layer:
-            flag_masks = layer["flag_masks"] if "flag_masks" in layer else [-1] * len(layer["flag_values"])
-            flag_info = tuple(zip(layer["flag_meanings"], layer["flag_values"], flag_masks))
-
-            def _format_unit(val, numeric=True, include_units=True, flag_info=flag_info):
-                val = int(val)
-                if numeric:
-                    return '{:d}'.format(val)
-
-                meanings = []
-                for fmean, fval, fmask in flag_info:
-                    if (val & fmask) == fval:
-                        meanings.append(fmean)
-                return "{:d} ({:s})".format(val, ", ".join(meanings))
-        else:
-            def _format_unit(val, numeric=True, include_units=True):
-                return '{:d}'.format(int(val))
-    else:
-        # default formatting string
-        def _format_unit(val, numeric=True, include_units=True):
-            return '{:.03f} {units:s}'.format(val, units=units if include_units else "")
-
-    return _format_unit
-
-
-def preferred_units(dsi: DocBasicLayer) -> str:
-    """
-    Return unit string (i.e.: Kelvin) for a Product currently being loaded.
-    :param dsi: DocBasicLayer describing the product currently being added.
-    :return: String describing the preferred unit for the product described in dsi.
-    """
-    # FUTURE: Use cfunits or cf_units package
-
-    default_temperature_unit = Unit_Strings_Kelvin[0]
-    lookup_name = dsi.get(Info.STANDARD_NAME)  # may return 'None', that's OK
-    if lookup_name == 'toa_bidirectional_reflectance':
-        return '1'
-    elif lookup_name in Temperature_Quantities:
-        calibration_to_temperature_unit_map = config.get("units.temperature",
-                                                         default=None)
-        if calibration_to_temperature_unit_map is None:
-            LOG.info(f"No configuration for unit of temperature found..."
-                     f" Reverting to {default_temperature_unit}.")
-            return default_temperature_unit
-        elif lookup_name in calibration_to_temperature_unit_map:
-            temperature_unit = calibration_to_temperature_unit_map[lookup_name]
-        else:
-            lookup_name = 'all'  # For the warning message below
-            temperature_unit = \
-                calibration_to_temperature_unit_map.get(lookup_name,
-                                                        default_temperature_unit)
-        if temperature_unit not in Unit_Strings_Kelvin and \
-                temperature_unit not in Unit_Strings_degC:
-            LOG.warning(f"Unit '{temperature_unit}' as configured for"
-                        f" '{lookup_name}' is not a known temperature unit."
-                        f" Reverting to {default_temperature_unit}.")
-            return default_temperature_unit
-        return temperature_unit
-
-    else:
-        return dsi.get(Info.UNITS, None)
-
-
-def units_conversion(dsi):
-    """return UTF8 unit string, lambda v,inverse=False: convert-raw-data-to-unit,
-    format string for converted value with unit."""
-    # the dataset might be in one unit, but the user may want something else
-    # FUTURE: Use cfunits or cf_units package
-    punits = preferred_units(dsi)
-
-    # Conversion functions
-    # FUTURE: Use cfunits or cf_units package
-    if dsi.get(Info.UNITS) in Unit_Strings_Kelvin and punits in Unit_Strings_degC:
-        def conv_func(x, inverse=False):
-            return x - 273.15 if not inverse else x + 273.15
-    elif dsi.get(Info.UNITS) == '%' and punits == '1':
-        def conv_func(x, inverse=False):
-            return x / 100. if not inverse else x * 100.
-    else:
-        def conv_func(x, inverse=False):
-            return x
-
-    # Format strings
-    format_func = _unit_format_func(dsi, punits)
-    return punits, conv_func, format_func
 
 
 class DocLayerStack(MutableSequence):
@@ -261,7 +132,7 @@ class DocLayerStack(MutableSequence):
             return self._store[index]
         elif isinstance(index, UUID):  # then return 0..n-1 index in stack
             return self.uuid2row.get(index, None)
-        elif isinstance(index, DocLayer):
+        elif isinstance(index, DocDataset):
             return self.uuid2row.get(index.uuid, None)
         elif isinstance(index, Presentation):
             return self.uuid2row.get(index.uuid, None)
@@ -285,7 +156,7 @@ class DocLayerStack(MutableSequence):
 
     def clear_animation_order(self):
         for i, q in enumerate(self._store):
-            self._store[i] = q._replace(a_order=None)
+            self._store[i] = dataclasses.replace(q, a_order=None)
 
     def index(self, uuid):
         assert (isinstance(uuid, UUID))
@@ -314,7 +185,7 @@ class DocLayerStack(MutableSequence):
             except ValueError:
                 LOG.warning('unable to find layer in LayerStack')
                 raise
-            self._store[idx] = self._store[idx]._replace(a_order=nth)
+            self._store[idx] = dataclasses.replace(self._store[idx], a_order=nth)
 
 
 # FUTURE: move these into separate modules
@@ -783,7 +654,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         def _then_show_frames_in_document(doc=self.doc, frames=frames):
             """finally-do-this section back on UI thread
             """
-            [self.doc.activate_product_uuid_as_new_layer(frame) for frame in frames]
+            [self.doc.activate_product_uuid_as_new_dataset(frame) for frame in frames]
             return
             # ensure that the track these frames belongs to is activated itself
             # update the timeline view states of these frames to show them as active as well
@@ -1191,8 +1062,8 @@ class DataLayer:
         # Create timeline according to temporal resolution
 
         # maps: timestamp -> uuid
-        self.timeline = OrderedDict({uuid_dt_tup[1]: uuid_dt_tup[0]
-                                     for uuid_dt_tup in uuids_tstamps_asc})
+        self.timeline = {uuid_dt_tup[1]: uuid_dt_tup[0] for uuid_dt_tup in uuids_tstamps_asc}
+
 
     def t_matched_uuid(self) -> typ.Optional[UUID]:
         """
@@ -1384,7 +1255,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     # Maps of family names to their document recipes
     family_presentation: typ.Mapping[str, Presentation] = None
-    family_composition: typ.Mapping[str, CompositeRecipe] = None  # using multiple products to present RGBA
     family_calculation: typ.Mapping[str, object] = None  # algebraic combinations of multiple products
 
     # DEPRECATION in progress: layer sets
@@ -1403,16 +1273,17 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # signals
     # Clarification: Layer interfaces migrate to layer meaning "current active products under the playhead"
     # new order list with None for new layer; info-dictionary, overview-content-ndarray
-    didAddBasicLayer = pyqtSignal(tuple, UUID, Presentation)
-    didUpdateBasicLayer = pyqtSignal(UUID, Kind)
+    didAddDataset = pyqtSignal(frozendict, Presentation)
+    didAddBasicDataset = pyqtSignal(tuple, UUID, Presentation)  # REMOVE: not emitted anywhere anymore
+    didUpdateBasicDataset = pyqtSignal(UUID, Kind)
     # comp layer is derived from multiple basic layers and has its own UUID
-    didAddCompositeLayer = pyqtSignal(tuple, UUID, Presentation)
-    didAddLinesLayer = pyqtSignal(tuple, UUID, Presentation)
-    didAddPointsLayer = pyqtSignal(tuple, UUID, Presentation)
+    didAddCompositeDataset = pyqtSignal(tuple, UUID, Presentation)
+    didAddLinesDataset = pyqtSignal(tuple, UUID, Presentation)  # REMOVE: not emitted anywhere anymore
+    didAddPointsDataset = pyqtSignal(tuple, UUID, Presentation)  # REMOVE: not emitted anywhere anymore
     # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
-    didRemoveLayers = pyqtSignal(tuple, list, int, int)
-    willPurgeLayer = pyqtSignal(UUID)  # UUID of the layer being removed
-    didReorderLayers = pyqtSignal(tuple)  # list of original indices in their new order, None for new layers
+    didRemoveDatasets = pyqtSignal(tuple, list, int, int)
+    willPurgeDataset = pyqtSignal(UUID)  # UUID of the layer being removed
+    didReorderDatasets = pyqtSignal(tuple)  # list of original indices in their new order, None for new layers
     didChangeLayerVisibility = pyqtSignal(dict)  # {UUID: new-visibility, ...} for changed layers
     didReorderAnimation = pyqtSignal(tuple)  # list of UUIDs representing new animation order
     didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
@@ -1479,8 +1350,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.colormaps = COLORMAP_MANAGER
         self.default_area_def_name = AreaDefinitionsManager.default_area_def_name()
         self.current_area_def_name = self.default_area_def_name
-        self.recipe_manager = RecipeManager(self.config_dir)
-        self._recipe_layers = {}
         # HACK: This should probably be part of the metadata database in the future
         self._families = defaultdict(list)
 
@@ -1604,7 +1473,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         assert (isinstance(cls, DocLayerStack))
         return cls
 
-    def _insert_layer_with_info(self, info: DocLayer, cmap=None, style=None,
+    def _insert_layer_with_info(self, info: DocDataset, cmap=None, style=None,
                                 insert_before=0):
         """
         insert a layer into the presentations but do not signal
@@ -1615,7 +1484,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if style is None:
             style = info.get(Info.STYLE)
         gamma = 1.
-        if isinstance(info, DocRGBLayer):
+        if isinstance(info, DocRGBDataset):
             gamma = (1.,) * 3
         elif hasattr(info, 'layers'):
             gamma = (1.,) * len(info.layers)
@@ -1631,9 +1500,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                          style=style if family_prez is None else family_prez.style,
                          climits=info[Info.CLIM] if family_prez is None else family_prez.climits,
                          gamma=gamma if family_prez is None else family_prez.gamma,
-                         mixing=Mixing.NORMAL)
+                         mixing=Mixing.NORMAL,
+                         opacity=1.0,)
 
-        q = p._replace(visible=False)  # make it available but not visible in other layer sets
+        q = dataclasses.replace(p, visible=False)  # make it available but not visible in other layer sets
         old_layer_count = len(self._layer_sets[self.current_set_index])
         for dex, lset in enumerate(self._layer_sets):
             if lset is not None:  # uninitialized layer sets will be None
@@ -1643,39 +1513,35 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             range(old_layer_count)))  # FIXME: this should obey insert_before, currently assumes always insert at top
         return p, reordered_indices
 
-    def activate_product_uuid_as_new_layer(self, uuid: UUID, insert_before=0, **importer_kwargs):
+    def activate_product_uuid_as_new_dataset(self, uuid: UUID, insert_before=0,
+                                             **importer_kwargs):
         if uuid in self._layer_with_uuid:
             LOG.debug("Layer already loaded: {}".format(uuid))
-            active_content_data = self._workspace.import_product_content(uuid, **importer_kwargs)
+            active_content_data = \
+                self._workspace.import_product_content(uuid, **importer_kwargs)
             return uuid, self[uuid], active_content_data
 
-        # FUTURE: Load this async, the slots for the below signal need to be OK with that
-        active_content_data = self._workspace.import_product_content(uuid, **importer_kwargs)
-        # updated metadata with content information (most importantly nav information)
+        # FUTURE: Load this async, the slots for the below signal need to be OK
+        # with that
+        active_content_data = \
+            self._workspace.import_product_content(uuid, **importer_kwargs)
+        # updated metadata with content information (most importantly navigation
+        # information)
         info = self._workspace.get_info(uuid)
         assert (info is not None)
         LOG.debug('cell_width: {}'.format(repr(info[Info.CELL_WIDTH])))
 
         LOG.debug('new layer info: {}'.format(repr(info)))
-        self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, info)
-        if Info.UNIT_CONVERSION not in dataset:
+        self._layer_with_uuid[uuid] = dataset = DocBasicDataset(self, info)
+        if Info.UNIT_CONVERSION not in info:
             dataset[Info.UNIT_CONVERSION] = units_conversion(dataset)
         if Info.FAMILY not in dataset:
             dataset[Info.FAMILY] = self.family_for_product_or_layer(dataset)
-        presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
+        presentation, reordered_indices = \
+            self._insert_layer_with_info(dataset, insert_before=insert_before)
 
-        if dataset[Info.KIND] == Kind.LINES:
-            self.didAddLinesLayer.emit(reordered_indices, dataset.uuid, presentation)
-            self._add_layer_family(dataset)
-        elif dataset[Info.KIND] == Kind.POINTS:
-            self.didAddPointsLayer.emit(reordered_indices, dataset.uuid, presentation)
-            self._add_layer_family(dataset)
-        else:
-            # signal updates from the document
-            self.didAddBasicLayer.emit(reordered_indices, dataset.uuid, presentation)
-            self._add_layer_family(dataset)
-            # update any RGBs that could use this to make an RGB
-            self.sync_composite_layer_prereqs([dataset[Info.SCHED_TIME]])
+        # signal updates from the document
+        self.didAddDataset.emit(info, presentation)
 
         return uuid, dataset, active_content_data
 
@@ -1730,7 +1596,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         family = layer = family_or_layer_or_uuid
         if isinstance(family_or_layer_or_uuid, UUID):
             layer = self[family_or_layer_or_uuid]
-        if isinstance(layer, DocBasicLayer):
+        if isinstance(layer, DocBasicDataset):
             family = layer[Info.FAMILY]
 
         # one layer that represents all the layers in this family
@@ -1823,13 +1689,13 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 # and there is nothing new to import
                 if active_content_data:
                     dataset = self[merge_target_uuid]
-                    self.didUpdateBasicLayer.emit(merge_target_uuid,
-                                                  dataset[Info.KIND])
+                    self.didUpdateBasicDataset.emit(merge_target_uuid,
+                                                    dataset[Info.KIND])
             elif uuid in self._layer_with_uuid:
                 LOG.warning("layer with UUID {} already in document?".format(uuid))
                 self._workspace.get_content(uuid)
             else:
-                self.activate_product_uuid_as_new_layer(uuid, insert_before=insert_before, **importer_kwargs)
+                self.activate_product_uuid_as_new_dataset(uuid, insert_before=insert_before, **importer_kwargs)
 
             yield {
                 TASK_DOING: 'Loading content {}/{}'.format(dex + 1, total_products),
@@ -2109,7 +1975,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 dex = L.index(dex)  # returns row index
             old = L[dex]
             vis = (not old.visible) if visible is None else visible
-            nu = old._replace(visible=vis)
+            nu = dataclasses.replace(old, visible=vis)
             L[dex] = nu
             zult[nu.uuid] = nu.visible
         self.didChangeLayerVisibility.emit(zult)
@@ -2126,7 +1992,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for uuid, visible in changes.items():
             dex = curr_set[uuid]
             old = curr_set[dex]
-            curr_set[dex] = old._replace(visible=visible)
+            curr_set[dex] = dataclasses.replace(old, visible=visible)
         self.didChangeLayerVisibility.emit(changes)
 
     def next_last_step(self, uuid, delta=0, bandwise=False):
@@ -2187,7 +2053,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for uuid in uuids:
             for dex, pinfo in enumerate(L):
                 if pinfo.uuid == uuid:
-                    L[dex] = pinfo._replace(colormap=name)
+                    L[dex] = dataclasses.replace(pinfo, colormap=name)
                     nfo[uuid] = name
         self.didChangeColormap.emit(nfo)
 
@@ -2219,7 +2085,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         nfo = {}
         L = self.current_layer_set
         for idx, pz, layer in self.current_layers_where(**query):
-            new_pz = pz._replace(climits=clims)
+            new_pz = dataclasses.replace(pz, climits=clims)
             nfo[layer.uuid] = new_pz.climits
             L[idx] = new_pz
         self.didChangeColorLimits.emit(nfo)
@@ -2240,14 +2106,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             for dex, pinfo in enumerate(L):
                 if pinfo.uuid == uuid:
                     nfo[uuid] = pinfo.climits[::-1]
-                    L[dex] = pinfo._replace(climits=nfo[uuid])
+                    L[dex] = dataclasses.replace(pinfo, climits=nfo[uuid])
         self.didChangeColorLimits.emit(nfo)
 
     def change_gamma_for_layers_where(self, gamma, **query):
         nfo = {}
         L = self.current_layer_set
         for idx, pz, layer in self.current_layers_where(**query):
-            new_pz = pz._replace(gamma=gamma)
+            new_pz = dataclasses.replace(pz, gamma=gamma)
             nfo[layer.uuid] = new_pz.gamma
             L[idx] = new_pz
         self.didChangeGamma.emit(nfo)
@@ -2269,7 +2135,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             if pz.kind not in [Kind.IMAGE, Kind.CONTOUR]:
                 LOG.warning("Can't change image kind for Kind: %s", pz.kind.name)
                 continue
-            new_pz = pz._replace(kind=new_kind)
+            new_pz = dataclasses.replace(pz, kind=new_kind)
             nfo[layer.uuid] = new_pz
             layer_set[idx] = new_pz
         self.didChangeImageKind.emit(nfo)
@@ -2310,270 +2176,22 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                                                                                               Info.SCHED_TIME)))
 
             uuid, layer_info, data = self._workspace.create_algebraic_composite(operations, temp_namespace, info.copy())
-            self._layer_with_uuid[uuid] = dataset = DocBasicLayer(self, layer_info)
+            self._layer_with_uuid[uuid] = dataset = DocBasicDataset(self, layer_info)
             presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
             if Info.UNIT_CONVERSION not in dataset:
                 dataset[Info.UNIT_CONVERSION] = units_conversion(dataset)
             if Info.FAMILY not in dataset:
                 dataset[Info.FAMILY] = self.family_for_product_or_layer(dataset)
             self._add_layer_family(dataset)
-            self.didAddCompositeLayer.emit(reordered_indices, dataset.uuid, presentation)
+            self.didAddCompositeDataset.emit(reordered_indices, dataset.uuid, presentation)
 
     def available_rgb_components(self):
-        non_rgb_classes = [DocBasicLayer, DocCompositeLayer]
+        non_rgb_classes = [DocBasicDataset, DocCompositeDataset]
         valid_ranges = {}
         for layer in self.layers_where(is_valid=True, in_type_set=non_rgb_classes):
             sname = layer.get(Info.CENTRAL_WAVELENGTH, layer[Info.DATASET_NAME])
             valid_ranges.setdefault(sname, layer[Info.VALID_RANGE])
         return valid_ranges
-
-    def create_rgb_composite(self, r=None, g=None, b=None, clim=None, gamma=None):
-        """Create an RGB recipe and the layers that can be created from it.
-
-        Args:
-            r (str): Family name to use for the Red component of the RGB
-            g (str): Family name to use for the Green component of the RGB
-            b (str): Family name to use for the Blue component of the RGB
-            clim (tuple): 3-element tuple of min and max floats for each
-                          component.
-                          Example: ``((0.0, 1.2), (None, None), (273.15, 310.0))``
-            gamma (tuple): 3-element tuple of Gamma value for each component
-
-        Returns:
-            Iterator of RGB layers created
-
-        """
-        # create a new recipe object
-        recipe = CompositeRecipe.from_rgb(uuidgen(), r=r, g=g, b=b, color_limits=clim, gammas=gamma)
-        self.recipe_manager.add_recipe(recipe)
-        # recipe.name -> (sat, inst) -> {t: layer}
-        self._recipe_layers[recipe.name] = {}
-        self.update_rgb_composite_layers(recipe)
-        return chain(*(x.values() for x in self._recipe_layers[recipe.name].values()))
-
-    def change_rgb_recipe_components(self, recipe, update=True, **rgba):
-        if recipe.read_only:
-            raise ValueError("Recipe is read only, can't modify")
-        for idx, channel in enumerate('rgba'):
-            if channel not in rgba:
-                continue
-            new_comp_family = rgba[channel]
-            recipe.input_ids[idx] = new_comp_family
-        if update:
-            self.update_rgb_composite_layers(recipe, rgba=set(rgba.keys()))
-
-    def _uuids_for_recipe(self, recipe, valid_only=True):
-        prez_uuids = self.current_layer_uuid_order
-        for time_layers in self._recipe_layers[recipe.name].values():
-            for rgb_layer in time_layers.values():
-                u = rgb_layer[Info.UUID]
-                if not valid_only:
-                    yield u
-                elif u in prez_uuids:
-                    # only provide UUIDs if the layer is valid and presentable
-                    yield u
-
-    def change_rgb_recipe_prez(self, recipe, climits=None, gamma=None, uuids=None):
-        if uuids is None:
-            uuids = list(self._uuids_for_recipe(recipe))
-        if climits:
-            # modify each element separately
-            for i in range(3):
-                recipe.color_limits[i] = climits[i]
-            self.change_clims_for_layers_where(recipe.color_limits, uuids=uuids)
-        if gamma:
-            for i in range(3):
-                recipe.gammas[i] = gamma[i]
-            self.change_gamma_for_layers_where(recipe.gammas, uuids=uuids)
-
-    def update_rgb_composite_layers(self, recipe, times=None, rgba='rgb'):
-        """Analyze each RGB layer for `recipe` and update it is needed.
-
-        Args:
-            recipe (CompositeRecipe): Recipe whose layers will be updated
-            times (iterable of datetimes): Limit analyzed layers by these
-                                           times.
-            rgba (iterable of strings): Limit updated RGB components to these
-                                        components ('r', 'g', 'b', 'a').
-
-        """
-        # find all the layer combinations
-        changed_uuids = []
-        prez_uuids = self.current_layer_uuid_order
-        for t, category, r, g, b in self._composite_layers(recipe, times=times, rgba=rgba):
-            # (sat, inst) -> {time -> layer}
-            layers = self._recipe_layers[recipe.name].setdefault(category, {})
-            # NOTE: combinations may be returned that don't match the recipe
-            if t not in layers:
-                # create a new blank RGB
-                uuid = uuidgen()
-                ds_info = {
-                    Info.UUID: uuid,
-                    Info.KIND: Kind.RGB,
-                    "recipe": recipe,
-                }
-                # better place for this?
-                ds_info[Info.FAMILY] = self.family_for_product_or_layer(ds_info)
-                LOG.debug("Creating new RGB layer for recipe '{}'".format(recipe.name))
-                rgb_layer = layers[t] = DocRGBLayer(self, recipe, ds_info)
-                self._layer_with_uuid[uuid] = rgb_layer
-                layers[t].update_metadata_from_dependencies()
-                # maybe we shouldn't add the family until the layers are set
-                self._add_layer_family(rgb_layer)
-                LOG.info('generating incomplete (invalid) composite for user to configure')
-                # maybe we shouldn't send this out for invalid layers
-            else:
-                rgb_layer = layers[t]
-
-            # only try to change the layers that were specified as being changed
-            if rgba:
-                changed_components = {comp: comp_layer for comp, comp_layer in zip('rgb', [r, g, b]) if comp in rgba}
-            else:
-                changed_components = {'r': r, 'g': g, 'b': b}
-
-            if not changed_components:
-                continue
-
-            # update the component layers and tell which ones changed
-            changed = self._change_rgb_component_layer(rgb_layer, **changed_components)
-
-            # check recipes color limits and update them
-            # but only if this RGB layer matches the layers the recipe has
-            if not recipe.read_only and changed and rgb_layer.recipe_layers_match:
-                def_limits = {comp: rgb_layer[Info.CLIM][idx] for idx, comp in enumerate('rgb') if comp in changed}
-                recipe.set_default_color_limits(**def_limits)
-
-            # only tell other components about this layer if it is valid
-            should_show = rgb_layer.is_valid or rgb_layer.recipe_layers_match
-            if rgb_layer[Info.UUID] not in prez_uuids:
-                if should_show:
-                    presentation, reordered_indices = self._insert_layer_with_info(rgb_layer)
-                    self.didAddCompositeLayer.emit(reordered_indices, rgb_layer[Info.UUID], presentation)
-                else:
-                    continue
-            elif not should_show:
-                # is being shown, but shouldn't be
-                self.remove_layer_prez(rgb_layer[Info.UUID])
-                continue
-
-            if rgb_layer is not None:
-                changed_uuids.append(rgb_layer[Info.UUID])
-
-        self.change_rgb_recipe_prez(recipe, climits=recipe.color_limits,
-                                    gamma=recipe.gammas, uuids=changed_uuids)
-        if changed_uuids:
-            self.didChangeCompositions.emit((), *zip(*self.prez_for_uuids(changed_uuids)))
-        LOG.info('Done with updating RGB composite.')
-
-    def _composite_layers(self, recipe, times=None, rgba=None):
-        if times:
-            times = set(times)
-        if rgba is None:
-            rgba = []
-
-        def _key_func(x):
-            return x[Info.CATEGORY]
-
-        def _component_generator(family, this_rgba):
-            # limit what layers are returned
-            if this_rgba not in rgba:
-                return {}
-
-            # FIXME: Should we use SERIAL instead?
-            #        Algebraic layers and RGBs need to use the same thing
-            #        Any call to 'sync_composite_layer_prereqs' needs to use
-            #        SERIAL instead of SCHED_TIME too.
-            if family is None:
-                layers = self.current_layers_where(kinds=[Kind.IMAGE, Kind.COMPOSITE])
-                layers = (x[-1] for x in layers)
-                # return empty `None` layers since we don't know what is wanted right now
-                # we look at all possible times
-                inst_layers = {
-                    k: {layer[Info.SCHED_TIME]: None for layer in g}
-                    for k, g in groupby(sorted(layers, key=_key_func), _key_func)}
-                return inst_layers
-            else:
-                family_uuids = self._families[family]
-                family_layers = [self[u] for u in family_uuids]
-            # (sat, inst) -> {time -> layer}
-            inst_layers = {k: {layer[Info.SCHED_TIME]: layer for layer in g} for k, g in
-                           groupby(sorted(family_layers, key=_key_func), _key_func)}
-            return inst_layers
-
-        # if the layers we were using as dependencies have all been removed (family no longer exists)
-        # then change the recipe to use None instead. The `didRemoveFamily` signal already told the
-        # RGB pane to update its list of choices and defaults to None
-        missing_rgba = {comp: None for comp, input_id in zip('rgb', recipe.input_ids) if
-                        input_id and input_id not in self._families}
-        if missing_rgba:
-            LOG.debug("Recipe's inputs have gone missing: {}".format(missing_rgba))
-            self.change_rgb_recipe_components(recipe, update=False, **missing_rgba)
-
-        # find all the layers for these components
-        r_layers = _component_generator(recipe.input_ids[0], 'r')
-        g_layers = _component_generator(recipe.input_ids[1], 'g')
-        b_layers = _component_generator(recipe.input_ids[2], 'b')
-        categories = (r_layers.keys() | g_layers.keys() | b_layers.keys() |
-                      self._recipe_layers[recipe.name].keys())
-
-        for category in categories:
-            # any new times plus existing times if RGBs already exist
-            rgb_times = (r_layers.setdefault(category, {}).keys() |
-                         g_layers.setdefault(category, {}).keys() |
-                         b_layers.setdefault(category, {}).keys() |
-                         self._recipe_layers[recipe.name].setdefault(category, {}).keys())
-            if times:
-                rgb_times &= times
-            # time order doesn't really matter
-            for t in rgb_times:
-                yield t, category, r_layers[category].get(t), g_layers[category].get(t), b_layers[category].get(t)
-
-    def sync_composite_layer_prereqs(self, new_times):
-        """Check if we can make more RGBs based on newly added times"""
-        # add a blank layer object if we've never seen this time before
-        # update the layer object with newly available layers if possible
-        # add the layer object to the document if it should be included with
-        # the rest of them
-        for recipe_name in self._recipe_layers.keys():
-            recipe = self.recipe_manager[recipe_name]
-            self.update_rgb_composite_layers(recipe, times=new_times)
-
-    def _change_rgb_component_layer(self, layer: DocRGBLayer, **rgba):
-        """Update RGB Layer with specified components
-
-        If the layer is not valid
-
-        change the layer composition for an RGB layer, and signal
-        by default, propagate the changes to sibling layers matching this layer's configuration
-        """
-        LOG.debug('revising RGB layer config for %s: %s' % (layer.uuid, repr(list(rgba.keys()))))
-        if layer is None or not rgba:
-            return
-        # identify siblings before we make any changes!
-        changed = []
-        clims = list(layer[Info.CLIM])
-        for k, v in rgba.items():
-            # assert(k in 'rgba')
-            idx = 'rgba'.index(k)
-            if getattr(layer, k, None) is v:
-                continue
-            changed.append(k)
-            setattr(layer, k, v)
-            clims[idx] = None  # causes update_metadata to pull in upstream clim values
-        if not changed:
-            return changed
-        # force an update of clims for components that changed
-        # These clims are the current state of the default clims for each sub-layer
-        layer[Info.CLIM] = tuple(clims)
-        updated = layer.update_metadata_from_dependencies()
-        LOG.debug('updated metadata for layer %s: %s' % (layer.uuid, repr(list(updated.keys()))))
-
-        return changed
-
-    def set_rgb_range(self, recipe: CompositeRecipe, rgba: str, min: float, max: float):
-        new_clims = tuple(x if c != rgba else (min, max) for c, x in zip("rgba", recipe.color_limits))
-        # update the ranges on this layer and all it's siblings
-        self.change_rgb_recipe_prez(recipe, climits=new_clims)
 
     def _directory_of_layers(self, kind=Kind.IMAGE):
         if not isinstance(kind, (list, tuple)):
@@ -2607,24 +2225,13 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def family_uuids_for_uuid(self, uuid, active_only=False):
         return self.family_uuids(self[uuid][Info.FAMILY], active_only=active_only)
 
-    def recipe_for_uuid(self, uuid):
-        # put this in a separate method in case things change in the future
-        return self[uuid]['recipe']
-
-    def remove_rgb_recipes(self, recipe_names):
-        for recipe_name in recipe_names:
-            del self.recipe_manager[recipe_name]
-            del self._recipe_layers[recipe_name]
-
     def remove_layers_from_all_sets(self, uuids):
         # find RGB layers family
         all_uuids = set()
-        recipes_to_remove = set()
         for uuid in list(uuids):
             all_uuids.add(uuid)
-            if isinstance(self[uuid], DocRGBLayer):
+            if isinstance(self[uuid], DocRGBDataset):
                 all_uuids.update(self.family_uuids_for_uuid(uuid))
-                recipes_to_remove.add(self.recipe_for_uuid(uuid).name)
 
         # collect all times for these layers to update RGBs later
         times = [self[u][Info.SCHED_TIME] for u in all_uuids]
@@ -2639,10 +2246,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             # remove from data layer collection
             if self.data_layer_collection is not None:
                 self.data_layer_collection.remove_by_uuid(uuid)
-
-        # remove recipes for RGBs that were deleted
-        # if we don't then they may be recreated below
-        self.remove_rgb_recipes(recipes_to_remove)
 
         # Remove this layer from any RGBs it is a part of
         self.sync_composite_layer_prereqs(times)
@@ -2665,8 +2268,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         layer = self._layer_with_uuid[uuid]
         L = self.current_layer_set
 
-        if isinstance(layer, DocRGBLayer):
-            new_anim_uuids = tuple(self._uuids_for_recipe(layer.recipe))
+        if isinstance(layer, DocRGBDataset):
+            pass
         else:
             new_anim_uuids, _ = self.time_siblings(uuid)
             if new_anim_uuids is None or len(new_anim_uuids) < 2:
@@ -2681,7 +2284,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.didReorderAnimation.emit(tuple(new_anim_uuids))
         return new_anim_uuids
 
-    def get_info(self, row: int = None, uuid: UUID = None) -> typ.Optional[DocBasicLayer]:
+    def get_info(self, row: int = None, uuid: UUID = None) -> typ.Optional[DocBasicDataset]:
         if row is not None:
             uuid_temp = self.current_layer_set[row].uuid
             nfo = self._layer_with_uuid[uuid_temp]
@@ -2726,7 +2329,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         assert (len(new_order) == len(self._layer_sets[layer_set_index]))
         new_layer_set = DocLayerStack(self, [self._layer_sets[layer_set_index][n] for n in new_order])
         self._layer_sets[layer_set_index] = new_layer_set
-        self.didReorderLayers.emit(tuple(new_order))
+        self.didReorderDatasets.emit(tuple(new_order))
 
     def insert_layer_prez(self, row: int, layer_prez_seq):
         cls = self.current_layer_set
@@ -2780,14 +2383,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         clo = list(range(len(self.current_layer_set)))
         del clo[row:row + count]
         del self.current_layer_set[row:row + count]
-        self.didRemoveLayers.emit(tuple(clo), uuids, row, count)
+        self.didRemoveDatasets.emit(tuple(clo), uuids, row, count)
 
     def purge_layer_prez(self, uuids):
         """Purge layers from the workspace"""
         for uuid in uuids:
             if not self.is_using(uuid):
                 LOG.debug('purging layer {}, no longer in use'.format(uuid))
-                self.willPurgeLayer.emit(uuid)
+                self.willPurgeDataset.emit(uuid)
                 # remove from our bookkeeping
                 del self._layer_with_uuid[uuid]
                 # remove from workspace
@@ -2828,7 +2431,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def get_unique_product_family_keys(self) -> typ.List[typ.Tuple]:
         """
         Return list of unique product_family_keys in i.e. document._layer_with_uuid's
-        DocBasicLayers.
+        DocBasicDatasets.
         :return: unique_product_family_keys
         """
         prod_fam_keys = [dbl.product_family_key for dbl in self._layer_with_uuid.values()]
@@ -2842,7 +2445,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def create_data_layers(self) -> typ.List[DataLayer]:
         """
             Adds data layers to document, based on currently present
-            uuid -> DocBasicLayer (document._layer_with_uuid) mappings.
+            uuid -> DocBasicDataset (document._layer_with_uuid) mappings.
             :return: data_layers: typ.List of data layers to be incorporated into DataLayerCollection.
         """
         pf_keys: typ.List[typ.Tuple] = [dbl.product_family_key for dbl in self._layer_with_uuid.values()]

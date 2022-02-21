@@ -1,20 +1,23 @@
 import logging
+from typing import Optional
 
-from PyQt5.QtCore import QStringListModel, QDateTime
+from PyQt5.QtCore import QDateTime, QObject, pyqtSignal
 
 from uwsift.control.time_matcher import TimeMatcher
 from uwsift.control.time_matcher_policies import find_nearest_past
 from uwsift.control.time_transformer import TimeTransformer
 from uwsift.control.time_transformer_policies import WrappingDrivingPolicy
 from uwsift.control.qml_utils import QmlLayerManager, TimebaseModel, QmlBackend
-from uwsift.model.document import DataLayer, DataLayerCollection
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+
+from uwsift.model.layer_item import LayerItem
+from uwsift.model.layer_model import LayerModel
 
 LOG = logging.getLogger(__name__)
 
 
-class TimeManager:
+class TimeManager(QObject):
     # TODO(mk): make this class abstract and subclass,
     #           as soon as non driving layer policies are necessary?
     """
@@ -27,27 +30,34 @@ class TimeManager:
               from collection
             - Image is displayed
     """
-    def __init__(self, collection: DataLayerCollection, animation_speed,
-                 matching_policy=find_nearest_past):
-        self._collection = collection
+
+    didMatchTimes = pyqtSignal(dict)
+
+    def __init__(self, animation_speed, matching_policy=find_nearest_past):
+        super().__init__()
+        self._animation_speed = animation_speed
+        self._time_matcher = TimeMatcher(matching_policy)
+
+        self._layer_model: Optional[LayerModel] = None
+
         self.qml_root_object = None
         self.qml_engine = None
         self._qml_backend = None
         self.qml_layer_manager: QmlLayerManager = QmlLayerManager()
+        self.current_timebase_uuid = None
 
-        dummy_dt = datetime.now()
-        dummy_dt = datetime(dummy_dt.year, dummy_dt.month, dummy_dt.day, dummy_dt.hour)
-        test_qdts = list(map(lambda dt: QDateTime(dt),
-                             [dummy_dt + relativedelta(hours=i) for i in range(5)]))
-        self.qml_timestamps_model = TimebaseModel(timestamps=test_qdts)
-        # TODO(mk): remove the below as soon as the 2 above are working
-        self.timeStampQStringModel = QStringListModel()
-        self._animation_speed = animation_speed
-        self._time_transformer = None
-        self._init_collection(collection)
-        self._animation_speed = animation_speed
+        self.qml_timestamps_model = \
+            TimebaseModel(timestamps=self._get_default_qdts())
+        self._time_transformer: Optional[TimeTransformer] = None
 
-        self._time_matcher = TimeMatcher(matching_policy)
+    @staticmethod
+    def _get_default_qdts(steps=5):
+        now_dt = datetime.now()
+        now_dt = datetime(now_dt.year, now_dt.month, now_dt.day, now_dt.hour)
+        return list(
+            map(lambda dt: QDateTime(dt),
+                [now_dt + relativedelta(hours=i) for i in range(steps)])
+        )
 
     @property
     def qml_backend(self) -> QmlBackend:
@@ -57,36 +67,83 @@ class TimeManager:
     def qml_backend(self, backend):
         self._qml_backend = backend
 
-    def _init_collection(self, collection: DataLayerCollection):
-        self._collection = collection
-        # Expose collection's convenience functions to QmlLayerManager
-        if self.qml_layer_manager is not None:
-            self.qml_layer_manager.convenience_functions = self._collection.convenience_functions
-        policy = WrappingDrivingPolicy(self._collection)
-        self._collection.didUpdateCollection.connect(policy.on_collection_update)
-        self._collection.didUpdateCollection.connect(self.update_qml_collection_representation)
+    def connect_to_model(self, layer_model: LayerModel):
+        self._layer_model: LayerModel = layer_model
+        self.qml_layer_manager._layer_model = layer_model
+
+        policy = WrappingDrivingPolicy(self._layer_model.layers)
+        layer_model.didUpdateLayers.connect(policy.on_layers_update)
+        layer_model.didUpdateLayers.connect(self.update_qml_layer_model)
+        layer_model.didUpdateLayers.connect(self.sync_to_time_transformer)
+        layer_model.didReorderLayers.connect(self.update_layer_order)
+
+        self.didMatchTimes.connect(self._layer_model.on_didMatchTimes)
+
         policy.didUpdatePolicy.connect(self.update_qml_timeline)
         self._time_transformer = TimeTransformer(policy)
 
-    @property
-    def collection(self):
-        return self._collection
+    def tick(self, event):
+        """
+        Proxy function for `TimeManager.step()`, which cannot directly
+        receive a signal from the animation timer signal because the latter
+        passes an `event` that `step()` cannot deal with. Thus connect to
+        this method to actually trigger `step()`.
+
+        :param event: Event passed by `AnimationController.animation_timer` on
+        expiry, simply dropped.
+        """
+        self.step()
+
+    def step(self, backwards: bool = False):
+        """
+        Method allowing advancement of time, either forwards or backwards, by
+        one time step, as determined by the currently active time base.
+
+        :param backwards: Flag which sets advancement either to `forwards` or
+        `backwards`.
+        """
+        self._time_transformer.step(backwards=backwards)
+        self.sync_to_time_transformer()
 
     def jump(self, index):
         self._time_transformer.jump(index)
+        self.sync_to_time_transformer()
+
+    def sync_to_time_transformer(self):
         t_sim = self._time_transformer.t_sim
         t_idx = self._time_transformer.timeline_index
-        self.tick_qml_state(t_sim, t_idx)
-        self.update_collection_state(t_sim)
 
-    def tick(self, backwards=False):
-        self._time_transformer.tick(backwards=backwards)
-        t_sim = self._time_transformer.t_sim
-        t_idx = self._time_transformer.timeline_index
-        self.tick_qml_state(t_sim, t_idx)
-        self.update_collection_state(t_sim)
+        t_matched_dict = self._match_times(t_sim)
+        self.didMatchTimes.emit(t_matched_dict)
 
-    def update_qml_timeline(self, data_layer: DataLayer):
+        self.tick_qml_state(t_sim, t_idx)
+
+    def _match_times(self, t_sim: datetime) -> dict:
+        """
+        Match time steps of available data in LayerModel's dynamic layers to
+        `t_sim` of i.e.: a driving layer.
+
+        A mapping of one layer to multiple soon-to-be visible ProductDatasets is
+        made possible to support products (i.e.: Lightning) where multiple
+        ProductDatasets may accumulate and must thus be made visible to the
+        user.
+
+        :param t_sim: Datetime of current active time step of time base.
+        :return: Dictionary of possibly multiple tuples of
+        (layer_uuid -> [product_dataset_uuid0,..,product_dataset_uuidN]),
+        describing all ProductDatasets within a layer that are to be set
+        visible.
+        """
+        t_matched_dict = {}
+        for layer in self._layer_model.get_dynamic_layers():
+            t_matched = self._time_matcher.match(layer.timeline, t_sim)
+            if t_matched:
+                t_matched_dict[layer.uuid] = [layer.timeline[t_matched].uuid]
+            else:
+                t_matched_dict[layer.uuid] = [None]
+        return t_matched_dict
+
+    def update_qml_timeline(self, layer: LayerItem):
         """
         Slot that updates and refreshes QML timeline state using a DataLayer that is either:
             a) a driving layer or some other form of high priority data layer
@@ -95,37 +152,52 @@ class TimeManager:
             # TODO(mk): the policy should not be responsible for UI, another policy or an object
                         that ingests a policy and handles UI based on that?
         """
-        if not self._time_transformer.t_sim:
-            self.qml_timestamps_model.currentTimestamp = list(data_layer.timeline.keys())[0]
+        if not layer or not layer.dynamic:
+            new_timestamp_qdts = self._get_default_qdts()
         else:
-            self.qml_timestamps_model.currentTimestamp = self._time_transformer.t_sim
+            new_timestamp_qdts = list(map(lambda dt: QDateTime(dt), layer.timeline.keys()))
+
+            if not self._time_transformer.t_sim:
+                self.qml_timestamps_model.currentTimestamp = list(layer.timeline.keys())[0]
+            else:
+                self.qml_timestamps_model.currentTimestamp = self._time_transformer.t_sim
 
         self.qml_engine.clearComponentCache()
-
-        new_timestamp_qdts = list(map(lambda dt: QDateTime(dt), data_layer.timeline.keys()))
         self.qml_timestamps_model.timestamps = new_timestamp_qdts
         self.qml_backend.refresh_timeline()
 
-    def update_qml_collection_representation(self):
+    def update_qml_layer_model(self):
         """
-        Slot connected to didUpdateCollection signal, responsible for managing the data layer
-        combo box contents
+        Slot connected to didUpdateCollection signal, responsible for
+        managing the data layer combo box contents
         """
-        data_layers_str = []
-        for i, pfkey in enumerate(self._collection.data_layers):
-            dl_str = self.qml_layer_manager.format_product_family_key(pfkey)
-            data_layers_str.append(dl_str)
-        self.qml_layer_manager.layerModel.layer_strings = data_layers_str
-        # TODO(mk): create cleaner interface to get timebase index, should not directly
-        #           access policy, expose via transformer?
-        time_index = self._time_transformer._translation_policy._driving_idx
-        self.qml_backend.didChangeTimebase.emit(time_index)
+        dynamic_layers_descriptors = []
+        # In case the current timebase layer isn't found again (it may have
+        # been removed), select the first, therefore initialize to 0:
+        new_index_of_current_timebase = 0
+        for idx, layer in enumerate(self._layer_model.get_dynamic_layers()):
+            dynamic_layers_descriptors.append(layer.descriptor)
+            if layer.uuid == self.current_timebase_uuid:
+                new_index_of_current_timebase = idx
+
+        self.qml_layer_manager._qml_layer_model.layer_strings = \
+            dynamic_layers_descriptors
+
+        self.qml_backend.didChangeTimebase.emit(new_index_of_current_timebase)
+
+    def update_layer_order(self):
+        dynamic_layers = self._layer_model.get_dynamic_layers()
+        dynamic_layers_descriptors = \
+            [layer.descriptor for layer in dynamic_layers]
+
+        self.qml_layer_manager._qml_layer_model.layer_strings = \
+            dynamic_layers_descriptors
 
     def tick_qml_state(self, t_sim, timeline_idx):
         # TODO(mk): if TimeManager is subclassed the behavior below must be adapted:
         #           it may no longer be desirable to show t_sim as the current time step
         self.qml_timestamps_model.currentTimestamp = self._time_transformer.t_sim
-        self.qml_backend.notify_tidx_changed(timeline_idx)
+        self.qml_backend.doNotifyTimelineIndexChanged.emit(timeline_idx)
 
     def create_formatted_t_sim(self):
         """
@@ -133,29 +205,28 @@ class TimeManager:
         """
         return self._time_transformer.create_formatted_time_stamp()
 
-    def update_collection_state(self, t_sim):
-        """
-            Iterate over data layers in collection to match times to t_sim and set the t_matched
-            state of all data_layers to their t_matched.
-        """
-        for pfkey, data_layer in self._collection.data_layers.items():
-            timeline = list(data_layer.timeline.keys())
-            matched_t = self._time_matcher.match(timeline, t_sim)
-            if matched_t:
-                data_layer.t_matched = matched_t
-            else:
-                data_layer.t_matched = timeline[0]
-
     def on_timebase_change(self, index):
         """
-        Slot to trigger timebase change by looking up data layer at specified index.
-         Then calls time transformer to execute change of the timebase.
-        :param index: DataLayer index obtained by either: clicking an item in the ComboBox or
-                      by clicking a convenience function in the convenience function popup menu
+        Slot to trigger timebase change by looking up data layer at specified
+        index. Then calls time transformer to execute change of the timebase.
+
+        :param index: DataLayer index obtained by either: clicking an item in
+                      the ComboBox or by clicking a convenience function in the
+                      convenience function popup menu
         """
-        data_layer = self._collection.get_data_layer_by_index(index)
-        if data_layer:
-            self._time_transformer.change_timebase(data_layer)
-            self.update_qml_timeline(data_layer)
-            # TODO(mk): still need call below?
-            self.qml_backend.refresh_timeline()
+
+        dynamic_layers = self._layer_model.get_dynamic_layers()
+
+        if not dynamic_layers:
+            # FIXME: reset to initial state when last dynamic layer has been
+            #  removed (as soon as layer removal becomes possible)
+            # self.update_qml_timeline(None)
+            return
+
+        assert 0 <= index < len(dynamic_layers)
+
+        layer = self._layer_model.get_dynamic_layers()[index]
+        self.current_timebase_uuid = layer.uuid
+        self._time_transformer.change_timebase(layer)
+        self.update_qml_timeline(layer)
+        self.sync_to_time_transformer()

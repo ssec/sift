@@ -22,7 +22,9 @@ __author__ = 'rayg'
 
 # To have consistent logging for all modules (also for their static
 # initialization) it must be set up before importing them.
+from uwsift.model.composite_recipes import RecipeManager
 from uwsift.util.logger import configure_loggers
+from uwsift.view.algebraic_config import AlgebraicLayerConfigPane
 
 configure_loggers()  # noqa - we rerun this later again to post-config
 
@@ -50,10 +52,9 @@ from uwsift import (__version__, config,
 from uwsift.common import Info, Tool, CompositeType, Presentation
 from uwsift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
 from uwsift.control.layer_tree import LayerStackTreeViewModel
-from uwsift.control.rgb_behaviors import UserModifiesRGBLayers
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.model.document import Document
-from uwsift.model.layer import DocRGBLayer
+from uwsift.model.layer import DocRGBDataset
 from uwsift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from uwsift.ui.pov_main_ui import Ui_MainWindow
@@ -61,7 +62,6 @@ from uwsift.util import (WORKSPACE_DB_DIR, DOCUMENT_SETTINGS_DIR, USER_CACHE_DIR
                          get_package_data_dir, check_grib_definition_dir, check_imageio_deps,
                          HeapProfiler)
 from uwsift.view.colormap_editor import ColormapEditor
-from uwsift.view.create_algebraic import CreateAlgebraicDialog
 from uwsift.view.export_image import ExportImageHelper
 from uwsift.view.layer_details import SingleLayerInfoPane
 from uwsift.view.probes import ProbeGraphManager, DEFAULT_POINT_PROBE
@@ -69,6 +69,8 @@ from uwsift.view.rgb_config import RGBLayerConfigPane
 from uwsift.view.scene_graph import SceneGraphManager
 from uwsift.workspace import CachingWorkspace, SimpleWorkspace
 from uwsift.workspace.collector import ResourceSearchPathCollector
+
+from uwsift.model.layer_model import LayerModel
 
 LOG = logging.getLogger(__name__)
 # re-configure loggers instantiated meanwhile
@@ -294,20 +296,20 @@ class UserControlsAnimation(QtCore.QObject):
 
         self.document.didSwitchLayerSet.connect(self.animation_reset_by_layer_set_switch)
         self.document.didChangeLayerVisibility.connect(self.update_frame_time_to_top_visible)
-        self.document.didReorderLayers.connect(self.update_frame_time_to_top_visible)
-        self.document.didRemoveLayers.connect(self.update_frame_time_to_top_visible)
-        self.document.didAddBasicLayer.connect(self.update_frame_time_to_top_visible)
-        self.document.didAddCompositeLayer.connect(self.update_frame_time_to_top_visible)
+        self.document.didReorderDatasets.connect(self.update_frame_time_to_top_visible)
+        self.document.didRemoveDatasets.connect(self.update_frame_time_to_top_visible)
+        self.document.didAddBasicDataset.connect(self.update_frame_time_to_top_visible)
+        self.document.didAddCompositeDataset.connect(self.update_frame_time_to_top_visible)
 
     def next_frame(self, *args, **kwargs):
         """Advance a frame along the animation order."""
-        self.scene_manager.layer_set.animating = False
-        self.scene_manager.layer_set.step(backwards=False)
+        self.scene_manager.animation_controller.animating = False
+        self.scene_manager.animation_controller.time_manager.step()
 
     def prev_frame(self, *args, **kwargs):
         """Retreat a frame along the animation list."""
-        self.scene_manager.layer_set.animating = False
-        self.scene_manager.layer_set.step(backwards=True)
+        self.scene_manager.animation_controller.animating = False
+        self.scene_manager.animation_controller.time_manager.step(backwards=True)
 
     def reset_frame_slider(self, *args, **kwargs):
         """Reset frame slider to show current animation state in document when aniamtion list changes."""
@@ -333,9 +335,8 @@ class UserControlsAnimation(QtCore.QObject):
         self.ui.animationSlider.repaint()
         if animating:
             if not UWSIFT_ANIM_INDICATOR_DISABLED:
-                t_sim = self.scene_manager.layer_set.time_manager.create_formatted_t_sim()
+                t_sim = self.scene_manager.animation_controller.time_manager.create_formatted_t_sim()
                 self.ui.animationLabel.setText(t_sim)
-            #self.ui.animationLabel.setText(self.document.time_label_for_uuid(uuid))
         else:
             self.update_frame_time_to_top_visible()
 
@@ -373,7 +374,7 @@ class UserControlsAnimation(QtCore.QObject):
 
     def next_last_time(self, direction=0, *args, **kwargs):
         """Move forward (direction=+1) or backward (-1) a time step in animation order."""
-        self.scene_manager.layer_set.animating = False
+        self.scene_manager.animation_controller.animating = False
         new_focus = self._next_last_time_visibility(direction=direction)
         self.layer_list_model.select([new_focus])
         # if this part of the animation cycle, update the animation slider and displayed time as well
@@ -397,7 +398,7 @@ class UserControlsAnimation(QtCore.QObject):
     def set_animation_speed(self, milliseconds):
         """Change frame rate as measured in milliseconds."""
         LOG.info('animation speed set to {}ms'.format(milliseconds))
-        self.scene_manager.layer_set.animation_speed = milliseconds
+        self.scene_manager.animation_controller.animation_speed = milliseconds
 
     def show_animation_speed_slider(self, pos: QtCore.QPoint, *args):
         """Show frame-rate slider as a pop-up control, at current mouse position."""
@@ -409,7 +410,7 @@ class UserControlsAnimation(QtCore.QObject):
         else:
             popup = self._animation_speed_popup
         if not popup.isVisible():
-            popup.show_at(gpos, self.scene_manager.layer_set.animation_speed)
+            popup.show_at(gpos, self.scene_manager.animation_controller.animation_speed)
 
     def animation_reset_by_layer_set_switch(self, *args, **kwargs):
         """Perform necessary control resets when document layer set is swapped."""
@@ -433,7 +434,7 @@ class UserControlsAnimation(QtCore.QObject):
 
     def toggle_animation(self, action: QtWidgets.QAction = None, *args):
         """Toggle animation on/off."""
-        new_state = self.scene_manager.layer_set.toggle_animation()
+        new_state = self.scene_manager.animation_controller.toggle_animation()
         self.ui.animPlayPause.setChecked(new_state)
 
 
@@ -458,7 +459,7 @@ class Main(QtWidgets.QMainWindow):
     _heartbeat_file = None
 
     def interactive_open_files(self, *args, files=None, **kwargs):
-        self.scene_manager.layer_set.animating = False
+        self.scene_manager.animation_controller.animating = False
         # http://pyqt.sourceforge.net/Docs/PyQt4/qfiledialog.html#getOpenFileNames
         filename_filters = [
             # 'All files (*.*)',
@@ -519,7 +520,7 @@ class Main(QtWidgets.QMainWindow):
         if not uuids:
             return
         for uuid in uuids:
-            self.document.activate_product_uuid_as_new_layer(uuid)
+            self.document.activate_product_uuid_as_new_dataset(uuid)
         uuid = uuids[-1]
         self.layer_list_model.select([uuid])
         # set the animation based on the last added (topmost) layer
@@ -551,7 +552,7 @@ class Main(QtWidgets.QMainWindow):
         for uuid, p_name in uuid_to_name.items():
             def openit(checked=False, uuid=uuid):
                 LOG.debug('open recent product {}'.format(uuid))
-                self.scene_manager.layer_set.animating = False
+                self.scene_manager.animation_controller.animating = False
                 self.activate_products_by_uuid([uuid])
 
             open_action = QtWidgets.QAction(p_name, self)
@@ -581,7 +582,7 @@ class Main(QtWidgets.QMainWindow):
         uuids = list(uuids)
         for uuid in uuids:
             layer = self.document[uuid]
-            if not isinstance(layer, DocRGBLayer):
+            if not isinstance(layer, DocRGBDataset):
                 uuids_to_remove.add(uuid)
                 continue
             elif uuid in rgb_uuids_handled:
@@ -627,7 +628,10 @@ class Main(QtWidgets.QMainWindow):
 
     def update_point_probe_text(self, probe_name, state=None, xy_pos=None, uuid=None, animating=None):
         if uuid is None:
-            uuid = self.document.current_visible_layer_uuid
+            top_probeable_layer, product_dataset = self.layer_model\
+                .get_top_probeable_layer_with_active_product_dataset()
+            uuid = None if product_dataset is None \
+                else product_dataset.uuid
         if state is None or xy_pos is None:
             _state, _xy_pos = self.graphManager.current_point_probe_status(probe_name)
             if state is None:
@@ -661,7 +665,7 @@ class Main(QtWidgets.QMainWindow):
                 data_str = "N/A"
                 layer_str = "N/A"
             else:
-                info = self.document[uuid]
+                info = top_probeable_layer.info
                 unit_info = info[Info.UNIT_CONVERSION]
                 data_point = unit_info[1](data_point)
                 data_str = unit_info[2](data_point, numeric=False)
@@ -907,16 +911,19 @@ class Main(QtWidgets.QMainWindow):
         else:
             self.workspace = SimpleWorkspace(workspace_dir)
         self.document = doc = Document(self.workspace, config_dir=config_dir, queue=self.queue)
-        self.document.didRemoveLayers.connect(self.run_gc_after_layer_deletion)
+        self.document.didRemoveDatasets.connect(self.run_gc_after_layer_deletion)
         self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
-                                               border_shapefile=border_shapefile,
+                                               borders_shapefiles=border_shapefile,
                                                center=center,
                                                parent=self)
         self.export_image = ExportImageHelper(self, self.document, self.scene_manager)
         self._wizard_dialog = None
 
+        self._init_layer_model()
         self._init_layer_panes()
+        self._init_algebraic_pane()
         self._init_rgb_pane()
+        self._init_recipe_manager()
         self._init_map_widget()
         self._init_qml_timeline()
 
@@ -930,7 +937,11 @@ class Main(QtWidgets.QMainWindow):
                                                )
 
         # disable close button on panes
-        panes = [self.ui.areaProbePane, self.ui.layersPane, self.ui.layerDetailsPane, self.ui.rgbConfigPane]
+        panes = [self.ui.areaProbePane,
+                 self.ui.layerDetailsPane,
+                 self.ui.rgbConfigPane,
+                 self.ui.algebraicConfigPane,
+                 ]
         for pane in panes:
             pane.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable |
                              QtWidgets.QDockWidget.DockWidgetMovable)
@@ -985,50 +996,42 @@ class Main(QtWidgets.QMainWindow):
         timer.start(60000)
 
     def _init_point_polygon_probes(self):
-        self.graphManager = ProbeGraphManager(self.ui.probeTabWidget, self.workspace, self.document, self.queue)
+        self.graphManager = ProbeGraphManager(self.ui.probeTabWidget,
+                                              self.ui.autoUpdateCheckbox,
+                                              self.ui.updateButton,
+                                              self.workspace, self.layer_model,
+                                              self.queue)
         self.graphManager.didChangeTab.connect(self.scene_manager.show_only_polygons)
         self.graphManager.didClonePolygon.connect(self.scene_manager.copy_polygon)
         self.graphManager.pointProbeChanged.connect(self.scene_manager.on_point_probe_set)
-        self.graphManager.pointProbeChanged.connect(self.document.update_equalizer_values)
+        self.graphManager.pointProbeChanged.connect(self.layer_model.on_point_probe_set)
         self.graphManager.pointProbeChanged.connect(self.update_point_probe_text)
         self.graphManager.pointProbeChanged.connect(self.graphManager.update_point_probe_graph)
 
         self.scene_manager.newPointProbe.connect(self.graphManager.update_point_probe)
 
-        def _update_point_probe_slot(*args):
-            return self.graphManager.update_point_probe(DEFAULT_POINT_PROBE)
-        self.document.didAddBasicLayer.connect(_update_point_probe_slot)
-        self.document.didAddCompositeLayer.connect(_update_point_probe_slot)
+        self.layer_model.didUpdateLayers.connect(
+            self.graphManager.update_point_probe)
+        self.layer_model.didUpdateLayers.connect(
+            self.graphManager.handleActiveProductDatasetsChanged)
 
-        # FIXME: These were added as a simple fix to update the probe value on layer changes, but this should really
-        #        have its own manager-like object
-        def _blackhole(*args, **kwargs):
-            return self.update_point_probe_text(DEFAULT_POINT_PROBE)
+        # Connect to an unnamed slot (lambda: ...) to strip off the argument
+        # (of type dict) from the signal 'didMatchTimes'
+        self.scene_manager.animation_controller.time_manager.didMatchTimes\
+            .connect(lambda *args: self.graphManager.update_point_probe())
 
-        self.document.didChangeLayerVisibility.connect(_blackhole)
-        self.document.didAddBasicLayer.connect(_blackhole)
-        self.document.didAddCompositeLayer.connect(_blackhole)
-        self.document.didRemoveLayers.connect(_blackhole)
-        self.document.didReorderLayers.connect(_blackhole)
-        if False:
-            # XXX: Disable the below line if updating during animation is too much work
-            # self.scene_manager.didChangeFrame.connect(lambda frame_info: update_probe_point(uuid=frame_info[-1]))
-            pass
-        else:
-            # XXX: Disable the below line if updating the probe value during animation isn't a performance problem
-            self.scene_manager.didChangeFrame.connect(
-                lambda frame_info: self.ui.cursorProbeText.setText("Probe Value: <animating>"))
-
-        def update_probe_polygon(uuid, points, layerlist=self.layer_list_model):
-            top_uuids = list(self.document.current_visible_layer_uuids)
-            LOG.debug("top visible UUID is {0!r:s}".format(top_uuids))
+        def update_probe_polygon(points: list):
+            probeable_layers = self.layer_model.get_probeable_layers()
+            probeable_layers_uuids = [layer.uuid for layer in probeable_layers]
+            LOG.debug("top visible UUID is {0!r:s}"
+                      .format(probeable_layers_uuids[0]))
 
             # TODO, when the plots manage their own layer selection, change this call
             # FUTURE, once the polygon is a layer, this will need to change
             # set the selection for the probe plot to the top visible layer(s)
             # new tabs should clone the information from the currently selected tab
             # the call below will check if this is a new polygon
-            self.graphManager.set_default_layer_selections(*top_uuids)
+            self.graphManager.set_default_layer_selections(probeable_layers_uuids)
 
             # update our current plot with the new polygon
             polygon_name = self.graphManager.current_graph_set_region(polygon_points=points)
@@ -1040,9 +1043,6 @@ class Main(QtWidgets.QMainWindow):
                 self.ui.panZoomToolButton.click()
 
         self.scene_manager.newProbePolygon.connect(update_probe_polygon)
-        # setup RGB configuration
-        self.document.didChangeComposition.connect(lambda *args: self._refresh_probe_results(*args[1:]))
-        self.document.didChangeColorLimits.connect(self._refresh_probe_results)
 
     def _init_tool_controls(self):
         self.ui.panZoomToolButton.toggled.connect(partial(self.change_tool, name=Tool.PAN_ZOOM))
@@ -1058,14 +1058,17 @@ class Main(QtWidgets.QMainWindow):
 
             # Reset graph X layer and Y layer to the two top visible layers,
             # see update_probe_polygon(), copied from there
-            top_uuids = list(self.document.current_visible_layer_uuids)
-            LOG.debug("top visible UUID is {0!r:s}".format(top_uuids))
+            probeable_layers = self.layer_model.get_probeable_layers()
+            probeable_layers_uuids = [layer.uuid for layer in probeable_layers]
+            LOG.debug(f"Probeable layer UUIDs are {probeable_layers_uuids!r:s}")
             # TODO, when the plots manage their own layer selection, change this
             #  call (see update_probe_polygon())
-            self.graphManager.set_default_layer_selections(*top_uuids)
+            self.graphManager\
+                .set_default_layer_selections(probeable_layers_uuids)
 
             must_remove_polygon = self.graphManager.current_graph_has_polygon()
-            current_graph_name = self.graphManager.current_graph_set_region(select_full_data=True)
+            current_graph_name = self.graphManager\
+                .current_graph_set_region(select_full_data=True)
             if must_remove_polygon:
                 self.scene_manager.remove_polygon(current_graph_name)
 
@@ -1081,12 +1084,136 @@ class Main(QtWidgets.QMainWindow):
         menu.addAction(select_full_data_action)
         self.ui.regionSelectButton.setMenu(menu)
 
+    def _init_layer_model(self):
+
+        self.layer_model = LayerModel(self.workspace)
+
+        self.document.didAddDataset.connect(self.layer_model.add_dataset)
+
+        self.layer_model.didCreateLayer.connect(
+            self.scene_manager.add_node_for_layer)
+        self.layer_model.didAddImageDataset.connect(
+            self.scene_manager.add_node_for_image_dataset)
+        self.layer_model.didAddLinesDataset.connect(
+            self.scene_manager.add_node_for_lines_dataset)
+        self.layer_model.didAddPointsDataset.connect(
+            self.scene_manager.add_node_for_points_dataset)
+
+        self.layer_model.didAddSystemLayer.connect(
+            self.scene_manager.add_node_for_system_generated_data)
+
+        self.layer_model.didReorderLayers.connect(
+            self.scene_manager.update_layers_z)
+
+        self.layer_model.didChangeLayerVisible.connect(
+            self.scene_manager.change_layer_visible)
+        self.layer_model.didChangeLayerOpacity.connect(
+            self.scene_manager.change_layer_opacity)
+
+        self.layer_model.didChangeColormap.connect(
+            self.scene_manager.change_dataset_nodes_colormap)
+        self.layer_model.didChangeGamma.connect(
+            self.scene_manager.change_dataset_nodes_gamma)
+        self.layer_model.didChangeColorLimits.connect(
+            self.scene_manager.change_dataset_nodes_color_limits)
+
+        self.scene_manager.animation_controller.connect_to_model(
+            self.layer_model)
+        self.layer_model.didActivateProductDataset.connect(
+            self.scene_manager.change_dataset_visible)
+        self.layer_model.didAddCompositeDataset.connect(
+            self.scene_manager.add_node_for_composite_dataset
+        )
+        self.layer_model.didChangeCompositeProductDataset.connect(
+            self.scene_manager.change_node_for_composite_dataset
+        )
+        self.layer_model.didDeleteProductDataset.connect(
+            self.scene_manager.purge_dataset
+        )
+        self.layer_model.didRequestSelectionOfLayer.connect(
+            self.ui.treeView.setCurrentIndex
+        )
+
+        self.ui.treeView.setModel(self.layer_model)
+
+        self.layer_model.init_system_layers()
+
+    def _init_algebraic_pane(self):
+        self.algebraic_config_pane = AlgebraicLayerConfigPane(
+            self.ui, self.ui.layersPaneWidget, self.layer_model
+        )
+
+        self.ui.treeView.layerSelectionChanged.connect(
+            self.algebraic_config_pane.selection_did_change
+        )
+        self.layer_model.didAddImageLayer.connect(
+            self.algebraic_config_pane.layer_added
+        )
+        self.algebraic_config_pane.didTriggeredUpdate.connect(
+            self.layer_model.update_recipe_layer_timeline
+        )
+
     def _init_rgb_pane(self):
-        self.rgb_config_pane = RGBLayerConfigPane(self.ui, self.ui.layersPaneWidget)
-        self.user_rgb_behavior = UserModifiesRGBLayers(self.document,
-                                                       self.rgb_config_pane,
-                                                       self.layer_list_model,
-                                                       parent=self)
+        self.rgb_config_pane = RGBLayerConfigPane(self.ui,
+                                                  self.ui.layersPaneWidget,
+                                                  self.layer_model)
+        self.ui.treeView.layerSelectionChanged.connect(
+            self.rgb_config_pane.selection_did_change
+        )
+        self.layer_model.didAddImageLayer.connect(
+            self.rgb_config_pane.layer_added
+        )
+
+    def _init_recipe_manager(self):
+        self.recipe_manager = RecipeManager()
+        self.layer_model.didRequestCompositeRecipeCreation.connect(
+            self.recipe_manager.create_rgb_recipe
+        )
+        self.layer_model.didRequestAlgebraicRecipeCreation.connect(
+            self.recipe_manager.create_algebraic_recipe
+        )
+        self.recipe_manager.didCreateRGBCompositeRecipe.connect(
+            self.layer_model.create_rgb_composite_layer
+        )
+        self.recipe_manager.didCreateAlgebraicRecipe.connect(
+            self.layer_model.create_algebraic_composite_layer
+        )
+        self.rgb_config_pane.didChangeRGBInputLayers.connect(
+            self.recipe_manager.update_rgb_recipe_input_layers
+        )
+        self.recipe_manager.didUpdateRGBInputLayers.connect(
+            self.layer_model.update_recipe_layer_timeline
+        )
+        self.rgb_config_pane.didChangeRGBColorLimits.connect(
+            self.recipe_manager.update_rgb_recipe_color_limits
+        )
+        self.recipe_manager.didUpdateRGBColorLimits.connect(
+            self.layer_model.update_rgb_layer_color_limits
+        )
+        self.rgb_config_pane.didChangeRGBGamma.connect(
+            self.recipe_manager.update_rgb_recipe_gammas
+        )
+        self.recipe_manager.didUpdateRGBGamma.connect(
+            self.layer_model.update_rgb_layer_gamma
+        )
+        self.rgb_config_pane.didChangeRecipeName.connect(
+            self.recipe_manager.update_recipe_name
+        )
+        self.algebraic_config_pane.didChangeRecipeName.connect(
+            self.recipe_manager.update_recipe_name
+        )
+        self.recipe_manager.didUpdateRecipeName.connect(
+            self.layer_model.update_rgb_layer_name
+        )
+        self.algebraic_config_pane.didChangeAlgebraicInputLayers.connect(
+            self.recipe_manager.update_algebraic_recipe_input_layers
+        )
+        self.algebraic_config_pane.didChangeAlgebraicOperationKind.connect(
+            self.recipe_manager.update_algebraic_recipe_operation_kind
+        )
+        self.algebraic_config_pane.didChangeAlgebraicOperationFormula.connect(
+            self.recipe_manager.update_algebraic_recipe_operation_formula
+        )
 
     def _init_layer_panes(self):
         # convey action between document and layer list view
@@ -1109,11 +1236,12 @@ class Main(QtWidgets.QMainWindow):
 
         root_context = self.ui.timelineQuickWidget.engine().rootContext()
 
-        time_manager = self.scene_manager.layer_set.time_manager
+        time_manager = self.scene_manager.animation_controller.time_manager
         time_manager.qml_engine = self.ui.timelineQuickWidget.engine()
         time_manager.qml_root_object = self.ui.timelineQuickWidget.rootObject()
         time_manager.qml_backend = QmlBackend()
-        time_manager.qml_backend.didJumpInTimeline.connect(self.scene_manager.layer_set.jump)
+        time_manager.qml_backend.\
+            didJumpInTimeline.connect(self.scene_manager.animation_controller.jump)
         time_manager.qml_backend.didChangeTimebase.connect(time_manager.on_timebase_change)
         # TODO(mk): refactor all QML related objects as belonging to TimeManager's QMLBackend
         #           instance -> communication between TimeManager and QMLBackend via Signal/Slot?
@@ -1133,13 +1261,20 @@ class Main(QtWidgets.QMainWindow):
     def _init_arrange_panes(self):
         self.tabifyDockWidget(self.ui.layersPane, self.ui.areaProbePane)
         self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.rgbConfigPane)
+        self.tabifyDockWidget(self.ui.layerDetailsPane,
+                              self.ui.algebraicConfigPane)
         # self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.timelinePane)
         self.layout().removeWidget(self.ui.timelinePane)
         self.ui.timelinePane.deleteLater()
         self.ui.timelinePane = None
         # self.tabifyDockWidget(self.ui.rgbConfigPane, self.ui.layerDetailsPane)
         # Make the layer list and layer details shown
-        self.ui.layersPane.raise_()
+        # FIXME remove layerPane finally from the system, for now we only kind
+        #  of hide it
+        self.layout().removeWidget(self.ui.layersPane)
+        self.ui.layersPane.deleteLater()
+        self.ui.layersPane = None
+
         self.ui.layerDetailsPane.raise_()
         # refer to objectName'd entities as self.ui.objectName
         self.setAcceptDrops(True)
@@ -1180,11 +1315,11 @@ class Main(QtWidgets.QMainWindow):
             LOG.info(f"Highlighting last data time display when delayed for"
                      f" more than {self._max_tolerable_dataset_age} seconds.")
 
-        self.document.didAddBasicLayer.connect(self._update_dataset_timestamps)
-        self.document.didAddCompositeLayer.connect(self._update_dataset_timestamps)
+        self.document.didAddBasicDataset.connect(self._update_dataset_timestamps)
+        self.document.didAddCompositeDataset.connect(self._update_dataset_timestamps)
 
         # don't clear the time of last import when the layers are removed
-        self.document.didRemoveLayers.connect(
+        self.document.didRemoveDatasets.connect(
             self._clear_last_dataset_creation_time)
 
         self.currentTimeTimer = QtCore.QTimer(parent=self)
@@ -1201,8 +1336,8 @@ class Main(QtWidgets.QMainWindow):
                 heartbeat_file.replace("$$CACHE_DIR$$", USER_CACHE_DIR)
             LOG.info(f"Communication with watchdog via heartbeat file "
                      f" '{self._heartbeat_file}' configured.")
-            self.document.didAddBasicLayer.connect(self._update_heartbeat_file)
-            self.document.didAddCompositeLayer.connect(self._update_heartbeat_file)
+            self.document.didAddBasicDataset.connect(self._update_heartbeat_file)
+            self.document.didAddCompositeDataset.connect(self._update_heartbeat_file)
 
     def _timer_collect_resources(self):
         if self._resource_collector:
@@ -1324,14 +1459,6 @@ class Main(QtWidgets.QMainWindow):
             LOG.info("Clearing polygon with name '%s'", removed_name)
             self.scene_manager.remove_polygon(removed_name)
 
-    def create_algebraic(self, action: QtWidgets.QAction = None, uuids=None, composite_type=CompositeType.ARITHMETIC):
-        if uuids is None:
-            uuids = list(self.layer_list_model.current_selected_uuids())
-        dialog = CreateAlgebraicDialog(self.document, uuids, parent=self)
-        dialog.show()
-        dialog.raise_()
-        dialog.activateWindow()
-
     def _init_menu(self):
         open_action = QtWidgets.QAction("&Open...", self)
         open_action.setShortcut("Ctrl+Shift+O")
@@ -1426,7 +1553,7 @@ class Main(QtWidgets.QMainWindow):
 
         cycle_grid = QtWidgets.QAction("Cycle &Lat/Lon Grid", self)
         cycle_grid.setShortcut('L')
-        cycle_grid.triggered.connect(self.scene_manager.cycle_grid_color)
+        cycle_grid.triggered.connect(self.scene_manager.cycle_latlon_grid_color)
 
         remove = QtWidgets.QAction("Remove Layer", self)
         remove.setShortcut(QtCore.Qt.Key_Delete)
@@ -1438,10 +1565,15 @@ class Main(QtWidgets.QMainWindow):
 
         composite = QtWidgets.QAction("Create Composite", self)
         composite.setShortcut('C')
-        composite.triggered.connect(self.user_rgb_behavior.create_rgb)
+        composite.triggered.connect(
+            self.layer_model.start_rgb_composite_creation
+        )
+
 
         algebraic = QtWidgets.QAction("Create Algebraic", self)
-        algebraic.triggered.connect(self.create_algebraic)
+        algebraic.triggered.connect(
+            self.layer_model.start_algebraic_composite_creation
+        )
 
         toggle_point = QtWidgets.QAction("Toggle Point Probe", self)
         toggle_point.setShortcut('X')

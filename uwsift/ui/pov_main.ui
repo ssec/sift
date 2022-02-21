@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1296</width>
-    <height>846</height>
+    <height>1012</height>
    </rect>
   </property>
   <property name="acceptDrops">
@@ -55,9 +55,6 @@
         <property name="autoRaise">
          <bool>false</bool>
         </property>
-        <attribute name="buttonGroup">
-         <string notr="true">buttonGroup</string>
-        </attribute>
        </widget>
       </item>
       <item>
@@ -86,9 +83,6 @@
         <property name="checkable">
          <bool>true</bool>
         </property>
-        <attribute name="buttonGroup">
-         <string notr="true">buttonGroup</string>
-        </attribute>
        </widget>
       </item>
       <item>
@@ -114,9 +108,6 @@
         <property name="popupMode">
          <enum>QToolButton::MenuButtonPopup</enum>
         </property>
-        <attribute name="buttonGroup">
-         <string notr="true">buttonGroup</string>
-        </attribute>
        </widget>
       </item>
       <item>
@@ -1096,7 +1087,7 @@
      <x>0</x>
      <y>0</y>
      <width>1296</width>
-     <height>19</height>
+     <height>20</height>
     </rect>
    </property>
   </widget>
@@ -1136,6 +1127,44 @@
         </attribute>
        </widget>
       </widget>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_11">
+       <item>
+        <spacer name="horizontalSpacer_4">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="autoUpdateCheckbox">
+         <property name="toolTip">
+          <string>Update plots with animation if this is checked.
+Checking this deactivates the Update button.</string>
+         </property>
+         <property name="text">
+          <string>Auto Update</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="updateButton">
+         <property name="toolTip">
+          <string>Manually update plots to display currently active Datasets.</string>
+         </property>
+         <property name="text">
+          <string>Update</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
      </item>
     </layout>
    </widget>
@@ -1211,7 +1240,7 @@
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>274</width>
+          <width>292</width>
           <height>68</height>
          </rect>
         </property>
@@ -1264,20 +1293,32 @@
       <number>0</number>
      </property>
      <item>
-      <widget class="QScrollArea" name="scrollArea">
+      <widget class="QScrollArea" name="rgbScrollAreaWidget">
        <property name="widgetResizable">
         <bool>true</bool>
        </property>
-       <widget class="QWidget" name="scrollAreaWidgetContents_8">
+       <widget class="QWidget" name="rgbScrollAreaWidgetContents">
         <property name="geometry">
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>260</width>
-          <height>492</height>
+          <width>278</width>
+          <height>612</height>
          </rect>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_33">
+         <item>
+          <widget class="QGroupBox" name="nameGroupBox">
+           <property name="title">
+            <string>Name</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_13">
+            <item>
+             <widget class="QLineEdit" name="nameEdit"/>
+            </item>
+           </layout>
+          </widget>
+         </item>
          <item>
           <widget class="QGroupBox" name="redGroupBox">
            <property name="title">
@@ -1721,6 +1762,210 @@
     </layout>
    </widget>
   </widget>
+  <widget class="QDockWidget" name="LayerModelDockWidget">
+   <property name="minimumSize">
+    <size>
+     <width>90</width>
+     <height>185</height>
+    </size>
+   </property>
+   <property name="features">
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
+   </property>
+   <property name="windowTitle">
+    <string>Layer Manager</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>2</number>
+   </attribute>
+   <widget class="QWidget" name="dockWidgetContents_3">
+    <layout class="QHBoxLayout" name="horizontalLayout_10">
+     <item>
+      <layout class="QVBoxLayout" name="verticalLayout_11">
+       <item>
+        <widget class="LayerTreeView" name="treeView">
+         <property name="contextMenuPolicy">
+          <enum>Qt::CustomContextMenu</enum>
+         </property>
+         <property name="dragDropMode">
+          <enum>QAbstractItemView::InternalMove</enum>
+         </property>
+         <property name="alternatingRowColors">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+  <widget class="QDockWidget" name="algebraicConfigPane">
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
+   <property name="minimumSize">
+    <size>
+     <width>107</width>
+     <height>138</height>
+    </size>
+   </property>
+   <property name="maximumSize">
+    <size>
+     <width>800</width>
+     <height>800</height>
+    </size>
+   </property>
+   <property name="baseSize">
+    <size>
+     <width>128</width>
+     <height>128</height>
+    </size>
+   </property>
+   <property name="features">
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
+   </property>
+   <property name="windowTitle">
+    <string>Algebraic</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>2</number>
+   </attribute>
+   <widget class="QWidget" name="dockWidgetContents_4">
+    <layout class="QVBoxLayout" name="verticalLayout_15">
+     <item>
+      <widget class="QScrollArea" name="algebraicScrollAreaWidget">
+       <property name="widgetResizable">
+        <bool>true</bool>
+       </property>
+       <widget class="QWidget" name="algebraicScrollAreaWidgetContents">
+        <property name="geometry">
+         <rect>
+          <x>0</x>
+          <y>0</y>
+          <width>260</width>
+          <height>299</height>
+         </rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_14">
+         <item>
+          <layout class="QFormLayout" name="formLayout">
+           <property name="fieldGrowthPolicy">
+            <enum>QFormLayout::AllNonFixedFieldsGrow</enum>
+           </property>
+           <property name="labelAlignment">
+            <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+           </property>
+           <property name="formAlignment">
+            <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+           </property>
+           <item row="0" column="0">
+            <widget class="QLabel" name="name_label">
+             <property name="text">
+              <string>Name:</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QLineEdit" name="layer_name_edit">
+             <property name="maxLength">
+              <number>35</number>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="operation_label">
+             <property name="text">
+              <string>Operation:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QComboBox" name="operation_combo">
+             <property name="frame">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QLabel" name="x_label">
+             <property name="text">
+              <string>x:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QComboBox" name="x_combo"/>
+           </item>
+           <item row="3" column="0">
+            <widget class="QLabel" name="y_label">
+             <property name="text">
+              <string>y:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="1">
+            <widget class="QComboBox" name="y_combo"/>
+           </item>
+           <item row="4" column="0">
+            <widget class="QLabel" name="z_label">
+             <property name="text">
+              <string>z:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="1">
+            <widget class="QComboBox" name="z_combo"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QLabel" name="operations_label">
+           <property name="font">
+            <font>
+             <weight>50</weight>
+             <bold>false</bold>
+             <underline>true</underline>
+            </font>
+           </property>
+           <property name="text">
+            <string>Operations</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPlainTextEdit" name="operations_text">
+           <property name="lineWidth">
+            <number>2</number>
+           </property>
+           <property name="midLineWidth">
+            <number>1</number>
+           </property>
+           <property name="plainText">
+            <string>result = x - y</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="algebraicUpdateButton">
+           <property name="text">
+            <string>Update</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </widget>
+     </item>
+    </layout>
+   </widget>
+  </widget>
  </widget>
  <customwidgets>
   <customwidget>
@@ -1743,10 +1988,12 @@
    <extends>QDoubleSpinBox</extends>
    <header>uwsift.ui.custom_widgets</header>
   </customwidget>
+  <customwidget>
+   <class>LayerTreeView</class>
+   <extends>QTreeView</extends>
+   <header>uwsift.view.layer_tree_view</header>
+  </customwidget>
  </customwidgets>
  <resources/>
  <connections/>
- <buttongroups>
-  <buttongroup name="buttonGroup"/>
- </buttongroups>
 </ui>
