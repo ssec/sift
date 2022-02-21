@@ -549,7 +549,12 @@ class BaseWorkspace(QObject):
         info.setdefault(Info.UNITS, '1')
 
         max_meta = max(md_list, key=lambda x: x[Info.SHAPE])
-        for k in (Info.PROJ, Info.ORIGIN_X, Info.ORIGIN_Y, Info.CELL_WIDTH, Info.CELL_HEIGHT, Info.SHAPE):
+        for k in (Info.PROJ, Info.ORIGIN_X, Info.ORIGIN_Y, Info.CELL_WIDTH,
+                  Info.CELL_HEIGHT, Info.SHAPE,
+                  Info.GRID_ORIGIN,
+                  Info.GRID_FIRST_INDEX_Y,
+                  Info.GRID_FIRST_INDEX_X,
+                  ):
             info[k] = max_meta[k]
 
         info[Info.VALID_RANGE] = (np.nanmin(composite_array), np.nanmax(composite_array))
