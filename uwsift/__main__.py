@@ -937,7 +937,11 @@ class Main(QtWidgets.QMainWindow):
                                                )
 
         # disable close button on panes
-        panes = [self.ui.areaProbePane, self.ui.layersPane, self.ui.layerDetailsPane, self.ui.rgbConfigPane, self.ui.algebraicConfigPane]
+        panes = [self.ui.areaProbePane,
+                 self.ui.layerDetailsPane,
+                 self.ui.rgbConfigPane,
+                 self.ui.algebraicConfigPane,
+                 ]
         for pane in panes:
             pane.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable |
                              QtWidgets.QDockWidget.DockWidgetMovable)
@@ -1265,7 +1269,12 @@ class Main(QtWidgets.QMainWindow):
         self.ui.timelinePane = None
         # self.tabifyDockWidget(self.ui.rgbConfigPane, self.ui.layerDetailsPane)
         # Make the layer list and layer details shown
-        self.ui.layersPane.raise_()
+        # FIXME remove layerPane finally from the system, for now we only kind
+        #  of hide it
+        self.layout().removeWidget(self.ui.layersPane)
+        self.ui.layersPane.deleteLater()
+        self.ui.layersPane = None
+
         self.ui.layerDetailsPane.raise_()
         # refer to objectName'd entities as self.ui.objectName
         self.setAcceptDrops(True)
