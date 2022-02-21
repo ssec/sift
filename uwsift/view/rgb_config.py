@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """UI objects for configuring RGB layers."""
+import uuid
 
 import logging
 from functools import partial
@@ -10,23 +11,27 @@ from PyQt5.QtCore import QObject, pyqtSignal
 from PyQt5.QtGui import QDoubleValidator
 from PyQt5.QtWidgets import QComboBox, QLineEdit
 
-from uwsift.common import Info, Kind
-from uwsift.model.composite_recipes import CompositeRecipe
+from uwsift.common import Info, Kind, DEFAULT_GAMMA_VALUE
+from uwsift.model.composite_recipes import CompositeRecipe, RGBA2IDX
+from uwsift.model.layer_item import LayerItem
+from uwsift.model.layer_model import LayerModel
 
 LOG = logging.getLogger(__name__)
-RGBA2IDX: Mapping[str, int] = dict(r=0, g=1, b=2, a=3)
 
 
 class RGBLayerConfigPane(QObject):
     """Configures RGB channel selection and ranges on behalf of document.
     Document in turn generates update signals which cause the SceneGraph to refresh.
     """
-    # recipe being changed, character from 'rgba', layer being assigned
-    didChangeRGBComponentSelection = pyqtSignal(CompositeRecipe, str, object)
-    # recipe being changed, ((min, max), (min, max), (min, max))
-    didChangeRGBComponentLimits = pyqtSignal(CompositeRecipe, tuple)
-    # recipe being changed, (new-gamma, new-gamma, new-gamma)
-    didChangeRGBComponentGamma = pyqtSignal(CompositeRecipe, tuple)
+    # Recipe, Channel (RGB), layer uuid, color limits, gamma
+    didChangeRGBInputLayers = pyqtSignal(CompositeRecipe, str, object,
+                                         tuple, float)
+    # Recipe, Channel (RGB), color limits
+    didChangeRGBColorLimits = pyqtSignal(CompositeRecipe, str, tuple)
+    # Recipe, Channel (RGB), gamma
+    didChangeRGBGamma = pyqtSignal(CompositeRecipe, str, float)
+
+    didChangeRecipeName = pyqtSignal(CompositeRecipe, str)
 
     _rgb = None  # combo boxes in r,g,b order; cache
     _sliders = None  # sliders in r,g,b order; cache
@@ -34,12 +39,13 @@ class RGBLayerConfigPane(QObject):
     _valid_ranges: List[Tuple[float, float]] = None  # tuples of each component's c-limits
     _gamma_boxes = None  # tuple of each component's gamma spin boxes
 
-    def __init__(self, ui, parent):
+    def __init__(self, ui, parent, model: LayerModel):
         super(RGBLayerConfigPane, self).__init__(parent)
         self.ui = ui
         self._valid_ranges = [(None, None), (None, None), (None, None)]
-        self._families = {}
+        self._layer_uuids = []
         self.recipe = None
+        self.model = model
 
         self._slider_steps = 100
         self.ui.slideMinRed.setRange(0, self._slider_steps)
@@ -75,10 +81,14 @@ class RGBLayerConfigPane(QObject):
          for rgb, x in zip(('b', 'g', 'r'), (self.ui.editMaxBlue, self.ui.editMaxGreen, self.ui.editMaxRed))]
         [x.valueChanged.connect(self._gamma_changed)
          for rgb, x in
-         zip(('b', 'g', 'r'), (self.ui.redGammaSpinBox, self.ui.greenGammaSpinBox, self.ui.blueGammaSpinBox))]
+         zip(('b', 'g', 'r'), (self.ui.blueGammaSpinBox, self.ui.greenGammaSpinBox, self.ui.redGammaSpinBox))]
+
+        self.ui.nameEdit.textEdited.connect(self._rgb_name_edit_changed)
+
+        self._rgb_name_edit = self.ui.nameEdit
 
         # initialize the combo boxes
-        self._set_combos_to_family_names()
+        self._set_combos_to_layer_names()
         # disable all UI elements to start
         self._show_settings_for_layer()
 
@@ -111,6 +121,10 @@ class RGBLayerConfigPane(QObject):
         return self._edits
 
     @property
+    def rgb_name_edit(self):
+        return self._rgb_name_edit
+
+    @property
     def gamma_boxes(self):
         if self._gamma_boxes is None:
             self._gamma_boxes = (
@@ -120,53 +134,79 @@ class RGBLayerConfigPane(QObject):
             )
         return self._gamma_boxes
 
-    def family_added(self, family, family_info):
-        if family_info[Info.KIND] in [Kind.RGB, Kind.CONTOUR]:
-            # can't choose RGBs as components of RGBs
-            return
+    def layer_added(self, layer: LayerItem):
+        if layer.kind in [Kind.IMAGE, Kind.COMPOSITE]:
+            self._layer_uuids.append(layer.uuid)
+            self._set_combos_to_layer_names()
 
-        self._families[family] = family_info
-        self._set_combos_to_family_names()
-
-    def family_removed(self, family):
-        if family in self._families:
-            del self._families[family]
-            self._set_combos_to_family_names()
-            self._show_settings_for_layer(self.recipe)
+    def layer_removed(self, layer_uuid):
+        for idx in range(len(self._layer_uuids)):
+            if self._layer_uuids[idx] == layer_uuid:
+                del self._layer_uuids[idx]
+                self._set_combos_to_layer_names()
+                self._show_settings_for_layer(self.recipe)
 
     def _gamma_changed(self, value):
         gamma = tuple(x.value() for x in self.gamma_boxes)
-        self.didChangeRGBComponentGamma.emit(self.recipe, gamma)
+        recipe_gamma = self.recipe.gammas
+        channels = ['r', 'g', 'b']
+
+        changed_channel = ''
+
+        for idx in range(len(channels)):
+            if gamma[idx] != recipe_gamma[idx]:
+                changed_channel = channels[idx]
+
+        self.didChangeRGBGamma.emit(self.recipe, changed_channel, value)
 
     def _combo_changed(self, index, combo: QComboBox = None, color=None):
-        family = combo.itemData(index)
-        if not family:
+        layer_uuid = combo.itemData(index)
+        if not layer_uuid:
             # we use None as no-selection value, not empty string
-            family = None
+            layer_uuid = None
 
-        LOG.debug("RGB: user selected %s for %s" % (repr(family), color))
+        LOG.debug("RGB: user selected %s for %s" % (repr(layer_uuid), color))
         # reset slider position to min and max for layer
-        self._set_minmax_slider(color, family)
-        self.didChangeRGBComponentSelection.emit(self.recipe, color, family)
+        self._set_minmax_slider(color, layer_uuid)
+        layer_info \
+            = self.model.get_layer_by_uuid(layer_uuid).info \
+            if layer_uuid else None
+
+        clim = layer_info.get(Info.CLIM) if layer_info else (None, None)
+
+        self.didChangeRGBInputLayers.emit(self.recipe, color, layer_uuid,
+                                          clim,
+                                          DEFAULT_GAMMA_VALUE)
+
+        self._show_settings_for_layer(self.recipe)
+
+    def _rgb_name_edit_changed(self, text):
+        self.didChangeRecipeName.emit(self.recipe, text)
 
     def _display_to_data(self, color: str, values):
         """Convert display value to data value."""
         if self.recipe is None:
             # No recipe has been set yet
             return values
-        family = self.recipe.input_layer_ids[RGBA2IDX[color]]
-        if family is None:
+        layer_uuid = self.recipe.input_layer_ids[RGBA2IDX[color]]
+        if layer_uuid is None:
             return values
-        family_info = self._families[family]
-        return family_info[Info.UNIT_CONVERSION][1](values, inverse=True)
+        layer_info \
+            = self.model.get_layer_by_uuid(layer_uuid).info
+
+        return layer_info[Info.UNIT_CONVERSION][1](values, inverse=True) \
+            if layer_info.get(Info.UNIT_CONVERSION) else values
 
     def _data_to_display(self, color: str, values):
         "convert data value to display value"
-        family = self.recipe.input_layer_ids[RGBA2IDX[color]]
-        if family is None:
+        layer_uuid = self.recipe.input_layer_ids[RGBA2IDX[color]]
+        if layer_uuid is None:
             return values
-        family_info = self._families[family]
-        return family_info[Info.UNIT_CONVERSION][1](values)
+        layer_info \
+            = self.model.get_layer_by_uuid(layer_uuid).info
+
+        return layer_info[Info.UNIT_CONVERSION][1](values) \
+            if layer_info.get(Info.UNIT_CONVERSION) else values
 
     def _get_slider_value(self, valid_min, valid_max, slider_val):
         return (slider_val / self._slider_steps) * (valid_max - valid_min) + valid_min
@@ -218,10 +258,8 @@ class RGBLayerConfigPane(QObject):
         return n, x
 
     def _signal_color_changing_range(self, color: str, n: float, x: float):
-        idx = RGBA2IDX[color]
-        new_limits = list(self.recipe.color_limits)
-        new_limits[idx] = (n, x)
-        self.didChangeRGBComponentLimits.emit(self.recipe, tuple(new_limits))
+        new_limits = (n, x)
+        self.didChangeRGBColorLimits.emit(self.recipe, color, new_limits)
 
     def _slider_changed(self, value=None, slider=None, color: str = None, is_max: bool = False):
         """
@@ -260,36 +298,19 @@ class RGBLayerConfigPane(QObject):
         slider.blockSignals(False)
         self._signal_color_changing_range(color, *self._update_line_edits(color))
 
-    def selection_did_change(self, recipe):
+    def selection_did_change(self, layers: Tuple[LayerItem]):
         """Change UI elements to reflect the provided recipe."""
-        self.recipe = recipe
-        self._show_settings_for_layer(recipe)
+        if layers is not None and len(layers) == 1:
+            layer = layers[0]
+            self.recipe = layer.recipe if layer.recipe else None
+            self._show_settings_for_layer(self.recipe)
 
     def _show_settings_for_layer(self, recipe=None):
-        if recipe is None:
-            for slider in self.sliders:
-                slider[0].setDisabled(True)
-                slider[1].setDisabled(True)
-            for combo in self.rgb:
-                combo.setDisabled(True)
-            for edit in self.line_edits:
-                edit[0].setDisabled(True)
-                edit[1].setDisabled(True)
-            for sbox in self.gamma_boxes:
-                sbox.setDisabled(True)
+        if not isinstance(recipe, CompositeRecipe):
+            self.ui.rgbScrollAreaWidgetContents.setDisabled(True)
             return
         else:
-            # re-enable all the widgets
-            for slider in self.sliders:
-                slider[0].setDisabled(False)
-                slider[1].setDisabled(False)
-            for combo in self.rgb:
-                combo.setDisabled(False)
-            for edit in self.line_edits:
-                edit[0].setDisabled(False)
-                edit[1].setDisabled(False)
-            for sbox in self.gamma_boxes:
-                sbox.setDisabled(False)
+            self.ui.rgbScrollAreaWidgetContents.setDisabled(False)
 
         for widget in self.rgb:
             # block signals so an existing RGB layer doesn't get overwritten with new layer selections
@@ -299,23 +320,31 @@ class RGBLayerConfigPane(QObject):
         self._select_components_for_recipe(recipe)
         self._set_minmax_sliders(recipe)
         self._set_gamma_boxes(recipe)
+        self._set_rgb_name_edit(recipe)
 
         for widget in self.rgb:
             # block signals so an existing RGB layer doesn't get overwritten with new layer selections
             widget.blockSignals(False)
 
-    def _set_minmax_slider(self, color: str, family: str, clims: Optional[Tuple[float, float]] = None):
+    def _set_rgb_name_edit(self, recipe):
+        if recipe is not None:
+            self.rgb_name_edit.setText(recipe.name)
+        else:
+            self.rgb_name_edit.setText("")
+
+    def _set_minmax_slider(self, color: str, layer_uuid: uuid.UUID, clims: Optional[Tuple[float, float]] = None):
         idx = RGBA2IDX[color]
         slider = self.sliders[idx]
         editn, editx = self.line_edits[idx]
-        if family not in self._families:
+        if layer_uuid not in self._layer_uuids:
             LOG.debug(
-                "Could not find {} in families {}".format(repr(family), repr(list(sorted(self._families.keys())))))
+                "Could not find {} in layer_uuids {}".format(repr(layer_uuid),
+                                                             self._layer_uuids))
         # block signals so the changed sliders don't trigger updates
         slider[0].blockSignals(True)
         slider[1].blockSignals(True)
         if clims is None or clims == (None, None) or \
-                family not in self._families:
+                layer_uuid not in self._layer_uuids:
             self._valid_ranges[idx] = (None, None)
             slider[0].setSliderPosition(0)
             slider[1].setSliderPosition(0)
@@ -335,7 +364,9 @@ class RGBLayerConfigPane(QObject):
             editn.setDisabled(False)
             editx.setDisabled(False)
 
-            valid_range = self._families[family][Info.VALID_RANGE]
+            layer: LayerItem = self.model.get_layer_by_uuid(layer_uuid)
+
+            valid_range = layer.info.get(Info.VALID_RANGE)
             self._valid_ranges[idx] = valid_range
 
             slider_val = self._create_slider_value(valid_range[0], valid_range[1], clims[0])
@@ -349,9 +380,9 @@ class RGBLayerConfigPane(QObject):
 
     def _set_minmax_sliders(self, recipe):
         if recipe:
-            for idx, (color, clim) in enumerate(zip("rgb", recipe.color_limits)):
-                family = recipe.input_layer_ids[idx]
-                self._set_minmax_slider(color, family, clim)
+            for idx, (color, clim) in enumerate(zip("rgb", self.recipe.color_limits)):
+                layer_uuid = self.recipe.input_layer_ids[idx]
+                self._set_minmax_slider(color, layer_uuid, clim)
         else:
             self._set_minmax_slider("r", None)
             self._set_minmax_slider("g", None)
@@ -359,29 +390,30 @@ class RGBLayerConfigPane(QObject):
 
     def _select_components_for_recipe(self, recipe=None):
         if recipe is not None:
-            for family_name, widget in zip(recipe.input_layer_ids, self.rgb):
-                if family_name is None:
+            for layer_uuid, widget in zip(recipe.input_layer_ids, self.rgb):
+                if not layer_uuid:
                     widget.setCurrentIndex(0)
                 else:
                     # Qt can't handle item data being tuples
-                    dex = widget.findData(family_name)
+                    dex = widget.findData(layer_uuid)
                     if dex <= 0:
                         widget.setCurrentIndex(0)
-                        LOG.error("Layer family '%s' not available to be selected" % (family_name,))
+                        LOG.error("Layer with uuid '%s' not available to"
+                                  " be selected" % (layer_uuid,))
                     else:
                         widget.setCurrentIndex(dex)
         else:
             for widget in self.rgb:
                 widget.setCurrentIndex(0)
 
-    def _set_combos_to_family_names(self):
+    def _set_combos_to_layer_names(self):
         """
         update combo boxes with the list of layer names and then select the right r,g,b,a layers if they're not None
         :return:
         """
         # Get the current selected families so we can reselect them when we
         # rebuild the lists.
-        current_families = [x.itemData(x.currentIndex()) for x in self.rgb]
+        current_layers = [x.itemData(x.currentIndex()) for x in self.rgb]
 
         for widget in self.rgb:
             # block signals so an existing RGB layer doesn't get overwritten with new layer selections
@@ -390,24 +422,25 @@ class RGBLayerConfigPane(QObject):
         # clear out the current lists
         for widget in self.rgb:
             widget.clear()
-            widget.addItem('None', '')
+            widget.addItem('None', None)
 
         # fill up our lists of layers
-        for widget, selected_family in zip(self.rgb, current_families):
-            if not selected_family or selected_family not in self._families:
-                # if the selection is None or the current family was removed
-                # if the current family was removed by the document then the
+        for widget, selected_layer_uuid in zip(self.rgb, current_layers):
+            if not selected_layer_uuid or selected_layer_uuid not in self._layer_uuids:
+                # if the selection is None or the current layer was removed
+                # if the current layer was removed by the document then the
                 # document should have updated the recipe
                 widget.setCurrentIndex(0)
-            for idx, (family_name, family_info) in enumerate(
-                    sorted(self._families.items(), key=lambda x: x[1][Info.DISPLAY_FAMILY])):
-                # Qt can't handle tuples as
-                display_name = family_info[Info.DISPLAY_FAMILY]
-                LOG.debug('adding to widget family {} as "{}"'.format(family_name, display_name))
-                widget.addItem(display_name, family_name)
-                widget.findData(family_name)  # sanity check
-                if family_name == selected_family:
-                    # None is 0 so add 1 to index
+
+            for idx, layer_uuid in enumerate(self._layer_uuids):
+                LOG.info(f"Length of Layer Items {len(self._layer_uuids)}")
+                layer: LayerItem = self.model.get_layer_by_uuid(layer_uuid)
+                display_name = layer.descriptor
+
+                widget.addItem(display_name, layer_uuid)
+                widget.findData(uuid)
+
+                if layer_uuid == selected_layer_uuid:
                     widget.setCurrentIndex(idx + 1)
 
         for widget in self.rgb:

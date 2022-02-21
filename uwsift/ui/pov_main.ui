@@ -1096,7 +1096,7 @@
      <x>0</x>
      <y>0</y>
      <width>1296</width>
-     <height>22</height>
+     <height>20</height>
     </rect>
    </property>
   </widget>
@@ -1249,8 +1249,8 @@ Checking this deactivates the Update button.</string>
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>276</width>
-          <height>68</height>
+          <width>272</width>
+          <height>64</height>
          </rect>
         </property>
        </widget>
@@ -1302,20 +1302,32 @@ Checking this deactivates the Update button.</string>
       <number>0</number>
      </property>
      <item>
-      <widget class="QScrollArea" name="scrollArea">
+      <widget class="QScrollArea" name="rgbScrollAreaWidget">
        <property name="widgetResizable">
         <bool>true</bool>
        </property>
-       <widget class="QWidget" name="scrollAreaWidgetContents_8">
+       <widget class="QWidget" name="rgbScrollAreaWidgetContents">
         <property name="geometry">
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>262</width>
-          <height>537</height>
+          <width>259</width>
+          <height>550</height>
          </rect>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_33">
+         <item>
+          <widget class="QGroupBox" name="nameGroupBox">
+           <property name="title">
+            <string>Name</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_13">
+            <item>
+             <widget class="QLineEdit" name="nameEdit"/>
+            </item>
+           </layout>
+          </widget>
+         </item>
          <item>
           <widget class="QGroupBox" name="redGroupBox">
            <property name="title">

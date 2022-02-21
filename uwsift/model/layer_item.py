@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from types import MappingProxyType
 from typing import List, Optional, Tuple
 from uuid import uuid1, UUID
@@ -46,8 +47,9 @@ class LayerItem:
         self.recipe = recipe
 
         self.grouping_key = grouping_key
-        self._invariable_display_data = \
-            self._generate_invariable_display_data(self.info)
+
+        self._invariable_display_data = None
+        self.update_invariable_display_data()
 
     @staticmethod
     def extract_layer_info(info: frozendict) -> frozendict:
@@ -64,6 +66,7 @@ class LayerItem:
             Info.PLATFORM,
             Info.SHORT_NAME,
             Info.UNITS,
+            Info.VALID_RANGE,
             # for _get_dataset_info_labels()
             "name",
             "standard_name",
@@ -92,13 +95,21 @@ class LayerItem:
                f"{self._invariable_display_data[LMC.NAME]} " \
                f"{self._invariable_display_data[LMC.WAVELENGTH]}"
 
-    @staticmethod
-    def _generate_invariable_display_data(info) -> dict:
-        name, wavelength, unit = LayerItem._get_dataset_info_labels(info)
+    def update_invariable_display_data(self) -> None:
+        if self.recipe:
+            self._invariable_display_data = {
+                LMC.SOURCE: self.recipe.kind(),
+                LMC.NAME: self.recipe.name,
+                LMC.WAVELENGTH: N_A,
+                LMC.PROBE_UNIT: N_A
+            }
+            return
 
-        platform = info.get(Info.PLATFORM)
-        instrument = info.get(Info.INSTRUMENT)
-        return {
+        name, wavelength, unit = LayerItem._get_dataset_info_labels(self.info)
+
+        platform = self.info.get(Info.PLATFORM)
+        instrument = self.info.get(Info.INSTRUMENT)
+        self._invariable_display_data = {
             LMC.SOURCE: f"{platform.value} {instrument.value}",
             LMC.NAME: name,
             LMC.WAVELENGTH: wavelength,
@@ -262,3 +273,45 @@ class LayerItem:
 
         return None if num_active_product_datasets == 0 \
             else active_product_datasets[0]
+
+    def add_multichannel_dataset(
+            self, presentation: Optional[Presentation],
+            sched_time: datetime,
+            input_datasets_uuids: Optional[List[UUID]],
+            input_datasets_infos: Optional[List[frozendict]]
+    ) -> ProductDataset:
+        """Add multichannel ProductDataset to Layer. If a Presentation is passed
+        it overwrites the Presentation of the layer for the given dataset.
+
+        :param presentation: Mapping with visualisation configuration for the
+               dataset to add.
+        :param sched_time:
+        :param input_datasets_uuids:
+        :param input_datasets_infos: List of mapping providing metadata for
+               ProductDatasets
+        :return: Newly created  multichannel ProductDataset if a dataset
+                 with the same scheduled time does not already
+                 exist in the layer
+        """
+        if sched_time in self._timeline:
+            LOG.warning(f"Other  multichannel dataset for {sched_time}"
+                        f" is already in layer '{self.descriptor}',"
+                        f" ignoring the new one.")
+            return None
+
+        product_dataset = ProductDataset.get_rgb_multichannel_product_dataset(
+            self.uuid, presentation, input_datasets_uuids, self.kind,
+            sched_time, input_datasets_infos
+        )
+        self._timeline[sched_time] = product_dataset
+        self._sort_timeline()
+        return product_dataset
+
+    def remove_dataset(self, sched_time):
+        """Remove a dataset for given datetime from layer
+
+        Gracefully ignores if no dataset with the given shed_time exists in
+        the layer.
+        """
+        self._timeline.pop(sched_time, None)
+

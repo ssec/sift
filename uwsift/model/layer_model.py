@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import logging
 import struct
 from typing import Dict, List, Optional, Tuple
@@ -9,6 +11,7 @@ from PyQt5.QtCore import (QAbstractItemModel, Qt, QModelIndex, pyqtSignal,
 from uwsift.common import LAYER_TREE_VIEW_HEADER, Presentation, Info, Kind, \
     LATLON_GRID_DATASET_NAME, BORDERS_DATASET_NAME, Platform, Instrument, \
     LayerModelColumns as LMC, LayerVisibility
+from uwsift.model.composite_recipes import CompositeRecipe, Recipe
 from uwsift.model.layer_item import LayerItem
 from uwsift.model.product_dataset import ProductDataset
 from uwsift.workspace.workspace import frozendict
@@ -19,10 +22,13 @@ LOG = logging.getLogger(__name__)
 class LayerModel(QAbstractItemModel):
     # ------------------- Creating layers and product datasets -----------------
     didCreateLayer = pyqtSignal(LayerItem)
+
+    didAddCompositeDataset = pyqtSignal(LayerItem, ProductDataset)
     didAddImageDataset = pyqtSignal(LayerItem, ProductDataset)
     didAddLinesDataset = pyqtSignal(LayerItem, ProductDataset)
     didAddPointsDataset = pyqtSignal(LayerItem, ProductDataset)
 
+    didAddImageLayer = pyqtSignal(LayerItem)
     didAddSystemLayer = pyqtSignal(LayerItem)
 
     # ------------------ Changing properties of existing layers ----------------
@@ -42,12 +48,26 @@ class LayerModel(QAbstractItemModel):
 
     # ----------------------- Removing existing layers -------------------------
     # didDeleteLayer = pyqtSignal(UUID)
-    # didDeleteProductDataset = pyqtSignal(UUID)
+    didDeleteProductDataset = pyqtSignal(UUID)
+    # ---------------------- Request creation of Recipes -----------------------
+    # object should be a List[Optional[UUID]]
+    didRequestCompositeRecipeCreation = pyqtSignal(object)
 
     # --------------------------------------------------------------------------
     # didChangeImageKind = pyqtSignal(dict)
 
     didActivateProductDataset = pyqtSignal(UUID, bool)
+    # The parameter here should be a list, but in some cases PyQt has problems
+    # with this. If the list is only filled with Nones, then sending this
+    # signal will cause a 139 error and the application will crash. But if
+    # the parameter is of type object, then the crash does not occur if the
+    # list is only filled with None. This is only a workaround and needs to be
+    # fixed when the problem with PyQT no longer occurs.
+    # See also:
+    # https://stackoverflow.com/questions/12050397/pyqt-signal-emit-with-object-instance-or-none
+    didChangeCompositeProductDataset = pyqtSignal(LayerItem, ProductDataset)
+
+    didRequestSelectionOfLayer = pyqtSignal(QModelIndex)
 
     def __init__(self, workspace, parent=None, policy=None):
         """
@@ -172,6 +192,9 @@ class LayerModel(QAbstractItemModel):
         self.beginInsertRows(QModelIndex(), row, row)
         self.layers.insert(row, layer)
         self.endInsertRows()
+
+        if layer.kind == Kind.IMAGE:
+            self.didAddImageLayer.emit(layer)
 
         self._emit_didReorderLayers()
 
@@ -305,6 +328,7 @@ class LayerModel(QAbstractItemModel):
                     f" not (yet) supported.")
 
             self.didUpdateLayers.emit()
+        self._trigger_composite_layer_update(layer)
 
     def mimeTypes(self):
         return ['text/plain', 'text/xml']
@@ -438,6 +462,272 @@ class LayerModel(QAbstractItemModel):
                 self._workspace.get_content_point(product_dataset.uuid, xy_pos)
 
         self._refresh()
+
+    def create_rgb_composite_layer(self, recipe: CompositeRecipe):
+        """Creates a layer which has a rgb composite recipe
+
+        :param recipe: the rgb composite recipe which the created layer gets
+        as recipe
+        """
+        rgb_layer = self._get_empty_rgb_layer(recipe)
+
+        if rgb_layer:
+            index = self.index(rgb_layer.order, 0)
+            self.didRequestSelectionOfLayer.emit(index)
+
+    def _get_empty_rgb_layer(self, recipe: CompositeRecipe):
+        # TODO(am) add check of existing layer with help of recipe
+        info = {
+            Info.KIND: Kind.RGB
+        }
+
+        prez = Presentation(
+            uuid=None,
+            kind=Kind.RGB,
+            climits=recipe.color_limits,
+            gamma=recipe.gammas
+        )
+
+        rgb_layer = LayerItem(self, info, prez, recipe=recipe)
+        self.didCreateLayer.emit(rgb_layer)
+        self._add_layer(rgb_layer)
+        return rgb_layer
+
+    def update_rgb_layer_color_limits(self, recipe: CompositeRecipe):
+        """"""
+        rgb_layer: LayerItem = self._get_layer_of_recipe(recipe.id)
+        self.change_color_limits_for_layer(rgb_layer.uuid, recipe.color_limits)
+
+    def update_rgb_layer_gamma(self, recipe: CompositeRecipe):
+        rgb_layer: LayerItem = self._get_layer_of_recipe(recipe.id)
+        self.change_gamma_for_layer(rgb_layer.uuid, recipe.gammas)
+
+    @staticmethod
+    def _get_datasets_uuids_of_multichannel_dataset(
+            sched_time: datetime, input_layers: List[LayerItem]
+    ) -> List[UUID]:
+        input_datasets_uuids = []
+        for layer in input_layers:
+            dataset_uuid \
+                = layer.timeline.get(sched_time).uuid if layer else None
+            input_datasets_uuids.append(dataset_uuid)
+        return input_datasets_uuids
+
+    @staticmethod
+    def _get_datasets_infos_of_multichannel_dataset(
+            sched_time: datetime, input_layers: List[LayerItem]
+    ) -> List[dict]:
+        input_datasets_infos = []
+        for layer in input_layers:
+            dataset_info \
+                = layer.timeline.get(sched_time).info if layer else None
+            input_datasets_infos.append(dataset_info)
+        return input_datasets_infos
+
+    def _remove_datasets(self,
+                         datasets_to_remove: List[datetime],
+                         layer: LayerItem):
+        for sched_time in datasets_to_remove:
+            dataset: ProductDataset = layer.timeline.get(sched_time)
+            self._remove_dataset(layer, sched_time, dataset.uuid)
+
+    def _remove_dataset(self,
+                        layer: LayerItem,
+                        sched_time: datetime,
+                        dataset_uuid: UUID):
+        layer.remove_dataset(sched_time)
+        # TODO: Workspace has to remove Content/Product
+        self.didDeleteProductDataset.emit(dataset_uuid)
+
+    def _update_rgb_datasets(self, datasets_to_update: List[datetime],
+                             input_layers: List[LayerItem],
+                             rgb_layer: LayerItem):
+        for sched_time in datasets_to_update:
+            dataset: ProductDataset = rgb_layer.timeline.get(sched_time)
+
+            input_datasets_uuids \
+                = self._get_datasets_uuids_of_multichannel_dataset(sched_time,
+                                                                   input_layers)
+            input_datasets_infos \
+                = self._get_datasets_infos_of_multichannel_dataset(sched_time,
+                                                                   input_layers)
+            dataset_uuid = dataset.uuid
+
+            dataset.input_datasets_uuids = input_datasets_uuids
+            dataset.update_multichannel_dataset_info(input_datasets_infos)
+
+            if not dataset.info:
+                self._remove_dataset(rgb_layer, sched_time, dataset_uuid)
+                continue
+
+            self.didChangeCompositeProductDataset.emit(
+                rgb_layer,
+                dataset
+            )
+
+    def _add_rgb_datasets(self, datasets_to_added: List[datetime],
+                          input_layers: List[LayerItem],
+                          rgb_layer: LayerItem):
+        for sched_time in datasets_to_added:
+            input_datasets_uuids \
+                = self._get_datasets_uuids_of_multichannel_dataset(sched_time,
+                                                                   input_layers)
+            input_datasets_infos \
+                = self._get_datasets_infos_of_multichannel_dataset(sched_time,
+                                                                   input_layers)
+
+            dataset = rgb_layer.add_multichannel_dataset(None,
+                                                         sched_time,
+                                                         input_datasets_uuids,
+                                                         input_datasets_infos)
+
+            self.didAddCompositeDataset.emit(rgb_layer, dataset)
+
+    @staticmethod
+    def _get_diff_of_timelines(common_timeline: List[datetime],
+                               rgb_layer: LayerItem):
+        datasets_to_added = []
+        datasets_to_remove = list(rgb_layer.timeline.keys())
+        datasets_to_update = []
+        for timestep in common_timeline:
+            if timestep in rgb_layer.timeline.keys():
+                datasets_to_update.append(timestep)
+                datasets_to_remove.remove(timestep)
+            elif timestep not in rgb_layer.timeline.keys():
+                datasets_to_added.append(timestep)
+        return datasets_to_added, datasets_to_update, datasets_to_remove
+
+    @staticmethod
+    def _get_common_timeline_of_input_layers(
+            timelines_to_compare: List[dict]):
+        if len(timelines_to_compare) == 0:
+            return []
+
+        intersection = timelines_to_compare[-1].keys()
+        for idx in range(len(timelines_to_compare) - 1):
+            curr_timeline = timelines_to_compare[idx]
+            intersection = intersection & curr_timeline.keys()
+
+        return intersection
+
+    @staticmethod
+    def _get_timeline_of_layers(input_layers: List[LayerItem]):
+        timelines_of_input_layers = []
+        for layer in input_layers:
+            if layer:
+                timelines_of_input_layers.append(layer.timeline)
+        return timelines_of_input_layers
+
+    def update_recipe_layer_timeline(self, recipe: Recipe):
+        recipe_layer: LayerItem = self._get_layer_of_recipe(recipe.id)
+
+        if isinstance(recipe, CompositeRecipe):
+            self.update_rgb_layer_gamma(recipe)
+            self.update_rgb_layer_color_limits(recipe)
+
+        input_layers \
+            = self.get_layers_by_uuids(recipe_layer.recipe.input_layer_ids)
+
+        timelines_to_compare = self._get_timeline_of_layers(input_layers)
+        common_timeline = self._get_common_timeline_of_input_layers(
+            timelines_to_compare
+        )
+
+        sched_times_to_add, existing_sched_times, sched_times_to_remove \
+            = self._get_diff_of_timelines(common_timeline, recipe_layer)
+
+        self._remove_datasets(sched_times_to_remove, recipe_layer)
+
+        sched_times_to_update = self._check_recipe_layer_sched_times_to_update(
+            existing_sched_times, input_layers, recipe_layer)
+
+        if isinstance(recipe, CompositeRecipe):
+            self._update_rgb_datasets(sched_times_to_update,
+                                      input_layers,
+                                      recipe_layer)
+            self._add_rgb_datasets(sched_times_to_add, input_layers,
+                                   recipe_layer)
+
+        self.didUpdateLayers.emit()
+
+    def _check_recipe_layer_sched_times_to_update(self, existing_sched_times,
+                                                  input_layers,
+                                                  recipe_layer):
+        sched_times_to_update = []
+        for sched_time in existing_sched_times:
+            dataset: ProductDataset = recipe_layer.timeline.get(sched_time)
+            input_datasets_uuids \
+                = self._get_datasets_uuids_of_multichannel_dataset(sched_time,
+                                                                   input_layers)
+
+            if dataset.input_datasets_uuids != input_datasets_uuids:
+                sched_times_to_update.append(sched_time)
+        return sched_times_to_update
+
+    def _get_layer_of_recipe(self, recipe_id: UUID):
+        """Get layer which has the given recipe as a attribute
+
+        :param recipe_id: recipe which is used to search the wanted layers
+        :return: the searched layers
+        """
+        return [layer for layer in self.layers
+                if layer.recipe and layer.recipe.id == recipe_id][-1]
+
+    def get_layers_by_uuids(self, layer_uuids: List[UUID]):
+        """Get layers which have the given identifiers as a attribute.
+
+        :param layer_uuids: identifiers which are used to search the
+        wanted layers
+        :return: the searched layers
+        """
+        layers = []
+        for uuid in layer_uuids:
+            layers.append(self.get_layer_by_uuid(uuid))
+        return layers
+
+    def _trigger_composite_layer_update(self, changed_layer):
+        for layer in self.layers:
+            if layer.recipe:
+                if changed_layer.uuid in layer.recipe.input_layer_ids:
+                    self._update_composite_layer_timeline(layer)
+
+    def _update_composite_layer_timeline(self, layer):
+        if isinstance(layer.recipe, CompositeRecipe):
+            self.update_recipe_layer_timeline(layer.recipe)
+
+    @staticmethod
+    def create_reasonable_rgb_composite_default():
+        """Creates a reasonable default layer list for rgb composites
+        :return: the reasonable default layer list
+        """
+        return [None, None, None]
+
+    def start_rgb_composite_creation(self, layers=None):
+        """starts creation of rgb composite recipe.
+
+        :param layers: The layers which will be used to create a rgb composite.
+            - Layer at the index 0 will be used for the red component
+            of the rgb.
+            - Layer at the index 1 will be used for the green component
+            of the rgb.
+            - Layer at the index 2 will be used for the blue component
+            of the rgb.
+        """
+
+        if not layers or len(layers) == 0:
+            layers = self.create_reasonable_rgb_composite_default()
+
+        # TODO: case when layers list has less then 3 elements
+        # layers = []
+
+        self.didRequestCompositeRecipeCreation.emit(layers)
+
+    def update_rgb_layer_name(self, recipe: CompositeRecipe):
+        rgb_layer: LayerItem = self._get_layer_of_recipe(recipe.id)
+        rgb_layer.update_invariable_display_data()
+
+        index = self.index(rgb_layer.order, LMC.NAME)
+        self.dataChanged.emit(index, index)
 
 
 class ProductFamilyKeyMappingPolicy:

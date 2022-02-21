@@ -1006,7 +1006,8 @@ class SceneGraphManager(QObject):
         self.on_view_change(None)
 
     def add_node_for_layer(self, layer: LayerItem):
-        if not USE_TILED_GEOLOCATED_IMAGES and layer.kind == Kind.IMAGE:
+        if not USE_TILED_GEOLOCATED_IMAGES \
+                and layer.kind in [Kind.IMAGE, Kind.RGB]:
             layer_node = scene.Node(parent=self.main_map_parent,
                                     name=str(layer.uuid))
         else:
@@ -1116,80 +1117,60 @@ class SceneGraphManager(QObject):
         LOG.debug("Scene Graph after IMAGE dataset insertion:")
         LOG.debug(self.main_view.describe_tree(with_transform=True))
 
-    def add_composite_dataset(self, new_order: tuple, uuid: UUID, p: Presentation):
-        layer = self.document[uuid]
-        LOG.debug("SceneGraphManager.add_composite_layer %s" % repr(layer))
-        if not layer.is_valid:
-            LOG.info('unable to add an invalid composite layer, will try again later when layer changes')
-            return
-        if p.kind == Kind.RGB:
-            dep_uuids = r, g, b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
-            image_data = list(self.workspace.get_content(cuuid, kind=Kind.IMAGE) for cuuid in dep_uuids)
-            uuid = layer.uuid
-            LOG.debug("Adding composite layer to Scene Graph Manager with UUID: %s", uuid)
-            if USE_TILED_GEOLOCATED_IMAGES:
-                self.dataset_nodes[uuid] = dataset_node = RGBCompositeLayer(
-                    image_data,
-                    layer[Info.ORIGIN_X],
-                    layer[Info.ORIGIN_Y],
-                    layer[Info.CELL_WIDTH],
-                    layer[Info.CELL_HEIGHT],
-                    name=str(uuid),
-                    clim=p.climits,
-                    gamma=p.gamma,
-                    interpolation='nearest',
-                    method='subdivide',
-                    cmap=None,
-                    double=False,
-                    texture_shape=DEFAULT_TEXTURE_SHAPE,
-                    wrap_lon=False,
-                    parent=self.main_map,
-                    projection=layer[Info.PROJ],
-                )
-                dataset_node.transform = PROJ4Transform(layer[Info.PROJ], inverse=True)
-                dataset_node.transform *= STTransform(translate=(0, 0, -50.0))
-                self.composite_element_dependencies[uuid] = dep_uuids
-                self.animation_controller.add_layer(dataset_node)
-                if new_order:
-                    self.animation_controller.set_layer_order(new_order)
-                self.on_view_change(None)
-                dataset_node.determine_reference_points()
-            else:
-                self.dataset_nodes[uuid] = dataset_node = MultiChannelImage(
-                    image_data,
-                    name=str(uuid),
-                    clim=p.climits,
-                    gamma=p.gamma,
-                    interpolation='nearest',
-                    cmap=None,
-                    parent=self.main_map_parent
-                )
-                # TODO: We must use a ChainTransform, because of the assumption made
-                # in LayerSet.update_layers_z(): there it is assumed, that the
-                # (last) transformation of the layer can be overwritten incautiously
-                # since it would only carry z translation. So the question: why
-                # doesn't LayerSet.add_layer() take care to guarantee this?
-                # Anyhow, here we can't concatenate two STTransforms with *= because
-                # they would end up in *one* transform whose 'translate' part would
-                # be overwritten in LayerSet.update_layers_z(), i.e. any x,y-offset
-                # would be reset to 0.0,0.0.
-                calibration_transform = STTransform(
-                    scale=(layer[Info.CELL_WIDTH], layer[Info.CELL_HEIGHT], 1),
-                    translate=(layer[Info.ORIGIN_X], layer[Info.ORIGIN_Y], 0))
-                z_transform = STTransform(translate=(0, 0, -50))
-                dataset_node.transform = ChainTransform([calibration_transform,
-                                                    z_transform])
-                self.composite_element_dependencies[uuid] = dep_uuids
-                self.animation_controller.add_layer(dataset_node)
-                if new_order:
-                    self.animation_controller.set_layer_order(new_order)
-                self.on_view_change(None)
+    def add_node_for_composite_dataset(self, layer: LayerItem,
+                                       product_dataset: ProductDataset):
+        assert self.layer_nodes[layer.uuid] is not None
+        assert product_dataset.kind == Kind.RGB
 
-            self.update()
-            return True
-        elif p.kind in [Kind.COMPOSITE, Kind.IMAGE]:
-            # algebraic layer
-            return self.add_basic_dataset(new_order, uuid, p)
+        images_data \
+            = list(self.workspace.get_content(curr_input_uuid, Kind.IMAGE)
+                   for curr_input_uuid in product_dataset.input_datasets_uuids)
+
+        if USE_TILED_GEOLOCATED_IMAGES:
+            composite = RGBCompositeLayer(
+                images_data,
+                product_dataset.info[Info.ORIGIN_X],
+                product_dataset.info[Info.ORIGIN_Y],
+                product_dataset.info[Info.CELL_WIDTH],
+                product_dataset.info[Info.CELL_HEIGHT],
+                name=str(product_dataset.uuid),
+                clim=layer.presentation.climits,
+                gamma=layer.presentation.gamma,
+                interpolation='nearest',
+                method='subdivide',
+                cmap=None,
+                double=False,
+                texture_shape=DEFAULT_TEXTURE_SHAPE,
+                wrap_lon=False,
+                parent=self.layer_nodes[layer.uuid],
+                projection=product_dataset.info[Info.PROJ],
+            )
+            composite.transform = PROJ4Transform(
+                product_dataset.info[Info.PROJ], inverse=True
+            )
+            composite.transform *= STTransform(translate=(0, 0, -50.0))
+            composite.determine_reference_points()
+        else:
+            composite = MultiChannelImage(
+                images_data,
+                name=str(product_dataset.uuid),
+                clim=layer.presentation.climits,
+                gamma=layer.presentation.gamma,
+                interpolation='nearest',
+                cmap=None,
+                parent=self.layer_nodes[layer.uuid],
+            )
+            composite.transform = STTransform(
+                scale=(product_dataset.info[Info.CELL_WIDTH],
+                       product_dataset.info[Info.CELL_HEIGHT], 1),
+                translate=(product_dataset.info[Info.ORIGIN_X],
+                           product_dataset.info[Info.ORIGIN_Y], 0))
+        self.composite_element_dependencies[product_dataset.uuid] \
+            = product_dataset.input_datasets_uuids
+        self.dataset_nodes[product_dataset.uuid] = composite
+        self.on_view_change(None)
+        LOG.debug("Scene Graph after COMPOSITE dataset insertion:")
+        LOG.debug(self.main_view.describe_tree(with_transform=True))
 
     def add_node_for_lines_dataset(self, layer: LayerItem,
                                    product_dataset: ProductDataset) \
@@ -1270,49 +1251,40 @@ class SceneGraphManager(QObject):
         colors = colormap.map(scaled_attr)
         return colors
 
-    def change_composite_datasets(self, new_order: tuple, uuid_list: list, presentations: list):
-        for uuid, presentation in zip(uuid_list, presentations):
-            self.change_composite_dataset(None, uuid, presentation)
-        # set the order after we've updated and created all the new layers
-        if new_order:
-            self.animation_controller.set_layer_order(new_order)
+    def change_node_for_composite_dataset(self, layer: LayerItem,
+                                          product_dataset: ProductDataset):
+        if layer.kind == Kind.RGB:
+            if product_dataset.uuid in self.dataset_nodes:
+                # RGB selection has changed, rebuild the layer
+                LOG.debug(f"Changing existing composite layer to"
+                          f" Scene Graph Manager with UUID:"
+                          f" {product_dataset.uuid}")
 
-    def change_composite_dataset(self, new_order: tuple, uuid: UUID, presentation: Presentation):
-        layer = self.document[uuid]
-        if presentation.kind == Kind.RGB:
-            if layer.uuid in self.dataset_nodes:
-                if layer.is_valid:
-                    # RGB selection has changed, rebuild the layer
-                    LOG.debug("Changing existing composite layer to Scene Graph Manager with UUID: %s", layer.uuid)
-                    dep_uuids = r, g, b = [c.uuid if c is not None else None for c in [layer.r, layer.g, layer.b]]
-                    image_arrays = list(self.workspace.get_content(cuuid) for cuuid in dep_uuids)
-                    self.composite_element_dependencies[layer.uuid] = dep_uuids
-                    elem = self.dataset_nodes[layer.uuid]
-                    if isinstance(elem, RGBCompositeLayer):
-                        elem.set_channels(image_arrays,
-                                          cell_width=layer[Info.CELL_WIDTH],
-                                          cell_height=layer[Info.CELL_HEIGHT],
-                                          origin_x=layer[Info.ORIGIN_X],
-                                          origin_y=layer[Info.ORIGIN_Y])
-                    elif isinstance(elem, MultiChannelImage):
-                        elem.set_data(image_arrays)
-                    elem.clim = presentation.climits
-                    elem.gamma = presentation.gamma
-                    self.on_view_change(None)
-                    if isinstance(elem, RGBCompositeLayer):
-                        elem.determine_reference_points()
-                else:
-                    # layer is no longer valid and has to be removed
-                    LOG.debug("Purging composite ")
-                    self.purge_dataset(layer.uuid)
+                images_data = list(
+                    self.workspace.get_content(curr_input_id, Kind.IMAGE)
+                    for curr_input_id in product_dataset.input_datasets_uuids)
+
+                self.composite_element_dependencies[product_dataset.uuid] \
+                    = product_dataset.input_datasets_uuids
+
+                composite = self.dataset_nodes[product_dataset.uuid]
+                if isinstance(composite, RGBCompositeLayer):
+                    composite.set_channels(
+                        images_data,
+                        cell_width=product_dataset.info[Info.CELL_WIDTH],
+                        cell_height=product_dataset.info[Info.CELL_HEIGHT],
+                        origin_x=product_dataset.info[Info.ORIGIN_X],
+                        origin_y=product_dataset.info[Info.ORIGIN_Y])
+                elif isinstance(composite, MultiChannelImage):
+                    composite.set_data(images_data)
+                composite.clim = layer.presentation.climits
+                composite.gamma = layer.presentation.gamma
+                self.on_view_change(None)
+                if isinstance(composite, RGBCompositeLayer):
+                    composite.determine_reference_points()
                 self.update()
             else:
-                if layer.is_valid:
-                    # Add this now valid layer
-                    self.add_composite_dataset(new_order, layer.uuid, presentation)
-                else:
-                    LOG.info('unable to add an changed invalid composite layer, will try again later when layer changes')
-                    return
+                self.add_node_for_composite_dataset(layer, product_dataset)
         else:
             raise ValueError("Unknown or unimplemented composite type")
 
@@ -1415,8 +1387,6 @@ class SceneGraphManager(QObject):
         document.didReorderDatasets.connect(self._rebuild_dataset_order)  # current layer set changed z/anim order
         # REMOVE document.didAddBasicDataset.connect(self.add_basic_dataset)  # layer added to one or more layer sets
         document.didUpdateBasicDataset.connect(self.update_basic_dataset)  # new data integrated in existing layer
-        document.didAddCompositeDataset.connect(
-            self.add_composite_dataset)  # layer derived from other layers (either basic or composite themselves)
         # REMOVE document.didAddLinesDataset.connect(self.add_lines_dataset)
         # REMOVE document.didAddPointsDataset.connect(self.add_points_dataset)
         document.didRemoveDatasets.connect(self._remove_dataset)  # layer removed from current layer set
@@ -1425,8 +1395,6 @@ class SceneGraphManager(QObject):
         document.didChangeColormap.connect(self.change_dataset_nodes_colormap)
         document.didChangeLayerVisibility.connect(self.change_datasets_visibility)
         document.didReorderAnimation.connect(self._rebuild_frame_order)
-        document.didChangeComposition.connect(self.change_composite_dataset)
-        document.didChangeCompositions.connect(self.change_composite_datasets)
         document.didChangeColorLimits.connect(self.change_dataset_nodes_color_limits)
         document.didChangeGamma.connect(self.change_dataset_nodes_gamma)
         # document.didChangeImageKind.connect(self.change_layers_image_kind)
@@ -1505,7 +1473,8 @@ class SceneGraphManager(QObject):
                 LOG.debug('creating deferred element for layer %s' % layer.uuid)
                 if layer.kind in [Kind.COMPOSITE, Kind.RGB]:
                     # create an invisible element with the RGB
-                    self.change_composite_dataset(current_uuid_order, layer, prez_lookup[uuid])
+                    self.change_node_for_composite_dataset(None, None, None,
+                                                           None)
                 else:
                     # FIXME this was previously a NotImplementedError
                     LOG.warning('unable to create deferred scenegraph element for %s' % repr(layer))

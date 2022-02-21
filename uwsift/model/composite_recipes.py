@@ -23,15 +23,28 @@ import dataclasses
 import logging
 import os
 import uuid
+from abc import abstractmethod
 from dataclasses import dataclass
 from glob import glob
+from typing import Mapping, Tuple
 from uuid import uuid1 as uuidgen
 
 import yaml
+from PyQt5.QtCore import QObject, pyqtSignal
 
 from uwsift.util.default_paths import DOCUMENT_SETTINGS_DIR
 
 LOG = logging.getLogger(__name__)
+
+CHANNEL_RED = 0
+CHANNEL_GREEN = 1
+CHANNEL_BLUE = 2
+CHANNEL_ALPHA = 3
+
+RGBA2IDX: Mapping[str, int] = dict(r=CHANNEL_RED,
+                                   g=CHANNEL_GREEN,
+                                   b=CHANNEL_BLUE,
+                                   a=CHANNEL_ALPHA)
 
 
 @dataclass
@@ -59,6 +72,11 @@ class Recipe:
     def copy(self, new_name):
         """Get a copy of this recipe with a new name"""
         return dataclasses.replace(self, name=new_name)
+
+    @classmethod
+    @abstractmethod
+    def kind(cls):
+        pass
 
 
 @dataclass
@@ -118,21 +136,34 @@ class CompositeRecipe(Recipe):
     @property
     def red(self):
         """Get the control parameters for the red channel as a dict."""
-        return self._channel_info(0)
+        return self._channel_info(CHANNEL_RED)
 
     @property
     def green(self):
         """Get the control parameters for the green channel as a dict."""
-        return self._channel_info(1)
+        return self._channel_info(CHANNEL_GREEN)
 
     @property
     def blue(self):
         """Get the control parameters for the blue channel as a dict."""
-        return self._channel_info(2)
+        return self._channel_info(CHANNEL_BLUE)
+
+    @classmethod
+    def kind(cls):
+        return "RGB Composite"
 
 
-class RecipeManager(object):
-    def __init__(self, config_dir=None):
+class RecipeManager(QObject):
+    didCreateRGBCompositeRecipe = pyqtSignal(CompositeRecipe)
+    didUpdateRGBCompositeRecipe = pyqtSignal(CompositeRecipe, object)
+
+    didUpdateRGBInputLayers = pyqtSignal(CompositeRecipe)
+    didUpdateRGBColorLimits = pyqtSignal(CompositeRecipe)
+    didUpdateRGBGamma = pyqtSignal(CompositeRecipe)
+    didUpdateRecipeName = pyqtSignal(Recipe)
+
+    def __init__(self, parent=None, config_dir=None):
+        super(RecipeManager, self).__init__(parent)
         if config_dir is None:
             config_dir = DOCUMENT_SETTINGS_DIR
 
@@ -157,6 +188,80 @@ class RecipeManager(object):
 
     def add_recipe(self, recipe):
         self.recipes[recipe.id] = recipe
+
+    def create_rgb_recipe(self, layers):
+        """Create an RGB recipe and triggers a signal that a rgb composite
+        layer can be created.
+
+        :param layers: The layers which will be used to create a rgb composite
+        """
+
+        recipe_name = CompositeRecipe.kind()
+        recipe = CompositeRecipe.from_rgb(
+            recipe_name,
+            r=None if layers[0] is None else layers[0].uuid,
+            g=None if layers[1] is None else layers[1].uuid,
+            b=None if layers[2] is None else layers[2].uuid)
+        self.add_recipe(recipe)
+
+        self.didCreateRGBCompositeRecipe.emit(recipe)
+
+    def update_rgb_recipe_input_layers(self,
+                                       recipe: CompositeRecipe,
+                                       channel: str,
+                                       layer_uuid: uuid.UUID,
+                                       clims: Tuple[float, float],
+                                       gamma: float):
+        """Update the input layers in the recipe for a specific channel.
+        With this change, the color limits and the gamma value of this specific
+        channel has to be changed, too.
+        """
+        channel_idx = RGBA2IDX.get(channel)
+
+        assert channel_idx is not None, f"Given channel '{channel}' is invalid"
+
+        recipe.input_layer_ids[channel_idx] = layer_uuid
+        recipe.color_limits[channel_idx] = clims
+        recipe.gammas[channel_idx] = gamma
+
+        self.recipes[recipe.id] = recipe
+        self.didUpdateRGBInputLayers.emit(recipe)
+
+    def update_rgb_recipe_gammas(self,
+                                 recipe: CompositeRecipe,
+                                 channel: str,
+                                 gamma: float):
+        """Update the gamma value of the given channel"""
+        channel_idx = RGBA2IDX.get(channel)
+
+        assert channel_idx is not None, f"Given channel '{channel}' is invalid"
+
+        recipe.gammas[channel_idx] = gamma
+
+        self.recipes[recipe.id] = recipe
+        self.didUpdateRGBGamma.emit(recipe)
+
+    def update_rgb_recipe_color_limits(self,
+                                       recipe: CompositeRecipe,
+                                       channel: str,
+                                       clim: Tuple[float, float]):
+        """Update the color limit value of the given channel"""
+        channel_idx = RGBA2IDX.get(channel)
+
+        assert channel_idx is not None, f"Given channel '{channel}' is invalid"
+
+        recipe.color_limits[channel_idx] = clim
+
+        self.recipes[recipe.id] = recipe
+        self.didUpdateRGBColorLimits.emit(recipe)
+
+    def update_recipe_name(self,
+                           recipe: CompositeRecipe,
+                           name: str):
+        recipe.name = name
+
+        self.recipes[recipe.id] = recipe
+        self.didUpdateRecipeName.emit(recipe)
 
     def __getitem__(self, recipe_id):
         return self.recipes[recipe_id]

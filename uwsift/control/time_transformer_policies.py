@@ -24,6 +24,7 @@ class WrappingDrivingPolicy(QObject):
         super().__init__()
         self._layers: List[LayerItem] = layers
         self._driving_idx = 0
+        self._curr_t_sim = None
         self._timeline = None
         self._driving_layer = None
         self._driving_layer_uuid = None
@@ -80,17 +81,17 @@ class WrappingDrivingPolicy(QObject):
 
             self._driving_idx = 0
         else:
-            # Store time step of old timeline to retrieve analogous time step
-            # of new timeline.
-            current_time_step = \
-                list(self._driving_layer.timeline.keys())[self._driving_idx]
+            # Retrieve  time step of new timeline analogous to previous
+            # simulation time (stored in self._current_t_sim).
             self.timeline = list(layer.timeline.keys())
             self._driving_layer = layer
-            nearest_past_idx = self._find_nearest_past(current_time_step)
+            nearest_past_idx = self._find_nearest_past(self._curr_t_sim)
             if nearest_past_idx:
                 self._driving_idx = nearest_past_idx
             else:
                 self._driving_idx = 0
+        self._curr_t_sim = None if not self.timeline \
+            else self.timeline[self._driving_idx]
 
     @property
     def timeline(self):
@@ -116,9 +117,10 @@ class WrappingDrivingPolicy(QObject):
 
     def curr_t_sim(self):
         if not self.timeline:
-            return None
+            assert self._curr_t_sim is None
         else:
-            return self.timeline[self._driving_idx]
+            assert self._curr_t_sim == self.timeline[self._driving_idx]
+        return self._curr_t_sim
 
     def curr_timeline_index(self):
         return self._driving_idx
@@ -160,10 +162,9 @@ class WrappingDrivingPolicy(QObject):
             self._driving_idx = \
                 (self._driving_idx + (self.timeline_length - 1)) \
                 % self.timeline_length
-            t_sim = self.timeline[self._driving_idx]
         else:
             self._driving_idx += 1
             if self._driving_idx >= self.timeline_length:
                 self._driving_idx = 0
-            t_sim = self.timeline[self._driving_idx]
-        return t_sim
+        self._curr_t_sim = self.timeline[self._driving_idx]
+        return self._curr_t_sim

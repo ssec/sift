@@ -134,6 +134,7 @@ class LayerVisibility(NamedTuple):
     visible: bool
     opacity: float
 
+DEFAULT_GAMMA_VALUE = 1.0
 
 class Box(NamedTuple):
     bottom: float

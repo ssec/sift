@@ -1,7 +1,7 @@
 import logging
 from uuid import UUID
 
-from PyQt5.QtCore import QModelIndex, Qt
+from PyQt5.QtCore import QModelIndex, Qt, pyqtSignal
 from PyQt5.QtWidgets import QAbstractItemView, QHeaderView, QTreeView
 from PyQt5.QtWidgets import (QMenu)
 
@@ -15,6 +15,8 @@ LOG = logging.getLogger(__name__)
 
 
 class LayerTreeView(QTreeView):
+    layerSelectionChanged = pyqtSignal(tuple)
+
     def __init__(self, *args, **kwargs):
         super(LayerTreeView, self).__init__(*args, **kwargs)
 
@@ -104,3 +106,15 @@ class LayerTreeView(QTreeView):
 
         action = menu.addAction('Change Colormap...')
         return {action: _show_change_colormap_dialog}
+
+    def currentChanged(self, current: QModelIndex,
+                       previous: QModelIndex) -> None:
+        # TODO: This is not Qt's default way of handling selections and the
+        #  "current item", but for now - as we are not (yet) interested in
+        #  multiple selections - it is sufficient. We may need to revise this
+        #  and switch to using the QItemSelectionModel interface in the future.
+
+        super(LayerTreeView, self).currentChanged(current, previous)
+        if len(self.model().layers) > 0:
+            selected_layer: tuple = (self.model().layers[current.row()],)
+            self.layerSelectionChanged.emit(selected_layer)
