@@ -25,6 +25,7 @@ configurations have a look here: https://donfig.readthedocs.io/en/latest/.
    Default Colormaps <configuration-default_colormaps.rst>
    Points Styles <configuration-points_styles.rst>
    Display <configuration-display.rst>
+   Layer Manager Display Names <configuration-standard_names.rst>
    External Satpy <configuration-external_satpy.rst>
    Readers <configuration-readers.rst>
    Latlon Grid Resolution <configuration-latlon-grid-resolution.rst>
