@@ -1140,7 +1140,7 @@ class Main(QtWidgets.QMainWindow):
 
     def _init_algebraic_pane(self):
         self.algebraic_config_pane = AlgebraicLayerConfigPane(
-            self.ui, self.ui.layersPaneWidget, self.layer_model
+            self.ui, self.ui.algebraicScrollAreaWidget, self.layer_model
         )
 
         self.ui.treeView.layerSelectionChanged.connect(
@@ -1155,7 +1155,7 @@ class Main(QtWidgets.QMainWindow):
 
     def _init_rgb_pane(self):
         self.rgb_config_pane = RGBLayerConfigPane(self.ui,
-                                                  self.ui.layersPaneWidget,
+                                                  self.ui.rgbScrollAreaWidget,
                                                   self.layer_model)
         self.ui.treeView.layerSelectionChanged.connect(
             self.rgb_config_pane.selection_did_change
