@@ -668,6 +668,8 @@ class LayerModel(QAbstractItemModel):
                                          recipe_layer)
             recipe_layer.recipe.modified = False
 
+            self._trigger_composite_layer_update(recipe_layer)
+
         self.didUpdateLayers.emit()
 
     def _check_recipe_layer_sched_times_to_update(self, existing_sched_times,
