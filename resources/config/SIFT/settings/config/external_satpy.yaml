@@ -1,8 +1,6 @@
-# Overwrite the default import path for the Sapty package
-# This can be used during development to load a different version of Satpy without the need to package it first
-satpy_import_path: "path/to/satpy/satpy"
+# Overwrite the default import path for the Satpy package
+# This can be used during development to load a different version of Satpy without the need to package it first.
+# satpy_import_path: "/path/to/your/satpy/repo/clone/satpy"
 
-# Make special fci_l1_geoobs reader (see
-# https://gitlab.eumetsat.int/Meraner/fci_l1_geoobs_satpy_reader) available
-# NOTE: this option may be a temporary solution
-satpy_extra_readers_import_path: "path/to/fci_l1_geoobs_satpy_reader"
+# Define the path to a folder containing custom Satpy readers to be used in SIFT.
+# satpy_extra_readers_import_path: "path/to/your/local_readers/repo/clone/local_readers"
