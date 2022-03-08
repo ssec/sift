@@ -15,3 +15,5 @@ logging:
       level: DEBUG
     vispy:
       level: INFO
+    sqlalchemy:
+      level: ERROR
