@@ -11,3 +11,6 @@ data_reading:
       origin: "SE"
       first_index_x: 1
       first_index_y: 1
+
+    reader_kwargs:
+      fill_disk: True  # needed to load correctly the HRV channel

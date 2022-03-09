@@ -1025,7 +1025,8 @@ class SatpyImporter(aImporter):
         self.scn = kwargs.get('scene')
         self.merge_target = kwargs.get('merge_target')
         if self.scn is None:
-            self.scn = Scene(reader=self.reader, filenames=self.filenames)
+            self.scn = Scene(reader=self.reader, filenames=self.filenames,
+                             reader_kwargs=config.get(f"data_reading.{self.reader}.reader_kwargs", None))
         self._resources = []
         # DataID filters
         self.product_filters = {}
