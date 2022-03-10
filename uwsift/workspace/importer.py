@@ -1024,9 +1024,9 @@ class SatpyImporter(aImporter):
         self.resampling_info = kwargs.get('resampling_info')
         self.scn = kwargs.get('scene')
         self.merge_target = kwargs.get('merge_target')
-        reader_kwargs = config.get(f"data_reading.{self.reader}.reader_kwargs",
-                                   None)
         if self.scn is None:
+            reader_kwargs = config.get(f"data_reading.{self.reader}."
+                                       f"reader_kwargs", None)
             self.scn = Scene(reader=self.reader, filenames=self.filenames,
                              reader_kwargs=reader_kwargs)
         self._resources = []
