@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
+from uuid import UUID
 
 from PyQt5.QtCore import QDateTime, QObject, pyqtSignal
 from dateutil.relativedelta import relativedelta
@@ -12,6 +13,7 @@ from uwsift.control.time_transformer import TimeTransformer
 from uwsift.control.time_transformer_policies import WrappingDrivingPolicy
 from uwsift.model.layer_item import LayerItem
 from uwsift.model.layer_model import LayerModel
+from uwsift.model.product_dataset import ProductDataset
 
 LOG = logging.getLogger(__name__)
 
@@ -119,6 +121,36 @@ class TimeManager(QObject):
         self.didMatchTimes.emit(t_matched_dict)
 
         self.tick_qml_state(t_sim, t_idx)
+
+    def get_current_timebase_timeline(self):
+        timebase_layer = self._layer_model.get_layer_by_uuid(
+            self.current_timebase_uuid)
+        return timebase_layer.timeline
+
+    def get_current_timebase_dataset_count(self):
+        return len(self.get_current_timebase_timeline())
+
+    def get_current_timebase_timeline_index(self):
+        return self._time_transformer.timeline_index
+
+    def get_current_timebase_current_dataset_uuid(self) -> Optional[UUID]:
+        current_dataset = self.get_current_timebase_current_dataset()
+        return None if not current_dataset else current_dataset.uuid
+
+    def get_current_timebase_datasets(self) -> List[ProductDataset]:
+        timeline = self.get_current_timebase_timeline()
+        timeline_datasets = list(timeline.values())
+        return timeline_datasets
+
+    def get_current_timebase_current_dataset(self):
+        i = self.get_current_timebase_timeline_index()
+        try:
+            return self.get_current_timebase_datasets()[i]
+        except IndexError:
+            return None
+
+    def get_current_timebase_dataset_uuids(self) -> List[UUID]:
+        return [ds.uuid for ds in self.get_current_timebase_datasets()]
 
     def _match_times(self, t_sim: datetime) -> dict:
         """
