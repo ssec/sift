@@ -27,8 +27,10 @@ def get_reader_kwargs_dict(reader_names):
     reader_kwargs = {}
     for reader_name in reader_names:
         reader_kwargs.update({
-            reader_name: config.get(f"data_reading.{reader_name}."
-                                    f"reader_kwargs", None)})
+            reader_name: config.get(f"data_reading.{reader_name}.reader_kwargs",
+                                    {}
+                                    )
+        })
     return reader_kwargs
 
 
