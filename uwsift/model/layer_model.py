@@ -849,6 +849,11 @@ class LayerModel(QAbstractItemModel):
         self._add_algebraic_datasets(sched_times, input_layers,
                                      algebraic_layer)
 
+    def toggle_layer_visibility(self, index: QModelIndex):
+        layer = self.layers[index.row()]
+        layer_visibility = LayerVisibility(not layer.visible, layer.opacity)
+        self.setData(self.index(index.row(), LMC.VISIBILITY), layer_visibility)
+
 
 class ProductFamilyKeyMappingPolicy:
     def __init__(self, model: LayerModel):

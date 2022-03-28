@@ -277,6 +277,10 @@ class PieDialDelegate(QtWidgets.QStyledItemDelegate):
             pie_dial = PieDial(visible=layer_visibility.visible,
                                opacity=layer_visibility.opacity)
             editor.set_pie_dial(pie_dial)
+        else:
+            editor.pie_dial.visible = layer_visibility.visible
+            editor.pie_dial.opacity = layer_visibility.opacity
+            editor.update()
 
     def setModelData(self, editor: QtWidgets.QWidget,
                      model: QtCore.QAbstractItemModel,
