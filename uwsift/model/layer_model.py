@@ -442,19 +442,19 @@ class LayerModel(QAbstractItemModel):
 
     def change_colormap_for_layer(self, uuid: UUID, colormap: object):
         layer = self.get_layer_by_uuid(uuid)
-        layer.colormap = colormap
+        layer.presentation.colormap = colormap
         change_dict = self._build_presentation_change_dict(layer, colormap)
         self.didChangeColormap.emit(change_dict)
 
     def change_color_limits_for_layer(self, uuid: UUID, color_limits: object):
         layer = self.get_layer_by_uuid(uuid)
-        layer.climits = color_limits
+        layer.presentation.climits = color_limits
         change_dict = self._build_presentation_change_dict(layer, color_limits)
         self.didChangeColorLimits.emit(change_dict)
 
     def change_gamma_for_layer(self, uuid: UUID, gamma: float):
         layer = self.get_layer_by_uuid(uuid)
-        layer.gamma = gamma
+        layer.presentation.gamma = gamma
         change_dict = self._build_presentation_change_dict(layer, gamma)
         self.didChangeGamma.emit(change_dict)
 
