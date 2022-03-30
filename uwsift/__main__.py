@@ -1270,10 +1270,11 @@ class Main(QtWidgets.QMainWindow):
         # self.tabifyDockWidget(self.ui.rgbConfigPane, self.ui.layerDetailsPane)
         # Make the layer list and layer details shown
         # FIXME remove layerPane finally from the system, for now we only kind
-        #  of hide it
+        #  of hide it. This shall be done as part of ticket "Code cleanup (#89)"
+        #  (https://gitlab.eumetsat.int/webservices/mtg-sift/-/issues/89)
         self.layout().removeWidget(self.ui.layersPane)
-        self.ui.layersPane.deleteLater()
-        self.ui.layersPane = None
+        # self.ui.layersPane.deleteLater()
+        # self.ui.layersPane = None
 
         self.ui.layerDetailsPane.raise_()
         # refer to objectName'd entities as self.ui.objectName
