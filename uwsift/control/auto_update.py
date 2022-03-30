@@ -38,6 +38,8 @@ class StartTimeGranuleUpdatePolicy:
 
         sorted_scenes_dict = sorted(reader_scenes_ds_ids["scenes"].items(),
                                     key=lambda item: item[1].start_time)
+        if not sorted_scenes_dict:
+            return None
         most_recent_scene_item = sorted_scenes_dict.pop()
 
         if most_recent_scene_item[0] != self._last_scene_files:
