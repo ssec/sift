@@ -570,8 +570,8 @@ class Main(QtWidgets.QMainWindow):
         # LOG.warning('progress bar updated to {}'.format(val))
 
     def toggle_visibility_on_selected_layers(self, *args, **kwargs):
-        model_index = self.ui.treeView.currentIndex()
-        self.layer_model.toggle_layer_visibility(model_index)
+        model_indexes = self.ui.treeView.selectedIndexes()
+        self.layer_model.toggle_layers_visibility(model_indexes)
 
     def remove_layer(self, *args, **kwargs):
         uuids = self.layer_list_model.current_selected_uuids()
