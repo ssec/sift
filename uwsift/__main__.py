@@ -1508,18 +1508,12 @@ class Main(QtWidgets.QMainWindow):
 
         next_time = QtWidgets.QAction("Next Time", self)
         next_time.setShortcut(QtCore.Qt.Key_Right)
-        next_slot = partial(self.animation.next_last_time, direction=1)
-        next_time.triggered.connect(next_slot)
+        next_time.triggered.connect(self.animation.next_frame)
         # self.ui.animForward.clicked.connect(next_slot)
-
-        focus_current = QtWidgets.QAction("Focus Current Timestep", self)
-        focus_current.setShortcut('.')
-        focus_current.triggered.connect(partial(self.animation.next_last_band, direction=0))
 
         prev_time = QtWidgets.QAction("Previous Time", self)
         prev_time.setShortcut(QtCore.Qt.Key_Left)
-        prev_slot = partial(self.animation.next_last_time, direction=-1)
-        prev_time.triggered.connect(prev_slot)
+        prev_time.triggered.connect(self.animation.prev_frame)
         # self.ui.animBack.clicked.connect(prev_slot)
 
         toggle_vis = QtWidgets.QAction("Toggle &Visibility", self)
@@ -1588,7 +1582,6 @@ class Main(QtWidgets.QMainWindow):
         view_menu = menubar.addMenu('&View')
         view_menu.addAction(animate)
         view_menu.addAction(prev_time)
-        view_menu.addAction(focus_current)
         view_menu.addAction(next_time)
         view_menu.addAction(change_order)
         view_menu.addAction(toggle_vis)
