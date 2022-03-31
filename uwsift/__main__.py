@@ -570,9 +570,8 @@ class Main(QtWidgets.QMainWindow):
         # LOG.warning('progress bar updated to {}'.format(val))
 
     def toggle_visibility_on_selected_layers(self, *args, **kwargs):
-        uuids = self.layer_list_model.current_selected_uuids()
-        self.document.toggle_layer_visibility(uuids)
-        self.animation.update_frame_time_to_top_visible()
+        model_indexes = self.ui.treeView.selectedIndexes()
+        self.layer_model.toggle_layers_visibility(model_indexes)
 
     def remove_layer(self, *args, **kwargs):
         uuids = self.layer_list_model.current_selected_uuids()
@@ -1523,14 +1522,6 @@ class Main(QtWidgets.QMainWindow):
         prev_time.triggered.connect(prev_slot)
         # self.ui.animBack.clicked.connect(prev_slot)
 
-        focus_prev_band = QtWidgets.QAction("Next Band", self)
-        focus_prev_band.setShortcut(QtCore.Qt.Key_Up)
-        focus_prev_band.triggered.connect(partial(self.animation.next_last_band, direction=-1))
-
-        focus_next_band = QtWidgets.QAction("Previous Band", self)
-        focus_next_band.setShortcut(QtCore.Qt.Key_Down)
-        focus_next_band.triggered.connect(partial(self.animation.next_last_band, direction=1))
-
         toggle_vis = QtWidgets.QAction("Toggle &Visibility", self)
         toggle_vis.setShortcut('V')
         toggle_vis.triggered.connect(self.toggle_visibility_on_selected_layers)
@@ -1599,8 +1590,6 @@ class Main(QtWidgets.QMainWindow):
         view_menu.addAction(prev_time)
         view_menu.addAction(focus_current)
         view_menu.addAction(next_time)
-        view_menu.addAction(focus_next_band)
-        view_menu.addAction(focus_prev_band)
         view_menu.addAction(change_order)
         view_menu.addAction(toggle_vis)
         view_menu.addAction(flip_colormap)
