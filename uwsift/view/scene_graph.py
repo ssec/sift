@@ -1064,6 +1064,37 @@ class SceneGraphManager(QObject):
             node.set_gl_state('translucent')
             self.borders_nodes.append(node)
 
+    def apply_presentation_to_image_node(self, image: Image,
+                                         presentation: Presentation,
+                                         visible: Optional[bool] = None):
+        """
+        Apply all relevant and set properties (not None) of the given
+        presentation to the given image.
+
+        Visibility can be explicitly overridden, because this is (at least for
+        now) the only property where a dataset may deviate from the layer
+        presentation; it depends on whether the dataset is active in the layer's
+        timeline.
+
+        :param image: the image node which should get the new presentation
+        :param presentation: to apply, usually the presentation of the owning
+               layer
+        :param visible:
+        """
+        if visible is not None:
+            image.visible = visible
+        elif presentation.visible:
+            image.visible = presentation.visible
+
+        if presentation.colormap:
+            image.cmap = self.document.find_colormap(presentation.colormap)
+        if presentation.climits:
+            image.clim = presentation.climits
+        if presentation.gamma:
+            image.gamma = presentation.gamma
+        if presentation.opacity:
+            image.opacity = presentation.opacity
+
     def add_node_for_image_dataset(self, layer: LayerItem,
                                    product_dataset: ProductDataset):
         assert self.layer_nodes[layer.uuid] is not None
@@ -1083,11 +1114,8 @@ class SceneGraphManager(QObject):
                 product_dataset.info[Info.CELL_WIDTH],
                 product_dataset.info[Info.CELL_HEIGHT],
                 name=str(product_dataset.uuid),
-                clim=layer.presentation.climits,
-                gamma=layer.presentation.gamma,
                 interpolation='nearest',
                 method='subdivide',
-                cmap=self.document.find_colormap(layer.presentation.colormap),
                 double=False,
                 texture_shape=DEFAULT_TEXTURE_SHAPE,
                 wrap_lon=False,
@@ -1101,10 +1129,7 @@ class SceneGraphManager(QObject):
             image = Image(
                 image_data,
                 name=str(product_dataset.uuid),
-                clim=layer.presentation.climits,
-                gamma=layer.presentation.gamma,
                 interpolation='nearest',
-                cmap=self.document.find_colormap(layer.presentation.colormap),
                 parent=self.layer_nodes[layer.uuid],
             )
             image.transform = STTransform(
@@ -1113,6 +1138,9 @@ class SceneGraphManager(QObject):
                 translate=(product_dataset.info[Info.ORIGIN_X],
                            product_dataset.info[Info.ORIGIN_Y], 0))
         self.dataset_nodes[product_dataset.uuid] = image
+        # Make sure *all* applicable properties of the owning layer's current
+        # presentation are applied to the new image node
+        self.apply_presentation_to_image_node(image, layer.presentation)
         self.on_view_change(None)
         LOG.debug("Scene Graph after IMAGE dataset insertion:")
         LOG.debug(self.main_view.describe_tree(with_transform=True))
