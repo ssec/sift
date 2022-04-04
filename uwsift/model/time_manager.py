@@ -75,6 +75,9 @@ class TimeManager(QObject):
         layer_model.didUpdateLayers.connect(policy.on_layers_update)
         layer_model.didUpdateLayers.connect(self.update_qml_layer_model)
         layer_model.didUpdateLayers.connect(self.sync_to_time_transformer)
+        layer_model.didChangeRecipeLayerNames.connect(
+            self.update_qml_layer_model
+        )
         layer_model.didReorderLayers.connect(self.update_layer_order)
 
         self.didMatchTimes.connect(self._layer_model.on_didMatchTimes)

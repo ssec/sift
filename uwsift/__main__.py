@@ -1012,6 +1012,9 @@ class Main(QtWidgets.QMainWindow):
             self.graphManager.update_point_probe)
         self.layer_model.didUpdateLayers.connect(
             self.graphManager.handleActiveProductDatasetsChanged)
+        self.layer_model.didChangeRecipeLayerNames.connect(
+            self.graphManager.handleActiveProductDatasetsChanged
+        )
 
         # Connect to an unnamed slot (lambda: ...) to strip off the argument
         # (of type dict) from the signal 'didMatchTimes'
@@ -1160,6 +1163,9 @@ class Main(QtWidgets.QMainWindow):
         )
         self.layer_model.didAddImageLayer.connect(
             self.rgb_config_pane.layer_added
+        )
+        self.layer_model.didChangeRecipeLayerNames.connect(
+            self.rgb_config_pane.set_combos_to_layer_names
         )
 
     def _init_recipe_manager(self):

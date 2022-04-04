@@ -38,6 +38,7 @@ class LayerModel(QAbstractItemModel):
     didChangeGamma = pyqtSignal(dict)
     didChangeLayerVisible = pyqtSignal(UUID, bool)
     didChangeLayerOpacity = pyqtSignal(UUID, float)
+    didChangeRecipeLayerNames = pyqtSignal()
 
     didUpdateLayers = pyqtSignal()
     didReorderLayers = pyqtSignal(list)
@@ -749,6 +750,7 @@ class LayerModel(QAbstractItemModel):
     def update_recipe_layer_name(self, recipe: Recipe):
         recipe_layer: LayerItem = self._get_layer_of_recipe(recipe.id)
         recipe_layer.update_invariable_display_data()
+        self.didChangeRecipeLayerNames.emit()
 
         index = self.index(recipe_layer.order, LMC.NAME)
         self.dataChanged.emit(index, index)
