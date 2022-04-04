@@ -746,11 +746,11 @@ class LayerModel(QAbstractItemModel):
 
         self.didRequestCompositeRecipeCreation.emit(layers)
 
-    def update_rgb_layer_name(self, recipe: CompositeRecipe):
-        rgb_layer: LayerItem = self._get_layer_of_recipe(recipe.id)
-        rgb_layer.update_invariable_display_data()
+    def update_recipe_layer_name(self, recipe: Recipe):
+        recipe_layer: LayerItem = self._get_layer_of_recipe(recipe.id)
+        recipe_layer.update_invariable_display_data()
 
-        index = self.index(rgb_layer.order, LMC.NAME)
+        index = self.index(recipe_layer.order, LMC.NAME)
         self.dataChanged.emit(index, index)
 
     @staticmethod

@@ -1201,7 +1201,7 @@ class Main(QtWidgets.QMainWindow):
             self.recipe_manager.update_recipe_name
         )
         self.recipe_manager.didUpdateRecipeName.connect(
-            self.layer_model.update_rgb_layer_name
+            self.layer_model.update_recipe_layer_name
         )
         self.algebraic_config_pane.didChangeAlgebraicInputLayers.connect(
             self.recipe_manager.update_algebraic_recipe_input_layers
