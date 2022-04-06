@@ -137,13 +137,15 @@ class ProbeGraphManager(QObject):
         # reload things
         #self.layer_model.didUpdateLayers.connect(
         #    self.handleActiveProductDatasetsChanged)
-        auto_update_checkbox.setCheckState(Qt.Checked)
 
         # hook up auto update vs manual update changes
         self.update_button.clicked.connect(
             self.handleActiveProductDatasetsChanged)
+        self.update_button.clicked.connect(
+            self.update_point_probe_graph)
         self.auto_update_checkbox.stateChanged.connect(
             self.autoUpdateStateChanged)
+        self.auto_update_checkbox.setCheckState(Qt.Unchecked)
 
     def draw_child(self, child_name):
         for child in self.graphs:
@@ -651,7 +653,8 @@ class ProbeGraphDisplay(object):
 
             x_conv_func = x_layer.info[Info.UNIT_CONVERSION][1]
             data_polygon = x_conv_func(data_polygon)
-            title = x_layer.descriptor
+            time = x_active_product_dataset.info[Info.DISPLAY_TIME]
+            title = f"{x_layer.descriptor} {time}"
 
             # get point probe value
             if x_active_product_dataset and point_xy:
@@ -820,9 +823,9 @@ class ProbeGraphDisplay(object):
         colorbar.set_label('log(count of data points)')
 
         # set the various text labels
-        axes.set_xlabel(f"{nameX} {timeX}")
-        axes.set_ylabel(f"{nameY} {timeY}")
-        axes.set_title(nameX + " vs " + nameY)
+        axes.set_xlabel(f"{nameX}")
+        axes.set_ylabel(f"{nameY}")
+        axes.set_title(timeX)
 
         # draw the x vs y line
         self._draw_xy_line(axes)

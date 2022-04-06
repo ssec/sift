@@ -462,17 +462,16 @@ class LayerModel(QAbstractItemModel):
         """user has clicked on a point probe; determine relative and absolute
         values for all document image layers
         """
-        # if the point probe was turned off then we don't want to have the
-        # equalizer
         if not state:
-            return
+            for layer in self.get_probeable_layers():
+                layer.probe_value = None
+        else:
+            for layer in self.get_probeable_layers():
+                product_dataset = layer.get_first_active_product_dataset()
 
-        for layer in self.get_probeable_layers():
-            product_dataset = layer.get_first_active_product_dataset()
-
-            layer.probe_value = None if not product_dataset \
-                else \
-                self._workspace.get_content_point(product_dataset.uuid, xy_pos)
+                layer.probe_value = None if not product_dataset \
+                    else \
+                    self._workspace.get_content_point(product_dataset.uuid, xy_pos)
 
         self._refresh()
 
