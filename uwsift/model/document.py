@@ -2094,21 +2094,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         uuids = self.time_siblings(uuid)[0]
         return self.change_clims_for_layers_where(clims, uuids=uuids)
 
-    def flip_climits_for_layers(self, uuids=None):
-        L = self.current_layer_set
-        if uuids is not None:
-            uuids = self.time_siblings_uuids(uuids)
-        else:  # all data layers
-            uuids = [pinfo.uuid for pinfo in L]
-
-        nfo = {}
-        for uuid in uuids:
-            for dex, pinfo in enumerate(L):
-                if pinfo.uuid == uuid:
-                    nfo[uuid] = pinfo.climits[::-1]
-                    L[dex] = dataclasses.replace(pinfo, climits=nfo[uuid])
-        self.didChangeColorLimits.emit(nfo)
-
     def change_gamma_for_layers_where(self, gamma, **query):
         nfo = {}
         L = self.current_layer_set
