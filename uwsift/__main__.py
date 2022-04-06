@@ -866,7 +866,7 @@ class Main(QtWidgets.QMainWindow):
         self.ui.setupUi(self)
         if AUTO_UPDATE_MODE__ACTIVE:
             self.ui.animFrame.hide()
-            self.ui.timelineFrame.hide()
+            # self.ui.timelineFrame.hide()
             self.ui.progressBar.hide()
             self.ui.progressText.hide()
 
