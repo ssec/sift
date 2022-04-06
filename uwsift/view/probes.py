@@ -820,9 +820,9 @@ class ProbeGraphDisplay(object):
         colorbar.set_label('log(count of data points)')
 
         # set the various text labels
-        axes.set_xlabel(f"{nameX} {timeX}")
-        axes.set_ylabel(f"{nameY} {timeY}")
-        axes.set_title(nameX + " vs " + nameY)
+        axes.set_xlabel(f"{nameX}")
+        axes.set_ylabel(f"{nameY}")
+        axes.set_title(timeX)
 
         # draw the x vs y line
         self._draw_xy_line(axes)
