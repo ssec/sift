@@ -651,7 +651,8 @@ class ProbeGraphDisplay(object):
 
             x_conv_func = x_layer.info[Info.UNIT_CONVERSION][1]
             data_polygon = x_conv_func(data_polygon)
-            title = x_layer.descriptor
+            time = x_active_product_dataset.info[Info.DISPLAY_TIME]
+            title = f"{x_layer.descriptor} {time}"
 
             # get point probe value
             if x_active_product_dataset and point_xy:
@@ -820,9 +821,9 @@ class ProbeGraphDisplay(object):
         colorbar.set_label('log(count of data points)')
 
         # set the various text labels
-        axes.set_xlabel(f"{nameX} {timeX}")
-        axes.set_ylabel(f"{nameY} {timeY}")
-        axes.set_title(nameX + " vs " + nameY)
+        axes.set_xlabel(f"{nameX}")
+        axes.set_ylabel(f"{nameY}")
+        axes.set_title(timeX)
 
         # draw the x vs y line
         self._draw_xy_line(axes)
