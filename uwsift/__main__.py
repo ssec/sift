@@ -1528,11 +1528,6 @@ class Main(QtWidgets.QMainWindow):
         change_order.setShortcut('O')
         change_order.triggered.connect(self.animation.change_animation_to_current_selection_siblings)
 
-        flip_colormap = QtWidgets.QAction("Flip Color Limits (Top Layer)", self)
-        flip_colormap.setShortcut("/")
-        flip_colormap.triggered.connect(
-            lambda: self.document.flip_climits_for_layers([self.document.current_visible_layer_uuid]))
-
         cycle_borders = QtWidgets.QAction("Cycle &Borders", self)
         cycle_borders.setShortcut('B')
         cycle_borders.triggered.connect(self.scene_manager.cycle_borders_color)
@@ -1585,7 +1580,6 @@ class Main(QtWidgets.QMainWindow):
         view_menu.addAction(next_time)
         view_menu.addAction(change_order)
         view_menu.addAction(toggle_vis)
-        view_menu.addAction(flip_colormap)
         view_menu.addAction(cycle_borders)
         view_menu.addAction(cycle_grid)
 
