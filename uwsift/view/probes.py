@@ -137,13 +137,13 @@ class ProbeGraphManager(QObject):
         # reload things
         #self.layer_model.didUpdateLayers.connect(
         #    self.handleActiveProductDatasetsChanged)
-        auto_update_checkbox.setCheckState(Qt.Checked)
 
         # hook up auto update vs manual update changes
         self.update_button.clicked.connect(
             self.handleActiveProductDatasetsChanged)
         self.auto_update_checkbox.stateChanged.connect(
             self.autoUpdateStateChanged)
+        self.auto_update_checkbox.setCheckState(Qt.Unchecked)
 
     def draw_child(self, child_name):
         for child in self.graphs:
