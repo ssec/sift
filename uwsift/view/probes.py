@@ -141,6 +141,8 @@ class ProbeGraphManager(QObject):
         # hook up auto update vs manual update changes
         self.update_button.clicked.connect(
             self.handleActiveProductDatasetsChanged)
+        self.update_button.clicked.connect(
+            self.update_point_probe_graph)
         self.auto_update_checkbox.stateChanged.connect(
             self.autoUpdateStateChanged)
         self.auto_update_checkbox.setCheckState(Qt.Unchecked)
