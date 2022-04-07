@@ -458,7 +458,7 @@ class Main(QtWidgets.QMainWindow):
     _max_tolerable_dataset_age: float = -1
     _heartbeat_file = None
 
-    didFinishLoading = QtCore.pyqtSignal()
+    didFinishLoading = QtCore.pyqtSignal(list)
 
     def interactive_open_files(self, *args, files=None, **kwargs):
         self.scene_manager.animation_controller.animating = False
@@ -490,7 +490,7 @@ class Main(QtWidgets.QMainWindow):
             isok: whether _bgnd_open_paths ran without exception
             uuid_list: list of UUIDs it generated
         """
-        self.didFinishLoading.emit()
+        self.didFinishLoading.emit(uuid_list)
 
         if not uuid_list:
             raise ValueError("no UUIDs provided by background open"
@@ -1076,7 +1076,7 @@ class Main(QtWidgets.QMainWindow):
 
     def _init_layer_model(self):
 
-        self.layer_model = LayerModel(self.workspace)
+        self.layer_model = LayerModel(self.document)
 
         self.document.didAddDataset.connect(self.layer_model.add_dataset)
 

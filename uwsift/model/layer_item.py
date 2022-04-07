@@ -256,6 +256,14 @@ class LayerItem:
         self._timeline = {kv[0]: kv[1] for kv in sorted(self._timeline.items(),
                                                         key=lambda kv: kv[0])}
 
+    def get_dataset_by_uuid(self, uuid: UUID) -> Optional[ProductDataset]:
+        items_for_uuid = [item for item in self.timeline.items()
+                          if item[1].uuid == uuid]
+        if not items_for_uuid:
+            return None
+        assert len(items_for_uuid) == 1
+        return items_for_uuid[0][1]
+
     def get_datasets_uuids(self) -> List[UUID]:
         return [pd.uuid for pd in self.timeline.values()]
 

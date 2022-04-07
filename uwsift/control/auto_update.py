@@ -1,6 +1,6 @@
 import logging
 from copy import deepcopy
-from typing import Optional, Dict, Callable, Tuple
+from typing import Callable, Dict, Optional, List, Tuple
 from uuid import UUID
 
 from vispy import app
@@ -116,11 +116,15 @@ class AutoUpdateManager:
          self.products
          ) = Catalogue.extract_query_parameters(first_query)
 
-    def on_loading_done(self):
-        # Only upon completion of data loading allow for removal of old data.
-        self._window.document.remove_layers_from_all_sets(self._old_uuids)
-        self._old_uuids = []
+    def on_loading_done(self, uuids: List[UUID]):
+        # The time consuming stuff is done, let's already start the next round
         self.timer.start()
+
+        # Only upon completion of data loading allow for removal of old data.
+        uuids_to_keep = set(uuids)
+        uuids_to_remove = list(set(self._old_uuids) - uuids_to_keep)
+        self._window.layer_model.remove_datasets_from_all_layers(uuids_to_remove)
+        self._old_uuids.clear()
 
     def update(self):
         """
