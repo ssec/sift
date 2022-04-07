@@ -458,6 +458,8 @@ class Main(QtWidgets.QMainWindow):
     _max_tolerable_dataset_age: float = -1
     _heartbeat_file = None
 
+    didFinishLoading = QtCore.pyqtSignal()
+
     def interactive_open_files(self, *args, files=None, **kwargs):
         self.scene_manager.animation_controller.animating = False
         # http://pyqt.sourceforge.net/Docs/PyQt4/qfiledialog.html#getOpenFileNames
@@ -488,6 +490,8 @@ class Main(QtWidgets.QMainWindow):
             isok: whether _bgnd_open_paths ran without exception
             uuid_list: list of UUIDs it generated
         """
+        self.didFinishLoading.emit()
+
         if not uuid_list:
             raise ValueError("no UUIDs provided by background open"
                              " in _bgnd_open_paths_finish")
@@ -1711,6 +1715,8 @@ def main() -> int:
         if minimum_interval is None:
             raise ValueError("Auto update interval needs to be set!")
         auto_update_manager = AutoUpdateManager(window, minimum_interval)
+        # connect signal to start timer anew when loading is done
+        window.didFinishLoading.connect(auto_update_manager.on_loading_done)
 
     # run the event loop until the user closes the application
     exit_code = vispy_app.run()

@@ -6,7 +6,6 @@ from uuid import UUID
 from vispy import app
 
 from uwsift import config
-from uwsift.common import Presentation
 from uwsift.model.catalogue import Catalogue
 from uwsift.queue import TheQueue, TASK_DOING, TASK_PROGRESS
 
@@ -78,9 +77,6 @@ class AutoUpdateManager:
         self._old_uuids = []
 
         self._init_catalogue()
-        # connect to didAddBasicDataset --> signal starts timer anew when
-        # loading is done
-        self._window.document.didAddBasicDataset.connect(self.on_loading_done)
 
         def update_in_background(event):
             TheQueue.add("auto update", self.update(), None)
@@ -120,7 +116,7 @@ class AutoUpdateManager:
          self.products
          ) = Catalogue.extract_query_parameters(first_query)
 
-    def on_loading_done(self, new_order: tuple, uuid: UUID, p: Presentation):
+    def on_loading_done(self):
         # Only upon completion of data loading allow for removal of old data.
         self._window.document.remove_layers_from_all_sets(self._old_uuids)
         self._old_uuids = []
