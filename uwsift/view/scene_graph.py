@@ -1148,7 +1148,6 @@ class SceneGraphManager(QObject):
             composite.transform = PROJ4Transform(
                 product_dataset.info[Info.PROJ], inverse=True
             )
-            composite.transform *= STTransform(translate=(0, 0, -50.0))
             composite.determine_reference_points()
         else:
             composite = MultiChannelImage(
