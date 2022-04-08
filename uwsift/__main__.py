@@ -49,7 +49,7 @@ from uwsift import (__version__, config,
                     AUTO_UPDATE_MODE__ACTIVE,
                     USE_INVENTORY_DB,
                     USE_TILED_GEOLOCATED_IMAGES)
-from uwsift.common import Info, Tool, CompositeType, Presentation
+from uwsift.common import Info, Tool, Presentation
 from uwsift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
 from uwsift.control.layer_tree import LayerStackTreeViewModel
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
@@ -489,7 +489,8 @@ class Main(QtWidgets.QMainWindow):
             uuid_list: list of UUIDs it generated
         """
         if not uuid_list:
-            raise ValueError("no UUIDs provided by background open in _bgnd_open_paths_when_done")
+            raise ValueError("no UUIDs provided by background open"
+                             " in _bgnd_open_paths_finish")
         if not isok:
             raise ValueError("background open did not succeed")
 
