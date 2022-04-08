@@ -310,7 +310,7 @@ class LayerItem:
     def remove_dataset(self, sched_time):
         """Remove a dataset for given datetime from layer
 
-        Gracefully ignores if no dataset with the given shed_time exists in
+        Gracefully ignores if no dataset with the given sched_time exists in
         the layer.
         """
         self._timeline.pop(sched_time, None)
@@ -332,3 +332,12 @@ class LayerItem:
         self._timeline[sched_time] = product_dataset
         self._sort_timeline()
         return product_dataset
+
+    def describe_timeline(self):
+        """Get a string containing the layer's descriptor and the scheduling
+        times in its timeline with the according dataset UUIDs.
+        """
+        output = f"{self.descriptor}\n"
+        for ds in self.timeline.values():
+            output += f"{ds.info[Info.SCHED_TIME]} -> {ds.info[Info.UUID]}"
+        return output
