@@ -1321,6 +1321,7 @@ class SceneGraphManager(QObject):
                 raise
 
         self.on_view_change(None)
+        self.update()
 
     def update_layers_z(self, uuids: list):
         if self.layer_nodes:

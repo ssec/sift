@@ -492,15 +492,6 @@ class Main(QtWidgets.QMainWindow):
             raise ValueError("no UUIDs provided by background open in _bgnd_open_paths_when_done")
         if not isok:
             raise ValueError("background open did not succeed")
-        # Populate data layer collection
-        data_layers = self.document.create_data_layers()
-        self.document.data_layer_collection.notify_update_collection(data_layers)
-        uuid = uuid_list[0]
-        self.layer_list_model.select([uuid])
-        # set the animation based on the last added (topmost) layer
-        self.document.animate_siblings_of_layer(uuid)
-        # force the newest layer to be visible
-        self.document.next_last_step(uuid)
 
     def open_paths(self, paths, **importer_kwargs):
         paths = list(paths)
