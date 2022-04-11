@@ -256,6 +256,25 @@ class AnimationController(object):
     def connect_to_model(self, model: LayerModel):
         self.time_manager.connect_to_model(model)
 
+    def get_frame_count(self):
+        return self.time_manager.get_current_timebase_dataset_count()
+
+    def get_current_frame_index(self):
+        return self.time_manager.get_current_timebase_timeline_index()
+
+    def get_current_frame_uuid(self):
+        return self.time_manager.get_current_timebase_current_dataset_uuid()
+
+    def get_frame_uuids(self):
+        """
+        Get a list of dataset uuids, one for each frame of the animation as the
+        current timeline manager would play. The uuids are those of the current
+        driving layer, therefore they are unique in the list.
+
+        :return: list of dataset UUIDs
+        """
+        return self.time_manager.get_current_timebase_dataset_uuids()
+
     def next_frame(self, event=None, frame_number=None):
         """
         skip to the frame (from 0) or increment one frame and update
@@ -459,21 +478,23 @@ class SceneGraphManager(QObject):
 
     def get_screenshot_array(self, frame_range=None):
         """Get numpy arrays representing the current canvas."""
-        if frame_range is None:
-            self.main_canvas.on_draw(None)
-            return [(self.animation_controller.top_layer_uuid(), _screenshot())]
-        s, e = frame_range
+        # Store current index to reset the view once we are done
+        current_frame = self.animation_controller.get_current_frame_index()
 
-        # reset the view once we are done
-        c = self.animation_controller.current_frame
+        if frame_range is None:
+            s = e = current_frame
+        else:
+            s, e = frame_range
+
         images = []
         for i in range(s, e + 1):
-            self.set_frame_number(i)
+            self.animation_controller.jump(i)
             self.update()
             self.main_canvas.on_draw(None)
-            u = self.animation_controller.frame_order[i] if self.animation_controller.frame_order else None
+            u = self.animation_controller.get_current_frame_uuid()
             images.append((u, _screenshot()))
-        self.set_frame_number(c)
+
+        self.animation_controller.jump(current_frame)
         self.update()
         self.main_canvas.on_draw(None)
         return images
