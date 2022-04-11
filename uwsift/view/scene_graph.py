@@ -1345,7 +1345,7 @@ class SceneGraphManager(QObject):
         :return:
         """
         for uuid_removed in uuids_removed:
-            self.set_layer_visible(uuid_removed, False)
+            self.set_dataset_visible(uuid_removed, False)
         # XXX: Used to rebuild_all instead of just update, is that actually needed?
         # self.rebuild_all()
 
@@ -1360,7 +1360,7 @@ class SceneGraphManager(QObject):
         :param uuid_removed: UUID of the layer that is to be removed
         :return:
         """
-        self.set_layer_visible(uuid_removed, False)
+        self.set_dataset_visible(uuid_removed, False)
         if uuid_removed in self.dataset_nodes:
             image_layer = self.dataset_nodes[uuid_removed]
             image_layer.parent = None
@@ -1377,7 +1377,7 @@ class SceneGraphManager(QObject):
 
     def change_datasets_visibility(self, layers_changed: Dict[UUID, bool]):
         for uuid, visible in layers_changed.items():
-            self.set_layer_visible(uuid, visible)
+            self.set_dataset_visible(uuid, visible)
 
     def rebuild_new_layer_set(self, new_set_number: int, new_prez_order: DocLayerStack, new_anim_order: list):
         self.rebuild_all()
@@ -1402,7 +1402,7 @@ class SceneGraphManager(QObject):
     def set_frame_number(self, frame_number=None):
         self.animation_controller.next_frame(None, frame_number)
 
-    def set_layer_visible(self, uuid: UUID, visible: Optional[bool] = None):
+    def set_dataset_visible(self, uuid: UUID, visible: Optional[bool] = None):
         dataset_node = self.dataset_nodes.get(uuid, None)
         if dataset_node is None:
             return
@@ -1440,7 +1440,7 @@ class SceneGraphManager(QObject):
         for uuid, layer_prez in presentation_info.items():
             self.set_colormap(layer_prez.colormap, uuid=uuid)
             self.set_color_limits(layer_prez.climits, uuid=uuid)
-            self.set_layer_visible(uuid, visible=layer_prez.visible)
+            self.set_dataset_visible(uuid, visible=layer_prez.visible)
             # FUTURE, if additional information is added to the presentation tuple, you must also update it here
 
     def rebuild_all(self, *args, **kwargs):
