@@ -23,6 +23,7 @@ __author__ = 'rayg'
 # To have consistent logging for all modules (also for their static
 # initialization) it must be set up before importing them.
 from uwsift.model.composite_recipes import RecipeManager
+from uwsift.model.product_dataset import ProductDataset
 from uwsift.util.logger import configure_loggers
 from uwsift.view.algebraic_config import AlgebraicLayerConfigPane
 
@@ -49,7 +50,7 @@ from uwsift import (__version__, config,
                     AUTO_UPDATE_MODE__ACTIVE,
                     USE_INVENTORY_DB,
                     USE_TILED_GEOLOCATED_IMAGES)
-from uwsift.common import Info, Tool, CompositeType, Presentation
+from uwsift.common import Info, Tool
 from uwsift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
 from uwsift.control.layer_tree import LayerStackTreeViewModel
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
@@ -458,6 +459,8 @@ class Main(QtWidgets.QMainWindow):
     _max_tolerable_dataset_age: float = -1
     _heartbeat_file = None
 
+    didFinishLoading = QtCore.pyqtSignal(list)
+
     def interactive_open_files(self, *args, files=None, **kwargs):
         self.scene_manager.animation_controller.animating = False
         # http://pyqt.sourceforge.net/Docs/PyQt4/qfiledialog.html#getOpenFileNames
@@ -488,10 +491,21 @@ class Main(QtWidgets.QMainWindow):
             isok: whether _bgnd_open_paths ran without exception
             uuid_list: list of UUIDs it generated
         """
+        self.didFinishLoading.emit(uuid_list)
+
         if not uuid_list:
-            raise ValueError("no UUIDs provided by background open in _bgnd_open_paths_when_done")
+            raise ValueError("no UUIDs provided by background open"
+                             " in _bgnd_open_paths_finish")
         if not isok:
             raise ValueError("background open did not succeed")
+
+        if AUTO_UPDATE_MODE__ACTIVE:
+            # Choose one of the recently loaded datasets for reporting
+            # "vital signs"
+            dataset = self.document[uuid_list[0]]
+
+            self._update_dataset_timestamps(dataset)
+            self._update_heartbeat_file(dataset)
 
     def open_paths(self, paths, **importer_kwargs):
         paths = list(paths)
@@ -706,15 +720,13 @@ class Main(QtWidgets.QMainWindow):
         unreachable_object_count = gc.collect()
         LOG.debug(f"GC found {unreachable_object_count} unreachable objects")
 
-    def _update_heartbeat_file(self, reordered_layers: tuple, uuid: UUID,
-                               p: Presentation):
+    def _update_heartbeat_file(self, dataset: ProductDataset):
         """
         Write the dataset creation time into the heartbeat file. The time of
         last dataset update can be retrieved as the file modification time.
 
-        :param uuid: UUID of the new layer
+        :param dataset: recently loaded dataset
         """
-        dataset = self.document[uuid]
         dataset_sched_time_utc = dataset.sched_time.replace(tzinfo=timezone.utc)
         fmt_time = dataset_sched_time_utc.strftime(
             WATCHDOG_DATETIME_FORMAT_STORE).rstrip()
@@ -727,8 +739,7 @@ class Main(QtWidgets.QMainWindow):
 
         os.rename(journal_path, self._heartbeat_file)
 
-    def _update_dataset_timestamps(self, reordered_layers: tuple,
-                                   uuid: UUID, p: Presentation):
+    def _update_dataset_timestamps(self, dataset: ProductDataset):
         """
         Update the timestamp displayed in timeLastDatasetCreationLineEdit and
         timeLastDatasetImportLineEdit. The import time is the current local
@@ -738,19 +749,19 @@ class Main(QtWidgets.QMainWindow):
         colored green if the time between now and last import time is smaller
         than max_update_interval. Otherwise it will be colored red.
 
-        :param uuid: UUID of the new layer
+        :param dataset: recently loaded dataset
         """
-        self._last_imported_dataset_uuid = uuid
-        dataset = self.document[uuid]
+
+        self._last_imported_dataset_uuid = dataset.uuid
+
         dataset_sched_time_utc = dataset.sched_time.replace(tzinfo=timezone.utc)
-
-        self._last_imported_dataset_import_time = \
-            dataset_import_time = datetime.now(tz=timezone.utc)
-
         self.ui.timeLastDatasetCreationLineEdit.setText(
             dataset_sched_time_utc.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY))
+
+        self._last_imported_dataset_import_time = datetime.now(tz=timezone.utc)
         self.ui.timeLastDatasetImportLineEdit.setText(
-            dataset_import_time.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY))
+            self._last_imported_dataset_import_time.strftime(
+                WATCHDOG_DATETIME_FORMAT_DISPLAY))
 
     def _clear_last_dataset_creation_time(self, reordered_layers: tuple,
                                           removed_uuids: typ.List[UUID],
@@ -1071,7 +1082,7 @@ class Main(QtWidgets.QMainWindow):
 
     def _init_layer_model(self):
 
-        self.layer_model = LayerModel(self.workspace)
+        self.layer_model = LayerModel(self.document)
 
         self.document.didAddDataset.connect(self.layer_model.add_dataset)
 
@@ -1304,9 +1315,6 @@ class Main(QtWidgets.QMainWindow):
             LOG.info(f"Highlighting last data time display when delayed for"
                      f" more than {self._max_tolerable_dataset_age} seconds.")
 
-        self.document.didAddBasicDataset.connect(self._update_dataset_timestamps)
-        self.document.didAddCompositeDataset.connect(self._update_dataset_timestamps)
-
         # don't clear the time of last import when the layers are removed
         self.document.didRemoveDatasets.connect(
             self._clear_last_dataset_creation_time)
@@ -1325,8 +1333,6 @@ class Main(QtWidgets.QMainWindow):
                 heartbeat_file.replace("$$CACHE_DIR$$", USER_CACHE_DIR)
             LOG.info(f"Communication with watchdog via heartbeat file "
                      f" '{self._heartbeat_file}' configured.")
-            self.document.didAddBasicDataset.connect(self._update_heartbeat_file)
-            self.document.didAddCompositeDataset.connect(self._update_heartbeat_file)
 
     def _timer_collect_resources(self):
         if self._resource_collector:
@@ -1710,6 +1716,8 @@ def main() -> int:
         if minimum_interval is None:
             raise ValueError("Auto update interval needs to be set!")
         auto_update_manager = AutoUpdateManager(window, minimum_interval)
+        # connect signal to start timer anew when loading is done
+        window.didFinishLoading.connect(auto_update_manager.on_loading_done)
 
     # run the event loop until the user closes the application
     exit_code = vispy_app.run()

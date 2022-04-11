@@ -1,16 +1,13 @@
 import logging
-
-import numpy as np
-
 from datetime import datetime
 from typing import List, Set
 
+import numpy as np
 from satpy import DataID, Scene
 
 from uwsift import config as config
 from uwsift.common import Info, N_A
 from uwsift.model.layer import DocBasicDataset
-
 
 LOG = logging.getLogger(__name__)
 
@@ -31,7 +28,12 @@ def create_scenes(scenes: dict, file_groups: dict) -> List[DataID]:
             # need to create the Scene for the first time
             # file_group includes what reader to use
             # NOTE: We only allow a single reader at a time
-            scenes[group_id] = scn = Scene(filenames=file_group)
+            try:
+                scn = Scene(filenames=file_group)
+            except ValueError as e:
+                LOG.warning(e)
+                continue
+            scenes[group_id] = scn
 
             # WORKAROUND: to decompress compressed SEVIRI HRIT files, an environment variable
             # needs to be set. Check if decompression might have introduced errors when using

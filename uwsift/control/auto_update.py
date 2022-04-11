@@ -1,12 +1,11 @@
 import logging
 from copy import deepcopy
-from typing import Optional, Dict, Callable, Tuple
+from typing import Callable, Dict, Optional, List, Tuple
 from uuid import UUID
 
 from vispy import app
 
 from uwsift import config
-from uwsift.common import Presentation
 from uwsift.model.catalogue import Catalogue
 from uwsift.queue import TheQueue, TASK_DOING, TASK_PROGRESS
 
@@ -24,10 +23,12 @@ class StartTimeGranuleUpdatePolicy:
     # return None, if nothing has changed
     def update(self, current_constraints: Dict) -> Optional[Tuple]:
         """
-        :param: current_constraints dictionary as provided by catalogue_settings.yaml.
-        :returns: None if no new satpy scenes are available from the configured search dir or
-                  a tuple consisting of the reader: List and importer_kwargs: Dict needed to load
-                  data into SIFT.
+        :param current_constraints: dictionary as provided by
+                catalogue_settings.yaml.
+
+        :returns: None if no new satpy scenes are available from the configured
+                  search dir or a tuple consisting of the reader: List and
+                  importer_kwargs: Dict needed to load data into SIFT.
         """
         reader_scenes_ds_ids, readers = \
             self._query_catalogue_for_satpy_importer_args(current_constraints)
@@ -36,6 +37,8 @@ class StartTimeGranuleUpdatePolicy:
 
         sorted_scenes_dict = sorted(reader_scenes_ds_ids["scenes"].items(),
                                     key=lambda item: item[1].start_time)
+        if not sorted_scenes_dict:
+            return None
         most_recent_scene_item = sorted_scenes_dict.pop()
 
         if most_recent_scene_item[0] != self._last_scene_files:
@@ -74,13 +77,12 @@ class AutoUpdateManager:
         self._old_uuids = []
 
         self._init_catalogue()
-        # connect to didAddBasicDataset --> signal starts timer anew when loading is done
-        self._window.document.didAddBasicDataset.connect(self.on_loading_done)
 
         def update_in_background(event):
             TheQueue.add("auto update", self.update(), None)
 
-        # Set up auto update mode timer, with minimum waiting time between update cycles.
+        # Set up auto update mode timer, with minimum waiting time between
+        # update cycles.
         # Minimum is exceeded if data loading time exceeds minimum_wait time.
         # Timer is paused until end of data loading to account for this.
         self.timer = app.Timer(minimum_interval, connect=update_in_background)
@@ -114,11 +116,15 @@ class AutoUpdateManager:
          self.products
          ) = Catalogue.extract_query_parameters(first_query)
 
-    def on_loading_done(self, new_order: tuple, uuid: UUID, p: Presentation):
-        # Only upon completion of data loading allow for removal of old data.
-        self._window.document.remove_layers_from_all_sets(self._old_uuids)
-        self._old_uuids = []
+    def on_loading_done(self, uuids: List[UUID]):
+        # The time consuming stuff is done, let's already start the next round
         self.timer.start()
+
+        # Only upon completion of data loading allow for removal of old data.
+        uuids_to_keep = set(uuids)
+        uuids_to_remove = list(set(self._old_uuids) - uuids_to_keep)
+        self._window.layer_model.remove_datasets_from_all_layers(uuids_to_remove)
+        self._old_uuids.clear()
 
     def update(self):
         """
@@ -132,8 +138,8 @@ class AutoUpdateManager:
         if readers_importer_tup is not None:
             files_to_load, importer_kwargs = readers_importer_tup
             self._old_uuids = self._window.document.get_uuids()
-            # Stop timer to prohibit slow data loading to transition directly to deletion of just
-            # loaded or still loading data
+            # Stop timer to prohibit slow data loading to transition directly to
+            # deletion of just loaded or still loading data
             self.timer.stop()
             self._window.open_paths(files_to_load, **importer_kwargs)
         yield {TASK_DOING: 'Auto update finished', TASK_PROGRESS: 1.0}

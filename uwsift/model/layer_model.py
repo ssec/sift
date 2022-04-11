@@ -11,6 +11,7 @@ from PyQt5.QtCore import (QAbstractItemModel, Qt, QModelIndex, pyqtSignal,
 from uwsift.common import LAYER_TREE_VIEW_HEADER, Presentation, Info, Kind, \
     LATLON_GRID_DATASET_NAME, BORDERS_DATASET_NAME, Platform, Instrument, \
     LayerModelColumns as LMC, LayerVisibility
+from uwsift.model import Document
 from uwsift.model.composite_recipes import AlgebraicRecipe, CompositeRecipe, \
     Recipe
 from uwsift.model.layer_item import LayerItem
@@ -73,7 +74,7 @@ class LayerModel(QAbstractItemModel):
 
     didRequestSelectionOfLayer = pyqtSignal(QModelIndex)
 
-    def __init__(self, workspace, parent=None, policy=None):
+    def __init__(self, document: Document, parent=None, policy=None):
         """
         Model for a "flat" layer tree (list/table of layers)
         (Note: For hierarchies the `parent` and `index` methods, among others,
@@ -87,7 +88,9 @@ class LayerModel(QAbstractItemModel):
 
         super().__init__(parent)
 
-        self._workspace = workspace
+        self._document = document
+        self._workspace = self._document._workspace
+        assert self._workspace  # Verify proper initialisation order
 
         self._headers = LAYER_TREE_VIEW_HEADER
 
@@ -857,6 +860,39 @@ class LayerModel(QAbstractItemModel):
             layer = self.layers[index.row()]
             layer_visibility = LayerVisibility(not layer.visible, layer.opacity)
             self.setData(index, layer_visibility)
+
+    def get_dataset_by_uuid(self, dataset_uuid: UUID) \
+            -> Optional[ProductDataset]:
+        """
+        Find a dataset given by its uuid in the layer model and return it, None
+        if it is not in the model.
+
+        :param dataset_uuid:
+        :return: dataset if found, None else
+        """
+        for layer in self.layers:
+            dataset = layer.get_dataset_by_uuid(dataset_uuid)
+            if dataset:
+                return dataset
+        return None
+
+    def remove_datasets_from_all_layers(self, dataset_uuids):
+        did_remove_any_dataset = False
+        for dataset_uuid in dataset_uuids:
+            dataset = self.get_dataset_by_uuid(dataset_uuid)
+            LOG.debug(f"Dataset for uuid {dataset_uuid}: {dataset}")
+            if dataset:
+                layer = self.get_layer_by_uuid(dataset.layer_uuid)
+                self._remove_dataset(layer,
+                                     dataset.info[Info.SCHED_TIME],
+                                     dataset.info[Info.UUID])
+                LOG.debug(f"Removing {dataset}")
+                self._document.remove_layer_prez(dataset_uuid)
+                self._document.purge_layer_prez([dataset_uuid])
+                did_remove_any_dataset = True
+
+        if did_remove_any_dataset:
+            self.didUpdateLayers.emit()
 
 
 class ProductFamilyKeyMappingPolicy:
