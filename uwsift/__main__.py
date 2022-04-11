@@ -512,13 +512,6 @@ class Main(QtWidgets.QMainWindow):
             return
         for uuid in uuids:
             self.document.activate_product_uuid_as_new_dataset(uuid)
-        uuid = uuids[-1]
-        self.layer_list_model.select([uuid])
-        # set the animation based on the last added (topmost) layer
-        self.document.animate_siblings_of_layer(uuid)
-        # force the newest layer to be visible
-        self.document.next_last_step(uuid)
-        # don't use <algebraic layer ...> type paths
 
     def dropEvent(self, event):
         LOG.debug('drop event on mainwindow')
