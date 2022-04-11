@@ -1,16 +1,15 @@
 import logging
+from datetime import datetime
 from typing import Optional
 
 from PyQt5.QtCore import QDateTime, QObject, pyqtSignal
+from dateutil.relativedelta import relativedelta
 
+from uwsift.control.qml_utils import QmlLayerManager, TimebaseModel, QmlBackend
 from uwsift.control.time_matcher import TimeMatcher
 from uwsift.control.time_matcher_policies import find_nearest_past
 from uwsift.control.time_transformer import TimeTransformer
 from uwsift.control.time_transformer_policies import WrappingDrivingPolicy
-from uwsift.control.qml_utils import QmlLayerManager, TimebaseModel, QmlBackend
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
-
 from uwsift.model.layer_item import LayerItem
 from uwsift.model.layer_model import LayerModel
 
