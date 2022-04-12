@@ -932,7 +932,6 @@ class Main(QtWidgets.QMainWindow):
 
         # disable close button on panes
         panes = [self.ui.areaProbePane,
-                 self.ui.layerDetailsPane,
                  self.ui.rgbConfigPane,
                  self.ui.algebraicConfigPane,
                  ]
@@ -1275,7 +1274,9 @@ class Main(QtWidgets.QMainWindow):
         # self.ui.layersPane.deleteLater()
         # self.ui.layersPane = None
 
-        self.ui.layerDetailsPane.raise_()
+        # FIXME hide layerDetailsPane for now, improve and show it later again
+        self.ui.layerDetailsPane.hide()
+
         # refer to objectName'd entities as self.ui.objectName
         self.setAcceptDrops(True)
 
