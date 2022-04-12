@@ -1532,10 +1532,6 @@ class Main(QtWidgets.QMainWindow):
         cycle_grid.setShortcut('L')
         cycle_grid.triggered.connect(self.scene_manager.cycle_latlon_grid_color)
 
-        remove = QtWidgets.QAction("Remove Layer", self)
-        remove.setShortcut(QtCore.Qt.Key_Delete)
-        remove.triggered.connect(self.remove_layer)
-
         clear = QtWidgets.QAction("Clear Region Selection", self)
         clear.setShortcut(QtCore.Qt.Key_Escape)
         clear.triggered.connect(self.remove_region_polygon)
@@ -1561,7 +1557,6 @@ class Main(QtWidgets.QMainWindow):
         open_gradient.triggered.connect(self.open_colormap_editor)
 
         edit_menu = menubar.addMenu('&Edit')
-        edit_menu.addAction(remove)
         edit_menu.addAction(clear)
         edit_menu.addAction(toggle_point)
         edit_menu.addAction(open_gradient)
