@@ -1,0 +1,5 @@
+data_reading:
+  vii_l1b_nc:
+    geometry_definition: SwathDefinition
+    filter_patterns:
+      ['W_XX-EUMETSAT-Darmstadt,SAT,{spacecraft_name:s}-VII-1B-RAD_C_EUMT_{creation_time:%Y%m%d%H%M%S}_{mission_type:s}_{environment:s}_{sensing_start_time:%Y%m%d%H%M%S}_{sensing_end_time:%Y%m%d%H%M%S}_{disposition_mode:s}_{processing_mode:s}____.nc']
