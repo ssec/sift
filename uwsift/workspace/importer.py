@@ -36,6 +36,7 @@ from uwsift.common import Platform, Info, Instrument, Kind, INSTRUMENT_MAP, PLAT
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.satpy_compat import DataID, get_id_value, get_id_items, id_from_attrs
 from uwsift.util import USER_CACHE_DIR
+from uwsift.util.common import get_reader_kwargs_dict
 from uwsift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
 from .metadatabase import Resource, Product, Content, ContentImage, ContentUnstructuredPoints
 from .utils import metadata_utils
@@ -1025,7 +1026,9 @@ class SatpyImporter(aImporter):
         self.scn = kwargs.get('scene')
         self.merge_target = kwargs.get('merge_target')
         if self.scn is None:
-            self.scn = Scene(reader=self.reader, filenames=self.filenames)
+            reader_kwargs = get_reader_kwargs_dict([self.reader])
+            self.scn = Scene(filenames={self.reader: self.filenames},
+                             reader_kwargs=reader_kwargs)
         self._resources = []
         # DataID filters
         self.product_filters = {}

@@ -88,7 +88,7 @@ class RGBLayerConfigPane(QObject):
         self._rgb_name_edit = self.ui.nameEdit
 
         # initialize the combo boxes
-        self._set_combos_to_layer_names()
+        self.set_combos_to_layer_names()
         # disable all UI elements to start
         self._show_settings_for_layer()
 
@@ -137,13 +137,13 @@ class RGBLayerConfigPane(QObject):
     def layer_added(self, layer: LayerItem):
         if layer.kind in [Kind.IMAGE, Kind.COMPOSITE]:
             self._layer_uuids.append(layer.uuid)
-            self._set_combos_to_layer_names()
+            self.set_combos_to_layer_names()
 
     def layer_removed(self, layer_uuid):
         for idx in range(len(self._layer_uuids)):
             if self._layer_uuids[idx] == layer_uuid:
                 del self._layer_uuids[idx]
-                self._set_combos_to_layer_names()
+                self.set_combos_to_layer_names()
                 self._show_settings_for_layer(self.recipe)
 
     def _gamma_changed(self, value):
@@ -406,7 +406,7 @@ class RGBLayerConfigPane(QObject):
             for widget in self.rgb:
                 widget.setCurrentIndex(0)
 
-    def _set_combos_to_layer_names(self):
+    def set_combos_to_layer_names(self):
         """
         update combo boxes with the list of layer names and then select the right r,g,b,a layers if they're not None
         :return:

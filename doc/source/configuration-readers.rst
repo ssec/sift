@@ -25,6 +25,11 @@ configure:
 These settings are configured in the same way as in the Satpy reader
 configuration YAML files.
 
+If special reader keyword arguments need to be passed to the reader during the
+Satpy Scene initialisation, these can be configured by adding a
+``reader_kwargs`` entry to the reader configuration, containing the
+kwargs key-value pairs.
+
 In addition for GEOS files the grid layout can be configured to enable correct
 index display according to their PUGs. In the ``grid`` sub-config three
 parameters can be set:
@@ -54,7 +59,7 @@ can be configured as either ``True`` (the default) or ``False``.
           for some zoom levels the data segments loaded later may not be
           visible.
 
-As example for a complete configuration for a reader this is one for SEVIRI
+As example for a complete configuration for a reader, this is one for SEVIRI
 Level 1B in HRIT format::
 
   data_reading:
@@ -67,6 +72,9 @@ Level 1B in HRIT format::
         origin: "SE"
         first_index_x: 1
         first_index_y: 1
+
+      reader_kwargs:
+         fill_hrv: True
 
 Readers with the kind ``POINTS`` or ``LINES`` also support the
 ``style_attributes`` option. It is used to control which product is used for a

@@ -256,6 +256,25 @@ class AnimationController(object):
     def connect_to_model(self, model: LayerModel):
         self.time_manager.connect_to_model(model)
 
+    def get_frame_count(self):
+        return self.time_manager.get_current_timebase_dataset_count()
+
+    def get_current_frame_index(self):
+        return self.time_manager.get_current_timebase_timeline_index()
+
+    def get_current_frame_uuid(self):
+        return self.time_manager.get_current_timebase_current_dataset_uuid()
+
+    def get_frame_uuids(self):
+        """
+        Get a list of dataset uuids, one for each frame of the animation as the
+        current timeline manager would play. The uuids are those of the current
+        driving layer, therefore they are unique in the list.
+
+        :return: list of dataset UUIDs
+        """
+        return self.time_manager.get_current_timebase_dataset_uuids()
+
     def next_frame(self, event=None, frame_number=None):
         """
         skip to the frame (from 0) or increment one frame and update
@@ -459,21 +478,23 @@ class SceneGraphManager(QObject):
 
     def get_screenshot_array(self, frame_range=None):
         """Get numpy arrays representing the current canvas."""
-        if frame_range is None:
-            self.main_canvas.on_draw(None)
-            return [(self.animation_controller.top_layer_uuid(), _screenshot())]
-        s, e = frame_range
+        # Store current index to reset the view once we are done
+        current_frame = self.animation_controller.get_current_frame_index()
 
-        # reset the view once we are done
-        c = self.animation_controller.current_frame
+        if frame_range is None:
+            s = e = current_frame
+        else:
+            s, e = frame_range
+
         images = []
         for i in range(s, e + 1):
-            self.set_frame_number(i)
+            self.animation_controller.jump(i)
             self.update()
             self.main_canvas.on_draw(None)
-            u = self.animation_controller.frame_order[i] if self.animation_controller.frame_order else None
+            u = self.animation_controller.get_current_frame_uuid()
             images.append((u, _screenshot()))
-        self.set_frame_number(c)
+
+        self.animation_controller.jump(current_frame)
         self.update()
         self.main_canvas.on_draw(None)
         return images
@@ -1064,6 +1085,37 @@ class SceneGraphManager(QObject):
             node.set_gl_state('translucent')
             self.borders_nodes.append(node)
 
+    def apply_presentation_to_image_node(self, image: Image,
+                                         presentation: Presentation,
+                                         visible: Optional[bool] = None):
+        """
+        Apply all relevant and set properties (not None) of the given
+        presentation to the given image.
+
+        Visibility can be explicitly overridden, because this is (at least for
+        now) the only property where a dataset may deviate from the layer
+        presentation; it depends on whether the dataset is active in the layer's
+        timeline.
+
+        :param image: the image node which should get the new presentation
+        :param presentation: to apply, usually the presentation of the owning
+               layer
+        :param visible:
+        """
+        if visible is not None:
+            image.visible = visible
+        elif presentation.visible:
+            image.visible = presentation.visible
+
+        if presentation.colormap:
+            image.cmap = self.document.find_colormap(presentation.colormap)
+        if presentation.climits:
+            image.clim = presentation.climits
+        if presentation.gamma:
+            image.gamma = presentation.gamma
+        if presentation.opacity:
+            image.opacity = presentation.opacity
+
     def add_node_for_image_dataset(self, layer: LayerItem,
                                    product_dataset: ProductDataset):
         assert self.layer_nodes[layer.uuid] is not None
@@ -1083,11 +1135,8 @@ class SceneGraphManager(QObject):
                 product_dataset.info[Info.CELL_WIDTH],
                 product_dataset.info[Info.CELL_HEIGHT],
                 name=str(product_dataset.uuid),
-                clim=layer.presentation.climits,
-                gamma=layer.presentation.gamma,
                 interpolation='nearest',
                 method='subdivide',
-                cmap=self.document.find_colormap(layer.presentation.colormap),
                 double=False,
                 texture_shape=DEFAULT_TEXTURE_SHAPE,
                 wrap_lon=False,
@@ -1101,10 +1150,7 @@ class SceneGraphManager(QObject):
             image = Image(
                 image_data,
                 name=str(product_dataset.uuid),
-                clim=layer.presentation.climits,
-                gamma=layer.presentation.gamma,
                 interpolation='nearest',
-                cmap=self.document.find_colormap(layer.presentation.colormap),
                 parent=self.layer_nodes[layer.uuid],
             )
             image.transform = STTransform(
@@ -1113,6 +1159,9 @@ class SceneGraphManager(QObject):
                 translate=(product_dataset.info[Info.ORIGIN_X],
                            product_dataset.info[Info.ORIGIN_Y], 0))
         self.dataset_nodes[product_dataset.uuid] = image
+        # Make sure *all* applicable properties of the owning layer's current
+        # presentation are applied to the new image node
+        self.apply_presentation_to_image_node(image, layer.presentation)
         self.on_view_change(None)
         LOG.debug("Scene Graph after IMAGE dataset insertion:")
         LOG.debug(self.main_view.describe_tree(with_transform=True))
@@ -1148,7 +1197,6 @@ class SceneGraphManager(QObject):
             composite.transform = PROJ4Transform(
                 product_dataset.info[Info.PROJ], inverse=True
             )
-            composite.transform *= STTransform(translate=(0, 0, -50.0))
             composite.determine_reference_points()
         else:
             composite = MultiChannelImage(
@@ -1322,6 +1370,7 @@ class SceneGraphManager(QObject):
                 raise
 
         self.on_view_change(None)
+        self.update()
 
     def update_layers_z(self, uuids: list):
         if self.layer_nodes:
@@ -1345,7 +1394,7 @@ class SceneGraphManager(QObject):
         :return:
         """
         for uuid_removed in uuids_removed:
-            self.set_layer_visible(uuid_removed, False)
+            self.set_dataset_visible(uuid_removed, False)
         # XXX: Used to rebuild_all instead of just update, is that actually needed?
         # self.rebuild_all()
 
@@ -1360,7 +1409,7 @@ class SceneGraphManager(QObject):
         :param uuid_removed: UUID of the layer that is to be removed
         :return:
         """
-        self.set_layer_visible(uuid_removed, False)
+        self.set_dataset_visible(uuid_removed, False)
         if uuid_removed in self.dataset_nodes:
             image_layer = self.dataset_nodes[uuid_removed]
             image_layer.parent = None
@@ -1377,7 +1426,7 @@ class SceneGraphManager(QObject):
 
     def change_datasets_visibility(self, layers_changed: Dict[UUID, bool]):
         for uuid, visible in layers_changed.items():
-            self.set_layer_visible(uuid, visible)
+            self.set_dataset_visible(uuid, visible)
 
     def rebuild_new_layer_set(self, new_set_number: int, new_prez_order: DocLayerStack, new_anim_order: list):
         self.rebuild_all()
@@ -1402,7 +1451,7 @@ class SceneGraphManager(QObject):
     def set_frame_number(self, frame_number=None):
         self.animation_controller.next_frame(None, frame_number)
 
-    def set_layer_visible(self, uuid: UUID, visible: Optional[bool] = None):
+    def set_dataset_visible(self, uuid: UUID, visible: Optional[bool] = None):
         dataset_node = self.dataset_nodes.get(uuid, None)
         if dataset_node is None:
             return
@@ -1440,7 +1489,7 @@ class SceneGraphManager(QObject):
         for uuid, layer_prez in presentation_info.items():
             self.set_colormap(layer_prez.colormap, uuid=uuid)
             self.set_color_limits(layer_prez.climits, uuid=uuid)
-            self.set_layer_visible(uuid, visible=layer_prez.visible)
+            self.set_dataset_visible(uuid, visible=layer_prez.visible)
             # FUTURE, if additional information is added to the presentation tuple, you must also update it here
 
     def rebuild_all(self, *args, **kwargs):

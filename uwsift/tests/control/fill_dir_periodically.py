@@ -23,6 +23,11 @@ def gen_next_dt(initial_dt: datetime, mode: str):
     else:
         raise AttributeError(f"Unknown mode {mode} encountered in file name.")
     while True:
+        now = datetime.now(tz=timezone.utc)
+        if gen_dt > now:
+            # We don't want to rush ahead into the future in case we create
+            # mock data files faster than the nominal repeat cycle
+            gen_dt = now
         yield gen_dt
         gen_dt += offset
 

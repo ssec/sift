@@ -23,6 +23,7 @@ __author__ = 'rayg'
 # To have consistent logging for all modules (also for their static
 # initialization) it must be set up before importing them.
 from uwsift.model.composite_recipes import RecipeManager
+from uwsift.model.product_dataset import ProductDataset
 from uwsift.util.logger import configure_loggers
 from uwsift.view.algebraic_config import AlgebraicLayerConfigPane
 
@@ -49,7 +50,7 @@ from uwsift import (__version__, config,
                     AUTO_UPDATE_MODE__ACTIVE,
                     USE_INVENTORY_DB,
                     USE_TILED_GEOLOCATED_IMAGES)
-from uwsift.common import Info, Tool, CompositeType, Presentation
+from uwsift.common import Info, Tool
 from uwsift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
 from uwsift.control.layer_tree import LayerStackTreeViewModel
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
@@ -458,6 +459,8 @@ class Main(QtWidgets.QMainWindow):
     _max_tolerable_dataset_age: float = -1
     _heartbeat_file = None
 
+    didFinishLoading = QtCore.pyqtSignal(list)
+
     def interactive_open_files(self, *args, files=None, **kwargs):
         self.scene_manager.animation_controller.animating = False
         # http://pyqt.sourceforge.net/Docs/PyQt4/qfiledialog.html#getOpenFileNames
@@ -488,19 +491,21 @@ class Main(QtWidgets.QMainWindow):
             isok: whether _bgnd_open_paths ran without exception
             uuid_list: list of UUIDs it generated
         """
+        self.didFinishLoading.emit(uuid_list)
+
         if not uuid_list:
-            raise ValueError("no UUIDs provided by background open in _bgnd_open_paths_when_done")
+            raise ValueError("no UUIDs provided by background open"
+                             " in _bgnd_open_paths_finish")
         if not isok:
             raise ValueError("background open did not succeed")
-        # Populate data layer collection
-        data_layers = self.document.create_data_layers()
-        self.document.data_layer_collection.notify_update_collection(data_layers)
-        uuid = uuid_list[0]
-        self.layer_list_model.select([uuid])
-        # set the animation based on the last added (topmost) layer
-        self.document.animate_siblings_of_layer(uuid)
-        # force the newest layer to be visible
-        self.document.next_last_step(uuid)
+
+        if AUTO_UPDATE_MODE__ACTIVE:
+            # Choose one of the recently loaded datasets for reporting
+            # "vital signs"
+            dataset = self.document[uuid_list[0]]
+
+            self._update_dataset_timestamps(dataset)
+            self._update_heartbeat_file(dataset)
 
     def open_paths(self, paths, **importer_kwargs):
         paths = list(paths)
@@ -521,13 +526,6 @@ class Main(QtWidgets.QMainWindow):
             return
         for uuid in uuids:
             self.document.activate_product_uuid_as_new_dataset(uuid)
-        uuid = uuids[-1]
-        self.layer_list_model.select([uuid])
-        # set the animation based on the last added (topmost) layer
-        self.document.animate_siblings_of_layer(uuid)
-        # force the newest layer to be visible
-        self.document.next_last_step(uuid)
-        # don't use <algebraic layer ...> type paths
 
     def dropEvent(self, event):
         LOG.debug('drop event on mainwindow')
@@ -570,9 +568,8 @@ class Main(QtWidgets.QMainWindow):
         # LOG.warning('progress bar updated to {}'.format(val))
 
     def toggle_visibility_on_selected_layers(self, *args, **kwargs):
-        uuids = self.layer_list_model.current_selected_uuids()
-        self.document.toggle_layer_visibility(uuids)
-        self.animation.update_frame_time_to_top_visible()
+        model_indexes = self.ui.treeView.selectedIndexes()
+        self.layer_model.toggle_layers_visibility(model_indexes)
 
     def remove_layer(self, *args, **kwargs):
         uuids = self.layer_list_model.current_selected_uuids()
@@ -723,15 +720,13 @@ class Main(QtWidgets.QMainWindow):
         unreachable_object_count = gc.collect()
         LOG.debug(f"GC found {unreachable_object_count} unreachable objects")
 
-    def _update_heartbeat_file(self, reordered_layers: tuple, uuid: UUID,
-                               p: Presentation):
+    def _update_heartbeat_file(self, dataset: ProductDataset):
         """
         Write the dataset creation time into the heartbeat file. The time of
         last dataset update can be retrieved as the file modification time.
 
-        :param uuid: UUID of the new layer
+        :param dataset: recently loaded dataset
         """
-        dataset = self.document[uuid]
         dataset_sched_time_utc = dataset.sched_time.replace(tzinfo=timezone.utc)
         fmt_time = dataset_sched_time_utc.strftime(
             WATCHDOG_DATETIME_FORMAT_STORE).rstrip()
@@ -744,8 +739,7 @@ class Main(QtWidgets.QMainWindow):
 
         os.rename(journal_path, self._heartbeat_file)
 
-    def _update_dataset_timestamps(self, reordered_layers: tuple,
-                                   uuid: UUID, p: Presentation):
+    def _update_dataset_timestamps(self, dataset: ProductDataset):
         """
         Update the timestamp displayed in timeLastDatasetCreationLineEdit and
         timeLastDatasetImportLineEdit. The import time is the current local
@@ -755,19 +749,19 @@ class Main(QtWidgets.QMainWindow):
         colored green if the time between now and last import time is smaller
         than max_update_interval. Otherwise it will be colored red.
 
-        :param uuid: UUID of the new layer
+        :param dataset: recently loaded dataset
         """
-        self._last_imported_dataset_uuid = uuid
-        dataset = self.document[uuid]
+
+        self._last_imported_dataset_uuid = dataset.uuid
+
         dataset_sched_time_utc = dataset.sched_time.replace(tzinfo=timezone.utc)
-
-        self._last_imported_dataset_import_time = \
-            dataset_import_time = datetime.now(tz=timezone.utc)
-
         self.ui.timeLastDatasetCreationLineEdit.setText(
             dataset_sched_time_utc.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY))
+
+        self._last_imported_dataset_import_time = datetime.now(tz=timezone.utc)
         self.ui.timeLastDatasetImportLineEdit.setText(
-            dataset_import_time.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY))
+            self._last_imported_dataset_import_time.strftime(
+                WATCHDOG_DATETIME_FORMAT_DISPLAY))
 
     def _clear_last_dataset_creation_time(self, reordered_layers: tuple,
                                           removed_uuids: typ.List[UUID],
@@ -938,7 +932,6 @@ class Main(QtWidgets.QMainWindow):
 
         # disable close button on panes
         panes = [self.ui.areaProbePane,
-                 self.ui.layerDetailsPane,
                  self.ui.rgbConfigPane,
                  self.ui.algebraicConfigPane,
                  ]
@@ -1006,7 +999,6 @@ class Main(QtWidgets.QMainWindow):
         self.graphManager.pointProbeChanged.connect(self.scene_manager.on_point_probe_set)
         self.graphManager.pointProbeChanged.connect(self.layer_model.on_point_probe_set)
         self.graphManager.pointProbeChanged.connect(self.update_point_probe_text)
-        self.graphManager.pointProbeChanged.connect(self.graphManager.update_point_probe_graph)
 
         self.scene_manager.newPointProbe.connect(self.graphManager.update_point_probe)
 
@@ -1014,6 +1006,9 @@ class Main(QtWidgets.QMainWindow):
             self.graphManager.update_point_probe)
         self.layer_model.didUpdateLayers.connect(
             self.graphManager.handleActiveProductDatasetsChanged)
+        self.layer_model.didChangeRecipeLayerNames.connect(
+            self.graphManager.handleActiveProductDatasetsChanged
+        )
 
         # Connect to an unnamed slot (lambda: ...) to strip off the argument
         # (of type dict) from the signal 'didMatchTimes'
@@ -1086,7 +1081,7 @@ class Main(QtWidgets.QMainWindow):
 
     def _init_layer_model(self):
 
-        self.layer_model = LayerModel(self.workspace)
+        self.layer_model = LayerModel(self.document)
 
         self.document.didAddDataset.connect(self.layer_model.add_dataset)
 
@@ -1163,6 +1158,9 @@ class Main(QtWidgets.QMainWindow):
         self.layer_model.didAddImageLayer.connect(
             self.rgb_config_pane.layer_added
         )
+        self.layer_model.didChangeRecipeLayerNames.connect(
+            self.rgb_config_pane.set_combos_to_layer_names
+        )
 
     def _init_recipe_manager(self):
         self.recipe_manager = RecipeManager()
@@ -1203,7 +1201,7 @@ class Main(QtWidgets.QMainWindow):
             self.recipe_manager.update_recipe_name
         )
         self.recipe_manager.didUpdateRecipeName.connect(
-            self.layer_model.update_rgb_layer_name
+            self.layer_model.update_recipe_layer_name
         )
         self.algebraic_config_pane.didChangeAlgebraicInputLayers.connect(
             self.recipe_manager.update_algebraic_recipe_input_layers
@@ -1270,12 +1268,15 @@ class Main(QtWidgets.QMainWindow):
         # self.tabifyDockWidget(self.ui.rgbConfigPane, self.ui.layerDetailsPane)
         # Make the layer list and layer details shown
         # FIXME remove layerPane finally from the system, for now we only kind
-        #  of hide it
+        #  of hide it. This shall be done as part of ticket "Code cleanup (#89)"
+        #  (https://gitlab.eumetsat.int/webservices/mtg-sift/-/issues/89)
         self.layout().removeWidget(self.ui.layersPane)
-        self.ui.layersPane.deleteLater()
-        self.ui.layersPane = None
+        # self.ui.layersPane.deleteLater()
+        # self.ui.layersPane = None
 
-        self.ui.layerDetailsPane.raise_()
+        # FIXME hide layerDetailsPane for now, improve and show it later again
+        self.ui.layerDetailsPane.hide()
+
         # refer to objectName'd entities as self.ui.objectName
         self.setAcceptDrops(True)
 
@@ -1315,9 +1316,6 @@ class Main(QtWidgets.QMainWindow):
             LOG.info(f"Highlighting last data time display when delayed for"
                      f" more than {self._max_tolerable_dataset_age} seconds.")
 
-        self.document.didAddBasicDataset.connect(self._update_dataset_timestamps)
-        self.document.didAddCompositeDataset.connect(self._update_dataset_timestamps)
-
         # don't clear the time of last import when the layers are removed
         self.document.didRemoveDatasets.connect(
             self._clear_last_dataset_creation_time)
@@ -1336,8 +1334,6 @@ class Main(QtWidgets.QMainWindow):
                 heartbeat_file.replace("$$CACHE_DIR$$", USER_CACHE_DIR)
             LOG.info(f"Communication with watchdog via heartbeat file "
                      f" '{self._heartbeat_file}' configured.")
-            self.document.didAddBasicDataset.connect(self._update_heartbeat_file)
-            self.document.didAddCompositeDataset.connect(self._update_heartbeat_file)
 
     def _timer_collect_resources(self):
         if self._resource_collector:
@@ -1508,27 +1504,13 @@ class Main(QtWidgets.QMainWindow):
 
         next_time = QtWidgets.QAction("Next Time", self)
         next_time.setShortcut(QtCore.Qt.Key_Right)
-        next_slot = partial(self.animation.next_last_time, direction=1)
-        next_time.triggered.connect(next_slot)
+        next_time.triggered.connect(self.animation.next_frame)
         # self.ui.animForward.clicked.connect(next_slot)
-
-        focus_current = QtWidgets.QAction("Focus Current Timestep", self)
-        focus_current.setShortcut('.')
-        focus_current.triggered.connect(partial(self.animation.next_last_band, direction=0))
 
         prev_time = QtWidgets.QAction("Previous Time", self)
         prev_time.setShortcut(QtCore.Qt.Key_Left)
-        prev_slot = partial(self.animation.next_last_time, direction=-1)
-        prev_time.triggered.connect(prev_slot)
+        prev_time.triggered.connect(self.animation.prev_frame)
         # self.ui.animBack.clicked.connect(prev_slot)
-
-        focus_prev_band = QtWidgets.QAction("Next Band", self)
-        focus_prev_band.setShortcut(QtCore.Qt.Key_Up)
-        focus_prev_band.triggered.connect(partial(self.animation.next_last_band, direction=-1))
-
-        focus_next_band = QtWidgets.QAction("Previous Band", self)
-        focus_next_band.setShortcut(QtCore.Qt.Key_Down)
-        focus_next_band.triggered.connect(partial(self.animation.next_last_band, direction=1))
 
         toggle_vis = QtWidgets.QAction("Toggle &Visibility", self)
         toggle_vis.setShortcut('V')
@@ -1542,11 +1524,6 @@ class Main(QtWidgets.QMainWindow):
         change_order.setShortcut('O')
         change_order.triggered.connect(self.animation.change_animation_to_current_selection_siblings)
 
-        flip_colormap = QtWidgets.QAction("Flip Color Limits (Top Layer)", self)
-        flip_colormap.setShortcut("/")
-        flip_colormap.triggered.connect(
-            lambda: self.document.flip_climits_for_layers([self.document.current_visible_layer_uuid]))
-
         cycle_borders = QtWidgets.QAction("Cycle &Borders", self)
         cycle_borders.setShortcut('B')
         cycle_borders.triggered.connect(self.scene_manager.cycle_borders_color)
@@ -1554,10 +1531,6 @@ class Main(QtWidgets.QMainWindow):
         cycle_grid = QtWidgets.QAction("Cycle &Lat/Lon Grid", self)
         cycle_grid.setShortcut('L')
         cycle_grid.triggered.connect(self.scene_manager.cycle_latlon_grid_color)
-
-        remove = QtWidgets.QAction("Remove Layer", self)
-        remove.setShortcut(QtCore.Qt.Key_Delete)
-        remove.triggered.connect(self.remove_layer)
 
         clear = QtWidgets.QAction("Clear Region Selection", self)
         clear.setShortcut(QtCore.Qt.Key_Escape)
@@ -1584,7 +1557,6 @@ class Main(QtWidgets.QMainWindow):
         open_gradient.triggered.connect(self.open_colormap_editor)
 
         edit_menu = menubar.addMenu('&Edit')
-        edit_menu.addAction(remove)
         edit_menu.addAction(clear)
         edit_menu.addAction(toggle_point)
         edit_menu.addAction(open_gradient)
@@ -1596,13 +1568,9 @@ class Main(QtWidgets.QMainWindow):
         view_menu = menubar.addMenu('&View')
         view_menu.addAction(animate)
         view_menu.addAction(prev_time)
-        view_menu.addAction(focus_current)
         view_menu.addAction(next_time)
-        view_menu.addAction(focus_next_band)
-        view_menu.addAction(focus_prev_band)
         view_menu.addAction(change_order)
         view_menu.addAction(toggle_vis)
-        view_menu.addAction(flip_colormap)
         view_menu.addAction(cycle_borders)
         view_menu.addAction(cycle_grid)
 
@@ -1744,6 +1712,8 @@ def main() -> int:
         if minimum_interval is None:
             raise ValueError("Auto update interval needs to be set!")
         auto_update_manager = AutoUpdateManager(window, minimum_interval)
+        # connect signal to start timer anew when loading is done
+        window.didFinishLoading.connect(auto_update_manager.on_loading_done)
 
     # run the event loop until the user closes the application
     exit_code = vispy_app.run()
