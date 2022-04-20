@@ -19,6 +19,18 @@ def is_datetime_format(format_str):
     return format_str != format_result
 
 
+def get_reader_kwargs_dict(reader_names):
+    """Extract the reader_kwargs from the config for multiple readers."""
+    reader_kwargs = {}
+    for reader_name in reader_names:
+        reader_kwargs.update({
+            reader_name: config.get(
+                f"data_reading.{reader_name}.reader_kwargs", {}
+            )
+        })
+    return reader_kwargs
+
+
 def create_scenes(scenes: dict, file_groups: dict) -> List[DataID]:
     """Create Scene objects for the selected files."""
     all_available_products: Set[DataID] = set()
@@ -28,8 +40,9 @@ def create_scenes(scenes: dict, file_groups: dict) -> List[DataID]:
             # need to create the Scene for the first time
             # file_group includes what reader to use
             # NOTE: We only allow a single reader at a time
+            reader_kwargs = get_reader_kwargs_dict(file_group.keys())
             try:
-                scn = Scene(filenames=file_group)
+                scn = Scene(filenames=file_group, reader_kwargs=reader_kwargs)
             except ValueError as e:
                 LOG.warning(e)
                 continue
