@@ -256,6 +256,14 @@ class LayerItem:
         self._timeline = {kv[0]: kv[1] for kv in sorted(self._timeline.items(),
                                                         key=lambda kv: kv[0])}
 
+    def get_dataset_by_uuid(self, uuid: UUID) -> Optional[ProductDataset]:
+        items_for_uuid = [item for item in self.timeline.items()
+                          if item[1].uuid == uuid]
+        if not items_for_uuid:
+            return None
+        assert len(items_for_uuid) == 1
+        return items_for_uuid[0][1]
+
     def get_datasets_uuids(self) -> List[UUID]:
         return [pd.uuid for pd in self.timeline.values()]
 
@@ -310,7 +318,7 @@ class LayerItem:
     def remove_dataset(self, sched_time):
         """Remove a dataset for given datetime from layer
 
-        Gracefully ignores if no dataset with the given shed_time exists in
+        Gracefully ignores if no dataset with the given sched_time exists in
         the layer.
         """
         self._timeline.pop(sched_time, None)
@@ -332,3 +340,12 @@ class LayerItem:
         self._timeline[sched_time] = product_dataset
         self._sort_timeline()
         return product_dataset
+
+    def describe_timeline(self):
+        """Get a string containing the layer's descriptor and the scheduling
+        times in its timeline with the according dataset UUIDs.
+        """
+        output = f"{self.descriptor}\n"
+        for ds in self.timeline.values():
+            output += f"{ds.info[Info.SCHED_TIME]} -> {ds.info[Info.UUID]}"
+        return output

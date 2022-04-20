@@ -11,6 +11,7 @@ from PyQt5.QtCore import (QAbstractItemModel, Qt, QModelIndex, pyqtSignal,
 from uwsift.common import LAYER_TREE_VIEW_HEADER, Presentation, Info, Kind, \
     LATLON_GRID_DATASET_NAME, BORDERS_DATASET_NAME, Platform, Instrument, \
     LayerModelColumns as LMC, LayerVisibility
+from uwsift.model import Document
 from uwsift.model.composite_recipes import AlgebraicRecipe, CompositeRecipe, \
     Recipe
 from uwsift.model.layer_item import LayerItem
@@ -38,6 +39,7 @@ class LayerModel(QAbstractItemModel):
     didChangeGamma = pyqtSignal(dict)
     didChangeLayerVisible = pyqtSignal(UUID, bool)
     didChangeLayerOpacity = pyqtSignal(UUID, float)
+    didChangeRecipeLayerNames = pyqtSignal()
 
     didUpdateLayers = pyqtSignal()
     didReorderLayers = pyqtSignal(list)
@@ -72,7 +74,7 @@ class LayerModel(QAbstractItemModel):
 
     didRequestSelectionOfLayer = pyqtSignal(QModelIndex)
 
-    def __init__(self, workspace, parent=None, policy=None):
+    def __init__(self, document: Document, parent=None, policy=None):
         """
         Model for a "flat" layer tree (list/table of layers)
         (Note: For hierarchies the `parent` and `index` methods, among others,
@@ -86,7 +88,9 @@ class LayerModel(QAbstractItemModel):
 
         super().__init__(parent)
 
-        self._workspace = workspace
+        self._document = document
+        self._workspace = self._document._workspace
+        assert self._workspace  # Verify proper initialisation order
 
         self._headers = LAYER_TREE_VIEW_HEADER
 
@@ -442,19 +446,19 @@ class LayerModel(QAbstractItemModel):
 
     def change_colormap_for_layer(self, uuid: UUID, colormap: object):
         layer = self.get_layer_by_uuid(uuid)
-        layer.colormap = colormap
+        layer.presentation.colormap = colormap
         change_dict = self._build_presentation_change_dict(layer, colormap)
         self.didChangeColormap.emit(change_dict)
 
     def change_color_limits_for_layer(self, uuid: UUID, color_limits: object):
         layer = self.get_layer_by_uuid(uuid)
-        layer.climits = color_limits
+        layer.presentation.climits = color_limits
         change_dict = self._build_presentation_change_dict(layer, color_limits)
         self.didChangeColorLimits.emit(change_dict)
 
     def change_gamma_for_layer(self, uuid: UUID, gamma: float):
         layer = self.get_layer_by_uuid(uuid)
-        layer.gamma = gamma
+        layer.presentation.gamma = gamma
         change_dict = self._build_presentation_change_dict(layer, gamma)
         self.didChangeGamma.emit(change_dict)
 
@@ -462,17 +466,16 @@ class LayerModel(QAbstractItemModel):
         """user has clicked on a point probe; determine relative and absolute
         values for all document image layers
         """
-        # if the point probe was turned off then we don't want to have the
-        # equalizer
         if not state:
-            return
+            for layer in self.get_probeable_layers():
+                layer.probe_value = None
+        else:
+            for layer in self.get_probeable_layers():
+                product_dataset = layer.get_first_active_product_dataset()
 
-        for layer in self.get_probeable_layers():
-            product_dataset = layer.get_first_active_product_dataset()
-
-            layer.probe_value = None if not product_dataset \
-                else \
-                self._workspace.get_content_point(product_dataset.uuid, xy_pos)
+                layer.probe_value = None if not product_dataset \
+                    else \
+                    self._workspace.get_content_point(product_dataset.uuid, xy_pos)
 
         self._refresh()
 
@@ -747,11 +750,12 @@ class LayerModel(QAbstractItemModel):
 
         self.didRequestCompositeRecipeCreation.emit(layers)
 
-    def update_rgb_layer_name(self, recipe: CompositeRecipe):
-        rgb_layer: LayerItem = self._get_layer_of_recipe(recipe.id)
-        rgb_layer.update_invariable_display_data()
+    def update_recipe_layer_name(self, recipe: Recipe):
+        recipe_layer: LayerItem = self._get_layer_of_recipe(recipe.id)
+        recipe_layer.update_invariable_display_data()
+        self.didChangeRecipeLayerNames.emit()
 
-        index = self.index(rgb_layer.order, LMC.NAME)
+        index = self.index(recipe_layer.order, LMC.NAME)
         self.dataChanged.emit(index, index)
 
     @staticmethod
@@ -848,6 +852,47 @@ class LayerModel(QAbstractItemModel):
         self._remove_datasets(sched_times, algebraic_layer)
         self._add_algebraic_datasets(sched_times, input_layers,
                                      algebraic_layer)
+
+    def toggle_layers_visibility(self, indexes: List[QModelIndex]):
+        for index in indexes:
+            if index.column() != LMC.VISIBILITY:
+                continue
+            layer = self.layers[index.row()]
+            layer_visibility = LayerVisibility(not layer.visible, layer.opacity)
+            self.setData(index, layer_visibility)
+
+    def get_dataset_by_uuid(self, dataset_uuid: UUID) \
+            -> Optional[ProductDataset]:
+        """
+        Find a dataset given by its uuid in the layer model and return it, None
+        if it is not in the model.
+
+        :param dataset_uuid:
+        :return: dataset if found, None else
+        """
+        for layer in self.layers:
+            dataset = layer.get_dataset_by_uuid(dataset_uuid)
+            if dataset:
+                return dataset
+        return None
+
+    def remove_datasets_from_all_layers(self, dataset_uuids):
+        did_remove_any_dataset = False
+        for dataset_uuid in dataset_uuids:
+            dataset = self.get_dataset_by_uuid(dataset_uuid)
+            LOG.debug(f"Dataset for uuid {dataset_uuid}: {dataset}")
+            if dataset:
+                layer = self.get_layer_by_uuid(dataset.layer_uuid)
+                self._remove_dataset(layer,
+                                     dataset.info[Info.SCHED_TIME],
+                                     dataset.info[Info.UUID])
+                LOG.debug(f"Removing {dataset}")
+                self._document.remove_layer_prez(dataset_uuid)
+                self._document.purge_layer_prez([dataset_uuid])
+                did_remove_any_dataset = True
+
+        if did_remove_any_dataset:
+            self.didUpdateLayers.emit()
 
 
 class ProductFamilyKeyMappingPolicy:

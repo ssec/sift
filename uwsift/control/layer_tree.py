@@ -369,6 +369,8 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             yield self.doc.uuid_for_current_layer(q.row())
 
     def select(self, uuids, lbox: QTreeView = None, scroll_to_show_single=True):
+        return  # FIXME obsolete class, for now avoid to trigger debugger
+
         lbox = self.current_set_listbox if lbox is None else lbox
         lbox.clearSelection()
         if not uuids:
