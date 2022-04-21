@@ -1,0 +1,4 @@
+data_reading:
+  seviri_l2_bufr:
+    reader_kwargs:
+       with_area_definition: True  # requires Satpy>=0.35 (note that segmented products can't be loaded at all for previous versions)

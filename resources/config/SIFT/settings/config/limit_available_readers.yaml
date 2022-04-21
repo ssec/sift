@@ -6,10 +6,14 @@ data_reading:
     - fci_l1_geoobs_lmk_loc
     - fci_l1_geoobs_lmk_nav_err
     - fci_l1c_nc
+    - fci_l2_nc
     - li_l1b_bck_nc
     - seviri_l1b_hrit
     - seviri_l1b_native
     - avhrr_l1b_eps
+    - seviri_l2_binary
+    - seviri_l2_bufr
+    - seviri_l2_grib
   exclude_datasets:
     calibration:
       - radiance
