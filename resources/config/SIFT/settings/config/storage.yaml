@@ -1,8 +1,8 @@
 # Control the operations mode regarding inventory database and housekeeping of
 # intermediate data files
 storage:
-  use_inventory_db : True
-  cleanup_file_cache: False
+  use_inventory_db : False
+  cleanup_file_cache: True
 
   agent:
     notification_cmd: /path/to/raiseEvent.sh # Optional
