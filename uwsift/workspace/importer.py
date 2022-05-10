@@ -1935,10 +1935,27 @@ class SatpyImporter(aImporter):
                                   data=img_data,
                                   content=c)
 
-    @staticmethod
-    def get_fci_segment_height(segment_number: int, segment_width: int) -> int:
-        return satpy.readers.yaml_reader._get_FCI_L1c_FDHSI_chunk_height(
-            segment_width, segment_number)
+
+    def get_fci_segment_height(self, segment_number: int, segment_width: int) -> int:
+        try:
+            fci_width_to_grid_type = {
+                3712: '3km',
+                5568: '2km',
+                11136: '1km',
+                22272: '500m'}
+            seg_heights = self.scn._readers[self.reader].segment_heights
+            file_type = list(seg_heights.keys())[0]
+            grid_type = fci_width_to_grid_type[segment_width]
+            return seg_heights[file_type][grid_type][segment_number-1]
+        except AttributeError:
+            LOG.warning("You must be using an old version of Satpy; Please "
+                        "update Satpy (>v0.37) to make sure that the merging of"
+                        " FCI chunks in existing datasets works correctly "
+                        "for any input data. Using fallback  satpy.readers."
+                        "yaml_reader._get_FCI_L1c_FDHSI_chunk_height to compute"
+                        " chunk heights.")
+            return satpy.readers.yaml_reader._get_FCI_L1c_FDHSI_chunk_height(
+                segment_width, segment_number)
 
     def _calc_segment_heights(self, segments_data, segments_indices):
         def get_segment_height_calculator() -> Callable:
