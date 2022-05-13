@@ -49,13 +49,24 @@ def _proj4_to_srs(proj4_str):
     return srs
 
 
-def create_geotiff(data, output_filename, proj4_str, geotransform, etype=gdal.GDT_Byte,
-                   compress=None, predictor=None, tile=False,
-                   blockxsize=None, blockysize=None,
-                   quicklook=False, gcps=None,
-                   nodata=np.nan, meta=None, **kwargs):
-    """Function that creates a geotiff from the information provided.
-    """
+def create_geotiff(
+    data,
+    output_filename,
+    proj4_str,
+    geotransform,
+    etype=gdal.GDT_Byte,
+    compress=None,
+    predictor=None,
+    tile=False,
+    blockxsize=None,
+    blockysize=None,
+    quicklook=False,
+    gcps=None,
+    nodata=np.nan,
+    meta=None,
+    **kwargs,
+):
+    """Function that creates a geotiff from the information provided."""
     LOG.info("Creating geotiff '%s'" % (output_filename,))
 
     if etype != gdal.GDT_Float32 and nodata is not None and np.isnan(nodata):
@@ -97,11 +108,13 @@ def create_geotiff(data, output_filename, proj4_str, geotransform, etype=gdal.GD
     # Creating the file will truncate any pre-existing file
     LOG.debug("Creation Geotiff with options %r", options)
     if num_bands == 1:
-        gtiff = GTIFF_DRIVER.Create(output_filename, data.shape[1], data.shape[0],
-                                    bands=num_bands, eType=etype, options=options)
+        gtiff = GTIFF_DRIVER.Create(
+            output_filename, data.shape[1], data.shape[0], bands=num_bands, eType=etype, options=options
+        )
     else:
-        gtiff = GTIFF_DRIVER.Create(output_filename, data[0].shape[1], data[0].shape[0],
-                                    bands=num_bands, eType=etype, options=options)
+        gtiff = GTIFF_DRIVER.Create(
+            output_filename, data[0].shape[1], data[0].shape[0], bands=num_bands, eType=etype, options=options
+        )
 
     if gcps:
         new_gcps = [gdal.GCP(x, y, 0, col, row) for x, y, row, col in gcps]
@@ -248,14 +261,18 @@ def create_ahi_geotiff(info, meta, data, output_filename, **kwargs):
 
 def main():
     from argparse import ArgumentParser
+
     parser = ArgumentParser(description="Convert AHI NetCDF files to Geotiff images")
-    parser.add_argument("input_filename",
-                        help="Input AHI NetCDF file")
-    parser.add_argument("-o", "--output", dest="output_filename", default=None,
-                        help="Output geotiff filename")
-    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through '
-                             'ERROR-WARNING-Info-DEBUG (default Info)')
+    parser.add_argument("input_filename", help="Input AHI NetCDF file")
+    parser.add_argument("-o", "--output", dest="output_filename", default=None, help="Output geotiff filename")
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbosity",
+        action="count",
+        default=0,
+        help="each occurrence increases verbosity 1 level through " "ERROR-WARNING-Info-DEBUG (default Info)",
+    )
     args = parser.parse_args()
 
     levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]

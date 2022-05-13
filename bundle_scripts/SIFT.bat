@@ -15,7 +15,7 @@ if not %base_dir% == %install_dir:~0,-1% goto install
 
 goto run_sift
 
-:install 
+:install
   echo Running one-time initialization of SIFT installation...
   conda-unpack
   echo %base_dir% > %installed%

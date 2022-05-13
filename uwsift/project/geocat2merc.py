@@ -6,7 +6,7 @@
 :copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-__author__ = 'davidh'
+__author__ = "davidh"
 
 import logging
 import os
@@ -20,7 +20,7 @@ from netCDF4 import Dataset
 from osgeo import gdal
 from pyproj import Proj
 
-from uwsift.project.ahi2gtiff import create_ahi_geotiff, AHI_NADIR_RES
+from uwsift.project.ahi2gtiff import AHI_NADIR_RES, create_ahi_geotiff
 
 LOG = logging.getLogger(__name__)
 GTIFF_DRIVER = gdal.GetDriverByName("GTIFF")
@@ -32,24 +32,24 @@ DEFAULT_DATASETS = [
     "ACHA_mode_8_cloud_top_height",
 ]
 LEVEL_1_DATASETS = [
-    'himawari_8_ahi_channel_1_reflectance',
-    'himawari_8_ahi_channel_2_reflectance',
-    'himawari_8_ahi_channel_3_reflectance',
-    'himawari_8_ahi_channel_4_reflectance',
-    'himawari_8_ahi_channel_5_reflectance',
-    'himawari_8_ahi_channel_6_reflectance',
-    'himawari_8_ahi_channel_7_brightness_temperature',
+    "himawari_8_ahi_channel_1_reflectance",
+    "himawari_8_ahi_channel_2_reflectance",
+    "himawari_8_ahi_channel_3_reflectance",
+    "himawari_8_ahi_channel_4_reflectance",
+    "himawari_8_ahi_channel_5_reflectance",
+    "himawari_8_ahi_channel_6_reflectance",
+    "himawari_8_ahi_channel_7_brightness_temperature",
     # 'himawari_8_ahi_channel_7_emissivity',
     # 'himawari_8_ahi_channel_7_reflectance',
-    'himawari_8_ahi_channel_8_brightness_temperature',
-    'himawari_8_ahi_channel_9_brightness_temperature',
-    'himawari_8_ahi_channel_10_brightness_temperature',
-    'himawari_8_ahi_channel_11_brightness_temperature',
-    'himawari_8_ahi_channel_12_brightness_temperature',
-    'himawari_8_ahi_channel_13_brightness_temperature',
-    'himawari_8_ahi_channel_14_brightness_temperature',
-    'himawari_8_ahi_channel_15_brightness_temperature',
-    'himawari_8_ahi_channel_16_brightness_temperature',
+    "himawari_8_ahi_channel_8_brightness_temperature",
+    "himawari_8_ahi_channel_9_brightness_temperature",
+    "himawari_8_ahi_channel_10_brightness_temperature",
+    "himawari_8_ahi_channel_11_brightness_temperature",
+    "himawari_8_ahi_channel_12_brightness_temperature",
+    "himawari_8_ahi_channel_13_brightness_temperature",
+    "himawari_8_ahi_channel_14_brightness_temperature",
+    "himawari_8_ahi_channel_15_brightness_temperature",
+    "himawari_8_ahi_channel_16_brightness_temperature",
 ]
 
 
@@ -78,8 +78,9 @@ def ahi_image_info(input_filename):
     # input_proj_str += "+h={perspective_point_height} "
     # input_proj_str += "+sweep={sweep_angle_axis}"
     # input_proj_str = input_proj_str.format(**projection_info)
-    input_proj_str = "+proj=geos +over +lon_0=140.7 +h=35785863 +x_0=0 +y_0=0 " \
-                     "+a=6378137 +b=6356752.299581327 +units=m +no_defs"
+    input_proj_str = (
+        "+proj=geos +over +lon_0=140.7 +h=35785863 +x_0=0 +y_0=0 " "+a=6378137 +b=6356752.299581327 +units=m +no_defs"
+    )
     LOG.debug("AHI Fixed Grid Projection String: %s", input_proj_str)
 
     # Calculate upper-left corner (origin) using center point as a reference
@@ -134,12 +135,12 @@ def ahi_image_info(input_filename):
 
 
 VAR_NAME_STANDARD_NAME = {
-    'cloud_top_height': 'height_at_cloud_top',
-    'cloud_phase': 'thermodynamic_phase_of_cloud_water_particles_at_cloud_top',
-    'cloud_type': 'cloud_type',
-    'cloud_mask': 'cloud_mask',
-    'brightness_temperature': 'toa_brightness_temperature',
-    'reflectance': 'toa_bidirectional_reflectance',
+    "cloud_top_height": "height_at_cloud_top",
+    "cloud_phase": "thermodynamic_phase_of_cloud_water_particles_at_cloud_top",
+    "cloud_type": "cloud_type",
+    "cloud_mask": "cloud_mask",
+    "brightness_temperature": "toa_brightness_temperature",
+    "reflectance": "toa_bidirectional_reflectance",
 }
 
 
@@ -157,8 +158,9 @@ def ahi_dataset_metadata(input_filename, dataset_name):
         metadata["sensor"] = "AHI"
 
     # if we have valid_min and valid_max then get the scaled values
-    valid_min, valid_max = metadata.pop("valid_range",
-                                        (metadata.pop("valid_min", None), metadata.pop("valid_max", None)))
+    valid_min, valid_max = metadata.pop(
+        "valid_range", (metadata.pop("valid_min", None), metadata.pop("valid_max", None))
+    )
     scale_factor = metadata.pop("scale_factor", 1)
     add_offset = metadata.pop("add_offset", 0)
     if valid_min is not None and valid_max is not None:
@@ -192,42 +194,63 @@ def ahi_image_data(input_filename, dataset):
 
 def main():
     import argparse
+
     parser = argparse.ArgumentParser(
-        description="Convert geocat HDF4 files to mercator geotiffs at the same resolution")
-    parser.add_argument("--merc-ext", default=".{dataset}.merc.tif",
-                        help="Extension for new mercator files (replace '.tif' with '.merc.tif' by default)")
-    parser.add_argument("--input-pattern", default="????/*.nc",
-                        help="Input pattern used search for NetCDF files in 'input_dir'")
-    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through'
-                             'ERROR-WARNING-Info-DEBUG (default Info)')
+        description="Convert geocat HDF4 files to mercator geotiffs at the same resolution"
+    )
+    parser.add_argument(
+        "--merc-ext",
+        default=".{dataset}.merc.tif",
+        help="Extension for new mercator files (replace '.tif' with '.merc.tif' by default)",
+    )
+    parser.add_argument(
+        "--input-pattern", default="????/*.nc", help="Input pattern used search for NetCDF files in 'input_dir'"
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbosity",
+        action="count",
+        default=0,
+        help="each occurrence increases verbosity 1 level through" "ERROR-WARNING-Info-DEBUG (default Info)",
+    )
 
     # http://www.gdal.org/frmt_gtiff.html
-    parser.add_argument('--compress', default=None,
-                        help="Type of compression for geotiffs (passed to GDAL GeoTIFF Driver)")
-    parser.add_argument('--predictor', default=None, type=int,
-                        help="Set predictor for geotiff compression (LZW or DEFLATE)")
-    parser.add_argument('--tiled', action='store_true',
-                        help="Create tiled geotiffs")
-    parser.add_argument('--blockxsize', default=None, type=int,
-                        help="Set tile block X size")
-    parser.add_argument('--blockysize', default=None, type=int,
-                        help="Set tile block Y size")
-    parser.add_argument('--extents', default=[np.nan, np.nan, np.nan, np.nan], nargs=4, type=float,
-                        help="Set mercator bounds in lat/lon space (lon_min lat_min lon_max lat_max)")
-    parser.add_argument('--nodata', default=None, type=float,
-                        help="Set the nodata value for the geotiffs that are created")
-    parser.add_argument('--datasets', default=DEFAULT_DATASETS, nargs="+",
-                        help="Specify variables to load from input file")
-    parser.add_argument('--level1-channels', dest="datasets", action='store_const', const=LEVEL_1_DATASETS,
-                        help="Use the default Level 1 dataset names instead of `--datasets`")
-    parser.add_argument("input_dir",
-                        help="Input directory to search for the 'input_pattern' specified")
-    parser.add_argument("output_dir",
-                        help="Output directory to place new mercator files "
-                             "(input_pattern structure is reflected in output dir)")
-    parser.add_argument("gdalwarp_args", nargs="*",
-                        help="arguments that are passed directly to gdalwarp")
+    parser.add_argument(
+        "--compress", default=None, help="Type of compression for geotiffs (passed to GDAL GeoTIFF Driver)"
+    )
+    parser.add_argument(
+        "--predictor", default=None, type=int, help="Set predictor for geotiff compression (LZW or DEFLATE)"
+    )
+    parser.add_argument("--tiled", action="store_true", help="Create tiled geotiffs")
+    parser.add_argument("--blockxsize", default=None, type=int, help="Set tile block X size")
+    parser.add_argument("--blockysize", default=None, type=int, help="Set tile block Y size")
+    parser.add_argument(
+        "--extents",
+        default=[np.nan, np.nan, np.nan, np.nan],
+        nargs=4,
+        type=float,
+        help="Set mercator bounds in lat/lon space (lon_min lat_min lon_max lat_max)",
+    )
+    parser.add_argument(
+        "--nodata", default=None, type=float, help="Set the nodata value for the geotiffs that are created"
+    )
+    parser.add_argument(
+        "--datasets", default=DEFAULT_DATASETS, nargs="+", help="Specify variables to load from input file"
+    )
+    parser.add_argument(
+        "--level1-channels",
+        dest="datasets",
+        action="store_const",
+        const=LEVEL_1_DATASETS,
+        help="Use the default Level 1 dataset names instead of `--datasets`",
+    )
+    parser.add_argument("input_dir", help="Input directory to search for the 'input_pattern' specified")
+    parser.add_argument(
+        "output_dir",
+        help="Output directory to place new mercator files " "(input_pattern structure is reflected in output dir)",
+    )
+    parser.add_argument("gdalwarp_args", nargs="*", help="arguments that are passed directly to gdalwarp")
     args = parser.parse_args()
 
     levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
@@ -270,13 +293,18 @@ def main():
                     src_data = ahi_image_data(nc_file, dataset=dataset)
                     src_meta = ahi_dataset_metadata(nc_file, dataset_name=dataset)
                     # print("### Source Data: Min (%f) | Max (%f)" % (src_data.min(), src_data.max()))
-                    create_ahi_geotiff(src_info, src_meta, src_data, geos_file,
-                                       compress=args.compress,
-                                       predictor=args.predictor,
-                                       tiled=args.tiled,
-                                       blockxsize=args.blockxsize,
-                                       blockysize=args.blockysize,
-                                       nodata=args.nodata)
+                    create_ahi_geotiff(
+                        src_info,
+                        src_meta,
+                        src_data,
+                        geos_file,
+                        compress=args.compress,
+                        predictor=args.predictor,
+                        tiled=args.tiled,
+                        blockxsize=args.blockxsize,
+                        blockysize=args.blockysize,
+                        nodata=args.nodata,
+                    )
                 else:
                     LOG.debug("GEOS Projection GeoTIFF already exists, won't recreate...")
                 lon_west, lon_east = src_info["lon_extents"]
@@ -322,8 +350,11 @@ def main():
 
             gdalwarp_args = args.gdalwarp_args + [
                 # "-multi",
-                "-t_srs", proj,
-                "-tr", str(cw), str(ch),
+                "-t_srs",
+                proj,
+                "-tr",
+                str(cw),
+                str(ch),
                 "-te",
                 "{:0.03f}".format(x_extent[0]),
                 "{:0.03f}".format(y_extent[0]),
@@ -331,10 +362,14 @@ def main():
                 "{:0.03f}".format(y_extent[1]),
             ]
             if args.nodata is not None:
-                gdalwarp_args.extend([
-                    "-srcnodata", str(args.nodata),
-                    "-dstnodata", str(args.nodata),
-                ])
+                gdalwarp_args.extend(
+                    [
+                        "-srcnodata",
+                        str(args.nodata),
+                        "-dstnodata",
+                        str(args.nodata),
+                    ]
+                )
             if args.compress is not None:
                 gdalwarp_args.extend(["-co", "COMPRESS=%s" % (args.compress,)])
                 if args.predictor is not None:

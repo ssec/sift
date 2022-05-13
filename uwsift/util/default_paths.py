@@ -14,8 +14,9 @@ Directory Constants:
 import os
 import sys
 import tempfile
-import appdirs
 from pathlib import Path
+
+import appdirs
 
 APPLICATION_AUTHOR = "CIMSS-SSEC"
 APPLICATION_DIR = "SIFT"
@@ -25,9 +26,9 @@ USER_CACHE_DIR = appdirs.user_cache_dir(APPLICATION_DIR, APPLICATION_AUTHOR)
 USER_DATA_DIR = appdirs.user_data_dir(APPLICATION_DIR, APPLICATION_AUTHOR, roaming=True)
 USER_CONFIG_DIR = appdirs.user_config_dir(APPLICATION_DIR, APPLICATION_AUTHOR, roaming=True)
 
-WORKSPACE_DB_DIR = os.path.join(USER_CACHE_DIR, 'workspace')
+WORKSPACE_DB_DIR = os.path.join(USER_CACHE_DIR, "workspace")
 WORKSPACE_TEMP_DIR = os.path.join(WORKSPACE_DB_DIR, "temp")
-DOCUMENT_SETTINGS_DIR = os.path.join(USER_CONFIG_DIR, 'settings')
+DOCUMENT_SETTINGS_DIR = os.path.join(USER_CONFIG_DIR, "settings")
 
 
 # FUTURE: Is there Document data versus Document configuration?
@@ -35,12 +36,13 @@ DOCUMENT_SETTINGS_DIR = os.path.join(USER_CONFIG_DIR, 'settings')
 
 def _desktop_directory():
     try:
-        if sys.platform.startswith('win'):
+        if sys.platform.startswith("win"):
             import appdirs
+
             # https://msdn.microsoft.com/en-us/library/windows/desktop/bb762494(v=vs.85).aspx
-            return appdirs._get_win_folder('CSIDL_DESKTOPDIRECTORY')
+            return appdirs._get_win_folder("CSIDL_DESKTOPDIRECTORY")
         else:
-            return os.path.join(os.path.expanduser('~'), 'Desktop')
+            return os.path.join(os.path.expanduser("~"), "Desktop")
     except (KeyError, ValueError):
         return os.getcwd()
 

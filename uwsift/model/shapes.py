@@ -17,8 +17,8 @@ REQUIRES
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-__author__ = 'rayg'
-__docformat__ = 'reStructuredText'
+__author__ = "rayg"
+__docformat__ = "reStructuredText"
 
 import logging
 from functools import partial
@@ -42,10 +42,7 @@ def convert_shape_to_proj(to_proj: prj.Proj, shape: sgp.LinearRing, shape_proj: 
     # inverse-project the ring
     if to_proj is shape_proj:
         return shape
-    project = partial(
-        prj.transform,
-        shape_proj,
-        to_proj)
+    project = partial(prj.transform, shape_proj, to_proj)
     newshape = sops.transform(project, shape)
     return newshape
 
@@ -102,7 +99,8 @@ def content_within_shape(content: np.ndarray, trans: Affine, shape: sgp.LinearRi
 
     # Get boolean mask for where the polygon is and get an index mask of those positions
     index_mask = np.nonzero(
-        rasterize([shape], out_shape=(h, w), transform=offset_trans, default_value=1).astype(np.bool_))
+        rasterize([shape], out_shape=(h, w), transform=offset_trans, default_value=1).astype(np.bool_)
+    )
     # translate the mask indexes back to the original data array coordinates (original index mask is read-only)
     index_mask = (index_mask[0] + my, index_mask[1] + nx)
     return index_mask, content[index_mask]

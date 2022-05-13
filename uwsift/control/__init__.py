@@ -17,8 +17,8 @@ REQUIRES
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-__author__ = 'rayg'
-__docformat__ = 'reStructuredText'
+__author__ = "rayg"
+__docformat__ = "reStructuredText"
 
 import logging
 

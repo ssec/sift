@@ -1,18 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """UI objects for configuring RGB layers."""
-import uuid
-
 import logging
+import uuid
 from functools import partial
-from typing import List, Tuple, Optional, Mapping
+from typing import List, Mapping, Optional, Tuple
 
 from PyQt5.QtCore import QObject, pyqtSignal
 from PyQt5.QtGui import QDoubleValidator
 from PyQt5.QtWidgets import QComboBox, QLineEdit
 
-from uwsift.common import Info, Kind, DEFAULT_GAMMA_VALUE
-from uwsift.model.composite_recipes import CompositeRecipe, RGBA2IDX
+from uwsift.common import DEFAULT_GAMMA_VALUE, Info, Kind
+from uwsift.model.composite_recipes import RGBA2IDX, CompositeRecipe
 from uwsift.model.layer_item import LayerItem
 from uwsift.model.layer_model import LayerModel
 
@@ -23,9 +22,9 @@ class RGBLayerConfigPane(QObject):
     """Configures RGB channel selection and ranges on behalf of document.
     Document in turn generates update signals which cause the SceneGraph to refresh.
     """
+
     # Recipe, Channel (RGB), layer uuid, color limits, gamma
-    didChangeRGBInputLayers = pyqtSignal(CompositeRecipe, str, object,
-                                         tuple, float)
+    didChangeRGBInputLayers = pyqtSignal(CompositeRecipe, str, object, tuple, float)
     # Recipe, Channel (RGB), color limits
     didChangeRGBColorLimits = pyqtSignal(CompositeRecipe, str, tuple)
     # Recipe, Channel (RGB), gamma
@@ -69,19 +68,32 @@ class RGBLayerConfigPane(QObject):
         self.ui.editMaxBlue.setValidator(qdoba)
         self.ui.editMaxBlue.setText("0.0")
 
-        [x.currentIndexChanged.connect(partial(self._combo_changed, combo=x, color=rgb))
-         for rgb, x in zip(('b', 'g', 'r'), (self.ui.comboBlue, self.ui.comboGreen, self.ui.comboRed))]
-        [x.valueChanged.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=False))
-         for rgb, x in zip(('b', 'g', 'r'), (self.ui.slideMinBlue, self.ui.slideMinGreen, self.ui.slideMinRed))]
-        [x.valueChanged.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=True))
-         for rgb, x in zip(('b', 'g', 'r'), (self.ui.slideMaxBlue, self.ui.slideMaxGreen, self.ui.slideMaxRed))]
-        [x.editingFinished.connect(partial(self._edit_changed, line_edit=x, color=rgb, is_max=False))
-         for rgb, x in zip(('b', 'g', 'r'), (self.ui.editMinBlue, self.ui.editMinGreen, self.ui.editMinRed))]
-        [x.editingFinished.connect(partial(self._edit_changed, line_edit=x, color=rgb, is_max=True))
-         for rgb, x in zip(('b', 'g', 'r'), (self.ui.editMaxBlue, self.ui.editMaxGreen, self.ui.editMaxRed))]
-        [x.valueChanged.connect(self._gamma_changed)
-         for rgb, x in
-         zip(('b', 'g', 'r'), (self.ui.blueGammaSpinBox, self.ui.greenGammaSpinBox, self.ui.redGammaSpinBox))]
+        [
+            x.currentIndexChanged.connect(partial(self._combo_changed, combo=x, color=rgb))
+            for rgb, x in zip(("b", "g", "r"), (self.ui.comboBlue, self.ui.comboGreen, self.ui.comboRed))
+        ]
+        [
+            x.valueChanged.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=False))
+            for rgb, x in zip(("b", "g", "r"), (self.ui.slideMinBlue, self.ui.slideMinGreen, self.ui.slideMinRed))
+        ]
+        [
+            x.valueChanged.connect(partial(self._slider_changed, slider=x, color=rgb, is_max=True))
+            for rgb, x in zip(("b", "g", "r"), (self.ui.slideMaxBlue, self.ui.slideMaxGreen, self.ui.slideMaxRed))
+        ]
+        [
+            x.editingFinished.connect(partial(self._edit_changed, line_edit=x, color=rgb, is_max=False))
+            for rgb, x in zip(("b", "g", "r"), (self.ui.editMinBlue, self.ui.editMinGreen, self.ui.editMinRed))
+        ]
+        [
+            x.editingFinished.connect(partial(self._edit_changed, line_edit=x, color=rgb, is_max=True))
+            for rgb, x in zip(("b", "g", "r"), (self.ui.editMaxBlue, self.ui.editMaxGreen, self.ui.editMaxRed))
+        ]
+        [
+            x.valueChanged.connect(self._gamma_changed)
+            for rgb, x in zip(
+                ("b", "g", "r"), (self.ui.blueGammaSpinBox, self.ui.greenGammaSpinBox, self.ui.redGammaSpinBox)
+            )
+        ]
 
         self.ui.nameEdit.textEdited.connect(self._rgb_name_edit_changed)
 
@@ -149,9 +161,9 @@ class RGBLayerConfigPane(QObject):
     def _gamma_changed(self, value):
         gamma = tuple(x.value() for x in self.gamma_boxes)
         recipe_gamma = self.recipe.gammas
-        channels = ['r', 'g', 'b']
+        channels = ["r", "g", "b"]
 
-        changed_channel = ''
+        changed_channel = ""
 
         for idx in range(len(channels)):
             if gamma[idx] != recipe_gamma[idx]:
@@ -168,15 +180,11 @@ class RGBLayerConfigPane(QObject):
         LOG.debug("RGB: user selected %s for %s" % (repr(layer_uuid), color))
         # reset slider position to min and max for layer
         self._set_minmax_slider(color, layer_uuid)
-        layer_info \
-            = self.model.get_layer_by_uuid(layer_uuid).info \
-            if layer_uuid else None
+        layer_info = self.model.get_layer_by_uuid(layer_uuid).info if layer_uuid else None
 
         clim = layer_info.get(Info.CLIM) if layer_info else (None, None)
 
-        self.didChangeRGBInputLayers.emit(self.recipe, color, layer_uuid,
-                                          clim,
-                                          DEFAULT_GAMMA_VALUE)
+        self.didChangeRGBInputLayers.emit(self.recipe, color, layer_uuid, clim, DEFAULT_GAMMA_VALUE)
 
         self._show_settings_for_layer(self.recipe)
 
@@ -191,22 +199,22 @@ class RGBLayerConfigPane(QObject):
         layer_uuid = self.recipe.input_layer_ids[RGBA2IDX[color]]
         if layer_uuid is None:
             return values
-        layer_info \
-            = self.model.get_layer_by_uuid(layer_uuid).info
+        layer_info = self.model.get_layer_by_uuid(layer_uuid).info
 
-        return layer_info[Info.UNIT_CONVERSION][1](values, inverse=True) \
-            if layer_info.get(Info.UNIT_CONVERSION) else values
+        return (
+            layer_info[Info.UNIT_CONVERSION][1](values, inverse=True)
+            if layer_info.get(Info.UNIT_CONVERSION)
+            else values
+        )
 
     def _data_to_display(self, color: str, values):
         "convert data value to display value"
         layer_uuid = self.recipe.input_layer_ids[RGBA2IDX[color]]
         if layer_uuid is None:
             return values
-        layer_info \
-            = self.model.get_layer_by_uuid(layer_uuid).info
+        layer_info = self.model.get_layer_by_uuid(layer_uuid).info
 
-        return layer_info[Info.UNIT_CONVERSION][1](values) \
-            if layer_info.get(Info.UNIT_CONVERSION) else values
+        return layer_info[Info.UNIT_CONVERSION][1](values) if layer_info.get(Info.UNIT_CONVERSION) else values
 
     def _get_slider_value(self, valid_min, valid_max, slider_val):
         return (slider_val / self._slider_steps) * (valid_max - valid_min) + valid_min
@@ -243,13 +251,13 @@ class RGBLayerConfigPane(QObject):
         edx.blockSignals(True)
         if n is not None:
             ndis = self._data_to_display(color, n)
-            edn.setText('%f' % ndis)
+            edn.setText("%f" % ndis)
         else:
             ndis = float(edn.text())
             n = self._display_to_data(color, ndis)
         if x is not None:
             xdis = self._data_to_display(color, x)
-            edx.setText('%f' % xdis)
+            edx.setText("%f" % xdis)
         else:
             xdis = float(edx.text())
             x = self._display_to_data(color, xdis)
@@ -274,7 +282,7 @@ class RGBLayerConfigPane(QObject):
         if value is None:
             value = slider.value()
         value = self._get_slider_value(valid_min, valid_max, value)
-        LOG.debug('slider %s %s => %f' % (color, 'max' if is_max else 'min', value))
+        LOG.debug("slider %s %s => %f" % (color, "max" if is_max else "min", value))
         n, x = self._update_line_edits(color, value if not is_max else None, value if is_max else None)
         self._signal_color_changing_range(color, n, x)
 
@@ -290,7 +298,7 @@ class RGBLayerConfigPane(QObject):
         vn, vx = self._valid_ranges[idx]
         vdis = float(line_edit.text())
         val = self._display_to_data(color, vdis)
-        LOG.debug('line edit %s %s => %f => %f' % (color, 'max' if is_max else 'min', vdis, val))
+        LOG.debug("line edit %s %s => %f => %f" % (color, "max" if is_max else "min", vdis, val))
         sv = self._create_slider_value(vn, vx, val)
         slider = self.sliders[idx][1 if is_max else 0]
         slider.blockSignals(True)
@@ -337,21 +345,18 @@ class RGBLayerConfigPane(QObject):
         slider = self.sliders[idx]
         editn, editx = self.line_edits[idx]
         if layer_uuid not in self._layer_uuids:
-            LOG.debug(
-                "Could not find {} in layer_uuids {}".format(repr(layer_uuid),
-                                                             self._layer_uuids))
+            LOG.debug("Could not find {} in layer_uuids {}".format(repr(layer_uuid), self._layer_uuids))
         # block signals so the changed sliders don't trigger updates
         slider[0].blockSignals(True)
         slider[1].blockSignals(True)
-        if clims is None or clims == (None, None) or \
-                layer_uuid not in self._layer_uuids:
+        if clims is None or clims == (None, None) or layer_uuid not in self._layer_uuids:
             self._valid_ranges[idx] = (None, None)
             slider[0].setSliderPosition(0)
             slider[1].setSliderPosition(0)
             editn.blockSignals(True)
             editx.blockSignals(True)
-            editn.setText('0.0')
-            editx.setText('0.0')
+            editn.setText("0.0")
+            editx.setText("0.0")
             editn.blockSignals(False)
             editx.blockSignals(False)
             slider[0].setDisabled(True)
@@ -398,8 +403,7 @@ class RGBLayerConfigPane(QObject):
                     dex = widget.findData(layer_uuid)
                     if dex <= 0:
                         widget.setCurrentIndex(0)
-                        LOG.error("Layer with uuid '%s' not available to"
-                                  " be selected" % (layer_uuid,))
+                        LOG.error("Layer with uuid '%s' not available to" " be selected" % (layer_uuid,))
                     else:
                         widget.setCurrentIndex(dex)
         else:
@@ -422,7 +426,7 @@ class RGBLayerConfigPane(QObject):
         # clear out the current lists
         for widget in self.rgb:
             widget.clear()
-            widget.addItem('None', None)
+            widget.addItem("None", None)
 
         # fill up our lists of layers
         for widget, selected_layer_uuid in zip(self.rgb, current_layers):
@@ -455,4 +459,4 @@ class RGBLayerConfigPane(QObject):
         else:
             for sbox in self.gamma_boxes:
                 sbox.setDisabled(True)
-                sbox.setValue(1.)
+                sbox.setValue(1.0)

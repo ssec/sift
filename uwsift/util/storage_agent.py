@@ -38,8 +38,10 @@ class FileMetadata:
         self.last_data_modification = datetime.fromtimestamp(mtime)
 
     def __repr__(self) -> str:
-        return f"FileMetadata {{ path: {self.path}, size: {self.size}, " \
-               f"last data modification: {self.last_data_modification} }}"
+        return (
+            f"FileMetadata {{ path: {self.path}, size: {self.size}, "
+            f"last data modification: {self.last_data_modification} }}"
+        )
 
 
 class StorageAgent:
@@ -52,14 +54,14 @@ class StorageAgent:
     :param notification_cmd: command to send log messages to a reporting system
     :raise ValueError: files_lifetime is negative or zero
     """
+
     dir_paths: List[str] = []
     _fs_entries: Dict[str, FileMetadata] = {}
     _ignored_entries: Set[str] = set()
 
     def __init__(self, files_lifetime: int, notification_cmd: Optional[str]):
         if files_lifetime < 1:
-            raise ValueError("files_lifetime must not be negative or zero"
-                             " but is {files_lifetime}.")
+            raise ValueError("files_lifetime must not be negative or zero" " but is {files_lifetime}.")
         self.hostname = gethostname()
         self.files_lifetime = timedelta(seconds=files_lifetime)
 
@@ -83,8 +85,7 @@ class StorageAgent:
             process_name = shlex.quote(f"{APPLICATION_DIR}-storage-agent")
             severity = shlex.quote(logging.getLevelName(level))
             text = shlex.quote(text)
-            cmd = (f"{self.notification_cmd}"
-                   f" {machine} {process_name} {severity} {text}")
+            cmd = f"{self.notification_cmd}" f" {machine} {process_name} {severity} {text}"
 
             try:
                 subprocess.run(cmd, shell=True, check=True)
@@ -222,8 +223,7 @@ class StorageAgent:
             print(f"Directories will be checked every {interval} seconds")
 
         if interval <= 0:
-            raise ValueError("interval must not be negative or zero"
-                             " but is {interval}.")
+            raise ValueError("interval must not be negative or zero" " but is {interval}.")
 
         while True:
             for deletable_entry in self._check_for_deletable_entries():
@@ -246,22 +246,18 @@ class StorageAgent:
 
 if __name__ == "__main__":
     user_cache_dir = appdirs.user_cache_dir(APPLICATION_DIR, APPLICATION_AUTHOR)
-    user_config_dir = appdirs.user_config_dir(APPLICATION_DIR,
-                                              APPLICATION_AUTHOR, roaming=True)
+    user_config_dir = appdirs.user_config_dir(APPLICATION_DIR, APPLICATION_AUTHOR, roaming=True)
     config_dir = os.path.join(user_config_dir, "settings", "config")
 
     config = Config("uwsift", paths=[config_dir])
 
-    files_lifetime: int = \
-        int(config.get("storage.agent.files_lifetime", -1))
+    files_lifetime: int = int(config.get("storage.agent.files_lifetime", -1))
     if files_lifetime < 0:  #
         raise RuntimeError("Config option `files_lifetime` is required")
 
-    notification_cmd = config.get("storage.agent.notification_cmd",
-                                  None)
+    notification_cmd = config.get("storage.agent.notification_cmd", None)
     if not notification_cmd:
-        LOG.warning("Can't send notifications"
-                    " because `notification_cmd` isn't configured")
+        LOG.warning("Can't send notifications" " because `notification_cmd` isn't configured")
         notification_cmd = None
 
     interval = config.get("storage.agent.interval", None)

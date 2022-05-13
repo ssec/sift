@@ -182,7 +182,12 @@ class Ui_openFileWizard(object):
         _translate = QtCore.QCoreApplication.translate
         openFileWizard.setWindowTitle(_translate("openFileWizard", "Open File Wizard"))
         self.fileSelectionPage.setTitle(_translate("openFileWizard", "Select Files to Open"))
-        self.fileSelectionPage.setSubTitle(_translate("openFileWizard", "Select reader & folder. Click column headers to sort files. Click\'n\'drag with mouse for easier row selection. Hold control key to extend selection. Use filter combo-box to choose from predefined patterns or write your own."))
+        self.fileSelectionPage.setSubTitle(
+            _translate(
+                "openFileWizard",
+                "Select reader & folder. Click column headers to sort files. Click'n'drag with mouse for easier row selection. Hold control key to extend selection. Use filter combo-box to choose from predefined patterns or write your own.",
+            )
+        )
         self.filterPatternLabel.setText(_translate("openFileWizard", "Filter:"))
         self.folderLabel.setText(_translate("openFileWizard", "Folder:"))
         self.readerLabel.setText(_translate("openFileWizard", "Reader:"))
@@ -202,4 +207,6 @@ class Ui_openFileWizard(object):
         self.projectionLabel.setText(_translate("openFileWizard", "Projection:"))
         self.resamplingShapeLabel.setText(_translate("openFileWizard", "Shape:"))
         self.selectIDTable.setSortingEnabled(True)
+
+
 from uwsift.ui.custom_widgets import InitiallyIncompleteWizardPage

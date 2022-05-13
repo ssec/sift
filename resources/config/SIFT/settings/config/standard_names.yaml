@@ -13,4 +13,3 @@ standard_names:
   'air_pressure_at_cloud_top': CTP
   'reflectance_mean_all': REFL (mean, all)
   'reflectance_mean_cld': REFL (mean, cloudy)
-

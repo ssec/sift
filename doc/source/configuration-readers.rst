@@ -107,4 +107,3 @@ field names, as for example for the ``fci_l1_geoobs_lmk_nav_err`` reader::
         ...
         kind: LINES
         coordinates_end: ['longitude_reference', 'latitude_reference']
-

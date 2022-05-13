@@ -2,9 +2,9 @@ import json
 import logging
 import math
 import os
-from PyQt5 import QtCore, QtGui, QtWidgets
 
 import pyqtgraph as pg
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 LOG = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class ColormapEditor(QtWidgets.QDialog):
         self.builtin_colormap_states = {}
 
         # Setup Color Bar & clear its data
-        self.ColorBar = pg.GradientWidget(orientation='bottom')
+        self.ColorBar = pg.GradientWidget(orientation="bottom")
         tickList = self.ColorBar.listTicks()
         for tick in tickList:
             self.ColorBar.removeTick(tick[0])
@@ -81,7 +81,7 @@ class ColormapEditor(QtWidgets.QDialog):
             editable = cmap_manager.is_writeable_colormap(cmap)
             cmap_obj = cmap_manager[cmap]
             if cmap_obj.colors and hasattr(cmap_obj, "_controls"):
-                is_sqrt = getattr(cmap_obj, 'sqrt', False)
+                is_sqrt = getattr(cmap_obj, "sqrt", False)
                 self.import_colormaps(cmap, cmap_obj._controls, cmap_obj.colors._rgba, sqrt=is_sqrt, editable=editable)
 
     def save_button_click(self):
@@ -93,24 +93,28 @@ class ColormapEditor(QtWidgets.QDialog):
 
     def clone_colormap(self):
         # Clone existing colormap
-        text, ok = QtWidgets.QInputDialog.getText(self, 'Clone Colormap', 'Enter colormap name:')
-        protected_names = ['mode', 'ticks', 'step']
+        text, ok = QtWidgets.QInputDialog.getText(self, "Clone Colormap", "Enter colormap name:")
+        protected_names = ["mode", "ticks", "step"]
 
         if ok:
             save_name = str(text)
             if save_name in self.user_colormap_states or save_name in protected_names:
                 overwrite_msg = "There is already a save with this name. Would you like to Overwrite?"
                 reply = QtWidgets.QMessageBox.question(
-                    self, 'Message', overwrite_msg, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
+                    self, "Message", overwrite_msg, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No
+                )
 
                 if reply == QtWidgets.QMessageBox.Yes:
                     if save_name in self.builtin_colormap_states or save_name in protected_names:
                         QtWidgets.QMessageBox.information(
-                            self, "Error", "You cannot save a colormap with "
-                                           "the same name as one of the "
-                                           "internal colormaps or one of the "
-                                           "protected names ('mode', "
-                                           "'ticks', 'step').")
+                            self,
+                            "Error",
+                            "You cannot save a colormap with "
+                            "the same name as one of the "
+                            "internal colormaps or one of the "
+                            "protected names ('mode', "
+                            "'ticks', 'step').",
+                        )
                         reply.close()
                         return
 
@@ -118,8 +122,8 @@ class ColormapEditor(QtWidgets.QDialog):
             else:
                 if save_name in self.builtin_colormap_states:
                     QtWidgets.QMessageBox.information(
-                        self, "Error",
-                        "You cannot save a colormap with the same name as one of the internal colormaps.")
+                        self, "Error", "You cannot save a colormap with the same name as one of the internal colormaps."
+                    )
                     return
 
                 self.user_colormap_states[save_name] = self.ColorBar.saveState()
@@ -161,7 +165,7 @@ class ColormapEditor(QtWidgets.QDialog):
                 # numpy data types
                 controls = controls.tolist()
             for control, color in zip(controls, colors):
-                newWidget.addTick(control, QtGui.QColor(*(color * 255.)), movable=editable)
+                newWidget.addTick(control, QtGui.QColor(*(color * 255.0)), movable=editable)
 
             if editable:
                 self.user_colormap_states[name] = newWidget.saveState()
@@ -184,9 +188,9 @@ class ColormapEditor(QtWidgets.QDialog):
             if to_show is not None and key == to_show:
                 corVal = total_count
 
-        self.cmap_list.addItem("----------------------------- "
-                               "Below Are Builtin ColorMaps"
-                               " -----------------------------")
+        self.cmap_list.addItem(
+            "----------------------------- " "Below Are Builtin ColorMaps" " -----------------------------"
+        )
         barrier_item = self.cmap_list.item(total_count)
         barrier_item.setFlags(QtCore.Qt.NoItemFlags)
         total_count += 1
@@ -265,7 +269,8 @@ class ColormapEditor(QtWidgets.QDialog):
 
         delete_msg = "Please confirm you want to delete the colormap(s): " + to_print
         reply = QtWidgets.QMessageBox.question(
-            self, 'Message', delete_msg, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
+            self, "Message", delete_msg, QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No
+        )
         if reply == QtWidgets.QMessageBox.Yes:
             for index in selected_colormaps:
                 del self.user_colormap_states[index.text()]
@@ -275,29 +280,33 @@ class ColormapEditor(QtWidgets.QDialog):
     def importButtonClick(self):
         # Import colormap
         fname = QtWidgets.QFileDialog.getOpenFileName(
-            self, 'Get Colormap File', os.path.expanduser('~'), "Colormaps (*.json)")[0]
+            self, "Get Colormap File", os.path.expanduser("~"), "Colormaps (*.json)"
+        )[0]
         self._import_single_file(fname)
 
     def _import_single_file(self, filename):
         try:
-            cmap_content = json.loads(open(filename, 'r').read())
+            cmap_content = json.loads(open(filename, "r").read())
             # FUTURE: Handle all types of colormaps, make sure they are copied to the settings directory
-            if isinstance(cmap_content, dict) and 'ticks' in cmap_content:
+            if isinstance(cmap_content, dict) and "ticks" in cmap_content:
                 # single colormap file
                 cmap_name = os.path.splitext(os.path.basename(filename))[0]
                 cmap_content = {cmap_name: cmap_content}
             elif isinstance(cmap_content, list) and isinstance(cmap_content[0], dict):
                 # list of individual colormap objects (not currently used
-                cmap_content = {cmap['name']: cmap for cmap in cmap_content}
+                cmap_content = {cmap["name"]: cmap for cmap in cmap_content}
             elif not isinstance(cmap_content, dict):
                 raise ValueError("Unknown colormap file format: {}".format(filename))
 
             for cmap_name in cmap_content:
                 if cmap_name in self.builtin_colormap_states:
                     QtWidgets.QMessageBox.information(
-                        self, "Error", "You cannot import a colormap with "
-                                       "the same name as one of the internal "
-                                       "colormaps: {}".format(cmap_name))
+                        self,
+                        "Error",
+                        "You cannot import a colormap with "
+                        "the same name as one of the internal "
+                        "colormaps: {}".format(cmap_name),
+                    )
                     return
 
             for cmap_name, cmap_info in cmap_content.items():
@@ -309,13 +318,12 @@ class ColormapEditor(QtWidgets.QDialog):
             self.user_colormap_states.update(cmap_content)
             self.updateListWidget(cmap_name)
         except IOError:
-            LOG.error("Error importing colormap from file "
-                      "{}".format(filename), exc_info=True)
+            LOG.error("Error importing colormap from file " "{}".format(filename), exc_info=True)
 
     def exportButtonClick(self):
         # Export colormap(s)
         selected_colormaps = self.cmap_list.selectedItems()
-        fname = QtWidgets.QFileDialog.getSaveFileName(None, 'Save As', 'Export.json')[0]
+        fname = QtWidgets.QFileDialog.getSaveFileName(None, "Save As", "Export.json")[0]
         toExport = set()
         for index in selected_colormaps:
             toExport.add(index.text())
@@ -329,12 +337,11 @@ class ColormapEditor(QtWidgets.QDialog):
             if k in toExport:
                 done[k] = self.builtin_colormap_states[k]
         try:
-            file = open(fname, 'w')
+            file = open(fname, "w")
             file.write(json.dumps(done, indent=2, sort_keys=True))
             file.close()
         except IOError:
-            LOG.error("Error exporting colormaps: {}".format(fname),
-                      exc_info=True)
+            LOG.error("Error exporting colormaps: {}".format(fname), exc_info=True)
 
 
 def main():
@@ -345,7 +352,7 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import sys
 
     sys.exit(main())

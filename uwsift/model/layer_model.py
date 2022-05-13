@@ -1,19 +1,23 @@
-from datetime import datetime
-
 import logging
 import struct
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 
-from PyQt5.QtCore import (QAbstractItemModel, Qt, QModelIndex, pyqtSignal,
-                          QMimeData)
+from PyQt5.QtCore import QAbstractItemModel, QMimeData, QModelIndex, Qt, pyqtSignal
 
-from uwsift.common import LAYER_TREE_VIEW_HEADER, Presentation, Info, Kind, \
-    LATLON_GRID_DATASET_NAME, BORDERS_DATASET_NAME, Platform, Instrument, \
-    LayerModelColumns as LMC, LayerVisibility
+from uwsift.common import (
+    BORDERS_DATASET_NAME,
+    LATLON_GRID_DATASET_NAME,
+    LAYER_TREE_VIEW_HEADER,
+    Info,
+    Instrument,
+    Kind,
+)
+from uwsift.common import LayerModelColumns as LMC
+from uwsift.common import LayerVisibility, Platform, Presentation
 from uwsift.model import Document
-from uwsift.model.composite_recipes import AlgebraicRecipe, CompositeRecipe, \
-    Recipe
+from uwsift.model.composite_recipes import AlgebraicRecipe, CompositeRecipe, Recipe
 from uwsift.model.layer_item import LayerItem
 from uwsift.model.product_dataset import ProductDataset
 from uwsift.workspace.workspace import frozendict
@@ -101,17 +105,14 @@ class LayerModel(QAbstractItemModel):
 
         self.layers: List[LayerItem] = []
 
-        self._supportedRoles = [Qt.DisplayRole,
-                                Qt.EditRole,
-                                Qt.TextAlignmentRole]
+        self._supportedRoles = [Qt.DisplayRole, Qt.EditRole, Qt.TextAlignmentRole]
 
     def _init_system_layer(self, name):
         # The minimal 'dataset' information required by LayerItem
         # initialization:
-        pseudo_info = frozendict({Info.KIND: Kind.LINES,
-                                  Info.PLATFORM: Platform.SYSTEM,
-                                  Info.INSTRUMENT: Instrument.GENERATED,
-                                  "name": name})
+        pseudo_info = frozendict(
+            {Info.KIND: Kind.LINES, Info.PLATFORM: Platform.SYSTEM, Info.INSTRUMENT: Instrument.GENERATED, "name": name}
+        )
 
         presentation = Presentation(uuid=None, kind=Kind.LINES)
 
@@ -122,7 +123,7 @@ class LayerModel(QAbstractItemModel):
         self.didAddSystemLayer.emit(system_layer)
 
     def init_system_layers(self):
-        """ Create layers whose existence is controlled by the system, not
+        """Create layers whose existence is controlled by the system, not
         by the user.
 
         Currently two system layers are set up, one for a latitude/longitude
@@ -149,14 +150,11 @@ class LayerModel(QAbstractItemModel):
                 return Qt.AlignRight
             return Qt.AlignLeft
 
-        raise NotImplementedError(f"Missing implementation for supported"
-                                  f" Qt.ItemDataRole {role}")
+        raise NotImplementedError(f"Missing implementation for supported" f" Qt.ItemDataRole {role}")
 
     def flags(self, index):
         if index.isValid():
-            flags = (Qt.ItemIsEnabled |
-                     Qt.ItemIsSelectable |
-                     Qt.ItemIsDragEnabled)
+            flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsDragEnabled
         else:
             flags = Qt.ItemIsDropEnabled
         return flags
@@ -229,8 +227,7 @@ class LayerModel(QAbstractItemModel):
                  column
         """
         # This needs modification if hierarchical layers are introduced.
-        return not parent.isValid() and \
-            (self.rowCount(parent) > 0) and (self.columnCount(parent) > 0)
+        return not parent.isValid() and (self.rowCount(parent) > 0) and (self.columnCount(parent) > 0)
 
     def columnCount(self, parent=None):
         return len(self._headers)
@@ -264,25 +261,20 @@ class LayerModel(QAbstractItemModel):
         if not index.isValid():
             return False
 
-        assert role == Qt.EditRole, \
-            f"Unexpected role {role} for changing data."
-        assert index.column() == LMC.VISIBILITY, \
-            f"Attempt to edit immutable column {index.column()}."
+        assert role == Qt.EditRole, f"Unexpected role {role} for changing data."
+        assert index.column() == LMC.VISIBILITY, f"Attempt to edit immutable column {index.column()}."
 
-        LOG.debug(f"Changing row {index.row()}, column {index.column()}"
-                  f" to {data}.")
+        LOG.debug(f"Changing row {index.row()}, column {index.column()}" f" to {data}.")
 
         layer = self.layers[index.row()]
         layer_visibility: LayerVisibility = data
         if layer.opacity != layer_visibility.opacity:
             layer.opacity = layer_visibility.opacity
-            LOG.debug(f"Layer opacity changed to:"
-                      f" {self.layers[index.row()].opacity}")
+            LOG.debug(f"Layer opacity changed to:" f" {self.layers[index.row()].opacity}")
             self.didChangeLayerOpacity.emit(layer.uuid, layer.opacity)
         if layer.visible != layer_visibility.visible:
             layer.visible = layer_visibility.visible
-            LOG.debug(f"Layer visible changed to:"
-                      f" {self.layers[index.row()].visible}")
+            LOG.debug(f"Layer visible changed to:" f" {self.layers[index.row()].visible}")
             self.didChangeLayerVisible.emit(layer.uuid, layer.visible)
         self.dataChanged.emit(index, index)
         return True
@@ -290,16 +282,15 @@ class LayerModel(QAbstractItemModel):
     def get_layer_by_uuid(self, uuid: UUID) -> Optional[LayerItem]:
         layers = [layer for layer in self.layers if layer.uuid == uuid]
         if len(layers) > 1:
-            raise ValueError(f"Multiple Layers with UUID: {uuid} found"
-                             f" with product_family_key:"
-                             f" {self.product_family_key}!")
+            raise ValueError(
+                f"Multiple Layers with UUID: {uuid} found" f" with product_family_key:" f" {self.product_family_key}!"
+            )
         elif len(layers) == 0:
             return None
         else:
             return layers[0]
 
-    def _get_layer_for_dataset(self, info: frozendict,
-                               presentation: Presentation) -> LayerItem:
+    def _get_layer_for_dataset(self, info: frozendict, presentation: Presentation) -> LayerItem:
         layer, grouping_key = self.policy.get_existing_layer_for_dataset(info)
 
         if not layer:
@@ -314,8 +305,7 @@ class LayerModel(QAbstractItemModel):
 
         return layer
 
-    def add_dataset(self, info: frozendict, presentation: Presentation) \
-            -> None:
+    def add_dataset(self, info: frozendict, presentation: Presentation) -> None:
         """
         Slot specifically to fill model from Document's
         `activate_product_uuid_as_new_layer`.
@@ -340,21 +330,19 @@ class LayerModel(QAbstractItemModel):
             elif product_dataset.kind == Kind.POINTS:
                 self.didAddPointsDataset.emit(layer, product_dataset)
             else:
-                raise NotImplementedError(
-                    f"Managing datasets of kind {product_dataset.kind}"
-                    f" not (yet) supported.")
+                raise NotImplementedError(f"Managing datasets of kind {product_dataset.kind}" f" not (yet) supported.")
 
             self.didUpdateLayers.emit()
         self._trigger_composite_layer_update(layer)
 
     def mimeTypes(self):
-        return ['text/plain', 'text/xml']
+        return ["text/plain", "text/xml"]
 
     def mimeData(self, indexes):
         mime_data = QMimeData()
         rows = list(set([index.row() for index in indexes]))
         row_bytes = struct.pack("<I", rows[0])
-        mime_data.setData('text/plain', row_bytes)
+        mime_data.setData("text/plain", row_bytes)
         return mime_data
 
     def dropMimeData(self, mime_data, action, row, column, parentIndex):
@@ -363,23 +351,21 @@ class LayerModel(QAbstractItemModel):
         if action != Qt.MoveAction:
             return False
 
-        source_row = struct.unpack("<I", mime_data.data('text/plain'))[0]
+        source_row = struct.unpack("<I", mime_data.data("text/plain"))[0]
 
         if row != -1:  # we may also interpret this as put to the end
             target_row = row
         elif parentIndex.isValid():
-            assert not parentIndex.isValid(), \
-                "BUG: hierarchical layers not implemented," \
-                " dropping on a parent must not yet occur!"
+            assert not parentIndex.isValid(), (
+                "BUG: hierarchical layers not implemented," " dropping on a parent must not yet occur!"
+            )
             # This case needs modification when hierarchical layers are
             # introduced.
             target_row = parentIndex.row()  # just to keep the linter calm
         else:
             target_row = self.rowCount(QModelIndex())
 
-        move_is_possible = \
-            self.beginMoveRows(QModelIndex(), source_row, source_row,
-                               parentIndex, target_row)
+        move_is_possible = self.beginMoveRows(QModelIndex(), source_row, source_row, parentIndex, target_row)
         if not move_is_possible:
             return False
 
@@ -410,39 +396,37 @@ class LayerModel(QAbstractItemModel):
                     product_dataset.is_active = True
                 else:
                     product_dataset.is_active = False
-                self.didActivateProductDataset.emit(product_dataset.uuid,
-                                                    product_dataset.is_active)
+                self.didActivateProductDataset.emit(product_dataset.uuid, product_dataset.is_active)
         self.didFinishActivateProductDatasets.emit()
 
     def get_probeable_layers(self) -> List[LayerItem]:
-        """ Get LayerItems which may contain data suitable for probing
+        """Get LayerItems which may contain data suitable for probing
         operations.
 
         Currently only single channel raster data can be point or region probed,
         thus the layer must be one capable of carrying datasets of kind IMAGE or
         COMPOSITE.
         """
-        return [layer for layer in self.layers
-                if layer.kind in [Kind.IMAGE, Kind.COMPOSITE]]
+        return [layer for layer in self.layers if layer.kind in [Kind.IMAGE, Kind.COMPOSITE]]
 
     def get_top_probeable_layer(self) -> Optional[LayerItem]:
         probeable_layers = self.get_probeable_layers()
-        return None if len(probeable_layers) == 0 \
-            else probeable_layers[0]
+        return None if len(probeable_layers) == 0 else probeable_layers[0]
 
-    def get_top_probeable_layer_with_active_product_dataset(self) \
-            -> Tuple[Optional[LayerItem], Optional[ProductDataset]]:
+    def get_top_probeable_layer_with_active_product_dataset(
+        self,
+    ) -> Tuple[Optional[LayerItem], Optional[ProductDataset]]:
         top_probeable_layer = self.get_top_probeable_layer()
-        return (None, None) if top_probeable_layer is None \
-            else (top_probeable_layer,
-                  top_probeable_layer.get_first_active_product_dataset())
+        return (
+            (None, None)
+            if top_probeable_layer is None
+            else (top_probeable_layer, top_probeable_layer.get_first_active_product_dataset())
+        )
 
     @staticmethod
-    def _build_presentation_change_dict(layer: LayerItem,
-                                        presentation_element: object):
+    def _build_presentation_change_dict(layer: LayerItem, presentation_element: object):
         product_datasets_uuids = layer.get_datasets_uuids()
-        return {pd_uuid: presentation_element
-                for pd_uuid in product_datasets_uuids}
+        return {pd_uuid: presentation_element for pd_uuid in product_datasets_uuids}
 
     def change_colormap_for_layer(self, uuid: UUID, colormap: object):
         layer = self.get_layer_by_uuid(uuid)
@@ -473,9 +457,9 @@ class LayerModel(QAbstractItemModel):
             for layer in self.get_probeable_layers():
                 product_dataset = layer.get_first_active_product_dataset()
 
-                layer.probe_value = None if not product_dataset \
-                    else \
-                    self._workspace.get_content_point(product_dataset.uuid, xy_pos)
+                layer.probe_value = (
+                    None if not product_dataset else self._workspace.get_content_point(product_dataset.uuid, xy_pos)
+                )
 
         self._refresh()
 
@@ -493,16 +477,9 @@ class LayerModel(QAbstractItemModel):
 
     def _get_empty_rgb_layer(self, recipe: CompositeRecipe):
         # TODO(am) add check of existing layer with help of recipe
-        info = {
-            Info.KIND: Kind.RGB
-        }
+        info = {Info.KIND: Kind.RGB}
 
-        prez = Presentation(
-            uuid=None,
-            kind=Kind.RGB,
-            climits=recipe.color_limits,
-            gamma=recipe.gammas
-        )
+        prez = Presentation(uuid=None, kind=Kind.RGB, climits=recipe.color_limits, gamma=recipe.gammas)
 
         rgb_layer = LayerItem(self, info, prez, recipe=recipe)
         self.didCreateLayer.emit(rgb_layer)
@@ -519,54 +496,39 @@ class LayerModel(QAbstractItemModel):
         self.change_gamma_for_layer(rgb_layer.uuid, recipe.gammas)
 
     @staticmethod
-    def _get_datasets_uuids_of_multichannel_dataset(
-            sched_time: datetime, input_layers: List[LayerItem]
-    ) -> List[UUID]:
+    def _get_datasets_uuids_of_multichannel_dataset(sched_time: datetime, input_layers: List[LayerItem]) -> List[UUID]:
         input_datasets_uuids = []
         for layer in input_layers:
-            dataset_uuid \
-                = layer.timeline.get(sched_time).uuid if layer else None
+            dataset_uuid = layer.timeline.get(sched_time).uuid if layer else None
             input_datasets_uuids.append(dataset_uuid)
         return input_datasets_uuids
 
     @staticmethod
-    def _get_datasets_infos_of_multichannel_dataset(
-            sched_time: datetime, input_layers: List[LayerItem]
-    ) -> List[dict]:
+    def _get_datasets_infos_of_multichannel_dataset(sched_time: datetime, input_layers: List[LayerItem]) -> List[dict]:
         input_datasets_infos = []
         for layer in input_layers:
-            dataset_info \
-                = layer.timeline.get(sched_time).info if layer else None
+            dataset_info = layer.timeline.get(sched_time).info if layer else None
             input_datasets_infos.append(dataset_info)
         return input_datasets_infos
 
-    def _remove_datasets(self,
-                         datasets_to_remove: List[datetime],
-                         layer: LayerItem):
+    def _remove_datasets(self, datasets_to_remove: List[datetime], layer: LayerItem):
         for sched_time in datasets_to_remove:
             dataset: ProductDataset = layer.timeline.get(sched_time)
             self._remove_dataset(layer, sched_time, dataset.uuid)
 
-    def _remove_dataset(self,
-                        layer: LayerItem,
-                        sched_time: datetime,
-                        dataset_uuid: UUID):
+    def _remove_dataset(self, layer: LayerItem, sched_time: datetime, dataset_uuid: UUID):
         layer.remove_dataset(sched_time)
         # TODO: Workspace has to remove Content/Product
         self.didDeleteProductDataset.emit(dataset_uuid)
 
-    def _update_rgb_datasets(self, datasets_to_update: List[datetime],
-                             input_layers: List[LayerItem],
-                             rgb_layer: LayerItem):
+    def _update_rgb_datasets(
+        self, datasets_to_update: List[datetime], input_layers: List[LayerItem], rgb_layer: LayerItem
+    ):
         for sched_time in datasets_to_update:
             dataset: ProductDataset = rgb_layer.timeline.get(sched_time)
 
-            input_datasets_uuids \
-                = self._get_datasets_uuids_of_multichannel_dataset(sched_time,
-                                                                   input_layers)
-            input_datasets_infos \
-                = self._get_datasets_infos_of_multichannel_dataset(sched_time,
-                                                                   input_layers)
+            input_datasets_uuids = self._get_datasets_uuids_of_multichannel_dataset(sched_time, input_layers)
+            input_datasets_infos = self._get_datasets_infos_of_multichannel_dataset(sched_time, input_layers)
             dataset_uuid = dataset.uuid
 
             dataset.input_datasets_uuids = input_datasets_uuids
@@ -576,32 +538,19 @@ class LayerModel(QAbstractItemModel):
                 self._remove_dataset(rgb_layer, sched_time, dataset_uuid)
                 continue
 
-            self.didChangeCompositeProductDataset.emit(
-                rgb_layer,
-                dataset
-            )
+            self.didChangeCompositeProductDataset.emit(rgb_layer, dataset)
 
-    def _add_rgb_datasets(self, datasets_to_added: List[datetime],
-                          input_layers: List[LayerItem],
-                          rgb_layer: LayerItem):
+    def _add_rgb_datasets(self, datasets_to_added: List[datetime], input_layers: List[LayerItem], rgb_layer: LayerItem):
         for sched_time in datasets_to_added:
-            input_datasets_uuids \
-                = self._get_datasets_uuids_of_multichannel_dataset(sched_time,
-                                                                   input_layers)
-            input_datasets_infos \
-                = self._get_datasets_infos_of_multichannel_dataset(sched_time,
-                                                                   input_layers)
+            input_datasets_uuids = self._get_datasets_uuids_of_multichannel_dataset(sched_time, input_layers)
+            input_datasets_infos = self._get_datasets_infos_of_multichannel_dataset(sched_time, input_layers)
 
-            dataset = rgb_layer.add_multichannel_dataset(None,
-                                                         sched_time,
-                                                         input_datasets_uuids,
-                                                         input_datasets_infos)
+            dataset = rgb_layer.add_multichannel_dataset(None, sched_time, input_datasets_uuids, input_datasets_infos)
 
             self.didAddCompositeDataset.emit(rgb_layer, dataset)
 
     @staticmethod
-    def _get_diff_of_timelines(common_timeline: List[datetime],
-                               rgb_layer: LayerItem):
+    def _get_diff_of_timelines(common_timeline: List[datetime], rgb_layer: LayerItem):
         datasets_to_added = []
         datasets_to_remove = list(rgb_layer.timeline.keys())
         datasets_to_update = []
@@ -614,8 +563,7 @@ class LayerModel(QAbstractItemModel):
         return datasets_to_added, datasets_to_update, datasets_to_remove
 
     @staticmethod
-    def _get_common_timeline_of_input_layers(
-            timelines_to_compare: List[dict]):
+    def _get_common_timeline_of_input_layers(timelines_to_compare: List[dict]):
         if len(timelines_to_compare) == 0:
             return []
 
@@ -641,43 +589,35 @@ class LayerModel(QAbstractItemModel):
             self.update_rgb_layer_gamma(recipe)
             self.update_rgb_layer_color_limits(recipe)
 
-        input_layers \
-            = self.get_layers_by_uuids(recipe_layer.recipe.input_layer_ids)
+        input_layers = self.get_layers_by_uuids(recipe_layer.recipe.input_layer_ids)
 
         timelines_to_compare = self._get_timeline_of_layers(input_layers)
-        common_timeline = self._get_common_timeline_of_input_layers(
-            timelines_to_compare
-        )
+        common_timeline = self._get_common_timeline_of_input_layers(timelines_to_compare)
 
-        sched_times_to_add, existing_sched_times, sched_times_to_remove \
-            = self._get_diff_of_timelines(common_timeline, recipe_layer)
+        sched_times_to_add, existing_sched_times, sched_times_to_remove = self._get_diff_of_timelines(
+            common_timeline, recipe_layer
+        )
 
         self._remove_datasets(sched_times_to_remove, recipe_layer)
 
         sched_times_to_update = self._check_recipe_layer_sched_times_to_update(
-            existing_sched_times, input_layers, recipe_layer)
+            existing_sched_times, input_layers, recipe_layer
+        )
 
         if isinstance(recipe, CompositeRecipe):
-            self._update_rgb_datasets(sched_times_to_update,
-                                      input_layers,
-                                      recipe_layer)
-            self._add_rgb_datasets(sched_times_to_add, input_layers,
-                                   recipe_layer)
+            self._update_rgb_datasets(sched_times_to_update, input_layers, recipe_layer)
+            self._add_rgb_datasets(sched_times_to_add, input_layers, recipe_layer)
 
         elif isinstance(recipe, AlgebraicRecipe):
-            self._update_algebraic_datasets(sched_times_to_update, input_layers,
-                                            recipe_layer)
-            self._add_algebraic_datasets(sched_times_to_add, input_layers,
-                                         recipe_layer)
+            self._update_algebraic_datasets(sched_times_to_update, input_layers, recipe_layer)
+            self._add_algebraic_datasets(sched_times_to_add, input_layers, recipe_layer)
             recipe_layer.recipe.modified = False
 
             self._trigger_composite_layer_update(recipe_layer)
 
         self.didUpdateLayers.emit()
 
-    def _check_recipe_layer_sched_times_to_update(self, existing_sched_times,
-                                                  input_layers,
-                                                  recipe_layer):
+    def _check_recipe_layer_sched_times_to_update(self, existing_sched_times, input_layers, recipe_layer):
         if isinstance(recipe_layer.recipe, AlgebraicRecipe):
             if recipe_layer.recipe.modified:
                 return existing_sched_times
@@ -685,9 +625,7 @@ class LayerModel(QAbstractItemModel):
         sched_times_to_update = []
         for sched_time in existing_sched_times:
             dataset: ProductDataset = recipe_layer.timeline.get(sched_time)
-            input_datasets_uuids \
-                = self._get_datasets_uuids_of_multichannel_dataset(sched_time,
-                                                                   input_layers)
+            input_datasets_uuids = self._get_datasets_uuids_of_multichannel_dataset(sched_time, input_layers)
             if dataset.input_datasets_uuids != input_datasets_uuids:
                 sched_times_to_update.append(sched_time)
         return sched_times_to_update
@@ -698,8 +636,7 @@ class LayerModel(QAbstractItemModel):
         :param recipe_id: recipe which is used to search the wanted layers
         :return: the searched layers
         """
-        return [layer for layer in self.layers
-                if layer.recipe and layer.recipe.id == recipe_id][-1]
+        return [layer for layer in self.layers if layer.recipe and layer.recipe.id == recipe_id][-1]
 
     def get_layers_by_uuids(self, layer_uuids: List[UUID]):
         """Get layers which have the given identifiers as a attribute.
@@ -799,12 +736,7 @@ class LayerModel(QAbstractItemModel):
             Info.KIND: Kind.COMPOSITE,
         }
 
-        prez = Presentation(
-            uuid=None,
-            kind=Kind.COMPOSITE,
-            colormap='grays',
-            climits=(-100, 100)
-        )
+        prez = Presentation(uuid=None, kind=Kind.COMPOSITE, colormap="grays", climits=(-100, 100))
 
         algebraic_layer = LayerItem(self, info, prez, recipe=recipe)
 
@@ -812,46 +744,38 @@ class LayerModel(QAbstractItemModel):
         self._add_layer(algebraic_layer)
         return algebraic_layer
 
-    def _add_algebraic_datasets(self, sched_times: List[datetime],
-                                input_layers: List[LayerItem],
-                                algebraic_layer: LayerItem):
+    def _add_algebraic_datasets(
+        self, sched_times: List[datetime], input_layers: List[LayerItem], algebraic_layer: LayerItem
+    ):
         assert isinstance(algebraic_layer.recipe, AlgebraicRecipe)
 
         dataset_info = None
         for sched_time in sched_times:
-            input_datasets_uuids \
-                = self._get_datasets_uuids_of_multichannel_dataset(sched_time,
-                                                                   input_layers)
+            input_datasets_uuids = self._get_datasets_uuids_of_multichannel_dataset(sched_time, input_layers)
 
             info = {
                 Info.SHORT_NAME: algebraic_layer.recipe.name,
             }
             # Skip if input dataset uuid is None
             # and assign placeholders to the others
-            assignment \
-                = dict([p for p in zip('xyz', input_datasets_uuids) if p[1]])
+            assignment = dict([p for p in zip("xyz", input_datasets_uuids) if p[1]])
 
             operations = algebraic_layer.recipe.operation_formula
 
-            uuid, info, data = self._workspace.create_algebraic_composite(
-                operations, assignment, info
-            )
+            uuid, info, data = self._workspace.create_algebraic_composite(operations, assignment, info)
 
-            dataset = algebraic_layer.add_algebraic_dataset(
-                None, info, sched_time, input_datasets_uuids
-            )
+            dataset = algebraic_layer.add_algebraic_dataset(None, info, sched_time, input_datasets_uuids)
 
             self.didAddImageDataset.emit(algebraic_layer, dataset)
             dataset_info = info
         if dataset_info:
             algebraic_layer.info = LayerItem.extract_layer_info(dataset_info)
 
-    def _update_algebraic_datasets(self, sched_times: List[datetime],
-                                   input_layers: List[LayerItem],
-                                   algebraic_layer: LayerItem):
+    def _update_algebraic_datasets(
+        self, sched_times: List[datetime], input_layers: List[LayerItem], algebraic_layer: LayerItem
+    ):
         self._remove_datasets(sched_times, algebraic_layer)
-        self._add_algebraic_datasets(sched_times, input_layers,
-                                     algebraic_layer)
+        self._add_algebraic_datasets(sched_times, input_layers, algebraic_layer)
 
     def toggle_layers_visibility(self, indexes: List[QModelIndex]):
         for index in indexes:
@@ -861,8 +785,7 @@ class LayerModel(QAbstractItemModel):
             layer_visibility = LayerVisibility(not layer.visible, layer.opacity)
             self.setData(index, layer_visibility)
 
-    def get_dataset_by_uuid(self, dataset_uuid: UUID) \
-            -> Optional[ProductDataset]:
+    def get_dataset_by_uuid(self, dataset_uuid: UUID) -> Optional[ProductDataset]:
         """
         Find a dataset given by its uuid in the layer model and return it, None
         if it is not in the model.
@@ -883,9 +806,7 @@ class LayerModel(QAbstractItemModel):
             LOG.debug(f"Dataset for uuid {dataset_uuid}: {dataset}")
             if dataset:
                 layer = self.get_layer_by_uuid(dataset.layer_uuid)
-                self._remove_dataset(layer,
-                                     dataset.info[Info.SCHED_TIME],
-                                     dataset.info[Info.UUID])
+                self._remove_dataset(layer, dataset.info[Info.SCHED_TIME], dataset.info[Info.UUID])
                 LOG.debug(f"Removing {dataset}")
                 self._document.remove_layer_prez(dataset_uuid)
                 self._document.purge_layer_prez([dataset_uuid])
@@ -918,8 +839,7 @@ class ProductFamilyKeyMappingPolicy:
         product_family_key = self.get_grouping_key(info)
         LOG.debug(f"Product Family Key:\n {product_family_key}")
 
-        existing_product_family_keys = \
-            [layer.grouping_key for layer in self.model.layers]
+        existing_product_family_keys = [layer.grouping_key for layer in self.model.layers]
 
         if product_family_key in existing_product_family_keys:
             layer_idx = existing_product_family_keys.index(product_family_key)
@@ -931,6 +851,4 @@ class ProductFamilyKeyMappingPolicy:
     def get_grouping_key(info):
         # This is, where layer grouping policies will differ:
         # This implementation returns the (legacy SIFT) product_family_key
-        return info.get(Info.PLATFORM), \
-               info.get(Info.INSTRUMENT), \
-               info.get(Info.DATASET_NAME)
+        return info.get(Info.PLATFORM), info.get(Info.INSTRUMENT), info.get(Info.DATASET_NAME)

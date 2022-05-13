@@ -254,4 +254,3 @@ In this release 1 pull request was closed.
 
 
 ## Version 1.0.0 (2018/10/25)
-

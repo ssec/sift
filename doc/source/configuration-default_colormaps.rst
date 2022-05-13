@@ -11,12 +11,12 @@ association can be overwritten by configuring a different colormaps as follows::
         ...
 
 **Example** ::
- 
+
     default_colormaps:
          toa_bidirectional_reflectance: IR Color Clouds Summer
          toa_brightness_temperature: Square Root (Vis Default)
- 
-	
+
+
 If a given ``COLORMAP_NAME_<N>`` is not registered internally a warning is
 logged and the colormap is chosen by the Guidebook as fallback. The same
 happens for all standard names which are not listed in the configuration.

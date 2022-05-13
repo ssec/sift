@@ -12,4 +12,3 @@ off. The result is called Pixel Matrix display::
 
     display:
       use_tiled_geolocated_images: [boolean]
-

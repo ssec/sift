@@ -13,14 +13,14 @@ This module is the "scientific expert knowledge" that is consulted.
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-__author__ = 'rayg'
-__docformat__ = 'reStructuredText'
+__author__ = "rayg"
+__docformat__ = "reStructuredText"
 
 import logging
 from typing import Dict, Tuple
 
-from uwsift.common import Info, Platform, Instrument
-from uwsift.view.colormap import DEFAULT_IR, DEFAULT_VIS, DEFAULT_UNKNOWN
+from uwsift.common import Info, Instrument, Platform
+from uwsift.view.colormap import DEFAULT_IR, DEFAULT_UNKNOWN, DEFAULT_VIS
 
 LOG = logging.getLogger(__name__)
 GUIDEBOOKS = {}
@@ -53,12 +53,12 @@ class Guidebook(object):
 
 
 DEFAULT_COLORMAPS = {
-    'toa_bidirectional_reflectance': DEFAULT_VIS,
-    'toa_brightness_temperature': DEFAULT_IR,
-    'brightness_temperature': DEFAULT_IR,
-    'height_at_cloud_top': 'Cloud Top Height',
-    'air_temperature': DEFAULT_IR,
-    'relative_humidity': DEFAULT_IR,
+    "toa_bidirectional_reflectance": DEFAULT_VIS,
+    "toa_brightness_temperature": DEFAULT_IR,
+    "brightness_temperature": DEFAULT_IR,
+    "height_at_cloud_top": "Cloud Top Height",
+    "air_temperature": DEFAULT_IR,
+    "relative_humidity": DEFAULT_IR,
     # 'thermodynamic_phase_of_cloud_water_particles_at_cloud_top': 'Cloud Phase',
 }
 
@@ -108,7 +108,6 @@ _NW_HIMAWARI_AHI = {
 NOMINAL_WAVELENGTHS = {
     Platform.HIMAWARI_8: _NW_HIMAWARI_AHI,
     Platform.HIMAWARI_9: _NW_HIMAWARI_AHI,
-
     Platform.GOES_16: _NW_GOESR_ABI,
     Platform.GOES_17: _NW_GOESR_ABI,
     Platform.GOES_18: _NW_GOESR_ABI,
@@ -167,7 +166,7 @@ STANDARD_NAMES = {
     Platform.GOES_17: _SN_GOESR_ABI,
 }
 
-BT_STANDARD_NAMES = ["toa_brightness_temperature", 'brightness_temperature', 'air_temperature']
+BT_STANDARD_NAMES = ["toa_brightness_temperature", "brightness_temperature", "air_temperature"]
 
 
 class ABI_AHI_Guidebook(Guidebook):
@@ -183,11 +182,11 @@ class ABI_AHI_Guidebook(Guidebook):
         This method should only be called once to "fill in" metadata
         that isn't originally known about an opened file. The provided `info`
         is used as a starting point, but is not modified by this method.
-        
+
         """
         z = {}
 
-        band_short_name = info.get(Info.DATASET_NAME, '???')
+        band_short_name = info.get(Info.DATASET_NAME, "???")
         # FIXME: Don't use pure DATASET_NAME since resolution should not be part of the SHORT_NAME
         #        And/or don't use SHORT_NAME for grouping
         if Info.SHORT_NAME not in info:
@@ -197,9 +196,9 @@ class ABI_AHI_Guidebook(Guidebook):
         if Info.LONG_NAME not in info:
             z[Info.LONG_NAME] = info.get(Info.SHORT_NAME, z[Info.SHORT_NAME])
 
-        z.setdefault(Info.STANDARD_NAME, info.get(Info.STANDARD_NAME, 'unknown'))
-        if info.get(Info.UNITS, z.get(Info.UNITS)) in ['K', 'Kelvin']:
-            z[Info.UNITS] = 'kelvin'
+        z.setdefault(Info.STANDARD_NAME, info.get(Info.STANDARD_NAME, "unknown"))
+        if info.get(Info.UNITS, z.get(Info.UNITS)) in ["K", "Kelvin"]:
+            z[Info.UNITS] = "kelvin"
 
         return z
 
@@ -213,9 +212,9 @@ class ABI_AHI_Guidebook(Guidebook):
         # Valid min and max for colormap use for data values in file (unconverted)
         if self._is_refl(dsi):
             lims = (-0.012, 1.192)
-            if dsi[Info.UNITS] == '%':
+            if dsi[Info.UNITS] == "%":
                 # Reflectance/visible data limits
-                lims = (lims[0] * 100., lims[1] * 100.)
+                lims = (lims[0] * 100.0, lims[1] * 100.0)
             return lims
         elif self._is_bt(dsi):
             # BT data limits
@@ -225,18 +224,18 @@ class ABI_AHI_Guidebook(Guidebook):
         elif "flag_values" in dsi:
             return min(dsi["flag_values"]), max(dsi["flag_values"])
         elif "valid_range" in dsi:
-            return tuple(dsi['valid_range'])
+            return tuple(dsi["valid_range"])
         elif Info.VALID_RANGE in dsi:
             return tuple(dsi[Info.VALID_RANGE])
         else:
             # some kind of default
-            return 0., 255.
+            return 0.0, 255.0
 
     def valid_range(self, dsi):
-        if 'valid_min' in dsi:
-            valid_range = (dsi['valid_min'], dsi['valid_max'])
-        elif 'valid_range' in dsi:
-            valid_range = dsi['valid_range']
+        if "valid_min" in dsi:
+            valid_range = (dsi["valid_min"], dsi["valid_max"])
+        elif "valid_range" in dsi:
+            valid_range = dsi["valid_range"]
         else:
             valid_range = dsi[Info.CLIM]
         return dsi.setdefault(Info.VALID_RANGE, valid_range)
@@ -248,35 +247,34 @@ class ABI_AHI_Guidebook(Guidebook):
         # FUTURE: This can be customized by the user
         when = ds_info.get(Info.SCHED_TIME, ds_info.get(Info.OBS_TIME))
         if when is None:
-            dtime = '--:--:--'
-        elif 'model_time' in ds_info:
-            dtime = "{}Z +{}h".format(
-                ds_info['model_time'].strftime('%Y-%m-%d %H:%M'),
-                when.strftime('%H')
-            )
+            dtime = "--:--:--"
+        elif "model_time" in ds_info:
+            dtime = "{}Z +{}h".format(ds_info["model_time"].strftime("%Y-%m-%d %H:%M"), when.strftime("%H"))
         else:
-            dtime = when.strftime('%Y-%m-%d %H:%M:%S')
+            dtime = when.strftime("%Y-%m-%d %H:%M:%S")
         return dtime
 
     def _default_display_name(self, ds_info, display_time=None):
         # FUTURE: This can be customized by the user
         sat = ds_info[Info.PLATFORM]
         inst = ds_info[Info.INSTRUMENT]
-        name = ds_info.get(Info.SHORT_NAME, '-unknown-')
+        name = ds_info.get(Info.SHORT_NAME, "-unknown-")
 
-        label = ds_info.get(Info.STANDARD_NAME, '')
-        if label == 'toa_bidirectional_reflectance':
-            label = 'Refl'
-        elif label == 'toa_brightness_temperature':
-            label = 'BT'
+        label = ds_info.get(Info.STANDARD_NAME, "")
+        if label == "toa_bidirectional_reflectance":
+            label = "Refl"
+        elif label == "toa_brightness_temperature":
+            label = "BT"
         else:
-            label = ''
+            label = ""
 
         if display_time is None:
             display_time = ds_info.get(Info.DISPLAY_TIME, self._default_display_time(ds_info))
         name = "{sat} {inst} {name} {standard_name} {dtime}".format(
-            sat=sat.value, inst=inst.value, name=name, standard_name=label, dtime=display_time)
+            sat=sat.value, inst=inst.value, name=name, standard_name=label, dtime=display_time
+        )
         return name
+
 
 # if __name__ == '__main__':
 #     sys.exit(main())

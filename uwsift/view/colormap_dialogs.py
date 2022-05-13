@@ -1,8 +1,8 @@
 import logging
+from functools import partial
 from uuid import UUID
 
 from PyQt5 import QtGui, QtWidgets
-from functools import partial
 
 from uwsift.common import Info, Kind
 from uwsift.model.layer_model import LayerModel
@@ -13,7 +13,6 @@ LOG = logging.getLogger(__name__)
 
 
 class ChangeColormapDialog(QtWidgets.QDialog):
-
     def __init__(self, layer_model: LayerModel, uuid: UUID, parent=None):
         super(ChangeColormapDialog, self).__init__(parent)
         self.ui = Ui_changeColormapDialog()
@@ -39,10 +38,10 @@ class ChangeColormapDialog(QtWidgets.QDialog):
         self._init_cmap_combo()
         self._init_vmin_slider()
         self.ui.vmin_edit.setValidator(self._validator)
-        self.ui.vmin_edit.setText('{:0.03f}'.format(conv[1](self._initial_clims[0])))
+        self.ui.vmin_edit.setText("{:0.03f}".format(conv[1](self._initial_clims[0])))
         self._init_vmax_slider()
         self.ui.vmax_edit.setValidator(self._validator)
-        self.ui.vmax_edit.setText('{:0.03f}'.format(conv[1](self._initial_clims[1])))
+        self.ui.vmax_edit.setText("{:0.03f}".format(conv[1](self._initial_clims[1])))
         self.ui.gammaSpinBox.setValue(self._initial_gamma)
 
         self.ui.buttons.clicked.connect(self._clicked)
@@ -87,8 +86,7 @@ class ChangeColormapDialog(QtWidgets.QDialog):
             self._current_clims = (self._current_clims[0], val)
         else:
             self._current_clims = (val, self._current_clims[1])
-        self.layer_model.change_color_limits_for_layer(self.uuid,
-                                                       self._current_clims)
+        self.layer_model.change_color_limits_for_layer(self.uuid, self._current_clims)
 
     def _slider_changed(self, value=None, is_max=True):
         edit = self.ui.vmax_edit if is_max else self.ui.vmin_edit
@@ -96,10 +94,10 @@ class ChangeColormapDialog(QtWidgets.QDialog):
             slider = self.ui.vmax_slider if is_max else self.ui.vmin_slider
             value = slider.value()
         value = self._get_slider_value(value)
-        LOG.debug('slider %s %s => %f' % (self.uuid, 'max' if is_max else 'min', value))
+        LOG.debug("slider %s %s => %f" % (self.uuid, "max" if is_max else "min", value))
         display_val = self.layer.info[Info.UNIT_CONVERSION][1](value)
         edit.blockSignals(True)
-        edit.setText('{:0.03f}'.format(display_val))
+        edit.setText("{:0.03f}".format(display_val))
         edit.blockSignals(False)
         return self._set_new_clims(value, is_max)
 
@@ -109,7 +107,7 @@ class ChangeColormapDialog(QtWidgets.QDialog):
 
         vdis = float(edit.text())
         val = self.layer.info[Info.UNIT_CONVERSION][1](vdis, inverse=True)
-        LOG.debug('line edit %s %s => %f => %f' % (self.uuid, 'max' if is_max else 'min', vdis, val))
+        LOG.debug("line edit %s %s => %f => %f" % (self.uuid, "max" if is_max else "min", vdis, val))
         sv = self._create_slider_value(val)
         slider.blockSignals(True)
         slider.setValue(sv)

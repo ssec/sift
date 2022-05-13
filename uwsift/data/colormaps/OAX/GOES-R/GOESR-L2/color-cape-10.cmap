@@ -3,9 +3,9 @@
          CAPE color map (color-cape-10).
     -->
     <!-- TOWRdocs Description
-         Updates GOES-R baseline colormap, and may be applied to CAPE, K-Index, Showalter, and Total Totals. 
-		 This is a 10 bits per pixel linear enhancement. It has 5 main colors, ranging from brown to blue to yellow to 
-		 red to magenta, for increasing instability. In general, this is based on the traditional GOES Sounder 
+         Updates GOES-R baseline colormap, and may be applied to CAPE, K-Index, Showalter, and Total Totals.
+		 This is a 10 bits per pixel linear enhancement. It has 5 main colors, ranging from brown to blue to yellow to
+		 red to magenta, for increasing instability. In general, this is based on the traditional GOES Sounder
 		 stability enhancement from CIMSS. Readout precisions range approximately from 0.05 to 0.1K with suggested
 		 display ranges (e.g. 0-5000 for CAPE, -70 to 70 or -60 to 60 for LI, KI, SI, and TT).
 	     Contributors: Tim Schmit and Jordan Gerth

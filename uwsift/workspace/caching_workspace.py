@@ -6,17 +6,18 @@ import sys
 import unittest
 from collections import OrderedDict
 from datetime import datetime
-from typing import Generator, Tuple, Dict, Optional
+from typing import Dict, Generator, Optional, Tuple
 from uuid import UUID
 
 import numpy as np
 from sqlalchemy.orm.exc import NoResultFound
 
-from uwsift.common import Info, Kind, Flags, State
-from uwsift.queue import TASK_PROGRESS, TASK_DOING
-from .importer import aImporter, SatpyImporter
-from .metadatabase import Metadatabase, Content, Product, Resource, ContentImage
-from .workspace import BaseWorkspace, frozendict, ActiveContent
+from uwsift.common import Flags, Info, Kind, State
+from uwsift.queue import TASK_DOING, TASK_PROGRESS
+
+from .importer import SatpyImporter, aImporter
+from .metadatabase import Content, ContentImage, Metadatabase, Product, Resource
+from .workspace import ActiveContent, BaseWorkspace, frozendict
 
 LOG = logging.getLogger(__name__)
 
@@ -76,19 +77,23 @@ class CachingWorkspace(BaseWorkspace):
         return self._inventory
 
     def __init__(self, directory_path=None, process_pool=None, max_size_gb=None, queue=None, initial_clear=False):
-        super(CachingWorkspace, self, ).__init__(directory_path)
+        super(
+            CachingWorkspace,
+            self,
+        ).__init__(directory_path)
         self._queue = queue
         self._max_size_gb = max_size_gb if max_size_gb is not None else DEFAULT_WORKSPACE_SIZE
         if self._max_size_gb < MIN_WORKSPACE_SIZE:
             self._max_size_gb = MIN_WORKSPACE_SIZE
-            LOG.warning('setting workspace size to %dGB' % self._max_size_gb)
+            LOG.warning("setting workspace size to %dGB" % self._max_size_gb)
         if directory_path is None:
             import tempfile
+
             self._tempdir = tempfile.TemporaryDirectory()
             directory_path = str(self._tempdir)
-            LOG.info('using temporary directory {}'.format(directory_path))
+            LOG.info("using temporary directory {}".format(directory_path))
 
-        self._inventory_path = os.path.join(self.cwd, '_inventory.db')
+        self._inventory_path = os.path.join(self.cwd, "_inventory.db")
         if initial_clear:
             self.clear_workspace_content()
 
@@ -106,12 +111,12 @@ class CachingWorkspace(BaseWorkspace):
         dn, fn = os.path.split(self._inventory_path)
         if not os.path.isdir(dn):
             raise EnvironmentError("workspace directory {} does not exist".format(dn))
-        LOG.info('{} database at {}'.format('initializing' if should_init else 'attaching', self._inventory_path))
-        self._inventory = Metadatabase('sqlite:///' + self._inventory_path, create_tables=should_init)
+        LOG.info("{} database at {}".format("initializing" if should_init else "attaching", self._inventory_path))
+        self._inventory = Metadatabase("sqlite:///" + self._inventory_path, create_tables=should_init)
         if should_init:
             with self._inventory as s:
-                assert (0 == s.query(Content).count())
-        LOG.info('done with init')
+                assert 0 == s.query(Content).count()
+        LOG.info("done with init")
 
     def clear_workspace_content(self):
         """Remove binary files from workspace and workspace database."""
@@ -138,7 +143,8 @@ class CachingWorkspace(BaseWorkspace):
                     LOG.warning("purging missing content {}".format(c.path))
                     to_purge.append(c)
             LOG.debug(
-                "{} content entities no longer present in cache - will remove from database".format(len(to_purge)))
+                "{} content entities no longer present in cache - will remove from database".format(len(to_purge))
+            )
             for c in to_purge:
                 try:
                     c.product.content.remove(c)
@@ -168,8 +174,10 @@ class CachingWorkspace(BaseWorkspace):
         """
         remove products from database that have no cached Content, and no Resource we can re-import from
         """
-        LOG.debug("purging Products no longer recoverable by re-importing from Resources, "
-                  "and having no Content representation in cache")
+        LOG.debug(
+            "purging Products no longer recoverable by re-importing from Resources, "
+            "and having no Content representation in cache"
+        )
         with self._inventory as s:
             n_purged = 0
             prodall = list(s.query(Product).all())  # SIFT/sift#180, avoid locking database too long
@@ -238,7 +246,7 @@ class CachingWorkspace(BaseWorkspace):
                 continue
             pn = os.path.join(self.cache_dir, filename)
             if os.path.exists(pn):
-                LOG.debug('removing {}'.format(pn))
+                LOG.debug("removing {}".format(pn))
                 total += os.stat(pn).st_size
                 try:
                     os.remove(pn)
@@ -270,8 +278,9 @@ class CachingWorkspace(BaseWorkspace):
     def _product_with_uuid(self, session, uuid: UUID) -> Product:
         return session.query(Product).filter_by(uuid_str=str(uuid)).first()
 
-    def _product_overview_content(self, session, prod: Product = None, uuid: UUID = None,
-                                  kind: Kind = Kind.IMAGE) -> Optional[Content]:
+    def _product_overview_content(
+        self, session, prod: Product = None, uuid: UUID = None, kind: Kind = Kind.IMAGE
+    ) -> Optional[Content]:
         if prod is None and uuid is not None:
             # Get Product object
             try:
@@ -280,18 +289,17 @@ class CachingWorkspace(BaseWorkspace):
                 LOG.error("No product with UUID {} found".format(uuid))
                 return None
         if kind == Kind.IMAGE:
-            contents = session.query(ContentImage).filter(ContentImage
-                                                          .product_id
-                                                          == prod.id)\
-                .order_by(ContentImage.lod).all()
+            contents = (
+                session.query(ContentImage).filter(ContentImage.product_id == prod.id).order_by(ContentImage.lod).all()
+            )
         else:
-            contents = session.query(Content).filter(
-                Content.product_id == prod.id)
+            contents = session.query(Content).filter(Content.product_id == prod.id)
         contents = [c for c in contents if c.info.get(Info.KIND, Kind.IMAGE) == kind]
         return None if 0 == len(contents) else contents[0]
 
-    def _product_native_content(self, session, prod: Product = None, uuid: UUID = None,
-                                kind: Kind = Kind.IMAGE) -> Optional[Content]:
+    def _product_native_content(
+        self, session, prod: Product = None, uuid: UUID = None, kind: Kind = Kind.IMAGE
+    ) -> Optional[Content]:
         # NOTE: This assumes the last Content object is the best resolution
         #       but it is untested
         if prod is None and uuid is not None:
@@ -303,13 +311,14 @@ class CachingWorkspace(BaseWorkspace):
                 return None
 
         if kind == Kind.IMAGE:
-            contents = session.query(ContentImage).filter(ContentImage
-                                                          .product_id
-                                                          == prod.id)\
-                .order_by(ContentImage.lod.desc()).all()
+            contents = (
+                session.query(ContentImage)
+                .filter(ContentImage.product_id == prod.id)
+                .order_by(ContentImage.lod.desc())
+                .all()
+            )
         else:
-            contents = session.query(Content).filter(
-                Content.product_id == prod.id)
+            contents = session.query(Content).filter(Content.product_id == prod.id)
         contents = [c for c in contents if c.info.get(Info.KIND, Kind.IMAGE) == kind]
         return None if 0 == len(contents) else contents[-1]
 
@@ -317,14 +326,13 @@ class CachingWorkspace(BaseWorkspace):
     # combining queries with data content
     #
 
-    def _overview_content_for_uuid(self, uuid: UUID, kind: Kind = Kind.IMAGE) \
-            -> np.memmap:
+    def _overview_content_for_uuid(self, uuid: UUID, kind: Kind = Kind.IMAGE) -> np.memmap:
         # FUTURE: do a compound query for this to get the Content entry
         # prod = self._product_with_uuid(uuid)
         # assert(prod is not None)
         with self._inventory as s:
             ovc = self._product_overview_content(s, uuid=uuid)
-            assert (ovc is not None)
+            assert ovc is not None
             arrays = self._cached_arrays_for_content(ovc)
             return arrays.data
 
@@ -350,7 +358,7 @@ class CachingWorkspace(BaseWorkspace):
         for root, _, files in os.walk(self.cache_dir):
             sz = sum(os.path.getsize(os.path.join(root, name)) for name in files)
             total += sz
-            LOG.debug('%d bytes in %s' % (sz, root))
+            LOG.debug("%d bytes in %s" % (sz, root))
 
         return total
 
@@ -366,6 +374,7 @@ class CachingWorkspace(BaseWorkspace):
         :return: metadata access with mapping semantics, to be treated as read-only
         """
         from collections import ChainMap
+
         # FUTURE deprecate this
         if isinstance(dsi_or_uuid, str):
             uuid = UUID(dsi_or_uuid)
@@ -377,7 +386,7 @@ class CachingWorkspace(BaseWorkspace):
             # look up the product for that uuid
             prod = self._product_with_uuid(s, uuid)
             if not prod:  # then it hasn't had its metadata scraped
-                LOG.error('no info available for UUID {}'.format(dsi_or_uuid))
+                LOG.error("no info available for UUID {}".format(dsi_or_uuid))
                 LOG.error("known products: {}".format(repr(self._all_product_uuids())))
                 return None
             kind = prod.info[Info.KIND]
@@ -390,8 +399,9 @@ class CachingWorkspace(BaseWorkspace):
                 # if content is available, we want to provide native content metadata along with the product metadata
                 # specifically a lot of client code assumes that resource == product == content and
                 # that singular navigation (e.g. cell_size) is norm
-                assert (kind in [Kind.LINES, Kind.POINTS] or
-                        native_content.info[Info.CELL_WIDTH] is not None)  # FIXME DEBUG
+                assert (
+                    kind in [Kind.LINES, Kind.POINTS] or native_content.info[Info.CELL_WIDTH] is not None
+                )  # FIXME DEBUG
                 return frozendict(ChainMap(native_content.info, prod.info))
             # mapping semantics for database fields, as well as key-value fields;
             # flatten to one namespace and read-only
@@ -421,19 +431,22 @@ class CachingWorkspace(BaseWorkspace):
                 return None
             if len(hits) >= 1:
                 if len(hits) > 1:
-                    LOG.warning('more than one Resource found suitable, there can be only one')
+                    LOG.warning("more than one Resource found suitable, there can be only one")
                 resource = hits[0]
-                hits = list(s.query(Content).filter(
-                    Content.product_id == Product.id).filter(
-                    Product.resource_id == resource.id).order_by(
-                    Content.lod).all())
+                hits = list(
+                    s.query(Content)
+                    .filter(Content.product_id == Product.id)
+                    .filter(Product.resource_id == resource.id)
+                    .order_by(Content.lod)
+                    .all()
+                )
                 if len(hits) >= 1:
                     content = hits[0]  # presumably this is closest to LOD_OVERVIEW
                     # if len(hits)>1:
                     #     LOG.warning('more than one Content found suitable, there can be only one')
                     cac = self._cached_arrays_for_content(content)
                     if not cac:
-                        LOG.error('unable to attach content')
+                        LOG.error("unable to attach content")
                         data = None
                     else:
                         data = cac.data
@@ -463,8 +476,10 @@ class CachingWorkspace(BaseWorkspace):
 
     def recently_used_products(self, n=32) -> Dict[UUID, str]:
         with self._inventory as s:
-            return OrderedDict((p.uuid, p.info[Info.DISPLAY_NAME])
-                               for p in s.query(Product).order_by(Product.atime.desc()).limit(n).all())
+            return OrderedDict(
+                (p.uuid, p.info[Info.DISPLAY_NAME])
+                for p in s.query(Product).order_by(Product.atime.desc()).limit(n).all()
+            )
 
     def _purge_content_for_resource(self, resource: Resource, session, defer_commit=False):
         """
@@ -534,7 +549,7 @@ class CachingWorkspace(BaseWorkspace):
         with self._inventory as S:
             LOG.info("cleaning cache")
             total_size = self._total_workspace_bytes
-            GB = 1024 ** 3
+            GB = 1024**3
             LOG.info("total cache size is {}GB of max {}GB".format(total_size / GB, self._max_size_gb))
             max_size = self._max_size_gb * GB
             for res in S.query(Resource).order_by(Resource.atime).all():
@@ -574,16 +589,17 @@ class CachingWorkspace(BaseWorkspace):
                     return None
                 if len(hits) >= 1:
                     if len(hits) > 1:
-                        raise EnvironmentError('more than one Resource fits this path')
+                        raise EnvironmentError("more than one Resource fits this path")
                     resource = hits[0]
                     if len(resource.product) >= 1:
                         if len(resource.product) > 1:
-                            LOG.warning('more than one Product in this Resource, this query should be deprecated')
+                            LOG.warning("more than one Product in this Resource, this query should be deprecated")
                         prod = resource.product[0]
                         return prod.info
 
-    def collect_product_metadata_for_paths(self, paths: list,
-                                           **importer_kwargs) -> Generator[Tuple[int, frozendict], None, None]:
+    def collect_product_metadata_for_paths(
+        self, paths: list, **importer_kwargs
+    ) -> Generator[Tuple[int, frozendict], None, None]:
         """Start loading URI data into the workspace asynchronously.
 
         Args:
@@ -601,7 +617,7 @@ class CachingWorkspace(BaseWorkspace):
             importers = []
             num_products = 0
             remaining_paths = []
-            if 'reader' in importer_kwargs:
+            if "reader" in importer_kwargs:
                 # skip importer guessing and go straight to satpy importer
                 paths, remaining_paths = [], paths
 
@@ -614,10 +630,12 @@ class CachingWorkspace(BaseWorkspace):
                 # how many products each expects to return
                 for imp in self._importers:
                     if imp.is_relevant(source_path=source_path):
-                        hauler = imp(source_path,
-                                     database_session=import_session,
-                                     workspace_cwd=self.cache_dir,
-                                     **importer_kwargs)
+                        hauler = imp(
+                            source_path,
+                            database_session=import_session,
+                            workspace_cwd=self.cache_dir,
+                            **importer_kwargs,
+                        )
                         hauler.merge_resources()
                         importers.append(hauler)
                         num_products += hauler.num_products
@@ -627,40 +645,42 @@ class CachingWorkspace(BaseWorkspace):
 
             # Pass remaining paths to SatPy importer and see what happens
             if remaining_paths:
-                if 'reader' not in importer_kwargs:
-                    raise NotImplementedError("Reader discovery is not "
-                                              "currently implemented in "
-                                              "the satpy importer.")
-                if 'scenes' in importer_kwargs:
+                if "reader" not in importer_kwargs:
+                    raise NotImplementedError(
+                        "Reader discovery is not " "currently implemented in " "the satpy importer."
+                    )
+                if "scenes" in importer_kwargs:
                     # another component already created the satpy scenes, use those
-                    scenes = importer_kwargs.pop('scenes')
+                    scenes = importer_kwargs.pop("scenes")
                     scenes = scenes.items()
                 else:
                     scenes = [(remaining_paths, None)]
                 for paths, scene in scenes:
                     imp = SatpyImporter
                     these_kwargs = importer_kwargs.copy()
-                    these_kwargs['scene'] = scene
-                    hauler = imp(paths,
-                                 database_session=import_session,
-                                 workspace_cwd=self.cache_dir,
-                                 **these_kwargs)
+                    these_kwargs["scene"] = scene
+                    hauler = imp(paths, database_session=import_session, workspace_cwd=self.cache_dir, **these_kwargs)
                     hauler.merge_resources()
                     importers.append(hauler)
                     num_products += hauler.num_products
 
             for hauler in importers:
                 for prod in hauler.merge_products():
-                    assert (prod is not None)
+                    assert prod is not None
                     # merge the product into our database session, since it may belong to import_session
                     zult = frozendict(prod.info)  # self._S.merge(prod)
                     # LOG.debug('yielding product metadata for {}'.format(
                     #     zult.get(Info.DISPLAY_NAME, '?? unknown name ??')))
                     yield num_products, zult
 
-    def import_product_content(self, uuid: UUID = None, prod: Product = None,
-                               allow_cache=True, merge_target_uuid: Optional[UUID] = None,
-                               **importer_kwargs) -> np.memmap:
+    def import_product_content(
+        self,
+        uuid: UUID = None,
+        prod: Product = None,
+        allow_cache=True,
+        merge_target_uuid: Optional[UUID] = None,
+        **importer_kwargs,
+    ) -> np.memmap:
         with self._inventory as S:
             # S = self._S
             if prod is None and uuid is not None:
@@ -670,9 +690,9 @@ class CachingWorkspace(BaseWorkspace):
             default_prod_kind = prod.info[Info.KIND]
 
             if len(prod.content):
-                LOG.info('product already has content available, using that rather than re-importing')
+                LOG.info("product already has content available, using that rather than re-importing")
                 ovc = self._product_overview_content(S, uuid=uuid, kind=default_prod_kind)
-                assert (ovc is not None)
+                assert ovc is not None
                 arrays = self._cached_arrays_for_content(ovc)
                 return arrays.data
 
@@ -699,7 +719,7 @@ class CachingWorkspace(BaseWorkspace):
                     # data = update.data
                     LOG.info("{} {}: {:.01f}%".format(name, update.stage_desc, update.completion * 100.0))
             # self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
-            LOG.debug('received {} updates during import'.format(nupd))
+            LOG.debug("received {} updates during import".format(nupd))
             uuid = prod.uuid
             self.clear_product_state_flag(prod.uuid, State.ARRIVING)
         # S.commit()
@@ -726,8 +746,9 @@ class CachingWorkspace(BaseWorkspace):
     #     mm[:] = data[:]
     #     return mm
 
-    def _create_product_from_array(self, info: Info, data, namespace=None, codeblock=None) \
-            -> Tuple[UUID, Optional[frozendict], np.memmap]:
+    def _create_product_from_array(
+        self, info: Info, data, namespace=None, codeblock=None
+    ) -> Tuple[UUID, Optional[frozendict], np.memmap]:
         """
         update metadatabase to include Product and Content entries for this new dataset we've calculated
         this allows the calculated data to reside in the workspace
@@ -742,30 +763,34 @@ class CachingWorkspace(BaseWorkspace):
             uuid, info, data: uuid of the new product, its official read-only metadata, and cached content ndarray
         """
         if Info.UUID not in info:
-            raise ValueError('currently require an Info.UUID be included in product')
+            raise ValueError("currently require an Info.UUID be included in product")
         parms = dict(info)
         now = datetime.utcnow()
-        parms.update(dict(
-            atime=now,
-            mtime=now,
-        ))
+        parms.update(
+            dict(
+                atime=now,
+                mtime=now,
+            )
+        )
         P = Product.from_info(parms, symbols=namespace, codeblock=codeblock)
         uuid = P.uuid
         # FUTURE: add expression and namespace information, which would require additional parameters
-        ws_filename = '{}.image'.format(str(uuid))
+        ws_filename = "{}.image".format(str(uuid))
         ws_path = os.path.join(self.cache_dir, ws_filename)
-        with open(ws_path, 'wb+') as fp:
-            mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
+        with open(ws_path, "wb+") as fp:
+            mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode="w+")
             mm[:] = data[:]
 
-        parms.update(dict(
-            lod=ContentImage.LOD_OVERVIEW,
-            path=ws_filename,
-            dtype=str(data.dtype),
-            proj4=info[Info.PROJ],
-            resolution=min(info[Info.CELL_WIDTH], info[Info.CELL_HEIGHT])
-        ))
-        rcls = dict(zip(('rows', 'cols', 'levels'), data.shape))
+        parms.update(
+            dict(
+                lod=ContentImage.LOD_OVERVIEW,
+                path=ws_filename,
+                dtype=str(data.dtype),
+                proj4=info[Info.PROJ],
+                resolution=min(info[Info.CELL_WIDTH], info[Info.CELL_HEIGHT]),
+            )
+        )
+        rcls = dict(zip(("rows", "cols", "levels"), data.shape))
         parms.update(rcls)
         LOG.debug("about to create Content with this: {}".format(repr(parms)))
 
@@ -787,13 +812,13 @@ class CachingWorkspace(BaseWorkspace):
 
     def _bgnd_remove(self, uuid: UUID):
         from uwsift.queue import TASK_DOING, TASK_PROGRESS
-        yield {TASK_DOING: 'purging memory', TASK_PROGRESS: 0.5}
+
+        yield {TASK_DOING: "purging memory", TASK_PROGRESS: 0.5}
         with self._inventory as s:
             self._deactivate_content_for_product(self._product_with_uuid(s, uuid))
-        yield {TASK_DOING: 'purging memory', TASK_PROGRESS: 1.0}
+        yield {TASK_DOING: "purging memory", TASK_PROGRESS: 1.0}
 
-    def get_content(self, dsi_or_uuid, lod=None, kind: Kind = Kind.IMAGE) \
-            -> Optional[np.memmap]:
+    def get_content(self, dsi_or_uuid, lod=None, kind: Kind = Kind.IMAGE) -> Optional[np.memmap]:
         """
         By default, get the best-available (closest to native) np.ndarray-compatible view of the full dataset
         :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
@@ -815,25 +840,20 @@ class CachingWorkspace(BaseWorkspace):
         with self._inventory as s:
 
             if kind == Kind.IMAGE:
-                content = s.query(ContentImage).filter((Product.uuid_str
-                                                        == str(uuid))
-                                                       & (ContentImage
-                                                           .product_id
-                                                           == Product.id))\
-                    .order_by(ContentImage.lod.desc()).all()
+                content = (
+                    s.query(ContentImage)
+                    .filter((Product.uuid_str == str(uuid)) & (ContentImage.product_id == Product.id))
+                    .order_by(ContentImage.lod.desc())
+                    .all()
+                )
             else:
-                content = s.query(Content).filter((Product.uuid_str
-                                                   == str(uuid))
-                                                  & (Content.product_id
-                                                     == Product.id))
+                content = s.query(Content).filter((Product.uuid_str == str(uuid)) & (Content.product_id == Product.id))
 
             content = [x for x in content if x.info.get(Info.KIND, Kind.IMAGE) == kind]
             if len(content) != 1:
-                LOG.warning("More than one matching Content object for '{}'"
-                            .format(dsi_or_uuid))
+                LOG.warning("More than one matching Content object for '{}'".format(dsi_or_uuid))
             if not len(content) or not content[0]:
-                raise AssertionError(
-                    'no content in workspace for {}, must re-import'.format(uuid))
+                raise AssertionError("no content in workspace for {}, must re-import".format(uuid))
             content = content[0]
             # content.touch()
             # self._S.commit()  # flush any pending updates to workspace db file
@@ -867,17 +887,19 @@ class CachingWorkspace(BaseWorkspace):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="PURPOSE",
-        epilog="",
-        fromfile_prefix_chars='@')
-    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG')
+    parser = argparse.ArgumentParser(description="PURPOSE", epilog="", fromfile_prefix_chars="@")
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbosity",
+        action="count",
+        default=0,
+        help="each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG",
+    )
     # http://docs.python.org/2.7/library/argparse.html#nargs
     # parser.add_argument('--stuff', nargs='5', dest='my_stuff',
     #                    help="one or more random things")
-    parser.add_argument('pos_args', nargs='*',
-                        help="positional arguments don't have the '-' prefix")
+    parser.add_argument("pos_args", nargs="*", help="positional arguments don't have the '-' prefix")
     args = parser.parse_args()
 
     levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
@@ -893,5 +915,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

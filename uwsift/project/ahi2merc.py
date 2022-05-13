@@ -6,7 +6,7 @@
 :copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-__author__ = 'davidh'
+__author__ = "davidh"
 
 import logging
 import os
@@ -19,7 +19,7 @@ import osr
 from osgeo import gdal
 from pyproj import Proj
 
-from uwsift.project.ahi2gtiff import create_ahi_geotiff, ahi_image_info, ahi_image_data
+from uwsift.project.ahi2gtiff import ahi_image_data, ahi_image_info, create_ahi_geotiff
 
 LOG = logging.getLogger(__name__)
 GTIFF_DRIVER = gdal.GetDriverByName("GTIFF")
@@ -34,39 +34,54 @@ def run_gdalwarp(input_file, output_file, *args):
 
 def main():
     import argparse
+
     parser = argparse.ArgumentParser(
-        description="Convert AHI Geos NetCDF files to mercator geotiffs at the same resolution")
-    parser.add_argument("--merc-ext", default=".merc.tif",
-                        help="Extension for new mercator files (replace '.tif' with '.merc.tif' by default)")
-    parser.add_argument("--input-pattern", default="????/*.nc",
-                        help="Input pattern used search for NetCDF files in 'input_dir'")
-    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through '
-                             'ERROR-WARNING-Info-DEBUG (default Info)')
+        description="Convert AHI Geos NetCDF files to mercator geotiffs at the same resolution"
+    )
+    parser.add_argument(
+        "--merc-ext",
+        default=".merc.tif",
+        help="Extension for new mercator files (replace '.tif' with '.merc.tif' by default)",
+    )
+    parser.add_argument(
+        "--input-pattern", default="????/*.nc", help="Input pattern used search for NetCDF files in 'input_dir'"
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbosity",
+        action="count",
+        default=0,
+        help="each occurrence increases verbosity 1 level through " "ERROR-WARNING-Info-DEBUG (default Info)",
+    )
 
     # http://www.gdal.org/frmt_gtiff.html
-    parser.add_argument('--compress', default=None,
-                        help="Type of compression for geotiffs (passed to GDAL GeoTIFF Driver)")
-    parser.add_argument('--predictor', default=None, type=int,
-                        help="Set predictor for geotiff compression (LZW or DEFLATE)")
-    parser.add_argument('--tiled', action='store_true',
-                        help="Create tiled geotiffs")
-    parser.add_argument('--blockxsize', default=None, type=int,
-                        help="Set tile block X size")
-    parser.add_argument('--blockysize', default=None, type=int,
-                        help="Set tile block Y size")
-    parser.add_argument('--extents', default=[np.nan, np.nan, np.nan, np.nan], nargs=4, type=float,
-                        help="Set mercator bounds in lat/lon space (lon_min lat_min lon_max lat_max)")
-    parser.add_argument('--nodata', default=None, type=float,
-                        help="Set the nodata value for the geotiffs that are created")
+    parser.add_argument(
+        "--compress", default=None, help="Type of compression for geotiffs (passed to GDAL GeoTIFF Driver)"
+    )
+    parser.add_argument(
+        "--predictor", default=None, type=int, help="Set predictor for geotiff compression (LZW or DEFLATE)"
+    )
+    parser.add_argument("--tiled", action="store_true", help="Create tiled geotiffs")
+    parser.add_argument("--blockxsize", default=None, type=int, help="Set tile block X size")
+    parser.add_argument("--blockysize", default=None, type=int, help="Set tile block Y size")
+    parser.add_argument(
+        "--extents",
+        default=[np.nan, np.nan, np.nan, np.nan],
+        nargs=4,
+        type=float,
+        help="Set mercator bounds in lat/lon space (lon_min lat_min lon_max lat_max)",
+    )
+    parser.add_argument(
+        "--nodata", default=None, type=float, help="Set the nodata value for the geotiffs that are created"
+    )
 
-    parser.add_argument("input_dir",
-                        help="Input directory to search for the 'input_pattern' specified")
-    parser.add_argument("output_dir",
-                        help="Output directory to place new mercator files "
-                             "(input_pattern structure is reflected in output dir)")
-    parser.add_argument("gdalwarp_args", nargs="*",
-                        help="arguments that are passed directly to gdalwarp")
+    parser.add_argument("input_dir", help="Input directory to search for the 'input_pattern' specified")
+    parser.add_argument(
+        "output_dir",
+        help="Output directory to place new mercator files " "(input_pattern structure is reflected in output dir)",
+    )
+    parser.add_argument("gdalwarp_args", nargs="*", help="arguments that are passed directly to gdalwarp")
     args = parser.parse_args()
 
     levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
@@ -103,13 +118,17 @@ def main():
             if not os.path.exists(geos_file):
                 src_data = ahi_image_data(nc_file)
                 # print("### Resource Data: Min (%f) | Max (%f)" % (src_data.min(), src_data.max()))
-                create_ahi_geotiff(src_info, src_data, geos_file,
-                                   compress=args.compress,
-                                   predictor=args.predictor,
-                                   tiled=args.tiled,
-                                   blockxsize=args.blockxsize,
-                                   blockysize=args.blockysize,
-                                   nodata=args.nodata)
+                create_ahi_geotiff(
+                    src_info,
+                    src_data,
+                    geos_file,
+                    compress=args.compress,
+                    predictor=args.predictor,
+                    tiled=args.tiled,
+                    blockxsize=args.blockxsize,
+                    blockysize=args.blockysize,
+                    nodata=args.nodata,
+                )
             else:
                 LOG.debug("GEOS Projection GeoTIFF already exists, won't recreate...")
             lon_west, lon_east = src_info["lon_extents"]
@@ -152,8 +171,11 @@ def main():
 
         gdalwarp_args = args.gdalwarp_args + [
             # "-multi",
-            "-t_srs", proj,
-            "-tr", str(cw), str(ch),
+            "-t_srs",
+            proj,
+            "-tr",
+            str(cw),
+            str(ch),
             "-te",
             "{:0.03f}".format(x_extent[0]),
             "{:0.03f}".format(y_extent[0]),
@@ -161,10 +183,14 @@ def main():
             "{:0.03f}".format(y_extent[1]),
         ]
         if args.nodata is not None:
-            gdalwarp_args.extend([
-                "-srcnodata", str(args.nodata),
-                "-dstnodata", str(args.nodata),
-            ])
+            gdalwarp_args.extend(
+                [
+                    "-srcnodata",
+                    str(args.nodata),
+                    "-dstnodata",
+                    str(args.nodata),
+                ]
+            )
         if args.compress is not None:
             gdalwarp_args.extend(["-co", "COMPRESS=%s" % (args.compress,)])
             if args.predictor is not None:

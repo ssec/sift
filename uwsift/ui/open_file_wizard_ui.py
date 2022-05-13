@@ -122,4 +122,6 @@ class Ui_openFileWizard(object):
         self.productSelectionPage.setSubTitle(_translate("openFileWizard", "Select products to add"))
         self.selectAllButton.setText(_translate("openFileWizard", "Select/Deselect All"))
         self.selectIDTable.setSortingEnabled(False)
+
+
 from uwsift.ui.custom_widgets import AnyWizardPage

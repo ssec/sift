@@ -6,17 +6,18 @@ from importlib.machinery import PathFinder
 from importlib.util import spec_from_file_location
 
 from donfig import Config
-from .version import __version__  # noqa
-from .util.default_paths import DOCUMENT_SETTINGS_DIR
 
-BASE_CONFIG_DIR = os.path.join(DOCUMENT_SETTINGS_DIR, 'config')
-READERS_CONFIG_DIR = os.path.join(BASE_CONFIG_DIR, 'readers')
-os.environ.setdefault('UWSIFT_CONFIG', BASE_CONFIG_DIR)
+from .util.default_paths import DOCUMENT_SETTINGS_DIR
+from .version import __version__  # noqa
+
+BASE_CONFIG_DIR = os.path.join(DOCUMENT_SETTINGS_DIR, "config")
+READERS_CONFIG_DIR = os.path.join(BASE_CONFIG_DIR, "readers")
+os.environ.setdefault("UWSIFT_CONFIG", BASE_CONFIG_DIR)
 
 CONFIG_PATHS = [
     BASE_CONFIG_DIR,
     READERS_CONFIG_DIR,
-    os.path.join(os.path.expanduser('~'), '.config', 'uwsift'),
+    os.path.join(os.path.expanduser("~"), ".config", "uwsift"),
 ]
 
 # EXPERIMENTAL: This functionality is experimental and may change in future
@@ -24,84 +25,73 @@ CONFIG_PATHS = [
 DEFAULT_CONFIGURATION = {
     # settings for storing temporary or persistent data on the file system
     # this preset is for using a simple workspace without any caching
-    'storage': {
-        'use_inventory_db': False,
-        'cleanup_file_cache': True
-    },
-
-
+    "storage": {"use_inventory_db": False, "cleanup_file_cache": True},
     # related to any reading of data
-    'data_reading': {
+    "data_reading": {
         # What readers to use when opening files
         # None => all readers
         # from environment variable: export UWSIFT_DATA_READING__READERS = "['abi_l1b', 'ami_l1b']"
         # 'readers': None,
-        'readers': [
-            'abi_l1b',
-            'ahi_hrit',
-            'ahi_hsd',
-            'ami_l1b',
-            'fci_l1c_fdhsi',
-            'fci_l1_geoobs',
-            'glm_l2',
-            'grib',
-            'li_l2',
-            'seviri_l1b_hrit',
-            'seviri_l1b_native',
-            'seviri_l1b_nc',
-            'seviri_l2_bufr'],
-
+        "readers": [
+            "abi_l1b",
+            "ahi_hrit",
+            "ahi_hsd",
+            "ami_l1b",
+            "fci_l1c_fdhsi",
+            "fci_l1_geoobs",
+            "glm_l2",
+            "grib",
+            "li_l2",
+            "seviri_l1b_hrit",
+            "seviri_l1b_native",
+            "seviri_l1b_nc",
+            "seviri_l2_bufr",
+        ],
         # Filters for what datasets not to include
-        'exclude_datasets': {
+        "exclude_datasets": {
             # 'calibration': ['radiance', 'counts'],
         },
-
         # Reader-specific reading configuration
-        'seviri_l1b_hrit': {
+        "seviri_l1b_hrit": {
             # If group_keys is not specified it defaults to Satpy's configuration
-            'group_keys': ['start_time', 'platform_shortname', 'service'],
+            "group_keys": ["start_time", "platform_shortname", "service"],
             # Offered patterns to filter files (trollsift syntax), by default first entry is used.
-            'filter_patterns': [
-                '{rate:1s}-000-{hrit_format:_<6s}-{platform_shortname:4s}_{service:_<7s}-{channel:_<6s}___-{segment:_<6s}___-{start_time:%Y%m%d%H%M}-{c:1s}_',
-                '{rate:1s}-000-{hrit_format:_<6s}-{platform_shortname:4s}_{service:_<7s}-{channel:_<6s}___-{segment:_<6s}___-{start_time:%Y%m%d%H%M}-__',
+            "filter_patterns": [
+                "{rate:1s}-000-{hrit_format:_<6s}-{platform_shortname:4s}_{service:_<7s}-{channel:_<6s}___-{segment:_<6s}___-{start_time:%Y%m%d%H%M}-{c:1s}_",
+                "{rate:1s}-000-{hrit_format:_<6s}-{platform_shortname:4s}_{service:_<7s}-{channel:_<6s}___-{segment:_<6s}___-{start_time:%Y%m%d%H%M}-__",
             ],
         },
     },
-
     # Reader-specific mapping configuration
-    'data_mapping': {
-        'seviri_l1b_hrit': {
-            'iScansNegatively': True,
-            'jScansPositively': True,
+    "data_mapping": {
+        "seviri_l1b_hrit": {
+            "iScansNegatively": True,
+            "jScansPositively": True,
         },
     },
-
     # specific to the open file wizard dialog
-    'open_file_wizard': {
-        'default_reader': 'seviri_l1b_hrit',  # use 'None' for first in list
-        'id_components': [
-            'name',
-            'wavelength',
-            'resolution',
-            'calibration',
-            'level',
+    "open_file_wizard": {
+        "default_reader": "seviri_l1b_hrit",  # use 'None' for first in list
+        "id_components": [
+            "name",
+            "wavelength",
+            "resolution",
+            "calibration",
+            "level",
         ],
     },
-
     # display options
-    'display': {
-        'use_tiled_geolocated_images': True
-    },
+    "display": {"use_tiled_geolocated_images": True},
 }
 
-config = Config('uwsift', defaults=[DEFAULT_CONFIGURATION], paths=CONFIG_PATHS)
+config = Config("uwsift", defaults=[DEFAULT_CONFIGURATION], paths=CONFIG_PATHS)
 
 
 def overwrite_import(package_name: str, custom_import_path: str, *, verbose=True):
     if (custom_import_path is not None) and (not os.path.exists(custom_import_path)):
         raise FileNotFoundError(
-            f"Package '{package_name}' "
-            f"doesn't exist at given custom import path '{custom_import_path}'")
+            f"Package '{package_name}' " f"doesn't exist at given custom import path '{custom_import_path}'"
+        )
 
     class CustomPathFinder(PathFinder):
         @classmethod
@@ -135,8 +125,7 @@ satpy_import_path = config.get("satpy_import_path", None)
 if satpy_import_path is not None:
     overwrite_import("satpy", satpy_import_path)
 
-satpy_extra_readers_import_path = \
-    config.get("satpy_extra_readers_import_path", None)
+satpy_extra_readers_import_path = config.get("satpy_extra_readers_import_path", None)
 if satpy_extra_readers_import_path is not None:
     # See https://gitlab.eumetsat.int/Meraner/fci_l1_geoobs_satpy_reader/-/blob/master/README.md
     sys.path.insert(0, satpy_extra_readers_import_path)
@@ -148,5 +137,4 @@ USE_TILED_GEOLOCATED_IMAGES = config.get("display.use_tiled_geolocated_images")
 USE_INVENTORY_DB = config.get("storage.use_inventory_db")
 CLEANUP_FILE_CACHE = config.get("storage.cleanup_file_cache")
 
-AUTO_UPDATE_MODE__ACTIVE = config.get('auto_update.active', False)
-
+AUTO_UPDATE_MODE__ACTIVE = config.get("auto_update.active", False)

@@ -31,30 +31,42 @@ import shapefile
 from vispy.color import Color
 from vispy.gloo import VertexBuffer
 from vispy.gloo.texture import should_cast_to_f32
-from vispy.util.profiler import Profiler
 from vispy.io.datasets import load_spatial_filters
 from vispy.scene.visuals import create_visual_node
-from vispy.visuals import LineVisual, ImageVisual, IsocurveVisual
+from vispy.util.profiler import Profiler
+from vispy.visuals import ImageVisual, IsocurveVisual, LineVisual
+
 # The below imports are needed because we subclassed ImageVisual and ArrowVisual
-from vispy.visuals.line.arrow import _ArrowHeadVisual, ArrowVisual
-from vispy.visuals.line.line import _AggLineVisual, _GLLineVisual, vec3to4, vec2to4
+from vispy.visuals.line.arrow import ArrowVisual, _ArrowHeadVisual
+from vispy.visuals.line.line import _AggLineVisual, _GLLineVisual, vec2to4, vec3to4
 from vispy.visuals.shaders import Function, FunctionChain
 from vispy.visuals.transforms import NullTransform, as_vec4
 
 from uwsift.common import (
     DEFAULT_PROJECTION,
-    DEFAULT_TILE_HEIGHT,
-    DEFAULT_TILE_WIDTH,
     DEFAULT_TEXTURE_HEIGHT,
     DEFAULT_TEXTURE_WIDTH,
+    DEFAULT_TILE_HEIGHT,
+    DEFAULT_TILE_WIDTH,
     TESS_LEVEL,
-    Box, Point, Resolution, ViewBox,
+    Box,
+    Point,
+    Resolution,
+    ViewBox,
 )
-from uwsift.view.texture_atlas import TextureAtlas2D, MultiChannelTextureAtlas2D,MultiChannelGPUScaledTexture2D
-from uwsift.view.tile_calculator import TileCalculator, calc_pixel_size, get_reference_points
+from uwsift.view.texture_atlas import (
+    MultiChannelGPUScaledTexture2D,
+    MultiChannelTextureAtlas2D,
+    TextureAtlas2D,
+)
+from uwsift.view.tile_calculator import (
+    TileCalculator,
+    calc_pixel_size,
+    get_reference_points,
+)
 
-__author__ = 'rayg'
-__docformat__ = 'reStructuredText'
+__author__ = "rayg"
+__docformat__ = "reStructuredText"
 
 LOG = logging.getLogger(__name__)
 # if the absolute value of a vertex coordinate is beyond 'CANVAS_EPSILON'
@@ -90,13 +102,11 @@ class TextureTileState(object):
         self.reset()
 
     def __getitem__(self, item):
-        """Get the texture index associated with this image tile index.
-        """
+        """Get the texture index associated with this image tile index."""
         return self.itile_cache[item]
 
     def __contains__(self, item):
-        """Have we already added this image tile index (yidx, xidx).
-        """
+        """Have we already added this image tile index (yidx, xidx)."""
         return item in self.itile_cache
 
     def reset(self):
@@ -117,8 +127,7 @@ class TextureTileState(object):
         return ttile_idx
 
     def refresh_age(self, itile_idx):
-        """Update the age of an image tile so it is less likely to expire.
-        """
+        """Update the age of an image tile so it is less likely to expire."""
         try:
             # Remove it from wherever it is
             self.itile_age.remove(itile_idx)
@@ -158,11 +167,16 @@ class TextureTileState(object):
 
 
 class SIFTTiledGeolocatedMixin:
-    def __init__(self, data, *area_params,
-                 tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH),
-                 texture_shape=(DEFAULT_TEXTURE_HEIGHT, DEFAULT_TEXTURE_WIDTH),
-                 wrap_lon=False, projection=DEFAULT_PROJECTION,
-                 **visual_kwargs):
+    def __init__(
+        self,
+        data,
+        *area_params,
+        tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH),
+        texture_shape=(DEFAULT_TEXTURE_HEIGHT, DEFAULT_TEXTURE_WIDTH),
+        wrap_lon=False,
+        projection=DEFAULT_PROJECTION,
+        **visual_kwargs,
+    ):
         origin_x, origin_y, cell_width, cell_height = area_params
         if visual_kwargs.get("method", "subdivide") != "subdivide":
             raise ValueError("Only 'subdivide' drawing method is supported.")
@@ -183,7 +197,7 @@ class SIFTTiledGeolocatedMixin:
             texture_shape,
             tile_shape,
             wrap_lon,
-            visual_kwargs.get('shape'),
+            visual_kwargs.get("shape"),
             data,
         )
 
@@ -191,17 +205,7 @@ class SIFTTiledGeolocatedMixin:
         super().__init__(data, **visual_kwargs)
 
     def _init_geo_parameters(
-            self,
-            origin_x,
-            origin_y,
-            cell_width,
-            cell_height,
-            projection,
-            texture_shape,
-            tile_shape,
-            wrap_lon,
-            shape,
-            data
+        self, origin_x, origin_y, cell_width, cell_height, projection, texture_shape, tile_shape, wrap_lon, shape, data
     ):
         self._viewable_mesh_mask = None
         self._ref1 = None
@@ -218,7 +222,7 @@ class SIFTTiledGeolocatedMixin:
         self._latest_tile_box = None
         self.wrap_lon = wrap_lon
         self._tiles = {}
-        assert (shape or data is not None), "`data` or `shape` must be provided"
+        assert shape or data is not None, "`data` or `shape` must be provided"
         self.shape = shape or data.shape
         self.ndim = len(self.shape) or data.ndim
 
@@ -242,12 +246,14 @@ class SIFTTiledGeolocatedMixin:
         return data
 
     def _build_texture_tiles(self, data, stride, tile_box: Box):
-        """Prepare and organize strided data in to individual tiles with associated information.
-        """
+        """Prepare and organize strided data in to individual tiles with associated information."""
         data = self._normalize_data(data)
 
-        LOG.debug("Uploading texture data for %d tiles (%r)",
-                  (tile_box.bottom - tile_box.top) * (tile_box.right - tile_box.left), tile_box)
+        LOG.debug(
+            "Uploading texture data for %d tiles (%r)",
+            (tile_box.bottom - tile_box.top) * (tile_box.right - tile_box.left),
+            tile_box,
+        )
         # Tiles start at upper-left so go from top to bottom
         tiles_info = []
         for tiy in range(tile_box.top, tile_box.bottom):
@@ -315,27 +321,33 @@ class SIFTTiledGeolocatedMixin:
                     # THIS SHOULD NEVER HAPPEN IF TEXTURE BUILDING IS DONE CORRECTLY AND THE ATLAS IS BIG ENOUGH
                     tile_start = TESS_LEVEL * TESS_LEVEL * used_tile_idx * 6
                     tile_end = TESS_LEVEL * TESS_LEVEL * (used_tile_idx + 1) * 6
-                    tex_coords[tile_start: tile_end, :] = 0
-                    vertices[tile_start: tile_end, :] = 0
+                    tex_coords[tile_start:tile_end, :] = 0
+                    vertices[tile_start:tile_end, :] = 0
                     continue
 
                 # we should have already loaded the texture data in to the GPU so get the index of that texture
                 tex_tile_idx = self.texture_state[(preferred_stride, tiy, tix)]
                 factor_rez, offset_rez = self.calc.calc_tile_fraction(tiy, tix, preferred_stride)
-                tex_coords[tl * used_tile_idx * 6: tl * (used_tile_idx + 1) * 6, :] = \
-                    self.calc.calc_texture_coordinates(tex_tile_idx, factor_rez, offset_rez,
-                                                       tessellation_level=TESS_LEVEL)
-                vertices[tl * used_tile_idx * 6: tl * (used_tile_idx + 1) * 6, :] = self.calc.calc_vertex_coordinates(
-                    tiy, tix,
-                    preferred_stride[0], preferred_stride[1],
-                    factor_rez, offset_rez,
-                    tessellation_level=TESS_LEVEL)
+                tex_coords[
+                    tl * used_tile_idx * 6 : tl * (used_tile_idx + 1) * 6, :
+                ] = self.calc.calc_texture_coordinates(
+                    tex_tile_idx, factor_rez, offset_rez, tessellation_level=TESS_LEVEL
+                )
+                vertices[tl * used_tile_idx * 6 : tl * (used_tile_idx + 1) * 6, :] = self.calc.calc_vertex_coordinates(
+                    tiy,
+                    tix,
+                    preferred_stride[0],
+                    preferred_stride[1],
+                    factor_rez,
+                    offset_rez,
+                    tessellation_level=TESS_LEVEL,
+                )
 
         return vertices, tex_coords
 
     def _set_vertex_tiles(self, vertices, tex_coords):
-        self._subdiv_position.set_data(vertices.astype('float32'))
-        self._subdiv_texcoord.set_data(tex_coords.astype('float32'))
+        self._subdiv_position.set_data(vertices.astype("float32"))
+        self._subdiv_texcoord.set_data(tex_coords.astype("float32"))
 
     def determine_reference_points(self):
         # Image points transformed to canvas coordinates
@@ -354,8 +366,8 @@ class SIFTTiledGeolocatedMixin:
 
         x_cmin, x_cmax = img_cmesh[:, 0].min(), img_cmesh[:, 0].max()
         y_cmin, y_cmax = img_cmesh[:, 1].min(), img_cmesh[:, 1].max()
-        center_x = (x_cmax - x_cmin) / 2. + x_cmin
-        center_y = (y_cmax - y_cmin) / 2. + y_cmin
+        center_x = (x_cmax - x_cmin) / 2.0 + x_cmin
+        center_y = (y_cmax - y_cmin) / 2.0 + y_cmin
         dist = img_cmesh.copy()
         dist[:, 0] = center_x - img_cmesh[:, 0]
         dist[:, 1] = center_y - img_cmesh[:, 1]
@@ -385,9 +397,9 @@ class SIFTTiledGeolocatedMixin:
         img_vbox = self.calc.image_mesh[self._viewable_mesh_mask]
 
         ref_idx_1, ref_idx_2 = get_reference_points(img_cmesh, img_vbox)
-        dx, dy = calc_pixel_size(img_cmesh[(self._ref1, self._ref2), :],
-                                 img_vbox[(self._ref1, self._ref2), :],
-                                 self.canvas.size)
+        dx, dy = calc_pixel_size(
+            img_cmesh[(self._ref1, self._ref2), :], img_vbox[(self._ref1, self._ref2), :], self.canvas.size
+        )
         view_extents = self.calc.calc_view_extents(img_cmesh[ref_idx_1], img_vbox[ref_idx_1], self.canvas.size, dx, dy)
         return ViewBox(*view_extents, dx=dx, dy=dy)
 
@@ -409,8 +421,13 @@ class SIFTTiledGeolocatedMixin:
             return False, self._stride, self._latest_tile_box
 
         num_tiles = (tile_box.bottom - tile_box.top) * (tile_box.right - tile_box.left)
-        LOG.debug("Assessment: Prefer '%s' have '%s', was looking at %r, now looking at %r",
-                  preferred_stride, self._stride, self._latest_tile_box, tile_box)
+        LOG.debug(
+            "Assessment: Prefer '%s' have '%s', was looking at %r, now looking at %r",
+            preferred_stride,
+            self._stride,
+            self._latest_tile_box,
+            tile_box,
+        )
 
         # If we zoomed out or we panned
         need_retile = (num_tiles > 0) and (preferred_stride != self._stride or self._latest_tile_box != tile_box)
@@ -418,8 +435,7 @@ class SIFTTiledGeolocatedMixin:
         return need_retile, preferred_stride, tile_box
 
     def retile(self, data, preferred_stride, tile_box):
-        """Get data from workspace and retile/retexture as needed.
-        """
+        """Get data from workspace and retile/retexture as needed."""
         tiles_info = self._build_texture_tiles(data, preferred_stride, tile_box)
         vertices, tex_coords = self._build_vertex_tiles(preferred_stride, tile_box)
         return tiles_info, vertices, tex_coords
@@ -435,20 +451,22 @@ class SIFTTiledGeolocatedMixin:
 
 
 class TiledGeolocatedImageVisual(SIFTTiledGeolocatedMixin, ImageVisual):
-    def __init__(self, data, origin_x, origin_y, cell_width, cell_height,
-                 **image_kwargs):
+    def __init__(self, data, origin_x, origin_y, cell_width, cell_height, **image_kwargs):
         super().__init__(data, origin_x, origin_y, cell_width, cell_height, **image_kwargs)
 
     def _init_texture(self, data, texture_format):
-        if self._interpolation == 'bilinear':
-            texture_interpolation = 'linear'
+        if self._interpolation == "bilinear":
+            texture_interpolation = "linear"
         else:
-            texture_interpolation = 'nearest'
+            texture_interpolation = "nearest"
 
-        tex = TextureAtlas2D(self.texture_shape, tile_shape=self.tile_shape,
-                             interpolation=texture_interpolation,
-                             format="LUMINANCE", internalformat="R32F",
-                             )
+        tex = TextureAtlas2D(
+            self.texture_shape,
+            tile_shape=self.tile_shape,
+            interpolation=texture_interpolation,
+            format="LUMINANCE",
+            internalformat="R32F",
+        )
         return tex
 
     def set_data(self, image):
@@ -501,7 +519,7 @@ _apply_clim = """
             !(color.b <= 0.0 || 0.0 <= color.b)) {
             color.a = 0;
         }
-        
+
         // if color is NaN, set to minimum possible value
         color.r = !(color.r <= 0.0 || 0.0 <= color.r) ? min($clim_r.x, $clim_r.y) : color.r;
         color.g = !(color.g <= 0.0 || 0.0 <= color.g) ? min($clim_g.x, $clim_g.y) : color.g;
@@ -527,7 +545,7 @@ _apply_gamma = """
     }
 """
 
-_null_color_transform = 'vec4 pass(vec4 color) { return color; }'
+_null_color_transform = "vec4 pass(vec4 color) { return color; }"
 
 
 class SIFTMultiChannelTiledGeolocatedMixin(SIFTTiledGeolocatedMixin):
@@ -541,17 +559,17 @@ class SIFTMultiChannelTiledGeolocatedMixin(SIFTTiledGeolocatedMixin):
         return new_data
 
     def _init_geo_parameters(
-            self,
-            origin_x,
-            origin_y,
-            cell_width,
-            cell_height,
-            projection,
-            texture_shape,
-            tile_shape,
-            wrap_lon,
-            shape,
-            data_arrays
+        self,
+        origin_x,
+        origin_y,
+        cell_width,
+        cell_height,
+        projection,
+        texture_shape,
+        tile_shape,
+        wrap_lon,
+        shape,
+        data_arrays,
     ):
         if shape is None:
             shape = self._compute_shape(shape, data_arrays)
@@ -571,14 +589,16 @@ class SIFTMultiChannelTiledGeolocatedMixin(SIFTTiledGeolocatedMixin):
         )
 
         self.set_channels(
-            data_arrays, shape=shape, cell_width=cell_width,
-            cell_height=cell_height, origin_x=origin_x, origin_y=origin_y,
+            data_arrays,
+            shape=shape,
+            cell_width=cell_width,
+            cell_height=cell_height,
+            origin_x=origin_x,
+            origin_y=origin_y,
         )
 
-    def set_channels(self, data_arrays, shape=None,
-                     cell_width=None, cell_height=None,
-                     origin_x=None, origin_y=None):
-        assert (shape or data_arrays is not None), "`data` or `shape` must be provided"
+    def set_channels(self, data_arrays, shape=None, cell_width=None, cell_height=None, origin_x=None, origin_y=None):
+        assert shape or data_arrays is not None, "`data` or `shape` must be provided"
         if cell_width is not None:
             self.cell_width = cell_width
         if cell_height:
@@ -592,10 +612,12 @@ class SIFTMultiChannelTiledGeolocatedMixin(SIFTTiledGeolocatedMixin):
         # how many of the higher resolution channel tiles (smaller geographic area) make
         # up a low resolution channel tile
         self._channel_factors = tuple(
-            self.shape[0] / float(chn.shape[0]) if chn is not None else 1. for chn in data_arrays)
+            self.shape[0] / float(chn.shape[0]) if chn is not None else 1.0 for chn in data_arrays
+        )
         self._lowest_factor = max(self._channel_factors)
-        self._lowest_rez = Resolution(abs(self.cell_height * self._lowest_factor),
-                                      abs(self.cell_width * self._lowest_factor))
+        self._lowest_rez = Resolution(
+            abs(self.cell_height * self._lowest_factor), abs(self.cell_width * self._lowest_factor)
+        )
 
         # Where does this image lie in this lonely world
         self.calc = TileCalculator(
@@ -605,7 +627,7 @@ class SIFTMultiChannelTiledGeolocatedMixin(SIFTTiledGeolocatedMixin):
             Resolution(dy=abs(self.cell_height), dx=abs(self.cell_width)),
             self.tile_shape,
             self.texture_shape,
-            wrap_lon=self.wrap_lon
+            wrap_lon=self.wrap_lon,
         )
 
         # Reset texture state, if we change things to know which texture
@@ -681,23 +703,21 @@ class MultiChannelImageVisual(ImageVisual):
 
     """
 
-    def __init__(self, data_arrays, clim='auto', gamma=1.0, **kwargs):
+    def __init__(self, data_arrays, clim="auto", gamma=1.0, **kwargs):
         if kwargs.get("texture_format") is not None:
-            raise ValueError("'texture_format' can't be specified with the "
-                             "'MultiChannelImageVisual'.")
+            raise ValueError("'texture_format' can't be specified with the " "'MultiChannelImageVisual'.")
         kwargs["texture_format"] = "R32F"
         if kwargs.get("cmap") is not None:
-            raise ValueError("'cmap' can't be specified with the"
-                             "'MultiChannelImageVisual'.")
+            raise ValueError("'cmap' can't be specified with the" "'MultiChannelImageVisual'.")
         kwargs["cmap"] = None
         self.num_channels = len(data_arrays)
         super().__init__(data_arrays, clim=clim, gamma=gamma, **kwargs)
 
     def _init_texture(self, data_arrays, texture_format):
-        if self._interpolation == 'bilinear':
-            texture_interpolation = 'linear'
+        if self._interpolation == "bilinear":
+            texture_interpolation = "linear"
         else:
-            texture_interpolation = 'nearest'
+            texture_interpolation = "nearest"
 
         tex = MultiChannelGPUScaledTexture2D(
             data_arrays,
@@ -710,8 +730,7 @@ class MultiChannelImageVisual(ImageVisual):
     def _get_shapes(self, data_arrays):
         shapes = [x.shape for x in data_arrays if x is not None]
         if not shapes:
-            raise ValueError("List of data arrays must contain at least one "
-                             "numpy array.")
+            raise ValueError("List of data arrays must contain at least one " "numpy array.")
         return shapes
 
     def _get_min_shape(self, data_arrays):
@@ -748,11 +767,11 @@ class MultiChannelImageVisual(ImageVisual):
         except RuntimeError:
             return
         else:
-            clim_names = ('clim_r', 'clim_g', 'clim_b')
+            clim_names = ("clim_r", "clim_g", "clim_b")
             # shortcut so we don't have to rebuild the whole color transform
             for clim_name, clim in zip(clim_names, norm_clims):
                 # shortcut so we don't have to rebuild the whole color transform
-                self.shared_program.frag['color_transform'][1][clim_name] = clim
+                self.shared_program.frag["color_transform"][1][clim_name] = clim
 
     @property
     def gamma(self):
@@ -768,11 +787,11 @@ class MultiChannelImageVisual(ImageVisual):
             raise ValueError("gamma must be > 0")
         self._gamma = tuple(float(x) for x in value)
 
-        gamma_names = ('gamma_r', 'gamma_g', 'gamma_b')
+        gamma_names = ("gamma_r", "gamma_g", "gamma_b")
         for gamma_name, gam in zip(gamma_names, self._gamma):
             # shortcut so we don't have to rebuild the color transform
             if not self._need_colortransform_update:
-                self.shared_program.frag['color_transform'][2][gamma_name] = gam
+                self.shared_program.frag["color_transform"][2][gamma_name] = gam
         self.update()
 
     @ImageVisual.cmap.setter
@@ -784,17 +803,17 @@ class MultiChannelImageVisual(ImageVisual):
     def _build_interpolation(self):
         # assumes 'nearest' interpolation
         interpolation = self._interpolation
-        if interpolation != 'nearest':
+        if interpolation != "nearest":
             raise NotImplementedError("MultiChannelImageVisual only supports 'nearest' interpolation.")
-        texture_interpolation = 'nearest'
+        texture_interpolation = "nearest"
 
         self._data_lookup_fn = Function(_rgb_texture_lookup)
-        self.shared_program.frag['get_data'] = self._data_lookup_fn
+        self.shared_program.frag["get_data"] = self._data_lookup_fn
         if self._texture.interpolation != texture_interpolation:
             self._texture.interpolation = texture_interpolation
-        self._data_lookup_fn['texture_r'] = self._texture.textures[0]
-        self._data_lookup_fn['texture_g'] = self._texture.textures[1]
-        self._data_lookup_fn['texture_b'] = self._texture.textures[2]
+        self._data_lookup_fn["texture_r"] = self._texture.textures[0]
+        self._data_lookup_fn["texture_g"] = self._texture.textures[1]
+        self._data_lookup_fn["texture_b"] = self._texture.textures[2]
 
         self._need_interpolation_update = False
 
@@ -806,12 +825,12 @@ class MultiChannelImageVisual(ImageVisual):
             fclim = Function(_apply_clim)
             fgamma = Function(_apply_gamma)
             fun = FunctionChain(None, [Function(_null_color_transform), fclim, fgamma])
-        fclim['clim_r'] = self._texture.textures[0].clim_normalized
-        fclim['clim_g'] = self._texture.textures[1].clim_normalized
-        fclim['clim_b'] = self._texture.textures[2].clim_normalized
-        fgamma['gamma_r'] = self.gamma[0]
-        fgamma['gamma_g'] = self.gamma[1]
-        fgamma['gamma_b'] = self.gamma[2]
+        fclim["clim_r"] = self._texture.textures[0].clim_normalized
+        fclim["clim_g"] = self._texture.textures[1].clim_normalized
+        fclim["clim_b"] = self._texture.textures[2].clim_normalized
+        fgamma["gamma_r"] = self.gamma[0]
+        fgamma["gamma_g"] = self.gamma[1]
+        fgamma["gamma_b"] = self.gamma[2]
         return fun
 
     def set_data(self, data_arrays):
@@ -865,19 +884,22 @@ class MultiChannelImageVisual(ImageVisual):
 MultiChannelImage = create_visual_node(MultiChannelImageVisual)
 
 
-class RGBCompositeLayerVisual(SIFTMultiChannelTiledGeolocatedMixin,
-                              TiledGeolocatedImageVisual,
-                              MultiChannelImageVisual):
+class RGBCompositeLayerVisual(
+    SIFTMultiChannelTiledGeolocatedMixin, TiledGeolocatedImageVisual, MultiChannelImageVisual
+):
     def _init_texture(self, data_arrays, texture_format):
-        if self._interpolation == 'bilinear':
-            texture_interpolation = 'linear'
+        if self._interpolation == "bilinear":
+            texture_interpolation = "linear"
         else:
-            texture_interpolation = 'nearest'
+            texture_interpolation = "nearest"
 
         tex_shapes = [self.texture_shape] * len(data_arrays)
         tex = MultiChannelTextureAtlas2D(
-            tex_shapes, tile_shape=self.tile_shape,
-            interpolation=texture_interpolation, format="LUMINANCE", internalformat="R32F"
+            tex_shapes,
+            tile_shape=self.tile_shape,
+            interpolation=texture_interpolation,
+            format="LUMINANCE",
+            internalformat="R32F",
         )
         return tex
 
@@ -905,8 +927,8 @@ class ShapefileLinesVisual(LineVisual):
             # for part_idx in one_shape.parts:
             for part_start, part_end in zip(one_shape.parts, list(one_shape.parts[1:]) + [len(one_shape.points)]):
                 end_idx = prev_idx + (part_end - part_start) * 2 - 2
-                vertex_buffer[prev_idx:end_idx:2] = one_shape.points[part_start:part_end - 1]
-                vertex_buffer[prev_idx + 1:end_idx:2] = one_shape.points[part_start + 1:part_end]
+                vertex_buffer[prev_idx:end_idx:2] = one_shape.points[part_start : part_end - 1]
+                vertex_buffer[prev_idx + 1 : end_idx : 2] = one_shape.points[part_start + 1 : part_end]
                 prev_idx = end_idx
 
         # Clip lats to +/- 89.9 otherwise PROJ.4 on mercator projection will fail
@@ -938,6 +960,7 @@ class NEShapefileLinesVisual(ShapefileLinesVisual):
     data resolution, fields and other record information that is normally
     included in most Natural Earth files.
     """
+
     pass
 
 
@@ -951,8 +974,8 @@ class PrecomputedIsocurveVisual(IsocurveVisual):
         num_zoom_levels = len(levels)
         num_levels_per_zlevel = [len(x) for x in levels]
         self._zoom_level_indexes = [
-            level_indexes[:sum(num_levels_per_zlevel[:z_level + 1])]
-            for z_level in range(num_zoom_levels)]
+            level_indexes[: sum(num_levels_per_zlevel[: z_level + 1])] for z_level in range(num_zoom_levels)
+        ]
         self._zoom_level_size = [sum(z_level_indexes) for z_level_indexes in self._zoom_level_indexes]
 
         self._all_verts = []
@@ -963,7 +986,7 @@ class PrecomputedIsocurveVisual(IsocurveVisual):
             end_idx = self._zoom_level_size[zoom_level]
             self._all_verts.append(verts[:end_idx])
             self._all_connects.append(connects[:end_idx])
-            self._all_levels.append([x for y in levels[:zoom_level + 1] for x in y])
+            self._all_levels.append([x for y in levels[: zoom_level + 1] for x in y])
 
         super(PrecomputedIsocurveVisual, self).__init__(data=None, levels=levels, **kwargs)
 
@@ -999,8 +1022,7 @@ class PrecomputedIsocurveVisual(IsocurveVisual):
         self.update()
 
     def _compute_iso_line(self):
-        """ compute LineVisual vertices, connects and color-index
-        """
+        """compute LineVisual vertices, connects and color-index"""
         return
 
 
@@ -1015,57 +1037,53 @@ class _GLGradientLineVisual(_GLLineVisual):
     def _prepare_draw(self, view):
         prof = Profiler()
 
-        if self._parent._changed['pos']:
+        if self._parent._changed["pos"]:
             if self._parent._pos is None:
                 return False
             # todo: does this result in unnecessary copies?
             pos = np.ascontiguousarray(self._parent._pos.astype(np.float32))
-            xf = view.transforms.get_transform('visual', 'framebuffer')
+            xf = view.transforms.get_transform("visual", "framebuffer")
             # transform pos to pixel coords
             pos_px = xf.map(pos)
             # subtract necessary offset
             line_dirs = pos_px[1::2, 0:2] - pos_px[0::2, 0:2]
-            line_dirs_normed = (1.0 / (
-                np.linalg.norm(line_dirs, axis=1)))*line_dirs
-            offset = self._arrow_size/2.0
+            line_dirs_normed = (1.0 / (np.linalg.norm(line_dirs, axis=1))) * line_dirs
+            offset = self._arrow_size / 2.0
             pos_px[1::2, 0:2] -= offset * line_dirs_normed
             # tranform back to visual coords
             pos_re = xf.imap(pos_px)[:, 0:2].astype(np.float32)
             self._pos_vbo.set_data(pos_re)
             # self._pos_vbo.set_data(pos)
-            self._program.vert['position'] = self._pos_vbo
+            self._program.vert["position"] = self._pos_vbo
             if pos.shape[-1] == 2:
-                self._program.vert['to_vec4'] = vec2to4
+                self._program.vert["to_vec4"] = vec2to4
             elif pos.shape[-1] == 3:
-                self._program.vert['to_vec4'] = vec3to4
+                self._program.vert["to_vec4"] = vec3to4
             else:
-                raise TypeError("Got bad position array shape: %r"
-                                % (pos.shape,))
+                raise TypeError("Got bad position array shape: %r" % (pos.shape,))
 
-        if self._parent._changed['color']:
+        if self._parent._changed["color"]:
             color, cmap = self._parent._interpret_color()
             # If color is not visible, just quit now
             if isinstance(color, Color) and color.is_blank:
                 return False
             if isinstance(color, Function):
                 # TODO: Change to the parametric coordinate once that is done
-                self._program.vert['color'] = color(
-                    '(gl_Position.x + 1.0) / 2.0')
+                self._program.vert["color"] = color("(gl_Position.x + 1.0) / 2.0")
             else:
                 if color.ndim == 1:
-                    self._program.vert['color'] = color
+                    self._program.vert["color"] = color
                 else:
                     self._color_vbo.set_data(color)
-                    self._program.vert['color'] = self._color_vbo
+                    self._program.vert["color"] = self._color_vbo
 
-            self.shared_program['texture2D_LUT'] = cmap.texture_lut() \
-                if (hasattr(cmap, 'texture_lut')) else None
+            self.shared_program["texture2D_LUT"] = cmap.texture_lut() if (hasattr(cmap, "texture_lut")) else None
 
         # Do we want to use OpenGL, and can we?
         GL = None
         from vispy.app._default_app import default_app
-        if default_app is not None and \
-                default_app.backend_name != 'ipynb_webgl':
+
+        if default_app is not None and default_app.backend_name != "ipynb_webgl":
             try:
                 import OpenGL.GL as GL
             except Exception:  # can be other than ImportError sometimes
@@ -1079,33 +1097,31 @@ class _GLGradientLineVisual(_GLLineVisual):
                 GL.glDisable(GL.GL_LINE_SMOOTH)
             px_scale = self.transforms.pixel_scale
             width = px_scale * self._parent._width
-            GL.glLineWidth(max(width, 1.))
+            GL.glLineWidth(max(width, 1.0))
 
-        if self._parent._changed['connect']:
+        if self._parent._changed["connect"]:
             self._connect = self._parent._interpret_connect()
             if isinstance(self._connect, np.ndarray):
                 self._connect_ibo.set_data(self._connect)
         if self._connect is None:
             return False
 
-        prof('prepare')
+        prof("prepare")
 
         # Draw
-        if isinstance(self._connect, str) and \
-                self._connect == 'strip':
-            self._draw_mode = 'line_strip'
+        if isinstance(self._connect, str) and self._connect == "strip":
+            self._draw_mode = "line_strip"
             self._index_buffer = None
-        elif isinstance(self._connect, str) and \
-                self._connect == 'segments':
-            self._draw_mode = 'lines'
+        elif isinstance(self._connect, str) and self._connect == "segments":
+            self._draw_mode = "lines"
             self._index_buffer = None
         elif isinstance(self._connect, np.ndarray):
-            self._draw_mode = 'lines'
+            self._draw_mode = "lines"
             self._index_buffer = self._connect_ibo
         else:
             raise ValueError("Invalid line connect mode: %r" % self._connect)
 
-        prof('draw')
+        prof("draw")
 
 
 class GradientLineVisual(LineVisual):
@@ -1146,13 +1162,20 @@ class GradientLineVisual(LineVisual):
         For method='gl', this specifies whether to use GL's line smoothing,
         which may be unavailable or inconsistent on some platforms.
     """
-    def __init__(self, pos=None, color=(0.5, 0.5, 0.5, 1), width=1,
-                 arrow_size=None, connect='strip', method='gl',
-                 antialias=False):
+
+    def __init__(
+        self,
+        pos=None,
+        color=(0.5, 0.5, 0.5, 1),
+        width=1,
+        arrow_size=None,
+        connect="strip",
+        method="gl",
+        antialias=False,
+    ):
         self._line_visual = None
 
-        self._changed = {'pos': False, 'color': False, 'width': False,
-                         'connect': False}
+        self._changed = {"pos": False, "color": False, "width": False, "connect": False}
 
         self._pos = None
         self._color = None
@@ -1161,20 +1184,18 @@ class GradientLineVisual(LineVisual):
         self._connect = None
         self._bounds = None
         self._antialias = None
-        self._method = 'none'
+        self._method = "none"
 
         super(LineVisual, self).__init__([])
 
         # don't call subclass set_data; these often have different
         # signatures.
-        LineVisual.set_data(self, pos=pos, color=color, width=width,
-                            connect=connect)
+        LineVisual.set_data(self, pos=pos, color=color, width=width, connect=connect)
         self.antialias = antialias
         self.method = method
 
-
     def method(self, method):
-        if method not in ('agg', 'gl'):
+        if method not in ("agg", "gl"):
             raise ValueError('method argument must be "agg" or "gl".')
         if method == self._method:
             return
@@ -1183,9 +1204,9 @@ class GradientLineVisual(LineVisual):
         if self._line_visual is not None:
             self.remove_subvisual(self._line_visual)
 
-        if method == 'gl':
+        if method == "gl":
             self._line_visual = _GLGradientLineVisual(self, self._arrow_size)
-        elif method == 'agg':
+        elif method == "agg":
             self._line_visual = _AggLineVisual(self)
         self.add_subvisual(self._line_visual)
 
@@ -1201,18 +1222,17 @@ class _TipAlignedArrowHeadVisual(_ArrowHeadVisual):
         if self._parent._arrows_changed:
             self._prepare_vertex_data(view)
         self.shared_program.bind(self._arrow_vbo)
-        self.shared_program['antialias'] = 0.0
-        self.shared_program.frag['arrow_type'] = self._parent.arrow_type
-        self.shared_program.frag['fill_type'] = "filled"
+        self.shared_program["antialias"] = 0.0
+        self.shared_program.frag["arrow_type"] = self._parent.arrow_type
+        self.shared_program.frag["fill_type"] = "filled"
 
     def _prepare_vertex_data(self, view):
         arrows = self._parent.arrows
 
-        xf = view.transforms.get_transform('visual', 'framebuffer')
+        xf = view.transforms.get_transform("visual", "framebuffer")
 
         if arrows is None or arrows.size == 0:
-            self._arrow_vbo = VertexBuffer(
-                np.array([], dtype=self._arrow_vtype))
+            self._arrow_vbo = VertexBuffer(np.array([], dtype=self._arrow_vtype))
             return
 
         # arrows present in (N/2 x 4), need (N x 2) where N is number of
@@ -1224,7 +1244,7 @@ class _TipAlignedArrowHeadVisual(_ArrowHeadVisual):
         arrow_dirs = arrows_px[1::2, 0:2] - arrows_px[0::2, 0:2]
         arrow_dirs_normed = (1.0 / (np.linalg.norm(arrow_dirs, axis=1)))[:, np.newaxis] * arrow_dirs
         offset = self._parent.arrow_size / 2.0
-        arrows_px[1::2, 0:2] -= offset*arrow_dirs_normed
+        arrows_px[1::2, 0:2] -= offset * arrow_dirs_normed
         # tranform back to visual coords
         arrows_re = xf.imap(arrows_px)[:, 0:2].astype(np.float32)
         # arrows now again needed in (N/2 x 4)
@@ -1232,12 +1252,12 @@ class _TipAlignedArrowHeadVisual(_ArrowHeadVisual):
         v = np.zeros(len(arrows), dtype=self._arrow_vtype)
         # 2d // 3d v1 v2.
         sh = int(arrows.shape[1] / 2)
-        v['v1'] = as_vec4(arrows[:, 0:sh])
-        v['v2'] = as_vec4(arrows[:, sh:int(2 * sh)])
-        v['size'][:] = self._parent.arrow_size
+        v["v1"] = as_vec4(arrows[:, 0:sh])
+        v["v2"] = as_vec4(arrows[:, sh : int(2 * sh)])
+        v["size"][:] = self._parent.arrow_size
         color, cmap = self._parent._interpret_color(self._parent.arrow_color)
-        v['color'][:] = color
-        v['linewidth'][:] = self._parent.width
+        v["color"][:] = color
+        v["linewidth"][:] = self._parent.width
         self._arrow_vbo = VertexBuffer(v)
 
 
@@ -1305,10 +1325,20 @@ class TipAlignedArrowVisual(ArrowVisual):
         (..., 4) and provide one rgba color per arrow head. Can also be a
         colormap name, or appropriate `Function`.
     """
-    def __init__(self, pos=None, color=(0.5, 0.5, 0.5, 1), width=1,
-                 connect='strip', method='gl', antialias=False, arrows=None,
-                 arrow_type='stealth', arrow_size=None,
-                 arrow_color=(0.5, 0.5, 0.5, 1)):
+
+    def __init__(
+        self,
+        pos=None,
+        color=(0.5, 0.5, 0.5, 1),
+        width=1,
+        connect="strip",
+        method="gl",
+        antialias=False,
+        arrows=None,
+        arrow_type="stealth",
+        arrow_size=None,
+        arrow_color=(0.5, 0.5, 0.5, 1),
+    ):
         # Do not use the self._changed dictionary as it gets overwritten by
         # the LineVisual constructor.
         self._arrows_changed = False
@@ -1327,8 +1357,7 @@ class TipAlignedArrowVisual(ArrowVisual):
         # which triggers an *update* event. This results in a redraw. After
         # that we call our own `set_data` method, which triggers another
         # redraw. This should be fixed.
-        GradientLineVisual.__init__(self, pos, color, width, arrow_size,
-                                    connect, method, antialias)
+        GradientLineVisual.__init__(self, pos, color, width, arrow_size, connect, method, antialias)
         TipAlignedArrowVisual.set_data(self, arrows=arrows)
 
         # Add marker visual for the arrow head
@@ -1337,8 +1366,8 @@ class TipAlignedArrowVisual(ArrowVisual):
 
 class LinesVisual(TipAlignedArrowVisual):
     default_colors = {
-        "red": (1., 0., 0., 1.),
-        "green": (0., 1., 0., 1.),
+        "red": (1.0, 0.0, 0.0, 1.0),
+        "green": (0.0, 1.0, 0.0, 1.0),
     }
 
     def __init__(self, arrows: np.ndarray, colors: Optional[np.ndarray] = None):
@@ -1357,20 +1386,27 @@ class LinesVisual(TipAlignedArrowVisual):
         # arrow head, and the first vertex is only used for determining
         # the arrow head orientation.
         if colors is None:
-            colors = np.array([np.array(self.default_colors["green"]),
-                               np.array(self.default_colors["red"])])
+            colors = np.array([np.array(self.default_colors["green"]), np.array(self.default_colors["red"])])
             colors = np.tile(colors, (n_points, 1))
         elif colors.ndim == 1 and colors.size == 4:
             pass
         elif colors.ndim == 2 and colors.shape[0] == 2:
             colors = np.tile(colors, (n_points, 1))
         else:
-            raise AttributeError("Too many colors provided or colors ill-formed, "
-                                 "provide at-most two colors in RGBA format.")
+            raise AttributeError(
+                "Too many colors provided or colors ill-formed, " "provide at-most two colors in RGBA format."
+            )
 
-        super().__init__(pos=points, arrows=arrows, arrow_type='triangle_30',
-                         color=colors, arrow_color='w', arrow_size=10,
-                         connect='segments', method='gl')
+        super().__init__(
+            pos=points,
+            arrows=arrows,
+            arrow_type="triangle_30",
+            color=colors,
+            arrow_color="w",
+            arrow_size=10,
+            connect="segments",
+            method="gl",
+        )
 
 
 Lines = create_visual_node(LinesVisual)

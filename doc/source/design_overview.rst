@@ -45,4 +45,3 @@ The Scene Graph wraps all map canvas elements visual elements.
 It handles connecting all mouse events from the map canvas like pan and zoom
 events. The majority of this components responsibility is to map SIFT
 functions to the python ``vispy`` library.
-

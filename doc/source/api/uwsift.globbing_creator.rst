@@ -162,5 +162,3 @@ since this would lead to combinatorial explosion (which is *not* retained).
 
 Actually the Catalogue defines kind of a query language which to implement a complete validation for would require
 considerable effort.
-
-

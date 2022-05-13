@@ -41,25 +41,20 @@ CHANNEL_GREEN = 1
 CHANNEL_BLUE = 2
 CHANNEL_ALPHA = 3
 
-RGBA2IDX: Mapping[str, int] = dict(r=CHANNEL_RED,
-                                   g=CHANNEL_GREEN,
-                                   b=CHANNEL_BLUE,
-                                   a=CHANNEL_ALPHA)
+RGBA2IDX: Mapping[str, int] = dict(r=CHANNEL_RED, g=CHANNEL_GREEN, b=CHANNEL_BLUE, a=CHANNEL_ALPHA)
 
 CHANNEL_X = 0
 CHANNEL_Y = 1
 CHANNEL_Z = 2
 
-XYZ2IDX: Mapping[str, int] = dict(x=CHANNEL_X,
-                                  y=CHANNEL_Y,
-                                  z=CHANNEL_Z)
+XYZ2IDX: Mapping[str, int] = dict(x=CHANNEL_X, y=CHANNEL_Y, z=CHANNEL_Z)
 
-DIFF_OP_NAME = 'Difference'
-NDI_OP_NAME = 'Normalized Difference Index'
+DIFF_OP_NAME = "Difference"
+NDI_OP_NAME = "Normalized Difference Index"
 CUSTOM_OP_NAME = "Custom..."
 PRESET_OPERATIONS = {
-    DIFF_OP_NAME: ('result = x - y', 2),
-    NDI_OP_NAME: ('result = (x - y) / (x + y)', 2),
+    DIFF_OP_NAME: ("result = x - y", 2),
+    NDI_OP_NAME: ("result = (x - y) / (x + y)", 2),
 }
 
 
@@ -70,6 +65,7 @@ class Recipe:
     which input Layers provide the image data that is used to generate the
     images of their Layer.
     """
+
     name: str
     input_layer_ids: list = dataclasses.field(default_factory=list)
     read_only: bool = False
@@ -105,12 +101,13 @@ class CompositeRecipe(Recipe):
 
     Do not instantiate this class directly but use `CompositeRecipe.from_rgb()`.
     """
+
     color_limits: list = dataclasses.field(default_factory=list)
     gammas: list = dataclasses.field(default_factory=list)
 
     def __post_init__(self):
         super().__post_init__()
-        
+
         def _normalize_list(x, default=None):
             return [x[idx] if x and len(x) > idx and x[idx] else default for idx in range(3)]
 
@@ -130,9 +127,9 @@ class CompositeRecipe(Recipe):
         :return: Info dict for the channel
         """
         return {
-            'name': self.input_layer_ids[idx],
-            'color_limits': self.color_limits[idx],
-            'gamma': self.gammas[idx],
+            "name": self.input_layer_ids[idx],
+            "color_limits": self.color_limits[idx],
+            "gamma": self.gammas[idx],
         }
 
     def set_default_color_limits(self, r=None, g=None, b=None):
@@ -180,8 +177,7 @@ class AlgebraicRecipe(Recipe):
         self.__modified = True
 
         def _normalize_list(x, default=None):
-            return [x[idx] if x and len(x) > idx and x[idx] else default for idx
-                    in range(3)]
+            return [x[idx] if x and len(x) > idx and x[idx] else default for idx in range(3)]
 
         self.input_layer_ids = _normalize_list(self.input_layer_ids)
 
@@ -189,15 +185,11 @@ class AlgebraicRecipe(Recipe):
             self.operation_kind = DIFF_OP_NAME
 
         if self.operation_formula is None:
-            self.operation_formula = PRESET_OPERATIONS.get(
-                self.operation_kind, PRESET_OPERATIONS.get(DIFF_OP_NAME))
+            self.operation_formula = PRESET_OPERATIONS.get(self.operation_kind, PRESET_OPERATIONS.get(DIFF_OP_NAME))
 
     @classmethod
-    def from_algebraic(cls, name, x=None, y=None, z=None, operation_kind=None,
-                       operation_formula=None):
-        return cls(name, input_layer_ids=[x, y, z],
-                   operation_kind=operation_kind,
-                   operation_formula=operation_formula)
+    def from_algebraic(cls, name, x=None, y=None, z=None, operation_kind=None, operation_formula=None):
+        return cls(name, input_layer_ids=[x, y, z], operation_kind=operation_kind, operation_formula=operation_formula)
 
     @classmethod
     def kind(cls):
@@ -227,7 +219,7 @@ class RecipeManager(QObject):
         if config_dir is None:
             config_dir = DOCUMENT_SETTINGS_DIR
 
-        recipe_dir = os.path.join(config_dir, 'composite_recipes')
+        recipe_dir = os.path.join(config_dir, "composite_recipes")
         if not os.path.isdir(recipe_dir):
             LOG.debug("creating new composite recipes directory at {}".format(recipe_dir))
             os.makedirs(recipe_dir)
@@ -240,8 +232,8 @@ class RecipeManager(QObject):
 
     def load_available_recipes(self):
         """Load recipes from stored config files"""
-        for pathname in glob(os.path.join(self.recipe_dir, '*')):
-            if not (pathname.endswith('.yml') or pathname.endswith('.yaml')):
+        for pathname in glob(os.path.join(self.recipe_dir, "*")):
+            if not (pathname.endswith(".yml") or pathname.endswith(".yaml")):
                 continue
             recipe = self.open_recipe(pathname)
             self._stored_recipes[recipe.name] = (pathname, recipe)
@@ -261,17 +253,15 @@ class RecipeManager(QObject):
             recipe_name,
             r=None if layers[0] is None else layers[0].uuid,
             g=None if layers[1] is None else layers[1].uuid,
-            b=None if layers[2] is None else layers[2].uuid)
+            b=None if layers[2] is None else layers[2].uuid,
+        )
         self.add_recipe(recipe)
 
         self.didCreateRGBCompositeRecipe.emit(recipe)
 
-    def update_rgb_recipe_input_layers(self,
-                                       recipe: CompositeRecipe,
-                                       channel: str,
-                                       layer_uuid: uuid.UUID,
-                                       clims: Tuple[float, float],
-                                       gamma: float):
+    def update_rgb_recipe_input_layers(
+        self, recipe: CompositeRecipe, channel: str, layer_uuid: uuid.UUID, clims: Tuple[float, float], gamma: float
+    ):
         """Update the input layers in the recipe for a specific channel.
         With this change, the color limits and the gamma value of this specific
         channel has to be changed, too.
@@ -287,10 +277,7 @@ class RecipeManager(QObject):
         self.recipes[recipe.id] = recipe
         self.didUpdateRGBInputLayers.emit(recipe)
 
-    def update_rgb_recipe_gammas(self,
-                                 recipe: CompositeRecipe,
-                                 channel: str,
-                                 gamma: float):
+    def update_rgb_recipe_gammas(self, recipe: CompositeRecipe, channel: str, gamma: float):
         """Update the gamma value of the given channel"""
         channel_idx = RGBA2IDX.get(channel)
 
@@ -301,10 +288,7 @@ class RecipeManager(QObject):
         self.recipes[recipe.id] = recipe
         self.didUpdateRGBGamma.emit(recipe)
 
-    def update_rgb_recipe_color_limits(self,
-                                       recipe: CompositeRecipe,
-                                       channel: str,
-                                       clim: Tuple[float, float]):
+    def update_rgb_recipe_color_limits(self, recipe: CompositeRecipe, channel: str, clim: Tuple[float, float]):
         """Update the color limit value of the given channel"""
         channel_idx = RGBA2IDX.get(channel)
 
@@ -315,9 +299,7 @@ class RecipeManager(QObject):
         self.recipes[recipe.id] = recipe
         self.didUpdateRGBColorLimits.emit(recipe)
 
-    def update_recipe_name(self,
-                           recipe: CompositeRecipe,
-                           name: str):
+    def update_recipe_name(self, recipe: CompositeRecipe, name: str):
         recipe.name = name
 
         self.recipes[recipe.id] = recipe
@@ -330,28 +312,23 @@ class RecipeManager(QObject):
             x=None if layers[0] is None else layers[0].uuid,
             y=None if layers[1] is None else layers[1].uuid,
             z=None if layers[2] is None else layers[2].uuid,
-            operation_kind=DIFF_OP_NAME
+            operation_kind=DIFF_OP_NAME,
         )
         self.add_recipe(recipe)
 
         self.didCreateAlgebraicRecipe.emit(recipe)
 
-    def update_algebraic_recipe_operation_kind(self, recipe: AlgebraicRecipe,
-                                               operation_kind: str):
+    def update_algebraic_recipe_operation_kind(self, recipe: AlgebraicRecipe, operation_kind: str):
         recipe.operation_kind = operation_kind
         recipe.modified = True
         self.recipes[recipe.id] = recipe
 
-    def update_algebraic_recipe_operation_formula(self,
-                                                  recipe: AlgebraicRecipe,
-                                                  operation_formula: str):
+    def update_algebraic_recipe_operation_formula(self, recipe: AlgebraicRecipe, operation_formula: str):
         recipe.operation_formula = operation_formula
         recipe.modified = True
         self.recipes[recipe.id] = recipe
 
-    def update_algebraic_recipe_input_layers(self, recipe: AlgebraicRecipe,
-                                             channel: str,
-                                             layer_uuid: uuid.UUID):
+    def update_algebraic_recipe_input_layers(self, recipe: AlgebraicRecipe, channel: str, layer_uuid: uuid.UUID):
         channel_idx = XYZ2IDX.get(channel)
 
         assert channel_idx is not None, f"Given channel '{channel}' is invalid"
@@ -387,21 +364,21 @@ class RecipeManager(QObject):
         LOG.debug("Loading composite recipes from {}".format(pathname))
         try:
             for recipe_content in yaml.safe_load_all(pathname):
-                name = recipe_content['name']
+                name = recipe_content["name"]
                 input_layer_ids = [
-                    recipe_content['red']['name'],
-                    recipe_content['green']['name'],
-                    recipe_content['blue']['name'],
+                    recipe_content["red"]["name"],
+                    recipe_content["green"]["name"],
+                    recipe_content["blue"]["name"],
                 ]
                 color_limits = [
-                    recipe_content['red']['color_limit'],
-                    recipe_content['green']['color_limit'],
-                    recipe_content['blue']['color_limit'],
+                    recipe_content["red"]["color_limit"],
+                    recipe_content["green"]["color_limit"],
+                    recipe_content["blue"]["color_limit"],
                 ]
                 gammas = [
-                    recipe_content['red']['gamma'],
-                    recipe_content['green']['gamma'],
-                    recipe_content['blue']['gamma'],
+                    recipe_content["red"]["gamma"],
+                    recipe_content["green"]["gamma"],
+                    recipe_content["blue"]["gamma"],
                 ]
                 recipe = CompositeRecipe(
                     name=name,

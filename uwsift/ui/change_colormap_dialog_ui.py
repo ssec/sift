@@ -23,7 +23,7 @@ class Ui_changeColormapDialog(object):
         self.buttons = QtWidgets.QDialogButtonBox(changeColormapDialog)
         self.buttons.setGeometry(QtCore.QRect(20, 160, 321, 32))
         self.buttons.setOrientation(QtCore.Qt.Horizontal)
-        self.buttons.setStandardButtons(QtWidgets.QDialogButtonBox.Close|QtWidgets.QDialogButtonBox.Reset)
+        self.buttons.setStandardButtons(QtWidgets.QDialogButtonBox.Close | QtWidgets.QDialogButtonBox.Reset)
         self.buttons.setCenterButtons(False)
         self.buttons.setObjectName("buttons")
         self.cmap_combobox = QtWidgets.QComboBox(changeColormapDialog)
@@ -53,7 +53,7 @@ class Ui_changeColormapDialog(object):
         self.gammaSpinBox.setObjectName("gammaSpinBox")
         self.gammaLabel = QtWidgets.QLabel(changeColormapDialog)
         self.gammaLabel.setGeometry(QtCore.QRect(200, 120, 56, 24))
-        self.gammaLabel.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.gammaLabel.setAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         self.gammaLabel.setObjectName("gammaLabel")
 
         self.retranslateUi(changeColormapDialog)
@@ -69,4 +69,6 @@ class Ui_changeColormapDialog(object):
         self.vmax_slider.setToolTip(_translate("changeColormapDialog", "maximum color limit"))
         self.vmax_edit.setToolTip(_translate("changeColormapDialog", "maximum color limit"))
         self.gammaLabel.setText(_translate("changeColormapDialog", "Gamma: "))
+
+
 from uwsift.ui.custom_widgets import QNoScrollDoubleSpinBox
