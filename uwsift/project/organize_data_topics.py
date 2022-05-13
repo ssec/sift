@@ -167,7 +167,7 @@ def main():
                                                 delta=int(case.delta.total_seconds() / 60.0))
             case_dir = os.path.join(args.base_ahi_dir, section_name, case_name)
             if not os.path.isdir(case_dir):
-                LOG.info("Creating case directory: %s", case_dir)
+                LOG.debug("Creating case directory: %s", case_dir)
                 os.makedirs(case_dir)
             else:
                 LOG.error("Case directory already exists: %s", case_dir)
@@ -188,7 +188,7 @@ def main():
                     if os.path.exists(link_path) and not args.overwrite:
                         LOG.debug("Link '%s' already exists, skipping...", link_path)
                         continue
-                    LOG.info("Creating hardlink '%s' -> '%s'", link_path, input_pathname)
+                    LOG.debug("Creating hardlink '%s' -> '%s'", link_path, input_pathname)
                     os.link(input_pathname, link_path)
                 if int(case.delta.total_seconds()) == 0:
                     LOG.debug("Only one file needed to meet delta of 0")

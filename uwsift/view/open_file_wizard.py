@@ -30,6 +30,7 @@ from satpy.readers import group_files
 
 from uwsift import config
 from uwsift.ui.open_file_wizard_ui import Ui_openFileWizard
+from uwsift.util.common import get_reader_kwargs_dict
 from uwsift.workspace.importer import available_satpy_readers, filter_dataset_ids
 
 LOG = logging.getLogger(__name__)
@@ -241,7 +242,8 @@ class OpenFileWizard(QtWidgets.QWizard):
                 # need to create the Scene for the first time
                 # file_group includes what reader to use
                 # NOTE: We only allow a single reader at a time
-                self.scenes[group_id] = scn = Scene(filenames=file_group)
+                reader_kwargs = get_reader_kwargs_dict(file_group.keys())
+                self.scenes[group_id] = scn = Scene(filenames=file_group, reader_kwargs=reader_kwargs)
 
             all_available_products.update(scn.available_dataset_ids())
 
@@ -322,7 +324,7 @@ class OpenFileWizard(QtWidgets.QWizard):
             return QtCore.Qt.Unchecked
 
     def add_file(self):
-        filename_filters = ['All files (*.*)']
+        filename_filters = ['All files (*)']
         filter_str = ';;'.join(filename_filters)
         files = QtWidgets.QFileDialog.getOpenFileNames(
             self, "Select one or more files to open", self.last_open_dir or os.getenv("HOME"), filter_str)[0]
@@ -355,3 +357,6 @@ class OpenFileWizard(QtWidgets.QWizard):
     def files_to_load(self):
         """Files that should be used by the Document/Workspace."""
         return [fn for fgroup in self.file_groups.values() for fn in fgroup]
+
+    def get_reader_name(self) -> str:
+        return self.ui.readerComboBox.currentData()

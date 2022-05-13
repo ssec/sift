@@ -8,50 +8,117 @@ possible to implement in Matrix transforms that come with VisPy.
 """
 
 import re
+from os import linesep as os_linesep
+from typing import List
 
 import numpy as np
 from pyproj import Proj, pj_ellps
+from vispy import glsl
 from vispy.visuals.shaders import Function
 from vispy.visuals.shaders.expression import TextExpression
+from vispy.visuals.shaders.parsing import find_program_variables
 from vispy.visuals.transforms import BaseTransform
 from vispy.visuals.transforms._util import arg_to_vec4
 
 
-# FIXME: This is the wrong usage of TextExpression. See if we can switch to
-#        doing what vispy math/constants.glsl does and how #define uses it
-class MacroExpression(TextExpression):
-    macro_regex = re.compile(r'^#define\s+(?P<name>\w+)\s+(?P<expression>[^\s]+)')
+class VariableDeclaration(TextExpression):
+    """TextExpression subclass for exposing GLSL variables to vispy glsl interface.
 
-    def __init__(self, text):
-        match = self.macro_regex.match(text)
-        if match is None:
-            raise ValueError("Invalid macro definition: {}".format(text))
-        match_dict = match.groupdict()
-        self._name = match_dict['name']
-        super(MacroExpression, self).__init__(text)
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+        text : str
+            Rvalue to be assigned to the variable.
+    """
 
-    def definition(self, names, version=None, shader=None):
+    def __init__(self, name: str, text: str) -> None:
+        self._name = name
+        super().__init__(text)
+
+    def definition(self, names, version=None, shader=None) -> str:
         return self.text
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._name
 
 
-COMMON_DEFINITIONS = """#define SPI     3.14159265359
-#define TWOPI   6.2831853071795864769
-#define ONEPI   3.14159265358979323846
-#define M_PI    3.14159265358979310
-#define M_PI_2  1.57079632679489660
-#define M_PI_4  0.78539816339744828
-#define M_FORTPI        M_PI_4                   /* pi/4 */
-#define M_HALFPI        M_PI_2                   /* pi/2 */
-#define M_PI_HALFPI     4.71238898038468985769   /* 1.5*pi */
-#define M_TWOPI         6.28318530717958647693   /* 2*pi */
-#define M_TWO_D_PI      M_2_PI                   /* 2/pi */
-#define M_TWOPI_HALFPI  7.85398163397448309616   /* 2.5*pi */
+class GLSL_Adapter(TextExpression):
+    """TextExpression subclass for parsing Macro definitions from .glsl header files and exposing
+        them to the vispy glsl interface and make them accessible for vispy's shader code
+        processing. Assumes .glsl code to be parsed is accessible as python string. For reading
+        .glsl header code from a file see GLSL_FileAdapter subclass.
+
+            Parameters
+            ----------
+            text : str
+                Actual .glsl code string.
+    """
+    _expr_list = []
+
+    def __init__(self, text: str) -> None:
+        # Regular expression for parsing possibly include-guarded macro definitions from .glsl
+        # header files; makes strong assumptions about formatting of macro names by assuming
+        # underscores in front of and behind the macro name. In line with vispy .glsl shader code.
+        guard_pattern = re.compile(r'^#ifndef\s*(?P<guard>_[A-Za-z]*_)')
+        _guard_flag = False
+        for line in text.splitlines():
+            match_guard = guard_pattern.match(line)
+            var_match = find_program_variables(line)
+            if match_guard is not None:
+                _name = match_guard['guard']
+                _text = match_guard.group(0) + os_linesep + f"#define {_name}"
+                self._expr_list.append(VariableDeclaration(_name, _text))
+                self._expr_list.append(VariableDeclaration(_name+"EIF", "#endif"))
+                _guard_flag = True
+            elif var_match is not None:
+                key_list = list(var_match.keys())
+                if len(key_list) > 1:
+                    raise ValueError(
+                        "More than one variable definition per line "
+                        "not supported.")
+                elif len(key_list) != 0:
+                    self._expr_list.append(VariableDeclaration(key_list[0],
+                                                                  line))
+        if _guard_flag:
+            # in case of include guards, shift #endif to bottom of
+            # expression list to match #ifndef
+            eif_token = self._expr_list[1]
+            self._expr_list[1:-1] = self._expr_list[2:]
+            self._expr_list[-1] = eif_token
+
+    @property
+    def expr_list(self) -> List[VariableDeclaration]:
+        return self._expr_list
+
+
+class GLSL_FileAdapter(GLSL_Adapter):
+    """GLSL_Adapter subclass adding the functionality to read .glsl header code from files.
+
+                Parameters
+                ----------
+                file_path : str
+                    Path to .glsl header file.
+        """
+    def __init__(self, file_path: str) -> None:
+        text = glsl.get(file_path)
+        super(GLSL_FileAdapter, self).__init__(text)
+
+
+COMMON_VALUES = """const float SPI = 3.14159265359;
+const float TWOPI = 6.2831853071795864769;
+const float ONEPI = 3.14159265358979323846;
+const float M_FORTPI = M_PI_4;                      /* pi/4 */
+const float M_HALFPI = M_PI_2;                      /* pi/2 */
+const float M_PI_HALFPI = 4.71238898038468985769;   /* 1.5*pi */
+const float M_TWOPI = 6.28318530717958647693;       /* 2*pi */
+const float M_TWO_D_PI = 2.0/M_PI;                  /* 2/pi */
+const float M_TWOPI_HALFPI = 2.5 / M_PI;            /* 2.5*pi */
 """
-COMMON_DEFINITIONS = tuple(MacroExpression(line) for line in COMMON_DEFINITIONS.splitlines())
+
+math_consts = GLSL_FileAdapter("math/constants.glsl").expr_list
+COMMON_VALUES = GLSL_Adapter(COMMON_VALUES).expr_list
 M_FORTPI = M_PI_4 = 0.78539816339744828
 M_HALFPI = M_PI_2 = 1.57079632679489660
 
@@ -206,13 +273,13 @@ def latlong_init(proj_dict):
 # and 'imap' is X/Y to lon/lat
 # WARNING: Need double {{ }} for functions for string formatting to work properly
 PROJECTIONS = {
-    'latlong': (
+    'longlat': (
         latlong_init,
         """vec4 latlong_map(vec4 pos) {{
-            return vec4(pos.x + {offset}, y, pos.z, pos.w);
+            return vec4(pos.x + {offset}, pos.y, pos.z, pos.w);
         }}""",
         """vec4 latlong_map(vec4 pos) {{
-            return vec4(pos.x + {offset}, y, pos.z, pos.w);
+            return vec4(pos.x + {offset}, pos.y, pos.z, pos.w);
         }}""",
         """vec4 latlong_imap(vec4 pos) {{
             return pos;
@@ -700,7 +767,7 @@ class PROJ4Transform(BaseTransform):
         super(PROJ4Transform, self).__init__()
 
         # Add common definitions and functions
-        for d in COMMON_DEFINITIONS + (pj_tsfn, pj_phi2, hypot):
+        for d in math_consts + COMMON_VALUES + [pj_tsfn, pj_phi2, hypot]:
             self._shader_map._add_dep(d)
             self._shader_imap._add_dep(d)
 

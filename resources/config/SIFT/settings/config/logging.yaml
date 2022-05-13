@@ -1,0 +1,19 @@
+# All logging related settings are grouped below the keyword 'logging'.
+# All settings are optional.
+logging:
+
+  # If 'filename' is given all logging is appended to that file, nothing is
+  # printed to the console.
+  # Only an absolute path is accepted.
+  # filename: /tmp/log_file.txt
+
+  # Listed loggers can get individual settings (currently the log 'level' only).
+  # A special case is the pseudo-logger 'all'. It can be used to set the default
+  # for all loggers.
+  loggers:
+    all:
+      level: DEBUG
+    vispy:
+      level: INFO
+    sqlalchemy:
+      level: ERROR

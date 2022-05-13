@@ -107,7 +107,7 @@ class TaskQueue(QObject):
     # finished : inherited
     # terminated : inherited
 
-    def __init__(self, process_pool=None, worker_count=3):
+    def __init__(self, process_pool=None):
         super(TaskQueue, self).__init__()
         self._interactive_round_robin = 0
         self.process_pool = process_pool
@@ -153,7 +153,7 @@ class TaskQueue(QObject):
         if interactive:
             wdex = self._interactive_round_robin
             self._interactive_round_robin += 1
-            self._interactive_round_robin %= 2
+            self._interactive_round_robin %= 2 # TODO(nk) worker count is hardcoded: worker_count-1
         else:
             wdex = 2
         if callable(and_then):

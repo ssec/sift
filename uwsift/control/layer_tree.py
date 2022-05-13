@@ -262,15 +262,15 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         # FIXME: Reset colormap change dialog when layer set changes
 
         # for now, a copout by just having a refresh to the content when document changes
-        doc.didReorderLayers.connect(self.refresh)
-        doc.didRemoveLayers.connect(self.drop_layers_just_removed)
+        doc.didReorderDatasets.connect(self.refresh)
+        doc.didRemoveDatasets.connect(self.drop_layers_just_removed)
         doc.didChangeColormap.connect(self.refresh)
         # doc.didChangeColorLimits.connect(self.refresh)
         doc.didChangeLayerVisibility.connect(self.refresh)
         doc.didChangeLayerName.connect(self.refresh)
-        doc.didAddBasicLayer.connect(self.doc_added_basic_layer)
-        doc.didAddCompositeLayer.connect(self.refresh)
-        doc.willPurgeLayer.connect(self.refresh)
+        doc.didAddBasicDataset.connect(self.doc_added_basic_layer)
+        doc.didAddCompositeDataset.connect(self.refresh)
+        doc.willPurgeDataset.connect(self.refresh)
         doc.didSwitchLayerSet.connect(self.refresh)
         doc.didReorderAnimation.connect(self.refresh)
         doc.didCalculateLayerEqualizerValues.connect(self.update_equalizer)
@@ -369,6 +369,8 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             yield self.doc.uuid_for_current_layer(q.row())
 
     def select(self, uuids, lbox: QTreeView = None, scroll_to_show_single=True):
+        return  # FIXME obsolete class, for now avoid to trigger debugger
+
         lbox = self.current_set_listbox if lbox is None else lbox
         lbox.clearSelection()
         if not uuids:
@@ -569,7 +571,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             # LOG.debug('after insertion removing rows {0!r:s}'.format(delete_these_rows))
             # for exrow in delete_these_rows:
             #     self.doc.remove_layer_prez(exrow)
-            # self.doc.didReorderLayers.emit(order)  # FUTURE: not our business to be emitting on behalf of the document
+            # self.doc.didReorderDatasets.emit(order)  # FUTURE: not our business to be emitting on behalf of the document
             assert (count == len(insertion_info))
             return True
         return False

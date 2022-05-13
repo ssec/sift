@@ -34,7 +34,7 @@ def test_slider_change(qtbot):
         Info.UNIT_CONVERSION: (lambda x, inverse=False: x, lambda x, inverse=False: x),
     })
     rgb_recipe = CompositeRecipe("my_rgb",
-                                 input_ids=["family1", "family2", None],
+                                 input_layer_ids=["family1", "family2", None],
                                  color_limits=((0.0, 90.0), (0.0, 90.0), (None, None)))
     pane.selection_did_change(rgb_recipe)
 

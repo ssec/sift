@@ -1,0 +1,7 @@
+data_reading:
+  fci_l1_cat_lmk_loc:
+    group_keys: ['creation_time', 'free_format']
+    filter_patterns: ['IQT-I__CFG+MTP-CAT-LMK_{free_description}_{creation_time:%Y%m%d%H%M%S}_{free_format}.xml']
+    kind: 'POINTS'
+    style_attributes:
+      fill: 'catalogue_landmark_locations'

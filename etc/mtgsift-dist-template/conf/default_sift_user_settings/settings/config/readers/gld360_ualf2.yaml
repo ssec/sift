@@ -1,0 +1,3 @@
+data_reading:
+  gld360_ualf2:
+    kind: 'POINTS'

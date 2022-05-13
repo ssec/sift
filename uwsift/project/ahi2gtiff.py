@@ -207,8 +207,8 @@ def ahi_image_info(input_filename):
     lon_max = np.nanmax(lon)
     lat_south = np.nanmin(lat)
     lat_north = np.nanmax(lat)
-    LOG.info("Longitude Minimum: %f; Maximum: %f" % (lon_min, lon_max))
-    LOG.info("Latitude Minimum: %f; Maximum: %f" % (lat_south, lat_north))
+    LOG.debug("Longitude Minimum: %f; Maximum: %f" % (lon_min, lon_max))
+    LOG.debug("Latitude Minimum: %f; Maximum: %f" % (lat_south, lat_north))
     if lon_max >= 180 or (lon_max - lon_min) < 180:
         # If longitudes are 0-360 then coordinates are as expected
         lon_west = lon_min

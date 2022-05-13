@@ -106,8 +106,8 @@ def ahi_image_info(input_filename):
     lon_max = np.nanmax(lon)
     lat_south = np.nanmin(lat)
     lat_north = np.nanmax(lat)
-    LOG.info("Longitude Minimum: %f; Maximum: %f" % (lon_min, lon_max))
-    LOG.info("Latitude Minimum: %f; Maximum: %f" % (lat_south, lat_north))
+    LOG.debug("Longitude Minimum: %f; Maximum: %f" % (lon_min, lon_max))
+    LOG.debug("Latitude Minimum: %f; Maximum: %f" % (lat_south, lat_north))
     # this logic only works if lons are 0-360 (see +over attribute of above PROJ.4)
     if lon_max >= 180 or (lon_max - lon_min) < 180:
         # If longitudes are 0-360 then coordinates are as expected
@@ -245,14 +245,14 @@ def main():
         src_info = ahi_image_info(nc_file)
 
         for dataset in args.datasets:
-            LOG.info("Creating geotiff for dataset '%s'", dataset)
+            LOG.debug("Creating geotiff for dataset '%s'", dataset)
             # Come up with an intermediate geotiff name
             in_ext = os.path.splitext(nc_file)[-1]
             geos_ext = ".{dataset}.tif".format(dataset=dataset)
             geos_file = nc_file.replace(idir, odir, 1).replace(in_ext, geos_ext)
             opath = os.path.dirname(geos_file)
             if not os.path.exists(opath):
-                LOG.info("Creating output directory: %s", opath)
+                LOG.debug("Creating output directory: %s", opath)
                 os.makedirs(opath, exist_ok=True)
 
             # Come up with an output mercator filename

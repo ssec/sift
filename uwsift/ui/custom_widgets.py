@@ -1,5 +1,6 @@
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QComboBox, QSlider, QDoubleSpinBox, QWizardPage, QTableWidget, QListWidget
+from PyQt5.QtWidgets import QComboBox, QSlider, QDoubleSpinBox, QWizardPage, QTableWidget,\
+    QListWidget
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 
 
@@ -94,6 +95,21 @@ class AnyWizardPage(QWizardPage):
             else:
                 return False
         return True
+
+    def completeChangedSlot(self, *args, **kwargs):
+        self.completeChanged.emit()
+
+
+class InitiallyIncompleteWizardPage(QWizardPage):
+    """QWizardPage that is only complete once 'page_complete' is set to True"""
+
+    def __init__(self, *args, **kwargs):
+        self.page_complete = False
+        super(InitiallyIncompleteWizardPage, self).__init__(*args, **kwargs)
+
+    # override default behaviour by allowing the code to disable 'Next'/'Finish' buttons
+    def isComplete(self):
+        return self.page_complete
 
     def completeChangedSlot(self, *args, **kwargs):
         self.completeChanged.emit()

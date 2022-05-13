@@ -1,0 +1,26 @@
+data_reading:
+  merge_with_existing: True
+  readers:
+    - abi_l1b
+    - fci_l1_cat_lmk_loc
+    - fci_l1_geoobs_lmk_loc
+    - fci_l1_geoobs_lmk_nav_err
+    - fci_l1c_nc
+    - fci_l2_nc
+    - li_l1b_nc
+    - seviri_l1b_hrit
+    - seviri_l1b_native
+    - seviri_l1b_nc
+    - seviri_l2_binary
+    - seviri_l2_bufr
+    - seviri_l2_grib
+    - avhrr_l1b_eps
+    - vii_l1b_nc
+    - gld360_ualf2
+  exclude_datasets:
+    calibration:
+      - radiance
+      - counts
+    name:
+      - latitude # must not be loaded
+      - longitude # must not be loaded

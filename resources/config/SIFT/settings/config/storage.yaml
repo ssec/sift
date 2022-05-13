@@ -1,0 +1,13 @@
+# Control the operations mode regarding inventory database and housekeeping of
+# intermediate data files
+storage:
+  use_inventory_db : False
+  cleanup_file_cache: True
+
+  agent:
+    notification_cmd: /path/to/raiseEvent.sh # Optional
+    # interval: 60 # Optional, sensible default can be calculated from files_lifetime
+    files_lifetime: 1200
+    directories:
+      - "$$CACHE_DIR$$/workspace/data_cache"
+      - "$$CACHE_DIR$$/workspace/temp"

@@ -1,32 +1,38 @@
 import logging
+from uuid import UUID
+
 from PyQt5 import QtGui, QtWidgets
 from functools import partial
 
 from uwsift.common import Info, Kind
+from uwsift.model.layer_model import LayerModel
 from uwsift.ui.change_colormap_dialog_ui import Ui_changeColormapDialog
+from uwsift.view.colormap import COLORMAP_MANAGER
 
 LOG = logging.getLogger(__name__)
 
 
 class ChangeColormapDialog(QtWidgets.QDialog):
 
-    def __init__(self, doc, uuid, parent=None):
+    def __init__(self, layer_model: LayerModel, uuid: UUID, parent=None):
         super(ChangeColormapDialog, self).__init__(parent)
         self.ui = Ui_changeColormapDialog()
         self.ui.setupUi(self)
-        self.doc = doc
+        self.layer_model = layer_model
+        self.colormap_manager = COLORMAP_MANAGER
+
+        self.layer = self.layer_model.get_layer_by_uuid(uuid)
         self.uuid = uuid
         self._slider_steps = 100
-        self.valid_min, self.valid_max = self.doc.valid_range_for_uuid(self.uuid)
-        prez = self.doc.prez_for_uuid(self.uuid)
-        layer = self.doc[self.uuid]
-        conv = layer[Info.UNIT_CONVERSION]
-        self.setWindowTitle(str(self.windowTitle()) + ": " + self.doc[self.uuid][Info.SHORT_NAME])
-        self._initial_cmap = prez.colormap
+        self.valid_min, self.valid_max = self.layer.info[Info.CLIM]
+        presentation = self.layer.presentation
+        conv = self.layer.info[Info.UNIT_CONVERSION]
+        self.setWindowTitle(str(self.windowTitle()) + ": " + self.layer.info[Info.SHORT_NAME])
+        self._initial_cmap = presentation.colormap
         self._current_cmap = self._initial_cmap
-        self._initial_clims = prez.climits
+        self._initial_clims = presentation.climits
         self._current_clims = self._initial_clims
-        self._initial_gamma = prez.gamma
+        self._initial_gamma = presentation.gamma
         self._current_gamma = self._initial_gamma
 
         self._validator = QtGui.QDoubleValidator()
@@ -53,7 +59,7 @@ class ChangeColormapDialog(QtWidgets.QDialog):
         self.ui.vmin_edit.editingFinished.connect(partial(self._edit_changed, is_max=False))
         self.ui.vmax_edit.editingFinished.connect(partial(self._edit_changed, is_max=True))
 
-        if layer[Info.KIND] in [Kind.CONTOUR]:
+        if self.layer.kind in [Kind.CONTOUR]:
             self.ui.gammaSpinBox.setDisabled(True)
         else:
             self.ui.gammaSpinBox.valueChanged.connect(self._gamma_changed)
@@ -67,21 +73,22 @@ class ChangeColormapDialog(QtWidgets.QDialog):
 
     def reset(self):
         # rejecting (Cancel button) means reset previous settings
-        self.doc.change_colormap_for_layers(self._initial_cmap, (self.uuid,))
-        self.doc.change_clims_for_siblings(self.uuid, self._initial_clims)
-        self.doc.change_gamma_for_siblings(self.uuid, self._initial_gamma)
+        self.layer_model.change_colormap_for_layer(self.uuid, self._initial_cmap)
+        self.layer_model.change_color_limits_for_layer(self.uuid, self._initial_clims)
+        self.layer_model.change_gamma_for_layer(self.uuid, self._initial_gamma)
 
     def _cmap_changed(self, index):
         cmap_str = self.ui.cmap_combobox.itemData(index)
         self._current_cmap = str(cmap_str)
-        self.doc.change_colormap_for_layers(self._current_cmap, (self.uuid,))
+        self.layer_model.change_colormap_for_layer(self.uuid, self._current_cmap)
 
     def _set_new_clims(self, val, is_max):
         if is_max:
             self._current_clims = (self._current_clims[0], val)
         else:
             self._current_clims = (val, self._current_clims[1])
-        self.doc.change_clims_for_siblings(self.uuid, self._current_clims)
+        self.layer_model.change_color_limits_for_layer(self.uuid,
+                                                       self._current_clims)
 
     def _slider_changed(self, value=None, is_max=True):
         edit = self.ui.vmax_edit if is_max else self.ui.vmin_edit
@@ -90,7 +97,7 @@ class ChangeColormapDialog(QtWidgets.QDialog):
             value = slider.value()
         value = self._get_slider_value(value)
         LOG.debug('slider %s %s => %f' % (self.uuid, 'max' if is_max else 'min', value))
-        display_val = self.doc[self.uuid][Info.UNIT_CONVERSION][1](value)
+        display_val = self.layer.info[Info.UNIT_CONVERSION][1](value)
         edit.blockSignals(True)
         edit.setText('{:0.03f}'.format(display_val))
         edit.blockSignals(False)
@@ -101,7 +108,7 @@ class ChangeColormapDialog(QtWidgets.QDialog):
         edit = self.ui.vmax_edit if is_max else self.ui.vmin_edit
 
         vdis = float(edit.text())
-        val = self.doc[self.uuid][Info.UNIT_CONVERSION][1](vdis, inverse=True)
+        val = self.layer.info[Info.UNIT_CONVERSION][1](vdis, inverse=True)
         LOG.debug('line edit %s %s => %f => %f' % (self.uuid, 'max' if is_max else 'min', vdis, val))
         sv = self._create_slider_value(val)
         slider.blockSignals(True)
@@ -111,7 +118,7 @@ class ChangeColormapDialog(QtWidgets.QDialog):
 
     def _init_cmap_combo(self):
         # FIXME: We should do this by colormap category
-        for idx, colormap in enumerate(self.doc.colormaps.keys()):
+        for idx, colormap in enumerate(self.colormap_manager.keys()):
             self.ui.cmap_combobox.addItem(colormap, colormap)
             if colormap == self._initial_cmap:
                 self.ui.cmap_combobox.setCurrentIndex(idx)
@@ -137,4 +144,4 @@ class ChangeColormapDialog(QtWidgets.QDialog):
 
     def _gamma_changed(self, val):
         self._current_gamma = val
-        self.doc.change_gamma_for_siblings(self.uuid, self._current_gamma)
+        self.layer_model.change_gamma_for_layer(self.uuid, self._current_gamma)

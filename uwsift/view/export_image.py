@@ -213,7 +213,8 @@ class ExportImageHelper(QtCore.QObject):
         if not self._screenshot_dialog:
             self._screenshot_dialog = ExportImageDialog(self.parent())
             self._screenshot_dialog.accepted.connect(self._save_screenshot)
-        self._screenshot_dialog.set_total_frames(max(self.sgm.layer_set.max_frame, 1))
+        frame_count = self.sgm.animation_controller.get_frame_count()
+        self._screenshot_dialog.set_total_frames(max(frame_count, 1))
         self._screenshot_dialog.show()
 
     def _add_screenshot_footer(self, im, banner_text, font_size=11):
@@ -361,7 +362,7 @@ class ExportImageHelper(QtCore.QObject):
         if s is None:
             s = 1
         if e is None:
-            e = max(self.sgm.layer_set.max_frame, 1)
+            e = max(self.sgm.animation_controller.get_frame_count(), 1)
         return s - 1, e - 1
 
     def _save_screenshot(self):
@@ -370,9 +371,11 @@ class ExportImageHelper(QtCore.QObject):
         info['frame_range'] = self._convert_frame_range(info['frame_range'])
         if info['frame_range']:
             s, e = info['frame_range']
-            uuids = self.sgm.layer_set.frame_order[s: e + 1]
         else:
-            uuids = [self.sgm.layer_set.top_layer_uuid()]
+            s = e = self.sgm.animation_controller.get_current_frame_index()
+
+        uuids = self.sgm.animation_controller.get_frame_uuids()[s: e+1]
+
         uuids, filenames = self._create_filenames(uuids, info['filename'])
 
         # check for existing filenames
@@ -383,7 +386,8 @@ class ExportImageHelper(QtCore.QObject):
         # get canvas screenshot arrays (numpy arrays of canvas pixels)
         img_arrays = self.sgm.get_screenshot_array(info['frame_range'])
         if not img_arrays or len(uuids) != len(img_arrays):
-            LOG.error("Number of frames does not equal number of UUIDs")
+            LOG.error(f"Number of frames: {len(img_arrays)} does not equal "
+                      f"number of UUIDs: {len(uuids)}")
             return
 
         images = [(u, Image.fromarray(x)) for u, x in img_arrays]
