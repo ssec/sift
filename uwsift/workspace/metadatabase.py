@@ -32,21 +32,15 @@ SQLAlchemy with SQLite
 :copyright: 2016 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-__author__ = 'rayg'
-__docformat__ = 'reStructuredText'
 
-import argparse
 import logging
 import os
-import sys
-import unittest
 from collections import defaultdict
 from collections.abc import MutableMapping
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import Optional
 from uuid import UUID
 
-import numpy as np
 from sqlalchemy import Table, Column, Integer, String, Unicode, ForeignKey, DateTime, Interval, PickleType, \
     Float, create_engine
 from sqlalchemy.ext.associationproxy import association_proxy
@@ -565,7 +559,7 @@ class Content(Base):
 
     # TODO Number of attributes per point: n_attributes (e.g. lightning peak
     #  current) but then, what are the datatypes of the attributes?
-    n_attributes = Column(Integer) #  always 1, reserverd for future extensions
+    n_attributes = Column(Integer)  # always 1, reserverd for future extensions
 
     # TODO Currently all attributes must have the same datatype as the points,
     #  because there is no way yet to define them differently
@@ -585,7 +579,7 @@ class Content(Base):
 
     # projection information for this representation of the data
     # proj4 projection string for the data in this array, if one exists; else assume y=lat/x=lon
-    proj4 = Column(String, nullable=True) # TODO maybe basis
+    proj4 = Column(String, nullable=True)  # TODO maybe basis
 
     # link to key-value further information; primarily a hedge in case specific information
     # has to be squirreled away for later consideration for main content table
@@ -726,7 +720,7 @@ class Content(Base):
 
 
 class ContentImage(Content):
-    __mapper_args__ = { "polymorphic_identity": "image" }
+    __mapper_args__ = {"polymorphic_identity": "image"}
 
     # handle overview versus detailed data
     lod = Column(Integer)  # power of 2 level of detail; 0 for coarse-resolution overview
@@ -771,16 +765,16 @@ class ContentImage(Content):
     z_path = Column(String, nullable=True)  # if needed, z location cache path relative to workspace
 
     INFO_TO_FIELD = {
-            Info.PROJ: 'proj4',
-            Info.PATHNAME: 'path',
-            Info.CELL_HEIGHT: 'cell_height',
-            Info.CELL_WIDTH: 'cell_width',
-            Info.ORIGIN_X: 'origin_x',
-            Info.ORIGIN_Y: 'origin_y',
-            Info.GRID_ORIGIN: 'grid_origin',
-            Info.GRID_FIRST_INDEX_X: 'grid_first_index_x',
-            Info.GRID_FIRST_INDEX_Y: 'grid_first_index_y',
-        }
+        Info.PROJ: 'proj4',
+        Info.PATHNAME: 'path',
+        Info.CELL_HEIGHT: 'cell_height',
+        Info.CELL_WIDTH: 'cell_width',
+        Info.ORIGIN_X: 'origin_x',
+        Info.ORIGIN_Y: 'origin_y',
+        Info.GRID_ORIGIN: 'grid_origin',
+        Info.GRID_FIRST_INDEX_X: 'grid_first_index_x',
+        Info.GRID_FIRST_INDEX_Y: 'grid_first_index_y',
+    }
 
     def __init__(self, *args, **kwargs):
         super(ContentImage, self).__init__(*args, **kwargs)
@@ -798,9 +792,10 @@ class ContentUnstructuredPoints(Content):
     __mapper_args__ = {"polymorphic_identity": "unstructured_points"}
 
     n_points = Column(Integer)
-    # Points may have 2 or 3 spatial dimensions
+
     @declared_attr
     def n_dimensions(cls):
+        # Points may have 2 or 3 spatial dimensions
         return Content.__table__.c.get('n_dimensions', Column(Integer))
 
 
@@ -808,9 +803,10 @@ class ContentLines(Content):
     __mapper_args__ = {"polymorphic_identity": "lines"}
 
     n_lines = Column(Integer)
-    # Points have 4 spatial dimensions
+
     @declared_attr
     def n_dimensions(cls):
+        # Points have 4 spatial dimensions
         return Content.__table__.c.get('n_dimensions', Column(Integer))
 
 
@@ -952,96 +948,3 @@ class Metadatabase(object):
 #             raise AssertionError('more than one value for {}'.format(key))
 #         kvs[0].value = value
 #         self.S.commit()
-
-
-# ============================
-# support and testing routines
-
-class tests(unittest.TestCase):
-    # data_file = os.environ.get('TEST_DATA', os.path.expanduser("~/Data/test_files/thing.dat"))
-    mdb = None
-
-    def setUp(self):
-        pass
-
-    def test_insert(self):
-        from datetime import datetime, timedelta
-        mdb = Metadatabase('sqlite://', create_tables=True)
-        # mdb.create_tables()
-        s = mdb.session()
-        from uuid import uuid1
-        uu = uuid1()
-        when = datetime.utcnow()
-        nextwhen = when + timedelta(minutes=5)
-        f = Resource(path='/path/to/foo.bar', mtime=when, atime=when, format=None)
-        p = Product(uuid_str=str(uu), atime=when, name='B00 Refl', obs_time=when, obs_duration=timedelta(minutes=5))
-        f.product.append(p)
-        p.info['test_key'] = u'test_value'
-        p.info['turkey'] = u'cobbler'
-        s.add(f)
-        s.add(p)
-        s.commit()
-        p.info.update({'key': 'value'})
-        p.info.update({Info.OBS_TIME: datetime.utcnow()})
-        p.info.update({Info.OBS_TIME: nextwhen, Info.OBS_DURATION: timedelta(seconds=15)})
-        # p.info.update({'key': 'value', Info.OBS_TIME: nextwhen, Info.OBS_DURATION: nextwhen + timedelta(seconds=15)})
-        # p.info[Info.OBS_TIME] = nextwhen
-        # p.info['key'] = 'value'
-        # p.obs_time = nextwhen
-        s.commit()
-        self.assertIs(p.resource[0], f)
-        self.assertEqual(p.uuid, uu)
-        self.assertEqual(p.obs_time, nextwhen)
-        q = f.product[0]
-        # q = s.query(Product).filter_by(resource=f).first()
-        self.assertEqual(q.info['test_key'], u'test_value')
-        # self.assertEquals(q[Info.UUID], q.uuid)
-        self.assertEqual(q.info['turkey'], p.info['turkey'])
-        self.assertEqual(q.info['key'], p.info['key'])
-        # self.assertEqual(q.obs_time, nextwhen)
-
-
-def _debug(type, value, tb):
-    "enable with sys.excepthook = debug"
-    if not sys.stdin.isatty():
-        sys.__excepthook__(type, value, tb)
-    else:
-        import traceback
-        import pdb  # noqa
-        traceback.print_exception(type, value, tb)
-        # …then start the debugger in post-mortem mode.
-        pdb.post_mortem(tb)  # more “modern”
-
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="PURPOSE",
-        epilog="",
-        fromfile_prefix_chars='@')
-    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG')
-    parser.add_argument('-d', '--debug', dest='debug', action='store_true',
-                        help="enable interactive PDB debugger on exception")
-    # http://docs.python.org/2.7/library/argparse.html#nargs
-    # parser.add_argument('--stuff', nargs='5', dest='my_stuff',
-    #                    help="one or more random things")
-    parser.add_argument('inputs', nargs='*',
-                        help="input files to process")
-    args = parser.parse_args()
-
-    if args.debug:
-        sys.excepthook = _debug
-
-    if not args.inputs:
-        logging.basicConfig(level=logging.DEBUG)
-        unittest.main()
-        return 0
-
-    levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
-    logging.basicConfig(level=levels[min(3, args.verbosity)])
-
-    return 0
-
-
-if __name__ == '__main__':
-    sys.exit(main())
