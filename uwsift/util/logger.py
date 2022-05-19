@@ -1,8 +1,7 @@
-import os
 import logging
 import sys
 from pathlib import PurePath
-from typing import Optional, List, Tuple
+from typing import Optional, List
 
 from PyQt5.QtWidgets import QMessageBox
 
@@ -12,8 +11,7 @@ LOG = logging.getLogger(__name__)
 
 
 def configure_loggers() -> None:
-    """
-    Configure all loggers with a certain log level, format and handler.
+    """Configure all loggers with a certain log level, format and handler.
 
     While all loggers are configured to have the same format and handler,
     the log level can be configured explicitly for "all" loggers and/or for

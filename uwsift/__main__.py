@@ -18,16 +18,12 @@ REQUIRES
 :license: GPLv3, see LICENSE for more details
 """
 
-__author__ = 'rayg'
-
 # To have consistent logging for all modules (also for their static
 # initialization) it must be set up before importing them.
 from uwsift.model.composite_recipes import RecipeManager
 from uwsift.model.product_dataset import ProductDataset
 from uwsift.util.logger import configure_loggers
 from uwsift.view.algebraic_config import AlgebraicLayerConfigPane
-
-configure_loggers()  # noqa - we rerun this later again to post-config
 
 import gc
 import logging
@@ -74,7 +70,6 @@ from uwsift.workspace.collector import ResourceSearchPathCollector
 from uwsift.model.layer_model import LayerModel
 
 LOG = logging.getLogger(__name__)
-# re-configure loggers instantiated meanwhile
 configure_loggers()
 
 PROGRESS_BAR_MAX = 1000
@@ -1542,7 +1537,6 @@ class Main(QtWidgets.QMainWindow):
             self.layer_model.start_rgb_composite_creation
         )
 
-
         algebraic = QtWidgets.QAction("Create Algebraic", self)
         algebraic.triggered.connect(
             self.layer_model.start_algebraic_composite_creation
@@ -1651,7 +1645,8 @@ def main() -> int:
                         help="Specify center longitude and latitude for camera")
     parser.add_argument("--desktop", type=int, default=0,
                         help="Number of monitor/display to show the main window on (0 for main, 1 for secondary, etc.)")
-    parser.add_argument("--profile-heap", type=float, help="take a snapshot of the heap in the given interval (in seconds)")
+    parser.add_argument("--profile-heap", type=float,
+                        help="take a snapshot of the heap in the given interval (in seconds)")
     parser.add_argument('-v', '--verbose', dest='verbosity', action="count",
                         default=int(os.environ.get("VERBOSITY", 2)),
                         help='each occurrence increases verbosity 1 level through '
