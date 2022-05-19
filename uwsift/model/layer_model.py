@@ -2,7 +2,7 @@ from datetime import datetime
 
 import logging
 import struct
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 from uuid import UUID
 
 from PyQt5.QtCore import (QAbstractItemModel, Qt, QModelIndex, pyqtSignal,
@@ -219,7 +219,7 @@ class LayerModel(QAbstractItemModel):
         uuids = [layer.uuid for layer in self.layers]
         self.didReorderLayers.emit(uuids)
 
-    def hasChildren(self, parent=QModelIndex()) -> bool:
+    def hasChildren(self, parent=None) -> bool:
         """
         For now the Layer model does not support layer hierarchies
         (group layers) thus only the root index can have children.
@@ -228,6 +228,8 @@ class LayerModel(QAbstractItemModel):
         :return: true if parent is the root index and has at least one row and
                  column
         """
+        if parent is None:
+            parent = QModelIndex()
         # This needs modification if hierarchical layers are introduced.
         return not parent.isValid() and \
             (self.rowCount(parent) > 0) and (self.columnCount(parent) > 0)
@@ -239,7 +241,9 @@ class LayerModel(QAbstractItemModel):
         # This needs modification if hierarchical layers are introduced.
         return len(self.layers)
 
-    def index(self, row: int, col: int, parent=QModelIndex()):
+    def index(self, row: int, col: int, parent=None):
+        if parent is None:
+            parent = QModelIndex()
         if not self.hasIndex(row, col, parent):
             return QModelIndex()
         assert not parent.isValid()
@@ -931,6 +935,4 @@ class ProductFamilyKeyMappingPolicy:
     def get_grouping_key(info):
         # This is, where layer grouping policies will differ:
         # This implementation returns the (legacy SIFT) product_family_key
-        return info.get(Info.PLATFORM), \
-               info.get(Info.INSTRUMENT), \
-               info.get(Info.DATASET_NAME)
+        return info.get(Info.PLATFORM), info.get(Info.INSTRUMENT), info.get(Info.DATASET_NAME)

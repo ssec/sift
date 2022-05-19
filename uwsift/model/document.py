@@ -62,10 +62,9 @@ __docformat__ = 'reStructuredText'
 
 import dataclasses
 import logging
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from collections.abc import MutableSequence
-from itertools import groupby, chain
-from uuid import UUID, uuid1 as uuidgen
+from uuid import UUID
 from datetime import datetime, timedelta
 import typing as typ
 import numpy as np
@@ -1065,7 +1064,6 @@ class DataLayer:
         # maps: timestamp -> uuid
         self.timeline = {uuid_dt_tup[1]: uuid_dt_tup[0] for uuid_dt_tup in uuids_tstamps_asc}
 
-
     def t_matched_uuid(self) -> typ.Optional[UUID]:
         """
         Helper function for accessing the timeline of a data_layer
@@ -1322,8 +1320,13 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # content gets probes applied across points and regions
     as_region_probes: DocumentAsRegionProbes = None
 
-    def __init__(self, workspace: BaseWorkspace, queue, config_dir=DOCUMENT_SETTINGS_DIR, layer_set_count=DEFAULT_LAYER_SET_COUNT,
-                 **kwargs):
+    def __init__(self,
+                 workspace: BaseWorkspace,
+                 queue,
+                 config_dir=DOCUMENT_SETTINGS_DIR,
+                 layer_set_count=DEFAULT_LAYER_SET_COUNT,
+                 **kwargs
+                 ):
         super(Document, self).__init__(**kwargs)
         self.config_dir = config_dir
         self.queue = queue
@@ -1684,8 +1687,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             merge_target_uuid = merge_target_uuids[uuid]
             if do_merge_with_existing and uuid != merge_target_uuid:  # merge products
                 active_content_data = self._workspace.import_product_content(
-                        uuid, merge_target_uuid=merge_target_uuid,
-                        **importer_kwargs)
+                    uuid, merge_target_uuid=merge_target_uuid,
+                    **importer_kwargs)
                 # active_content_data is none if all segments are already loaded
                 # and there is nothing new to import
                 if active_content_data:

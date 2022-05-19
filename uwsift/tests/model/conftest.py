@@ -22,16 +22,16 @@ def constraints():
         constraints = constraints_absolute
     """
     return {
-            'platform_name': "MSG4",
-            'channel': ["______", "IR_108"],
-            'end_time': {
-                'type': "datetime",
-                'Y': 2019,
-                'm': 12,
-                'd': 31,
-                'H': 12 # Future: [3,9,15,21]
-            }
-        }
+        'platform_name': "MSG4",
+        'channel': ["______", "IR_108"],
+        'end_time': {
+            'type': "datetime",
+            'Y': 2019,
+            'm': 12,
+            'd': 31,
+            'H': 12,  # Future: [3,9,15,21]
+        },
+    }
 
 
 constraints_absolute = constraints
@@ -40,13 +40,13 @@ constraints_absolute = constraints
 @pytest.fixture
 def constraints_relative():
     return {
-            'platform_name': "MSG4",
-            'channel': ["______", "IR_108"],
-            'start_time': {
-                'type': "recent_datetime",
-                'H': [0, -1]
-            }
-        }
+        'platform_name': "MSG4",
+        'channel': ["______", "IR_108"],
+        'start_time': {
+            'type': "recent_datetime",
+            'H': [0, -1],
+        },
+    }
 
 
 @pytest.fixture
