@@ -62,8 +62,10 @@ DEFAULT_CONFIGURATION = {
             'group_keys': ['start_time', 'platform_shortname', 'service'],
             # Offered patterns to filter files (trollsift syntax), by default first entry is used.
             'filter_patterns': [
-                '{rate:1s}-000-{hrit_format:_<6s}-{platform_shortname:4s}_{service:_<7s}-{channel:_<6s}___-{segment:_<6s}___-{start_time:%Y%m%d%H%M}-{c:1s}_',
-                '{rate:1s}-000-{hrit_format:_<6s}-{platform_shortname:4s}_{service:_<7s}-{channel:_<6s}___-{segment:_<6s}___-{start_time:%Y%m%d%H%M}-__',
+                '{rate:1s}-000-{hrit_format:_<6s}-{platform_shortname:4s}_{service:_<7s}-'
+                '{channel:_<6s}___-{segment:_<6s}___-{start_time:%Y%m%d%H%M}-{c:1s}_',
+                '{rate:1s}-000-{hrit_format:_<6s}-{platform_shortname:4s}_{service:_<7s}-'
+                '{channel:_<6s}___-{segment:_<6s}___-{start_time:%Y%m%d%H%M}-__',
             ],
         },
     },
@@ -149,4 +151,3 @@ USE_INVENTORY_DB = config.get("storage.use_inventory_db")
 CLEANUP_FILE_CACHE = config.get("storage.cleanup_file_cache")
 
 AUTO_UPDATE_MODE__ACTIVE = config.get('auto_update.active', False)
-

@@ -113,7 +113,7 @@ class StorageAgent:
                     file.write(b"Hello World!\n")
             except FileExistsError:
                 continue
-            except (OSError, IOError):
+            except OSError:
                 return False
 
             return True

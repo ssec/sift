@@ -107,4 +107,3 @@ def test_construct_globbing_patterns(globbing_creator, filter_patterns, constrai
     constraints = request.getfixturevalue(constraints)
     gp_abs = globbing_creator.construct_globbing_patterns(filter_patterns, constraints)
     assert gp_abs == expected_result
-

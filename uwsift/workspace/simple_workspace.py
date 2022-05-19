@@ -30,7 +30,7 @@ class SimpleWorkspace(BaseWorkspace):
     one dictionary for saving the Content objects for a specific UUID.
     """
 
-    def __init__(self, directory_path: str=None):
+    def __init__(self, directory_path: str = None):
         super(SimpleWorkspace, self).__init__(directory_path)
 
         self.products: dict = {}
@@ -374,7 +374,7 @@ class SimpleWorkspace(BaseWorkspace):
         """
         reader = info['reader']
         group_keys = config.get(f"data_reading.{reader}.group_keys", None)
-        for existing_uuid, existing_prod in self.products.items():
+        for existing_prod in self.products.values():
             # exclude all products which are incomplete (products which are imported right now)
             # and products with different kind or parameter
             # TODO: when loading granules without resampling after granules of

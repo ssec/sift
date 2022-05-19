@@ -32,20 +32,19 @@ def gen_next_dt(initial_dt: datetime, mode: str):
         gen_dt += offset
 
 
-def insert_new_file_into_dir(file, target_dir, t_stamp_full_disk, *args, **kwargs):
+def insert_new_file_into_dir(file, target_dir, t_stamp_full_disk):
     tmp_path = pathlib.Path(shutil.copy(file, target_dir))
     time_idx = -1
     time_chunk = None
     # TODO(mk): assumes "-" to be delimiter, does this generalize?, do we care?
     file_name_chunks = re.split('(-)', tmp_path.name)
-    fname_dt = None
     for idx, chunk in enumerate(file_name_chunks):
         try:
-            fname_dt = dt_parser.parse(chunk)
+            dt_parser.parse(chunk)
             time_idx = idx
             time_chunk = chunk
             break
-        except:
+        except (TypeError, dt_parser.ParserError):
             pass
     time_len = len(time_chunk)
     new_dt = str(t_stamp_full_disk).replace("-", "").replace(" ", "").replace(":", "")[:time_len]
@@ -80,7 +79,7 @@ def fill_dir_periodically_seviri(data_dir: str, tmp_dir: str, sleep_time: float)
     first_query["search_path"] = data_dir
     first_query["constraints"]["start_time"] = {
         'type': 'datetime',
-        'Y': 2019, 'm': 10, 'd': 21 # TODO(mk): make this dependant on the data in data dir and not hardcoded
+        'Y': 2019, 'm': 10, 'd': 21  # TODO(mk): make this dependant on the data in data dir and not hardcoded
     }
     reader_scenes_ds_ids, readers = \
         Catalogue.query_for_satpy_importer_kwargs_and_readers(
@@ -144,8 +143,7 @@ def fill_dir_periodically_fci(data_dir: str, tmp_dir: str, sleep_time: float) ->
             start_time = sat_filename_keyvals["start_time"]
             end_time = sat_filename_keyvals["end_time"]
             start_to_end_span = end_time - start_time
-
-            repeat_cycle_in_day = sat_filename_keyvals["repeat_cycle_in_day"]
+            # repeat_cycle_in_day = sat_filename_keyvals["repeat_cycle_in_day"]
         except KeyError:
             raise KeyError(f"Could not match replacement fields"
                            f" 'start_time', 'end_time' or 'repeat_cycle_in_day'"
@@ -194,4 +192,3 @@ if __name__ == "__main__":
     else:
         raise NotImplementedError(f"Reader {reader} not supported yet")
     print(f"\nDONE copying test data to: {out_dir}\n")
-

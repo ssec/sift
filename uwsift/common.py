@@ -127,6 +127,7 @@ class LayerModelColumns:
 
 LATLON_GRID_DATASET_NAME = "Geo-Grid"  # noqa
 BORDERS_DATASET_NAME = "Borders"
+DEFAULT_GAMMA_VALUE = 1.0
 
 
 class LayerVisibility(NamedTuple):
@@ -134,7 +135,6 @@ class LayerVisibility(NamedTuple):
     visible: bool
     opacity: float
 
-DEFAULT_GAMMA_VALUE = 1.0
 
 class Box(NamedTuple):
     bottom: float
@@ -398,20 +398,15 @@ class Presentation:
     z_order comes from the layerset
 
     """
-    uuid: Optional[UUID]     # dataset in the document/workspace, None if
-                             # referring to a system layer
-    kind: Kind               # what kind of layer it is
-    visible: bool = True     # whether it's visible or not
-    a_order: int = None      # None for non-animating, 0..n-1 what order to draw
-                             # in during animation
-    colormap: object = None  # name or uuid: color map to use; name for default,
-                             # uuid for user-specified
-    style: object = None     # name or uuid: SVG/HTML style to use; name for
-                             # default, (FUTURE?) uuid for user-specified
-    climits: tuple = None    # valid min and valid max used for color mapping
-                             # normalization
-    gamma: float = 1.0       # valid (0 to 5) for gamma correction
-    mixing: object = None    # mixing mode constant
+    uuid: Optional[UUID]  # dataset in the document/workspace, None if referring to a system layer
+    kind: Kind  # what kind of layer it is
+    visible: bool = True  # whether it's visible or not
+    a_order: int = None  # None for non-animating, 0..n-1 what order to draw in during animation
+    colormap: object = None  # name or uuid: color map to use; name for default, uuid for user-specified
+    style: object = None  # name or uuid: SVG/HTML style to use; name for default, (FUTURE?) uuid for user-specified
+    climits: tuple = None  # valid min and valid max used for color mapping normalization
+    gamma: float = 1.0  # valid (0 to 5) for gamma correction
+    mixing: object = None  # mixing mode constant
     opacity: float = 1.0
 
 
