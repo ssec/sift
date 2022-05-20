@@ -1,3 +1,20 @@
+## Version 1.2.3 (2022/02/04)
+
+### Issues Closed
+
+* [Issue 305](https://github.com/ssec/sift/issues/305) - uwsift 1.1.3 doesn't work w/ satpy 0.23
+
+In this release 1 issue was closed.
+
+### Pull Requests Merged
+
+#### Bugs fixed
+
+* [PR 331](https://github.com/ssec/sift/pull/331) - Fix Python 3.10 incompatibilities
+
+In this release 1 pull request was closed.
+
+
 ## Version 1.2.2 (2021/10/29)
 
 ### Pull Requests Merged
@@ -254,4 +271,3 @@ In this release 1 pull request was closed.
 
 
 ## Version 1.0.0 (2018/10/25)
-

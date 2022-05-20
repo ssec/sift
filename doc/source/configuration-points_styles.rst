@@ -35,19 +35,19 @@ where
 
 All styling settings are optional, for missing ones a predefined default is
 chosen.
-  
+
 **Example**
 
 The following would be an explicit definition of the default marker style::
-  
+
     point_styles:
       red_empty_cross:
         symbol: cross
         size: 9px
-        fill: '#00000000' 
+        fill: '#00000000'
         stroke: white
         stroke-width: 1px
-  
+
 Configuring Point Styles Based on the Layer Standard Name
 ---------------------------------------------------------
 
@@ -62,7 +62,6 @@ named points style to the standard name of each points data layer::
       ...
 
 **Example** ::
- 
+
     default_colormaps:
       observed_lmk_locations_ir_105: red_empty_cross
- 

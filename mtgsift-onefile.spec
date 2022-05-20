@@ -70,7 +70,7 @@ hidden_imports += collect_submodules("pkg_resources")
 hidden_imports += collect_submodules("pyproj")
 hidden_imports += collect_submodules("rasterio")
 hidden_imports += collect_submodules("satpy")
-hidden_imports += collect_submodules("numcodecs") 
+hidden_imports += collect_submodules("numcodecs")
 hidden_imports += collect_submodules("shapely")
 hidden_imports += collect_submodules("sqlalchemy")
 hidden_imports += collect_submodules("pyqtgraph")
@@ -109,7 +109,7 @@ else:
 # Add extra pygrib .def files
 data_files.append((os.path.join(share_dir, 'eccodes'), os.path.join('share', 'eccodes')))
 
-    
+
 #-------------------------------------------------------------------------------
 # Add ffmpeg dependencies that pyinstaller doesn't automatically find
 if is_linux:
@@ -138,7 +138,7 @@ import pyproj.datadir
 data_files.append((pyproj.datadir.get_data_dir(),  os.path.join("share", "proj")))
 
 #-------------------------------------------------------------------------------
-        
+
 a = Analysis([main_script_pathname],
              pathex=[_script_base],
              binaries=binaries,

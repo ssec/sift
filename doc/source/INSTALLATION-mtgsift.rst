@@ -43,9 +43,9 @@ environment for the desired task::
   (MY_ENV)%> conda config --env --add channels conda-forge
   (MY_ENV)%> conda config --env --add channels MTGSIFT_CHANNEL
   (MY_ENV)%> conda config --set channel_priority strict
-   
+
 .. rubric:: Footnotes
-	    
+
 .. [#f1] You need to ask for the URL or name of this ``MTGSIFT_CHANNEL``. If you
 	 build packages yourself, the local build directory can be used as
 	 this channel, by default it is ``~/conda-channels/mtgvis/`` (see
@@ -60,27 +60,27 @@ prepared as described above::
   (work)%> conda install mtgsift
 
 Now you can start MTG-SIFT like so::
- 
+
   (work)%> python -m uwsift
 
 .. _install-conda-mtgsift-devel:
-  
+
 Installation for developing MTG-SIFT
 +++++++++++++++++++++++++++++++++++++
 
 Set up the Conda environment as above - let's call it ``devel`` - and then
 install all dependencies for developing MTG-SIFT as follows::
-  
+
   (devel)%> conda install mtgsift-devel-deps
 
 PIP-install MTG-SIFT in editable mode by run the following in the root
 directory of the MTG-SIFT sources::
-  
+
   (devel)%> pip install --editable .
 
 Now you can run MTG-SIFT from the current sources with all your changes to the
 source code being active immediately just like so::
-  
+
   (devel)%> python -m uwsift
 
 How to Install MTG-SIFT from PyInstaller Packages
@@ -98,5 +98,3 @@ configuration, databases).
 Note that the single executable file variant has significant slower startup
 since each time it is run the contained dependencies are extracted into a
 temporary directory.
-
-

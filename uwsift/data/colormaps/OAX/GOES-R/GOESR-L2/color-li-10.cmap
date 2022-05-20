@@ -3,8 +3,8 @@
          Lifted Index (LI) color map (color-li-10).
     -->
     <!-- TOWRdocs Description
-         Updates GOES-R baseline colormap for LI. This is a 10 bits per pixel linear enhancement. It has 4 main colors, ranging 
-		 from brown to tan blue to yellow to red, for increasing instability. In general, this is based on the traditional 
+         Updates GOES-R baseline colormap for LI. This is a 10 bits per pixel linear enhancement. It has 4 main colors, ranging
+		 from brown to tan blue to yellow to red, for increasing instability. In general, this is based on the traditional
 		 GOES Sounder LI enhancement from CIMSS.
          Contributors: Tim Schmit and Jordan Gerth
     -->

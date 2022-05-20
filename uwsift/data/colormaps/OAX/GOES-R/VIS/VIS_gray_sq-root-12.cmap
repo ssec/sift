@@ -7,26 +7,26 @@ This is a colormap file that is read via JaXB to marshel the ColorMap class.
     -->
     <!-- TOWRdocs Description
          12-bit, square-root color map which can be applied to both the vis and near-infrared
-         (NIR) reflective spectral bands. 
-	 
-         It is a special case of the power law stretch (n=1/2). It compresses the 
-         upper end of the reflectance factor spectrum and stretches the lower end. This method 
-         has been used for decades when displaying GOES visible data. For example, this is 
+         (NIR) reflective spectral bands.
+
+         It is a special case of the power law stretch (n=1/2). It compresses the
+         upper end of the reflectance factor spectrum and stretches the lower end. This method
+         has been used for decades when displaying GOES visible data. For example, this is
          applied 'up stream' for the GOES visible band in AWIPS 1. The idea of this enhancement
-         is to brighten the darker land features, while leaving the brighter clouds mostly 
+         is to brighten the darker land features, while leaving the brighter clouds mostly
          unchanged. For the ABI on GOES-R, this enhancement can be applied to both the visbile
-         and near-infrared (reflective) spectral bands.    
+         and near-infrared (reflective) spectral bands.
 
          The color map can be added to styleRules in common_static, or it can be used to modify
-         an existing display. For the latter, right-click the title of the product at the bottom 
+         an existing display. For the latter, right-click the title of the product at the bottom
          of the CAVE screen.  Select "Change Color Map." Under "Set Color Table Range" press the
          entry that appears and there will be a pull-down of options. Select "site" and then your
-         site 3-letter identifier, then "Sat", then "IR" (or "VIS" for Vis color tables), and 
+         site 3-letter identifier, then "Sat", then "IR" (or "VIS" for Vis color tables), and
          select the desired color map. Training Team Approved. Contributors: Tim Schmit and Jordan Gerth.
 
     -->
     <!-- TOWRdocs Status
-         12-bit VIS/NIR color map which is not currently in the AWIPS baseline. 
+         12-bit VIS/NIR color map which is not currently in the AWIPS baseline.
     -->
     <!-- TOWRdocs POC
          Lee Byerle

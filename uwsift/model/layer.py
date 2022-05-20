@@ -17,16 +17,18 @@ REQUIRES
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-from _weakref import ref
 from collections import ChainMap
 from enum import Enum
 
+from _weakref import ref
+
 from uwsift.common import Info, Kind
 
-__author__ = 'rayg'
-__docformat__ = 'reStructuredText'
+__author__ = "rayg"
+__docformat__ = "reStructuredText"
 
 import logging
+
 import numpy as np
 
 LOG = logging.getLogger(__name__)
@@ -41,9 +43,10 @@ class Mixing(Enum):
 
 class DocDataset(ChainMap):
     """Container for layer metadata
-    
+
     Use dictionary-like access for metadata information.
     """
+
     _doc = None  # weakref to document that owns us
 
     def __init__(self, doc, info, *args, **kwargs):
@@ -147,6 +150,7 @@ class DocBasicDataset(DocDataset):
     """
     A layer consistent of a simple scalar floating point value field, which can have color maps applied
     """
+
     pass
 
 
@@ -208,7 +212,6 @@ class DocRGBDataset(DocCompositeDataset):
         self.layers[3] = x
 
     def _get_if_not_none_func(self, attr=None, item=None):
-
         def _get_not_none_item(layer):
             return None if layer is None else layer.get(item)
 
@@ -225,14 +228,12 @@ class DocRGBDataset(DocCompositeDataset):
 
     def product_family_keys(self, include_alpha=False):
         max_idx = 4 if include_alpha else 3
-        gb = self._get_if_not_none_func(attr='product_family_key')
+        gb = self._get_if_not_none_func(attr="product_family_key")
         return [gb(x) for x in self.layers[:max_idx]]
 
     @property
     def has_deps(self):
-        return (self.r is not None or
-                self.g is not None or
-                self.b is not None)
+        return self.r is not None or self.g is not None or self.b is not None
 
     @property
     def shared_projections(self):
@@ -243,15 +244,15 @@ class DocRGBDataset(DocCompositeDataset):
         if all(x is None for x in self.layers[:3]):
             return False
 
-        atol = max(abs(x[Info.CELL_WIDTH])
-                   for x in self.layers[:3] if x is not None)
-        shared_x = all(np.isclose(x[Info.ORIGIN_X], self[Info.ORIGIN_X], atol=atol)
-                       for x in self.layers[:3] if x is not None)
+        atol = max(abs(x[Info.CELL_WIDTH]) for x in self.layers[:3] if x is not None)
+        shared_x = all(
+            np.isclose(x[Info.ORIGIN_X], self[Info.ORIGIN_X], atol=atol) for x in self.layers[:3] if x is not None
+        )
 
-        atol = max(abs(x[Info.CELL_HEIGHT])
-                   for x in self.layers[:3] if x is not None)
-        shared_y = all(np.isclose(x[Info.ORIGIN_Y], self[Info.ORIGIN_Y], atol=atol)
-                       for x in self.layers[:3] if x is not None)
+        atol = max(abs(x[Info.CELL_HEIGHT]) for x in self.layers[:3] if x is not None)
+        shared_y = all(
+            np.isclose(x[Info.ORIGIN_Y], self[Info.ORIGIN_Y], atol=atol) for x in self.layers[:3] if x is not None
+        )
         return shared_x and shared_y
 
     @property
@@ -276,17 +277,17 @@ class DocRGBDataset(DocCompositeDataset):
 
     @property
     def sched_time(self):
-        gst = self._get_if_not_none_func(attr='sched_time')
+        gst = self._get_if_not_none_func(attr="sched_time")
         return _concurring(gst(self.r), gst(self.g), gst(self.b), remove_none=True)
 
     @property
     def instrument(self):
-        gst = self._get_if_not_none_func(attr='instrument')
+        gst = self._get_if_not_none_func(attr="instrument")
         return _concurring(gst(self.r), gst(self.g), gst(self.b), remove_none=True)
 
     @property
     def platform(self):
-        gst = self._get_if_not_none_func(attr='platform')
+        gst = self._get_if_not_none_func(attr="platform")
         return _concurring(gst(self.r), gst(self.g), gst(self.b), remove_none=True)
 
     @property
@@ -303,7 +304,7 @@ class DocRGBDataset(DocCompositeDataset):
                 num_elems = x_tmp.size // len(deps)
                 new_vals = []
                 for i, dep in enumerate(deps):
-                    new_val = x_tmp[i * num_elems: (i + 1) * num_elems]
+                    new_val = x_tmp[i * num_elems : (i + 1) * num_elems]
                     if dep is not None:
                         new_val = dep[Info.UNIT_CONVERSION][1](new_val, inverse=inverse)
                     new_vals.append(new_val)
@@ -321,12 +322,15 @@ class DocRGBDataset(DocCompositeDataset):
     def _default_display_time(self):
         dep_info = [self.r, self.g, self.b]
         valid_times = [nfo.get(Info.SCHED_TIME, None) for nfo in dep_info if nfo is not None]
-        valid_times = [x.strftime("%Y-%m-%d %H:%M:%S") if x is not None else '<unknown time>' for x in valid_times]
+        valid_times = [x.strftime("%Y-%m-%d %H:%M:%S") if x is not None else "<unknown time>" for x in valid_times]
         if len(valid_times) == 0:
-            display_time = '<unknown time>'
+            display_time = "<unknown time>"
         else:
-            display_time = valid_times[0] if len(valid_times) and all(
-                t == valid_times[0] for t in valid_times[1:]) else '<multiple times>'
+            display_time = (
+                valid_times[0]
+                if len(valid_times) and all(t == valid_times[0] for t in valid_times[1:])
+                else "<multiple times>"
+            )
 
         return display_time
 
@@ -336,13 +340,13 @@ class DocRGBDataset(DocCompositeDataset):
             names = []
             for color, dep_layer in zip("RGB", dep_info):
                 if dep_layer is None:
-                    name = u"{}:---".format(color)
+                    name = "{}:---".format(color)
                 else:
-                    name = u"{}:{}".format(color, dep_layer[Info.SHORT_NAME])
+                    name = "{}:{}".format(color, dep_layer[Info.SHORT_NAME])
                 names.append(name)
-            name = u' '.join(names)
+            name = " ".join(names)
         except KeyError:
-            LOG.error('unable to create new name from {0!r:s}'.format(dep_info))
+            LOG.error("unable to create new name from {0!r:s}".format(dep_info))
             name = "-RGB-"
 
         return name
@@ -353,7 +357,7 @@ class DocRGBDataset(DocCompositeDataset):
         if short_name is None:
             short_name = self._default_short_name()
 
-        return short_name + u' ' + display_time
+        return short_name + " " + display_time
 
     def update_metadata_from_dependencies(self):
         """
@@ -381,24 +385,28 @@ class DocRGBDataset(DocCompositeDataset):
         }
 
         if self.r is None and self.g is None and self.b is None:
-            ds_info.update({
-                Info.ORIGIN_X: None,
-                Info.ORIGIN_Y: None,
-                Info.CELL_WIDTH: None,
-                Info.CELL_HEIGHT: None,
-                Info.PROJ: None,
-                Info.CLIM: ((None, None), (None, None), (None, None)),
-            })
+            ds_info.update(
+                {
+                    Info.ORIGIN_X: None,
+                    Info.ORIGIN_Y: None,
+                    Info.CELL_WIDTH: None,
+                    Info.CELL_HEIGHT: None,
+                    Info.PROJ: None,
+                    Info.CLIM: ((None, None), (None, None), (None, None)),
+                }
+            )
             # defer initialization until we have upstream layers
         else:
             highest_res_dep = min([x for x in dep_info if x is not None], key=lambda x: x[Info.CELL_WIDTH])
-            ds_info.update({
-                Info.ORIGIN_X: highest_res_dep[Info.ORIGIN_X],
-                Info.ORIGIN_Y: highest_res_dep[Info.ORIGIN_Y],
-                Info.CELL_WIDTH: highest_res_dep[Info.CELL_WIDTH],
-                Info.CELL_HEIGHT: highest_res_dep[Info.CELL_HEIGHT],
-                Info.PROJ: highest_res_dep[Info.PROJ],
-            })
+            ds_info.update(
+                {
+                    Info.ORIGIN_X: highest_res_dep[Info.ORIGIN_X],
+                    Info.ORIGIN_Y: highest_res_dep[Info.ORIGIN_Y],
+                    Info.CELL_WIDTH: highest_res_dep[Info.CELL_WIDTH],
+                    Info.CELL_HEIGHT: highest_res_dep[Info.CELL_HEIGHT],
+                    Info.PROJ: highest_res_dep[Info.PROJ],
+                }
+            )
 
             def upstream_clim(up):
                 return (None, None) if (up is None) else tuple(up.get(Info.CLIM, (None, None)))
@@ -409,7 +417,8 @@ class DocRGBDataset(DocCompositeDataset):
             else:
                 # merge upstream with existing settings, replacing None with upstream; watch out for upstream==None case
                 ds_info[Info.CLIM] = tuple(
-                    (existing or upstream_clim(upstream)) for (existing, upstream) in zip(old_clim, dep_info))
+                    (existing or upstream_clim(upstream)) for (existing, upstream) in zip(old_clim, dep_info)
+                )
 
         self.update(ds_info)
         if self.has_deps:
@@ -425,6 +434,7 @@ class DocAlgebraicDataset(DocCompositeDataset):
     """
     A value field derived from other value fields algebraically
     """
+
     pass
 
 

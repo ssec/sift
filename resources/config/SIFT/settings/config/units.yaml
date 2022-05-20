@@ -6,4 +6,3 @@ units:
     all: kelvin
     toa_brightness_temperature: kelvin
     brightness_temperature: kelvin
-

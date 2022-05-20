@@ -40,25 +40,33 @@ FUTURE import sequence:
 import logging
 import os
 from abc import abstractmethod
-from collections import Mapping as ReadOnlyMapping, defaultdict
+from collections import defaultdict
+from collections.abc import Mapping as ReadOnlyMapping
 from datetime import timedelta
-from typing import Mapping, Generator, Tuple, Dict, Optional
-from uuid import UUID, uuid1 as uuidgen
+from typing import Dict, Generator, Mapping, Optional, Tuple
+from uuid import UUID
+from uuid import uuid1 as uuidgen
 
 import numba as nb
 import numpy as np
-from PyQt5.QtCore import QObject, pyqtSignal
 from pyproj import Proj
+from PyQt5.QtCore import QObject, pyqtSignal
 from pyresample.geometry import AreaDefinition
 from pyresample.utils import proj4_str_to_dict
 from rasterio import Affine
 from shapely.geometry.polygon import LinearRing
 
-from uwsift.common import Info, Kind, Flags
+from uwsift.common import Flags, Info, Kind
 from uwsift.model.shapes import content_within_shape
+
 from .importer import SatpyImporter, generate_guidebook_metadata
-from .metadatabase import Metadatabase, Product, Content, \
-    ContentImage, ContentUnstructuredPoints
+from .metadatabase import (
+    Content,
+    ContentImage,
+    ContentUnstructuredPoints,
+    Metadatabase,
+    Product,
+)
 
 LOG = logging.getLogger(__name__)
 
@@ -113,6 +121,7 @@ class ActiveContent(QObject):
     Purpose: consolidate common operations on content, while factoring in things like sparsity, coverage, y, x, z arrays
     Workspace instantiates ActiveContent from metadatabase Content entries
     """
+
     _cid = None  # Content.id database entry I belong to
     _wsd = None  # full path of workspace
     _rcl = None
@@ -128,7 +137,7 @@ class ActiveContent(QObject):
         self._cid = C.id
         self._wsd = workspace_cwd
         if workspace_cwd is None and C is None:
-            LOG.warning('test initialization of ActiveContent')
+            LOG.warning("test initialization of ActiveContent")
             self._test_init()
         else:
             self._attach(C)
@@ -144,16 +153,14 @@ class ActiveContent(QObject):
         co[2:4] = 1  # and of that, only the bottom half of the image
 
     @staticmethod
-    def _rcls(rows: Optional[int], columns: Optional[int], levels: Optional[int]) \
-            -> Tuple[tuple, tuple]:
+    def _rcls(rows: Optional[int], columns: Optional[int], levels: Optional[int]) -> Tuple[tuple, tuple]:
         """
         :param rows: rows or None
         :param columns: columns or None
         :param levels: levels or None
         :return: condensed tuple(string with 'rcl', 'rc', 'rl', dimension tuple corresponding to string)
         """
-        rcl_shape = tuple(
-            (name, dimension) for (name, dimension) in zip('rcl', (rows, columns, levels)) if dimension)
+        rcl_shape = tuple((name, dimension) for (name, dimension) in zip("rcl", (rows, columns, levels)) if dimension)
         rcl = tuple(x[0] for x in rcl_shape)
         shape = tuple(x[1] for x in rcl_shape)
         return rcl, shape
@@ -180,7 +187,7 @@ class ActiveContent(QObject):
         # FIXME: apply sparsity, coverage, and missing value masks
         return self._data
 
-    def _attach(self, c: Content, mode='c'):
+    def _attach(self, c: Content, mode="c"):
         """
         attach content arrays, for holding by workspace in _available
         :param c: Content entity from database
@@ -243,6 +250,7 @@ class BaseWorkspace(QObject):
     - interface to external data processing or loading plug-ins and notify application of new-dataset-in-workspace
 
     """
+
     cwd = None  # directory we work in
     _own_cwd = None  # whether or not we created the cwd - which is also whether or not we're allowed to destroy it
     _pool = None  # process pool that importers can use for background activities, if any
@@ -266,8 +274,7 @@ class BaseWorkspace(QObject):
     _state: Mapping[UUID, Flags] = None
 
     def set_product_state_flag(self, uuid: UUID, flag):
-        """primarily used by Importers to signal work in progress
-        """
+        """primarily used by Importers to signal work in progress"""
         state = self._state[uuid]
         state.add(flag)
         self.didChangeProductState.emit(uuid, state)
@@ -312,7 +319,7 @@ class BaseWorkspace(QObject):
             self.cwd = directory_path = os.path.abspath(directory_path[0])
         else:
             self.cwd = directory_path = os.path.abspath(directory_path)
-            self.cache_dir = cache_path = os.path.join(self.cwd, 'data_cache')
+            self.cache_dir = cache_path = os.path.join(self.cwd, "data_cache")
 
         self._available = {}
         self._importers = IMPORT_CLASSES.copy()
@@ -352,6 +359,7 @@ class BaseWorkspace(QObject):
         :return: workspace_content_arrays
         """
         pass
+
     @abstractmethod
     def _deactivate_content_for_product(self, p: Product):
         pass
@@ -365,13 +373,15 @@ class BaseWorkspace(QObject):
         pass
 
     @abstractmethod
-    def _product_overview_content(self, session, prod: Product = None, uuid: UUID = None,
-                                  kind: Kind = Kind.IMAGE) -> Optional[Content]:
+    def _product_overview_content(
+        self, session, prod: Product = None, uuid: UUID = None, kind: Kind = Kind.IMAGE
+    ) -> Optional[Content]:
         pass
 
     @abstractmethod
-    def _product_native_content(self, session, prod: Product = None, uuid: UUID = None,
-                                kind: Kind = Kind.IMAGE) -> Optional[Content]:
+    def _product_native_content(
+        self, session, prod: Product = None, uuid: UUID = None, kind: Kind = Kind.IMAGE
+    ) -> Optional[Content]:
         pass
 
     #
@@ -379,8 +389,7 @@ class BaseWorkspace(QObject):
     #
 
     @abstractmethod
-    def _overview_content_for_uuid(self, uuid: UUID, kind: Kind = Kind.IMAGE) \
-            -> np.memmap:
+    def _overview_content_for_uuid(self, uuid: UUID, kind: Kind = Kind.IMAGE) -> np.memmap:
         pass
 
     @abstractmethod
@@ -482,8 +491,9 @@ class BaseWorkspace(QObject):
         pass
 
     @abstractmethod
-    def collect_product_metadata_for_paths(self, paths: list,
-                                           **importer_kwargs) -> Generator[Tuple[int, frozendict], None, None]:
+    def collect_product_metadata_for_paths(
+        self, paths: list, **importer_kwargs
+    ) -> Generator[Tuple[int, frozendict], None, None]:
         """Start loading URI data into the workspace asynchronously.
 
         Args:
@@ -497,9 +507,14 @@ class BaseWorkspace(QObject):
         pass
 
     @abstractmethod
-    def import_product_content(self, uuid: UUID = None, prod: Product = None,
-                               allow_cache=True, merge_target_uuid: Optional[UUID] = None,
-                               **importer_kwargs) -> np.memmap:
+    def import_product_content(
+        self,
+        uuid: UUID = None,
+        prod: Product = None,
+        allow_cache=True,
+        merge_target_uuid: Optional[UUID] = None,
+        **importer_kwargs,
+    ) -> np.memmap:
         pass
 
     def create_composite(self, symbols: dict, relation: dict):
@@ -513,13 +528,13 @@ class BaseWorkspace(QObject):
     @staticmethod
     def _merge_famcat_strings(md_list, key, suffix=None):
         zult = []
-        splatter = [md[key].split(':') for md in md_list]
+        splatter = [md[key].split(":") for md in md_list]
         for pieces in zip(*splatter):
             uniq = set(pieces)
-            zult.append(','.join(sorted(uniq)))
+            zult.append(",".join(sorted(uniq)))
         if suffix:
             zult.append(suffix)
-        return ':'.join(zult)
+        return ":".join(zult)
 
     def _get_composite_metadata(self, info, md_list, composite_array):
         """Combine composite dependency metadata in a logical way.
@@ -544,17 +559,22 @@ class BaseWorkspace(QObject):
             if all(x.get(k) == md_list[0].get(k) for x in md_list[1:]):
                 info.setdefault(k, md_list[0][k])
         info.setdefault(Info.KIND, Kind.COMPOSITE)
-        info.setdefault(Info.SHORT_NAME, '<unknown>')
+        info.setdefault(Info.SHORT_NAME, "<unknown>")
         info.setdefault(Info.DATASET_NAME, info[Info.SHORT_NAME])
-        info.setdefault(Info.UNITS, '1')
+        info.setdefault(Info.UNITS, "1")
 
         max_meta = max(md_list, key=lambda x: x[Info.SHAPE])
-        for k in (Info.PROJ, Info.ORIGIN_X, Info.ORIGIN_Y, Info.CELL_WIDTH,
-                  Info.CELL_HEIGHT, Info.SHAPE,
-                  Info.GRID_ORIGIN,
-                  Info.GRID_FIRST_INDEX_Y,
-                  Info.GRID_FIRST_INDEX_X,
-                  ):
+        for k in (
+            Info.PROJ,
+            Info.ORIGIN_X,
+            Info.ORIGIN_Y,
+            Info.CELL_WIDTH,
+            Info.CELL_HEIGHT,
+            Info.SHAPE,
+            Info.GRID_ORIGIN,
+            Info.GRID_FIRST_INDEX_Y,
+            Info.GRID_FIRST_INDEX_X,
+        ):
             info[k] = max_meta[k]
 
         info[Info.VALID_RANGE] = (np.nanmin(composite_array), np.nanmax(composite_array))
@@ -562,8 +582,10 @@ class BaseWorkspace(QObject):
         info[Info.OBS_TIME] = min([x[Info.OBS_TIME] for x in md_list])
         info[Info.SCHED_TIME] = min([x[Info.SCHED_TIME] for x in md_list])
         # get the overall observation time
-        info[Info.OBS_DURATION] = max([
-            x[Info.OBS_TIME] + x.get(Info.OBS_DURATION, timedelta(seconds=0)) for x in md_list]) - info[Info.OBS_TIME]
+        info[Info.OBS_DURATION] = (
+            max([x[Info.OBS_TIME] + x.get(Info.OBS_DURATION, timedelta(seconds=0)) for x in md_list])
+            - info[Info.OBS_TIME]
+        )
 
         # generate family and category names
         info[Info.FAMILY] = family = self._merge_famcat_strings(md_list, Info.FAMILY, suffix=info.get(Info.SHORT_NAME))
@@ -578,9 +600,10 @@ class BaseWorkspace(QObject):
             info = {}
 
         import ast
+
         try:
-            ops_ast = ast.parse(operations, mode='exec')
-            ops = compile(ast.parse(operations, mode='exec'), '<string>', 'exec')
+            ops_ast = ast.parse(operations, mode="exec")
+            ops = compile(ast.parse(operations, mode="exec"), "<string>", "exec")
             result_name = ops_ast.body[-1].targets[0].id
         except SyntaxError:
             raise ValueError("Invalid syntax or operations in algebraic layer")
@@ -592,7 +615,8 @@ class BaseWorkspace(QObject):
         names = list(dep_metadata.keys())
         try:
             valid_combos = np.array(np.meshgrid(*tuple(dep_metadata[n][Info.VALID_RANGE] for n in names))).reshape(
-                len(names), -1)
+                len(names), -1
+            )
         except KeyError:
             badboys = [n for n in names if Info.VALID_RANGE not in dep_metadata[n]]
             LOG.error("missing VALID_RANGE for: {}".format(repr([dep_metadata[n][Info.DISPLAY_NAME] for n in badboys])))
@@ -626,14 +650,15 @@ class BaseWorkspace(QObject):
 
         info = generate_guidebook_metadata(info)
 
-        uuid, info, data = self._create_product_from_array(info, content[result_name],
-                                                           namespace=namespace,
-                                                           codeblock=operations)
+        uuid, info, data = self._create_product_from_array(
+            info, content[result_name], namespace=namespace, codeblock=operations
+        )
         return uuid, info, data
 
     @abstractmethod
-    def _create_product_from_array(self, info: Info, data, namespace=None, codeblock=None) \
-            -> Tuple[UUID, Optional[frozendict], np.memmap]:
+    def _create_product_from_array(
+        self, info: Info, data, namespace=None, codeblock=None
+    ) -> Tuple[UUID, Optional[frozendict], np.memmap]:
         pass
 
     @abstractmethod
@@ -651,15 +676,14 @@ class BaseWorkspace(QObject):
         uuid = dsi if isinstance(dsi, UUID) else dsi[Info.UUID]
 
         if self._queue is not None:
-            self._queue.add(str(uuid), self._bgnd_remove(uuid), 'Purge dataset')
+            self._queue.add(str(uuid), self._bgnd_remove(uuid), "Purge dataset")
         else:
             # iterate over generator
             list(self._bgnd_remove(uuid))
         return True
 
     @abstractmethod
-    def get_content(self, dsi_or_uuid, lod=None, kind: Kind = Kind.IMAGE) \
-            -> Optional[np.memmap]:
+    def get_content(self, dsi_or_uuid, lod=None, kind: Kind = Kind.IMAGE) -> Optional[np.memmap]:
         pass
 
     def _create_layer_affine(self, dsi_or_uuid):
@@ -680,17 +704,13 @@ class BaseWorkspace(QObject):
         if info is None:
             return None, None
         # Assume `xy_pos` is lon/lat value
-        if '+proj=latlong' in info[Info.PROJ]:
+        if "+proj=latlong" in info[Info.PROJ]:
             x, y = xy_pos[:2]
         else:
             x, y = Proj(info[Info.PROJ])(*xy_pos)
 
-        column = np.int64(np.floor(
-            (x - info[Info.ORIGIN_X]) / info[Info.CELL_WIDTH])
-        )
-        row = np.int64(np.floor(
-            (y - info[Info.ORIGIN_Y]) / info[Info.CELL_HEIGHT])
-        )
+        column = np.int64(np.floor((x - info[Info.ORIGIN_X]) / info[Info.CELL_WIDTH]))
+        row = np.int64(np.floor((y - info[Info.ORIGIN_Y]) / info[Info.CELL_HEIGHT]))
         return row, column
 
     def position_to_grid_index(self, dsi_or_uuid, xy_pos) -> Tuple[int, int]:
@@ -788,18 +808,19 @@ class BaseWorkspace(QObject):
         y_start = y_slice.start or 0
         num_cols = (x_slice.stop or cols) - x_start
         num_rows = (y_slice.stop or rows) - y_start
-        half_x = info[Info.CELL_WIDTH] / 2.
-        half_y = info[Info.CELL_HEIGHT] / 2.
+        half_x = info[Info.CELL_WIDTH] / 2.0
+        half_y = info[Info.CELL_HEIGHT] / 2.0
         min_x = info[Info.ORIGIN_X] - half_x + x_start * info[Info.CELL_WIDTH]
         max_y = info[Info.ORIGIN_Y] + half_y - y_start * info[Info.CELL_HEIGHT]
         min_y = max_y - num_rows * info[Info.CELL_HEIGHT]
         max_x = min_x + num_cols * info[Info.CELL_WIDTH]
         return AreaDefinition(
-            'layer area',
-            'layer area',
-            'layer area',
+            "layer area",
+            "layer area",
+            "layer area",
             proj4_str_to_dict(info[Info.PROJ]),
-            cols, rows,
+            cols,
+            rows,
             (min_x, min_y, max_x, max_y),
         )
 
@@ -814,8 +835,7 @@ class BaseWorkspace(QObject):
     def find_merge_target(self, uuid: UUID, info) -> Optional[Product]:
         pass
 
-    def get_points_arrays(self, uuid: UUID) \
-            -> Tuple[Optional[np.array], Optional[np.array]]:
+    def get_points_arrays(self, uuid: UUID) -> Tuple[Optional[np.array], Optional[np.array]]:
         """
         Get the DataArrays from a ``POINTS`` product. The first ``DataArray``
         contains the positions of the points. The second array represents the
@@ -833,7 +853,7 @@ class BaseWorkspace(QObject):
             # be a list of tuples of points by shaving off everything but the
             # first item of each entry.
             # See vispy.MarkersVisual.set_data() regarding the check criterion.
-            return np.hsplit(content, np.array([2]))[0] # TODO when is this called?
+            return np.hsplit(content, np.array([2]))[0]  # TODO when is this called?
         elif content.ndim == 2 and content.shape[1] == 3:
             return np.hsplit(content, [2])
         return content, None

@@ -28,7 +28,6 @@ uwsift.view.timeline.scene module
    :undoc-members:
    :show-inheritance:
 
-
 Module contents
 ---------------
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-from time import sleep, perf_counter
+from time import perf_counter, sleep
 from typing import List, Optional
 
-from psutil import process_iter, Process, NoSuchProcess
+from psutil import NoSuchProcess, Process, process_iter
 
 
 class PsProfiler:
@@ -73,9 +73,11 @@ class PsProfiler:
                 except NoSuchProcess:
                     continue
 
-                self.file.write(f"{time_delta:.4f},{process.pid},{mem_info.uss},"
-                                f"{mem_info.pss},{mem_info.lib},{mem_info.shared},"
-                                f"{mem_info.vms},{mem_info.rss}\n")
+                self.file.write(
+                    f"{time_delta:.4f},{process.pid},{mem_info.uss},"
+                    f"{mem_info.pss},{mem_info.lib},{mem_info.shared},"
+                    f"{mem_info.vms},{mem_info.rss}\n"
+                )
                 pss_sum += mem_info.pss
                 pids.append(process.pid)
             self.file.flush()

@@ -9,15 +9,15 @@ This QGraphicsScene represents document.as_track_stack, passing operations back 
 :license: GPLv3, see LICENSE for more details
 """
 import logging
-from typing import Tuple, Optional, Mapping, List, Any, Callable, Set, Iterable
+from typing import Any, Callable, Iterable, List, Mapping, Optional, Set, Tuple
 from uuid import UUID
 
 from PyQt5.QtWidgets import QMenu
 
-from uwsift.common import Span, State, Flags
+from uwsift.common import Flags, Span, State
 from uwsift.model.document import Document, DocumentAsTrackStack, FrameInfo, TrackInfo
 from uwsift.view.timeline.common import VisualState
-from uwsift.view.timeline.items import QTrackItem, QFrameItem
+from uwsift.view.timeline.items import QFrameItem, QTrackItem
 from uwsift.view.timeline.scene import QFramesInTracksScene
 from uwsift.workspace import BaseWorkspace
 
@@ -43,11 +43,12 @@ def _translate_to_visual_state(s: Flags) -> Flags:
 
 
 class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
-    """ represent SIFT Workspace and Document as frames in tracks
+    """represent SIFT Workspace and Document as frames in tracks
     Timeline QGraphicsScene uses doc.as_track_stack high level interface to query doc+mdb+ws
     Allow GUI manipulation to be passed thru to the document state and vice versa,
     including handling inquiries about the legality of operations like drag-n-drops
     """
+
     _doc: DocumentAsTrackStack = None
 
     def __init__(self, doc: Document, ws: BaseWorkspace, *args, **kwargs):
@@ -76,8 +77,16 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         return qti
 
     def _create_frame(self, qti: QTrackItem, frm: FrameInfo) -> QFrameItem:
-        qfi = QFrameItem(qti, self.coords, frm.uuid, frm.when.s, frm.when.d, _translate_to_visual_state(frm.state),
-                         frm.primary, frm.secondary)
+        qfi = QFrameItem(
+            qti,
+            self.coords,
+            frm.uuid,
+            frm.when.s,
+            frm.when.d,
+            _translate_to_visual_state(frm.state),
+            frm.primary,
+            frm.secondary,
+        )
         return qfi
 
     def _sync_frame(self, qfi: QFrameItem, frm: FrameInfo):
@@ -85,8 +94,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         # qfi.update()
 
     def _purge_orphan_tracks_frames(self, tracks: Iterable[str], frames: Iterable[UUID]):
-        """Remove QTrackItem and QFrameItem instances that no longer correspond to document content
-        """
+        """Remove QTrackItem and QFrameItem instances that no longer correspond to document content"""
         LOG.debug("purging {} orphan tracks and {} orphan frames from timeline scene".format(len(tracks), len(frames)))
         for _ in frames:
             self.removeItem()
@@ -94,14 +102,14 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         self._track_items = dict((k, v) for (k, v) in self._track_items.items() if k not in tracks)
 
     def _sync_tracks_frames(self):
-        """populate QTrackItems and QFrameItems, filling any gaps and removing as needed
-        """
+        """populate QTrackItems and QFrameItems, filling any gaps and removing as needed"""
         new_tracks = []
         new_frames = []
         orphan_tracks = set(self._track_items.keys())
         orphan_frames = set(self._frame_items.keys())
         LOG.debug(
-            "current timeline scene population: {} frames in {} tracks".format(len(orphan_frames), len(orphan_tracks)))
+            "current timeline scene population: {} frames in {} tracks".format(len(orphan_frames), len(orphan_tracks))
+        )
         iters = 0
         for z, trk in self._doc.enumerate_tracks_frames():
             qti = self._track_items.get(trk.track)
@@ -124,12 +132,17 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
                     try:
                         orphan_frames.remove(qfi.uuid)
                     except KeyError:
-                        LOG.warning("frame {} <{}> found but not originally "
-                                    "present in collection {}".format(frm.ident, frm.uuid, orphan_frames))
+                        LOG.warning(
+                            "frame {} <{}> found but not originally "
+                            "present in collection {}".format(frm.ident, frm.uuid, orphan_frames)
+                        )
                 else:
                     new_frames.append(self._create_frame(qti, frm))
-        LOG.debug("added {} tracks and {} frames to timeline scene after {} iterations".format(len(new_tracks),
-                                                                                               len(new_frames), iters))
+        LOG.debug(
+            "added {} tracks and {} frames to timeline scene after {} iterations".format(
+                len(new_tracks), len(new_frames), iters
+            )
+        )
         self._purge_orphan_tracks_frames(orphan_tracks, orphan_frames)
         self.propagate_max_z()
         for track in new_tracks:
@@ -138,8 +151,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         super(SiftDocumentAsFramesInTracks, self).update()
 
     def _invalidate(self, *args, **kwargs):
-        """document state has changed, re-consult document and update our display
-        """
+        """document state has changed, re-consult document and update our display"""
         self._sync_tracks_frames()
 
     def _sync_and_update_frame(self, uuid: UUID, frm: Optional[FrameInfo] = None):
@@ -173,8 +185,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
     #     self._invalidate()
 
     def _connect_signals(self, doc: Document, ws: BaseWorkspace):
-        """Connect document, workspace, signals in order to invalidate and update scene representation
-        """
+        """Connect document, workspace, signals in order to invalidate and update scene representation"""
 
         # FUTURE: more fine-grained response than just invalidating and redrawing
         def refresh_with_new_product(order, uuid, presentation, ts=self):
@@ -212,7 +223,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         ws.didUpdateProductsMetadata.connect(refresh)
 
         def refresh_product(uuid, state, *args, **kwargs):
-            LOG.debug('updating frame state {} in timeline'.format(str(uuid)))
+            LOG.debug("updating frame state {} in timeline".format(str(uuid)))
             self._sync_and_update_frame(uuid)
 
         ws.didChangeProductState.connect(refresh_product)
@@ -249,20 +260,23 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         return set(self._doc.tracks_in_family(track, only_active=True))
 
     def may_reassign_color_map(self, from_track: str, to_track: str) -> Optional[Callable[[bool], None]]:
-        """User is dragging a color map around, determine if drop is permitted and provide a commit/abort function if so
-        """
+        """Determine if user dragged colormap drop is permitted and provide a commit/abort function is so."""
         LOG.warning("using base class may_reassign_color_map which does nothing")
         return lambda b: None
 
-    def menu_for_track(self, track: str, frame: Optional[UUID] = None) -> Optional[
-            Tuple[QMenu, Mapping[Any, Callable]]]:
-        """Generate QMenu to use as context menu for a given track, optionally with frame if mouse was over that frame
+    def menu_for_track(
+        self, track: str, frame: Optional[UUID] = None
+    ) -> Optional[Tuple[QMenu, Mapping[Any, Callable]]]:
+        """Generate QMenu to use as context menu for a given track.
+
+        Optionally with frame if mouse was over that frame.
+
         """
         LOG.debug("generating menu with track {} and frame {}".format(track, frame))
         menu = QMenu()
         actions = {}
         if frame:
-            sfx = ' frame'
+            sfx = " frame"
 
             def _activate(*args, **kwargs):
                 self._doc.activate_frames(frame)
@@ -274,7 +288,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
             # FUTURE: frames in track is too dangerous for now
             return None
 
-            sfx = ' frames in track'
+            sfx = " frames in track"
 
             def _activate(*args, **kwargs):
                 self._doc.activate_track(track)
@@ -286,8 +300,9 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         actions[menu.addAction("Deactivate" + sfx)] = _deactivate
         return menu, actions
 
-    def sync_items(self, changed_tracks: Optional[Iterable[str]] = None,
-                   changed_frame_uuids: Optional[Iterable[UUID]] = None):
+    def sync_items(
+        self, changed_tracks: Optional[Iterable[str]] = None, changed_frame_uuids: Optional[Iterable[UUID]] = None
+    ):
         """Populate or update scene, returning number of items changed in scene
         Does not add new items for tracks and frames already present
         Parameters serve only as hints
@@ -308,6 +323,7 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         if not acted:
             self._invalidate()
         self.update()
+
 
 # def _debug(type, value, tb):
 #     "enable with sys.excepthook = debug"

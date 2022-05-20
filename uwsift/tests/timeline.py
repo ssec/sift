@@ -3,19 +3,28 @@ import sys
 import time
 from random import randint, shuffle
 
-from PyQt5.QtWidgets import (QGraphicsScene, QMainWindow, QToolBar, QAction, QLabel, QCheckBox, QStatusBar,
-                             QGraphicsView, QGraphicsTextItem, QApplication)
-from PyQt5.QtCore import QSize, QTimer, Qt, QTimeLine, QPointF
-from PyQt5.QtGui import QKeySequence, QIcon, QFont
-from PyQt5.QtOpenGL import QGLWidget, QGLFormat, QGL
-
+from PyQt5.QtCore import QPointF, QSize, Qt, QTimeLine, QTimer
+from PyQt5.QtGui import QFont, QIcon, QKeySequence
+from PyQt5.QtOpenGL import QGL, QGLFormat, QGLWidget
+from PyQt5.QtWidgets import (
+    QAction,
+    QApplication,
+    QCheckBox,
+    QGraphicsScene,
+    QGraphicsTextItem,
+    QGraphicsView,
+    QLabel,
+    QMainWindow,
+    QStatusBar,
+    QToolBar,
+)
 
 # http://pyqt.sourceforge.net/Docs/PyQt4/modules.html
 # from PyQt4.QtWidgets import *
 # ref https://ralsina.me/stories/BBS53.html
 
-class DemoScene(QGraphicsScene):
 
+class DemoScene(QGraphicsScene):
     def __init__(self, *args, **kwargs):
         super(DemoScene, self).__init__(*args, **kwargs)
 
@@ -63,7 +72,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(gfx)
         fmt = QGLFormat(QGL.SampleBuffers)
         wdgt = QGLWidget(fmt)
-        assert (wdgt.isValid())
+        assert wdgt.isValid()
         gfx.setViewport(wdgt)
         gfx.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
         gfx.setScene(scene)
@@ -129,19 +138,19 @@ class MainWindow(QMainWindow):
         shuffle(offsets)
 
         # Some items, animate with purpose
-        h1, h2 = map(int, '%02d' % time.localtime().tm_hour)
+        h1, h2 = map(int, "%02d" % time.localtime().tm_hour)
         h1 += offsets[0] * 10
         h2 += offsets[1] * 10
         self.animations[h1] = animate_to(0.2, self.digits[h1], -40, 0, 0)
         self.animations[h2] = animate_to(0.2, self.digits[h2], 50, 0, 0)
 
-        m1, m2 = map(int, '%02d' % time.localtime().tm_min)
+        m1, m2 = map(int, "%02d" % time.localtime().tm_min)
         m1 += offsets[2] * 10
         m2 += offsets[3] * 10
         self.animations[m1] = animate_to(0.2, self.digits[m1], 230, 0, 0)
         self.animations[m2] = animate_to(0.2, self.digits[m2], 320, 0, 0)
 
-        s1, s2 = map(int, '%02d' % time.localtime().tm_sec)
+        s1, s2 = map(int, "%02d" % time.localtime().tm_sec)
         s1 += offsets[4] * 10
         s2 += offsets[5] * 10
         self.animations[s1] = animate_to(0.2, self.digits[s1], 500, 0, 0)
@@ -153,7 +162,7 @@ class MainWindow(QMainWindow):
             if i in [h1, h2, m1, m2, s1, s2]:
                 t_item.setOpacity(1)
                 continue
-            t_item.setOpacity(.3)
+            t_item.setOpacity(0.3)
             self.animations[i] = animate_to(1, t_item, randint(0, 500), randint(0, 300), randint(0, 0))
 
         [animation.timeLine().start() for animation in self.animations]
@@ -171,15 +180,15 @@ class MainWindow(QMainWindow):
         self.animations = []
 
         # This is just a nice font, use any font you like, or none
-        font = QFont('White Rabbit')
+        font = QFont("White Rabbit")
         font.setPointSize(120)
 
         # Create three ":" and place them in our scene
-        self.dot1 = QGraphicsTextItem(':')  # from QtGui
+        self.dot1 = QGraphicsTextItem(":")  # from QtGui
         self.dot1.setFont(font)
         self.dot1.setPos(140, 0)
         self._scene.addItem(self.dot1)
-        self.dot2 = QGraphicsTextItem(':')
+        self.dot2 = QGraphicsTextItem(":")
         self.dot2.setFont(font)
         self.dot2.setPos(410, 0)
         self._scene.addItem(self.dot2)
@@ -196,7 +205,7 @@ class MainWindow(QMainWindow):
             t_item.setPos(randint(0, 500), randint(150, 300))
 
             # Make them semi-transparent
-            t_item.setOpacity(.3)
+            t_item.setOpacity(0.3)
 
             # Put them in the scene
             self._scene.addItem(t_item)

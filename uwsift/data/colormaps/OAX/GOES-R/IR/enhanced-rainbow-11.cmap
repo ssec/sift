@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <!-- TOWRdocs Header
      enhanced-rainbow-11 color map
---> 
+-->
 <!-- TOWRdocs Description
      3/27/2017 Color table added by SET team (contact: Jordan Gerth)
---> 
+-->
 <!-- TOWRdocs Status
      New color table that is not part of the AWIPS baseline, for use with GOES-R imagery.
-     The color map can be added to styleRules in common_static, or it can be used to modify an existing display.  
-     For the latter, right-click the title of the product at the bottom of the CAVE screen.  Select "Change Color Map."  
-     Under "Set Color Table Range" press the entry that appears and there will be a pull-down of options. 
+     The color map can be added to styleRules in common_static, or it can be used to modify an existing display.
+     For the latter, right-click the title of the product at the bottom of the CAVE screen.  Select "Change Color Map."
+     Under "Set Color Table Range" press the entry that appears and there will be a pull-down of options.
      Select "site" and then your site 3-letter identifier, then "Sat", then "IR" (or "VIS" for Vis color tables), and select the desired color map.
---> 
+-->
 <!-- TOWRdocs POC
      Lee Byerle
---> 
+-->
 <colorMap xmlns:ns2="group" xmlns:ns3="http://www.example.org/productType">
     <color r="0.498039215686" g="0.0" b="0.0" a="1.0"/>
     <color r="0.398431372549" g="0.0" b="0.0" a="1.0"/>

@@ -13,11 +13,11 @@ REQUIRES
 :copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-__author__ = 'evas'
-__docformat__ = 'reStructuredText'
+__author__ = "evas"
+__docformat__ = "reStructuredText"
 
-import logging
 import enum
+import logging
 import typing as typ
 from collections import defaultdict
 from uuid import UUID
@@ -25,10 +25,17 @@ from uuid import UUID
 import numpy as np
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QGridLayout, QLabel, QTextEdit, QSizePolicy, QWidget, QVBoxLayout
+from PyQt5.QtWidgets import (
+    QGridLayout,
+    QLabel,
+    QSizePolicy,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
-from uwsift.model.layer import DocBasicDataset
 from uwsift.common import Info, Kind, Presentation
+from uwsift.model.layer import DocBasicDataset
 from uwsift.ui.custom_widgets import QNoScrollWebView
 from uwsift.view.colormap import COLORMAP_MANAGER
 
@@ -108,7 +115,7 @@ class SingleLayerInfoPane(QWidget):
         self.wavelength_text.setText("Wavelength: " + shared_info[Info.CENTRAL_WAVELENGTH])
         self.colormap_text.setText("Colormap: " + (shared_info["colormap"] or ""))
         self.clims_text.setText("Color Limits: " + shared_info["climits"])
-        self.composite_codeblock.setText(shared_info['codeblock'])
+        self.composite_codeblock.setText(shared_info["codeblock"])
 
         # format colormap
         if not shared_info["colormap"]:
@@ -117,10 +124,17 @@ class SingleLayerInfoPane(QWidget):
             cmap_html = COLORMAP_MANAGER[shared_info["colormap"]]._repr_html_()
             cmap_html = cmap_html.replace("height", "border-collapse: collapse;\nheight")
             self.cmap_vis.setHtml(
-                """<html><head></head><body style="margin: 0px"><div>%s</div></body></html>""" % (cmap_html,))
+                """<html><head></head><body style="margin: 0px"><div>%s</div></body></html>""" % (cmap_html,)
+            )
 
-    def _update_if_different(self, shared_info: defaultdict, layer_info: typ.Union[DocBasicDataset, Presentation],
-                             key: typ.Hashable = None, attr: str = None, default=""):
+    def _update_if_different(
+        self,
+        shared_info: defaultdict,
+        layer_info: typ.Union[DocBasicDataset, Presentation],
+        key: typ.Hashable = None,
+        attr: str = None,
+        default="",
+    ):
         """Get information from the provided layer or presentation.
 
         Compares current layer information with existing info in ``shared_info``. If they are the same then keep the
@@ -151,7 +165,7 @@ class SingleLayerInfoPane(QWidget):
                 if layer_info[Info.KIND] in [Kind.IMAGE, Kind.COMPOSITE, Kind.CONTOUR]:
                     min_str = layer_info[Info.UNIT_CONVERSION][2](new_clims[0], include_units=False)
                     max_str = layer_info[Info.UNIT_CONVERSION][2](new_clims[1])
-                    new_clims = '{} ~ {}'.format(min_str, max_str)
+                    new_clims = "{} ~ {}".format(min_str, max_str)
                 elif layer_info[Info.KIND] in [Kind.RGB]:
                     # FUTURE: Other layer types
                     deps = (layer_info.r, layer_info.g, layer_info.b)
@@ -159,12 +173,12 @@ class SingleLayerInfoPane(QWidget):
                     tmp_clims = []
                     for i, dep in enumerate(deps):
                         if dep is None:
-                            tmp_clims.append('N/A')
+                            tmp_clims.append("N/A")
                             continue
 
                         min_str = dep[Info.UNIT_CONVERSION][2](new_clims[i][0], include_units=False)
                         max_str = dep[Info.UNIT_CONVERSION][2](new_clims[i][1])
-                        tmp_clims.append('{} ~ {}'.format(min_str, max_str))
+                        tmp_clims.append("{} ~ {}".format(min_str, max_str))
                     new_clims = ", ".join(tmp_clims)
                 else:
                     new_clims = "N/A"
@@ -183,19 +197,19 @@ class SingleLayerInfoPane(QWidget):
             for name, uuid in ns.items():
                 try:
                     dep_info = self.document[uuid]
-                    short_name = dep_info.get(Info.SHORT_NAME, '<N/A>')
+                    short_name = dep_info.get(Info.SHORT_NAME, "<N/A>")
                 except KeyError:
                     LOG.debug("Layer '{}' not found in document".format(uuid))
-                    short_name = '<Unknown>'
+                    short_name = "<Unknown>"
                 short_names.append("# {} = {}".format(name, short_name))
             ns_str = "\n".join(short_names)
-            codeblock_str = ns_str + '\n\n' + codeblock
+            codeblock_str = ns_str + "\n\n" + codeblock
         else:
-            codeblock_str = ''
-        if 'codeblock' not in shared_info:
-            shared_info['codeblock'] = codeblock_str
+            codeblock_str = ""
+        if "codeblock" not in shared_info:
+            shared_info["codeblock"] = codeblock_str
         else:
-            shared_info['codeblock'] = '' if shared_info['codeblock'] != codeblock_str else codeblock_str
+            shared_info["codeblock"] = "" if shared_info["codeblock"] != codeblock_str else codeblock_str
 
     def update_display(self, selected_uuid_list: list = None):
         """update the information being displayed to match the given UUID(s)
@@ -225,7 +239,7 @@ class SingleLayerInfoPane(QWidget):
             self._update_if_different(shared_info, layer_info, Info.DISPLAY_NAME)
             self._update_if_different(shared_info, layer_info, Info.DISPLAY_TIME)
             self._update_if_different(shared_info, layer_info, Info.INSTRUMENT)
-            self._update_if_different(shared_info, this_prez, attr='colormap')
+            self._update_if_different(shared_info, this_prez, attr="colormap")
             self._get_shared_color_limits(shared_info, layer_info, this_prez)
             self._get_code_block(shared_info, layer_uuid)
 
@@ -233,10 +247,10 @@ class SingleLayerInfoPane(QWidget):
             wl = layer_info.get(Info.CENTRAL_WAVELENGTH)
             fmt = "{:0.2f} µm"
             if isinstance(wl, (tuple, list)):
-                wl = [fmt.format(x) if x is not None else '---' for x in wl]
+                wl = [fmt.format(x) if x is not None else "---" for x in wl]
                 wl = "(" + ", ".join(wl) + ")"
             else:
-                wl = fmt.format(wl) if wl is not None else '---'
+                wl = fmt.format(wl) if wl is not None else "---"
             if Info.CENTRAL_WAVELENGTH not in shared_info:
                 shared_info[Info.CENTRAL_WAVELENGTH] = wl
             else:

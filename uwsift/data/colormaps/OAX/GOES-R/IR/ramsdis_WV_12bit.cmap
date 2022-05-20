@@ -5,17 +5,17 @@
 <!-- TOWRdocs Description
      12-bit version of legacy table similar to the former AWIPS-1 and AWIPS-2 RAMSDIS WV color table.
      Contributor: Dan Lindsey
---> 
+-->
 <!-- TOWRdocs Status
-     Added WV color map for GOES-R channels. This color table is not part of the AWIPS baseline. 
-     The color map can be added to styleRules in common_static, or it can be used to modify an existing display.  
-     For the latter, right-click the title of the product at the bottom of the CAVE screen.  Select "Change Color Map."  
-     Under "Set Color Table Range" press the entry that appears and there will be a pull-down of options. 
+     Added WV color map for GOES-R channels. This color table is not part of the AWIPS baseline.
+     The color map can be added to styleRules in common_static, or it can be used to modify an existing display.
+     For the latter, right-click the title of the product at the bottom of the CAVE screen.  Select "Change Color Map."
+     Under "Set Color Table Range" press the entry that appears and there will be a pull-down of options.
      Select "site" and then your site 3-letter identifier, then "Sat", then "IR", and select the desired color map.
 
 	 1/10/2017 updated name of file to add 12bit
 
---> 
+-->
 <!-- TOWRdocs POC
      Lee Byerle 1/10/2017
 -->

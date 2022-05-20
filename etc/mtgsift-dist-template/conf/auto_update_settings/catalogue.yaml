@@ -50,7 +50,7 @@ catalogue:
 
   - reader: 'fci_l1c_fdhsi'
     search_path: '/opt/mtg-sift/Data/MTG-Incoming'
-    
+
     # Constraints items must match replacement fields as defined in readers/fci_l1c_fdhsi.yaml
     constraints:
       spacecraft_id: 1
@@ -72,7 +72,7 @@ catalogue:
 
   #- reader: 'seviri_l1b_hrit'
   #  search_path: '/path/to/seviri/data/'
-    
+
     # Constraints items must match replacement fields as defined in readers/seviri_l1b_hrit.yaml:
   #  constraints:
   #    platform_shortname:
@@ -89,4 +89,3 @@ catalogue:
 
   #  products:
   #    IR_108: [brightness_temperature, radiance]
-

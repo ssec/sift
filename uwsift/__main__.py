@@ -18,17 +18,6 @@ REQUIRES
 :license: GPLv3, see LICENSE for more details
 """
 
-__author__ = 'rayg'
-
-# To have consistent logging for all modules (also for their static
-# initialization) it must be set up before importing them.
-from uwsift.model.composite_recipes import RecipeManager
-from uwsift.model.product_dataset import ProductDataset
-from uwsift.util.logger import configure_loggers
-from uwsift.view.algebraic_config import AlgebraicLayerConfigPane
-
-configure_loggers()  # noqa - we rerun this later again to post-config
-
 import gc
 import logging
 import os
@@ -39,42 +28,57 @@ from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from functools import partial
 from glob import glob
-from uuid import UUID
 from types import FrameType
+from uuid import UUID
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from vispy import app
 
 import uwsift.ui.open_cache_dialog_ui as open_cache_dialog_ui
-from uwsift import (__version__, config,
-                    AUTO_UPDATE_MODE__ACTIVE,
-                    USE_INVENTORY_DB,
-                    USE_TILED_GEOLOCATED_IMAGES)
+from uwsift import (
+    AUTO_UPDATE_MODE__ACTIVE,
+    USE_INVENTORY_DB,
+    USE_TILED_GEOLOCATED_IMAGES,
+    __version__,
+    config,
+)
 from uwsift.common import Info, Tool
 from uwsift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
 from uwsift.control.layer_tree import LayerStackTreeViewModel
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
+
+# To have consistent logging for all modules (also for their static
+# initialization) it must be set up before importing them.
+from uwsift.model.composite_recipes import RecipeManager
 from uwsift.model.document import Document
 from uwsift.model.layer import DocRGBDataset
-from uwsift.queue import TaskQueue, TASK_PROGRESS, TASK_DOING
+from uwsift.model.layer_model import LayerModel
+from uwsift.model.product_dataset import ProductDataset
+from uwsift.queue import TASK_DOING, TASK_PROGRESS, TaskQueue
+
 # this is generated with pyuic4 pov_main.ui >pov_main_ui.py
 from uwsift.ui.pov_main_ui import Ui_MainWindow
-from uwsift.util import (WORKSPACE_DB_DIR, DOCUMENT_SETTINGS_DIR, USER_CACHE_DIR,
-                         get_package_data_dir, check_grib_definition_dir, check_imageio_deps,
-                         HeapProfiler)
+from uwsift.util import (
+    DOCUMENT_SETTINGS_DIR,
+    USER_CACHE_DIR,
+    WORKSPACE_DB_DIR,
+    HeapProfiler,
+    check_grib_definition_dir,
+    check_imageio_deps,
+    get_package_data_dir,
+)
+from uwsift.util.logger import configure_loggers
+from uwsift.view.algebraic_config import AlgebraicLayerConfigPane
 from uwsift.view.colormap_editor import ColormapEditor
 from uwsift.view.export_image import ExportImageHelper
 from uwsift.view.layer_details import SingleLayerInfoPane
-from uwsift.view.probes import ProbeGraphManager, DEFAULT_POINT_PROBE
+from uwsift.view.probes import DEFAULT_POINT_PROBE, ProbeGraphManager
 from uwsift.view.rgb_config import RGBLayerConfigPane
 from uwsift.view.scene_graph import SceneGraphManager
 from uwsift.workspace import CachingWorkspace, SimpleWorkspace
 from uwsift.workspace.collector import ResourceSearchPathCollector
 
-from uwsift.model.layer_model import LayerModel
-
 LOG = logging.getLogger(__name__)
-# re-configure loggers instantiated meanwhile
 configure_loggers()
 
 PROGRESS_BAR_MAX = 1000
@@ -101,6 +105,7 @@ def test_layers(doc, glob_pattern=None):
 
 async def do_test_cycle(txt: QtWidgets.QWidget):
     from asyncio import sleep
+
     n = 0
     while True:
         txt.setText(str(n))
@@ -143,8 +148,7 @@ class OpenCacheDialog(QtWidgets.QDialog):
 
     def accept(self, *args, **kwargs):
         self.hide()
-        to_open = [item.data(QtCore.Qt.UserRole)
-                   for item in self.ui.cacheListWidget.selectedItems()]
+        to_open = [item.data(QtCore.Qt.UserRole) for item in self.ui.cacheListWidget.selectedItems()]
         LOG.info("opening from cache: " + repr(to_open))
         self._opener(to_open)
 
@@ -159,9 +163,10 @@ class AnimationSpeedPopupWindow(QtWidgets.QWidget):
     def __init__(self, slot, *args, **kwargs):
         super(AnimationSpeedPopupWindow, self).__init__(*args, **kwargs)
         from PyQt5.QtCore import Qt
+
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Popup)
         self.setFocusPolicy(Qt.ClickFocus)
-        self.setToolTip('Set animation speed')
+        self.setToolTip("Set animation speed")
         self._slider = QtWidgets.QSlider(parent=self)
         # n, x = self._convert(10, reverse=True), self._convert(5000, reverse=True)
         n, x = 2, 150  # frames per 10 seconds
@@ -194,12 +199,13 @@ class AnimationSpeedPopupWindow(QtWidgets.QWidget):
         if not self._active:
             return
         fps = float(value) / 10.0
-        self.setToolTip('{0:.1f} fps'.format(fps))
+        self.setToolTip("{0:.1f} fps".format(fps))
         val = self._convert(value)
         self._slot(val)
 
     def show_at(self, pos, val):
-        from PyQt5.QtCore import QRect, QPoint, QSize
+        from PyQt5.QtCore import QPoint, QRect, QSize
+
         sz = QSize(40, 180)
         pt = QPoint(pos.x() - 20, pos.y() - 160)
         rect = QRect(pt, sz)
@@ -236,7 +242,7 @@ def _common_path_prefix_seq(paths):
 def _common_path_prefix(paths):
     "find the most common directory shared by a list of paths"
     paths = list(paths)
-    LOG.debug('looking for common path prefix for {}'.format(repr(paths)))
+    LOG.debug("looking for common path prefix for {}".format(repr(paths)))
     if len(paths) == 1:
         return os.path.split(paths[0])[0]
     parts = list(_common_path_prefix_seq(paths))
@@ -257,17 +263,16 @@ class UserControlsAnimation(QtCore.QObject):
     - update time display above time slider
     - update animation rate using popup widget
     """
+
     ui = None
     document: Document = None
     scene_manager: SceneGraphManager = None
     layer_list_model: LayerStackTreeViewModel = None
     _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
 
-    def __init__(self, ui,
-                 scene_manager: SceneGraphManager,
-                 document: Document,
-                 layer_list_model: LayerStackTreeViewModel
-                 ):
+    def __init__(
+        self, ui, scene_manager: SceneGraphManager, document: Document, layer_list_model: LayerStackTreeViewModel
+    ):
         """
         Args:
             ui: QtDesigner UI element tree for application
@@ -352,11 +357,11 @@ class UserControlsAnimation(QtCore.QObject):
         # TODO: update layer list to reflect what layers are visible/hidden?
 
     def _next_last_time_visibility(self, direction=0, *args, **kwargs):
-        LOG.info('time incr {}'.format(direction))
+        LOG.info("time incr {}".format(direction))
         # TODO: if this frame is part of the animation sequence, update the slider as well!
         uuids = self.layer_list_model.current_selected_uuids()
         if not uuids:
-            self.ui.statusbar.showMessage('ERROR: No layer selected', STATUS_BAR_DURATION)
+            self.ui.statusbar.showMessage("ERROR: No layer selected", STATUS_BAR_DURATION)
         new_focus = None
         for uuid in uuids:
             new_focus = self.document.next_last_step(uuid, direction, bandwise=False)
@@ -384,7 +389,7 @@ class UserControlsAnimation(QtCore.QObject):
 
     def next_last_band(self, direction=0, *args, **kwargs):
         """Move forward (direction=+1) or backward (-1) a band step in animation order."""
-        LOG.info('band incr {}'.format(direction))
+        LOG.info("band incr {}".format(direction))
         uuids = self.layer_list_model.current_selected_uuids()
         new_focus = None
         if not uuids:
@@ -398,12 +403,12 @@ class UserControlsAnimation(QtCore.QObject):
 
     def set_animation_speed(self, milliseconds):
         """Change frame rate as measured in milliseconds."""
-        LOG.info('animation speed set to {}ms'.format(milliseconds))
+        LOG.info("animation speed set to {}ms".format(milliseconds))
         self.scene_manager.animation_controller.animation_speed = milliseconds
 
     def show_animation_speed_slider(self, pos: QtCore.QPoint, *args):
         """Show frame-rate slider as a pop-up control, at current mouse position."""
-        LOG.info('menu requested for animation control')
+        LOG.info("menu requested for animation control")
         gpos = self.ui.animPlayPause.mapToGlobal(pos)
 
         if self._animation_speed_popup is None:
@@ -431,7 +436,7 @@ class UserControlsAnimation(QtCore.QObject):
             self.layer_list_model.select(uuids)
         else:
             self.ui.statusbar.showMessage("ERROR: Layer with time steps or band siblings needed", STATUS_BAR_DURATION)
-        LOG.info('using siblings of {} for animation loop'.format(uuids[0] if uuids else '-unknown-'))
+        LOG.info("using siblings of {} for animation loop".format(uuids[0] if uuids else "-unknown-"))
 
     def toggle_animation(self, action: QtWidgets.QAction = None, *args):
         """Toggle animation on/off."""
@@ -466,23 +471,22 @@ class Main(QtWidgets.QMainWindow):
         # http://pyqt.sourceforge.net/Docs/PyQt4/qfiledialog.html#getOpenFileNames
         filename_filters = [
             # 'All files (*.*)',
-            'All supported files (*.nc *.nc4)',
-            'GOES-16 NetCDF (*.nc *.nc4)',
+            "All supported files (*.nc *.nc4)",
+            "GOES-16 NetCDF (*.nc *.nc4)",
         ]
-        filter_str = ';;'.join(filename_filters)
+        filter_str = ";;".join(filename_filters)
         files = QtWidgets.QFileDialog.getOpenFileNames(
-            self, "Select one or more files to open", self._last_open_dir or os.getenv("HOME"), filter_str)[0]
+            self, "Select one or more files to open", self._last_open_dir or os.getenv("HOME"), filter_str
+        )[0]
         self.open_paths(files)
 
     def _bgnd_open_paths(self, paths, uuid_list, **importer_kwargs):
-        """Background task runs on a secondary thread
-        """
-        LOG.info("opening products from {} paths in background".format(
-            len(paths)))
+        """Background task runs on a secondary thread"""
+        LOG.info("opening products from {} paths in background".format(len(paths)))
         for progress in self.document.import_files(paths, **importer_kwargs):
             yield progress
-            uuid_list.append(progress['uuid'])
-        yield {TASK_DOING: 'products loaded from paths', TASK_PROGRESS: 1.0}
+            uuid_list.append(progress["uuid"])
+        yield {TASK_DOING: "products loaded from paths", TASK_PROGRESS: 1.0}
 
     def _bgnd_open_paths_finish(self, isok: bool, uuid_list: typ.List[UUID]):
         """Main thread finalization after background imports are done.
@@ -494,8 +498,7 @@ class Main(QtWidgets.QMainWindow):
         self.didFinishLoading.emit(uuid_list)
 
         if not uuid_list:
-            raise ValueError("no UUIDs provided by background open"
-                             " in _bgnd_open_paths_finish")
+            raise ValueError("no UUIDs provided by background open" " in _bgnd_open_paths_finish")
         if not isok:
             raise ValueError("background open did not succeed")
 
@@ -516,7 +519,7 @@ class Main(QtWidgets.QMainWindow):
         bopf = partial(self._bgnd_open_paths_finish, uuid_list=uli)
         self.queue.add("load_files", bop(paths), "Open {} files".format(len(paths)), and_then=bopf, interactive=False)
         # don't use <algebraic layer ...> type paths
-        self._last_open_dir = _common_path_prefix([x for x in paths if x[0] != '<']) or self._last_open_dir
+        self._last_open_dir = _common_path_prefix([x for x in paths if x[0] != "<"]) or self._last_open_dir
         if USE_INVENTORY_DB:
             self.update_recent_file_menu()
 
@@ -528,7 +531,7 @@ class Main(QtWidgets.QMainWindow):
             self.document.activate_product_uuid_as_new_dataset(uuid)
 
     def dropEvent(self, event):
-        LOG.debug('drop event on mainwindow')
+        LOG.debug("drop event on mainwindow")
         mime = event.mimeData()
         if mime.hasUrls:
             event.setDropAction(QtCore.Qt.CopyAction)
@@ -545,11 +548,12 @@ class Main(QtWidgets.QMainWindow):
 
     def update_recent_file_menu(self, *args, **kwargs):
         uuid_to_name = self.workspace.recently_used_products()
-        LOG.debug('recent uuids: {}'.format(repr(uuid_to_name.keys())))
+        LOG.debug("recent uuids: {}".format(repr(uuid_to_name.keys())))
         self._recent_files_menu.clear()
         for uuid, p_name in uuid_to_name.items():
+
             def openit(checked=False, uuid=uuid):
-                LOG.debug('open recent product {}'.format(uuid))
+                LOG.debug("open recent product {}".format(uuid))
                 self.scene_manager.animation_controller.animating = False
                 self.activate_products_by_uuid([uuid])
 
@@ -561,7 +565,7 @@ class Main(QtWidgets.QMainWindow):
         active = status_info[0] if len(status_info) > 0 else None
         # LOG.debug('{0!r:s}'.format(status_info))
         val = active[TASK_PROGRESS] if active else 0.0
-        txt = active[TASK_DOING] if active else ''
+        txt = active[TASK_DOING] if active else ""
         val = self.queue.progress_ratio(val)
         self.ui.progressBar.setValue(int(val * PROGRESS_BAR_MAX))
         self.ui.progressText.setText(txt)
@@ -625,10 +629,11 @@ class Main(QtWidgets.QMainWindow):
 
     def update_point_probe_text(self, probe_name, state=None, xy_pos=None, uuid=None, animating=None):
         if uuid is None:
-            top_probeable_layer, product_dataset = self.layer_model\
-                .get_top_probeable_layer_with_active_product_dataset()
-            uuid = None if product_dataset is None \
-                else product_dataset.uuid
+            (
+                top_probeable_layer,
+                product_dataset,
+            ) = self.layer_model.get_top_probeable_layer_with_active_product_dataset()
+            uuid = None if product_dataset is None else product_dataset.uuid
         if state is None or xy_pos is None:
             _state, _xy_pos = self.graphManager.current_point_probe_status(probe_name)
             if state is None:
@@ -672,8 +677,7 @@ class Main(QtWidgets.QMainWindow):
                         wl_str = "{:0.02f} µm".format(wl)
                     else:
                         wl_str = "{:0.01f} µm".format(wl)
-                    layer_str = "{}, {}".format(info[Info.SHORT_NAME],
-                                                wl_str)
+                    layer_str = "{}, {}".format(info[Info.SHORT_NAME], wl_str)
                 else:
                     layer_str = info[Info.SHORT_NAME]
         else:
@@ -705,7 +709,7 @@ class Main(QtWidgets.QMainWindow):
             frame_uuids = list(frame_uuids) if not isinstance(frame_uuids, list) else frame_uuids
             # FIXME: again, we're assuming product id = frame id = layer id
             if len(frame_uuids) == 1 and gv.isVisible():
-                LOG.debug('centering timeline view on single selected frame')
+                LOG.debug("centering timeline view on single selected frame")
 
                 timeline_scene.center_view_on_frame(gv, frame_uuids[0])
 
@@ -728,8 +732,7 @@ class Main(QtWidgets.QMainWindow):
         :param dataset: recently loaded dataset
         """
         dataset_sched_time_utc = dataset.sched_time.replace(tzinfo=timezone.utc)
-        fmt_time = dataset_sched_time_utc.strftime(
-            WATCHDOG_DATETIME_FORMAT_STORE).rstrip()
+        fmt_time = dataset_sched_time_utc.strftime(WATCHDOG_DATETIME_FORMAT_STORE).rstrip()
 
         journal_path = self._heartbeat_file + "-journal"
         with open(journal_path, "w") as file:
@@ -756,17 +759,17 @@ class Main(QtWidgets.QMainWindow):
 
         dataset_sched_time_utc = dataset.sched_time.replace(tzinfo=timezone.utc)
         self.ui.timeLastDatasetCreationLineEdit.setText(
-            dataset_sched_time_utc.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY))
+            dataset_sched_time_utc.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY)
+        )
 
         self._last_imported_dataset_import_time = datetime.now(tz=timezone.utc)
         self.ui.timeLastDatasetImportLineEdit.setText(
-            self._last_imported_dataset_import_time.strftime(
-                WATCHDOG_DATETIME_FORMAT_DISPLAY))
+            self._last_imported_dataset_import_time.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY)
+        )
 
-    def _clear_last_dataset_creation_time(self, reordered_layers: tuple,
-                                          removed_uuids: typ.List[UUID],
-                                          first_row_removed: int,
-                                          num_rows_removed: int):
+    def _clear_last_dataset_creation_time(
+        self, reordered_layers: tuple, removed_uuids: typ.List[UUID], first_row_removed: int, num_rows_removed: int
+    ):
         """
         Clear the LineEdit if the layer, from which the creation time was
         extracted, is deleted from the scene graph.
@@ -780,8 +783,7 @@ class Main(QtWidgets.QMainWindow):
         Update currentTimeLineEdit with the current local time.
         """
         now_utc = datetime.now(tz=timezone.utc)
-        self.ui.currentTimeLineEdit.setText(
-            now_utc.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY))
+        self.ui.currentTimeLineEdit.setText(now_utc.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY))
 
         if not self._last_imported_dataset_uuid:
             return
@@ -789,8 +791,7 @@ class Main(QtWidgets.QMainWindow):
         if self._max_tolerable_dataset_age > 0:
             dataset = self.document[self._last_imported_dataset_uuid]
 
-            dataset_sched_time_utc = \
-                dataset.sched_time.replace(tzinfo=timezone.utc)
+            dataset_sched_time_utc = dataset.sched_time.replace(tzinfo=timezone.utc)
             dataset_age = now_utc - dataset_sched_time_utc
             if dataset_age.total_seconds() > self._max_tolerable_dataset_age:
                 palette = self._palette_text_red
@@ -817,8 +818,7 @@ class Main(QtWidgets.QMainWindow):
             else:
                 since_last_restart = datetime.now() - self._last_restart_request
                 if since_last_restart < self._restart_ask_again_interval:
-                    LOG.debug("Ignoring restart request because last restart "
-                              "request was denied recently")
+                    LOG.debug("Ignoring restart request because last restart " "request was denied recently")
                     return
 
         msg_box = QtWidgets.QMessageBox()
@@ -847,29 +847,35 @@ class Main(QtWidgets.QMainWindow):
             self._restart_handler_active = False
 
     def _init_auto_restart(self):
-        restart_popup_deadline = config.get(
-            "watchdog.auto_restart_popup_deadline", 0)
+        restart_popup_deadline = config.get("watchdog.auto_restart_popup_deadline", 0)
         if restart_popup_deadline == 0:
             LOG.warning("deadline for the auto restart is disabled")
             self._restart_popup_deadline = None
         else:
             self._restart_popup_deadline = int(restart_popup_deadline)
 
-        restart_ask_again_interval = config.get(
-            "watchdog.auto_restart_ask_again_interval", 0)
+        restart_ask_again_interval = config.get("watchdog.auto_restart_ask_again_interval", 0)
         if restart_ask_again_interval == 0:
             LOG.warning("User won't be asked again to restart")
             self._restart_ask_again_interval = None
         else:
-            self._restart_ask_again_interval = timedelta(seconds=int(
-                restart_ask_again_interval))
+            self._restart_ask_again_interval = timedelta(seconds=int(restart_ask_again_interval))
 
         self._restart_handler_active = False
         self._last_restart_request = None
         signal.signal(signal.SIGUSR1, self._restart_handler)
 
-    def __init__(self, config_dir=None, workspace_dir=None, cache_size=None, glob_pattern=None, search_paths=None,
-                 border_shapefile=None, center=None, clear_workspace=False):
+    def __init__(
+        self,
+        config_dir=None,
+        workspace_dir=None,
+        cache_size=None,
+        glob_pattern=None,
+        search_paths=None,
+        border_shapefile=None,
+        center=None,
+        clear_workspace=False,
+    ):
         super(Main, self).__init__()
 
         self.ui = Ui_MainWindow()
@@ -898,18 +904,16 @@ class Main(QtWidgets.QMainWindow):
 
         # create manager and helper classes
         if USE_INVENTORY_DB:
-            self.workspace = CachingWorkspace(workspace_dir,
-                                              max_size_gb=cache_size,
-                                              queue=self.queue,
-                                              initial_clear=clear_workspace)
+            self.workspace = CachingWorkspace(
+                workspace_dir, max_size_gb=cache_size, queue=self.queue, initial_clear=clear_workspace
+            )
         else:
             self.workspace = SimpleWorkspace(workspace_dir)
         self.document = doc = Document(self.workspace, config_dir=config_dir, queue=self.queue)
         self.document.didRemoveDatasets.connect(self.run_gc_after_layer_deletion)
-        self.scene_manager = SceneGraphManager(doc, self.workspace, self.queue,
-                                               borders_shapefiles=border_shapefile,
-                                               center=center,
-                                               parent=self)
+        self.scene_manager = SceneGraphManager(
+            doc, self.workspace, self.queue, borders_shapefiles=border_shapefile, center=center, parent=self
+        )
         self.export_image = ExportImageHelper(self, self.document, self.scene_manager)
         self._wizard_dialog = None
 
@@ -924,20 +928,16 @@ class Main(QtWidgets.QMainWindow):
         if AUTO_UPDATE_MODE__ACTIVE:
             self._init_update_times_display()
 
-        self.animation = UserControlsAnimation(self.ui,
-                                               self.scene_manager,
-                                               self.document,
-                                               self.layer_list_model
-                                               )
+        self.animation = UserControlsAnimation(self.ui, self.scene_manager, self.document, self.layer_list_model)
 
         # disable close button on panes
-        panes = [self.ui.areaProbePane,
-                 self.ui.rgbConfigPane,
-                 self.ui.algebraicConfigPane,
-                 ]
+        panes = [
+            self.ui.areaProbePane,
+            self.ui.rgbConfigPane,
+            self.ui.algebraicConfigPane,
+        ]
         for pane in panes:
-            pane.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable |
-                             QtWidgets.QDockWidget.DockWidgetMovable)
+            pane.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable | QtWidgets.QDockWidget.DockWidgetMovable)
         # Make the panes on the right side 375px wide
         self.resizeDocks(panes, [375] * len(panes), QtCore.Qt.Horizontal)
 
@@ -950,12 +950,11 @@ class Main(QtWidgets.QMainWindow):
         self._init_key_releases()
 
         self.scheduler = QtCore.QTimer(parent=self)
-        self.scheduler.setInterval(200.0)
+        self.scheduler.setInterval(200)
         self.scheduler.timeout.connect(partial(self.scene_manager.on_view_change, self.scheduler))
 
         def start_wrapper(timer, event):
-            """Simple wrapper around a timers start method so we can accept but ignore the event provided
-            """
+            """Simple wrapper around a timers start method so we can accept but ignore the event provided"""
             timer.start()
 
         self.scene_manager.main_view.scene.transform.changed.connect(partial(start_wrapper, self.scheduler))
@@ -989,11 +988,14 @@ class Main(QtWidgets.QMainWindow):
         timer.start(60000)
 
     def _init_point_polygon_probes(self):
-        self.graphManager = ProbeGraphManager(self.ui.probeTabWidget,
-                                              self.ui.autoUpdateCheckbox,
-                                              self.ui.updateButton,
-                                              self.workspace, self.layer_model,
-                                              self.queue)
+        self.graphManager = ProbeGraphManager(
+            self.ui.probeTabWidget,
+            self.ui.autoUpdateCheckbox,
+            self.ui.updateButton,
+            self.workspace,
+            self.layer_model,
+            self.queue,
+        )
         self.graphManager.didChangeTab.connect(self.scene_manager.show_only_polygons)
         self.graphManager.didClonePolygon.connect(self.scene_manager.copy_polygon)
         self.graphManager.pointProbeChanged.connect(self.scene_manager.on_point_probe_set)
@@ -1002,24 +1004,20 @@ class Main(QtWidgets.QMainWindow):
 
         self.scene_manager.newPointProbe.connect(self.graphManager.update_point_probe)
 
-        self.layer_model.didUpdateLayers.connect(
-            self.graphManager.update_point_probe)
-        self.layer_model.didUpdateLayers.connect(
-            self.graphManager.handleActiveProductDatasetsChanged)
-        self.layer_model.didChangeRecipeLayerNames.connect(
-            self.graphManager.handleActiveProductDatasetsChanged
-        )
+        self.layer_model.didUpdateLayers.connect(self.graphManager.update_point_probe)
+        self.layer_model.didUpdateLayers.connect(self.graphManager.handleActiveProductDatasetsChanged)
+        self.layer_model.didChangeRecipeLayerNames.connect(self.graphManager.handleActiveProductDatasetsChanged)
 
         # Connect to an unnamed slot (lambda: ...) to strip off the argument
         # (of type dict) from the signal 'didMatchTimes'
-        self.scene_manager.animation_controller.time_manager.didMatchTimes\
-            .connect(lambda *args: self.graphManager.update_point_probe())
+        self.scene_manager.animation_controller.time_manager.didMatchTimes.connect(
+            lambda *args: self.graphManager.update_point_probe()
+        )
 
         def update_probe_polygon(points: list):
             probeable_layers = self.layer_model.get_probeable_layers()
             probeable_layers_uuids = [layer.uuid for layer in probeable_layers]
-            LOG.debug("top visible UUID is {0!r:s}"
-                      .format(probeable_layers_uuids[0]))
+            LOG.debug("top visible UUID is {0!r:s}".format(probeable_layers_uuids[0]))
 
             # TODO, when the plots manage their own layer selection, change this call
             # FUTURE, once the polygon is a layer, this will need to change
@@ -1058,12 +1056,10 @@ class Main(QtWidgets.QMainWindow):
             LOG.debug(f"Probeable layer UUIDs are {probeable_layers_uuids!r:s}")
             # TODO, when the plots manage their own layer selection, change this
             #  call (see update_probe_polygon())
-            self.graphManager\
-                .set_default_layer_selections(probeable_layers_uuids)
+            self.graphManager.set_default_layer_selections(probeable_layers_uuids)
 
             must_remove_polygon = self.graphManager.current_graph_has_polygon()
-            current_graph_name = self.graphManager\
-                .current_graph_set_region(select_full_data=True)
+            current_graph_name = self.graphManager.current_graph_set_region(select_full_data=True)
             if must_remove_polygon:
                 self.scene_manager.remove_polygon(current_graph_name)
 
@@ -1085,49 +1081,28 @@ class Main(QtWidgets.QMainWindow):
 
         self.document.didAddDataset.connect(self.layer_model.add_dataset)
 
-        self.layer_model.didCreateLayer.connect(
-            self.scene_manager.add_node_for_layer)
-        self.layer_model.didAddImageDataset.connect(
-            self.scene_manager.add_node_for_image_dataset)
-        self.layer_model.didAddLinesDataset.connect(
-            self.scene_manager.add_node_for_lines_dataset)
-        self.layer_model.didAddPointsDataset.connect(
-            self.scene_manager.add_node_for_points_dataset)
+        self.layer_model.didCreateLayer.connect(self.scene_manager.add_node_for_layer)
+        self.layer_model.didAddImageDataset.connect(self.scene_manager.add_node_for_image_dataset)
+        self.layer_model.didAddLinesDataset.connect(self.scene_manager.add_node_for_lines_dataset)
+        self.layer_model.didAddPointsDataset.connect(self.scene_manager.add_node_for_points_dataset)
 
-        self.layer_model.didAddSystemLayer.connect(
-            self.scene_manager.add_node_for_system_generated_data)
+        self.layer_model.didAddSystemLayer.connect(self.scene_manager.add_node_for_system_generated_data)
 
-        self.layer_model.didReorderLayers.connect(
-            self.scene_manager.update_layers_z)
+        self.layer_model.didReorderLayers.connect(self.scene_manager.update_layers_z)
 
-        self.layer_model.didChangeLayerVisible.connect(
-            self.scene_manager.change_layer_visible)
-        self.layer_model.didChangeLayerOpacity.connect(
-            self.scene_manager.change_layer_opacity)
+        self.layer_model.didChangeLayerVisible.connect(self.scene_manager.change_layer_visible)
+        self.layer_model.didChangeLayerOpacity.connect(self.scene_manager.change_layer_opacity)
 
-        self.layer_model.didChangeColormap.connect(
-            self.scene_manager.change_dataset_nodes_colormap)
-        self.layer_model.didChangeGamma.connect(
-            self.scene_manager.change_dataset_nodes_gamma)
-        self.layer_model.didChangeColorLimits.connect(
-            self.scene_manager.change_dataset_nodes_color_limits)
+        self.layer_model.didChangeColormap.connect(self.scene_manager.change_dataset_nodes_colormap)
+        self.layer_model.didChangeGamma.connect(self.scene_manager.change_dataset_nodes_gamma)
+        self.layer_model.didChangeColorLimits.connect(self.scene_manager.change_dataset_nodes_color_limits)
 
-        self.scene_manager.animation_controller.connect_to_model(
-            self.layer_model)
-        self.layer_model.didActivateProductDataset.connect(
-            self.scene_manager.change_dataset_visible)
-        self.layer_model.didAddCompositeDataset.connect(
-            self.scene_manager.add_node_for_composite_dataset
-        )
-        self.layer_model.didChangeCompositeProductDataset.connect(
-            self.scene_manager.change_node_for_composite_dataset
-        )
-        self.layer_model.didDeleteProductDataset.connect(
-            self.scene_manager.purge_dataset
-        )
-        self.layer_model.didRequestSelectionOfLayer.connect(
-            self.ui.treeView.setCurrentIndex
-        )
+        self.scene_manager.animation_controller.connect_to_model(self.layer_model)
+        self.layer_model.didActivateProductDataset.connect(self.scene_manager.change_dataset_visible)
+        self.layer_model.didAddCompositeDataset.connect(self.scene_manager.add_node_for_composite_dataset)
+        self.layer_model.didChangeCompositeProductDataset.connect(self.scene_manager.change_node_for_composite_dataset)
+        self.layer_model.didDeleteProductDataset.connect(self.scene_manager.purge_dataset)
+        self.layer_model.didRequestSelectionOfLayer.connect(self.ui.treeView.setCurrentIndex)
 
         self.ui.treeView.setModel(self.layer_model)
 
@@ -1138,71 +1113,31 @@ class Main(QtWidgets.QMainWindow):
             self.ui, self.ui.algebraicScrollAreaWidget, self.layer_model
         )
 
-        self.ui.treeView.layerSelectionChanged.connect(
-            self.algebraic_config_pane.selection_did_change
-        )
-        self.layer_model.didAddImageLayer.connect(
-            self.algebraic_config_pane.layer_added
-        )
-        self.algebraic_config_pane.didTriggeredUpdate.connect(
-            self.layer_model.update_recipe_layer_timeline
-        )
+        self.ui.treeView.layerSelectionChanged.connect(self.algebraic_config_pane.selection_did_change)
+        self.layer_model.didAddImageLayer.connect(self.algebraic_config_pane.layer_added)
+        self.algebraic_config_pane.didTriggeredUpdate.connect(self.layer_model.update_recipe_layer_timeline)
 
     def _init_rgb_pane(self):
-        self.rgb_config_pane = RGBLayerConfigPane(self.ui,
-                                                  self.ui.rgbScrollAreaWidget,
-                                                  self.layer_model)
-        self.ui.treeView.layerSelectionChanged.connect(
-            self.rgb_config_pane.selection_did_change
-        )
-        self.layer_model.didAddImageLayer.connect(
-            self.rgb_config_pane.layer_added
-        )
-        self.layer_model.didChangeRecipeLayerNames.connect(
-            self.rgb_config_pane.set_combos_to_layer_names
-        )
+        self.rgb_config_pane = RGBLayerConfigPane(self.ui, self.ui.rgbScrollAreaWidget, self.layer_model)
+        self.ui.treeView.layerSelectionChanged.connect(self.rgb_config_pane.selection_did_change)
+        self.layer_model.didAddImageLayer.connect(self.rgb_config_pane.layer_added)
+        self.layer_model.didChangeRecipeLayerNames.connect(self.rgb_config_pane.set_combos_to_layer_names)
 
     def _init_recipe_manager(self):
         self.recipe_manager = RecipeManager()
-        self.layer_model.didRequestCompositeRecipeCreation.connect(
-            self.recipe_manager.create_rgb_recipe
-        )
-        self.layer_model.didRequestAlgebraicRecipeCreation.connect(
-            self.recipe_manager.create_algebraic_recipe
-        )
-        self.recipe_manager.didCreateRGBCompositeRecipe.connect(
-            self.layer_model.create_rgb_composite_layer
-        )
-        self.recipe_manager.didCreateAlgebraicRecipe.connect(
-            self.layer_model.create_algebraic_composite_layer
-        )
-        self.rgb_config_pane.didChangeRGBInputLayers.connect(
-            self.recipe_manager.update_rgb_recipe_input_layers
-        )
-        self.recipe_manager.didUpdateRGBInputLayers.connect(
-            self.layer_model.update_recipe_layer_timeline
-        )
-        self.rgb_config_pane.didChangeRGBColorLimits.connect(
-            self.recipe_manager.update_rgb_recipe_color_limits
-        )
-        self.recipe_manager.didUpdateRGBColorLimits.connect(
-            self.layer_model.update_rgb_layer_color_limits
-        )
-        self.rgb_config_pane.didChangeRGBGamma.connect(
-            self.recipe_manager.update_rgb_recipe_gammas
-        )
-        self.recipe_manager.didUpdateRGBGamma.connect(
-            self.layer_model.update_rgb_layer_gamma
-        )
-        self.rgb_config_pane.didChangeRecipeName.connect(
-            self.recipe_manager.update_recipe_name
-        )
-        self.algebraic_config_pane.didChangeRecipeName.connect(
-            self.recipe_manager.update_recipe_name
-        )
-        self.recipe_manager.didUpdateRecipeName.connect(
-            self.layer_model.update_recipe_layer_name
-        )
+        self.layer_model.didRequestCompositeRecipeCreation.connect(self.recipe_manager.create_rgb_recipe)
+        self.layer_model.didRequestAlgebraicRecipeCreation.connect(self.recipe_manager.create_algebraic_recipe)
+        self.recipe_manager.didCreateRGBCompositeRecipe.connect(self.layer_model.create_rgb_composite_layer)
+        self.recipe_manager.didCreateAlgebraicRecipe.connect(self.layer_model.create_algebraic_composite_layer)
+        self.rgb_config_pane.didChangeRGBInputLayers.connect(self.recipe_manager.update_rgb_recipe_input_layers)
+        self.recipe_manager.didUpdateRGBInputLayers.connect(self.layer_model.update_recipe_layer_timeline)
+        self.rgb_config_pane.didChangeRGBColorLimits.connect(self.recipe_manager.update_rgb_recipe_color_limits)
+        self.recipe_manager.didUpdateRGBColorLimits.connect(self.layer_model.update_rgb_layer_color_limits)
+        self.rgb_config_pane.didChangeRGBGamma.connect(self.recipe_manager.update_rgb_recipe_gammas)
+        self.recipe_manager.didUpdateRGBGamma.connect(self.layer_model.update_rgb_layer_gamma)
+        self.rgb_config_pane.didChangeRecipeName.connect(self.recipe_manager.update_recipe_name)
+        self.algebraic_config_pane.didChangeRecipeName.connect(self.recipe_manager.update_recipe_name)
+        self.recipe_manager.didUpdateRecipeName.connect(self.layer_model.update_recipe_layer_name)
         self.algebraic_config_pane.didChangeAlgebraicInputLayers.connect(
             self.recipe_manager.update_algebraic_recipe_input_layers
         )
@@ -1216,8 +1151,9 @@ class Main(QtWidgets.QMainWindow):
     def _init_layer_panes(self):
         # convey action between document and layer list view
         self.layer_info_pane = SingleLayerInfoPane(self.document, parent=self.ui.layerDetailsContents)
-        self.layer_list_model = LayerStackTreeViewModel([self.ui.layerListView], self.document,
-                                                        parent=self.ui.layersPaneWidget)
+        self.layer_list_model = LayerStackTreeViewModel(
+            [self.ui.layerListView], self.document, parent=self.ui.layersPaneWidget
+        )
         self.layer_list_model.uuidSelectionChanged.connect(self.layer_info_pane.update_display)
 
     def _init_map_widget(self):
@@ -1229,8 +1165,8 @@ class Main(QtWidgets.QMainWindow):
         self.document.didChangeProjection.connect(self.scene_manager.set_projection)
 
     def _init_qml_timeline(self):
-        from uwsift.ui import QML_PATH
         from uwsift.control.qml_utils import QmlBackend
+        from uwsift.ui import QML_PATH
 
         root_context = self.ui.timelineQuickWidget.engine().rootContext()
 
@@ -1238,8 +1174,7 @@ class Main(QtWidgets.QMainWindow):
         time_manager.qml_engine = self.ui.timelineQuickWidget.engine()
         time_manager.qml_root_object = self.ui.timelineQuickWidget.rootObject()
         time_manager.qml_backend = QmlBackend()
-        time_manager.qml_backend.\
-            didJumpInTimeline.connect(self.scene_manager.animation_controller.jump)
+        time_manager.qml_backend.didJumpInTimeline.connect(self.scene_manager.animation_controller.jump)
         time_manager.qml_backend.didChangeTimebase.connect(time_manager.on_timebase_change)
         # TODO(mk): refactor all QML related objects as belonging to TimeManager's QMLBackend
         #           instance -> communication between TimeManager and QMLBackend via Signal/Slot?
@@ -1259,8 +1194,7 @@ class Main(QtWidgets.QMainWindow):
     def _init_arrange_panes(self):
         self.tabifyDockWidget(self.ui.layersPane, self.ui.areaProbePane)
         self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.rgbConfigPane)
-        self.tabifyDockWidget(self.ui.layerDetailsPane,
-                              self.ui.algebraicConfigPane)
+        self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.algebraicConfigPane)
         # self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.timelinePane)
         self.layout().removeWidget(self.ui.timelinePane)
         self.ui.timelinePane.deleteLater()
@@ -1283,42 +1217,45 @@ class Main(QtWidgets.QMainWindow):
     def _init_font_sizes(self):
         # hack some font sizes until we migrate to PyQt5 and handle it better
         # was 14 on osx
-        font = QtGui.QFont('Andale Mono')
+        font = QtGui.QFont("Andale Mono")
         font.setPointSizeF(14)
         self.ui.cursorProbeLayer.setFont(font)
         self.ui.cursorProbeText.setFont(font)
 
     def _init_update_times_display(self):
         self._palette_text_green = QtGui.QPalette()
-        self._palette_text_green.setColor(QtGui.QPalette.Text,
-                                          QtGui.QColor(23, 193, 23))
+        self._palette_text_green.setColor(QtGui.QPalette.Text, QtGui.QColor(23, 193, 23))
         self._palette_text_red = QtGui.QPalette()
-        self._palette_text_red.setColor(QtGui.QPalette.Text,
-                                        QtGui.QColor(220, 0, 0))
+        self._palette_text_red.setColor(QtGui.QPalette.Text, QtGui.QColor(220, 0, 0))
 
-        self._max_tolerable_idle_time = \
-            config.get("watchdog.max_tolerable_idle_time", -1)
+        self._max_tolerable_idle_time = config.get("watchdog.max_tolerable_idle_time", -1)
         if self._max_tolerable_idle_time <= 0:
-            LOG.warning("No valid configuration for"
-                        " 'watchdog.max_tolerable_idle_time'. Can't highlight"
-                        " last import time display when delayed.")
+            LOG.warning(
+                "No valid configuration for"
+                " 'watchdog.max_tolerable_idle_time'. Can't highlight"
+                " last import time display when delayed."
+            )
         else:
-            LOG.info(f"Highlighting last import time display when delayed for"
-                     f" more than {self._max_tolerable_idle_time} seconds.")
+            LOG.info(
+                f"Highlighting last import time display when delayed for"
+                f" more than {self._max_tolerable_idle_time} seconds."
+            )
 
-        self._max_tolerable_dataset_age = \
-            config.get("watchdog.max_tolerable_dataset_age", -1)
+        self._max_tolerable_dataset_age = config.get("watchdog.max_tolerable_dataset_age", -1)
         if self._max_tolerable_dataset_age <= 0:
-            LOG.warning("No valid configuration for"
-                        " 'watchdog.max_tolerable_dataset_age'. Can't highlight"
-                        " last data time display when delayed.")
+            LOG.warning(
+                "No valid configuration for"
+                " 'watchdog.max_tolerable_dataset_age'. Can't highlight"
+                " last data time display when delayed."
+            )
         else:
-            LOG.info(f"Highlighting last data time display when delayed for"
-                     f" more than {self._max_tolerable_dataset_age} seconds.")
+            LOG.info(
+                f"Highlighting last data time display when delayed for"
+                f" more than {self._max_tolerable_dataset_age} seconds."
+            )
 
         # don't clear the time of last import when the layers are removed
-        self.document.didRemoveDatasets.connect(
-            self._clear_last_dataset_creation_time)
+        self.document.didRemoveDatasets.connect(self._clear_last_dataset_creation_time)
 
         self.currentTimeTimer = QtCore.QTimer(parent=self)
         self.currentTimeTimer.timeout.connect(self._update_current_time)
@@ -1326,33 +1263,38 @@ class Main(QtWidgets.QMainWindow):
 
         heartbeat_file = config.get("watchdog.heartbeat_file", None)
         if heartbeat_file is None:
-            LOG.warning("No configuration for 'watchdog.heartbeat_file'."
-                        " Can't send heartbeats to the watchdog.")
+            LOG.warning("No configuration for 'watchdog.heartbeat_file'." " Can't send heartbeats to the watchdog.")
         else:
             self.pid = os.getpid()
-            self._heartbeat_file = \
-                heartbeat_file.replace("$$CACHE_DIR$$", USER_CACHE_DIR)
-            LOG.info(f"Communication with watchdog via heartbeat file "
-                     f" '{self._heartbeat_file}' configured.")
+            self._heartbeat_file = heartbeat_file.replace("$$CACHE_DIR$$", USER_CACHE_DIR)
+            LOG.info(f"Communication with watchdog via heartbeat file " f" '{self._heartbeat_file}' configured.")
 
     def _timer_collect_resources(self):
         if self._resource_collector:
             LOG.debug("launching background resource search")
-            self.queue.add('resource_find', self._resource_collector.bgnd_look_for_new_files(),
-                           "look for new or modified files",
-                           and_then=self._finish_collecting_resources, interactive=False)
+            self.queue.add(
+                "resource_find",
+                self._resource_collector.bgnd_look_for_new_files(),
+                "look for new or modified files",
+                and_then=self._finish_collecting_resources,
+                interactive=False,
+            )
 
     def _finish_collecting_resources(self, previous_stage_ok: bool = True):
         ntodo = self._resource_collector.has_pending_files
         if ntodo:
             LOG.debug("{} new resources to collect metadata from".format(ntodo))
-            self.queue.add("resource_collect", self._resource_collector.bgnd_merge_new_file_metadata_into_mdb(),
-                           "add metadata for newly found files", interactive=False)
+            self.queue.add(
+                "resource_collect",
+                self._resource_collector.bgnd_merge_new_file_metadata_into_mdb(),
+                "add metadata for newly found files",
+                interactive=False,
+            )
         else:
             LOG.debug("no resources to collect, skipping followup task")
 
     def closeEvent(self, event, *args, **kwargs):
-        LOG.debug('main window closing')
+        LOG.debug("main window closing")
         self.workspace.close()
 
     def _remove_paths_from_cache(self, paths):
@@ -1362,19 +1304,17 @@ class Main(QtWidgets.QMainWindow):
 
     def open_from_cache(self, *args, **kwargs):
         def _activate_products_for_names(uuids):
-            LOG.info('activating cached products with uuids: {}'.format(repr(uuids)))
+            LOG.info("activating cached products with uuids: {}".format(repr(uuids)))
             self.activate_products_by_uuid(uuids)
 
         def _purge_content_for_names(uuids):
-            LOG.info('removing cached products with uuids: {}'.format(repr(uuids)))
+            LOG.info("removing cached products with uuids: {}".format(repr(uuids)))
             self.workspace.purge_content_for_product_uuids(uuids, also_products=False)
             if USE_INVENTORY_DB:
                 self.update_recent_file_menu()
 
         if not self._open_cache_dialog:
-            self._open_cache_dialog = OpenCacheDialog(self,
-                                                      _activate_products_for_names,
-                                                      _purge_content_for_names)
+            self._open_cache_dialog = OpenCacheDialog(self, _activate_products_for_names, _purge_content_for_names)
 
         uuid_to_name = self.workspace.product_names_available_in_cache
         ordered_uuids = self.document.sort_product_uuids(uuid_to_name.keys())
@@ -1390,17 +1330,15 @@ class Main(QtWidgets.QMainWindow):
 
     def open_wizard(self, *args, **kwargs):
         from uwsift.view.open_file_wizard_2 import OpenFileWizard
-        wizard_dialog = OpenFileWizard(base_dir=self._last_open_dir,
-                                       base_reader=self._last_reader,
-                                       parent=self)
+
+        wizard_dialog = OpenFileWizard(base_dir=self._last_open_dir, base_reader=self._last_reader, parent=self)
         self._wizard_dialog = wizard_dialog
         if wizard_dialog.exec_():
             LOG.info("Loading products from open wizard...")
             scenes = wizard_dialog.scenes
             reader = wizard_dialog.get_reader()
 
-            merge_with_existing = \
-                config.get("data_reading.merge_with_existing", True)
+            merge_with_existing = config.get("data_reading.merge_with_existing", True)
             if USE_INVENTORY_DB and merge_with_existing:
                 # TODO(AR): provide a choice in the wizard for
                 #  'merge_with_existing' but only, if caching is off. The latter
@@ -1411,27 +1349,29 @@ class Main(QtWidgets.QMainWindow):
                     " when the caching database is active, i.e. not both"
                     " 'storage.use_inventory_db' and"
                     " 'data_reading.merge_with_existing' can be True."
-                    "  Deactivating merging, the caching database wins.")
+                    "  Deactivating merging, the caching database wins."
+                )
                 merge_with_existing = False
 
             if USE_TILED_GEOLOCATED_IMAGES and merge_with_existing:
-                LOG.warning("Merging of new data segments into existing data"
-                            " does not work well with adaptive tiled image"
-                            " rendering. Consider switching it of by configuring"
-                            " 'display.use_tiled_geolocated_images: False'")
+                LOG.warning(
+                    "Merging of new data segments into existing data"
+                    " does not work well with adaptive tiled image"
+                    " rendering. Consider switching it of by configuring"
+                    " 'display.use_tiled_geolocated_images: False'"
+                )
 
             importer_kwargs = {
-                'reader': reader,
-                'scenes': scenes,
-                'dataset_ids': wizard_dialog.collect_selected_ids(),
-                'resampling_info': wizard_dialog.resampling_info,
-                'merge_with_existing': merge_with_existing,
+                "reader": reader,
+                "scenes": scenes,
+                "dataset_ids": wizard_dialog.collect_selected_ids(),
+                "resampling_info": wizard_dialog.resampling_info,
+                "merge_with_existing": merge_with_existing,
             }
             self._last_reader = reader
             self._last_open_dir = wizard_dialog.get_directory()
 
-            self.open_paths(wizard_dialog.files_to_load,
-                            **importer_kwargs)
+            self.open_paths(wizard_dialog.files_to_load, **importer_kwargs)
         else:
             LOG.debug("Wizard closed, nothing to load")
         self._wizard_dialog = None
@@ -1482,14 +1422,14 @@ class Main(QtWidgets.QMainWindow):
         reload_config_action.triggered.connect(self.reload_config)
 
         menubar = self.ui.menubar
-        file_menu = menubar.addMenu('&File')
+        file_menu = menubar.addMenu("&File")
         self.addAction(open_action)  # add it to the main window, not the menu (hide it)
         if USE_INVENTORY_DB:
             file_menu.addAction(open_cache_action)
         file_menu.addAction(open_wizard_action)
         if USE_INVENTORY_DB:
             # file_menu.addAction(open_glob_action)
-            self._recent_files_menu = file_menu.addMenu('Open Recent')
+            self._recent_files_menu = file_menu.addMenu("Open Recent")
 
         screenshot_action = QtWidgets.QAction("Export Image", self)
         screenshot_action.setShortcut("Ctrl+I")
@@ -1513,23 +1453,23 @@ class Main(QtWidgets.QMainWindow):
         # self.ui.animBack.clicked.connect(prev_slot)
 
         toggle_vis = QtWidgets.QAction("Toggle &Visibility", self)
-        toggle_vis.setShortcut('V')
+        toggle_vis.setShortcut("V")
         toggle_vis.triggered.connect(self.toggle_visibility_on_selected_layers)
 
         animate = QtWidgets.QAction("Animate", self)
-        animate.setShortcut('A')
+        animate.setShortcut("A")
         animate.triggered.connect(partial(self.animation.toggle_animation, action=animate))
 
         change_order = QtWidgets.QAction("Set Animation &Order", self)
-        change_order.setShortcut('O')
+        change_order.setShortcut("O")
         change_order.triggered.connect(self.animation.change_animation_to_current_selection_siblings)
 
         cycle_borders = QtWidgets.QAction("Cycle &Borders", self)
-        cycle_borders.setShortcut('B')
+        cycle_borders.setShortcut("B")
         cycle_borders.triggered.connect(self.scene_manager.cycle_borders_color)
 
         cycle_grid = QtWidgets.QAction("Cycle &Lat/Lon Grid", self)
-        cycle_grid.setShortcut('L')
+        cycle_grid.setShortcut("L")
         cycle_grid.triggered.connect(self.scene_manager.cycle_latlon_grid_color)
 
         clear = QtWidgets.QAction("Clear Region Selection", self)
@@ -1537,35 +1477,30 @@ class Main(QtWidgets.QMainWindow):
         clear.triggered.connect(self.remove_region_polygon)
 
         composite = QtWidgets.QAction("Create Composite", self)
-        composite.setShortcut('C')
-        composite.triggered.connect(
-            self.layer_model.start_rgb_composite_creation
-        )
-
+        composite.setShortcut("C")
+        composite.triggered.connect(self.layer_model.start_rgb_composite_creation)
 
         algebraic = QtWidgets.QAction("Create Algebraic", self)
-        algebraic.triggered.connect(
-            self.layer_model.start_algebraic_composite_creation
-        )
+        algebraic.triggered.connect(self.layer_model.start_algebraic_composite_creation)
 
         toggle_point = QtWidgets.QAction("Toggle Point Probe", self)
-        toggle_point.setShortcut('X')
+        toggle_point.setShortcut("X")
         toggle_point.triggered.connect(lambda: self.graphManager.toggle_point_probe(DEFAULT_POINT_PROBE))
 
         open_gradient = QtWidgets.QAction("Toggle Colormap Editor", self)
         open_gradient.setShortcut("Ctrl+E")
         open_gradient.triggered.connect(self.open_colormap_editor)
 
-        edit_menu = menubar.addMenu('&Edit')
+        edit_menu = menubar.addMenu("&Edit")
         edit_menu.addAction(clear)
         edit_menu.addAction(toggle_point)
         edit_menu.addAction(open_gradient)
 
-        layer_menu = menubar.addMenu('&Layer')
+        layer_menu = menubar.addMenu("&Layer")
         layer_menu.addAction(composite)
         layer_menu.addAction(algebraic)
 
-        view_menu = menubar.addMenu('&View')
+        view_menu = menubar.addMenu("&View")
         view_menu.addAction(animate)
         view_menu.addAction(prev_time)
         view_menu.addAction(next_time)
@@ -1602,7 +1537,7 @@ def set_default_geometry(window, desktop=0):
     screen = QtWidgets.QApplication.desktop()
     screen_geometry = screen.screenGeometry(desktop)
     # TODO: Remove platform specific code
-    if 'darwin' not in sys.platform:
+    if "darwin" not in sys.platform:
         w, h = screen_geometry.width() - 400, screen_geometry.height() - 300
         window.setGeometry(200, 150, w, h)
     else:
@@ -1610,52 +1545,64 @@ def set_default_geometry(window, desktop=0):
         w, h = size.width(), size.height()
         center = screen_geometry.center()
         screen_x, screen_y = center.x(), center.y()
-        window.move(int(screen_x - w / 2.), int(screen_y - h / 2.))
+        window.move(int(screen_x - w / 2.0), int(screen_y - h / 2.0))
 
 
 def _search_paths(arglist):
     for arg in arglist:
-        for subpath in arg.split(':'):
+        for subpath in arg.split(":"):
             yield subpath
 
 
 def create_app() -> (app.Application, QtWidgets.QApplication):
     QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
-    vispy_app = app.use_app('pyqt5')
+    vispy_app = app.use_app("pyqt5")
     qt_app = vispy_app.create()
-    if hasattr(QtWidgets.QStyleFactory, 'AA_UseHighDpiPixmaps'):
+    if hasattr(QtWidgets.QStyleFactory, "AA_UseHighDpiPixmaps"):
         qt_app.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
     return vispy_app, qt_app
 
 
 def main() -> int:
     import argparse
+
     parser = argparse.ArgumentParser(description="Run SIFT")
-    parser.add_argument("-w", "--workspace-dir", default=WORKSPACE_DB_DIR,
-                        help="Specify workspace base directory")
-    parser.add_argument("--cache-dir",
-                        help="(DEPRECATED: use --workspace-dir) Specify workspace directory")
-    parser.add_argument('--clear-workspace', action='store_true',
-                        help="Remove workspace contents during start up")
-    parser.add_argument("--config-dir", default=DOCUMENT_SETTINGS_DIR,
-                        help="Specify config directory")
-    parser.add_argument("-s", "--space", default=256, type=int,
-                        help="Specify max amount of data to hold in workspace cache in Gigabytes")
-    parser.add_argument("--border-shapefile", default=None,
-                        help="Specify alternative coastline/border shapefile")
-    parser.add_argument("--glob-pattern", default=os.environ.get("TIFF_GLOB", None),
-                        help="Specify glob pattern for input images")
-    parser.add_argument('-p', '--path', dest='paths', action="append",
-                        help='directory to search for data [MULTIPLE ALLOWED]')
-    parser.add_argument("-c", "--center", nargs=2, type=float,
-                        help="Specify center longitude and latitude for camera")
-    parser.add_argument("--desktop", type=int, default=0,
-                        help="Number of monitor/display to show the main window on (0 for main, 1 for secondary, etc.)")
-    parser.add_argument("--profile-heap", type=float, help="take a snapshot of the heap in the given interval (in seconds)")
-    parser.add_argument('-v', '--verbose', dest='verbosity', action="count",
-                        default=int(os.environ.get("VERBOSITY", 2)),
-                        help='each occurrence increases verbosity 1 level through '
-                             'ERROR-WARNING-Info-DEBUG (default Info)')
+    parser.add_argument("-w", "--workspace-dir", default=WORKSPACE_DB_DIR, help="Specify workspace base directory")
+    parser.add_argument("--cache-dir", help="(DEPRECATED: use --workspace-dir) Specify workspace directory")
+    parser.add_argument("--clear-workspace", action="store_true", help="Remove workspace contents during start up")
+    parser.add_argument("--config-dir", default=DOCUMENT_SETTINGS_DIR, help="Specify config directory")
+    parser.add_argument(
+        "-s",
+        "--space",
+        default=256,
+        type=int,
+        help="Specify max amount of data to hold in workspace cache in Gigabytes",
+    )
+    parser.add_argument("--border-shapefile", default=None, help="Specify alternative coastline/border shapefile")
+    parser.add_argument(
+        "--glob-pattern", default=os.environ.get("TIFF_GLOB", None), help="Specify glob pattern for input images"
+    )
+    parser.add_argument(
+        "-p", "--path", dest="paths", action="append", help="directory to search for data [MULTIPLE ALLOWED]"
+    )
+    parser.add_argument("-c", "--center", nargs=2, type=float, help="Specify center longitude and latitude for camera")
+    parser.add_argument(
+        "--desktop",
+        type=int,
+        default=0,
+        help="Number of monitor/display to show the main window on (0 for main, 1 for secondary, etc.)",
+    )
+    parser.add_argument(
+        "--profile-heap", type=float, help="take a snapshot of the heap in the given interval (in seconds)"
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbosity",
+        action="count",
+        default=int(os.environ.get("VERBOSITY", 2)),
+        help="each occurrence increases verbosity 1 level through " "ERROR-WARNING-Info-DEBUG (default Info)",
+    )
     args = parser.parse_args()
 
     if args.profile_heap:
@@ -1680,7 +1627,7 @@ def main() -> int:
     vispy_app, qt_app = create_app()
 
     # Add our own fonts to Qt windowing system
-    font_pattern = os.path.join(get_package_data_dir(), 'fonts', '*')
+    font_pattern = os.path.join(get_package_data_dir(), "fonts", "*")
     for fn in glob(font_pattern):
         QtGui.QFontDatabase.addApplicationFont(fn)
 
@@ -1708,6 +1655,7 @@ def main() -> int:
         # FIXME: let the AutoUpdateManager be in control...
         from uwsift import config
         from uwsift.control.auto_update import AutoUpdateManager
+
         minimum_interval = config.get("auto_update.interval", None)
         if minimum_interval is None:
             raise ValueError("Auto update interval needs to be set!")
@@ -1725,5 +1673,5 @@ def main() -> int:
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

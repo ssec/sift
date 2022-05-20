@@ -10,9 +10,9 @@ import logging
 import pickle as pkl
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Tuple, Optional, NamedTuple, Any
+from typing import Any, NamedTuple, Optional, Tuple
 
-from PyQt5.QtCore import QObject, QRectF, QByteArray, QPointF
+from PyQt5.QtCore import QByteArray, QObject, QPointF, QRectF
 from PyQt5.QtWidgets import QGraphicsSceneDragDropEvent
 
 LOG = logging.getLogger(__name__)
@@ -38,8 +38,8 @@ class GraphicsConfig(object):
 GFXC = GraphicsConfig()
 
 # drag and drop mimetypes
-MIMETYPE_TIMELINE_COLORMAP = 'application/uwsift.timeline.colormap'
-MIMETYPE_TIMELINE_TRACK = 'application/uwsift.timeline.track'
+MIMETYPE_TIMELINE_COLORMAP = "application/uwsift.timeline.colormap"
+MIMETYPE_TIMELINE_TRACK = "application/uwsift.timeline.track"
 
 
 class mimed_track(NamedTuple):
@@ -63,6 +63,7 @@ class VisualState(Enum):
     Typically combines information from Workspace and Scenegraph, does not correspond to selection.
     by default, display greyed-out potential frame
     """
+
     ERROR = 1  # error red
     WARNING = 2  # warning yellow
 
@@ -90,6 +91,7 @@ class CoordTransform(QObject):
     When we have expandable RGB timelines this will change
 
     """
+
     _time_base: datetime = None
     _time_unit: timedelta = None
     _track_height: float = None
@@ -128,8 +130,9 @@ class CoordTransform(QObject):
         self._time_unit = time_unit
         self._track_height = track_height or GFXC.track_height
 
-    def calc_time_duration(self, scene_x: Optional[float], scene_w: Optional[float]
-                           ) -> Tuple[Optional[datetime], Optional[timedelta]]:
+    def calc_time_duration(
+        self, scene_x: Optional[float], scene_w: Optional[float]
+    ) -> Tuple[Optional[datetime], Optional[timedelta]]:
         """Calculate time and duration given scene X coordinate and width (from QRectF typically)
 
         Args:
@@ -140,19 +143,21 @@ class CoordTransform(QObject):
             (start time, time width)
 
         """
-        return self._time_base + (self._time_unit * scene_x) if (
-            scene_x is not None) else None, self._time_unit * scene_w
+        return (
+            self._time_base + (self._time_unit * scene_x) if (scene_x is not None) else None,
+            self._time_unit * scene_w,
+        )
 
     def calc_scene_width(self, d: timedelta):
         return self._time_unit * d
 
     def calc_track_pixel_y_center(self, z: int):
-        """normalize based on max_z such that max_z..-bignum becomes 0..bignum going downward on the screen
-        """
+        """normalize based on max_z such that max_z..-bignum becomes 0..bignum going downward on the screen"""
         return self._track_height * (0.5 + float(self._max_z - z))
 
-    def calc_scene_rect(self, ztd: ztdtup = None, z: int = None, t: datetime = None, d: timedelta = None
-                        ) -> Optional[QRectF]:
+    def calc_scene_rect(
+        self, ztd: ztdtup = None, z: int = None, t: datetime = None, d: timedelta = None
+    ) -> Optional[QRectF]:
         """
         calculate scene coordinates given time and Z
         Args:

@@ -52,6 +52,14 @@ uwsift.ui.open\_cache\_dialog\_ui module
    :undoc-members:
    :show-inheritance:
 
+uwsift.ui.open\_file\_wizard\_2\_ui module
+------------------------------------------
+
+.. automodule:: uwsift.ui.open_file_wizard_2_ui
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 uwsift.ui.open\_file\_wizard\_ui module
 ---------------------------------------
 
@@ -67,7 +75,6 @@ uwsift.ui.pov\_main\_ui module
    :members:
    :undoc-members:
    :show-inheritance:
-
 
 Module contents
 ---------------

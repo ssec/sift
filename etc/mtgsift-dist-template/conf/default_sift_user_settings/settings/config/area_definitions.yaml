@@ -18,4 +18,3 @@ area_definitions:
 
 #---- MTG-SIFT doesn't implement proj=eqc correctly/completely ----
 #  Plate Carree 3km: worldeqc3km
-

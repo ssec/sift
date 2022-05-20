@@ -1,5 +1,5 @@
 # This file may be used to create an environment using:
-# e.g. ENV=devel 
+# e.g. ENV=devel
 # $ conda create --name $ENV --channel conda-forge --strict-channel-priority python=3.7
 # $ conda activate $ENV
 # $ conda config --env --add channels conda-forge
@@ -51,5 +51,3 @@ sphinx -> sphinx=3.4.3
 # sphinx -> sphinxcontrib-jsmath=1.0.1
 # sphinx -> sphinxcontrib-qthelp=1.0.3
 # sphinx -> sphinxcontrib-serializinghtml=1.1.5
-
-

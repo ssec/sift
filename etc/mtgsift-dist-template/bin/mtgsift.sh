@@ -43,7 +43,7 @@ else
          CDIR=`dirname "$res_readlink"`
       else
          #do not use readlink default to a version that doesn't support symbolic link
-         CDIR=`dirname "$0"` 
+         CDIR=`dirname "$0"`
       fi
    fi
 fi
@@ -75,7 +75,7 @@ cd "$MTGSIFT_HOME"/lib
 echo "Launching MTGSift"
 
 #./mtgsift >"$MTGSIFT_LOGS/mtgsift.log" 2>&1
-./mtgsift 
+./mtgsift
 res="$?"
 
 exit $res

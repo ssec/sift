@@ -8,11 +8,12 @@ from uuid import UUID
 import numpy as np
 import satpy.readers
 
-from uwsift import config, CLEANUP_FILE_CACHE
-from uwsift.common import Info, Kind, Flags, State
-from .importer import aImporter, SatpyImporter
-from .metadatabase import Metadatabase, Product, Content, ContentImage
-from .workspace import BaseWorkspace, frozendict, ActiveContent
+from uwsift import CLEANUP_FILE_CACHE, config
+from uwsift.common import Flags, Info, Kind, State
+
+from .importer import SatpyImporter, aImporter
+from .metadatabase import Content, ContentImage, Metadatabase, Product
+from .workspace import ActiveContent, BaseWorkspace, frozendict
 
 LOG = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class SimpleWorkspace(BaseWorkspace):
     one dictionary for saving the Content objects for a specific UUID.
     """
 
-    def __init__(self, directory_path: str=None):
+    def __init__(self, directory_path: str = None):
         super(SimpleWorkspace, self).__init__(directory_path)
 
         self.products: dict = {}
@@ -82,8 +83,7 @@ class SimpleWorkspace(BaseWorkspace):
         return cache_entry or self._activate_content(c)
 
     # FIXME: Use code from CachingWorkspace._remove_content_files_from_workspace?
-    def _remove_content_data_from_cache_dir_checked(self,
-                                                    c: Optional[Content] = None):
+    def _remove_content_data_from_cache_dir_checked(self, c: Optional[Content] = None):
         if CLEANUP_FILE_CACHE:
             for file in os.listdir(self.cache_dir):
                 if c is not None:
@@ -99,22 +99,23 @@ class SimpleWorkspace(BaseWorkspace):
     def _product_with_uuid(self, session, uuid: UUID) -> Optional[Product]:
         return self.products.get(uuid, None)
 
-    def _product_overview_content(self, session, prod: Product = None, uuid: UUID = None,
-                                  kind: Kind = Kind.IMAGE) -> Optional[Content]:
+    def _product_overview_content(
+        self, session, prod: Product = None, uuid: UUID = None, kind: Kind = Kind.IMAGE
+    ) -> Optional[Content]:
         return self.contents.get(uuid, None)
 
-    def _product_native_content(self, session, prod: Product = None, uuid: UUID = None,
-                                kind: Kind = Kind.IMAGE) -> Optional[Content]:
+    def _product_native_content(
+        self, session, prod: Product = None, uuid: UUID = None, kind: Kind = Kind.IMAGE
+    ) -> Optional[Content]:
         return self.contents.get(uuid, None)
 
     #
     # combining queries with data content
     #
 
-    def _overview_content_for_uuid(self, uuid: UUID, kind: Kind = Kind.IMAGE) \
-            -> np.memmap:
+    def _overview_content_for_uuid(self, uuid: UUID, kind: Kind = Kind.IMAGE) -> np.memmap:
         ovc = self._product_overview_content(None, uuid=uuid, kind=kind)
-        assert (ovc is not None)
+        assert ovc is not None
         arrays = self._cached_arrays_for_content(ovc)
         return arrays.data
 
@@ -150,14 +151,11 @@ class SimpleWorkspace(BaseWorkspace):
 
         prod = self._product_with_uuid(None, uuid)
         if not prod:  # then it hasn't had its metadata scraped
-            LOG.error('no info available for UUID {}'.format(dsi_or_uuid))
-            LOG.error("known products: {}".format(
-                repr(self._all_product_uuids())))
+            LOG.error("no info available for UUID {}".format(dsi_or_uuid))
+            LOG.error("known products: {}".format(repr(self._all_product_uuids())))
             return None
         kind = prod.info[Info.KIND]
-        native_content = self._product_native_content(None, prod=prod,
-                                                      uuid=uuid,
-                                                      kind=kind)
+        native_content = self._product_native_content(None, prod=prod, uuid=uuid, kind=kind)
         if native_content is not None:
             # FUTURE: this is especially saddening; upgrade to finer grained
             # query and/or deprecate .get_info
@@ -168,8 +166,7 @@ class SimpleWorkspace(BaseWorkspace):
             # specifically a lot of client code assumes that resource
             # == product == content and
             # that singular navigation (e.g. cell_size) is norm
-            assert (kind in [Kind.LINES, Kind.POINTS] or
-                    native_content.info[Info.CELL_WIDTH] is not None)  # FIXME DEBUG
+            assert kind in [Kind.LINES, Kind.POINTS] or native_content.info[Info.CELL_WIDTH] is not None  # FIXME DEBUG
             return frozendict(ChainMap(native_content.info, prod.info))
         # mapping semantics for database fields, as well as key-value fields;
         # flatten to one namespace and read-only
@@ -214,8 +211,9 @@ class SimpleWorkspace(BaseWorkspace):
         else:
             return None
 
-    def collect_product_metadata_for_paths(self, paths: list,
-                                           **importer_kwargs) -> Generator[Tuple[int, frozendict], None, None]:
+    def collect_product_metadata_for_paths(
+        self, paths: list, **importer_kwargs
+    ) -> Generator[Tuple[int, frozendict], None, None]:
         """Start loading URI data into the workspace asynchronously.
 
         Args:
@@ -229,7 +227,7 @@ class SimpleWorkspace(BaseWorkspace):
         importers = []
         num_products = 0
         remaining_paths = []
-        if 'reader' in importer_kwargs:
+        if "reader" in importer_kwargs:
             # skip importer guessing and go straight to satpy importer
             paths, remaining_paths = [], paths
 
@@ -244,10 +242,7 @@ class SimpleWorkspace(BaseWorkspace):
             # how many products each expects to return
             for imp in self._importers:
                 if imp.is_relevant(source_path=source_path):
-                    hauler = imp(source_path,
-                                 database_session=None,
-                                 workspace_cwd=self.cache_dir,
-                                 **importer_kwargs)
+                    hauler = imp(source_path, database_session=None, workspace_cwd=self.cache_dir, **importer_kwargs)
                     hauler.merge_resources()
                     importers.append(hauler)
                     num_products += hauler.num_products
@@ -257,35 +252,30 @@ class SimpleWorkspace(BaseWorkspace):
 
         # Pass remaining paths to SatPy importer and see what happens
         if remaining_paths:
-            if 'reader' not in importer_kwargs:
-                raise NotImplementedError("Reader discovery is not "
-                                          "currently implemented in "
-                                          "the satpy importer.")
-            if 'scenes' in importer_kwargs:
+            if "reader" not in importer_kwargs:
+                raise NotImplementedError("Reader discovery is not " "currently implemented in " "the satpy importer.")
+            if "scenes" in importer_kwargs:
                 # another component already created the satpy scenes, use those
-                scenes = importer_kwargs.pop('scenes')
+                scenes = importer_kwargs.pop("scenes")
                 scenes = scenes.items()
             else:
                 scenes = [(remaining_paths, None)]
             for paths, scene in scenes:
                 imp = SatpyImporter
                 these_kwargs = importer_kwargs.copy()
-                these_kwargs['scene'] = scene
-                hauler = imp(paths,
-                             database_session=None,
-                             workspace_cwd=self.cache_dir,
-                             **these_kwargs)
+                these_kwargs["scene"] = scene
+                hauler = imp(paths, database_session=None, workspace_cwd=self.cache_dir, **these_kwargs)
                 hauler.merge_resources()
                 importers.append(hauler)
                 num_products += hauler.num_products
 
         for hauler in importers:
             for prod in hauler.merge_products():
-                assert (prod is not None)
+                assert prod is not None
                 # add to-be-imported filenames to check for possible merge targets but
                 # do not include this filenames in the product info
                 extended_prod_info = dict(prod.info)
-                extended_prod_info['paths'] = hauler.filenames
+                extended_prod_info["paths"] = hauler.filenames
                 zult = frozendict(extended_prod_info)
                 # merge the product into our database session, since it may
                 # belong to import_session
@@ -295,9 +285,14 @@ class SimpleWorkspace(BaseWorkspace):
                 #     zult.get(Info.DISPLAY_NAME, '?? unknown name ??')))
                 yield num_products, zult
 
-    def import_product_content(self, uuid: UUID = None, prod: Product = None,
-                               allow_cache=True, merge_target_uuid: Optional[UUID] = None,
-                               **importer_kwargs) -> np.memmap:
+    def import_product_content(
+        self,
+        uuid: UUID = None,
+        prod: Product = None,
+        allow_cache=True,
+        merge_target_uuid: Optional[UUID] = None,
+        **importer_kwargs,
+    ) -> np.memmap:
         if prod is None and uuid is not None:
             prod = self._product_with_uuid(None, uuid)
 
@@ -312,18 +307,13 @@ class SimpleWorkspace(BaseWorkspace):
         default_prod_kind = prod.info[Info.KIND]
 
         if merge_target_uuid and len(prod.content):
-            LOG.info(
-                'product already has content available, using that '
-                'rather than re-importing')
-            ovc = self._product_overview_content(None, uuid=uuid,
-                                                 kind=default_prod_kind)
-            assert (ovc is not None)
+            LOG.info("product already has content available, using that " "rather than re-importing")
+            ovc = self._product_overview_content(None, uuid=uuid, kind=default_prod_kind)
+            assert ovc is not None
             arrays = self._cached_arrays_for_content(ovc)
             return arrays.data
 
-        truck = aImporter.from_product(prod, workspace_cwd=self.cache_dir,
-                                       database_session=None,
-                                       **importer_kwargs)
+        truck = aImporter.from_product(prod, workspace_cwd=self.cache_dir, database_session=None, **importer_kwargs)
         if not truck:
             # aImporter.from_product() didn't return an Importer instance
             # since all files represent data granules, which are already
@@ -343,19 +333,19 @@ class SimpleWorkspace(BaseWorkspace):
             # including sparsity and coverage arrays
             if update.data is not None:
                 # data = update.data
-                LOG.info("{} {}: {:.01f}%".format(name, update.stage_desc,
-                                                  update.completion * 100.0))
+                LOG.info("{} {}: {:.01f}%".format(name, update.stage_desc, update.completion * 100.0))
             if update.content is not None:
                 self.contents[update.uuid] = update.content
         # self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
-        LOG.debug('received {} updates during import'.format(nupd))
+        LOG.debug("received {} updates during import".format(nupd))
         self.clear_product_state_flag(prod.uuid, State.ARRIVING)
         # S.commit()
         # S.flush()
 
         # make an ActiveContent object from the Content, now that we've imported it
-        ac = self._overview_content_for_uuid(merge_target_uuid if merge_target_uuid else prod.uuid,
-                                             kind=default_prod_kind)
+        ac = self._overview_content_for_uuid(
+            merge_target_uuid if merge_target_uuid else prod.uuid, kind=default_prod_kind
+        )
         if ac is None:
             return None
         return ac.data
@@ -372,9 +362,9 @@ class SimpleWorkspace(BaseWorkspace):
         :return: the existing product to merge new content into or None if no
                  existing product is compatible
         """
-        reader = info['reader']
+        reader = info["reader"]
         group_keys = config.get(f"data_reading.{reader}.group_keys", None)
-        for existing_uuid, existing_prod in self.products.items():
+        for existing_prod in self.products.values():
             # exclude all products which are incomplete (products which are imported right now)
             # and products with different kind or parameter
             # TODO: when loading granules without resampling after granules of
@@ -384,11 +374,13 @@ class SimpleWorkspace(BaseWorkspace):
             #  whether they are compatible for array broadcasting, but that is
             #  only a necessary, but not sufficient condition.
             #  Idea: modify the FAMILY info by adding grid information?
-            if not existing_prod.content \
-                    or reader != existing_prod.info['reader'] \
-                    or info[Info.SHAPE][0] > existing_prod.info[Info.SHAPE][0] \
-                    or info[Info.SHAPE][1] != existing_prod.info[Info.SHAPE][1] \
-                    or info[Info.FAMILY] != existing_prod.info[Info.FAMILY]:
+            if (
+                not existing_prod.content
+                or reader != existing_prod.info["reader"]
+                or info[Info.SHAPE][0] > existing_prod.info[Info.SHAPE][0]
+                or info[Info.SHAPE][1] != existing_prod.info[Info.SHAPE][1]
+                or info[Info.FAMILY] != existing_prod.info[Info.FAMILY]
+            ):
                 continue
 
             # if to-be-imported product seem to be compatible with an existing product check
@@ -397,15 +389,18 @@ class SimpleWorkspace(BaseWorkspace):
             all_files = set(existing_prod.content[0].source_files) if existing_prod.content[0] else set()
             all_files |= set(paths)
             grouped_files = satpy.readers.group_files(all_files, reader=reader, group_keys=group_keys)
-            if len(grouped_files) == 1 \
-                    and len(grouped_files[0]) == 1 \
-                    and reader in grouped_files[0] \
-                    and len(all_files) == len(grouped_files[0][reader]):
+            if (
+                len(grouped_files) == 1
+                and len(grouped_files[0]) == 1
+                and reader in grouped_files[0]
+                and len(all_files) == len(grouped_files[0][reader])
+            ):
                 return existing_prod
         return None
 
-    def _create_product_from_array(self, info: Info, data, namespace=None, codeblock=None) \
-            -> Tuple[UUID, Optional[frozendict], np.memmap]:
+    def _create_product_from_array(
+        self, info: Info, data, namespace=None, codeblock=None
+    ) -> Tuple[UUID, Optional[frozendict], np.memmap]:
         """
         Puts created image array into resp. data structures within workspace and returns
         uuid, updated info, as well as the memmap of the created array.
@@ -426,31 +421,35 @@ class SimpleWorkspace(BaseWorkspace):
             content ndarray
         """
         if Info.UUID not in info:
-            raise ValueError('currently require an Info.UUID be included in product')
+            raise ValueError("currently require an Info.UUID be included in product")
         parms = dict(info)
         now = datetime.utcnow()
-        parms.update(dict(
-            atime=now,
-            mtime=now,
-        ))
+        parms.update(
+            dict(
+                atime=now,
+                mtime=now,
+            )
+        )
         P = Product.from_info(parms, symbols=namespace, codeblock=codeblock)
         uuid = P.uuid
         # FUTURE: add expression and namespace information, which would require additional parameters
-        ws_filename = '{}.image'.format(str(uuid))
+        ws_filename = "{}.image".format(str(uuid))
         ws_path = os.path.join(self.cache_dir, ws_filename)
         # Write memmap to disk, for later reference by workspace
-        with open(ws_path, 'wb+') as fp:
-            mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
+        with open(ws_path, "wb+") as fp:
+            mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode="w+")
             mm[:] = data[:]
         # Update metadata to contain path to cached memmap .image file
-        parms.update(dict(
-            lod=ContentImage.LOD_OVERVIEW,
-            path=ws_filename,
-            dtype=str(data.dtype),
-            proj4=info[Info.PROJ],
-            resolution=min(info[Info.CELL_WIDTH], info[Info.CELL_HEIGHT])
-        ))
-        rcls = dict(zip(('rows', 'cols', 'levels'), data.shape))
+        parms.update(
+            dict(
+                lod=ContentImage.LOD_OVERVIEW,
+                path=ws_filename,
+                dtype=str(data.dtype),
+                proj4=info[Info.PROJ],
+                resolution=min(info[Info.CELL_WIDTH], info[Info.CELL_HEIGHT]),
+            )
+        )
+        rcls = dict(zip(("rows", "cols", "levels"), data.shape))
         parms.update(rcls)
         LOG.debug("about to create Content with this: {}".format(repr(parms)))
 
@@ -466,15 +465,14 @@ class SimpleWorkspace(BaseWorkspace):
 
     def _bgnd_remove(self, uuid: UUID):
         from uwsift.queue import TASK_DOING, TASK_PROGRESS
-        yield {TASK_DOING: 'purging memory', TASK_PROGRESS: 0.5}
-        self._deactivate_content_for_product(self._product_with_uuid(None,
-                                                                     uuid))
+
+        yield {TASK_DOING: "purging memory", TASK_PROGRESS: 0.5}
+        self._deactivate_content_for_product(self._product_with_uuid(None, uuid))
         self.contents.pop(uuid, None)
         self.products.pop(uuid, None)
-        yield {TASK_DOING: 'purging memory', TASK_PROGRESS: 1.0}
+        yield {TASK_DOING: "purging memory", TASK_PROGRESS: 1.0}
 
-    def get_content(self, dsi_or_uuid, lod=None, kind: Kind = Kind.IMAGE) \
-            -> Optional[np.memmap]:
+    def get_content(self, dsi_or_uuid, lod=None, kind: Kind = Kind.IMAGE) -> Optional[np.memmap]:
         """
         By default, get the best-available (closest to native)
         np.ndarray-compatible view of the full dataset
@@ -498,13 +496,10 @@ class SimpleWorkspace(BaseWorkspace):
         # TODO(FUTURE): Update this in case CachingWorkspace is dropped and/or
         #  multiple contents per Product/UUID are implemented, see below.
         content = self.contents.get(uuid)
-        content = content \
-            if content and content.info.get(Info.KIND, Kind.IMAGE) == kind \
-            else None
+        content = content if content and content.info.get(Info.KIND, Kind.IMAGE) == kind else None
 
         if content is None:
-            raise AssertionError(
-                'no content in workspace for {}, must re-import'.format(uuid))
+            raise AssertionError("no content in workspace for {}, must re-import".format(uuid))
 
         # FIXME: find the content for the requested LOD, then return its
         #  ActiveContent - or attach one
