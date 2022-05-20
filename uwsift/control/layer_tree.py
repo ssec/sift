@@ -571,7 +571,8 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             # LOG.debug('after insertion removing rows {0!r:s}'.format(delete_these_rows))
             # for exrow in delete_these_rows:
             #     self.doc.remove_layer_prez(exrow)
-            # self.doc.didReorderDatasets.emit(order)  # FUTURE: not our business to be emitting on behalf of the document
+            # FUTURE: not our business to be emitting on behalf of the document
+            # self.doc.didReorderDatasets.emit(order)
             assert (count == len(insertion_info))
             return True
         return False

@@ -51,8 +51,7 @@ from vispy.gloo.util import _screenshot
 from vispy.scene.visuals import Image, Markers, Polygon, Compound, Line
 from vispy.util.keys import SHIFT
 from vispy.visuals import LineVisual
-from vispy.visuals.transforms import STTransform, MatrixTransform, \
-    ChainTransform
+from vispy.visuals.transforms import STTransform, MatrixTransform
 
 from uwsift import USE_TILED_GEOLOCATED_IMAGES
 from uwsift import config
@@ -631,7 +630,6 @@ class SceneGraphManager(QObject):
         self.main_view.camera.rect = \
             Rect(ll_xy, (ur_xy[0] - ll_xy[0], ur_xy[1] - ll_xy[1]))
 
-
     @staticmethod
     def _create_latlon_grid_points(resolution=5.):
         """Create a series of line segments representing latitude and longitude lines.
@@ -763,7 +761,7 @@ class SceneGraphManager(QObject):
         point_visual.visible = state
 
     def on_new_polygon(self, probe_name, points, **kwargs):
-        points = np.array(points, dtype=np.float32) # convert list to NumPy array
+        points = np.array(points, dtype=np.float32)  # convert list to NumPy array
 
         # kwargs.setdefault("color", (1.0, 0.0, 1.0, 0.5))
         kwargs.setdefault("color", None)
@@ -1660,5 +1658,3 @@ def get_configured_latlon_grid_resolution() -> float:
         return LATLON_GRID_RESOLUTION_MIN
 
     return resolution
-
-

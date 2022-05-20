@@ -109,7 +109,7 @@ class DiskManagement:
 
             # indicate progress to the user by printing a dot for each new file
             for _ in range(new_file_counter):
-                print(f".", end="", flush=True)
+                print(".", end="", flush=True)
 
             sleep(interval)
 

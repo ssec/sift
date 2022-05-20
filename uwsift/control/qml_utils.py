@@ -1,6 +1,5 @@
 import sys
 
-import numpy as np
 from typing import List, Dict, Callable, Optional
 
 import numpy as np
@@ -109,13 +108,10 @@ class QmlLayerManager(QObject):
             topIdx -= 1
         self.layerModelChanged.emit()
 
-
-
     # TODO(mk): this only works for SEVIRI data like this, make this more general!
     @staticmethod
     def format_product_family_key(product_family_key):
-        return product_family_key[0].name + "-" + product_family_key[1].name + "-" + \
-               product_family_key[2]
+        return product_family_key[0].name + "-" + product_family_key[1].name + "-" + product_family_key[2]
 
     # number = pyqtProperty(int, get_number, notify=numberChanged)
     # Define the getter of the 'name' property.  The C++ type of the
@@ -201,7 +197,7 @@ class LayerModel(QAbstractListModel):
         if role == Qt.DisplayRole:
             return self._layer_strings[index.row()]
 
-    def rowCount(self, parent=QModelIndex()):
+    def rowCount(self, parent=None):
         return len(self._layer_strings)
 
 
@@ -227,7 +223,7 @@ class TimebaseModel(QAbstractListModel):
         if role == Qt.DisplayRole:
             return self._timestamps[index.row()]
 
-    def rowCount(self, parent=QModelIndex()):
+    def rowCount(self, parent=None):
         return len(self._timestamps)
 
     @pyqtSlot(int, result=QDateTime)

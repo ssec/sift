@@ -153,7 +153,7 @@ class TaskQueue(QObject):
         if interactive:
             wdex = self._interactive_round_robin
             self._interactive_round_robin += 1
-            self._interactive_round_robin %= 2 # TODO(nk) worker count is hardcoded: worker_count-1
+            self._interactive_round_robin %= 2  # TODO(nk) worker count is hardcoded: worker_count-1
         else:
             wdex = 2
         if callable(and_then):

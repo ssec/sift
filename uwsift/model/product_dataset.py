@@ -35,8 +35,7 @@ class ProductDataset:
     ) -> Optional['ProductDataset']:
 
         if not any(input_datasets_uuids):
-            LOG.debug(f"Could not create a multichannel ProductDataset,"
-                      f" when no input ProductDatasets exist.")
+            LOG.debug("Could not create a multichannel ProductDataset, when no input ProductDatasets exist.")
             return None
 
         dataset_info = {
@@ -66,8 +65,7 @@ class ProductDataset:
                            Info.CELL_HEIGHT, Info.PROJ]
         infos_to_compare = [info for info in input_datasets_infos if info]
         if len(infos_to_compare) == 0:
-            LOG.debug(f"Could not create a multichannel ProductDataset,"
-                      f" without any given datasets infos")
+            LOG.debug("Could not create a multichannel ProductDataset, without any given datasets infos")
             return None
         for key in keys_to_compare:
             for idx in range(len(infos_to_compare) - 1):
@@ -96,13 +94,11 @@ class ProductDataset:
 
     def update_multichannel_dataset_info(self, input_datasets_infos):
         if not self.input_datasets_uuids:
-            LOG.debug(f"Can't update multichannel dataset info if the dataset"
-                      f" is not a multichannel dataset.")
+            LOG.debug("Can't update multichannel dataset info if the dataset is not a multichannel dataset.")
             return None
 
         if not any(input_datasets_infos):
-            LOG.debug(f"Can't update multichannel dataset info if no"
-                      f" valid input datasets infos available.")
+            LOG.debug("Can't update multichannel dataset info if no valid input datasets infos available.")
             return None
 
         dataset_info = {
@@ -123,8 +119,7 @@ class ProductDataset:
             input_datasets_uuids: List[Optional[UUID]]
     ):
         if not any(input_datasets_uuids):
-            LOG.debug(f"Could not create a algebraic ProductDataset,"
-                      f" when no input ProductDatasets exist.")
+            LOG.debug("Could not create a algebraic ProductDataset, when no input ProductDatasets exist.")
             return None
 
         dataset = cls(layer_uuid=layer_uuid, info=info,

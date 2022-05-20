@@ -70,14 +70,9 @@ class Watchdog:
         else:
             self.notification_cmd = shlex.quote(notification_cmd)
 
-        self.heartbeat_check_interval = float(get_config_value(config,
-            "watchdog.heartbeat_check_interval"))
-
-        self.max_tolerable_dataset_age = float(get_config_value(config,
-            "watchdog.max_tolerable_dataset_age"))
-
-        self.max_tolerable_idle_time = float(get_config_value(config,
-            "watchdog.max_tolerable_idle_time"))
+        self.heartbeat_check_interval = float(get_config_value(config, "watchdog.heartbeat_check_interval"))
+        self.max_tolerable_dataset_age = float(get_config_value(config, "watchdog.max_tolerable_dataset_age"))
+        self.max_tolerable_idle_time = float(get_config_value(config, "watchdog.max_tolerable_idle_time"))
 
         restart_interval = int(config.get("watchdog.auto_restart_interval", 0))
         if restart_interval == 0:
