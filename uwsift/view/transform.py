@@ -45,15 +45,16 @@ class VariableDeclaration(TextExpression):
 
 
 class GLSL_Adapter(TextExpression):
-    """TextExpression subclass for parsing Macro definitions from .glsl header files and exposing
-        them to the vispy glsl interface and make them accessible for vispy's shader code
-        processing. Assumes .glsl code to be parsed is accessible as python string. For reading
-        .glsl header code from a file see GLSL_FileAdapter subclass.
+    """TextExpression subclass for parsing Macro definitions from .glsl header files and exposing them to vispy.
 
-            Parameters
-            ----------
-            text : str
-                Actual .glsl code string.
+    This class makes macro definitions accessible to vispy's shader code
+    processing. Assumes .glsl code to be parsed is accessible as python string. For reading
+    .glsl header code from a file see GLSL_FileAdapter subclass.
+
+    Parameters
+    ----------
+    text : str
+        Actual .glsl code string.
     """
     _expr_list = []
 
@@ -95,11 +96,11 @@ class GLSL_Adapter(TextExpression):
 class GLSL_FileAdapter(GLSL_Adapter):
     """GLSL_Adapter subclass adding the functionality to read .glsl header code from files.
 
-                Parameters
-                ----------
-                file_path : str
-                    Path to .glsl header file.
-        """
+    Parameters
+    ----------
+    file_path : str
+        Path to .glsl header file.
+    """
     def __init__(self, file_path: str) -> None:
         text = glsl.get(file_path)
         super(GLSL_FileAdapter, self).__init__(text)
