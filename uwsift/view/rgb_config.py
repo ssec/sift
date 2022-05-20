@@ -5,7 +5,7 @@ import uuid
 
 import logging
 from functools import partial
-from typing import List, Tuple, Optional, Mapping
+from typing import List, Tuple, Optional
 
 from PyQt5.QtCore import QObject, pyqtSignal
 from PyQt5.QtGui import QDoubleValidator

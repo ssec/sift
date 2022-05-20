@@ -25,7 +25,7 @@ from matplotlib.colors import LogNorm
 from matplotlib.figure import Figure
 
 # a useful constant
-from uwsift.common import Info, Kind
+from uwsift.common import Info
 from uwsift.model.layer_model import LayerModel
 from uwsift.queue import TASK_PROGRESS, TASK_DOING
 
@@ -637,7 +637,10 @@ class ProbeGraphDisplay(object):
             y_active_product_dataset.uuid
 
         # if we are plotting only x and we have a selected x and a polygon
-        if not plot_versus and x_layer_uuid is not None and (polygon is not None or plot_full_data):
+        have_x_layer = x_layer_uuid is not None
+        have_y_layer = y_layer_uuid is not None
+        should_plot = polygon is not None or plot_full_data
+        if not plot_versus and have_x_layer and should_plot:
             yield {TASK_DOING: f'Probe Plot: Collecting {data_source_description}...', TASK_PROGRESS: 0.0}
 
             # get the data and info we need for this plot
@@ -672,7 +675,7 @@ class ProbeGraphDisplay(object):
                                x_axis_label, y_axis_label)
 
         # if we are plotting x vs y and have x, y, and a polygon
-        elif plot_versus and x_layer_uuid is not None and y_layer_uuid is not None and (polygon is not None or plot_full_data):
+        elif plot_versus and have_x_layer and have_y_layer and should_plot:
             yield {TASK_DOING: f'Probe Plot: Collecting {data_source_description} (layer 1)...', TASK_PROGRESS: 0.0}
 
             name1 = x_layer.descriptor
@@ -702,7 +705,8 @@ class ProbeGraphDisplay(object):
 
                 x_conv_func = x_layer.info[Info.UNIT_CONVERSION][1]
                 y_conv_func = y_layer.info[Info.UNIT_CONVERSION][1]
-                yield {TASK_DOING: f'Probe Plot: Collecting {data_source_description} (layer 2)...', TASK_PROGRESS: 0.15}
+                yield {TASK_DOING: f'Probe Plot: Collecting {data_source_description} (layer 2)...',
+                       TASK_PROGRESS: 0.15}
                 if hires_uuid == x_uuid:
                     # the hires data was from the X UUID
                     data1 = x_conv_func(hires_data)

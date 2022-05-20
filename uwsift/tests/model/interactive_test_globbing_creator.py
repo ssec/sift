@@ -11,7 +11,8 @@ from uwsift.model.catalogue import GlobbingCreator
 LOG = logging.getLogger(__name__)
 
 filter_patterns = [
-    "A-{platform_name:4s}-{channel:_<6s}-B_-{undefined}-{service:3s}-{start_time:%Y%m%d%H%M}-CCC-{end_time:%Y%m%d%H%M}-D_"
+    "A-{platform_name:4s}-{channel:_<6s}-B_-{undefined}-"
+    "{service:3s}-{start_time:%Y%m%d%H%M}-CCC-{end_time:%Y%m%d%H%M}-D_"
 ]
 
 constraints = constraints_absolute = {
@@ -22,8 +23,8 @@ constraints = constraints_absolute = {
         'Y': 2019,
         'm': 12,
         'd': 31,
-        'H': 12 #[3, 9, 15, 21] # 12 # Future:
-    }
+        'H': 12,  # [3, 9, 15, 21] # 12 # Future:
+    },
 }
 
 constraints_relative = {
@@ -31,8 +32,8 @@ constraints_relative = {
     'channel': ["______", "IR_108"],
     'start_time': {
         'type': "recent_datetime",
-        'H': [-1]
-    }
+        'H': [-1],
+    },
 }
 
 print("\n------------------------------------------------------------------")
@@ -98,4 +99,3 @@ print("Globbing Patterns, type: recent_datetime:")
 gp_rel = GlobbingCreator.construct_globbing_patterns(
     filter_patterns, constraints_relative)
 pprint(gp_rel)
-
