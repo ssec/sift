@@ -10,8 +10,8 @@ import trollsift
 from dateutil import parser as dt_parser
 from dateutil.relativedelta import relativedelta
 
-#from uwsift import config
-#from uwsift.model.catalogue import Catalogue
+from uwsift import config
+from uwsift.model.catalogue import Catalogue
 
 
 def gen_next_dt(initial_dt: datetime, mode: str):
@@ -33,14 +33,13 @@ def insert_new_file_into_dir(file, target_dir, t_stamp_full_disk, *args, **kwarg
     time_chunk = None
     # TODO(mk): assumes "-" to be delimiter, does this generalize?, do we care?
     file_name_chunks = re.split('(-)', tmp_path.name)
-    fname_dt = None
     for idx, chunk in enumerate(file_name_chunks):
         try:
-            fname_dt = dt_parser.parse(chunk)
+            dt_parser.parse(chunk)
             time_idx = idx
             time_chunk = chunk
             break
-        except:
+        except (TypeError, dt_parser.ParserError):
             pass
     time_len = len(time_chunk)
     new_dt = str(t_stamp_full_disk).replace("-", "").replace(" ", "").replace(":", "")[:time_len]
@@ -75,7 +74,7 @@ def fill_dir_periodically_seviri(data_dir: str, tmp_dir: str, sleep_time: float)
     first_query["search_path"] = data_dir
     first_query["constraints"]["start_time"] = {
         'type': 'datetime',
-        'Y': 2019, 'm': 10, 'd': 21 # TODO(mk): make this dependant on the data in data dir and not hardcoded
+        'Y': 2019, 'm': 10, 'd': 21  # TODO(mk): make this dependant on the data in data dir and not hardcoded
     }
     reader_scenes_ds_ids, readers = \
         Catalogue.query_for_satpy_importer_kwargs_and_readers(
@@ -116,7 +115,12 @@ def fill_dir_periodically_fci(data_dir: str, tmp_dir: str, sleep_time: float) ->
     """
     try:
         #format_string = config["data_reading.fci_l1c_fdhsi.filter_patterns"][0]
-        format_string = '{pflag}_{location_indicator},{data_designator},MTI{spacecraft_id:1d}+{data_source}-{processing_level}-{type}-{subtype}-{coverage}-{subsetting}-{component1}-BODY-{component3}-{purpose}-{format}_{oflag}_{originator}_{processing_time:%Y%m%d%H%M%S}_{facility_or_tool}_{environment}_{start_time:%Y%m%d%H%M%S}_{end_time:%Y%m%d%H%M%S}_{processing_mode}_{special_compression}_{disposition_mode}_{repeat_cycle_in_day:>04d}_{count_in_repeat_cycle:>04d}.nc'
+        format_string = '{pflag}_{location_indicator},{data_designator},MTI{spacecraft_id:1d}+{data_source}-' \
+                        '{processing_level}-{type}-{subtype}-{coverage}-{subsetting}-{component1}-BODY-{component3}-' \
+                        '{purpose}-{format}_{oflag}_{originator}_{processing_time:%Y%m%d%H%M%S}_{facility_or_tool}_' \
+                        '{environment}_{start_time:%Y%m%d%H%M%S}_{end_time:%Y%m%d%H%M%S}_{processing_mode}_' \
+                        '{special_compression}_{disposition_mode}_{repeat_cycle_in_day:>04d}_' \
+                        '{count_in_repeat_cycle:>04d}.nc'
 
     except Exception:
         raise ValueError("Reader not found or wrong reader config.")
@@ -141,8 +145,7 @@ def fill_dir_periodically_fci(data_dir: str, tmp_dir: str, sleep_time: float) ->
             start_time = sat_filename_keyvals["start_time"]
             end_time = sat_filename_keyvals["end_time"]
             start_to_end_span = end_time - start_time
-
-            repeat_cycle_in_day = sat_filename_keyvals["repeat_cycle_in_day"]
+            # repeat_cycle_in_day = sat_filename_keyvals["repeat_cycle_in_day"]
         except KeyError:
             raise KeyError(f"Could not match replacement fields"
                            f" 'start_time', 'end_time' or 'repeat_cycle_in_day'"
@@ -192,4 +195,3 @@ if __name__ == "__main__":
     #else:
     #    raise NotImplementedError(f"Reader {reader} not supported yet")
     #print(f"\nDONE copying test data to: {out_dir}\n")
-

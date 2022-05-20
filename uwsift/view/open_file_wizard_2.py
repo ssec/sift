@@ -431,7 +431,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         pattern_convert_dict = None
         try:
             pattern_convert_dict = fnparser.get_convert_dict(filter_pattern)
-        except ValueError as e:
+        except ValueError:
             LOG.error(f'Invalid filter pattern: {filter_pattern}')
             self.ui.statusMessage.setText('Invalid filter pattern')
             self.ui.statusMessage.setStyleSheet('color: red')
@@ -466,7 +466,7 @@ class OpenFileWizard(QtWidgets.QWizard):
                             table.setItem(table.rowCount()-1, col, QtWidgets.QTableWidgetItem(
                                 str(p.get(column_names[col], ''))
                             ))
-                except Exception as e:
+                except Exception:  # FIXME: Don't catch generic Exception
                     # As the error thrown by trollsift's validate function in case of an
                     # unparsable pattern has no class, a general 'Exception' is caught although
                     # this is not PEP8-compliant.
@@ -508,7 +508,6 @@ class OpenFileWizard(QtWidgets.QWizard):
         # synchronize selection with checkmarks to enable sorting by marked files
         indices = self.ui.fileTable.selectionModel().selectedRows()
         for r in range(self.ui.fileTable.rowCount()):
-            filename = self.ui.fileTable.item(r, 1).text()
             if r in [index.row() for index in indices]:
                 self.ui.fileTable.setItem(r, 0, QtWidgets.QTableWidgetItem(CHECKMARK))
                 self.ui.fileSelectionPage.page_complete = True

@@ -40,10 +40,14 @@ def test_config_satpy_import_path(tmp_path):
 
         # Use stderr, because other print statements will confuse the `literal_eval`.
         # If an import is overwritten, then `overwrite_import` will output to stdout.
-        command = [get_python_path(), "-c", "import sys, uwsift, satpy, satpy.readers\n"
-                                            "print({'base_config_dir': uwsift.BASE_CONFIG_DIR, "
-                                            "'overwritten_satpy_import_path': uwsift.config.get('satpy_import_path', None), "
-                                            "'satpy_init_path': satpy.__file__}, file=sys.stderr)"]
+        command = [
+            get_python_path(),
+            "-c",
+            "import sys, uwsift, satpy, satpy.readers\n"
+            "print({'base_config_dir': uwsift.BASE_CONFIG_DIR, "
+            "'overwritten_satpy_import_path': uwsift.config.get('satpy_import_path', None), "
+            "'satpy_init_path': satpy.__file__}, file=sys.stderr)"
+        ]
         working_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
         process = subprocess.run(command, stderr=subprocess.PIPE, env=modified_env, cwd=working_dir, check=True)
         results = literal_eval(process.stderr.decode("utf-8"))

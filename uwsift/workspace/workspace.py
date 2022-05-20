@@ -353,6 +353,7 @@ class BaseWorkspace(QObject):
         :return: workspace_content_arrays
         """
         pass
+
     @abstractmethod
     def _deactivate_content_for_product(self, p: Product):
         pass
@@ -834,7 +835,7 @@ class BaseWorkspace(QObject):
             # be a list of tuples of points by shaving off everything but the
             # first item of each entry.
             # See vispy.MarkersVisual.set_data() regarding the check criterion.
-            return np.hsplit(content, np.array([2]))[0] # TODO when is this called?
+            return np.hsplit(content, np.array([2]))[0]  # TODO when is this called?
         elif content.ndim == 2 and content.shape[1] == 3:
             return np.hsplit(content, [2])
         return content, None

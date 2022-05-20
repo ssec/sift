@@ -103,6 +103,7 @@ STYLE_KEYWORD_FILL = "fill"
 
 COLOR_TRANSPARENT = "#00000000"
 
+
 def map_point_style_to_marker_kwargs(point_style: dict):
     """
     Map a dictionary containing style settings to the Vispy Markers interface.

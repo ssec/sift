@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with SIFT.  If not, see <http://www.gnu.org/licenses/>.
 """Test various parts of the Open File Wizard dialog."""
-import pytest
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QWizard
 from uwsift.view.open_file_wizard import OpenFileWizard

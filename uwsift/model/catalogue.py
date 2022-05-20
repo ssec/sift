@@ -361,8 +361,6 @@ class GlobbingCreator:
         combinations which result from the interpretation of the given
         *dt_constraints*
         """
-
-
         expanded_dt_constraints: List[dict] = []
         supported_codes = ["Y", "m", "d", "H", "M", "S"]  # Devel hint: Don't change this to a string.
 

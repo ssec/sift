@@ -79,8 +79,7 @@ class GLSL_Adapter(TextExpression):
                         "More than one variable definition per line "
                         "not supported.")
                 elif len(key_list) != 0:
-                    self._expr_list.append(VariableDeclaration(key_list[0],
-                                                                  line))
+                    self._expr_list.append(VariableDeclaration(key_list[0], line))
         if _guard_flag:
             # in case of include guards, shift #endif to bottom of
             # expression list to match #ifndef

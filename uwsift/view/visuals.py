@@ -32,14 +32,13 @@ from vispy.color import Color
 from vispy.gloo import VertexBuffer
 from vispy.gloo.texture import should_cast_to_f32
 from vispy.util.profiler import Profiler
-from vispy.io.datasets import load_spatial_filters
 from vispy.scene.visuals import create_visual_node
 from vispy.visuals import LineVisual, ImageVisual, IsocurveVisual
 # The below imports are needed because we subclassed ImageVisual and ArrowVisual
 from vispy.visuals.line.arrow import _ArrowHeadVisual, ArrowVisual
 from vispy.visuals.line.line import _AggLineVisual, _GLLineVisual, vec3to4, vec2to4
 from vispy.visuals.shaders import Function, FunctionChain
-from vispy.visuals.transforms import NullTransform, as_vec4
+from vispy.visuals.transforms import as_vec4
 
 from uwsift.common import (
     DEFAULT_PROJECTION,
@@ -50,7 +49,7 @@ from uwsift.common import (
     TESS_LEVEL,
     Box, Point, Resolution, ViewBox,
 )
-from uwsift.view.texture_atlas import TextureAtlas2D, MultiChannelTextureAtlas2D,MultiChannelGPUScaledTexture2D
+from uwsift.view.texture_atlas import TextureAtlas2D, MultiChannelTextureAtlas2D, MultiChannelGPUScaledTexture2D
 from uwsift.view.tile_calculator import TileCalculator, calc_pixel_size, get_reference_points
 
 __author__ = 'rayg'
@@ -1171,7 +1170,6 @@ class GradientLineVisual(LineVisual):
                             connect=connect)
         self.antialias = antialias
         self.method = method
-
 
     def method(self, method):
         if method not in ('agg', 'gl'):

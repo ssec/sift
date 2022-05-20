@@ -77,8 +77,9 @@ GUIDEBOOKS = {
     Platform.HIMAWARI_9: ABI_AHI_Guidebook,
 }
 
-import_progress = namedtuple('import_progress',
-                             ['uuid', 'stages', 'current_stage', 'completion', 'stage_desc', 'dataset_info', 'data', 'content'])
+import_progress = namedtuple(
+    'import_progress',
+    ['uuid', 'stages', 'current_stage', 'completion', 'stage_desc', 'dataset_info', 'data', 'content'])
 """
 # stages:int, number of stages this import requires
 # current_stage:int, 0..stages-1 , which stage we're on
@@ -1900,8 +1901,7 @@ class SatpyImporter(aImporter):
             contour_data[:, 0] += origin_x
             contour_data[:, 1] *= cell_height
             contour_data[:, 1] += origin_y
-            data_filename: str = self.create_contour_file_cache_data(contour_data,
-                                                                prod)
+            data_filename: str = self.create_contour_file_cache_data(contour_data, prod)
             c = ContentImage(
                 lod=0,
                 resolution=int(min(abs(cell_width), abs(cell_height))),
@@ -1934,7 +1934,6 @@ class SatpyImporter(aImporter):
                                   dataset_info=None,
                                   data=img_data,
                                   content=c)
-
 
     def get_fci_segment_height(self, segment_number: int, segment_width: int) -> int:
         try:
@@ -1979,7 +1978,7 @@ class SatpyImporter(aImporter):
         segment_starts_stops = []
         image_starts_stops = []
         visited_segments = []
-        for segment_idx, segment_num in enumerate(segments_indices):
+        for segment_num in segments_indices:
             curr_segment_height_idx = segment_num - 1
             curr_segment_height = segment_heights[curr_segment_height_idx]
 
