@@ -26,6 +26,7 @@ will slowly replace the low-level documents on the wiki.
    Initial setup for packaging MTG-Sift with CMake <PACKAGING-mtgsift>
    Configuring MTG-Sift <configuration>
    Auto Update Mode <auto_update_mode>
+   profiling
 
 Indices and tables
 ==================

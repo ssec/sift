@@ -2,14 +2,12 @@
 # -*- coding: utf-8 -*-
 """
 uwsift.model.area_definitions_manager
-----------------------------
+-------------------------------------
 
 Manage area definitions from Satpy/Pyresample.
 
 :author: A.Rettig <alexander.rettig@askvisual.de>
 """
-
-__docformat__ = 'reStructuredText'
 
 import logging
 import typing as typ

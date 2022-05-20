@@ -1,8 +1,24 @@
 uwsift.workspace package
 ========================
 
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   uwsift.workspace.utils
+
 Submodules
 ----------
+
+uwsift.workspace.caching\_workspace module
+------------------------------------------
+
+.. automodule:: uwsift.workspace.caching_workspace
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 uwsift.workspace.collector module
 ---------------------------------
@@ -52,6 +68,14 @@ uwsift.workspace.metadatabase module
    :undoc-members:
    :show-inheritance:
 
+uwsift.workspace.simple\_workspace module
+-----------------------------------------
+
+.. automodule:: uwsift.workspace.simple_workspace
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 uwsift.workspace.workspace module
 ---------------------------------
 
@@ -59,7 +83,6 @@ uwsift.workspace.workspace module
    :members:
    :undoc-members:
    :show-inheritance:
-
 
 Module contents
 ---------------

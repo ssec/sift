@@ -484,10 +484,9 @@ class LayerModel(QAbstractItemModel):
         self._refresh()
 
     def create_rgb_composite_layer(self, recipe: CompositeRecipe):
-        """Creates a layer which has a rgb composite recipe
+        """Creates a layer which has a rgb composite recipe.
 
-        :param recipe: the rgb composite recipe which the created layer gets
-        as recipe
+        :param recipe: the rgb composite recipe which the created layer gets as recipe
         """
         rgb_layer = self._get_empty_rgb_layer(recipe)
 
@@ -706,10 +705,9 @@ class LayerModel(QAbstractItemModel):
                 if layer.recipe and layer.recipe.id == recipe_id][-1]
 
     def get_layers_by_uuids(self, layer_uuids: List[UUID]):
-        """Get layers which have the given identifiers as a attribute.
+        """Get layers which have the given identifiers as an attribute.
 
-        :param layer_uuids: identifiers which are used to search the
-        wanted layers
+        :param layer_uuids: identifiers which are used to search the wanted layers
         :return: the searched layers
         """
         layers = []

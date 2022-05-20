@@ -1,6 +1,8 @@
 Configuring Catalogue and Auto Update Mode
 ------------------------------------------
 
+.. _auto_update_catalogue_config:
+
 Catalogue Query Configuration
 =============================
 
@@ -118,6 +120,8 @@ Update Mode since it defines a fixed time span for the data::
 Note, that to catch the EPI and PRO files of the SEVIRI HRIT format the item
 ``______`` must be given for the replacement field option ``channel``: EPI and
 PRO files have this at the *channel* part of their filenames.
+
+.. _auto_update_mode_activation:
 
 Activation of Auto Update Mode
 ==============================

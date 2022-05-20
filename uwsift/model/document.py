@@ -1165,15 +1165,15 @@ class DataLayerCollection(QObject):
         return len(list(self.data_layers.values()))
 
     def notify_update_collection(self, new_data_layers: typ.List[DataLayer]):
-        """
-        Update state of collection when new data is being loaded or old data is discarded and
-        notify dependants via Qt signal.
+        """Update state of collection when new data is being loaded or old data is discarded.
+
+        Notifies dependents via Qt signal.
+
         Two cases need to be taken into account:
             1) entirely new data layer as shown by previously unknown product family key
+            2) data layer with same pfkey already exists
+               -> add new timesteps without duplication
 
-            2)data layer with same pfkey already exists
-                   -> add new timesteps without duplication
-        :return:
         """
         for data_layer in new_data_layers:
 

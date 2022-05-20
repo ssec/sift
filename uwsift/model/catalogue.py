@@ -579,11 +579,11 @@ class GlobbingCreator:
 
 
 class SceneManager:
+    """The (future) purpose of this class is to keep information about already seen Satpy Scenes.
 
-    """
-    The (future) purpose of this class is to keep information about already seen
-    (Satpy) Scenes (which are in a way collections of files as well as the
-    information which products can be "made" from them).
+    Satpy Scenes are in a way collections of files as well as the information
+    which products can be "made" from them.
+
     TODO: This purpose may overlap with similar task elsewhere implemented in
       SIFT already, check this
 

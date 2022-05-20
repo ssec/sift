@@ -5,11 +5,20 @@ Subpackages
 -----------
 
 .. toctree::
+   :maxdepth: 4
 
    uwsift.view.timeline
 
 Submodules
 ----------
+
+uwsift.view.algebraic\_config module
+------------------------------------
+
+.. automodule:: uwsift.view.algebraic_config
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 uwsift.view.cameras module
 --------------------------
@@ -43,14 +52,6 @@ uwsift.view.colormap\_editor module
    :undoc-members:
    :show-inheritance:
 
-uwsift.view.create\_algebraic module
-------------------------------------
-
-.. automodule:: uwsift.view.create_algebraic
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 uwsift.view.export\_image module
 --------------------------------
 
@@ -67,10 +68,26 @@ uwsift.view.layer\_details module
    :undoc-members:
    :show-inheritance:
 
+uwsift.view.layer\_tree\_view module
+------------------------------------
+
+.. automodule:: uwsift.view.layer_tree_view
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 uwsift.view.open\_file\_wizard module
 -------------------------------------
 
 .. automodule:: uwsift.view.open_file_wizard
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+uwsift.view.open\_file\_wizard\_2 module
+----------------------------------------
+
+.. automodule:: uwsift.view.open_file_wizard_2
    :members:
    :undoc-members:
    :show-inheritance:
@@ -95,6 +112,14 @@ uwsift.view.scene\_graph module
 -------------------------------
 
 .. automodule:: uwsift.view.scene_graph
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+uwsift.view.test\_visuals module
+--------------------------------
+
+.. automodule:: uwsift.view.test_visuals
    :members:
    :undoc-members:
    :show-inheritance:
@@ -130,7 +155,6 @@ uwsift.view.visuals module
    :members:
    :undoc-members:
    :show-inheritance:
-
 
 Module contents
 ---------------

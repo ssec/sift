@@ -1,37 +1,27 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-scene_graph.py
-~~~~~~~~~~~~~~
-
-PURPOSE
-Provides a SceneGraphManager to handle display of visuals, in this case satellite imaging data,
-latitude/longitude lines and coastlines.
+"""Provide a SceneGraphManager to handle display of visuals.
 
 As per http://api.vispy.org/en/latest/scene.html (abridged)
 
-        - Vispy scene graph (SG) prerequisites:
-            1. create SceneCanvas -> this object's scene property is top level node in SG:
-                ```
-                    vispy_canvas = scene.SceneCanvas
-                    sg_root_node = vispy_canvas.scene
-                ```
-            2. create node instances (from vispy.scene.visuals)
-            3. add node instances to scene by making them children of canvas scene, or
-                of nodes already in the scene
+    - Vispy scene graph (SG) prerequisites:
+        1. create SceneCanvas -> this object's scene property is top level node in SG:
+
+           ```
+           vispy_canvas = scene.SceneCanvas
+           sg_root_node = vispy_canvas.scene
+           ```
+        2. create node instances (from vispy.scene.visuals)
+        3. add node instances to scene by making them children of canvas scene, or
+           of nodes already in the scene
 
 REFERENCES
 http://api.vispy.org/en/latest/scene.html
-
-REQUIRES
-
 
 :author: R.K.Garcia <rayg@ssec.wisc.edu>
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-__docformat__ = 'reStructuredText'
-__author__ = 'davidh'
 
 import logging
 import os
@@ -1257,8 +1247,7 @@ class SceneGraphManager(QObject):
             assert len(pos) == len(values)
             # TODO use climits of the presentation instead of autoscaling?
             colormap = self.document.find_colormap(layer.presentation.colormap)
-            kwargs["face_color"] = \
-                self.map_to_colors_autoscaled(colormap, values)
+            kwargs["face_color"] = self.map_to_colors_autoscaled(colormap, values)
 
         points = Markers(pos=pos,
                          parent=self.layer_nodes[layer.uuid],
@@ -1272,9 +1261,7 @@ class SceneGraphManager(QObject):
         LOG.debug(self.main_view.describe_tree(with_transform=True))
 
     def map_to_colors_autoscaled(self, colormap, values, m=2):
-        """
-        Get a list of colors by mapping each entry in values by the given
-        colormap.
+        """Get a list of colors by mapping each entry in values by the given colormap.
 
         The mapping range is adjusted automatically to m times the standard
         deviation from the mean. This ignores outliers in the calculation of
@@ -1285,8 +1272,7 @@ class SceneGraphManager(QObject):
 
         :param colormap: the colormap to apply
         :param values: the values to map to colors
-        :param m: factor to stretch the standard deviation around the mean to
-        define the mapping range
+        :param m: factor to stretch the standard deviation around the mean to define the mapping range
         :return: list of mapped colors in the same order as the input values
         """
         std_dev = np.std(values)

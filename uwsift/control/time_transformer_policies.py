@@ -126,9 +126,10 @@ class WrappingDrivingPolicy(QObject):
         return self._driving_idx
 
     def jump_to_t_sim(self, index: int) -> datetime:
-        """
-            Returns t_sim by looking up the driving layer's timestamp at the provided index
-            location. Raises an exception if being called with an invalid index.
+        """Returns t_sim by looking up the driving layer's timestamp at the provided index location.
+
+        Raises an exception if being called with an invalid index.
+
         :param index: integer location in the timeline to jump to.
         :return: datetime object located at the provided index.
         """

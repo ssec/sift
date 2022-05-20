@@ -87,24 +87,21 @@ class TimeManager(QObject):
         self._time_transformer = TimeTransformer(policy)
 
     def tick(self, event):
-        """
-        Proxy function for `TimeManager.step()`, which cannot directly
+        """Proxy function for `TimeManager.step()`.
+
+        TimeManager cannot directly
         receive a signal from the animation timer signal because the latter
         passes an `event` that `step()` cannot deal with. Thus connect to
         this method to actually trigger `step()`.
 
-        :param event: Event passed by `AnimationController.animation_timer` on
-        expiry, simply dropped.
+        :param event: Event passed by `AnimationController.animation_timer` on expiry, simply dropped.
         """
         self.step()
 
     def step(self, backwards: bool = False):
-        """
-        Method allowing advancement of time, either forwards or backwards, by
-        one time step, as determined by the currently active time base.
+        """Advance in time, either forwards or backwards, by one time step.
 
-        :param backwards: Flag which sets advancement either to `forwards` or
-        `backwards`.
+        :param backwards: Flag which sets advancement either to `forwards` or `backwards`.
         """
         self._time_transformer.step(backwards=backwards)
         self.sync_to_time_transformer()
@@ -178,13 +175,15 @@ class TimeManager(QObject):
         return t_matched_dict
 
     def update_qml_timeline(self, layer: LayerItem):
-        """
-        Slot that updates and refreshes QML timeline state using a DataLayer that is either:
+        """Slot that updates and refreshes QML timeline state using a DataLayer.
+
+        DataLayer is either:
             a) a driving layer or some other form of high priority data layer
             b) a 'synthetic' data layer, only created to reflect the best fitting
                 timeline/layer info for the current policy -> this may be policy-dependant
-            # TODO(mk): the policy should not be responsible for UI, another policy or an object
-                        that ingests a policy and handles UI based on that?
+
+        # TODO(mk): the policy should not be responsible for UI, another policy or an object
+                    that ingests a policy and handles UI based on that?
         """
         if not layer or not layer.dynamic:
             new_timestamp_qdts = self._get_default_qdts()

@@ -9,13 +9,15 @@ LOG = logging.getLogger(__name__)
 
 
 class PieDial:
-    """The available look and behaviour of the QDial widget is not suitable for
+    """Widget for displaying visibility and opacity of a layer.
+
+    The available look and behaviour of the QDial widget is not suitable for
     the purpose of displaying the state of visibility and opacity of a layer.
     Therefore, a separate widget system was developed.
 
     The opacity is indicated by the filled area of a pie:
         - If, for example, the pie is completely filled, then the opacity
-        is 100%.
+          is 100%.
         - If the cake is e.g. only half filled, the opacity is 50%.
 
     Visibility is indicated by crossing out or not crossing out the circle.
