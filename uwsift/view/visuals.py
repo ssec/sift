@@ -36,7 +36,7 @@ from vispy.scene.visuals import create_visual_node
 from vispy.visuals import LineVisual, ImageVisual, IsocurveVisual
 # The below imports are needed because we subclassed ImageVisual and ArrowVisual
 from vispy.visuals.line.arrow import _ArrowHeadVisual, ArrowVisual
-from vispy.visuals.line.line import _AggLineVisual, _GLLineVisual, vec3to4, vec2to4
+from vispy.visuals.line.line import _AggLineVisual, _GLLineVisual
 from vispy.visuals.shaders import Function, FunctionChain
 from vispy.visuals.transforms import as_vec4
 
@@ -1033,13 +1033,18 @@ class _GLGradientLineVisual(_GLLineVisual):
             self._pos_vbo.set_data(pos_re)
             # self._pos_vbo.set_data(pos)
             self._program.vert['position'] = self._pos_vbo
-            if pos.shape[-1] == 2:
-                self._program.vert['to_vec4'] = vec2to4
-            elif pos.shape[-1] == 3:
-                self._program.vert['to_vec4'] = vec3to4
+            if hasattr(self, "_ensure_vec4_func"):
+                self._program.vert['to_vec4'] = self._ensure_vec4_func(pos.shape[-1])
             else:
-                raise TypeError("Got bad position array shape: %r"
-                                % (pos.shape,))
+                # old vispy
+                from vispy.visuals.line.line import vec3to4, vec2to4
+                if pos.shape[-1] == 2:
+                    self._program.vert['to_vec4'] = vec2to4
+                elif pos.shape[-1] == 3:
+                    self._program.vert['to_vec4'] = vec3to4
+                else:
+                    raise TypeError("Got bad position array shape: %r"
+                                    % (pos.shape,))
 
         if self._parent._changed['color']:
             color, cmap = self._parent._interpret_color()
