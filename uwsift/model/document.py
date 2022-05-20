@@ -567,7 +567,11 @@ class DocumentAsTrackStack(DocumentAsContextBase):
     def frame_info_for_product(
         self, prod: Product = None, uuid: UUID = None, when_overlaps: Span = None
     ) -> typ.Optional[FrameInfo]:
-        """Generate info struct needed for timeline representation, optionally returning None if outside timespan of interest"""
+        """Generate info struct needed for timeline representation.
+
+        Optionally returning None if outside timespan of interest.
+
+        """
         if prod is None:
             with self.mdb as S:  # this is a potential performance toilet, but OK to use sparsely
                 prod = S.query(Product).filter_by(uuid_str=str(uuid)).first()

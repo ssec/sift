@@ -260,14 +260,18 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         return set(self._doc.tracks_in_family(track, only_active=True))
 
     def may_reassign_color_map(self, from_track: str, to_track: str) -> Optional[Callable[[bool], None]]:
-        """User is dragging a color map around, determine if drop is permitted and provide a commit/abort function if so"""
+        """Determine if user dragged colormap drop is permitted and provide a commit/abort function is so."""
         LOG.warning("using base class may_reassign_color_map which does nothing")
         return lambda b: None
 
     def menu_for_track(
         self, track: str, frame: Optional[UUID] = None
     ) -> Optional[Tuple[QMenu, Mapping[Any, Callable]]]:
-        """Generate QMenu to use as context menu for a given track, optionally with frame if mouse was over that frame"""
+        """Generate QMenu to use as context menu for a given track.
+
+        Optionally with frame if mouse was over that frame.
+
+        """
         LOG.debug("generating menu with track {} and frame {}".format(track, frame))
         menu = QMenu()
         actions = {}

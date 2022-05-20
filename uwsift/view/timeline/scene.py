@@ -186,7 +186,7 @@ class QFramesInTracksScene(QGraphicsScene):
         super(QFramesInTracksScene, self).sceneRectChanged(new_rect)
 
     def visible_tracks_frames(self, view: QGraphicsView = None) -> Mapping[UUID, List[UUID]]:
-        """return OrderedDict with UUID keys for tracks and list values of frames, for tracks and frames visible on in view"""
+        """Get mapping of UUIDs to list of visible frames for tracks."""
         raise NotImplementedError("NYI")  # FIXME
 
     def visible_time_range(self, view: QGraphicsView = None):
