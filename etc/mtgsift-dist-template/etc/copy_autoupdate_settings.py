@@ -1,11 +1,11 @@
 #! /usr/bin/env python3
 """Script to copy the auto update settings to the user env."""
-import sys
-import os
-import tempfile
-import datetime
 import calendar
+import datetime
+import os
 import shutil
+import sys
+import tempfile
 
 CONF_ROOT_DIR = "{}/.config/SIFT"
 AUTO_UPDATE_FILE = "{}/settings/config/auto_update.yaml".format(CONF_ROOT_DIR)
@@ -131,11 +131,7 @@ def makedirs(a_path):
         # it already exists so return
         return
     elif os.path.isfile(a_path):
-        raise OSError(
-            "a file with the same name as the desired dir, '{}', already exists.".format(
-                a_path
-            )
-        )
+        raise OSError("a file with the same name as the desired dir, '{}', already exists.".format(a_path))
 
     os.makedirs(a_path)
 
@@ -154,37 +150,25 @@ def copy_and_backup():
     auto_update_file = AUTO_UPDATE_FILE.format(home_dir)
     catalogue_file = CATALOGUE_FILE.format(home_dir)
 
-    print(
-        "Make a backup copy of the auto_update settings, namely auto_update.yaml and catalogue.yaml ."
-    )
+    print("Make a backup copy of the auto_update settings, namely auto_update.yaml and catalogue.yaml .")
 
     print("Looking for auto update files in {}".format(home_dir))
 
-    if (
-        auto_update_file
-        and os.path.exists(auto_update_file)
-        and os.path.isfile(auto_update_file)
-    ):
+    if auto_update_file and os.path.exists(auto_update_file) and os.path.isfile(auto_update_file):
         # copy the content of the setting dir in WORK_DIR
         print("Backup {} into {}".format(auto_update_file, work_dir))
 
         makedirs(work_dir)
         shutil.copy(auto_update_file, work_dir)
 
-    if (
-        catalogue_file
-        and os.path.exists(catalogue_file)
-        and os.path.isfile(catalogue_file)
-    ):
+    if catalogue_file and os.path.exists(catalogue_file) and os.path.isfile(catalogue_file):
         # copy the content of the setting dir in WORK_DIR
         print("Backup {} into {}".format(catalogue_file, work_dir))
 
         makedirs(work_dir)
         shutil.copy(catalogue_file, work_dir)
 
-    print(
-        "Copying auto_update mode files to the user env in {}".format(setting_root_dir)
-    )
+    print("Copying auto_update mode files to the user env in {}".format(setting_root_dir))
     # print("defaut_catalogue = {}, catalogue_file = {}".format(default_catalogue, catalogue_file))
     shutil.copy(default_catalogue, catalogue_file)
     shutil.copy(default_auto_update, auto_update_file)
@@ -204,9 +188,7 @@ def restore(a_ask_for_inputs=False):
     auto_update_file = AUTO_UPDATE_FILE.format(home_dir)
     catalogue_file = CATALOGUE_FILE.format(home_dir)
 
-    print(
-        "Check to Restore the auto_update settings (namely auto_update.yaml and catalogue.yaml) of the user."
-    )
+    print("Check to Restore the auto_update settings (namely auto_update.yaml and catalogue.yaml) of the user.")
 
     print("Looking for auto update files in {}.".format(setting_root_dir))
 
@@ -214,11 +196,7 @@ def restore(a_ask_for_inputs=False):
 
     restore = True
 
-    if (
-        work_auto_update
-        and os.path.exists(work_auto_update)
-        and os.path.isfile(work_auto_update)
-    ):
+    if work_auto_update and os.path.exists(work_auto_update) and os.path.isfile(work_auto_update):
 
         # check for the interactive mode in the first file check
         # (by default restore if there is no interactive input mode)
@@ -228,18 +206,12 @@ def restore(a_ask_for_inputs=False):
                 "there is an auto_update.yaml and catalogue.yaml backup copy in {}.\n"
                 "Do you want to restore them ?\n".format(work_dir)
             )
-            input_var = input(
-                "Enter yes to restore the files or no to ignore it (default [no]):"
-            )
+            input_var = input("Enter yes to restore the files or no to ignore it (default [no]):")
             if input_var and input_var.strip().lower() == "yes":
                 restore = True
             else:
                 restore = False
-                print(
-                    "\nDo not restore the auto_update.yaml and catalogue.yaml file from {}".format(
-                        work_dir
-                    )
-                )
+                print("\nDo not restore the auto_update.yaml and catalogue.yaml file from {}".format(work_dir))
 
         if restore:
             # copy the content of the setting dir in WORK_DIR
@@ -252,18 +224,9 @@ def restore(a_ask_for_inputs=False):
             except OSError as e:  # if failed, report it back to the user
                 print("Ignore Error: %s - %s." % (e.filename, e.strerror))
     else:
-        print(
-            "Nothing to do. There are no auto_update.yaml and catalogue.yaml backup copies in {}\n".format(
-                work_dir
-            )
-        )
+        print("Nothing to do. There are no auto_update.yaml and catalogue.yaml backup copies in {}\n".format(work_dir))
 
-    if (
-        restore
-        and work_catalogue
-        and os.path.exists(work_catalogue)
-        and os.path.isfile(work_catalogue)
-    ):
+    if restore and work_catalogue and os.path.exists(work_catalogue) and os.path.isfile(work_catalogue):
         # copy the content of the setting dir in WORK_DIR
         print("Restore {} into {}".format(work_catalogue, catalogue_file))
 

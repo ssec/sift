@@ -70,7 +70,7 @@ Alternatively the argument ``--pid`` can be used to trace a specific PID:
 .. code-block:: bash
 
     $ python uwsift/util/disk_management.py --pid <pid>
-    
+
 Example Output
 ..............
 

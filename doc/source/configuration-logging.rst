@@ -11,7 +11,7 @@ All logging configuration is done below the item ``logging``.
 
 Logging to file is activated, when an *absolute* [#abspath]_ file path is given
 for the keyword ``filename``::
-  
+
     logging:
       filename: [absolute file path]
 

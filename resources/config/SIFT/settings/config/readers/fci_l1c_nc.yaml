@@ -6,4 +6,4 @@ data_reading:
     grid:
       origin: "SW"
       first_index_x: 1
-      first_index_y: 1  
+      first_index_y: 1

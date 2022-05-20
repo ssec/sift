@@ -34,7 +34,7 @@ class Ui_openFromCacheDialog(object):
         self.verticalLayout.addWidget(self.cacheListWidget)
         self.buttonBox = QtWidgets.QDialogButtonBox(openFromCacheDialog)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName("buttonBox")
         self.verticalLayout.addWidget(self.buttonBox)
 

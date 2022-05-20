@@ -49,4 +49,3 @@ echo "$current_date_time: Start ftp transfer"
 # Add the included/transferred files to the exclusion list
 cat "$inc_file" "$exc_file" > "$exc_file".tmp
 sort "$exc_file".tmp | uniq > "$exc_file"
-

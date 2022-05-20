@@ -17,8 +17,8 @@ REQUIRES
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-__author__ = 'rayg'
-__docformat__ = 'reStructuredText'
+__author__ = "rayg"
+__docformat__ = "reStructuredText"
 
 import logging
 
@@ -34,6 +34,7 @@ class UserAddsFileToDoc(QObject):
     """
     Manage an open dialog and queue up adding files to the document
     """
+
     _main = None
     _open_dialog = None
     _task_queue = None

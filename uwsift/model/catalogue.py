@@ -17,36 +17,27 @@ LOG = logging.getLogger(__name__)
 
 
 class Catalogue:
-
     @staticmethod
     def extract_query_parameters(query: dict):
         """
         Extract the values of parameters relevant for a catalogue query
         from the given dictionary *query* and return them as tuple.
         """
-        reader = query.get('reader')
-        _reader_info = config.get('data_reading.' + reader, None)
-        filter_patterns = _reader_info.get('filter_patterns')
-        group_keys = _reader_info.get('group_keys')
+        reader = query.get("reader")
+        _reader_info = config.get("data_reading." + reader, None)
+        filter_patterns = _reader_info.get("filter_patterns")
+        group_keys = _reader_info.get("group_keys")
 
-        search_path = query.get('search_path')
-        constraints = query.get('constraints')
-        products = query.get('products')
+        search_path = query.get("search_path")
+        constraints = query.get("constraints")
+        products = query.get("products")
 
-        return (reader,
-                search_path,
-                filter_patterns,
-                group_keys,
-                constraints,
-                products)
+        return (reader, search_path, filter_patterns, group_keys, constraints, products)
 
     @staticmethod
-    def query_for_satpy_importer_kwargs_and_readers(reader: str,
-                                                    search_path: str,
-                                                    filter_patterns: List[str],
-                                                    group_keys: List[str],
-                                                    constraints: dict,
-                                                    products):
+    def query_for_satpy_importer_kwargs_and_readers(
+        reader: str, search_path: str, filter_patterns: List[str], group_keys: List[str], constraints: dict, products
+    ):
         """
         Create a data catalogue with the given parameters and generate
         importer keywords arguments.
@@ -54,14 +45,13 @@ class Catalogue:
         logged. If no files were found with the given parameters, then the
         importer keyword arguments won't be created.
         """
-        LOG.debug(f"Processing query: {reader}, {search_path},"
-                  f" {filter_patterns}, {group_keys},"
-                  f" {constraints}, {products}")
+        LOG.debug(
+            f"Processing query: {reader}, {search_path},"
+            f" {filter_patterns}, {group_keys},"
+            f" {constraints}, {products}"
+        )
         try:
-            files = Catalogue.collect_files_for_data_catalogue(
-                search_path,
-                filter_patterns,
-                constraints)
+            files = Catalogue.collect_files_for_data_catalogue(search_path, filter_patterns, constraints)
         except Exception as e:
             LOG.error(f"Create data catalogue failed. Error occurred: {e}")
             return None, None
@@ -72,17 +62,14 @@ class Catalogue:
 
         LOG.info(f"Found files: {files}")
 
-        file_group_map: Optional[dict] \
-            = Catalogue.group_files_by_group_keys(files, group_keys, reader)
+        file_group_map: Optional[dict] = Catalogue.group_files_by_group_keys(files, group_keys, reader)
 
-        return Catalogue._compose_satpy_importer_kwargs(
-            file_group_map, products, reader)
+        return Catalogue._compose_satpy_importer_kwargs(file_group_map, products, reader)
 
     @staticmethod
-    def _compose_satpy_importer_kwargs(file_group_map,
-                                       products: List[dict],
-                                       reader: str) \
-            -> Tuple[Dict[str, Union[str, dict, list]], list]:
+    def _compose_satpy_importer_kwargs(
+        file_group_map, products: List[dict], reader: str
+    ) -> Tuple[Dict[str, Union[str, dict, list]], list]:
         """
         Set up a dictionary which can be used as ***kwargs* in according
         function calls which pass them through to ``SatpyImporter`` for actually
@@ -91,15 +78,9 @@ class Catalogue:
         """
         scn_mng: SceneManager = SceneManager()
         all_available_products = create_scenes(scn_mng.scenes, file_group_map)
-        dataset_ids: List[DataID] \
-            = scn_mng.get_data_ids_for_products(all_available_products, products)
-        importer_kwargs = {
-            'reader': reader,
-            'scenes': scn_mng.scenes,
-            'dataset_ids': dataset_ids
-        }
-        files_to_load: List[str] = \
-            [fn for fgroup in file_group_map.values() for fn in fgroup]
+        dataset_ids: List[DataID] = scn_mng.get_data_ids_for_products(all_available_products, products)
+        importer_kwargs = {"reader": reader, "scenes": scn_mng.scenes, "dataset_ids": dataset_ids}
+        files_to_load: List[str] = [fn for fgroup in file_group_map.values() for fn in fgroup]
         return importer_kwargs, files_to_load
 
     @staticmethod
@@ -121,10 +102,9 @@ class Catalogue:
     #   pattern = compute_globbing_pattern(...)
     #   glob_find_files(pattern, search_path)
     @staticmethod
-    def collect_files_for_data_catalogue(search_path: str,
-                                         filter_patterns: List[str],
-                                         filter: dict) \
-            -> Optional[Set[str]]:
+    def collect_files_for_data_catalogue(
+        search_path: str, filter_patterns: List[str], filter: dict
+    ) -> Optional[Set[str]]:
         """
         This method summarize all methods which are needed to create the
         data catalogue. So it regulates the creation.
@@ -135,9 +115,7 @@ class Catalogue:
         # is ...
         GlobbingCreator.init_now()
 
-        globbing_patterns: Optional[list] \
-            = GlobbingCreator.construct_globbing_patterns(filter_patterns,
-                                                          filter)
+        globbing_patterns: Optional[list] = GlobbingCreator.construct_globbing_patterns(filter_patterns, filter)
 
         if not globbing_patterns:
             return None
@@ -146,8 +124,7 @@ class Catalogue:
         return Catalogue.glob_find_files(globbing_patterns, search_path)
 
     @staticmethod
-    def group_files_by_group_keys(files: Set[str], group_keys: List[str],
-                                  reader: str) -> Optional[dict]:
+    def group_files_by_group_keys(files: Set[str], group_keys: List[str], reader: str) -> Optional[dict]:
         """
         Group given *files* according to the *group_keys* configured for the
         given *reader*.
@@ -166,16 +143,14 @@ class Catalogue:
             LOG.debug("No group keys available. Files can't be grouped.")
             return None
 
-        file_groups = group_files(files, reader=reader,
-                                  group_keys=group_keys)
+        file_groups = group_files(files, reader=reader, group_keys=group_keys)
         # TODO(ar): The following code is borrowed from OpenFileWizard(2)._group_files()
         file_group_map = {}
         for file_group in file_groups:
             # file_group includes what reader to use
             # NOTE: We only allow a single reader at a time
             # TODO(ar) refactor this into a function 'group_id_from_file_group' or so
-            group_id = tuple(sorted(fn for group_list in file_group.values()
-                                    for fn in group_list))
+            group_id = tuple(sorted(fn for group_list in file_group.values() for fn in group_list))
             file_group_map[group_id] = file_group
         return file_group_map
 
@@ -197,14 +172,13 @@ class GlobbingCreator:
         GlobbingCreator.now_utc = datetime.now(timezone.utc)
 
     @staticmethod
-    def _convert_to_relativedelta(value: int, code: str) \
-            -> Optional[relativedelta]:
+    def _convert_to_relativedelta(value: int, code: str) -> Optional[relativedelta]:
         """
         Interpret *value* as relative time delta in the unit given by *code*
         according to the `datetime strftime() and strptime() Format Codes
         <https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes>`_.
         """
-        
+
         if "S" == code:
             return relativedelta(seconds=value)
         if "M" in code:
@@ -221,8 +195,7 @@ class GlobbingCreator:
         return None
 
     @staticmethod
-    def _expand_datetime_pattern(field_name: str,
-                                 format_spec: str) -> List[Tuple[str, str]]:
+    def _expand_datetime_pattern(field_name: str, format_spec: str) -> List[Tuple[str, str]]:
         """
         Get a list of several single-directive datetime patterns made
         from the *field_name* and *format_spec* of one datetime pattern.
@@ -268,26 +241,24 @@ class GlobbingCreator:
         codes = format_spec.split("%")[1:]
 
         for code in codes:
-            single_directive_patterns.append(
-                (f"{field_name}_{code}", f"%{code}")
-            )
+            single_directive_patterns.append((f"{field_name}_{code}", f"%{code}"))
 
         return single_directive_patterns
 
     @staticmethod
-    def _make_replacement_field(field_name: str,
-                                conversion: str,
-                                format_spec: str) -> str:
+    def _make_replacement_field(field_name: str, conversion: str, format_spec: str) -> str:
         """
         Build a replacement field from its components *field_name*, *conversion*
         and *format_spec* according to the replacement field grammar, see
         https://docs.python.org/3/library/string.html#formatstrings
         """
-        return ("{"
-                + ('' if not field_name else field_name)
-                + ('' if not conversion else f"!{conversion}")
-                + ('' if not format_spec else f":{format_spec}")
-                + "}")
+        return (
+            "{"
+            + ("" if not field_name else field_name)
+            + ("" if not conversion else f"!{conversion}")
+            + ("" if not format_spec else f":{format_spec}")
+            + "}"
+        )
 
     @staticmethod
     def _expand_filter_pattern(filter_pattern: str) -> str:
@@ -319,29 +290,22 @@ class GlobbingCreator:
 
             elif not is_datetime_format(format_spec):
                 replacement_fields_list.append(
-                    GlobbingCreator._make_replacement_field(field_name,
-                                                            conversion,
-                                                            format_spec)
+                    GlobbingCreator._make_replacement_field(field_name, conversion, format_spec)
                 )
             else:
                 # Iterate with 'sdp' (short for [s]ingle [d]irective [p]attern)
                 # over the list generated when expanding the current datetime
                 # pattern as represented by (field_name, format_spec)
-                for sdp in GlobbingCreator._expand_datetime_pattern(field_name,
-                                                                    format_spec):
+                for sdp in GlobbingCreator._expand_datetime_pattern(field_name, format_spec):
                     sdp_field_name, sdp_format_spec = sdp
                     replacement_fields_list.append(
-                        GlobbingCreator._make_replacement_field(sdp_field_name,
-                                                                conversion,
-                                                                sdp_format_spec)
+                        GlobbingCreator._make_replacement_field(sdp_field_name, conversion, sdp_format_spec)
                     )
 
-            replacement_fields = ''.join(replacement_fields_list)
-            expanded_filter_pattern_parts.append(
-                f"{literal_text}{replacement_fields}"
-            )
+            replacement_fields = "".join(replacement_fields_list)
+            expanded_filter_pattern_parts.append(f"{literal_text}{replacement_fields}")
 
-        return ''.join(expanded_filter_pattern_parts)
+        return "".join(expanded_filter_pattern_parts)
 
     @staticmethod
     def _expand_datetime_constraint(field_name, dt_constraints) -> List[dict]:
@@ -365,22 +329,22 @@ class GlobbingCreator:
         supported_codes = ["Y", "m", "d", "H", "M", "S"]  # Devel hint: Don't change this to a string.
 
         if dt_constraints.get("type") == "datetime":
-            year = dt_constraints.get('Y', 2000)
-            month = dt_constraints.get('m', 1)
-            day = dt_constraints.get('d', 1)
-            hours = dt_constraints.get('H', 0)
-            minutes = dt_constraints.get('M', 0)
-            seconds = dt_constraints.get('S', 0)
+            year = dt_constraints.get("Y", 2000)
+            month = dt_constraints.get("m", 1)
+            day = dt_constraints.get("d", 1)
+            hours = dt_constraints.get("H", 0)
+            minutes = dt_constraints.get("M", 0)
+            seconds = dt_constraints.get("S", 0)
 
             # FIXME: catch here for wrong parameters and generate helpful exception to re-raise
             try:
-                dt = datetime(year, month, day,
-                              hours, minutes, seconds,
-                              tzinfo=timezone.utc)
+                dt = datetime(year, month, day, hours, minutes, seconds, tzinfo=timezone.utc)
             except TypeError as exc:
-                msg = (f"Got data incompatible to datetime initialisation"
-                       f" for constraint '{field_name}'."
-                       f" Original message: {exc}")
+                msg = (
+                    f"Got data incompatible to datetime initialisation"
+                    f" for constraint '{field_name}'."
+                    f" Original message: {exc}"
+                )
                 raise TypeError(msg) from exc
 
             expanded_dt_constraint = {}
@@ -402,8 +366,7 @@ class GlobbingCreator:
                     break
 
             if not given_code:
-                msg = (f"No valid time code specification for constraint"
-                       f" '{field_name}' given.")
+                msg = f"No valid time code specification for constraint" f" '{field_name}' given."
                 raise ValueError(msg)
 
             if not isinstance(sequence_of_given_code, collections.abc.Sequence):
@@ -411,12 +374,13 @@ class GlobbingCreator:
 
             for value in sequence_of_given_code:
                 try:
-                    delta_dt = GlobbingCreator._convert_to_relativedelta(
-                        value, given_code)
+                    delta_dt = GlobbingCreator._convert_to_relativedelta(value, given_code)
                 except TypeError as exc:
-                    msg = (f"Got incompatible data for constraint"
-                           f" '{field_name} / {given_code}'."
-                           f" Original message: {exc}")
+                    msg = (
+                        f"Got incompatible data for constraint"
+                        f" '{field_name} / {given_code}'."
+                        f" Original message: {exc}"
+                    )
                     raise TypeError(msg) from exc
 
                 dt = GlobbingCreator.now_utc + delta_dt
@@ -429,9 +393,7 @@ class GlobbingCreator:
         return expanded_dt_constraints
 
     @staticmethod
-    def _expand_to_dict_of_scalars(
-            initial_list_of_dict_of_scalars: List[dict],
-            dict_of_sequences: dict) -> List[dict]:
+    def _expand_to_dict_of_scalars(initial_list_of_dict_of_scalars: List[dict], dict_of_sequences: dict) -> List[dict]:
         """
         Convert the dictionary *dict_of_sequences* with list items to list of
         dictionaries with only scalar items by combination including the given
@@ -470,8 +432,7 @@ class GlobbingCreator:
         for key, value in dict_of_sequences.items():
             new_list_of_dicts_of_scalars = []
             for dict_of_scalars in list_of_dicts_of_scalars:
-                if not isinstance(value, collections.abc.Iterable) \
-                        or isinstance(value, str):
+                if not isinstance(value, collections.abc.Iterable) or isinstance(value, str):
                     new_dict_of_scalars = dict_of_scalars.copy()
                     new_dict_of_scalars[key] = value
                     new_list_of_dicts_of_scalars.append(new_dict_of_scalars)
@@ -528,32 +489,25 @@ class GlobbingCreator:
                 # TODO: Since (for now) we cannot deal with more than one of
                 #  them, ignore all but the first ...
                 if have_datetime_constraint_already:
-                    LOG.warning(f"Skipping datetime constraint '{key}'"
-                                f" because it is not the first one.")
+                    LOG.warning(f"Skipping datetime constraint '{key}'" f" because it is not the first one.")
                     continue
 
                 try:
-                    expanded_datetime_constraints = \
-                        GlobbingCreator._expand_datetime_constraint(key, value)
+                    expanded_datetime_constraints = GlobbingCreator._expand_datetime_constraint(key, value)
                     have_datetime_constraint_already = True
                 except (ValueError, TypeError) as exc:
                     LOG.warning(exc)
 
             else:
                 # No other 'type' is handled (yet)
-                LOG.warning(f"Ignoring constraint '{key}'"
-                            f" of unknown type '{_type}'")
+                LOG.warning(f"Ignoring constraint '{key}'" f" of unknown type '{_type}'")
 
         # Now create a list of constraints (dictionaries) which
         # are the combination of the variants for each constraint.
-        return GlobbingCreator._expand_to_dict_of_scalars(
-            expanded_datetime_constraints,
-            normalized_constraints)
+        return GlobbingCreator._expand_to_dict_of_scalars(expanded_datetime_constraints, normalized_constraints)
 
     @staticmethod
-    def construct_globbing_patterns(filter_patterns: List[str],
-                                    constraints: dict) \
-            -> List[str]:
+    def construct_globbing_patterns(filter_patterns: List[str], constraints: dict) -> List[str]:
         """
         Construct a list of globbing patterns from the given *filter_patterns*
         with the given *constraints* applied
@@ -562,18 +516,13 @@ class GlobbingCreator:
         """
         globbing_patterns: List[str] = []
 
-        expanded_constraints: List[dict] = \
-            GlobbingCreator._expand_constraints(constraints)
+        expanded_constraints: List[dict] = GlobbingCreator._expand_constraints(constraints)
 
         for filter_pattern in filter_patterns:
-            expanded_filter_pattern = \
-                GlobbingCreator._expand_filter_pattern(filter_pattern)
+            expanded_filter_pattern = GlobbingCreator._expand_filter_pattern(filter_pattern)
 
             for expanded_constraint in expanded_constraints:
-                globbing_patterns.append(
-                    trollsift.globify(expanded_filter_pattern,
-                                      expanded_constraint)
-                )
+                globbing_patterns.append(trollsift.globify(expanded_filter_pattern, expanded_constraint))
 
         return globbing_patterns
 
@@ -602,33 +551,22 @@ class SceneManager:
         products_data_ids = []
         for data_id in all_available_data_ids:
             for channel, calibrations in products.items():
-                if data_id.get('name') == channel and \
-                        data_id.get('calibration').name in calibrations:
+                if data_id.get("name") == channel and data_id.get("calibration").name in calibrations:
                     products_data_ids.append(data_id)
 
         return products_data_ids
 
 
-if __name__ == '__main__':
-    catalogue_config = config.get('catalogue', None)
+if __name__ == "__main__":
+    catalogue_config = config.get("catalogue", None)
     first_query = catalogue_config[0]
 
-    (reader,
-     search_path,
-     filter_patterns,
-     group_keys,
-     constraints,
-     products
-     ) = Catalogue.extract_query_parameters(first_query)
+    (reader, search_path, filter_patterns, group_keys, constraints, products) = Catalogue.extract_query_parameters(
+        first_query
+    )
 
-    (importer_kwargs,
-     files_to_load
-     ) = Catalogue.query_for_satpy_importer_kwargs_and_readers(
-        reader,
-        search_path,
-        filter_patterns,
-        group_keys,
-        constraints,
-        products)
+    (importer_kwargs, files_to_load) = Catalogue.query_for_satpy_importer_kwargs_and_readers(
+        reader, search_path, filter_patterns, group_keys, constraints, products
+    )
 
     print(importer_kwargs)

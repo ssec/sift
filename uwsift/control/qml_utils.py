@@ -1,10 +1,17 @@
 import sys
-
-from typing import List, Dict, Callable, Optional
+from typing import Callable, Dict, List, Optional
 
 import numpy as np
-from PyQt5.QtCore import QObject, pyqtSignal, pyqtProperty, pyqtSlot, QAbstractListModel
-from PyQt5.QtCore import Qt, QModelIndex, QDateTime
+from PyQt5.QtCore import (
+    QAbstractListModel,
+    QDateTime,
+    QModelIndex,
+    QObject,
+    Qt,
+    pyqtProperty,
+    pyqtSignal,
+    pyqtSlot,
+)
 
 from uwsift.common import DEFAULT_TIME_FORMAT
 
@@ -25,9 +32,7 @@ class QmlLayerManager(QObject):
         self._layer_model = None
 
         self._convenience_functions: Dict[str, Callable] = None
-        self.set_convenience_functions(
-            {"Most Frequent": self.get_most_frequent_data_layer_index}
-        )
+        self.set_convenience_functions({"Most Frequent": self.get_most_frequent_data_layer_index})
 
         # TODO(mk): make this configurable if the user wants to display dates differently?
         self._format_str = DEFAULT_TIME_FORMAT
@@ -52,9 +57,9 @@ class QmlLayerManager(QObject):
                 # timestamps. Timelines with zero or one entries (=> t_diffs
                 # is empty) are not suitable, assign largest possible mean
                 # value for them!
-                temporal_differences[i] = \
-                    sys.float_info.max if not t_diffs else \
-                    np.mean(list(map(lambda td: td.total_seconds(), t_diffs)))
+                temporal_differences[i] = (
+                    sys.float_info.max if not t_diffs else np.mean(list(map(lambda td: td.total_seconds(), t_diffs)))
+                )
             most_frequent_data_layer_idx = np.argmin(temporal_differences)
             if not isinstance(most_frequent_data_layer_idx, np.int64):
                 # If there exist multiple timelines at the same sampling rate,

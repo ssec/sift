@@ -12,10 +12,10 @@ LOG = logging.getLogger(__name__)
 
 class WrappingDrivingPolicy(QObject):
     """
-        Time translation policy that when called returns a simulated data time
-        by taking a timestamp from a designated data layer (the driving layer).
-        Each successive call will return the driving layer's next timestamp. If there are
-        no more timestamps in the driving layer it starts over from the first timestamp.
+    Time translation policy that when called returns a simulated data time
+    by taking a timestamp from a designated data layer (the driving layer).
+    Each successive call will return the driving layer's next timestamp. If there are
+    no more timestamps in the driving layer it starts over from the first timestamp.
     """
 
     didUpdatePolicy = pyqtSignal(LayerItem)
@@ -90,8 +90,7 @@ class WrappingDrivingPolicy(QObject):
                 self._driving_idx = nearest_past_idx
             else:
                 self._driving_idx = 0
-        self._curr_t_sim = None if not self.timeline \
-            else self.timeline[self._driving_idx]
+        self._curr_t_sim = None if not self.timeline else self.timeline[self._driving_idx]
 
     @property
     def timeline(self):
@@ -137,8 +136,7 @@ class WrappingDrivingPolicy(QObject):
             self._driving_idx = index
             t_sim = self.timeline[self._driving_idx]
         except Exception as e:
-            LOG.error(f"Invalid index passed to driving layer timeline: "
-                      f"index={index}\n", exc_info=True)
+            LOG.error(f"Invalid index passed to driving layer timeline: " f"index={index}\n", exc_info=True)
             raise e
         return t_sim
 
@@ -160,9 +158,7 @@ class WrappingDrivingPolicy(QObject):
                location
         """
         if backwards:
-            self._driving_idx = \
-                (self._driving_idx + (self.timeline_length - 1)) \
-                % self.timeline_length
+            self._driving_idx = (self._driving_idx + (self.timeline_length - 1)) % self.timeline_length
         else:
             self._driving_idx += 1
             if self._driving_idx >= self.timeline_length:

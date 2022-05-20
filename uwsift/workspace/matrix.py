@@ -33,8 +33,8 @@ REQUIRES
 :copyright: 2016 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-__author__ = 'rayg'
-__docformat__ = 'reStructuredText'
+__author__ = "rayg"
+__docformat__ = "reStructuredText"
 
 import logging
 from collections import namedtuple
@@ -55,6 +55,7 @@ class state(Enum):
     CACHED - available in workspace but not converted to layer or layers; has a UUID
     ACTIVE - available as layers, and being presented
     """
+
     UNKNOWN = 0  # undefined
     UNAVAILABLE = 1  # implied existence, but unknown location
     AVAILABLE = 2  # known location, but hasn't been imported to workspace
@@ -62,11 +63,11 @@ class state(Enum):
     ACTIVE = 4  # available as layer, dataset in workspace, and has at least one presentation
 
 
-column_info = namedtuple('column_info', ('time', 'product_count'))
+column_info = namedtuple("column_info", ("time", "product_count"))
 
-row_info = namedtuple('row_info', ('product_name', 'timestep_count'))
+row_info = namedtuple("row_info", ("product_name", "timestep_count"))
 
-product_info = namedtuple('product_info', ('product_name', 'time', 'state', 'path', 'variable', 'slice'))
+product_info = namedtuple("product_info", ("product_name", "time", "state", "path", "variable", "slice"))
 
 
 class DataAdjacencyMatrix(QObject):

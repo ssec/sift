@@ -17,12 +17,12 @@ An example configuration looks a follows::
         <replacement_field_1>: <replacement_field_1_setting>
         <replacement_field_2>:
           - <replacement_field_2_setting_1>
-          - <replacement_field_2_setting_2>  
+          - <replacement_field_2_setting_2>
       products:
         <source>:
           - <product_1>
           - <product_2>
-    
+
 
 Each query must define the ``reader`` to use, the ``search_path`` where to look
 for files, optional ``constraints``, and a mandatory definition of the desired
@@ -46,12 +46,12 @@ explicit ``type`` is defined for them; two of these explicit constraint types
 are available (for now):
 
 * ``type: datetime``
-  
+
   a fixed filter based on the different parts of the data time can be defined,
   e.g. data from all 1st days of each month in 2019 at 12:00
-  
+
 * ``type: recent_datetime``
-  
+
   a range of time steps relative to the current time ("now") can be defined,
   e.g. all data for the current hour and the two before with the value
   ``[0, -1, -2]``

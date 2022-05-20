@@ -32,7 +32,7 @@ def insert_new_file_into_dir(file, target_dir, t_stamp_full_disk, *args, **kwarg
     time_idx = -1
     time_chunk = None
     # TODO(mk): assumes "-" to be delimiter, does this generalize?, do we care?
-    file_name_chunks = re.split('(-)', tmp_path.name)
+    file_name_chunks = re.split("(-)", tmp_path.name)
     for idx, chunk in enumerate(file_name_chunks):
         try:
             dt_parser.parse(chunk)
@@ -52,33 +52,35 @@ def insert_new_file_into_dir(file, target_dir, t_stamp_full_disk, *args, **kwarg
 
 def fill_dir_periodically_seviri(data_dir: str, tmp_dir: str, sleep_time: float):
     """
-        Fill specified directory with existing SEVIRI test files, found in in_dir, altering the
-        respective start time and end_time of every file to times correctly offset from present
-        time.
+    Fill specified directory with existing SEVIRI test files, found in in_dir, altering the
+    respective start time and end_time of every file to times correctly offset from present
+    time.
 
-        :param tmp_dir: Temporary directory to write test data to.
-        :param tmp_dir: Temporary directory to write test data to.
+    :param tmp_dir: Temporary directory to write test data to.
+    :param tmp_dir: Temporary directory to write test data to.
 
-        :param data_dir: Directory from which data to be renamed is taken.
+    :param data_dir: Directory from which data to be renamed is taken.
 
-        :param sleep_time: Time between writes to out_dir.
+    :param sleep_time: Time between writes to out_dir.
 
-        Note: SEVIRI and FCI work just differently enough to be a bother, EPI, PRO & granules
-              for seviri all same start_time whereas FCI has a different start_time for every file.
+    Note: SEVIRI and FCI work just differently enough to be a bother, EPI, PRO & granules
+          for seviri all same start_time whereas FCI has a different start_time for every file.
     """
-    catalogue_config = config.get('catalogue', None)
+    catalogue_config = config.get("catalogue", None)
     first_query = catalogue_config[0]
     # FIXME(mk) cast to list b/c Tuple is immutable, problematic if first entry of tuple,
     #  search_path, is a str and not a list or dict and thus immutable.
-    #catalogue_args = list(Catalogue.extract_query_parameters(first_query))
+    # catalogue_args = list(Catalogue.extract_query_parameters(first_query))
     first_query["search_path"] = data_dir
     first_query["constraints"]["start_time"] = {
-        'type': 'datetime',
-        'Y': 2019, 'm': 10, 'd': 21  # TODO(mk): make this dependant on the data in data dir and not hardcoded
+        "type": "datetime",
+        "Y": 2019,
+        "m": 10,
+        "d": 21,  # TODO(mk): make this dependant on the data in data dir and not hardcoded
     }
-    reader_scenes_ds_ids, readers = \
-        Catalogue.query_for_satpy_importer_kwargs_and_readers(
-            *Catalogue.extract_query_parameters(first_query))
+    reader_scenes_ds_ids, readers = Catalogue.query_for_satpy_importer_kwargs_and_readers(
+        *Catalogue.extract_query_parameters(first_query)
+    )
     file_tuples = list(reader_scenes_ds_ids["scenes"].keys())
     file_stack = []
     for file_tup in file_tuples:
@@ -100,27 +102,29 @@ def fill_dir_periodically_seviri(data_dir: str, tmp_dir: str, sleep_time: float)
 
 def fill_dir_periodically_fci(data_dir: str, tmp_dir: str, sleep_time: float) -> None:
     """
-        Fill specified directory with existing FCI test files, found in in_dir, altering the
-        respective start time and end_time of every file to times correctly offset from present
-        time.
+    Fill specified directory with existing FCI test files, found in in_dir, altering the
+    respective start time and end_time of every file to times correctly offset from present
+    time.
 
-        :param tmp_dir: Temporary directory to write test data to.
+    :param tmp_dir: Temporary directory to write test data to.
 
-        :param data_dir: Directory from which data to be renamed is taken.
+    :param data_dir: Directory from which data to be renamed is taken.
 
-        :param sleep_time: Time between writes to out_dir.
+    :param sleep_time: Time between writes to out_dir.
 
-        Note: SEVIRI and FCI work just differently enough to be a bother, EPI, PRO & granules
-              for seviri all same start_time whereas FCI has a different start_time for every file.
+    Note: SEVIRI and FCI work just differently enough to be a bother, EPI, PRO & granules
+          for seviri all same start_time whereas FCI has a different start_time for every file.
     """
     try:
-        #format_string = config["data_reading.fci_l1c_fdhsi.filter_patterns"][0]
-        format_string = '{pflag}_{location_indicator},{data_designator},MTI{spacecraft_id:1d}+{data_source}-' \
-                        '{processing_level}-{type}-{subtype}-{coverage}-{subsetting}-{component1}-BODY-{component3}-' \
-                        '{purpose}-{format}_{oflag}_{originator}_{processing_time:%Y%m%d%H%M%S}_{facility_or_tool}_' \
-                        '{environment}_{start_time:%Y%m%d%H%M%S}_{end_time:%Y%m%d%H%M%S}_{processing_mode}_' \
-                        '{special_compression}_{disposition_mode}_{repeat_cycle_in_day:>04d}_' \
-                        '{count_in_repeat_cycle:>04d}.nc'
+        # format_string = config["data_reading.fci_l1c_fdhsi.filter_patterns"][0]
+        format_string = (
+            "{pflag}_{location_indicator},{data_designator},MTI{spacecraft_id:1d}+{data_source}-"
+            "{processing_level}-{type}-{subtype}-{coverage}-{subsetting}-{component1}-BODY-{component3}-"
+            "{purpose}-{format}_{oflag}_{originator}_{processing_time:%Y%m%d%H%M%S}_{facility_or_tool}_"
+            "{environment}_{start_time:%Y%m%d%H%M%S}_{end_time:%Y%m%d%H%M%S}_{processing_mode}_"
+            "{special_compression}_{disposition_mode}_{repeat_cycle_in_day:>04d}_"
+            "{count_in_repeat_cycle:>04d}.nc"
+        )
 
     except Exception:
         raise ValueError("Reader not found or wrong reader config.")
@@ -147,10 +151,12 @@ def fill_dir_periodically_fci(data_dir: str, tmp_dir: str, sleep_time: float) ->
             start_to_end_span = end_time - start_time
             # repeat_cycle_in_day = sat_filename_keyvals["repeat_cycle_in_day"]
         except KeyError:
-            raise KeyError(f"Could not match replacement fields"
-                           f" 'start_time', 'end_time' or 'repeat_cycle_in_day'"
-                           f" of filter_pattern '{format_string}'"
-                           f" in file name '{file_name}'.")
+            raise KeyError(
+                f"Could not match replacement fields"
+                f" 'start_time', 'end_time' or 'repeat_cycle_in_day'"
+                f" of filter_pattern '{format_string}'"
+                f" in file name '{file_name}'."
+            )
         # replace datetime
         sat_filename_keyvals["start_time"] = next(time_gen)
         sat_filename_keyvals["end_time"] = sat_filename_keyvals["start_time"] + start_to_end_span
@@ -168,13 +174,25 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Time delayed directory population.")
-    parser.add_argument("-i", "--input_directory", action="store",
-                        required=True, type=str,
-                        help="Directory to take original test data from.")
-    parser.add_argument("-o", "--output_directory", action="store", required=True, type=str,
-                        help="Directory to populate with mocked test data.")
-    parser.add_argument("-t", "--time_delay", action="store", default=5., type=float,
-                        help="Time between two arriving files in seconds")
+    parser.add_argument(
+        "-i",
+        "--input_directory",
+        action="store",
+        required=True,
+        type=str,
+        help="Directory to take original test data from.",
+    )
+    parser.add_argument(
+        "-o",
+        "--output_directory",
+        action="store",
+        required=True,
+        type=str,
+        help="Directory to populate with mocked test data.",
+    )
+    parser.add_argument(
+        "-t", "--time_delay", action="store", default=5.0, type=float, help="Time between two arriving files in seconds"
+    )
     args = parser.parse_args()
 
     out_dir = pathlib.Path(args.output_directory)
@@ -184,14 +202,14 @@ if __name__ == "__main__":
     in_dir = args.input_directory
     time_delay = args.time_delay
     fill_dir_periodically_fci(in_dir, out_dir, time_delay)
-    #try:
+    # try:
     #    reader = config["catalogue"][0]["reader"]
-    #except KeyError:
+    # except KeyError:
     #    raise KeyError("Reader not set in config files.")
-    #if reader == "seviri_l1b_hrit":
+    # if reader == "seviri_l1b_hrit":
     #    fill_dir_periodically_seviri(in_dir, out_dir, time_delay)
-    #elif reader == "fci_l1c_fdhsi":
+    # elif reader == "fci_l1c_fdhsi":
     #    fill_dir_periodically_fci(in_dir, out_dir, time_delay)
-    #else:
+    # else:
     #    raise NotImplementedError(f"Reader {reader} not supported yet")
-    #print(f"\nDONE copying test data to: {out_dir}\n")
+    # print(f"\nDONE copying test data to: {out_dir}\n")

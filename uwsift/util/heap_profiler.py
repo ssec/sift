@@ -5,7 +5,7 @@ import os
 import tracemalloc
 from collections import OrderedDict
 from datetime import datetime
-from threading import Thread, Event
+from threading import Event, Thread
 
 import psutil
 
@@ -23,7 +23,7 @@ def format_byte_count(byte_count: int):
         byte_count = abs(byte_count)
 
     symbols = OrderedDict()
-    for idx, symbol in enumerate(['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB']):
+    for idx, symbol in enumerate(["B", "KiB", "MiB", "GiB", "TiB", "PiB"]):
         symbols[symbol] = 1 << idx * 10
     for symbol, min_byte_count in reversed(symbols.items()):
         if byte_count >= min_byte_count:
@@ -83,7 +83,9 @@ class HeapProfiler:
         physical_ram_usage = psutil.virtual_memory()[2]
         cpu_usage = psutil.cpu_percent()
         pid = os.getpid()
-        LOG.info(f"[PID {pid}] Python: {allocation_count} allocations -> {allocated_bytes} " +
-                 f"(System usage: CPU {cpu_usage}% - Physical memory {physical_ram_usage}%)")
+        LOG.info(
+            f"[PID {pid}] Python: {allocation_count} allocations -> {allocated_bytes} "
+            + f"(System usage: CPU {cpu_usage}% - Physical memory {physical_ram_usage}%)"
+        )
 
         self.snapshot_idx += 1

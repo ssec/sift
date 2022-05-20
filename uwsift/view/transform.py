@@ -24,12 +24,12 @@ from vispy.visuals.transforms._util import arg_to_vec4
 class VariableDeclaration(TextExpression):
     """TextExpression subclass for exposing GLSL variables to vispy glsl interface.
 
-        Parameters
-        ----------
-        name : str
-            Name of the variable.
-        text : str
-            Rvalue to be assigned to the variable.
+    Parameters
+    ----------
+    name : str
+        Name of the variable.
+    text : str
+        Rvalue to be assigned to the variable.
     """
 
     def __init__(self, name: str, text: str) -> None:
@@ -56,29 +56,28 @@ class GLSL_Adapter(TextExpression):
     text : str
         Actual .glsl code string.
     """
+
     _expr_list = []
 
     def __init__(self, text: str) -> None:
         # Regular expression for parsing possibly include-guarded macro definitions from .glsl
         # header files; makes strong assumptions about formatting of macro names by assuming
         # underscores in front of and behind the macro name. In line with vispy .glsl shader code.
-        guard_pattern = re.compile(r'^#ifndef\s*(?P<guard>_[A-Za-z]*_)')
+        guard_pattern = re.compile(r"^#ifndef\s*(?P<guard>_[A-Za-z]*_)")
         _guard_flag = False
         for line in text.splitlines():
             match_guard = guard_pattern.match(line)
             var_match = find_program_variables(line)
             if match_guard is not None:
-                _name = match_guard['guard']
+                _name = match_guard["guard"]
                 _text = match_guard.group(0) + os_linesep + f"#define {_name}"
                 self._expr_list.append(VariableDeclaration(_name, _text))
-                self._expr_list.append(VariableDeclaration(_name+"EIF", "#endif"))
+                self._expr_list.append(VariableDeclaration(_name + "EIF", "#endif"))
                 _guard_flag = True
             elif var_match is not None:
                 key_list = list(var_match.keys())
                 if len(key_list) > 1:
-                    raise ValueError(
-                        "More than one variable definition per line "
-                        "not supported.")
+                    raise ValueError("More than one variable definition per line " "not supported.")
                 elif len(key_list) != 0:
                     self._expr_list.append(VariableDeclaration(key_list[0], line))
         if _guard_flag:
@@ -101,6 +100,7 @@ class GLSL_FileAdapter(GLSL_Adapter):
     file_path : str
         Path to .glsl header file.
     """
+
     def __init__(self, file_path: str) -> None:
         text = glsl.get(file_path)
         super(GLSL_FileAdapter, self).__init__(text)
@@ -124,124 +124,133 @@ M_HALFPI = M_PI_2 = 1.57079632679489660
 
 
 def merc_init(proj_dict):
-    proj_dict.setdefault('lon_0', 0.)
-    proj_dict.setdefault('k0', 1.)
+    proj_dict.setdefault("lon_0", 0.0)
+    proj_dict.setdefault("k0", 1.0)
 
-    phits = 0.
-    is_phits = 'lat_ts' in proj_dict
+    phits = 0.0
+    is_phits = "lat_ts" in proj_dict
     if is_phits:
-        phits = np.radians(proj_dict['lat_ts'])
+        phits = np.radians(proj_dict["lat_ts"])
         if phits >= M_HALFPI:
             raise ValueError("PROJ.4 'lat_ts' parameter must be greater than PI/2")
 
-    if proj_dict['a'] != proj_dict['b']:
+    if proj_dict["a"] != proj_dict["b"]:
         # ellipsoid
         if is_phits:
-            proj_dict['k0'] = pj_msfn_py(np.sin(phits), np.cos(phits), proj_dict['es'])
+            proj_dict["k0"] = pj_msfn_py(np.sin(phits), np.cos(phits), proj_dict["es"])
     elif is_phits:
         # spheroid
-        proj_dict['k0'] = np.cos(phits)
+        proj_dict["k0"] = np.cos(phits)
 
     return proj_dict
 
 
 def lcc_init(proj_dict):
-    if 'lat_1' not in proj_dict:
+    if "lat_1" not in proj_dict:
         raise ValueError("PROJ.4 'lat_1' parameter is required for 'lcc' projection")
 
-    proj_dict.setdefault('lon_0', 0.)
-    if 'lat_2' not in proj_dict:
-        proj_dict['lat_2'] = proj_dict['lat_1']
-        if 'lat_0' not in proj_dict:
-            proj_dict['lat_0'] = proj_dict['lat_1']
-    proj_dict['phi1'] = np.radians(proj_dict['lat_1'])
-    proj_dict['phi2'] = np.radians(proj_dict['lat_2'])
-    proj_dict['phi0'] = np.radians(proj_dict['lat_0'])
+    proj_dict.setdefault("lon_0", 0.0)
+    if "lat_2" not in proj_dict:
+        proj_dict["lat_2"] = proj_dict["lat_1"]
+        if "lat_0" not in proj_dict:
+            proj_dict["lat_0"] = proj_dict["lat_1"]
+    proj_dict["phi1"] = np.radians(proj_dict["lat_1"])
+    proj_dict["phi2"] = np.radians(proj_dict["lat_2"])
+    proj_dict["phi0"] = np.radians(proj_dict["lat_0"])
 
-    if abs(proj_dict['phi1'] + proj_dict['phi2']) < 1e-10:
+    if abs(proj_dict["phi1"] + proj_dict["phi2"]) < 1e-10:
         raise ValueError("'lat_1' + 'lat_2' for 'lcc' projection when converted to radians must be greater than 1e-10.")
 
-    proj_dict['n'] = sinphi = np.sin(proj_dict['phi1'])
-    cosphi = np.cos(proj_dict['phi1'])
-    secant = abs(proj_dict['phi1'] - proj_dict['phi2']) >= 1e-10
-    proj_dict['ellips'] = proj_dict['a'] != proj_dict['b']
-    if proj_dict['ellips']:
+    proj_dict["n"] = sinphi = np.sin(proj_dict["phi1"])
+    cosphi = np.cos(proj_dict["phi1"])
+    secant = abs(proj_dict["phi1"] - proj_dict["phi2"]) >= 1e-10
+    proj_dict["ellips"] = proj_dict["a"] != proj_dict["b"]
+    if proj_dict["ellips"]:
         # ellipsoid
-        m1 = pj_msfn_py(sinphi, cosphi, proj_dict['es'])
-        ml1 = pj_tsfn_py(proj_dict['phi1'], sinphi, proj_dict['e'])
+        m1 = pj_msfn_py(sinphi, cosphi, proj_dict["es"])
+        ml1 = pj_tsfn_py(proj_dict["phi1"], sinphi, proj_dict["e"])
         if secant:
-            sinphi = np.sin(proj_dict['phi2'])
-            proj_dict['n'] = np.log(m1 / pj_msfn_py(sinphi, np.cos(proj_dict['phi2']), proj_dict['es']))
-            proj_dict['n'] /= np.log(ml1 / pj_tsfn_py(proj_dict['phi2'], sinphi, proj_dict['e']))
-        proj_dict['c'] = proj_dict['rho0'] = m1 * pow(ml1, -proj_dict['n']) / proj_dict['n']
-        proj_dict['rho0'] *= 0. if abs(abs(proj_dict['phi0']) - M_HALFPI) < 1e-10 else \
-            pow(pj_tsfn_py(proj_dict['phi0'], np.sin(proj_dict['phi0']), proj_dict['e']), proj_dict['n'])
+            sinphi = np.sin(proj_dict["phi2"])
+            proj_dict["n"] = np.log(m1 / pj_msfn_py(sinphi, np.cos(proj_dict["phi2"]), proj_dict["es"]))
+            proj_dict["n"] /= np.log(ml1 / pj_tsfn_py(proj_dict["phi2"], sinphi, proj_dict["e"]))
+        proj_dict["c"] = proj_dict["rho0"] = m1 * pow(ml1, -proj_dict["n"]) / proj_dict["n"]
+        proj_dict["rho0"] *= (
+            0.0
+            if abs(abs(proj_dict["phi0"]) - M_HALFPI) < 1e-10
+            else pow(pj_tsfn_py(proj_dict["phi0"], np.sin(proj_dict["phi0"]), proj_dict["e"]), proj_dict["n"])
+        )
     else:
         # spheroid
         if secant:
-            proj_dict['n'] = np.log(cosphi / np.cos(proj_dict['phi2'])) / np.log(
-                np.tan(M_FORTPI + 0.5 * proj_dict['phi2']) / np.tan(M_FORTPI + 0.5 * proj_dict['phi1'])
+            proj_dict["n"] = np.log(cosphi / np.cos(proj_dict["phi2"])) / np.log(
+                np.tan(M_FORTPI + 0.5 * proj_dict["phi2"]) / np.tan(M_FORTPI + 0.5 * proj_dict["phi1"])
             )
-        proj_dict['c'] = cosphi * pow(np.tan(M_FORTPI + 0.5 * proj_dict['phi1']), proj_dict['n']) / proj_dict['n']
-        proj_dict['rho0'] = 0. if abs(abs(proj_dict['phi0']) - M_HALFPI) < 1e-10 else \
-            proj_dict['c'] * pow(np.tan(M_FORTPI + 0.5 * proj_dict['phi0']), -proj_dict['n'])
-    proj_dict['ellips'] = 'true' if proj_dict['ellips'] else 'false'
+        proj_dict["c"] = cosphi * pow(np.tan(M_FORTPI + 0.5 * proj_dict["phi1"]), proj_dict["n"]) / proj_dict["n"]
+        proj_dict["rho0"] = (
+            0.0
+            if abs(abs(proj_dict["phi0"]) - M_HALFPI) < 1e-10
+            else proj_dict["c"] * pow(np.tan(M_FORTPI + 0.5 * proj_dict["phi0"]), -proj_dict["n"])
+        )
+    proj_dict["ellips"] = "true" if proj_dict["ellips"] else "false"
     return proj_dict
 
 
 def geos_init(proj_dict):
-    if 'h' not in proj_dict:
+    if "h" not in proj_dict:
         raise ValueError("PROJ.4 'h' parameter is required for 'geos' projection")
 
-    proj_dict.setdefault('lat_0', 0.)
-    proj_dict.setdefault('lon_0', 0.)
+    proj_dict.setdefault("lat_0", 0.0)
+    proj_dict.setdefault("lon_0", 0.0)
     # lat_0 is set to phi0 in the PROJ.4 C source code
     # if 'lat_0' not in proj_dict:
     #     raise ValueError("PROJ.4 'lat_0' parameter is required for 'geos' projection")
 
-    if 'sweep' not in proj_dict or proj_dict['sweep'] is None:
-        proj_dict['flip_axis'] = 'false'
-    elif proj_dict['sweep'] not in ['x', 'y']:
+    if "sweep" not in proj_dict or proj_dict["sweep"] is None:
+        proj_dict["flip_axis"] = "false"
+    elif proj_dict["sweep"] not in ["x", "y"]:
         raise ValueError("PROJ.4 'sweep' parameter must be 'x' or 'y'")
-    elif proj_dict['sweep'] == 'x':
-        proj_dict['flip_axis'] = 'true'
+    elif proj_dict["sweep"] == "x":
+        proj_dict["flip_axis"] = "true"
     else:
-        proj_dict['flip_axis'] = 'false'
+        proj_dict["flip_axis"] = "false"
 
-    proj_dict['radius_g_1'] = proj_dict['h'] / proj_dict['a']
-    proj_dict['radius_g'] = 1. + proj_dict['radius_g_1']
-    proj_dict['C'] = proj_dict['radius_g'] * proj_dict['radius_g'] - 1.0
-    if proj_dict['a'] != proj_dict['b']:
+    proj_dict["radius_g_1"] = proj_dict["h"] / proj_dict["a"]
+    proj_dict["radius_g"] = 1.0 + proj_dict["radius_g_1"]
+    proj_dict["C"] = proj_dict["radius_g"] * proj_dict["radius_g"] - 1.0
+    if proj_dict["a"] != proj_dict["b"]:
         # ellipsoid
-        proj_dict['one_es'] = 1. - proj_dict['es']
-        proj_dict['rone_es'] = 1. / proj_dict['one_es']
-        proj_dict['radius_p'] = np.sqrt(proj_dict['one_es'])
-        proj_dict['radius_p2'] = proj_dict['one_es']
-        proj_dict['radius_p_inv2'] = proj_dict['rone_es']
+        proj_dict["one_es"] = 1.0 - proj_dict["es"]
+        proj_dict["rone_es"] = 1.0 / proj_dict["one_es"]
+        proj_dict["radius_p"] = np.sqrt(proj_dict["one_es"])
+        proj_dict["radius_p2"] = proj_dict["one_es"]
+        proj_dict["radius_p_inv2"] = proj_dict["rone_es"]
     else:
-        proj_dict['radius_p'] = proj_dict['radius_p2'] = proj_dict['radius_p_inv2'] = 1.0
+        proj_dict["radius_p"] = proj_dict["radius_p2"] = proj_dict["radius_p_inv2"] = 1.0
     return proj_dict
 
 
 def stere_init(proj_dict):
     # Calculate phits
-    phits = abs(np.radians(proj_dict['lat_ts']) if 'lat_ts' in proj_dict else M_HALFPI)
+    phits = abs(np.radians(proj_dict["lat_ts"]) if "lat_ts" in proj_dict else M_HALFPI)
     # Determine mode
-    if abs(abs(np.radians(proj_dict['lat_0'])) - M_HALFPI) < 1e-10:
+    if abs(abs(np.radians(proj_dict["lat_0"])) - M_HALFPI) < 1e-10:
         # Assign "mode" in proj_dict to be GLSL for specific case (make sure to handle C-code case fallthrough):
         # 0 = n_pole, 1 = s_pole.
-        proj_dict['mode'] = 1 if proj_dict['lat_0'] < 0 else 0
-        if proj_dict['a'] != proj_dict['b']:
+        proj_dict["mode"] = 1 if proj_dict["lat_0"] < 0 else 0
+        if proj_dict["a"] != proj_dict["b"]:
             # ellipsoid
-            e = proj_dict['e']
+            e = proj_dict["e"]
             if abs(phits - M_HALFPI) < 1e-10:
-                proj_dict['akm1'] = 2. / np.sqrt((1 + e) ** (1 + e) * (1 - e) ** (1 - e))
+                proj_dict["akm1"] = 2.0 / np.sqrt((1 + e) ** (1 + e) * (1 - e) ** (1 - e))
             else:
-                proj_dict['akm1'] = np.cos(phits) / (
-                    pj_tsfn_py(phits, np.sin(phits), e) * np.sqrt(1. - (np.sin(phits) * e) ** 2))
+                proj_dict["akm1"] = np.cos(phits) / (
+                    pj_tsfn_py(phits, np.sin(phits), e) * np.sqrt(1.0 - (np.sin(phits) * e) ** 2)
+                )
         else:
             # sphere
-            proj_dict['akm1'] = np.cos(phits) / np.tan(M_FORTPI - .5 * phits) if abs(phits - M_HALFPI) >= 1e-10 else 2.
+            proj_dict["akm1"] = (
+                np.cos(phits) / np.tan(M_FORTPI - 0.5 * phits) if abs(phits - M_HALFPI) >= 1e-10 else 2.0
+            )
     else:
         # If EQUIT or OBLIQ mode:
         raise NotImplementedError("This projection mode is not supported yet.")
@@ -249,22 +258,22 @@ def stere_init(proj_dict):
 
 
 def eqc_init(proj_dict):
-    proj_dict.setdefault('lat_0', 0.)
-    proj_dict.setdefault('lat_ts', proj_dict['lat_0'])
-    proj_dict['rc'] = np.cos(np.radians(proj_dict['lat_ts']))
-    if (proj_dict['rc'] <= 0.):
+    proj_dict.setdefault("lat_0", 0.0)
+    proj_dict.setdefault("lat_ts", proj_dict["lat_0"])
+    proj_dict["rc"] = np.cos(np.radians(proj_dict["lat_ts"]))
+    if proj_dict["rc"] <= 0.0:
         raise ValueError("PROJ.4 'lat_ts' parameter must be in range (-PI/2,PI/2)")
-    proj_dict['phi0'] = np.radians(proj_dict['lat_0'])
-    proj_dict['es'] = 0.
+    proj_dict["phi0"] = np.radians(proj_dict["lat_0"])
+    proj_dict["es"] = 0.0
     return proj_dict
 
 
 def latlong_init(proj_dict):
-    if 'over' in proj_dict:
+    if "over" in proj_dict:
         # proj_dict['offset'] = '360.'
-        proj_dict['offset'] = '0.'
+        proj_dict["offset"] = "0."
     else:
-        proj_dict['offset'] = '0.'
+        proj_dict["offset"] = "0."
     return proj_dict
 
 
@@ -273,7 +282,7 @@ def latlong_init(proj_dict):
 # and 'imap' is X/Y to lon/lat
 # WARNING: Need double {{ }} for functions for string formatting to work properly
 PROJECTIONS = {
-    'longlat': (
+    "longlat": (
         latlong_init,
         """vec4 latlong_map(vec4 pos) {{
             return vec4(pos.x + {offset}, pos.y, pos.z, pos.w);
@@ -288,7 +297,7 @@ PROJECTIONS = {
             return pos;
         }}""",
     ),
-    'merc': (
+    "merc": (
         merc_init,
         """vec4 merc_map_e(vec4 pos) {{
             float lambda = radians(pos.x);
@@ -331,7 +340,7 @@ PROJECTIONS = {
             return vec4(lambda, phi, pos.z, pos.w);
         }}""",
     ),
-    'lcc': (
+    "lcc": (
         lcc_init,
         """vec4 lcc_map_e(vec4 pos) {{
             float rho;
@@ -384,7 +393,7 @@ PROJECTIONS = {
         }}""",
         None,
     ),
-    'geos': (
+    "geos": (
         geos_init,
         """vec4 geos_map_e(vec4 pos) {{
             float lambda, phi, r, Vx, Vy, Vz, tmp, x, y;
@@ -395,14 +404,14 @@ PROJECTIONS = {
             Vx = r * cos(lambda) * cos(phi);
             Vy = r * sin(lambda) * cos(phi);
             Vz = r * sin(phi);
-        
+
             // TODO: Best way to 'discard' a vertex
             if ((({radius_g} - Vx) * Vx - Vy * Vy - Vz * Vz * {radius_p_inv2}) < 0.) {{
                return vec4(1. / 0., 1. / 0., pos.z, pos.w);
             }}
-        
+
             tmp = {radius_g} - Vx;
-        
+
             if ({flip_axis}) {{
                 x = {radius_g_1} * atan(Vy / hypot(Vz, tmp));
                 y = {radius_g_1} * atan(Vz / tmp);
@@ -439,7 +448,7 @@ PROJECTIONS = {
             float a, b, k, det, x, y, Vx, Vy, Vz, lambda, phi;
             x = pos.x / {a};
             y = pos.y / {a};
-        
+
             Vx = -1.0;
             if ({flip_axis}) {{
                 Vz = tan(y / {radius_g_1});
@@ -448,7 +457,7 @@ PROJECTIONS = {
                 Vy = tan(x / {radius_g_1});
                 Vz = tan(y / {radius_g_1}) * hypot(1.0, Vy);
             }}
-        
+
             a = Vz / {radius_p};
             a = Vy * Vy + a * a + Vx * Vx;
             b = 2 * {radius_g} * Vx;
@@ -457,12 +466,12 @@ PROJECTIONS = {
                 // FIXME
                 return vec4(1. / 0., 1. / 0., pos.z, pos.w);
             }}
-        
+
             k = (-b - sqrt(det)) / (2. * a);
             Vx = {radius_g} + k * Vx;
             Vy *= k;
             Vz *= k;
-        
+
             // atan2 in C
             lambda = atan(Vy, Vx);
             {over}
@@ -499,7 +508,7 @@ PROJECTIONS = {
             return vec4(degrees(lambda) + {lon_0}, degrees(phi), pos.z, pos.w);
         }}""",
     ),
-    'stere': (
+    "stere": (
         stere_init,
         """vec4 stere_map_e(vec4 pos) {{
             float lambda, phi, coslam, sinlam, sinphi, x, y;
@@ -585,7 +594,7 @@ PROJECTIONS = {
             return vec4(degrees(lambda) + {lon_0}, degrees(phi), pos.z, pos.w);
         }}""",
     ),
-    'eqc': (
+    "eqc": (
         eqc_init,
         None,
         """vec4 eqc_map_s(vec4 pos) {{
@@ -608,15 +617,17 @@ PROJECTIONS = {
         }}""",
     ),
 }
-PROJECTIONS['lcc'] = (lcc_init,
-                      PROJECTIONS['lcc'][1],
-                      PROJECTIONS['lcc'][1],
-                      PROJECTIONS['lcc'][3],
-                      PROJECTIONS['lcc'][3],
-                      )
+PROJECTIONS["lcc"] = (
+    lcc_init,
+    PROJECTIONS["lcc"][1],
+    PROJECTIONS["lcc"][1],
+    PROJECTIONS["lcc"][3],
+    PROJECTIONS["lcc"][3],
+)
 
 # Misc GLSL functions used in one or more mapping functions above
-adjlon_func = Function("""
+adjlon_func = Function(
+    """
     float adjlon(float lon) {
         if (abs(lon) <= M_PI) return (lon);
         lon += M_PI; // adjust to 0..2pi rad
@@ -624,7 +635,8 @@ adjlon_func = Function("""
         lon -= M_PI;  // adjust back to -pi..pi rad
         return( lon );
     }
-    """)
+    """
+)
 
 # handle prime meridian shifts
 pm_func_str = """
@@ -633,33 +645,37 @@ pm_func_str = """
     }}
 """
 
-pj_msfn = Function("""
+pj_msfn = Function(
+    """
     float pj_msfn(float sinphi, float cosphi, float es) {
         return (cosphi / sqrt (1. - es * sinphi * sinphi));
     }
-    """)
+    """
+)
 
 
 def pj_msfn_py(sinphi, cosphi, es):
-    return cosphi / np.sqrt(1. - es * sinphi * sinphi)
+    return cosphi / np.sqrt(1.0 - es * sinphi * sinphi)
 
 
-pj_tsfn = Function("""
+pj_tsfn = Function(
+    """
     float pj_tsfn(float phi, float sinphi, float e) {
         sinphi *= e;
         return (tan (.5 * (M_HALFPI - phi)) /
            pow((1. - sinphi) / (1. + sinphi), .5 * e));
     }
-    """)
+    """
+)
 
 
 def pj_tsfn_py(phi, sinphi, e):
     sinphi *= e
-    return (np.tan(.5 * (M_HALFPI - phi)) /
-            pow((1. - sinphi) / (1. + sinphi), .5 * e))
+    return np.tan(0.5 * (M_HALFPI - phi)) / pow((1.0 - sinphi) / (1.0 + sinphi), 0.5 * e)
 
 
-pj_phi2 = Function("""
+pj_phi2 = Function(
+    """
     float pj_phi2(float ts, float e) {
         float eccnth, Phi, con, dphi;
 
@@ -677,9 +693,11 @@ pj_phi2 = Function("""
         //    pj_ctx_set_errno( ctx, -18 );
         return Phi;
     }
-    """)
+    """
+)
 
-hypot = Function("""
+hypot = Function(
+    """
 float hypot(float x, float y) {
     if ( x < 0.)
         x = -x;
@@ -697,7 +715,8 @@ float hypot(float x, float y) {
         return ( x * sqrt( 1. + y * y ) );
     }
 }
-""")
+"""
+)
 
 
 class PROJ4Transform(BaseTransform):
@@ -731,32 +750,32 @@ class PROJ4Transform(BaseTransform):
         proj_dict = self.create_proj_dict(proj4_str)
 
         # Get the specific functions for this projection
-        proj_funcs = PROJECTIONS[proj_dict['proj']]
+        proj_funcs = PROJECTIONS[proj_dict["proj"]]
         # set default function parameters
         proj_init = proj_funcs[0]
         proj_args = proj_init(proj_dict)
 
-        if 'pm' in proj_args:
+        if "pm" in proj_args:
             # force to float
-            proj_args['pm'] = float(proj_args['pm'])
-            proj_args['over'] = 'lambda = adjlon(lambda);'
-        elif proj_args.get('over'):
-            proj_args['over'] = ''
+            proj_args["pm"] = float(proj_args["pm"])
+            proj_args["over"] = "lambda = adjlon(lambda);"
+        elif proj_args.get("over"):
+            proj_args["over"] = ""
         else:
-            proj_args['over'] = 'lambda = adjlon(lambda);'
+            proj_args["over"] = "lambda = adjlon(lambda);"
 
-        if proj_dict['a'] == proj_dict['b']:
+        if proj_dict["a"] == proj_dict["b"]:
             # spheroid
             self.glsl_map = proj_funcs[2]
             self.glsl_imap = proj_funcs[4]
             if self.glsl_map is None or self.glsl_imap is None:
-                raise ValueError("Spheroid transform for {} not implemented yet".format(proj_dict['proj']))
+                raise ValueError("Spheroid transform for {} not implemented yet".format(proj_dict["proj"]))
         else:
             # ellipsoid
             self.glsl_map = proj_funcs[1]
             self.glsl_imap = proj_funcs[3]
             if self.glsl_map is None or self.glsl_imap is None:
-                raise ValueError("Ellipsoid transform for {} not implemented yet".format(proj_dict['proj']))
+                raise ValueError("Ellipsoid transform for {} not implemented yet".format(proj_dict["proj"]))
 
         self.glsl_map = self.glsl_map.format(**proj_args)
         self.glsl_imap = self.glsl_imap.format(**proj_args)
@@ -771,16 +790,18 @@ class PROJ4Transform(BaseTransform):
             self._shader_map._add_dep(d)
             self._shader_imap._add_dep(d)
 
-        if 'pm' in proj_args:
+        if "pm" in proj_args:
             pm_func = Function(pm_func_str.format(**proj_args))
             self._shader_map._add_dep(pm_func)
             self._shader_imap._add_dep(pm_func)
-        elif proj_args['over']:
+        elif proj_args["over"]:
             self._shader_map._add_dep(adjlon_func)
             self._shader_imap._add_dep(adjlon_func)
 
         # Add special handling of possible infinity lon/lat values
-        self._shader_map['pre'] = """
+        self._shader_map[
+            "pre"
+        ] = """
     if (abs(pos.x) > 1e30 || abs(pos.y) > 1e30)
         return vec4(1. / 0., 1. / 0., pos.z, pos.w);
         """
@@ -789,14 +810,14 @@ class PROJ4Transform(BaseTransform):
 
     @property
     def is_geographic(self):
-        if hasattr(self.proj, 'crs'):
+        if hasattr(self.proj, "crs"):
             # pyproj 2.0+
             return self.proj.crs.is_geographic
         return self.proj.is_latlong()
 
     def create_proj_dict(self, proj_str):
         d = tuple(x.replace("+", "").split("=") for x in proj_str.split(" "))
-        d = dict((x[0], x[1] if len(x) > 1 else 'true') for x in d)
+        d = dict((x[0], x[1] if len(x) > 1 else "true") for x in d)
 
         # convert numerical parameters to floats
         for k in d.keys():
@@ -805,50 +826,50 @@ class PROJ4Transform(BaseTransform):
             except ValueError:
                 pass
 
-        d['proj4_str'] = proj_str
+        d["proj4_str"] = proj_str
 
         # if they haven't provided a radius then they must have provided a datum or ellps
-        if 'R' in d:
+        if "R" in d:
             # spheroid
-            d.setdefault('a', d['R'])
-            d.setdefault('b', d['R'])
-        if 'a' not in d:
-            if 'datum' not in d:
-                d.setdefault('ellps', d.setdefault('datum', 'WGS84'))
+            d.setdefault("a", d["R"])
+            d.setdefault("b", d["R"])
+        if "a" not in d:
+            if "datum" not in d:
+                d.setdefault("ellps", d.setdefault("datum", "WGS84"))
             else:
-                d.setdefault('ellps', d.get('datum'))
+                d.setdefault("ellps", d.get("datum"))
 
         # if they provided an ellps/datum fill in information we know about it
-        if d.get('ellps') is not None:
+        if d.get("ellps") is not None:
             # get information on the ellps being used
-            ellps_info = pj_ellps[d['ellps']]
-            for k in ['a', 'b', 'rf']:
+            ellps_info = pj_ellps[d["ellps"]]
+            for k in ["a", "b", "rf"]:
                 if k in ellps_info:
                     d.setdefault(k, ellps_info[k])
 
         # derive b, es, f, e
-        if 'rf' not in d:
-            if 'f' in d:
-                d['rf'] = 1. / d['f']
-            elif d['a'] == d['b']:
-                d['rf'] = 0.
+        if "rf" not in d:
+            if "f" in d:
+                d["rf"] = 1.0 / d["f"]
+            elif d["a"] == d["b"]:
+                d["rf"] = 0.0
             else:
-                d['rf'] = d['a'] / (d['a'] - d['b'])
-        if 'f' not in d:
-            if d['rf']:
-                d['f'] = 1. / d['rf']
+                d["rf"] = d["a"] / (d["a"] - d["b"])
+        if "f" not in d:
+            if d["rf"]:
+                d["f"] = 1.0 / d["rf"]
             else:
-                d['f'] = 0.
-        if 'b' not in d:
+                d["f"] = 0.0
+        if "b" not in d:
             # a and rf must be in the dict
-            d['b'] = d['a'] * (1. - d['f'])
-        if 'es' not in d:
-            if 'e' in d:
-                d['es'] = d['e'] ** 2
+            d["b"] = d["a"] * (1.0 - d["f"])
+        if "es" not in d:
+            if "e" in d:
+                d["es"] = d["e"] ** 2
             else:
-                d['es'] = 2 * d['f'] - d['f'] ** 2
-        if 'e' not in d:
-            d['e'] = d['es'] ** 0.5
+                d["es"] = 2 * d["f"] - d["f"] ** 2
+        if "e" not in d:
+            d["e"] = d["es"] ** 0.5
 
         return d
 

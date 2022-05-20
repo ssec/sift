@@ -4,13 +4,12 @@
 if the file setting.update doesn't exist in ~user/config/SIFT/settings/config copy the default settings dir
 If it exists and the contained date is older than the one contained in the default settings, overwrite it
 """
-import sys
-import os
-import tempfile
-import datetime
 import calendar
-
+import datetime
 import distutils.dir_util as dt
+import os
+import sys
+import tempfile
 
 CONF_ROOT_DIR = "{}/.config/SIFT"
 SETTING_UPDATE_FILE = "{}/settings/settings.version".format(CONF_ROOT_DIR)
@@ -18,7 +17,7 @@ SETTING_UPDATE_FILE = "{}/settings/settings.version".format(CONF_ROOT_DIR)
 
 def get_home_dir_path():
     """
-       Get the software root dir
+    Get the software root dir
     """
     mtgsift_dir = os.getenv("MTGSIFT_HOME", None)
 
@@ -26,7 +25,8 @@ def get_home_dir_path():
     if not mtgsift_dir:
         print(
             "Error, no ENV variable $MTGSIFT_HOME defined. "
-            "Please set the $MTGSIFT_HOME to root directory of the MTGSIFT distribution.")
+            "Please set the $MTGSIFT_HOME to root directory of the MTGSIFT distribution."
+        )
         sys.exit(1)
 
     # create dir if not there
@@ -40,15 +40,15 @@ class UTC(datetime.tzinfo):
     """UTC Timezone"""
 
     def utcoffset(self, a_dt):  # pylint: disable=W0613
-        ''' return utcoffset '''
+        """return utcoffset"""
         return 0
 
     def tzname(self, a_dt):  # pylint: disable=W0613
-        ''' return tzname '''
+        """return tzname"""
         return "UTC"
 
     def dst(self, a_dt):  # pylint: disable=W0613
-        ''' return dst '''
+        """return dst"""
         return 0
 
     # pylint: enable-msg=W0613
@@ -57,11 +57,11 @@ class UTC(datetime.tzinfo):
 UTC_TZ = UTC()
 
 
-def str2datetime(a_str, a_pattern='%Y%m%dT%H:%M:%SZ'):
+def str2datetime(a_str, a_pattern="%Y%m%dT%H:%M:%SZ"):
     """
-       :param a_datetime: the datetime.
-       :param a_pattern: the datetime string pattern to parse (default ='%Y%m%dT%H:%M:%SZ').
-       :return formatted string from a datetime.
+    :param a_datetime: the datetime.
+    :param a_pattern: the datetime string pattern to parse (default ='%Y%m%dT%H:%M:%SZ').
+    :return formatted string from a datetime.
     """
     if a_str:
         dt = datetime.datetime.strptime(a_str, a_pattern)
@@ -71,11 +71,11 @@ def str2datetime(a_str, a_pattern='%Y%m%dT%H:%M:%SZ'):
     return None
 
 
-def datetime2str(a_datetime, a_pattern='%Y%m%dT%H:%M:%SZ'):
+def datetime2str(a_datetime, a_pattern="%Y%m%dT%H:%M:%SZ"):
     """
-       :param a_datetime: the datetime.      
-       :param a_pattern: the datetime string pattern to use for the conversion (default ='%Y%m%dT%H:%M:%SZ').
-       :return formatted string from a datetime
+    :param a_datetime: the datetime.
+    :param a_pattern: the datetime string pattern to use for the conversion (default ='%Y%m%dT%H:%M:%SZ').
+    :return formatted string from a datetime
     """
     if a_datetime:
         return a_datetime.strftime(a_pattern)
@@ -85,10 +85,10 @@ def datetime2str(a_datetime, a_pattern='%Y%m%dT%H:%M:%SZ'):
 
 def e2datetime(a_epoch):
     """
-        convert epoch time in datetime
+    convert epoch time in datetime
 
-        :param  long a_epoch: the epoch time to convert
-        :return datetime: a datetime
+    :param  long a_epoch: the epoch time to convert
+    :return datetime: a datetime
     """
 
     # utcfromtimestamp is not working properly with a decimals.
@@ -106,28 +106,27 @@ def get_utcnow_epoch():
 
 def datetime2e(a_date):
     """
-        convert datetime in epoch
-        Beware the datetime as to be in UTC otherwise you might have some surprises
-            Args:
-               a_date: the datertime to convert
-            Returns: a epoch time
+    convert datetime in epoch
+    Beware the datetime as to be in UTC otherwise you might have some surprises
+        Args:
+           a_date: the datertime to convert
+        Returns: a epoch time
     """
     return calendar.timegm(a_date.timetuple())
 
 
 def get_home():
-    """ return the user home dir
-   """
+    """return the user home dir"""
     return os.path.expanduser("~")
 
 
 def get_random_name():
-    """ get a random filename or dirname"""
+    """get a random filename or dirname"""
     return next(tempfile._get_candidate_names())
 
 
 def makedirs(a_path):
-    """ my own version of makedir """
+    """my own version of makedir"""
 
     if os.path.isdir(a_path):
         # it already exists so return
@@ -140,8 +139,8 @@ def makedirs(a_path):
 
 def run():
     """
-      Default runner
-   """
+    Default runner
+    """
 
     home_dir = get_home()
 
@@ -175,13 +174,16 @@ def run():
         settings_dir = "{}/settings".format(setting_root_dir)
 
         if os.path.exists(settings_dir) and os.path.isdir(settings_dir):
-            os.rename(settings_dir, "{}/settings.old.{}".format(
-                setting_root_dir,
-                datetime2str(e2datetime(get_utcnow_epoch()), '%Y%m%dT%H%M%SZ')))
+            os.rename(
+                settings_dir,
+                "{}/settings.old.{}".format(
+                    setting_root_dir, datetime2str(e2datetime(get_utcnow_epoch()), "%Y%m%dT%H%M%SZ")
+                ),
+            )
 
         # rename new dir in settings
         os.rename(output_dir, settings_dir)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run()

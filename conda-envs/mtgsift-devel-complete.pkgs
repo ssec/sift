@@ -1,5 +1,5 @@
 # This file may be used to create an environment using:
-# e.g. ENV=devel 
+# e.g. ENV=devel
 # $ conda create --name $ENV --channel conda-forge --strict-channel-priority python=3.7
 # $ conda activate $ENV
 # $ conda config --env --add channels conda-forge

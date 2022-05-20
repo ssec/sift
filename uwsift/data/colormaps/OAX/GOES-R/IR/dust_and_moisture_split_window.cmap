@@ -7,10 +7,10 @@
 - This color table is specifically designed for the GOES-16 10.3-12.3 difference product, and is most useful for detecting blowing dust, volcanic ash, and regions of low-level water vapor pooling.  Values that are negative (especially below about -1.0) are colored shades of brown and are uniquely associated with blowing dust or volcanic ash.  Values near zero (white) are typically associated with optically thick clouds and snow cover.  Values above about +10 are generally optically thin clouds, such as thin cirrus.  Values between about +1 and +10 are of interest when attempting to diagnose regions of low-level water vapor pooling.  In *clear skies*, larger positive values in this range mean deeper low-level water vapor for a given temperature lapse rate.  Steeper lapse rates and deeper moisture will cause values to increase.
 -->
 <!-- TOWRdocs Status
-     New color table that is not part of the AWIPS baseline, for use with GOES-16. 
-     The color map can be added to styleRules in common_static, or it can be used to modify an existing display.  
-     For the latter, right-click the title of the product at the bottom of the CAVE screen.  Select "Change Color Map."  
-     Under "Set Color Table Range" press the entry that appears and there will be a pull-down of options. 
+     New color table that is not part of the AWIPS baseline, for use with GOES-16.
+     The color map can be added to styleRules in common_static, or it can be used to modify an existing display.
+     For the latter, right-click the title of the product at the bottom of the CAVE screen.  Select "Change Color Map."
+     Under "Set Color Table Range" press the entry that appears and there will be a pull-down of options.
      Select "site" and then your site 3-letter identifier, then "GOES-R", then "IR" (or "VIS" for Vis color tables), and select the desired color map.
 -->
 <!-- TOWRdocs POC

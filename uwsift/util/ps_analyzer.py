@@ -16,7 +16,7 @@ def format_byte_count(byte_count: int):
         byte_count = abs(byte_count)
 
     symbols = OrderedDict()
-    for idx, symbol in enumerate(['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB']):
+    for idx, symbol in enumerate(["B", "KiB", "MiB", "GiB", "TiB", "PiB"]):
         symbols[symbol] = 1 << idx * 10
     for symbol, min_byte_count in reversed(symbols.items()):
         if byte_count >= min_byte_count:

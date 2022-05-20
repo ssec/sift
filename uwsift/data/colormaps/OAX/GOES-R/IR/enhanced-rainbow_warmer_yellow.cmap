@@ -9,9 +9,9 @@ to help identify fires. This table is not recommended for fire detection in the 
 -->
 <!-- TOWRdocs Status
      New color table that is not part of the AWIPS baseline, for use with GOES-R imagery.
-     The color map can be added to styleRules in common_static, or it can be used to modify an existing display.  
-     For the latter, right-click the title of the product at the bottom of the CAVE screen.  Select "Change Color Map."  
-     Under "Set Color Table Range" press the entry that appears and there will be a pull-down of options. 
+     The color map can be added to styleRules in common_static, or it can be used to modify an existing display.
+     For the latter, right-click the title of the product at the bottom of the CAVE screen.  Select "Change Color Map."
+     Under "Set Color Table Range" press the entry that appears and there will be a pull-down of options.
      Select "site" and then your site 3-letter identifier, then "GOES-R", then "IR" (or "VIS" for Vis color tables), and select the desired color map.
 -->
 <!-- TOWRdocs POC

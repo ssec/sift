@@ -18,7 +18,7 @@ Assume X coordinate corresponds to seconds, apply transforms as needed
 - pop a context menu for a track or a frame
 - tool tips for frames or tracks
 - change display state of frame, represented by color (see TimelineFrameState)
-- allow one or more tracks to be selected 
+- allow one or more tracks to be selected
 - allow one or more frames to be selected
 - scroll left and right to follow playback animation in background
 - display time axis with actual dates and times, including click-to-place
@@ -66,28 +66,46 @@ https://stackoverflow.com/questions/4216139/python-object-in-qmimedata
 :license: GPLv3, see LICENSE for more details
 """
 import logging
-from typing import Mapping, Any, Tuple, Union
-from uuid import UUID
-from weakref import ref
 import pickle as pkl
 from datetime import datetime, timedelta
+from typing import Any, Mapping, Tuple, Union
+from uuid import UUID
+from weakref import ref
 
-from PyQt5.QtCore import Qt, QRectF
-from PyQt5.QtGui import QIcon, QGradient, QImage, QPixmap, QPainter, QPen, QBrush
-from PyQt5.QtWidgets import (QGraphicsItem, QGraphicsObject, QGraphicsTextItem,
-                             QGraphicsPixmapItem, QStyleOptionGraphicsItem, QWidget,
-                             QGraphicsSceneMouseEvent, QGraphicsSceneDragDropEvent,
-                             QGraphicsSceneContextMenuEvent, QGraphicsRectItem)
+from PyQt5.QtCore import QRectF, Qt
+from PyQt5.QtGui import QBrush, QGradient, QIcon, QImage, QPainter, QPen, QPixmap
+from PyQt5.QtWidgets import (
+    QGraphicsItem,
+    QGraphicsObject,
+    QGraphicsPixmapItem,
+    QGraphicsRectItem,
+    QGraphicsSceneContextMenuEvent,
+    QGraphicsSceneDragDropEvent,
+    QGraphicsSceneMouseEvent,
+    QGraphicsTextItem,
+    QStyleOptionGraphicsItem,
+    QWidget,
+)
 
 from uwsift.common import Flags
-from .common import (CoordTransform, GFXC, MIMETYPE_TIMELINE_COLORMAP, MIMETYPE_TIMELINE_TRACK,
-                     mimed_colormap, mimed_track, recv_mime, VisualState)
+
+from .common import (
+    GFXC,
+    MIMETYPE_TIMELINE_COLORMAP,
+    MIMETYPE_TIMELINE_TRACK,
+    CoordTransform,
+    VisualState,
+    mimed_colormap,
+    mimed_track,
+    recv_mime,
+)
 
 LOG = logging.getLogger(__name__)
 
 
 def _wtf_recursion():
-    from inspect import getouterframes, currentframe
+    from inspect import currentframe, getouterframes
+
     level = len(getouterframes(currentframe()))
     LOG.debug("frame boundingRect depth {}".format(level))
 
@@ -115,9 +133,10 @@ def _perform_context_menu(event, scene, track, frame) -> bool:
 
 
 class QTrackItem(QGraphicsObject):
-    """ A group of Frames corresponding to a timeline
+    """A group of Frames corresponding to a timeline
     This allows drag and drop of timelines to be easier
     """
+
     frames = None  # Iterable[QFrameItem], maintained privately between track and frame
     _scene = None  # weakref to scene
     _scale: CoordTransform = None
@@ -144,12 +163,23 @@ class QTrackItem(QGraphicsObject):
     _gi_icon: QGraphicsPixmapItem = None
     _gi_colormap: QGraphicsPixmapItem = None
 
-    def __init__(self, scene, scale: CoordTransform, track: str, z: int,
-                 title: str, subtitle: str = None, icon: QIcon = None, metadata: dict = None,
-                 tooltip: str = None, state: Flags = None, colormap: Union[QGradient, QImage, QPixmap] = None,
-                 min: float = None, max: float = None):
-        """Create a track and connect it to its Scene
-        """
+    def __init__(
+        self,
+        scene,
+        scale: CoordTransform,
+        track: str,
+        z: int,
+        title: str,
+        subtitle: str = None,
+        icon: QIcon = None,
+        metadata: dict = None,
+        tooltip: str = None,
+        state: Flags = None,
+        colormap: Union[QGradient, QImage, QPixmap] = None,
+        min: float = None,
+        max: float = None,
+    ):
+        """Create a track and connect it to its Scene"""
         super(QTrackItem, self).__init__()
         self.frames = []
         self._scene = ref(scene) if scene else None
@@ -222,8 +252,7 @@ class QTrackItem(QGraphicsObject):
     # commands to cause item updates and then propagate back to the scene
 
     def set_colormap(self, cmap: mimed_colormap):
-        """Inform scene that the user wants all tracks in our family to use this colormap
-        """
+        """Inform scene that the user wants all tracks in our family to use this colormap"""
         LOG.warning("set colormap from dragged colormap not yet implemented")
 
     def insert_track_before(self, track: mimed_track):
@@ -305,8 +334,7 @@ class QTrackItem(QGraphicsObject):
         #         yield child
 
     def _time_extent_of_frames(self):
-        """start time and duration of the frames held by the track
-        """
+        """start time and duration of the frames held by the track"""
         s, e = None, None
         for child in self._iter_frame_children():
             # y relative to track is 0
@@ -341,8 +369,12 @@ class QTrackItem(QGraphicsObject):
         # bounds relative to position in scene, left_pad space to left of local origin (x<0),
         # frames and right-pad at x>=0
         self.prepareGeometryChange()
-        self._bounds = QRectF(-GFXC.track_left_pad, -GFXC.track_height / 2,
-                              frames_width + GFXC.track_left_pad + GFXC.track_right_pad, GFXC.track_height)
+        self._bounds = QRectF(
+            -GFXC.track_left_pad,
+            -GFXC.track_height / 2,
+            frames_width + GFXC.track_left_pad + GFXC.track_right_pad,
+            GFXC.track_height,
+        )
         LOG.debug("new track bounds: {}".format(self._bounds))
         # origin is at the start of the first frame contained. padding extends into negative x
         LOG.debug("track centerline placed at {},{}".format(frames_left, screen_track_center_y))
@@ -350,8 +382,7 @@ class QTrackItem(QGraphicsObject):
         self._update_decorations()
 
     def update_frame_positions(self, *frames):
-        """Update frames' origins relative to self after TimelineCoordTransform has changed scale
-        """
+        """Update frames' origins relative to self after TimelineCoordTransform has changed scale"""
         myx = self.pos().x()  # my x coordinate relative to scene
         frames = tuple(frames) or self._iter_frame_children()
         for frame in frames:
@@ -368,6 +399,7 @@ class QFrameItem(QGraphicsObject):
     QGraphicsView representation of a data frame, with a start and end time relative to the scene.
     Essentially a frame sprite
     """
+
     _state: Flags = None
     _track = None  # weakref to track we belong to
     _scale: CoordTransform = None
@@ -383,10 +415,19 @@ class QFrameItem(QGraphicsObject):
     _gi_title = None
     _gi_subtitle = None
 
-    def __init__(self, track: QTrackItem, scale: CoordTransform, uuid: UUID,
-                 start: datetime, duration: timedelta, state: Flags,
-                 title: str, subtitle: str = None, thumb: QPixmap = None,
-                 metadata: Mapping[str, Any] = None):
+    def __init__(
+        self,
+        track: QTrackItem,
+        scale: CoordTransform,
+        uuid: UUID,
+        start: datetime,
+        duration: timedelta,
+        state: Flags,
+        title: str,
+        subtitle: str = None,
+        thumb: QPixmap = None,
+        metadata: Mapping[str, Any] = None,
+    ):
         """create a frame representation and add it to a timeline track within a scene
         Args:
             track: which timeline to add it to
@@ -483,8 +524,7 @@ class QFrameItem(QGraphicsObject):
 
     @property
     def pen_brush(self) -> Tuple[QPen, QBrush]:
-        """Pen and brush to use, based on VisualState
-        """
+        """Pen and brush to use, based on VisualState"""
         pen, brush = self._track().default_frame_pen_brush
         s = self._state
         if VisualState.READY in s:
@@ -502,8 +542,7 @@ class QFrameItem(QGraphicsObject):
         # super(QFrameItem, self).paint(painter, option, widget)
 
     def boundingRect(self) -> QRectF:
-        """return relative bounding rectangle, given position is set by Track parent as needed
-        """
+        """return relative bounding rectangle, given position is set by Track parent as needed"""
         # from inspect import getouterframes, currentframe
         # level = len(getouterframes(currentframe()))
         # LOG.debug("frame boundingRect depth {}".format(level))
@@ -516,7 +555,7 @@ class QFrameItem(QGraphicsObject):
         position is controlled by the track, since we have to be track-relative
         """
         left = 0.0
-        top = - GFXC.frame_height / 2
+        top = -GFXC.frame_height / 2
         height = GFXC.frame_height
         width = self._scale.calc_pixel_duration(self._duration)
         LOG.debug("width for {} is {} scene pixels".format(self._duration, width))

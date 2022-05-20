@@ -17,11 +17,13 @@
 """Test various parts of the Open File Wizard dialog."""
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QWizard
+
 from uwsift.view.open_file_wizard import OpenFileWizard
 
 
 def create_scene(dataset_ids):
     """Create a fake Scene object with specified datasets available."""
+
     class _SceneMock(object):
         """Fake Satpy Scene object."""
 
@@ -38,17 +40,21 @@ def create_scene(dataset_ids):
 
 def _get_group_files_mock(groups):
     """Create a fake group_files function for testing."""
+
     def _group_files_mock(*args, **kwargs):
         """Fake Satpy group_files function."""
         return groups
+
     return _group_files_mock
 
 
 def _create_get_open_file_names_mock(returned_files):
     """Create a mocked open file dialog box."""
+
     def _get_open_file_names(self_, msg, start_dir, filter_str):
         """Return filenames like a open file dialog."""
         return [returned_files]
+
     return _get_open_file_names
 
 
@@ -56,24 +62,28 @@ def test_wizard_abi_l1b(qtbot, monkeypatch):
     """Test that the open file wizard works all the way through."""
 
     from uwsift import config
-    config.set({'data_reading.exclude_datasets.calibration': ['radiance', 'counts']})
+
+    config.set({"data_reading.exclude_datasets.calibration": ["radiance", "counts"]})
 
     from satpy.tests.utils import make_dataid
-    files = ['OR_ABI-L1b-RadM1-M3C01_G16_s20182541300210_e20182541300267_c20182541300308.nc']
+
+    files = ["OR_ABI-L1b-RadM1-M3C01_G16_s20182541300210_e20182541300267_c20182541300308.nc"]
     dataset_ids = [
         # test that floating point resolutions don't crash
-        make_dataid(name='C01', resolution=1000.5, calibration='reflectance'),
+        make_dataid(name="C01", resolution=1000.5, calibration="reflectance"),
         # radiance calibrations should be ignored by default
-        make_dataid(name='C01', resolution=1000.5, calibration='radiance'),
+        make_dataid(name="C01", resolution=1000.5, calibration="radiance"),
     ]
     # Don't actually talk to Satpy
-    monkeypatch.setattr('uwsift.view.open_file_wizard.Scene', create_scene(dataset_ids))
-    monkeypatch.setattr('uwsift.view.open_file_wizard.group_files',
-                        _get_group_files_mock([{'abi_l1b': files}]))
+    monkeypatch.setattr("uwsift.view.open_file_wizard.Scene", create_scene(dataset_ids))
+    monkeypatch.setattr("uwsift.view.open_file_wizard.group_files", _get_group_files_mock([{"abi_l1b": files}]))
     # Add some ABI L1b files to the file list when add button is clicked
-    monkeypatch.setattr('uwsift.view.open_file_wizard.QtWidgets.QFileDialog.getOpenFileNames',
-                        _create_get_open_file_names_mock(
-                            ['OR_ABI-L1b-RadM1-M3C01_G16_s20182541300210_e20182541300267_c20182541300308.nc']))
+    monkeypatch.setattr(
+        "uwsift.view.open_file_wizard.QtWidgets.QFileDialog.getOpenFileNames",
+        _create_get_open_file_names_mock(
+            ["OR_ABI-L1b-RadM1-M3C01_G16_s20182541300210_e20182541300267_c20182541300308.nc"]
+        ),
+    )
 
     # open the dialog and do some things
     wiz = OpenFileWizard()
@@ -82,12 +92,12 @@ def test_wizard_abi_l1b(qtbot, monkeypatch):
 
     ## Page 1
     # Set reader to ABI L1b
-    wiz.ui.readerComboBox.setCurrentIndex(wiz.ui.readerComboBox.findData('abi_l1b'))
+    wiz.ui.readerComboBox.setCurrentIndex(wiz.ui.readerComboBox.findData("abi_l1b"))
     # Add a single file (see mock above)
     qtbot.mouseClick(wiz.ui.addButton, Qt.LeftButton)
     # Adding this file for the 'abi_l1b' should make this page complete
     # HACK: Bug in Windows, no enum's by name
-    assert wiz.button(getattr(QWizard.WizardButton, 'NextButton', 1)).isEnabled()
+    assert wiz.button(getattr(QWizard.WizardButton, "NextButton", 1)).isEnabled()
     # Go to the next page
     wiz.next()  # noqa: B305
 
@@ -99,12 +109,12 @@ def test_wizard_abi_l1b(qtbot, monkeypatch):
         assert item.checkState() == Qt.Checked
     # A product is selected, that should be to good for the next page
     # HACK: Bug in Windows, no enum's by name
-    assert wiz.button(getattr(QWizard.WizardButton, 'FinishButton', 3)).isEnabled()
+    assert wiz.button(getattr(QWizard.WizardButton, "FinishButton", 3)).isEnabled()
     # Go to the next page
     wiz.next()  # noqa: B305
 
     # Verify the wizard is left in a usable state for the MainWindow
     assert len(wiz.scenes) == 1
-    assert wiz.previous_reader == 'abi_l1b'
+    assert wiz.previous_reader == "abi_l1b"
     sel_ids = wiz.collect_selected_ids()
     assert len(sel_ids) == 1

@@ -1,15 +1,15 @@
-import os
-import re
-import sys
 import importlib
 import importlib.util
-import appdirs
-import subprocess
+import os
+import re
 import shutil
-import pytest
-
-from typing import Union
+import subprocess
+import sys
 from ast import literal_eval
+from typing import Union
+
+import appdirs
+import pytest
 
 
 def get_python_path() -> str:
@@ -31,8 +31,12 @@ def test_config_satpy_import_path(tmp_path):
     # Don't import the `uwsift` module using the current Python Interpreter, because the code
     # in the __init__.py is just executed once. Use a subprocess, such that the code can be
     # executed multiple times with different config files and corrupted Satpy modules.
-    def check_uwsift_paths(xdg_config_home: Union[str, None], base_config_dir: str,
-                           overwritten_satpy_import_path: Union[str, None], satpy_init_path: str):
+    def check_uwsift_paths(
+        xdg_config_home: Union[str, None],
+        base_config_dir: str,
+        overwritten_satpy_import_path: Union[str, None],
+        satpy_init_path: str,
+    ):
         if xdg_config_home is None:
             modified_env = {}
         else:
@@ -46,7 +50,7 @@ def test_config_satpy_import_path(tmp_path):
             "import sys, uwsift, satpy, satpy.readers\n"
             "print({'base_config_dir': uwsift.BASE_CONFIG_DIR, "
             "'overwritten_satpy_import_path': uwsift.config.get('satpy_import_path', None), "
-            "'satpy_init_path': satpy.__file__}, file=sys.stderr)"
+            "'satpy_init_path': satpy.__file__}, file=sys.stderr)",
         ]
         working_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
         process = subprocess.run(command, stderr=subprocess.PIPE, env=modified_env, cwd=working_dir, check=True)
@@ -66,7 +70,7 @@ def test_config_satpy_import_path(tmp_path):
     if os.path.exists(user_general_settings_path):
         if os.path.isfile(user_general_settings_path):
             with open(user_general_settings_path) as file:
-                import_path_regex = re.compile('^satpy_import_path: \"(.*)\"$')
+                import_path_regex = re.compile('^satpy_import_path: "(.*)"$')
                 for line in file.readlines():
                     match = import_path_regex.match(line)
                     if match:

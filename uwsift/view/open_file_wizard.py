@@ -15,20 +15,20 @@
 # You should have received a copy of the GNU General Public License
 # along with SIFT.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
 import logging
-from enum import Enum
-from PyQt5 import QtCore, QtWidgets, QtGui
-from PyQt5.QtCore import QPoint
-from PyQt5.QtWidgets import QMenu
+import os
 from collections import OrderedDict
+from enum import Enum
 from typing import Generator, Tuple, Union
 
-from uwsift.satpy_compat import DataID, get_id_value
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import QPoint
+from PyQt5.QtWidgets import QMenu
 from satpy import Scene
 from satpy.readers import group_files
 
 from uwsift import config
+from uwsift.satpy_compat import DataID, get_id_value
 from uwsift.ui.open_file_wizard_ui import Ui_openFileWizard
 from uwsift.util.common import get_reader_kwargs_dict
 from uwsift.workspace.importer import available_satpy_readers, filter_dataset_ids
@@ -48,7 +48,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         # enable context menus
         self.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
         # assume this doesn't change through the lifetime of the wizard
-        self.config = config.get('open_file_wizard')
+        self.config = config.get("open_file_wizard")
         self.last_open_dir = base_dir
         self._all_filenames = set()
         self._filelist_changed = False
@@ -88,8 +88,8 @@ class OpenFileWizard(QtWidgets.QWizard):
         """Set status message to empty text and check if this page is complete."""
         self.ui.fileSelectionPage.sift_page_checked = True
         if self.ui.fileList.count() != 0:
-            self.ui.statusMessage.setText('Checking file/reader compatibility...')
-            self.ui.statusMessage.setStyleSheet('color: black')
+            self.ui.statusMessage.setText("Checking file/reader compatibility...")
+            self.ui.statusMessage.setStyleSheet("color: black")
             reader = self.ui.readerComboBox.currentData()
             groups_updated = self._group_files(reader)
             if groups_updated:
@@ -98,9 +98,9 @@ class OpenFileWizard(QtWidgets.QWizard):
                 # if none of the files were usable then the user can't click Next
                 self.ui.fileSelectionPage.sift_page_checked = False
                 self.ui.statusMessage.setText("ERROR: Could not load any files with specified reader")
-                self.ui.statusMessage.setStyleSheet('color: red')
+                self.ui.statusMessage.setStyleSheet("color: red")
             else:
-                self.ui.statusMessage.setText('')
+                self.ui.statusMessage.setText("")
         self.ui.fileSelectionPage.completeChanged.emit()
 
     def _mark_unknown_files(self):
@@ -128,8 +128,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         self._all_selected = not self._all_selected
         self.select_all_products(select=self._all_selected)
 
-    def select_all_products(self, select=True, prop_key: Union[str, None] = None,
-                            prop_val: Union[str, None] = None):
+    def select_all_products(self, select=True, prop_key: Union[str, None] = None, prop_val: Union[str, None] = None):
         """Select products based on a specific property."""
         for row_idx in range(self.ui.selectIDTable.rowCount()):
             # our check state goes on the name item (always)
@@ -144,7 +143,7 @@ class OpenFileWizard(QtWidgets.QWizard):
     def _product_context_menu(self, position: QPoint):
         item = self.ui.selectIDTable.itemAt(position)
         col = item.column()
-        id_comp = self.config['id_components'][col]
+        id_comp = self.config["id_components"][col]
         # first column always has DataID
         id_data = self.ui.selectIDTable.item(item.row(), 0).data(QtCore.Qt.UserRole)
         menu = QMenu()
@@ -157,10 +156,12 @@ class OpenFileWizard(QtWidgets.QWizard):
 
     def collect_selected_ids(self):
         selected_ids = []
-        prime_key = self.config['id_components'][0]
+        prime_key = self.config["id_components"][0]
         for item_idx in range(self.ui.selectIDTable.rowCount()):
-            id_items = OrderedDict((key, self.ui.selectIDTable.item(item_idx, id_idx))
-                                   for id_idx, key in enumerate(self.config['id_components']))
+            id_items = OrderedDict(
+                (key, self.ui.selectIDTable.item(item_idx, id_idx))
+                for id_idx, key in enumerate(self.config["id_components"])
+            )
             if id_items[prime_key].checkState():
                 data_id = id_items[prime_key]
                 selected_ids.append(data_id.data(QtCore.Qt.UserRole))
@@ -176,7 +177,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         """Check that the current page will generate the necessary data."""
         valid = super(OpenFileWizard, self).validateCurrentPage()
         if not valid:
-            self.ui.statusMessage.setText('')
+            self.ui.statusMessage.setText("")
             return valid
 
         p_int = self.currentId()
@@ -187,15 +188,15 @@ class OpenFileWizard(QtWidgets.QWizard):
                 LOG.error("Could not load files with Satpy reader.")
                 LOG.debug("Could not load files with Satpy reader.", exc_info=True)
                 self.ui.statusMessage.setText("ERROR: Could not load files with specified reader")
-                self.ui.statusMessage.setStyleSheet('color: red')
+                self.ui.statusMessage.setStyleSheet("color: red")
                 return False
 
             if not self.all_available_products:
                 LOG.error("No known products can be loaded from the available files.")
                 self.ui.statusMessage.setText("ERROR: No known products can be loaded from the available files.")
-                self.ui.statusMessage.setStyleSheet('color: red')
+                self.ui.statusMessage.setStyleSheet("color: red")
                 return False
-        self.ui.statusMessage.setText('')
+        self.ui.statusMessage.setText("")
         return True
 
     def _group_files(self, reader) -> bool:
@@ -254,31 +255,31 @@ class OpenFileWizard(QtWidgets.QWizard):
         if self.AVAILABLE_READERS:
             readers = self.AVAILABLE_READERS
         else:
-            satpy_readers = config.get('data_reading.readers')
+            satpy_readers = config.get("data_reading.readers")
             readers = available_satpy_readers(as_dict=True)
-            readers = (r for r in readers if not satpy_readers or r['name'] in satpy_readers)
-            readers = sorted(readers, key=lambda x: x.get('long_name', x['name']))
-            readers = OrderedDict((ri.get('long_name', ri['name']), ri['name']) for ri in readers)
+            readers = (r for r in readers if not satpy_readers or r["name"] in satpy_readers)
+            readers = sorted(readers, key=lambda x: x.get("long_name", x["name"]))
+            readers = OrderedDict((ri.get("long_name", ri["name"]), ri["name"]) for ri in readers)
             OpenFileWizard.AVAILABLE_READERS = readers
 
         for idx, (reader_short_name, reader_name) in enumerate(readers.items()):
             self.ui.readerComboBox.addItem(reader_short_name, reader_name)
-            if self.config['default_reader'] == reader_name:
+            if self.config["default_reader"] == reader_name:
                 self.ui.readerComboBox.setCurrentIndex(idx)
 
     def _pretty_identifiers(self, data_id: DataID) -> Generator[Tuple[str, object, str], None, None]:
         """Determine pretty version of each identifier."""
-        for key in self.config['id_components']:
+        for key in self.config["id_components"]:
             value = get_id_value(data_id, key)
             if value is None:
                 pretty_val = "N/A"
-            elif key == 'wavelength':
+            elif key == "wavelength":
                 pretty_val = "{:0.02f} µm".format(value[1])
-            elif key == 'level':
+            elif key == "level":
                 pretty_val = "{:d} hPa".format(int(value))
-            elif key == 'resolution':
+            elif key == "resolution":
                 pretty_val = "{:d}m".format(int(value))
-            elif key == 'calibration' and isinstance(value, Enum):
+            elif key == "calibration" and isinstance(value, Enum):
                 # calibration is an enum in newer Satpy version
                 pretty_val = value.name
                 value = value.name
@@ -292,7 +293,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         self._disconnect_next_button_signals(self.ui.selectIDTable, self.ui.productSelectionPage)
 
         # name and level
-        id_components = self.config['id_components']
+        id_components = self.config["id_components"]
         self.ui.selectIDTable.setColumnCount(len(id_components))
         self.ui.selectIDTable.setHorizontalHeaderLabels([x.title() for x in id_components])
         for idx, ds_id in enumerate(filter_dataset_ids(self.all_available_products)):
@@ -308,7 +309,7 @@ class OpenFileWizard(QtWidgets.QWizard):
                 else:
                     item.setData(QtCore.Qt.UserRole, id_val)
                 item.setFlags((item.flags() ^ QtCore.Qt.ItemIsEditable) | QtCore.Qt.ItemIsUserCheckable)
-                if id_key == 'name':
+                if id_key == "name":
                     item.setCheckState(QtCore.Qt.Checked)
                 self.ui.selectIDTable.setItem(idx, col_idx, item)
                 col_idx += 1
@@ -324,10 +325,11 @@ class OpenFileWizard(QtWidgets.QWizard):
             return QtCore.Qt.Unchecked
 
     def add_file(self):
-        filename_filters = ['All files (*)']
-        filter_str = ';;'.join(filename_filters)
+        filename_filters = ["All files (*)"]
+        filter_str = ";;".join(filename_filters)
         files = QtWidgets.QFileDialog.getOpenFileNames(
-            self, "Select one or more files to open", self.last_open_dir or os.getenv("HOME"), filter_str)[0]
+            self, "Select one or more files to open", self.last_open_dir or os.getenv("HOME"), filter_str
+        )[0]
         if not files:
             return
         self.last_open_dir = os.path.dirname(files[0])

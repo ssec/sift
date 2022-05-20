@@ -1,7 +1,7 @@
 import logging
 import sys
 from pathlib import PurePath
-from typing import Optional, List
+from typing import List, Optional
 
 from PyQt5.QtWidgets import QMessageBox
 
@@ -21,17 +21,16 @@ def configure_loggers() -> None:
     writable), to console otherwise.
     """
 
-    formatter: logging.Formatter \
-        = logging.Formatter('%(asctime)s %(levelname)s %(module)s:'
-                            '%(funcName)s:L%(lineno)d %(message)s',
-                            datefmt='%Y-%m-%d %H:%M:%S')
+    formatter: logging.Formatter = logging.Formatter(
+        "%(asctime)s %(levelname)s %(module)s:" "%(funcName)s:L%(lineno)d %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    )
 
-    config_key: str = 'logging.filename'
+    config_key: str = "logging.filename"
     file_path: Optional[str] = config.get(config_key, None)
     handler = __configure_handler(file_path)
 
     handler.setFormatter(formatter)
-    
+
     loggers_all_level: Optional[str] = __configure_root_logger(handler)
     __configure_available_loggers(loggers_all_level)
 
@@ -49,29 +48,24 @@ def __configure_handler(file_path: str):
         return handler
 
     if not PurePath(file_path).is_absolute():
-        err_msg: str = (f"Logging to file '{file_path}' is not possible."
-                        f"\nThe given path is not absolute."
-                        f"\nLogging to console instead.")
-        QMessageBox.warning(None,
-                            "Error in Logging Configuration",
-                            err_msg)
+        err_msg: str = (
+            f"Logging to file '{file_path}' is not possible."
+            f"\nThe given path is not absolute."
+            f"\nLogging to console instead."
+        )
+        QMessageBox.warning(None, "Error in Logging Configuration", err_msg)
         return handler
 
     try:
         handler: logging.FileHandler = logging.FileHandler(file_path)
     except OSError as e:
-        err_msg: str = (f"Logging to file '{file_path}' is not possible."
-                        f"\n{e}"
-                        f"\nLogging to console instead.")
-        QMessageBox.warning(None,
-                            "Error in Logging Configuration",
-                            err_msg)
+        err_msg: str = f"Logging to file '{file_path}' is not possible." f"\n{e}" f"\nLogging to console instead."
+        QMessageBox.warning(None, "Error in Logging Configuration", err_msg)
 
     return handler
 
 
-def __configure_available_loggers(logger_all_level: Optional[str]) \
-        -> None:
+def __configure_available_loggers(logger_all_level: Optional[str]) -> None:
     """
     Remove handlers from all loggers to ensure that all write to either the
     console or a log file by propagating to the root logger.
@@ -80,15 +74,14 @@ def __configure_available_loggers(logger_all_level: Optional[str]) \
     """
     # The following will collect all loggers except for the root logger. This is
     # exactly what's intended.
-    loggers: List[logging.Logger] = [logging.getLogger(name) for name in
-                                     logging.root.manager.loggerDict]
+    loggers: List[logging.Logger] = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
     for logger in loggers:
         # No individual handlers, only the root logger shall have handlers.
         # This avoids any duplicated log messages.
         logger.handlers.clear()
         logger.propagate = True
 
-        config_key: str = 'logging.loggers.' + logger.name + '.level'
+        config_key: str = "logging.loggers." + logger.name + ".level"
         individual_level = config.get(config_key, logger_all_level)
 
         if individual_level is None:
@@ -98,11 +91,10 @@ def __configure_available_loggers(logger_all_level: Optional[str]) \
 
         try:
             logger.setLevel(individual_level)
-            #LOG.debug(f"Individual level configuration for logger"
+            # LOG.debug(f"Individual level configuration for logger"
             #          f" '{logger.name}' found and set: '{individual_level}'")
         except ValueError:
-            LOG.warning(f"Logger '{logger.name}' configured with invalid"
-                        f" log level '{individual_level}'. Ignoring.")
+            LOG.warning(f"Logger '{logger.name}' configured with invalid" f" log level '{individual_level}'. Ignoring.")
 
 
 def __configure_root_logger(handler: logging.Handler) -> Optional[str]:
@@ -116,7 +108,7 @@ def __configure_root_logger(handler: logging.Handler) -> Optional[str]:
     root_logger.handlers.clear()
     root_logger.addHandler(handler)
 
-    config_key: str = 'logging.loggers.all.level'
+    config_key: str = "logging.loggers.all.level"
     loggers_all_level: Optional[str] = config.get(config_key, None)
     if loggers_all_level is None:
         # Do nothing since no level was configured for "all" loggers
@@ -125,8 +117,7 @@ def __configure_root_logger(handler: logging.Handler) -> Optional[str]:
     try:
         root_logger.setLevel(loggers_all_level)
     except ValueError:
-        LOG.warning(f"Configured '{config_key}: {loggers_all_level}'"
-                    f" isn't a valid log level. Ignoring.")
+        LOG.warning(f"Configured '{config_key}: {loggers_all_level}'" f" isn't a valid log level. Ignoring.")
         return None
 
     return loggers_all_level

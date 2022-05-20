@@ -29,4 +29,3 @@ ln -fs ../resources/qtwebengine_resources_100p.pak qtwebengine_resources_100p.pa
 ln -fs ../resources/qtwebengine_resources_200p.pak qtwebengine_resources_200p.pak
 ln -fs ../resources/qtwebengine_resources.pak qtwebengine_resources.pak
 ln -fs ../translations/qtwebengine_locales qtwebengine_locales
-

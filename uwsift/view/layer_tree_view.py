@@ -2,8 +2,7 @@ import logging
 from uuid import UUID
 
 from PyQt5.QtCore import QModelIndex, Qt, pyqtSignal
-from PyQt5.QtWidgets import QAbstractItemView, QHeaderView, QTreeView
-from PyQt5.QtWidgets import (QMenu)
+from PyQt5.QtWidgets import QAbstractItemView, QHeaderView, QMenu, QTreeView
 
 from uwsift.common import Kind
 from uwsift.common import LayerModelColumns as LMC  # noqa
@@ -37,8 +36,7 @@ class LayerTreeView(QTreeView):
         self.setDragDropMode(QAbstractItemView.InternalMove)
 
         self.visibility_delegate = PieDialDelegate(parent=self)
-        self.setItemDelegateForColumn(LMC.VISIBILITY,
-                                      self.visibility_delegate)
+        self.setItemDelegateForColumn(LMC.VISIBILITY, self.visibility_delegate)
         self.setEditTriggers(QAbstractItemView.AllEditTriggers)
 
         self.customContextMenuRequested.connect(self.open_layer_context_menu)
@@ -56,8 +54,7 @@ class LayerTreeView(QTreeView):
         for column in range(self.model().columnCount()):
             self.resizeColumnToContents(column)
 
-    def rowsInserted(self, parent: QModelIndex, start: int, end: int)\
-            -> None:
+    def rowsInserted(self, parent: QModelIndex, start: int, end: int) -> None:
 
         super(LayerTreeView, self).rowsInserted(parent, start, end)
         for idx in range(start, end + 1):
@@ -71,17 +68,13 @@ class LayerTreeView(QTreeView):
         menu = QMenu()
         selection_model_idx = self.selectionModel().currentIndex()
 
-        model_idx = self.model().index(selection_model_idx.row(), 0,
-                                       QModelIndex())
+        model_idx = self.model().index(selection_model_idx.row(), 0, QModelIndex())
         if not model_idx.isValid():
-            raise ValueError(f"Entry at row {selection_model_idx.row()}"
-                             f" not in model")
+            raise ValueError(f"Entry at row {selection_model_idx.row()}" f" not in model")
 
         layer: LayerItem = self.model().layers[model_idx.row()]
         actions = {}
-        if layer is not None and layer.kind in [Kind.IMAGE,
-                                                Kind.COMPOSITE,
-                                                Kind.CONTOUR]:
+        if layer is not None and layer.kind in [Kind.IMAGE, Kind.COMPOSITE, Kind.CONTOUR]:
             actions.update(self.change_layer_colormap_menu(menu, layer.uuid))
 
         if not actions:
@@ -98,17 +91,17 @@ class LayerTreeView(QTreeView):
 
     def change_layer_colormap_menu(self, menu: QMenu, selected_uuid: UUID):
         model = self.model()
-        def _show_change_colormap_dialog(action): # noqa
+
+        def _show_change_colormap_dialog(action):  # noqa
             d = ChangeColormapDialog(model, selected_uuid, parent=self)
             d.show()
             d.raise_()
             d.activateWindow()
 
-        action = menu.addAction('Change Colormap...')
+        action = menu.addAction("Change Colormap...")
         return {action: _show_change_colormap_dialog}
 
-    def currentChanged(self, current: QModelIndex,
-                       previous: QModelIndex) -> None:
+    def currentChanged(self, current: QModelIndex, previous: QModelIndex) -> None:
         # TODO: This is not Qt's default way of handling selections and the
         #  "current item", but for now - as we are not (yet) interested in
         #  multiple selections - it is sufficient. We may need to revise this

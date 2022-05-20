@@ -18,5 +18,3 @@ displayed name will be *REFL (mean, all)*, for
     standard_names:
       'toa_outgoing_radiance_per_unit_wavelength': RAD
       'reflectance_mean_all': REFL (mean, all)
-
-

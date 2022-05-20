@@ -2,11 +2,12 @@ import logging
 from datetime import datetime
 from types import MappingProxyType
 from typing import List, Optional, Tuple
-from uuid import uuid1, UUID
+from uuid import UUID, uuid1
 
 from uwsift import config
-from uwsift.common import Presentation, N_A, Info, LayerModelColumns as LMC, \
-    LayerVisibility
+from uwsift.common import N_A, Info
+from uwsift.common import LayerModelColumns as LMC
+from uwsift.common import LayerVisibility, Presentation
 from uwsift.model.composite_recipes import Recipe
 from uwsift.model.document import units_conversion
 from uwsift.model.product_dataset import ProductDataset
@@ -16,9 +17,15 @@ LOG = logging.getLogger(__name__)
 
 
 class LayerItem:
-    def __init__(self, model, info: frozendict, presentation: Presentation,
-                 grouping_key=None,
-                 recipe: Optional[Recipe] = None, parent=None):
+    def __init__(
+        self,
+        model,
+        info: frozendict,
+        presentation: Presentation,
+        grouping_key=None,
+        recipe: Optional[Recipe] = None,
+        parent=None,
+    ):
         """
         Class to represent layers as items of LayerModel's `layers` collection.
 
@@ -70,7 +77,7 @@ class LayerItem:
             # for _get_dataset_info_labels()
             "name",
             "standard_name",
-            "wavelength"
+            "wavelength",
         ]:
             if key in info:
                 layer_info[key] = info[key]
@@ -91,9 +98,11 @@ class LayerItem:
 
     @property
     def descriptor(self):
-        return f"{self._invariable_display_data[LMC.SOURCE]} " \
-               f"{self._invariable_display_data[LMC.NAME]} " \
-               f"{self._invariable_display_data[LMC.WAVELENGTH]}"
+        return (
+            f"{self._invariable_display_data[LMC.SOURCE]} "
+            f"{self._invariable_display_data[LMC.NAME]} "
+            f"{self._invariable_display_data[LMC.WAVELENGTH]}"
+        )
 
     def update_invariable_display_data(self) -> None:
         if self.recipe:
@@ -101,7 +110,7 @@ class LayerItem:
                 LMC.SOURCE: self.recipe.kind(),
                 LMC.NAME: self.recipe.name,
                 LMC.WAVELENGTH: N_A,
-                LMC.PROBE_UNIT: N_A
+                LMC.PROBE_UNIT: N_A,
             }
             return
 
@@ -113,7 +122,7 @@ class LayerItem:
             LMC.SOURCE: f"{platform.value} {instrument.value}",
             LMC.NAME: name,
             LMC.WAVELENGTH: wavelength,
-            LMC.PROBE_UNIT: unit
+            LMC.PROBE_UNIT: unit,
         }
 
     def data(self, column: int):
@@ -187,11 +196,10 @@ class LayerItem:
             except KeyError:
                 ds_name = N_A
 
-        ds_name_from_config = config.get(f"standard_names.{ds_name}",
-                                         default=None)
+        ds_name_from_config = config.get(f"standard_names.{ds_name}", default=None)
 
         if not ds_name_from_config:
-            ds_name = ds_name.replace('_', ' ')
+            ds_name = ds_name.replace("_", " ")
         else:
             ds_name = ds_name_from_config
 
@@ -215,9 +223,7 @@ class LayerItem:
     def dynamic(self):
         return len(self._timeline) != 0
 
-    def add_dataset(self, info: frozendict,
-                    presentation: Optional[Presentation] = None) \
-            -> Optional[ProductDataset]:
+    def add_dataset(self, info: frozendict, presentation: Optional[Presentation] = None) -> Optional[ProductDataset]:
         """
         Add ProductDataset to Layer. If a Presentation is passed
         it overwrites the Presentation of the layer for the given dataset.
@@ -232,16 +238,16 @@ class LayerItem:
         dataset_uuid = info[Info.UUID]
         sched_time = info[Info.SCHED_TIME]
         if self.has_in_timeline(dataset_uuid):
-            LOG.debug(f"The given dataset for {sched_time}"
-                      f" is already in layer '{self.descriptor}',"
-                      f" nothing to do.")
+            LOG.debug(
+                f"The given dataset for {sched_time}" f" is already in layer '{self.descriptor}'," f" nothing to do."
+            )
             return None
 
         if sched_time in self._timeline:
             # TODO: Consider: Would it be better to overwrite the exiting entry?
-            LOG.warning(f"Other dataset for {sched_time}"
-                        f" is already in layer '{self.descriptor}',"
-                        f" ignoring the new one.")
+            LOG.warning(
+                f"Other dataset for {sched_time}" f" is already in layer '{self.descriptor}'," f" ignoring the new one."
+            )
             return None
 
         product_dataset = ProductDataset(self.uuid, info, presentation)
@@ -253,12 +259,10 @@ class LayerItem:
         return dataset_uuid in [pds.uuid for pds in self._timeline.values()]
 
     def _sort_timeline(self):
-        self._timeline = {kv[0]: kv[1] for kv in sorted(self._timeline.items(),
-                                                        key=lambda kv: kv[0])}
+        self._timeline = {kv[0]: kv[1] for kv in sorted(self._timeline.items(), key=lambda kv: kv[0])}
 
     def get_dataset_by_uuid(self, uuid: UUID) -> Optional[ProductDataset]:
-        items_for_uuid = [item for item in self.timeline.items()
-                          if item[1].uuid == uuid]
+        items_for_uuid = [item for item in self.timeline.items() if item[1].uuid == uuid]
         if not items_for_uuid:
             return None
         assert len(items_for_uuid) == 1
@@ -279,14 +283,14 @@ class LayerItem:
         #  go unnoticed here, thus:
         assert num_active_product_datasets <= 1
 
-        return None if num_active_product_datasets == 0 \
-            else active_product_datasets[0]
+        return None if num_active_product_datasets == 0 else active_product_datasets[0]
 
     def add_multichannel_dataset(
-            self, presentation: Optional[Presentation],
-            sched_time: datetime,
-            input_datasets_uuids: Optional[List[UUID]],
-            input_datasets_infos: Optional[List[frozendict]]
+        self,
+        presentation: Optional[Presentation],
+        sched_time: datetime,
+        input_datasets_uuids: Optional[List[UUID]],
+        input_datasets_infos: Optional[List[frozendict]],
     ) -> ProductDataset:
         """Add multichannel ProductDataset to Layer. If a Presentation is passed
         it overwrites the Presentation of the layer for the given dataset.
@@ -302,14 +306,15 @@ class LayerItem:
                  exist in the layer
         """
         if sched_time in self._timeline:
-            LOG.warning(f"Other  multichannel dataset for {sched_time}"
-                        f" is already in layer '{self.descriptor}',"
-                        f" ignoring the new one.")
+            LOG.warning(
+                f"Other  multichannel dataset for {sched_time}"
+                f" is already in layer '{self.descriptor}',"
+                f" ignoring the new one."
+            )
             return None
 
         product_dataset = ProductDataset.get_rgb_multichannel_product_dataset(
-            self.uuid, presentation, input_datasets_uuids, self.kind,
-            sched_time, input_datasets_infos
+            self.uuid, presentation, input_datasets_uuids, self.kind, sched_time, input_datasets_infos
         )
         self._timeline[sched_time] = product_dataset
         self._sort_timeline()
@@ -323,19 +328,22 @@ class LayerItem:
         """
         self._timeline.pop(sched_time, None)
 
-    def add_algebraic_dataset(self, presentation: Optional[Presentation],
-                              info: frozendict, sched_time: datetime,
-                              input_datasets_uuids: Optional[List[UUID]]
-                              ):
+    def add_algebraic_dataset(
+        self,
+        presentation: Optional[Presentation],
+        info: frozendict,
+        sched_time: datetime,
+        input_datasets_uuids: Optional[List[UUID]],
+    ):
         if sched_time in self._timeline:
-            LOG.warning(f"Other  multichannel dataset for {sched_time}"
-                        f" is already in layer '{self.descriptor}',"
-                        f" ignoring the new one.")
+            LOG.warning(
+                f"Other  multichannel dataset for {sched_time}"
+                f" is already in layer '{self.descriptor}',"
+                f" ignoring the new one."
+            )
             return None
 
-        product_dataset = ProductDataset.get_algebraic_dataset(
-            self.uuid, info, presentation, input_datasets_uuids
-        )
+        product_dataset = ProductDataset.get_algebraic_dataset(self.uuid, info, presentation, input_datasets_uuids)
 
         self._timeline[sched_time] = product_dataset
         self._sort_timeline()

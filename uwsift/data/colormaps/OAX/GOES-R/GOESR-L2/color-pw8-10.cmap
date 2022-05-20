@@ -3,7 +3,7 @@
          Precipitable Water (TPW) color map (color-pw8-10).
     -->
     <!-- TOWRdocs Description
-         Updates GOES-R baseline colormap for TPW. This is a 10 bits per pixel linear enhancement. The main colors range 
+         Updates GOES-R baseline colormap for TPW. This is a 10 bits per pixel linear enhancement. The main colors range
 		 from brown to blue to green to yellow to red to magenta to pink to red, for increasing amounts of moisture.
 		 In general, this is based on the traditional GOES Sounder TPW enhancement from CIMSS.
 		 If 80 mm is used for these 10 bit enhancements, that’s a read-out precision of approximately 0.08 mm. (80/(2^10)).

@@ -16,15 +16,16 @@ Example::
 """
 
 import os
-import sys
+import re
 import shutil
 import subprocess
-import re
+import sys
 
 
 def get_version():
     try:
         from uwsift import __version__
+
         return __version__
     except ImportError:
         raise RuntimeError("Could not determine SIFT version. Is SIFT installed?")
@@ -32,54 +33,56 @@ def get_version():
 
 def main():
     import argparse
+
     parser = argparse.ArgumentParser(
-        description="Build SIFT installation tarball (remaining arguments "
-                    "are passed to conda-pack)")
-    parser.add_argument('--arcroot',
-                        help="Directory name inside the tarball (default: SIFT_X.Y.Z)")
-    parser.add_argument('-o', '--output',
-                        help="Pathname for bundled file. Default is "
-                             "'SIFT_X.Y.Z_<platform>.<ext>' where platform is "
-                             "'linux', 'darwin', or 'win32' and ext is "
-                             "'.tar.gz' for linux and OSX, '.zip' for Windows.")
+        description="Build SIFT installation tarball (remaining arguments " "are passed to conda-pack)"
+    )
+    parser.add_argument("--arcroot", help="Directory name inside the tarball (default: SIFT_X.Y.Z)")
+    parser.add_argument(
+        "-o",
+        "--output",
+        help="Pathname for bundled file. Default is "
+        "'SIFT_X.Y.Z_<platform>.<ext>' where platform is "
+        "'linux', 'darwin', or 'win32' and ext is "
+        "'.tar.gz' for linux and OSX, '.zip' for Windows.",
+    )
     args, unknown_args = parser.parse_known_args()
 
     version = get_version()
     if args.arcroot is None:
         args.arcroot = f"SIFT_{version}"
     if args.output is None:
-        ext = '.zip' if sys.platform.startswith('win') else '.tar.gz'
+        ext = ".zip" if sys.platform.startswith("win") else ".tar.gz"
         args.output = f"SIFT_{version}_{sys.platform}{ext}"
 
     # Copy appropriate wrapper scripts
     dst = sys.prefix
     script_dir = os.path.realpath(os.path.dirname(__file__))
-    if 'nux' in sys.platform:
-        script = os.path.join(script_dir, 'bundle_scripts', 'SIFT.sh')
-        shutil.copy(script, os.path.join(dst, 'SIFT.sh'))
-    elif 'darwin' in sys.platform:
-        script = os.path.join(script_dir, 'bundle_scripts', 'SIFT.sh')
-        shutil.copy(script, os.path.join(dst, 'SIFT.command'))
-    elif 'win' in sys.platform:
-        script = os.path.join(script_dir, 'bundle_scripts', 'SIFT.bat')
-        shutil.copy(script, os.path.join(dst, 'SIFT.bat'))
+    if "nux" in sys.platform:
+        script = os.path.join(script_dir, "bundle_scripts", "SIFT.sh")
+        shutil.copy(script, os.path.join(dst, "SIFT.sh"))
+    elif "darwin" in sys.platform:
+        script = os.path.join(script_dir, "bundle_scripts", "SIFT.sh")
+        shutil.copy(script, os.path.join(dst, "SIFT.command"))
+    elif "win" in sys.platform:
+        script = os.path.join(script_dir, "bundle_scripts", "SIFT.bat")
+        shutil.copy(script, os.path.join(dst, "SIFT.bat"))
     else:
         raise RuntimeError(f"Unknown platform: {sys.platform}")
 
     # HACK: https://github.com/conda/conda-pack/issues/141
-    if sys.platform.startswith('win'):
-        with open(os.path.join(sys.prefix, 'qt.conf'), 'rt') as qtconf:
+    if sys.platform.startswith("win"):
+        with open(os.path.join(sys.prefix, "qt.conf"), "rt") as qtconf:
             old_text = qtconf.read()
-        old_prefix, = tuple(re.findall(r'^Prefix\s*=\s*(.*?).Library\s*$', old_text, re.MULTILINE))
-        new_prefix = old_prefix.replace('/', '\\')
+        (old_prefix,) = tuple(re.findall(r"^Prefix\s*=\s*(.*?).Library\s*$", old_text, re.MULTILINE))
+        new_prefix = old_prefix.replace("/", "\\")
         new_text = old_text.replace(old_prefix, new_prefix)
-        with open(os.path.join(sys.prefix, 'qt.conf'), 'wt') as qtconf:
+        with open(os.path.join(sys.prefix, "qt.conf"), "wt") as qtconf:
             qtconf.write(new_text)
-        with open(os.path.join(sys.prefix, 'Library', 'bin', 'qt.conf'), 'wt') as qtconf:
+        with open(os.path.join(sys.prefix, "Library", "bin", "qt.conf"), "wt") as qtconf:
             qtconf.write(new_text)
 
-    subprocess.check_call(['conda-pack', '--arcroot', args.arcroot,
-                          '--output', args.output] + unknown_args)
+    subprocess.check_call(["conda-pack", "--arcroot", args.arcroot, "--output", args.output] + unknown_args)
     os.chmod(args.output, 0o755)
 
     # TODO: Do additional risky cleanup to reduce output file size

@@ -20,10 +20,10 @@ build:
 
 requirements:
   host:
-    - python 
+    - python
     - pyqt
   run:
-    - python 
+    - python
     - pyqt
 
 test:

@@ -5,14 +5,14 @@ import os
 import shlex
 import signal
 import subprocess
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from socket import gethostname
 from time import sleep
-from typing import List, Tuple, Union, Optional
+from typing import List, Optional, Tuple, Union
 
 import appdirs
 from donfig import Config
-from psutil import Process, NoSuchProcess
+from psutil import NoSuchProcess, Process
 
 LOG = logging.getLogger(__name__)
 
@@ -58,15 +58,14 @@ class Watchdog:
              used as the default location of the heartbeat file.
         """
         self.hostname = gethostname()
-        config = Config('uwsift', paths=config_dirs)
+        config = Config("uwsift", paths=config_dirs)
 
         heartbeat_file = get_config_value(config, "watchdog.heartbeat_file")
         self.heartbeat_file = heartbeat_file.replace("$$CACHE_DIR$$", cache_dir)
 
         notification_cmd = config.get("watchdog.notification_cmd", None)
         if not notification_cmd:
-            LOG.warning("Can't send notifications"
-                        " because `notification_cmd` isn't configured")
+            LOG.warning("Can't send notifications" " because `notification_cmd` isn't configured")
         else:
             self.notification_cmd = shlex.quote(notification_cmd)
 
@@ -80,8 +79,7 @@ class Watchdog:
         else:
             self.restart_interval = timedelta(seconds=restart_interval)
 
-        ask_again_interval = int(config.get(
-            "watchdog.auto_restart_ask_again_interval", 0))
+        ask_again_interval = int(config.get("watchdog.auto_restart_ask_again_interval", 0))
         if ask_again_interval == 0:
             LOG.warning("Auto Restart will ask the user only once")
         else:
@@ -111,8 +109,8 @@ class Watchdog:
             raise ValueError("expected a unit like `M` or `G`")
         byte_count, unit = int(byte_count[:-1]), byte_count[-1]
 
-        MEBIBYTE_BYTES = 1024 ** 2
-        GIBIBYTE_BYTES = 1024 ** 3
+        MEBIBYTE_BYTES = 1024**2
+        GIBIBYTE_BYTES = 1024**3
 
         if unit == "M":
             return byte_count * MEBIBYTE_BYTES
@@ -131,8 +129,7 @@ class Watchdog:
             content = file.read()
 
         pid, timestamp = content.splitlines()
-        return int(pid), datetime.strptime(timestamp,
-                                           WATCHDOG_DATETIME_FORMAT_STORE)
+        return int(pid), datetime.strptime(timestamp, WATCHDOG_DATETIME_FORMAT_STORE)
 
     def _notify(self, level: int, text: str):
         """
@@ -150,8 +147,7 @@ class Watchdog:
             process_name = shlex.quote(f"{APPLICATION_DIR}-watchdog")
             severity = shlex.quote(logging.getLevelName(level))
             text = shlex.quote(text)
-            cmd = [self.notification_cmd, machine, process_name,
-                   severity, text]
+            cmd = [self.notification_cmd, machine, process_name, severity, text]
 
             try:
                 subprocess.run(cmd, shell=True, check=True)
@@ -218,8 +214,7 @@ class Watchdog:
             os.kill(pid, signal.SIGUSR1)
             self._notify(logging.INFO, f"Sent restart request to {pid}")
         except ProcessLookupError:
-            self._notify(logging.WARNING, f"Can't issue restart request because"
-                                          f" the PID {pid} doesn't exist")
+            self._notify(logging.WARNING, f"Can't issue restart request because" f" the PID {pid} doesn't exist")
 
     def run(self):
         """
@@ -237,52 +232,50 @@ class Watchdog:
             if self.restart_interval is None:
                 sleep(self.heartbeat_check_interval)
             else:
-                sleep(min(self.heartbeat_check_interval,
-                          self.restart_interval.seconds))
+                sleep(min(self.heartbeat_check_interval, self.restart_interval.seconds))
 
             try:
                 pid, latest_dataset_time = self._read_watchdog_file()
             except ValueError as err:
-                self._notify(logging.ERROR, f"Can't parse the watchdog file:"
-                                            f" {err}")
+                self._notify(logging.ERROR, f"Can't parse the watchdog file:" f" {err}")
                 continue
             except FileNotFoundError:
                 # application might not have been started yet or
                 # the application is running but no data was loaded yet
-                self._notify(logging.INFO, f"Heartbeat file doesn't exist:"
-                                           f" {self.heartbeat_file}")
+                self._notify(logging.INFO, f"Heartbeat file doesn't exist:" f" {self.heartbeat_file}")
                 continue
 
             # The last update time is implicitly stored as the file modification
             # time. It is possible to approximate this time by checking whether
             # the file content changes, but if the user loads the same dataset
             # again, then this update won't be detected.
-            modification_time = datetime.fromtimestamp(
-                os.path.getmtime(self.heartbeat_file), tz=timezone.utc)
+            modification_time = datetime.fromtimestamp(os.path.getmtime(self.heartbeat_file), tz=timezone.utc)
 
             now_utc = datetime.now(tz=timezone.utc)
             idle_time = now_utc - modification_time
             if idle_time.total_seconds() > self.max_tolerable_idle_time:
-                self._notify(logging.WARNING, f"Dataset was not updated"
-                                              f" since {modification_time}")
+                self._notify(logging.WARNING, f"Dataset was not updated" f" since {modification_time}")
             else:
-                self._notify(logging.INFO,
-                             f"Dataset was updated {idle_time.total_seconds()}"
-                             f" seconds ago at: {modification_time}")
+                self._notify(
+                    logging.INFO,
+                    f"Dataset was updated {idle_time.total_seconds()}" f" seconds ago at: {modification_time}",
+                )
 
             dataset_age = now_utc - latest_dataset_time
             if dataset_age.total_seconds() > self.max_tolerable_dataset_age:
-                overdue_time = \
-                    dataset_age.total_seconds() - self.max_tolerable_dataset_age
-                self._notify(logging.WARNING,
-                             f"Current dataset scheduled time for observation"
-                             f" ('start_time'): {latest_dataset_time} -"
-                             f" Next dataset is overdue by "
-                             f"{overdue_time:.1f} seconds.")
+                overdue_time = dataset_age.total_seconds() - self.max_tolerable_dataset_age
+                self._notify(
+                    logging.WARNING,
+                    f"Current dataset scheduled time for observation"
+                    f" ('start_time'): {latest_dataset_time} -"
+                    f" Next dataset is overdue by "
+                    f"{overdue_time:.1f} seconds.",
+                )
             else:
-                self._notify(logging.INFO,
-                             f"Current dataset scheduled time for observation"
-                             f" ('start_time'): {latest_dataset_time} - OK")
+                self._notify(
+                    logging.INFO,
+                    f"Current dataset scheduled time for observation" f" ('start_time'): {latest_dataset_time} - OK",
+                )
 
             if application_start_time is None:
                 application_start_time = now_utc
@@ -313,8 +306,7 @@ class Watchdog:
 
 if __name__ == "__main__":
     user_cache_dir = appdirs.user_cache_dir(APPLICATION_DIR, APPLICATION_AUTHOR)
-    user_config_dir = appdirs.user_config_dir(APPLICATION_DIR,
-                                              APPLICATION_AUTHOR, roaming=True)
+    user_config_dir = appdirs.user_config_dir(APPLICATION_DIR, APPLICATION_AUTHOR, roaming=True)
     config_dir = os.path.join(user_config_dir, "settings", "config")
 
     try:

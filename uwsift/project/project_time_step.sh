@@ -60,4 +60,3 @@ for nc_file in `find $input_dir/ -name "*.nc"`; do
         continue
     fi
 done
-

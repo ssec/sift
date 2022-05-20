@@ -4,14 +4,14 @@
     -->
     <!-- TOWRdocs Description
          New colormap not in 17.x baseline that improves depiction of rain rate.
-         
+
          The current default color scale for the RR/QPE product highlights a lot of areas that have essentially no
          useful data, based upon the accuracy of the product design (around 0.3 inches/hr). Further, the default
          AWIPS RR/QPE product scale has a max value of 1.6 inches.  This value is too low as some readings in the product
          are in excess of 3 inches.
          This new color maps is intended for use with inches per hour, and removes data below 0.1 inches.  It also
          shows colors that are more familiar to forecasters from radar QPE products, and is intended
-         for extending the maximum value to 3.0 inches.  
+         for extending the maximum value to 3.0 inches.
          Contributors: Satellite Enhancement Team/Frank Alsheimer
     -->
     <!-- TOWRdocs Status
@@ -278,4 +278,3 @@
     <color a="1.0" b="0.76862746" g="0.76862746" r="0.76862746"/>
     <color a="1.0" b="0.7647059" g="0.7647059" r="0.7647059"/>
 </colorMap>
-

@@ -25,7 +25,7 @@ DEFAULT_AREAS = {
     # plane chart) should be available always. It will be only added though,
     # if there is no other area definition found in configuration which uses the
     # 'latlong' projection (or its PROJ.4 aliases)
-    'Plate Carree': 'plate_carree'
+    "Plate Carree": "plate_carree"
 }
 
 DEFAULT_AREA_DEFINITIONS_YAML = """
@@ -52,6 +52,7 @@ class AreaDefinitionsManager:
     than the *area_id* and shorter than the *description* provided in the
     AreaDefinition object.
     """
+
     _available_area_defs_by_id = None
     _available_area_defs_id_by_name = None
 
@@ -67,8 +68,9 @@ class AreaDefinitionsManager:
             try:
                 area_def = get_area_def(area_id)
             except AreaNotFound as e:
-                LOG.warning(f"Area definition configured for display name"
-                            f" '{area_def_name}' unknown: {e}. Skipping...")
+                LOG.warning(
+                    f"Area definition configured for display name" f" '{area_def_name}' unknown: {e}. Skipping..."
+                )
                 continue
 
             LOG.info(f"Adding area definition: {area_def_name} -> {area_id}")
@@ -85,11 +87,9 @@ class AreaDefinitionsManager:
 
         # Add default area definition(s)?
         for area_def_name, area_id in DEFAULT_AREAS.items():
-            area_def = \
-                load_area_from_string(DEFAULT_AREA_DEFINITIONS_YAML, area_id)
+            area_def = load_area_from_string(DEFAULT_AREA_DEFINITIONS_YAML, area_id)
 
-            LOG.info(f"Adding default area definition:"
-                     f" {area_def_name} -> {area_id}")
+            LOG.info(f"Adding default area definition:" f" {area_def_name} -> {area_id}")
             cls._available_area_defs_by_id[area_id] = area_def
             cls._available_area_defs_id_by_name[area_def_name] = area_id
 

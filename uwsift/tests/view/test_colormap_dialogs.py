@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """Test changes through the colormap dialog."""
+from unittest import mock
+
 from uwsift.common import Info, Kind, Presentation
 from uwsift.model.layer import DocBasicDataset
 from uwsift.view.colormap_dialogs import ChangeColormapDialog
-from unittest import mock
 
 
 def test_slider_change(qtbot):
@@ -26,7 +27,6 @@ def test_slider_change(qtbot):
         Info.DISPLAY_FAMILY: "family1",
         Info.SHORT_NAME: "some_name",
         Info.UNIT_CONVERSION: (lambda x, inverse=False: x, lambda x, inverse=False: x),
-
     }
     layer = DocBasicDataset(doc, layer_info)
     doc.prez_for_uuid.return_value = prez
