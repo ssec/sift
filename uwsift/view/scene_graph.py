@@ -1,37 +1,27 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-scene_graph.py
-~~~~~~~~~~~~~~
-
-PURPOSE
-Provides a SceneGraphManager to handle display of visuals, in this case satellite imaging data,
-latitude/longitude lines and coastlines.
+"""Provide a SceneGraphManager to handle display of visuals.
 
 As per http://api.vispy.org/en/latest/scene.html (abridged)
 
-        - Vispy scene graph (SG) prerequisites:
-            1. create SceneCanvas -> this object's scene property is top level node in SG:
-                ```
-                    vispy_canvas = scene.SceneCanvas
-                    sg_root_node = vispy_canvas.scene
-                ```
-            2. create node instances (from vispy.scene.visuals)
-            3. add node instances to scene by making them children of canvas scene, or
-                of nodes already in the scene
+    - Vispy scene graph (SG) prerequisites:
+        1. create SceneCanvas -> this object's scene property is top level node in SG:
+
+           ```
+           vispy_canvas = scene.SceneCanvas
+           sg_root_node = vispy_canvas.scene
+           ```
+        2. create node instances (from vispy.scene.visuals)
+        3. add node instances to scene by making them children of canvas scene, or
+           of nodes already in the scene
 
 REFERENCES
 http://api.vispy.org/en/latest/scene.html
-
-REQUIRES
-
 
 :author: R.K.Garcia <rayg@ssec.wisc.edu>
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-__docformat__ = 'reStructuredText'
-__author__ = 'davidh'
 
 import logging
 import os
@@ -41,26 +31,29 @@ from typing import Dict, Optional
 from uuid import UUID
 
 import numpy as np
-from PyQt5.QtCore import QObject, pyqtSignal, Qt
+from PyQt5.QtCore import QObject, Qt, pyqtSignal
 from PyQt5.QtGui import QCursor
 from pyresample import AreaDefinition
-from vispy import app
-from vispy import scene
+from vispy import app, scene
 from vispy.geometry import Rect
 from vispy.gloo.util import _screenshot
-from vispy.scene.visuals import Image, Markers, Polygon, Compound, Line
+from vispy.scene.visuals import Compound, Image, Line, Markers, Polygon
 from vispy.util.keys import SHIFT
 from vispy.visuals import LineVisual
-from vispy.visuals.transforms import STTransform, MatrixTransform, \
-    ChainTransform
+from vispy.visuals.transforms import MatrixTransform, STTransform
 
-from uwsift import USE_TILED_GEOLOCATED_IMAGES
-from uwsift import config
-from uwsift.common import DEFAULT_ANIMATION_DELAY, Info, Kind, Tool, \
-    Presentation, \
-    LATLON_GRID_DATASET_NAME, BORDERS_DATASET_NAME
+from uwsift import USE_TILED_GEOLOCATED_IMAGES, config
+from uwsift.common import (
+    BORDERS_DATASET_NAME,
+    DEFAULT_ANIMATION_DELAY,
+    LATLON_GRID_DATASET_NAME,
+    Info,
+    Kind,
+    Presentation,
+    Tool,
+)
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
-from uwsift.model.document import DocLayerStack, DocBasicDataset, Document
+from uwsift.model.document import DocBasicDataset, DocLayerStack, Document
 from uwsift.model.layer_item import LayerItem
 from uwsift.model.layer_model import LayerModel
 from uwsift.model.product_dataset import ProductDataset
@@ -70,18 +63,25 @@ from uwsift.util import get_package_data_dir
 from uwsift.view.cameras import PanZoomProbeCamera
 from uwsift.view.probes import DEFAULT_POINT_PROBE
 from uwsift.view.transform import PROJ4Transform
-from uwsift.view.visuals import (NEShapefileLines, TiledGeolocatedImage,
-                                 MultiChannelImage,
-                                 RGBCompositeLayer,
-                                 PrecomputedIsocurve, Lines)
+from uwsift.view.visuals import (
+    Lines,
+    MultiChannelImage,
+    NEShapefileLines,
+    PrecomputedIsocurve,
+    RGBCompositeLayer,
+    TiledGeolocatedImage,
+)
 from uwsift.workspace.utils.metadata_utils import (
-    map_point_style_to_marker_kwargs, get_point_style_by_name)
+    get_point_style_by_name,
+    map_point_style_to_marker_kwargs,
+)
 
 LOG = logging.getLogger(__name__)
 DATA_DIR = get_package_data_dir()
-DEFAULT_SHAPE_FILE = os.path.join(DATA_DIR, 'ne_50m_admin_0_countries', 'ne_50m_admin_0_countries.shp')
-DEFAULT_STATES_SHAPE_FILE = os.path.join(DATA_DIR, 'ne_50m_admin_1_states_provinces_lakes',
-                                         'ne_50m_admin_1_states_provinces_lakes.shp')
+DEFAULT_SHAPE_FILE = os.path.join(DATA_DIR, "ne_50m_admin_0_countries", "ne_50m_admin_0_countries.shp")
+DEFAULT_STATES_SHAPE_FILE = os.path.join(
+    DATA_DIR, "ne_50m_admin_1_states_provinces_lakes", "ne_50m_admin_1_states_provinces_lakes.shp"
+)
 DEFAULT_TEXTURE_SHAPE = (4, 16)
 
 
@@ -115,11 +115,19 @@ class FakeMarker(Compound):
 
     def _get_positions(self, point):
         margin = 0.5
-        if self.symbol == 'x':
-            pos1 = np.array([[point[0] - margin, point[1] - margin * 2, point[2]],
-                             [point[0] + margin, point[1] + margin * 2, point[2]]])
-            pos2 = np.array([[point[0] - margin, point[1] + margin * 2, point[2]],
-                             [point[0] + margin, point[1] - margin * 2, point[2]]])
+        if self.symbol == "x":
+            pos1 = np.array(
+                [
+                    [point[0] - margin, point[1] - margin * 2, point[2]],
+                    [point[0] + margin, point[1] + margin * 2, point[2]],
+                ]
+            )
+            pos2 = np.array(
+                [
+                    [point[0] - margin, point[1] + margin * 2, point[2]],
+                    [point[0] + margin, point[1] - margin * 2, point[2]],
+                ]
+            )
         else:
             pos1 = np.array([[point[0] - margin, point[1], point[2]], [point[0] + margin, point[1], point[2]]])
             pos2 = np.array([[point[0], point[1] - margin * 2, point[2]], [point[0], point[1] + margin * 2, point[2]]])
@@ -134,6 +142,7 @@ class FakeMarker(Compound):
 
 class SIFTMainMapCanvas(scene.SceneCanvas):
     """High level map canvas node."""
+
     pass
 
 
@@ -145,8 +154,7 @@ class MainMap(scene.Node):
 
 
 class PendingPolygon(object):
-    """Temporary information holder for Probe Polygons.
-    """
+    """Temporary information holder for Probe Polygons."""
 
     def __init__(self, point_parent):
         self.parent = point_parent
@@ -172,14 +180,16 @@ class PendingPolygon(object):
         self.points.append(xy_pos)
         if len(xy_pos) == 2:
             xy_pos = [xy_pos[0], xy_pos[1], z]
-        point_visual = Markers(parent=self.parent,
-                               name='polygon_%02d' % (len(self.markers),),
-                               symbol="disc", pos=np.array([xy_pos]),
-                               face_color=np.array([0., 0.5, 0.5, 1.]),
-                               edge_color=np.array([.5, 1.0, 1.0, 1.]),
-                               size=18.,
-                               edge_width=3.,
-                               )
+        point_visual = Markers(
+            parent=self.parent,
+            name="polygon_%02d" % (len(self.markers),),
+            symbol="disc",
+            pos=np.array([xy_pos]),
+            face_color=np.array([0.0, 0.5, 0.5, 1.0]),
+            edge_color=np.array([0.5, 1.0, 1.0, 1.0]),
+            size=18.0,
+            edge_width=3.0,
+        )
         self.markers.append(point_visual)
         return False
 
@@ -214,8 +224,7 @@ class AnimationController(object):
 
     @property
     def animation_speed(self):
-        """speed in milliseconds
-        """
+        """speed in milliseconds"""
         return self._animation_speed
 
     @animation_speed.setter
@@ -333,8 +342,7 @@ class ContourGroupNode(scene.Node):
                 # child handles an unchanged zoom_level
                 child.zoom_level = zoom_level
             else:
-                raise NotImplementedError("Don't know how to assess "
-                                          "non-contour layer")
+                raise NotImplementedError("Don't know how to assess " "non-contour layer")
 
     def _assess_contour(self, child):
         """Calculate shown portion of image and image units per pixel
@@ -349,13 +357,9 @@ class ContourGroupNode(scene.Node):
         accurate, it should work for all possible viewing cases.
         """
         # in contour coordinate space, the extents of the canvas
-        canvas_extents = child.transforms.get_transform().imap([
-            [-1., -1.],
-            [0., 0.],
-            [1., 1.],
-            [-1., 1.],
-            [1., -1.]
-        ])[:, :2]
+        canvas_extents = child.transforms.get_transform().imap(
+            [[-1.0, -1.0], [0.0, 0.0], [1.0, 1.0], [-1.0, 1.0], [1.0, -1.0]]
+        )[:, :2]
         canvas_size = self.canvas.size
         # valid projection coordinates
         canvas_extents = canvas_extents[(canvas_extents[:, 0] <= 1e30) & (canvas_extents[:, 1] <= 1e30), :]
@@ -425,9 +429,17 @@ class SceneGraphManager(QObject):
     # having an argument of type 'object' is avoided.
     newProbePolygon = pyqtSignal(object)
 
-    def __init__(self, doc, workspace, queue,
-                 borders_shapefiles: list = None, states_shapefile=None,
-                 parent=None, texture_shape=(4, 16), center=None):
+    def __init__(
+        self,
+        doc,
+        workspace,
+        queue,
+        borders_shapefiles: list = None,
+        states_shapefile=None,
+        parent=None,
+        texture_shape=(4, 16),
+        center=None,
+    ):
         super(SceneGraphManager, self).__init__(parent)
         self.didRetilingCalcs.connect(self._set_retiled)
 
@@ -435,8 +447,7 @@ class SceneGraphManager(QObject):
         self.document = doc
         self.workspace = workspace
         self.queue = queue
-        self.borders_shapefiles = borders_shapefiles or \
-            [DEFAULT_SHAPE_FILE, DEFAULT_STATES_SHAPE_FILE]
+        self.borders_shapefiles = borders_shapefiles or [DEFAULT_SHAPE_FILE, DEFAULT_STATES_SHAPE_FILE]
         self.texture_shape = texture_shape
         self.polygon_probes = {}
         self.point_probes = {}
@@ -455,11 +466,11 @@ class SceneGraphManager(QObject):
 
         # border and lat/lon grid color choices
         self._color_choices = [
-            np.array([1., 1., 1., 1.], dtype=np.float32),  # white
-            np.array([.5, .5, .5, 1.], dtype=np.float32),  # gray
-            np.array([0., 1., 1., 1.], dtype=np.float32),  # cyan
-            np.array([0., 0., 0., 1.], dtype=np.float32),  # black
-            np.array([0., 0., 0., 0.], dtype=np.float32),  # transparent
+            np.array([1.0, 1.0, 1.0, 1.0], dtype=np.float32),  # white
+            np.array([0.5, 0.5, 0.5, 1.0], dtype=np.float32),  # gray
+            np.array([0.0, 1.0, 1.0, 1.0], dtype=np.float32),  # cyan
+            np.array([0.0, 0.0, 0.0, 1.0], dtype=np.float32),  # black
+            np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32),  # transparent
         ]
         self._latlon_grid_color_idx = 1
         self._borders_color_idx = 0
@@ -525,8 +536,9 @@ class SceneGraphManager(QObject):
         self.main_view = self.main_canvas.central_widget.add_view(name="MainView")
 
         # Camera Setup
-        self.pz_camera = PanZoomProbeCamera(name=Tool.PAN_ZOOM.name, aspect=1, pan_limits=(-1., -1., 1., 1.),
-                                            zoom_limits=(0.0015, 0.0015))
+        self.pz_camera = PanZoomProbeCamera(
+            name=Tool.PAN_ZOOM.name, aspect=1, pan_limits=(-1.0, -1.0, 1.0, 1.0), zoom_limits=(0.0015, 0.0015)
+        )
         self.main_view.camera = self.pz_camera
         self.main_view.camera.flip = (False, False, False)
         self.main_view.events.mouse_press.connect(self.on_mouse_press_point)
@@ -536,7 +548,7 @@ class SceneGraphManager(QObject):
         z_level_transform = MatrixTransform()
         # near/far is backwards it seems:
         camera_z_scale = 1e-6
-        z_level_transform.set_ortho(-1., 1., -1., 1., -100.0 * camera_z_scale, 100.0 * camera_z_scale)
+        z_level_transform.set_ortho(-1.0, 1.0, -1.0, 1.0, -100.0 * camera_z_scale, 100.0 * camera_z_scale)
 
         # Head node of all visualizations, needed mostly to scale Z level
         self.main_map_parent = scene.Node(name="HeadNode", parent=self.main_view.scene)
@@ -562,13 +574,13 @@ class SceneGraphManager(QObject):
             return
         shape = (2000, 2000)
         fake_data = np.zeros(shape, np.float32) + 0.5
-        fake_data[:5, :] = 1.
-        fake_data[-5:, :] = 1.
-        fake_data[:, :5] = 1.
-        fake_data[:, -5:] = 1.
+        fake_data[:5, :] = 1.0
+        fake_data[-5:, :] = 1.0
+        fake_data[:, :5] = 1.0
+        fake_data[:, -5:] = 1.0
         cell_size = 1000
-        origin_x = -shape[1] / 2. * cell_size
-        origin_y = shape[0] / 2. * cell_size
+        origin_x = -shape[1] / 2.0 * cell_size
+        origin_y = shape[0] / 2.0 * cell_size
 
         image = TiledGeolocatedImage(
             fake_data,
@@ -577,11 +589,11 @@ class SceneGraphManager(QObject):
             cell_size,
             cell_size,
             name="Test Image",
-            clim=(0., 1.),
-            gamma=1.,
-            interpolation='nearest',
-            method='subdivide',
-            cmap=self.document.find_colormap('grays'),
+            clim=(0.0, 1.0),
+            gamma=1.0,
+            interpolation="nearest",
+            method="subdivide",
+            cmap=self.document.find_colormap("grays"),
             double=False,
             texture_shape=DEFAULT_TEXTURE_SHAPE,
             wrap_lon=False,
@@ -598,7 +610,7 @@ class SceneGraphManager(QObject):
         self._set_projection(area_def, center)
 
         for dataset_node in self.dataset_nodes.values():
-            if hasattr(dataset_node, 'determine_reference_points'):
+            if hasattr(dataset_node, "determine_reference_points"):
                 dataset_node.determine_reference_points()
         self.on_view_change(None)
 
@@ -623,54 +635,50 @@ class SceneGraphManager(QObject):
             #  transform but it doesn't work (waiting on vispy developers)
             # mapped_center = self.main_map.transforms\
             #    .get_transform(map_to="scene").map([center])[0][:2]
-            mapped_center = self.latlon_grid_node.transforms \
-                .get_transform(map_to="scene").map([center])[0][:2]
+            mapped_center = self.latlon_grid_node.transforms.get_transform(map_to="scene").map([center])[0][:2]
             ll_xy += mapped_center
             ur_xy += mapped_center
 
-        self.main_view.camera.rect = \
-            Rect(ll_xy, (ur_xy[0] - ll_xy[0], ur_xy[1] - ll_xy[1]))
-
+        self.main_view.camera.rect = Rect(ll_xy, (ur_xy[0] - ll_xy[0], ur_xy[1] - ll_xy[1]))
 
     @staticmethod
-    def _create_latlon_grid_points(resolution=5.):
+    def _create_latlon_grid_points(resolution=5.0):
         """Create a series of line segments representing latitude and longitude lines.
 
         :param resolution: number of degrees between lines
         """
-        lons = np.arange(-180., 180. + resolution, resolution, dtype=np.float32)
-        lats = np.arange(-90., 90. + resolution, resolution, dtype=np.float32)
+        lons = np.arange(-180.0, 180.0 + resolution, resolution, dtype=np.float32)
+        lats = np.arange(-90.0, 90.0 + resolution, resolution, dtype=np.float32)
 
         # One long line of lawn mower pattern (lon lines, then lat lines)
         points = np.empty((lons.shape[0] * lats.shape[0] * 2, 2), np.float32)
         LOG.debug("Generating longitude lines...")
         for idx, lon_point in enumerate(lons):
-            points[idx * lats.shape[0]:(idx + 1) * lats.shape[0], 0] = lon_point
+            points[idx * lats.shape[0] : (idx + 1) * lats.shape[0], 0] = lon_point
             if idx % 2 == 0:
-                points[idx * lats.shape[0]:(idx + 1) * lats.shape[0], 1] = lats
+                points[idx * lats.shape[0] : (idx + 1) * lats.shape[0], 1] = lats
             else:
-                points[idx * lats.shape[0]:(idx + 1) * lats.shape[0], 1] = lats[::-1]
+                points[idx * lats.shape[0] : (idx + 1) * lats.shape[0], 1] = lats[::-1]
         start_idx = lons.shape[0] * lats.shape[0]
         LOG.debug("Generating latitude lines...")
         for idx, lat_point in enumerate(lats[::-1]):
-            points[start_idx + idx * lons.shape[0]:start_idx + (idx + 1) * lons.shape[0], 1] = lat_point
+            points[start_idx + idx * lons.shape[0] : start_idx + (idx + 1) * lons.shape[0], 1] = lat_point
             if idx % 2 == 0:
-                points[start_idx + idx * lons.shape[0]:start_idx + (idx + 1) * lons.shape[0], 0] = lons
+                points[start_idx + idx * lons.shape[0] : start_idx + (idx + 1) * lons.shape[0], 0] = lons
             else:
-                points[start_idx + idx * lons.shape[0]:start_idx + (idx + 1) * lons.shape[0], 0] = lons[::-1]
+                points[start_idx + idx * lons.shape[0] : start_idx + (idx + 1) * lons.shape[0], 0] = lons[::-1]
 
         # Repeat for "second" size of the earth (180 to 540)
         offset = 360  # box_x[lons.shape[0] - 1] - box_x[0]
         points2 = np.empty((points.shape[0] * 2, 2), dtype=np.float32)
-        points2[:points.shape[0], :] = points
-        points2[points.shape[0]:, :] = points
-        points2[points.shape[0]:, 0] += offset
+        points2[: points.shape[0], :] = points
+        points2[points.shape[0] :, :] = points
+        points2[points.shape[0] :, 0] += offset
 
         return points2
 
     def on_mouse_press_point(self, event):
-        """Handle mouse events that mean we are using the point probe.
-        """
+        """Handle mouse events that mean we are using the point probe."""
         if event.handled:
             return
         modifiers = event.mouse_event.modifiers
@@ -679,27 +687,25 @@ class SceneGraphManager(QObject):
             # FIXME: We should be able to use the main_map object to do the transform
             #  but it doesn't work (waiting on vispy developers)
             # map_pos = self.main_map.transforms.get_transform().imap(buffer_pos)
-            map_pos = self.latlon_grid_node.transforms\
-                .get_transform().imap(buffer_pos)
+            map_pos = self.latlon_grid_node.transforms.get_transform().imap(buffer_pos)
             if np.any(np.abs(map_pos[:2]) > 1e25):
                 LOG.error("Invalid point probe location")
                 return
             self.newPointProbe.emit(DEFAULT_POINT_PROBE, tuple(map_pos[:2]))
 
     def on_mouse_press_region(self, event):
-        """Handle mouse events that mean we are using the point probe.
-        """
+        """Handle mouse events that mean we are using the point probe."""
         if event.handled:
             return
         modifiers = event.mouse_event.modifiers
         if (event.button == 2 and modifiers == (SHIFT,)) or (
-                self._current_tool == Tool.REGION_PROBE and event.button == 1):
+            self._current_tool == Tool.REGION_PROBE and event.button == 1
+        ):
             buffer_pos = event.sources[0].transforms.get_transform().map(event.pos)
             # FIXME: We should be able to use the main_map object to do the transform
             #  but it doesn't work (waiting on vispy developers)
             # map_pos = self.main_map.transforms.get_transform().imap(buffer_pos)
-            map_pos = self.latlon_grid_node.transforms\
-                .get_transform().imap(buffer_pos)
+            map_pos = self.latlon_grid_node.transforms.get_transform().imap(buffer_pos)
             if np.any(np.abs(map_pos[:2]) > 1e25):
                 LOG.error("Invalid region probe location")
                 return
@@ -716,8 +722,7 @@ class SceneGraphManager(QObject):
         self.pending_polygon.reset()
 
     def remove_polygon(self, name=None):
-        """Remove a polygon from the SGM or clear the pending polygon if it exists.
-        """
+        """Remove a polygon from the SGM or clear the pending polygon if it exists."""
         if name is None:
             LOG.debug("No polygon name specified to remove")
             return
@@ -734,18 +739,18 @@ class SceneGraphManager(QObject):
 
     def on_point_probe_set(self, probe_name, state, xy_pos, **kwargs):
         z = float(kwargs.get("z", 60))
-        edge_color = kwargs.get("edge_color", np.array([1.0, 0.5, 0.5, 1.]))
-        face_color = kwargs.get("face_color", np.array([0.5, 0., 0., 1.]))
+        edge_color = kwargs.get("edge_color", np.array([1.0, 0.5, 0.5, 1.0]))
+        face_color = kwargs.get("face_color", np.array([0.5, 0.0, 0.0, 1.0]))
         if len(xy_pos) == 2:
             xy_pos = [xy_pos[0], xy_pos[1], z]
 
         probe_kwargs = {
-            'symbol': 'disc',
-            'pos': np.array([xy_pos]),
-            'face_color': face_color,
-            'edge_color': edge_color,
-            'size': 18.,
-            'edge_width': 3.,
+            "symbol": "disc",
+            "pos": np.array([xy_pos]),
+            "face_color": face_color,
+            "edge_color": edge_color,
+            "size": 18.0,
+            "edge_width": 3.0,
         }
 
         if probe_name not in self.point_probes and xy_pos is None:
@@ -763,7 +768,7 @@ class SceneGraphManager(QObject):
         point_visual.visible = state
 
     def on_new_polygon(self, probe_name, points, **kwargs):
-        points = np.array(points, dtype=np.float32) # convert list to NumPy array
+        points = np.array(points, dtype=np.float32)  # convert list to NumPy array
 
         # kwargs.setdefault("color", (1.0, 0.0, 1.0, 0.5))
         kwargs.setdefault("color", None)
@@ -790,25 +795,21 @@ class SceneGraphManager(QObject):
         return self.main_canvas.update()
 
     def cycle_borders_color(self):
-        self._borders_color_idx = \
-            (self._borders_color_idx + 1) % len(self._color_choices)
+        self._borders_color_idx = (self._borders_color_idx + 1) % len(self._color_choices)
         if self._borders_color_idx + 1 == len(self._color_choices):
             for borders_node in self.borders_nodes:
                 borders_node.visible = False
         else:
             for borders_node in self.borders_nodes:
-                borders_node.set_data(
-                    color=self._color_choices[self._borders_color_idx])
+                borders_node.set_data(color=self._color_choices[self._borders_color_idx])
                 borders_node.visible = True
 
     def cycle_latlon_grid_color(self):
-        self._latlon_grid_color_idx = \
-            (self._latlon_grid_color_idx + 1) % len(self._color_choices)
+        self._latlon_grid_color_idx = (self._latlon_grid_color_idx + 1) % len(self._color_choices)
         if self._latlon_grid_color_idx + 1 == len(self._color_choices):
             self.latlon_grid_node.visible = False
         else:
-            self.latlon_grid_node.set_data(
-                color=self._color_choices[self._latlon_grid_color_idx])
+            self.latlon_grid_node.set_data(color=self._color_choices[self._latlon_grid_color_idx])
             self.latlon_grid_node.visible = True
 
     def change_tool(self, name: Tool):
@@ -860,15 +861,13 @@ class SceneGraphManager(QObject):
 
         for uuid in uuids:
             dataset_node = self.dataset_nodes[uuid]
-            if (isinstance(dataset_node, TiledGeolocatedImage)
-                    or isinstance(dataset_node, Image)):
+            if isinstance(dataset_node, TiledGeolocatedImage) or isinstance(dataset_node, Image):
                 self.dataset_nodes[uuid].cmap = colormap
             else:
                 self.dataset_nodes[uuid].color = colormap
 
     def set_color_limits(self, clims, uuid=None):
-        """Update the color limits for the specified UUID
-        """
+        """Update the color limits for the specified UUID"""
         uuids = uuid
         if uuid is None:
             uuids = self.dataset_nodes.keys()
@@ -889,22 +888,22 @@ class SceneGraphManager(QObject):
 
         for uuid in uuids:
             dataset_node = self.dataset_nodes.get(uuid, None)
-            if dataset_node is not None and hasattr(dataset_node, 'gamma'):
+            if dataset_node is not None and hasattr(dataset_node, "gamma"):
                 self.dataset_nodes[uuid].gamma = gamma
 
     def change_dataset_nodes_colormap(self, change_dict):
         for uuid, cmapid in change_dict.items():
-            LOG.info('changing {} to colormap {}'.format(uuid, cmapid))
+            LOG.info("changing {} to colormap {}".format(uuid, cmapid))
             self.set_colormap(cmapid, uuid)
 
     def change_dataset_nodes_color_limits(self, change_dict):
         for uuid, clims in change_dict.items():
-            LOG.debug('changing {} to color limits {}'.format(uuid, clims))
+            LOG.debug("changing {} to color limits {}".format(uuid, clims))
             self.set_color_limits(clims, uuid)
 
     def change_dataset_nodes_gamma(self, change_dict):
         for uuid, gamma in change_dict.items():
-            LOG.debug('changing {} to gamma {}'.format(uuid, gamma))
+            LOG.debug("changing {} to gamma {}".format(uuid, gamma))
             self.set_gamma(gamma, uuid)
 
     # This method may be revived again in case CONTOURS should be supported
@@ -953,45 +952,41 @@ class SceneGraphManager(QObject):
         data[:, :] = 0
 
         class RainbowValue(Enum):
-            BROWN = 320.
-            RED = 300.
-            LIGHT_GREEN = 280.
-            GREEN = 260.
-            LIGHT_BLUE = 240.
-            DARK_BLUE = 220.
-            PINK = 200.
+            BROWN = 320.0
+            RED = 300.0
+            LIGHT_GREEN = 280.0
+            GREEN = 260.0
+            LIGHT_BLUE = 240.0
+            DARK_BLUE = 220.0
+            PINK = 200.0
 
         center_x, center_y = max_x // 2, max_y // 2
         pixels = [
-            {"x": center_x,     "y": center_y,     "color": RainbowValue.RED,         "desc": "center"},
-            {"x": center_x - 1, "y": center_y - 1, "color": RainbowValue.GREEN,       "desc": "upper left"},
-            {"x": center_x - 1, "y": center_y + 1, "color": RainbowValue.LIGHT_BLUE,  "desc": "bottom left"},
+            {"x": center_x, "y": center_y, "color": RainbowValue.RED, "desc": "center"},
+            {"x": center_x - 1, "y": center_y - 1, "color": RainbowValue.GREEN, "desc": "upper left"},
+            {"x": center_x - 1, "y": center_y + 1, "color": RainbowValue.LIGHT_BLUE, "desc": "bottom left"},
             {"x": center_x - 1, "y": center_y + 2, "color": RainbowValue.LIGHT_GREEN, "desc": "below bottom left"},
-            {"x": center_x + 1, "y": center_y - 1, "color": RainbowValue.DARK_BLUE,   "desc": "upper right"},
-            {"x": center_x + 1, "y": center_y + 1, "color": RainbowValue.PINK,        "desc": "bottom right"},
-
-            {"x": max_x - 1, "y": max_y - 1, "color": RainbowValue.RED,        "desc": "bottom right corner"},
-            {"x": max_x - 2, "y": max_y - 1, "color": RainbowValue.GREEN,      "desc": "bottom right corner"},
+            {"x": center_x + 1, "y": center_y - 1, "color": RainbowValue.DARK_BLUE, "desc": "upper right"},
+            {"x": center_x + 1, "y": center_y + 1, "color": RainbowValue.PINK, "desc": "bottom right"},
+            {"x": max_x - 1, "y": max_y - 1, "color": RainbowValue.RED, "desc": "bottom right corner"},
+            {"x": max_x - 2, "y": max_y - 1, "color": RainbowValue.GREEN, "desc": "bottom right corner"},
             {"x": max_x - 3, "y": max_y - 1, "color": RainbowValue.LIGHT_BLUE, "desc": "bottom right corner"},
-            {"x": max_x - 1, "y": max_y - 2, "color": RainbowValue.PINK,       "desc": "bottom right corner"},
-            {"x": max_x - 2, "y": max_y - 2, "color": RainbowValue.BROWN,      "desc": "bottom right corner"},
-
-            {"x": 0, "y": max_y - 1, "color": RainbowValue.PINK,       "desc": "bottom left corner"},
+            {"x": max_x - 1, "y": max_y - 2, "color": RainbowValue.PINK, "desc": "bottom right corner"},
+            {"x": max_x - 2, "y": max_y - 2, "color": RainbowValue.BROWN, "desc": "bottom right corner"},
+            {"x": 0, "y": max_y - 1, "color": RainbowValue.PINK, "desc": "bottom left corner"},
             {"x": 1, "y": max_y - 1, "color": RainbowValue.LIGHT_BLUE, "desc": "bottom left corner"},
-            {"x": 0, "y": max_y - 2, "color": RainbowValue.BROWN,      "desc": "bottom left corner"},
-            {"x": 0, "y": max_y - 3, "color": RainbowValue.RED,        "desc": "bottom left corner"},
-            {"x": 1, "y": max_y - 2, "color": RainbowValue.GREEN,      "desc": "bottom left corner"},
-
-            {"x": max_x - 1, "y": 0, "color": RainbowValue.LIGHT_BLUE,  "desc": "upper right corner"},
+            {"x": 0, "y": max_y - 2, "color": RainbowValue.BROWN, "desc": "bottom left corner"},
+            {"x": 0, "y": max_y - 3, "color": RainbowValue.RED, "desc": "bottom left corner"},
+            {"x": 1, "y": max_y - 2, "color": RainbowValue.GREEN, "desc": "bottom left corner"},
+            {"x": max_x - 1, "y": 0, "color": RainbowValue.LIGHT_BLUE, "desc": "upper right corner"},
             {"x": max_x - 2, "y": 0, "color": RainbowValue.LIGHT_GREEN, "desc": "upper right corner"},
-            {"x": max_x - 3, "y": 0, "color": RainbowValue.RED,         "desc": "upper right corner"},
-            {"x": max_x - 1, "y": 1, "color": RainbowValue.BROWN,       "desc": "upper right corner"},
-            {"x": max_x - 2, "y": 1, "color": RainbowValue.PINK,        "desc": "upper right corner"},
-
-            {"x": 0, "y": 0, "color": RainbowValue.BROWN,       "desc": "upper left corner"},
-            {"x": 1, "y": 0, "color": RainbowValue.RED,         "desc": "upper left corner"},
-            {"x": 0, "y": 1, "color": RainbowValue.PINK,        "desc": "upper left corner"},
-            {"x": 0, "y": 2, "color": RainbowValue.DARK_BLUE,   "desc": "upper left corner"},
+            {"x": max_x - 3, "y": 0, "color": RainbowValue.RED, "desc": "upper right corner"},
+            {"x": max_x - 1, "y": 1, "color": RainbowValue.BROWN, "desc": "upper right corner"},
+            {"x": max_x - 2, "y": 1, "color": RainbowValue.PINK, "desc": "upper right corner"},
+            {"x": 0, "y": 0, "color": RainbowValue.BROWN, "desc": "upper left corner"},
+            {"x": 1, "y": 0, "color": RainbowValue.RED, "desc": "upper left corner"},
+            {"x": 0, "y": 1, "color": RainbowValue.PINK, "desc": "upper left corner"},
+            {"x": 0, "y": 2, "color": RainbowValue.DARK_BLUE, "desc": "upper left corner"},
             {"x": 1, "y": 1, "color": RainbowValue.LIGHT_GREEN, "desc": "upper left corner"},
         ]
 
@@ -1016,24 +1011,26 @@ class SceneGraphManager(QObject):
             parent.transform = PROJ4Transform(dataset[Info.PROJ], inverse=True)
             self.proxy_nodes[proj4_str] = parent
 
-        contour_visual = PrecomputedIsocurve(verts, connects, level_indexes,
-                                             levels=levels, color_lev=cmap,
-                                             clim=p.climits,
-                                             parent=parent,
-                                             name=str(dataset[Info.UUID]))
+        contour_visual = PrecomputedIsocurve(
+            verts,
+            connects,
+            level_indexes,
+            levels=levels,
+            color_lev=cmap,
+            clim=p.climits,
+            parent=parent,
+            name=str(dataset[Info.UUID]),
+        )
         contour_visual.transform *= STTransform(translate=(0, 0, -50.0))
         self.dataset_nodes[dataset[Info.UUID]] = contour_visual
         self.animation_controller.add_layer(contour_visual)
         self.on_view_change(None)
 
     def add_node_for_layer(self, layer: LayerItem):
-        if not USE_TILED_GEOLOCATED_IMAGES \
-                and layer.kind in [Kind.IMAGE, Kind.COMPOSITE, Kind.RGB]:
-            layer_node = scene.Node(parent=self.main_map_parent,
-                                    name=str(layer.uuid))
+        if not USE_TILED_GEOLOCATED_IMAGES and layer.kind in [Kind.IMAGE, Kind.COMPOSITE, Kind.RGB]:
+            layer_node = scene.Node(parent=self.main_map_parent, name=str(layer.uuid))
         else:
-            layer_node = scene.Node(parent=self.main_map,
-                                    name=str(layer.uuid))
+            layer_node = scene.Node(parent=self.main_map, name=str(layer.uuid))
 
         z_transform = STTransform(translate=(0, 0, 0))
         layer_node.transform = z_transform
@@ -1050,24 +1047,24 @@ class SceneGraphManager(QObject):
             raise ValueError(f"Unsupported generated layer: {layer.name}")
 
     def _build_latlon_grid_node(self, layer_node):
-        """ Helper function for setting up the VisualNode for the system
+        """Helper function for setting up the VisualNode for the system
         layer for latitude/longitude grid.
 
         :param layer_node: Scene graph node to be used as parent for the grid
                            node.
         """
         latlon_grid_resolution = get_configured_latlon_grid_resolution()
-        latlon_grid_points = \
-            self._create_latlon_grid_points(resolution=latlon_grid_resolution)
+        latlon_grid_points = self._create_latlon_grid_points(resolution=latlon_grid_resolution)
         self.latlon_grid_node = Line(
-            pos=latlon_grid_points, connect="strip",
+            pos=latlon_grid_points,
+            connect="strip",
             color=self._color_choices[self._latlon_grid_color_idx],
-            parent=layer_node
+            parent=layer_node,
         )
-        self.latlon_grid_node.set_gl_state('translucent')
+        self.latlon_grid_node.set_gl_state("translucent")
 
     def _build_borders_nodes(self, layer_node):
-        """ Helper function for setting up the VisualNodes for the system
+        """Helper function for setting up the VisualNodes for the system
         layer for political borders.
 
         One node is generated for each file stored in the (currently) internal
@@ -1078,16 +1075,14 @@ class SceneGraphManager(QObject):
         """
         for shapefile in self.borders_shapefiles:
             node = NEShapefileLines(
-                shapefile, double=True,
-                color=self._color_choices[self._borders_color_idx],
-                parent=layer_node
+                shapefile, double=True, color=self._color_choices[self._borders_color_idx], parent=layer_node
             )
-            node.set_gl_state('translucent')
+            node.set_gl_state("translucent")
             self.borders_nodes.append(node)
 
-    def apply_presentation_to_image_node(self, image: Image,
-                                         presentation: Presentation,
-                                         visible: Optional[bool] = None):
+    def apply_presentation_to_image_node(
+        self, image: Image, presentation: Presentation, visible: Optional[bool] = None
+    ):
         """
         Apply all relevant and set properties (not None) of the given
         presentation to the given image.
@@ -1116,13 +1111,11 @@ class SceneGraphManager(QObject):
         if presentation.opacity:
             image.opacity = presentation.opacity
 
-    def add_node_for_image_dataset(self, layer: LayerItem,
-                                   product_dataset: ProductDataset):
+    def add_node_for_image_dataset(self, layer: LayerItem, product_dataset: ProductDataset):
         assert self.layer_nodes[layer.uuid] is not None
         assert product_dataset.kind in [Kind.IMAGE, Kind.COMPOSITE]
 
-        image_data = self.workspace.get_content(product_dataset.uuid,
-                                                kind=product_dataset.kind)
+        image_data = self.workspace.get_content(product_dataset.uuid, kind=product_dataset.kind)
 
         if False:  # Set to True FOR TESTING ONLY
             self._overwrite_with_test_pattern(image_data)
@@ -1135,29 +1128,27 @@ class SceneGraphManager(QObject):
                 product_dataset.info[Info.CELL_WIDTH],
                 product_dataset.info[Info.CELL_HEIGHT],
                 name=str(product_dataset.uuid),
-                interpolation='nearest',
-                method='subdivide',
+                interpolation="nearest",
+                method="subdivide",
                 double=False,
                 texture_shape=DEFAULT_TEXTURE_SHAPE,
                 wrap_lon=False,
                 parent=self.layer_nodes[layer.uuid],
                 projection=product_dataset.info[Info.PROJ],
             )
-            image.transform = PROJ4Transform(product_dataset.info[Info.PROJ],
-                                             inverse=True)
+            image.transform = PROJ4Transform(product_dataset.info[Info.PROJ], inverse=True)
             image.determine_reference_points()
         else:
             image = Image(
                 image_data,
                 name=str(product_dataset.uuid),
-                interpolation='nearest',
+                interpolation="nearest",
                 parent=self.layer_nodes[layer.uuid],
             )
             image.transform = STTransform(
-                scale=(product_dataset.info[Info.CELL_WIDTH],
-                       product_dataset.info[Info.CELL_HEIGHT], 1),
-                translate=(product_dataset.info[Info.ORIGIN_X],
-                           product_dataset.info[Info.ORIGIN_Y], 0))
+                scale=(product_dataset.info[Info.CELL_WIDTH], product_dataset.info[Info.CELL_HEIGHT], 1),
+                translate=(product_dataset.info[Info.ORIGIN_X], product_dataset.info[Info.ORIGIN_Y], 0),
+            )
         self.dataset_nodes[product_dataset.uuid] = image
         # Make sure *all* applicable properties of the owning layer's current
         # presentation are applied to the new image node
@@ -1166,14 +1157,14 @@ class SceneGraphManager(QObject):
         LOG.debug("Scene Graph after IMAGE dataset insertion:")
         LOG.debug(self.main_view.describe_tree(with_transform=True))
 
-    def add_node_for_composite_dataset(self, layer: LayerItem,
-                                       product_dataset: ProductDataset):
+    def add_node_for_composite_dataset(self, layer: LayerItem, product_dataset: ProductDataset):
         assert self.layer_nodes[layer.uuid] is not None
         assert product_dataset.kind == Kind.RGB
 
-        images_data \
-            = list(self.workspace.get_content(curr_input_uuid, Kind.IMAGE)
-                   for curr_input_uuid in product_dataset.input_datasets_uuids)
+        images_data = list(
+            self.workspace.get_content(curr_input_uuid, Kind.IMAGE)
+            for curr_input_uuid in product_dataset.input_datasets_uuids
+        )
 
         if USE_TILED_GEOLOCATED_IMAGES:
             composite = RGBCompositeLayer(
@@ -1185,8 +1176,8 @@ class SceneGraphManager(QObject):
                 name=str(product_dataset.uuid),
                 clim=layer.presentation.climits,
                 gamma=layer.presentation.gamma,
-                interpolation='nearest',
-                method='subdivide',
+                interpolation="nearest",
+                method="subdivide",
                 cmap=None,
                 double=False,
                 texture_shape=DEFAULT_TEXTURE_SHAPE,
@@ -1194,9 +1185,7 @@ class SceneGraphManager(QObject):
                 parent=self.layer_nodes[layer.uuid],
                 projection=product_dataset.info[Info.PROJ],
             )
-            composite.transform = PROJ4Transform(
-                product_dataset.info[Info.PROJ], inverse=True
-            )
+            composite.transform = PROJ4Transform(product_dataset.info[Info.PROJ], inverse=True)
             composite.determine_reference_points()
         else:
             composite = MultiChannelImage(
@@ -1204,25 +1193,21 @@ class SceneGraphManager(QObject):
                 name=str(product_dataset.uuid),
                 clim=layer.presentation.climits,
                 gamma=layer.presentation.gamma,
-                interpolation='nearest',
+                interpolation="nearest",
                 cmap=None,
                 parent=self.layer_nodes[layer.uuid],
             )
             composite.transform = STTransform(
-                scale=(product_dataset.info[Info.CELL_WIDTH],
-                       product_dataset.info[Info.CELL_HEIGHT], 1),
-                translate=(product_dataset.info[Info.ORIGIN_X],
-                           product_dataset.info[Info.ORIGIN_Y], 0))
-        self.composite_element_dependencies[product_dataset.uuid] \
-            = product_dataset.input_datasets_uuids
+                scale=(product_dataset.info[Info.CELL_WIDTH], product_dataset.info[Info.CELL_HEIGHT], 1),
+                translate=(product_dataset.info[Info.ORIGIN_X], product_dataset.info[Info.ORIGIN_Y], 0),
+            )
+        self.composite_element_dependencies[product_dataset.uuid] = product_dataset.input_datasets_uuids
         self.dataset_nodes[product_dataset.uuid] = composite
         self.on_view_change(None)
         LOG.debug("Scene Graph after COMPOSITE dataset insertion:")
         LOG.debug(self.main_view.describe_tree(with_transform=True))
 
-    def add_node_for_lines_dataset(self, layer: LayerItem,
-                                   product_dataset: ProductDataset) \
-            -> scene.VisualNode:
+    def add_node_for_lines_dataset(self, layer: LayerItem, product_dataset: ProductDataset) -> scene.VisualNode:
         assert self.layer_nodes[layer.uuid] is not None
         assert product_dataset.kind == Kind.LINES
 
@@ -1231,9 +1216,8 @@ class SceneGraphManager(QObject):
             LOG.info(f"Dataset contains no lines: {product_dataset.uuid}")
             return
 
-        lines = Lines(content,
-                      parent=self.layer_nodes[layer.uuid])
-        lines.set_gl_state('translucent')
+        lines = Lines(content, parent=self.layer_nodes[layer.uuid])
+        lines.set_gl_state("translucent")
         lines.name = str(product_dataset.uuid)
 
         self.dataset_nodes[product_dataset.uuid] = lines
@@ -1241,9 +1225,7 @@ class SceneGraphManager(QObject):
         LOG.debug("Scene Graph after LINES dataset insertion:")
         LOG.debug(self.main_view.describe_tree(with_transform=True))
 
-    def add_node_for_points_dataset(self, layer: LayerItem,
-                                    product_dataset: ProductDataset) \
-            -> scene.VisualNode:
+    def add_node_for_points_dataset(self, layer: LayerItem, product_dataset: ProductDataset) -> scene.VisualNode:
         assert self.layer_nodes[layer.uuid] is not None
         assert product_dataset.kind == Kind.POINTS
 
@@ -1252,20 +1234,16 @@ class SceneGraphManager(QObject):
             LOG.info(f"layer contains no points: {product_dataset.uuid}")
             return
 
-        kwargs = map_point_style_to_marker_kwargs(
-            get_point_style_by_name(layer.presentation.style))
+        kwargs = map_point_style_to_marker_kwargs(get_point_style_by_name(layer.presentation.style))
 
         if values is not None:
             assert len(pos) == len(values)
             # TODO use climits of the presentation instead of autoscaling?
             colormap = self.document.find_colormap(layer.presentation.colormap)
-            kwargs["face_color"] = \
-                self.map_to_colors_autoscaled(colormap, values)
+            kwargs["face_color"] = self.map_to_colors_autoscaled(colormap, values)
 
-        points = Markers(pos=pos,
-                         parent=self.layer_nodes[layer.uuid],
-                         **kwargs)
-        points.set_gl_state('translucent')  # makes no difference though
+        points = Markers(pos=pos, parent=self.layer_nodes[layer.uuid], **kwargs)
+        points.set_gl_state("translucent")  # makes no difference though
         points.name = str(product_dataset.uuid)
 
         self.dataset_nodes[product_dataset.uuid] = points
@@ -1274,9 +1252,7 @@ class SceneGraphManager(QObject):
         LOG.debug(self.main_view.describe_tree(with_transform=True))
 
     def map_to_colors_autoscaled(self, colormap, values, m=2):
-        """
-        Get a list of colors by mapping each entry in values by the given
-        colormap.
+        """Get a list of colors by mapping each entry in values by the given colormap.
 
         The mapping range is adjusted automatically to m times the standard
         deviation from the mean. This ignores outliers in the calculation of
@@ -1287,8 +1263,7 @@ class SceneGraphManager(QObject):
 
         :param colormap: the colormap to apply
         :param values: the values to map to colors
-        :param m: factor to stretch the standard deviation around the mean to
-        define the mapping range
+        :param m: factor to stretch the standard deviation around the mean to define the mapping range
         :return: list of mapped colors in the same order as the input values
         """
         std_dev = np.std(values)
@@ -1299,21 +1274,22 @@ class SceneGraphManager(QObject):
         colors = colormap.map(scaled_attr)
         return colors
 
-    def change_node_for_composite_dataset(self, layer: LayerItem,
-                                          product_dataset: ProductDataset):
+    def change_node_for_composite_dataset(self, layer: LayerItem, product_dataset: ProductDataset):
         if layer.kind == Kind.RGB:
             if product_dataset.uuid in self.dataset_nodes:
                 # RGB selection has changed, rebuild the layer
-                LOG.debug(f"Changing existing composite layer to"
-                          f" Scene Graph Manager with UUID:"
-                          f" {product_dataset.uuid}")
+                LOG.debug(
+                    f"Changing existing composite layer to"
+                    f" Scene Graph Manager with UUID:"
+                    f" {product_dataset.uuid}"
+                )
 
                 images_data = list(
                     self.workspace.get_content(curr_input_id, Kind.IMAGE)
-                    for curr_input_id in product_dataset.input_datasets_uuids)
+                    for curr_input_id in product_dataset.input_datasets_uuids
+                )
 
-                self.composite_element_dependencies[product_dataset.uuid] \
-                    = product_dataset.input_datasets_uuids
+                self.composite_element_dependencies[product_dataset.uuid] = product_dataset.input_datasets_uuids
 
                 composite = self.dataset_nodes[product_dataset.uuid]
                 if isinstance(composite, RGBCompositeLayer):
@@ -1322,7 +1298,8 @@ class SceneGraphManager(QObject):
                         cell_width=product_dataset.info[Info.CELL_WIDTH],
                         cell_height=product_dataset.info[Info.CELL_HEIGHT],
                         origin_x=product_dataset.info[Info.ORIGIN_X],
-                        origin_y=product_dataset.info[Info.ORIGIN_Y])
+                        origin_y=product_dataset.info[Info.ORIGIN_Y],
+                    )
                 elif isinstance(composite, MultiChannelImage):
                     composite.set_data(images_data)
                 composite.clim = layer.presentation.climits
@@ -1352,10 +1329,12 @@ class SceneGraphManager(QObject):
             dataset_node.set_data(dataset_content)
         except NotImplementedError:
             if isinstance(dataset_node, TiledGeolocatedImage):
-                LOG.debug(f"Updating data for UUID {uuid} on its associated"
-                          f" scenegraph TiledGeolocatedImage node is not"
-                          f" possible, hopefully the data was modified in-place"
-                          f" (e.g. when merging new granules).")
+                LOG.debug(
+                    f"Updating data for UUID {uuid} on its associated"
+                    f" scenegraph TiledGeolocatedImage node is not"
+                    f" possible, hopefully the data was modified in-place"
+                    f" (e.g. when merging new granules)."
+                )
                 # TODO: How to detect the case that the data was not changed in
                 #  place but a new reference was given? In this case, we must
                 #  re-raise the NotImplementedError exception (as in the 'else'
@@ -1473,9 +1452,9 @@ class SceneGraphManager(QObject):
         return res
 
     def rebuild_frame_order(self, uuid_list: list, *args, **kwargs):
-        LOG.debug('setting SGM new frame order to {0!r:s}'.format(uuid_list))
+        LOG.debug("setting SGM new frame order to {0!r:s}".format(uuid_list))
         self.animation_controller.frame_order = uuid_list
-        #self.layer_set.update_time_manager_collection(self.document.data_layer_collection)
+        # self.layer_set.update_time_manager_collection(self.document.data_layer_collection)
 
     def _rebuild_frame_order(self, *args, **kwargs):
         res = self.rebuild_frame_order(*args, **kwargs)
@@ -1519,14 +1498,13 @@ class SceneGraphManager(QObject):
             if uuid in active_lookup and active_lookup[uuid].is_valid:
                 layer = active_lookup[uuid]
                 # create elements for layers which have transitioned to a valid state
-                LOG.debug('creating deferred element for layer %s' % layer.uuid)
+                LOG.debug("creating deferred element for layer %s" % layer.uuid)
                 if layer.kind in [Kind.COMPOSITE, Kind.RGB]:
                     # create an invisible element with the RGB
-                    self.change_node_for_composite_dataset(None, None, None,
-                                                           None)
+                    self.change_node_for_composite_dataset(None, None, None, None)
                 else:
                     # FIXME this was previously a NotImplementedError
-                    LOG.warning('unable to create deferred scenegraph element for %s' % repr(layer))
+                    LOG.warning("unable to create deferred scenegraph element for %s" % repr(layer))
             else:
                 # remove elements for layers which are no longer valid
                 remove_elements.append(uuid)
@@ -1546,8 +1524,7 @@ class SceneGraphManager(QObject):
         self.update()
 
     def on_view_change(self, scheduler):
-        """Simple event handler for when we need to reassess image layers.
-        """
+        """Simple event handler for when we need to reassess image layers."""
         # Stop the timer so it doesn't continuously call this slot
         if scheduler:
             scheduler.stop()
@@ -1557,14 +1534,12 @@ class SceneGraphManager(QObject):
             if need_retile:
                 self.start_retiling_task(uuid, preferred_stride, tile_box)
 
-        current_visible_datasets_uuids = \
-            [p.uuid for (p, l) in self.document.active_layer_order if p.visible]
-        current_invisible_datasets_uuids = \
-            set(self.dataset_nodes.keys()) - set(current_visible_datasets_uuids)
+        current_visible_datasets_uuids = [p.uuid for (p, l) in self.document.active_layer_order if p.visible]
+        current_invisible_datasets_uuids = set(self.dataset_nodes.keys()) - set(current_visible_datasets_uuids)
 
         def _assess_if_active(uuid):
             dataset_node = self.dataset_nodes.get(uuid, None)
-            if dataset_node is not None and hasattr(dataset_node, 'assess'):
+            if dataset_node is not None and hasattr(dataset_node, "assess"):
                 _assess(uuid, dataset_node)
 
         for uuid in current_visible_datasets_uuids:
@@ -1578,41 +1553,47 @@ class SceneGraphManager(QObject):
 
     def start_retiling_task(self, uuid, preferred_stride, tile_box):
         LOG.debug("Scheduling retile for child with UUID: %s", uuid)
-        self.queue.add(str(uuid) + "_retile", self._retile_child(uuid, preferred_stride, tile_box),
-                       'Retile calculations for image layer ' + str(uuid), interactive=True)
+        self.queue.add(
+            str(uuid) + "_retile",
+            self._retile_child(uuid, preferred_stride, tile_box),
+            "Retile calculations for image layer " + str(uuid),
+            interactive=True,
+        )
 
     def _retile_child(self, uuid, preferred_stride, tile_box):
         LOG.debug("Retiling child with UUID: '%s'", uuid)
-        yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.0}
+        yield {TASK_DOING: "Re-tiling", TASK_PROGRESS: 0.0}
         if uuid not in self.composite_element_dependencies:
             child = self.dataset_nodes[uuid]
             data = self.workspace.get_content(uuid, lod=preferred_stride)
-            yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.5}
+            yield {TASK_DOING: "Re-tiling", TASK_PROGRESS: 0.5}
             # FIXME: Use LOD instead of stride and provide the lod to the workspace
-            data = data[::preferred_stride[0], ::preferred_stride[1]]
+            data = data[:: preferred_stride[0], :: preferred_stride[1]]
             tiles_info, vertices, tex_coords = child.retile(data, preferred_stride, tile_box)
-            yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 1.0}
+            yield {TASK_DOING: "Re-tiling", TASK_PROGRESS: 1.0}
             self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)
         else:
             child = self.dataset_nodes[uuid]
-            data = [self.workspace.get_content(d_uuid, lod=preferred_stride) for d_uuid in
-                    self.composite_element_dependencies[uuid]]
-            yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 0.5}
+            data = [
+                self.workspace.get_content(d_uuid, lod=preferred_stride)
+                for d_uuid in self.composite_element_dependencies[uuid]
+            ]
+            yield {TASK_DOING: "Re-tiling", TASK_PROGRESS: 0.5}
             # FIXME: Use LOD instead of stride and provide the lod to the workspace
             data = [
-                d[::int(preferred_stride[0] / factor), ::int(preferred_stride[1] / factor)] if d is not None else None
-                for factor, d in zip(child._channel_factors, data)]
+                d[:: int(preferred_stride[0] / factor), :: int(preferred_stride[1] / factor)] if d is not None else None
+                for factor, d in zip(child._channel_factors, data)
+            ]
             tiles_info, vertices, tex_coords = child.retile(data, preferred_stride, tile_box)
-            yield {TASK_DOING: 'Re-tiling', TASK_PROGRESS: 1.0}
+            yield {TASK_DOING: "Re-tiling", TASK_PROGRESS: 1.0}
             self.didRetilingCalcs.emit(uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords)
         self.workspace.bgnd_task_complete()  # FUTURE: consider a threading context manager for this??
 
     def _set_retiled(self, uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords):
-        """Slot to take data from background thread and apply it to the layer living in the image layer.
-        """
+        """Slot to take data from background thread and apply it to the layer living in the image layer."""
         child = self.dataset_nodes.get(uuid, None)
         if child is None:
-            LOG.warning('unable to find uuid %s in dataset_nodes' % uuid)
+            LOG.warning("unable to find uuid %s in dataset_nodes" % uuid)
             return
         child.set_retiled(preferred_stride, tile_box, tiles_info, vertices, tex_coords)
         child.update()
@@ -1635,30 +1616,30 @@ LATLON_GRID_RESOLUTION_MAX: float = 10.0
 
 def get_configured_latlon_grid_resolution() -> float:
 
-    resolution: float = config.get("latlon_grid.resolution",
-                                   LATLON_GRID_RESOLUTION_DEFAULT)
+    resolution: float = config.get("latlon_grid.resolution", LATLON_GRID_RESOLUTION_DEFAULT)
 
     if not isinstance(resolution, Number):
         LOG.warning(
             f"Invalid configuration for lat/lon grid resolution"
             f" (='{resolution}') found."
-            f" Using the default {LATLON_GRID_RESOLUTION_DEFAULT}°.")
+            f" Using the default {LATLON_GRID_RESOLUTION_DEFAULT}°."
+        )
         return LATLON_GRID_RESOLUTION_DEFAULT
 
     if resolution > LATLON_GRID_RESOLUTION_MAX:
         LOG.warning(
             f"Configured lat/lon grid resolution {resolution}°"
             f" is greater than allowed maximum."
-            f" Using the maximum {LATLON_GRID_RESOLUTION_MAX}°.")
+            f" Using the maximum {LATLON_GRID_RESOLUTION_MAX}°."
+        )
         return LATLON_GRID_RESOLUTION_MAX
 
     if resolution < LATLON_GRID_RESOLUTION_MIN:
         LOG.warning(
             f"Configured lat/lon grid resolution {resolution}°"
             f" is less than allowed minimum."
-            f" Using the minimum {LATLON_GRID_RESOLUTION_MIN}°.")
+            f" Using the minimum {LATLON_GRID_RESOLUTION_MIN}°."
+        )
         return LATLON_GRID_RESOLUTION_MIN
 
     return resolution
-
-

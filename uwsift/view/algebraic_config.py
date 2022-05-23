@@ -1,12 +1,17 @@
 import logging
-from PyQt5.QtCore import QObject, pyqtSignal
-from PyQt5.QtWidgets import QComboBox
 from functools import partial
 from typing import Tuple
 
+from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt5.QtWidgets import QComboBox
+
 from uwsift.common import Kind
-from uwsift.model.composite_recipes import AlgebraicRecipe, PRESET_OPERATIONS, \
-    CUSTOM_OP_NAME, DIFF_OP_NAME
+from uwsift.model.composite_recipes import (
+    CUSTOM_OP_NAME,
+    DIFF_OP_NAME,
+    PRESET_OPERATIONS,
+    AlgebraicRecipe,
+)
 from uwsift.model.layer_item import LayerItem
 from uwsift.model.layer_model import LayerModel
 
@@ -40,19 +45,13 @@ class AlgebraicLayerConfigPane(QObject):
         self.recipe = None
         self.model = model
 
-        [x.currentIndexChanged.connect(partial(self._combo_changed, combo=x,
-                                               channel=xyz))
-         for xyz, x in zip(('z', 'y', 'x'), (self.ui.z_combo, self.ui.y_combo,
-                                             self.ui.x_combo))]
-        self.ui.layer_name_edit.textEdited.connect(
-            self._algebraic_name_edit_changed
-        )
-        self.ui.operations_text.textChanged.connect(
-            self._operation_formular_changed
-        )
-        self.ui.algebraicUpdateButton.clicked.connect(
-            self._on_algebraic_update_button_clicked
-        )
+        [
+            x.currentIndexChanged.connect(partial(self._combo_changed, combo=x, channel=xyz))
+            for xyz, x in zip(("z", "y", "x"), (self.ui.z_combo, self.ui.y_combo, self.ui.x_combo))
+        ]
+        self.ui.layer_name_edit.textEdited.connect(self._algebraic_name_edit_changed)
+        self.ui.operations_text.textChanged.connect(self._operation_formular_changed)
+        self.ui.algebraicUpdateButton.clicked.connect(self._on_algebraic_update_button_clicked)
 
         self._algebraic_name_edit = self.ui.layer_name_edit
         self._algebraic_update_button = self.ui.algebraicUpdateButton
@@ -66,11 +65,7 @@ class AlgebraicLayerConfigPane(QObject):
     @property
     def algebraic_channels(self):
         if self._algebraic_channels is None:
-            self._algebraic_channels = [
-                self.ui.x_combo,
-                self.ui.y_combo,
-                self.ui.z_combo
-            ]
+            self._algebraic_channels = [self.ui.x_combo, self.ui.y_combo, self.ui.z_combo]
         return self._algebraic_channels
 
     @property
@@ -84,7 +79,7 @@ class AlgebraicLayerConfigPane(QObject):
     @property
     def layer_combos_names(self):
         return zip(
-            ('x', 'y', 'z'),
+            ("x", "y", "z"),
             self.algebraic_channels,
         )
 
@@ -115,8 +110,7 @@ class AlgebraicLayerConfigPane(QObject):
 
         LOG.debug(f"Alegbraic: user selected {repr(layer_uuid)} for {channel}")
 
-        self.didChangeAlgebraicInputLayers.emit(self.recipe, channel,
-                                                layer_uuid)
+        self.didChangeAlgebraicInputLayers.emit(self.recipe, channel, layer_uuid)
 
         self._show_settings_for_layer(self.recipe)
 
@@ -150,16 +144,14 @@ class AlgebraicLayerConfigPane(QObject):
 
     def _select_components_for_recipe(self, recipe=None):
         if recipe is not None:
-            for layer_uuid, widget \
-                    in zip(recipe.input_layer_ids, self.algebraic_channels):
+            for layer_uuid, widget in zip(recipe.input_layer_ids, self.algebraic_channels):
                 if not layer_uuid:
                     widget.setCurrentIndex(0)
                 else:
                     dex = widget.findData(layer_uuid)
                     if dex <= 0:
                         widget.setCurrentIndex(0)
-                        LOG.error(f"Layer with  uuid '{layer_uuid}' not"
-                                  f" available to be selected")
+                        LOG.error(f"Layer with  uuid '{layer_uuid}' not" f" available to be selected")
                     else:
                         widget.setCurrentIndex(dex)
         else:
@@ -177,20 +169,17 @@ class AlgebraicLayerConfigPane(QObject):
         update combo boxes with the list of layer names and then select
          the right x, y, z layers if they're not None
         """
-        current_layers = [x.itemData(x.currentIndex())
-                          for x in self.algebraic_channels]
+        current_layers = [x.itemData(x.currentIndex()) for x in self.algebraic_channels]
 
         for widget in self.algebraic_channels:
             widget.blockSignals(True)
 
         for widget in self.algebraic_channels:
             widget.clear()
-            widget.addItem('None', None)
+            widget.addItem("None", None)
 
-        for widget, selected_layer_uuid \
-                in zip(self.algebraic_channels, current_layers):
-            if not selected_layer_uuid \
-                    or selected_layer_uuid not in self._layer_uuids:
+        for widget, selected_layer_uuid in zip(self.algebraic_channels, current_layers):
+            if not selected_layer_uuid or selected_layer_uuid not in self._layer_uuids:
                 widget.setCurrentIndex(0)
 
             for idx, layer_uuid in enumerate(self._layer_uuids):
@@ -213,9 +202,7 @@ class AlgebraicLayerConfigPane(QObject):
         self.operation_combo.addItem(CUSTOM_OP_NAME)
         self.operation_combo.setCurrentIndex(0)
         self.operation_combo.currentIndexChanged.connect(self._set_operation)
-        self.ui.operation_combo.currentIndexChanged.connect(
-            self._operation_kind_changed
-        )
+        self.ui.operation_combo.currentIndexChanged.connect(self._operation_kind_changed)
         self._custom_formula = PRESET_OPERATIONS[DIFF_OP_NAME][0]
 
     def _set_operation(self, *args, **kwargs):
@@ -246,9 +233,7 @@ class AlgebraicLayerConfigPane(QObject):
         self.didChangeAlgebraicOperationKind.emit(self.recipe, operation_kind)
 
     def _operation_formular_changed(self):
-        self.didChangeAlgebraicOperationFormula.emit(
-            self.recipe, self.operations_text.toPlainText()
-        )
+        self.didChangeAlgebraicOperationFormula.emit(self.recipe, self.operations_text.toPlainText())
 
     def _on_algebraic_update_button_clicked(self):
         self.didTriggeredUpdate.emit(self.recipe)

@@ -3,10 +3,10 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
-from PyQt5.QtCore import QDateTime, QObject, pyqtSignal
 from dateutil.relativedelta import relativedelta
+from PyQt5.QtCore import QDateTime, QObject, pyqtSignal
 
-from uwsift.control.qml_utils import QmlLayerManager, TimebaseModel, QmlBackend
+from uwsift.control.qml_utils import QmlBackend, QmlLayerManager, TimebaseModel
 from uwsift.control.time_matcher import TimeMatcher
 from uwsift.control.time_matcher_policies import find_nearest_past
 from uwsift.control.time_transformer import TimeTransformer
@@ -22,14 +22,14 @@ class TimeManager(QObject):
     # TODO(mk): make this class abstract and subclass,
     #           as soon as non driving layer policies are necessary?
     """
-        Actions upon tick event:
-            - Time Manager gets t_sim from t2t_translator
-            - forwards it to Display Layers
-            - Display Layers each give their timeline and t_sim to TimeMatcher
-            - TimeMatcher returns t_matched for every non-driving layer timeline
-            - each Display Layer requests the image corresponding to the matched timestamp
-              from collection
-            - Image is displayed
+    Actions upon tick event:
+        - Time Manager gets t_sim from t2t_translator
+        - forwards it to Display Layers
+        - Display Layers each give their timeline and t_sim to TimeMatcher
+        - TimeMatcher returns t_matched for every non-driving layer timeline
+        - each Display Layer requests the image corresponding to the matched timestamp
+          from collection
+        - Image is displayed
     """
 
     didMatchTimes = pyqtSignal(dict)
@@ -47,18 +47,14 @@ class TimeManager(QObject):
         self.qml_layer_manager: QmlLayerManager = QmlLayerManager()
         self.current_timebase_uuid = None
 
-        self.qml_timestamps_model = \
-            TimebaseModel(timestamps=self._get_default_qdts())
+        self.qml_timestamps_model = TimebaseModel(timestamps=self._get_default_qdts())
         self._time_transformer: Optional[TimeTransformer] = None
 
     @staticmethod
     def _get_default_qdts(steps=5):
         now_dt = datetime.now()
         now_dt = datetime(now_dt.year, now_dt.month, now_dt.day, now_dt.hour)
-        return list(
-            map(lambda dt: QDateTime(dt),
-                [now_dt + relativedelta(hours=i) for i in range(steps)])
-        )
+        return list(map(lambda dt: QDateTime(dt), [now_dt + relativedelta(hours=i) for i in range(steps)]))
 
     @property
     def qml_backend(self) -> QmlBackend:
@@ -76,9 +72,7 @@ class TimeManager(QObject):
         layer_model.didUpdateLayers.connect(policy.on_layers_update)
         layer_model.didUpdateLayers.connect(self.update_qml_layer_model)
         layer_model.didUpdateLayers.connect(self.sync_to_time_transformer)
-        layer_model.didChangeRecipeLayerNames.connect(
-            self.update_qml_layer_model
-        )
+        layer_model.didChangeRecipeLayerNames.connect(self.update_qml_layer_model)
         layer_model.didReorderLayers.connect(self.update_layer_order)
 
         self.didMatchTimes.connect(self._layer_model.on_didMatchTimes)
@@ -87,24 +81,21 @@ class TimeManager(QObject):
         self._time_transformer = TimeTransformer(policy)
 
     def tick(self, event):
-        """
-        Proxy function for `TimeManager.step()`, which cannot directly
+        """Proxy function for `TimeManager.step()`.
+
+        TimeManager cannot directly
         receive a signal from the animation timer signal because the latter
         passes an `event` that `step()` cannot deal with. Thus connect to
         this method to actually trigger `step()`.
 
-        :param event: Event passed by `AnimationController.animation_timer` on
-        expiry, simply dropped.
+        :param event: Event passed by `AnimationController.animation_timer` on expiry, simply dropped.
         """
         self.step()
 
     def step(self, backwards: bool = False):
-        """
-        Method allowing advancement of time, either forwards or backwards, by
-        one time step, as determined by the currently active time base.
+        """Advance in time, either forwards or backwards, by one time step.
 
-        :param backwards: Flag which sets advancement either to `forwards` or
-        `backwards`.
+        :param backwards: Flag which sets advancement either to `forwards` or `backwards`.
         """
         self._time_transformer.step(backwards=backwards)
         self.sync_to_time_transformer()
@@ -123,8 +114,7 @@ class TimeManager(QObject):
         self.tick_qml_state(t_sim, t_idx)
 
     def get_current_timebase_timeline(self):
-        timebase_layer = self._layer_model.get_layer_by_uuid(
-            self.current_timebase_uuid)
+        timebase_layer = self._layer_model.get_layer_by_uuid(self.current_timebase_uuid)
         return timebase_layer.timeline
 
     def get_current_timebase_dataset_count(self):
@@ -178,13 +168,15 @@ class TimeManager(QObject):
         return t_matched_dict
 
     def update_qml_timeline(self, layer: LayerItem):
-        """
-        Slot that updates and refreshes QML timeline state using a DataLayer that is either:
+        """Slot that updates and refreshes QML timeline state using a DataLayer.
+
+        DataLayer is either:
             a) a driving layer or some other form of high priority data layer
             b) a 'synthetic' data layer, only created to reflect the best fitting
                 timeline/layer info for the current policy -> this may be policy-dependant
-            # TODO(mk): the policy should not be responsible for UI, another policy or an object
-                        that ingests a policy and handles UI based on that?
+
+        # TODO(mk): the policy should not be responsible for UI, another policy or an object
+                    that ingests a policy and handles UI based on that?
         """
         if not layer or not layer.dynamic:
             new_timestamp_qdts = self._get_default_qdts()
@@ -214,18 +206,15 @@ class TimeManager(QObject):
             if layer.uuid == self.current_timebase_uuid:
                 new_index_of_current_timebase = idx
 
-        self.qml_layer_manager._qml_layer_model.layer_strings = \
-            dynamic_layers_descriptors
+        self.qml_layer_manager._qml_layer_model.layer_strings = dynamic_layers_descriptors
 
         self.qml_backend.didChangeTimebase.emit(new_index_of_current_timebase)
 
     def update_layer_order(self):
         dynamic_layers = self._layer_model.get_dynamic_layers()
-        dynamic_layers_descriptors = \
-            [layer.descriptor for layer in dynamic_layers]
+        dynamic_layers_descriptors = [layer.descriptor for layer in dynamic_layers]
 
-        self.qml_layer_manager._qml_layer_model.layer_strings = \
-            dynamic_layers_descriptors
+        self.qml_layer_manager._qml_layer_model.layer_strings = dynamic_layers_descriptors
 
     def tick_qml_state(self, t_sim, timeline_idx):
         # TODO(mk): if TimeManager is subclassed the behavior below must be adapted:

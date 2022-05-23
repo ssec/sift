@@ -16,12 +16,12 @@ times are sufficiently recent but change the colour to red when there is
 significant delay.
 
 To run MTG-SIFT in *Auto Update Mode* according settings must be added to the
-application configuration, see `Activation of Auto Update Mode`_.
+application configuration, see :ref:`auto_update_mode_activation`.
 
 Since in auto update mode no files are load interactively a *Catalogue* must
 be configured which configures files according to which file name patterns
 should be loaded and where to find them. For details please see
-`Catalogue Query Configuration`_.
+:ref:`auto_update_catalogue_config`.
 
 Disk Space Management Tools
 ---------------------------
@@ -70,7 +70,7 @@ Alternatively the argument ``--pid`` can be used to trace a specific PID:
 .. code-block:: bash
 
     $ python uwsift/util/disk_management.py --pid <pid>
-    
+
 Example Output
 ..............
 

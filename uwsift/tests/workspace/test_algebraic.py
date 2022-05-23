@@ -2,9 +2,11 @@
 # -*- coding: utf-8 -*-
 """Tests for algebraic layer operations."""
 
-import numpy as np
 from datetime import datetime
-from uwsift.common import Info, Platform, Instrument
+
+import numpy as np
+
+from uwsift.common import Info, Instrument, Platform
 
 
 def _get_data_array_generator(data_arrs):
@@ -14,19 +16,21 @@ def _get_data_array_generator(data_arrs):
 
 def test_satpy_importer_basic(tmpdir, monkeypatch, mocker):
     """Basic import test using Satpy."""
-    from uwsift.workspace import Workspace
-    from uwsift.model.layer import DocBasicDataset
     from uuid import uuid1 as uuidgen
+
+    from uwsift.model.layer import DocBasicDataset
+    from uwsift.workspace import Workspace
+
     ws = Workspace(str(tmpdir))
     c01_attrs = {
-        Info.SHORT_NAME: 'C01',
-        Info.DATASET_NAME: 'C01',
+        Info.SHORT_NAME: "C01",
+        Info.DATASET_NAME: "C01",
         Info.CENTRAL_WAVELENGTH: 2.0,
         Info.UUID: uuidgen(),
     }
     c03_attrs = {
-        Info.SHORT_NAME: 'C03',
-        Info.DATASET_NAME: 'C03',
+        Info.SHORT_NAME: "C03",
+        Info.DATASET_NAME: "C03",
         Info.CENTRAL_WAVELENGTH: 4.0,
         Info.UUID: uuidgen(),
     }
@@ -50,7 +54,7 @@ def test_satpy_importer_basic(tmpdir, monkeypatch, mocker):
     c01 = DocBasicDataset(doc, c01_attrs)
     c03 = DocBasicDataset(doc, c03_attrs)
     ops = "z = x - y"
-    ns = {'y': c03_attrs[Info.UUID], 'x': c01_attrs[Info.UUID]}
+    ns = {"y": c03_attrs[Info.UUID], "x": c01_attrs[Info.UUID]}
 
     def get_metadata(u):
         return c01 if u == c01_attrs[Info.UUID] else c03
@@ -58,10 +62,9 @@ def test_satpy_importer_basic(tmpdir, monkeypatch, mocker):
     def get_content(u):
         return np.ones((2, 2)) if u == c01_attrs[Info.UUID] else np.zeros((2, 2))
 
-    monkeypatch.setattr(ws, 'get_metadata', get_metadata)
-    monkeypatch.setattr(ws, 'get_content', get_content)
-    uuid, info, data = ws.create_algebraic_composite(
-        ops, ns, info={Info.SHORT_NAME: 'new', Info.DATASET_NAME: 'new'})
+    monkeypatch.setattr(ws, "get_metadata", get_metadata)
+    monkeypatch.setattr(ws, "get_content", get_content)
+    uuid, info, data = ws.create_algebraic_composite(ops, ns, info={Info.SHORT_NAME: "new", Info.DATASET_NAME: "new"})
 
     np.testing.assert_equal(data, 1)
     assert info.get(Info.STANDARD_NAME) == "unknown"

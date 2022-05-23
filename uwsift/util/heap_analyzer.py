@@ -6,8 +6,8 @@ import pickle
 import re
 import sys
 import tracemalloc
-from collections import defaultdict, OrderedDict
-from typing import List, Generator, Optional
+from collections import OrderedDict, defaultdict
+from typing import Generator, List, Optional
 
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
@@ -102,8 +102,9 @@ class HeapAnalyzer:
         if sort_key not in ["size", "count"]:
             raise ValueError("sort key must be size or count")
 
-        sorted_list_of_allocs = sorted(self._allocations.items(), reverse=True,
-                                       key=lambda item: sum(alloc[sort_key] for alloc in item[1]))
+        sorted_list_of_allocs = sorted(
+            self._allocations.items(), reverse=True, key=lambda item: sum(alloc[sort_key] for alloc in item[1])
+        )
 
         sorted_dict = OrderedDict()
         for location, allocs in sorted_list_of_allocs:
@@ -154,11 +155,11 @@ class HeapAnalyzer:
             if rank < limit:
                 # use "relative" paths because the absolute paths are too long
                 if conda_packages_path and file_name.startswith(conda_packages_path):
-                    file_name = "<conda>/%s" % file_name[len(conda_packages_path):]
+                    file_name = "<conda>/%s" % file_name[len(conda_packages_path) :]
                 elif python_stdlib_path and file_name.startswith(python_stdlib_path):
-                    file_name = "<python-stdlib>/%s" % file_name[len(python_stdlib_path):]
+                    file_name = "<python-stdlib>/%s" % file_name[len(python_stdlib_path) :]
                 elif uwsift_project_path and file_name.startswith(uwsift_project_path):
-                    file_name = "<uwsift>/%s" % file_name[len(uwsift_project_path):]
+                    file_name = "<uwsift>/%s" % file_name[len(uwsift_project_path) :]
 
                 labels.append(f"{file_name}:{line_number}")
                 stacked_y_axis.append([alloc[top_sort] for alloc in allocs])

@@ -13,6 +13,7 @@ dependencies:
   - pyshp
   - pyqt
   - pyqtgraph
+  - pyqtwebengine
   - satpy
   - scikit-image
   - shapely

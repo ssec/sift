@@ -1,7 +1,8 @@
 import pytest
+from PyQt5.QtTest import QTest
+
 from uwsift.__main__ import Main, create_app
 from uwsift.util.default_paths import USER_CONFIG_DIR
-from PyQt5.QtTest import QTest
 
 
 @pytest.fixture(scope="session")

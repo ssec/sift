@@ -11,28 +11,29 @@ from uwsift.model.catalogue import GlobbingCreator
 LOG = logging.getLogger(__name__)
 
 filter_patterns = [
-    "A-{platform_name:4s}-{channel:_<6s}-B_-{undefined}-{service:3s}-{start_time:%Y%m%d%H%M}-CCC-{end_time:%Y%m%d%H%M}-D_"
+    "A-{platform_name:4s}-{channel:_<6s}-B_-{undefined}-"
+    "{service:3s}-{start_time:%Y%m%d%H%M}-CCC-{end_time:%Y%m%d%H%M}-D_"
 ]
 
 constraints = constraints_absolute = {
-    'platform_name': "MSG4",
-    'channel': ["______", "IR_108"],
-    'start_time': {
-        'type': "datetime",
-        'Y': 2019,
-        'm': 12,
-        'd': 31,
-        'H': 12 #[3, 9, 15, 21] # 12 # Future:
-    }
+    "platform_name": "MSG4",
+    "channel": ["______", "IR_108"],
+    "start_time": {
+        "type": "datetime",
+        "Y": 2019,
+        "m": 12,
+        "d": 31,
+        "H": 12,  # [3, 9, 15, 21] # 12 # Future:
+    },
 }
 
 constraints_relative = {
-    'platform_name': "MSG4",
-    'channel': ["______", "IR_108"],
-    'start_time': {
-        'type': "recent_datetime",
-        'H': [-1]
-    }
+    "platform_name": "MSG4",
+    "channel": ["______", "IR_108"],
+    "start_time": {
+        "type": "recent_datetime",
+        "H": [-1],
+    },
 }
 
 print("\n------------------------------------------------------------------")
@@ -57,8 +58,7 @@ pprint(efp)
 print("\n=====================================================================")
 print("Expand Datetime 'start_time Constraint, type: datetime:")
 print(constraints_absolute.get("start_time"))
-edc_abs = GlobbingCreator._expand_datetime_constraint(
-    "start_time", constraints_absolute.get("start_time"))
+edc_abs = GlobbingCreator._expand_datetime_constraint("start_time", constraints_absolute.get("start_time"))
 pprint(edc_abs)
 
 print("\n----------------------------------------------------------------")
@@ -71,8 +71,7 @@ except (ValueError, TypeError) as exc:
 
 print("\n----------------------------------------------------------------")
 print("Globbing Patterns, type: datetime:")
-gp_abs = GlobbingCreator.construct_globbing_patterns(
-    filter_patterns, constraints_absolute)
+gp_abs = GlobbingCreator.construct_globbing_patterns(filter_patterns, constraints_absolute)
 pprint(gp_abs)
 
 print("\n=====================================================================")
@@ -82,8 +81,7 @@ print("----------------------------------------------------------------")
 print("Expand Datetime 'start_time Constraint, type: recent_datetime:")
 print(constraints_relative.get("start_time"))
 try:
-    edc_rel = GlobbingCreator._expand_datetime_constraint(
-        "start_time", constraints_relative.get("start_time"))
+    edc_rel = GlobbingCreator._expand_datetime_constraint("start_time", constraints_relative.get("start_time"))
     pprint(edc_rel)
 except (ValueError, TypeError) as exc:
     LOG.warning(exc)
@@ -95,7 +93,5 @@ pprint(ec_rel)
 
 print("\n----------------------------------------------------------------")
 print("Globbing Patterns, type: recent_datetime:")
-gp_rel = GlobbingCreator.construct_globbing_patterns(
-    filter_patterns, constraints_relative)
+gp_rel = GlobbingCreator.construct_globbing_patterns(filter_patterns, constraints_relative)
 pprint(gp_rel)
-

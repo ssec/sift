@@ -1,8 +1,9 @@
 #!/usr/bin/env python
-from psutil import Process, process_iter, NoSuchProcess, PermissionError
-from typing import Dict, List, Optional
-from time import sleep
 import atexit
+from time import sleep
+from typing import Dict, List, Optional
+
+from psutil import NoSuchProcess, PermissionError, Process, process_iter
 
 
 class DiskManagement:
@@ -18,6 +19,7 @@ class DiskManagement:
          cmdline of process does not match with specified cmdline,
          process with the specified command line could not be found
     """
+
     open_files: Dict[str, str] = {}
 
     def __init__(self, pid: Optional[int] = None, cmdline: Optional[str] = None):
@@ -109,7 +111,7 @@ class DiskManagement:
 
             # indicate progress to the user by printing a dot for each new file
             for _ in range(new_file_counter):
-                print(f".", end="", flush=True)
+                print(".", end="", flush=True)
 
             sleep(interval)
 
@@ -143,6 +145,7 @@ class DiskManagement:
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser("Disk Management")
     parser.add_argument("--pid", type=int, help="PID of the process, which should be traced")
     parser.add_argument("--cmdline", default="python -m uwsift", help="find the process using the cmdline")

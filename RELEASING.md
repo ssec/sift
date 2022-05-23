@@ -32,4 +32,3 @@ See [semver.org](http://semver.org/) on how to write a version number.
 7. Create a release of the package on
    [github](https://github.com/ssec/sift/releases) by drafting a new release
    and copying the release notes from the changelog (see above).
-   

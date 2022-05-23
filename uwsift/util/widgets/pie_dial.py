@@ -1,7 +1,7 @@
 import logging
 import sys
 
-from PyQt5 import QtGui, QtCore, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 from uwsift.common import LayerVisibility
 
@@ -9,13 +9,15 @@ LOG = logging.getLogger(__name__)
 
 
 class PieDial:
-    """The available look and behaviour of the QDial widget is not suitable for
+    """Widget for displaying visibility and opacity of a layer.
+
+    The available look and behaviour of the QDial widget is not suitable for
     the purpose of displaying the state of visibility and opacity of a layer.
     Therefore, a separate widget system was developed.
 
     The opacity is indicated by the filled area of a pie:
         - If, for example, the pie is completely filled, then the opacity
-        is 100%.
+          is 100%.
         - If the cake is e.g. only half filled, the opacity is 50%.
 
     Visibility is indicated by crossing out or not crossing out the circle.
@@ -30,12 +32,15 @@ class PieDial:
     https://stackoverflow.com/questions/12011147/how-to-create-a-3-color-gradient-dial-indicator-the-one-that-shows-green-yellow
     """
 
-    def __init__(self, visible: bool = True,
-                 opacity: float = 1.0,
-                 pie_brush=QtCore.Qt.blue,
-                 pie_pen=QtCore.Qt.NoPen,
-                 strike_out_brush=QtCore.Qt.red,
-                 strike_out_pen=QtCore.Qt.NoPen):
+    def __init__(
+        self,
+        visible: bool = True,
+        opacity: float = 1.0,
+        pie_brush=QtCore.Qt.blue,
+        pie_pen=QtCore.Qt.NoPen,
+        strike_out_brush=QtCore.Qt.red,
+        strike_out_pen=QtCore.Qt.NoPen,
+    ):
         self._opacity = opacity
         self._visible = visible
 
@@ -44,8 +49,7 @@ class PieDial:
         self._strike_out_brush = strike_out_brush
         self._strike_out_pen = strike_out_pen
 
-    def _configure_appearance_of_drawn_pie(self, painter: QtGui.QPainter,
-                                           rect: QtCore.QRect):
+    def _configure_appearance_of_drawn_pie(self, painter: QtGui.QPainter, rect: QtCore.QRect):
         """
 
         :param painter:
@@ -57,8 +61,7 @@ class PieDial:
         painter.setPen(self._pie_pen)
         painter.setBrush(self._pie_brush)
 
-    def _configure_appearance_of_drawn_strike_out(self,
-                                                  painter: QtGui.QPainter):
+    def _configure_appearance_of_drawn_strike_out(self, painter: QtGui.QPainter):
         """
 
         :param painter:
@@ -87,16 +90,13 @@ class PieDial:
 
         pie_rect = QtCore.QRect(rect)
 
-        pie_rect_size_min = min(pie_rect.size().width(),
-                                pie_rect.size().height())
+        pie_rect_size_min = min(pie_rect.size().width(), pie_rect.size().height())
 
-        pie_rect.setSize(QtCore.QSize(pie_rect_size_min - 2,
-                                      pie_rect_size_min - 2))
+        pie_rect.setSize(QtCore.QSize(pie_rect_size_min - 2, pie_rect_size_min - 2))
         pie_rect.moveCenter(rect.center())
 
         self._configure_appearance_of_drawn_pie(painter, pie_rect)
-        painter.drawPie(pie_rect, int(90.0 * 16),
-                        int(self._convert_current_value_to_degree() * 16))
+        painter.drawPie(pie_rect, int(90.0 * 16), int(self._convert_current_value_to_degree() * 16))
 
         if not self._visible:
             blocked_rect = QtCore.QRect(pie_rect)
@@ -110,10 +110,9 @@ class PieDial:
 
             center = blocked_rect.center()
 
-            transform = QtGui.QTransform()\
-                .translate(center.x(), center.y())\
-                .rotate(45.0)\
-                .translate(-center.x(), -center.y())
+            transform = (
+                QtGui.QTransform().translate(center.x(), center.y()).rotate(45.0).translate(-center.x(), -center.y())
+            )
 
             rotated_rect = transform.mapToPolygon(blocked_rect)
 
@@ -149,8 +148,7 @@ class PieDialEditor(QtWidgets.QWidget):
         self.setAutoFillBackground(True)
 
         self._layer_opacity_popup = SliderPopup(parent=self)
-        self._layer_opacity_popup.get_slider().valueChanged \
-            .connect(self._set_opacity_in_percent)
+        self._layer_opacity_popup.get_slider().valueChanged.connect(self._set_opacity_in_percent)
         self._current_mouse_pos = QtCore.QPoint(0, 0)
 
     def _set_opacity_in_percent(self, val: int) -> None:
@@ -178,13 +176,11 @@ class PieDialEditor(QtWidgets.QWidget):
 
         :param event:
         """
-        if event.button() == QtCore.Qt.RightButton \
-                and not self._layer_opacity_popup.active:
+        if event.button() == QtCore.Qt.RightButton and not self._layer_opacity_popup.active:
             global_pos = self.mapToGlobal(event.pos())
             self._layer_opacity_popup.show_at(global_pos, self.pie_dial.opacity)
 
-        if event.button() == QtCore.Qt.LeftButton \
-                and not self._layer_opacity_popup.active:
+        if event.button() == QtCore.Qt.LeftButton and not self._layer_opacity_popup.active:
             self.pie_dial.visible = not self.pie_dial.visible
             self.editingFinished.emit()
 
@@ -210,13 +206,11 @@ class PieDialEditor(QtWidgets.QWidget):
         :param event:
         """
 
-        if event.angleDelta().y() > 0 \
-                and not self._layer_opacity_popup.active:
+        if event.angleDelta().y() > 0 and not self._layer_opacity_popup.active:
             self.pie_dial.opacity = self.pie_dial.opacity + 0.05
             self.editingFinished.emit()
 
-        elif event.angleDelta().y() < 0 \
-                and not self._layer_opacity_popup.active:
+        elif event.angleDelta().y() < 0 and not self._layer_opacity_popup.active:
             self.pie_dial.opacity = self.pie_dial.opacity - 0.05
             self.editingFinished.emit()
 
@@ -226,16 +220,14 @@ class PieDialEditor(QtWidgets.QWidget):
 
 
 class PieDialDelegate(QtWidgets.QStyledItemDelegate):
-    """
-
-    """
+    """ """
 
     def __init__(self, *args, **kwargs):
         super(PieDialDelegate, self).__init__(*args, **kwargs)
 
-    def createEditor(self, parent: QtWidgets.QWidget,
-                     option: QtWidgets.QStyleOptionViewItem,
-                     index: QtCore.QModelIndex) -> QtWidgets.QWidget:
+    def createEditor(
+        self, parent: QtWidgets.QWidget, option: QtWidgets.QStyleOptionViewItem, index: QtCore.QModelIndex
+    ) -> QtWidgets.QWidget:
         """
 
         :param parent:
@@ -248,24 +240,18 @@ class PieDialDelegate(QtWidgets.QStyledItemDelegate):
 
         return editor
 
-    def paint(self, painter: QtGui.QPainter,
-              option: QtWidgets.QStyleOptionViewItem,
-              index: QtCore.QModelIndex) -> None:
+    def paint(self, painter: QtGui.QPainter, option: QtWidgets.QStyleOptionViewItem, index: QtCore.QModelIndex) -> None:
         layer_visibility: LayerVisibility = index.data()
 
-        pie_dial = PieDial(visible=layer_visibility.visible,
-                           opacity=layer_visibility.opacity)
+        pie_dial = PieDial(visible=layer_visibility.visible, opacity=layer_visibility.opacity)
         pie_dial.paint(painter, option.rect)
 
     def commit_and_close_editor(self):
-        """
-
-        """
+        """ """
         editor = self.sender()
         self.commitData.emit(editor)
 
-    def setEditorData(self, editor: QtWidgets.QWidget,
-                      index: QtCore.QModelIndex) -> None:
+    def setEditorData(self, editor: QtWidgets.QWidget, index: QtCore.QModelIndex) -> None:
         """
 
         :param editor:
@@ -274,33 +260,31 @@ class PieDialDelegate(QtWidgets.QStyledItemDelegate):
         layer_visibility: LayerVisibility = index.data()
 
         if not editor.pie_dial:
-            pie_dial = PieDial(visible=layer_visibility.visible,
-                               opacity=layer_visibility.opacity)
+            pie_dial = PieDial(visible=layer_visibility.visible, opacity=layer_visibility.opacity)
             editor.set_pie_dial(pie_dial)
         else:
             editor.pie_dial.visible = layer_visibility.visible
             editor.pie_dial.opacity = layer_visibility.opacity
             editor.update()
 
-    def setModelData(self, editor: QtWidgets.QWidget,
-                     model: QtCore.QAbstractItemModel,
-                     index: QtCore.QModelIndex) -> None:
+    def setModelData(
+        self, editor: QtWidgets.QWidget, model: QtCore.QAbstractItemModel, index: QtCore.QModelIndex
+    ) -> None:
         """
 
         :param editor:
         :param model:
         :param index:
         """
-        layer_visibility = LayerVisibility(editor.pie_dial.visible,
-                                           editor.pie_dial.opacity)
+        layer_visibility = LayerVisibility(editor.pie_dial.visible, editor.pie_dial.opacity)
 
         if index.data() != layer_visibility:
             model.setData(index, layer_visibility)
         editor.update()
 
-    def updateEditorGeometry(self, editor: QtWidgets.QWidget,
-                             option: QtWidgets.QStyleOptionViewItem,
-                             index: QtCore.QModelIndex) -> None:
+    def updateEditorGeometry(
+        self, editor: QtWidgets.QWidget, option: QtWidgets.QStyleOptionViewItem, index: QtCore.QModelIndex
+    ) -> None:
         """
 
         :param editor:
@@ -315,6 +299,7 @@ class SliderPopup(QtWidgets.QWidget):
     is displayed in a pop-up window. When the widget is displayed, the value to
     be changed must be converted if the value is not a percentage value.
     """
+
     _slider = None
 
     def __init__(self, *args, **kwargs):
@@ -323,8 +308,7 @@ class SliderPopup(QtWidgets.QWidget):
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Popup)
         self.setFocusPolicy(QtCore.Qt.ClickFocus)
 
-        self._slider = QtWidgets.QSlider(QtCore.Qt.Horizontal,
-                                         parent=self)
+        self._slider = QtWidgets.QSlider(QtCore.Qt.Horizontal, parent=self)
         self._slider.setRange(0, 100)
         self._label = QtWidgets.QLabel("0 %")
 
@@ -397,5 +381,5 @@ def main():
     sys.exit(app.exec_())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

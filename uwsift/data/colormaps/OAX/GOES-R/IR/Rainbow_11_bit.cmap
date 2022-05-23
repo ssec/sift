@@ -3,8 +3,8 @@
          11-bit IR/VIS/NIR color map (Rainbow_11_bit, IR Pixel Flag off)
     -->
     <!-- TOWRdocs Description
-         The 11-bit "Rainbow" enhancement was designed to be applicable to any 
-	 infrared band, including the water vapor bands. The "warmer" colors 
+         The 11-bit "Rainbow" enhancement was designed to be applicable to any
+	 infrared band, including the water vapor bands. The "warmer" colors
 	 represent the hot temperatures with "cooler" colors representing the
 	 colder temperatures. The sequence and discretization of the colors is
 	 a function of a continuous path on the classical Red-Green-Blue (RGB)
@@ -14,16 +14,16 @@
 	 suitable for visible and near-infrared imagery.
 
          The color map can be added to styleRules in common_static, or it can be used to modify
-         an existing display. For the latter, right-click the title of the product at the bottom 
+         an existing display. For the latter, right-click the title of the product at the bottom
          of the CAVE screen.  Select "Change Color Map." Under "Set Color Table Range" press the
          entry that appears and there will be a pull-down of options. Select "site" and then your
-         site 3-letter identifier, then "Sat", then "IR" (or "VIS" for Vis color tables), and 
+         site 3-letter identifier, then "Sat", then "IR" (or "VIS" for Vis color tables), and
          select the desired color map. Training Team Approved.
          Contributors: Tim Schmit and Jordan Gerth.
     -->
     <!-- TOWRdocs Status
          New experimental IR/VIS/NIR color map for GOES-R channels. This color map does not
-         appear in the current AWIPS baseline.  
+         appear in the current AWIPS baseline.
    -->
     <!-- TOWRdocs POC
          Lee Byerle

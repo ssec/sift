@@ -15,19 +15,37 @@ import logging
 import sys
 import unittest
 from datetime import datetime, timedelta
-from typing import Tuple, Optional, Mapping, List, Callable, Set, Iterable, Sequence, Any, Union
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+)
 from uuid import UUID
 
 from PyQt5.QtCore import QRectF, Qt, pyqtSignal
-from PyQt5.QtGui import QPen, QBrush, QPainter
-from PyQt5.QtWidgets import (QGraphicsScene, QGraphicsView,
-                             QMenu, QMainWindow, QStatusBar, QApplication,
-                             QGraphicsItem)
-from PyQt5.QtOpenGL import QGLFormat, QGL, QGLWidget
+from PyQt5.QtGui import QBrush, QPainter, QPen
+from PyQt5.QtOpenGL import QGL, QGLFormat, QGLWidget
+from PyQt5.QtWidgets import (
+    QApplication,
+    QGraphicsItem,
+    QGraphicsScene,
+    QGraphicsView,
+    QMainWindow,
+    QMenu,
+    QStatusBar,
+)
 
 from uwsift.common import Flags, Span
-from .common import VisualState, CoordTransform
-from .items import QTrackItem, QFrameItem, QTimeRulerItem
+
+from .common import CoordTransform, VisualState
+from .items import QFrameItem, QTimeRulerItem, QTrackItem
 
 LOG = logging.getLogger(__name__)
 
@@ -136,7 +154,7 @@ class QFramesInTracksScene(QGraphicsScene):
 
     @property
     def timeline_span(self) -> Span:
-        if hasattr(self, '_demo_time_span'):
+        if hasattr(self, "_demo_time_span"):
             return self._demo_time_span
         t = datetime.utcnow()
         hh = timedelta(minutes=30)
@@ -155,26 +173,24 @@ class QFramesInTracksScene(QGraphicsScene):
         """Revise ruler size and internal tick items and labels to match scene extents"""
 
     def _update_cursor_in_rulers(self):
-        """Update ruler contents to show current cursor position and duration
-        """
+        """Update ruler contents to show current cursor position and duration"""
 
     def _align_tracks_to_scene_rect(self, rect: QRectF, immediate_refresh: bool = True):
-        """Move track labels to left edge """
+        """Move track labels to left edge"""
         # FUTURE: okay, how do we deal with more than one view?
         pass
 
     def sceneRectChanged(self, new_rect: QRectF):
+        """Update tracks when scene rect changes."""
         self._align_tracks_to_scene_rect(new_rect, False)
         super(QFramesInTracksScene, self).sceneRectChanged(new_rect)
 
     def visible_tracks_frames(self, view: QGraphicsView = None) -> Mapping[UUID, List[UUID]]:
-        """return OrderedDict with UUID keys for tracks and list values of frames, for tracks and frames visible on in view
-        """
+        """Get mapping of UUIDs to list of visible frames for tracks."""
         raise NotImplementedError("NYI")  # FIXME
 
     def visible_time_range(self, view: QGraphicsView = None):
-        """return visible time range for the view in question
-        """
+        """return visible time range for the view in question"""
         raise NotImplementedError("NYI")  # FIXME
 
     def center_view_on_frame(self, gv: QGraphicsView, frame_uuid: UUID):
@@ -211,13 +227,11 @@ class QFramesInTracksScene(QGraphicsScene):
         raise NotImplementedError("NYI")  # FIXME
 
     def _change_frame_state(self, frame: UUID, new_state: Flags):
-        """Change the displayed state of a frame and queue a visual refresh
-        """
+        """Change the displayed state of a frame and queue a visual refresh"""
         raise NotImplementedError("NYI")  # FIXME
 
     def _change_track_state(self, track: str, new_state: Flags):
-        """Change the displayed state of a track and queue a visual refresh
-        """
+        """Change the displayed state of a track and queue a visual refresh"""
         raise NotImplementedError("NYI")  # FIXME
 
     def _move_cursor(self, when: datetime, duration: timedelta = None, animating_over: timedelta = None):
@@ -262,7 +276,7 @@ class QFramesInTracksScene(QGraphicsScene):
         zx, zn = max(zord.keys()), min(zord.keys())
         ntracks = zx - zn + 1
         if ntracks != len(self._track_items) or ntracks != len(zord):
-            readout = '\n'.join('{}: {}'.format(trk.z, trk.track) for trk in self._track_items.values())
+            readout = "\n".join("{}: {}".format(trk.z, trk.track) for trk in self._track_items.values())
             LOG.error("continuity check failed:\n" + readout)
             raise AssertionError("logic error: tracks are not contiguous in z-order")
 
@@ -287,12 +301,12 @@ class QFramesInTracksScene(QGraphicsScene):
     def propagate_max_z(self, new_max_z: int = None):
         if new_max_z is None:
             new_max_z = self._track_max_z
-        LOG.debug('max_z propagating as {}'.format(new_max_z))
+        LOG.debug("max_z propagating as {}".format(new_max_z))
         self._coords.max_z = new_max_z
 
-    def _shift_zorders_to_close(self, removing_at_z: int,
-                                subject: QTrackItem = None,
-                                zord: Mapping[int, QTrackItem] = None) -> List[QTrackItem]:
+    def _shift_zorders_to_close(
+        self, removing_at_z: int, subject: QTrackItem = None, zord: Mapping[int, QTrackItem] = None
+    ) -> List[QTrackItem]:
         changed = []
         if zord is None:
             zord = self._track_order
@@ -311,9 +325,9 @@ class QFramesInTracksScene(QGraphicsScene):
                 changed.append(bub)
         return changed
 
-    def _shift_zorders_to_open(self, inserting_above_z: int,
-                               subject: QTrackItem = None,
-                               zord: Mapping[int, QTrackItem] = None) -> Tuple[List[QTrackItem], int]:
+    def _shift_zorders_to_open(
+        self, inserting_above_z: int, subject: QTrackItem = None, zord: Mapping[int, QTrackItem] = None
+    ) -> Tuple[List[QTrackItem], int]:
         """Open up a z-order to move or insert a track.
 
         For zorder >=0 we bubble everything above upward and place new layer at trkz+1;
@@ -378,8 +392,8 @@ class QFramesInTracksScene(QGraphicsScene):
         """Change track z-order after it's been inserted
         return list of tracks that had their z-order shifted
         """
-        assert (trk in self._track_items.values())
-        assert (trk is self._track_items[trk.track])
+        assert trk in self._track_items.values()
+        assert trk is self._track_items[trk.track]
         closing_changes = self._shift_zorders_to_close(trk.z, subject=trk)
         opening_changes, new_z = self._shift_zorders_to_open(new_z, subject=trk)
         trk.z = new_z
@@ -406,9 +420,9 @@ class QFramesInTracksScene(QGraphicsScene):
     didRequestActivation = pyqtSignal(dict, dict)
     didCopyPresentationBetweenTracks = pyqtSignal(str, str)  # from-track and to-track
     didChangePlaybackSpan = pyqtSignal(Span)  # overall playback Span had one or both of its ends moved
-    didChangeVisibleAreaForView = pyqtSignal(QGraphicsView,
-                                             datetime,
-                                             timedelta)  # note: multiple views can share one scene
+    didChangeVisibleAreaForView = pyqtSignal(
+        QGraphicsView, datetime, timedelta
+    )  # note: multiple views can share one scene
 
     # delegate functions to implement for document and workspace
     # these are typically called by view or scene control logic
@@ -418,8 +432,7 @@ class QFramesInTracksScene(QGraphicsScene):
     #
 
     def iterate_track_info(self, start_z: int = 0, stop_z: Optional[int] = None):
-        """Yield series of track information tuples which will be used to generate/update QTrackItems
-        """
+        """Yield series of track information tuples which will be used to generate/update QTrackItems"""
 
     def get(self, item: Union[UUID, str]) -> Union[QTrackItem, QFrameItem, None]:
         if isinstance(item, UUID):
@@ -459,8 +472,9 @@ class QFramesInTracksScene(QGraphicsScene):
         LOG.warning("using base class may_reassign_color_map which does nothing")
         return lambda b: None
 
-    def menu_for_track(self, track: str, frame: Optional[UUID] = None) -> Optional[
-            Tuple[QMenu, Mapping[Any, Callable]]]:
+    def menu_for_track(
+        self, track: str, frame: Optional[UUID] = None
+    ) -> Optional[Tuple[QMenu, Mapping[Any, Callable]]]:
         """Generate QMenu and action LUT to use as context menu for a given track.
 
         Optionally with frame if mouse was over that frame
@@ -485,9 +499,7 @@ class TestScene(QFramesInTracksScene):
         super(TestScene, self).__init__(*args, **kwargs)
         # assert(hasattr(self, '_track_order'))
 
-    def update(self,
-               changed_tracks: Optional[Set[str]] = None,
-               changed_frame_uuids: Optional[Set[UUID]] = None) -> int:
+    def update(self, changed_tracks: Optional[Set[str]] = None, changed_frame_uuids: Optional[Set[UUID]] = None) -> int:
         if self._did_populate:
             return 0
         self._test_populate()
@@ -498,21 +510,53 @@ class TestScene(QFramesInTracksScene):
 
     def _test_populate(self):
         from uuid import uuid1 as uuidgen
+
         once = datetime.utcnow()
 
         def minutes_td(minutes):
             return timedelta(minutes=minutes)
+
         # assert(hasattr(self, '_track_order'))
         self._span = Span(once - minutes_td(10), minutes_td(30))
-        track0 = QTrackItem(self, self.coords, 'IMAGE:test::timeline:GOES-21:QBI:mars', 1,
-                            "G21 QBI B99 BT", "test track", tooltip="peremptorily cromulent")
+        track0 = QTrackItem(
+            self,
+            self.coords,
+            "IMAGE:test::timeline:GOES-21:QBI:mars",
+            1,
+            "G21 QBI B99 BT",
+            "test track",
+            tooltip="peremptorily cromulent",
+        )
         # scene.addItem(abitrack)  # done in init
-        frame01 = QFrameItem(track0, self.coords, uuidgen(), once + minutes_td(5), minutes_td(5),
-                             Flags([VisualState.BUSY]), "abi1", "fulldiskimus")
-        track1 = QTrackItem(self, self.coords, 'IMAGE:test::timeline:Himawari-11:AHI:mars', 0,
-                            "H11 AHI B99 Rad", "second test track", tooltip="nominally cromulent")
-        frame11 = QFrameItem(track1, self.coords, uuidgen(), once + minutes_td(6), minutes_td(1),
-                             Flags([VisualState.READY]), "ahi1", "JP04")
+        frame01 = QFrameItem(
+            track0,
+            self.coords,
+            uuidgen(),
+            once + minutes_td(5),
+            minutes_td(5),
+            Flags([VisualState.BUSY]),
+            "abi1",
+            "fulldiskimus",
+        )
+        track1 = QTrackItem(
+            self,
+            self.coords,
+            "IMAGE:test::timeline:Himawari-11:AHI:mars",
+            0,
+            "H11 AHI B99 Rad",
+            "second test track",
+            tooltip="nominally cromulent",
+        )
+        frame11 = QFrameItem(
+            track1,
+            self.coords,
+            uuidgen(),
+            once + minutes_td(6),
+            minutes_td(1),
+            Flags([VisualState.READY]),
+            "ahi1",
+            "JP04",
+        )
         # self.insert_track(track0)
         # self.insert_track(track1)
         # assert(hasattr(self, '_propagate_max_z'))
@@ -537,7 +581,7 @@ class QFramesInTracksView(QGraphicsView):
         super(QFramesInTracksView, self).__init__(*args, **kwargs)
         fmt = QGLFormat(QGL.SampleBuffers)
         wdgt = QGLWidget(fmt)
-        assert (wdgt.isValid())
+        assert wdgt.isValid()
         self.setViewport(wdgt)
         self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
@@ -623,8 +667,9 @@ def _debug(type, value, tb):
     if not sys.stdin.isatty():
         sys.__excepthook__(type, value, tb)
     else:
-        import traceback
         import pdb  # noqa
+        import traceback
+
         traceback.print_exception(type, value, tb)
         # …then start the debugger in post-mortem mode.
         pdb.post_mortem(tb)  # more “modern”
@@ -646,5 +691,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

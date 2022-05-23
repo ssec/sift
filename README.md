@@ -28,6 +28,17 @@ also be found on GitHub: https://github.com/ssec/sift/wiki
 
 Developer documentation can be found on https://sift.readthedocs.io/en/latest/.
 
+## History
+
+SIFT was originally created and designed at SSEC/CIMSS at the University of
+Wisconsin - Madison as a training tool for US NWS forecasters. Later, EUMETSAT,
+European Organization for the Exploitation of Meteorological Satellites,
+joined the project contributing many new features and refactoring various
+portions of the project to support instrument calibration/validation workflows
+as well as additional scientific analysis. CIMSS and EUMETSAT now work on the
+project together as well as accepting contributions from users outside these
+groups.
+
 ## Data Access and Reading
 
 SIFT uses the open source python library Satpy to read input data. By using

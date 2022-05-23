@@ -10,11 +10,10 @@ seconds is as follows::
   python -m uwsift --profile-heap 2.0
 
 Afterwards the snapshorts must be combined::
-  
+
   python ./uwsift/util/heap_analyzer.py --combine ./combined_stats.prof --snapshot-dir <<YYYYddmm_HH-MM>_uwsift_heap_profile>
 
 This creates the file ``combined_stats.prof``, which can be visualized with
 matplotlib for analysis::
-  
-  python ./uwsift/util/heap_analyzer.py --load ./combined_stats.prof --plot
 
+  python ./uwsift/util/heap_analyzer.py --load ./combined_stats.prof --plot

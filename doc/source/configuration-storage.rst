@@ -73,7 +73,7 @@ itself still ``SIFT``, thus for now ``$$CACHE_DIR$$`` expands to
 **Example**
 
 .. code-block:: yaml
-		
+
     storage:
         agent:
             notification_cmd: /opt/eum/bin/raiseEvent.sh
@@ -82,4 +82,3 @@ itself still ``SIFT``, thus for now ``$$CACHE_DIR$$`` expands to
             directories:
                 - "$$CACHE_DIR$$/workspace/data_cache"
                 - "$$CACHE_DIR$$/workspace/temp"
-

@@ -21,22 +21,21 @@ REQUIRES
 :copyright: 2014 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-__docformat__ = 'reStructuredText'
-__author__ = 'davidh'
+__docformat__ = "reStructuredText"
+__author__ = "davidh"
 
 import logging
 
 import numpy as np
 from vispy.geometry import Rect
-from vispy.scene import PanZoomCamera, BaseCamera
+from vispy.scene import BaseCamera, PanZoomCamera
 from vispy.util.keys import SHIFT
 
 LOG = logging.getLogger(__name__)
 
 
 class PanZoomProbeCamera(PanZoomCamera):
-    """Camera that maps mouse presses to events for probing.
-    """
+    """Camera that maps mouse presses to events for probing."""
 
     # def viewbox_mouse_event(self, event):
     #     """
@@ -61,8 +60,7 @@ class PanZoomProbeCamera(PanZoomCamera):
         super(PanZoomProbeCamera, self).__init__(*args, **kwargs)
 
     def _viewbox_set(self, viewbox):
-        """ Friend method of viewbox to register itself.
-        """
+        """Friend method of viewbox to register itself."""
         self._viewbox = viewbox
         # Connect
         viewbox.events.mouse_press.connect(self.viewbox_mouse_event)
@@ -73,8 +71,7 @@ class PanZoomProbeCamera(PanZoomCamera):
         # todo: also add key events! (and also on viewbox (they're missing)
 
     def _viewbox_unset(self, viewbox):
-        """ Friend method of viewbox to unregister itself.
-        """
+        """Friend method of viewbox to unregister itself."""
         self._viewbox = None
         # Disconnect
         viewbox.events.mouse_press.disconnect(self.viewbox_mouse_event)
@@ -85,7 +82,7 @@ class PanZoomProbeCamera(PanZoomCamera):
 
     @property
     def rect(self):
-        """ The rectangular border of the ViewBox visible area, expressed in
+        """The rectangular border of the ViewBox visible area, expressed in
         the coordinate system of the scene.
 
         Note that the rectangle can have negative width or height, in
@@ -152,12 +149,12 @@ class PanZoomProbeCamera(PanZoomCamera):
         BaseCamera.viewbox_mouse_event(self, event)
         # print("In camera event: ", event.button, event.buttons, event.mouse_event.modifiers)
 
-        if event.type == 'mouse_wheel':
+        if event.type == "mouse_wheel":
             center = self._scene_transform.imap(event.pos)
             self.zoom((1 + self.zoom_factor) ** (-event.delta[1] * 30), center)
             event.handled = True
 
-        elif event.type == 'mouse_move':
+        elif event.type == "mouse_move":
             if event.press_event is None:
                 return
 
@@ -177,14 +174,13 @@ class PanZoomProbeCamera(PanZoomCamera):
                 # Zoom
                 p1c = np.array(event.last_event.pos)[:2]
                 p2c = np.array(event.pos)[:2]
-                scale = ((1 + self.zoom_factor) **
-                         ((p1c - p2c) * np.array([1, -1])))
+                scale = (1 + self.zoom_factor) ** ((p1c - p2c) * np.array([1, -1]))
                 center = self._transform.imap(event.press_event.pos[:2])
                 self.zoom(scale, center)
                 event.handled = True
             else:
                 event.handled = False
-        elif event.type == 'mouse_press':
+        elif event.type == "mouse_press":
             # accept the event if it is button 1 or 2.
             # This is required in order to receive future events
             # event.handled = event.button in [1, 2]

@@ -67,7 +67,7 @@ if( NOT "${Conda_ENVIRONMENT}" STREQUAL "${${PROJECT_NAME}_CONDA_ENVIRONMENT}" )
     "  ${CMAKE_MAKE_PROGRAM} devel-bootstrap\n"
     "to set up an initial development environment '${${PROJECT_NAME}_CONDA_ENVIRONMENT}'\n"
     "or if it already exists:\n"
-    "  conda activate ${${PROJECT_NAME}_CONDA_ENVIRONMENT}\n"  
+    "  conda activate ${${PROJECT_NAME}_CONDA_ENVIRONMENT}\n"
     "in your working shell\n"
     "or synchronize the value of ${PROJECT_NAME}_CONDA_ENVIRONMENT in the CMake configuration.\n"
     )
@@ -96,9 +96,9 @@ endif( DIST_Conda )
 # PyInstaller Packaging
 #-------------------------------------------------------------------------------------------------
 
-option( DIST_PyInstaller "If set, a target for building installers with PyInstaller is created" ON ) 
+option( DIST_PyInstaller "If set, a target for building installers with PyInstaller is created" ON )
 if( DIST_PyInstaller )
-  
+
   find_package( PyInstaller REQUIRED )
   find_package( SelfPackers )
   if( NOT SELF_PACKER_FOR_EXECUTABLE )
@@ -162,4 +162,3 @@ foreach( PYINSTALLER_MODE onedir onefile )
 endforeach()
 
 endif( DIST_PyInstaller )
-

@@ -32,28 +32,34 @@ SQLAlchemy with SQLite
 :copyright: 2016 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
-__author__ = 'rayg'
-__docformat__ = 'reStructuredText'
 
-import argparse
 import logging
 import os
-import sys
-import unittest
-from collections import MutableMapping, defaultdict
+from collections import defaultdict
+from collections.abc import MutableMapping
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import Optional
 from uuid import UUID
 
-import numpy as np
-from sqlalchemy import Table, Column, Integer, String, Unicode, ForeignKey, DateTime, Interval, PickleType, \
-    Float, create_engine
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    Interval,
+    PickleType,
+    String,
+    Table,
+    Unicode,
+    create_engine,
+)
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
-from sqlalchemy.orm import Session, relationship, sessionmaker, backref, scoped_session
+from sqlalchemy.orm import Session, backref, relationship, scoped_session, sessionmaker
 from sqlalchemy.orm.collections import attribute_mapped_collection
 
-from uwsift.common import Info, FCS_SEP
+from uwsift.common import FCS_SEP, Info
 
 LOG = logging.getLogger(__name__)
 
@@ -100,10 +106,13 @@ Base = declarative_base()
 
 # resources can have multiple products in them
 # products may require multiple resourcse (e.g. separate GEO; tiled imagery)
-PRODUCTS_FROM_RESOURCES_TABLE_NAME = 'product_resource_assoc_v1'
-ProductsFromResources = Table(PRODUCTS_FROM_RESOURCES_TABLE_NAME, Base.metadata,
-                              Column('product_id', Integer, ForeignKey('products_v1.id')),
-                              Column('resource_id', Integer, ForeignKey('resources_v1.id')))
+PRODUCTS_FROM_RESOURCES_TABLE_NAME = "product_resource_assoc_v1"
+ProductsFromResources = Table(
+    PRODUCTS_FROM_RESOURCES_TABLE_NAME,
+    Base.metadata,
+    Column("product_id", Integer, ForeignKey("products_v1.id")),
+    Column("resource_id", Integer, ForeignKey("resources_v1.id")),
+)
 
 
 class Resource(Base):
@@ -111,7 +120,8 @@ class Resource(Base):
     held metadata regarding a file that we can access and import data into the workspace from
     resources are external to the workspace, but the workspace can keep track of them in its database
     """
-    __tablename__ = 'resources_v1'
+
+    __tablename__ = "resources_v1"
     # identity information
     id = Column(Integer, primary_key=True)
 
@@ -119,8 +129,9 @@ class Resource(Base):
     format = Column(PickleType)  # classname, class or callable which can pull this data into workspace from storage
 
     # {scheme}://{path}/{name}?{query}, default is just an absolute path in filesystem
-    scheme = Column(Unicode,
-                    nullable=True)  # uri scheme for the content (the part left of ://), assume file:// by default
+    scheme = Column(
+        Unicode, nullable=True
+    )  # uri scheme for the content (the part left of ://), assume file:// by default
     path = Column(Unicode)  # '/' separated real path
     query = Column(Unicode, nullable=True)  # query portion of a URI or URL, e.g. 'interval=1m&stride=2'
 
@@ -131,18 +142,21 @@ class Resource(Base):
 
     @property
     def uri(self):
-        return self.path if (not self.scheme or self.scheme == 'file') else "{}://{}/{}{}".format(
-            self.scheme, self.path, self.name, '' if not self.query else '?' + self.query)
+        return (
+            self.path
+            if (not self.scheme or self.scheme == "file")
+            else "{}://{}/{}{}".format(self.scheme, self.path, self.name, "" if not self.query else "?" + self.query)
+        )
 
     def touch(self, when=None):
         self.atime = datetime.utcnow() if not when else when
 
     def exists(self):
-        if self.scheme not in {None, 'file'}:
+        if self.scheme not in {None, "file"}:
             return True  # FUTURE: alternate tests for still-exists-ness
         if os.path.exists(self.path):
             return True
-        LOG.info('path {} no longer exists'.format(self.path))
+        LOG.info("path {} no longer exists".format(self.path))
         return False
 
 
@@ -184,17 +198,17 @@ class ChainRecordWithDict(MutableMapping):
     def __getitem__(self, key):
         fieldname = self._field_keys.get(key)
         if fieldname is not None:
-            assert (isinstance(fieldname, str))
+            assert isinstance(fieldname, str)
             return getattr(self._obj, fieldname)
         return self._more[key]
 
     def __repr__(self):
-        return '<ChainRecordWithDict {}>'.format(repr(tuple(self.keys())))
+        return "<ChainRecordWithDict {}>".format(repr(tuple(self.keys())))
 
     def __setitem__(self, key, value):
         fieldname = self._field_keys.get(key)  # Info -> fieldname
         if fieldname is not None:
-            LOG.debug('assigning database field {}'.format(fieldname))
+            LOG.debug("assigning database field {}".format(fieldname))
             # self._obj.__dict__[fieldname] = value
             setattr(self._obj, fieldname, value)
         else:
@@ -202,7 +216,7 @@ class ChainRecordWithDict(MutableMapping):
 
     def __delitem__(self, key):
         if key in self._field_keys:
-            raise KeyError('cannot remove key {}'.format(key))
+            raise KeyError("cannot remove key {}".format(key))
         del self._more[key]
 
 
@@ -216,14 +230,16 @@ class Product(Base):
     A StoredProduct's kind determines how its cached data is transformed to different representations for display
     additional information is stored in a key-value table addressable as product[key:str]
     """
-    __tablename__ = 'products_v1'
+
+    __tablename__ = "products_v1"
 
     # identity information
     id = Column(Integer, primary_key=True)
     resource_id = Column(Integer, ForeignKey(Resource.id))
     # relationship: .resource
-    uuid_str = Column(String, nullable=False,
-                      unique=True)  # UUID representing this data in SIFT, or None if not in cache
+    uuid_str = Column(
+        String, nullable=False, unique=True
+    )  # UUID representing this data in SIFT, or None if not in cache
 
     @property
     def uuid(self):
@@ -293,10 +309,12 @@ class Product(Base):
 
     # link to key-value further information
     # this provides dictionary style access to key-value pairs
-    _key_values = relationship("ProductKeyValue", collection_class=attribute_mapped_collection('key'),
-                               cascade="all, delete-orphan")
-    _kwinfo = association_proxy("_key_values", "value",
-                                creator=lambda key, value: ProductKeyValue(key=key, value=value))
+    _key_values = relationship(
+        "ProductKeyValue", collection_class=attribute_mapped_collection("key"), cascade="all, delete-orphan"
+    )
+    _kwinfo = association_proxy(
+        "_key_values", "value", creator=lambda key, value: ProductKeyValue(key=key, value=value)
+    )
 
     # derived / algebraic layers have a symbol table and an expression
     # typically Content objects for algebraic layers cache calculation output
@@ -319,8 +337,10 @@ class Product(Base):
             if f is not None:
                 fields[f] = v
             elif k in valset:
-                LOG.warning("key {} corresponds to a database field when standard key is available; "
-                            "this code may not be intended".format(k))
+                LOG.warning(
+                    "key {} corresponds to a database field when standard key is available; "
+                    "this code may not be intended".format(k)
+                )
                 fields[k] = v
             elif k in columns:
                 fields[k] = v
@@ -337,7 +357,7 @@ class Product(Base):
         """
         fields, keyvalues = cls._separate_fields_and_keys(mapping)
         LOG.debug("fields to import: {}".format(repr(fields)))
-        LOG.debug("key-value pairs to {}: {}".format('IGNORE' if only_fields else 'import', repr(keyvalues)))
+        LOG.debug("key-value pairs to {}: {}".format("IGNORE" if only_fields else "import", repr(keyvalues)))
         try:
             p = cls(**fields)
         except AttributeError:
@@ -354,8 +374,9 @@ class Product(Base):
         return p
 
     def __repr__(self):
-        return "<Product '{}' @ {}~{} / {} keys>".format(self.name, self.obs_time, self.obs_time + self.obs_duration,
-                                                         len(self.info.keys()))
+        return "<Product '{}' @ {}~{} / {} keys>".format(
+            self.name, self.obs_time, self.obs_time + self.obs_duration, len(self.info.keys())
+        )
 
     @property
     def info(self):
@@ -389,7 +410,7 @@ class Product(Base):
 
     @proj4.setter
     def proj4(self, value):
-        LOG.debug('DEPRECATED: setting proj4 on resource')
+        LOG.debug("DEPRECATED: setting proj4 on resource")
 
     @property
     def cell_height(self):
@@ -402,7 +423,7 @@ class Product(Base):
 
     @cell_height.setter
     def cell_height(self, value):
-        LOG.debug('DEPRECATED: setting cell_height on resource')
+        LOG.debug("DEPRECATED: setting cell_height on resource")
 
     @property
     def cell_width(self):
@@ -415,7 +436,7 @@ class Product(Base):
 
     @cell_width.setter
     def cell_width(self, value):
-        LOG.debug('DEPRECATED: setting cell_width on resource')
+        LOG.debug("DEPRECATED: setting cell_width on resource")
 
     @property
     def origin_x(self):
@@ -428,7 +449,7 @@ class Product(Base):
 
     @origin_x.setter
     def origin_x(self, value):
-        LOG.debug('DEPRECATED: setting origin_x on resource')
+        LOG.debug("DEPRECATED: setting origin_x on resource")
 
     @property
     def origin_y(self):
@@ -441,7 +462,7 @@ class Product(Base):
 
     @origin_y.setter
     def origin_y(self, value):
-        LOG.debug('DEPRECATED: setting origin_y on resource')
+        LOG.debug("DEPRECATED: setting origin_y on resource")
 
     @property
     def grid_origin(self):
@@ -454,7 +475,7 @@ class Product(Base):
 
     @grid_origin.setter
     def grid_origin(self, value):
-        LOG.debug('DEPRECATED: setting grid_origin on resource')
+        LOG.debug("DEPRECATED: setting grid_origin on resource")
 
     @property
     def grid_first_index_x(self):
@@ -467,7 +488,7 @@ class Product(Base):
 
     @grid_first_index_x.setter
     def grid_first_index_x(self, value):
-        LOG.debug('DEPRECATED: setting grid_first_index_x on resource')
+        LOG.debug("DEPRECATED: setting grid_first_index_x on resource")
 
     @property
     def grid_first_index_y(self):
@@ -480,27 +501,27 @@ class Product(Base):
 
     @grid_first_index_y.setter
     def grid_first_index_y(self, value):
-        LOG.debug('DEPRECATED: setting grid_first_index_y on resource')
+        LOG.debug("DEPRECATED: setting grid_first_index_y on resource")
 
     def can_be_activated_without_importing(self):
         return len(self.content) > 0
 
     INFO_TO_FIELD = {
-        Info.SHORT_NAME: 'name',
-        Info.UUID: 'uuid',
-        Info.PROJ: 'proj4',
-        Info.OBS_TIME: 'obs_time',
-        Info.OBS_DURATION: 'obs_duration',
-        Info.CELL_WIDTH: 'cell_width',
-        Info.CELL_HEIGHT: 'cell_height',
-        Info.ORIGIN_X: 'origin_x',
-        Info.ORIGIN_Y: 'origin_y',
-        Info.GRID_ORIGIN: 'grid_origin',
-        Info.GRID_FIRST_INDEX_X: 'grid_first_index_x',
-        Info.GRID_FIRST_INDEX_Y: 'grid_first_index_y',
-        Info.FAMILY: 'family',
-        Info.CATEGORY: 'category',
-        Info.SERIAL: 'serial'
+        Info.SHORT_NAME: "name",
+        Info.UUID: "uuid",
+        Info.PROJ: "proj4",
+        Info.OBS_TIME: "obs_time",
+        Info.OBS_DURATION: "obs_duration",
+        Info.CELL_WIDTH: "cell_width",
+        Info.CELL_HEIGHT: "cell_height",
+        Info.ORIGIN_X: "origin_x",
+        Info.ORIGIN_Y: "origin_y",
+        Info.GRID_ORIGIN: "grid_origin",
+        Info.GRID_FIRST_INDEX_X: "grid_first_index_x",
+        Info.GRID_FIRST_INDEX_Y: "grid_first_index_y",
+        Info.FAMILY: "family",
+        Info.CATEGORY: "category",
+        Info.SERIAL: "serial",
     }
 
     def touch(self, when=None):
@@ -512,10 +533,12 @@ class ProductKeyValue(Base):
     """
     key-value pairs associated with a product
     """
-    __tablename__ = 'product_key_values_v1'
+
+    __tablename__ = "product_key_values_v1"
     product_id = Column(ForeignKey(Product.id), primary_key=True)
-    key = Column(PickleType,
-                 primary_key=True)  # FUTURE: can this be a string? for now need pickling of Info/Platform Enum
+    key = Column(
+        PickleType, primary_key=True
+    )  # FUTURE: can this be a string? for now need pickling of Info/Platform Enum
     # relationship: .product
     value = Column(PickleType)
 
@@ -524,7 +547,8 @@ class SymbolKeyValue(Base):
     """
     derived layers have a symbol table which becomes namespace used by expression
     """
-    __tablename__ = 'algebraic_symbol_key_values_v1'
+
+    __tablename__ = "algebraic_symbol_key_values_v1"
     product_id = Column(ForeignKey(Product.id), primary_key=True)
     key = Column(Unicode, primary_key=True)
     # relationship: .product
@@ -541,6 +565,7 @@ class Content(Base):
     a given product may have several Content for different projections
     additional information is stored in a key-value table addressable as content[key:str]
     """
+
     # _array = None  # when attached, this is a np.memmap
     __tablename__ = "content_v1"
     id = Column(Integer, primary_key=True)
@@ -564,7 +589,7 @@ class Content(Base):
 
     # TODO Number of attributes per point: n_attributes (e.g. lightning peak
     #  current) but then, what are the datatypes of the attributes?
-    n_attributes = Column(Integer) #  always 1, reserverd for future extensions
+    n_attributes = Column(Integer)  # always 1, reserverd for future extensions
 
     # TODO Currently all attributes must have the same datatype as the points,
     #  because there is no way yet to define them differently
@@ -584,20 +609,19 @@ class Content(Base):
 
     # projection information for this representation of the data
     # proj4 projection string for the data in this array, if one exists; else assume y=lat/x=lon
-    proj4 = Column(String, nullable=True) # TODO maybe basis
+    proj4 = Column(String, nullable=True)  # TODO maybe basis
 
     # link to key-value further information; primarily a hedge in case specific information
     # has to be squirreled away for later consideration for main content table
     # this provides dictionary style access to key-value pairs
-    _key_values = relationship("ContentKeyValue", collection_class=attribute_mapped_collection('key'),
-                               cascade="all, delete-orphan")
-    _kwinfo = association_proxy("_key_values", "value",
-                                creator=lambda key, value: ContentKeyValue(key=key, value=value))
+    _key_values = relationship(
+        "ContentKeyValue", collection_class=attribute_mapped_collection("key"), cascade="all, delete-orphan"
+    )
+    _kwinfo = association_proxy(
+        "_key_values", "value", creator=lambda key, value: ContentKeyValue(key=key, value=value)
+    )
 
-    INFO_TO_FIELD = {
-        Info.PROJ: 'proj4',
-        Info.PATHNAME: 'path'
-    }
+    INFO_TO_FIELD = {Info.PROJ: "proj4", Info.PATHNAME: "path"}
 
     _info = None  # database fields and key-value dictionary merged as one transparent mapping
 
@@ -616,8 +640,10 @@ class Content(Base):
             if f is not None:
                 fields[f] = v
             elif k in valset:
-                LOG.warning("key {} corresponds to a database field when standard key is available; "
-                            "this code may not be intended".format(k))
+                LOG.warning(
+                    "key {} corresponds to a database field when standard key is available; "
+                    "this code may not be intended".format(k)
+                )
                 fields[k] = v
             elif k in columns:
                 fields[k] = v
@@ -647,7 +673,7 @@ class Content(Base):
         fields, keyvalues = cls._separate_fields_and_keys(mapping)
         # cls._patch_info_fields(fields)
         LOG.debug("fields to import: {}".format(repr(fields)))
-        LOG.debug("key-value pairs to {}: {}".format('IGNORE' if only_fields else 'import', repr(keyvalues)))
+        LOG.debug("key-value pairs to {}: {}".format("IGNORE" if only_fields else "import", repr(keyvalues)))
         try:
             p = cls(**fields)
         except AttributeError:
@@ -691,16 +717,20 @@ class Content(Base):
         return self.product.uuid
 
     def __str__(self):
-        product = "%s:%s.%s" % (self.product.source.name or '?',
-                                self.product.platform or '?',
-                                self.product.identifier or '?')
-        dtype = self.dtype or 'float32'
-        xyzcs = ' '.join(
-            q for (q, p) in
-            zip('XYZCS', (self.x_path, self.y_path, self.z_path, self.coverage_path, self.sparsity_path)) if p
+        product = "%s:%s.%s" % (
+            self.product.source.name or "?",
+            self.product.platform or "?",
+            self.product.identifier or "?",
+        )
+        dtype = self.dtype or "float32"
+        xyzcs = " ".join(
+            q
+            for (q, p) in zip("XYZCS", (self.x_path, self.y_path, self.z_path, self.coverage_path, self.sparsity_path))
+            if p
         )
         return "<{uuid} product {product} content with path={path} dtype={dtype} {xyzcs}>".format(
-            uuid=self.uuid, product=product, path=self.path, dtype=dtype, xyzcs=xyzcs)
+            uuid=self.uuid, product=product, path=self.path, dtype=dtype, xyzcs=xyzcs
+        )
 
     def touch(self, when: Optional[datetime] = None) -> None:
         self.atime = when = when or datetime.utcnow()
@@ -725,7 +755,7 @@ class Content(Base):
 
 
 class ContentImage(Content):
-    __mapper_args__ = { "polymorphic_identity": "image" }
+    __mapper_args__ = {"polymorphic_identity": "image"}
 
     # handle overview versus detailed data
     lod = Column(Integer)  # power of 2 level of detail; 0 for coarse-resolution overview
@@ -770,16 +800,16 @@ class ContentImage(Content):
     z_path = Column(String, nullable=True)  # if needed, z location cache path relative to workspace
 
     INFO_TO_FIELD = {
-            Info.PROJ: 'proj4',
-            Info.PATHNAME: 'path',
-            Info.CELL_HEIGHT: 'cell_height',
-            Info.CELL_WIDTH: 'cell_width',
-            Info.ORIGIN_X: 'origin_x',
-            Info.ORIGIN_Y: 'origin_y',
-            Info.GRID_ORIGIN: 'grid_origin',
-            Info.GRID_FIRST_INDEX_X: 'grid_first_index_x',
-            Info.GRID_FIRST_INDEX_Y: 'grid_first_index_y',
-        }
+        Info.PROJ: "proj4",
+        Info.PATHNAME: "path",
+        Info.CELL_HEIGHT: "cell_height",
+        Info.CELL_WIDTH: "cell_width",
+        Info.ORIGIN_X: "origin_x",
+        Info.ORIGIN_Y: "origin_y",
+        Info.GRID_ORIGIN: "grid_origin",
+        Info.GRID_FIRST_INDEX_X: "grid_first_index_x",
+        Info.GRID_FIRST_INDEX_Y: "grid_first_index_y",
+    }
 
     def __init__(self, *args, **kwargs):
         super(ContentImage, self).__init__(*args, **kwargs)
@@ -797,27 +827,30 @@ class ContentUnstructuredPoints(Content):
     __mapper_args__ = {"polymorphic_identity": "unstructured_points"}
 
     n_points = Column(Integer)
-    # Points may have 2 or 3 spatial dimensions
+
     @declared_attr
     def n_dimensions(cls):
-        return Content.__table__.c.get('n_dimensions', Column(Integer))
+        # Points may have 2 or 3 spatial dimensions
+        return Content.__table__.c.get("n_dimensions", Column(Integer))
 
 
 class ContentLines(Content):
     __mapper_args__ = {"polymorphic_identity": "lines"}
 
     n_lines = Column(Integer)
-    # Points have 4 spatial dimensions
+
     @declared_attr
     def n_dimensions(cls):
-        return Content.__table__.c.get('n_dimensions', Column(Integer))
+        # Points have 4 spatial dimensions
+        return Content.__table__.c.get("n_dimensions", Column(Integer))
 
 
 class ContentKeyValue(Base):
     """
     key-value pairs associated with a product
     """
-    __tablename__ = 'content_key_values_v1'
+
+    __tablename__ = "content_key_values_v1"
     product_id = Column(ForeignKey(Content.id), primary_key=True)
     key = Column(PickleType, primary_key=True)  # FUTURE: can this be a string?
     value = Column(PickleType)
@@ -831,6 +864,7 @@ class Metadatabase(object):
     """
     singleton interface to application metadatabase
     """
+
     engine = None
     connection = None
     session_factory = None
@@ -840,7 +874,7 @@ class Metadatabase(object):
         self.session_nesting = defaultdict(int)
         global _MDB
         if _MDB is not None:
-            raise AssertionError('Metadatabase is a singleton and already exists')
+            raise AssertionError("Metadatabase is a singleton and already exists")
         self._MDB = self
         if uri:
             self.connect(uri, **kwargs)
@@ -854,22 +888,29 @@ class Metadatabase(object):
 
     def _all_tables_present(self):
         from sqlalchemy.engine.reflection import Inspector
+
         inspector = Inspector.from_engine(self.engine)
         all_tables = set(inspector.get_table_names())
         zult = True
-        for table_name in (Resource.__tablename__, Product.__tablename__,
-                           ProductKeyValue.__tablename__, SymbolKeyValue.__tablename__,
-                           Content.__tablename__, ContentKeyValue.__tablename__, PRODUCTS_FROM_RESOURCES_TABLE_NAME):
+        for table_name in (
+            Resource.__tablename__,
+            Product.__tablename__,
+            ProductKeyValue.__tablename__,
+            SymbolKeyValue.__tablename__,
+            Content.__tablename__,
+            ContentKeyValue.__tablename__,
+            PRODUCTS_FROM_RESOURCES_TABLE_NAME,
+        ):
             present = table_name in all_tables
             LOG.debug("table {} {} present in database".format(table_name, "is" if present else "is not"))
             zult = False if not present else zult
         return zult
 
     def connect(self, uri, create_tables=False, **kwargs):
-        assert (self.engine is None)
-        assert (self.connection is None)
+        assert self.engine is None
+        assert self.connection is None
         self.engine = create_engine(uri, **kwargs)
-        LOG.info('attaching database at {}'.format(uri))
+        LOG.info("attaching database at {}".format(uri))
         if create_tables or not self._all_tables_present():
             LOG.info("creating database tables")
             Base.metadata.create_all(self.engine)
@@ -907,7 +948,7 @@ class Metadatabase(object):
             del self.session_nesting[id(s)]
         else:  # we're in a nested context for this session
             if exc_val is not None:  # propagate the exception to the outermost session context
-                LOG.warning('propagating database exception to outermost context')
+                LOG.warning("propagating database exception to outermost context")
                 raise exc_val
 
     #
@@ -951,96 +992,3 @@ class Metadatabase(object):
 #             raise AssertionError('more than one value for {}'.format(key))
 #         kvs[0].value = value
 #         self.S.commit()
-
-
-# ============================
-# support and testing routines
-
-class tests(unittest.TestCase):
-    # data_file = os.environ.get('TEST_DATA', os.path.expanduser("~/Data/test_files/thing.dat"))
-    mdb = None
-
-    def setUp(self):
-        pass
-
-    def test_insert(self):
-        from datetime import datetime, timedelta
-        mdb = Metadatabase('sqlite://', create_tables=True)
-        # mdb.create_tables()
-        s = mdb.session()
-        from uuid import uuid1
-        uu = uuid1()
-        when = datetime.utcnow()
-        nextwhen = when + timedelta(minutes=5)
-        f = Resource(path='/path/to/foo.bar', mtime=when, atime=when, format=None)
-        p = Product(uuid_str=str(uu), atime=when, name='B00 Refl', obs_time=when, obs_duration=timedelta(minutes=5))
-        f.product.append(p)
-        p.info['test_key'] = u'test_value'
-        p.info['turkey'] = u'cobbler'
-        s.add(f)
-        s.add(p)
-        s.commit()
-        p.info.update({'key': 'value'})
-        p.info.update({Info.OBS_TIME: datetime.utcnow()})
-        p.info.update({Info.OBS_TIME: nextwhen, Info.OBS_DURATION: timedelta(seconds=15)})
-        # p.info.update({'key': 'value', Info.OBS_TIME: nextwhen, Info.OBS_DURATION: nextwhen + timedelta(seconds=15)})
-        # p.info[Info.OBS_TIME] = nextwhen
-        # p.info['key'] = 'value'
-        # p.obs_time = nextwhen
-        s.commit()
-        self.assertIs(p.resource[0], f)
-        self.assertEqual(p.uuid, uu)
-        self.assertEqual(p.obs_time, nextwhen)
-        q = f.product[0]
-        # q = s.query(Product).filter_by(resource=f).first()
-        self.assertEqual(q.info['test_key'], u'test_value')
-        # self.assertEquals(q[Info.UUID], q.uuid)
-        self.assertEqual(q.info['turkey'], p.info['turkey'])
-        self.assertEqual(q.info['key'], p.info['key'])
-        # self.assertEqual(q.obs_time, nextwhen)
-
-
-def _debug(type, value, tb):
-    "enable with sys.excepthook = debug"
-    if not sys.stdin.isatty():
-        sys.__excepthook__(type, value, tb)
-    else:
-        import traceback
-        import pdb  # noqa
-        traceback.print_exception(type, value, tb)
-        # …then start the debugger in post-mortem mode.
-        pdb.post_mortem(tb)  # more “modern”
-
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="PURPOSE",
-        epilog="",
-        fromfile_prefix_chars='@')
-    parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-                        help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG')
-    parser.add_argument('-d', '--debug', dest='debug', action='store_true',
-                        help="enable interactive PDB debugger on exception")
-    # http://docs.python.org/2.7/library/argparse.html#nargs
-    # parser.add_argument('--stuff', nargs='5', dest='my_stuff',
-    #                    help="one or more random things")
-    parser.add_argument('inputs', nargs='*',
-                        help="input files to process")
-    args = parser.parse_args()
-
-    if args.debug:
-        sys.excepthook = _debug
-
-    if not args.inputs:
-        logging.basicConfig(level=logging.DEBUG)
-        unittest.main()
-        return 0
-
-    levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
-    logging.basicConfig(level=levels[min(3, args.verbosity)])
-
-    return 0
-
-
-if __name__ == '__main__':
-    sys.exit(main())
