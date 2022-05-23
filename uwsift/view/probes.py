@@ -142,7 +142,7 @@ class ProbeGraphManager(QObject):
 
         # hook up auto update vs manual update changes
         self.update_button.clicked.connect(self.handleActiveProductDatasetsChanged)
-        self.update_button.clicked.connect(self.update_point_probe_graph)
+        self.update_button.clicked.connect(self._update_point_probe_graph)
         self.auto_update_checkbox.stateChanged.connect(self.autoUpdateStateChanged)
         self.auto_update_checkbox.setCheckState(Qt.Unchecked)
 
@@ -251,6 +251,11 @@ class ProbeGraphManager(QObject):
 
         self.point_probes[probe_name] = [state, xy_pos]
         self.pointProbeChanged.emit(probe_name, state, xy_pos)
+
+    def _update_point_probe_graph(self):
+        probe_name = DEFAULT_POINT_PROBE
+        point_probe = self.point_probes.get(probe_name, [None, None])
+        self.update_point_probe_graph(probe_name, *point_probe)
 
     def update_point_probe_graph(self, probe_name, state, xy_pos):
         # need to set the point for all graphs because the point probe
