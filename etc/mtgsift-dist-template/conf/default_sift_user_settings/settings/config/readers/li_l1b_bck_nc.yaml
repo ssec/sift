@@ -1,8 +1,0 @@
-data_reading:
-  li_l1b_bck_nc:
-    geometry_definition: SwathDefinition  # Default: AreaDefinition
-    group_keys: ['repeat_cycle_in_day', 'spacecraft_id']
-    filter_patterns:
-      [
-        '{pflag}_{location_indicator},{data_designator},MTGI{spacecraft_id}+{data_source}-{processing_level}-{type}--{subtype}--{component1}-{component2}-{component3}-{purpose}-{format}_{oflag}_{originator}_{processing_time:%Y%m%d%H%M%S}_{facility_or_tool}_{environment}_{start_time:%Y%m%d%H%M%S}_{end_time:%Y%m%d%H%M%S}_{processing_mode}_{special_compression}_{disposition_mode}_{repeat_cycle_in_day:>04d}_{count_in_repeat_cycle:>04d}.nc'
-      ]
