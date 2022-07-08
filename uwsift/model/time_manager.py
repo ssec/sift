@@ -115,7 +115,7 @@ class TimeManager(QObject):
 
     def get_current_timebase_timeline(self):
         timebase_layer = self._layer_model.get_layer_by_uuid(self.current_timebase_uuid)
-        return timebase_layer.timeline
+        return timebase_layer.timeline if timebase_layer else {}
 
     def get_current_timebase_dataset_count(self):
         return len(self.get_current_timebase_timeline())
