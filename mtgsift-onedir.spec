@@ -66,6 +66,9 @@ hidden_imports = [
     "vispy.app.backends._pyqt5",
     "vispy.ext._bundled.six",
     "xarray",
+    "pyhdf",
+    "pyhdf.six",
+    "gribapi"
 ]
 hidden_imports += collect_submodules("pkg_resources")
 hidden_imports += collect_submodules("pyproj")
@@ -75,6 +78,10 @@ hidden_imports += collect_submodules("sqlalchemy")
 hidden_imports += collect_submodules("numcodecs")
 hidden_imports += collect_submodules("shapely")
 hidden_imports += collect_submodules("pyqtgraph")
+hidden_imports += collect_submodules("pyhdf")
+hidden_imports += collect_submodules("python-eccodes")
+hidden_imports += collect_submodules("eccodes")
+hidden_imports += collect_submodules("gribapi")
 if is_win:
     hidden_imports += collect_submodules("encodings")
     hidden_imports += collect_submodules("PyQt5")

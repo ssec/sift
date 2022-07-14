@@ -45,7 +45,7 @@ set( ${PROJECT_NAME}_DEPENDENCIES_CHANNEL "conda-forge" CACHE STRING "Conda chan
 
 add_custom_target( devel-bootstrap
   COMMAND ${Conda_EXECUTABLE} create  --name ${${PROJECT_NAME}_CONDA_ENVIRONMENT} --channel conda-forge --strict-channel-priority python=${PYTHON_VERSION}
-  COMMAND ${Conda_EXECUTABLE} install --name ${${PROJECT_NAME}_CONDA_ENVIRONMENT} --channel conda-forge --strict-channel-priority --file conda-envs/mtgsift-devel.pkgs
+  COMMAND ${Conda_EXECUTABLE} install --name ${${PROJECT_NAME}_CONDA_ENVIRONMENT} --channel conda-forge --strict-channel-priority --file conda-envs/mtgsift-devel-minimal.pkgs
   COMMAND echo "You may want to run the following commands manually:"
   COMMAND echo "  conda activate ${${PROJECT_NAME}_CONDA_ENVIRONMENT}"
   COMMAND echo "  conda config --env --add channels conda-forge"

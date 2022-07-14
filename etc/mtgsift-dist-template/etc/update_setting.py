@@ -2,8 +2,10 @@
 """Script to copy the settings if they are not up to date.
 
 if the file setting.update doesn't exist in ~user/config/SIFT/settings/config copy the default settings dir
-If it exists and the contained date is older than the one contained in the default settings, overwrite it
 """
+# TODO: If setting.update exists and the contained date is older than the one contained in the default settings, overwrite it
+
+
 import calendar
 import datetime
 import distutils.dir_util as dt
@@ -159,7 +161,7 @@ def run():
         # copy the content of the default setting dir in CONF_ROOT_DIR
         print("The file doesn't exist.")
 
-        input_dir = "{}/conf/default_sift_user_settings/settings".format(mtgsift_root_dir)
+        input_dir = "{}/resources/config/SIFT/settings".format(mtgsift_root_dir)
         output_dir = "{}/{}".format(setting_root_dir, get_random_name())
 
         # make the dir if necessary
