@@ -8,6 +8,7 @@ data_reading:
     - fci_l1c_nc
     - fci_l2_nc
     - li_l1b_nc
+    - li_l2_nc
     - seviri_l1b_hrit
     - seviri_l1b_native
     - seviri_l1b_nc
