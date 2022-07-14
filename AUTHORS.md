@@ -14,3 +14,5 @@ The following people have made contributions to this project:
 - [Coda Phillips (CodaP)](https://github.com/CodaP)
 - [William Roberts (wroberts4)](https://github.com/wroberts4)
 - [Eva Schiffer (evas-ssec)](https://github.com/evas-ssec)
+- [Andrea Meraner (ameraner)](https://github.com/ameraner)
+- [Johan Strandgren (strandgren)](https://github.com/strandgren)
