@@ -3,9 +3,9 @@ import pathlib
 import re
 import shutil
 import warnings
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from time import sleep
-
+import time
 import trollsift
 from dateutil import parser as dt_parser
 from dateutil.relativedelta import relativedelta
@@ -100,7 +100,7 @@ def fill_dir_periodically_seviri(data_dir: str, tmp_dir: str, sleep_time: float)
         sleep(sleep_time)
 
 
-def fill_dir_periodically_fci(data_dir: str, tmp_dir: str, sleep_time: float) -> None:
+def fill_dir_periodically_fci(data_dir: str, tmp_dir: str, sleep_time: float, retain_n_times: int) -> None:
     """
     Fill specified directory with existing FCI test files, found in in_dir, altering the
     respective start time and end_time of every file to times correctly offset from present
@@ -131,14 +131,17 @@ def fill_dir_periodically_fci(data_dir: str, tmp_dir: str, sleep_time: float) ->
 
     time_gen = gen_next_dt(datetime.now(tz=timezone.utc), "FCI")
     files_and_start_ts = []
-    for file_name in os.listdir(data_dir):
-        try:
-            start_t = trollsift.parse(format_string, file_name)["start_time"]
-            files_and_start_ts.append((file_name, start_t))
-        except Exception:
-            # FIXME(mk): filter pattern does not work for TRAILER file...
-            warnings.warn("FCI TRAIL files not yet supported by parser, skipping...")
-            pass
+    files_fullpath = []
+    for subdata_dir in sorted(os.listdir(data_dir)):
+        for file_name in sorted(os.listdir(data_dir+'/'+subdata_dir)):
+            try:
+                start_t = trollsift.parse(format_string, file_name)["start_time"]
+                files_and_start_ts.append((file_name, start_t))
+                files_fullpath.append(data_dir+'/'+subdata_dir+'/'+file_name)
+            except Exception:
+                # FIXME(mk): filter pattern does not work for TRAILER file...
+                warnings.warn("FCI TRAIL files not yet supported by parser, skipping...")
+                pass
 
     files_and_start_ts = sorted(files_and_start_ts, key=lambda tup: tup[1])
     old_files = [file for file, _ in files_and_start_ts]
@@ -149,7 +152,6 @@ def fill_dir_periodically_fci(data_dir: str, tmp_dir: str, sleep_time: float) ->
             start_time = sat_filename_keyvals["start_time"]
             end_time = sat_filename_keyvals["end_time"]
             start_to_end_span = end_time - start_time
-            # repeat_cycle_in_day = sat_filename_keyvals["repeat_cycle_in_day"]
         except KeyError:
             raise KeyError(
                 f"Could not match replacement fields"
@@ -160,14 +162,25 @@ def fill_dir_periodically_fci(data_dir: str, tmp_dir: str, sleep_time: float) ->
         # replace datetime
         sat_filename_keyvals["start_time"] = next(time_gen)
         sat_filename_keyvals["end_time"] = sat_filename_keyvals["start_time"] + start_to_end_span
+        sat_filename_keyvals["processing_time"] = sat_filename_keyvals["start_time"] + start_to_end_span + timedelta(seconds=5)
         file_name = trollsift.compose(format_string, sat_filename_keyvals)
         file_stack.append(file_name)
-    old_files = [os.path.join(data_dir, old_file) for old_file in old_files]
-    for old_file, new_filename in zip(old_files, file_stack):
-        tmp_path = pathlib.Path(shutil.copy(old_file, tmp_dir))
+    # old_files = [os.path.join(data_dir, old_file) for old_file in old_files]
+    for n, (old_file, new_filename) in enumerate(zip(files_fullpath, file_stack)):
+        st = time.time()
+        if n >= retain_n_times:
+            os.remove(os.path.join(tmp_path.parent, file_stack[n-retain_n_times]))
+            print(f"Removed: {file_stack[n-retain_n_times]}")
+        tmp_path = pathlib.Path(shutil.copy(old_file, tmp_dir+'/tempfile.nc'))
         os.rename(tmp_path, os.path.join(tmp_path.parent, new_filename))
         print(f"Created: {old_file} -> {new_filename}")
-        sleep(sleep_time)
+        elapsed_time = time.time()-st
+        if elapsed_time<0:
+            print("Copy is running late (longer than sleep time). Moving on right away.")
+            continue
+        else:
+            print(f"Skipping elapsed time {elapsed_time}")
+            sleep(sleep_time-elapsed_time)
 
 
 if __name__ == "__main__":
@@ -193,15 +206,23 @@ if __name__ == "__main__":
     parser.add_argument(
         "-t", "--time_delay", action="store", default=5.0, type=float, help="Time between two arriving files in seconds"
     )
+
+    parser.add_argument(
+        "-r", "--retain_n_files", action="store", default=-1, type=int, help="Keep only the last n files in folder. "
+                                                                             "Default is -1 which means no automatic"
+                                                                             "cleanup."
+    )
     args = parser.parse_args()
 
-    out_dir = pathlib.Path(args.output_directory)
+    out_dir = args.output_directory
 
     if not os.path.exists(args.input_directory):
         raise ValueError("Could not find data dir.")
     in_dir = args.input_directory
     time_delay = args.time_delay
-    fill_dir_periodically_fci(in_dir, out_dir, time_delay)
+    retain_n_files = args.retain_n_files
+    fill_dir_periodically_fci(in_dir, out_dir, time_delay, retain_n_files)
+
     # try:
     #    reader = config["catalogue"][0]["reader"]
     # except KeyError:
