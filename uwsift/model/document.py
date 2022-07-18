@@ -411,7 +411,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
     didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: (vmin, vmax), ...} for all changed layers
-    didChangeComposition = pyqtSignal(tuple, UUID, Presentation)  # new-layer-order, changed-layer, new-Presentation
     didChangeCompositions = pyqtSignal(tuple, tuple, tuple)  # new-layer-order, changed-layers, new-prezs
     didCalculateLayerEqualizerValues = pyqtSignal(
         dict
