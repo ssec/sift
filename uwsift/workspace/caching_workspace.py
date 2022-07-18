@@ -9,7 +9,7 @@ from uuid import UUID
 import numpy as np
 from sqlalchemy.orm.exc import NoResultFound
 
-from uwsift.common import Flags, Info, Kind, State
+from uwsift.common import Info, Kind, State
 from uwsift.queue import TASK_DOING, TASK_PROGRESS
 
 from .importer import SatpyImporter, aImporter
@@ -48,17 +48,6 @@ class CachingWorkspace(BaseWorkspace):
     - interface to external data processing or loading plug-ins and notify application of new-dataset-in-workspace
 
     """
-
-    def product_state(self, uuid: UUID) -> Flags:
-        state = Flags(self._state[uuid])
-        # add any derived information
-        if uuid in self._available:
-            state.add(State.ATTACHED)
-        with self._inventory as s:
-            ncontent = s.query(Content).filter_by(uuid=uuid).count()
-        if ncontent > 0:
-            state.add(State.CACHED)
-        return state
 
     @property
     def _S(self):
@@ -202,9 +191,6 @@ class CachingWorkspace(BaseWorkspace):
         n += 1
         yield {TASK_DOING: "DB ready", TASK_PROGRESS: float(n) / float(ntot)}
 
-    def _then_refresh_mdb_customers(self, *args, **kwargs):
-        self.didUpdateProductsMetadata.emit(set())
-
     def _init_inventory_existing_datasets(self):
         """
         Do an inventory of an pre-existing workspace
@@ -217,13 +203,6 @@ class CachingWorkspace(BaseWorkspace):
         for _ in self._bgnd_startup_purge():
             # SIFT/sift#180 -- background thread of lengthy database operations can cause lock failure in pysqlite
             pass
-
-    def _store_inventory(self):
-        """
-        write inventory dictionary to an inventory.pkl file in the cwd
-        :return:
-        """
-        self._S.commit()
 
     #
     #  data array handling
@@ -326,13 +305,6 @@ class CachingWorkspace(BaseWorkspace):
             arrays = self._cached_arrays_for_content(ovc)
             return arrays.data
 
-    def _native_content_for_uuid(self, uuid: UUID) -> np.memmap:
-        # FUTURE: do a compound query for this to get the Content entry
-        with self._inventory as s:
-            nac = self._product_native_content(s, uuid=uuid)
-            arrays = self._cached_arrays_for_content(nac)
-            return arrays.data
-
     #
     # workspace file management
     #
@@ -408,37 +380,6 @@ class CachingWorkspace(BaseWorkspace):
             code = prod.expression
         return symbols, code
 
-    def _check_cache(self, path: str):
-        """
-        FIXME: does not work if more than one product inside a path
-        :param path: file we're checking
-        :return: uuid, info, overview_content if the data is already available without import
-        """
-        with self._inventory as s:
-            hits = s.query(Resource).filter_by(path=path).all()
-            if not hits:
-                return None
-            if len(hits) >= 1:
-                if len(hits) > 1:
-                    LOG.warning("more than one Resource found suitable, there can be only one")
-                resource = hits[0]
-                hits = list(
-                    s.query(Content)
-                    .filter(Content.product_id == Product.id)
-                    .filter(Product.resource_id == resource.id)
-                    .order_by(Content.lod)
-                    .all()
-                )
-                if len(hits) >= 1:
-                    content = hits[0]  # presumably this is closest to LOD_OVERVIEW
-                    cac = self._cached_arrays_for_content(content)
-                    if not cac:
-                        LOG.error("unable to attach content")
-                        data = None
-                    else:
-                        data = cac.data
-                    return content.product.uuid, content.product.info, data
-
     @property
     def product_names_available_in_cache(self) -> dict:
         """
@@ -454,12 +395,6 @@ class CachingWorkspace(BaseWorkspace):
                 if p.uuid not in zult:
                     zult[p.uuid] = p.info[Info.DISPLAY_NAME]
         return zult
-
-    @property
-    def uuids_in_cache(self):
-        with self._inventory as s:
-            contents_of_cache = s.query(Content).all()
-            return list(sorted(set(c.product.uuid for c in contents_of_cache)))
 
     def recently_used_products(self, n=32) -> Dict[UUID, str]:
         with self._inventory as s:
@@ -488,15 +423,6 @@ class CachingWorkspace(BaseWorkspace):
             S.delete(resource)
         if not defer_commit:
             S.commit()
-        return total
-
-    def remove_all_workspace_content_for_resource_paths(self, paths: list):
-        total = 0
-        with self._inventory as s:
-            for path in paths:
-                rsr_hits = s.query(Resource).filter_by(path=path).all()
-                for rsr in rsr_hits:
-                    total += self._purge_content_for_resource(rsr, defer_commit=True)
         return total
 
     def purge_content_for_product_uuids(self, uuids: list, also_products=False):
