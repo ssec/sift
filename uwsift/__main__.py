@@ -43,7 +43,6 @@ from uwsift import (
     config,
 )
 from uwsift.common import Info, Tool
-from uwsift.control.doc_ws_as_timeline_scene import SiftDocumentAsFramesInTracks
 from uwsift.control.layer_tree import LayerStackTreeViewModel
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 
@@ -51,7 +50,6 @@ from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 # initialization) it must be set up before importing them.
 from uwsift.model.composite_recipes import RecipeManager
 from uwsift.model.document import Document
-from uwsift.model.layer import DocRGBDataset
 from uwsift.model.layer_model import LayerModel
 from uwsift.model.product_dataset import ProductDataset
 from uwsift.queue import TASK_DOING, TASK_PROGRESS, TaskQueue
@@ -350,40 +348,6 @@ class UserControlsAnimation(QtCore.QObject):
         self.scene_manager.set_frame_number(frame)
         # TODO: update layer list to reflect what layers are visible/hidden?
 
-    def update_slider_if_frame_is_in_animation(self, uuid, **kwargs):
-        """Update frame slider to the specified frame UUID, but only if it's part of animation order."""
-        # FUTURE: this could be a cheaper operation but it's probably fine since it's input-driven
-        cao = self.document.current_animation_order
-        try:
-            dex = cao.index(uuid)
-        except ValueError:
-            return
-        frame_change_tuple = (dex, len(cao), False, uuid)
-        self.update_frame_slider(frame_change_tuple)
-
-    def next_last_time(self, direction=0, *args, **kwargs):
-        """Move forward (direction=+1) or backward (-1) a time step in animation order."""
-        self.scene_manager.animation_controller.animating = False
-        new_focus = self._next_last_time_visibility(direction=direction)
-        self.layer_list_model.select([new_focus])
-        # if this part of the animation cycle, update the animation slider and displayed time as well
-        self.update_slider_if_frame_is_in_animation(new_focus)
-        return new_focus
-
-    def next_last_band(self, direction=0, *args, **kwargs):
-        """Move forward (direction=+1) or backward (-1) a band step in animation order."""
-        LOG.info("band incr {}".format(direction))
-        uuids = self.layer_list_model.current_selected_uuids()
-        new_focus = None
-        if not uuids:
-            pass  # FIXME: notify user
-        for uuid in uuids:
-            new_focus = self.document.next_last_step(uuid, direction, bandwise=True)
-        if new_focus is not None:
-            self.layer_list_model.select([new_focus])
-            self.update_frame_time_to_top_visible()
-            self.update_slider_if_frame_is_in_animation(new_focus)
-
     def set_animation_speed(self, milliseconds):
         """Change frame rate as measured in milliseconds."""
         LOG.info("animation speed set to {}ms".format(milliseconds))
@@ -424,7 +388,6 @@ class Main(QtWidgets.QMainWindow):
     _cmap_editor = None  # Gradient editor widget
     _resource_collector: ResourceSearchPathCollector = None
     _resource_collector_timer: QtCore.QTimer = None
-    _timeline_scene: SiftDocumentAsFramesInTracks = None
     _last_imported_dataset_uuid: typ.Optional[UUID] = None
     _palette_text_green: QtGui.QPalette = None
     _palette_text_red: QtGui.QPalette = None
@@ -541,16 +504,6 @@ class Main(QtWidgets.QMainWindow):
         model_indexes = self.ui.treeView.selectedIndexes()
         self.layer_model.toggle_layers_visibility(model_indexes)
 
-    def _refresh_probe_results(self, *args):
-        arg1 = args[0]
-        if isinstance(arg1, dict):
-            # Given a dictionary of changes
-            uuids = arg1.keys()
-        else:
-            uuids = [arg1]
-        _state, _xy_pos = self.graphManager.current_point_probe_status(DEFAULT_POINT_PROBE)
-        self.document.update_equalizer_values(DEFAULT_POINT_PROBE, _state, _xy_pos, uuids=uuids)
-
     def update_point_probe_text(self, probe_name, state=None, xy_pos=None, uuid=None, animating=None):
         if uuid is None:
             (
@@ -609,34 +562,6 @@ class Main(QtWidgets.QMainWindow):
             layer_str = "N/A"
         self.ui.cursorProbeLayer.setText(layer_str)
         self.ui.cursorProbeText.setText("{} ({}) [{}, {}]".format(data_str, probe_loc, col, row))
-
-    def _init_timeline(self, doc: Document):
-        gv = self.ui.timelineView
-
-        # set up the widget itself
-        gv.setViewportUpdateMode(QtWidgets.QGraphicsView.FullViewportUpdate)
-        gv.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
-        gv.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-
-        # connect up the scene
-        if USE_INVENTORY_DB:
-            doc.sync_potential_tracks_from_metadata()
-            LOG.debug("Potential tracks: {}".format(repr(doc.track_order)))
-        self._timeline_scene = SiftDocumentAsFramesInTracks(doc, self.workspace)
-        gv.setScene(self._timeline_scene)
-        QtWidgets.QApplication.instance().aboutToQuit.connect(self._timeline_scene.clear)
-
-        self._timeline_scene.sync_items()
-
-        def center_timeline_view_on_single_frame(frame_uuids, gv=gv, timeline_scene=self._timeline_scene):
-            frame_uuids = list(frame_uuids) if not isinstance(frame_uuids, list) else frame_uuids
-            # FIXME: again, we're assuming product id = frame id = layer id
-            if len(frame_uuids) == 1 and gv.isVisible():
-                LOG.debug("centering timeline view on single selected frame")
-
-                timeline_scene.center_view_on_frame(gv, frame_uuids[0])
-
-        self.layer_list_model.uuidSelectionChanged.connect(center_timeline_view_on_single_frame)
 
     @staticmethod
     def run_gc_after_layer_deletion(new_order: tuple, removed_uuids: list, first_removed_row: int, rows_removed: int):
@@ -1208,11 +1133,6 @@ class Main(QtWidgets.QMainWindow):
         LOG.debug("main window closing")
         self.workspace.close()
 
-    def _remove_paths_from_cache(self, paths):
-        self.workspace.remove_all_workspace_content_for_resource_paths(paths)
-        if USE_INVENTORY_DB:
-            self.update_recent_file_menu()
-
     def open_from_cache(self, *args, **kwargs):
         def _activate_products_for_names(uuids):
             LOG.info("activating cached products with uuids: {}".format(repr(uuids)))
@@ -1414,9 +1334,6 @@ class Main(QtWidgets.QMainWindow):
             return tmp_cb
 
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("t", self.scene_manager.next_tool))
-
-    def updateLayerList(self):
-        pass
 
     def open_colormap_editor(self):
         if self._cmap_editor is None:
