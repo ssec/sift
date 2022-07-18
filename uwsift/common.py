@@ -137,23 +137,6 @@ class ViewBox(NamedTuple):
     dx: float
 
 
-class Span(NamedTuple):
-    s: datetime  # start
-    d: timedelta  # duration
-
-    @property
-    def e(self):
-        return self.s + self.d
-
-    @staticmethod
-    def from_s_e(s: datetime, e: datetime):
-        return Span(s, e - s) if (s is not None) and (e is not None) else None
-
-    @property
-    def is_instantaneous(self):
-        return timedelta(seconds=0) == self.d
-
-
 class Flags(set):
     """A set of enumerated Flags which may ultimately be represented as a bitfield, but observing set interface"""
 
@@ -395,10 +378,6 @@ class ZList(MutableSequence):
     def min_max(self) -> Tuple[int, int]:
         return (self._zmax + 1 - len(self), self._zmax) if len(self) else (None, None)
 
-    @property
-    def top_z(self) -> Optional[int]:
-        return self._zmax if len(self) else None
-
     def __contains__(self, z) -> bool:
         n, x = self.min_max
         return False if (n is None) or (x is None) or (z < n) or (z > x) else True
@@ -485,14 +464,6 @@ class ZList(MutableSequence):
         if z >= 0:
             self._zmax -= 1
         del self._content[ldex]
-
-    def merge_subst(self, new_values: Iterable[Tuple[int, Any]]):
-        """batch merge of substitutions
-        raises IndexError if any of them is outside current range
-        """
-        for z, q in new_values:
-            ldex = self._zmax - z
-            self._content[ldex] = q
 
     def __repr__(self) -> str:
         return "ZList({}, {})".format(self._zmax, repr(self._content))
