@@ -19,10 +19,7 @@ numba
 :license: GPLv3, see LICENSE for more details
 """
 import logging
-import os
-import sys
 from dataclasses import dataclass
-from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Iterable, MutableSequence, NamedTuple, Optional, Tuple
 from uuid import UUID
@@ -35,28 +32,6 @@ LOG = logging.getLogger(__name__)
 FCS_SEP = "::"
 # standard N/A string used in FCS
 NOT_AVAILABLE = FCS_NA = "N/A"
-
-
-def get_font_size(pref_size):
-    """Get a font size that looks good on this platform.
-
-    This is a HACK and can be replaced by PyQt5 font handling after migration.
-
-    """
-    # win = 7
-    # osx = 12
-    env_factor = os.getenv("SIFT_FONT_FACTOR", None)
-    if env_factor is not None:
-        factor = float(env_factor)
-    elif sys.platform.startswith("win"):
-        factor = 1.0
-    elif "darwin" in sys.platform:
-        factor = 1.714
-    else:
-        factor = 1.3
-
-    return pref_size * factor
-
 
 PREFERRED_SCREEN_TO_TEXTURE_RATIO = 1.0  # screenpx:texturepx that we want to keep, ideally, by striding
 
@@ -151,11 +126,6 @@ class Point(NamedTuple):
     x: float
 
 
-class Coordinate(NamedTuple):
-    deg_north: float
-    deg_east: float
-
-
 class ViewBox(NamedTuple):
     """Combination of Box + Resolution."""
 
@@ -224,13 +194,6 @@ class Kind(Enum):
     LINES = 7
     VECTORS = 8
     POINTS = 9
-
-
-class CompositeType(Enum):
-    """Type of non-luminance image layers."""
-
-    RGB = 1
-    ARITHMETIC = 2
 
 
 class Instrument(Enum):
@@ -436,17 +399,9 @@ class ZList(MutableSequence):
     def top_z(self) -> Optional[int]:
         return self._zmax if len(self) else None
 
-    @property
-    def bottom_z(self) -> Optional[int]:
-        return self._zmax + 1 - len(self) if len(self) else None
-
     def __contains__(self, z) -> bool:
         n, x = self.min_max
         return False if (n is None) or (x is None) or (z < n) or (z > x) else True
-
-    def prepend(self, val):
-        self._zmax += 1
-        self._content.insert(0, val)
 
     def append(self, val, start_negative: bool = False, not_if_present: bool = False):
         if start_negative and 0 == len(self._content):
