@@ -296,7 +296,6 @@ class UserControlsAnimation(QtCore.QObject):
         self.document.didChangeLayerVisibility.connect(self.update_frame_time_to_top_visible)
         self.document.didReorderDatasets.connect(self.update_frame_time_to_top_visible)
         self.document.didRemoveDatasets.connect(self.update_frame_time_to_top_visible)
-        self.document.didAddBasicDataset.connect(self.update_frame_time_to_top_visible)
         self.document.didAddCompositeDataset.connect(self.update_frame_time_to_top_visible)
 
     def next_frame(self, *args, **kwargs):

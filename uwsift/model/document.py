@@ -399,7 +399,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # Clarification: Layer interfaces migrate to layer meaning "current active products under the playhead"
     # new order list with None for new layer; info-dictionary, overview-content-ndarray
     didAddDataset = pyqtSignal(frozendict, Presentation)
-    didAddBasicDataset = pyqtSignal(tuple, UUID, Presentation)  # REMOVE: not emitted anywhere anymore
     didUpdateBasicDataset = pyqtSignal(UUID, Kind)
     # comp layer is derived from multiple basic layers and has its own UUID
     didAddCompositeDataset = pyqtSignal(tuple, UUID, Presentation)

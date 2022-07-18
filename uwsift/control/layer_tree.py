@@ -224,7 +224,6 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         doc.didChangeColormap.connect(self.refresh)
         doc.didChangeLayerVisibility.connect(self.refresh)
         doc.didChangeLayerName.connect(self.refresh)
-        doc.didAddBasicDataset.connect(self.doc_added_basic_layer)
         doc.didAddCompositeDataset.connect(self.refresh)
         doc.willPurgeDataset.connect(self.refresh)
         doc.didReorderAnimation.connect(self.refresh)
