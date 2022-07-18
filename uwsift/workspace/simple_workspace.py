@@ -9,7 +9,7 @@ import numpy as np
 import satpy.readers
 
 from uwsift import CLEANUP_FILE_CACHE, config
-from uwsift.common import Flags, Info, Kind, State
+from uwsift.common import Info, Kind, State
 
 from .importer import SatpyImporter, aImporter
 from .metadatabase import Content, ContentImage, Metadatabase, Product
@@ -39,13 +39,6 @@ class SimpleWorkspace(BaseWorkspace):
         self._available: dict = {}
 
         self._remove_content_data_from_cache_dir_checked()
-
-    def product_state(self, uuid: UUID) -> Flags:
-        state: Flags = Flags(self._state[uuid])
-        # add any derived information
-        if uuid in self._available:
-            state.add(State.ATTACHED)
-        return state
 
     @property
     def _S(self):
@@ -119,11 +112,6 @@ class SimpleWorkspace(BaseWorkspace):
         arrays = self._cached_arrays_for_content(ovc)
         return arrays.data
 
-    def _native_content_for_uuid(self, uuid: UUID) -> np.memmap:
-        nac = self._product_native_content(None, uuid=uuid)
-        arrays = self._cached_arrays_for_content(nac)
-        return arrays.data
-
     #
     # workspace file management
     #
@@ -186,14 +174,7 @@ class SimpleWorkspace(BaseWorkspace):
     def product_names_available_in_cache(self) -> dict:
         return None
 
-    @property
-    def uuids_in_cache(self):
-        return None
-
     def recently_used_products(self, n=32) -> Dict[UUID, str]:
-        pass
-
-    def remove_all_workspace_content_for_resource_paths(self, paths: list):
         pass
 
     def purge_content_for_product_uuids(self, uuids: list, also_products=False):
