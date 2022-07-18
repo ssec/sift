@@ -227,7 +227,6 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         doc.didAddCompositeDataset.connect(self.refresh)
         doc.willPurgeDataset.connect(self.refresh)
         doc.didReorderAnimation.connect(self.refresh)
-        doc.didCalculateLayerEqualizerValues.connect(self.update_equalizer)
 
 
         # set up each of the widgets

@@ -411,9 +411,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
     didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: (vmin, vmax), ...} for all changed layers
-    didCalculateLayerEqualizerValues = pyqtSignal(
-        dict
-    )  # dict of {uuid: (value, normalized_value_within_clim)} for equalizer display
     didChangeProjection = pyqtSignal(str)  # name of projection (area definition)
     didAddFamily = pyqtSignal(str, dict)  # name of the newly added family and dict of family info
     didRemoveFamily = pyqtSignal(str)  # name of the newly added family and dict of family info
