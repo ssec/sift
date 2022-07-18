@@ -446,9 +446,6 @@ class Product(Base):
     def grid_first_index_y(self, value):
         LOG.debug("DEPRECATED: setting grid_first_index_y on resource")
 
-    def can_be_activated_without_importing(self):
-        return len(self.content) > 0
-
     INFO_TO_FIELD = {
         Info.SHORT_NAME: "name",
         Info.UUID: "uuid",
