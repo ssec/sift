@@ -65,22 +65,17 @@ import json
 import logging
 import os
 import typing as typ
-import warnings
-from collections import defaultdict
 from collections.abc import MutableSequence
-from datetime import datetime, timedelta
 from uuid import UUID
 from weakref import ref
 
-import numpy as np
 from PyQt5.QtCore import QObject, pyqtSignal
 
-from uwsift.common import FCS_SEP, Flags, Info, Kind, Presentation, Span, ZList
+from uwsift.common import FCS_SEP, Info, Kind, Presentation, ZList
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.model.layer import (
     DocBasicDataset,
     DocDataset,
-    DocRGBDataset,
     Mixing,
 )
 from uwsift.queue import TASK_DOING, TASK_PROGRESS, TaskQueue
@@ -192,150 +187,8 @@ class DocLayerStack(MutableSequence):
                 raise
             self._store[idx] = dataclasses.replace(self._store[idx], a_order=nth)
 
+
 ###################################################################################################################
-
-
-class DataLayer:
-    """
-    A DataLayer is unique to a satellite, channel and calibration
-    over a certain period of time.
-
-    Represents images over time belonging to a certain (satellite, channel, calibration)
-                            for a given span of time
-    """
-
-    def __init__(self, uuids_timestamps: typ.List, product_family_key: typ.Tuple):
-        # metadata redundant w.r.t. satellite, channel, calibration, so any metadata object
-        #                           from the list of tuples will do
-        self._t_matched: typ.Optional[datetime] = None
-        self.product_family_key = product_family_key
-
-        # sort timestamps while keeping them synchronous with images
-        uuids_tstamps_asc = sorted(uuids_timestamps, key=lambda tup: tup[1])
-        # Create timeline according to temporal resolution
-
-        self.timeline = {uuid_dt_tup[1]: uuid_dt_tup[0] for uuid_dt_tup in uuids_tstamps_asc}
-
-    @property
-    def t_matched(self):
-        return self._t_matched
-
-    @t_matched.setter
-    def t_matched(self, t_matched):
-        if not isinstance(t_matched, datetime):
-            raise ValueError("Matched time needs to be datetime object.")
-        self._t_matched = t_matched
-
-    @property
-    def satellite(self):
-        return self.product_family_key[0].value
-
-    @satellite.setter
-    def satellite(self, *args, **kwargs):
-        raise ValueError("Changing type of a DataLayer forbidden.")
-
-    @property
-    def product_str(self):
-        return self.product_family_key[2]
-
-    @product_str.setter
-    def product_str(self, *args, **kwargs):
-        raise ValueError("Changing type of a DataLayer forbidden.")
-
-
-class DataLayerCollection(QObject):
-    """
-    Collection of data layers (representation of time series of images) with one data layer
-    as driving layer, designated by its ProductFamilyKey.
-    """
-
-    didUpdateCollection = pyqtSignal()
-
-    def __init__(self, data_layers: typ.List[DataLayer]):
-        super().__init__()
-        # dict mapping product family keys to data layers
-        self.data_layers = {}
-        # Convenience functions must return a data layer. This is used by caller code to i.e. set a
-        # new driving layer either according to some policy or an index
-        self.convenience_functions: typ.Dict[str, typ.Callable] = {
-            "Most Frequent": self.get_most_frequent_data_layer_index
-        }
-        self.product_family_keys = set()
-        if data_layers:
-            self.notify_update_collection(data_layers)
-
-    def get_most_frequent_data_layer_index(self) -> int:
-        """
-        Get index of the data layer with the least mean difference between timestamps.
-        :return: -1 if no data layers exist, index of most frequent data layer otherwise.
-        """
-        num_data_layers = len(self.data_layers.values())
-        if num_data_layers == 0:
-            return -1
-        else:
-            temporal_differences = np.zeros(num_data_layers)
-            for i, data_layer in enumerate(self.data_layers.values()):
-                tl = list(data_layer.timeline.keys())
-                t_diffs = [tl[i + 1] - tl[i] for i in range(len(tl) - 1)]
-                # Calculate mean difference in timeline in seconds to support
-                # comparing timelines with non-regularly occurring timestamps
-                temporal_differences[i] = np.mean(list(map(lambda td: td.total_seconds(), t_diffs)))
-            most_frequent_data_layer_idx = np.argmin(temporal_differences)
-            if not isinstance(most_frequent_data_layer_idx, np.int64):
-                # If there exist multiple timelines at the same sampling rate, take the first one.
-                most_frequent_data_layer_idx = most_frequent_data_layer_idx[0]
-            return most_frequent_data_layer_idx
-
-    @property
-    def num_data_layers(self):
-        return len(list(self.data_layers.values()))
-
-    def notify_update_collection(self, new_data_layers: typ.List[DataLayer]):
-        """Update state of collection when new data is being loaded or old data is discarded.
-
-        Notifies dependents via Qt signal.
-
-        Two cases need to be taken into account:
-            1) entirely new data layer as shown by previously unknown product family key
-            2) data layer with same pfkey already exists
-               -> add new timesteps without duplication
-
-        """
-        for data_layer in new_data_layers:
-
-            if data_layer.product_family_key in self.product_family_keys:
-                old_data_layer = self.data_layers[data_layer.product_family_key]
-                # Timeline maps: timestamp -> uuid
-                for tstamp, uuid in data_layer.timeline.items():
-                    if uuid not in old_data_layer.timeline.values():
-                        old_data_layer.timeline[tstamp] = uuid
-                self.data_layers[data_layer.product_family_key].timeline = self._sort_timeline(old_data_layer.timeline)
-            else:
-                self.product_family_keys.add(data_layer.product_family_key)
-                self.data_layers[data_layer.product_family_key] = data_layer
-        self.didUpdateCollection.emit()
-
-    @staticmethod
-    def _sort_timeline(timeline):
-        """
-        Convenience method to sort timelines of data layers by ordered
-        ascending by their timestamps.
-        :param timeline: Dict mapping datetime objects to uuids
-        :return: Sorted timeline dict
-        """
-        sorted_tl = sorted(timeline.items(), key=lambda kv: kv[0])
-        return {k: v for k, v in sorted_tl}
-
-    def remove_by_uuid(self, uuid_to_remove: UUID):
-        for _, data_layer in self.data_layers.items():
-            new_timeline = data_layer.timeline.copy()
-            for dt, uuid in data_layer.timeline.items():
-                if uuid_to_remove == uuid:
-                    del new_timeline[dt]
-                    # NOTE(mk): Able to exit prematurely here if guaranteed that
-                    # no uuid present in multiple data layers
-            data_layer.timeline = self._sort_timeline(new_timeline)
-        self.didUpdateCollection.emit()
 
 
 class Document(QObject):  # base class is rightmost, mixins left of that
@@ -359,28 +212,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     # timeline the user has specified:
     track_order: ZList = None  # (zorder, family-name) with higher z above lower z; z<0 should not occur
-
-    # overall visible range of the active data if specified by user,
-    # else None means assume use the product timespan from metadatabase
-    timeline_span: Span = None
-
-    # playback information
-    playhead_time: datetime = None  # document stored playhead time
-    playback_per_sec: timedelta = timedelta(seconds=60.0)  # data time increment per wall-second
-
-    # playback time range, if not None is a subset of overall timeline
-    playback_span: Span = None
-
-    # user-directed overrides on tracks and frames (products)
-    track_state: typ.Mapping[str, Flags] = None
-    product_state: typ.Mapping[UUID, Flags] = None
-
-    # user can lock tracks to a single frame throughout
-    track_frame_locks: typ.Mapping[str, UUID] = None
-
-    # Maps of family names to their document recipes
-    family_presentation: typ.Mapping[str, Presentation] = None
-    family_calculation: typ.Mapping[str, object] = None  # algebraic combinations of multiple products
 
     # DEPRECATION in progress: layer sets
     """
@@ -433,15 +264,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self._layer_sets = [DocLayerStack(self)] + [None] * (layer_set_count - 1)
         self._layer_with_uuid = {}
 
-        # data_layers represents time series of images ordered by product family
-        self.data_layers: typ.List[DataLayer] = []
-        self.data_layer_collection: DataLayerCollection = DataLayerCollection([])
-
         self.colormaps = COLORMAP_MANAGER
         self.default_area_def_name = AreaDefinitionsManager.default_area_def_name()
         self.current_area_def_name = self.default_area_def_name
-        # HACK: This should probably be part of the metadata database in the future
-        self._families = defaultdict(list)
 
         # Create directory if it does not exist
         cmap_base_dir = os.path.join(self.config_dir, "colormaps")
@@ -457,13 +282,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 self.colormaps.import_colormaps(cmap_dir, read_only=read_only, category=cmap_cat)
 
         # timeline document storage setup with initial track order and time range
-        self.product_state = defaultdict(Flags)
-        self.track_state = defaultdict(Flags)
         self.track_order = ZList()
-        self.track_frame_locks = {}
-        self.family_calculation = {}
-        self.family_composition = {}
-        self.family_presentation = {}
 
         # scan available metadata for initial state
         # FIXME: refresh this once background scan finishes and new products are found
@@ -642,47 +461,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             subcat = uuid_or_layer[Info.DATASET_NAME]
         return "{}:{}:{}:{}".format(kind.name, refpoint, measurement, subcat)
 
-    def _add_layer_family(self, layer):
-        family = layer[Info.FAMILY]
-        is_new = family not in self._families or not len(self._families[family])
-        self._families[family].append(layer[Info.UUID])
-        if is_new:
-            self.didAddFamily.emit(family, self.family_info(family))
-        return family
-
-    def _remove_layer_from_family(self, uuid):
-        family = self[uuid][Info.FAMILY]
-        self._families[family].remove(uuid)
-
-        if not self._families[family]:
-            # remove the family entirely if it is empty
-            LOG.debug("Removing empty family: {}".format(family))
-            del self._families[family]
-            self.didRemoveFamily.emit(family)
-
-    def family_info(self, family_or_layer_or_uuid):
-        family = layer = family_or_layer_or_uuid
-        if isinstance(family_or_layer_or_uuid, UUID):
-            layer = self[family_or_layer_or_uuid]
-        if isinstance(layer, DocBasicDataset):
-            family = layer[Info.FAMILY]
-
-        # one layer that represents all the layers in this family
-        family_rep = self[self._families[family][0]]
-
-        family_name_components = family.split(":")
-        display_family = family_rep[Info.SHORT_NAME] + " " + " ".join(reversed(family_name_components))
-
-        # NOTE: For RGBs the SHORT_NAME will update as the RGB changes
-        return {
-            Info.VALID_RANGE: family_rep[Info.VALID_RANGE],
-            Info.UNIT_CONVERSION: family_rep[Info.UNIT_CONVERSION],
-            Info.SHORT_NAME: family_rep[Info.SHORT_NAME],
-            Info.UNITS: family_rep[Info.UNITS],
-            Info.KIND: family_rep[Info.KIND],
-            Info.DISPLAY_FAMILY: display_family,
-        }
-
     def import_files(self, paths, insert_before=0, **importer_kwargs) -> dict:
         """Load product metadata and content from provided file paths.
 
@@ -802,19 +580,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for _, p in self.colormap_for_uuids((uuid,), lset=lset):
             return p
 
-    def valid_range_for_uuid(self, uuid):
-        # Limit ourselves to what information
-        # in the future valid range may be different than the default CLIMs
-        return self[uuid][Info.CLIM]
-
-    @property
-    def current_animation_order(self):
-        """
-        return tuple of UUIDs representing the animation order in the currently selected layer set
-        :return: tuple of UUIDs
-        """
-        return self.current_layer_set.animation_order
-
     @property
     def current_layer_uuid_order(self):
         """
@@ -834,29 +599,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 return x.uuid
         return None
 
-    @property
-    def current_visible_layer_uuids(self):
-        for x in self.current_layer_set:
-            layer = self._layer_with_uuid[x.uuid]
-            if x.visible and layer.is_valid:
-                yield x.uuid
-
     # TODO: add a document style guide which says how different bands from different instruments are displayed
-
-    @property
-    def active_layer_order(self):
-        """
-        return list of valid (can-be-displayed) layers which are either visible or in the animation order
-        typically this is used by the scenegraphmanager to synchronize the scenegraph elements
-        :return: sequence of (layer_prez, layer) pairs, with order=0 for non-animating layers
-        """
-        for layer_prez in self.current_layer_set:
-            if layer_prez.visible or layer_prez.a_order is not None:
-                layer = self._layer_with_uuid[layer_prez.uuid]
-                if not layer.is_valid:
-                    # we don't have enough information to display this layer yet, it's still loading or being configured
-                    continue
-                yield layer_prez, layer
 
     def row_for_uuid(self, *uuids):
         d = dict((q.uuid, i) for i, q in enumerate(self.current_layer_set))
@@ -884,67 +627,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             L[dex] = nu
             zult[nu.uuid] = nu.visible
         self.didChangeLayerVisibility.emit(zult)
-
-    def animation_changed_visibility(self, changes):
-        """
-        this is triggered by animation being stopped,
-        via signal scenegraphmanager.didChangeLayerVisibility
-        in turn we generate our own didChangeLayerVisibility to ensure document views are up to date
-        :param changes: dictionary of {uuid:bool} with new visibility state
-        :return:
-        """
-        curr_set = self.current_layer_set
-        for uuid, visible in changes.items():
-            dex = curr_set[uuid]
-            old = curr_set[dex]
-            curr_set[dex] = dataclasses.replace(old, visible=visible)
-        self.didChangeLayerVisibility.emit(changes)
-
-    def next_last_step(self, uuid, delta=0, bandwise=False):
-        """
-        given a selected layer uuid,
-        find the next or last time/bandstep (default: the layer itself) in the document
-        make all layers in the sibling group invisible save that timestep
-        :param uuid: layer we're focusing on as reference
-        :param delta: -1 => last step, 0 for focus step, +1 for next step
-        :param bandwise: True if we want to change by band instead of time
-        :return: UUID of new focus layer
-        """
-        if bandwise:  # next or last band
-            consult_guide = self.channel_siblings
-        else:
-            consult_guide = self.time_siblings
-        sibs, dex = consult_guide(uuid)
-        if not sibs:
-            LOG.info("nothing to do in next_last_timestep")
-            self.toggle_layer_visibility(uuid, True)
-            return uuid
-        dex += delta + len(sibs)
-        dex %= len(sibs)
-        new_focus = sibs[dex]
-        del sibs[dex]
-        if sibs:
-            LOG.debug("hiding {} siblings".format(len(sibs)))
-            self.toggle_layer_visibility(sibs, False)
-        LOG.debug("showing new preferred {}step {}".format("time" if not bandwise else "band", new_focus))
-        self.toggle_layer_visibility(new_focus, True)  # FUTURE: do these two commands in one step
-        return new_focus
-
-    def is_layer_visible(self, row):
-        return self.current_layer_set[row].visible
-
-    def layer_animation_order(self, layer_number):
-        return self.current_layer_set[layer_number].a_order
-
-    def change_layer_name(self, row, new_name):
-        uuid = self.current_layer_set[row].uuid if not isinstance(row, UUID) else row
-        info = self._layer_with_uuid[uuid]
-        assert uuid == info[Info.UUID]
-        if not new_name:
-            # empty string, reset to default DISPLAY_NAME
-            new_name = info.default_display_name
-        info[Info.DISPLAY_NAME] = new_name
-        self.didChangeLayerName.emit(uuid, new_name)
 
     def change_colormap_for_layers(self, name, uuids=None):
         L = self.current_layer_set
@@ -978,112 +660,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 continue
             yield (idx, p, layer)
 
-    def change_clims_for_layers_where(self, clims, **query):
-        """
-        query using .current_layers_where() and change clims en masse
-        :param clims: new color limits consistent with layer's presentation
-        :param query: see current_layers_where()
-        :return:
-        """
-        nfo = {}
-        L = self.current_layer_set
-        for idx, pz, layer in self.current_layers_where(**query):
-            new_pz = dataclasses.replace(pz, climits=clims)
-            nfo[layer.uuid] = new_pz.climits
-            L[idx] = new_pz
-        self.didChangeColorLimits.emit(nfo)
-
-    def change_clims_for_siblings(self, uuid, clims):
-        uuids = self.time_siblings(uuid)[0]
-        return self.change_clims_for_layers_where(clims, uuids=uuids)
-
-    def change_layers_image_kind(self, uuids, new_kind):
-        """Change an image or contour layer to present as a different kind."""
-        nfo = {}
-        layer_set = self.current_layer_set
-        assert new_kind in Kind
-        all_uuids = set()
-        for u in uuids:
-            fam = self.family_for_product_or_layer(u)
-            all_uuids.update(self._families[fam])
-        for idx, pz, layer in self.current_layers_where(uuids=all_uuids):
-            if pz.kind not in [Kind.IMAGE, Kind.CONTOUR]:
-                LOG.warning("Can't change image kind for Kind: %s", pz.kind.name)
-                continue
-            new_pz = dataclasses.replace(pz, kind=new_kind)
-            nfo[layer.uuid] = new_pz
-            layer_set[idx] = new_pz
-        self.didChangeImageKind.emit(nfo)
-
     def __len__(self):
         # FIXME: this should be consistent with __getitem__, not self.current_layer_set
         return len(self.current_layer_set)
 
-    def uuid_for_current_layer(self, row):
-        uuid = self.current_layer_set[row].uuid
-        return uuid
-
-    def family_uuids(self, family, active_only=False):
-        uuids = self._families[family]
-        if not active_only:
-            return uuids
-        current_visible = list(self.current_visible_layer_uuids)
-        return [u for u in uuids if u in current_visible]
-
-    def family_uuids_for_uuid(self, uuid, active_only=False):
-        return self.family_uuids(self[uuid][Info.FAMILY], active_only=active_only)
-
-    def remove_layers_from_all_sets(self, uuids):
-        # find RGB layers family
-        all_uuids = set()
-        for uuid in list(uuids):
-            all_uuids.add(uuid)
-            if isinstance(self[uuid], DocRGBDataset):
-                all_uuids.update(self.family_uuids_for_uuid(uuid))
-
-        # collect all times for these layers to update RGBs later
-        times = [self[u][Info.SCHED_TIME] for u in all_uuids]
-
-        # delete all these layers from the layer list/presentation
-        for uuid in all_uuids:
-            LOG.debug("removing {} from family and Presentation lists".format(uuid))
-            # remove from available family layers
-            self._remove_layer_from_family(uuid)
-            # remove from the layer set
-            self.remove_layer_prez(uuid)  # this will send signal and start purge
-            # remove from data layer collection
-            if self.data_layer_collection is not None:
-                self.data_layer_collection.remove_by_uuid(uuid)
-
-        # Remove this layer from any RGBs it is a part of
-        self.sync_composite_layer_prereqs(times)
-
-        # Remove data from the workspace
-        self.purge_layer_prez(uuids)
-
     def get_uuids(self):
         return list(self._layer_with_uuid.keys())
-
-    def animate_siblings_of_layer(self, row_or_uuid):
-        uuid = self.current_layer_set[row_or_uuid].uuid if not isinstance(row_or_uuid, UUID) else row_or_uuid
-        layer = self._layer_with_uuid[uuid]
-        L = self.current_layer_set
-
-        if isinstance(layer, DocRGBDataset):
-            pass
-        else:
-            new_anim_uuids, _ = self.time_siblings(uuid)
-            if new_anim_uuids is None or len(new_anim_uuids) < 2:
-                LOG.info("no time siblings to chosen band, will try channel siblings to chosen time")
-                new_anim_uuids, _ = self.channel_siblings(uuid)
-            if new_anim_uuids is None or len(new_anim_uuids) < 2:
-                LOG.info("No animation found")
-                return []
-
-        LOG.debug("new animation order will be {0!r:s}".format(new_anim_uuids))
-        L.animation_order = new_anim_uuids
-        self.didReorderAnimation.emit(tuple(new_anim_uuids))
-        return new_anim_uuids
 
     def get_info(self, row: int = None, uuid: UUID = None) -> typ.Optional[DocBasicDataset]:
         if row is not None:
@@ -1120,17 +702,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if info is None:
             raise KeyError("Key '{}' does not exist in document or workspace".format(layer_uuid))
         return info
-
-    def reorder_by_indices(self, new_order, uuids=None, layer_set_index=None):
-        """given a new layer order, replace the current layer set
-        emits signal to other subsystems
-        """
-        if layer_set_index is None:
-            layer_set_index = self.current_set_index
-        assert len(new_order) == len(self._layer_sets[layer_set_index])
-        new_layer_set = DocLayerStack(self, [self._layer_sets[layer_set_index][n] for n in new_order])
-        self._layer_sets[layer_set_index] = new_layer_set
-        self.didReorderDatasets.emit(tuple(new_order))
 
     def is_using(self, uuid: UUID, layer_set: int = None):
         "return true if this dataset is still in use in one of the layer sets"
@@ -1181,30 +752,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 del self._layer_with_uuid[uuid]
                 # remove from workspace
                 self._workspace.remove(uuid)
-
-    def channel_siblings(self, uuid, sibling_infos=None):
-        """
-        filter document info to just dataset of the same channels
-        meaning all channels at a specific time, in alphabetical name order
-        :param uuid: focus UUID we're trying to build around
-        :param sibling_infos: dictionary of UUID -> Dataset Info to sort through
-        :return: sorted list of sibling uuids in channel order
-        """
-        if sibling_infos is None:
-            sibling_infos = self._layer_with_uuid
-        it = sibling_infos.get(uuid, None)
-        if it is None:
-            return None
-        sibs = [
-            (x[Info.SHORT_NAME], x[Info.UUID])
-            for x in self._filter(
-                sibling_infos.values(), it, {Info.SCENE, Info.SCHED_TIME, Info.INSTRUMENT, Info.PLATFORM}
-            )
-        ]
-        # then sort it by bands
-        sibs.sort()
-        offset = [i for i, x in enumerate(sibs) if x[1] == uuid]
-        return [x[1] for x in sibs], offset[0]
 
     def _filter(self, seq, reference, keys):
         "filter a sequence of metadata dictionaries to matching keys with reference"
