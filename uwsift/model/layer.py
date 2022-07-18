@@ -137,14 +137,6 @@ class DocDataset(ChainMap):
         """
         return True
 
-    @property
-    def is_flat_field(self):
-        """
-        return whether the layer can be represented as a flat numerical field or not (RGB layers cannot)
-        :return: bool
-        """
-        return True
-
 
 class DocBasicDataset(DocDataset):
     """
@@ -267,15 +259,6 @@ class DocRGBDataset(DocCompositeDataset):
         return self.has_deps and self.shared_projections and self.shared_origin and self.recipe_layers_match
 
     @property
-    def is_flat_field(self):
-        return False
-
-    @property
-    def central_wavelength(self):
-        gb = self._get_if_not_none_func(item=Info.CENTRAL_WAVELENGTH)
-        return gb(self.r), gb(self.g), gb(self.b)
-
-    @property
     def sched_time(self):
         gst = self._get_if_not_none_func(attr="sched_time")
         return _concurring(gst(self.r), gst(self.g), gst(self.b), remove_none=True)
@@ -294,30 +277,6 @@ class DocRGBDataset(DocCompositeDataset):
     def scene(self):
         gst = self._get_if_not_none_func(item=Info.SCENE)
         return _concurring(gst(self.r), gst(self.g), gst(self.b), remove_none=True)
-
-    def _get_units_conversion(self):
-        def conv_func(x, inverse=False, deps=(self.r, self.g, self.b)):
-            if isinstance(x, np.ndarray):
-                # some sort of array
-                x_tmp = x.ravel()
-                assert x_tmp.size % len(deps) == 0
-                num_elems = x_tmp.size // len(deps)
-                new_vals = []
-                for i, dep in enumerate(deps):
-                    new_val = x_tmp[i * num_elems : (i + 1) * num_elems]
-                    if dep is not None:
-                        new_val = dep[Info.UNIT_CONVERSION][1](new_val, inverse=inverse)
-                    new_vals.append(new_val)
-                res = np.array(new_vals).reshape(x.shape)
-                return res
-            else:
-                # Not sure this should ever happen (should always be at least 3
-                return x
-
-        def format_func(val, numeric=True, include_units=False):
-            return ", ".join("{}".format(v) if v is None else "{:0.03f}".format(v) for v in val)
-
-        return None, conv_func, format_func
 
     def _default_display_time(self):
         dep_info = [self.r, self.g, self.b]
@@ -358,81 +317,3 @@ class DocRGBDataset(DocCompositeDataset):
             short_name = self._default_short_name()
 
         return short_name + " " + display_time
-
-    def update_metadata_from_dependencies(self):
-        """
-        recalculate origin and dimension information based on new upstream
-        :return:
-        """
-        # FUTURE: resolve dictionary-style into attribute-style uses
-        dep_info = [self.r, self.g, self.b]
-        display_time = self._default_display_time()
-        short_name = self._default_short_name()
-        name = self._default_display_name(short_name=short_name, display_time=display_time)
-        ds_info = {
-            Info.DATASET_NAME: short_name,
-            Info.SHORT_NAME: short_name,
-            Info.DISPLAY_NAME: name,
-            Info.DISPLAY_TIME: display_time,
-            Info.SCHED_TIME: self.sched_time,
-            Info.CENTRAL_WAVELENGTH: self.central_wavelength,
-            Info.INSTRUMENT: self.instrument,
-            Info.PLATFORM: self.platform,
-            Info.SCENE: self.scene,
-            Info.UNIT_CONVERSION: self._get_units_conversion(),
-            Info.UNITS: None,
-            Info.VALID_RANGE: [d[Info.VALID_RANGE] if d else (None, None) for d in dep_info],
-        }
-
-        if self.r is None and self.g is None and self.b is None:
-            ds_info.update(
-                {
-                    Info.ORIGIN_X: None,
-                    Info.ORIGIN_Y: None,
-                    Info.CELL_WIDTH: None,
-                    Info.CELL_HEIGHT: None,
-                    Info.PROJ: None,
-                    Info.CLIM: ((None, None), (None, None), (None, None)),
-                }
-            )
-            # defer initialization until we have upstream layers
-        else:
-            highest_res_dep = min([x for x in dep_info if x is not None], key=lambda x: x[Info.CELL_WIDTH])
-            ds_info.update(
-                {
-                    Info.ORIGIN_X: highest_res_dep[Info.ORIGIN_X],
-                    Info.ORIGIN_Y: highest_res_dep[Info.ORIGIN_Y],
-                    Info.CELL_WIDTH: highest_res_dep[Info.CELL_WIDTH],
-                    Info.CELL_HEIGHT: highest_res_dep[Info.CELL_HEIGHT],
-                    Info.PROJ: highest_res_dep[Info.PROJ],
-                }
-            )
-
-            def upstream_clim(up):
-                return (None, None) if (up is None) else tuple(up.get(Info.CLIM, (None, None)))
-
-            old_clim = self.get(Info.CLIM, None)
-            if not old_clim:  # initialize from upstream default maxima
-                ds_info[Info.CLIM] = tuple(tuple(d[Info.CLIM]) if d is not None else (None, None) for d in dep_info)
-            else:
-                # merge upstream with existing settings, replacing None with upstream; watch out for upstream==None case
-                ds_info[Info.CLIM] = tuple(
-                    (existing or upstream_clim(upstream)) for (existing, upstream) in zip(old_clim, dep_info)
-                )
-
-        self.update(ds_info)
-        if self.has_deps:
-            if not self.shared_projections:
-                LOG.warning("RGB dependency layers don't share the same projection")
-            if not self.shared_origin:
-                LOG.warning("RGB dependency layers don't share the same origin")
-
-        return ds_info
-
-
-class DocAlgebraicDataset(DocCompositeDataset):
-    """
-    A value field derived from other value fields algebraically
-    """
-
-    pass
