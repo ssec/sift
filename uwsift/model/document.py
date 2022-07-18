@@ -402,7 +402,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didUpdateBasicDataset = pyqtSignal(UUID, Kind)
     # comp layer is derived from multiple basic layers and has its own UUID
     didAddCompositeDataset = pyqtSignal(tuple, UUID, Presentation)
-    didAddLinesDataset = pyqtSignal(tuple, UUID, Presentation)  # REMOVE: not emitted anywhere anymore
     didAddPointsDataset = pyqtSignal(tuple, UUID, Presentation)  # REMOVE: not emitted anywhere anymore
     # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
     didRemoveDatasets = pyqtSignal(tuple, list, int, int)
