@@ -94,7 +94,6 @@ class QFramesInTracksScene(QGraphicsScene):
         pen = QPen()
         pen.setWidthF(1.25)
         pen.setColor(Qt.black)
-        # pen.setCapStyle(Qt.RoundCap)
         pen.setJoinStyle(Qt.RoundJoin)
         brush = QBrush()
         brush.setColor(Qt.blue)
@@ -108,7 +107,6 @@ class QFramesInTracksScene(QGraphicsScene):
         brush.setColor(Qt.gray)
         self._track_pen_brush = pen, brush
         # by default, show extent
-        # self.setSceneRect(None)
 
     def clear(self):
         LOG.debug("clearing out Timeline Scene")
@@ -202,27 +200,6 @@ class QFramesInTracksScene(QGraphicsScene):
     # internal mid-level update commands
     #
 
-    # def add_frames_to_track(self, track: [QTrackItem, str], paranoid=True, *frames):
-    #     """Add track and optional frames to scene storage, to ensure they are retained
-    #     Asserts that if frame or track for the given UUID is already known, that the same item is being used
-    #     """
-    #     if isinstance(track, str):
-    #         track = self._track_items[track]
-    #     if paranoid:
-    #         assert(isinstance(track, QTrackItem))
-    #         if track.track in self._track_items:
-    #             assert(track is self._track_items[track.track])
-    #         else:
-    #             raise AssertionError("need to insert_track_with_zorder before adding frames")
-    #             # self._track_items[track.uuid] = track
-    #     for frame in frames:
-    #         assert(isinstance(frame, QFrameItem))
-    #         existing = self._frame_items.get(frame.uuid)
-    #         if paranoid:
-    #             assert((existing is None) or (existing is frame))
-    #         if existing is None:
-    #             self._frame_items[frame.uuid] = frame
-
     def _del_track(self, track):
         raise NotImplementedError("NYI")  # FIXME
 
@@ -242,22 +219,6 @@ class QFramesInTracksScene(QGraphicsScene):
     #
     # track management
     #
-
-    # @property
-    # def _current_tracks_order(self):
-    #     L = dict((trk.z, trk) for trk in self._track_items.values())
-    #     n = max(L.keys())
-    #     if len(L) != n:
-    #         raise AssertionError("inconsistency in z-order of tracks; expected {} but have {}".format(n, len(L)))
-    #     for q in range(n):
-    #         yield L[q]  # raises if we're missing a track
-    #
-    # @property
-    # def _current_tracks_uuid_order(self):
-    #     for trk in self._current_tracks_order:
-    #         yield trk.uuid
-
-    # FUTURE: look at handling z-order hijinks with a uwsift.common.ZList and removing .z from QTrackItem
 
     @property
     def _track_order(self) -> Mapping[int, QTrackItem]:
@@ -359,35 +320,6 @@ class QFramesInTracksScene(QGraphicsScene):
                 changed.append(bub)
         return changed, inserting_above_z
 
-    # REMOVED since QTrackItem and QFrameItem cannot be created without a scene
-    # def insert_track(self, trk: QTrackItem) -> Sequence[QTrackItem]:
-    #     """Insert a track, if necessary displacing z orders such that old track at same z order is beneath
-    #     return list of any QTrackItems that had to have their zorder changed
-    #     """
-    #     # zord = self._track_order
-    #     # if trk.z not in zord:
-    #     #     if (trk.track in set(zord.values())) and (trk is not self._track_items[trk.track]):
-    #     #         raise AssertionError("remove track {} before replacing it with a new one".format(trk.track))
-    #     #     if trk.z >= 0:  # nudge it to the contiguous top
-    #     #         LOG.debug("placing {} at top of stack", trk.track)
-    #     #         trk.z = self._track_max_z + 1
-    #     #     else:
-    #     #         LOG.debug("placing {} at bottom of stack", trk.track)
-    #     #         trk.z = min(zord.keys()) - 1
-    #     #     self._track_items[trk.track] = trk
-    #     #     return [trk]
-    #     assert(trk not in list(self._track_items.values()))
-    #     changed, final_z = self._shift_zorders_to_open(trk.z)
-    #     trk.z = final_z
-    #     LOG.info("placing {} at zorder {}".format(trk.track, final_z))
-    #     self._track_items[trk.track] = trk
-    #     self.addItem(trk)
-    #     trk.scene = self
-    #     self._verify_z_contiguity()
-    #     self.propagate_max_z()
-    #     self.update()
-    #     return changed
-
     def move_track(self, trk: QTrackItem, new_z: int) -> Sequence[QTrackItem]:
         """Change track z-order after it's been inserted
         return list of tracks that had their z-order shifted
@@ -403,12 +335,6 @@ class QFramesInTracksScene(QGraphicsScene):
         self.propagate_max_z()
         self.update()
         return [trk] + list(all_changes)
-
-    # def select_tracks_by_metadata(self, key, value):
-    #     raise NotImplementedError("NYI")
-    #
-    # def select_frames_by_metadata(self, key, value):
-    #     raise NotImplementedError("NYI")
 
     #
     # high-level signals from scene to hook to other parts of application
@@ -488,7 +414,6 @@ class QFramesInTracksScene(QGraphicsScene):
         Does not add new items for tracks and frames already present
         Parameters serve only as hints
         """
-        # super(QFramesInTracksScene, self).update()
         return 0
 
 
@@ -497,7 +422,6 @@ class TestScene(QFramesInTracksScene):
 
     def __init__(self, *args, **kwargs):
         super(TestScene, self).__init__(*args, **kwargs)
-        # assert(hasattr(self, '_track_order'))
 
     def update(self, changed_tracks: Optional[Set[str]] = None, changed_frame_uuids: Optional[Set[UUID]] = None) -> int:
         if self._did_populate:
@@ -516,7 +440,6 @@ class TestScene(QFramesInTracksScene):
         def minutes_td(minutes):
             return timedelta(minutes=minutes)
 
-        # assert(hasattr(self, '_track_order'))
         self._span = Span(once - minutes_td(10), minutes_td(30))
         track0 = QTrackItem(
             self,
@@ -527,7 +450,6 @@ class TestScene(QFramesInTracksScene):
             "test track",
             tooltip="peremptorily cromulent",
         )
-        # scene.addItem(abitrack)  # done in init
         frame01 = QFrameItem(
             track0,
             self.coords,
@@ -557,20 +479,11 @@ class TestScene(QFramesInTracksScene):
             "ahi1",
             "JP04",
         )
-        # self.insert_track(track0)
-        # self.insert_track(track1)
-        # assert(hasattr(self, '_propagate_max_z'))
+
         self.propagate_max_z()
         for track in [track0, track1]:
             track.update_pos_bounds()
             track.update_frame_positions()
-        # scene.addItem(frame1)  # done in init
-        # blabla = QGraphicsTextItem('abcdcba')
-        # font = QFont('White Rabbit')
-        # blabla.setFont(font)
-        # blabla.setPos(140, 100)
-        # self.addItem(blabla)
-        # blabla = None
         self.content = [track0, frame01, track1, frame11]
 
 
@@ -595,38 +508,17 @@ class TestWindow(QMainWindow):
 
     def __init__(self, scene, *args, **kwargs):
         super(TestWindow, self).__init__(*args, **kwargs)
-        # self.windowTitleChanged.connect(self.onWindowTitleChange)
         self.setWindowTitle("timeline unit test")
-
-        # toolbar = QToolBar("och")
-        # toolbar.setIconSize(QSize(20,20))
-        # self.addToolBar(toolbar)
-
-        # button_action = QAction(QIcon("balance.png"), "ochtuse", self)
-        # button_action.setStatusTip("och, just do something")
-        # button_action.triggered.connect(self.onMyToolBarButtonClick)
-        # button_action.setCheckable(True)
-        # # button_action.setShortcut(QKeySequence("Ctrl+p"))
-        # # button_action.setShortcut(QKeySequence(Qt.CTRL + Qt.Key_P))
-        # button_action.setShortcut(QKeySequence.Print)
-        # toolbar.addAction(button_action)
-        # toolbar.addWidget(QLabel("OCH"))
-        # toolbar.addWidget(QCheckBox())
 
         self.setStatusBar(QStatusBar(self))
 
         menu = self.menuBar()
 
         file_menu = menu.addMenu("&File")
-        # file_menu.addAction(button_action)
-        # file_menu.addSeparator()
         file_menu.addMenu("Do not push")
-        #        file_menu.addAction()
 
         self._scene = scene
         gfx = self._gfx = QFramesInTracksView(self)
-        # label = QLabel("och!")
-        # label.setAlignment(Qt.AlignCenter)
 
         # ref https://doc.qt.io/archives/qq/qq26-openglcanvas.html
         self.setCentralWidget(gfx)
@@ -634,22 +526,6 @@ class TestWindow(QMainWindow):
         scene.setSceneRect(QRectF(0, 0, 800, 600))
         gfx.setScene(scene)
 
-        # populate fills the scene with interesting stuff.
-        # self.populate()
-
-        # Make it bigger
-        # self.setWindowState(Qt.WindowMaximized)
-
-        # Well... it's going to have an animation, ok?
-
-        # So, I set a timer to 1 second
-        # self.animator=QTimer()
-
-        # And when it triggers, it calls the animate method
-        # self.animator.timeout.connect(self.animate)
-
-        # And I animate it once manually.
-        # self.animate()
         self.show()
         self.raise_()
 

@@ -70,7 +70,6 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
     def _sync_track(self, qti: QTrackItem, z: int, trk: TrackInfo):
         qti.z = z
         qti.state = trk.state
-        # qti.update()
 
     def _create_track(self, z: int, trk: TrackInfo) -> QTrackItem:
         qti = QTrackItem(self, self.coords, trk.track, z, trk.primary, trk.secondary)
@@ -91,7 +90,6 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
 
     def _sync_frame(self, qfi: QFrameItem, frm: FrameInfo):
         qfi.state = _translate_to_visual_state(frm.state)
-        # qfi.update()
 
     def _purge_orphan_tracks_frames(self, tracks: Iterable[str], frames: Iterable[UUID]):
         """Remove QTrackItem and QFrameItem instances that no longer correspond to document content"""
@@ -177,12 +175,6 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         if None in all_frame_items:
             LOG.debug("a frame did not exist to update, have to refresh everything")
             self._invalidate()
-        # LOG.warning("UNIMPLEMENTED: update display state for {} layers".format(len(uuid_vis)))
-
-    # def _reorder_tracks_given_layer_order(self, new_order: tuple):
-    #     # user dragged layer list around;
-    #     # .as_layer_list should have updated the document track order for us a didReorderTracks
-    #     self._invalidate()
 
     def _connect_signals(self, doc: Document, ws: BaseWorkspace):
         """Connect document, workspace, signals in order to invalidate and update scene representation"""
@@ -208,13 +200,6 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
 
         doc.didChangeLayerName.connect(refresh_product_new_name)
 
-        # def refresh_track_order(self, added_tracks, removed_tracks, ts=self):
-        #     pass
-        # doc.didReorderTracks.connect(refresh_track_order)
-
-        # doc.didReorderDatasets.connect(self._reorder_tracks_given_layer_order)
-        # doc.didChangeComposition.connect(self._invalidate)
-
         def refresh(changed_uuids, ts=self, *args, **kwargs):
             LOG.debug("updating timeline for {} changed products".format(len(changed_uuids)))
             ts.sync_available_tracks()
@@ -227,13 +212,6 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
             self._sync_and_update_frame(uuid)
 
         ws.didChangeProductState.connect(refresh_product)
-
-    # def get(self, uuid: UUID) -> [QTrackItem, QFrameItem, None]:
-    #     z = self._track_items.get(uuid, None)
-    #     if z is not None:
-    #         return z
-    #     z = self._frame_items.get(uuid, None)
-    #     return z
 
     def may_rearrange_track_z_order(self, track_list: List[str]) -> Optional[Callable[[bool], None]]:
         """Determine whether tracks can be rearranged and provide a commit/abort function if so
@@ -323,48 +301,3 @@ class SiftDocumentAsFramesInTracks(QFramesInTracksScene):
         if not acted:
             self._invalidate()
         self.update()
-
-
-# def _debug(type, value, tb):
-#     "enable with sys.excepthook = debug"
-#     if not sys.stdin.isatty():
-#         sys.__excepthook__(type, value, tb)
-#     else:
-#         import traceback, pdb
-#         traceback.print_exception(type, value, tb)
-#         # …then start the debugger in post-mortem mode.
-#         pdb.post_mortem(tb)  # more “modern”
-#
-#
-# def main():
-#     import argparse
-#     parser = argparse.ArgumentParser(
-#         description="PURPOSE",
-#         epilog="",
-#         fromfile_prefix_chars='@')
-#     parser.add_argument('-v', '--verbose', dest='verbosity', action="count", default=0,
-#                         help='each occurrence increases verbosity 1 level through ERROR-WARNING-Info-DEBUG')
-#     parser.add_argument('-d', '--debug', dest='debug', action='store_true',
-#                         help="enable interactive PDB debugger on exception")
-#     parser.add_argument('inputs', nargs='*',
-#                         help="input files to process")
-#     args = parser.parse_args()
-#
-#     levels = [logging.ERROR, logging.WARN, logging.Info, logging.DEBUG]
-#     logging.basicConfig(level=levels[min(3, args.verbosity)])
-#
-#     if args.debug:
-#         sys.excepthook = _debug
-#
-#     if not args.inputs:
-#         unittest.main()
-#         return 0
-#
-#     for pn in args.inputs:
-#         pass
-#
-#     return 0
-
-
-# if __name__ == '__main__':
-#     sys.exit(main())

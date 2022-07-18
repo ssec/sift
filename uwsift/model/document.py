@@ -245,21 +245,6 @@ class DocumentAsContextBase(object):
                 else:
                     break
 
-
-# class DocumentAsContext(DocumentAsContextBase):
-#     def __enter__(self):
-#         raise NotImplementedError()
-#
-#     def __exit__(self, exc_type, exc_val, exc_tb):
-#         if exc_val is not None:
-#             # abort code
-#             pass
-#         else:
-#             # commit code
-#             pass
-#         raise NotImplementedError()
-
-
 ###################################################################################################################
 
 
@@ -344,11 +329,6 @@ class DocumentAsLayerStack(DocumentAsContextBase):
     def prez_for_uuids(self, uuids, lset=None):
         for uuid in uuids:
             yield self.prez_for_uuid(uuid)
-        # if lset is None:
-        #     lset = self.current_layer_set
-        # for p in lset:
-        #     if p.uuid in uuids:
-        #         yield p
 
     def colormap_for_uuids(self, uuids, lset=None):
         for p in self.prez_for_uuids(uuids, lset=lset):
@@ -362,15 +342,12 @@ class DocumentAsLayerStack(DocumentAsContextBase):
         # Limit ourselves to what information
         # in the future valid range may be different than the default CLIMs
         return self._layer_info_for_uuid(uuid).climits
-        # return self[uuid][Info.CLIM]
 
     def convert_value(self, uuid, x, inverse=False):
         return self._layer_info_for_uuid(uuid).f_convert(x, inverse=inverse)
-        # return self[uuid][Info.UNIT_CONVERSION][1](x, inverse=inverse)
 
     def format_value(self, uuid, x, numeric=True, units=True):
         return self._layer_info_for_uuid(uuid).f_format(x, numeric=numeric, units=units)
-        # return self[uuid][Info.UNIT_CONVERSION][2](x, numeric=numeric, units=units)
 
     def __len__(self):
         """Return active track count"""
@@ -428,7 +405,6 @@ class FrameInfo(typ.NamedTuple):
     state: Flags  # logical state for timeline to display with color and glyphs
     primary: str  # primary description for timeline, e.g. "G16 ABI B06"
     secondary: str  # secondary description, typically time information
-    # thumb: QImage  # thumbnail image to embed in timeline item
 
 
 class TrackInfo(typ.NamedTuple):
@@ -491,42 +467,6 @@ class DocumentAsTrackStack(DocumentAsContextBase):
     def top_z(self) -> int:
         return self.doc.track_order.top_z
 
-    # def track_order_at_time(self, when:datetime = None,
-    #                         only_active=False,
-    #                         include_products=True
-    #                         ) -> T.Iterable[T.Tuple[int, str, T.Optional[Product]]]:
-    #     """List of tracks from highest Z order to lowest, at a given time;
-    #     (zorder, track) pairs are returned, with zorder>=0 being "part of the document" and
-    #     <0 being "available but nothing activated"
-    #     include_products implies (zorder, track, product-or-None) tuples be yielded;
-    #     otherwise tracks without products are not yielded
-    #     Inactive tracks can be filtered by stopping iteration when zorder<0
-    #     tracks are returned as track-name strings
-    #     Product instances are readonly metadatabase entries
-    #     defaults to current document time
-    #     """
-    #     if when is None:
-    #         when = self.doc.playhead_time
-    #     if when is None:
-    #         raise RuntimeError("unknown time for iterating track order, animation likely in progress")
-    #     with self.mdb as s:
-    #         que = s.query(Product).filter((Product.obs_time < when) and (
-    #                                       (Product.obs_time + Product.obs_duration) <= when))
-    #         if only_active:
-    #             famtab = dict((track, z) for (z, track) in self.doc.track_order.enumerate() if z>=0)
-    #             active_families = set(famtab.keys())
-    #             que = s.filter((Product.family + FCS_SEP + Product.category) in active_families)
-    #         else:
-    #             famtab = dict((track, z) for (z, track) in self.doc.track_order.enumerate())
-    #         prods = list(que.all())
-    #         # sort into z order according to document
-    #         if include_products:
-    #             zult = [(famtab[p.track], p.track, p) for p in prods]
-    #         else:
-    #             zult = [(famtab[p.track], p.track) for p in prods]
-    #         zult.sort(reverse=True)
-    #         return zult
-
     def enumerate_track_names(self, only_active=False) -> typ.Iterable[typ.Tuple[int, str]]:
         """All the names of the tracks, from highest zorder to lowest
 
@@ -539,29 +479,10 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 break
             yield z, track
 
-    # def product_state(self, *product_uuids: T.Iterable[UUID]) -> T.Iterable[Flags]:
-    #     """Merge document and workspace state information on a given sequence of products
-    #     """
-    #     uuids = list(product_uuids)
-    #     warnings.warn("old-model query of product states, this is a crutch")
-    #     # FIXME: implement using new model
-    #     cls = self.doc.current_layer_set
-    #     ready_uuids = {x.uuid for x in cls}
-    #     if not uuids:
-    #         uuids = list(ready_uuids)
-    #     for uuid in uuids:
-    #         s = set()
-    #         if uuid in ready_uuids:
-    #             s.add(State.READY)
-    #         # merge state from workspace
-    #         s.update(self.ws.product_state(uuid))
-    #         yield s
-
     def product_state(self, uuid: UUID) -> Flags:
         """Merge document state with workspace state"""
         s = Flags()
         s.update(self.ws.product_state(uuid))
-        # s.update(self.doc.product_state.get(prod.uuid) or Flags())
         return s
 
     def frame_info_for_product(
@@ -591,8 +512,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
             # FIXME: new model old model
             state=self.product_state(prod.uuid),
             primary=dn,
-            secondary=dt,  # prod.obs_time.strftime("%Y-%m-%d %H:%M:%S")
-            # thumb=
+            secondary=dt,
         )
         return fin
 
@@ -607,7 +527,6 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                 fam, ctg = track.split(FCS_SEP)
                 LOG.debug("yielding TrackInfo and FrameInfos for {}".format(track))
                 frames = []
-                # fam_nfo = self.doc.family_info(fam)
                 que = s.query(Product).filter((Product.family == fam) & (Product.category == ctg))
                 for prod in que.all():
                     frm = self.frame_info_for_product(prod, when_overlaps=when)
@@ -625,7 +544,7 @@ class DocumentAsTrackStack(DocumentAsContextBase):
                     when=track_span,
                     frames=frames,
                     state=Flags(),  # FIXME
-                    primary=" ".join(reversed(fam.split(FCS_SEP))),  # fam_nfo[Info.DISPLAY_FAMILY],
+                    primary=" ".join(reversed(fam.split(FCS_SEP))),
                     secondary=" ".join(reversed(ctg.split(FCS_SEP))),
                 )
                 yield z, trk
@@ -718,7 +637,6 @@ class DocumentAsTrackStack(DocumentAsContextBase):
 
     def deactivate_track(self, track: str):
         LOG.debug("deactivate_track {}".format(track))
-        # time_range: Span = self.timeline_span
         pit = self._products_in_track(track)
         if pit:
             self.deactivate_frames(*pit)
@@ -730,7 +648,6 @@ class DocumentAsTrackStack(DocumentAsContextBase):
 
     def activate_track(self, track: str):
         """Activate a track, nudging all frames in the active time range into active state"""
-        # time_range: Span = self.timeline_span
         pit = self._products_in_track(track)
         if pit:
             self.activate_frames(*pit)
@@ -739,12 +656,6 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         # send a refresh to the timeline display and layer list
         self._finally(self.doc.didReorderTracks.emit, {track}, set())
         LOG.debug("activate_track {}".format(track))
-
-    # def activate_track_time_range(self, track: str, when: Span, activate: bool=True):
-    #     pass
-    #
-    # def disable_track(self, track:str):
-    #     pass
 
     def move_track(self, track: str, to_z: int):
         was_inactive = self.doc.track_order.move(to_z, track) < 0
@@ -756,8 +667,6 @@ class DocumentAsTrackStack(DocumentAsContextBase):
             else:
                 LOG.debug("activating track {}".format(track))
                 self.activate_track(track)
-
-    # def reorder_tracks(self, new_order: T.Iterable[T.Tuple[int, str]]):
 
     def tracks_in_family(self, family: str, only_active: bool = True) -> typ.Sequence[str]:
         """yield track names in document that share a common family"""
@@ -777,11 +686,6 @@ class DocumentAsTrackStack(DocumentAsContextBase):
         # that will require making sure that the z-order matches the layer list order and vice versa
         # delay that transition until we're fully over to a track-centric model, since layer-centric
         # model can have products from multiple tracks stacked in random z order
-
-    # @property
-    # def _deferring(self):
-    #     "Am I a deferred-action context or an immediate context helper"
-    #     return self._actions is not None
 
     def __init__(self, *args, as_readwrite_context=False, **kwargs):
         super(DocumentAsTrackStack, self).__init__(*args, **kwargs)
@@ -936,12 +840,6 @@ class DocumentAsAnimationSequence(DocumentAsContextBase):
         """
         return []
 
-    # @property
-    # def prez_id(self) -> T.Any:
-    #     """An immutable hashable unique which changes when any presentation in the document changes
-    #     :return:
-    #     """
-
     @property
     def family_presentation(self) -> typ.Mapping[str, Presentation]:
         """Mapping of families to their presentation tuples.
@@ -1075,7 +973,6 @@ class DataLayer:
         uuids_tstamps_asc = sorted(uuids_timestamps, key=lambda tup: tup[1])
         # Create timeline according to temporal resolution
 
-        # maps: timestamp -> uuid
         self.timeline = {uuid_dt_tup[1]: uuid_dt_tup[0] for uuid_dt_tup in uuids_tstamps_asc}
 
     def t_matched_uuid(self) -> typ.Optional[UUID]:
@@ -1313,7 +1210,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         dict
     )  # dict of {uuid: (value, normalized_value_within_clim)} for equalizer display
     didChangeProjection = pyqtSignal(str)  # name of projection (area definition)
-    # didChangeShapeLayer = pyqtSignal(dict)
     didAddFamily = pyqtSignal(str, dict)  # name of the newly added family and dict of family info
     didRemoveFamily = pyqtSignal(str)  # name of the newly added family and dict of family info
     didReorderTracks = pyqtSignal(set, set)  # added track names, removed track names
@@ -1615,17 +1511,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # one layer that represents all the layers in this family
         family_rep = self[self._families[family][0]]
 
-        # convert family subcategory to displayable name
-        # if isinstance(family[2], UUID):
-        #     # RGB Recipes, this needs more thinking
-        #     display_family = family_rep[Info.SHORT_NAME]
-        # elif not isinstance(family[2], str):
-        #     display_family = "{:.02f} µm".format(family[2])
-        # else:
-        #     display_family = family[2]
         family_name_components = family.split(":")
         display_family = family_rep[Info.SHORT_NAME] + " " + " ".join(reversed(family_name_components))
-        # display_family = str(family)
 
         # NOTE: For RGBs the SHORT_NAME will update as the RGB changes
         return {
@@ -2022,7 +1909,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         else:
             consult_guide = self.time_siblings
         sibs, dex = consult_guide(uuid)
-        # LOG.debug('layer {0} family is +{1} of {2!r:s}'.format(uuid, dex, sibs))
         if not sibs:
             LOG.info("nothing to do in next_last_timestep")
             self.toggle_layer_visibility(uuid, True)
@@ -2473,8 +2359,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # be passed to methods of data_layer_collection
         # self.create_data_layers()
         # TODO(mk) pull create_data_layers into DataLayerCollection
-        # self.data_layer_collection = DataLayerCollection(self.data_layers)
-        # self.data_layer_collection.notify_extend_collection(self.data_layers)
         if sibling_infos is None:
             sibling_infos = self._layer_with_uuid
         it = sibling_infos.get(uuid, None)
@@ -2503,30 +2387,3 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for requested_uuid in uuids:
             for sibling_uuid in self.time_siblings(requested_uuid, sibling_infos=sibling_infos)[0]:
                 yield sibling_uuid
-
-
-#
-# class DocumentTreeBranch(QObject):
-#     pass
-#
-# class DocumentTreeLeaf(QObject):
-#     pass
-#
-#
-# class DocumentAsLayerTree(QObject):
-#     """
-#      DocumentAsLayerTree is a facet or wrapper (if it were a database, it would be a view; but view is already taken)
-#      It allows the layer controls - specifically a LayerStackTreeViewModel - to easily access and modify
-#      the document on behalf of the user.
-#      It includes both queries for display and changes which then turn into document updates
-#      The base model is just a list of basic layers.
-#      Composite and Algebraic layers, however, are more like folders.
-#      Other additional layer types may also have different responses to being dragged or having items dropped on them
-#     """
-#
-#     def __init__(self, doc, *args, **kwargs):
-#         self._doc = doc
-#         super(DocumentAsLayerTree, self).__init__()
-#
-#     def
-#

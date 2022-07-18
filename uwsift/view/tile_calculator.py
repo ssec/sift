@@ -67,40 +67,6 @@ def get_reference_points(img_cmesh, img_vbox):
 
     return ref_idx_1, near_points_2[0]
 
-
-# @jit(nb_types.UniTuple(int64, 2)(float64[:, :], boolean[:, :]))
-# def get_reference_points_image(img_dist, valid_mask):
-#     """Get two image reference point indexes close to image center.
-#
-#     This function will return the two nearest reference points to the
-#     center of the image. The argument `img_vbox` is an array of points
-#     across the image that can be successfully projected to the viewed
-#     projection.
-#
-#     :param img_dist: (N, 2) array of distances from the image center
-#                      in image space for points that can be projected
-#                      to the viewed projection
-#     :return: (reference array index 1, reference array index 2)
-#     :raises: ValueError if not enough valid points to create
-#              two reference points
-#     """
-#     # Sort points by nearest to further from the 0,0 center of the canvas
-#     # Uses a cheap Pythagorean theorem by summing X + Y
-#     near_points = np.sum(np.abs(img_dist), axis=1)
-#     near_points[~valid_mask] = np.inf
-#     near_points = near_points.argsort()
-#     ref_idx_1 = near_points[0]
-#     if np.isinf(near_points[ref_idx_1]):
-#         raise ValueError("Could not determine reference points")
-#     # pick a second reference point that isn't in the same row or column as the first
-#     near_points_2 = near_points[~np.isclose(img_dist[near_points][:, 0], img_dist[ref_idx_1][0]) &
-#                                 ~np.isclose(img_dist[near_points][:, 1], img_dist[ref_idx_1][1])]
-#     if near_points_2.shape[0] == 0:
-#         raise ValueError("Could not determine reference points")
-#
-#     return ref_idx_1, near_points_2[0]
-
-
 @jit(
     nb_types.UniTuple(float64, 2)(float64[:, :], float64[:, :], nb_types.UniTuple(int64, 2)),
     nopython=True,

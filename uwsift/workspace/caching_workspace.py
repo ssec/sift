@@ -161,8 +161,6 @@ class CachingWorkspace(BaseWorkspace):
             for r in resall:
                 if not r.exists():
                     LOG.info("resource {} no longer exists, purging from database")
-                    # for p in r.product:
-                    #     p.resource.remove(r)
                     n_purged += 1
                     s.delete(r)
         LOG.info("discarded metadata for {} orphaned resources".format(n_purged))
@@ -186,9 +184,6 @@ class CachingWorkspace(BaseWorkspace):
 
     def _migrate_metadata(self):
         """Replace legacy metadata uses with new uses."""
-        # with self._inventory as s:
-        #     for p in s.query(Product).all():
-        #         pass
 
     def _bgnd_startup_purge(self):
         ntot = 5
@@ -222,8 +217,6 @@ class CachingWorkspace(BaseWorkspace):
         for _ in self._bgnd_startup_purge():
             # SIFT/sift#180 -- background thread of lengthy database operations can cause lock failure in pysqlite
             pass
-        # self._queue.add("database cleanup", self._bgnd_startup_purge(), "database cleanup",
-        #           interactive=False, and_then=self._then_refresh_mdb_customers)
 
     def _store_inventory(self):
         """
@@ -335,7 +328,6 @@ class CachingWorkspace(BaseWorkspace):
 
     def _native_content_for_uuid(self, uuid: UUID) -> np.memmap:
         # FUTURE: do a compound query for this to get the Content entry
-        # prod = self._product_with_uuid(uuid)
         with self._inventory as s:
             nac = self._product_native_content(s, uuid=uuid)
             arrays = self._cached_arrays_for_content(nac)
@@ -439,8 +431,6 @@ class CachingWorkspace(BaseWorkspace):
                 )
                 if len(hits) >= 1:
                     content = hits[0]  # presumably this is closest to LOD_OVERVIEW
-                    # if len(hits)>1:
-                    #     LOG.warning('more than one Content found suitable, there can be only one')
                     cac = self._cached_arrays_for_content(content)
                     if not cac:
                         LOG.error("unable to attach content")
@@ -557,15 +547,12 @@ class CachingWorkspace(BaseWorkspace):
 
     def close(self):
         self._clean_cache()
-        # self._S.commit()
 
     def bgnd_task_complete(self):
         """
         handle operations that should be done at the end of a threaded background task
         """
         pass
-        # self._S.commit()
-        # self._S.remove()
 
     def get_metadata(self, uuid_or_path):
         """
@@ -610,7 +597,6 @@ class CachingWorkspace(BaseWorkspace):
         with self._inventory as import_session:
             # FUTURE: consider returning importers instead of products,
             # since we can then re-use them to import the content instead of having to regenerate
-            # import_session = self._S
             importers = []
             num_products = 0
             remaining_paths = []
@@ -665,9 +651,7 @@ class CachingWorkspace(BaseWorkspace):
                 for prod in hauler.merge_products():
                     assert prod is not None
                     # merge the product into our database session, since it may belong to import_session
-                    zult = frozendict(prod.info)  # self._S.merge(prod)
-                    # LOG.debug('yielding product metadata for {}'.format(
-                    #     zult.get(Info.DISPLAY_NAME, '?? unknown name ??')))
+                    zult = frozendict(prod.info)
                     yield num_products, zult
 
     def import_product_content(
@@ -679,7 +663,6 @@ class CachingWorkspace(BaseWorkspace):
         **importer_kwargs,
     ) -> np.memmap:
         with self._inventory as S:
-            # S = self._S
             if prod is None and uuid is not None:
                 prod = self._product_with_uuid(S, uuid)
 
@@ -713,35 +696,16 @@ class CachingWorkspace(BaseWorkspace):
                 # data updates are coming back to us (eventually asynchronously)
                 # Content is in the metadatabase and being updated + committed, including sparsity and coverage arrays
                 if update.data is not None:
-                    # data = update.data
                     LOG.info("{} {}: {:.01f}%".format(name, update.stage_desc, update.completion * 100.0))
-            # self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
             LOG.debug("received {} updates during import".format(nupd))
             uuid = prod.uuid
             self.clear_product_state_flag(prod.uuid, State.ARRIVING)
-        # S.commit()
-        # S.flush()
 
         # make an ActiveContent object from the Content, now that we've imported it
         ac = self._overview_content_for_uuid(uuid, kind=default_prod_kind)
         if ac is None:
             return None
         return ac.data
-
-    # def _preferred_cache_path(self, uuid):
-    #     filename = str(uuid)
-    #     return self._ws_path(filename)
-    #
-    # def _convert_to_memmap(self, uuid, data:np.ndarray):
-    #     if isinstance(data, np.memmap):
-    #         return data
-    #     # from tempfile import TemporaryFile
-    #     # fp = TemporaryFile()
-    #     pathname = self._preferred_cache_path(uuid)
-    #     fp = open(pathname, 'wb+')
-    #     mm = np.memmap(fp, dtype=data.dtype, shape=data.shape, mode='w+')
-    #     mm[:] = data[:]
-    #     return mm
 
     def _create_product_from_array(
         self, info: Info, data, namespace=None, codeblock=None
@@ -804,7 +768,6 @@ class CachingWorkspace(BaseWorkspace):
 
         # activate the content we just loaded into the workspace
         overview_data = self._overview_content_for_uuid(uuid)
-        # prod = self._product_with_uuid(S, uuid)
         return uuid, self.get_info(uuid), overview_data
 
     def _bgnd_remove(self, uuid: UUID):
@@ -830,10 +793,8 @@ class CachingWorkspace(BaseWorkspace):
             uuid = UUID(dsi_or_uuid)
         else:
             uuid = dsi_or_uuid[Info.UUID]
-        # prod = self._product_with_uuid(dsi_or_uuid)
         # TODO: this causes a locking exception when run in a secondary thread.
         #  Keeping background operations lightweight makes sense however, so just review this
-        # prod.touch()
         with self._inventory as s:
 
             if kind == Kind.IMAGE:
@@ -852,8 +813,6 @@ class CachingWorkspace(BaseWorkspace):
             if not len(content) or not content[0]:
                 raise AssertionError("no content in workspace for {}, must re-import".format(uuid))
             content = content[0]
-            # content.touch()
-            # self._S.commit()  # flush any pending updates to workspace db file
 
             # FIXME: find the content for the requested LOD, then return its
             #  ActiveContent - or attach one
@@ -866,18 +825,3 @@ class CachingWorkspace(BaseWorkspace):
             return
         for c in p.content:
             self._available.pop(c.id, None)
-
-    # NOTE: when using this function in future, decide whether data flipping needs to be considered
-    # def _create_position_to_index_transform(self, dsi_or_uuid):
-    #     info = self.get_info(dsi_or_uuid)
-    #     origin_x = info[Info.ORIGIN_X]
-    #     origin_y = info[Info.ORIGIN_Y]
-    #     cell_width = info[Info.CELL_WIDTH]
-    #     cell_height = info[Info.CELL_HEIGHT]
-    #
-    #     def _transform(x, y, origin_x=origin_x, origin_y=origin_y, cell_width=cell_width, cell_height=cell_height):
-    #         col = (x - info[Info.ORIGIN_X]) / info[Info.CELL_WIDTH]
-    #         row = (y - info[Info.ORIGIN_Y]) / info[Info.CELL_HEIGHT]
-    #         return col, row
-    #
-    #     return _transform

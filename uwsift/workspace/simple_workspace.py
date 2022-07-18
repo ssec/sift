@@ -336,11 +336,8 @@ class SimpleWorkspace(BaseWorkspace):
                 LOG.info("{} {}: {:.01f}%".format(name, update.stage_desc, update.completion * 100.0))
             if update.content is not None:
                 self.contents[update.uuid] = update.content
-        # self._data[uuid] = data = self._convert_to_memmap(str(uuid), data)
         LOG.debug("received {} updates during import".format(nupd))
         self.clear_product_state_flag(prod.uuid, State.ARRIVING)
-        # S.commit()
-        # S.flush()
 
         # make an ActiveContent object from the Content, now that we've imported it
         ac = self._overview_content_for_uuid(

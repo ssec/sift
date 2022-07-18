@@ -48,13 +48,8 @@ class LayerModel(QAbstractItemModel):
     didUpdateLayers = pyqtSignal()
     didReorderLayers = pyqtSignal(list)
     didFinishActivateProductDatasets = pyqtSignal()
-    # didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
-
-    # --------------- Adding layers derived from existing layers ---------------
-    # didAddCompositeLayer = pyqtSignal(tuple, UUID, Presentation)
 
     # ----------------------- Removing existing layers -------------------------
-    # didDeleteLayer = pyqtSignal(UUID)
     didDeleteProductDataset = pyqtSignal(UUID)
     # ---------------------- Request creation of Recipes -----------------------
     # object should be a List[Optional[UUID]]
@@ -63,7 +58,6 @@ class LayerModel(QAbstractItemModel):
     didRequestAlgebraicRecipeCreation = pyqtSignal(object)
 
     # --------------------------------------------------------------------------
-    # didChangeImageKind = pyqtSignal(dict)
 
     didActivateProductDataset = pyqtSignal(UUID, bool)
     # The parameter here should be a list, but in some cases PyQt has problems

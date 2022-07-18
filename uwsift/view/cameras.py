@@ -37,23 +37,6 @@ LOG = logging.getLogger(__name__)
 class PanZoomProbeCamera(PanZoomCamera):
     """Camera that maps mouse presses to events for probing."""
 
-    # def viewbox_mouse_event(self, event):
-    #     """
-    #     The SubScene received a mouse event; update transform
-    #     accordingly.
-    #
-    #     Parameters
-    #     ----------
-    #     event : instance of Event
-    #         The event.
-    #     """
-    #     if event.handled or not self.interactive:
-    #         return
-    #
-    #     # Scrolling
-    #     BaseCamera.viewbox_mouse_event(self, event)
-    #     event.handled = False
-
     def __init__(self, *args, **kwargs):
         self._pan_limits = kwargs.pop("pan_limits", None)
         self._zoom_limits = kwargs.pop("zoom_limits", (0.001, 0.001))
@@ -98,36 +81,6 @@ class PanZoomProbeCamera(PanZoomCamera):
         else:
             rect = Rect(args)
 
-        # THIS DOESN'T WORK. The `rect` object doesn't represent a fixed coordinate system
-        # (0 and 1 have different meanings at different zoom levels)
-
-        # Limit how far we can pan and zoom out
-        # if self.parent.transform
-        # if rect.left >= self._pan_limits[2]:
-        #     print("To far right")
-        #     return
-        # elif rect.left <= self._pan_limits[0]:
-        #     print("To far left")
-        #     return
-        # if self._pan_limits is not None:
-        #     new_left = np.clip(rect.left, self._pan_limits[0] - self._zoom_limits[0], self._pan_limits[2])
-        #     new_right = np.clip(rect.right, self._pan_limits[0], self._pan_limits[2] + self._zoom_limits[0])
-        #     new_bottom = np.clip(rect.bottom, self._pan_limits[1] - self._zoom_limits[0], self._pan_limits[3])
-        #     new_top = np.clip(rect.top, self._pan_limits[1], self._pan_limits[3] + self._zoom_limits[1])
-        # else:
-        #     new_left = rect.left
-        #     new_right = rect.right
-        #     new_bottom = rect.bottom
-        #     new_top = rect.top
-        #
-        # # Limit how far we can zoom in
-        # new_size_x = new_right - new_left
-        # new_size_y = new_top - new_bottom
-        # if self._zoom_limits is not None:
-        #     new_size_x = max(new_size_x, self._zoom_limits[0])
-        #     new_size_y = max(new_size_y, self._zoom_limits[1])
-        # rect = Rect(new_left, new_bottom, new_size_x, new_size_y)
-
         if self._rect != rect:
             self._rect = rect
             self.view_changed()
@@ -147,7 +100,6 @@ class PanZoomProbeCamera(PanZoomCamera):
 
         # Scrolling
         BaseCamera.viewbox_mouse_event(self, event)
-        # print("In camera event: ", event.button, event.buttons, event.mouse_event.modifiers)
 
         if event.type == "mouse_wheel":
             center = self._scene_transform.imap(event.pos)

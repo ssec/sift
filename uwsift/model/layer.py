@@ -436,21 +436,3 @@ class DocAlgebraicDataset(DocCompositeDataset):
     """
 
     pass
-
-
-# class DocMapLayer(DocLayer):
-#     """
-#     FUTURE: A layer containing a background map as vector
-#     """
-#     pass
-#
-# class DocShapeLayer(DocLayer):
-#     """
-#     FUTURE: A layer represented in the scene graph as an editable shape
-#     """
-#     pass
-#
-# class DocProbeLayer(DocShapeLayer):
-#     """
-#     FUTURE: A shape layer which feeds probe values to another UI element or helper.
-#     """

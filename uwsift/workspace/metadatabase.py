@@ -63,42 +63,6 @@ from uwsift.common import FCS_SEP, Info
 
 LOG = logging.getLogger(__name__)
 
-#
-# ref   http://docs.sqlalchemy.org/en/latest/_modules/examples/vertical/dictlike.html
-#
-
-# class ProxiedDictMixin(object):
-#     """Adds obj[key] access to a mapped class.
-#
-#     This class basically proxies dictionary access to an attribute
-#     called ``_proxied``.  The class which inherits this class
-#     should have an attribute called ``_proxied`` which points to a dictionary.
-#
-#     """
-#
-#     def __len__(self):
-#         return len(self._proxied)
-#
-#     def __iter__(self):
-#         return iter(self._proxied)
-#
-#     def __getitem__(self, key):
-#         # if key in Info:
-#         #     v = getattr(self, str(key), Info)
-#         #     if v is not Info:
-#         #         return v
-#         return self._proxied[key]
-#
-#     def __contains__(self, key):
-#         return key in self._proxied
-#
-#     def __setitem__(self, key, value):
-#         self._proxied[key] = value
-#
-#     def __delitem__(self, key):
-#         del self._proxied[key]
-
-
 # =================
 # Database Entities
 
@@ -179,13 +143,6 @@ class ChainRecordWithDict(MutableMapping):
         for k in self.keys():
             yield self[k]
 
-    # def update(self, *args, **kwds):
-    #     for arg in args:
-    #         for k, v in arg.items():  # (arg if isinstance(arg, Iterable) else arg.items()):
-    #             self[k] = v
-    #     for k,v in kwds.items():
-    #         self[k] = v
-
     def __len__(self):
         return len(self.keys())
 
@@ -209,7 +166,6 @@ class ChainRecordWithDict(MutableMapping):
         fieldname = self._field_keys.get(key)  # Info -> fieldname
         if fieldname is not None:
             LOG.debug("assigning database field {}".format(fieldname))
-            # self._obj.__dict__[fieldname] = value
             setattr(self._obj, fieldname, value)
         else:
             self._more[key] = value
@@ -250,7 +206,6 @@ class Product(Base):
         self.uuid_str = str(uu)
 
     # primary handler
-    # kind = Column(PickleType)  # class or callable which can perform transformations on this data in workspace
     atime = Column(DateTime, nullable=False)  # last time this file was accessed by application
 
     # cached metadata provided by the file format handler
@@ -288,21 +243,9 @@ class Product(Base):
         fam, ctg, ser = new_ident.split("::")
         self.family, self.category, self.serial = fam, ctg, ser
 
-    # platform = Column(String)  # platform or satellite name e.g. "GOES-16", "Himawari-8"; should match Platform enum
-    # standard_name = Column(String, nullable=True)
-    #
     # times
-    # display_time = Column(DateTime)  # normalized instantaneous scheduled observation time e.g. 20170122T2310
     obs_time = Column(DateTime, nullable=False)  # actual observation time start
     obs_duration = Column(Interval, nullable=False)  # duration of the observation
-
-    # native resolution information - see Content for projection details at different LODs
-    # resolution = Column(Integer, nullable=True)  # meters max resolution, e.g. 500, 1000, 2000, 4000
-
-    # descriptive - move these to Info keys
-    # units = Column(Unicode, nullable=True)  # udunits compliant units, e.g. 'K'
-    # label = Column(Unicode, nullable=True)  # "AHI Refl B11"
-    # description = Column(UnicodeText, nullable=True)
 
     # link to workspace cache files representing this data
     content = relationship("Content", backref=backref("product"), cascade="all")
@@ -566,7 +509,6 @@ class Content(Base):
     additional information is stored in a key-value table addressable as content[key:str]
     """
 
-    # _array = None  # when attached, this is a np.memmap
     __tablename__ = "content_v1"
     id = Column(Integer, primary_key=True)
     type = Column(String)
@@ -601,11 +543,9 @@ class Content(Base):
 
     # json for numpy array with polynomial coefficients for transforming native data to natural units
     # (e.g. for scaled integers), c[0] + c[1]*x + c[2]*x**2 ...
-    # coeffs = Column(String, nullable=True)
 
     # json for optional dict {int:string} lookup table for NaN flag fields
     # (when dtype is float32 or float64) or integer values (when dtype is an int8/16/32/64)
-    # values = Column(String, nullable=True)
 
     # projection information for this representation of the data
     # proj4 projection string for the data in this array, if one exists; else assume y=lat/x=lon
@@ -651,18 +591,6 @@ class Content(Base):
                 keyvalues[k] = v
         return fields, keyvalues
 
-    # @classmethod
-    # def _patch_info_fields(cls, d):
-    #     if 'lod' not in d:
-    #         d['lod'] = Content.LOD_OVERVIEW
-    #     if ('resolution' not in d) and ('cell_width' in d and 'cell_height' in d):
-    #         d['resolution'] = min(d['cell_width'], d['cell_height'])
-    #     now = datetime.utcnow()
-    #     if 'atime' not in d:
-    #         d['atime'] = now
-    #     if 'mtime' not in d:
-    #         d['mtime'] = now
-
     @classmethod
     def from_info(cls, mapping, only_fields=False):
         """
@@ -671,7 +599,6 @@ class Content(Base):
         :return: Product object
         """
         fields, keyvalues = cls._separate_fields_and_keys(mapping)
-        # cls._patch_info_fields(fields)
         LOG.debug("fields to import: {}".format(repr(fields)))
         LOG.debug("key-value pairs to {}: {}".format("IGNORE" if only_fields else "import", repr(keyvalues)))
         try:
@@ -735,24 +662,6 @@ class Content(Base):
     def touch(self, when: Optional[datetime] = None) -> None:
         self.atime = when = when or datetime.utcnow()
         self.product.touch(when)
-
-    # this doesn't belong here, database routines only plz
-    # @property
-    # def data(self):
-    #     """
-    #     numpy array with the content
-    #     :return:
-    #     """
-    #     self.touch()
-    #     if self._array is not None:
-    #         return self._array
-    #     self._array = zult = np.memmap(self.path, mode='r', shape=self.shape, dtype=self.dtype or 'float32')
-    #     return zult
-
-    # def close(self):
-    #     if self._array is not None:
-    #         self._array = None
-
 
 class ContentImage(Content):
     __mapper_args__ = {"polymorphic_identity": "image"}
@@ -931,7 +840,6 @@ class Metadatabase(object):
         # fetch the active session, typically zero or one active per thread
         s = self.SessionRegistry()
         self.session_nesting[id(s)] -= 1
-        # LOG.debug("database session nesting now at {}".format(self.session_nesting[id(s)]))
         if self.session_nesting[id(s)] <= 0:
             if exc_val is not None:
                 LOG.warning("an exception occurred, rolling back any metadatabase changes")
@@ -942,8 +850,6 @@ class Metadatabase(object):
                     s.commit()
                 else:
                     LOG.debug("closing clean database session without commit")
-                    # LOG.debug("session is clean but committing before close anyway")
-                    # s.commit()
             s.close()
             del self.session_nesting[id(s)]
         else:  # we're in a nested context for this session
@@ -954,41 +860,3 @@ class Metadatabase(object):
     #
     # high-level functions
     #
-
-
-# # ============================
-# # mapping wrappers
-#
-# class ProductInfoAsWritableMappingAdapter(MutableMapping):
-#     """
-#     database Product.info dictionary adapter
-#     """
-#     def __init__(self, session, product, warn_on_write=True):
-#         self.S = session
-#         self.prod = product
-#         self.wow = warn_on_write
-#
-#     def __contains__(self, item):
-#         items = self.S.query(ProductKeyValue).filter_by(product_id=self.prod.id, key=item).all()
-#         return len(items)>0
-#
-#     def __getitem__(self, item:str):
-#         kvs = self.S.query(ProductKeyValue).filter_by(product_id=self.prod.id, key=item).all()
-#         if not kvs:
-#             raise KeyError("product does not have value for key {}".format(item))
-#         if len(kvs)>1:
-#             raise AssertionError('more than one value for %s' % item)
-#
-#     def __setitem__(self, key, value):
-#         if self.wow:
-#             LOG.warning('attempting to write to Product info dictionary in workspace??')
-#         kvs = self.S.query(ProductKeyValue).filter_by(product_id=self.prod.id, key=key).all()
-#         if not kvs:
-#             kv = ProductKeyValue(key=key, value=value)
-#             self.S.add(kv)
-#             self.product.info.append(kv)
-#             self.S.commit()
-#         if len(kvs)>1:
-#             raise AssertionError('more than one value for {}'.format(key))
-#         kvs[0].value = value
-#         self.S.commit()

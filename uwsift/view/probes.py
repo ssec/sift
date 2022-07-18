@@ -137,8 +137,6 @@ class ProbeGraphManager(QObject):
 
         # hook up the various layer_model signals that would mean we need to
         # reload things
-        # self.layer_model.didUpdateLayers.connect(
-        #    self.handleActiveProductDatasetsChanged)
 
         # hook up auto update vs manual update changes
         self.update_button.clicked.connect(self.handleActiveProductDatasetsChanged)

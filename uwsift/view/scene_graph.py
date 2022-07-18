@@ -519,7 +519,6 @@ class SceneGraphManager(QObject):
                 Typically (frame_index:int, total_frames:int, animating:bool, frame_id:UUID)
 
         """
-        # LOG.debug('emitting didChangeFrame')
         self.didChangeFrame.emit(frame_info)
         is_animating = frame_info[2]
         if not is_animating:
@@ -560,11 +559,6 @@ class SceneGraphManager(QObject):
         self.proxy_nodes = {}
 
         self.create_test_image()
-
-        # Make the camera center on Guam
-        # center = (144.8, 13.5)
-        ##proj_info = self.document.projection_info()
-        ##self._set_projection(proj_info)
 
         area_def = self.document.area_definition()
         self._set_projection(area_def)
@@ -757,12 +751,10 @@ class SceneGraphManager(QObject):
         if probe_name not in self.point_probes and xy_pos is None:
             raise ValueError("Probe '{}' does not exist".format(probe_name))
         elif probe_name not in self.point_probes:
-            # point_visual = FakeMarker(parent=self.main_map, symbol="x", pos=np.array([xy_pos]), color=color)
             point_visual = Markers(parent=self.main_map, name=probe_name, **probe_kwargs)
             self.point_probes[probe_name] = point_visual
         else:
             point_visual = self.point_probes[probe_name]
-            # point_visual.set_point(xy_pos)
             point_visual.set_data(**probe_kwargs)
 
         # set the Point visible or not
@@ -771,7 +763,6 @@ class SceneGraphManager(QObject):
     def on_new_polygon(self, probe_name, points, **kwargs):
         points = np.array(points, dtype=np.float32)  # convert list to NumPy array
 
-        # kwargs.setdefault("color", (1.0, 0.0, 1.0, 0.5))
         kwargs.setdefault("color", None)
         kwargs.setdefault("border_color", (1.0, 0.0, 1.0, 1.0))
 
@@ -823,8 +814,6 @@ class SceneGraphManager(QObject):
 
         # Set the cursor
         if name == Tool.PAN_ZOOM:
-            # self.main_canvas.native.setCursor(QCursor(QPixmap("py/uwsift/ui/cursors/noun_275_cc.png")))
-            # self.main_canvas.native.setCursor(QCursor(Qt.SizeAllCursor))
             self.main_canvas.native.setCursor(QCursor(Qt.OpenHandCursor))
         elif name == Tool.POINT_PROBE:
             self.main_canvas.native.setCursor(QCursor(Qt.PointingHandCursor))
@@ -906,13 +895,6 @@ class SceneGraphManager(QObject):
         for uuid, gamma in change_dict.items():
             LOG.debug("changing {} to gamma {}".format(uuid, gamma))
             self.set_gamma(gamma, uuid)
-
-    # This method may be revived again in case CONTOURS should be supported
-    # (again)
-    # def change_layers_image_kind(self, change_dict):
-    #     for uuid, new_pz in change_dict.items():
-    #         LOG.info('changing {} to kind {}'.format(uuid, new_pz.kind.name))
-    #         self.add_basic_dataset(None, uuid, new_pz)
 
     def change_layer_visible(self, layer_uuid: UUID, visible: bool):
         self.layer_nodes[layer_uuid].visible = visible
@@ -1375,8 +1357,6 @@ class SceneGraphManager(QObject):
         """
         for uuid_removed in uuids_removed:
             self.set_dataset_visible(uuid_removed, False)
-        # XXX: Used to rebuild_all instead of just update, is that actually needed?
-        # self.rebuild_all()
 
     def _remove_dataset(self, *args, **kwargs):
         self.remove_dataset(*args, **kwargs)
@@ -1414,10 +1394,7 @@ class SceneGraphManager(QObject):
 
     def _connect_doc_signals(self, document: Document):
         document.didReorderDatasets.connect(self._rebuild_dataset_order)  # current layer set changed z/anim order
-        # REMOVE document.didAddBasicDataset.connect(self.add_basic_dataset)  # layer added to one or more layer sets
         document.didUpdateBasicDataset.connect(self.update_basic_dataset)  # new data integrated in existing layer
-        # REMOVE document.didAddLinesDataset.connect(self.add_lines_dataset)
-        # REMOVE document.didAddPointsDataset.connect(self.add_points_dataset)
         document.didRemoveDatasets.connect(self._remove_dataset)  # layer removed from current layer set
         document.willPurgeDataset.connect(self._purge_dataset)  # layer removed from document
         document.didSwitchLayerSet.connect(self.rebuild_new_layer_set)
@@ -1426,7 +1403,6 @@ class SceneGraphManager(QObject):
         document.didReorderAnimation.connect(self._rebuild_frame_order)
         document.didChangeColorLimits.connect(self.change_dataset_nodes_color_limits)
         document.didChangeGamma.connect(self.change_dataset_nodes_gamma)
-        # document.didChangeImageKind.connect(self.change_layers_image_kind)
 
     def set_frame_number(self, frame_number=None):
         self.animation_controller.next_frame(None, frame_number)
@@ -1455,7 +1431,6 @@ class SceneGraphManager(QObject):
     def rebuild_frame_order(self, uuid_list: list, *args, **kwargs):
         LOG.debug("setting SGM new frame order to {0!r:s}".format(uuid_list))
         self.animation_controller.frame_order = uuid_list
-        # self.layer_set.update_time_manager_collection(self.document.data_layer_collection)
 
     def _rebuild_frame_order(self, *args, **kwargs):
         res = self.rebuild_frame_order(*args, **kwargs)
@@ -1464,8 +1439,6 @@ class SceneGraphManager(QObject):
         return res
 
     def rebuild_presentation(self, presentation_info: dict):
-        # refresh our presentation info
-        # presentation_info = self.document.current_layer_set
         for uuid, layer_prez in presentation_info.items():
             self.set_colormap(layer_prez.colormap, uuid=uuid)
             self.set_color_limits(layer_prez.climits, uuid=uuid)
@@ -1491,7 +1464,6 @@ class SceneGraphManager(QObject):
         # get set of valid layers not having elements and invalid layers having elements
         inconsistent_uuids = uuids_w_elements ^ active_uuids
 
-        # current_uuid_order = self.document.current_layer_uuid_order
         current_uuid_order = tuple(p.uuid for p in presentation_info)
 
         remove_elements = []

@@ -65,15 +65,6 @@ SATPY_READER_CACHE_FILE = os.path.join(USER_CACHE_DIR, "available_satpy_readers.
 LOG = logging.getLogger(__name__)
 
 satpy_version = None
-# try:
-#    from satpy import __version__ as satpy_version
-# except ImportError as e:
-#    # Satpy's internal way of defining its version breaks when it is not
-#    # installed. This leads to the exception when referencing satpy from just
-#    # a git clone without installing it or within a PyInstaller package (bug
-#    # report pending).
-#    LOG.warning("BUG: Cannot determine satpy version. Cached information must be ignored."
-#                "(Reason:" + e + ")")
 
 try:
     from skimage.measure import find_contours
@@ -216,19 +207,6 @@ def get_contour_increments(layer_info):
     if contour_increments is None:
         contour_increments = unit_increments.get(units)
 
-        # def _in_group(wg, grp):
-        #     return round(wg / grp) * grp >= grp
-        # contour_increments = [5., 2.5, 1., 0.5, 0.1]
-        # vmin, vmax = layer_info[Info.VALID_RANGE]
-        # width_guess = vmax - vmin
-        # if _in_group(width_guess, 10000.):
-        #     contour_increments = [x * 100. for x in contour_increments]
-        # elif _in_group(width_guess, 1000.):
-        #     contour_increments = [x * 50. for x in contour_increments]
-        # elif _in_group(width_guess, 100.):
-        #     contour_increments = [x * 10. for x in contour_increments]
-        # elif _in_group(width_guess, 10.):
-        #     contour_increments = [x * 1. for x in contour_increments]
     if contour_increments is None:
         LOG.warning("Unknown contour data type ({}, {}), guessing at contour " "levels...".format(standard_name, units))
         return [5000.0, 1000.0, 500.0, 200.0, 100.0]
@@ -518,7 +496,6 @@ class aSingleFileWithSingleProductImporter(aImporter):
 
         if len(res.product):
             zult = list(res.product)
-            # LOG.debug('pre-existing products {}'.format(repr(zult)))
             return zult
 
         # else probe the file and add product metadata, without importing content
@@ -567,13 +544,6 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
             when = datetime.strptime(yyyymmdd + hhmm, "%Y%m%d%H%M")
             plat = Platform("Himawari-{}".format(int(plat)))
             band = int(bb)
-            #
-            # # workaround to make old files work with new information
-            # from uwsift.model.guidebook import AHI_HSF_Guidebook
-            # if band in AHI_HSF_Guidebook.REFL_BANDS:
-            #     standard_name = "toa_bidirectional_reflectance"
-            # else:
-            #     standard_name = "toa_brightness_temperature"
 
             meta.update(
                 {
@@ -687,7 +657,6 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
     def product_metadata(self):
         return GeoTiffImporter.get_metadata(self.source_path)
 
-    # @asyncio.coroutine
     def begin_import_products(self, *product_ids):  # FUTURE: allow product_ids to be uuids
         import gdal
 
@@ -771,7 +740,6 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
             coverage_cols=1,
             coverage_path=coverage_filename,
         )
-        # c.info.update(prod.info) would just make everything leak together so let's not do it
         self._S.add(c)
         prod.content.append(c)
         self._S.commit()
@@ -798,10 +766,6 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
             )
             yield status
 
-        # img_data = gtiff.GetRasterBand(1).ReadAsArray()
-        # img_data = np.require(img_data, dtype=np.float32, requirements=['C'])  # FIXME: is this necessary/correct?
-        # normally we would place a numpy.memmap in the workspace with the content of the geotiff raster band/s here
-
         # single stage import with all the data for this simple case
         zult = import_progress(
             uuid=prod.uuid,
@@ -817,7 +781,6 @@ class GeoTiffImporter(aSingleFileWithSingleProductImporter):
 
         # Finally, update content mtime and atime
         c.atime = c.mtime = datetime.utcnow()
-        # self._S.commit()
 
 
 # map .platform_id in PUG format files to SIFT platform enum
@@ -867,12 +830,6 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         if not is_netcdf:
             raise ValueError("PUG loader requires files ending in .nc or .nc4: {}".format(repr(source_path)))
         return PugFile.attach(source_path)  # noqa
-        # if 'L1b' in fn:
-        #     LOG.debug('attaching {} as PUG L1b'.format(source_path))
-        #     return PugL1bTools(source_path)
-        # else:
-        #     LOG.debug('attaching {} as PUG CMI'.format(source_path))
-        #     return PugCmiTools(source_path)
 
     @staticmethod
     def get_metadata(source_path=None, source_uri=None, pug=None, **kwargs):
@@ -885,11 +842,9 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         #
 
         d = {}
-        # nc = nc4.Dataset(source_path)
         pug = pug or GoesRPUGImporter.pug_factory(source_path)
 
         d.update(GoesRPUGImporter._basic_pug_metadata(pug))
-        # d[Info.DATASET_NAME] = os.path.split(source_path)[-1]
         d[Info.KIND] = Kind.IMAGE
 
         # FUTURE: this is Content metadata and not Product metadata:
@@ -899,15 +854,12 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         d[Info.ORIGIN_X] = x[0]
         d[Info.ORIGIN_Y] = y[0]
 
-        # midyi, midxi = int(y.shape[0] / 2), int(x.shape[0] / 2)
         # PUG states radiance at index [0,0] extends between coordinates [0,0] to [1,1] on a quadrille
         # centers of pixels are therefore at +0.5, +0.5
         # for a (e.g.) H x W image this means [H/2,W/2] coordinates are image center
         # for now assume all scenes are even-dimensioned (e.g. 5424x5424)
         # given that coordinates are evenly spaced in angular -> nadir-meters space,
         # technically this should work with any two neighbor values
-        # d[Info.CELL_WIDTH] = x[midxi+1] - x[midxi]
-        # d[Info.CELL_HEIGHT] = y[midyi+1] - y[midyi]
         cell_size = pug.cell_size
         d[Info.CELL_HEIGHT], d[Info.CELL_WIDTH] = cell_size
 
@@ -924,10 +876,6 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         d[Info.SERIAL] = d[Info.SCHED_TIME].strftime("%Y%m%dT%H%M%S")
         LOG.debug(repr(d))
         return d
-
-    # def __init__(self, source_path, workspace_cwd, database_session, **kwargs):
-    #     super(GoesRPUGImporter, self).__init__(workspace_cwd, database_session)
-    #     self.source_path = source_path
 
     def product_metadata(self):
         return GoesRPUGImporter.get_metadata(self.source_path)
@@ -965,8 +913,6 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
         data_filename = "{}.image".format(prod.uuid)
         data_path = os.path.join(self._cwd, data_filename)
 
-        # coverage_filename = '{}.coverage'.format(prod.uuid)
-        # coverage_path = os.path.join(self._cwd, coverage_filename)
         # no sparsity map
 
         # shovel that data into the memmap incrementally
@@ -974,17 +920,6 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
 
         LOG.info("converting radiance to %s" % pug.bt_or_refl)
         image = pug.bt if "bt" == pug.bt_or_refl else pug.refl
-        # bt_or_refl, image, units = pug.convert_from_nc()  # FIXME expensive
-        # overview_image = fixme  # FIXME, we need a properly navigated overview image here
-
-        # we got some metadata, let's yield progress
-        # yield    import_progress(uuid=dest_uuid,
-        #                          stages=1,
-        #                          current_stage=0,
-        #                          completion=1.0/3.0,
-        #                          stage_desc="calculating imagery",
-        #                          dataset_info=d,
-        #                          data=image)
 
         #
         # step 2: read and convert the image data
@@ -1010,19 +945,13 @@ class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
             proj4=proj4,
             # levels = 0,
             dtype="float32",
-            # info about the coverage array memmap, which in our case just tells what rows are ready
-            # coverage_rows = rows,
-            # coverage_cols = 1,
-            # coverage_path = coverage_filename
             cell_width=cell_width,
             cell_height=cell_height,
             origin_x=origin_x,
             origin_y=origin_y,
         )
-        # c.info.update(prod.info) would just make everything leak together so let's not do it
         self._S.add(c)
         prod.content.append(c)
-        # prod.touch()
         self._S.commit()
 
         yield import_progress(
@@ -1855,12 +1784,7 @@ class SatpyImporter(aImporter):
                     rows=shape[0],
                     cols=shape[1],
                     proj4=proj4,
-                    # levels = 0,
                     dtype="float32",
-                    # info about the coverage array memmap, which in our case just tells what rows are ready
-                    # coverage_rows = rows,
-                    # coverage_cols = 1,
-                    # coverage_path = coverage_filename
                     cell_width=cell_width,
                     cell_height=cell_height,
                     origin_x=origin_x,
@@ -1927,7 +1851,6 @@ class SatpyImporter(aImporter):
                 rows=contour_data.shape[0],  # number of vertices
                 cols=contour_data.shape[1],  # col (x), row (y), "connect", num_points_for_level
                 proj4=proj4,
-                # levels = 0,
                 dtype="float32",
                 cell_width=cell_width,
                 cell_height=cell_height,
@@ -2106,7 +2029,6 @@ class SatpyImporter(aImporter):
             this_level[:] = np.nan
             this_level[-1] = v.shape[0]
             c = np.concatenate((c, [False])).astype(np.float32)
-            # level_data = np.concatenate((v, c[:, None]), axis=1)
             level_data = np.concatenate((v, c[:, None], this_level[:, None]), axis=1)
             all_levels.append(level_data)
 

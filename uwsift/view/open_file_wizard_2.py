@@ -290,44 +290,6 @@ class OpenFileWizard(QtWidgets.QWizard):
 
             yield key, value, pretty_val
 
-    # def _create_scenes(self):
-    #     """Create Scene objects for the selected files."""
-    #     all_available_products = set()
-    #     for group_id, file_group in self.file_groups.items():
-    #         scn = self.scenes.get(group_id)
-    #         if scn is None:
-    #             # need to create the Scene for the first time
-    #             # file_group includes what reader to use
-    #             # NOTE: We only allow a single reader at a time
-    #             self.scenes[group_id] = scn = Scene(filenames=file_group)
-    #
-    #             # WORKAROUND: to decompress compressed SEVIRI HRIT files, an environment variable
-    #             # needs to be set. Check if decompression might have introduced errors when using
-    #             # the specific reader and loading a file with compression flag set.
-    #             # NOTE: in case this workaround-check fails data cannot be loaded in SIFT although
-    #             # creating the scene might have succeeded!
-    #             compressed_seviri = False
-    #             from satpy.readers.hrit_base import get_xritdecompress_cmd
-    #             # TODO: Scene may not provide information about reader in the
-    #             # future - here the "protected" variable '_readers' is used as
-    #             # workaround already
-    #             for r in scn._readers.values():
-    #                 # only perform check when using a relevant reader, so that this is not triggered
-    #                 # mistakenly when another reader uses the same meta data key for another purpose
-    #                 if r.name in ['seviri_l1b_hrit']:
-    #                     for fh in r.file_handlers.values():
-    #                         for fh2 in fh:
-    #                             if fh2.mda.get('compression_flag_for_data'):
-    #                                 compressed_seviri = True
-    #             if compressed_seviri:
-    #                 get_xritdecompress_cmd()
-    #             # END OF WORKAROUND
-    #
-    #         all_available_products.update(scn.available_dataset_ids())
-    #
-    #     # update the widgets
-    #     self.all_available_products = sorted(all_available_products)
-
     # ==============================================================================================
     # PUBLIC CUSTOM INTERFACE
     # ==============================================================================================
@@ -547,7 +509,7 @@ class OpenFileWizard(QtWidgets.QWizard):
             file_groups = group_files(selected_files, reader=reader, group_keys=group_keys)
         elif grouping_mode == GroupingMode.MERGE_ALL:
             file_groups = [{reader: list(selected_files)}]
-        else:  # elif grouping_mode == GroupingModes.KEEP_SEPARATE:
+        else:
             file_groups = [{reader: [file]} for file in selected_files]
 
         if not file_groups:
@@ -729,11 +691,9 @@ class OpenFileWizard(QtWidgets.QWizard):
         cb_model = self.ui.groupingModeComboBox.model()
 
         if geometry_definition == "SwathDefinition":
-            # cb_model.item(GroupingModes.BY_GROUP_KEYS.value).setEnabled(True)
             cb_model.item(GroupingMode.KEEP_SEPARATE.value).setEnabled(True)
             cb_model.item(GroupingMode.MERGE_ALL.value).setEnabled(True)
         else:
-            # cb_model.item(GroupingModes.BY_GROUP_KEYS.value).setEnabled(True)
             cb_model.item(GroupingMode.KEEP_SEPARATE.value).setEnabled(False)
             cb_model.item(GroupingMode.MERGE_ALL.value).setEnabled(False)
             self.ui.groupingModeComboBox.setCurrentIndex(GroupingMode.BY_GROUP_KEYS.value)

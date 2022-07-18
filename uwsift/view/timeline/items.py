@@ -205,14 +205,6 @@ class QTrackItem(QGraphicsObject):
         self._scene().add_frame(frame)
         self.frames.append(frame)
 
-    # @property
-    # def scene(self):
-    #     return self._scene()
-    #
-    # @scene.setter
-    # def scene(self, s):
-    #     self._scene = ref(s)
-
     @property
     def track(self) -> str:
         return self._track
@@ -262,8 +254,6 @@ class QTrackItem(QGraphicsObject):
     # painting and boundaries
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None):
-        # LOG.debug("QTrackItem.paint")
-        # _wtf_recursion()
         pen, brush = self._scene().default_track_pen_brush
         rect = self.boundingRect()
         painter.setRenderHint(QPainter.Antialiasing)
@@ -274,8 +264,6 @@ class QTrackItem(QGraphicsObject):
         painter.drawRoundedRect(rect, GFXC.track_corner_radius1, GFXC.track_corner_radius2, Qt.RelativeSize)
 
     def boundingRect(self) -> QRectF:
-        #     if self._bounds is None:
-        #         return self.update_pos_and_bounds()
         return self._bounds
 
     # click events / drag departures
@@ -327,11 +315,6 @@ class QTrackItem(QGraphicsObject):
 
     def _iter_frame_children(self):
         return list(self.frames)
-        # children = tuple(self.childItems())
-        # # LOG.debug("{} children".format(len(children)))
-        # for child in children:
-        #     if isinstance(child, QFrameItem):
-        #         yield child
 
     def _time_extent_of_frames(self):
         """start time and duration of the frames held by the track"""
@@ -339,7 +322,6 @@ class QTrackItem(QGraphicsObject):
         for child in self._iter_frame_children():
             # y relative to track is 0
             # calculate absolute x position in scene
-            # assert (child.uuid != self.uuid)
             t, d = child.td
             s = t if (s is None) else min(t, s)
             e = (t + d) if (e is None) else max(e, t + d)
@@ -363,8 +345,6 @@ class QTrackItem(QGraphicsObject):
         # convert track extent to scene coordinates using current transform
         frames_left, frames_width = self._scale.calc_pixel_x_pos(t, d)
         screen_track_center_y = self._scale.calc_track_pixel_y_center(self.z)
-        # track_left, track_width = self._scale.calc_pixel_x_pos(t - GFXC.track_left_pad,
-        #     d + GFXC.track_left_pad + GFXC.track_right_pad)
         # set track position, assuming we want origin coordinate of track item to be centered vertically within item
         # bounds relative to position in scene, left_pad space to left of local origin (x<0),
         # frames and right-pad at x>=0
@@ -451,13 +431,6 @@ class QFrameItem(QGraphicsObject):
         self._metadata = metadata
         self._uuid = uuid
         self.setToolTip("{}\n{}".format(title, subtitle))
-        # self._pen, self._brush = track.default_frame_pen_brush
-        # if pen:
-        #     LOG.debug('setting pen')
-        #     self.setPen(pen)
-        # if brush:
-        #     LOG.debug('setting brush')
-        #     self.setBrush(brush)
         track.addFrame(self)  # adds to track, which in turn adds to scene
         self.setParentItem(track)
         self.update_bounds()
@@ -465,7 +438,6 @@ class QFrameItem(QGraphicsObject):
         track.update_frame_positions()
         self.setFlag(QGraphicsItem.ItemClipsChildrenToShape, enabled=True)
         self._update_decorations()
-        # self.setAcceptDrops(True)
 
     def _update_decorations(self):
         """Add decor sub-items to self
@@ -532,20 +504,15 @@ class QFrameItem(QGraphicsObject):
         return pen, brush
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget = None) -> None:
-        # LOG.debug("QFrameItem.paint")
         pen, brush = self.pen_brush
         rect = self.boundingRect()
         painter.setBrush(brush)
         painter.setPen(pen)
         painter.setRenderHint(QPainter.Antialiasing)
         painter.drawRoundedRect(rect, GFXC.frame_corner_radius, GFXC.frame_corner_radius, Qt.RelativeSize)
-        # super(QFrameItem, self).paint(painter, option, widget)
 
     def boundingRect(self) -> QRectF:
         """return relative bounding rectangle, given position is set by Track parent as needed"""
-        # from inspect import getouterframes, currentframe
-        # level = len(getouterframes(currentframe()))
-        # LOG.debug("frame boundingRect depth {}".format(level))
         return self._bounds
 
     # internal recalculation / realignment
@@ -564,16 +531,6 @@ class QFrameItem(QGraphicsObject):
         if (old_bounds is None) or (new_bounds != old_bounds):
             self.prepareGeometryChange()
             self._bounds = new_bounds
-
-    # # handle drag and drop
-    # def dragEnterEvent(self, event: QGraphicsSceneDragDropEvent):
-    #     event.setAccepted(False)
-    #
-    # def dragLeaveEvent(self, event: QGraphicsSceneDragDropEvent):
-    #     event.setAccepted(False)
-    #
-    # def dropEvent(self, event: QGraphicsSceneDragDropEvent):
-    #     event.setAccepted(False)
 
     # handle clicking
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent):

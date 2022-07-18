@@ -130,8 +130,6 @@ class OpenCacheDialog(QtWidgets.QDialog):
         self.ui.cacheListWidget.clear()
         # assume uuid_to_name is already an OrderedDict:
         sorted_items = uuid_to_name.items()
-        # sorted_items = sorted(uuid_to_name.items(),
-        #                       key=lambda x: x[1])
         for uuid, name in sorted_items:
             li = QtWidgets.QListWidgetItem(name)
             li.setData(QtCore.Qt.UserRole, uuid)
@@ -168,11 +166,8 @@ class AnimationSpeedPopupWindow(QtWidgets.QWidget):
         self.setFocusPolicy(Qt.ClickFocus)
         self.setToolTip("Set animation speed")
         self._slider = QtWidgets.QSlider(parent=self)
-        # n, x = self._convert(10, reverse=True), self._convert(5000, reverse=True)
         n, x = 2, 150  # frames per 10 seconds
         self._slider.setRange(n, x)  #
-        # self._slider.setSingleStep(1)
-        # self._slider.setInvertedAppearance(True)
         self._slot = slot
         self._slider.valueChanged.connect(self._changed)
         self._layout = QtWidgets.QHBoxLayout()
@@ -336,7 +331,6 @@ class UserControlsAnimation(QtCore.QObject):
         frame_index, frame_count, animating, uuid = frame_info[:4]
         self.ui.animationSlider.setRange(0, frame_count - 1)
         self.ui.animationSlider.setValue(frame_index or 0)
-        # LOG.debug('did update animation slider {} {}'.format(frame_index, frame_count))
         self.ui.animPlayPause.setDown(animating)
         self.ui.animationSlider.repaint()
         if animating:
@@ -563,13 +557,11 @@ class Main(QtWidgets.QMainWindow):
 
     def update_progress_bar(self, status_info, *args, **kwargs):
         active = status_info[0] if len(status_info) > 0 else None
-        # LOG.debug('{0!r:s}'.format(status_info))
         val = active[TASK_PROGRESS] if active else 0.0
         txt = active[TASK_DOING] if active else ""
         val = self.queue.progress_ratio(val)
         self.ui.progressBar.setValue(int(val * PROGRESS_BAR_MAX))
         self.ui.progressText.setText(txt)
-        # LOG.warning('progress bar updated to {}'.format(val))
 
     def toggle_visibility_on_selected_layers(self, *args, **kwargs):
         model_indexes = self.ui.treeView.selectedIndexes()
@@ -693,7 +685,6 @@ class Main(QtWidgets.QMainWindow):
         gv.setViewportUpdateMode(QtWidgets.QGraphicsView.FullViewportUpdate)
         gv.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
         gv.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-        # gv.setRenderHints(QtGui.QPainter.Antialiasing)
 
         # connect up the scene
         if USE_INVENTORY_DB:
@@ -943,9 +934,6 @@ class Main(QtWidgets.QMainWindow):
 
         test_layers(self.document, glob_pattern=glob_pattern)
 
-        # quamash async test pattern updates a control once a second
-        # loop.create_task(do_test_cycle(self.ui.cursorProbeText))
-
         # Interaction Setup
         self._init_key_releases()
 
@@ -970,10 +958,6 @@ class Main(QtWidgets.QMainWindow):
         self.ui.projectionComboBox.setCurrentIndex(self.document.current_projection_index())
         if USE_INVENTORY_DB:
             self._init_metadata_background_collection(search_paths)
-
-        # set up timeline
-        # LOG.info("potential tracks already in database: {}".format(repr(doc.potential_tracks())))
-        # self._init_timeline(doc, self.workspace)
 
         # FIXME: make sure sync of metadata signals sync of document potentials and track display
 
@@ -1159,7 +1143,6 @@ class Main(QtWidgets.QMainWindow):
     def _init_map_widget(self):
         # connect canvas and projection pieces
         self.ui.mainMapWidget.layout().addWidget(self.scene_manager.main_canvas.native)
-        # self.ui.projectionComboBox.addItems(tuple(self.document.available_projections.keys()))
         self.ui.projectionComboBox.addItems(tuple(AreaDefinitionsManager.available_area_def_names()))
         self.ui.projectionComboBox.currentIndexChanged.connect(self.document.change_projection_index)
         self.document.didChangeProjection.connect(self.scene_manager.set_projection)
@@ -1195,18 +1178,14 @@ class Main(QtWidgets.QMainWindow):
         self.tabifyDockWidget(self.ui.layersPane, self.ui.areaProbePane)
         self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.rgbConfigPane)
         self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.algebraicConfigPane)
-        # self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.timelinePane)
         self.layout().removeWidget(self.ui.timelinePane)
         self.ui.timelinePane.deleteLater()
         self.ui.timelinePane = None
-        # self.tabifyDockWidget(self.ui.rgbConfigPane, self.ui.layerDetailsPane)
         # Make the layer list and layer details shown
         # FIXME remove layerPane finally from the system, for now we only kind
         #  of hide it. This shall be done as part of ticket "Code cleanup (#89)"
         #  (https://gitlab.eumetsat.int/webservices/mtg-sift/-/issues/89)
         self.layout().removeWidget(self.ui.layersPane)
-        # self.ui.layersPane.deleteLater()
-        # self.ui.layersPane = None
 
         # FIXME hide layerDetailsPane for now, improve and show it later again
         self.ui.layerDetailsPane.hide()
@@ -1321,13 +1300,6 @@ class Main(QtWidgets.QMainWindow):
         ordered_uuid_to_name = OrderedDict([(u, uuid_to_name[u]) for u in ordered_uuids])
         self._open_cache_dialog.activate(ordered_uuid_to_name)
 
-    # def open_glob(self, *args, **kwargs):
-    #     text, ok = QtWidgets.QInputDialog.getText(self, 'Open Glob Pattern', 'Open files matching pattern:')
-    #     from glob import glob
-    #     if ok:
-    #         paths = list(glob(text))
-    #         self.open_paths(paths)
-
     def open_wizard(self, *args, **kwargs):
         from uwsift.view.open_file_wizard_2 import OpenFileWizard
 
@@ -1409,10 +1381,6 @@ class Main(QtWidgets.QMainWindow):
             open_cache_action.setShortcut("Ctrl+A")
             open_cache_action.triggered.connect(self.open_from_cache)
 
-        # open_glob_action = QtWidgets.QAction("Open Filename Pattern...", self)
-        # open_glob_action.setShortcut("Ctrl+Shift+O")
-        # open_glob_action.triggered.connect(self.open_glob)
-
         open_wizard_action = QtWidgets.QAction("Open File Wizard...", self)
         open_wizard_action.setShortcuts(["Ctrl+O", "Ctrl+Alt+O"])
         open_wizard_action.triggered.connect(self.open_wizard)
@@ -1428,7 +1396,6 @@ class Main(QtWidgets.QMainWindow):
             file_menu.addAction(open_cache_action)
         file_menu.addAction(open_wizard_action)
         if USE_INVENTORY_DB:
-            # file_menu.addAction(open_glob_action)
             self._recent_files_menu = file_menu.addMenu("Open Recent")
 
         screenshot_action = QtWidgets.QAction("Export Image", self)
@@ -1445,12 +1412,10 @@ class Main(QtWidgets.QMainWindow):
         next_time = QtWidgets.QAction("Next Time", self)
         next_time.setShortcut(QtCore.Qt.Key_Right)
         next_time.triggered.connect(self.animation.next_frame)
-        # self.ui.animForward.clicked.connect(next_slot)
 
         prev_time = QtWidgets.QAction("Previous Time", self)
         prev_time.setShortcut(QtCore.Qt.Key_Left)
         prev_time.triggered.connect(self.animation.prev_frame)
-        # self.ui.animBack.clicked.connect(prev_slot)
 
         toggle_vis = QtWidgets.QAction("Toggle &Visibility", self)
         toggle_vis.setShortcut("V")
@@ -1524,7 +1489,6 @@ class Main(QtWidgets.QMainWindow):
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("t", self.scene_manager.next_tool))
 
     def updateLayerList(self):
-        # self.ui.layers.add
         pass
 
     def open_colormap_editor(self):
@@ -1609,14 +1573,8 @@ def main() -> int:
         heap_profiler = HeapProfiler(args.profile_heap)
         heap_profiler.start()
 
-    # levels = [logging.ERROR, logging.WARN, logging.INFO, logging.DEBUG]
-    # level = levels[min(3, args.verbosity)]
-    # logging.basicConfig(level=level, datefmt='%H:%M:%S',
-    #                     format='%(levelname)s %(asctime)s %(module)s:%(funcName)s:L%(lineno)d %(message)s')
-
     check_grib_definition_dir()
     check_imageio_deps()
-    # logging.getLogger('vispy').setLevel(level)
 
     if args.cache_dir:
         LOG.warning("'--cache-dir' is deprecated, use '--workspace-dir'")

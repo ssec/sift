@@ -82,8 +82,6 @@ class LayerWidgetDelegate(QStyledItemDelegate):
 
     _doc: Document = None  # document we're representing
 
-    # _doc: DocumentAsLayerStack = None  # document we're representing
-
     def layer_prez(self, index: int):
         cll = self._doc.current_layer_set
         return cll[index] if index < len(cll) and index >= 0 else None
@@ -91,16 +89,10 @@ class LayerWidgetDelegate(QStyledItemDelegate):
     def __init__(self, doc: Document, *args, **kwargs):
         super(LayerWidgetDelegate, self).__init__(*args, **kwargs)
         self._doc = doc
-        # self._doc = doc.as_layer_stack
         self.font = QFont("Andale Mono")
         self.font.setPointSizeF(12)
 
     def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex):
-        # pz = self.layer_prez(index.row())
-        # if pz.kind == Kind.RGB:
-        #     LOG.debug('triple-sizing composite layer')
-        #     return QSize(CELL_WIDTH, CELL_HEIGHT*3)
-        # else:
         return QSize(CELL_WIDTH, CELL_HEIGHT)
 
     def displayText(self, *args, **kwargs):
@@ -111,7 +103,6 @@ class LayerWidgetDelegate(QStyledItemDelegate):
         painter.save()
 
         color = QColor(187, 213, 255, 255) if index.row() % 2 == 0 else QColor(177, 223, 255, 255)
-        # color = QColor(187, 213, 255, 255)
         painter.setPen(QPen(color))
         painter.setFont(self.font)
         value = index.data(Qt.UserRole)
@@ -188,62 +179,6 @@ class LayerWidgetDelegate(QStyledItemDelegate):
 
         painter.restore()
 
-    # def paint(self, painter, option, index):
-    #     '''
-    #     Paint a checkbox without the label.
-    #     from http://stackoverflow.com/questions/17748546/pyqt-column-of-checkboxes-in-a-qtableview
-    #     '''
-    #     checked = index.model().data(index, QtCore.Qt.DisplayRole) == 'True'
-    #     check_box_style_option = QtGui.QStyleOptionButton()
-    #
-    #     if (index.Flags() & QtCore.Qt.ItemIsEditable) > 0:
-    #         check_box_style_option.state |= QtGui.QStyle.State_Enabled
-    #     else:
-    #         check_box_style_option.state |= QtGui.QStyle.State_ReadOnly
-    #
-    #     if checked:
-    #         check_box_style_option.state |= QtGui.QStyle.State_On
-    #     else:
-    #         check_box_style_option.state |= QtGui.QStyle.State_Off
-    #
-    #     check_box_style_option.rect = self.getCheckBoxRect(option)
-    #
-    #     # this will not run - hasFlag does not exist
-    #     #if not index.model().hasFlag(index, QtCore.Qt.ItemIsEditable):
-    #         #check_box_style_option.state |= QtGui.QStyle.State_ReadOnly
-    #
-    #     check_box_style_option.state |= QtGui.QStyle.State_Enabled
-    #
-    #     QtGui.QApplication.style().drawControl(QtGui.QStyle.CE_CheckBox, check_box_style_option, painter)
-    #
-    # def editorEvent(self, event, model, option, index):
-    #     '''
-    #     Change the data in the model and the state of the checkbox
-    #     if the user presses the left mousebutton or presses
-    #     Key_Space or Key_Select and this cell is editable. Otherwise do nothing.
-    #     '''
-    #     print 'Check Box editor Event detected : '
-    #     if not (index.Flags() & QtCore.Qt.ItemIsEditable) > 0:
-    #         return False
-    #
-    #     print 'Check Box edior Event detected : passed first check'
-    #     # Do not change the checkbox-state
-    #     if event.type() == QtCore.QEvent.MouseButtonRelease or event.type() == QtCore.QEvent.MouseButtonDblClick:
-    #         if event.button() != QtCore.Qt.LeftButton or not self.getCheckBoxRect(option).contains(event.pos()):
-    #             return False
-    #         if event.type() == QtCore.QEvent.MouseButtonDblClick:
-    #             return True
-    #     elif event.type() == QtCore.QEvent.KeyPress:
-    #         if event.key() != QtCore.Qt.Key_Space and event.key() != QtCore.Qt.Key_Select:
-    #             return False
-    #         else:
-    #             return False
-    #
-    #     # Change the checkbox-state
-    #     self.setModelData(None, model, index)
-    #     return True
-
-
 class LayerStackTreeViewModel(QAbstractItemModel):
     """Behavior connecting list widget to layer stack (both ways)
 
@@ -280,7 +215,6 @@ class LayerStackTreeViewModel(QAbstractItemModel):
 
         self.widgets = []
         self.doc = doc
-        # self._column = [self._visibilityData, self._nameData]
         self.item_delegate = LayerWidgetDelegate(doc)
         # FIXME: Reset colormap change dialog when layer set changes
 
@@ -288,7 +222,6 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         doc.didReorderDatasets.connect(self.refresh)
         doc.didRemoveDatasets.connect(self.drop_layers_just_removed)
         doc.didChangeColormap.connect(self.refresh)
-        # doc.didChangeColorLimits.connect(self.refresh)
         doc.didChangeLayerVisibility.connect(self.refresh)
         doc.didChangeLayerName.connect(self.refresh)
         doc.didAddBasicDataset.connect(self.doc_added_basic_layer)
@@ -298,7 +231,6 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         doc.didReorderAnimation.connect(self.refresh)
         doc.didCalculateLayerEqualizerValues.connect(self.update_equalizer)
 
-        # self.setSupportedDragActions(Qt.MoveAction)
 
         # set up each of the widgets
         for widget in widgets:
@@ -312,33 +244,17 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         listbox.setModel(self)
         listbox.setItemDelegate(self.item_delegate)
         listbox.setContextMenuPolicy(Qt.CustomContextMenu)
-        # listbox.customContextMenuRequested.connect(self.context_menu)
         listbox.customContextMenuRequested.connect(self.menu)
         listbox.setDragEnabled(True)
         listbox.setAcceptDrops(True)
         listbox.setDropIndicatorShown(True)
         listbox.setSelectionMode(listbox.ExtendedSelection)
-        # listbox.setMovement(QTreeView.Snap)
-        # listbox.setDragDropMode(QTreeView.InternalMove)
         listbox.setDragDropMode(QAbstractItemView.DragDrop)
-        # listbox.setAlternatingRowColors(True)
-        # listbox.setDefaultDropAction(Qt.MoveAction)
-        # listbox.setDragDropOverwriteMode(True)
-        # listbox.entered.connect(self.layer_entered)
-        # listbox.setFont(QFont('Andale Mono', 13))
 
-        # the various signals that may result from the user changing the selections
-        # listbox.activated.connect(self.changedSelection)
-        # listbox.clicked.connect(self.changedSelection)
-        # listbox.doubleClicked.connect(self.changedSelection)
-        # listbox.pressed.connect(self.changedSelection)
         listbox.selectionModel().selectionChanged.connect(self.changedSelection)
 
         self.widgets.append(listbox)
 
-    # def supportedDragActions(self):
-    #     return Qt.MoveAction
-    #
     def supportedDropActions(self):
         return Qt.MoveAction | Qt.LinkAction
 
@@ -362,15 +278,9 @@ class LayerStackTreeViewModel(QAbstractItemModel):
                 return widget
 
     def doc_added_basic_layer(self, new_order, layer, presentation):
-        # dexes = [i for i,q in enumerate(new_order) if q==None]
-        # for dex in dexes:
-        #     self.beginInsertRows(QModelIndex(), dex, dex)
-        #     self.endInsertRows()
         self.refresh()
 
     def refresh(self):
-        # self.beginResetModel()
-        # self.endResetModel()
         self.layoutAboutToBeChanged.emit()
         self.revert()
         self.layoutChanged.emit()
@@ -409,7 +319,6 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             q = self.createIndex(row, 0)
             items.select(q, q)
             lbox.selectionModel().select(items, QItemSelectionModel.Select)
-            # lbox.setCurrentIndex(q)
         if scroll_to_show_single and len(uuids) == 1 and q is not None:
             lbox.scrollTo(q)
 
@@ -421,7 +330,6 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         :return:
         """
         self.refresh()
-        # self.removeRows(row, count)
 
     def update_equalizer(self, doc_values):
         """
@@ -535,10 +443,6 @@ class LayerStackTreeViewModel(QAbstractItemModel):
     def columnCount(self, QModelIndex_parent=None, *args, **kwargs):
         return 1
 
-    #
-    # def hasChildren(self, QModelIndex_parent=None, *args, **kwargs):
-    #     return False  # FIXME
-
     def headerData(self, section: int, Qt_Orientation, role=None):
         pass
 
@@ -558,8 +462,6 @@ class LayerStackTreeViewModel(QAbstractItemModel):
                 self.doc.import_files(paths)  # FIXME: replace with a signal
                 return True
         elif mime.hasFormat(self._mimetype):
-            # unpickle the presentation information and re-insert it
-            # b = base64.decodebytes(mime.text())
             b = mime.data(self._mimetype)
             layer_set_len, insertion_info = pkl.loads(b)
             LOG.debug("dropped: {0!r:s}".format(insertion_info))
@@ -568,13 +470,8 @@ class LayerStackTreeViewModel(QAbstractItemModel):
                 row = len(self.doc)  # append
                 # FIXME: row=col=-1 implies drop-on-parent
                 #  which may mean replace or may mean append for composite layers
-            # self.insertRows(row, count)
-            # for i, presentation in enumerate(l):
-            #     self.setData(self.index(row+i, 0), presentation)
             order = list(range(layer_set_len))
             inserted_row_numbers = []
-            # inserted_presentations = []
-            # delete_these_rows = []
             insertion_point = row
             uuids = []
             for old_row, presentation in reversed(sorted(insertion_info)):
@@ -583,22 +480,14 @@ class LayerStackTreeViewModel(QAbstractItemModel):
                     insertion_point -= 1
                 inserted_row_numbers.insert(0, old_row)
                 uuids.append(presentation.uuid)
-                # delete_these_rows.append(old_row if old_row<row else old_row+count)
-                # inserted_presentations.append(presentation)
             order = order[:insertion_point] + inserted_row_numbers + order[insertion_point:]
             LOG.debug("new order after drop {0!r:s}".format(order))
             self.select([])
             self.doc.reorder_by_indices(order)
-            # self.doc.insert_layer_prez(row, inserted_presentations)
-            # LOG.debug('after insertion removing rows {0!r:s}'.format(delete_these_rows))
-            # for exrow in delete_these_rows:
-            #     self.doc.remove_layer_prez(exrow)
             # FUTURE: not our business to be emitting on behalf of the document
-            # self.doc.didReorderDatasets.emit(order)
             assert count == len(insertion_info)
             return True
         return False
-        # return super(LayerStackListViewModel, self).dropMimeData(mime, action, row, column, parent)
 
     def mimeData(self, list_of_QModelIndex):
         valid_rows = []
@@ -608,8 +497,6 @@ class LayerStackTreeViewModel(QAbstractItemModel):
                 valid_rows.append((index.row(), self.doc.current_layer_set[index.row()]))
         p = pkl.dumps((len(self.doc.current_layer_set), valid_rows), pkl.HIGHEST_PROTOCOL)
         mime = QMimeData()
-        # t = base64.encodebytes(p).decode('ascii')
-        # LOG.debug('mimetext for drag is "{}"'.format(t))
         mime.setData(self._mimetype, p)
         LOG.debug("presenting mime data for {0!r:s}".format(valid_rows))
         return mime
@@ -662,27 +549,11 @@ class LayerStackTreeViewModel(QAbstractItemModel):
 
     def parent(self, index=None):
         return QModelIndex()
-        # FIXME
-        # if not index.isValid():
-        #     return QModelIndex()
-        #
-        # childItem = index.internalPointer()
-        # if not childItem:
-        #     return QModelIndex()
-        #
-        # parentItem = childItem.parent()
-        #
-        # if parentItem == self.rootItem:
-        #     return QModelIndex()
-        #
-        # return self.createIndex(parentItem.row(), 0, parentItem)
 
     def data(self, index: QModelIndex, role: int = None):
         if not index.isValid():
             return None
         row = index.row()
-        # LOG.debug("getting data for row %d" % row)
-        # col = index.column()
         el = self.listing
         info = el[row] if row < len(self.doc) else None
         if not info:
@@ -706,12 +577,7 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             value, normalized = eq_content[:2]
             return str(value)
         elif role == Qt.DisplayRole:
-            # lao = self.doc.layer_animation_order(row)
             name = info[Info.DISPLAY_NAME]
-            # return  ('[-]  ' if lao is None else '[{}]'.format(lao+1)) + el[row]['name']
-            # if leroy:
-            #     data = '[%.2f] ' % leroy[0]
-            #     return data + name
             return name
         return None
 
@@ -735,7 +601,6 @@ class LayerStackTreeViewModel(QAbstractItemModel):
             return True
         elif role == Qt.ItemDataRole:
             LOG.warning("attempting to change layer")
-            # self.doc.replace_layer()
             # FIXME implement this
             self.dataChanged.emit(index, index)
             return True
@@ -758,40 +623,5 @@ class LayerStackTreeViewModel(QAbstractItemModel):
     def removeRows(self, row, count, QModelIndex_parent=None, *args, **kwargs):
         self.beginRemoveRows(QModelIndex(), row, row + count - 1)
         LOG.debug(">>>> REMOVE {} rows at {}".format(count, row))
-        # self.doc.remove_layer_prez(row, count)
         self.endRemoveRows()
         return True
-
-    # def dragEnterEvent(self, event):
-    #     if event.mimeData().hasUrls:
-    #         event.accept()
-    #
-    #     else:
-    #         event.ignore()
-    #
-    # def dragMoveEvent(self, event):
-    #     if event.mimeData().hasUrls:
-    #         event.setDropAction(QtCore.Qt.CopyAction)
-    #         event.accept()
-    #
-    #     else:
-    #         event.ignore()
-    #
-    # def dropEvent(self, event):
-    #     if event.mimeData().hasUrls:
-    #         event.setDropAction(QtCore.Qt.CopyAction)
-    #         event.accept()
-    #
-    #         filePaths = [
-    #             str(url.toLocalFile())
-    #             for url in event.mimeData().urls()
-    #         ]
-    #
-    #         self.dropped.emit(filePaths)
-    #
-    #     else:
-    #         event.ignore()
-
-    # self.widget().clear()
-    # for x in self.doc.asListing():
-    #     self.widget().addItem(x['name'])

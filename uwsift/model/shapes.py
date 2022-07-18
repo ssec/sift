@@ -23,7 +23,6 @@ __docformat__ = "reStructuredText"
 import logging
 from functools import partial
 
-# import shapefile as shf
 import numpy as np
 import pyproj as prj
 import shapely.geometry as sgeo
