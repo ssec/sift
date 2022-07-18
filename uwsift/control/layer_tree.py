@@ -227,7 +227,6 @@ class LayerStackTreeViewModel(QAbstractItemModel):
         doc.didAddBasicDataset.connect(self.doc_added_basic_layer)
         doc.didAddCompositeDataset.connect(self.refresh)
         doc.willPurgeDataset.connect(self.refresh)
-        doc.didSwitchLayerSet.connect(self.refresh)
         doc.didReorderAnimation.connect(self.refresh)
         doc.didCalculateLayerEqualizerValues.connect(self.update_equalizer)
 

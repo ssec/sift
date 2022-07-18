@@ -293,7 +293,6 @@ class UserControlsAnimation(QtCore.QObject):
         # allow animation, once stopped, to propagate visibility to the document and layerlist:
         self.scene_manager.didChangeLayerVisibility.connect(self.document.animation_changed_visibility)
 
-        self.document.didSwitchLayerSet.connect(self.animation_reset_by_layer_set_switch)
         self.document.didChangeLayerVisibility.connect(self.update_frame_time_to_top_visible)
         self.document.didReorderDatasets.connect(self.update_frame_time_to_top_visible)
         self.document.didRemoveDatasets.connect(self.update_frame_time_to_top_visible)
