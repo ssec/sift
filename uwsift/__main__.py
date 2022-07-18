@@ -306,34 +306,6 @@ class UserControlsAnimation(QtCore.QObject):
         self.scene_manager.animation_controller.animating = False
         self.scene_manager.animation_controller.time_manager.step(backwards=True)
 
-    def reset_frame_slider(self, *args, **kwargs):
-        """Reset frame slider to show current animation state in document when aniamtion list changes."""
-        frame_count = len(self.document.current_animation_order)
-        frame_index = None  # self.scene_manager.layer_set._frame_number  # FIXME BAAD
-        self.ui.animationSlider.setRange(0, frame_count - 1)
-        self.ui.animationSlider.setValue(frame_index or 0)
-        self.ui.animPlayPause.setDown(False)
-        self.ui.animationSlider.repaint()
-        self.update_frame_time_to_top_visible()
-
-    def update_frame_slider(self, frame_info):
-        """
-        Update animation frame slider and time display to reflect current document animation state.
-        Args:
-            frame_info: tuple, ultimately from SceneGraphManager.layer_set callback
-        """
-        frame_index, frame_count, animating, uuid = frame_info[:4]
-        self.ui.animationSlider.setRange(0, frame_count - 1)
-        self.ui.animationSlider.setValue(frame_index or 0)
-        self.ui.animPlayPause.setDown(animating)
-        self.ui.animationSlider.repaint()
-        if animating:
-            if not UWSIFT_ANIM_INDICATOR_DISABLED:
-                t_sim = self.scene_manager.animation_controller.time_manager.create_formatted_t_sim()
-                self.ui.animationLabel.setText(t_sim)
-        else:
-            self.update_frame_time_to_top_visible()
-
     def update_frame_time_to_top_visible(self, *args):
         """Update frame slider's time display to show the current top layer's time."""
         self.ui.animationLabel.setText(self.document.time_label_for_uuid(self.document.current_visible_layer_uuid))
@@ -360,11 +332,6 @@ class UserControlsAnimation(QtCore.QObject):
             popup = self._animation_speed_popup
         if not popup.isVisible():
             popup.show_at(gpos, self.scene_manager.animation_controller.animation_speed)
-
-    def animation_reset_by_layer_set_switch(self, *args, **kwargs):
-        """Perform necessary control resets when document layer set is swapped."""
-        self.reset_frame_slider()
-        self.update_frame_time_to_top_visible()
 
     def toggle_animation(self, action: QtWidgets.QAction = None, *args):
         """Toggle animation on/off."""
