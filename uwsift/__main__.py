@@ -279,7 +279,6 @@ class UserControlsAnimation(QtCore.QObject):
         self.document = document
         self.layer_list_model = layer_list_model
 
-        self.scene_manager.didChangeFrame.connect(self.update_frame_slider)
         self.ui.animPlayPause.clicked.connect(self.toggle_animation)
         self.ui.animPlayPause.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.ui.animPlayPause.customContextMenuRequested.connect(self.show_animation_speed_slider)

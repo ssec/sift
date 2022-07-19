@@ -298,7 +298,6 @@ class SceneGraphManager(QObject):
     # FIXME: many more undocumented member variables
 
     didRetilingCalcs = pyqtSignal(object, object, object, object, object, object)
-    didChangeFrame = pyqtSignal(tuple)
     didChangeLayerVisibility = pyqtSignal(dict)  # similar to document didChangeLayerVisibility
     newPointProbe = pyqtSignal(str, tuple)
     # REMARK: PyQT tends to fail if a signal with an argument of type 'list' is
