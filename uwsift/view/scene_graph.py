@@ -1223,7 +1223,6 @@ class SceneGraphManager(QObject):
         document.didChangeColormap.connect(self.change_dataset_nodes_colormap)
         document.didChangeLayerVisibility.connect(self.change_datasets_visibility)
         document.didReorderAnimation.connect(self._rebuild_frame_order)
-        document.didChangeColorLimits.connect(self.change_dataset_nodes_color_limits)
 
     def set_frame_number(self, frame_number=None):
         self.animation_controller.next_frame(None, frame_number)

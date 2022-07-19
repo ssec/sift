@@ -410,7 +410,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didReorderAnimation = pyqtSignal(tuple)  # list of UUIDs representing new animation order
     didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
     didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
-    didChangeColorLimits = pyqtSignal(dict)  # dict of {uuid: (vmin, vmax), ...} for all changed layers
     didChangeProjection = pyqtSignal(str)  # name of projection (area definition)
     didAddFamily = pyqtSignal(str, dict)  # name of the newly added family and dict of family info
     didRemoveFamily = pyqtSignal(str)  # name of the newly added family and dict of family info
