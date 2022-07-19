@@ -1070,13 +1070,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def get_uuids(self):
         return list(self._layer_with_uuid.keys())
 
-    def clear(self):
-        """
-        Convenience function to clear document
-        """
-        all_uuids = self.get_uuids()
-        self.remove_layers_from_all_sets(all_uuids)
-
     def animate_siblings_of_layer(self, row_or_uuid):
         uuid = self.current_layer_set[row_or_uuid].uuid if not isinstance(row_or_uuid, UUID) else row_or_uuid
         layer = self._layer_with_uuid[uuid]
