@@ -240,7 +240,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
     didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didChangeProjection = pyqtSignal(str)  # name of projection (area definition)
-    didAddFamily = pyqtSignal(str, dict)  # name of the newly added family and dict of family info
     didReorderTracks = pyqtSignal(set, set)  # added track names, removed track names
     didChangeImageKind = pyqtSignal(dict)
 
