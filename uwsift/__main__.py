@@ -290,7 +290,6 @@ class UserControlsAnimation(QtCore.QObject):
         self.ui.animationSlider.valueChanged.connect(self.animation_slider_jump_frame)
 
         # allow animation, once stopped, to propagate visibility to the document and layerlist:
-        self.scene_manager.didChangeLayerVisibility.connect(self.document.animation_changed_visibility)
 
         self.document.didChangeLayerVisibility.connect(self.update_frame_time_to_top_visible)
         self.document.didReorderDatasets.connect(self.update_frame_time_to_top_visible)
