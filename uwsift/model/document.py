@@ -400,8 +400,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # new order list with None for new layer; info-dictionary, overview-content-ndarray
     didAddDataset = pyqtSignal(frozendict, Presentation)
     didUpdateBasicDataset = pyqtSignal(UUID, Kind)
-    # comp layer is derived from multiple basic layers and has its own UUID
-    didAddCompositeDataset = pyqtSignal(tuple, UUID, Presentation)
     # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
     didRemoveDatasets = pyqtSignal(tuple, list, int, int)
     willPurgeDataset = pyqtSignal(UUID)  # UUID of the layer being removed
