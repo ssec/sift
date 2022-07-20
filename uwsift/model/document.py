@@ -559,7 +559,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if style is None:
             style = info.get(Info.STYLE)
         gamma = 1.0
-        if isinstance(info, DocRGBDataset):
+        if info.get(Info.KIND) == Kind.RGB:
             gamma = (1.0,) * 3
         elif hasattr(info, "layers"):
             gamma = (1.0,) * len(info.layers)
