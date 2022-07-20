@@ -350,17 +350,6 @@ class UserControlsAnimation(QtCore.QObject):
         self.scene_manager.set_frame_number(frame)
         # TODO: update layer list to reflect what layers are visible/hidden?
 
-    def _next_last_time_visibility(self, direction=0, *args, **kwargs):
-        LOG.info("time incr {}".format(direction))
-        # TODO: if this frame is part of the animation sequence, update the slider as well!
-        uuids = self.layer_list_model.current_selected_uuids()
-        if not uuids:
-            self.ui.statusbar.showMessage("ERROR: No layer selected", STATUS_BAR_DURATION)
-        new_focus = None
-        for uuid in uuids:
-            new_focus = self.document.next_last_step(uuid, direction, bandwise=False)
-        return new_focus
-
     def update_slider_if_frame_is_in_animation(self, uuid, **kwargs):
         """Update frame slider to the specified frame UUID, but only if it's part of animation order."""
         # FUTURE: this could be a cheaper operation but it's probably fine since it's input-driven
@@ -416,21 +405,6 @@ class UserControlsAnimation(QtCore.QObject):
         """Perform necessary control resets when document layer set is swapped."""
         self.reset_frame_slider()
         self.update_frame_time_to_top_visible()
-
-    def change_animation_to_current_selection_siblings(self, *args, **kwargs):
-        """Assign new animation order based on selection."""
-        uuid = self._next_last_time_visibility(direction=0)
-        if uuid is None:
-            self.ui.statusbar.showMessage("ERROR: No layer selected", STATUS_BAR_DURATION)
-            return
-        # calculate the new animation sequence by consulting the guidebook
-        uuids = self.document.animate_siblings_of_layer(uuid)
-        if uuids:
-            self.ui.statusbar.showMessage("Info: Frame order updated", STATUS_BAR_DURATION)
-            self.layer_list_model.select(uuids)
-        else:
-            self.ui.statusbar.showMessage("ERROR: Layer with time steps or band siblings needed", STATUS_BAR_DURATION)
-        LOG.info("using siblings of {} for animation loop".format(uuids[0] if uuids else "-unknown-"))
 
     def toggle_animation(self, action: QtWidgets.QAction = None, *args):
         """Toggle animation on/off."""
@@ -1383,10 +1357,6 @@ class Main(QtWidgets.QMainWindow):
         animate.setShortcut("A")
         animate.triggered.connect(partial(self.animation.toggle_animation, action=animate))
 
-        change_order = QtWidgets.QAction("Set Animation &Order", self)
-        change_order.setShortcut("O")
-        change_order.triggered.connect(self.animation.change_animation_to_current_selection_siblings)
-
         cycle_borders = QtWidgets.QAction("Cycle &Borders", self)
         cycle_borders.setShortcut("B")
         cycle_borders.triggered.connect(self.scene_manager.cycle_borders_color)
@@ -1427,7 +1397,6 @@ class Main(QtWidgets.QMainWindow):
         view_menu.addAction(animate)
         view_menu.addAction(prev_time)
         view_menu.addAction(next_time)
-        view_menu.addAction(change_order)
         view_menu.addAction(toggle_vis)
         view_menu.addAction(cycle_borders)
         view_menu.addAction(cycle_grid)
