@@ -2005,7 +2005,4 @@ Checking this deactivates the Update button.</string>
  </customwidgets>
  <resources/>
  <connections/>
- <attribute name="buttonGroup">
-    <string notr="true">buttonGroup</string>
- </attribute>
 </ui>
