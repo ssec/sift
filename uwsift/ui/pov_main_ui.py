@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'pov_main.ui'
+# Form implementation generated from reading ui file './uwsift/ui/pov_main.ui'
 #
 # Created by: PyQt5 UI code generator 5.12.3
 #
@@ -90,7 +90,7 @@ class Ui_MainWindow(object):
         font.setPointSize(14)
         self.cursorProbeText.setFont(font)
         self.cursorProbeText.setScaledContents(False)
-        self.cursorProbeText.setAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        self.cursorProbeText.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
         self.cursorProbeText.setObjectName("cursorProbeText")
         self.horizontalLayout_2.addWidget(self.cursorProbeText)
         spacerItem = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
@@ -106,7 +106,7 @@ class Ui_MainWindow(object):
         font.setFamily("Andale Mono")
         font.setPointSize(14)
         self.cursorProbeLayer.setFont(font)
-        self.cursorProbeLayer.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignTrailing | QtCore.Qt.AlignVCenter)
+        self.cursorProbeLayer.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.cursorProbeLayer.setObjectName("cursorProbeLayer")
         self.horizontalLayout_2.addWidget(self.cursorProbeLayer)
         self.verticalLayout_2.addLayout(self.horizontalLayout_2)
@@ -441,9 +441,7 @@ class Ui_MainWindow(object):
         self.statusbar.setObjectName("statusbar")
         MainWindow.setStatusBar(self.statusbar)
         self.areaProbePane = QtWidgets.QDockWidget(MainWindow)
-        self.areaProbePane.setFeatures(
-            QtWidgets.QDockWidget.DockWidgetFloatable | QtWidgets.QDockWidget.DockWidgetMovable
-        )
+        self.areaProbePane.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable|QtWidgets.QDockWidget.DockWidgetMovable)
         self.areaProbePane.setObjectName("areaProbePane")
         self.probeWidget = QtWidgets.QWidget()
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
@@ -474,30 +472,13 @@ class Ui_MainWindow(object):
         self.verticalLayout_12.addLayout(self.horizontalLayout_11)
         self.areaProbePane.setWidget(self.probeWidget)
         MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.areaProbePane)
-        self.layersPane = QtWidgets.QDockWidget(MainWindow)
-        self.layersPane.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable | QtWidgets.QDockWidget.DockWidgetMovable)
-        self.layersPane.setObjectName("layersPane")
-        self.layersPaneWidget = QtWidgets.QWidget()
-        self.layersPaneWidget.setObjectName("layersPaneWidget")
-        self.verticalLayout_9 = QtWidgets.QVBoxLayout(self.layersPaneWidget)
-        self.verticalLayout_9.setObjectName("verticalLayout_9")
-        self.layerWidgetLayout = QtWidgets.QVBoxLayout()
-        self.layerWidgetLayout.setObjectName("layerWidgetLayout")
-        self.layerListView = QtWidgets.QTreeView(self.layersPaneWidget)
-        self.layerListView.setObjectName("layerListView")
-        self.layerWidgetLayout.addWidget(self.layerListView)
-        self.verticalLayout_9.addLayout(self.layerWidgetLayout)
-        self.layersPane.setWidget(self.layersPaneWidget)
-        MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.layersPane)
         self.layerDetailsPane = QtWidgets.QDockWidget(MainWindow)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.layerDetailsPane.sizePolicy().hasHeightForWidth())
         self.layerDetailsPane.setSizePolicy(sizePolicy)
-        self.layerDetailsPane.setFeatures(
-            QtWidgets.QDockWidget.DockWidgetFloatable | QtWidgets.QDockWidget.DockWidgetMovable
-        )
+        self.layerDetailsPane.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable|QtWidgets.QDockWidget.DockWidgetMovable)
         self.layerDetailsPane.setObjectName("layerDetailsPane")
         self.layerInfoContents = QtWidgets.QWidget()
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
@@ -527,9 +508,7 @@ class Ui_MainWindow(object):
         self.rgbConfigPane.setSizePolicy(sizePolicy)
         self.rgbConfigPane.setMaximumSize(QtCore.QSize(800, 800))
         self.rgbConfigPane.setBaseSize(QtCore.QSize(128, 128))
-        self.rgbConfigPane.setFeatures(
-            QtWidgets.QDockWidget.DockWidgetFloatable | QtWidgets.QDockWidget.DockWidgetMovable
-        )
+        self.rgbConfigPane.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable|QtWidgets.QDockWidget.DockWidgetMovable)
         self.rgbConfigPane.setObjectName("rgbConfigPane")
         self.dockWidgetContents = QtWidgets.QWidget()
         self.dockWidgetContents.setObjectName("dockWidgetContents")
@@ -764,11 +743,7 @@ class Ui_MainWindow(object):
         self.timelinePane = QtWidgets.QDockWidget(MainWindow)
         self.timelinePane.setMinimumSize(QtCore.QSize(172, 112))
         self.timelinePane.setBaseSize(QtCore.QSize(0, 32))
-        self.timelinePane.setFeatures(
-            QtWidgets.QDockWidget.DockWidgetFloatable
-            | QtWidgets.QDockWidget.DockWidgetMovable
-            | QtWidgets.QDockWidget.DockWidgetVerticalTitleBar
-        )
+        self.timelinePane.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable|QtWidgets.QDockWidget.DockWidgetMovable|QtWidgets.QDockWidget.DockWidgetVerticalTitleBar)
         self.timelinePane.setObjectName("timelinePane")
         self.dockWidgetContents_2 = QtWidgets.QWidget()
         self.dockWidgetContents_2.setObjectName("dockWidgetContents_2")
@@ -790,9 +765,7 @@ class Ui_MainWindow(object):
         MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(8), self.timelinePane)
         self.LayerModelDockWidget = QtWidgets.QDockWidget(MainWindow)
         self.LayerModelDockWidget.setMinimumSize(QtCore.QSize(90, 185))
-        self.LayerModelDockWidget.setFeatures(
-            QtWidgets.QDockWidget.DockWidgetFloatable | QtWidgets.QDockWidget.DockWidgetMovable
-        )
+        self.LayerModelDockWidget.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable|QtWidgets.QDockWidget.DockWidgetMovable)
         self.LayerModelDockWidget.setObjectName("LayerModelDockWidget")
         self.dockWidgetContents_3 = QtWidgets.QWidget()
         self.dockWidgetContents_3.setObjectName("dockWidgetContents_3")
@@ -818,9 +791,7 @@ class Ui_MainWindow(object):
         self.algebraicConfigPane.setMinimumSize(QtCore.QSize(107, 138))
         self.algebraicConfigPane.setMaximumSize(QtCore.QSize(800, 800))
         self.algebraicConfigPane.setBaseSize(QtCore.QSize(128, 128))
-        self.algebraicConfigPane.setFeatures(
-            QtWidgets.QDockWidget.DockWidgetFloatable | QtWidgets.QDockWidget.DockWidgetMovable
-        )
+        self.algebraicConfigPane.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable|QtWidgets.QDockWidget.DockWidgetMovable)
         self.algebraicConfigPane.setObjectName("algebraicConfigPane")
         self.dockWidgetContents_4 = QtWidgets.QWidget()
         self.dockWidgetContents_4.setObjectName("dockWidgetContents_4")
@@ -836,11 +807,11 @@ class Ui_MainWindow(object):
         self.verticalLayout_14.setObjectName("verticalLayout_14")
         self.formLayout = QtWidgets.QFormLayout()
         self.formLayout.setFieldGrowthPolicy(QtWidgets.QFormLayout.AllNonFixedFieldsGrow)
-        self.formLayout.setLabelAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-        self.formLayout.setFormAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
+        self.formLayout.setLabelAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
+        self.formLayout.setFormAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignTop)
         self.formLayout.setObjectName("formLayout")
         self.name_label = QtWidgets.QLabel(self.algebraicScrollAreaWidgetContents)
-        self.name_label.setAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        self.name_label.setAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter)
         self.name_label.setObjectName("name_label")
         self.formLayout.setWidget(0, QtWidgets.QFormLayout.LabelRole, self.name_label)
         self.layer_name_edit = QtWidgets.QLineEdit(self.algebraicScrollAreaWidgetContents)
@@ -905,14 +876,10 @@ class Ui_MainWindow(object):
         self.panZoomToolButton.setStatusTip(_translate("MainWindow", "Left mouse click and drag pans the scene"))
         self.panZoomToolButton.setText(_translate("MainWindow", "Pan/Zoom"))
         self.pointSelectButton.setToolTip(_translate("MainWindow", "Point Probe Tool"))
-        self.pointSelectButton.setStatusTip(
-            _translate("MainWindow", "Left mouse click probes a single point in the scene")
-        )
+        self.pointSelectButton.setStatusTip(_translate("MainWindow", "Left mouse click probes a single point in the scene"))
         self.pointSelectButton.setText(_translate("MainWindow", "Point"))
         self.regionSelectButton.setToolTip(_translate("MainWindow", "Region Probe Tool"))
-        self.regionSelectButton.setStatusTip(
-            _translate("MainWindow", "Left mouse click creates a polygon vertex (click initial vertex to complete)")
-        )
+        self.regionSelectButton.setStatusTip(_translate("MainWindow", "Left mouse click creates a polygon vertex (click initial vertex to complete)"))
         self.regionSelectButton.setText(_translate("MainWindow", "Region"))
         self.projectionLabel.setText(_translate("MainWindow", "Projection:"))
         self.cursorProbeText.setToolTip(_translate("MainWindow", "Value under cursor"))
@@ -935,18 +902,11 @@ class Ui_MainWindow(object):
         self.progressBar.setToolTip(_translate("MainWindow", "Activity Progress"))
         self.areaProbePane.setWindowTitle(_translate("MainWindow", "Area Probe Graphs"))
         self.probeTabWidget.setTabText(self.probeTabWidget.indexOf(self.tab_plus), _translate("MainWindow", "+"))
-        self.autoUpdateCheckbox.setToolTip(
-            _translate(
-                "MainWindow",
-                "Update plots with animation if this is checked.\n" "Checking this deactivates the Update button.",
-            )
-        )
+        self.autoUpdateCheckbox.setToolTip(_translate("MainWindow", "Update plots with animation if this is checked.\n"
+"Checking this deactivates the Update button."))
         self.autoUpdateCheckbox.setText(_translate("MainWindow", "Auto Update"))
-        self.updateButton.setToolTip(
-            _translate("MainWindow", "Manually update plots to display currently active Datasets.")
-        )
+        self.updateButton.setToolTip(_translate("MainWindow", "Manually update plots to display currently active Datasets."))
         self.updateButton.setText(_translate("MainWindow", "Update"))
-        self.layersPane.setWindowTitle(_translate("MainWindow", "Layers"))
         self.layerDetailsPane.setStatusTip(_translate("MainWindow", "Selected layer information"))
         self.layerDetailsPane.setWindowTitle(_translate("MainWindow", "Layer Details"))
         self.rgbConfigPane.setWindowTitle(_translate("MainWindow", "RGB Bounds"))
@@ -980,13 +940,6 @@ class Ui_MainWindow(object):
         self.operations_label.setText(_translate("MainWindow", "Operations"))
         self.operations_text.setPlainText(_translate("MainWindow", "result = x - y"))
         self.algebraicUpdateButton.setText(_translate("MainWindow", "Update"))
-
-
 from PyQt5 import QtQuickWidgets
-
-from uwsift.ui.custom_widgets import (
-    QNoScrollComboBox,
-    QNoScrollDoubleSpinBox,
-    QNoScrollSlider,
-)
+from uwsift.ui.custom_widgets import QNoScrollComboBox, QNoScrollDoubleSpinBox, QNoScrollSlider
 from uwsift.view.layer_tree_view import LayerTreeView

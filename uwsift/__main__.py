@@ -43,7 +43,6 @@ from uwsift import (
     config,
 )
 from uwsift.common import Info, Tool
-from uwsift.control.layer_tree import LayerStackTreeViewModel
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 
 # To have consistent logging for all modules (also for their static
@@ -260,24 +259,19 @@ class UserControlsAnimation(QtCore.QObject):
     ui = None
     document: Document = None
     scene_manager: SceneGraphManager = None
-    layer_list_model: LayerStackTreeViewModel = None
     _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
 
-    def __init__(
-        self, ui, scene_manager: SceneGraphManager, document: Document, layer_list_model: LayerStackTreeViewModel
-    ):
+    def __init__(self, ui, scene_manager: SceneGraphManager, document: Document):
         """
         Args:
             ui: QtDesigner UI element tree for application
             scene_manager: Map display manager, needed for controller screen animation
             document: document object, needed for sibling lookups
-            layer_list_model: model used to display current layer list, needed for selection
         """
         super(UserControlsAnimation, self).__init__()
         self.ui = ui
         self.scene_manager = scene_manager
         self.document = document
-        self.layer_list_model = layer_list_model
 
         self.ui.animPlayPause.clicked.connect(self.toggle_animation)
         self.ui.animPlayPause.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -739,7 +733,7 @@ class Main(QtWidgets.QMainWindow):
         if AUTO_UPDATE_MODE__ACTIVE:
             self._init_update_times_display()
 
-        self.animation = UserControlsAnimation(self.ui, self.scene_manager, self.document, self.layer_list_model)
+        self.animation = UserControlsAnimation(self.ui, self.scene_manager, self.document)
 
         # disable close button on panes
         panes = [
@@ -955,10 +949,6 @@ class Main(QtWidgets.QMainWindow):
     def _init_layer_panes(self):
         # convey action between document and layer list view
         self.layer_info_pane = SingleLayerInfoPane(self.document, parent=self.ui.layerDetailsContents)
-        self.layer_list_model = LayerStackTreeViewModel(
-            [self.ui.layerListView], self.document, parent=self.ui.layersPaneWidget
-        )
-        self.layer_list_model.uuidSelectionChanged.connect(self.layer_info_pane.update_display)
 
     def _init_map_widget(self):
         # connect canvas and projection pieces
@@ -995,18 +985,12 @@ class Main(QtWidgets.QMainWindow):
         return engine.rootContext()
 
     def _init_arrange_panes(self):
-        self.tabifyDockWidget(self.ui.layersPane, self.ui.areaProbePane)
         self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.rgbConfigPane)
         self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.algebraicConfigPane)
         self.layout().removeWidget(self.ui.timelinePane)
         self.ui.timelinePane.deleteLater()
         self.ui.timelinePane = None
-        # Make the layer list and layer details shown
-        # FIXME remove layerPane finally from the system, for now we only kind
-        #  of hide it. This shall be done as part of ticket "Code cleanup (#89)"
-        #  (https://gitlab.eumetsat.int/webservices/mtg-sift/-/issues/89)
-        self.layout().removeWidget(self.ui.layersPane)
-
+        # Make the layer details shown
         # FIXME hide layerDetailsPane for now, improve and show it later again
         self.ui.layerDetailsPane.hide()
 
