@@ -237,7 +237,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didReorderDatasets = pyqtSignal(tuple)  # list of original indices in their new order, None for new layers
     didChangeLayerVisibility = pyqtSignal(dict)  # {UUID: new-visibility, ...} for changed layers
     didReorderAnimation = pyqtSignal(tuple)  # list of UUIDs representing new animation order
-    didChangeLayerName = pyqtSignal(UUID, str)  # layer uuid, new name
     didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didChangeProjection = pyqtSignal(str)  # name of projection (area definition)
     didReorderTracks = pyqtSignal(set, set)  # added track names, removed track names
