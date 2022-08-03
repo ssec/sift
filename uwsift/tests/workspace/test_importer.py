@@ -58,6 +58,12 @@ def test_available_satpy_readers_empty_cache(tmpdir, monkeypatch):
 
 def test_available_satpy_readers_known_cache(tmpdir, monkeypatch):
     """Test loading the satpy readers when the cache exists."""
+
+    # TODO: The next line of code skips the test.
+    #  If this test is no longer to be skipped, this line must be removed.
+    #  Adjustments may have to be made to make the test work correctly again.
+    pytest.skip("Satpy available readers caching is deactivated at the moment.")
+
     p = tmpdir.join("satpy_available_readers.yaml")
     with open(p, "w") as cfile:
         yaml.dump({}, cfile)
