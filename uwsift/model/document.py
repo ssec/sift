@@ -224,7 +224,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     """
     current_set_index = 0
     _layer_sets = None  # list(DocLayerSet(Presentation, ...) or None)
-    _layer_with_uuid = None  # dict(uuid:Doc____Layer)
+    _info_by_uuid = None  # dict(uuid:Doc____Layer)
 
     # signals
     # Clarification: Layer interfaces migrate to layer meaning "current active products under the playhead"
@@ -258,7 +258,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         self._workspace = workspace
         self._layer_sets = [DocLayerStack(self)] + [None] * (layer_set_count - 1)
-        self._layer_with_uuid = {}
+        self._info_by_uuid = {}
 
         self.colormaps = COLORMAP_MANAGER
         self.default_area_def_name = AreaDefinitionsManager.default_area_def_name()
@@ -402,7 +402,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         return p, reordered_indices
 
     def activate_product_uuid_as_new_dataset(self, uuid: UUID, insert_before=0, **importer_kwargs):
-        if uuid in self._layer_with_uuid:
+        if uuid in self._info_by_uuid:
             LOG.debug("Layer already loaded: {}".format(uuid))
             active_content_data = self._workspace.import_product_content(uuid, **importer_kwargs)
             return uuid, self[uuid], active_content_data
@@ -417,7 +417,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         LOG.debug("cell_width: {}".format(repr(info[Info.CELL_WIDTH])))
 
         LOG.debug("new layer info: {}".format(repr(info)))
-        self._layer_with_uuid[uuid] = dataset = DocBasicDataset(self, info)
+        self._info_by_uuid[uuid] = dataset = DocBasicDataset(self, info)
         if Info.UNIT_CONVERSION not in info:
             dataset[Info.UNIT_CONVERSION] = units_conversion(dataset)
         if Info.FAMILY not in dataset:
@@ -522,7 +522,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 if active_content_data:
                     dataset = self[merge_target_uuid]
                     self.didUpdateBasicDataset.emit(merge_target_uuid, dataset[Info.KIND])
-            elif uuid in self._layer_with_uuid:
+            elif uuid in self._info_by_uuid:
                 LOG.warning("layer with UUID {} already in document?".format(uuid))
                 self._workspace.get_content(uuid)
             else:
@@ -554,7 +554,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """used to update animation display when a new frame is shown"""
         if not uuid:
             return "YYYY-MM-DD HH:MM"
-        info = self._layer_with_uuid[uuid]
+        info = self._info_by_uuid[uuid]
         return info.get(Info.DISPLAY_TIME, "--:--")
 
     def prez_for_uuids(self, uuids: typ.List[UUID], lset: list = None) -> typ.Iterable[typ.Tuple[UUID, Presentation]]:
@@ -590,7 +590,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :return: the topmost visible layer's UUID
         """
         for x in self.current_layer_set:
-            layer = self._layer_with_uuid[x.uuid]
+            layer = self._info_by_uuid[x.uuid]
             if x.visible and layer.is_valid:
                 return x.uuid
         return None
@@ -645,7 +645,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         for idx, p in enumerate(L):
             if (uuids is not None) and (p.uuid not in uuids):
                 continue
-            layer = self._layer_with_uuid[p.uuid]
+            layer = self._info_by_uuid[p.uuid]
             if (kinds is not None) and (layer.kind not in kinds):
                 continue
             if (dataset_names is not None) and (layer[Info.DATASET_NAME] not in dataset_names):
@@ -661,15 +661,15 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         return len(self.current_layer_set)
 
     def get_uuids(self):
-        return list(self._layer_with_uuid.keys())
+        return list(self._info_by_uuid.keys())
 
     def get_info(self, row: int = None, uuid: UUID = None) -> typ.Optional[DocBasicDataset]:
         if row is not None:
             uuid_temp = self.current_layer_set[row].uuid
-            nfo = self._layer_with_uuid[uuid_temp]
+            nfo = self._info_by_uuid[uuid_temp]
             return nfo
         elif uuid is not None:
-            nfo = self._layer_with_uuid[uuid]
+            nfo = self._info_by_uuid[uuid]
             return nfo
         return None
 
@@ -685,8 +685,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         elif not isinstance(layer_uuid, UUID):
             raise ValueError("document[UUID] required, %r was used" % type(layer_uuid))
 
-        if layer_uuid in self._layer_with_uuid:
-            return self._layer_with_uuid[layer_uuid]
+        if layer_uuid in self._info_by_uuid:
+            return self._info_by_uuid[layer_uuid]
 
         # check the workspace for information
         try:
@@ -701,7 +701,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def is_using(self, uuid: UUID, layer_set: int = None):
         "return true if this dataset is still in use in one of the layer sets"
-        layer = self._layer_with_uuid[uuid]
+        layer = self._info_by_uuid[uuid]
         if layer_set is not None:
             lss = [self._layer_sets[layer_set]]
         else:
@@ -710,7 +710,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             for p in ls:
                 if p.uuid == uuid:
                     return True
-                parent_layer = self._layer_with_uuid[p.uuid]
+                parent_layer = self._info_by_uuid[p.uuid]
                 if parent_layer.kind == Kind.RGB and layer in parent_layer.layers:
                     return True
         return False
@@ -745,7 +745,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 LOG.debug("purging layer {}, no longer in use".format(uuid))
                 self.willPurgeDataset.emit(uuid)
                 # remove from our bookkeeping
-                del self._layer_with_uuid[uuid]
+                del self._info_by_uuid[uuid]
                 # remove from workspace
                 self._workspace.remove(uuid)
 
@@ -774,7 +774,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         # self.create_data_layers()
         # TODO(mk) pull create_data_layers into DataLayerCollection
         if sibling_infos is None:
-            sibling_infos = self._layer_with_uuid
+            sibling_infos = self._info_by_uuid
         it = sibling_infos.get(uuid, None)
         if it is None:
             return [], 0
