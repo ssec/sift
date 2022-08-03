@@ -562,18 +562,15 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         elif hasattr(info, "layers"):
             gamma = (1.0,) * len(info.layers)
 
-        # get the presentation for another layer in our family
-        family_uuids = self.family_uuids(info[Info.FAMILY])
-        family_prez = self.prez_for_uuid(family_uuids[0]) if family_uuids else None
         p = Presentation(
             uuid=info[Info.UUID],
             kind=info[Info.KIND],
             visible=True,
             a_order=None,
-            colormap=cmap if family_prez is None else family_prez.colormap,
-            style=style if family_prez is None else family_prez.style,
-            climits=info[Info.CLIM] if family_prez is None else family_prez.climits,
-            gamma=gamma if family_prez is None else family_prez.gamma,
+            colormap=cmap,
+            style=style,
+            climits=info[Info.CLIM],
+            gamma=gamma,
             mixing=Mixing.NORMAL,
             opacity=1.0,
         )
