@@ -17,7 +17,7 @@ class _PaneWrapper(QMainWindow):
         super().__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
-        self.pane = RGBLayerConfigPane(self.ui, self.ui.layersPaneWidget, model)
+        self.pane = RGBLayerConfigPane(self.ui, None, model)
 
 
 def test_slider_change(qtbot):
