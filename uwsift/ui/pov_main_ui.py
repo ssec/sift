@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file './uwsift/ui/pov_main.ui'
+# Form implementation generated from reading ui file 'pov_main.ui'
 #
 # Created by: PyQt5 UI code generator 5.12.3
 #
@@ -740,29 +740,6 @@ class Ui_MainWindow(object):
         self.verticalLayout_4.addWidget(self.rgbScrollAreaWidget)
         self.rgbConfigPane.setWidget(self.dockWidgetContents)
         MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.rgbConfigPane)
-        self.timelinePane = QtWidgets.QDockWidget(MainWindow)
-        self.timelinePane.setMinimumSize(QtCore.QSize(172, 112))
-        self.timelinePane.setBaseSize(QtCore.QSize(0, 32))
-        self.timelinePane.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable|QtWidgets.QDockWidget.DockWidgetMovable|QtWidgets.QDockWidget.DockWidgetVerticalTitleBar)
-        self.timelinePane.setObjectName("timelinePane")
-        self.dockWidgetContents_2 = QtWidgets.QWidget()
-        self.dockWidgetContents_2.setObjectName("dockWidgetContents_2")
-        self.horizontalLayout_9 = QtWidgets.QHBoxLayout(self.dockWidgetContents_2)
-        self.horizontalLayout_9.setObjectName("horizontalLayout_9")
-        self.timelineView = QtWidgets.QGraphicsView(self.dockWidgetContents_2)
-        self.timelineView.setObjectName("timelineView")
-        self.horizontalLayout_9.addWidget(self.timelineView)
-        self.timelineScaleSlider = QtWidgets.QSlider(self.dockWidgetContents_2)
-        self.timelineScaleSlider.setMaximum(1000)
-        self.timelineScaleSlider.setSingleStep(10)
-        self.timelineScaleSlider.setPageStep(100)
-        self.timelineScaleSlider.setOrientation(QtCore.Qt.Vertical)
-        self.timelineScaleSlider.setTickPosition(QtWidgets.QSlider.NoTicks)
-        self.timelineScaleSlider.setTickInterval(100)
-        self.timelineScaleSlider.setObjectName("timelineScaleSlider")
-        self.horizontalLayout_9.addWidget(self.timelineScaleSlider)
-        self.timelinePane.setWidget(self.dockWidgetContents_2)
-        MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(8), self.timelinePane)
         self.LayerModelDockWidget = QtWidgets.QDockWidget(MainWindow)
         self.LayerModelDockWidget.setMinimumSize(QtCore.QSize(90, 185))
         self.LayerModelDockWidget.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable|QtWidgets.QDockWidget.DockWidgetMovable)
@@ -929,7 +906,6 @@ class Ui_MainWindow(object):
         self.slideMinBlue.setToolTip(_translate("MainWindow", "value at 0% blue"))
         self.slideMaxBlue.setToolTip(_translate("MainWindow", "value at 100% blue"))
         self.blueGammaLabel.setText(_translate("MainWindow", "Gamma: "))
-        self.timelinePane.setWindowTitle(_translate("MainWindow", "Timeline"))
         self.LayerModelDockWidget.setWindowTitle(_translate("MainWindow", "Layer Manager"))
         self.algebraicConfigPane.setWindowTitle(_translate("MainWindow", "Algebraic"))
         self.name_label.setText(_translate("MainWindow", "Name:"))

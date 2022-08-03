@@ -1697,58 +1697,6 @@ Checking this deactivates the Update button.</string>
     </layout>
    </widget>
   </widget>
-  <widget class="QDockWidget" name="timelinePane">
-   <property name="minimumSize">
-    <size>
-     <width>172</width>
-     <height>112</height>
-    </size>
-   </property>
-   <property name="baseSize">
-    <size>
-     <width>0</width>
-     <height>32</height>
-    </size>
-   </property>
-   <property name="features">
-    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable|QDockWidget::DockWidgetVerticalTitleBar</set>
-   </property>
-   <property name="windowTitle">
-    <string>Timeline</string>
-   </property>
-   <attribute name="dockWidgetArea">
-    <number>8</number>
-   </attribute>
-   <widget class="QWidget" name="dockWidgetContents_2">
-    <layout class="QHBoxLayout" name="horizontalLayout_9">
-     <item>
-      <widget class="QGraphicsView" name="timelineView"/>
-     </item>
-     <item>
-      <widget class="QSlider" name="timelineScaleSlider">
-       <property name="maximum">
-        <number>1000</number>
-       </property>
-       <property name="singleStep">
-        <number>10</number>
-       </property>
-       <property name="pageStep">
-        <number>100</number>
-       </property>
-       <property name="orientation">
-        <enum>Qt::Vertical</enum>
-       </property>
-       <property name="tickPosition">
-        <enum>QSlider::NoTicks</enum>
-       </property>
-       <property name="tickInterval">
-        <number>100</number>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </widget>
-  </widget>
   <widget class="QDockWidget" name="LayerModelDockWidget">
    <property name="minimumSize">
     <size>

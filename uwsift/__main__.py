@@ -693,8 +693,6 @@ class Main(QtWidgets.QMainWindow):
             self._init_auto_restart()
         else:
             self.ui.watchdogFrame.hide()
-        # FIXME: Slider does not currently work as intended. Re-enable later
-        self.ui.timelineScaleSlider.setDisabled(True)
         if UWSIFT_ANIM_INDICATOR_DISABLED:
             self.ui.animSliderFrame.hide()
         self._init_font_sizes()
@@ -986,9 +984,6 @@ class Main(QtWidgets.QMainWindow):
     def _init_arrange_panes(self):
         self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.rgbConfigPane)
         self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.algebraicConfigPane)
-        self.layout().removeWidget(self.ui.timelinePane)
-        self.ui.timelinePane.deleteLater()
-        self.ui.timelinePane = None
         # Make the layer details shown
         # FIXME hide layerDetailsPane for now, improve and show it later again
         self.ui.layerDetailsPane.hide()
