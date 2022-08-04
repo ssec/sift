@@ -924,7 +924,7 @@ class SceneGraphManager(QObject):
 
         image_data = self.workspace.get_content(product_dataset.uuid, kind=product_dataset.kind)
 
-        if False:  # Set to True FOR TESTING ONLY
+        if False:  # Set to True FOR TESTING ONLY DON'T REMOVE!
             self._overwrite_with_test_pattern(image_data)
 
         if USE_TILED_GEOLOCATED_IMAGES:
