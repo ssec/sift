@@ -35,7 +35,6 @@ from PyQt5.QtWidgets import (
 )
 
 from uwsift.common import Info, Kind, Presentation
-from uwsift.model.layer import DocBasicDataset
 from uwsift.ui.custom_widgets import QNoScrollWebView
 from uwsift.view.colormap import COLORMAP_MANAGER
 
@@ -130,7 +129,7 @@ class SingleLayerInfoPane(QWidget):
     def _update_if_different(
         self,
         shared_info: defaultdict,
-        layer_info: typ.Union[DocBasicDataset, Presentation],
+        layer_info: typ.Union[dict, Presentation],
         key: typ.Hashable = None,
         attr: str = None,
         default="",
@@ -155,7 +154,7 @@ class SingleLayerInfoPane(QWidget):
         else:
             shared_info[key] = default if shared_info[key] != new_name else new_name
 
-    def _get_shared_color_limits(self, shared_info: defaultdict, layer_info: DocBasicDataset, this_prez: Presentation):
+    def _get_shared_color_limits(self, shared_info: defaultdict, layer_info: dict, this_prez: Presentation):
         new_clims = ""
         if this_prez is not None:
             new_clims = np.array(this_prez.climits)

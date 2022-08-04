@@ -392,7 +392,7 @@ class Main(QtWidgets.QMainWindow):
         if AUTO_UPDATE_MODE__ACTIVE:
             # Choose one of the recently loaded datasets for reporting
             # "vital signs"
-            dataset = self.document[uuid_list[0]]
+            dataset = self.layer_model.get_dataset_by_uuid(uuid_list[0])
 
             self._update_dataset_timestamps(dataset)
             self._update_heartbeat_file(dataset)
@@ -535,7 +535,7 @@ class Main(QtWidgets.QMainWindow):
 
         :param dataset: recently loaded dataset
         """
-        dataset_sched_time_utc = dataset.sched_time.replace(tzinfo=timezone.utc)
+        dataset_sched_time_utc = dataset.info.get(Info.SCHED_TIME).replace(tzinfo=timezone.utc)
         fmt_time = dataset_sched_time_utc.strftime(WATCHDOG_DATETIME_FORMAT_STORE).rstrip()
 
         journal_path = self._heartbeat_file + "-journal"
@@ -561,7 +561,7 @@ class Main(QtWidgets.QMainWindow):
 
         self._last_imported_dataset_uuid = dataset.uuid
 
-        dataset_sched_time_utc = dataset.sched_time.replace(tzinfo=timezone.utc)
+        dataset_sched_time_utc = dataset.info.get(Info.SCHED_TIME).replace(tzinfo=timezone.utc)
         self.ui.timeLastDatasetCreationLineEdit.setText(
             dataset_sched_time_utc.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY)
         )
@@ -595,7 +595,7 @@ class Main(QtWidgets.QMainWindow):
         if self._max_tolerable_dataset_age > 0:
             dataset = self.document[self._last_imported_dataset_uuid]
 
-            dataset_sched_time_utc = dataset.sched_time.replace(tzinfo=timezone.utc)
+            dataset_sched_time_utc = dataset.get(Info.SCHED_TIME).replace(tzinfo=timezone.utc)
             dataset_age = now_utc - dataset_sched_time_utc
             if dataset_age.total_seconds() > self._max_tolerable_dataset_age:
                 palette = self._palette_text_red

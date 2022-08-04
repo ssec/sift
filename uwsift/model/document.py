@@ -72,10 +72,6 @@ from PyQt5.QtCore import QObject, pyqtSignal
 
 from uwsift.common import FCS_SEP, Info, Kind, Presentation, ZList
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
-from uwsift.model.layer import (
-    DocBasicDataset,
-    DocDataset,
-)
 from uwsift.queue import TASK_DOING, TASK_PROGRESS, TaskQueue
 from uwsift.util.common import units_conversion
 from uwsift.util.default_paths import DOCUMENT_SETTINGS_DIR
@@ -87,7 +83,6 @@ from uwsift.view.colormap import (
 )
 from uwsift.workspace import BaseWorkspace, CachingWorkspace, SimpleWorkspace
 from uwsift.workspace.metadatabase import Product
-from uwsift.workspace.workspace import frozendict
 
 LOG = logging.getLogger(__name__)
 
@@ -135,7 +130,7 @@ class DocLayerStack(MutableSequence):
             return self._store[index]
         elif isinstance(index, UUID):  # then return 0..n-1 index in stack
             return self.uuid2row.get(index, None)
-        elif isinstance(index, DocDataset):
+        elif isinstance(index, dict):
             return self.uuid2row.get(index.uuid, None)
         elif isinstance(index, Presentation):
             return self.uuid2row.get(index.uuid, None)
@@ -227,7 +222,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # signals
     # Clarification: Layer interfaces migrate to layer meaning "current active products under the playhead"
     # new order list with None for new layer; info-dictionary, overview-content-ndarray
-    didAddDataset = pyqtSignal(frozendict, Presentation)
+    didAddDataset = pyqtSignal(dict, Presentation)
     didUpdateBasicDataset = pyqtSignal(UUID, Kind)
     # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
     didRemoveDatasets = pyqtSignal(tuple, list, int, int)
@@ -360,7 +355,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         assert isinstance(cls, DocLayerStack)
         return cls
 
-    def _insert_layer_with_info(self, info: DocDataset, cmap=None, style=None, insert_before=0):
+    def _insert_layer_with_info(self, info: dict, cmap=None, style=None, insert_before=0):
         """
         insert a layer into the presentations but do not signal
         :return: new Presentation tuple, new reordered indices tuple
@@ -409,22 +404,22 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         active_content_data = self._workspace.import_product_content(uuid, **importer_kwargs)
         # updated metadata with content information (most importantly navigation
         # information)
-        info = self._workspace.get_info(uuid)
+        info = dict(self._workspace.get_info(uuid))
         assert info is not None
         LOG.debug("cell_width: {}".format(repr(info[Info.CELL_WIDTH])))
 
         LOG.debug("new layer info: {}".format(repr(info)))
-        self._info_by_uuid[uuid] = dataset = DocBasicDataset(self, info)
+        self._info_by_uuid[uuid] = info
         if Info.UNIT_CONVERSION not in info:
-            dataset[Info.UNIT_CONVERSION] = units_conversion(dataset)
-        if Info.FAMILY not in dataset:
-            dataset[Info.FAMILY] = self.family_for_product_or_layer(dataset)
-        presentation, reordered_indices = self._insert_layer_with_info(dataset, insert_before=insert_before)
+            info[Info.UNIT_CONVERSION] = units_conversion(info)
+        if Info.FAMILY not in info:
+            info[Info.FAMILY] = self.family_for_product_or_layer(info)
+        presentation, reordered_indices = self._insert_layer_with_info(info, insert_before=insert_before)
 
         # signal updates from the document
         self.didAddDataset.emit(info, presentation)
 
-        return uuid, dataset, active_content_data
+        return uuid, info, active_content_data
 
     def family_for_product_or_layer(self, uuid_or_layer):
         if isinstance(uuid_or_layer, UUID):
@@ -660,7 +655,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def get_uuids(self):
         return list(self._info_by_uuid.keys())
 
-    def get_info(self, row: int = None, uuid: UUID = None) -> typ.Optional[DocBasicDataset]:
+    def get_info(self, row: int = None, uuid: UUID = None) -> typ.Optional[dict]:
         if row is not None:
             uuid_temp = self.current_layer_set[row].uuid
             nfo = self._info_by_uuid[uuid_temp]
