@@ -1266,18 +1266,15 @@ class SceneGraphManager(QObject):
             if need_retile:
                 self.start_retiling_task(uuid, preferred_stride, tile_box)
 
-        current_visible_datasets_uuids = [p.uuid for (p, l) in self.document.active_layer_order if p.visible]
-        current_invisible_datasets_uuids = set(self.dataset_nodes.keys()) - set(current_visible_datasets_uuids)
+        current_datasets_uuids = self.dataset_nodes.keys()
 
         def _assess_if_active(uuid):
             dataset_node = self.dataset_nodes.get(uuid, None)
             if dataset_node is not None and hasattr(dataset_node, "assess"):
                 _assess(uuid, dataset_node)
 
-        for uuid in current_visible_datasets_uuids:
-            _assess_if_active(uuid)
-        # update invisible datasets
-        for uuid in current_invisible_datasets_uuids:
+        # update all available datasets nodes
+        for uuid in current_datasets_uuids:
             _assess_if_active(uuid)
 
     def start_retiling_task(self, uuid, preferred_stride, tile_box):
