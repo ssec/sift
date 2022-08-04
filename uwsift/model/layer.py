@@ -123,20 +123,6 @@ class DocDataset(ChainMap):
                 return d[Info.DISPLAY_NAME]
         return None
 
-    @property
-    def is_valid(self):
-        """
-        invalid layers cannot be displayed (are never visible)
-        valid layers may or may not be visible
-        visibility is managed by the scenegraph
-        validity is managed by the document
-        example of an invalid layer: an RGB or algebraic layer that's insufficiently specified to actually display,
-        be it through lack of data or lack of projection information
-        however, an invalid layer may still be configurable in order to allow it to become valid and then visible
-        :return: bool
-        """
-        return True
-
 
 class DocBasicDataset(DocDataset):
     """

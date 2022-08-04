@@ -591,7 +591,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """
         for x in self.current_layer_set:
             layer = self._info_by_uuid[x.uuid]
-            if x.visible and layer.is_valid:
+            if x.visible:
                 return x.uuid
         return None
 
