@@ -356,7 +356,6 @@ class Presentation:
     style: object = None  # name or uuid: SVG/HTML style to use; name for default, (FUTURE?) uuid for user-specified
     climits: tuple = None  # valid min and valid max used for color mapping normalization
     gamma: float = 1.0  # valid (0 to 5) for gamma correction
-    mixing: object = None  # mixing mode constant
     opacity: float = 1.0
 
 

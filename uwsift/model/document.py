@@ -34,7 +34,6 @@ Layers have presentation settings that vary with LayerSet:
  - visible: whether or not it's being drawn on the map
  - a_order: animation order, when the animation button is hit
  - colormap: how the data is converted to pixels
- - mixing: mixing mode when drawing (normal, additive)
 
 Document has zero or more Probes. Layers also come in multiple
 flavors that may be be attached to plugins or helper applications.
@@ -76,7 +75,6 @@ from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.model.layer import (
     DocBasicDataset,
     DocDataset,
-    Mixing,
 )
 from uwsift.queue import TASK_DOING, TASK_PROGRESS, TaskQueue
 from uwsift.util.common import units_conversion
@@ -386,7 +384,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             style=style,
             climits=info[Info.CLIM],
             gamma=gamma,
-            mixing=Mixing.NORMAL,
             opacity=1.0,
         )
 
