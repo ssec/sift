@@ -383,15 +383,11 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         )
 
         q = dataclasses.replace(p, visible=False)  # make it available but not visible in other layer sets
-        old_layer_count = len(self._layer_sets[self.current_set_index])
         for dex, lset in enumerate(self._layer_sets):
             if lset is not None:  # uninitialized layer sets will be None
                 lset.insert(insert_before, p if dex == self.current_set_index else q)
 
-        reordered_indices = tuple(
-            [None] + list(range(old_layer_count))
-        )  # FIXME: this should obey insert_before, currently assumes always insert at top
-        return p, reordered_indices
+        return p
 
     def activate_product_uuid_as_new_dataset(self, uuid: UUID, insert_before=0, **importer_kwargs):
         if uuid in self._info_by_uuid:
@@ -414,7 +410,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             info[Info.UNIT_CONVERSION] = units_conversion(info)
         if Info.FAMILY not in info:
             info[Info.FAMILY] = self.family_for_product_or_layer(info)
-        presentation, reordered_indices = self._insert_layer_with_info(info, insert_before=insert_before)
+        presentation = self._insert_layer_with_info(info, insert_before=insert_before)
 
         # signal updates from the document
         self.didAddDataset.emit(info, presentation)
