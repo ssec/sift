@@ -411,7 +411,6 @@ class SceneGraphManager(QObject):
 
         # Head node of the map graph
         self.main_map = MainMap(name="MainMap", parent=self.main_map_parent)
-        self.proxy_nodes = {}
 
         self.create_test_image()
 
@@ -1277,9 +1276,6 @@ class SceneGraphManager(QObject):
 
         for uuid in current_visible_datasets_uuids:
             _assess_if_active(uuid)
-        # update contours
-        for node in self.proxy_nodes.values():
-            node.on_view_change()
         # update invisible datasets
         for uuid in current_invisible_datasets_uuids:
             _assess_if_active(uuid)
