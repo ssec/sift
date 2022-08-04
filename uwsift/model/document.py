@@ -392,12 +392,12 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def activate_product_uuid_as_new_dataset(self, uuid: UUID, insert_before=0, **importer_kwargs):
         if uuid in self._info_by_uuid:
             LOG.debug("Layer already loaded: {}".format(uuid))
-            active_content_data = self._workspace.import_product_content(uuid, **importer_kwargs)
-            return uuid, self[uuid], active_content_data
+            self._workspace.import_product_content(uuid, **importer_kwargs)
+            return
 
         # FUTURE: Load this async, the slots for the below signal need to be OK
         # with that
-        active_content_data = self._workspace.import_product_content(uuid, **importer_kwargs)
+        self._workspace.import_product_content(uuid, **importer_kwargs)
         # updated metadata with content information (most importantly navigation
         # information)
         info = dict(self._workspace.get_info(uuid))
@@ -414,8 +414,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
         # signal updates from the document
         self.didAddDataset.emit(info, presentation)
-
-        return uuid, info, active_content_data
 
     def family_for_product_or_layer(self, uuid_or_layer):
         if isinstance(uuid_or_layer, UUID):
