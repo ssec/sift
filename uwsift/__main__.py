@@ -84,7 +84,6 @@ STATUS_BAR_DURATION = 2000  # ms
 WATCHDOG_DATETIME_FORMAT_DISPLAY = "%Y-%m-%d %H:%M:%S %Z"
 WATCHDOG_DATETIME_FORMAT_STORE = "%Y-%m-%d %H:%M:%S %z"
 
-UWSIFT_ANIM_INDICATOR_DISABLED = True
 
 EXIT_FORCED_SHUTDOWN = 101
 EXIT_CONFIRMED_SHUTDOWN = 102
@@ -280,15 +279,6 @@ class UserControlsAnimation(QtCore.QObject):
         self.ui.animForward.clicked.connect(self.next_frame)
         self.ui.animBack.clicked.connect(self.prev_frame)
 
-        # allow animation slider to set animation frame being displayed:
-        self.ui.animationSlider.valueChanged.connect(self.animation_slider_jump_frame)
-
-        # allow animation, once stopped, to propagate visibility to the document and layerlist:
-
-        self.document.didChangeLayerVisibility.connect(self.update_frame_time_to_top_visible)
-        self.document.didReorderDatasets.connect(self.update_frame_time_to_top_visible)
-        self.document.didRemoveDatasets.connect(self.update_frame_time_to_top_visible)
-
     def next_frame(self, *args, **kwargs):
         """Advance a frame along the animation order."""
         self.scene_manager.animation_controller.animating = False
@@ -298,16 +288,6 @@ class UserControlsAnimation(QtCore.QObject):
         """Retreat a frame along the animation list."""
         self.scene_manager.animation_controller.animating = False
         self.scene_manager.animation_controller.time_manager.step(backwards=True)
-
-    def update_frame_time_to_top_visible(self, *args):
-        """Update frame slider's time display to show the current top layer's time."""
-        self.ui.animationLabel.setText(self.document.time_label_for_uuid(self.document.current_visible_layer_uuid))
-
-    def animation_slider_jump_frame(self, event, *args, **kwargs):
-        """Update display to match frame slider change."""
-        frame = self.ui.animationSlider.value()
-        self.scene_manager.set_frame_number(frame)
-        # TODO: update layer list to reflect what layers are visible/hidden?
 
     def set_animation_speed(self, milliseconds):
         """Change frame rate as measured in milliseconds."""
@@ -693,8 +673,6 @@ class Main(QtWidgets.QMainWindow):
             self._init_auto_restart()
         else:
             self.ui.watchdogFrame.hide()
-        if UWSIFT_ANIM_INDICATOR_DISABLED:
-            self.ui.animSliderFrame.hide()
         self._init_font_sizes()
 
         self.setWindowTitle(self.windowTitle().replace("|X.X.X|", __version__))

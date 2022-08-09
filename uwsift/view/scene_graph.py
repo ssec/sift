@@ -234,35 +234,6 @@ class AnimationController(object):
         """
         return self.time_manager.get_current_timebase_dataset_uuids()
 
-    def next_frame(self, event=None, frame_number=None):
-        """
-        skip to the frame (from 0) or increment one frame and update
-        typically this is run by self._animation_timer
-        :param frame_number: optional frame to go to, from 0
-        :return:
-        """
-        raise ValueError("AnimationController.next_frame should not be called, ever!!!")
-        lfo = len(self._frame_order)
-        frame = self._frame_number
-        if frame_number is None:
-            frame = self._frame_number + 1
-        elif isinstance(frame_number, int):
-            if frame_number == -1:
-                frame = self._frame_number + (lfo - 1)
-            else:
-                frame = frame_number
-        if lfo > 0:
-            frame %= lfo
-        else:
-            frame = 0
-        # self._set_visible_child(frame)
-        self._frame_number = frame
-        self.parent.update()
-        if self._frame_change_cb is not None and lfo:
-
-            uuid = self._frame_order[self._frame_number]
-            self._frame_change_cb((self._frame_number, lfo, self._animating, uuid))
-
 
 class SceneGraphManager(QObject):
     """
@@ -1220,9 +1191,6 @@ class SceneGraphManager(QObject):
         document.didChangeColormap.connect(self.change_dataset_nodes_colormap)
         document.didChangeLayerVisibility.connect(self.change_datasets_visibility)
         document.didReorderAnimation.connect(self._rebuild_frame_order)
-
-    def set_frame_number(self, frame_number=None):
-        self.animation_controller.next_frame(None, frame_number)
 
     def set_dataset_visible(self, uuid: UUID, visible: Optional[bool] = None):
         dataset_node = self.dataset_nodes.get(uuid, None)

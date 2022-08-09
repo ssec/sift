@@ -536,13 +536,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         LOG.debug("sorted products: {}".format(repr(zult)))
         return [u for u, _ in zult]
 
-    def time_label_for_uuid(self, uuid):
-        """used to update animation display when a new frame is shown"""
-        if not uuid:
-            return "YYYY-MM-DD HH:MM"
-        info = self._info_by_uuid[uuid]
-        return info.get(Info.DISPLAY_TIME, "--:--")
-
     def prez_for_uuids(self, uuids: typ.List[UUID], lset: list = None) -> typ.Iterable[typ.Tuple[UUID, Presentation]]:
         if lset is None:
             lset = self.current_layer_set
@@ -569,17 +562,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         :return:
         """
         return tuple(x.uuid for x in self.current_layer_set)
-
-    @property
-    def current_visible_layer_uuid(self):
-        """
-        :return: the topmost visible layer's UUID
-        """
-        for x in self.current_layer_set:
-            layer = self._info_by_uuid[x.uuid]
-            if x.visible:
-                return x.uuid
-        return None
 
     # TODO: add a document style guide which says how different bands from different instruments are displayed
 
