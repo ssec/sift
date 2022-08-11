@@ -31,8 +31,7 @@ class TimeTransformer:
 
     def change_timebase(self, layer):
         self._translation_policy.change_timebase(layer)
-        self.t_sim = self._translation_policy.curr_t_sim()
-        self.timeline_index = self._translation_policy.curr_timeline_index()
+        self.update_current_timebase()
 
     def jump(self, index):
         self.t_sim = self._translation_policy.jump_to_t_sim(index=index)
@@ -42,4 +41,12 @@ class TimeTransformer:
         # tick times in milliseconds since Epoch
         self.curr_tick_time = time.time_ns() // 1000000
         self.t_sim = self._translation_policy.compute_t_sim(self.curr_tick_time, backwards=backwards)
+        self.timeline_index = self._translation_policy.curr_timeline_index()
+
+    def update_current_timebase(self):
+        """Update timebase parameters to pick up according changes from the time translation policy.
+
+        Implementation details: This method is only public to be callable from TimeManager, no other use intended.
+        """
+        self.t_sim = self._translation_policy.curr_t_sim()
         self.timeline_index = self._translation_policy.curr_timeline_index()
