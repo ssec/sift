@@ -46,7 +46,7 @@ class TimeManager(QObject):
         self.qml_layer_manager: QmlLayerManager = QmlLayerManager()
         self.current_timebase_uuid = None
 
-        self.qml_timestamps_model = TimebaseModel(timestamps=TimebaseModel._get_default_qdts())
+        self.qml_timestamps_model = TimebaseModel(timestamps=None)
         self._time_transformer: Optional[TimeTransformer] = None
 
     @property

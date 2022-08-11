@@ -213,14 +213,11 @@ class TimebaseModel(QAbstractListModel):
     timebaseChanged = pyqtSignal()
     currentTimestampChanged = pyqtSignal(str)
 
-    def __init__(self, *args, timestamps: List[QDateTime] = None, **kwargs):
+    def __init__(self, *args, timestamps: List[QDateTime], **kwargs):
         super().__init__(*args, **kwargs)
-        if timestamps is None:
-            timestamps = []
-        self._timestamps = None
-        self.timestamps = timestamps
-        self._current_timestamp = None
         self._format_str = DEFAULT_TIME_FORMAT
+        self.timestamps = timestamps  # sets self._timestamps
+        self.currentTimestamp = None  # sets self._current_timestamp
 
     @pyqtProperty("QVariantList", notify=modelChanged)
     def model(self):
@@ -239,14 +236,11 @@ class TimebaseModel(QAbstractListModel):
 
     @pyqtProperty(str, notify=currentTimestampChanged)
     def currentTimestamp(self):
-        if not self._current_timestamp:
-            return self._format_str.strip("%")
-        else:
-            return self._current_timestamp
+        return self._current_timestamp
 
     @currentTimestamp.setter
     def currentTimestamp(self, new_date):
-        self._current_timestamp = new_date.strftime(self._format_str)
+        self._current_timestamp = new_date.strftime(self._format_str) if new_date else self._format_str.replace("%", "")
         self.currentTimestampChanged.emit(self._current_timestamp)
 
     @property
@@ -254,13 +248,13 @@ class TimebaseModel(QAbstractListModel):
         return self._timestamps
 
     @timestamps.setter
-    def timestamps(self, new_timetamps):
+    def timestamps(self, timestamps):
         self.layoutAboutToBeChanged.emit()
-        self._timestamps = new_timetamps
+        self._timestamps = timestamps if timestamps else self._get_default_qdts()
         # upd. persistent indexes
         from_index_list = self.persistentIndexList()
         to_index_list = []
-        for i, _ in enumerate(new_timetamps):
+        for i, _ in enumerate(self._timestamps):
             to_index_list.append(self.index(i, parent=QModelIndex()))
         self.changePersistentIndexList(from_index_list, to_index_list)
         self.layoutChanged.emit()
