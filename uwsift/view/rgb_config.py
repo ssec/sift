@@ -152,11 +152,11 @@ class RGBLayerConfigPane(QObject):
             self.set_combos_to_layer_names()
 
     def layer_removed(self, layer_uuid):
-        for idx in range(len(self._layer_uuids)):
-            if self._layer_uuids[idx] == layer_uuid:
-                del self._layer_uuids[idx]
-                self.set_combos_to_layer_names()
-                self._show_settings_for_layer(self.recipe)
+        if layer_uuid in self._layer_uuids:
+            idx = self._layer_uuids.index(layer_uuid)
+            del self._layer_uuids[idx]
+            self.set_combos_to_layer_names()
+            self._show_settings_for_layer(self.recipe)
 
     def _gamma_changed(self, value):
         gamma = tuple(x.value() for x in self.gamma_boxes)
