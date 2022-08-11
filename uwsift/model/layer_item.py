@@ -338,6 +338,7 @@ class LayerItem:
         the layer.
         """
         self._timeline.pop(sched_time, None)
+        LOG.debug(f"ProductDataset with sched_time '{sched_time}' removed.")
 
     def add_algebraic_dataset(
         self,

@@ -700,8 +700,10 @@ class CachingWorkspace(BaseWorkspace):
         from uwsift.queue import TASK_DOING, TASK_PROGRESS
 
         yield {TASK_DOING: "purging memory", TASK_PROGRESS: 0.5}
+        LOG.debug(f"Active Content before deletion: {list(self._available.keys())}")
         with self._inventory as s:
             self._deactivate_content_for_product(self._product_with_uuid(s, uuid))
+        LOG.debug(f"Active Content after deletion: {list(self._available.keys())}")
         yield {TASK_DOING: "purging memory", TASK_PROGRESS: 1.0}
 
     def get_content(self, dsi_or_uuid, lod=None, kind: Kind = Kind.IMAGE) -> Optional[np.memmap]:

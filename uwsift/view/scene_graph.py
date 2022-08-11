@@ -1169,9 +1169,11 @@ class SceneGraphManager(QObject):
             image_layer = self.dataset_nodes[uuid_removed]
             image_layer.parent = None
             del self.dataset_nodes[uuid_removed]
-            LOG.info("layer {} purge from scenegraphmanager".format(uuid_removed))
+            LOG.info(f"dataset {uuid_removed} purge from Scene Graph")
         else:
-            LOG.debug("Layer {} already purged from Scene Graph".format(uuid_removed))
+            LOG.debug(f"dataset {uuid_removed} already purged from Scene Graph")
+        LOG.debug("Scene Graph after dataset deletion:")
+        LOG.debug(self.main_view.describe_tree(with_transform=True))
 
     def _purge_dataset(self, *args, **kwargs):
         res = self.purge_dataset(*args, **kwargs)
