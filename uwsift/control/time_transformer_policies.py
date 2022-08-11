@@ -18,7 +18,8 @@ class WrappingDrivingPolicy(QObject):
     no more timestamps in the driving layer it starts over from the first timestamp.
     """
 
-    didUpdatePolicy = pyqtSignal(LayerItem)
+    # should be a LayerItem, but it could be None, too. It can be None if no driving layer could be chosen
+    didUpdatePolicy = pyqtSignal(object)
 
     def __init__(self, layers: List[LayerItem]):
         super().__init__()
@@ -73,6 +74,8 @@ class WrappingDrivingPolicy(QObject):
     def driving_layer(self, layer: LayerItem):
         if not layer or not layer.dynamic:
             self._driving_layer = None
+            self._driving_idx = 1
+            self._timeline = None
         elif not self._driving_layer:
             self._driving_layer = layer
             self.timeline = list(self._driving_layer.timeline.keys())

@@ -212,6 +212,7 @@ class TimebaseModel(QAbstractListModel):
     modelChanged = pyqtSignal()
     timebaseChanged = pyqtSignal()
     currentTimestampChanged = pyqtSignal(str)
+    returnToInitialState = pyqtSignal()
 
     def __init__(self, *args, timestamps: List[QDateTime], **kwargs):
         super().__init__(*args, **kwargs)
@@ -246,6 +247,15 @@ class TimebaseModel(QAbstractListModel):
     @property
     def timestamps(self):
         return self._timestamps
+
+    def clear(self):
+        """Set the two corresponding properties which has to do something with the timestamps to None.
+
+        The purpose of this is to give a possibility to return to a similar state like
+        when TimeBaseModel was initialized."""
+        self.timestamps = None
+        self.currentTimestamp = None
+        self.returnToInitialState.emit()
 
     @timestamps.setter
     def timestamps(self, timestamps):

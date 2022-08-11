@@ -171,8 +171,11 @@ class TimeManager(QObject):
         # TODO(mk): the policy should not be responsible for UI, another policy or an object
                     that ingests a policy and handles UI based on that?
         """
+        self.qml_engine.clearComponentCache()
         if not layer or not layer.dynamic:
-            new_timestamp_qdts = TimebaseModel._get_default_qdts()
+            self.qml_timestamps_model.clear()
+            self.qml_backend.clear_timeline()
+            self._time_transformer.update_current_timebase()
         else:
             new_timestamp_qdts = list(map(lambda dt: QDateTime(dt), layer.timeline.keys()))
 
@@ -180,9 +183,7 @@ class TimeManager(QObject):
                 self.qml_timestamps_model.currentTimestamp = list(layer.timeline.keys())[0]
             else:
                 self.qml_timestamps_model.currentTimestamp = self._time_transformer.t_sim
-
-        self.qml_engine.clearComponentCache()
-        self.qml_timestamps_model.timestamps = new_timestamp_qdts
+            self.qml_timestamps_model.timestamps = new_timestamp_qdts
         self.qml_backend.refresh_timeline()
 
     def update_qml_layer_model(self):
@@ -236,7 +237,7 @@ class TimeManager(QObject):
         if not dynamic_layers:
             # FIXME: reset to initial state when last dynamic layer has been
             #  removed (as soon as layer removal becomes possible)
-            # self.update_qml_timeline(None)
+            self.update_qml_timeline(None)
             return
 
         assert 0 <= index < len(dynamic_layers)
