@@ -43,11 +43,15 @@ CHANNEL_ALPHA = 3
 
 RGBA2IDX: Mapping[str, int] = dict(r=CHANNEL_RED, g=CHANNEL_GREEN, b=CHANNEL_BLUE, a=CHANNEL_ALPHA)
 
+IDX2RGBA: Mapping[int, str] = dict([(0, "r"), (1, "g"), (2, "b"), (3, "a")])
+
 CHANNEL_X = 0
 CHANNEL_Y = 1
 CHANNEL_Z = 2
 
 XYZ2IDX: Mapping[str, int] = dict(x=CHANNEL_X, y=CHANNEL_Y, z=CHANNEL_Z)
+
+IDX2XYZ: Mapping[int, str] = dict([(0, "x"), (1, "y"), (2, "z")])
 
 DIFF_OP_NAME = "Difference"
 NDI_OP_NAME = "Normalized Difference Index"
