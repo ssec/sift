@@ -331,7 +331,7 @@ class LayerModel(QAbstractItemModel):
                 raise NotImplementedError(f"Managing datasets of kind {product_dataset.kind}" f" not (yet) supported.")
 
             self.didUpdateLayers.emit()
-        self._trigger_composite_layer_update(layer)
+        self._update_dependent_recipe_layers(layer)
 
     def mimeTypes(self):
         return ["text/plain", "text/xml"]
@@ -610,7 +610,7 @@ class LayerModel(QAbstractItemModel):
             self._add_algebraic_datasets(sched_times_to_add, input_layers, recipe_layer)
             recipe_layer.recipe.modified = False
 
-            self._trigger_composite_layer_update(recipe_layer)
+            self._update_dependent_recipe_layers(recipe_layer)
 
         self.didUpdateLayers.emit()
 
@@ -646,15 +646,11 @@ class LayerModel(QAbstractItemModel):
             layers.append(self.get_layer_by_uuid(uuid))
         return layers
 
-    def _trigger_composite_layer_update(self, changed_layer):
+    def _update_dependent_recipe_layers(self, changed_layer):
         for layer in self.layers:
             if layer.recipe:
                 if changed_layer.uuid in layer.recipe.input_layer_ids:
-                    self._update_composite_layer_timeline(layer)
-
-    def _update_composite_layer_timeline(self, layer):
-        if isinstance(layer.recipe, CompositeRecipe):
-            self.update_recipe_layer_timeline(layer.recipe)
+                    self.update_recipe_layer_timeline(layer.recipe)
 
     @staticmethod
     def create_reasonable_rgb_composite_default():
