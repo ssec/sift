@@ -754,7 +754,11 @@ class LayerModel(QAbstractItemModel):
 
             operations = algebraic_layer.recipe.operation_formula
 
-            uuid, info, data = self._workspace.create_algebraic_composite(operations, assignment, info)
+            try:
+                uuid, info, data = self._workspace.create_algebraic_composite(operations, assignment, info)
+            except (NameError, ValueError, AttributeError) as e:
+                LOG.warning(f"Invalid formula of layer '{algebraic_layer.descriptor}': {e}")
+                return
 
             dataset = algebraic_layer.add_algebraic_dataset(None, info, sched_time, input_datasets_uuids)
 

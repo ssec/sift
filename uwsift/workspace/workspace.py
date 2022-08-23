@@ -725,7 +725,7 @@ class BaseWorkspace(QObject):
         )
         return data[index_mask]
 
-    def __getitem__(self,datasetinfo_or_uuid):
+    def __getitem__(self, datasetinfo_or_uuid):
         """
         return science content proxy capable of generating a numpy array when sliced
         :param datasetinfo_or_uuid: metadata or key for the dataset
