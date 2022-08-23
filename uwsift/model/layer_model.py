@@ -50,13 +50,17 @@ class LayerModel(QAbstractItemModel):
     didFinishActivateProductDatasets = pyqtSignal()
 
     # ----------------------- Removing existing layers -------------------------
-    didDeleteProductDataset = pyqtSignal(UUID)
+    willRemoveLayer = pyqtSignal(UUID)
+    didRemoveLayer = pyqtSignal(UUID)
+    willDeleteProductDataset = pyqtSignal(UUID)
+    didDeleteProductDataset = pyqtSignal(list)
     # ---------------------- Request creation of Recipes -----------------------
     # object should be a List[Optional[UUID]]
     didRequestCompositeRecipeCreation = pyqtSignal(object)
     # object should be a List[Optional[UUID]]
     didRequestAlgebraicRecipeCreation = pyqtSignal(object)
-
+    # ---------------------- Request change of Recipes -------------------------
+    removeLayerAsRecipeInput = pyqtSignal(UUID)
     # --------------------------------------------------------------------------
 
     didActivateProductDataset = pyqtSignal(UUID, bool)
@@ -100,6 +104,8 @@ class LayerModel(QAbstractItemModel):
         self.layers: List[LayerItem] = []
 
         self._supportedRoles = [Qt.DisplayRole, Qt.EditRole, Qt.TextAlignmentRole]
+
+        self.rowsAboutToBeRemoved.connect(self._rows_about_to_be_removed)
 
     def _init_system_layer(self, name):
         # The minimal 'dataset' information required by LayerItem
@@ -509,14 +515,40 @@ class LayerModel(QAbstractItemModel):
         return input_datasets_infos
 
     def _remove_datasets(self, datasets_to_remove: List[datetime], layer: LayerItem):
+        """
+        The caller of this function has to guarantee that the dataset with the given
+        dataset schedule times exist in the given layer.
+
+        MAINTENANCE: If the use case arises that this condition should not be met replace
+        the assertion statement with e.g. an if statement.
+
+        :param datasets_to_remove: List of schedule times of datasets which should be removed
+        :param layer: The specific layer which owns the datasets which should be removed
+        """
+
         for sched_time in datasets_to_remove:
             dataset: ProductDataset = layer.timeline.get(sched_time)
+            assert dataset
             self._remove_dataset(layer, sched_time, dataset.uuid)
 
     def _remove_dataset(self, layer: LayerItem, sched_time: datetime, dataset_uuid: UUID):
+        """When a specific dataset with the UUID should be removed then the corresponding distributed parts have to
+        be removed, too. These parts should be removed in the reverse order of their creation. So the order for the
+        deletion looks like:
+            - Deletion of scene graph node of the dataset
+            - Deletion of ProductDataset (+ its Presentation)
+            - Deletion of saved info of the dataset in the document
+            - Deletion of the corrsponding parts of the dataset which are handled by the workspace
+
+        :param layer: The Layer which the dataset belongs to
+        :param sched_time: The schedule time of the dataset which will be removed
+        :param dataset_uuid: The UUID of the dataset which will be removed
+        """
+        self.willDeleteProductDataset.emit(dataset_uuid)
         layer.remove_dataset(sched_time)
-        # TODO: Workspace has to remove Content/Product
-        self.didDeleteProductDataset.emit(dataset_uuid)
+        self._document.remove_dataset_info(dataset_uuid)
+        self._workspace.remove(dataset_uuid)
+        self.didDeleteProductDataset.emit([dataset_uuid])
 
     def _update_rgb_datasets(
         self, datasets_to_update: List[datetime], input_layers: List[LayerItem], rgb_layer: LayerItem
@@ -796,6 +828,13 @@ class LayerModel(QAbstractItemModel):
         return None
 
     def remove_datasets_from_all_layers(self, dataset_uuids):
+        """
+        This method can be used if only the datasets and not the whole layer should be removed and if datasets from
+        different layers should be removed (or the caller does not know to which layer the datasets belong).
+        The dataset can be only removed if the UUID in the given list belongs to an existing dataset.
+
+        :param dataset_uuids: List of UUIDs from datasets which going to be removed
+        """
         did_remove_any_dataset = False
         for dataset_uuid in dataset_uuids:
             dataset = self.get_dataset_by_uuid(dataset_uuid)
@@ -804,12 +843,54 @@ class LayerModel(QAbstractItemModel):
                 layer = self.get_layer_by_uuid(dataset.layer_uuid)
                 self._remove_dataset(layer, dataset.info[Info.SCHED_TIME], dataset.info[Info.UUID])
                 LOG.debug(f"Removing {dataset}")
-                self._document.remove_layer_prez(dataset_uuid)
-                self._document.purge_layer_prez([dataset_uuid])
                 did_remove_any_dataset = True
 
         if did_remove_any_dataset:
             self.didUpdateLayers.emit()
+
+    def remove_layers(self, indices: List[QModelIndex]):
+        """Iterate the given indices, and if the layer is not a system layer at a given index, it can be deleted.
+
+        But before a layer can be finally deleted, it must be empty. To do this, the layer must no longer have
+        any ProductDatasets and other things associated with them, such as visual nodes.
+        The layer must be removed as an input layer for all derived layers that use the layer to be deleted.
+        Finally, the corresponding Scene Graph node of the layer must also be removed and the timeline must also
+        be updated.
+
+        :param indices: a list of QModelIndex indices which should be deleted and which should exist in the LayerModel
+        """
+        # TODO think about if this really works if more then one Layer should be deleted?
+        for idx in indices:
+            layer = self.layers[idx.row()]
+
+            if layer.info.get(Info.PLATFORM) == Platform.SYSTEM:
+                continue
+
+            self._clear_layer(layer)
+            self._remove_empty_layer(idx.row())
+
+            self.didRemoveLayer.emit(layer.uuid)
+        self.didUpdateLayers.emit()
+
+    def _clear_layer(self, layer: LayerItem):
+
+        self.removeLayerAsRecipeInput.emit(layer.uuid)
+
+        datasets_sched_times = list(layer.timeline.keys())
+
+        self._remove_datasets(datasets_sched_times, layer)
+
+    def _remove_empty_layer(self, row: int):
+        self.beginRemoveRows(QModelIndex(), row, row)
+        del self.layers[row]
+        self.endRemoveRows()
+
+        self._emit_didReorderLayers()
+
+    def _rows_about_to_be_removed(self, parent: QModelIndex, first: int, last: int):
+        for row in range(first, last + 1):
+            layer = self.layers[row]
+            self.willRemoveLayer.emit(layer.uuid)
 
 
 class ProductFamilyKeyMappingPolicy:
