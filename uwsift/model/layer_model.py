@@ -612,6 +612,29 @@ class LayerModel(QAbstractItemModel):
         return timelines_of_input_layers
 
     def update_recipe_layer_timeline(self, recipe: Recipe):
+        """Update the list of sched_times and associated data for which the recipe layer can present data.
+
+        A recipe layer aka derived layer has an entry for any given sched_time, if and only if all layers directly
+        or indirectly referenced by its recipe have data for that sched_time. The method updates the timeline for (the
+        layer of) the given recipe by calculating it as intersection of the timelines of all contributing layers.
+        By comparing this common timeline with the current timeline of the recipe layer it has to be determined, for
+        which sched_times derived datasets need to be removed, updated or added before the corresponding actions
+        are performed.
+
+        MAINTENANCE: For now the removal of recipe layer datasets is the same regardless of whether the recipe layer has
+        an algebraic or composite recipe. For the other two steps of the update process - updating and adding derived
+        datasets - there is a different handling depending on the type of recipe.
+
+        If the given recipe (layer) can be used as input for other recipe layers (currently only for algebraics),
+        then the dependent recipe layers must also be and is updated by calling this method with their recipes
+        recursively.
+
+        ATTENTION: There *must* be no cyclic dependency defined by recipes (e.g. an algebraic layer *n* which uses the
+        algebraic layer *m* as input layer, which in turn - directly or indirectly - again uses the layer *n* as input
+        layer), otherwise the depicted recursion will not terminate! This case is not caught!
+
+        :param recipe: Recipe of the layer whose timeline is to be updated
+        """
         recipe_layer: LayerItem = self._get_layer_of_recipe(recipe.id)
 
         if isinstance(recipe, CompositeRecipe):
