@@ -211,6 +211,7 @@ class AlgebraicRecipe(Recipe):
 class RecipeManager(QObject):
     didCreateRGBCompositeRecipe = pyqtSignal(CompositeRecipe)
     didCreateAlgebraicRecipe = pyqtSignal(AlgebraicRecipe)
+    didUpdateAlgebraicInputLayers = pyqtSignal(AlgebraicRecipe)
 
     didUpdateRGBInputLayers = pyqtSignal(CompositeRecipe)
     didUpdateRGBColorLimits = pyqtSignal(CompositeRecipe)
@@ -339,6 +340,25 @@ class RecipeManager(QObject):
         recipe.input_layer_ids[channel_idx] = layer_uuid
         recipe.modified = True
         self.recipes[recipe.id] = recipe
+
+    def remove_layer_as_recipe_input(self, layer_uuid: uuid):
+        """
+        Remove a layer from all recipes in which it is used as input layer.
+
+        Must be called before the layer given by the layer_uuid can be removed from the system.
+
+        :param layer_uuid: UUID of the layer to be removed from all recipes
+        """
+        for recipe in self.recipes.values():
+            if layer_uuid in recipe.input_layer_ids:
+                idx = recipe.input_layer_ids.index(layer_uuid)
+                if isinstance(recipe, CompositeRecipe):
+                    channel = IDX2RGBA.get(idx)
+                    self.update_rgb_recipe_input_layers(recipe, channel, None, (None, None), 1.0)
+                if isinstance(recipe, AlgebraicRecipe):
+                    channel = IDX2XYZ.get(idx)
+                    self.update_algebraic_recipe_input_layers(recipe, channel, None)
+                    self.didUpdateAlgebraicInputLayers.emit(recipe)
 
     def __getitem__(self, recipe_id):
         return self.recipes[recipe_id]
