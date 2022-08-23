@@ -111,3 +111,9 @@ class LayerTreeView(QTreeView):
         if len(self.model().layers) > 0:
             selected_layer: tuple = (self.model().layers[current.row()],)
             self.layerSelectionChanged.emit(selected_layer)
+
+    def begin_layers_removal(self, *args, **kwargs):
+        """
+        Triggers the process that the model removes the current selected Rows out of itself.
+        """
+        self.model().remove_layers(self.selectionModel().selectedRows())
