@@ -224,8 +224,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     # new order list with None for new layer; info-dictionary, overview-content-ndarray
     didAddDataset = pyqtSignal(dict, Presentation)
     didUpdateBasicDataset = pyqtSignal(UUID, Kind)
-    # new order, UUIDs that were removed from current layer set, first row removed, num rows removed
-    didRemoveDatasets = pyqtSignal(tuple, list, int, int)
     didChangeLayerVisibility = pyqtSignal(dict)  # {UUID: new-visibility, ...} for changed layers
     didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didChangeProjection = pyqtSignal(str)  # name of projection (area definition)

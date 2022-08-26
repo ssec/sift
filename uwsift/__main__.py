@@ -688,7 +688,6 @@ class Main(QtWidgets.QMainWindow):
         else:
             self.workspace = SimpleWorkspace(workspace_dir)
         self.document = doc = Document(self.workspace, config_dir=config_dir, queue=self.queue)
-        self.document.didRemoveDatasets.connect(self.run_gc_after_layer_deletion)
         self.scene_manager = SceneGraphManager(
             doc, self.workspace, self.queue, borders_shapefiles=border_shapefile, center=center, parent=self
         )
