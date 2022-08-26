@@ -1200,7 +1200,6 @@ class SceneGraphManager(QObject):
             self.set_dataset_visible(uuid, visible)
 
     def _connect_doc_signals(self, document: Document):
-        document.didReorderDatasets.connect(self._rebuild_dataset_order)  # current layer set changed z/anim order
         document.didUpdateBasicDataset.connect(self.update_basic_dataset)  # new data integrated in existing layer
         document.didRemoveDatasets.connect(self._remove_dataset)  # layer removed from current layer set
         document.willPurgeDataset.connect(self._purge_dataset)  # layer removed from document
