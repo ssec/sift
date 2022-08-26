@@ -1174,12 +1174,6 @@ class SceneGraphManager(QObject):
         LOG.debug("Scene Graph after dataset deletion:")
         LOG.debug(self.main_view.describe_tree(with_transform=True))
 
-    def _purge_dataset(self, *args, **kwargs):
-        res = self.purge_dataset(*args, **kwargs)
-        # when purging the layer is the only operation being performed then update when we are done
-        self.update()
-        return res
-
     def remove_layer_node(self, uuid_removed: UUID):
         """
         Layer will be removed, but before it can be removed correctly the scene graph node has to be removed.
@@ -1209,31 +1203,6 @@ class SceneGraphManager(QObject):
         if dataset_node is None:
             return
         dataset_node.visible = not dataset_node.visible if visible is None else visible
-
-    def rebuild_dataset_order(self, new_layer_index_order, *args, **kwargs):
-        """
-        layer order has changed; shift layers around.
-        an empty list is sent if the whole layer order has been changed
-        :param change:
-        :return:
-        """
-        # TODO this is the lazy implementation, eventually just change z order on affected layers
-        self.animation_controller.set_layer_order(self.document.current_layer_uuid_order)
-
-    def _rebuild_dataset_order(self, *args, **kwargs):
-        res = self.rebuild_dataset_order(*args, **kwargs)
-        self.update()
-        return res
-
-    def rebuild_frame_order(self, uuid_list: list, *args, **kwargs):
-        LOG.debug("setting SGM new frame order to {0!r:s}".format(uuid_list))
-        self.animation_controller.frame_order = uuid_list
-
-    def _rebuild_frame_order(self, *args, **kwargs):
-        res = self.rebuild_frame_order(*args, **kwargs)
-        # when purging the layer is the only operation being performed then update when we are done
-        self.update()
-        return res
 
     def on_view_change(self, scheduler):
         """Simple event handler for when we need to reassess image layers."""
