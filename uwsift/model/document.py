@@ -70,7 +70,7 @@ from weakref import ref
 
 from PyQt5.QtCore import QObject, pyqtSignal
 
-from uwsift.common import FCS_SEP, Info, Kind, Presentation, ZList
+from uwsift.common import Info, Kind, Presentation
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.queue import TASK_DOING, TASK_PROGRESS, TaskQueue
 from uwsift.util.common import units_conversion
@@ -203,9 +203,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     queue: TaskQueue = None
     _workspace: BaseWorkspace = None
 
-    # timeline the user has specified:
-    track_order: ZList = None  # (zorder, family-name) with higher z above lower z; z<0 should not occur
-
     # DEPRECATION in progress: layer sets
     """
     Document has one or more LayerSets choosable by the user (one at a time) as currentLayerSet
@@ -266,35 +263,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             else:
                 self.colormaps.import_colormaps(cmap_dir, read_only=read_only, category=cmap_cat)
 
-        # timeline document storage setup with initial track order and time range
-        self.track_order = ZList()
-
-        # scan available metadata for initial state
-        # FIXME: refresh this once background scan finishes and new products are found
-        # self.timeline_span = self.playback_span = self.potential_product_span()
-        if isinstance(self._workspace, CachingWorkspace):
-            self.sync_potential_tracks_from_metadata()
-
-    def potential_tracks(self) -> typ.List[str]:
-        """List the names of available tracks (both active and potential) according to the metadatabase"""
-        with self._workspace.metadatabase as S:
-            return list((f + FCS_SEP + c) for (f, c) in S.query(Product.family, Product.category).distinct())
-
-    def sync_potential_tracks_from_metadata(self):
-        """update track_order to include any newly available tracks"""
-        all_tracks = list(self.potential_tracks())
-        all_tracks.sort()
-        old_tracks = set(name for z, name in self.track_order.items())
-        for track in all_tracks:
-            self.track_order.append(track, start_negative=True, not_if_present=True)
-        for dismissed in old_tracks - set(all_tracks):
-            LOG.debug("removing track {} from track_order".format(dismissed))
-            self.track_order.remove(dismissed)
-        new_tracks = set(name for z, name in self.track_order.items())
-        if old_tracks != new_tracks:
-            LOG.info("went from {} available tracks to {}".format(len(old_tracks), len(new_tracks)))
-            self.didReorderTracks.emit(new_tracks - old_tracks, old_tracks - new_tracks)
-
     def find_colormap(self, colormap):
         if isinstance(colormap, str) and colormap in self.colormaps:
             colormap = self.colormaps[colormap]
@@ -343,12 +311,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def change_projection_index(self, idx):
         return self.change_projection(tuple(AreaDefinitionsManager.available_area_def_names())[idx])
-
-    @property
-    def current_layer_set(self):
-        cls = self._layer_sets[self.current_set_index]
-        assert isinstance(cls, DocLayerStack)
-        return cls
 
     def _insert_layer_with_info(self, info: dict, cmap=None, style=None, insert_before=0):
         """
@@ -531,110 +493,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         LOG.debug("sorted products: {}".format(repr(zult)))
         return [u for u, _ in zult]
 
-    def prez_for_uuids(self, uuids: typ.List[UUID], lset: list = None) -> typ.Iterable[typ.Tuple[UUID, Presentation]]:
-        if lset is None:
-            lset = self.current_layer_set
-        for p in lset:
-            if p.uuid in uuids:
-                yield p.uuid, p
-
-    def prez_for_uuid(self, uuid: UUID, lset: list = None) -> Presentation:
-        for _, p in self.prez_for_uuids((uuid,), lset=lset):
-            return p
-
-    def colormap_for_uuids(self, uuids: typ.List[UUID], lset: list = None) -> typ.Iterable[typ.Tuple[UUID, str]]:
-        for u, p in self.prez_for_uuids(uuids, lset=lset):
-            yield u, p.colormap
-
-    def colormap_for_uuid(self, uuid: UUID, lset: list = None) -> str:
-        for _, p in self.colormap_for_uuids((uuid,), lset=lset):
-            return p
-
-    @property
-    def current_layer_uuid_order(self):
-        """
-        list of UUIDs (top to bottom) currently being displayed, independent of visibility/validity
-        :return:
-        """
-        return tuple(x.uuid for x in self.current_layer_set)
-
     # TODO: add a document style guide which says how different bands from different instruments are displayed
-
-    def row_for_uuid(self, *uuids):
-        d = dict((q.uuid, i) for i, q in enumerate(self.current_layer_set))
-        if len(uuids) == 1:
-            return d[uuids[0]]
-        else:
-            return [d[x] for x in uuids]
-
-    def toggle_layer_visibility(self, rows_or_uuids, visible=None):
-        """
-        change the visibility of a layer or layers
-        :param rows_or_uuids: layer index or index list, 0..n-1, alternately UUIDs of layers
-        :param visible: True, False, or None (toggle)
-        """
-        L = self.current_layer_set
-        zult = {}
-        if isinstance(rows_or_uuids, int) or isinstance(rows_or_uuids, UUID):
-            rows_or_uuids = [rows_or_uuids]
-        for dex in rows_or_uuids:
-            if isinstance(dex, UUID):
-                dex = L.index(dex)  # returns row index
-            old = L[dex]
-            vis = (not old.visible) if visible is None else visible
-            nu = dataclasses.replace(old, visible=vis)
-            L[dex] = nu
-            zult[nu.uuid] = nu.visible
-        self.didChangeLayerVisibility.emit(zult)
-
-    def change_colormap_for_layers(self, name, uuids=None):
-        L = self.current_layer_set
-        if uuids is not None:
-            uuids = self.time_siblings_uuids(uuids)
-        else:  # all data layers
-            uuids = [pinfo.uuid for pinfo in L]
-
-        nfo = {}
-        for uuid in uuids:
-            for dex, pinfo in enumerate(L):
-                if pinfo.uuid == uuid:
-                    L[dex] = dataclasses.replace(pinfo, colormap=name)
-                    nfo[uuid] = name
-        self.didChangeColormap.emit(nfo)
-
-    def current_layers_where(self, kinds=None, uuids=None, dataset_names=None, wavelengths=None, colormaps=None):
-        """check current layer list for criteria and yield"""
-        L = self.current_layer_set
-        for idx, p in enumerate(L):
-            if (uuids is not None) and (p.uuid not in uuids):
-                continue
-            layer = self._info_by_uuid[p.uuid]
-            if (kinds is not None) and (layer.kind not in kinds):
-                continue
-            if (dataset_names is not None) and (layer[Info.DATASET_NAME] not in dataset_names):
-                continue
-            if (wavelengths is not None) and (layer.get(Info.CENTRAL_WAVELENGTH) not in wavelengths):
-                continue
-            if (colormaps is not None) and (p.colormap not in colormaps):
-                continue
-            yield (idx, p, layer)
-
-    def __len__(self):
-        # FIXME: this should be consistent with __getitem__, not self.current_layer_set
-        return len(self.current_layer_set)
 
     def get_uuids(self):
         return list(self._info_by_uuid.keys())
-
-    def get_info(self, row: int = None, uuid: UUID = None) -> typ.Optional[dict]:
-        if row is not None:
-            uuid_temp = self.current_layer_set[row].uuid
-            nfo = self._info_by_uuid[uuid_temp]
-            return nfo
-        elif uuid is not None:
-            nfo = self._info_by_uuid[uuid]
-            return nfo
-        return None
 
     def get_algebraic_namespace(self, uuid):
         return self._workspace.get_algebraic_namespace(uuid)
@@ -662,56 +524,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             raise KeyError("Key '{}' does not exist in document or workspace".format(layer_uuid))
         return info
 
-    def is_using(self, uuid: UUID, layer_set: int = None):
-        "return true if this dataset is still in use in one of the layer sets"
-        layer = self._info_by_uuid[uuid]
-        if layer_set is not None:
-            lss = [self._layer_sets[layer_set]]
-        else:
-            lss = [q for q in self._layer_sets if q is not None]
-        for ls in lss:
-            for p in ls:
-                if p.uuid == uuid:
-                    return True
-                parent_layer = self._info_by_uuid[p.uuid]
-                if parent_layer.kind == Kind.RGB and layer in parent_layer.layers:
-                    return True
-        return False
-
-    def remove_layer_prez(self, row_or_uuid, count: int = 1):
-        """
-        remove the presentation of a given layer/s in the current set
-        :param row: which current layer set row to remove
-        :param count: how many rows to remove
-        :return:
-        """
-        if isinstance(row_or_uuid, UUID) and count == 1:
-            try:
-                row = self.row_for_uuid(row_or_uuid)
-            except KeyError:
-                LOG.debug("Can't remove in-active layer: {}".format(row_or_uuid))
-                return
-            uuids = [row_or_uuid]
-        else:
-            row = row_or_uuid
-            uuids = [x.uuid for x in self.current_layer_set[row : row + count]]
-        self.toggle_layer_visibility(list(range(row, row + count)), False)
-        clo = list(range(len(self.current_layer_set)))
-        del clo[row : row + count]
-        del self.current_layer_set[row : row + count]
-        self.didRemoveDatasets.emit(tuple(clo), uuids, row, count)
-
-    def purge_layer_prez(self, uuids):
-        """Purge layers from the workspace"""
-        for uuid in uuids:
-            if not self.is_using(uuid):
-                LOG.debug("purging layer {}, no longer in use".format(uuid))
-                self.willPurgeDataset.emit(uuid)
-                # remove from our bookkeeping
-                del self._info_by_uuid[uuid]
-                # remove from workspace
-                self._workspace.remove(uuid)
-
     def remove_dataset_info(self, uuid: UUID):
         """Remove the info of a dataset because it is no longer needed
 
@@ -719,56 +531,3 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """
         LOG.debug(f"Remove dataset info of  uuid {uuid}")
         self._info_by_uuid.pop(uuid, None)
-
-    def _filter(self, seq, reference, keys):
-        "filter a sequence of metadata dictionaries to matching keys with reference"
-        for md in seq:
-            fail = False
-            for key in keys:
-                val = reference.get(key, None)
-                v = md.get(key, None)
-                if val != v:
-                    fail = True
-            if not fail:
-                yield md
-
-    def time_siblings(self, uuid, sibling_infos=None):
-        """
-        return time-ordered list of datasets which have the same band, in time order
-        :param uuid: focus UUID we're trying to build around
-        :param sibling_infos: dictionary of UUID -> Dataset Info to sort through
-        :return: sorted list of sibling uuids in time order, index of where uuid is in the list
-        """
-        # NOTE(mk): create_data_layers is the bridge between document and collection
-        # as it uses state from document to create a list of data_layers that can then
-        # be passed to methods of data_layer_collection
-        # self.create_data_layers()
-        # TODO(mk) pull create_data_layers into DataLayerCollection
-        if sibling_infos is None:
-            sibling_infos = self._info_by_uuid
-        it = sibling_infos.get(uuid, None)
-        if it is None:
-            return [], 0
-        sibs = [
-            (x[Info.SCHED_TIME], x[Info.UUID])
-            for x in self._filter(
-                sibling_infos.values(),
-                it,
-                {Info.SHORT_NAME, Info.STANDARD_NAME, Info.SCENE, Info.INSTRUMENT, Info.PLATFORM, Info.KIND},
-            )
-        ]
-        # then sort it into time order
-        sibs.sort()
-        offset = [i for i, x in enumerate(sibs) if x[1] == uuid]
-        return [x[1] for x in sibs], offset[0]
-
-    def time_siblings_uuids(self, uuids, sibling_infos=None):
-        """
-        return generator uuids for datasets which have the same band as the uuids provided
-        :param uuids: iterable of uuids
-        :param infos: list of dataset infos available, some of which may not be relevant
-        :return: generate sorted list of sibling uuids in time order and in provided uuid order
-        """
-        for requested_uuid in uuids:
-            for sibling_uuid in self.time_siblings(requested_uuid, sibling_infos=sibling_infos)[0]:
-                yield sibling_uuid
