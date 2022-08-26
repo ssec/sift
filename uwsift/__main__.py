@@ -691,8 +691,6 @@ class Main(QtWidgets.QMainWindow):
         self.scene_manager = SceneGraphManager(
             doc, self.workspace, self.queue, borders_shapefiles=border_shapefile, center=center, parent=self
         )
-        self.export_image = ExportImageHelper(self, self.document, self.scene_manager)
-        self._wizard_dialog = None
 
         self._init_layer_model()
         self._init_layer_panes()
@@ -701,6 +699,9 @@ class Main(QtWidgets.QMainWindow):
         self._init_recipe_manager()
         self._init_map_widget()
         self._init_qml_timeline()
+
+        self.export_image = ExportImageHelper(self, self.scene_manager, self.layer_model)
+        self._wizard_dialog = None
 
         if AUTO_UPDATE_MODE__ACTIVE:
             self._init_update_times_display()

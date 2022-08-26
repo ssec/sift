@@ -955,6 +955,29 @@ class LayerModel(QAbstractItemModel):
                 derived_layers.append(recipe_layer.descriptor)
         return derived_layers
 
+    def _get_layer_by_dataset(self, dataset: ProductDataset):
+        for layer in self.layers:
+            for sched_time in layer.timeline:
+                if layer.timeline.get(sched_time) == dataset:
+                    return layer
+
+    def get_dataset_presentation_by_uuid(self, uuid):
+        """Get the presentation of the dataset with the given UUID. If the dataset has no presentation
+        then the presentation of the layer which own this dataset is returned.
+
+        :param uuid: UUID of the dataset which presentation should be returned
+        :return: either the presentation of the dataset or of the layer, if the dataset has no presentation
+        """
+        dataset = self.get_dataset_by_uuid(uuid)
+        if dataset:
+            if dataset.presentation:
+                return dataset.presentation
+
+            return self._get_layer_by_dataset(self.get_dataset_by_uuid(uuid)).presentation
+
+        else:
+            return None
+
 
 class ProductFamilyKeyMappingPolicy:
     def __init__(self, model: LayerModel):
