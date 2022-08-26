@@ -1205,7 +1205,6 @@ class SceneGraphManager(QObject):
         document.willPurgeDataset.connect(self._purge_dataset)  # layer removed from document
         document.didChangeColormap.connect(self.change_dataset_nodes_colormap)
         document.didChangeLayerVisibility.connect(self.change_datasets_visibility)
-        document.didReorderAnimation.connect(self._rebuild_frame_order)
 
     def set_dataset_visible(self, uuid: UUID, visible: Optional[bool] = None):
         dataset_node = self.dataset_nodes.get(uuid, None)
