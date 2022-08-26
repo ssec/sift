@@ -1202,7 +1202,6 @@ class SceneGraphManager(QObject):
     def _connect_doc_signals(self, document: Document):
         document.didUpdateBasicDataset.connect(self.update_basic_dataset)  # new data integrated in existing layer
         document.didRemoveDatasets.connect(self._remove_dataset)  # layer removed from current layer set
-        document.willPurgeDataset.connect(self._purge_dataset)  # layer removed from document
         document.didChangeColormap.connect(self.change_dataset_nodes_colormap)
         document.didChangeLayerVisibility.connect(self.change_datasets_visibility)
 
