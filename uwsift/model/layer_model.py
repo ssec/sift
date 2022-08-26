@@ -439,6 +439,18 @@ class LayerModel(QAbstractItemModel):
         change_dict = self._build_presentation_change_dict(layer, colormap)
         self.didChangeColormap.emit(change_dict)
 
+    def update_user_colormap_for_layers(self, colormap):
+        """Forward changes to a custom colormap to layers that use it
+
+        This slot must be called, when a user-created color map has been edited. The changes must be propagated to the
+        layers that use that color map so that they can update their scene graph nodes accordingly.
+
+        :param colormap: Name of the colormap which has an update
+        """
+        for layer in self.layers:
+            if layer.presentation.colormap == colormap:
+                self.change_colormap_for_layer(layer.uuid, colormap)
+
     def change_color_limits_for_layer(self, uuid: UUID, color_limits: object):
         layer = self.get_layer_by_uuid(uuid)
         layer.presentation.climits = color_limits

@@ -864,6 +864,7 @@ class Main(QtWidgets.QMainWindow):
         self.layer_model.didChangeLayerOpacity.connect(self.scene_manager.change_layer_opacity)
 
         self.layer_model.didChangeColormap.connect(self.scene_manager.change_dataset_nodes_colormap)
+        self.document.didUpdateUserColormap.connect(self.layer_model.update_user_colormap_for_layers)
         self.layer_model.didChangeGamma.connect(self.scene_manager.change_dataset_nodes_gamma)
         self.layer_model.didChangeColorLimits.connect(self.scene_manager.change_dataset_nodes_color_limits)
 

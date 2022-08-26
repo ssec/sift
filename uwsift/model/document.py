@@ -228,6 +228,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didChangeProjection = pyqtSignal(str)  # name of projection (area definition)
     didReorderTracks = pyqtSignal(set, set)  # added track names, removed track names
+    didUpdateUserColormap = pyqtSignal(str)  # name of colormap which has an update
 
     def __init__(
         self,
@@ -327,8 +328,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         self.colormaps[name] = cmap
 
         # Update live map
-        uuids = [p.uuid for _, p, _ in self.current_layers_where(colormaps=[name])]
-        self.change_colormap_for_layers(name, uuids)
+        self.didUpdateUserColormap.emit(name)
 
     def remove_user_colormap(self, name):
         try:
