@@ -1195,7 +1195,6 @@ class SceneGraphManager(QObject):
 
     def _connect_doc_signals(self, document: Document):
         document.didUpdateBasicDataset.connect(self.update_basic_dataset)  # new data integrated in existing layer
-        document.didChangeColormap.connect(self.change_dataset_nodes_colormap)
         document.didChangeLayerVisibility.connect(self.change_datasets_visibility)
 
     def set_dataset_visible(self, uuid: UUID, visible: Optional[bool] = None):

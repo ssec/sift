@@ -122,7 +122,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     didAddDataset = pyqtSignal(dict, Presentation)
     didUpdateBasicDataset = pyqtSignal(UUID, Kind)
     didChangeLayerVisibility = pyqtSignal(dict)  # {UUID: new-visibility, ...} for changed layers
-    didChangeColormap = pyqtSignal(dict)  # dict of {uuid: colormap-name-or-UUID, ...} for all changed layers
     didChangeProjection = pyqtSignal(str)  # name of projection (area definition)
     didReorderTracks = pyqtSignal(set, set)  # added track names, removed track names
     didUpdateUserColormap = pyqtSignal(str)  # name of colormap which has an update
