@@ -59,14 +59,11 @@ from __future__ import annotations
 __author__ = "rayg"
 __docformat__ = "reStructuredText"
 
-import dataclasses
 import json
 import logging
 import os
 import typing as typ
-from collections.abc import MutableSequence
 from uuid import UUID
-from weakref import ref
 
 from PyQt5.QtCore import QObject, pyqtSignal
 
@@ -85,101 +82,6 @@ from uwsift.workspace import BaseWorkspace, CachingWorkspace, SimpleWorkspace
 from uwsift.workspace.metadatabase import Product
 
 LOG = logging.getLogger(__name__)
-
-DEFAULT_LAYER_SET_COUNT = 1  # this should match the ui configuration!
-
-
-class DocLayerStack(MutableSequence):
-    """list-like layer set which will slowly eat functionality from Document as warranted
-
-    Provide cleaner interfacing to GUI elements.
-
-    """
-
-    _doc = None  # weakref to document we belong to
-    _store = None
-    _u2r = None  # uuid-to-row correspondence cache
-
-    def __init__(self, doc, *args, **kwargs):
-        if isinstance(doc, DocLayerStack):
-            self._doc = ref(doc._doc())
-            self._store = list(doc._store)
-        elif isinstance(doc, Document):
-            self._doc = ref(doc)
-            self._store = list(*args)
-        else:
-            raise ValueError("cannot initialize DocLayerStack using %s" % type(doc))
-
-    def __setitem__(self, index: int, value: Presentation):
-        if index >= 0 and index < len(self._store):
-            self._store[index] = value
-        elif index == len(self._store):
-            self._store.append(value)
-        else:
-            raise IndexError("%d not a valid index" % index)
-        self._u2r = None
-
-    @property
-    def uuid2row(self):
-        if self._u2r is None:
-            self._u2r = dict((p.uuid, i) for (i, p) in enumerate(self._store))
-        return self._u2r
-
-    def __getitem__(self, index: int):  # then return layer object
-        if isinstance(index, int):
-            return self._store[index]
-        elif isinstance(index, UUID):  # then return 0..n-1 index in stack
-            return self.uuid2row.get(index, None)
-        elif isinstance(index, dict):
-            return self.uuid2row.get(index.uuid, None)
-        elif isinstance(index, Presentation):
-            return self.uuid2row.get(index.uuid, None)
-        else:
-            raise ValueError("unable to index LayerStack using %s" % repr(index))
-
-    def __iter__(self):
-        for each in self._store:
-            yield each
-
-    def __len__(self):
-        return len(self._store)
-
-    def __delitem__(self, index: int):
-        del self._store[index]
-        self._u2r = None
-
-    def insert(self, index: int, value: Presentation):
-        self._store.insert(index, value)
-        self._u2r = None
-
-    def clear_animation_order(self):
-        for i, q in enumerate(self._store):
-            self._store[i] = dataclasses.replace(q, a_order=None)
-
-    def index(self, uuid):
-        assert isinstance(uuid, UUID)
-        u2r = self.uuid2row
-        return u2r.get(uuid, None)
-
-    @property
-    def animation_order(self):
-        aouu = [(x.a_order, x.uuid) for x in self._store if (x.a_order is not None)]
-        aouu.sort()
-        ao = tuple(u for a, u in aouu)
-        LOG.debug("animation order is {0!r:s}".format(ao))
-        return ao
-
-    @animation_order.setter
-    def animation_order(self, layer_or_uuid_seq):
-        self.clear_animation_order()
-        for nth, lu in enumerate(layer_or_uuid_seq):
-            try:
-                idx = self[lu]
-            except ValueError:
-                LOG.warning("unable to find layer in LayerStack")
-                raise
-            self._store[idx] = dataclasses.replace(self._store[idx], a_order=nth)
-
 
 ###################################################################################################################
 
@@ -212,8 +114,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     Probes have spatial areas (point probes, shaped areas)
     Probe areas are translated into localized data masks against the workspace raw data content
     """
-    current_set_index = 0
-    _layer_sets = None  # list(DocLayerSet(Presentation, ...) or None)
     _info_by_uuid = None  # dict(uuid:Doc____Layer)
 
     # signals
@@ -232,7 +132,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         workspace: BaseWorkspace,
         queue,
         config_dir=DOCUMENT_SETTINGS_DIR,
-        layer_set_count=DEFAULT_LAYER_SET_COUNT,
         **kwargs,
     ):
         super(Document, self).__init__(**kwargs)
@@ -243,7 +142,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             os.makedirs(self.config_dir)
 
         self._workspace = workspace
-        self._layer_sets = [DocLayerStack(self)] + [None] * (layer_set_count - 1)
         self._info_by_uuid = {}
 
         self.colormaps = COLORMAP_MANAGER
@@ -338,11 +236,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             gamma=gamma,
             opacity=1.0,
         )
-
-        q = dataclasses.replace(p, visible=False)  # make it available but not visible in other layer sets
-        for dex, lset in enumerate(self._layer_sets):
-            if lset is not None:  # uninitialized layer sets will be None
-                lset.insert(insert_before, p if dex == self.current_set_index else q)
 
         return p
 
