@@ -27,7 +27,7 @@ import logging
 import os
 from enum import Enum
 from numbers import Number
-from typing import Dict, Optional
+from typing import Optional
 from uuid import UUID
 
 import numpy as np
@@ -1189,13 +1189,8 @@ class SceneGraphManager(QObject):
         LOG.debug("Scene Graph after layer deletion:")
         LOG.debug(self.main_view.describe_tree(with_transform=True))
 
-    def change_datasets_visibility(self, layers_changed: Dict[UUID, bool]):
-        for uuid, visible in layers_changed.items():
-            self.set_dataset_visible(uuid, visible)
-
     def _connect_doc_signals(self, document: Document):
         document.didUpdateBasicDataset.connect(self.update_basic_dataset)  # new data integrated in existing layer
-        document.didChangeLayerVisibility.connect(self.change_datasets_visibility)
 
     def set_dataset_visible(self, uuid: UUID, visible: Optional[bool] = None):
         dataset_node = self.dataset_nodes.get(uuid, None)
