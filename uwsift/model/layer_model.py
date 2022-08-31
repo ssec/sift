@@ -5,6 +5,7 @@ from typing import List, Optional, Tuple
 from uuid import UUID
 
 from PyQt5.QtCore import QAbstractItemModel, QMimeData, QModelIndex, Qt, pyqtSignal
+from PyQt5.QtWidgets import QMessageBox
 
 from uwsift.common import (
     BORDERS_DATASET_NAME,
@@ -889,6 +890,21 @@ class LayerModel(QAbstractItemModel):
             if layer.info.get(Info.PLATFORM) == Platform.SYSTEM:
                 continue
 
+            derived_layers = self._get_derived_recipe_layers_of_layer(layer)
+            if derived_layers:
+                message = f"Layer '{layer.descriptor}' is used as input for the following derived layers: \n"
+                for layer_name in derived_layers:
+                    message += f"- '{layer_name}'\n"
+                message += "Are you sure you want to delete this layer?"
+                qm = QMessageBox()
+                answer = qm.question(
+                    None,
+                    "",
+                    message,
+                )
+                if answer != qm.Yes:
+                    return
+
             self._clear_layer(layer)
             self._remove_empty_layer(idx.row())
 
@@ -914,6 +930,18 @@ class LayerModel(QAbstractItemModel):
         for row in range(first, last + 1):
             layer = self.layers[row]
             self.willRemoveLayer.emit(layer.uuid)
+
+    def _get_recipe_layers(self):
+        return [layer for layer in self.layers if layer.recipe]
+
+    def _get_derived_recipe_layers_of_layer(self, layer: LayerItem):
+        recipe_layers = self._get_recipe_layers()
+        derived_layers = []
+        for recipe_layer in recipe_layers:
+            # check if the given layer is used as input layer of a recipe layer
+            if layer.uuid in recipe_layer.recipe.input_layer_ids:
+                derived_layers.append(recipe_layer.descriptor)
+        return derived_layers
 
 
 class ProductFamilyKeyMappingPolicy:
