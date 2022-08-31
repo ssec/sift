@@ -164,7 +164,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def change_projection_index(self, idx):
         return self.change_projection(tuple(AreaDefinitionsManager.available_area_def_names())[idx])
 
-    def _insert_layer_with_info(self, info: dict, cmap=None, style=None, insert_before=0):
+    def _insert_dataset_with_info(self, info: dict, cmap=None, style=None, insert_before=0):
         """
         insert a dataset into the presentations but do not signal
         :return: new Presentation tuple, new reordered indices tuple
@@ -213,38 +213,38 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if Info.UNIT_CONVERSION not in info:
             info[Info.UNIT_CONVERSION] = units_conversion(info)
         if Info.FAMILY not in info:
-            info[Info.FAMILY] = self.family_for_product_or_layer(info)
-        presentation = self._insert_layer_with_info(info, insert_before=insert_before)
+            info[Info.FAMILY] = self.family_for_product_or_info(info)
+        presentation = self._insert_dataset_with_info(info, insert_before=insert_before)
 
         # signal updates from the document
         self.didAddDataset.emit(info, presentation)
 
-    def family_for_product_or_layer(self, uuid_or_layer):
-        if isinstance(uuid_or_layer, UUID):
+    def family_for_product_or_info(self, uuid_or_info):
+        if isinstance(uuid_or_info, UUID):
             if isinstance(self._workspace, CachingWorkspace):
                 with self._workspace.metadatabase as s:
-                    fam = s.query(Product.family).filter_by(uuid_str=str(uuid_or_layer)).first()
+                    fam = s.query(Product.family).filter_by(uuid_str=str(uuid_or_info)).first()
             if isinstance(self._workspace, SimpleWorkspace):
-                fam = self._workspace.get_info(uuid_or_layer)[Info.FAMILY]
+                fam = self._workspace.get_info(uuid_or_info)[Info.FAMILY]
             if fam:
                 return fam[0]
-            uuid_or_layer = self[uuid_or_layer]
-        if Info.FAMILY in uuid_or_layer:
-            LOG.debug("using pre-existing family {}".format(uuid_or_layer[Info.FAMILY]))
-            return uuid_or_layer[Info.FAMILY]
+            uuid_or_info = self[uuid_or_info]
+        if Info.FAMILY in uuid_or_info:
+            LOG.debug("using pre-existing family {}".format(uuid_or_info[Info.FAMILY]))
+            return uuid_or_info[Info.FAMILY]
         # kind:pointofreference:measurement:wavelength
-        kind = uuid_or_layer[Info.KIND]
+        kind = uuid_or_info[Info.KIND]
         refpoint = "unknown"  # FUTURE: geo/leo
-        measurement = uuid_or_layer.get(Info.STANDARD_NAME)
-        if uuid_or_layer.get("recipe"):
+        measurement = uuid_or_info.get(Info.STANDARD_NAME)
+        if uuid_or_info.get("recipe"):
             # RGB
-            subcat = uuid_or_layer["recipe"].name
-        elif uuid_or_layer.get(Info.CENTRAL_WAVELENGTH):
+            subcat = uuid_or_info["recipe"].name
+        elif uuid_or_info.get(Info.CENTRAL_WAVELENGTH):
             # basic band
-            subcat = uuid_or_layer[Info.CENTRAL_WAVELENGTH]
+            subcat = uuid_or_info[Info.CENTRAL_WAVELENGTH]
         else:
             # higher level product or algebraic layer
-            subcat = uuid_or_layer[Info.DATASET_NAME]
+            subcat = uuid_or_info[Info.DATASET_NAME]
         return "{}:{}:{}:{}".format(kind.name, refpoint, measurement, subcat)
 
     def import_files(self, paths, insert_before=0, **importer_kwargs) -> dict:
