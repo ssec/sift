@@ -33,7 +33,6 @@ def test_satpy_importer_basic(tmpdir, monkeypatch, mocker):
         Info.CENTRAL_WAVELENGTH: 4.0,
         Info.UUID: uuidgen(),
     }
-    doc = mocker.MagicMock()
     for ds in [c01_attrs, c03_attrs]:
         ds[Info.ORIGIN_X] = -5434894.885056
         ds[Info.ORIGIN_Y] = 5434894.885056
@@ -49,7 +48,7 @@ def test_satpy_importer_basic(tmpdir, monkeypatch, mocker):
         ds[Info.SERIAL] = "serial"
         ds[Info.PLATFORM] = Platform.GOES_16
         ds[Info.INSTRUMENT] = Instrument.ABI
-        ds[Info.GRID_ORIGIN] = 'SE'
+        ds[Info.GRID_ORIGIN] = "SE"
         ds[Info.GRID_FIRST_INDEX_X] = 1
         ds[Info.GRID_FIRST_INDEX_Y] = 1
 
