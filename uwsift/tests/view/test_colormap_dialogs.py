@@ -14,7 +14,6 @@ def test_slider_change(qtbot):
         uuid="some_uuid",
         kind=Kind.IMAGE,
         visible=True,
-        a_order=0,
         colormap="viridis",
         climits=(0.0, 50.0),
         gamma=1.0,

@@ -350,7 +350,6 @@ class Presentation:
     uuid: Optional[UUID]  # dataset in the document/workspace, None if referring to a system layer
     kind: Kind  # what kind of layer it is
     visible: bool = True  # whether it's visible or not
-    a_order: int = None  # None for non-animating, 0..n-1 what order to draw in during animation
     colormap: object = None  # name or uuid: color map to use; name for default, uuid for user-specified
     style: object = None  # name or uuid: SVG/HTML style to use; name for default, (FUTURE?) uuid for user-specified
     climits: tuple = None  # valid min and valid max used for color mapping normalization

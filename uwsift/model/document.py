@@ -183,7 +183,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             uuid=info[Info.UUID],
             kind=info[Info.KIND],
             visible=True,
-            a_order=None,
             colormap=cmap,
             style=style,
             climits=info[Info.CLIM],
