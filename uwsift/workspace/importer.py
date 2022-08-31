@@ -34,7 +34,6 @@ import numpy as np
 import satpy.readers.yaml_reader
 import satpy.resample
 import yaml
-from pyproj import Proj
 from pyresample.geometry import AreaDefinition, StackedAreaDefinition
 from satpy import Scene, available_readers
 from satpy.dataset import DatasetDict
@@ -353,21 +352,6 @@ class aImporter(ABC):
         """
         # FUTURE: this should be async def coroutine
         return
-
-
-# map .platform_id in PUG format files to SIFT platform enum
-PLATFORM_ID_TO_PLATFORM = {
-    "G16": Platform.GOES_16,
-    "G17": Platform.GOES_17,
-    "G18": Platform.GOES_18,
-    "G19": Platform.GOES_19,
-    # hsd2nc export of AHI data as PUG format
-    "Himawari-8": Platform.HIMAWARI_8,
-    "Himawari-9": Platform.HIMAWARI_9,
-    # axi2cmi export as PUG, more consistent with other uses
-    "H8": Platform.HIMAWARI_8,
-    "H9": Platform.HIMAWARI_9,
-}
 
 
 class SatpyImporter(aImporter):
