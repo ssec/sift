@@ -525,35 +525,12 @@ class CachingWorkspace(BaseWorkspace):
             # since we can then re-use them to import the content instead of having to regenerate
             importers = []
             num_products = 0
-            remaining_paths = []
-            if "reader" in importer_kwargs:
-                # skip importer guessing and go straight to satpy importer
-                paths, remaining_paths = [], paths
+            if "reader" not in importer_kwargs:
+                # If there is no reader in the importer_kwargs then the SatPy Import can't be used
+                return None
 
-            for source_path in paths:
-                # LOG.info('collecting metadata for {}'.format(source_path))
-                # FIXME: Check if importer only accepts one path at a time
-                #        Maybe sort importers by single files versus multiple files and doing single files first?
-                # FIXME: decide whether to update database if mtime of file is newer than mtime in database
-                # Collect all the importers we are going to use and count
-                # how many products each expects to return
-                for imp in self._importers:
-                    if imp.is_relevant(source_path=source_path):
-                        hauler = imp(
-                            source_path,
-                            database_session=import_session,
-                            workspace_cwd=self.cache_dir,
-                            **importer_kwargs,
-                        )
-                        hauler.merge_resources()
-                        importers.append(hauler)
-                        num_products += hauler.num_products
-                        break
-                else:
-                    remaining_paths.append(source_path)
-
-            # Pass remaining paths to SatPy importer and see what happens
-            if remaining_paths:
+            # Pass paths to SatPy importer and see what happens
+            if paths:
                 if "reader" not in importer_kwargs:
                     raise NotImplementedError(
                         "Reader discovery is not " "currently implemented in " "the satpy importer."
@@ -563,7 +540,7 @@ class CachingWorkspace(BaseWorkspace):
                     scenes = importer_kwargs.pop("scenes")
                     scenes = scenes.items()
                 else:
-                    scenes = [(remaining_paths, None)]
+                    scenes = [(paths, None)]
                 for paths, scene in scenes:
                     imp = SatpyImporter
                     these_kwargs = importer_kwargs.copy()
