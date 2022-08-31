@@ -4,53 +4,26 @@
 uwsift.model.document
 ---------------------
 
-Core (low-level) document model for SIFT.
-The core is sometimes accessed via Facets, which are like database views for a specific group of use cases
+The document is an interface to further process some user interactions and delegate the import of new content to the
+workspace. It also contains all metadata information of all loaded records.
 
-The document model is a metadata representation which permits the workspace to be constructed and managed.
+The document handles the following tasks:
+    - import new files
+    - instruct the workspace to import new content
+    - create a Presentation using metadata information
+    - manage the currently active area definition used to present the data
+    - manage ser color maps
 
-Document is primarily a composition of layers.
-Layers come in several flavors:
-
- - Image : a float32 field shown as tiles containing strides and/or alternate LODs, having a colormap
- - Outline : typically a geographic political map
- - Shape : a highlighted region selected by the user: point, line (great circle), polygon
- - Combination : calculated from two or more image layers, e.g. RGBA combination of images
-                 combinations may be limited to areas specified by region layers.
-
-Future Work:
-
- - Volume : a 3D dataset, potentially sparse
- - DenseVolume
- - SparseVolume : (x,y,z) point cloud
-
-Layers are represented in 1 or more LayerSets, which are alternate configurations of the display.
-Users may wish to display the same data in several different ways for illustration purposes.
-Only one LayerSet is used on a given Map window at a time.
-
-Layers have presentation settings that vary with LayerSet:
-
- - z_order: bottom to top in the map display
- - visible: whether or not it's being drawn on the map
- - a_order: animation order, when the animation button is hit
- - colormap: how the data is converted to pixels
-
-Document has zero or more Probes. Layers also come in multiple
-flavors that may be be attached to plugins or helper applications.
-
- - Scatter: (layerA, layerB, region) -> xy plot
- - Slice: (volume, line) -> curtain plot
- - Profile: (volume, point) -> profile plot
+The communication between the document and other parts of the application are done with signal/slot connections.
 
 Document has zero or more Colormaps, determining how they're presented
 
 The document does not own data (content). It only owns metadata (info).
-At most, document holds coarse overview data content for preview purposes.
 
 All entities in the Document have a UUID that is their identity throughout their lifecycle,
 and is often used as shorthand between subsystems. Document rarely deals directly with content.
 
-:author: R.K.Garcia <rayg@ssec.wisc.edu>
+:author: R.K.Garcia <rayg@ssec.wisc.edu> and others
 :copyright: 2015 by University of Wisconsin Regents, see AUTHORS for more details
 :license: GPLv3, see LICENSE for more details
 """
@@ -87,13 +60,7 @@ LOG = logging.getLogger(__name__)
 
 
 class Document(QObject):  # base class is rightmost, mixins left of that
-    """Storage for layer and user information.
-
-    Document is a set of tracks in a Z order, with Z>=0 for "active" tracks the user is working with
-    Tracks with Z-order <0 are inactive, but may be displayed in the timeline as potentials for the
-    user to drag to active
-    Document has a playhead, a playback time range, an active timeline display range
-    Tracks and frames (aka Products) can have state information set
+    """Storage for dataset and user information.
 
     This is the low-level "internal" interface that acts as a signaling hub.
     Direct access to the document is being deprecated.
@@ -105,20 +72,9 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     queue: TaskQueue = None
     _workspace: BaseWorkspace = None
 
-    # DEPRECATION in progress: layer sets
-    """
-    Document has one or more LayerSets choosable by the user (one at a time) as currentLayerSet
-    LayerSets configure animation order, visibility, enhancements and linear combinations
-    LayerSets can be cloned from the prior active LayerSet when unconfigured
-    Document has Probes, which operate on the currentLayerSet
-    Probes have spatial areas (point probes, shaped areas)
-    Probe areas are translated into localized data masks against the workspace raw data content
-    """
     _info_by_uuid = None  # dict(uuid:Doc____Layer)
 
     # signals
-    # Clarification: Layer interfaces migrate to layer meaning "current active products under the playhead"
-    # new order list with None for new layer; info-dictionary, overview-content-ndarray
     didAddDataset = pyqtSignal(dict, Presentation)
     didUpdateBasicDataset = pyqtSignal(UUID, Kind)
     didChangeProjection = pyqtSignal(str)  # name of projection (area definition)
@@ -210,7 +166,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def _insert_layer_with_info(self, info: dict, cmap=None, style=None, insert_before=0):
         """
-        insert a layer into the presentations but do not signal
+        insert a dataset into the presentations but do not signal
         :return: new Presentation tuple, new reordered indices tuple
         """
         if cmap is None:
@@ -239,7 +195,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def activate_product_uuid_as_new_dataset(self, uuid: UUID, insert_before=0, **importer_kwargs):
         if uuid in self._info_by_uuid:
-            LOG.debug("Layer already loaded: {}".format(uuid))
+            LOG.debug("dataset already loaded: {}".format(uuid))
             self._workspace.import_product_content(uuid, **importer_kwargs)
             return
 
@@ -252,7 +208,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         assert info is not None
         LOG.debug("cell_width: {}".format(repr(info[Info.CELL_WIDTH])))
 
-        LOG.debug("new layer info: {}".format(repr(info)))
+        LOG.debug("new dataset info: {}".format(repr(info)))
         self._info_by_uuid[uuid] = info
         if Info.UNIT_CONVERSION not in info:
             info[Info.UNIT_CONVERSION] = units_conversion(info)
@@ -394,7 +350,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def __getitem__(self, layer_uuid):
         """
-        return layer with the given UUID
+        return dataset with the given UUID
         """
         if layer_uuid is None:
             raise KeyError("Key 'None' does not exist in document or workspace")
