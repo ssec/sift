@@ -61,7 +61,6 @@ add_custom_target( devel-bootstrap
   COMMAND echo "  conda config --env --add channels conda-forge"
   COMMAND echo "  conda config --env --set channel_priority strict"
   COMMAND echo "  ${CMAKE_COMMAND} ."
-  COMMAND echo "  ${CMAKE_MAKE_PROGRAM} patch-shapely # This may fail, if the patch is already applied"
   VERBATIM
   COMMAND_EXPAND_LISTS
   COMMENT "Setting up conda environment for development ..."
@@ -115,38 +114,6 @@ if( DIST_PyInstaller )
   if( NOT SELF_PACKER_FOR_EXECUTABLE )
     message( "PyInstaller packaging: Consider to install UPX (https://upx.github.io/) to get a smaller package." )
   endif()
-
-#---------- Patching Shapely.geos for PyInstaller ------------------------
-# This block may be removed as soon as Shapely cleanly can by PyInstaller'ed
-# from within a Conda environment
-
-find_package( Patch )
-
-execute_process(
-  COMMAND python -c "import shapely.geos; print(shapely.geos.__file__)"
-  OUTPUT_VARIABLE shapely.geos.__file__
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-  )
-set( shapely.geos.patch "${CMAKE_SOURCE_DIR}/shapely.geos.patch" )
-
-if( Patch_FOUND )
-  add_custom_target( patch-shapely
-    COMMAND ${Patch_EXECUTABLE} --posix --input=${shapely.geos.patch} --force --reject-file=- ${shapely.geos.__file__}
-    VERBATIM
-    COMMENT "Patching ${shapely.geos.__file__} for PyInstaller.
-         This may fail, e.g. if the patch was already applied.
-         In that case, verify '${shapely.geos.__file__}' against '${shapely.geos.patch}' please."
-    )
-  message( "The following file from shapely may need to be patched to work for PyInstaller:\n"
-    "  '${shapely.geos.__file__}'.\n"
-    "  The patch to be applied is '${shapely.geos.patch}'.\n"
-    "  Please build the target 'patch-shapely' once before 'pyinstaller-package'." )
-else()
-  message( WARNING "The following file from shapely may need to be patched to work for PyInstaller:"
-    " '${shapely.geos.__file__}'. The patch to be applied is '${shapely.geos.patch}',"
-    " but there is no 'Patch' tool found/configured. You may patch the file manually." )
-endif()
-
 
 #-------------------------------------------------------------------------
 

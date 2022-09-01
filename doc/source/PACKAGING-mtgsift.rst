@@ -85,7 +85,6 @@ If not already done, execute the steps::
   (devel-3.10)%> conda config --env --add channels conda-forge
   (devel-3.10)%> conda config --env --set channel_priority strict
   (devel-3.10)%> cmake -G "Unix Makefiles" .
-  (devel-3.10)%> make patch-shapely
 
 The system is now ready to create Conda and PyInstaller packages for
 MTG-SIFT. The according targets can be found in the target lists printed by
@@ -135,12 +134,6 @@ Using the two targets you can create executables which allow to run MTG-SIFT
 without any additional installation of dependencies. All dependencies are
 provided.
 
-Please don't forget to at least once build the target *patch-shapely* in the
-Conda environment you use for packaging. The MTG-SIFT dependency *Shapely* has
-an issue with respect to PyInstaller based packaging, which is fixed with the
-provided patch for now::
-
-  (devel-3.10)%> make patch-shapely
 
 The difference between the two targets is:
 
