@@ -168,68 +168,6 @@ def get_guidebook_class(layer_info) -> Guidebook:
     return GUIDEBOOKS.get(platform, DEFAULT_GUIDEBOOK)()
 
 
-def get_contour_increments(layer_info):
-    standard_name = layer_info[Info.STANDARD_NAME]
-    units = layer_info[Info.UNITS]
-    increments = {
-        "air_temperature": [10.0, 5.0, 2.5, 1.0, 0.5],
-        "brightness_temperature": [10.0, 5.0, 2.5, 1.0, 0.5],
-        "toa_brightness_temperature": [10.0, 5.0, 2.5, 1.0, 0.5],
-        "toa_bidirectional_reflectance": [0.15, 0.10, 0.05, 0.02, 0.01],
-        "relative_humidity": [15.0, 10.0, 5.0, 2.0, 1.0],
-        "eastward_wind": [15.0, 10.0, 5.0, 2.0, 1.0],
-        "northward_wind": [15.0, 10.0, 5.0, 2.0, 1.0],
-        "geopotential_height": [100.0, 50.0, 25.0, 10.0, 5.0],
-    }
-
-    unit_increments = {
-        "kelvin": [10.0, 5.0, 2.5, 1.0, 0.5],
-        "1": [0.15, 0.10, 0.05, 0.02, 0.01],
-        "%": [15.0, 10.0, 5.0, 2.0, 1.0],
-        "kg m**-2": [20.0, 10.0, 5.0, 2.0, 1.0],
-        "m s**-1": [15.0, 10.0, 5.0, 2.0, 1.0],
-        "m**2 s**-1": [5000.0, 1000.0, 500.0, 200.0, 100.0],
-        "gpm": [6000.0, 2000.0, 1000.0, 500.0, 200.0],
-        "kg kg**-1": [16e-8, 8e-8, 4e-8, 2e-8, 1e-8],
-        "Pa s**-1": [6.0, 3.0, 2.0, 1.0, 0.5],
-        "s**-1": [0.02, 0.01, 0.005, 0.002, 0.001],
-        "Pa": [5000.0, 1000.0, 500.0, 200.0, 100.0],
-        "J kg**-1": [5000.0, 1000.0, 500.0, 200.0, 100.0],
-        "(0 - 1)": [0.5, 0.2, 0.1, 0.05, 0.05],
-    }
-
-    contour_increments = increments.get(standard_name)
-    if contour_increments is None:
-        contour_increments = unit_increments.get(units)
-
-    if contour_increments is None:
-        LOG.warning("Unknown contour data type ({}, {}), guessing at contour " "levels...".format(standard_name, units))
-        return [5000.0, 1000.0, 500.0, 200.0, 100.0]
-
-    LOG.debug("Contour increments for ({}, {}): {}".format(standard_name, units, contour_increments))
-    return contour_increments
-
-
-def get_contour_levels(vmin, vmax, increments):
-    levels = []
-    mult = 1 / increments[-1]
-    for idx, inc in enumerate(increments):
-        vmin_round = np.ceil(vmin / inc) * inc
-        vmax_round = np.ceil(vmax / inc) * inc
-        inc_levels = np.arange(vmin_round, vmax_round, inc)
-        # round to the highest increment or modulo operations will be wrong
-        inc_levels = np.round(inc_levels / increments[-1]) * increments[-1]
-        if idx > 0:
-            # don't use coarse contours in the finer contour levels
-            # we multiple by 1 / increments[-1] to try to resolve precision
-            # errors which can be a big issue for very small increments.
-            mask = np.logical_or.reduce([np.isclose((inc_levels * mult) % (i * mult), 0) for i in increments[:idx]])
-            inc_levels = inc_levels[~mask]
-        levels.append(inc_levels)
-
-    return levels
-
-
 def generate_guidebook_metadata(layer_info) -> Mapping:
     guidebook = get_guidebook_class(layer_info)
     # also get info for this layer from the guidebook
@@ -246,13 +184,6 @@ def generate_guidebook_metadata(layer_info) -> Mapping:
         layer_info[Info.DISPLAY_TIME] = guidebook._default_display_time(layer_info)
     if Info.DISPLAY_NAME not in layer_info:
         layer_info[Info.DISPLAY_NAME] = guidebook._default_display_name(layer_info)
-
-    if "level" in layer_info:
-        # calculate contour_levels and zoom levels
-        increments = get_contour_increments(layer_info)
-        vmin, vmax = layer_info[Info.VALID_RANGE]
-        contour_levels = get_contour_levels(vmin, vmax, increments)
-        layer_info["contour_levels"] = contour_levels
 
     return layer_info
 
