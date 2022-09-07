@@ -176,6 +176,7 @@ class Kind(Enum):
     LINES = 7
     VECTORS = 8
     POINTS = 9
+    MC_IMAGE = 10
 
 
 class Instrument(Enum):
