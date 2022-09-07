@@ -1005,7 +1005,7 @@ class SatpyImporter(aImporter):
 
         if self.resampling_info:
             resampler: str = self.resampling_info["resampler"]
-            max_area = self.scn.max_area()
+            max_area = self.scn.finest_area()
             if isinstance(max_area, AreaDefinition) and max_area.area_id == self.resampling_info["area_id"]:
                 LOG.info(
                     f"Source and target area ID are identical:"
