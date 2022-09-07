@@ -1004,40 +1004,7 @@ class SatpyImporter(aImporter):
         self.scn.load(dataset_ids, pad_data=not merge_with_existing, upper_right_corner="NE")
 
         if self.resampling_info:
-            resampler: str = self.resampling_info["resampler"]
-            max_area = self.scn.finest_area()
-            if isinstance(max_area, AreaDefinition) and max_area.area_id == self.resampling_info["area_id"]:
-                LOG.info(
-                    f"Source and target area ID are identical:"
-                    f" '{self.resampling_info['area_id']}'."
-                    f" Skipping resampling."
-                )
-            else:
-                area_name = max_area.area_id if hasattr(max_area, "area_id") else max_area.name
-                LOG.info(
-                    f"Resampling from area ID/name '{area_name}'"
-                    f" to area ID '{self.resampling_info['area_id']}'"
-                    f" with method '{resampler}'"
-                )
-                # Use as many processes for resampling as the number of CPUs
-                # the application can use.
-                # See https://pyresample.readthedocs.io/en/latest/multi.html
-                #  and https://docs.python.org/3/library/os.html#os.cpu_count
-                nprocs = len(os.sched_getaffinity(0))
-
-                target_area_def = AreaDefinitionsManager.area_def_by_id(self.resampling_info["area_id"])
-
-                # About the next strange line of code: keep a reference to the
-                # original scene to work around an issue in the resampling
-                # implementation for NetCDF data: otherwise the original data
-                # would be garbage collected too early.
-                self.scn_original = self.scn  # noqa - Do not simply remove
-                self.scn = self.scn.resample(
-                    target_area_def,
-                    resampler=resampler,
-                    nprocs=nprocs,
-                    radius_of_influence=self.resampling_info["radius_of_influence"],
-                )
+            self._preprocess_products_with_resampling()
 
         num_stages = len(products)
         for idx, (prod, ds_id) in enumerate(zip(products, dataset_ids)):
@@ -1058,26 +1025,14 @@ class SatpyImporter(aImporter):
 
             now = datetime.utcnow()
 
-            if prod.info[Info.KIND] in [Kind.LINES, Kind.POINTS]:
+            if kind in [Kind.LINES, Kind.POINTS]:
                 if len(shape) == 1:
                     LOG.error(f"one dimensional dataset can't be loaded: {ds_id['name']}")
                     continue
 
-                data_filename, data_memmap = self._create_data_memmap_file(dataset.data, dataset.dtype, prod)
-                content = ContentUnstructuredPoints(
-                    atime=now,
-                    mtime=now,
-                    # info about the data array memmap
-                    path=data_filename,
-                    n_points=shape[0],
-                    n_dimensions=shape[1],
-                    dtype=dataset.dtype,
+                completion, content, data_memmap = self._create_unstructured_points_dataset_content(
+                    dataset, kind, now, prod, shape
                 )
-                content.info[Info.KIND] = kind
-                prod.content.append(content)
-                self.add_content_to_cache(content)
-
-                completion = 2.0
                 yield import_progress(
                     uuid=prod.uuid,
                     stages=num_stages,
@@ -1102,49 +1057,14 @@ class SatpyImporter(aImporter):
                 self.merge_data_into_memmap(data, img_data, segments)
             else:
                 area_info = self._area_to_sift_attrs(dataset.attrs["area"])
-                cell_width = area_info[Info.CELL_WIDTH]
-                cell_height = area_info[Info.CELL_HEIGHT]
-                proj4 = area_info[Info.PROJ]
-                origin_x = area_info[Info.ORIGIN_X]
-                origin_y = area_info[Info.ORIGIN_Y]
-
                 grid_info = self._get_grid_info()
-                grid_origin = grid_info[Info.GRID_ORIGIN]
-                grid_first_index_x = grid_info[Info.GRID_FIRST_INDEX_X]
-                grid_first_index_y = grid_info[Info.GRID_FIRST_INDEX_Y]
 
-                # For kind IMAGE the dtype must be float32 seemingly, see class
-                # Column, comment for 'dtype' and the construction of c = Content
-                # just below.
-                # FIXME: It is dubious to enforce that type conversion to happen in
-                #  _create_data_memmap_file, but otherwise IMAGES of pixel counts
-                #  data (dtype = np.uint16) crash.
-                data_filename, img_data = self._create_data_memmap_file(data, np.float32, prod)
+                c, img_data = self._create_image_dataset_content(data, now, prod, shape, area_info, grid_info)
 
-                c = ContentImage(
-                    lod=0,
-                    resolution=int(min(abs(cell_width), abs(cell_height))),
-                    atime=now,
-                    mtime=now,
-                    # info about the data array memmap
-                    path=data_filename,
-                    rows=shape[0],
-                    cols=shape[1],
-                    proj4=proj4,
-                    dtype="float32",
-                    cell_width=cell_width,
-                    cell_height=cell_height,
-                    origin_x=origin_x,
-                    origin_y=origin_y,
-                    grid_origin=grid_origin,
-                    grid_first_index_x=grid_first_index_x,
-                    grid_first_index_y=grid_first_index_y,
-                )
                 c.info[Info.KIND] = Kind.IMAGE
                 c.img_data = img_data
                 c.source_files = set()  # FIXME(AR) is this correct?
                 # c.info.update(prod.info) would just make everything leak together so let's not do it
-
                 prod.content.append(c)
                 self.add_content_to_cache(c)
 
@@ -1163,6 +1083,88 @@ class SatpyImporter(aImporter):
                 dataset_info=None,
                 data=img_data,
                 content=c,
+            )
+
+    def _create_image_dataset_content(self, data, now, prod, shape, area_info, grid_info):
+        # For kind IMAGE the dtype must be float32 seemingly, see class
+        # Column, comment for 'dtype' and the construction of c = Content
+        # just below.
+        # FIXME: It is dubious to enforce that type conversion to happen in
+        #  _create_data_memmap_file, but otherwise IMAGES of pixel counts
+        #  data (dtype = np.uint16) crash.
+        data_filename, img_data = self._create_data_memmap_file(data, np.float32, prod)
+        c = ContentImage(
+            lod=0,
+            resolution=int(min(abs(area_info[Info.CELL_WIDTH]), abs(area_info[Info.CELL_HEIGHT]))),
+            atime=now,
+            mtime=now,
+            # info about the data array memmap
+            path=data_filename,
+            rows=shape[0],
+            cols=shape[1],
+            proj4=area_info[Info.PROJ],
+            dtype="float32",
+            cell_width=area_info[Info.CELL_WIDTH],
+            cell_height=area_info[Info.CELL_HEIGHT],
+            origin_x=area_info[Info.ORIGIN_X],
+            origin_y=area_info[Info.ORIGIN_Y],
+            grid_origin=grid_info[Info.GRID_ORIGIN],
+            grid_first_index_x=grid_info[Info.GRID_FIRST_INDEX_X],
+            grid_first_index_y=grid_info[Info.GRID_FIRST_INDEX_Y],
+        )
+        return c, img_data
+
+    def _create_unstructured_points_dataset_content(self, dataset, kind, now, prod, shape):
+        data_filename, data_memmap = self._create_data_memmap_file(dataset.data, dataset.dtype, prod)
+        content = ContentUnstructuredPoints(
+            atime=now,
+            mtime=now,
+            # info about the data array memmap
+            path=data_filename,
+            n_points=shape[0],
+            n_dimensions=shape[1],
+            dtype=dataset.dtype,
+        )
+        content.info[Info.KIND] = kind
+        prod.content.append(content)
+        self.add_content_to_cache(content)
+        completion = 2.0
+        return completion, content, data_memmap
+
+    def _preprocess_products_with_resampling(self):
+        resampler: str = self.resampling_info["resampler"]
+        max_area = self.scn.finest_area()
+        if isinstance(max_area, AreaDefinition) and max_area.area_id == self.resampling_info["area_id"]:
+            LOG.info(
+                f"Source and target area ID are identical:"
+                f" '{self.resampling_info['area_id']}'."
+                f" Skipping resampling."
+            )
+        else:
+            area_name = max_area.area_id if hasattr(max_area, "area_id") else max_area.name
+            LOG.info(
+                f"Resampling from area ID/name '{area_name}'"
+                f" to area ID '{self.resampling_info['area_id']}'"
+                f" with method '{resampler}'"
+            )
+            # Use as many processes for resampling as the number of CPUs
+            # the application can use.
+            # See https://pyresample.readthedocs.io/en/latest/multi.html
+            #  and https://docs.python.org/3/library/os.html#os.cpu_count
+            nprocs = len(os.sched_getaffinity(0))
+
+            target_area_def = AreaDefinitionsManager.area_def_by_id(self.resampling_info["area_id"])
+
+            # About the next strange line of code: keep a reference to the
+            # original scene to work around an issue in the resampling
+            # implementation for NetCDF data: otherwise the original data
+            # would be garbage collected too early.
+            self.scn_original = self.scn  # noqa - Do not simply remove
+            self.scn = self.scn.resample(
+                target_area_def,
+                resampler=resampler,
+                nprocs=nprocs,
+                radius_of_influence=self.resampling_info["radius_of_influence"],
             )
 
     def get_fci_segment_height(self, segment_number: int, segment_width: int) -> int:
