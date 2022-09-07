@@ -66,11 +66,6 @@ LOG = logging.getLogger(__name__)
 
 satpy_version = None
 
-try:
-    from skimage.measure import find_contours
-except ImportError:
-    find_contours = None
-
 DEFAULT_GTIFF_OBS_DURATION = timedelta(seconds=60)
 DEFAULT_GUIDEBOOK = ABI_AHI_Guidebook
 
@@ -1662,16 +1657,6 @@ class SatpyImporter(aImporter):
             # any case, it doesn't hurt.
             prod.info[Info.SHAPE] = shape
             kind = prod.info[Info.KIND]
-            # TODO (Alexander Rettig): Review this, best with David Hoese:
-            #  The line (exactly speaking, code equivalent to it) was
-            #  introduced in commit bba8d73f but looked very suspicious - it
-            #  seems to assume, that the only kinds here could be IMAGE or
-            #  CONTOUR:
-            #     num_contents = 1 if kind == Kind.IMAGE else 2
-            #  Assuming that num_contents == 2 is the right setting only for
-            #  kind == Kind.CONTOUR, the following implementation is supposed to
-            #  do better:
-            num_contents = 2 if kind == Kind.CONTOUR else 1
 
             if prod.content:
                 LOG.warning("content was already available, skipping import")
@@ -1698,7 +1683,7 @@ class SatpyImporter(aImporter):
                 prod.content.append(content)
                 self.add_content_to_cache(content)
 
-                completion = 2.0 / num_contents
+                completion = 2.0
                 yield import_progress(
                     uuid=prod.uuid,
                     stages=num_stages,
@@ -1733,38 +1718,6 @@ class SatpyImporter(aImporter):
                 grid_origin = grid_info[Info.GRID_ORIGIN]
                 grid_first_index_x = grid_info[Info.GRID_FIRST_INDEX_X]
                 grid_first_index_y = grid_info[Info.GRID_FIRST_INDEX_Y]
-
-                # Handle building contours for data from 0 to 360 longitude
-                # Handle building contours for data from 0 to 360 longitude
-                # our map's antimeridian is 180
-                antimeridian = 179.999
-                # find out if there is data beyond 180 in this data
-                if "+proj=latlong" not in proj4:
-                    # the x coordinate for the antimeridian in this projection
-                    am = Proj(proj4)(antimeridian, 0)[0]
-                    if am >= 1e30:
-                        am_index = -1
-                    else:
-                        am_index = int(np.ceil((am - origin_x) / cell_width))
-                else:
-                    am_index = int(np.ceil((antimeridian - origin_x) / cell_width))
-                # if there is data beyond 180, let's copy it to the beginning of the
-                # array so it shows up in the primary -180/0 portion of the SIFT map
-                if prod.info[Info.KIND] == Kind.CONTOUR and 0 < am_index < shape[1]:
-                    # Previous implementation:
-                    # Prepend a copy of the last half of the data (180 to 360 -> -180 to 0)
-                    # data = da.concatenate((data[:, am_index:], data), axis=1)
-                    # adjust X origin to be -180
-                    # origin_x -= (shape[1] - am_index) * cell_width
-                    # The above no longer works with newer PROJ because +over is deprecated
-                    #
-                    # New implementation:
-                    # Swap the 180 to 360 portion to    be -180 to 0
-                    # if we have data from 0 to 360 longitude, we want -180 to 360
-                    data = da.concatenate((data[:, am_index:], data[:, :am_index]), axis=1)
-                    # remove the custom 180 prime meridian in the projection
-                    proj4 = proj4.replace("+pm=180 ", "")
-                    area_info[Info.PROJ] = proj4
 
                 # For kind IMAGE the dtype must be float32 seemingly, see class
                 # Column, comment for 'dtype' and the construction of c = Content
@@ -1811,63 +1764,8 @@ class SatpyImporter(aImporter):
                 uuid=uuid,
                 stages=num_stages,
                 current_stage=idx,
-                completion=1.0 / num_contents,
+                completion=1.0,
                 stage_desc="SatPy IMAGE data add to workspace",
-                dataset_info=None,
-                data=img_data,
-                content=c,
-            )
-
-            if num_contents == 1:
-                continue
-
-            if find_contours is None:
-                raise RuntimeError("Can't create contours without 'skimage' " "package installed.")
-
-            # XXX: Should/could 'lod' be used for different contour level data?
-            levels = [x for y in prod.info["contour_levels"] for x in y]
-
-            try:
-                contour_data = self._compute_contours(
-                    img_data, prod.info[Info.VALID_RANGE][0], prod.info[Info.VALID_RANGE][1], levels
-                )
-            except ValueError:
-                LOG.warning("Could not compute contour levels for '{}'".format(prod.uuid))
-                LOG.debug("Contour error: ", exc_info=True)
-                continue
-
-            contour_data[:, 0] *= cell_width
-            contour_data[:, 0] += origin_x
-            contour_data[:, 1] *= cell_height
-            contour_data[:, 1] += origin_y
-            data_filename: str = self.create_contour_file_cache_data(contour_data, prod)
-            c = ContentImage(
-                lod=0,
-                resolution=int(min(abs(cell_width), abs(cell_height))),
-                atime=now,
-                mtime=now,
-                # info about the data array memmap
-                path=data_filename,
-                rows=contour_data.shape[0],  # number of vertices
-                cols=contour_data.shape[1],  # col (x), row (y), "connect", num_points_for_level
-                proj4=proj4,
-                dtype="float32",
-                cell_width=cell_width,
-                cell_height=cell_height,
-                origin_x=origin_x,
-                origin_y=origin_y,
-            )
-            c.info[Info.KIND] = Kind.CONTOUR
-            # c.info["level_index"] = level_indexes
-            self.add_content_to_cache(c)
-
-            completion = 2.0 / num_contents
-            yield import_progress(
-                uuid=uuid,
-                stages=num_stages,
-                current_stage=idx,
-                completion=completion,
-                stage_desc="SatPy CONTOUR data add to workspace",
                 dataset_info=None,
                 data=img_data,
                 content=c,
@@ -1957,17 +1855,6 @@ class SatpyImporter(aImporter):
             image_stop = image_starts_stops[i][1]
             image_data[image_start:image_stop, :] = segments_data[segment_start:segment_stop, :]
 
-    def create_contour_file_cache_data(self, contour_data: np.ndarray, prod: Product) -> str:
-        """
-        Creating a file in the current work directory for saving data in
-        '.contour' files
-        """
-        data_filename: str = "{}.contour".format(prod.uuid)
-        data_path: str = os.path.join(self._cwd, data_filename)
-        contour_data.tofile(data_path)
-
-        return data_filename
-
     def add_content_to_cache(self, c: Content) -> None:
         if self.use_inventory_db:
             self._S.add(c)
@@ -1995,43 +1882,3 @@ class SatpyImporter(aImporter):
         da.store(data, data_memmap)
 
         return data_filename, data_memmap
-
-    def _get_verts_and_connect(self, paths):
-        """retrieve vertices and connects from given paths-list"""
-        # THIS METHOD WAS COPIED FROM VISPY
-        verts = np.vstack(paths)
-        gaps = np.add.accumulate(np.array([len(x) for x in paths])) - 1
-        connect = np.ones(gaps[-1], dtype=bool)
-        connect[gaps[:-1]] = False
-        return verts, connect
-
-    def _compute_contours(self, img_data: np.ndarray, vmin: float, vmax: float, levels: list) -> np.ndarray:
-        all_levels = []
-        empty_level = np.array([[0, 0, 0, 0]], dtype=np.float32)
-        for level in levels:
-            if level < vmin or level > vmax:
-                all_levels.append(empty_level)
-                continue
-
-            contours = find_contours(img_data, level, positive_orientation="high")
-            if not contours:
-                LOG.debug("No contours found for level: {}".format(level))
-                all_levels.append(empty_level)
-                continue
-            v, c = self._get_verts_and_connect(contours)
-            # swap row, column to column, row (x, y)
-            v[:, [0, 1]] = v[:, [1, 0]]
-            v += np.array([0.5, 0.5])
-            v[:, 0] = np.where(np.isnan(v[:, 0]), 0, v[:, 0])
-
-            # HACK: Store float vertices, boolean, and index arrays together in one float array
-            this_level = np.empty((v.shape[0],), np.float32)
-            this_level[:] = np.nan
-            this_level[-1] = v.shape[0]
-            c = np.concatenate((c, [False])).astype(np.float32)
-            level_data = np.concatenate((v, c[:, None], this_level[:, None]), axis=1)
-            all_levels.append(level_data)
-
-        if not all_levels:
-            raise ValueError("No valid contour levels")
-        return np.concatenate(all_levels).astype(np.float32)
