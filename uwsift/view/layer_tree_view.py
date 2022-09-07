@@ -74,7 +74,7 @@ class LayerTreeView(QTreeView):
 
         layer: LayerItem = self.model().layers[model_idx.row()]
         actions = {}
-        if layer is not None and layer.kind in [Kind.IMAGE, Kind.COMPOSITE, Kind.CONTOUR]:
+        if layer is not None and layer.kind in [Kind.IMAGE, Kind.COMPOSITE]:
             actions.update(self.change_layer_colormap_menu(menu, layer.uuid))
 
         if not actions:

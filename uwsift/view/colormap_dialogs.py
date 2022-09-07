@@ -4,7 +4,7 @@ from uuid import UUID
 
 from PyQt5 import QtGui, QtWidgets
 
-from uwsift.common import Info, Kind
+from uwsift.common import Info
 from uwsift.model.layer_model import LayerModel
 from uwsift.ui.change_colormap_dialog_ui import Ui_changeColormapDialog
 from uwsift.view.colormap import COLORMAP_MANAGER
@@ -58,10 +58,7 @@ class ChangeColormapDialog(QtWidgets.QDialog):
         self.ui.vmin_edit.editingFinished.connect(partial(self._edit_changed, is_max=False))
         self.ui.vmax_edit.editingFinished.connect(partial(self._edit_changed, is_max=True))
 
-        if self.layer.kind in [Kind.CONTOUR]:
-            self.ui.gammaSpinBox.setDisabled(True)
-        else:
-            self.ui.gammaSpinBox.valueChanged.connect(self._gamma_changed)
+        self.ui.gammaSpinBox.valueChanged.connect(self._gamma_changed)
 
     def _clicked(self, button):
         r = self.ui.buttons.buttonRole(button)

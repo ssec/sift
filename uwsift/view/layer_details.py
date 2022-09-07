@@ -161,7 +161,7 @@ class SingleLayerInfoPane(QWidget):
             unit_info = self.document[this_prez.uuid][Info.UNIT_CONVERSION]
             new_clims = unit_info[1](new_clims, inverse=False)
             try:
-                if layer_info[Info.KIND] in [Kind.IMAGE, Kind.COMPOSITE, Kind.CONTOUR]:
+                if layer_info[Info.KIND] in [Kind.IMAGE, Kind.COMPOSITE]:
                     min_str = layer_info[Info.UNIT_CONVERSION][2](new_clims[0], include_units=False)
                     max_str = layer_info[Info.UNIT_CONVERSION][2](new_clims[1])
                     new_clims = "{} ~ {}".format(min_str, max_str)
