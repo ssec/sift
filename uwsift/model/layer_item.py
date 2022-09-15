@@ -216,7 +216,7 @@ class LayerItem:
 
         try:
             ds_wl = f"{info['wavelength'].central} {info['wavelength'].unit}"
-        except KeyError:
+        except (KeyError, AttributeError):
             ds_wl = N_A
 
         try:
