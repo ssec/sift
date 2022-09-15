@@ -730,6 +730,20 @@ class ContentImage(Content):
         return tuple(filter(lambda x: x, [self.rows, self.cols, self.levels]))
 
 
+class ContentMultiChannelImage(ContentImage):
+    __mapper_args__ = {"polymorphic_identity": "mc_image"}
+
+    bands = Column(Integer, nullable=True)
+    coverage_bands = Column(Integer, nullable=True)
+
+    def __int__(self, *args, **kwargs):
+        super(ContentMultiChannelImage, self).__int__(*args, **kwargs)
+
+    @property
+    def shape(self):
+        return tuple(filter(lambda x: x, [self.rows, self.cols, self.bands]))
+
+
 class ContentUnstructuredPoints(Content):
     __mapper_args__ = {"polymorphic_identity": "unstructured_points"}
 
