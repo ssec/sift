@@ -33,6 +33,7 @@ class LayerModel(QAbstractItemModel):
     didAddCompositeDataset = pyqtSignal(LayerItem, ProductDataset)
     didAddImageDataset = pyqtSignal(LayerItem, ProductDataset)
     didAddLinesDataset = pyqtSignal(LayerItem, ProductDataset)
+    didAddMCImageDataset = pyqtSignal(LayerItem, ProductDataset)
     didAddPointsDataset = pyqtSignal(LayerItem, ProductDataset)
 
     didAddImageLayer = pyqtSignal(LayerItem)
@@ -334,6 +335,8 @@ class LayerModel(QAbstractItemModel):
                 self.didAddLinesDataset.emit(layer, product_dataset)
             elif product_dataset.kind == Kind.POINTS:
                 self.didAddPointsDataset.emit(layer, product_dataset)
+            elif product_dataset.kind == Kind.MC_IMAGE:
+                self.didAddMCImageDataset.emit(layer, product_dataset)
             else:
                 raise NotImplementedError(f"Managing datasets of kind {product_dataset.kind}" f" not (yet) supported.")
 

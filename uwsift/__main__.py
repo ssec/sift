@@ -838,6 +838,7 @@ class Main(QtWidgets.QMainWindow):
         self.layer_model.didCreateLayer.connect(self.scene_manager.add_node_for_layer)
         self.layer_model.didAddImageDataset.connect(self.scene_manager.add_node_for_image_dataset)
         self.layer_model.didAddLinesDataset.connect(self.scene_manager.add_node_for_lines_dataset)
+        self.layer_model.didAddMCImageDataset.connect(self.scene_manager.add_node_for_mc_image_dataset)
         self.layer_model.didAddPointsDataset.connect(self.scene_manager.add_node_for_points_dataset)
 
         self.layer_model.didAddSystemLayer.connect(self.scene_manager.add_node_for_system_generated_data)
