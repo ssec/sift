@@ -45,6 +45,8 @@ from uwsift import USE_TILED_GEOLOCATED_IMAGES, config
 from uwsift.common import (
     BORDERS_DATASET_NAME,
     DEFAULT_ANIMATION_DELAY,
+    DEFAULT_TILE_HEIGHT,
+    DEFAULT_TILE_WIDTH,
     LATLON_GRID_DATASET_NAME,
     Info,
     Kind,
@@ -799,7 +801,7 @@ class SceneGraphManager(QObject):
         return data
 
     def add_node_for_layer(self, layer: LayerItem):
-        if not USE_TILED_GEOLOCATED_IMAGES and layer.kind in [Kind.IMAGE, Kind.COMPOSITE, Kind.RGB]:
+        if not USE_TILED_GEOLOCATED_IMAGES and layer.kind in [Kind.IMAGE, Kind.COMPOSITE, Kind.RGB, Kind.MC_IMAGE]:
             layer_node = scene.Node(parent=self.main_map_parent, name=str(layer.uuid))
         else:
             layer_node = scene.Node(parent=self.main_map, name=str(layer.uuid))
@@ -927,6 +929,60 @@ class SceneGraphManager(QObject):
         self.apply_presentation_to_image_node(image, layer.presentation)
         self.on_view_change(None)
         LOG.debug("Scene Graph after IMAGE dataset insertion:")
+        LOG.debug(self.main_view.describe_tree(with_transform=True))
+
+    def add_node_for_mc_image_dataset(self, layer: LayerItem, product_dataset: ProductDataset) -> None:
+        """Create and add a new node for a multichannel images to the SceneGraphManager.
+
+        Depending on the system configuration either a node with or without tiling is created from the product_dataset
+        and inserted as a child of the layer's node in the scene graph.
+
+        :param layer: LayerItem which owns the ProductDataset
+        :param product_dataset: ProductDataset to create the multichannel image for
+        """
+        assert self.layer_nodes[layer.uuid] is not None
+        assert product_dataset.kind == Kind.MC_IMAGE
+
+        img_data = self.workspace.get_content(product_dataset.uuid, kind=product_dataset.kind)
+
+        if USE_TILED_GEOLOCATED_IMAGES:
+            image = TiledGeolocatedImage(
+                img_data,
+                product_dataset.info[Info.ORIGIN_X],
+                product_dataset.info[Info.ORIGIN_Y],
+                product_dataset.info[Info.CELL_WIDTH],
+                product_dataset.info[Info.CELL_HEIGHT],
+                name=str(product_dataset.uuid),
+                interpolation="nearest",
+                method="subdivide",
+                double=False,
+                #  TODO: (Inform David about the strange behavior)
+                #   workaround (setting clims to (0.0, 1.0) because if no clim is set then default is auto and
+                #   this is not corrcetly resolved before build tiles. But the real clim value is need before
+                #   ImageVisual._build_color_transform() is executed.
+                clim=(0.0, 1.0),
+                texture_shape=DEFAULT_TEXTURE_SHAPE,
+                tile_shape=(DEFAULT_TILE_HEIGHT, DEFAULT_TILE_WIDTH, img_data.shape[2]),
+                wrap_lon=False,
+                parent=self.layer_nodes[layer.uuid],
+                projection=product_dataset.info[Info.PROJ],
+            )
+            image.transform = PROJ4Transform(product_dataset.info[Info.PROJ], inverse=True)
+            image.determine_reference_points()
+        else:
+            image = Image(
+                img_data,
+                name=str(product_dataset.uuid),
+                interpolation="nearest",
+                parent=self.layer_nodes[layer.uuid],
+            )
+            image.transform = STTransform(
+                scale=(product_dataset.info[Info.CELL_WIDTH], product_dataset.info[Info.CELL_HEIGHT], 1),
+                translate=(product_dataset.info[Info.ORIGIN_X], product_dataset.info[Info.ORIGIN_Y], 0),
+            )
+        self.dataset_nodes[product_dataset.uuid] = image
+        self.on_view_change(None)
+        LOG.debug("Scene Graph after MC IMAGE dataset insertion:")
         LOG.debug(self.main_view.describe_tree(with_transform=True))
 
     def add_node_for_composite_dataset(self, layer: LayerItem, product_dataset: ProductDataset):
