@@ -35,8 +35,9 @@ import satpy.readers.yaml_reader
 import satpy.resample
 import yaml
 from pyresample.geometry import AreaDefinition, StackedAreaDefinition
-from satpy import Scene, available_readers
+from satpy import DataQuery, Scene, available_readers
 from satpy.dataset import DatasetDict
+from satpy.writers import get_enhanced_image
 from sqlalchemy.orm import Session
 from xarray import DataArray
 
@@ -51,6 +52,7 @@ from uwsift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
 from .metadatabase import (
     Content,
     ContentImage,
+    ContentMultiChannelImage,
     ContentUnstructuredPoints,
     Product,
     Resource,
@@ -268,7 +270,18 @@ class aImporter(ABC):
             if scn and "_satpy_id" in prod.info:
                 # filter out files not required to load dataset for given product
                 # extraneous files interfere with the merging process
-                paths = _wanted_paths(scn, prod.info["_satpy_id"].get("name"))
+
+                if "prerequisites" in prod.info:
+                    # If the dataset has prerequisites for it to be loaded,
+                    # the files that are required by them must be included
+                    paths = []
+                    for prerequisite in prod.info.get("prerequisites"):
+                        name = prerequisite.get("name") if isinstance(prerequisite, DataQuery) else prerequisite
+                        paths += _wanted_paths(scn, name)
+                    # remove possible duplicates of files
+                    paths = list(dict.fromkeys(paths))
+                else:
+                    paths = _wanted_paths(scn, prod.info["_satpy_id"].get("name"))
 
         merge_target = kwargs.get("merge_target")
         if merge_target:
@@ -617,6 +630,9 @@ class SatpyImporter(aImporter):
         attrs[Info.OBS_DURATION] = duration
 
     def _set_kind_metadata(self, attrs: dict) -> None:
+        if "prerequisites" in attrs:
+            attrs[Info.KIND] = Kind.MC_IMAGE
+            return
         reader_kind = config.get(f"data_reading.{self.reader}.kind", None)
         if reader_kind:
             try:
@@ -629,7 +645,7 @@ class SatpyImporter(aImporter):
 
     def _set_wavelength_metadata(self, attrs: dict) -> None:
         self._get_platform_instrument(attrs)
-        if "wavelength" in attrs:
+        if "wavelength" in attrs and attrs.get("wavelength"):
             attrs.setdefault(Info.CENTRAL_WAVELENGTH, attrs["wavelength"][1])
 
     def _set_shape_metadata(self, attrs: dict, shape) -> None:
@@ -1008,8 +1024,16 @@ class SatpyImporter(aImporter):
 
         num_stages = len(products)
         for idx, (prod, ds_id) in enumerate(zip(products, dataset_ids)):
-            dataset = self.scn[ds_id]
+
+            dataset = (
+                self.scn[ds_id] if prod.info[Info.KIND] != Kind.MC_IMAGE else get_enhanced_image(self.scn[ds_id]).data
+            )
             shape = dataset.shape
+            if prod.info[Info.KIND] == Kind.MC_IMAGE:
+                # The dimension of the dataset is ('bands', 'y', 'x')
+                # but for later the dimension ('y', 'x', 'bands') is needed
+                dataset = dataset.transpose("y", "x", "bands")
+                shape = dataset.shape
             # Since in the first SatpyImporter loading pass (see
             # load_all_datasets()) no padding is applied (pad_data=False), the
             # Info.SHAPE stored at that time may not be the same as it is now if
@@ -1059,9 +1083,14 @@ class SatpyImporter(aImporter):
                 area_info = self._area_to_sift_attrs(dataset.attrs["area"])
                 grid_info = self._get_grid_info()
 
-                c, img_data = self._create_image_dataset_content(data, now, prod, shape, area_info, grid_info)
+                if kind == Kind.MC_IMAGE:
+                    c, img_data = self._create_mc_image_dataset_content(
+                        area_info, data, dataset, grid_info, now, prod, shape
+                    )
+                else:
+                    c, img_data = self._create_image_dataset_content(data, now, prod, shape, area_info, grid_info)
 
-                c.info[Info.KIND] = Kind.IMAGE
+                c.info[Info.KIND] = prod.info[Info.KIND]
                 c.img_data = img_data
                 c.source_files = set()  # FIXME(AR) is this correct?
                 # c.info.update(prod.info) would just make everything leak together so let's not do it
@@ -1084,6 +1113,30 @@ class SatpyImporter(aImporter):
                 data=img_data,
                 content=c,
             )
+
+    def _create_mc_image_dataset_content(self, area_info, data, dataset, grid_info, now, prod, shape):
+        data_filename, img_data = self._create_data_memmap_file(data, data.dtype, prod)
+        c = ContentMultiChannelImage(
+            lod=0,
+            resolution=int(min(abs(area_info[Info.CELL_WIDTH]), abs(area_info[Info.CELL_HEIGHT]))),
+            atime=now,
+            mtime=now,
+            # info about the data array memmap
+            path=data_filename,
+            rows=shape[0],
+            cols=shape[1],
+            bands=shape[2],
+            proj4=area_info[Info.PROJ],
+            dtype=str(dataset.dtype),
+            cell_width=area_info[Info.CELL_WIDTH],
+            cell_height=area_info[Info.CELL_HEIGHT],
+            origin_x=area_info[Info.ORIGIN_X],
+            origin_y=area_info[Info.ORIGIN_Y],
+            grid_origin=grid_info[Info.GRID_ORIGIN],
+            grid_first_index_x=grid_info[Info.GRID_FIRST_INDEX_X],
+            grid_first_index_y=grid_info[Info.GRID_FIRST_INDEX_Y],
+        )
+        return c, img_data
 
     def _create_image_dataset_content(self, data, now, prod, shape, area_info, grid_info):
         # For kind IMAGE the dtype must be float32 seemingly, see class
