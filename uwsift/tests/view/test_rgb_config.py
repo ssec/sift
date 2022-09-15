@@ -4,10 +4,10 @@
 from unittest import mock
 
 from PyQt5.QtWidgets import QMainWindow
-from uwsift.model.layer_model import LayerModel
 
 from uwsift.common import Info, Kind
 from uwsift.model.composite_recipes import CompositeRecipe
+from uwsift.model.layer_model import LayerModel
 from uwsift.ui.pov_main_ui import Ui_MainWindow
 from uwsift.view.rgb_config import RGBLayerConfigPane
 
@@ -59,11 +59,7 @@ def test_slider_change(qtbot):
     pane.layer_added(layer_two)
 
     rgb_recipe = CompositeRecipe.from_rgb(
-        name="my_rgb",
-        r="some_uuid",
-        g="some_other_uuid",
-        b=None,
-        color_limits=((0.0, 90.0), (0.0, 90.0), (None, None))
+        name="my_rgb", r="some_uuid", g="some_other_uuid", b=None, color_limits=((0.0, 90.0), (0.0, 90.0), (None, None))
     )
     rgb_layer = mock.MagicMock()
     rgb_layer.recipe = rgb_recipe
@@ -77,5 +73,5 @@ def test_slider_change(qtbot):
     color = blocker.args[1]
     clim = blocker.args[2]
     assert recipe is rgb_recipe
-    assert color == 'r'
+    assert color == "r"
     assert clim == ((8.0 / 100.0) * 150, 90.0)

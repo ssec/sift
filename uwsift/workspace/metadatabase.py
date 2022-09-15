@@ -660,6 +660,7 @@ class Content(Base):
         self.atime = when = when or datetime.utcnow()
         self.product.touch(when)
 
+
 class ContentImage(Content):
     __mapper_args__ = {"polymorphic_identity": "image"}
 
