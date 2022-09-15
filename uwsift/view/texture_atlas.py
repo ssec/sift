@@ -45,10 +45,16 @@ class TextureAtlas2D(GPUScaledTexture2D):
         self.tile_shape = tile_shape
         # Number of rows and columns to hold all of these tiles in one texture
         shape = (self.texture_shape[0] * self.tile_shape[0], self.texture_shape[1] * self.tile_shape[1])
+        if len(tile_shape) == 3:
+            shape = (shape[0], shape[1], tile_shape[2])
         self.texture_size = shape
         self._fill_array = np.tile(np.float32(np.nan), self.tile_shape)
         # create a representative array so the texture can be initialized properly with the right dtype
-        rep_arr = np.zeros((10, 10), dtype=np.float32)
+        rep_arr = (
+            np.zeros((10, 10, tile_shape[2]), dtype=np.float32)
+            if len(tile_shape) == 3
+            else np.zeros((10, 10), dtype=np.float32)
+        )
         # will add self.shape:
         super(TextureAtlas2D, self).__init__(data=rep_arr, **texture_kwargs)
         # GPUScaledTexture2D always uses a "representative" size
