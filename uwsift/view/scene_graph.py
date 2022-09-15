@@ -1213,8 +1213,9 @@ class SceneGraphManager(QObject):
         LOG.debug("Retiling child with UUID: '%s'", uuid)
         yield {TASK_DOING: "Re-tiling", TASK_PROGRESS: 0.0}
         if uuid not in self.composite_element_dependencies:
+            kind = self.document[uuid].get(Info.KIND)
             child = self.dataset_nodes[uuid]
-            data = self.workspace.get_content(uuid, lod=preferred_stride)
+            data = self.workspace.get_content(uuid, lod=preferred_stride, kind=kind)
             yield {TASK_DOING: "Re-tiling", TASK_PROGRESS: 0.5}
             # FIXME: Use LOD instead of stride and provide the lod to the workspace
             data = data[:: preferred_stride[0], :: preferred_stride[1]]

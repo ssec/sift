@@ -300,7 +300,7 @@ class CachingWorkspace(BaseWorkspace):
         # prod = self._product_with_uuid(uuid)
         # assert(prod is not None)
         with self._inventory as s:
-            ovc = self._product_overview_content(s, uuid=uuid)
+            ovc = self._product_overview_content(s, uuid=uuid, kind=kind)
             assert ovc is not None
             arrays = self._cached_arrays_for_content(ovc)
             return arrays.data
