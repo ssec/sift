@@ -14,7 +14,7 @@ project( mtgsift LANGUAGES NONE )
 
 list( APPEND CMAKE_MODULE_PATH "cmake/" )
 
-set( PYTHON_VERSION 3.7 )
+set( PYTHON_VERSION 3.10 CACHE STRING "Version of Python to setup/build MTG-SIFT for." )
 
 #-------------------------------------------------------------------------------------------------
 # Dependencies
@@ -28,10 +28,12 @@ find_package( Conda REQUIRED )
 #-------------------------------------------------------------------------------------------------
 
 if( NOT ${PROJECT_NAME}_CONDA_ENVIRONMENT )
-  set( ${PROJECT_NAME}_CONDA_ENVIRONMENT "$ENV{CONDA_DEFAULT_ENV}" CACHE STRING "Name (or absolute path) of conda environment in which ${PROJECT_NAME} is build/packaged" )
-  if( "${${PROJECT_NAME}_CONDA_ENVIRONMENT}" STREQUAL "base" )
-    set( ${PROJECT_NAME}_CONDA_ENVIRONMENT "devel-default"         CACHE STRING "Name (or absolute path) of conda environment in which ${PROJECT_NAME} is build/packaged" FORCE )
-  endif()
+  set( ${PROJECT_NAME}_CONDA_ENVIRONMENT "devel-${PYTHON_VERSION}" CACHE STRING "Name (or absolute path) of conda environment in which ${PROJECT_NAME} is build/packaged" )
+endif()
+
+if( "${${PROJECT_NAME}_CONDA_ENVIRONMENT}" STREQUAL "base" )
+  set( ${PROJECT_NAME}_CONDA_ENVIRONMENT "devel-${PYTHON_VERSION}" CACHE STRING "Name (or absolute path) of conda environment in which ${PROJECT_NAME} is build/packaged" FORCE )
+  message( FATAL_ERROR "${PROJECT_NAME} project must not be set up in a Conda 'base' environment. Resetting to sensible default." )
 endif()
 
 set( ${PROJECT_NAME}_DEPENDENCIES_CHANNEL "conda-forge" CACHE STRING "Conda channel which provides dependencies of ${PROJECT_NAME}." )

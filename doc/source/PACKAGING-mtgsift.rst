@@ -57,8 +57,9 @@ for the chosen build system::
   (base)%> cmake -G "Unix Makefiles" .
 
 Then follow the advice given by the messages showing up. When doing so, a new
-Conda environment *devel-default* [#f4]_ will be created and populated with
-all packages necessary for MTG-SIFT development and packaging::
+Conda environment *devel-<python version>* (by default *devel-3.10*) [#f4]_ will
+be created and populated with all packages necessary for MTG-SIFT development
+and packaging::
 
   (base)%> make devel-bootstrap
 
@@ -72,17 +73,17 @@ Building Conda and PyInstaller Packages
 
 If not already done, execute the steps::
 
-  (base)%> conda activate devel-default
-  (devel-default)%> conda config --env --add channels conda-forge
-  (devel-default)%> conda config --env --set channel_priority strict
-  (devel-default)%> cmake -G "Unix Makefiles" .
-  (devel-default)%> make patch-shapely
+  (base)%> conda activate devel-3.10
+  (devel-3.10)%> conda config --env --add channels conda-forge
+  (devel-3.10)%> conda config --env --set channel_priority strict
+  (devel-3.10)%> cmake -G "Unix Makefiles" .
+  (devel-3.10)%> make patch-shapely
 
 The system is now ready to create Conda and PyInstaller packages for
 MTG-SIFT. The according targets can be found in the target lists printed by
 running::
 
-  (devel-default)%> make help
+  (devel-3.10)%> make help
    The following are some of the valid targets for this Makefile:
    [...]
    ... conda-packages
@@ -92,7 +93,7 @@ running::
 
 Each of these *package-target*\ s can be build by running::
 
-   (devel-default)%> make <package-target>
+   (devel-3.10)%> make <package-target>
 
 .. _conda-packaging:
 
@@ -131,7 +132,7 @@ Conda environment you use for packaging. The MTG-SIFT dependency *Shapely* has
 an issue with respect to PyInstaller based packaging, which is fixed with the
 provided patch for now::
 
-  (devel-default)%> make patch-shapely
+  (devel-3.10)%> make patch-shapely
 
 The difference between the two targets is:
 
