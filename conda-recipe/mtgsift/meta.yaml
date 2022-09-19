@@ -25,31 +25,31 @@ outputs:
     requirements:
       run:
         - python {{PY_VER}}*
-        - numpy
-        - rasterio
-        - matplotlib
-        - numba
-        - pyproj
-        - vispy
-        - netcdf4
+
+        - appdirs
+        - defusedxml
+        - donfig
+        - ffmpeg
         - h5py
         - imageio
         - imageio-ffmpeg
-        - ffmpeg
+        - matplotlib
+        - netcdf4
+        - numba
+        - numpy
         - pillow
-        - pyshp
+        - pygrib
+        - pyproj
+        - pyqt >=5.9
         - pyqtgraph
+        - pyshp
+        - pyyaml
+        - rasterio
+        - satpy
+        - scikit-image
         - shapely
         - sqlalchemy
-        - pyqt >=5.9
-        - appdirs
-        - pyyaml
-        - satpy
-        - pygrib
-        - scikit-image
-        - donfig
-        - defusedxml
-
+        - vispy
     test:
       commands:
         - python -c "from rasterio import Affine"
@@ -68,16 +68,17 @@ outputs:
     requirements:
       run:
         - mtgsift-deps
-        - pip
-        - setuptools
+
         - cmake
         - conda-build
         - git
         - git-bash # [win]
         - make # Alternative: ninja
+        - pip
         - pyinstaller
         - pytest-mock
         - pytest-qt
+        - setuptools
 
 test:
   commands:
