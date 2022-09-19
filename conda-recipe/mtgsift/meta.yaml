@@ -40,8 +40,9 @@ outputs:
         - pillow
         - pygrib
         - pyproj
-        - pyqt >=5.9
+        - pyqt >=5.15
         - pyqtgraph
+        - pyqtwebengine
         - pyshp
         - pyyaml
         - rasterio
@@ -49,7 +50,7 @@ outputs:
         - scikit-image
         - shapely
         - sqlalchemy
-        - vispy
+        - vispy >=0.10
     test:
       commands:
         - python -c "from rasterio import Affine"
