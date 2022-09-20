@@ -265,9 +265,10 @@ class aImporter(ABC):
         if "reader" in prod.info:
             kwargs.setdefault("reader", prod.info["reader"])
 
+        merge_target = kwargs.get("merge_target")
         if "scenes" in kwargs:
             scn = kwargs["scenes"].get(tuple(paths), None)
-            if scn and "_satpy_id" in prod.info:
+            if scn and "_satpy_id" in prod.info and config.get("data_reading.merge_with_existing", True):
                 # filter out files not required to load dataset for given product
                 # extraneous files interfere with the merging process
 
@@ -277,13 +278,21 @@ class aImporter(ABC):
                     paths = []
                     for prerequisite in prod.info.get("prerequisites"):
                         name = prerequisite.get("name") if isinstance(prerequisite, DataQuery) else prerequisite
+                        if name not in scn.available_dataset_names():
+                            # In this case we have to interrupt the loading (which runs it is own thread) by raising
+                            # an exception
+                            raise RuntimeError(
+                                f"RGB Composite provided by satpy with the name"
+                                f" '{prod.info[Info.SHORT_NAME]}' does not work with activated merging of "
+                                f" new data segments into existing data. Consider switching it off by"
+                                f" configuring 'data_reading.merge_with_existing: False'"
+                            )
                         paths += _wanted_paths(scn, name)
                     # remove possible duplicates of files
                     paths = list(dict.fromkeys(paths))
                 else:
                     paths = _wanted_paths(scn, prod.info["_satpy_id"].get("name"))
 
-        merge_target = kwargs.get("merge_target")
         if merge_target:
             # filter out all segments which are already loaded in the target product
             new_filenames = []
@@ -513,14 +522,23 @@ class SatpyImporter(aImporter):
         :return: list of all the segment numbers of all segments loaded by the scene
         """
         segments = []
+        collected_segment_count = 0
         for reader in self.scn._readers.values():
             for file_handlers in reader.file_handlers.values():
+                collected_segment_count += 1
                 for file_handler in file_handlers:
                     if file_handler.filetype_info["file_type"] in self.requires:
+                        collected_segment_count -= 1
                         continue
                     seg = file_handler.filename_info["segment"]
                     segments.append(seg)
-        return segments
+
+        filtered_segments = []
+        for segment in set(segments):
+            if segments.count(segment) == collected_segment_count:
+                filtered_segments.append(segment)
+
+        return sorted(filtered_segments)
 
     def _extract_expected_segments(self) -> Optional[int]:
         """
@@ -649,6 +667,8 @@ class SatpyImporter(aImporter):
             attrs.setdefault(Info.CENTRAL_WAVELENGTH, attrs["wavelength"][1])
 
     def _set_shape_metadata(self, attrs: dict, shape) -> None:
+        if len(shape) == 3 and "prerequisites" in attrs.keys():
+            shape = (shape[1], shape[2], shape[0])
         attrs[Info.SHAPE] = shape if not self.resampling_info else self.resampling_info["shape"]
         attrs[Info.UNITS] = attrs.get("units")
         if attrs[Info.UNITS] == "unknown":
