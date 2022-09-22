@@ -1301,7 +1301,7 @@ class Main(QtWidgets.QMainWindow):
         self._open_cache_dialog.activate(ordered_uuid_to_name)
 
     def open_wizard(self, *args, **kwargs):
-        from uwsift.view.open_file_wizard_2 import OpenFileWizard
+        from uwsift.view.open_file_wizard import OpenFileWizard
 
         wizard_dialog = OpenFileWizard(base_dir=self._last_open_dir, base_reader=self._last_reader, parent=self)
         self._wizard_dialog = wizard_dialog
