@@ -1237,6 +1237,10 @@ class Main(QtWidgets.QMainWindow):
         open_gradient.setShortcut("Ctrl+E")
         open_gradient.triggered.connect(self.open_colormap_editor)
 
+        focus_layer_manager = QtWidgets.QAction("Set Focus to LayerManager", self)
+        focus_layer_manager.setShortcut("Shift+L")
+        focus_layer_manager.triggered.connect(self.ui.treeView.setFocus)
+
         edit_menu = menubar.addMenu("&Edit")
         edit_menu.addAction(remove)
         edit_menu.addAction(clear)
@@ -1254,6 +1258,7 @@ class Main(QtWidgets.QMainWindow):
         view_menu.addAction(toggle_vis)
         view_menu.addAction(cycle_borders)
         view_menu.addAction(cycle_grid)
+        view_menu.addAction(focus_layer_manager)
 
         if USE_INVENTORY_DB:
             self.update_recent_file_menu()
