@@ -10,6 +10,7 @@ def dataset_statistical_analysis(xarr):
     can be used to compute and return the appropriate statistical information.
     """
 
+    stats = None
     if "flag_values" in xarr.attrs:
         # Categorical data
         flag_values = xarr.attrs["flag_values"]
@@ -24,7 +25,7 @@ def dataset_statistical_analysis(xarr):
 
     elif "flag_masks" in xarr.attrs:
         # Bit-encoded data
-        pass
+        return {}
 
     elif "algebraic" in xarr.attrs:
         # Algebraic data. At least for differences, we want to have some additional statistical metrics.
@@ -39,8 +40,9 @@ def dataset_statistical_analysis(xarr):
         flag_values = np.arange(0, np.nanmax(xarr) + 1)
         flag_meanings = ["n/a"] * len(flag_values)
         stats = CategoricalBasicStats(flag_values, flag_meanings)
-    else:
-        # All remaining datasets, including basic continuous data.
+
+    # All remaining datasets, including basic continuous data.
+    if not stats:
         stats = ContinuousBasicStats()
 
     stats.compute_stats(xarr.values)
