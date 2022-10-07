@@ -49,15 +49,16 @@ def dataset_statistical_analysis(xarr):
 
 
 class ContinuousBasicStats:
-    """ Basic statistical metrics to use for continuous datasets."""
+    """Basic statistical metrics to use for continuous datasets."""
     def __init__(self):
-        self.stats = {}
-        self.stats['count'] = []
-        self.stats['min'] = []
-        self.stats['max'] = []
-        self.stats['mean'] = []
-        self.stats['median'] = []
-        self.stats['std'] = []
+        self.stats = {
+            'count': [],
+            'min': [],
+            'max': [],
+            'mean': [],
+            'median': [],
+            'std': [],
+        }
 
     def compute_stats(self, data):
         self.compute_basic_stats(data)
@@ -139,12 +140,14 @@ class CategoricalBasicStats:
 
         where i, j, k represents the values representing the different categories.
         """
-        stats = [list((value, meaning, count, fraction)) for value, meaning, count, fraction in zip(self.flag_values, self.flag_meanings, self.count, self.fraction)]
-        stats_dict = {'header': self.header,
-                      'stats': stats}
+        stats = [
+            list((value, meaning, count, fraction))
+            for value, meaning, count, fraction
+            in zip(self.flag_values, self.flag_meanings, self.count, self.fraction)
+        ]
+        stats_dict = {
+            'header': self.header,
+            'stats': stats,
+        }
 
         return stats_dict
-
-
-
-
