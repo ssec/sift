@@ -1,5 +1,6 @@
-import numpy as np
 import logging
+
+import numpy as np
 
 
 def dataset_statistical_analysis(xarr):
@@ -9,34 +10,34 @@ def dataset_statistical_analysis(xarr):
     can be used to compute and return the appropriate statistical information.
     """
 
-    if 'flag_values' in xarr.attrs:
+    if "flag_values" in xarr.attrs:
         # Categorical data
-        flag_values = xarr.attrs['flag_values']
+        flag_values = xarr.attrs["flag_values"]
 
         try:
-            flag_meanings = xarr.attrs['flag_meanings']
+            flag_meanings = xarr.attrs["flag_meanings"]
         except (KeyError, AttributeError):
             logging.warning("'flag_meanings' not available as dataset attributes, setting to n/a.")
-            flag_meanings = ['n/a'] * len(flag_values)
+            flag_meanings = ["n/a"] * len(flag_values)
 
         stats = CategoricalBasicStats(flag_values, flag_meanings)
 
-    elif 'flag_masks' in xarr.attrs:
+    elif "flag_masks" in xarr.attrs:
         # Bit-encoded data
         pass
 
-    elif 'algebraic' in xarr.attrs:
+    elif "algebraic" in xarr.attrs:
         # Algebraic data. At least for differences, we want to have some additional statistical metrics.
-        if xarr.attrs['algebraic'] == 'x-y':
+        if xarr.attrs["algebraic"] == "x-y":
             stats = ContinuousDifferenceStats()
         else:
             logging.info(f"'ContinuousBasicStats' will be computed for algabraic operation {xarr.attrs['algebraic']}.")
 
-    elif xarr.dtype.kind == 'i' and len(np.unique(xarr)) < 25:
+    elif xarr.dtype.kind == "i" and len(np.unique(xarr)) < 25:
         # NOTE: This is a preliminary ugly workaround used to identify categorical dataset and guess the categories.
         # TODO: Modify satpy readers to provide proper information using flag_values and flag_meanings attributes.
-        flag_values = np.arange(0, np.nanmax(xarr)+1)
-        flag_meanings = ['n/a'] * len(flag_values)
+        flag_values = np.arange(0, np.nanmax(xarr) + 1)
+        flag_meanings = ["n/a"] * len(flag_values)
         stats = CategoricalBasicStats(flag_values, flag_meanings)
     else:
         # All remaining datasets, including basic continuous data.
@@ -50,26 +51,27 @@ def dataset_statistical_analysis(xarr):
 
 class ContinuousBasicStats:
     """Basic statistical metrics to use for continuous datasets."""
+
     def __init__(self):
         self.stats = {
-            'count': [],
-            'min': [],
-            'max': [],
-            'mean': [],
-            'median': [],
-            'std': [],
+            "count": [],
+            "min": [],
+            "max": [],
+            "mean": [],
+            "median": [],
+            "std": [],
         }
 
     def compute_stats(self, data):
         self.compute_basic_stats(data)
 
     def compute_basic_stats(self, data):
-        self.stats['count'].append(np.count_nonzero(~np.isnan(data)))
-        self.stats['min'].append(np.nanmin(data))
-        self.stats['max'].append(np.nanmax(data))
-        self.stats['mean'].append(np.nanmean(data))
-        self.stats['median'].append(np.nanmedian(data))
-        self.stats['std'].append(np.nanstd(data))
+        self.stats["count"].append(np.count_nonzero(~np.isnan(data)))
+        self.stats["min"].append(np.nanmin(data))
+        self.stats["max"].append(np.nanmax(data))
+        self.stats["mean"].append(np.nanmean(data))
+        self.stats["median"].append(np.nanmedian(data))
+        self.stats["std"].append(np.nanstd(data))
 
     def get_stats(self):
         """Send the statistical data to a statistics dictionary.
@@ -86,16 +88,17 @@ class ContinuousBasicStats:
 
         where i, j, k represents the different statistical metrics.
         """
-        stats_dict = {'stats': self.stats}
+        stats_dict = {"stats": self.stats}
         return stats_dict
 
 
 class ContinuousDifferenceStats(ContinuousBasicStats):
     """Statistical metrics to use for continuous difference datasets."""
+
     def __init__(self):
         super().__init__()  # initialize basic continuous statistics
-        self.stats['mad'] = []
-        self.stats['rmsd'] = []
+        self.stats["mad"] = []
+        self.stats["rmsd"] = []
 
     def compute_stats(self, diff):
         self.compute_basic_stats(diff)
@@ -103,14 +106,15 @@ class ContinuousDifferenceStats(ContinuousBasicStats):
 
     def compute_difference_stats(self, diff):
         """Compute additional statistical metrics useful for difference datasets."""
-        self.stats['mad'].append(np.nanmean(np.abs(diff)))
-        self.stats['rmsd'].append(np.sqrt(np.nanmean(np.square(diff))))
+        self.stats["mad"].append(np.nanmean(np.abs(diff)))
+        self.stats["rmsd"].append(np.sqrt(np.nanmean(np.square(diff))))
 
 
 class CategoricalBasicStats:
     """Basic statistical metrics to use for categorical datasets."""
+
     def __init__(self, flag_values, flag_meanings):
-        self.header = ['value', 'meaning', 'count / -', 'fraction / %']
+        self.header = ["value", "meaning", "count / -", "fraction / %"]
         self.flag_values = list(flag_values)
         self.flag_meanings = list(flag_meanings)
         self.count = []
@@ -122,7 +126,7 @@ class CategoricalBasicStats:
     def compute_basic_stats(self, data):
         """Compute the number and fraction (wrt. total count) of a given category."""
         self.count = [np.count_nonzero(data == val) for val in self.flag_values]
-        self.fraction = [(c / sum(self.count) * 100. if sum(self.count) > 0. else 0.0) for c in self.count]
+        self.fraction = [(c / sum(self.count) * 100.0 if sum(self.count) > 0.0 else 0.0) for c in self.count]
 
     def get_stats(self):
         """Put the statistical data in a list of lists and send together with header to a statistics dictionary.
@@ -142,12 +146,11 @@ class CategoricalBasicStats:
         """
         stats = [
             list((value, meaning, count, fraction))
-            for value, meaning, count, fraction
-            in zip(self.flag_values, self.flag_meanings, self.count, self.fraction)
+            for value, meaning, count, fraction in zip(self.flag_values, self.flag_meanings, self.count, self.fraction)
         ]
         stats_dict = {
-            'header': self.header,
-            'stats': stats,
+            "header": self.header,
+            "stats": stats,
         }
 
         return stats_dict
