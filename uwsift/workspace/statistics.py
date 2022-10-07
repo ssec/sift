@@ -5,7 +5,7 @@ import logging
 def dataset_statistical_analysis(xarr):
     """Compute and return a dictionary with statistical information about the input dataset.
 
-    The dataset should be of type xarray.Dataarray (usually Satpy Scene objects) such that the dataset attributes
+    The dataset should be of type xarray.DataArray (usually Satpy Scene objects) such that the dataset attributes
     can be used to compute and return the appropriate statistical information.
     """
 
@@ -16,7 +16,7 @@ def dataset_statistical_analysis(xarr):
         try:
             flag_meanings = xarr.attrs['flag_meanings']
         except (KeyError, AttributeError):
-            logging.warning("'flag_meanings' not available as dataaset attributes, setting to n/a.")
+            logging.warning("'flag_meanings' not available as dataset attributes, setting to n/a.")
             flag_meanings = ['n/a'] * len(flag_values)
 
         stats = CategoricalBasicStats(flag_values, flag_meanings)
@@ -26,11 +26,11 @@ def dataset_statistical_analysis(xarr):
         pass
 
     elif 'algebraic' in xarr.attrs:
-        # Algebraic data. At least for differences, we want to have some additinal statistical metrics.
+        # Algebraic data. At least for differences, we want to have some additional statistical metrics.
         if xarr.attrs['algebraic'] == 'x-y':
-            stats = ContinousDifferenceStats()
+            stats = ContinuousDifferenceStats()
         else:
-            logging.info(f"'ContinousBasicStats' will be computed for algabraic operation {xarr.attrs['algebraic']}.")
+            logging.info(f"'ContinuousBasicStats' will be computed for algabraic operation {xarr.attrs['algebraic']}.")
 
     elif xarr.dtype.kind == 'i' and len(np.unique(xarr)) < 25:
         # NOTE: This is a preliminary ugly workaround used to identify categorical dataset and guess the categories.
@@ -40,7 +40,7 @@ def dataset_statistical_analysis(xarr):
         stats = CategoricalBasicStats(flag_values, flag_meanings)
     else:
         # All remaining datasets, including basic continuous data.
-        stats = ContinousBasicStats()
+        stats = ContinuousBasicStats()
 
     stats.compute_stats(xarr.values)
     stats_out = stats.get_stats()
@@ -48,8 +48,8 @@ def dataset_statistical_analysis(xarr):
     return stats_out
 
 
-class ContinousBasicStats:
-    """ Basic statistical metrics to use for continous datasets."""
+class ContinuousBasicStats:
+    """ Basic statistical metrics to use for continuous datasets."""
     def __init__(self):
         self.stats = {}
         self.stats['count'] = []
@@ -89,8 +89,8 @@ class ContinousBasicStats:
         return stats_dict
 
 
-class ContinousDifferenceStats(ContinousBasicStats):
-    """Statistical metrics to use for countinuous difference datasets."""
+class ContinuousDifferenceStats(ContinuousBasicStats):
+    """Statistical metrics to use for continuous difference datasets."""
     def __init__(self):
         super().__init__()  # initialize basic continuous statistics
         self.stats['mad'] = []
@@ -119,7 +119,7 @@ class CategoricalBasicStats:
         self.compute_basic_stats(data)
 
     def compute_basic_stats(self, data):
-        """Compute the number and fraction (wrt. total count) of a given catefory."""
+        """Compute the number and fraction (wrt. total count) of a given category."""
         self.count = [np.count_nonzero(data == val) for val in self.flag_values]
         self.fraction = [(c / sum(self.count) * 100. if sum(self.count) > 0. else 0.0) for c in self.count]
 
