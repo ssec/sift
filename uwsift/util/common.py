@@ -114,9 +114,6 @@ def _unit_format_func(info, units):
     units = unit_symbol(units)
     standard_name = info.get(Info.STANDARD_NAME)
 
-    def check_for_nan(val):
-        return N_A if np.isnan(val) else str(val)
-
     if (standard_name is not None) and (standard_name in Temperature_Quantities):
         # BT data limits, Kelvin to degC
         def _format_unit(val, numeric=True, include_units=True):
@@ -127,29 +124,7 @@ def _unit_format_func(info, units):
                 return "{:.02f}{units}".format(val, units=unit_str)
 
     elif "flag_values" in info:
-        # flag values don't have units
-        if "flag_meanings" in info:
-            flag_masks = info["flag_masks"] if "flag_masks" in info else [-1] * len(info["flag_values"])
-            flag_info = tuple(zip(info["flag_meanings"], info["flag_values"], flag_masks))
-
-            def _format_unit(val, numeric=True, include_units=True, flag_info=flag_info):
-                val = int(val)
-                if numeric:
-                    return "{:s}".format(check_for_nan(val))
-
-                meanings = []
-                for fmean, fval, fmask in flag_info:
-                    if (val & fmask) == fval:
-                        meanings.append(fmean)
-                return "{:s} ({:s})".format(check_for_nan(val), ", ".join(meanings))
-
-        else:
-
-            def _format_unit(val, numeric=True, include_units=True):
-                if np.isnan(val):
-                    return N_A
-                else:
-                    return "{:d}".format(int(val))
+        _format_unit = _unit_format_func_for_flags(info)
 
     else:
         # default formatting string
@@ -158,6 +133,37 @@ def _unit_format_func(info, units):
                 return "{:s} {units:s}".format(N_A, units=units if include_units else "")
             else:
                 return "{:.03f} {units:s}".format(val, units=units if include_units else "")
+
+    return _format_unit
+
+
+def _unit_format_func_for_flags(info):
+    def check_for_nan(val):
+        return N_A if np.isnan(val) else str(val)
+
+    # flag values don't have units
+    if "flag_meanings" in info:
+        flag_masks = info["flag_masks"] if "flag_masks" in info else [-1] * len(info["flag_values"])
+        flag_info = tuple(zip(info["flag_meanings"], info["flag_values"], flag_masks))
+
+        def _format_unit(val, numeric=True, include_units=True, flag_info=flag_info):
+            val = int(val)
+            if numeric:
+                return "{:s}".format(check_for_nan(val))
+
+            meanings = []
+            for fmean, fval, fmask in flag_info:
+                if (val & fmask) == fval:
+                    meanings.append(fmean)
+            return "{:s} ({:s})".format(check_for_nan(val), ", ".join(meanings))
+
+    else:
+
+        def _format_unit(val, numeric=True, include_units=True):
+            if np.isnan(val):
+                return N_A
+            else:
+                return "{:d}".format(int(val))
 
     return _format_unit
 
