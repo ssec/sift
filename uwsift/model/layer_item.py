@@ -174,6 +174,17 @@ class LayerItem:
     def presentation(self, presentation):
         self._presentation = presentation
 
+    @property
+    def valid_range(self):
+        # TODO: this method mimicks the behaviour of
+        #  Document.valid_range_for_uuid() and returns not the VALID_RANGE,
+        #  but CLIM info for now, but that may as the following comment cited
+        #  from the mentioned function states, this may (and should?) change
+        #  in the future:
+        #    "Limit ourselves to what information
+        #     in the future valid range may be different than the default CLIMs"
+        return self.info[Info.CLIM]
+
     @staticmethod
     def _get_dataset_info_labels(info: frozendict) -> Tuple[str, str, str]:
         """
