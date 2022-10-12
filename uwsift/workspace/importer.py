@@ -1016,17 +1016,7 @@ class SatpyImporter(aImporter):
 
     def begin_import_products(self, *product_ids) -> Generator[import_progress, None, None]:
         if self.use_inventory_db:
-            if product_ids:
-                products = [self._S.query(Product).filter_by(id=anid).one() for anid in product_ids]
-                assert products
-            else:
-                products = list(
-                    self._S.query(Resource, Product)
-                    .filter(Resource.path.in_(self.filenames))
-                    .filter(Product.resource_id == Resource.id)
-                    .all()
-                )
-                assert products
+            products = self._get_products_from_inventory_db(product_ids)
         else:
             products = product_ids
 
@@ -1132,6 +1122,20 @@ class SatpyImporter(aImporter):
                 data=img_data,
                 content=c,
             )
+
+    def _get_products_from_inventory_db(self, product_ids):
+        if product_ids:
+            products = [self._S.query(Product).filter_by(id=anid).one() for anid in product_ids]
+            assert products
+        else:
+            products = list(
+                self._S.query(Resource, Product)
+                .filter(Resource.path.in_(self.filenames))
+                .filter(Product.resource_id == Resource.id)
+                .all()
+            )
+            assert products
+        return products
 
     def _create_mc_image_dataset_content(self, dataset, now, prod, area_info, grid_info):
         data_filename, img_data = self._create_data_memmap_file(dataset.data, dataset.data.dtype, prod)
