@@ -4,13 +4,13 @@
 from unittest import mock
 
 from uwsift.common import Info, Kind, Presentation
-from uwsift.model.layer import DocBasicDataset
 from uwsift.view.colormap_dialogs import ChangeColormapDialog
 
 
 def test_slider_change(qtbot):
-    doc = mock.MagicMock()
-    prez = Presentation(
+    layer_model = mock.MagicMock()
+    layer = mock.MagicMock()
+    presentation = Presentation(
         uuid="some_uuid",
         kind=Kind.IMAGE,
         visible=True,
@@ -28,13 +28,14 @@ def test_slider_change(qtbot):
         Info.SHORT_NAME: "some_name",
         Info.UNIT_CONVERSION: (lambda x, inverse=False: x, lambda x, inverse=False: x),
     }
-    layer = DocBasicDataset(doc, layer_info)
-    doc.prez_for_uuid.return_value = prez
-    doc.valid_range_for_uuid.return_value = layer_info[Info.VALID_RANGE]
-    doc.__getitem__.return_value = layer
-    widget = ChangeColormapDialog(doc, "some_uuid")
+    layer.info = layer_info
+    layer.presentation = presentation
+    layer.valid_range = layer_info[Info.VALID_RANGE]
+    layer_model.get_layer_by_uuid.return_value = layer
+
+    widget = ChangeColormapDialog(layer_model, "some_uuid")
 
     # Set the red min value manually
     widget.ui.vmin_slider.setValue(8)
-    doc.change_clims_for_siblings.assert_called_once()
-    doc.change_clims_for_siblings.assert_called_with("some_uuid", (12.0, 50.0))
+    layer_model.change_color_limits_for_layer.assert_called_once()
+    layer_model.change_color_limits_for_layer.assert_called_with("some_uuid", (12.0, 50.0))
