@@ -2,6 +2,8 @@ import logging
 
 import numpy as np
 
+LOG = logging.getLogger(__name__)
+
 
 def dataset_statistical_analysis(xarr):
     """Compute and return a dictionary with statistical information about the input dataset.
@@ -18,7 +20,7 @@ def dataset_statistical_analysis(xarr):
         try:
             flag_meanings = xarr.attrs["flag_meanings"]
         except (KeyError, AttributeError):
-            logging.warning("'flag_meanings' not available as dataset attributes, setting to n/a.")
+            LOG.debug("'flag_meanings' not available as dataset attributes, setting to n/a.")
             flag_meanings = ["n/a"] * len(flag_values)
 
         stats = CategoricalBasicStats(flag_values, flag_meanings)
@@ -32,7 +34,7 @@ def dataset_statistical_analysis(xarr):
         if xarr.attrs["algebraic"] == "x-y":
             stats = ContinuousDifferenceStats()
         else:
-            logging.info(f"'ContinuousBasicStats' will be computed for algabraic operation {xarr.attrs['algebraic']}.")
+            LOG.debug(f"'ContinuousBasicStats' will be computed for algabraic operation {xarr.attrs['algebraic']}.")
 
     elif xarr.dtype.kind == "i" and len(np.unique(xarr)) < 25:
         # NOTE: This is a preliminary ugly workaround used to identify categorical dataset and guess the categories.
