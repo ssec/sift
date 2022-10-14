@@ -489,13 +489,14 @@ class SceneGraphManager(QObject):
 
     def get_screenshot_array(self, frame_range=None):
         """Get numpy arrays representing the current canvas."""
-        # Store current index to reset the view once we are done
-        current_frame = self.animation_controller.get_current_frame_index()
 
         if frame_range is None:
-            s = e = current_frame
+            self.main_canvas.on_draw(None)
+            return [("", _screenshot())]
         else:
             s, e = frame_range
+        # Store current index to reset the view once we are done
+        current_frame = self.animation_controller.get_current_frame_index()
 
         images = []
         for i in range(s, e + 1):

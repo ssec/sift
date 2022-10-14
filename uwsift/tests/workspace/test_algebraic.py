@@ -19,9 +19,9 @@ def test_satpy_importer_basic(tmpdir, monkeypatch, mocker):
     from uuid import uuid1 as uuidgen
 
     from uwsift.model.layer import DocBasicDataset
-    from uwsift.workspace import Workspace
+    from uwsift.workspace import CachingWorkspace
 
-    ws = Workspace(str(tmpdir))
+    ws = CachingWorkspace(str(tmpdir))
     c01_attrs = {
         Info.SHORT_NAME: "C01",
         Info.DATASET_NAME: "C01",
@@ -50,6 +50,9 @@ def test_satpy_importer_basic(tmpdir, monkeypatch, mocker):
         ds[Info.SERIAL] = "serial"
         ds[Info.PLATFORM] = Platform.GOES_16
         ds[Info.INSTRUMENT] = Instrument.ABI
+        ds[Info.GRID_ORIGIN] = 'SE'
+        ds[Info.GRID_FIRST_INDEX_X] = 1
+        ds[Info.GRID_FIRST_INDEX_Y] = 1
 
     c01 = DocBasicDataset(doc, c01_attrs)
     c03 = DocBasicDataset(doc, c03_attrs)

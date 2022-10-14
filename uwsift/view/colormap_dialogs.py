@@ -23,7 +23,7 @@ class ChangeColormapDialog(QtWidgets.QDialog):
         self.layer = self.layer_model.get_layer_by_uuid(uuid)
         self.uuid = uuid
         self._slider_steps = 100
-        self.valid_min, self.valid_max = self.layer.info[Info.CLIM]
+        self.valid_min, self.valid_max = self.layer.valid_range
         presentation = self.layer.presentation
         conv = self.layer.info[Info.UNIT_CONVERSION]
         self.setWindowTitle(str(self.windowTitle()) + ": " + self.layer.info[Info.SHORT_NAME])

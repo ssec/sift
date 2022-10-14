@@ -70,23 +70,26 @@ def _get_mock_sd(fr, fn):
 def _get_mock_sgm(frame_order):
     """Mock SceneGraphManager class for testing."""
 
-    class MockLayerSet:
-        def __init__(self, fo):
-            self.frame_order = fo
+    class MockAnimationController:
+        def __init__(self):
+            self._frame_order = frame_order
 
-        def top_layer_uuid(self):
-            return 1
+        def get_current_frame_index(self):
+            return max(self._frame_order, 1) if self._frame_order else 0
+
+        def get_frame_uuids(self):
+            return self._frame_order if self._frame_order else []
 
     class MockSGM:
-        def __init__(self, fo):
-            self.layer_set = MockLayerSet(fo)
+        def __init__(self):
+            self.animation_controller = MockAnimationController()
 
         def get_screenshot_array(self, fr):
             if fr is None:
                 return None
             return [[fr[1], fr[1] - fr[0]]]
 
-    return MockSGM(frame_order)
+    return MockSGM()
 
 
 def _get_mock_writer():
