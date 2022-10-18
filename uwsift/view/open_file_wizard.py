@@ -30,7 +30,7 @@ from satpy.readers import group_files
 from uwsift import config
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.satpy_compat import DataID, get_id_value
-from uwsift.ui.open_file_wizard_2_ui import Ui_openFileWizard
+from uwsift.ui.open_file_wizard_ui import Ui_openFileWizard
 from uwsift.util.common import create_scenes
 from uwsift.workspace.importer import available_satpy_readers, filter_dataset_ids
 
