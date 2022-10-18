@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'open_file_wizard_2.ui'
+# Form implementation generated from reading ui file 'open_file_wizard.ui'
 #
 # Created by: PyQt5 UI code generator 5.12.3
 #
