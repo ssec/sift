@@ -952,7 +952,7 @@ class Main(QtWidgets.QMainWindow):
         root_context.setContextProperty("timebaseModel", time_manager.qml_timestamps_model)
         root_context.setContextProperty("backend", time_manager.qml_backend)
 
-        self.ui.timelineQuickWidget.setSource(QtCore.QUrl(str(QML_PATH / "timeline.qml")))
+        self.ui.timelineQuickWidget.setSource(QtCore.QUrl.fromLocalFile(str(QML_PATH / "timeline.qml")))
 
     # TODO(mk): replace with method to set all relevant ContextProperties?
     def _get_qml_context(self):
