@@ -211,10 +211,3 @@ class TaskQueue(QObject):
         else:
             depth, remaining = self.depth, self.remaining
             return float(depth - remaining) / depth
-
-
-def test_task():
-    for dex in range(10):
-        yield {TASK_DOING: "test task", TASK_PROGRESS: float(dex) / 10.0}
-        TheQueue.sleep(1)
-    yield {TASK_DOING: "test task", TASK_PROGRESS: 1.0}

@@ -19,10 +19,7 @@ numba
 :license: GPLv3, see LICENSE for more details
 """
 import logging
-import os
-import sys
 from dataclasses import dataclass
-from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Iterable, MutableSequence, NamedTuple, Optional, Tuple
 from uuid import UUID
@@ -35,28 +32,6 @@ LOG = logging.getLogger(__name__)
 FCS_SEP = "::"
 # standard N/A string used in FCS
 NOT_AVAILABLE = FCS_NA = "N/A"
-
-
-def get_font_size(pref_size):
-    """Get a font size that looks good on this platform.
-
-    This is a HACK and can be replaced by PyQt5 font handling after migration.
-
-    """
-    # win = 7
-    # osx = 12
-    env_factor = os.getenv("SIFT_FONT_FACTOR", None)
-    if env_factor is not None:
-        factor = float(env_factor)
-    elif sys.platform.startswith("win"):
-        factor = 1.0
-    elif "darwin" in sys.platform:
-        factor = 1.714
-    else:
-        factor = 1.3
-
-    return pref_size * factor
-
 
 PREFERRED_SCREEN_TO_TEXTURE_RATIO = 1.0  # screenpx:texturepx that we want to keep, ideally, by striding
 
@@ -151,11 +126,6 @@ class Point(NamedTuple):
     x: float
 
 
-class Coordinate(NamedTuple):
-    deg_north: float
-    deg_east: float
-
-
 class ViewBox(NamedTuple):
     """Combination of Box + Resolution."""
 
@@ -165,23 +135,6 @@ class ViewBox(NamedTuple):
     right: float
     dy: float
     dx: float
-
-
-class Span(NamedTuple):
-    s: datetime  # start
-    d: timedelta  # duration
-
-    @property
-    def e(self):
-        return self.s + self.d
-
-    @staticmethod
-    def from_s_e(s: datetime, e: datetime):
-        return Span(s, e - s) if (s is not None) and (e is not None) else None
-
-    @property
-    def is_instantaneous(self):
-        return timedelta(seconds=0) == self.d
 
 
 class Flags(set):
@@ -220,17 +173,9 @@ class Kind(Enum):
     SHAPE = 3
     RGB = 4
     COMPOSITE = 1  # deprecated: use Kind.IMAGE instead
-    CONTOUR = 6
     LINES = 7
     VECTORS = 8
     POINTS = 9
-
-
-class CompositeType(Enum):
-    """Type of non-luminance image layers."""
-
-    RGB = 1
-    ARITHMETIC = 2
 
 
 class Instrument(Enum):
@@ -410,7 +355,6 @@ class Presentation:
     style: object = None  # name or uuid: SVG/HTML style to use; name for default, (FUTURE?) uuid for user-specified
     climits: tuple = None  # valid min and valid max used for color mapping normalization
     gamma: float = 1.0  # valid (0 to 5) for gamma correction
-    mixing: object = None  # mixing mode constant
     opacity: float = 1.0
 
 
@@ -432,21 +376,9 @@ class ZList(MutableSequence):
     def min_max(self) -> Tuple[int, int]:
         return (self._zmax + 1 - len(self), self._zmax) if len(self) else (None, None)
 
-    @property
-    def top_z(self) -> Optional[int]:
-        return self._zmax if len(self) else None
-
-    @property
-    def bottom_z(self) -> Optional[int]:
-        return self._zmax + 1 - len(self) if len(self) else None
-
     def __contains__(self, z) -> bool:
         n, x = self.min_max
         return False if (n is None) or (x is None) or (z < n) or (z > x) else True
-
-    def prepend(self, val):
-        self._zmax += 1
-        self._content.insert(0, val)
 
     def append(self, val, start_negative: bool = False, not_if_present: bool = False):
         if start_negative and 0 == len(self._content):
@@ -530,14 +462,6 @@ class ZList(MutableSequence):
         if z >= 0:
             self._zmax -= 1
         del self._content[ldex]
-
-    def merge_subst(self, new_values: Iterable[Tuple[int, Any]]):
-        """batch merge of substitutions
-        raises IndexError if any of them is outside current range
-        """
-        for z, q in new_values:
-            ldex = self._zmax - z
-            self._content[ldex] = q
 
     def __repr__(self) -> str:
         return "ZList({}, {})".format(self._zmax, repr(self._content))

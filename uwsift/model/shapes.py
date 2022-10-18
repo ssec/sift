@@ -21,50 +21,13 @@ __author__ = "rayg"
 __docformat__ = "reStructuredText"
 
 import logging
-from functools import partial
 
-# import shapefile as shf
 import numpy as np
-import pyproj as prj
-import shapely.geometry as sgeo
 import shapely.geometry.polygon as sgp
-import shapely.ops as sops
-from numba import jit
 from rasterio import Affine
 from rasterio.features import rasterize
 
 LOG = logging.getLogger(__name__)
-
-
-def convert_shape_to_proj(to_proj: prj.Proj, shape: sgp.LinearRing, shape_proj: prj.Proj):
-    # ref http://toblerity.org/shapely/manual.html#shapely.ops.transform
-    # ref http://all-geo.org/volcan01010/2012/11/change-coordinates-with-pyproj/
-    # inverse-project the ring
-    if to_proj is shape_proj:
-        return shape
-    project = partial(prj.transform, shape_proj, to_proj)
-    newshape = sops.transform(project, shape)
-    return newshape
-
-
-@jit
-def mask_inside_index_shape(xoff, yoff, width, height, shape):
-    """
-    for an index shape, return a mask of coordinates inside the shape
-    :param xoff: x offset between mask and shape
-    :param yoff: y offset
-    :param xmax: maximum x index 0-(xmax-1)
-    :param ymax: max y index
-    :param shape:
-    :return:
-    """
-    mask = np.zeros((height, width), dtype=np.bool_)
-    for y in range(height):
-        for x in range(width):
-            p = sgeo.Point(x + xoff, y + yoff)
-            if p.within(shape):
-                mask[y, x] = True
-    return mask
 
 
 def content_within_shape(content: np.ndarray, trans: Affine, shape: sgp.LinearRing):

@@ -47,12 +47,9 @@ from typing import Dict, Generator, Mapping, Optional, Tuple
 from uuid import UUID
 from uuid import uuid1 as uuidgen
 
-import numba as nb
 import numpy as np
 from pyproj import Proj
 from PyQt5.QtCore import QObject, pyqtSignal
-from pyresample.geometry import AreaDefinition
-from pyresample.utils import proj4_str_to_dict
 from rasterio import Affine
 from shapely.geometry.polygon import LinearRing
 
@@ -95,24 +92,6 @@ class frozendict(ReadOnlyMapping):
 
     def __repr__(self):
         return "frozendict({" + ", ".join("{}: {}".format(repr(k), repr(v)) for (k, v) in self.items()) + "})"
-
-
-@nb.jit(nogil=True)
-def mask_from_coverage_sparsity_2d(mask: np.ndarray, coverage: np.ndarray, sparsity: np.ndarray):
-    """
-    update a numpy.ma style mask from coverage and sparsity arrays
-    Args:
-        mask (np.array, dtype=bool): mutable array to be updated as a numpy.masked_array mask
-        coverage (np.array) : coverage array to stretch across the mask
-        sparsity (np.array) : sparsity array to repeat across the mask
-    """
-    # FIXME: we should not be using this without slicing to the part of interest; else we can eat a whole lot of memory
-    h, w = mask.shape
-    cov_rpt_y, cov_rpt_x = h // coverage.shape[0], w // coverage.shape[1]
-    spr_h, spr_w = sparsity.shape
-    for y in range(h):
-        for x in range(w):
-            mask[y, x] |= bool(0 == coverage[y // cov_rpt_y, x // cov_rpt_x] * sparsity[y % spr_h, x % spr_w])
 
 
 class ActiveContent(QObject):
@@ -284,10 +263,6 @@ class BaseWorkspace(QObject):
         state.remove(flag)
         self.didChangeProductState.emit(uuid, state)
 
-    @abstractmethod
-    def product_state(self, uuid: UUID) -> Flags:
-        pass
-
     @property
     @abstractmethod
     def _S(self):
@@ -297,15 +272,6 @@ class BaseWorkspace(QObject):
     @abstractmethod
     def metadatabase(self) -> Metadatabase:
         pass
-
-    @staticmethod
-    def default_workspace():
-        """
-        return the default (global) workspace
-        Currently no plans to have more than one workspace, but secondaries may eventually have some advantage.
-        :return: Workspace instance
-        """
-        return TheWorkspace
 
     def __init__(self, directory_path: str = None):
         """
@@ -392,10 +358,6 @@ class BaseWorkspace(QObject):
     def _overview_content_for_uuid(self, uuid: UUID, kind: Kind = Kind.IMAGE) -> np.memmap:
         pass
 
-    @abstractmethod
-    def _native_content_for_uuid(self, uuid: UUID) -> np.memmap:
-        pass
-
     #
     # workspace file management
     #
@@ -431,17 +393,8 @@ class BaseWorkspace(QObject):
         """
         pass
 
-    @property
-    @abstractmethod
-    def uuids_in_cache(self):
-        pass
-
     @abstractmethod
     def recently_used_products(self, n=32) -> Dict[UUID, str]:
-        pass
-
-    @abstractmethod
-    def remove_all_workspace_content_for_resource_paths(self, paths: list):
         pass
 
     @abstractmethod
@@ -466,16 +419,6 @@ class BaseWorkspace(QObject):
         handle operations that should be done at the end of a threaded background task
         """
         pass
-
-    def idle(self):
-        """Called periodically when application is idle.
-
-        Does a clean-up tasks and returns True if more needs to be done later.
-        Time constrained to ~0.1s.
-        :return: True/False, whether or not more clean-up needs to be scheduled.
-
-        """
-        return False
 
     @abstractmethod
     def get_metadata(self, uuid_or_path):
@@ -516,14 +459,6 @@ class BaseWorkspace(QObject):
         **importer_kwargs,
     ) -> np.memmap:
         pass
-
-    def create_composite(self, symbols: dict, relation: dict):
-        """
-        create a layer composite in the workspace
-        :param symbols: dictionary of logical-name to uuid
-        :param relation: dictionary with information on how the relation is calculated (FUTURE)
-        """
-        raise NotImplementedError()
 
     @staticmethod
     def _merge_famcat_strings(md_list, key, suffix=None):
@@ -764,9 +699,6 @@ class BaseWorkspace(QObject):
         _, data = content_within_shape(data, trans, LinearRing(points))
         return data
 
-    def highest_resolution_uuid(self, *uuids):
-        return min([self.get_info(uuid) for uuid in uuids], key=lambda i: i[Info.CELL_WIDTH])[Info.UUID]
-
     def lowest_resolution_uuid(self, *uuids):
         return max([self.get_info(uuid) for uuid in uuids], key=lambda i: i[Info.CELL_WIDTH])[Info.UUID]
 
@@ -793,38 +725,7 @@ class BaseWorkspace(QObject):
         )
         return data[index_mask]
 
-    def get_pyresample_area(self, uuid: UUID, y_slice=None, x_slice=None):
-        """Create a pyresample compatible AreaDefinition for this layer."""
-        # WARNING: Untested!
-        info = self.get_info(uuid)
-        if y_slice is None:
-            y_slice = slice(None, None, None)
-        if x_slice is None:
-            x_slice = slice(None, None, None)
-        if y_slice.step not in [1, None] or x_slice.step not in [1, None]:
-            raise ValueError("Slice steps other than 1 are not supported")
-        rows, cols = info[Info.SHAPE]
-        x_start = x_slice.start or 0
-        y_start = y_slice.start or 0
-        num_cols = (x_slice.stop or cols) - x_start
-        num_rows = (y_slice.stop or rows) - y_start
-        half_x = info[Info.CELL_WIDTH] / 2.0
-        half_y = info[Info.CELL_HEIGHT] / 2.0
-        min_x = info[Info.ORIGIN_X] - half_x + x_start * info[Info.CELL_WIDTH]
-        max_y = info[Info.ORIGIN_Y] + half_y - y_start * info[Info.CELL_HEIGHT]
-        min_y = max_y - num_rows * info[Info.CELL_HEIGHT]
-        max_x = min_x + num_cols * info[Info.CELL_WIDTH]
-        return AreaDefinition(
-            "layer area",
-            "layer area",
-            "layer area",
-            proj4_str_to_dict(info[Info.PROJ]),
-            cols,
-            rows,
-            (min_x, min_y, max_x, max_y),
-        )
-
-    def __getitem__(self, datasetinfo_or_uuid):
+    def __getitem__(self,datasetinfo_or_uuid):
         """
         return science content proxy capable of generating a numpy array when sliced
         :param datasetinfo_or_uuid: metadata or key for the dataset

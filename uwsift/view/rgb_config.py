@@ -222,19 +222,6 @@ class RGBLayerConfigPane(QObject):
     def _create_slider_value(self, valid_min, valid_max, channel_val):
         return int((channel_val - valid_min) / (valid_max - valid_min)) * self._slider_steps
 
-    def _min_max_for_color(self, rgba: str):
-        """
-        return min value, max value as represented in sliders
-        :param rgba: char in 'rgba'
-        :return: (min-value, max-value) where min can be > max
-        """
-        idx = RGBA2IDX[rgba]
-        slider = self.sliders[idx]
-        valid_min, valid_max = self._valid_ranges[idx]
-        n = self._get_slider_value(valid_min, valid_max, slider[0].value())
-        x = self._get_slider_value(valid_min, valid_max, slider[1].value())
-        return n, x
-
     def _update_line_edits(self, color: str, n: float = None, x: float = None):
         """
         update edit controls to match non-None values provided

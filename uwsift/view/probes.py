@@ -137,8 +137,6 @@ class ProbeGraphManager(QObject):
 
         # hook up the various layer_model signals that would mean we need to
         # reload things
-        # self.layer_model.didUpdateLayers.connect(
-        #    self.handleActiveProductDatasetsChanged)
 
         # hook up auto update vs manual update changes
         self.update_button.clicked.connect(self.handleActiveProductDatasetsChanged)
@@ -756,26 +754,6 @@ class ProbeGraphDisplay(object):
         axes.set_title(title)
         axes.set_xlabel(x_label)
         axes.set_ylabel(y_label)
-
-    def plotScatterplot(self, dataX, nameX, dataY, nameY):
-        """Make a scatter plot of the x and y data"""
-
-        # we should have the same size data here
-        assert dataX.size == dataY.size
-
-        if dataX.size > self.MAX_SCATTER_PLOT_DATA:
-            LOG.info("Too much data in selected region to generate scatter plot.")
-            self.clearPlot()
-            # self.plotDensityScatterplot(dataX, nameX, dataY, nameY)
-
-        else:
-            self.figure.clf()
-            axes = self.figure.add_subplot(111)
-            axes.scatter(dataX, dataY, color="b", s=1, alpha=0.5)
-            axes.set_xlabel(nameX)
-            axes.set_ylabel(nameY)
-            axes.set_title(nameX + " vs " + nameY)
-            self._draw_xy_line(axes)
 
     def plotDensityScatterplot(self, dataX, nameX, timeX, dataY, nameY, timeY, pointX, pointY):
         """Make a density scatter plot for the given data

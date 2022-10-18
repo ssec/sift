@@ -18,7 +18,6 @@ def test_satpy_importer_basic(tmpdir, monkeypatch, mocker):
     """Basic import test using Satpy."""
     from uuid import uuid1 as uuidgen
 
-    from uwsift.model.layer import DocBasicDataset
     from uwsift.workspace import CachingWorkspace
 
     ws = CachingWorkspace(str(tmpdir))
@@ -54,13 +53,11 @@ def test_satpy_importer_basic(tmpdir, monkeypatch, mocker):
         ds[Info.GRID_FIRST_INDEX_X] = 1
         ds[Info.GRID_FIRST_INDEX_Y] = 1
 
-    c01 = DocBasicDataset(doc, c01_attrs)
-    c03 = DocBasicDataset(doc, c03_attrs)
     ops = "z = x - y"
     ns = {"y": c03_attrs[Info.UUID], "x": c01_attrs[Info.UUID]}
 
     def get_metadata(u):
-        return c01 if u == c01_attrs[Info.UUID] else c03
+        return c01_attrs if u == c01_attrs[Info.UUID] else c03_attrs
 
     def get_content(u):
         return np.ones((2, 2)) if u == c01_attrs[Info.UUID] else np.zeros((2, 2))

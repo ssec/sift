@@ -35,7 +35,6 @@ class AlgebraicLayerConfigPane(QObject):
     _operations_text = None
     _algebraic_name_edit = None
     _algebraic_channels = None
-    _algebraic_update_button = None
     _custom_formula = None
 
     def __init__(self, ui, parent, model: LayerModel):
@@ -54,7 +53,6 @@ class AlgebraicLayerConfigPane(QObject):
         self.ui.algebraicUpdateButton.clicked.connect(self._on_algebraic_update_button_clicked)
 
         self._algebraic_name_edit = self.ui.layer_name_edit
-        self._algebraic_update_button = self.ui.algebraicUpdateButton
         self._operation_combo = self.ui.operation_combo
         self._operations_text = self.ui.operations_text
 
@@ -71,17 +69,6 @@ class AlgebraicLayerConfigPane(QObject):
     @property
     def algebraic_name_edit(self):
         return self._algebraic_name_edit
-
-    @property
-    def algebraic_update_button(self):
-        return self._algebraic_update_button
-
-    @property
-    def layer_combos_names(self):
-        return zip(
-            ("x", "y", "z"),
-            self.algebraic_channels,
-        )
 
     @property
     def operation_combo(self):

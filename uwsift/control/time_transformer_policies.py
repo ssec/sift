@@ -53,7 +53,6 @@ class WrappingDrivingPolicy(QObject):
         driving_layer_index = self._driving_layer_index_in_layers()
         if driving_layer_index:
             return
-            # self.driving_layer = self._layers[driving_layer_index]
         else:
             self.driving_layer = self.get_next_possible_driving_layer()
             self.didUpdatePolicy.emit(self.driving_layer)
@@ -74,7 +73,6 @@ class WrappingDrivingPolicy(QObject):
     def driving_layer(self, layer: LayerItem):
         if not layer or not layer.dynamic:
             self._driving_layer = None
-            # raise ValueError("No valid Driving layer")
         elif not self._driving_layer:
             self._driving_layer = layer
             self.timeline = list(self._driving_layer.timeline.keys())

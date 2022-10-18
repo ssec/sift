@@ -37,9 +37,8 @@ from pyresample import AreaDefinition
 from vispy import app, scene
 from vispy.geometry import Rect
 from vispy.gloo.util import _screenshot
-from vispy.scene.visuals import Compound, Image, Line, Markers, Polygon
+from vispy.scene.visuals import Image, Line, Markers, Polygon
 from vispy.util.keys import SHIFT
-from vispy.visuals import LineVisual
 from vispy.visuals.transforms import MatrixTransform, STTransform
 
 from uwsift import USE_TILED_GEOLOCATED_IMAGES, config
@@ -53,7 +52,7 @@ from uwsift.common import (
     Tool,
 )
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
-from uwsift.model.document import DocBasicDataset, DocLayerStack, Document
+from uwsift.model.document import Document
 from uwsift.model.layer_item import LayerItem
 from uwsift.model.layer_model import LayerModel
 from uwsift.model.product_dataset import ProductDataset
@@ -67,7 +66,6 @@ from uwsift.view.visuals import (
     Lines,
     MultiChannelImage,
     NEShapefileLines,
-    PrecomputedIsocurve,
     RGBCompositeLayer,
     TiledGeolocatedImage,
 )
@@ -86,58 +84,10 @@ DEFAULT_TEXTURE_SHAPE = (4, 16)
 
 
 class Markers2(Markers):
-    def _set_clipper(self, node, clipper):
-        return
+    pass
 
 
 Markers = Markers2
-
-
-class FakeMarker(Compound):
-    # FIXME: Temporary workaround because markers don't work on the target Windows laptops
-    def __init__(self, pos=None, parent=None, symbol=None, **kwargs):
-        self.line_one = None
-        self.line_two = None
-        self.symbol = symbol
-        point = pos[0]
-
-        kwargs["connect"] = "segments"
-        width = 5
-        pos1, pos2 = self._get_positions(point)
-        if self.line_one is None:
-            self.line_one = LineVisual(pos=pos1, width=width, **kwargs)
-            self.line_two = LineVisual(pos=pos2, width=width, **kwargs)
-
-        # For some reason we can't add the subvisuals later, so we'll live with redundant logic
-        super().__init__((self.line_one, self.line_two), parent=parent)
-
-        # self.set_point(point, **kwargs)
-
-    def _get_positions(self, point):
-        margin = 0.5
-        if self.symbol == "x":
-            pos1 = np.array(
-                [
-                    [point[0] - margin, point[1] - margin * 2, point[2]],
-                    [point[0] + margin, point[1] + margin * 2, point[2]],
-                ]
-            )
-            pos2 = np.array(
-                [
-                    [point[0] - margin, point[1] + margin * 2, point[2]],
-                    [point[0] + margin, point[1] - margin * 2, point[2]],
-                ]
-            )
-        else:
-            pos1 = np.array([[point[0] - margin, point[1], point[2]], [point[0] + margin, point[1], point[2]]])
-            pos2 = np.array([[point[0], point[1] - margin * 2, point[2]], [point[0], point[1] + margin * 2, point[2]]])
-        return pos1, pos2
-
-    def set_point(self, point, **kwargs):
-        kwargs["connect"] = "segments"
-        pos1, pos2 = self._get_positions(point)
-        self.line_one.set_data(pos=pos1)
-        self.line_two.set_data(pos=pos2)
 
 
 class SIFTMainMapCanvas(scene.SceneCanvas):
@@ -284,108 +234,6 @@ class AnimationController(object):
         """
         return self.time_manager.get_current_timebase_dataset_uuids()
 
-    def next_frame(self, event=None, frame_number=None):
-        """
-        skip to the frame (from 0) or increment one frame and update
-        typically this is run by self._animation_timer
-        :param frame_number: optional frame to go to, from 0
-        :return:
-        """
-        raise ValueError("AnimationController.next_frame should not be called, ever!!!")
-        lfo = len(self._frame_order)
-        frame = self._frame_number
-        if frame_number is None:
-            frame = self._frame_number + 1
-        elif isinstance(frame_number, int):
-            if frame_number == -1:
-                frame = self._frame_number + (lfo - 1)
-            else:
-                frame = frame_number
-        if lfo > 0:
-            frame %= lfo
-        else:
-            frame = 0
-        # self._set_visible_child(frame)
-        self._frame_number = frame
-        self.parent.update()
-        if self._frame_change_cb is not None and lfo:
-
-            uuid = self._frame_order[self._frame_number]
-            self._frame_change_cb((self._frame_number, lfo, self._animating, uuid))
-
-
-class ContourGroupNode(scene.Node):
-    """VisPy scene graph node managing multiple visuals.
-
-    This Node handles view changes and representing different "zoom" levels
-    in the data that is provided to its child widgets.
-
-    """
-
-    @staticmethod
-    def visible_first(children):
-        invisible_children = []
-        for c in children:
-            if c.visible:
-                yield c
-            else:
-                invisible_children.append(c)
-        for c in invisible_children:
-            yield c
-
-    def on_view_change(self):
-        zoom_level = None
-        for child in self.visible_first(self.children):
-            if isinstance(child, PrecomputedIsocurve):
-                if zoom_level is None:
-                    zoom_level = self._assess_contour(child)
-                # child handles an unchanged zoom_level
-                child.zoom_level = zoom_level
-            else:
-                raise NotImplementedError("Don't know how to assess " "non-contour layer")
-
-    def _assess_contour(self, child):
-        """Calculate shown portion of image and image units per pixel
-
-        This method utilizes a precomputed "mesh" of relatively evenly
-        spaced points over the entire image space. This mesh is transformed
-        to the canvas space (-1 to 1 user-viewed space) to figure out which
-        portions of the image are currently being viewed and which portions
-        can actually be projected on the viewed projection.
-
-        While the result of the chosen method may not always be completely
-        accurate, it should work for all possible viewing cases.
-        """
-        # in contour coordinate space, the extents of the canvas
-        canvas_extents = child.transforms.get_transform().imap(
-            [[-1.0, -1.0], [0.0, 0.0], [1.0, 1.0], [-1.0, 1.0], [1.0, -1.0]]
-        )[:, :2]
-        canvas_size = self.canvas.size
-        # valid projection coordinates
-        canvas_extents = canvas_extents[(canvas_extents[:, 0] <= 1e30) & (canvas_extents[:, 1] <= 1e30), :]
-        if not canvas_extents.size:
-            LOG.warning("Can't determine current view box, using lowest contour resolution")
-            zoom_level = 0
-        else:
-            min_x = canvas_extents[:, 0].min()
-            max_x = canvas_extents[:, 0].max()
-            min_y = canvas_extents[:, 1].min()
-            max_y = canvas_extents[:, 1].max()
-            pixel_ratio = max((max_x - min_x) / canvas_size[0], (max_y - min_y) / canvas_size[1])
-
-            if pixel_ratio > 10000:
-                zoom_level = 0
-            elif pixel_ratio > 5000:
-                zoom_level = 1
-            elif pixel_ratio > 3000:
-                zoom_level = 2
-            elif pixel_ratio > 1000:
-                zoom_level = 3
-            else:
-                zoom_level = 4
-
-        return zoom_level
-
 
 class SceneGraphManager(QObject):
     """
@@ -421,8 +269,6 @@ class SceneGraphManager(QObject):
     # FIXME: many more undocumented member variables
 
     didRetilingCalcs = pyqtSignal(object, object, object, object, object, object)
-    didChangeFrame = pyqtSignal(tuple)
-    didChangeLayerVisibility = pyqtSignal(dict)  # similar to document didChangeLayerVisibility
     newPointProbe = pyqtSignal(str, tuple)
     # REMARK: PyQT tends to fail if a signal with an argument of type 'list' is
     # passed an empty list or the 'None' object. By declaring the signal as
@@ -511,27 +357,6 @@ class SceneGraphManager(QObject):
         self.main_canvas.on_draw(None)
         return images
 
-    def frame_changed(self, frame_info):
-        """Callback which emits information on current animation frame as a signal (see LayerSet.next_frame)
-
-        Args:
-            frame_info (tuple): to be relayed in the signal.
-                Typically (frame_index:int, total_frames:int, animating:bool, frame_id:UUID)
-
-        """
-        # LOG.debug('emitting didChangeFrame')
-        self.didChangeFrame.emit(frame_info)
-        is_animating = frame_info[2]
-        if not is_animating:
-            # emit a signal equivalent to document's didChangeLayerVisibility,
-            # except that visibility is being changed by animation interactions
-            # only do this when we're not animating, however
-            # watch out for signal loops!
-            uuids = self.animation_controller.frame_order
-            # note that all the layers in the layer_order but the current one are now invisible
-            vis = dict((u, u == frame_info[3]) for u in uuids)
-            self.didChangeLayerVisibility.emit(vis)
-
     def setup_initial_canvas(self, center=None):
         self.main_canvas = SIFTMainMapCanvas(parent=self.parent())
         self.main_view = self.main_canvas.central_widget.add_view(name="MainView")
@@ -557,14 +382,8 @@ class SceneGraphManager(QObject):
 
         # Head node of the map graph
         self.main_map = MainMap(name="MainMap", parent=self.main_map_parent)
-        self.proxy_nodes = {}
 
         self.create_test_image()
-
-        # Make the camera center on Guam
-        # center = (144.8, 13.5)
-        ##proj_info = self.document.projection_info()
-        ##self._set_projection(proj_info)
 
         area_def = self.document.area_definition()
         self._set_projection(area_def)
@@ -757,12 +576,10 @@ class SceneGraphManager(QObject):
         if probe_name not in self.point_probes and xy_pos is None:
             raise ValueError("Probe '{}' does not exist".format(probe_name))
         elif probe_name not in self.point_probes:
-            # point_visual = FakeMarker(parent=self.main_map, symbol="x", pos=np.array([xy_pos]), color=color)
             point_visual = Markers(parent=self.main_map, name=probe_name, **probe_kwargs)
             self.point_probes[probe_name] = point_visual
         else:
             point_visual = self.point_probes[probe_name]
-            # point_visual.set_point(xy_pos)
             point_visual.set_data(**probe_kwargs)
 
         # set the Point visible or not
@@ -771,7 +588,6 @@ class SceneGraphManager(QObject):
     def on_new_polygon(self, probe_name, points, **kwargs):
         points = np.array(points, dtype=np.float32)  # convert list to NumPy array
 
-        # kwargs.setdefault("color", (1.0, 0.0, 1.0, 0.5))
         kwargs.setdefault("color", None)
         kwargs.setdefault("border_color", (1.0, 0.0, 1.0, 1.0))
 
@@ -823,8 +639,6 @@ class SceneGraphManager(QObject):
 
         # Set the cursor
         if name == Tool.PAN_ZOOM:
-            # self.main_canvas.native.setCursor(QCursor(QPixmap("py/uwsift/ui/cursors/noun_275_cc.png")))
-            # self.main_canvas.native.setCursor(QCursor(Qt.SizeAllCursor))
             self.main_canvas.native.setCursor(QCursor(Qt.OpenHandCursor))
         elif name == Tool.POINT_PROBE:
             self.main_canvas.native.setCursor(QCursor(Qt.PointingHandCursor))
@@ -906,13 +720,6 @@ class SceneGraphManager(QObject):
         for uuid, gamma in change_dict.items():
             LOG.debug("changing {} to gamma {}".format(uuid, gamma))
             self.set_gamma(gamma, uuid)
-
-    # This method may be revived again in case CONTOURS should be supported
-    # (again)
-    # def change_layers_image_kind(self, change_dict):
-    #     for uuid, new_pz in change_dict.items():
-    #         LOG.info('changing {} to kind {}'.format(uuid, new_pz.kind.name))
-    #         self.add_basic_dataset(None, uuid, new_pz)
 
     def change_layer_visible(self, layer_uuid: UUID, visible: bool):
         self.layer_nodes[layer_uuid].visible = visible
@@ -996,36 +803,6 @@ class SceneGraphManager(QObject):
             print(f'{pixel["desc"]} ({pixel["color"].name}) -> x: {pixel["x"]} y: {pixel["y"]}')
 
         return data
-
-    def add_contour_dataset(self, dataset: DocBasicDataset, p: Presentation, image_data: np.ndarray):
-        verts = image_data[:, :2]
-        connects = image_data[:, 2].astype(np.bool)
-        level_indexes = image_data[:, 3]
-        level_indexes = level_indexes[~np.isnan(level_indexes)].astype(np.int)
-        levels = dataset["contour_levels"]
-        cmap = self.document.find_colormap(p.colormap)
-
-        proj4_str = dataset[Info.PROJ]
-        parent = self.proxy_nodes.get(proj4_str)
-        if parent is None:
-            parent = ContourGroupNode(parent=self.main_map)
-            parent.transform = PROJ4Transform(dataset[Info.PROJ], inverse=True)
-            self.proxy_nodes[proj4_str] = parent
-
-        contour_visual = PrecomputedIsocurve(
-            verts,
-            connects,
-            level_indexes,
-            levels=levels,
-            color_lev=cmap,
-            clim=p.climits,
-            parent=parent,
-            name=str(dataset[Info.UUID]),
-        )
-        contour_visual.transform *= STTransform(translate=(0, 0, -50.0))
-        self.dataset_nodes[dataset[Info.UUID]] = contour_visual
-        self.animation_controller.add_layer(contour_visual)
-        self.on_view_change(None)
 
     def add_node_for_layer(self, layer: LayerItem):
         if not USE_TILED_GEOLOCATED_IMAGES and layer.kind in [Kind.IMAGE, Kind.COMPOSITE, Kind.RGB]:
@@ -1118,7 +895,7 @@ class SceneGraphManager(QObject):
 
         image_data = self.workspace.get_content(product_dataset.uuid, kind=product_dataset.kind)
 
-        if False:  # Set to True FOR TESTING ONLY
+        if False:  # Set to True FOR TESTING ONLY DON'T REMOVE!
             self._overwrite_with_test_pattern(image_data)
 
         if USE_TILED_GEOLOCATED_IMAGES:
@@ -1375,8 +1152,6 @@ class SceneGraphManager(QObject):
         """
         for uuid_removed in uuids_removed:
             self.set_dataset_visible(uuid_removed, False)
-        # XXX: Used to rebuild_all instead of just update, is that actually needed?
-        # self.rebuild_all()
 
     def _remove_dataset(self, *args, **kwargs):
         self.remove_dataset(*args, **kwargs)
@@ -1408,28 +1183,14 @@ class SceneGraphManager(QObject):
         for uuid, visible in layers_changed.items():
             self.set_dataset_visible(uuid, visible)
 
-    def rebuild_new_layer_set(self, new_set_number: int, new_prez_order: DocLayerStack, new_anim_order: list):
-        self.rebuild_all()
-        # raise NotImplementedError("layer set change not implemented in SceneGraphManager")
-
     def _connect_doc_signals(self, document: Document):
         document.didReorderDatasets.connect(self._rebuild_dataset_order)  # current layer set changed z/anim order
-        # REMOVE document.didAddBasicDataset.connect(self.add_basic_dataset)  # layer added to one or more layer sets
         document.didUpdateBasicDataset.connect(self.update_basic_dataset)  # new data integrated in existing layer
-        # REMOVE document.didAddLinesDataset.connect(self.add_lines_dataset)
-        # REMOVE document.didAddPointsDataset.connect(self.add_points_dataset)
         document.didRemoveDatasets.connect(self._remove_dataset)  # layer removed from current layer set
         document.willPurgeDataset.connect(self._purge_dataset)  # layer removed from document
-        document.didSwitchLayerSet.connect(self.rebuild_new_layer_set)
         document.didChangeColormap.connect(self.change_dataset_nodes_colormap)
         document.didChangeLayerVisibility.connect(self.change_datasets_visibility)
         document.didReorderAnimation.connect(self._rebuild_frame_order)
-        document.didChangeColorLimits.connect(self.change_dataset_nodes_color_limits)
-        document.didChangeGamma.connect(self.change_dataset_nodes_gamma)
-        # document.didChangeImageKind.connect(self.change_layers_image_kind)
-
-    def set_frame_number(self, frame_number=None):
-        self.animation_controller.next_frame(None, frame_number)
 
     def set_dataset_visible(self, uuid: UUID, visible: Optional[bool] = None):
         dataset_node = self.dataset_nodes.get(uuid, None)
@@ -1455,74 +1216,12 @@ class SceneGraphManager(QObject):
     def rebuild_frame_order(self, uuid_list: list, *args, **kwargs):
         LOG.debug("setting SGM new frame order to {0!r:s}".format(uuid_list))
         self.animation_controller.frame_order = uuid_list
-        # self.layer_set.update_time_manager_collection(self.document.data_layer_collection)
 
     def _rebuild_frame_order(self, *args, **kwargs):
         res = self.rebuild_frame_order(*args, **kwargs)
         # when purging the layer is the only operation being performed then update when we are done
         self.update()
         return res
-
-    def rebuild_presentation(self, presentation_info: dict):
-        # refresh our presentation info
-        # presentation_info = self.document.current_layer_set
-        for uuid, layer_prez in presentation_info.items():
-            self.set_colormap(layer_prez.colormap, uuid=uuid)
-            self.set_color_limits(layer_prez.climits, uuid=uuid)
-            self.set_dataset_visible(uuid, visible=layer_prez.visible)
-            # FUTURE, if additional information is added to the presentation tuple, you must also update it here
-
-    def rebuild_all(self, *args, **kwargs):
-        """
-        resynchronize the scenegraph to the document content
-        This includes creating elements for any newly-valid layers,
-        removing elements for no-longer-valid layers, and
-        making the display order, visibility, and animation order match the document
-        """
-        # get the list of layers which are valid, and either visible or in the animation order
-        doc_layers = list(self.document.active_layer_order)
-        presentation_info = tuple(p for (p, l) in doc_layers)
-        active_layers = tuple(l for (p, l) in doc_layers)
-        active_uuids = set(x.uuid for x in active_layers)
-        active_lookup = dict((x.uuid, x) for x in active_layers)
-        prez_lookup = dict((x.uuid, x) for x in presentation_info)
-
-        uuids_w_elements = set(self.dataset_nodes.keys())
-        # get set of valid layers not having elements and invalid layers having elements
-        inconsistent_uuids = uuids_w_elements ^ active_uuids
-
-        # current_uuid_order = self.document.current_layer_uuid_order
-        current_uuid_order = tuple(p.uuid for p in presentation_info)
-
-        remove_elements = []
-        for uuid in inconsistent_uuids:
-            if uuid in active_lookup and active_lookup[uuid].is_valid:
-                layer = active_lookup[uuid]
-                # create elements for layers which have transitioned to a valid state
-                LOG.debug("creating deferred element for layer %s" % layer.uuid)
-                if layer.kind in [Kind.COMPOSITE, Kind.RGB]:
-                    # create an invisible element with the RGB
-                    self.change_node_for_composite_dataset(None, None, None, None)
-                else:
-                    # FIXME this was previously a NotImplementedError
-                    LOG.warning("unable to create deferred scenegraph element for %s" % repr(layer))
-            else:
-                # remove elements for layers which are no longer valid
-                remove_elements.append(uuid)
-
-        # get info on the new order
-        self.animation_controller.set_layer_order(current_uuid_order)
-        self.animation_controller.frame_order = self.document.current_animation_order
-        self.rebuild_presentation(prez_lookup)
-
-        for elem in remove_elements:
-            self.purge_dataset(elem)
-        # This is triggered, when the layer set is updated?
-        # import_product_content when data loaded?
-        self.animation_controller.update_time_manager(self.document.data_layer_collection)
-
-        # Triggers main canvas update
-        self.update()
 
     def on_view_change(self, scheduler):
         """Simple event handler for when we need to reassess image layers."""
@@ -1535,21 +1234,15 @@ class SceneGraphManager(QObject):
             if need_retile:
                 self.start_retiling_task(uuid, preferred_stride, tile_box)
 
-        current_visible_datasets_uuids = [p.uuid for (p, l) in self.document.active_layer_order if p.visible]
-        current_invisible_datasets_uuids = set(self.dataset_nodes.keys()) - set(current_visible_datasets_uuids)
+        current_datasets_uuids = self.dataset_nodes.keys()
 
         def _assess_if_active(uuid):
             dataset_node = self.dataset_nodes.get(uuid, None)
             if dataset_node is not None and hasattr(dataset_node, "assess"):
                 _assess(uuid, dataset_node)
 
-        for uuid in current_visible_datasets_uuids:
-            _assess_if_active(uuid)
-        # update contours
-        for node in self.proxy_nodes.values():
-            node.on_view_change()
-        # update invisible datasets
-        for uuid in current_invisible_datasets_uuids:
+        # update all available datasets nodes
+        for uuid in current_datasets_uuids:
             _assess_if_active(uuid)
 
     def start_retiling_task(self, uuid, preferred_stride, tile_box):
@@ -1598,15 +1291,6 @@ class SceneGraphManager(QObject):
             return
         child.set_retiled(preferred_stride, tile_box, tiles_info, vertices, tex_coords)
         child.update()
-
-    def on_layer_visible_toggle(self, visible):
-        pass
-
-    def on_layer_change(self, event):
-        pass
-
-    def on_data_loaded(self, event):
-        pass
 
 
 # TODO move these defaults to common config defaults location

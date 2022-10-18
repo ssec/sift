@@ -26,125 +26,6 @@ def _get_awips_colors(cmap_file):
     return colors
 
 
-def generate_from_awips_cmap(cmap_file, flip=False):
-    colors = _get_awips_colors(cmap_file)
-    if flip:
-        colors = colors[::-1]
-
-    if len(colors) < 10:
-        control_indexes = range(len(colors))
-        cn = len(colors) - 1
-    else:
-        skp = 0
-        control_indexes = [0]
-        bp = np.round(colors[0] * 255.0)
-        lp = np.round(colors[1] * 255.0)
-        bpd = 1
-        cn = 2
-        rds = (lp[0] - bp[0]) / bpd
-        gds = (lp[1] - bp[1]) / bpd
-        bds = (lp[2] - bp[2]) / bpd
-        for c in colors[2:-1]:
-            ep = 1.0 / bpd
-            cc = np.round(c * 255.0)
-            rcs = cc[0] - lp[0]
-            gcs = cc[1] - lp[1]
-            bcs = cc[2] - lp[2]
-            rdsp = rds
-            gdsp = gds
-            bdsp = bds
-            rds = (lp[0] - bp[0]) / bpd
-            gds = (lp[1] - bp[1]) / bpd
-            bds = (lp[2] - bp[2]) / bpd
-            cd = np.round(colors[cn + 1] * 255.0)
-            res = 0.5 * (cd[0] - lp[0])
-            ges = 0.5 * (cd[1] - lp[1])
-            bes = 0.5 * (cd[2] - lp[2])
-            if skp == 1:
-                bpd += 1
-                skp = 0
-            elif (
-                (rcs * rds >= 0 and gcs * gds >= 0 and bcs * bds >= 0)
-                and (
-                    (
-                        bpd >= 10
-                        and (rds * rdsp != 0 or (rds * rdsp == 0 and max(abs(rds), abs(rdsp)) == 0))
-                        and (gds * gdsp != 0 or (gds * gdsp == 0 and max(abs(gds), abs(gdsp)) == 0))
-                        and (bds * bdsp != 0 or (bds * bdsp == 0 and max(abs(bds), abs(bdsp)) == 0))
-                    )
-                    or bpd < 10
-                )
-                and (
-                    (abs(rcs) > np.ceil(abs(rds) + ep) and abs(res) < abs(rcs))
-                    or (abs(rcs) < np.floor(abs(rds) - ep) and abs(res) > abs(rcs))
-                    or np.floor(abs(rds) - ep) <= abs(rcs) <= np.ceil(abs(rds) + ep)
-                )
-                and (
-                    (abs(gcs) > np.ceil(abs(gds) + ep) and abs(ges) < abs(gcs))
-                    or (abs(gcs) < np.floor(abs(gds) - ep) and abs(ges) > abs(gcs))
-                    or np.floor(abs(gds) - ep) <= abs(gcs) <= np.ceil(abs(gds) + ep)
-                )
-                and (
-                    (abs(bcs) > np.ceil(abs(bds) + ep) and abs(bes) < abs(bcs))
-                    or (abs(bcs) < np.floor(abs(bds) - ep) and abs(bes) > abs(bcs))
-                    or np.floor(abs(bds) - ep) <= abs(bcs) <= np.ceil(abs(bds) + ep)
-                )
-            ):
-                bpd += 1
-            else:
-                control_indexes.append(cn - 1)
-                bp = lp
-                bpd = 1
-                skp = 1
-            lp = cc
-            cn += 1
-        control_indexes.append(cn)
-
-    control_points = np.array(control_indexes) / cn
-    hex_colors = ["#{:02x}{:02x}{:02x}".format(*[int(x * 255) for x in c]) for c in colors[control_indexes]]
-
-    return control_points, hex_colors
-
-
-def generate_awips_cmap_debug_plot(cmap_file, out_fn):
-    import matplotlib.pyplot as plt
-
-    colors = _get_awips_colors(cmap_file)
-    velocity = np.diff(colors, axis=0)
-    acc = np.abs(np.diff(velocity, axis=0))
-    fig = plt.figure()
-    # 3 columns - R, G, B
-    # 3 Rows - color, vel, acc
-    ax = fig.add_subplot(3, 3, 1)
-    ax.set_ylabel("Color")
-    ax.set_title("Red")
-    ax.plot(colors[:, 0])
-    ax = fig.add_subplot(3, 3, 2)
-    ax.set_title("Green")
-    ax.plot(colors[:, 0])
-    ax = fig.add_subplot(3, 3, 3)
-    ax.set_title("Blue")
-    ax.plot(colors[:, 2])
-
-    ax = fig.add_subplot(3, 3, 4)
-    ax.set_ylabel("Velocity")
-    ax.plot(velocity[:, 0])
-    ax = fig.add_subplot(3, 3, 5)
-    ax.plot(velocity[:, 1])
-    ax = fig.add_subplot(3, 3, 6)
-    ax.plot(velocity[:, 2])
-
-    ax = fig.add_subplot(3, 3, 7)
-    ax.set_ylabel("Acceleration")
-    ax.plot(acc[:, 0])
-    ax = fig.add_subplot(3, 3, 8)
-    ax.plot(acc[:, 1])
-    ax = fig.add_subplot(3, 3, 9)
-    ax.plot(acc[:, 2])
-
-    plt.savefig(out_fn)
-
-
 class SquareRootColormap(BaseColormap):
     colors = [(0.0, 0.0, 0.0, 1.0), (1.0, 1.0, 1.0, 1.0)]
 
@@ -1700,22 +1581,6 @@ class ColormapManager(OrderedDict):
     def is_writeable_colormap(self, name):
         return name in self._writeable_cmaps
 
-    def user_colormaps(self):
-        return self.get_category(USER_CATEGORY, [])
-
-    def iter_categories(self):
-        """Generate category -> iterable of colormap names."""
-        for cat, cmap_list in self._category_dict.items():
-            yield cat, cmap_list
-
-    def get_category(self, cat_name, default=None):
-        return self._category_dict.get(cat_name, default)
-
-    def add_category(self, name, ignore_exist=False):
-        if not ignore_exist and name in self._category_dict:
-            raise ValueError("Category '{}' already exists".format(name))
-        self._category_dict.setdefault(name, [])
-
     def add_colormap(self, name, colormap, category=USER_CATEGORY, read_only=True):
         assert isinstance(colormap, (LazyColormap, BaseColormap))
         cat_dict = self._category_dict.setdefault(category, [])
@@ -1724,17 +1589,6 @@ class ColormapManager(OrderedDict):
         if not read_only:
             self._writeable_cmaps.add(name)
         super(ColormapManager, self).__setitem__(name, colormap)
-
-    def get_colormap(self, cmap_name, category=None):
-        if category is not None:
-            return self[category][cmap_name]
-
-        for cat_dict in self.values():
-            if cmap_name in cat_dict:
-                val = cat_dict[cmap_name]
-                self._cmap_cache[cmap_name] = val
-                return val
-        raise KeyError("No colormap named '{}'".format(cmap_name))
 
     def __getitem__(self, key):
         val = super(ColormapManager, self).__getitem__(key)

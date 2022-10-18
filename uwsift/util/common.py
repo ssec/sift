@@ -7,7 +7,6 @@ from satpy import DataID, Scene
 
 from uwsift import config as config
 from uwsift.common import N_A, Info
-from uwsift.model.layer import DocBasicDataset
 
 LOG = logging.getLogger(__name__)
 
@@ -153,7 +152,7 @@ def _unit_format_func(layer, units):
     return _format_unit
 
 
-def preferred_units(dsi: DocBasicDataset) -> str:
+def preferred_units(dsi) -> str:
     """
     Return unit string (i.e.: Kelvin) for a Product currently being loaded.
     :param dsi: DocBasicDataset describing the product currently being added.

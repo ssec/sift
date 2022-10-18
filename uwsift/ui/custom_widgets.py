@@ -21,10 +21,6 @@ class QNoScrollComboBox(QComboBox):
         # If we want it to scroll when it has focus then uncomment
         # Currently not desired for Projection combo box, but may
         # be desired for RGB layer selector
-        # if not self.hasFocus():
-        #    ev.ignore()
-        # else:
-        #    super(QNoScrollComboBox, self).wheelEvent(ev)
         ev.ignore()
 
 

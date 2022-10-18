@@ -91,8 +91,6 @@ def __configure_available_loggers(logger_all_level: Optional[str]) -> None:
 
         try:
             logger.setLevel(individual_level)
-            # LOG.debug(f"Individual level configuration for logger"
-            #          f" '{logger.name}' found and set: '{individual_level}'")
         except ValueError:
             LOG.warning(f"Logger '{logger.name}' configured with invalid" f" log level '{individual_level}'. Ignoring.")
 

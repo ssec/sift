@@ -274,7 +274,3 @@ class ABI_AHI_Guidebook(Guidebook):
             sat=sat.value, inst=inst.value, name=name, standard_name=label, dtime=display_time
         )
         return name
-
-
-# if __name__ == '__main__':
-#     sys.exit(main())
