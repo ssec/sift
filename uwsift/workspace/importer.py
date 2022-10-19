@@ -413,6 +413,9 @@ class SatpyImporter(aImporter):
         self.use_inventory_db = USE_INVENTORY_DB
         self.requires = _get_requires(self.scn)
 
+        # NOTE: needed for an issue with resampling of NetCDF data.
+        self.scn_original = None  # noqa - Do not simply remove
+
     @classmethod
     def from_product(cls, prod: Product, workspace_cwd, database_session, **kwargs):
         # this overrides the base class because we assume that the product
@@ -602,6 +605,10 @@ class SatpyImporter(aImporter):
     def load_all_datasets(self) -> None:
         self.scn.load(self.dataset_ids, pad_data=False, upper_right_corner="NE", **self.product_filters)
         # copy satpy metadata keys to SIFT keys
+
+        if self.scn.missing_datasets:
+            self.scn = self.scn.resample(resampler="native")
+
         for ds in self.scn:
             self._set_name_metadata(ds.attrs)
             self._set_time_metadata(ds.attrs)
@@ -1039,6 +1046,19 @@ class SatpyImporter(aImporter):
         dataset_ids = [prod.info["_satpy_id"] for prod in products]
         self.scn.load(dataset_ids, pad_data=not merge_with_existing, upper_right_corner="NE")
 
+        # If resampling is needed so that missing datasets can be generated then it is important
+        # to NOT override the SatpyImporter.scn variable. Because that cause problems with NetCDF files.
+        # The guess is here that with the overwritten scene the NetCDF files are closed in a way which
+        # leads later to problems for saving/computing the actual data of these files.
+        # Instead a local variable is used to prevent this.
+        if self.scn.missing_datasets:
+            # About the next strange line of code: keep a reference to the
+            # original scene to work around an issue in the resampling
+            # implementation for NetCDF data: otherwise the original data
+            # would be garbage collected too early.
+            self.scn_original = self.scn  # noqa - Do not simply remove
+            self.scn = self.scn.resample(resampler="native")
+
         if self.resampling_info:
             self._preprocess_products_with_resampling()
 
@@ -1232,7 +1252,8 @@ class SatpyImporter(aImporter):
             # original scene to work around an issue in the resampling
             # implementation for NetCDF data: otherwise the original data
             # would be garbage collected too early.
-            self.scn_original = self.scn  # noqa - Do not simply remove
+            if not self.scn_original:
+                self.scn_original = self.scn  # noqa - Do not simply remove
             self.scn = self.scn.resample(
                 target_area_def,
                 resampler=resampler,
