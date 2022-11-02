@@ -125,18 +125,15 @@ set( ${PROJECT_NAME}_PYINSTALLER_BASE_DIR "${CMAKE_BINARY_DIR}/../pyinstaller" C
     " The directory configured as ${PROJECT_NAME}_PYINSTALLER_BASE_DIR='${${PROJECT_NAME}_PYINSTALLER_BASE_DIR}'"
     " is *owned* by the build system, it will be removed and recreated by the target 'pyinstaller-package'!" )
 
-foreach( PYINSTALLER_MODE onedir onefile )
-  message( "Creating target 'pyinstaller-${PYINSTALLER_MODE}-package'" )
-  set( _pyi_dir_ ${${PROJECT_NAME}_PYINSTALLER_BASE_DIR}/${PYINSTALLER_MODE}  )
-  add_custom_target( pyinstaller-${PYINSTALLER_MODE}-package
-    COMMAND ${CMAKE_COMMAND} -E remove_directory ${${PROJECT_NAME}_PYINSTALLER_BASE_DIR}/${PYINSTALLER_MODE}
-    COMMAND pip install -e .
-    COMMAND ${PyInstaller_EXECUTABLE} --distpath "${_pyi_dir_}/dist" --workpath "${_pyi_dir_}/work" --clean -y ${PROJECT_NAME}-${PYINSTALLER_MODE}.spec
-    BYPRODUCTS "${_pyi_dir_}/dist/${PROJECT_NAME}/${PROJECT_NAME}"
-    VERBATIM
-    COMMENT "Building PyInstaller package in '${_pyi_dir_}/dist/${PROJECT_NAME}/${PROJECT_NAME}'"
-    )
-
-endforeach()
+message( "Creating target 'pyinstaller-package'" )
+set( _pyi_dir_ ${${PROJECT_NAME}_PYINSTALLER_BASE_DIR}  )
+add_custom_target( pyinstaller-package
+  COMMAND ${CMAKE_COMMAND} -E remove_directory "${_pyi_dir_}"
+  COMMAND pip install -e .
+  COMMAND ${PyInstaller_EXECUTABLE} --distpath "${_pyi_dir_}/dist" --workpath "${_pyi_dir_}/work" --clean -y ${PROJECT_NAME}-onedir.spec
+  BYPRODUCTS "${_pyi_dir_}/dist/${PROJECT_NAME}/${PROJECT_NAME}"
+  VERBATIM
+  COMMENT "Building PyInstaller package in '${_pyi_dir_}/dist/${PROJECT_NAME}/${PROJECT_NAME}'"
+)
 
 endif( DIST_PyInstaller )
