@@ -1460,5 +1460,24 @@ def main() -> int:
     return 0
 
 
+def close_splash_screen():
+    """
+    Helper function to close startup splash screen provided by pyinstaller.
+    If pyinstaller package has no splash screen or this is not started as
+    pyinstaller package at all the function does nothing.
+    """
+    if "_PYIBoot_SPLASH" in os.environ:
+        try:
+            import pyi_splash
+
+            pyi_splash.close()
+        except:
+            # not good not terrible. Splash screen might be still open but
+            # more likely there was no splash screen to begin with and the
+            # environment variable set defined by something else.
+            pass
+
+
 if __name__ == "__main__":
+    close_splash_screen()
     sys.exit(main())

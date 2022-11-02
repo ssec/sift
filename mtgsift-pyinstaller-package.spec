@@ -175,7 +175,12 @@ pyz = PYZ(a.pure,
 # options = [ ('v', None, 'OPTION') ]
 options=[]
 
+splash = Splash('splash.png',
+                binaries=a.binaries,
+                datas=a.datas)
+
 exe = EXE(pyz,
+          splash,
           a.scripts,
           options,
           exclude_binaries=True,
@@ -186,6 +191,7 @@ exe = EXE(pyz,
           console=True )
 
 coll = COLLECT(exe,
+               splash.binaries,
                a.binaries,
                a.zipfiles,
                a.datas,
