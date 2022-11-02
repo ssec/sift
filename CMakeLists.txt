@@ -126,14 +126,27 @@ set( ${PROJECT_NAME}_PYINSTALLER_BASE_DIR "${CMAKE_BINARY_DIR}/../pyinstaller" C
     " is *owned* by the build system, it will be removed and recreated by the target 'pyinstaller-package'!" )
 
 message( "Creating target 'pyinstaller-package'" )
-set( _pyi_dir_ ${${PROJECT_NAME}_PYINSTALLER_BASE_DIR}  )
-add_custom_target( pyinstaller-package
+set( _pyi_dir_ ${${PROJECT_NAME}_PYINSTALLER_BASE_DIR} )
+add_custom_command(OUTPUT pyinstaller-build
   COMMAND ${CMAKE_COMMAND} -E remove_directory "${_pyi_dir_}"
   COMMAND pip install -e .
-  COMMAND ${PyInstaller_EXECUTABLE} --distpath "${_pyi_dir_}/dist" --workpath "${_pyi_dir_}/work" --clean -y ${PROJECT_NAME}-pyinstaller-package.spec
-  BYPRODUCTS "${_pyi_dir_}/dist/${PROJECT_NAME}/${PROJECT_NAME}"
+  COMMAND ${PyInstaller_EXECUTABLE} --distpath "${_pyi_dir_}/package" --workpath "${_pyi_dir_}/work" --clean -y ${PROJECT_NAME}-pyinstaller-package.spec
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${_pyi_dir_}/dist/${PROJECT_NAME}"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${_pyi_dir_}/dist/${PROJECT_NAME}/bin"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${_pyi_dir_}/dist/${PROJECT_NAME}/logs"
+  COMMAND ${CMAKE_COMMAND} -E copy_directory "${_pyi_dir_}/package/${PROJECT_NAME}/resources/bin" "${_pyi_dir_}/dist/${PROJECT_NAME}/bin"
+  COMMAND ${CMAKE_COMMAND} -E rename "${_pyi_dir_}/package/${PROJECT_NAME}" "${_pyi_dir_}/dist/${PROJECT_NAME}/lib"
+  BYPRODUCTS "${_pyi_dir_}/dist/${PROJECT_NAME}/lib/${PROJECT_NAME}"
   VERBATIM
-  COMMENT "Building PyInstaller package in '${_pyi_dir_}/dist/${PROJECT_NAME}/${PROJECT_NAME}'"
+  COMMENT "Building PyInstaller package in '${_pyi_dir_}/dist/${PROJECT_NAME}/lib'"
+  )
+add_custom_target( pyinstaller-package
+  COMMAND ${CMAKE_COMMAND} -E tar "cf" "${PROJECT_NAME}.zip" --format=zip "${PROJECT_NAME}"
+  DEPENDS pyinstaller-build
+  BYPRODUCTS "${_pyi_dir_}/dist/${PROJECT_NAME}.zip"
+  WORKING_DIRECTORY "${_pyi_dir_}/dist"
+  VERBATIM
+  COMMENT "Package PyInstaller output for mtgsift"
 )
 
 endif( DIST_PyInstaller )
