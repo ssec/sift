@@ -48,6 +48,7 @@ from uuid import UUID
 from uuid import uuid1 as uuidgen
 
 import numpy as np
+import xarray
 from pyproj import Proj
 from PyQt5.QtCore import QObject, pyqtSignal
 from rasterio import Affine
@@ -65,6 +66,7 @@ from .metadatabase import (
     Metadatabase,
     Product,
 )
+from .statistics import dataset_statistical_analysis
 
 LOG = logging.getLogger(__name__)
 
@@ -111,8 +113,9 @@ class ActiveContent(QObject):
     _data = None
     _coverage = None
     _sparsity = None
+    statistics = None
 
-    def __init__(self, workspace_cwd: str, C: Content):
+    def __init__(self, workspace_cwd: str, C: Content, info):
         super(ActiveContent, self).__init__()
         self._cid = C.id
         self._wsd = workspace_cwd
@@ -121,6 +124,14 @@ class ActiveContent(QObject):
             self._test_init()
         else:
             self._attach(C)
+
+        # Needed for the calculation of the correct statistics
+        # we need a dict not a frozendict so convert it everytime to a dict
+        attrs = dict(info)
+        attrs = attrs.update({"algebraic": info.get(Info.ALGEBRAIC)}) if info.get(Info.ALGEBRAIC) else attrs
+
+        data_array = xarray.DataArray(self._data, attrs=attrs)
+        self.statistics = dataset_statistical_analysis(data_array)
 
     def _test_init(self):
         data = np.ones((4, 12), dtype=np.float32)

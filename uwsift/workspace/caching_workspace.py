@@ -225,7 +225,7 @@ class CachingWorkspace(BaseWorkspace):
         return total
 
     def _activate_content(self, c: Content) -> ActiveContent:
-        self._available[c.id] = zult = ActiveContent(self.cache_dir, c)
+        self._available[c.id] = zult = ActiveContent(self.cache_dir, c, self.get_info(c.uuid))
         c.touch()
         c.product.touch()
         return zult
