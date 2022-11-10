@@ -1842,6 +1842,24 @@ Checking this deactivates the Update button.</string>
     </layout>
    </widget>
   </widget>
+  <widget class="QDockWidget" name="datasetStatisticsPaneDockWidget">
+   <property name="features">
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
+   </property>
+   <property name="windowTitle">
+    <string>Statistics</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>2</number>
+   </attribute>
+   <widget class="QWidget" name="datasetStatisticsPaneDockWidgetContents">
+    <layout class="QVBoxLayout" name="verticalLayout_9">
+     <item>
+      <widget class="DatasetStatisticsPane" name="datasetStatisticsPane" native="true"/>
+     </item>
+    </layout>
+   </widget>
+  </widget>
  </widget>
  <customwidgets>
   <customwidget>
@@ -1868,6 +1886,12 @@ Checking this deactivates the Update button.</string>
    <class>LayerTreeView</class>
    <extends>QTreeView</extends>
    <header>uwsift.view.layer_tree_view</header>
+  </customwidget>
+  <customwidget>
+   <class>DatasetStatisticsPane</class>
+   <extends>QWidget</extends>
+   <header>uwsift.view.dataset_statistics_pane</header>
+   <container>1</container>
   </customwidget>
  </customwidgets>
  <resources/>
