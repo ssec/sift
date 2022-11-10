@@ -125,6 +125,17 @@ if not is_win:
 if is_win:
     data_files.append((os.path.join('resources', 'pyinstaller'), '.'))
 
+
+#-------------------------------------------------------------------------------
+# Add default config and startup scripts
+data_files.append((os.path.join('resources', 'config'), os.path.join('resources', 'config')))
+script_ext = ''
+if is_linux:
+    script_ext = '.sh'
+if is_win:
+    script_ext = '.bat'
+data_files.append((os.path.join('resources', 'bin', exe_name + script_ext), os.path.join('resources', 'bin')))
+
 #-------------------------------------------------------------------------------
 # Add ffmpeg dependencies that pyinstaller doesn't automatically find
 if is_linux:
