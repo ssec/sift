@@ -789,3 +789,15 @@ class BaseWorkspace(QObject):
         if content.shape[1] > 4:
             content, _ = np.hsplit(content, [4])
         return content, None
+
+    @abstractmethod
+    def _get_active_content_by_uuid(self, uuid: UUID):
+        pass
+
+    def get_statistics_for_dataset_by_uuid(self, uuid: UUID):
+        if uuid:
+            ac: ActiveContent = self._get_active_content_by_uuid(uuid)
+            stats = ac.statistics
+        else:
+            stats = {}
+        return stats
