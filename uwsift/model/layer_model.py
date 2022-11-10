@@ -816,8 +816,11 @@ class LayerModel(QAbstractItemModel):
         for sched_time in sched_times:
             input_datasets_uuids = self._get_datasets_uuids_of_multichannel_dataset(sched_time, input_layers)
 
+            operation = algebraic_layer.recipe.operation_formula.split("=")[1]
+
             info = {
                 Info.SHORT_NAME: algebraic_layer.recipe.name,
+                Info.ALGEBRAIC: operation,
             }
             # Skip if input dataset uuid is None
             # and assign placeholders to the others

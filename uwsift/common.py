@@ -300,6 +300,9 @@ class Info(Enum):
     # only in family info dictionaries:
     DISPLAY_FAMILY = "display_family"
 
+    # only used by algebraic datasets to save the operation kind
+    ALGEBRAIC = "algebraic"
+
     def __lt__(self, other):
         """
         when using pickletype in sqlalchemy tables, a comparator is needed for enumerations
