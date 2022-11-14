@@ -89,16 +89,6 @@ EXIT_FORCED_SHUTDOWN = 101
 EXIT_CONFIRMED_SHUTDOWN = 102
 
 
-def test_layers_from_directory(doc, layer_tiff_glob):
-    return doc.open_file(glob(layer_tiff_glob))
-
-
-def test_layers(doc, glob_pattern=None):
-    if glob_pattern:
-        return test_layers_from_directory(doc, glob_pattern)
-    return []
-
-
 async def do_test_cycle(txt: QtWidgets.QWidget):
     from asyncio import sleep
 
@@ -652,7 +642,6 @@ class Main(QtWidgets.QMainWindow):
         config_dir=None,
         workspace_dir=None,
         cache_size=None,
-        glob_pattern=None,
         search_paths=None,
         border_shapefile=None,
         center=None,
@@ -718,8 +707,6 @@ class Main(QtWidgets.QMainWindow):
             pane.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable | QtWidgets.QDockWidget.DockWidgetMovable)
         # Make the panes on the right side 375px wide
         self.resizeDocks(panes, [375] * len(panes), QtCore.Qt.Horizontal)
-
-        test_layers(self.document, glob_pattern=glob_pattern)
 
         # Interaction Setup
         self._init_key_releases()
@@ -1335,9 +1322,6 @@ def main() -> int:
     )
     parser.add_argument("--border-shapefile", default=None, help="Specify alternative coastline/border shapefile")
     parser.add_argument(
-        "--glob-pattern", default=os.environ.get("TIFF_GLOB", None), help="Specify glob pattern for input images"
-    )
-    parser.add_argument(
         "-p", "--path", dest="paths", action="append", help="directory to search for data [MULTIPLE ALLOWED]"
     )
     parser.add_argument("-c", "--center", nargs=2, type=float, help="Specify center longitude and latitude for camera")
@@ -1387,7 +1371,6 @@ def main() -> int:
         workspace_dir=args.workspace_dir,
         config_dir=args.config_dir,
         cache_size=args.space,
-        glob_pattern=args.glob_pattern,
         search_paths=data_search_paths,
         border_shapefile=args.border_shapefile,
         center=args.center,
