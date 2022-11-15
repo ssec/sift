@@ -161,8 +161,8 @@ def filter_dataset_ids(ids_to_filter: Iterable[DataID]) -> Generator[DataID, Non
             yield ds_id
 
 
-def get_guidebook_class(layer_info) -> Guidebook:
-    platform = layer_info.get(Info.PLATFORM)
+def get_guidebook_class(dataset_info) -> Guidebook:
+    platform = dataset_info.get(Info.PLATFORM)
     return GUIDEBOOKS.get(platform, DEFAULT_GUIDEBOOK)()
 
 
