@@ -341,14 +341,10 @@ class Info(Enum):
 
 @dataclass
 class Presentation:
-    """Presentation information for a layer.
+    """Presentation information for a layer and dataset."""
 
-    z_order comes from the layerset
-
-    """
-
-    uuid: Optional[UUID]  # dataset in the document/workspace, None if referring to a system layer
-    kind: Kind  # what kind of layer it is
+    uuid: Optional[UUID]  # dataset in the layermodel/document/workspace, None if referring to a system layer
+    kind: Kind  # what kind of layer/dataset it is
     visible: bool = True  # whether it's visible or not
     colormap: object = None  # name or uuid: color map to use; name for default, uuid for user-specified
     style: object = None  # name or uuid: SVG/HTML style to use; name for default, (FUTURE?) uuid for user-specified
