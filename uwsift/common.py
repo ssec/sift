@@ -249,8 +249,8 @@ class Info(Enum):
 
     # SIFT bookkeeping
     DATASET_NAME = "dataset_name"  # logical name of the file (possibly human assigned)
-    KIND = "kind"  # Kind enumeration on what kind of layer this makes
-    UUID = "uuid"  # UUID assigned on import, which follows the layer around the system
+    KIND = "kind"  # Kind enumeration on what kind of layer/dataset this makes
+    UUID = "uuid"  # UUID assigned on import, which follows the layer/dataset around the system
 
     # track determiner is family::category; presentation is determined by family
     # family::category::serial is a unique identifier equivalent to conventional make-model-serialnumber
@@ -290,7 +290,7 @@ class Info(Enum):
     INSTRUMENT = "instrument"  # Instrument enumeration, or string with full standard name
 
     # human-friendly conventions
-    DISPLAY_NAME = "display_name"  # preferred name in the layer list
+    DISPLAY_NAME = "display_name"  # preferred name for displaying
     DISPLAY_TIME = "display_time"  # typically from guidebook, used for labeling animation frame
     UNIT_CONVERSION = "unit_conversion"  # (preferred CF units, convert_func, format_func)
     # unit numeric conversion func: lambda x, inverse=False: convert-to-units
