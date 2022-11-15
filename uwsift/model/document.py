@@ -347,27 +347,27 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def get_algebraic_namespace(self, uuid):
         return self._workspace.get_algebraic_namespace(uuid)
 
-    def __getitem__(self, layer_uuid):
+    def __getitem__(self, dataset_uuid):
         """
         return dataset with the given UUID
         """
-        if layer_uuid is None:
+        if dataset_uuid is None:
             raise KeyError("Key 'None' does not exist in document or workspace")
-        elif not isinstance(layer_uuid, UUID):
-            raise ValueError("document[UUID] required, %r was used" % type(layer_uuid))
+        elif not isinstance(dataset_uuid, UUID):
+            raise ValueError("document[UUID] required, %r was used" % type(dataset_uuid))
 
-        if layer_uuid in self._info_by_uuid:
-            return self._info_by_uuid[layer_uuid]
+        if dataset_uuid in self._info_by_uuid:
+            return self._info_by_uuid[dataset_uuid]
 
         # check the workspace for information
         try:
             LOG.debug("Checking workspace for information on inactive product")
-            info = self._workspace.get_info(layer_uuid)
+            info = self._workspace.get_info(dataset_uuid)
         except KeyError:
             info = None
 
         if info is None:
-            raise KeyError("Key '{}' does not exist in document or workspace".format(layer_uuid))
+            raise KeyError("Key '{}' does not exist in document or workspace".format(dataset_uuid))
         return info
 
     def remove_dataset_info(self, uuid: UUID):
