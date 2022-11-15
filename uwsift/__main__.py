@@ -236,7 +236,7 @@ def _common_path_prefix(paths):
 class UserControlsAnimation(QtCore.QObject):
     """Controller behavior focused around animation bar and next/last key bindings.
 
-    Connects between document, scene graph manager, layer list view of document; uses UI elements.
+    Connects between scene graph managers animation controller and the UI elements.
     Is composed into MainWindow.
     - scrub left and right on slider
     - next and last timestep (if time animation)
@@ -250,17 +250,15 @@ class UserControlsAnimation(QtCore.QObject):
     scene_manager: SceneGraphManager = None
     _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
 
-    def __init__(self, ui, scene_manager: SceneGraphManager, document: Document):
+    def __init__(self, ui, scene_manager: SceneGraphManager):
         """
         Args:
             ui: QtDesigner UI element tree for application
             scene_manager: Map display manager, needed for controller screen animation
-            document: document object, needed for sibling lookups
         """
         super(UserControlsAnimation, self).__init__()
         self.ui = ui
         self.scene_manager = scene_manager
-        self.document = document
 
         self.ui.animPlayPause.clicked.connect(self.toggle_animation)
         self.ui.animPlayPause.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -695,7 +693,7 @@ class Main(QtWidgets.QMainWindow):
         if AUTO_UPDATE_MODE__ACTIVE:
             self._init_update_times_display()
 
-        self.animation = UserControlsAnimation(self.ui, self.scene_manager, self.document)
+        self.animation = UserControlsAnimation(self.ui, self.scene_manager)
 
         # disable close button on panes
         panes = [
