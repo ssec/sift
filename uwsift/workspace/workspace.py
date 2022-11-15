@@ -541,7 +541,7 @@ class BaseWorkspace(QObject):
             ops = compile(ast.parse(operations, mode="exec"), "<string>", "exec")
             result_name = ops_ast.body[-1].targets[0].id
         except SyntaxError:
-            raise ValueError("Invalid syntax or operations in algebraic layer")
+            raise ValueError("Invalid syntax or operations in algebraic layer recipe")
 
         dep_metadata = {n: self.get_metadata(u) for n, u in namespace.items() if isinstance(u, UUID)}
 
