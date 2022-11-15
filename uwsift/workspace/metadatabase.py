@@ -485,7 +485,7 @@ class ProductKeyValue(Base):
 
 class SymbolKeyValue(Base):
     """
-    derived layers have a symbol table which becomes namespace used by expression
+    datasets of derived layers have a symbol table which becomes namespace used by expression
     """
 
     __tablename__ = "algebraic_symbol_key_values_v1"

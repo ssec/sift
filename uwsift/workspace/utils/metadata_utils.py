@@ -55,25 +55,25 @@ def get_default_point_style_name(info: dict) -> str:
     #  It needs to be clarified which approach is the right one - either making
     #  sure the STANDARD_NAME is always set or implementing a common fallback
     #  strategy.
-    layer_identifying_name = info.get(Info.STANDARD_NAME, None)
-    if not layer_identifying_name:
-        layer_identifying_name = info.get(Info.SHORT_NAME, None)
-    if not layer_identifying_name:
-        layer_identifying_name = info.get(Info.LONG_NAME, None)
-    if not layer_identifying_name:
-        layer_identifying_name = info.get("name", None)
-    if not layer_identifying_name:
+    identifying_name = info.get(Info.STANDARD_NAME, None)
+    if not identifying_name:
+        identifying_name = info.get(Info.SHORT_NAME, None)
+    if not identifying_name:
+        identifying_name = info.get(Info.LONG_NAME, None)
+    if not identifying_name:
+        identifying_name = info.get("name", None)
+    if not identifying_name:
         LOG.warning(f"There is no name." f" Cannot determine a default point style." f"info: {info}")
         return DEFAULT_POINT_STYLE_UNKNOWN
 
-    point_style_name = config.get(f"default_point_styles.{layer_identifying_name}", None)
+    point_style_name = config.get(f"default_point_styles.{identifying_name}", None)
     if not point_style_name:
-        LOG.warning(f"No default point style configured for " f" '{layer_identifying_name}'")
+        LOG.warning(f"No default point style configured for " f" '{identifying_name}'")
         return DEFAULT_POINT_STYLE_UNKNOWN
     # Check, whether there is a style defined for the given name
     point_style = get_point_style_by_name(point_style_name)
     if not point_style:
-        LOG.warning(f"Unknown point style '{point_style_name}' configured for" f" '{layer_identifying_name}'.")
+        LOG.warning(f"Unknown point style '{point_style_name}' configured for" f" '{identifying_name}'.")
         return DEFAULT_POINT_STYLE_UNKNOWN
     return point_style_name
 
