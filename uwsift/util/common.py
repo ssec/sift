@@ -100,9 +100,9 @@ def unit_symbol(unit):
         return unit or ""
 
 
-def _unit_format_func(layer, units):
+def _unit_format_func(info, units):
     units = unit_symbol(units)
-    standard_name = layer.get(Info.STANDARD_NAME)
+    standard_name = info.get(Info.STANDARD_NAME)
 
     def check_for_nan(val):
         return N_A if np.isnan(val) else str(val)
@@ -116,11 +116,11 @@ def _unit_format_func(layer, units):
             else:
                 return "{:.02f}{units}".format(val, units=unit_str)
 
-    elif "flag_values" in layer:
+    elif "flag_values" in info:
         # flag values don't have units
-        if "flag_meanings" in layer:
-            flag_masks = layer["flag_masks"] if "flag_masks" in layer else [-1] * len(layer["flag_values"])
-            flag_info = tuple(zip(layer["flag_meanings"], layer["flag_values"], flag_masks))
+        if "flag_meanings" in info:
+            flag_masks = info["flag_masks"] if "flag_masks" in info else [-1] * len(info["flag_values"])
+            flag_info = tuple(zip(info["flag_meanings"], info["flag_values"], flag_masks))
 
             def _format_unit(val, numeric=True, include_units=True, flag_info=flag_info):
                 val = int(val)

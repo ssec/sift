@@ -166,24 +166,24 @@ def get_guidebook_class(dataset_info) -> Guidebook:
     return GUIDEBOOKS.get(platform, DEFAULT_GUIDEBOOK)()
 
 
-def generate_guidebook_metadata(layer_info) -> Mapping:
-    guidebook = get_guidebook_class(layer_info)
-    # also get info for this layer from the guidebook
-    gbinfo = guidebook.collect_info(layer_info)
-    layer_info.update(gbinfo)  # FUTURE: should guidebook be integrated into DocBasicLayer?
+def generate_guidebook_metadata(info) -> Mapping:
+    guidebook = get_guidebook_class(info)
+    # also get more values for this info from the guidebook
+    gbinfo = guidebook.collect_info(info)
+    info.update(gbinfo)  # FUTURE: should guidebook be integrated into suitable place?
 
     # add as visible to the front of the current set, and invisible to the rest of the available sets
-    layer_info[Info.COLORMAP] = metadata_utils.get_default_colormap(layer_info, guidebook)
-    if layer_info[Info.KIND] == Kind.POINTS:
-        layer_info[Info.STYLE] = metadata_utils.get_default_point_style_name(layer_info)
-    layer_info[Info.CLIM] = guidebook.climits(layer_info)
-    layer_info[Info.VALID_RANGE] = guidebook.valid_range(layer_info)
-    if Info.DISPLAY_TIME not in layer_info:
-        layer_info[Info.DISPLAY_TIME] = guidebook._default_display_time(layer_info)
-    if Info.DISPLAY_NAME not in layer_info:
-        layer_info[Info.DISPLAY_NAME] = guidebook._default_display_name(layer_info)
+    info[Info.COLORMAP] = metadata_utils.get_default_colormap(info, guidebook)
+    if info[Info.KIND] == Kind.POINTS:
+        info[Info.STYLE] = metadata_utils.get_default_point_style_name(info)
+    info[Info.CLIM] = guidebook.climits(info)
+    info[Info.VALID_RANGE] = guidebook.valid_range(info)
+    if Info.DISPLAY_TIME not in info:
+        info[Info.DISPLAY_TIME] = guidebook._default_display_time(info)
+    if Info.DISPLAY_NAME not in info:
+        info[Info.DISPLAY_NAME] = guidebook._default_display_name(info)
 
-    return layer_info
+    return info
 
 
 def _get_requires(scn: Scene) -> Set[str]:
