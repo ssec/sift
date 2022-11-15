@@ -150,13 +150,7 @@ class PendingPolygon(object):
 
 
 class AnimationController(object):
-    """Basic bookkeeping object for each layer set (A, B, C, D) from the UI.
-
-    Each LayerSet has its own:
-     - Per layer visiblity
-     - Animation loop and frame order
-     - Layer Order
-    """
+    """Basic bookkeeping object for each layer set (A, B, C, D) from the UI."""
 
     def __init__(self):
 
