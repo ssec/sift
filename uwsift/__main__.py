@@ -238,11 +238,9 @@ class UserControlsAnimation(QtCore.QObject):
 
     Connects between scene graph managers animation controller and the UI elements.
     Is composed into MainWindow.
-    - scrub left and right on slider
-    - next and last timestep (if time animation)
-    - next and last bandstep (if band animation)
-    - update time display above time slider
+    - next and last frame
     - update animation rate using popup widget
+    - start/stop animation
     """
 
     ui = None
@@ -490,7 +488,7 @@ class Main(QtWidgets.QMainWindow):
     @staticmethod
     def run_gc_after_layer_deletion():
         """
-        Trigger a full garbage collection run after the deletion of a layer from the scene graph.
+        Trigger a full garbage collection run after the deletion of a layer and its datasets from the scene graph.
         The code uses cyclic and weak references, which can only be freed by the GC.
         """
         unreachable_object_count = gc.collect()
@@ -541,7 +539,7 @@ class Main(QtWidgets.QMainWindow):
 
     def _clear_last_dataset_creation_time(self, removed_uuids: typ.List[UUID]):
         """
-        Clear the LineEdit if the layer, from which the creation time was
+        Clear the LineEdit if the dataset, from which the creation time was
         extracted, is deleted from the scene graph.
         """
         if self._last_imported_dataset_uuid in removed_uuids:
