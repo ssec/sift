@@ -1094,10 +1094,9 @@ class SceneGraphManager(QObject):
         :param uuid: identifier of the dataset
         :param kind: kind of the dataset / data content.
         """
-        layer = self.document[uuid]
-        dataset_node = self.dataset_nodes[layer[Info.UUID]]
-        dataset_content = self.workspace.get_content(layer[Info.UUID], kind=kind)
         try:
+            dataset_node = self.dataset_nodes[uuid]
+            dataset_content = self.workspace.get_content(uuid, kind=kind)
             dataset_node.set_data(dataset_content)
         except NotImplementedError:
             if isinstance(dataset_node, TiledGeolocatedImage):
@@ -1119,6 +1118,9 @@ class SceneGraphManager(QObject):
                 # image(!) data, looks like it was called for a node of another
                 # type not having set_data() too.
                 raise
+        except KeyError:
+            LOG.fatal(f"Node for dataset with the uuid '{uuid}' does not exist in the scene graph. This is a BUG!")
+            raise
 
         self.on_view_change(None)
         self.update()
