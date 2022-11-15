@@ -883,7 +883,7 @@ class MultiChannelImageVisual(ImageVisual):
 MultiChannelImage = create_visual_node(MultiChannelImageVisual)
 
 
-class RGBCompositeLayerVisual(
+class RGBCompositeImageVisual(
     SIFTMultiChannelTiledGeolocatedMixin, TiledGeolocatedImageVisual, MultiChannelImageVisual
 ):
     def _init_texture(self, data_arrays, texture_format):
@@ -903,7 +903,7 @@ class RGBCompositeLayerVisual(
         return tex
 
 
-RGBCompositeLayer = create_visual_node(RGBCompositeLayerVisual)
+RGBCompositeLayer = create_visual_node(RGBCompositeImageVisual)
 
 
 class ShapefileLinesVisual(LineVisual):
