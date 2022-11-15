@@ -66,7 +66,7 @@ from uwsift.view.visuals import (
     Lines,
     MultiChannelImage,
     NEShapefileLines,
-    RGBCompositeLayer,
+    RGBCompositeImage,
     TiledGeolocatedImage,
 )
 from uwsift.workspace.utils.metadata_utils import (
@@ -945,7 +945,7 @@ class SceneGraphManager(QObject):
         )
 
         if USE_TILED_GEOLOCATED_IMAGES:
-            composite = RGBCompositeLayer(
+            composite = RGBCompositeImage(
                 images_data,
                 product_dataset.info[Info.ORIGIN_X],
                 product_dataset.info[Info.ORIGIN_Y],
@@ -1070,7 +1070,7 @@ class SceneGraphManager(QObject):
                 self.composite_element_dependencies[product_dataset.uuid] = product_dataset.input_datasets_uuids
 
                 composite = self.dataset_nodes[product_dataset.uuid]
-                if isinstance(composite, RGBCompositeLayer):
+                if isinstance(composite, RGBCompositeImage):
                     composite.set_channels(
                         images_data,
                         cell_width=product_dataset.info[Info.CELL_WIDTH],
@@ -1083,7 +1083,7 @@ class SceneGraphManager(QObject):
                 composite.clim = layer.presentation.climits
                 composite.gamma = layer.presentation.gamma
                 self.on_view_change(None)
-                if isinstance(composite, RGBCompositeLayer):
+                if isinstance(composite, RGBCompositeImage):
                     composite.determine_reference_points()
                 self.update()
             else:

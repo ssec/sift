@@ -903,7 +903,7 @@ class RGBCompositeImageVisual(
         return tex
 
 
-RGBCompositeLayer = create_visual_node(RGBCompositeImageVisual)
+RGBCompositeImage = create_visual_node(RGBCompositeImageVisual)
 
 
 class ShapefileLinesVisual(LineVisual):
