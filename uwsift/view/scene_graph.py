@@ -1136,22 +1136,6 @@ class SceneGraphManager(QObject):
                 z_counter -= 1
             self.update()
 
-    def remove_dataset(self, new_order: tuple, uuids_removed: tuple, row: int, count: int):
-        """
-        remove (disable) a layer, though this may be temporary due to a move.
-        wait for purge to truly flush out this puppy
-        :param new_order:
-        :param uuid_removed:
-        :return:
-        """
-        for uuid_removed in uuids_removed:
-            self.set_dataset_visible(uuid_removed, False)
-
-    def _remove_dataset(self, *args, **kwargs):
-        self.remove_dataset(*args, **kwargs)
-        # when removing the layer is the only operation being performed then update when we are done
-        self.update()
-
     def purge_dataset(self, uuid_removed: UUID):
         """
         Dataset has been purged from document (no longer used anywhere) - flush it all out
