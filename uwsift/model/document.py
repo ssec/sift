@@ -60,7 +60,7 @@ LOG = logging.getLogger(__name__)
 
 
 class Document(QObject):  # base class is rightmost, mixins left of that
-    """Storage for dataset and user information.
+    """Storage for dataset info and user information.
 
     This is the low-level "internal" interface that acts as a signaling hub.
     Direct access to the document is being deprecated.
@@ -250,7 +250,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         """Load product metadata and content from provided file paths.
 
         :param paths: paths to open
-        :param insert_before: where to insert them in layer list
+        :param insert_before: where to insert them in layer manager
         :return:
 
         """
@@ -349,7 +349,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
 
     def __getitem__(self, dataset_uuid):
         """
-        return dataset with the given UUID
+        return dataset info with the given UUID
         """
         if dataset_uuid is None:
             raise KeyError("Key 'None' does not exist in document or workspace")
