@@ -257,7 +257,7 @@ class LayerModel(QAbstractItemModel):
         Method to return the order of a specific layer within the model.
         Determined by its index in the model.
 
-        :param layer: Layer whose oorder is queried.
+        :param layer: Layer whose order is queried.
         :return: Integer representing the order of queried layer.
         """
         return self.layers.index(layer)
