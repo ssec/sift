@@ -152,16 +152,16 @@ def _unit_format_func(info, units):
     return _format_unit
 
 
-def preferred_units(dsi) -> str:
+def preferred_units(info) -> str:
     """
     Return unit string (i.e.: Kelvin) for a Product currently being loaded.
-    :param dsi: DocBasicDataset describing the product currently being added.
-    :return: String describing the preferred unit for the product described in dsi.
+    :param info: metadata information describing the product currently being added.
+    :return: String describing the preferred unit for the product described in info.
     """
     # FUTURE: Use cfunits or cf_units package
 
     default_temperature_unit = Unit_Strings_Kelvin[0]
-    lookup_name = dsi.get(Info.STANDARD_NAME)  # may return 'None', that's OK
+    lookup_name = info.get(Info.STANDARD_NAME)  # may return 'None', that's OK
     if lookup_name == "toa_bidirectional_reflectance":
         return "1"
     elif lookup_name in Temperature_Quantities:
@@ -184,24 +184,24 @@ def preferred_units(dsi) -> str:
         return temperature_unit
 
     else:
-        return dsi.get(Info.UNITS, None)
+        return info.get(Info.UNITS, None)
 
 
-def units_conversion(dsi):
+def units_conversion(info):
     """return UTF8 unit string, lambda v,inverse=False: convert-raw-data-to-unit,
     format string for converted value with unit."""
     # the dataset might be in one unit, but the user may want something else
     # FUTURE: Use cfunits or cf_units package
-    punits = preferred_units(dsi)
+    punits = preferred_units(info)
 
     # Conversion functions
     # FUTURE: Use cfunits or cf_units package
-    if dsi.get(Info.UNITS) in Unit_Strings_Kelvin and punits in Unit_Strings_degC:
+    if info.get(Info.UNITS) in Unit_Strings_Kelvin and punits in Unit_Strings_degC:
 
         def conv_func(x, inverse=False):
             return x - 273.15 if not inverse else x + 273.15
 
-    elif dsi.get(Info.UNITS) == "%" and punits == "1":
+    elif info.get(Info.UNITS) == "%" and punits == "1":
 
         def conv_func(x, inverse=False):
             return x / 100.0 if not inverse else x * 100.0
@@ -212,5 +212,5 @@ def units_conversion(dsi):
             return x
 
     # Format strings
-    format_func = _unit_format_func(dsi, punits)
+    format_func = _unit_format_func(info, punits)
     return punits, conv_func, format_func

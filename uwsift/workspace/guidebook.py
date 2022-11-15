@@ -202,46 +202,46 @@ class ABI_AHI_Guidebook(Guidebook):
 
         return z
 
-    def _is_refl(self, dsi):
-        return dsi.get(Info.STANDARD_NAME) == "toa_bidirectional_reflectance"
+    def _is_refl(self, info):
+        return info.get(Info.STANDARD_NAME) == "toa_bidirectional_reflectance"
 
-    def _is_bt(self, dsi):
-        return dsi.get(Info.STANDARD_NAME) in BT_STANDARD_NAMES
+    def _is_bt(self, info):
+        return info.get(Info.STANDARD_NAME) in BT_STANDARD_NAMES
 
-    def climits(self, dsi: Dict) -> Tuple:
+    def climits(self, info: Dict) -> Tuple:
         # Valid min and max for colormap use for data values in file (unconverted)
-        if self._is_refl(dsi):
+        if self._is_refl(info):
             lims = (-0.012, 1.192)
-            if dsi[Info.UNITS] == "%":
+            if info[Info.UNITS] == "%":
                 # Reflectance/visible data limits
                 lims = (lims[0] * 100.0, lims[1] * 100.0)
             return lims
-        elif self._is_bt(dsi):
+        elif self._is_bt(info):
             # BT data limits
             return -109.0 + 273.15, 55 + 273.15
-        elif "valid_min" in dsi and "valid_max" in dsi:
-            return dsi["valid_min"], dsi["valid_max"]
-        elif "flag_values" in dsi:
-            return min(dsi["flag_values"]), max(dsi["flag_values"])
-        elif "valid_range" in dsi:
-            return tuple(dsi["valid_range"])
-        elif Info.VALID_RANGE in dsi:
-            return tuple(dsi[Info.VALID_RANGE])
+        elif "valid_min" in info and "valid_max" in info:
+            return info["valid_min"], info["valid_max"]
+        elif "flag_values" in info:
+            return min(info["flag_values"]), max(info["flag_values"])
+        elif "valid_range" in info:
+            return tuple(info["valid_range"])
+        elif Info.VALID_RANGE in info:
+            return tuple(info[Info.VALID_RANGE])
         else:
             # some kind of default
             return 0.0, 255.0
 
-    def valid_range(self, dsi):
-        if "valid_min" in dsi:
-            valid_range = (dsi["valid_min"], dsi["valid_max"])
-        elif "valid_range" in dsi:
-            valid_range = dsi["valid_range"]
+    def valid_range(self, info):
+        if "valid_min" in info:
+            valid_range = (info["valid_min"], info["valid_max"])
+        elif "valid_range" in info:
+            valid_range = info["valid_range"]
         else:
-            valid_range = dsi[Info.CLIM]
-        return dsi.setdefault(Info.VALID_RANGE, valid_range)
+            valid_range = info[Info.CLIM]
+        return info.setdefault(Info.VALID_RANGE, valid_range)
 
-    def default_colormap(self, dsi):
-        return DEFAULT_COLORMAPS.get(dsi.get(Info.STANDARD_NAME), DEFAULT_UNKNOWN)
+    def default_colormap(self, info):
+        return DEFAULT_COLORMAPS.get(info.get(Info.STANDARD_NAME), DEFAULT_UNKNOWN)
 
     def _default_display_time(self, ds_info):
         # FUTURE: This can be customized by the user
