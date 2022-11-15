@@ -13,7 +13,7 @@ Workspace responsibilities include:
 - understanding projections and y, x, z coordinate systems
 - subsecting data within slicing or geospatial boundaries
 - caching useful arrays as secondary content
-- performing minimized on-demand calculations, e.g. algebraic layers, in the background
+- performing minimized on-demand calculations, e.g. datasets for algebraic layers, in the background
 - use Importers to bring content arrays into the workspace from external resources, also in the background
 - maintain a metadatabase of what products have in-workspace content, and what products are available
   from external resources
