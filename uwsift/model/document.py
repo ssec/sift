@@ -309,8 +309,8 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 # active_content_data is none if all segments are already loaded
                 # and there is nothing new to import
                 if active_content_data:
-                    dataset = self[merge_target_uuid]
-                    self.didUpdateBasicDataset.emit(merge_target_uuid, dataset[Info.KIND])
+                    dataset_info = self[merge_target_uuid]
+                    self.didUpdateBasicDataset.emit(merge_target_uuid, dataset_info[Info.KIND])
             elif uuid in self._info_by_uuid:
                 LOG.warning("dataset with UUID {} already in document?".format(uuid))
                 self._workspace.get_content(uuid)
