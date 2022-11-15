@@ -243,24 +243,24 @@ class ABI_AHI_Guidebook(Guidebook):
     def default_colormap(self, info):
         return DEFAULT_COLORMAPS.get(info.get(Info.STANDARD_NAME), DEFAULT_UNKNOWN)
 
-    def _default_display_time(self, ds_info):
+    def _default_display_time(self, info):
         # FUTURE: This can be customized by the user
-        when = ds_info.get(Info.SCHED_TIME, ds_info.get(Info.OBS_TIME))
+        when = info.get(Info.SCHED_TIME, info.get(Info.OBS_TIME))
         if when is None:
             dtime = "--:--:--"
-        elif "model_time" in ds_info:
-            dtime = "{}Z +{}h".format(ds_info["model_time"].strftime("%Y-%m-%d %H:%M"), when.strftime("%H"))
+        elif "model_time" in info:
+            dtime = "{}Z +{}h".format(info["model_time"].strftime("%Y-%m-%d %H:%M"), when.strftime("%H"))
         else:
             dtime = when.strftime("%Y-%m-%d %H:%M:%S")
         return dtime
 
-    def _default_display_name(self, ds_info, display_time=None):
+    def _default_display_name(self, info, display_time=None):
         # FUTURE: This can be customized by the user
-        sat = ds_info[Info.PLATFORM]
-        inst = ds_info[Info.INSTRUMENT]
-        name = ds_info.get(Info.SHORT_NAME, "-unknown-")
+        sat = info[Info.PLATFORM]
+        inst = info[Info.INSTRUMENT]
+        name = info.get(Info.SHORT_NAME, "-unknown-")
 
-        label = ds_info.get(Info.STANDARD_NAME, "")
+        label = info.get(Info.STANDARD_NAME, "")
         if label == "toa_bidirectional_reflectance":
             label = "Refl"
         elif label == "toa_brightness_temperature":
@@ -269,7 +269,7 @@ class ABI_AHI_Guidebook(Guidebook):
             label = ""
 
         if display_time is None:
-            display_time = ds_info.get(Info.DISPLAY_TIME, self._default_display_time(ds_info))
+            display_time = info.get(Info.DISPLAY_TIME, self._default_display_time(info))
         name = "{sat} {inst} {name} {standard_name} {dtime}".format(
             sat=sat.value, inst=inst.value, name=name, standard_name=label, dtime=display_time
         )
