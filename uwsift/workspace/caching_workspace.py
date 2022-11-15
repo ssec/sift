@@ -328,26 +328,26 @@ class CachingWorkspace(BaseWorkspace):
             return [q.uuid for q in s.query(Product).all()]
 
     # ----------------------------------------------------------------------
-    def get_info(self, dsi_or_uuid, lod=None) -> Optional[frozendict]:
+    def get_info(self, info_or_uuid, lod=None) -> Optional[frozendict]:
         """
-        :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
+        :param info_or_uuid: existing datasetinfo dictionary, or its UUID
         :param lod: desired level of detail to focus
         :return: metadata access with mapping semantics, to be treated as read-only
         """
         from collections import ChainMap
 
         # FUTURE deprecate this
-        if isinstance(dsi_or_uuid, str):
-            uuid = UUID(dsi_or_uuid)
-        elif not isinstance(dsi_or_uuid, UUID):
-            uuid = dsi_or_uuid[Info.UUID]
+        if isinstance(info_or_uuid, str):
+            uuid = UUID(info_or_uuid)
+        elif not isinstance(info_or_uuid, UUID):
+            uuid = info_or_uuid[Info.UUID]
         else:
-            uuid = dsi_or_uuid
+            uuid = info_or_uuid
         with self._inventory as s:
             # look up the product for that uuid
             prod = self._product_with_uuid(s, uuid)
             if not prod:  # then it hasn't had its metadata scraped
-                LOG.error("no info available for UUID {}".format(dsi_or_uuid))
+                LOG.error("no info available for UUID {}".format(info_or_uuid))
                 LOG.error("known products: {}".format(repr(self._all_product_uuids())))
                 return None
             kind = prod.info[Info.KIND]
@@ -683,21 +683,21 @@ class CachingWorkspace(BaseWorkspace):
         LOG.debug(f"Active Content after deletion: {list(self._available.keys())}")
         yield {TASK_DOING: "purging memory", TASK_PROGRESS: 1.0}
 
-    def get_content(self, dsi_or_uuid, lod=None, kind: Kind = Kind.IMAGE) -> Optional[np.memmap]:
+    def get_content(self, info_or_uuid, lod=None, kind: Kind = Kind.IMAGE) -> Optional[np.memmap]:
         """
         By default, get the best-available (closest to native) np.ndarray-compatible view of the full dataset
-        :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
+        :param info_or_uuid: existing datasetinfo dictionary, or its UUID
         :param lod: desired level of detail to focus  (0 for overview)
         :return:
         """
-        if dsi_or_uuid is None:
+        if info_or_uuid is None:
             return None
-        elif isinstance(dsi_or_uuid, UUID):
-            uuid = dsi_or_uuid
-        elif isinstance(dsi_or_uuid, str):
-            uuid = UUID(dsi_or_uuid)
+        elif isinstance(info_or_uuid, UUID):
+            uuid = info_or_uuid
+        elif isinstance(info_or_uuid, str):
+            uuid = UUID(info_or_uuid)
         else:
-            uuid = dsi_or_uuid[Info.UUID]
+            uuid = info_or_uuid[Info.UUID]
         # TODO: this causes a locking exception when run in a secondary thread.
         #  Keeping background operations lightweight makes sense however, so just review this
         with self._inventory as s:
@@ -714,7 +714,7 @@ class CachingWorkspace(BaseWorkspace):
 
             content = [x for x in content if x.info.get(Info.KIND, Kind.IMAGE) == kind]
             if len(content) != 1:
-                LOG.warning("More than one matching Content object for '{}'".format(dsi_or_uuid))
+                LOG.warning("More than one matching Content object for '{}'".format(info_or_uuid))
             if not len(content) or not content[0]:
                 raise AssertionError("no content in workspace for {}, must re-import".format(uuid))
             content = content[0]

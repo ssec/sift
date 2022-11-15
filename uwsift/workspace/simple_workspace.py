@@ -123,23 +123,23 @@ class SimpleWorkspace(BaseWorkspace):
     def _all_product_uuids(self) -> list:
         return [self.products[p] for p in self.products]
 
-    def get_info(self, dsi_or_uuid, lod=None) -> Optional[frozendict]:
+    def get_info(self, info_or_uuid, lod=None) -> Optional[frozendict]:
         """
-        :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
+        :param info_or_uuid: existing datasetinfo dictionary, or its UUID
         :param lod: desired level of detail to focus
         :return: metadata access with mapping semantics, to be treated as read-only
         """
         # FUTURE deprecate this
-        if isinstance(dsi_or_uuid, str):
-            uuid = UUID(dsi_or_uuid)
-        elif not isinstance(dsi_or_uuid, UUID):
-            uuid = dsi_or_uuid[Info.UUID]
+        if isinstance(info_or_uuid, str):
+            uuid = UUID(info_or_uuid)
+        elif not isinstance(info_or_uuid, UUID):
+            uuid = info_or_uuid[Info.UUID]
         else:
-            uuid = dsi_or_uuid
+            uuid = info_or_uuid
 
         prod = self._product_with_uuid(None, uuid)
         if not prod:  # then it hasn't had its metadata scraped
-            LOG.error("no info available for UUID {}".format(dsi_or_uuid))
+            LOG.error("no info available for UUID {}".format(info_or_uuid))
             LOG.error("known products: {}".format(repr(self._all_product_uuids())))
             return None
         kind = prod.info[Info.KIND]
@@ -436,22 +436,22 @@ class SimpleWorkspace(BaseWorkspace):
         LOG.debug(f"Active Content after deletion: {list(self._available.keys())}")
         yield {TASK_DOING: "purging memory", TASK_PROGRESS: 1.0}
 
-    def get_content(self, dsi_or_uuid, lod=None, kind: Kind = Kind.IMAGE) -> Optional[np.memmap]:
+    def get_content(self, info_or_uuid, lod=None, kind: Kind = Kind.IMAGE) -> Optional[np.memmap]:
         """
         By default, get the best-available (closest to native)
         np.ndarray-compatible view of the full dataset
-        :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
+        :param info_or_uuid: existing datasetinfo dictionary, or its UUID
         :param lod: desired level of detail to focus  (0 for overview)
         :return:
         """
-        if dsi_or_uuid is None:
+        if info_or_uuid is None:
             return None
-        elif isinstance(dsi_or_uuid, UUID):
-            uuid = dsi_or_uuid
-        elif isinstance(dsi_or_uuid, str):
-            uuid = UUID(dsi_or_uuid)
+        elif isinstance(info_or_uuid, UUID):
+            uuid = info_or_uuid
+        elif isinstance(info_or_uuid, str):
+            uuid = UUID(info_or_uuid)
         else:
-            uuid = dsi_or_uuid[Info.UUID]
+            uuid = info_or_uuid[Info.UUID]
 
         # The current implementation, where self.contents is a dict, cannot
         # support multiple contents per Product/UUID which seems to be prepared
