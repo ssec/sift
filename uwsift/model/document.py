@@ -242,7 +242,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             # basic band
             subcat = uuid_or_info[Info.CENTRAL_WAVELENGTH]
         else:
-            # higher level product or algebraic layer
+            # higher level product or algebraic dataset
             subcat = uuid_or_info[Info.DATASET_NAME]
         return "{}:{}:{}:{}".format(kind.name, refpoint, measurement, subcat)
 
@@ -312,7 +312,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                     dataset = self[merge_target_uuid]
                     self.didUpdateBasicDataset.emit(merge_target_uuid, dataset[Info.KIND])
             elif uuid in self._info_by_uuid:
-                LOG.warning("layer with UUID {} already in document?".format(uuid))
+                LOG.warning("dataset with UUID {} already in document?".format(uuid))
                 self._workspace.get_content(uuid)
             else:
                 self.activate_product_uuid_as_new_dataset(uuid, insert_before=insert_before, **importer_kwargs)

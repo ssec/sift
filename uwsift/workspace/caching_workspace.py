@@ -356,7 +356,7 @@ class CachingWorkspace(BaseWorkspace):
             if native_content is not None:
                 # FUTURE: this is especially saddening; upgrade to finer grained query and/or deprecate .get_info
                 # once upon a time...
-                # our old model was that product == content and shares a UUID with the layer
+                # our old model was that product == content and shares a UUID with the dataset
                 # if content is available, we want to provide native content metadata along with the product metadata
                 # specifically a lot of client code assumes that resource == product == content and
                 # that singular navigation (e.g. cell_size) is norm

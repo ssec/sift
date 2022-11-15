@@ -259,8 +259,8 @@ class Product(Base):
         "_key_values", "value", creator=lambda key, value: ProductKeyValue(key=key, value=value)
     )
 
-    # derived / algebraic layers have a symbol table and an expression
-    # typically Content objects for algebraic layers cache calculation output
+    # derived / algebraic datasets have a symbol table and an expression
+    # typically Content objects for algebraic datasets cache calculation output
     symbol = relationship("SymbolKeyValue", backref=backref("product"), cascade="all, delete-orphan")
     expression = Column(Unicode, nullable=True)
 

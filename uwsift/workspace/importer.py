@@ -636,7 +636,7 @@ class SatpyImporter(aImporter):
         attrs[Info.SHAPE] = shape if not self.resampling_info else self.resampling_info["shape"]
         attrs[Info.UNITS] = attrs.get("units")
         if attrs[Info.UNITS] == "unknown":
-            LOG.warning("Layer units are unknown, using '1'")
+            LOG.warning("Dataset units are unknown, using '1'")
             attrs[Info.UNITS] = 1
         generate_guidebook_metadata(attrs)
 
@@ -1232,7 +1232,7 @@ class SatpyImporter(aImporter):
         in ascending order and produce an data array with the last segments data
         first.
         :param segments_data: the segments data as provided by Satpy importer
-        :param image_data: the layer data where the segments are merged into
+        :param image_data: the dataset data where the segments are merged into
         :param segments_indices: list of segments whose data is to be merged
         Note: this is not the highest segment number in the current segments
         list but the highest segment number which can appear for the product.

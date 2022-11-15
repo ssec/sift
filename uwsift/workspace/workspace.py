@@ -715,8 +715,8 @@ class BaseWorkspace(QObject):
 
     def get_content_coordinate_mask(self, uuid: UUID, coords_mask):
         data = self.get_content(uuid)
-        trans = self._create_layer_affine(uuid)
-        p = self.layer_proj(uuid)
+        trans = self._create_dataset_affine(uuid)
+        p = self.dataset_proj(uuid)
         # coords_mask is (Y, X) like a numpy array
         coords_mask = p(coords_mask[1], coords_mask[0])[::-1]
         index_mask = (
@@ -742,7 +742,7 @@ class BaseWorkspace(QObject):
         contains the positions of the points. The second array represents the
         attribute.
 
-        :param uuid: UUID of the layer
+        :param uuid: UUID of the dataset
         :return: Tuple of a position array and maybe an attribute array
         """
         content = self.get_content(uuid, kind=Kind.POINTS)
@@ -765,7 +765,7 @@ class BaseWorkspace(QObject):
         contains positions for the tip and base of the lines. The second array
         represents the attribute.
 
-        :param uuid: UUID of the layer
+        :param uuid: UUID of the dataset
         :return: Tuple of a lines array and maybe an attribute array
         """
         content = self.get_content(uuid, kind=Kind.LINES)

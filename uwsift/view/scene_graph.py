@@ -1009,7 +1009,7 @@ class SceneGraphManager(QObject):
 
         pos, values = self.workspace.get_points_arrays(product_dataset.uuid)
         if pos is None:
-            LOG.info(f"layer contains no points: {product_dataset.uuid}")
+            LOG.info(f"dataset contains no points: {product_dataset.uuid}")
             return
 
         kwargs = map_point_style_to_marker_kwargs(get_point_style_by_name(layer.presentation.style))
@@ -1055,9 +1055,9 @@ class SceneGraphManager(QObject):
     def change_node_for_composite_dataset(self, layer: LayerItem, product_dataset: ProductDataset):
         if layer.kind == Kind.RGB:
             if product_dataset.uuid in self.dataset_nodes:
-                # RGB selection has changed, rebuild the layer
+                # RGB selection has changed, rebuild the dataset
                 LOG.debug(
-                    f"Changing existing composite layer to"
+                    f"Changing existing composite dataset to"
                     f" Scene Graph Manager with UUID:"
                     f" {product_dataset.uuid}"
                 )
@@ -1093,12 +1093,12 @@ class SceneGraphManager(QObject):
 
     def update_basic_dataset(self, uuid: UUID, kind: Kind):
         """
-        Push the data (content) of a basic layer again to the associated scene
+        Push the data (content) of a basic dataset again to the associated scene
         graph node.
 
-        This method shall be called whenever the data of a basic layer changes.
-        :param uuid: identifier of the layer
-        :param kind: kind of the layer / data content.
+        This method shall be called whenever the data of a basic dataset changes.
+        :param uuid: identifier of the dataset
+        :param kind: kind of the dataset / data content.
         """
         layer = self.document[uuid]
         dataset_node = self.dataset_nodes[layer[Info.UUID]]
@@ -1161,7 +1161,7 @@ class SceneGraphManager(QObject):
     def purge_dataset(self, uuid_removed: UUID):
         """
         Dataset has been purged from document (no longer used anywhere) - flush it all out
-        :param uuid_removed: UUID of the layer that is to be removed
+        :param uuid_removed: UUID of the dataset that is to be removed
         :return:
         """
         if uuid_removed in self.dataset_nodes:
@@ -1199,7 +1199,7 @@ class SceneGraphManager(QObject):
         dataset_node.visible = not dataset_node.visible if visible is None else visible
 
     def on_view_change(self, scheduler):
-        """Simple event handler for when we need to reassess image layers."""
+        """Simple event handler for when we need to reassess image datasets."""
         # Stop the timer so it doesn't continuously call this slot
         if scheduler:
             scheduler.stop()
@@ -1225,7 +1225,7 @@ class SceneGraphManager(QObject):
         self.queue.add(
             str(uuid) + "_retile",
             self._retile_child(uuid, preferred_stride, tile_box),
-            "Retile calculations for image layer " + str(uuid),
+            "Retile calculations for image dataset" + str(uuid),
             interactive=True,
         )
 
@@ -1259,7 +1259,7 @@ class SceneGraphManager(QObject):
         self.workspace.bgnd_task_complete()  # FUTURE: consider a threading context manager for this??
 
     def _set_retiled(self, uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords):
-        """Slot to take data from background thread and apply it to the layer living in the image layer."""
+        """Slot to take data from background thread and apply it to the dataset living in the image dataset."""
         child = self.dataset_nodes.get(uuid, None)
         if child is None:
             LOG.warning("unable to find uuid %s in dataset_nodes" % uuid)

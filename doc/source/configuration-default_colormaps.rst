@@ -1,8 +1,8 @@
-Configuring a Colormap Based on the Layer Standard Name
+Configuring a Colormap Based on the Dataset Standard Name
 -------------------------------------------------------
 
 MTG-SIFT automatically associates a colormap to a newly loaded dataset based on
-the standard name of each data layer via its internal *Guidebook*. This
+the standard name of each dataset via its internal *Guidebook*. This
 association can be overwritten by configuring a different colormaps as follows::
 
     default_colormaps:

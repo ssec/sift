@@ -48,13 +48,13 @@ The following would be an explicit definition of the default marker style::
         stroke: white
         stroke-width: 1px
 
-Configuring Point Styles Based on the Layer Standard Name
+Configuring Point Styles Based on the Dataset Standard Name
 ---------------------------------------------------------
 
 Analogous to the default colormap configuration the style of the markers used to
 render a dataset can (and - since there are no default definitions in the
 MTG-SIFT's internal *Guidebook* for this - should) be configured by associating a
-named points style to the standard name of each points data layer::
+named points style to the standard name of each points dataset::
 
     default_point_styles:
       STANDARD_NAME_1: STYLE_NAME_1
