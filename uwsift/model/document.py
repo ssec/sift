@@ -295,10 +295,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         if not total_products:
             raise ValueError("no products available in {}".format(paths))
 
-        if isinstance(self._workspace, CachingWorkspace):
-            # reverse list since we always insert a top layer
-            uuids = list(reversed(self.sort_product_uuids(uuids)))
-
         # collect product and resource information but don't yet import content
         for dex, uuid in enumerate(uuids):
             merge_target_uuid = merge_target_uuids[uuid]
