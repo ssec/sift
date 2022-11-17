@@ -17,9 +17,10 @@ from PyQt5.QtCore import (
 
 from uwsift.common import DEFAULT_TIME_FORMAT
 
+INVALID_QModelIndex = QModelIndex()
+
 
 class QmlLayerManager(QObject):
-
     layerToDisplayChanged = pyqtSignal()
     layerModelChanged = pyqtSignal()
     convFuncModelChanged = pyqtSignal()
@@ -204,7 +205,7 @@ class LayerModel(QAbstractListModel):
         if role == Qt.DisplayRole:
             return self._layer_strings[index.row()]
 
-    def rowCount(self, parent=None):
+    def rowCount(self, parent: QModelIndex = INVALID_QModelIndex) -> int:  # noqa
         return len(self._layer_strings)
 
 
@@ -228,7 +229,7 @@ class TimebaseModel(QAbstractListModel):
         if role == Qt.DisplayRole:
             return self._timestamps[index.row()]
 
-    def rowCount(self, parent=None):
+    def rowCount(self, parent: QModelIndex = INVALID_QModelIndex) -> int:  # noqa
         return len(self._timestamps)
 
     @pyqtSlot(int, result=QDateTime)
@@ -276,7 +277,7 @@ class TimebaseModel(QAbstractListModel):
 
         If no data is loaded, there is no way to specify a time interval for
         the data. Create some dummy time steps as a substitute.
-        
+
         These QDateTime steps are not meant to be drawn with time markers for
         data. They only assist drawing the QML timeline.
 
@@ -290,7 +291,6 @@ class TimebaseModel(QAbstractListModel):
 
 
 class QmlBackend(QObject):
-
     doRefreshTimeline = pyqtSignal()
     doLoadTimeline = pyqtSignal()
     doClearTimeline = pyqtSignal()
