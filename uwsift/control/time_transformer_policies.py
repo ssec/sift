@@ -64,7 +64,7 @@ class WrappingDrivingPolicy(QObject):
 
     @property
     def timeline_length(self):
-        return len(self._timeline)
+        return 0 if not self._timeline else len(self._timeline)
 
     @property
     def driving_layer(self):
