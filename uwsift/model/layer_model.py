@@ -57,7 +57,7 @@ class LayerModel(QAbstractItemModel):
     didDeleteProductDataset = pyqtSignal(list)
     # ---------------------- Request creation of Recipes -----------------------
     # object should be a List[Optional[UUID]]
-    didRequestCompositeRecipeCreation = pyqtSignal(object)
+    didRequestRGBCompositeRecipeCreation = pyqtSignal(object)
     # object should be a List[Optional[UUID]]
     didRequestAlgebraicRecipeCreation = pyqtSignal(object)
     # ---------------------- Request change of Recipes -------------------------
@@ -733,7 +733,7 @@ class LayerModel(QAbstractItemModel):
         # TODO: case when layers list has less then 3 elements
         # layers = []
 
-        self.didRequestCompositeRecipeCreation.emit(layers)
+        self.didRequestRGBCompositeRecipeCreation.emit(layers)
 
     def update_recipe_layer_name(self, recipe: Recipe):
         recipe_layer: LayerItem = self._get_layer_of_recipe(recipe.id)

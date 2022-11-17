@@ -904,7 +904,7 @@ class Main(QtWidgets.QMainWindow):
 
     def _init_recipe_manager(self):
         self.recipe_manager = RecipeManager()
-        self.layer_model.didRequestCompositeRecipeCreation.connect(self.recipe_manager.create_rgb_recipe)
+        self.layer_model.didRequestRGBCompositeRecipeCreation.connect(self.recipe_manager.create_rgb_recipe)
         self.layer_model.didRequestAlgebraicRecipeCreation.connect(self.recipe_manager.create_algebraic_recipe)
         self.recipe_manager.didCreateRGBCompositeRecipe.connect(self.layer_model.create_rgb_composite_layer)
         self.recipe_manager.didCreateAlgebraicRecipe.connect(self.layer_model.create_algebraic_composite_layer)
