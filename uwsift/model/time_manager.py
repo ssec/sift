@@ -3,7 +3,6 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
-from dateutil.relativedelta import relativedelta
 from PyQt5.QtCore import QDateTime, QObject, pyqtSignal
 
 from uwsift.control.qml_utils import QmlBackend, QmlLayerManager, TimebaseModel
@@ -47,14 +46,8 @@ class TimeManager(QObject):
         self.qml_layer_manager: QmlLayerManager = QmlLayerManager()
         self.current_timebase_uuid = None
 
-        self.qml_timestamps_model = TimebaseModel(timestamps=self._get_default_qdts())
+        self.qml_timestamps_model = TimebaseModel(timestamps=TimebaseModel._get_default_qdts())
         self._time_transformer: Optional[TimeTransformer] = None
-
-    @staticmethod
-    def _get_default_qdts(steps=5):
-        now_dt = datetime.now()
-        now_dt = datetime(now_dt.year, now_dt.month, now_dt.day, now_dt.hour)
-        return list(map(lambda dt: QDateTime(dt), [now_dt + relativedelta(hours=i) for i in range(steps)]))
 
     @property
     def qml_backend(self) -> QmlBackend:
@@ -179,7 +172,7 @@ class TimeManager(QObject):
                     that ingests a policy and handles UI based on that?
         """
         if not layer or not layer.dynamic:
-            new_timestamp_qdts = self._get_default_qdts()
+            new_timestamp_qdts = TimebaseModel._get_default_qdts()
         else:
             new_timestamp_qdts = list(map(lambda dt: QDateTime(dt), layer.timeline.keys()))
 

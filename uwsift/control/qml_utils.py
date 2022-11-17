@@ -1,7 +1,9 @@
 import sys
+from datetime import datetime
 from typing import Callable, Dict, List, Optional
 
 import numpy as np
+from dateutil.relativedelta import relativedelta
 from PyQt5.QtCore import (
     QAbstractListModel,
     QDateTime,
@@ -263,6 +265,24 @@ class TimebaseModel(QAbstractListModel):
         self.changePersistentIndexList(from_index_list, to_index_list)
         self.layoutChanged.emit()
         self.timebaseChanged.emit()
+
+    @staticmethod
+    def _get_default_qdts(steps=5):
+        """Generate default QDateTime steps.
+
+        If no data is loaded, there is no way to specify a time interval for
+        the data. Create some dummy time steps as a substitute.
+        
+        These QDateTime steps are not meant to be drawn with time markers for
+        data. They only assist drawing the QML timeline.
+
+        :param steps: Number of QDateTime objects to be generated
+        :return: List of generated QDateTime objects
+
+        """
+        now_dt = datetime.utcnow()
+        now_dt = datetime(now_dt.year, now_dt.month, now_dt.day, now_dt.hour)
+        return list(map(lambda dt: QDateTime(dt), [now_dt + relativedelta(hours=i) for i in range(steps)]))
 
 
 class QmlBackend(QObject):
