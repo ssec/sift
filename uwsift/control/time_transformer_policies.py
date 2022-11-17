@@ -157,12 +157,16 @@ class WrappingDrivingPolicy(QObject):
                to a valid integer:
                looking up the driving layer's timestamp at the provided index
                location
+
+        In case the timeline is empty (None or empty list) return the current time (in UTC).
         """
         if backwards:
-            self._driving_idx = (self._driving_idx + (self.timeline_length - 1)) % self.timeline_length
+            self._driving_idx -= 1
+            if self._driving_idx < 0:
+                self._driving_idx = self.timeline_length - 1
         else:
             self._driving_idx += 1
             if self._driving_idx >= self.timeline_length:
                 self._driving_idx = 0
-        self._curr_t_sim = self.timeline[self._driving_idx]
+        self._curr_t_sim = self.timeline[self._driving_idx] if self.timeline_length > 0 else datetime.utcnow()
         return self._curr_t_sim
