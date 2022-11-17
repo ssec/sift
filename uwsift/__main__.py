@@ -904,29 +904,43 @@ class Main(QtWidgets.QMainWindow):
 
     def _init_recipe_manager(self):
         self.recipe_manager = RecipeManager()
+
+        # RGB Composites ------------------------------------------------------
         self.layer_model.didRequestRGBCompositeRecipeCreation.connect(self.recipe_manager.create_rgb_recipe)
-        self.layer_model.didRequestAlgebraicRecipeCreation.connect(self.recipe_manager.create_algebraic_recipe)
         self.recipe_manager.didCreateRGBCompositeRecipe.connect(self.layer_model.create_rgb_composite_layer)
-        self.recipe_manager.didCreateAlgebraicRecipe.connect(self.layer_model.create_algebraic_composite_layer)
-        self.recipe_manager.didUpdateAlgebraicInputLayers.connect(self.layer_model.update_recipe_layer_timeline)
+        self.rgb_config_pane.didChangeRecipeName.connect(self.recipe_manager.update_recipe_name)
+        #   regarding name change notification recipe_manager -> layer_model: see 'Common' below
+
         self.rgb_config_pane.didChangeRGBInputLayers.connect(self.recipe_manager.update_rgb_recipe_input_layers)
         self.recipe_manager.didUpdateRGBInputLayers.connect(self.layer_model.update_recipe_layer_timeline)
+
         self.rgb_config_pane.didChangeRGBColorLimits.connect(self.recipe_manager.update_rgb_recipe_color_limits)
         self.recipe_manager.didUpdateRGBColorLimits.connect(self.layer_model.update_rgb_layer_color_limits)
+
         self.rgb_config_pane.didChangeRGBGamma.connect(self.recipe_manager.update_rgb_recipe_gammas)
         self.recipe_manager.didUpdateRGBGamma.connect(self.layer_model.update_rgb_layer_gamma)
-        self.rgb_config_pane.didChangeRecipeName.connect(self.recipe_manager.update_recipe_name)
+
+        # Algebraics ----------------------------------------------------------
+        self.layer_model.didRequestAlgebraicRecipeCreation.connect(self.recipe_manager.create_algebraic_recipe)
+        self.recipe_manager.didCreateAlgebraicRecipe.connect(self.layer_model.create_algebraic_composite_layer)
         self.algebraic_config_pane.didChangeRecipeName.connect(self.recipe_manager.update_recipe_name)
-        self.recipe_manager.didUpdateRecipeName.connect(self.layer_model.update_recipe_layer_name)
+        #   regarding name change notification recipe_manager -> layer_model: see 'Common' below
+
         self.algebraic_config_pane.didChangeAlgebraicInputLayers.connect(
             self.recipe_manager.update_algebraic_recipe_input_layers
         )
+        self.recipe_manager.didUpdateAlgebraicInputLayers.connect(self.layer_model.update_recipe_layer_timeline)
+
         self.algebraic_config_pane.didChangeAlgebraicOperationKind.connect(
             self.recipe_manager.update_algebraic_recipe_operation_kind
         )
         self.algebraic_config_pane.didChangeAlgebraicOperationFormula.connect(
             self.recipe_manager.update_algebraic_recipe_operation_formula
         )
+
+        # Common --------------------------------------------------------------
+        self.recipe_manager.didUpdateRecipeName.connect(self.layer_model.update_recipe_layer_name)
+
         self.layer_model.willRemoveLayer.connect(self.recipe_manager.remove_layer_as_recipe_input)
 
     def _init_layer_panes(self):

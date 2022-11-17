@@ -209,13 +209,15 @@ class AlgebraicRecipe(Recipe):
 
 
 class RecipeManager(QObject):
+    # RGB Composites
     didCreateRGBCompositeRecipe = pyqtSignal(CompositeRecipe)
-    didCreateAlgebraicRecipe = pyqtSignal(AlgebraicRecipe)
-    didUpdateAlgebraicInputLayers = pyqtSignal(AlgebraicRecipe)
-
     didUpdateRGBInputLayers = pyqtSignal(CompositeRecipe)
     didUpdateRGBColorLimits = pyqtSignal(CompositeRecipe)
     didUpdateRGBGamma = pyqtSignal(CompositeRecipe)
+    # Algebraics
+    didCreateAlgebraicRecipe = pyqtSignal(AlgebraicRecipe)
+    didUpdateAlgebraicInputLayers = pyqtSignal(AlgebraicRecipe)
+    # Common
     didUpdateRecipeName = pyqtSignal(Recipe)
 
     def __init__(self, parent=None, config_dir=None):
