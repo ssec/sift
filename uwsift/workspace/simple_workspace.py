@@ -445,9 +445,15 @@ class SimpleWorkspace(BaseWorkspace):
         from uwsift.queue import TASK_DOING, TASK_PROGRESS
 
         yield {TASK_DOING: "purging memory", TASK_PROGRESS: 0.5}
+        LOG.debug(f"Products before deletion: {list(self.products.keys())}")
+        LOG.debug(f"Contents before deletion: {list(self.contents.keys())}")
+        LOG.debug(f"Active Content before deletion: {list(self._available.keys())}")
         self._deactivate_content_for_product(self._product_with_uuid(None, uuid))
         self.contents.pop(uuid, None)
         self.products.pop(uuid, None)
+        LOG.debug(f"Products after deletion: {list(self.products.keys())}")
+        LOG.debug(f"Contents after deletion: {list(self.contents.keys())}")
+        LOG.debug(f"Active Content after deletion: {list(self._available.keys())}")
         yield {TASK_DOING: "purging memory", TASK_PROGRESS: 1.0}
 
     def get_content(self, dsi_or_uuid, lod=None, kind: Kind = Kind.IMAGE) -> Optional[np.memmap]:

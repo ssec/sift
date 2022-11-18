@@ -717,6 +717,14 @@ class Document(QObject):  # base class is rightmost, mixins left of that
                 # remove from workspace
                 self._workspace.remove(uuid)
 
+    def remove_dataset_info(self, uuid: UUID):
+        """Remove the info of a dataset because it is no longer needed
+
+        :param uuid: UUID of the dataset which is removed
+        """
+        LOG.debug(f"Remove dataset info of  uuid {uuid}")
+        self._info_by_uuid.pop(uuid, None)
+
     def _filter(self, seq, reference, keys):
         "filter a sequence of metadata dictionaries to matching keys with reference"
         for md in seq:

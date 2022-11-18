@@ -18,7 +18,8 @@ class WrappingDrivingPolicy(QObject):
     no more timestamps in the driving layer it starts over from the first timestamp.
     """
 
-    didUpdatePolicy = pyqtSignal(LayerItem)
+    # should be a LayerItem, but it could be None, too. It can be None if no driving layer could be chosen
+    didUpdatePolicy = pyqtSignal(object)
 
     def __init__(self, layers: List[LayerItem]):
         super().__init__()
@@ -63,7 +64,7 @@ class WrappingDrivingPolicy(QObject):
 
     @property
     def timeline_length(self):
-        return len(self._timeline)
+        return 0 if not self._timeline else len(self._timeline)
 
     @property
     def driving_layer(self):
@@ -73,6 +74,8 @@ class WrappingDrivingPolicy(QObject):
     def driving_layer(self, layer: LayerItem):
         if not layer or not layer.dynamic:
             self._driving_layer = None
+            self._driving_idx = 1
+            self._timeline = None
         elif not self._driving_layer:
             self._driving_layer = layer
             self.timeline = list(self._driving_layer.timeline.keys())
@@ -154,12 +157,16 @@ class WrappingDrivingPolicy(QObject):
                to a valid integer:
                looking up the driving layer's timestamp at the provided index
                location
+
+        In case the timeline is empty (None or empty list) return the current time (in UTC).
         """
         if backwards:
-            self._driving_idx = (self._driving_idx + (self.timeline_length - 1)) % self.timeline_length
+            self._driving_idx -= 1
+            if self._driving_idx < 0:
+                self._driving_idx = self.timeline_length - 1
         else:
             self._driving_idx += 1
             if self._driving_idx >= self.timeline_length:
                 self._driving_idx = 0
-        self._curr_t_sim = self.timeline[self._driving_idx]
+        self._curr_t_sim = self.timeline[self._driving_idx] if self.timeline_length > 0 else datetime.utcnow()
         return self._curr_t_sim

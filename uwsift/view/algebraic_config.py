@@ -84,11 +84,11 @@ class AlgebraicLayerConfigPane(QObject):
             self._set_combos_to_layer_names()
 
     def layer_removed(self, layer_uuid):
-        for idx in range(len(self._layer_uuids)):
-            if self._layer_uuids[idx] == layer_uuid:
-                del self._layer_uuids[idx]
-                self._set_combos_to_layer_names()
-                self._show_settings_for_layer(self.recipe)
+        if layer_uuid in self._layer_uuids:
+            idx = self._layer_uuids.index(layer_uuid)
+            del self._layer_uuids[idx]
+            self._set_combos_to_layer_names()
+            self._show_settings_for_layer(self.recipe)
 
     def _combo_changed(self, index, combo: QComboBox = None, channel=None):
         layer_uuid = combo.itemData(index)

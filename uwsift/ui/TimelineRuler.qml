@@ -303,10 +303,11 @@ Rectangle{
         renderStrategy: Canvas.Threaded
 
         onPaint: {
+            var context = getContext("2d");
+            context.reset();
+
             if (dataLoaded){
                 updateTimelineCursorPosition()
-                var context = getContext("2d");
-                context.reset();
                 let markerColor = Qt.darker(Qt.rgba(1, 0, 0, 1), 1);
                 context.strokeStyle = markerColor;
                 context.fillStyle = markerColor;
@@ -352,6 +353,13 @@ Rectangle{
                 timelineMarkerCanvas.currIndex = 0;
                 timelineMarkerCanvas.updateMarkerBlueprints();
                 timelineMarkerCanvas.requestPaint();
+            }
+        }
+
+        Connections{
+            target: timebaseModel
+            onReturnToInitialState: {
+               timelineMarkerCanvas.dataLoaded = false;
             }
         }
 

@@ -1,7 +1,9 @@
 import sys
+from datetime import datetime
 from typing import Callable, Dict, List, Optional
 
 import numpy as np
+from dateutil.relativedelta import relativedelta
 from PyQt5.QtCore import (
     QAbstractListModel,
     QDateTime,
@@ -15,9 +17,10 @@ from PyQt5.QtCore import (
 
 from uwsift.common import DEFAULT_TIME_FORMAT
 
+INVALID_QModelIndex = QModelIndex()
+
 
 class QmlLayerManager(QObject):
-
     layerToDisplayChanged = pyqtSignal()
     layerModelChanged = pyqtSignal()
     convFuncModelChanged = pyqtSignal()
@@ -202,7 +205,7 @@ class LayerModel(QAbstractListModel):
         if role == Qt.DisplayRole:
             return self._layer_strings[index.row()]
 
-    def rowCount(self, parent=None):
+    def rowCount(self, parent: QModelIndex = INVALID_QModelIndex) -> int:  # noqa
         return len(self._layer_strings)
 
 
@@ -210,15 +213,13 @@ class TimebaseModel(QAbstractListModel):
     modelChanged = pyqtSignal()
     timebaseChanged = pyqtSignal()
     currentTimestampChanged = pyqtSignal(str)
+    returnToInitialState = pyqtSignal()
 
-    def __init__(self, *args, timestamps: List[QDateTime] = None, **kwargs):
+    def __init__(self, *args, timestamps: List[QDateTime], **kwargs):
         super().__init__(*args, **kwargs)
-        if timestamps is None:
-            timestamps = []
-        self._timestamps = None
-        self.timestamps = timestamps
-        self._current_timestamp = None
         self._format_str = DEFAULT_TIME_FORMAT
+        self.timestamps = timestamps  # sets self._timestamps
+        self.currentTimestamp = None  # sets self._current_timestamp
 
     @pyqtProperty("QVariantList", notify=modelChanged)
     def model(self):
@@ -228,7 +229,7 @@ class TimebaseModel(QAbstractListModel):
         if role == Qt.DisplayRole:
             return self._timestamps[index.row()]
 
-    def rowCount(self, parent=None):
+    def rowCount(self, parent: QModelIndex = INVALID_QModelIndex) -> int:  # noqa
         return len(self._timestamps)
 
     @pyqtSlot(int, result=QDateTime)
@@ -237,36 +238,59 @@ class TimebaseModel(QAbstractListModel):
 
     @pyqtProperty(str, notify=currentTimestampChanged)
     def currentTimestamp(self):
-        if not self._current_timestamp:
-            return self._format_str.strip("%")
-        else:
-            return self._current_timestamp
+        return self._current_timestamp
 
     @currentTimestamp.setter
     def currentTimestamp(self, new_date):
-        self._current_timestamp = new_date.strftime(self._format_str)
+        self._current_timestamp = new_date.strftime(self._format_str) if new_date else self._format_str.replace("%", "")
         self.currentTimestampChanged.emit(self._current_timestamp)
 
     @property
     def timestamps(self):
         return self._timestamps
 
+    def clear(self):
+        """Set the two corresponding properties which has to do something with the timestamps to None.
+
+        The purpose of this is to give a possibility to return to a similar state like
+        when TimeBaseModel was initialized."""
+        self.timestamps = None
+        self.currentTimestamp = None
+        self.returnToInitialState.emit()
+
     @timestamps.setter
-    def timestamps(self, new_timetamps):
+    def timestamps(self, timestamps):
         self.layoutAboutToBeChanged.emit()
-        self._timestamps = new_timetamps
+        self._timestamps = timestamps if timestamps else self._get_default_qdts()
         # upd. persistent indexes
         from_index_list = self.persistentIndexList()
         to_index_list = []
-        for i, _ in enumerate(new_timetamps):
+        for i, _ in enumerate(self._timestamps):
             to_index_list.append(self.index(i, parent=QModelIndex()))
         self.changePersistentIndexList(from_index_list, to_index_list)
         self.layoutChanged.emit()
         self.timebaseChanged.emit()
 
+    @staticmethod
+    def _get_default_qdts(steps=5):
+        """Generate default QDateTime steps.
+
+        If no data is loaded, there is no way to specify a time interval for
+        the data. Create some dummy time steps as a substitute.
+
+        These QDateTime steps are not meant to be drawn with time markers for
+        data. They only assist drawing the QML timeline.
+
+        :param steps: Number of QDateTime objects to be generated
+        :return: List of generated QDateTime objects
+
+        """
+        now_dt = datetime.utcnow()
+        now_dt = datetime(now_dt.year, now_dt.month, now_dt.day, now_dt.hour)
+        return list(map(lambda dt: QDateTime(dt), [now_dt + relativedelta(hours=i) for i in range(steps)]))
+
 
 class QmlBackend(QObject):
-
     doRefreshTimeline = pyqtSignal()
     doLoadTimeline = pyqtSignal()
     doClearTimeline = pyqtSignal()

@@ -500,7 +500,7 @@ class Main(QtWidgets.QMainWindow):
         self.ui.cursorProbeText.setText("{} ({}) [{}, {}]".format(data_str, probe_loc, col, row))
 
     @staticmethod
-    def run_gc_after_layer_deletion(new_order: tuple, removed_uuids: list, first_removed_row: int, rows_removed: int):
+    def run_gc_after_layer_deletion():
         """
         Trigger a full garbage collection run after the deletion of a layer from the scene graph.
         The code uses cyclic and weak references, which can only be freed by the GC.
@@ -551,9 +551,7 @@ class Main(QtWidgets.QMainWindow):
             self._last_imported_dataset_import_time.strftime(WATCHDOG_DATETIME_FORMAT_DISPLAY)
         )
 
-    def _clear_last_dataset_creation_time(
-        self, reordered_layers: tuple, removed_uuids: typ.List[UUID], first_row_removed: int, num_rows_removed: int
-    ):
+    def _clear_last_dataset_creation_time(self, removed_uuids: typ.List[UUID]):
         """
         Clear the LineEdit if the layer, from which the creation time was
         extracted, is deleted from the scene graph.
@@ -874,8 +872,14 @@ class Main(QtWidgets.QMainWindow):
         self.layer_model.didActivateProductDataset.connect(self.scene_manager.change_dataset_visible)
         self.layer_model.didAddCompositeDataset.connect(self.scene_manager.add_node_for_composite_dataset)
         self.layer_model.didChangeCompositeProductDataset.connect(self.scene_manager.change_node_for_composite_dataset)
-        self.layer_model.didDeleteProductDataset.connect(self.scene_manager.purge_dataset)
+        self.layer_model.willDeleteProductDataset.connect(self.scene_manager.purge_dataset)
         self.layer_model.didRequestSelectionOfLayer.connect(self.ui.treeView.setCurrentIndex)
+
+        self.layer_model.willRemoveLayer.connect(self.scene_manager.remove_layer_node)
+
+        # Connect to an unnamed slot (lambda: ...) to strip off the argument
+        # (of type list) from the signal 'didDeleteProductDataset'
+        self.layer_model.didDeleteProductDataset.connect(lambda *args: self.run_gc_after_layer_deletion())
 
         self.ui.treeView.setModel(self.layer_model)
 
@@ -889,37 +893,55 @@ class Main(QtWidgets.QMainWindow):
         self.ui.treeView.layerSelectionChanged.connect(self.algebraic_config_pane.selection_did_change)
         self.layer_model.didAddImageLayer.connect(self.algebraic_config_pane.layer_added)
         self.algebraic_config_pane.didTriggeredUpdate.connect(self.layer_model.update_recipe_layer_timeline)
+        self.layer_model.didRemoveLayer.connect(self.algebraic_config_pane.layer_removed)
 
     def _init_rgb_pane(self):
         self.rgb_config_pane = RGBLayerConfigPane(self.ui, self.ui.rgbScrollAreaWidget, self.layer_model)
         self.ui.treeView.layerSelectionChanged.connect(self.rgb_config_pane.selection_did_change)
         self.layer_model.didAddImageLayer.connect(self.rgb_config_pane.layer_added)
         self.layer_model.didChangeRecipeLayerNames.connect(self.rgb_config_pane.set_combos_to_layer_names)
+        self.layer_model.didRemoveLayer.connect(self.rgb_config_pane.layer_removed)
 
     def _init_recipe_manager(self):
         self.recipe_manager = RecipeManager()
-        self.layer_model.didRequestCompositeRecipeCreation.connect(self.recipe_manager.create_rgb_recipe)
-        self.layer_model.didRequestAlgebraicRecipeCreation.connect(self.recipe_manager.create_algebraic_recipe)
+
+        # RGB Composites ------------------------------------------------------
+        self.layer_model.didRequestRGBCompositeRecipeCreation.connect(self.recipe_manager.create_rgb_recipe)
         self.recipe_manager.didCreateRGBCompositeRecipe.connect(self.layer_model.create_rgb_composite_layer)
-        self.recipe_manager.didCreateAlgebraicRecipe.connect(self.layer_model.create_algebraic_composite_layer)
+        self.rgb_config_pane.didChangeRecipeName.connect(self.recipe_manager.update_recipe_name)
+        #   regarding name change notification recipe_manager -> layer_model: see 'Common' below
+
         self.rgb_config_pane.didChangeRGBInputLayers.connect(self.recipe_manager.update_rgb_recipe_input_layers)
         self.recipe_manager.didUpdateRGBInputLayers.connect(self.layer_model.update_recipe_layer_timeline)
+
         self.rgb_config_pane.didChangeRGBColorLimits.connect(self.recipe_manager.update_rgb_recipe_color_limits)
         self.recipe_manager.didUpdateRGBColorLimits.connect(self.layer_model.update_rgb_layer_color_limits)
+
         self.rgb_config_pane.didChangeRGBGamma.connect(self.recipe_manager.update_rgb_recipe_gammas)
         self.recipe_manager.didUpdateRGBGamma.connect(self.layer_model.update_rgb_layer_gamma)
-        self.rgb_config_pane.didChangeRecipeName.connect(self.recipe_manager.update_recipe_name)
+
+        # Algebraics ----------------------------------------------------------
+        self.layer_model.didRequestAlgebraicRecipeCreation.connect(self.recipe_manager.create_algebraic_recipe)
+        self.recipe_manager.didCreateAlgebraicRecipe.connect(self.layer_model.create_algebraic_composite_layer)
         self.algebraic_config_pane.didChangeRecipeName.connect(self.recipe_manager.update_recipe_name)
-        self.recipe_manager.didUpdateRecipeName.connect(self.layer_model.update_recipe_layer_name)
+        #   regarding name change notification recipe_manager -> layer_model: see 'Common' below
+
         self.algebraic_config_pane.didChangeAlgebraicInputLayers.connect(
             self.recipe_manager.update_algebraic_recipe_input_layers
         )
+        self.recipe_manager.didUpdateAlgebraicInputLayers.connect(self.layer_model.update_recipe_layer_timeline)
+
         self.algebraic_config_pane.didChangeAlgebraicOperationKind.connect(
             self.recipe_manager.update_algebraic_recipe_operation_kind
         )
         self.algebraic_config_pane.didChangeAlgebraicOperationFormula.connect(
             self.recipe_manager.update_algebraic_recipe_operation_formula
         )
+
+        # Common --------------------------------------------------------------
+        self.recipe_manager.didUpdateRecipeName.connect(self.layer_model.update_recipe_layer_name)
+
+        self.layer_model.willRemoveLayer.connect(self.recipe_manager.remove_layer_as_recipe_input)
 
     def _init_layer_panes(self):
         # convey action between document and layer list view
@@ -1010,7 +1032,7 @@ class Main(QtWidgets.QMainWindow):
             )
 
         # don't clear the time of last import when the layers are removed
-        self.document.didRemoveDatasets.connect(self._clear_last_dataset_creation_time)
+        self.layer_model.didDeleteProductDataset.connect(self._clear_last_dataset_creation_time)
 
         self.currentTimeTimer = QtCore.QTimer(parent=self)
         self.currentTimeTimer.timeout.connect(self._update_current_time)
@@ -1204,6 +1226,10 @@ class Main(QtWidgets.QMainWindow):
         cycle_grid.setShortcut("L")
         cycle_grid.triggered.connect(self.scene_manager.cycle_latlon_grid_color)
 
+        remove = QtWidgets.QAction("Remove Selected Layer(s)", self)
+        remove.setShortcut(QtCore.Qt.Key_Delete)
+        remove.triggered.connect(self.ui.treeView.begin_layers_removal)
+
         clear = QtWidgets.QAction("Clear Region Selection", self)
         clear.setShortcut(QtCore.Qt.Key_Escape)
         clear.triggered.connect(self.remove_region_polygon)
@@ -1224,6 +1250,7 @@ class Main(QtWidgets.QMainWindow):
         open_gradient.triggered.connect(self.open_colormap_editor)
 
         edit_menu = menubar.addMenu("&Edit")
+        edit_menu.addAction(remove)
         edit_menu.addAction(clear)
         edit_menu.addAction(toggle_point)
         edit_menu.addAction(open_gradient)

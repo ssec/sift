@@ -1160,24 +1160,40 @@ class SceneGraphManager(QObject):
 
     def purge_dataset(self, uuid_removed: UUID):
         """
-        Layer has been purged from document (no longer used anywhere) - flush it all out
+        Dataset has been purged from document (no longer used anywhere) - flush it all out
         :param uuid_removed: UUID of the layer that is to be removed
         :return:
         """
-        self.set_dataset_visible(uuid_removed, False)
         if uuid_removed in self.dataset_nodes:
-            image_layer = self.dataset_nodes[uuid_removed]
-            image_layer.parent = None
+            dataset = self.dataset_nodes[uuid_removed]
+            dataset.parent = None
             del self.dataset_nodes[uuid_removed]
-            LOG.info("layer {} purge from scenegraphmanager".format(uuid_removed))
+            LOG.info(f"dataset {uuid_removed} purge from Scene Graph")
         else:
-            LOG.debug("Layer {} already purged from Scene Graph".format(uuid_removed))
+            LOG.debug(f"dataset {uuid_removed} already purged from Scene Graph")
+        LOG.debug("Scene Graph after dataset deletion:")
+        LOG.debug(self.main_view.describe_tree(with_transform=True))
 
     def _purge_dataset(self, *args, **kwargs):
         res = self.purge_dataset(*args, **kwargs)
         # when purging the layer is the only operation being performed then update when we are done
         self.update()
         return res
+
+    def remove_layer_node(self, uuid_removed: UUID):
+        """
+        Layer will be removed, but before it can be removed correctly the scene graph node has to be removed.
+        :param uuid_removed: UUID of the layer that will be removed
+        """
+        if uuid_removed in self.layer_nodes:
+            layer = self.layer_nodes[uuid_removed]
+            layer.parent = None
+            del self.layer_nodes[uuid_removed]
+            LOG.info(f"layer {uuid_removed} removed from Scene Graph")
+        else:
+            LOG.debug(f"Layer {uuid_removed} already removed from Scene Graph")
+        LOG.debug("Scene Graph after layer deletion:")
+        LOG.debug(self.main_view.describe_tree(with_transform=True))
 
     def change_datasets_visibility(self, layers_changed: Dict[UUID, bool]):
         for uuid, visible in layers_changed.items():

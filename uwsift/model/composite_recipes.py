@@ -43,11 +43,15 @@ CHANNEL_ALPHA = 3
 
 RGBA2IDX: Mapping[str, int] = dict(r=CHANNEL_RED, g=CHANNEL_GREEN, b=CHANNEL_BLUE, a=CHANNEL_ALPHA)
 
+IDX2RGBA: Mapping[int, str] = dict([(0, "r"), (1, "g"), (2, "b"), (3, "a")])
+
 CHANNEL_X = 0
 CHANNEL_Y = 1
 CHANNEL_Z = 2
 
 XYZ2IDX: Mapping[str, int] = dict(x=CHANNEL_X, y=CHANNEL_Y, z=CHANNEL_Z)
+
+IDX2XYZ: Mapping[int, str] = dict([(0, "x"), (1, "y"), (2, "z")])
 
 DIFF_OP_NAME = "Difference"
 NDI_OP_NAME = "Normalized Difference Index"
@@ -205,12 +209,15 @@ class AlgebraicRecipe(Recipe):
 
 
 class RecipeManager(QObject):
+    # RGB Composites
     didCreateRGBCompositeRecipe = pyqtSignal(CompositeRecipe)
-    didCreateAlgebraicRecipe = pyqtSignal(AlgebraicRecipe)
-
     didUpdateRGBInputLayers = pyqtSignal(CompositeRecipe)
     didUpdateRGBColorLimits = pyqtSignal(CompositeRecipe)
     didUpdateRGBGamma = pyqtSignal(CompositeRecipe)
+    # Algebraics
+    didCreateAlgebraicRecipe = pyqtSignal(AlgebraicRecipe)
+    didUpdateAlgebraicInputLayers = pyqtSignal(AlgebraicRecipe)
+    # Common
     didUpdateRecipeName = pyqtSignal(Recipe)
 
     def __init__(self, parent=None, config_dir=None):
@@ -335,6 +342,25 @@ class RecipeManager(QObject):
         recipe.input_layer_ids[channel_idx] = layer_uuid
         recipe.modified = True
         self.recipes[recipe.id] = recipe
+
+    def remove_layer_as_recipe_input(self, layer_uuid: uuid):
+        """
+        Remove a layer from all recipes in which it is used as input layer.
+
+        Must be called before the layer given by the layer_uuid can be removed from the system.
+
+        :param layer_uuid: UUID of the layer to be removed from all recipes
+        """
+        for recipe in self.recipes.values():
+            if layer_uuid in recipe.input_layer_ids:
+                idx = recipe.input_layer_ids.index(layer_uuid)
+                if isinstance(recipe, CompositeRecipe):
+                    channel = IDX2RGBA.get(idx)
+                    self.update_rgb_recipe_input_layers(recipe, channel, None, (None, None), 1.0)
+                if isinstance(recipe, AlgebraicRecipe):
+                    channel = IDX2XYZ.get(idx)
+                    self.update_algebraic_recipe_input_layers(recipe, channel, None)
+                    self.didUpdateAlgebraicInputLayers.emit(recipe)
 
     def __getitem__(self, recipe_id):
         return self.recipes[recipe_id]
