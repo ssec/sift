@@ -13,7 +13,7 @@ Workspace responsibilities include:
 - understanding projections and y, x, z coordinate systems
 - subsecting data within slicing or geospatial boundaries
 - caching useful arrays as secondary content
-- performing minimized on-demand calculations, e.g. algebraic layers, in the background
+- performing minimized on-demand calculations, e.g. datasets for algebraic layers, in the background
 - use Importers to bring content arrays into the workspace from external resources, also in the background
 - maintain a metadatabase of what products have in-workspace content, and what products are available
   from external resources
@@ -372,9 +372,9 @@ class BaseWorkspace(QObject):
         pass
 
     @abstractmethod
-    def get_info(self, dsi_or_uuid, lod=None) -> Optional[frozendict]:
+    def get_info(self, info_or_uuid, lod=None) -> Optional[frozendict]:
         """
-        :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
+        :param info_or_uuid: existing datasetinfo dictionary, or its UUID
         :param lod: desired level of detail to focus
         :return: metadata access with mapping semantics, to be treated as read-only
         """
@@ -541,7 +541,7 @@ class BaseWorkspace(QObject):
             ops = compile(ast.parse(operations, mode="exec"), "<string>", "exec")
             result_name = ops_ast.body[-1].targets[0].id
         except SyntaxError:
-            raise ValueError("Invalid syntax or operations in algebraic layer")
+            raise ValueError("Invalid syntax or operations in algebraic layer recipe")
 
         dep_metadata = {n: self.get_metadata(u) for n, u in namespace.items() if isinstance(u, UUID)}
 
@@ -600,15 +600,15 @@ class BaseWorkspace(QObject):
     def _bgnd_remove(self, uuid: UUID):
         pass
 
-    def remove(self, dsi):
+    def remove(self, info_or_uuid):
         """Formally detach a dataset.
 
         Removing its content from the workspace fully by the time that idle() has nothing more to do.
 
-        :param dsi: datasetinfo dictionary or UUID of a dataset
+        :param info_or_uuid: datasetinfo dictionary or UUID of a dataset
         :return: True if successfully deleted, False if not found
         """
-        uuid = dsi if isinstance(dsi, UUID) else dsi[Info.UUID]
+        uuid = info_or_uuid if isinstance(info_or_uuid, UUID) else info_or_uuid[Info.UUID]
 
         if self._queue is not None:
             self._queue.add(str(uuid), self._bgnd_remove(uuid), "Purge dataset")
@@ -618,11 +618,11 @@ class BaseWorkspace(QObject):
         return True
 
     @abstractmethod
-    def get_content(self, dsi_or_uuid, lod=None, kind: Kind = Kind.IMAGE) -> Optional[np.memmap]:
+    def get_content(self, info_or_uuid, lod=None, kind: Kind = Kind.IMAGE) -> Optional[np.memmap]:
         pass
 
-    def _create_layer_affine(self, dsi_or_uuid):
-        info = self.get_info(dsi_or_uuid)
+    def _create_dataset_affine(self, info_or_uuid):
+        info = self.get_info(info_or_uuid)
         affine = Affine(
             info[Info.CELL_WIDTH],
             0.0,
@@ -633,9 +633,9 @@ class BaseWorkspace(QObject):
         )
         return affine
 
-    def _position_to_data_index(self, dsi_or_uuid, xy_pos) -> Tuple[int, int]:
+    def _position_to_data_index(self, info_or_uuid, xy_pos) -> Tuple[int, int]:
         """Calculate the sift-internal data index from lon/lat values"""
-        info = self.get_info(dsi_or_uuid)
+        info = self.get_info(info_or_uuid)
         if info is None:
             return None, None
         # Assume `xy_pos` is lon/lat value
@@ -648,13 +648,13 @@ class BaseWorkspace(QObject):
         row = np.int64(np.floor((y - info[Info.ORIGIN_Y]) / info[Info.CELL_HEIGHT]))
         return row, column
 
-    def position_to_grid_index(self, dsi_or_uuid, xy_pos) -> Tuple[int, int]:
+    def position_to_grid_index(self, info_or_uuid, xy_pos) -> Tuple[int, int]:
         """Calculate the satellite grid index from lon/lat values"""
-        info = self.get_info(dsi_or_uuid)
+        info = self.get_info(info_or_uuid)
         if info is None:
             return None, None
 
-        row, column = self._position_to_data_index(dsi_or_uuid, xy_pos)
+        row, column = self._position_to_data_index(info_or_uuid, xy_pos)
 
         grid_origin = info[Info.GRID_ORIGIN]
         grid_first_index_of_rows = info[Info.GRID_FIRST_INDEX_Y]
@@ -672,9 +672,9 @@ class BaseWorkspace(QObject):
 
         return row, column
 
-    def layer_proj(self, dsi_or_uuid):
+    def dataset_proj(self, info_or_uuid):
         """Project lon/lat probe points to image X/Y"""
-        info = self.get_info(dsi_or_uuid)
+        info = self.get_info(info_or_uuid)
         return Proj(info[Info.PROJ])
 
     def _project_points(self, p, points):
@@ -682,19 +682,19 @@ class BaseWorkspace(QObject):
         points[:, 0], points[:, 1] = p(points[:, 0], points[:, 1])
         return points
 
-    def get_content_point(self, dsi_or_uuid, xy_pos):
-        row, col = self._position_to_data_index(dsi_or_uuid, xy_pos)
+    def get_content_point(self, info_or_uuid, xy_pos):
+        row, col = self._position_to_data_index(info_or_uuid, xy_pos)
         if row is None or col is None:
             return None
-        data = self.get_content(dsi_or_uuid)
+        data = self.get_content(info_or_uuid)
         if not ((0 <= col < data.shape[1]) and (0 <= row < data.shape[0])):
-            raise ValueError("X/Y position is outside of image with UUID: %s", dsi_or_uuid)
+            raise ValueError("X/Y position is outside of image with UUID: %s", info_or_uuid)
         return data[row, col]
 
-    def get_content_polygon(self, dsi_or_uuid, points):
-        data = self.get_content(dsi_or_uuid)
-        trans = self._create_layer_affine(dsi_or_uuid)
-        p = self.layer_proj(dsi_or_uuid)
+    def get_content_polygon(self, info_or_uuid, points):
+        data = self.get_content(info_or_uuid)
+        trans = self._create_dataset_affine(info_or_uuid)
+        p = self.dataset_proj(info_or_uuid)
         points = self._project_points(p, points)
         _, data = content_within_shape(data, trans, LinearRing(points))
         return data
@@ -702,10 +702,10 @@ class BaseWorkspace(QObject):
     def lowest_resolution_uuid(self, *uuids):
         return max([self.get_info(uuid) for uuid in uuids], key=lambda i: i[Info.CELL_WIDTH])[Info.UUID]
 
-    def get_coordinate_mask_polygon(self, dsi_or_uuid, points):
-        data = self.get_content(dsi_or_uuid)
-        trans = self._create_layer_affine(dsi_or_uuid)
-        p = self.layer_proj(dsi_or_uuid)
+    def get_coordinate_mask_polygon(self, info_or_uuid, points):
+        data = self.get_content(info_or_uuid)
+        trans = self._create_dataset_affine(info_or_uuid)
+        p = self.dataset_proj(info_or_uuid)
         points = self._project_points(p, points)
         index_mask, data = content_within_shape(data, trans, LinearRing(points))
         coords_mask = (index_mask[0] * trans.e + trans.f, index_mask[1] * trans.a + trans.c)
@@ -715,8 +715,8 @@ class BaseWorkspace(QObject):
 
     def get_content_coordinate_mask(self, uuid: UUID, coords_mask):
         data = self.get_content(uuid)
-        trans = self._create_layer_affine(uuid)
-        p = self.layer_proj(uuid)
+        trans = self._create_dataset_affine(uuid)
+        p = self.dataset_proj(uuid)
         # coords_mask is (Y, X) like a numpy array
         coords_mask = p(coords_mask[1], coords_mask[0])[::-1]
         index_mask = (
@@ -742,7 +742,7 @@ class BaseWorkspace(QObject):
         contains the positions of the points. The second array represents the
         attribute.
 
-        :param uuid: UUID of the layer
+        :param uuid: UUID of the dataset
         :return: Tuple of a position array and maybe an attribute array
         """
         content = self.get_content(uuid, kind=Kind.POINTS)
@@ -765,7 +765,7 @@ class BaseWorkspace(QObject):
         contains positions for the tip and base of the lines. The second array
         represents the attribute.
 
-        :param uuid: UUID of the layer
+        :param uuid: UUID of the dataset
         :return: Tuple of a lines array and maybe an attribute array
         """
         content = self.get_content(uuid, kind=Kind.LINES)

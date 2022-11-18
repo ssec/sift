@@ -13,7 +13,6 @@ REQUIRES
 """
 import logging
 import os
-import re
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from datetime import datetime, timedelta
@@ -35,7 +34,6 @@ import numpy as np
 import satpy.readers.yaml_reader
 import satpy.resample
 import yaml
-from pyproj import Proj
 from pyresample.geometry import AreaDefinition, StackedAreaDefinition
 from satpy import Scene, available_readers
 from satpy.dataset import DatasetDict
@@ -163,29 +161,29 @@ def filter_dataset_ids(ids_to_filter: Iterable[DataID]) -> Generator[DataID, Non
             yield ds_id
 
 
-def get_guidebook_class(layer_info) -> Guidebook:
-    platform = layer_info.get(Info.PLATFORM)
+def get_guidebook_class(dataset_info) -> Guidebook:
+    platform = dataset_info.get(Info.PLATFORM)
     return GUIDEBOOKS.get(platform, DEFAULT_GUIDEBOOK)()
 
 
-def generate_guidebook_metadata(layer_info) -> Mapping:
-    guidebook = get_guidebook_class(layer_info)
-    # also get info for this layer from the guidebook
-    gbinfo = guidebook.collect_info(layer_info)
-    layer_info.update(gbinfo)  # FUTURE: should guidebook be integrated into DocBasicLayer?
+def generate_guidebook_metadata(info) -> Mapping:
+    guidebook = get_guidebook_class(info)
+    # also get more values for this info from the guidebook
+    gbinfo = guidebook.collect_info(info)
+    info.update(gbinfo)  # FUTURE: should guidebook be integrated into suitable place?
 
     # add as visible to the front of the current set, and invisible to the rest of the available sets
-    layer_info[Info.COLORMAP] = metadata_utils.get_default_colormap(layer_info, guidebook)
-    if layer_info[Info.KIND] == Kind.POINTS:
-        layer_info[Info.STYLE] = metadata_utils.get_default_point_style_name(layer_info)
-    layer_info[Info.CLIM] = guidebook.climits(layer_info)
-    layer_info[Info.VALID_RANGE] = guidebook.valid_range(layer_info)
-    if Info.DISPLAY_TIME not in layer_info:
-        layer_info[Info.DISPLAY_TIME] = guidebook._default_display_time(layer_info)
-    if Info.DISPLAY_NAME not in layer_info:
-        layer_info[Info.DISPLAY_NAME] = guidebook._default_display_name(layer_info)
+    info[Info.COLORMAP] = metadata_utils.get_default_colormap(info, guidebook)
+    if info[Info.KIND] == Kind.POINTS:
+        info[Info.STYLE] = metadata_utils.get_default_point_style_name(info)
+    info[Info.CLIM] = guidebook.climits(info)
+    info[Info.VALID_RANGE] = guidebook.valid_range(info)
+    if Info.DISPLAY_TIME not in info:
+        info[Info.DISPLAY_TIME] = guidebook._default_display_time(info)
+    if Info.DISPLAY_NAME not in info:
+        info[Info.DISPLAY_NAME] = guidebook._default_display_name(info)
 
-    return layer_info
+    return info
 
 
 def _get_requires(scn: Scene) -> Set[str]:
@@ -354,541 +352,6 @@ class aImporter(ABC):
         """
         # FUTURE: this should be async def coroutine
         return
-
-
-class aSingleFileWithSingleProductImporter(aImporter):
-    """
-    simplification of importer that handles a single-file with a single product
-    """
-
-    source_path: str = None
-    _resource: Resource = None
-
-    def __init__(self, source_path, workspace_cwd, database_session, **kwargs):
-        if isinstance(source_path, list) and len(source_path) == 1:
-            # backwards compatibility - we now expect a list
-            source_path = source_path[0]
-        super(aSingleFileWithSingleProductImporter, self).__init__(workspace_cwd, database_session)
-        self.source_path = source_path
-
-    @property
-    def num_products(self):
-        return 1
-
-    def merge_resources(self) -> Iterable[Resource]:
-        """
-        Returns:
-            sequence of Resources found at the source, typically one resource per file
-        """
-        now = datetime.utcnow()
-        if self._resource is not None:
-            res = self._resource
-        else:
-            self._resource = res = self._S.query(Resource).filter(Resource.path == self.source_path).first()
-        if res is None:
-            LOG.debug("creating new Resource entry for {}".format(self.source_path))
-            self._resource = res = Resource(
-                format=type(self),
-                path=self.source_path,
-                mtime=now,
-                atime=now,
-            )
-            self._S.add(res)
-        return [self._resource]
-
-    @abstractmethod
-    def product_metadata(self):
-        """
-        Returns:
-            info dictionary for the single product available
-        """
-        return {}
-
-    def merge_products(self) -> Iterable[Product]:
-        """
-        products available in the resource, adding any metadata entries for Products within the resource
-        this may be run by the metadata collection agent, or by the workspace!
-        Returns:
-            sequence of Products that could be turned into Content in the workspace
-        """
-        now = datetime.utcnow()
-        if self._resource is not None:
-            res = self._resource
-        else:
-            self._resource = res = self._S.query(Resource).filter(Resource.path == self.source_path).first()
-        if res is None:
-            LOG.debug("no resources for {}".format(self.source_path))
-            return []
-
-        if len(res.product):
-            zult = list(res.product)
-            return zult
-
-        # else probe the file and add product metadata, without importing content
-        from uuid import uuid1
-
-        uuid = uuid1()
-        meta = self.product_metadata()
-        meta[Info.UUID] = uuid
-
-        prod = Product(
-            uuid_str=str(uuid),
-            atime=now,
-        )
-        prod.resource.append(res)
-        assert Info.OBS_TIME in meta
-        assert Info.OBS_DURATION in meta
-        prod.update(meta)  # sets fields like obs_duration and obs_time transparently
-        assert prod.info[Info.OBS_TIME] is not None and prod.obs_time is not None
-        assert prod.info[Info.VALID_RANGE] is not None
-        LOG.debug("new product: {}".format(repr(prod)))
-        self._S.add(prod)
-        self._S.commit()
-        return [prod]
-
-
-class GeoTiffImporter(aSingleFileWithSingleProductImporter):
-    """
-    GeoTIFF data importer
-    """
-
-    @classmethod
-    def is_relevant(self, source_path=None, source_uri=None):
-        source = source_path or source_uri
-        return True if (source.lower().endswith(".tif") or source.lower().endswith(".tiff")) else False
-
-    @staticmethod
-    def _metadata_for_path(pathname):
-        meta = {}
-        if not pathname:
-            return meta
-
-        # Old but still necesary, get some information from the filename instead of the content
-        m = re.match(r"HS_H(\d\d)_(\d{8})_(\d{4})_B(\d\d)_([A-Za-z0-9]+).*", os.path.split(pathname)[1])
-        if m is not None:
-            plat, yyyymmdd, hhmm, bb, scene = m.groups()
-            when = datetime.strptime(yyyymmdd + hhmm, "%Y%m%d%H%M")
-            plat = Platform("Himawari-{}".format(int(plat)))
-            band = int(bb)
-
-            meta.update(
-                {
-                    Info.PLATFORM: plat,
-                    Info.BAND: band,
-                    Info.INSTRUMENT: Instrument.AHI,
-                    Info.SCHED_TIME: when,
-                    Info.OBS_TIME: when,
-                    Info.OBS_DURATION: DEFAULT_GTIFF_OBS_DURATION,
-                    Info.SCENE: scene,
-                }
-            )
-        return meta
-
-    @staticmethod
-    def _check_geotiff_metadata(gtiff):
-        gtiff_meta = gtiff.GetMetadata()
-        # Sanitize metadata from the file to use SIFT's Enums
-        if "name" in gtiff_meta:
-            gtiff_meta[Info.DATASET_NAME] = gtiff_meta.pop("name")
-        if "platform" in gtiff_meta:
-            plat = gtiff_meta.pop("platform")
-            try:
-                gtiff_meta[Info.PLATFORM] = Platform(plat)
-            except ValueError:
-                gtiff_meta[Info.PLATFORM] = Platform.UNKNOWN
-                LOG.warning("Unknown platform being loaded: {}".format(plat))
-        if "instrument" in gtiff_meta or "sensor" in gtiff_meta:
-            inst = gtiff_meta.pop("sensor", gtiff_meta.pop("instrument", None))
-            try:
-                gtiff_meta[Info.INSTRUMENT] = Instrument(inst)
-            except ValueError:
-                gtiff_meta[Info.INSTRUMENT] = Instrument.UNKNOWN
-                LOG.warning("Unknown instrument being loaded: {}".format(inst))
-        if "start_time" in gtiff_meta:
-            start_time = datetime.strptime(gtiff_meta["start_time"], "%Y-%m-%dT%H:%M:%SZ")
-            gtiff_meta[Info.SCHED_TIME] = start_time
-            gtiff_meta[Info.OBS_TIME] = start_time
-            if "end_time" in gtiff_meta:
-                end_time = datetime.strptime(gtiff_meta["end_time"], "%Y-%m-%dT%H:%M:%SZ")
-                gtiff_meta[Info.OBS_DURATION] = end_time - start_time
-        if "valid_min" in gtiff_meta:
-            gtiff_meta["valid_min"] = float(gtiff_meta["valid_min"])
-        if "valid_max" in gtiff_meta:
-            gtiff_meta["valid_max"] = float(gtiff_meta["valid_max"])
-        if "standard_name" in gtiff_meta:
-            gtiff_meta[Info.STANDARD_NAME] = gtiff_meta["standard_name"]
-        if "flag_values" in gtiff_meta:
-            gtiff_meta["flag_values"] = tuple(int(x) for x in gtiff_meta["flag_values"].split(","))
-        if "flag_masks" in gtiff_meta:
-            gtiff_meta["flag_masks"] = tuple(int(x) for x in gtiff_meta["flag_masks"].split(","))
-        if "flag_meanings" in gtiff_meta:
-            gtiff_meta["flag_meanings"] = gtiff_meta["flag_meanings"].split(" ")
-        if "units" in gtiff_meta:
-            gtiff_meta[Info.UNITS] = gtiff_meta.pop("units")
-        return gtiff_meta
-
-    @staticmethod
-    def get_metadata(source_path=None, source_uri=None, **kwargs):
-        import gdal
-        import osr
-
-        if source_uri is not None:
-            raise NotImplementedError("GeoTiffImporter cannot read from URIs yet")
-        d = GeoTiffImporter._metadata_for_path(source_path)
-        gtiff = gdal.Open(source_path)
-
-        ox, cw, _, oy, _, ch = gtiff.GetGeoTransform()
-        d[Info.KIND] = Kind.IMAGE
-
-        # FUTURE: this is Content metadata and not Product metadata:
-        d[Info.ORIGIN_X] = ox
-        d[Info.ORIGIN_Y] = oy
-        d[Info.CELL_WIDTH] = cw
-        d[Info.CELL_HEIGHT] = ch
-        # FUTURE: Should the Workspace normalize all input data or should the Image Layer handle any projection?
-        srs = osr.SpatialReference()
-        srs.ImportFromWkt(gtiff.GetProjection())
-        d[Info.PROJ] = srs.ExportToProj4().strip()  # remove extra whitespace
-
-        # Workaround for previously supported files
-        # give them some kind of name that means something
-        if Info.BAND in d:
-            d[Info.DATASET_NAME] = "B{:02d}".format(d[Info.BAND])
-        else:
-            # for new files, use this as a basic default
-            # FUTURE: Use Dataset name instead when we can read multi-dataset files
-            d[Info.DATASET_NAME] = os.path.split(source_path)[-1]
-
-        band = gtiff.GetRasterBand(1)
-        d[Info.SHAPE] = rows, cols = (band.YSize, band.XSize)
-
-        # Fix PROJ4 string if it needs an "+over" parameter
-        p = Proj(d[Info.PROJ])
-        lon_l, lat_u = p(ox, oy, inverse=True)
-        lon_r, lat_b = p(ox + cw * cols, oy + ch * rows, inverse=True)
-        if "+over" not in d[Info.PROJ] and lon_r < lon_l:
-            LOG.debug("Add '+over' to geotiff PROJ.4 because it seems to cross the anti-meridian")
-            d[Info.PROJ] += " +over"
-
-        bandtype = gdal.GetDataTypeName(band.DataType)
-        if bandtype.lower() != "float32":
-            LOG.warning("attempting to read geotiff files with non-float32 content")
-
-        gtiff_meta = GeoTiffImporter._check_geotiff_metadata(gtiff)
-        d.update(gtiff_meta)
-        generate_guidebook_metadata(d)
-        LOG.debug("GeoTIFF metadata for {}: {}".format(source_path, repr(d)))
-        return d
-
-    def product_metadata(self):
-        return GeoTiffImporter.get_metadata(self.source_path)
-
-    def begin_import_products(self, *product_ids):  # FUTURE: allow product_ids to be uuids
-        import gdal
-
-        source_path = self.source_path
-        if product_ids:
-            products = [self._S.query(Product).filter_by(id=anid).one() for anid in product_ids]
-        else:
-            products = list(
-                self._S.query(Resource, Product)
-                .filter(Resource.path == source_path)
-                .filter(Product.resource_id == Resource.id)
-                .all()
-            )
-            assert products
-        if len(products) > 1:
-            LOG.warning("only first product currently handled in geotiff loader")
-        prod = products[0]
-
-        if prod.content:
-            LOG.info("content is already available, skipping import")
-            return
-
-        now = datetime.utcnow()
-
-        # re-collect the metadata, which should be separated between Product vs Content metadata in the FUTURE
-        # principally we're not allowed to store ORIGIN_ or CELL_ metadata in the Product
-        info = GeoTiffImporter.get_metadata(source_path)
-
-        # Additional metadata that we've learned by loading the data
-        gtiff = gdal.Open(source_path)
-
-        band = gtiff.GetRasterBand(1)  # FUTURE may be an assumption
-        shape = rows, cols = band.YSize, band.XSize
-        blockw, blockh = band.GetBlockSize()  # non-blocked files will report [band.XSize,1]
-
-        data_filename = "{}.image".format(prod.uuid)
-        data_path = os.path.join(self._cwd, data_filename)
-
-        coverage_filename = "{}.coverage".format(prod.uuid)
-        coverage_path = os.path.join(self._cwd, coverage_filename)
-        # no sparsity map
-
-        # shovel that data into the memmap incrementally
-        # http://geoinformaticstutorial.blogspot.com/2012/09/reading-raster-data-with-python-and-gdal.html
-        img_data = np.memmap(data_path, dtype=np.float32, shape=shape, mode="w+")
-
-        # load at an increment that matches the file's tile size if possible
-        IDEAL_INCREMENT = 512.0
-        increment = min(blockh * int(np.ceil(IDEAL_INCREMENT / blockh)), 2048)
-
-        # how many coverage states are we traversing during the load?
-        # for now let's go simple and have it be just image rows
-        # coverage_rows = int((rows + increment - 1) / increment) if we had an even increment but it's not guaranteed
-        cov_data = np.memmap(coverage_path, dtype=np.int8, shape=(rows,), mode="w+")
-        cov_data[:] = 0  # should not be needed except maybe in Windows?
-
-        # LOG.debug("keys in geotiff product: {}".format(repr(list(prod.info.keys()))))
-        LOG.debug(
-            "cell size in geotiff product: {} x {}".format(prod.info[Info.CELL_HEIGHT], prod.info[Info.CELL_WIDTH])
-        )
-
-        # create and commit a Content entry pointing to where the content is in the workspace, even if coverage is empty
-        c = ContentImage(
-            lod=0,
-            resolution=int(min(abs(info[Info.CELL_WIDTH]), abs(info[Info.CELL_HEIGHT]))),
-            atime=now,
-            mtime=now,
-            # info about the data array memmap
-            path=data_filename,
-            rows=rows,
-            cols=cols,
-            levels=0,
-            dtype="float32",
-            cell_width=info[Info.CELL_WIDTH],
-            cell_height=info[Info.CELL_HEIGHT],
-            origin_x=info[Info.ORIGIN_X],
-            origin_y=info[Info.ORIGIN_Y],
-            proj4=info[Info.PROJ],
-            # info about the coverage array memmap, which in our case just tells what rows are ready
-            coverage_rows=rows,
-            coverage_cols=1,
-            coverage_path=coverage_filename,
-        )
-        self._S.add(c)
-        prod.content.append(c)
-        self._S.commit()
-
-        # FIXME: yield initial status to announce content is available, even if it's empty
-
-        # now do the actual array filling from the geotiff file
-        # FUTURE: consider explicit block loads using band.ReadBlock(x,y) once
-        irow = 0
-        while irow < rows:
-            nrows = min(increment, rows - irow)
-            row_data = band.ReadAsArray(0, irow, cols, nrows)
-            img_data[irow : irow + nrows, :] = np.require(row_data, dtype=np.float32)
-            cov_data[irow : irow + nrows] = 1
-            irow += increment
-            status = import_progress(
-                uuid=prod.uuid,
-                stages=1,
-                current_stage=0,
-                completion=float(irow) / float(rows),
-                stage_desc="importing geotiff",
-                dataset_info=None,
-                data=img_data,
-            )
-            yield status
-
-        # single stage import with all the data for this simple case
-        zult = import_progress(
-            uuid=prod.uuid,
-            stages=1,
-            current_stage=0,
-            completion=1.0,
-            stage_desc="done loading geotiff",
-            dataset_info=None,
-            data=img_data,
-        )
-
-        yield zult
-
-        # Finally, update content mtime and atime
-        c.atime = c.mtime = datetime.utcnow()
-
-
-# map .platform_id in PUG format files to SIFT platform enum
-PLATFORM_ID_TO_PLATFORM = {
-    "G16": Platform.GOES_16,
-    "G17": Platform.GOES_17,
-    "G18": Platform.GOES_18,
-    "G19": Platform.GOES_19,
-    # hsd2nc export of AHI data as PUG format
-    "Himawari-8": Platform.HIMAWARI_8,
-    "Himawari-9": Platform.HIMAWARI_9,
-    # axi2cmi export as PUG, more consistent with other uses
-    "H8": Platform.HIMAWARI_8,
-    "H9": Platform.HIMAWARI_9,
-}
-
-
-class GoesRPUGImporter(aSingleFileWithSingleProductImporter):
-    """
-    Import from PUG format GOES-16 netCDF4 files
-    """
-
-    @staticmethod
-    def _basic_pug_metadata(pug):
-        return {
-            Info.PLATFORM: PLATFORM_ID_TO_PLATFORM[pug.platform_id],  # e.g. G16, H8
-            Info.BAND: pug.band,
-            Info.DATASET_NAME: "B{:02d}".format(pug.band),
-            Info.INSTRUMENT: Instrument.AHI if "Himawari" in pug.instrument_type else Instrument.ABI,
-            Info.SCHED_TIME: pug.sched_time,
-            Info.OBS_TIME: pug.time_span[0],
-            Info.OBS_DURATION: pug.time_span[1] - pug.time_span[0],
-            Info.DISPLAY_TIME: pug.display_time,
-            Info.SCENE: pug.scene_id,
-            Info.DISPLAY_NAME: pug.display_name,
-        }
-
-    @classmethod
-    def is_relevant(cls, source_path=None, source_uri=None):
-        source = source_path or source_uri
-        return True if (source.lower().endswith(".nc") or source.lower().endswith(".nc4")) else False
-
-    @staticmethod
-    def pug_factory(source_path):
-        dn, fn = os.path.split(source_path)
-        is_netcdf = fn.lower().endswith(".nc") or fn.lower().endswith(".nc4")
-        if not is_netcdf:
-            raise ValueError("PUG loader requires files ending in .nc or .nc4: {}".format(repr(source_path)))
-        return PugFile.attach(source_path)  # noqa
-
-    @staticmethod
-    def get_metadata(source_path=None, source_uri=None, pug=None, **kwargs):
-        # yield successive levels of detail as we load
-        if source_uri is not None:
-            raise NotImplementedError("GoesRPUGImporter cannot read from URIs yet")
-
-        #
-        # step 1: get any additional metadata and an overview tile
-        #
-
-        d = {}
-        pug = pug or GoesRPUGImporter.pug_factory(source_path)
-
-        d.update(GoesRPUGImporter._basic_pug_metadata(pug))
-        d[Info.KIND] = Kind.IMAGE
-
-        # FUTURE: this is Content metadata and not Product metadata:
-        d[Info.PROJ] = pug.proj4_string
-        # get nadir-meter-ish projection coordinate vectors to be used by proj4
-        y, x = pug.proj_y, pug.proj_x
-        d[Info.ORIGIN_X] = x[0]
-        d[Info.ORIGIN_Y] = y[0]
-
-        # PUG states radiance at index [0,0] extends between coordinates [0,0] to [1,1] on a quadrille
-        # centers of pixels are therefore at +0.5, +0.5
-        # for a (e.g.) H x W image this means [H/2,W/2] coordinates are image center
-        # for now assume all scenes are even-dimensioned (e.g. 5424x5424)
-        # given that coordinates are evenly spaced in angular -> nadir-meters space,
-        # technically this should work with any two neighbor values
-        cell_size = pug.cell_size
-        d[Info.CELL_HEIGHT], d[Info.CELL_WIDTH] = cell_size
-
-        shape = pug.shape
-        d[Info.SHAPE] = shape
-        generate_guidebook_metadata(d)
-
-        d[Info.FAMILY] = "{}:{}:{}:{:5.2f}µm".format(
-            Kind.IMAGE.name, "geo", d[Info.STANDARD_NAME], d[Info.CENTRAL_WAVELENGTH]
-        )  # kind:pointofreference:measurement:wavelength
-        d[Info.CATEGORY] = "NOAA-PUG:{}:{}:{}".format(
-            d[Info.PLATFORM].name, d[Info.INSTRUMENT].name, d[Info.SCENE]
-        )  # system:platform:instrument:target
-        d[Info.SERIAL] = d[Info.SCHED_TIME].strftime("%Y%m%dT%H%M%S")
-        LOG.debug(repr(d))
-        return d
-
-    def product_metadata(self):
-        return GoesRPUGImporter.get_metadata(self.source_path)
-
-    # @asyncio.coroutine
-    def begin_import_products(self, *product_ids):
-        source_path = self.source_path
-        if product_ids:
-            products = [self._S.query(Product).filter_by(id=anid).one() for anid in product_ids]
-            assert products
-        else:
-            products = list(
-                self._S.query(Resource, Product)
-                .filter(Resource.path == source_path)
-                .filter(Product.resource_id == Resource.id)
-                .all()
-            )
-            assert products
-        if len(products) > 1:
-            LOG.warning("only first product currently handled in pug loader")
-        prod = products[0]
-
-        if prod.content:
-            LOG.warning("content was already available, skipping import")
-            return
-
-        pug = GoesRPUGImporter.pug_factory(source_path)
-        rows, cols = shape = pug.shape
-        cell_height, cell_width = pug.cell_size
-        origin_y, origin_x = pug.origin
-        proj4 = pug.proj4_string
-
-        now = datetime.utcnow()
-
-        data_filename = "{}.image".format(prod.uuid)
-        data_path = os.path.join(self._cwd, data_filename)
-
-        # no sparsity map
-
-        # shovel that data into the memmap incrementally
-        img_data = np.memmap(data_path, dtype=np.float32, shape=shape, mode="w+")
-
-        LOG.info("converting radiance to %s" % pug.bt_or_refl)
-        image = pug.bt if "bt" == pug.bt_or_refl else pug.refl
-
-        #
-        # step 2: read and convert the image data
-        #   - in chunks if it's a huge image so we can show progress and/or cancel
-        #   - push the data into a workspace memmap
-        #   - record the content information in the workspace metadatabase
-        #
-
-        # FUTURE as we're doing so, also update coverage array (showing what sections of data are loaded)
-        # FUTURE and for some cases the sparsity array, if the data is interleaved (N/A for NetCDF imagery)
-        img_data[:] = np.ma.fix_invalid(image, copy=False, fill_value=np.NAN)  # FIXME: expensive
-
-        # create and commit a Content entry pointing to where the content is in the workspace, even if coverage is empty
-        c = ContentImage(
-            lod=0,
-            resolution=int(min(abs(cell_width), abs(cell_height))),
-            atime=now,
-            mtime=now,
-            # info about the data array memmap
-            path=data_filename,
-            rows=rows,
-            cols=cols,
-            proj4=proj4,
-            # levels = 0,
-            dtype="float32",
-            cell_width=cell_width,
-            cell_height=cell_height,
-            origin_x=origin_x,
-            origin_y=origin_y,
-        )
-        self._S.add(c)
-        prod.content.append(c)
-        self._S.commit()
-
-        yield import_progress(
-            uuid=prod.uuid,
-            stages=1,
-            current_stage=0,
-            completion=1.0,
-            stage_desc="GOES PUG data add to workspace",
-            dataset_info=None,
-            data=img_data,
-        )
 
 
 class SatpyImporter(aImporter):
@@ -1173,7 +636,7 @@ class SatpyImporter(aImporter):
         attrs[Info.SHAPE] = shape if not self.resampling_info else self.resampling_info["shape"]
         attrs[Info.UNITS] = attrs.get("units")
         if attrs[Info.UNITS] == "unknown":
-            LOG.warning("Layer units are unknown, using '1'")
+            LOG.warning("Dataset units are unknown, using '1'")
             attrs[Info.UNITS] = 1
         generate_guidebook_metadata(attrs)
 
@@ -1769,7 +1232,7 @@ class SatpyImporter(aImporter):
         in ascending order and produce an data array with the last segments data
         first.
         :param segments_data: the segments data as provided by Satpy importer
-        :param image_data: the layer data where the segments are merged into
+        :param image_data: the dataset data where the segments are merged into
         :param segments_indices: list of segments whose data is to be merged
         Note: this is not the highest segment number in the current segments
         list but the highest segment number which can appear for the product.

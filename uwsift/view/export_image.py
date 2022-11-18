@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from uwsift.common import Info
+from uwsift.model.layer_model import LayerModel
 from uwsift.ui import export_image_dialog_ui
 from uwsift.util import USER_DESKTOP_DIRECTORY, get_package_data_dir
 from uwsift.view.colormap import COLORMAP_MANAGER
@@ -196,7 +197,7 @@ class ExportImageHelper(QtCore.QObject):
 
     default_font = os.path.join(DATA_DIR, "fonts", "Andale Mono.ttf")
 
-    def __init__(self, parent, doc, sgm):
+    def __init__(self, parent, sgm, model: LayerModel):
         """Initialize helper with defaults and other object handles.
 
         Args:
@@ -204,8 +205,8 @@ class ExportImageHelper(QtCore.QObject):
             sgm: ``SceneGraphManager`` object to get image data
         """
         super(ExportImageHelper, self).__init__(parent)
-        self.doc = doc
         self.sgm = sgm
+        self.model = model
         self._screenshot_dialog = None
 
     def take_screenshot(self):
@@ -235,8 +236,10 @@ class ExportImageHelper(QtCore.QObject):
         mpl.rcParams["font.sans-serif"] = FONT
         mpl.rcParams.update({"font.size": TICK_SIZE})
 
-        colors = COLORMAP_MANAGER[self.doc.colormap_for_uuid(u)]
-        if self.doc.prez_for_uuid(u).colormap == "Square Root (Vis Default)":
+        colormap = self.model.get_dataset_presentation_by_uuid(u).colormap
+        colors = COLORMAP_MANAGER[colormap]
+
+        if colormap == "Square Root (Vis Default)":
             colors = colors.map(numpy.linspace((0, 0, 0, 1), (1, 1, 1, 1), 256))
         else:
             colors = colors.colors.rgba
@@ -250,12 +253,16 @@ class ExportImageHelper(QtCore.QObject):
             ax = fig.add_axes([0.05, 0.4, 0.9, 0.2])
 
         cmap = mpl.colors.ListedColormap(colors)
-        vmin, vmax = self.doc.prez_for_uuid(u).climits
+        vmin, vmax = self.model.get_dataset_presentation_by_uuid(u).climits
         norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
         cbar = mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation=mode)
 
         ticks = [
-            str(self.doc[u][Info.UNIT_CONVERSION][2](self.doc[u][Info.UNIT_CONVERSION][1](t)))
+            str(
+                self.model.get_dataset_by_uuid(u).info.get(Info.UNIT_CONVERSION)[2](
+                    self.model.get_dataset_by_uuid(u).info.get(Info.UNIT_CONVERSION)[1](t)
+                )
+            )
             for t in numpy.linspace(vmin, vmax, NUM_TICKS)
         ]
         cbar.set_ticks(numpy.linspace(vmin, vmax, NUM_TICKS))
@@ -264,7 +271,11 @@ class ExportImageHelper(QtCore.QObject):
         return fig
 
     def _append_colorbar(self, mode, im, u):
-        if mode is None or COLORMAP_MANAGER.get(self.doc.colormap_for_uuid(u)) is None:
+        if (
+            mode is None
+            or not self.model.get_dataset_presentation_by_uuid(u)
+            or COLORMAP_MANAGER.get(self.model.get_dataset_presentation_by_uuid(u).colormap) is None
+        ):
             return im
 
         fig = self._create_colorbar(mode, u, im.size)
@@ -299,9 +310,9 @@ class ExportImageHelper(QtCore.QObject):
         # only use the first uuid to fill in filename information
         file_uuids = uuids[:1] if is_video_filename(base_filename) else uuids
         for u in file_uuids:
-            layer_info = self.doc[u]
+            dataset_info = self.model.get_dataset_by_uuid(u).info
             fn = base_filename.format(
-                start_time=layer_info[Info.SCHED_TIME],
+                start_time=dataset_info[Info.SCHED_TIME],
                 scene=Info.SCENE,
                 instrument=Info.INSTRUMENT,
             )
@@ -333,7 +344,7 @@ class ExportImageHelper(QtCore.QObject):
     def _get_animation_parameters(self, info, images):
         params = {}
         if info["fps"] is None:
-            t = [self.doc[u][Info.SCHED_TIME] for u, im in images]
+            t = [self.model.get_dataset_by_uuid(u).info.get(Info.SCHED_TIME) for u, im in images]
             t_diff = [max(1, (t[i] - t[i - 1]).total_seconds()) for i in range(1, len(t))]
             min_diff = float(min(t_diff))
             # imageio seems to be using duration in seconds
@@ -386,8 +397,11 @@ class ExportImageHelper(QtCore.QObject):
         # get canvas screenshot arrays (numpy arrays of canvas pixels)
         img_arrays = self.sgm.get_screenshot_array(info["frame_range"])
         if not img_arrays or len(uuids) != len(img_arrays):
-            LOG.error(f"Number of frames: {0 if not img_arrays else len(img_arrays)}"
-                      f" does not equal " f"number of UUIDs: {len(uuids)}")
+            LOG.error(
+                f"Number of frames: {0 if not img_arrays else len(img_arrays)}"
+                f" does not equal "
+                f"number of UUIDs: {len(uuids)}"
+            )
             return
 
         images = [(u, Image.fromarray(x)) for u, x in img_arrays]
@@ -396,7 +410,9 @@ class ExportImageHelper(QtCore.QObject):
             images = [(u, self._append_colorbar(info["colorbar"], im, u)) for (u, im) in images]
 
         if info["include_footer"]:
-            banner_text = [self.doc[u][Info.DISPLAY_NAME] if u else "" for u, im in images]
+            banner_text = [
+                self.model.get_dataset_by_uuid(u).info.get(Info.DISPLAY_NAME) if u else "" for u, im in images
+            ]
             images = [
                 (u, self._add_screenshot_footer(im, bt, font_size=info["font_size"]))
                 for (u, im), bt in zip(images, banner_text)

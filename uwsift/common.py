@@ -21,7 +21,7 @@ numba
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Iterable, MutableSequence, NamedTuple, Optional, Tuple
+from typing import NamedTuple, Optional
 from uuid import UUID
 
 from pyproj import Proj
@@ -249,8 +249,8 @@ class Info(Enum):
 
     # SIFT bookkeeping
     DATASET_NAME = "dataset_name"  # logical name of the file (possibly human assigned)
-    KIND = "kind"  # Kind enumeration on what kind of layer this makes
-    UUID = "uuid"  # UUID assigned on import, which follows the layer around the system
+    KIND = "kind"  # Kind enumeration on what kind of layer/dataset this makes
+    UUID = "uuid"  # UUID assigned on import, which follows the layer/dataset around the system
 
     # track determiner is family::category; presentation is determined by family
     # family::category::serial is a unique identifier equivalent to conventional make-model-serialnumber
@@ -290,7 +290,7 @@ class Info(Enum):
     INSTRUMENT = "instrument"  # Instrument enumeration, or string with full standard name
 
     # human-friendly conventions
-    DISPLAY_NAME = "display_name"  # preferred name in the layer list
+    DISPLAY_NAME = "display_name"  # preferred name for displaying
     DISPLAY_TIME = "display_time"  # typically from guidebook, used for labeling animation frame
     UNIT_CONVERSION = "unit_conversion"  # (preferred CF units, convert_func, format_func)
     # unit numeric conversion func: lambda x, inverse=False: convert-to-units
@@ -341,139 +341,13 @@ class Info(Enum):
 
 @dataclass
 class Presentation:
-    """Presentation information for a layer.
+    """Presentation information for a layer and dataset."""
 
-    z_order comes from the layerset
-
-    """
-
-    uuid: Optional[UUID]  # dataset in the document/workspace, None if referring to a system layer
-    kind: Kind  # what kind of layer it is
+    uuid: Optional[UUID]  # dataset in the layermodel/document/workspace, None if referring to a system layer
+    kind: Kind  # what kind of layer/dataset it is
     visible: bool = True  # whether it's visible or not
-    a_order: int = None  # None for non-animating, 0..n-1 what order to draw in during animation
     colormap: object = None  # name or uuid: color map to use; name for default, uuid for user-specified
     style: object = None  # name or uuid: SVG/HTML style to use; name for default, (FUTURE?) uuid for user-specified
     climits: tuple = None  # valid min and valid max used for color mapping normalization
     gamma: float = 1.0  # valid (0 to 5) for gamma correction
     opacity: float = 1.0
-
-
-class ZList(MutableSequence):
-    """List indexed from high Z to low Z
-    For z-ordered tracks, we want to have
-    - contiguous Z order values from high to low (negative)
-    - elements assigned negative stay negative, likewise with positive (negative Z implies inactive non-document track)
-    - no Z value is repeated
-    - insertions are correctly handled
-    - append also works, by default arriving as most-negative z-order
-    - assignment off either end gets snapped to the contiguous next value
-    """
-
-    _zmax: int = 0  # z-index of the first member of _content
-    _content: list
-
-    @property
-    def min_max(self) -> Tuple[int, int]:
-        return (self._zmax + 1 - len(self), self._zmax) if len(self) else (None, None)
-
-    def __contains__(self, z) -> bool:
-        n, x = self.min_max
-        return False if (n is None) or (x is None) or (z < n) or (z > x) else True
-
-    def append(self, val, start_negative: bool = False, not_if_present: bool = False):
-        if start_negative and 0 == len(self._content):
-            self._zmax = -1
-        if not_if_present and (val in self._content):
-            return
-        self._content.append(val)
-
-    def items(self) -> Iterable[Tuple[int, Any]]:
-        z = self._zmax
-        for q, v in enumerate(self._content):
-            yield z - q, v
-
-    def index(self, val):
-        ldex = self._content.index(val)
-        z = self._zmax - ldex
-        return z
-
-    def keys(self):
-        yield from range(self._zmax, self._zmax - len(self._content), -1)
-
-    def values(self):
-        yield from iter(self._content)
-
-    def insert(self, z: int, val):
-        """insert a value such that it lands at index z
-        as needed:
-        displace any content with z>=0 upward
-        displace any content with z<0 downward
-        """
-        if len(self._content) == 0:
-            self._zmax = -1 if (z < 0) else 0
-            self._content.append(val)
-        elif z not in self:
-            if z >= 0:
-                self._zmax += 1
-                self._content.insert(0, val)
-            else:
-                self._content.append(val)
-        else:
-            adj = 1 if z >= 0 else 0
-            ldex = max(0, self._zmax - z + adj)
-            self._content.insert(ldex, val)
-            self._zmax += adj
-
-    def move(self, to_z: int, val):
-        old_z = self.index(val)
-        if old_z != to_z:
-            del self[old_z]
-            self.insert(to_z, val)
-
-    def __init__(self, zmax: int = None, content: Iterable[Any] = None):
-        super(ZList, self).__init__()
-        if zmax is not None:
-            self._zmax = zmax
-        self._content = list(content) if content is not None else []
-
-    def __len__(self) -> int:
-        return len(self._content)
-
-    def __setitem__(self, z, val):
-        ldex = self._zmax - z
-        if ldex < 0:
-            self._content.insert(0, val)
-            self._zmax += 1
-        elif ldex >= len(self._content):
-            self._content.append(val)
-        else:
-            self._content[ldex] = val
-
-    def __getitem__(self, z) -> Any:
-        ldex = self._zmax - z
-        if ldex < 0 or ldex >= len(self._content):
-            raise IndexError("Z={} not in ZList".format(z))
-        return self._content[ldex]
-
-    def __delitem__(self, z):
-        if z not in self:
-            raise IndexError("Z={} not in ZList".format(z))
-        ldex = self._zmax - z
-        if z >= 0:
-            self._zmax -= 1
-        del self._content[ldex]
-
-    def __repr__(self) -> str:
-        return "ZList({}, {})".format(self._zmax, repr(self._content))
-
-    def __eq__(self, other) -> bool:
-        return isinstance(other, ZList) and other._zmax == self._zmax and other._content == self._content
-
-    def to_dict(self, inverse=False) -> dict:
-        if not inverse:
-            return dict(self.items())
-        else:
-            zult = dict((b, a) for (a, b) in self.items())
-            if len(zult) != len(self._content):
-                raise RuntimeWarning("ZList.to_dict inverse did not have fully unique keys")
-            return zult

@@ -27,7 +27,7 @@ import logging
 import os
 from enum import Enum
 from numbers import Number
-from typing import Dict, Optional
+from typing import Optional
 from uuid import UUID
 
 import numpy as np
@@ -66,7 +66,7 @@ from uwsift.view.visuals import (
     Lines,
     MultiChannelImage,
     NEShapefileLines,
-    RGBCompositeLayer,
+    RGBCompositeImage,
     TiledGeolocatedImage,
 )
 from uwsift.workspace.utils.metadata_utils import (
@@ -150,13 +150,7 @@ class PendingPolygon(object):
 
 
 class AnimationController(object):
-    """Basic bookkeeping object for each layer set (A, B, C, D) from the UI.
-
-    Each LayerSet has its own:
-     - Per layer visiblity
-     - Animation loop and frame order
-     - Layer Order
-    """
+    """Basic bookkeeping object for each layer set (A, B, C, D) from the UI."""
 
     def __init__(self):
 
@@ -945,7 +939,7 @@ class SceneGraphManager(QObject):
         )
 
         if USE_TILED_GEOLOCATED_IMAGES:
-            composite = RGBCompositeLayer(
+            composite = RGBCompositeImage(
                 images_data,
                 product_dataset.info[Info.ORIGIN_X],
                 product_dataset.info[Info.ORIGIN_Y],
@@ -1009,7 +1003,7 @@ class SceneGraphManager(QObject):
 
         pos, values = self.workspace.get_points_arrays(product_dataset.uuid)
         if pos is None:
-            LOG.info(f"layer contains no points: {product_dataset.uuid}")
+            LOG.info(f"dataset contains no points: {product_dataset.uuid}")
             return
 
         kwargs = map_point_style_to_marker_kwargs(get_point_style_by_name(layer.presentation.style))
@@ -1055,9 +1049,9 @@ class SceneGraphManager(QObject):
     def change_node_for_composite_dataset(self, layer: LayerItem, product_dataset: ProductDataset):
         if layer.kind == Kind.RGB:
             if product_dataset.uuid in self.dataset_nodes:
-                # RGB selection has changed, rebuild the layer
+                # RGB selection has changed, rebuild the dataset
                 LOG.debug(
-                    f"Changing existing composite layer to"
+                    f"Changing existing composite dataset to"
                     f" Scene Graph Manager with UUID:"
                     f" {product_dataset.uuid}"
                 )
@@ -1070,7 +1064,7 @@ class SceneGraphManager(QObject):
                 self.composite_element_dependencies[product_dataset.uuid] = product_dataset.input_datasets_uuids
 
                 composite = self.dataset_nodes[product_dataset.uuid]
-                if isinstance(composite, RGBCompositeLayer):
+                if isinstance(composite, RGBCompositeImage):
                     composite.set_channels(
                         images_data,
                         cell_width=product_dataset.info[Info.CELL_WIDTH],
@@ -1083,7 +1077,7 @@ class SceneGraphManager(QObject):
                 composite.clim = layer.presentation.climits
                 composite.gamma = layer.presentation.gamma
                 self.on_view_change(None)
-                if isinstance(composite, RGBCompositeLayer):
+                if isinstance(composite, RGBCompositeImage):
                     composite.determine_reference_points()
                 self.update()
             else:
@@ -1093,17 +1087,16 @@ class SceneGraphManager(QObject):
 
     def update_basic_dataset(self, uuid: UUID, kind: Kind):
         """
-        Push the data (content) of a basic layer again to the associated scene
+        Push the data (content) of a basic dataset again to the associated scene
         graph node.
 
-        This method shall be called whenever the data of a basic layer changes.
-        :param uuid: identifier of the layer
-        :param kind: kind of the layer / data content.
+        This method shall be called whenever the data of a basic dataset changes.
+        :param uuid: identifier of the dataset
+        :param kind: kind of the dataset / data content.
         """
-        layer = self.document[uuid]
-        dataset_node = self.dataset_nodes[layer[Info.UUID]]
-        dataset_content = self.workspace.get_content(layer[Info.UUID], kind=kind)
         try:
+            dataset_node = self.dataset_nodes[uuid]
+            dataset_content = self.workspace.get_content(uuid, kind=kind)
             dataset_node.set_data(dataset_content)
         except NotImplementedError:
             if isinstance(dataset_node, TiledGeolocatedImage):
@@ -1125,6 +1118,9 @@ class SceneGraphManager(QObject):
                 # image(!) data, looks like it was called for a node of another
                 # type not having set_data() too.
                 raise
+        except KeyError:
+            LOG.fatal(f"Node for dataset with the uuid '{uuid}' does not exist in the scene graph. This is a BUG!")
+            raise
 
         self.on_view_change(None)
         self.update()
@@ -1142,26 +1138,10 @@ class SceneGraphManager(QObject):
                 z_counter -= 1
             self.update()
 
-    def remove_dataset(self, new_order: tuple, uuids_removed: tuple, row: int, count: int):
-        """
-        remove (disable) a layer, though this may be temporary due to a move.
-        wait for purge to truly flush out this puppy
-        :param new_order:
-        :param uuid_removed:
-        :return:
-        """
-        for uuid_removed in uuids_removed:
-            self.set_dataset_visible(uuid_removed, False)
-
-    def _remove_dataset(self, *args, **kwargs):
-        self.remove_dataset(*args, **kwargs)
-        # when removing the layer is the only operation being performed then update when we are done
-        self.update()
-
     def purge_dataset(self, uuid_removed: UUID):
         """
         Dataset has been purged from document (no longer used anywhere) - flush it all out
-        :param uuid_removed: UUID of the layer that is to be removed
+        :param uuid_removed: UUID of the dataset that is to be removed
         :return:
         """
         if uuid_removed in self.dataset_nodes:
@@ -1173,12 +1153,6 @@ class SceneGraphManager(QObject):
             LOG.debug(f"dataset {uuid_removed} already purged from Scene Graph")
         LOG.debug("Scene Graph after dataset deletion:")
         LOG.debug(self.main_view.describe_tree(with_transform=True))
-
-    def _purge_dataset(self, *args, **kwargs):
-        res = self.purge_dataset(*args, **kwargs)
-        # when purging the layer is the only operation being performed then update when we are done
-        self.update()
-        return res
 
     def remove_layer_node(self, uuid_removed: UUID):
         """
@@ -1195,18 +1169,8 @@ class SceneGraphManager(QObject):
         LOG.debug("Scene Graph after layer deletion:")
         LOG.debug(self.main_view.describe_tree(with_transform=True))
 
-    def change_datasets_visibility(self, layers_changed: Dict[UUID, bool]):
-        for uuid, visible in layers_changed.items():
-            self.set_dataset_visible(uuid, visible)
-
     def _connect_doc_signals(self, document: Document):
-        document.didReorderDatasets.connect(self._rebuild_dataset_order)  # current layer set changed z/anim order
         document.didUpdateBasicDataset.connect(self.update_basic_dataset)  # new data integrated in existing layer
-        document.didRemoveDatasets.connect(self._remove_dataset)  # layer removed from current layer set
-        document.willPurgeDataset.connect(self._purge_dataset)  # layer removed from document
-        document.didChangeColormap.connect(self.change_dataset_nodes_colormap)
-        document.didChangeLayerVisibility.connect(self.change_datasets_visibility)
-        document.didReorderAnimation.connect(self._rebuild_frame_order)
 
     def set_dataset_visible(self, uuid: UUID, visible: Optional[bool] = None):
         dataset_node = self.dataset_nodes.get(uuid, None)
@@ -1214,33 +1178,8 @@ class SceneGraphManager(QObject):
             return
         dataset_node.visible = not dataset_node.visible if visible is None else visible
 
-    def rebuild_dataset_order(self, new_layer_index_order, *args, **kwargs):
-        """
-        layer order has changed; shift layers around.
-        an empty list is sent if the whole layer order has been changed
-        :param change:
-        :return:
-        """
-        # TODO this is the lazy implementation, eventually just change z order on affected layers
-        self.animation_controller.set_layer_order(self.document.current_layer_uuid_order)
-
-    def _rebuild_dataset_order(self, *args, **kwargs):
-        res = self.rebuild_dataset_order(*args, **kwargs)
-        self.update()
-        return res
-
-    def rebuild_frame_order(self, uuid_list: list, *args, **kwargs):
-        LOG.debug("setting SGM new frame order to {0!r:s}".format(uuid_list))
-        self.animation_controller.frame_order = uuid_list
-
-    def _rebuild_frame_order(self, *args, **kwargs):
-        res = self.rebuild_frame_order(*args, **kwargs)
-        # when purging the layer is the only operation being performed then update when we are done
-        self.update()
-        return res
-
     def on_view_change(self, scheduler):
-        """Simple event handler for when we need to reassess image layers."""
+        """Simple event handler for when we need to reassess image datasets."""
         # Stop the timer so it doesn't continuously call this slot
         if scheduler:
             scheduler.stop()
@@ -1266,7 +1205,7 @@ class SceneGraphManager(QObject):
         self.queue.add(
             str(uuid) + "_retile",
             self._retile_child(uuid, preferred_stride, tile_box),
-            "Retile calculations for image layer " + str(uuid),
+            "Retile calculations for image dataset" + str(uuid),
             interactive=True,
         )
 
@@ -1300,7 +1239,7 @@ class SceneGraphManager(QObject):
         self.workspace.bgnd_task_complete()  # FUTURE: consider a threading context manager for this??
 
     def _set_retiled(self, uuid, preferred_stride, tile_box, tiles_info, vertices, tex_coords):
-        """Slot to take data from background thread and apply it to the layer living in the image layer."""
+        """Slot to take data from background thread and apply it to the dataset living in the image dataset."""
         child = self.dataset_nodes.get(uuid, None)
         if child is None:
             LOG.warning("unable to find uuid %s in dataset_nodes" % uuid)

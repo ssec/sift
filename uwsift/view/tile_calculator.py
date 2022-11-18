@@ -67,6 +67,7 @@ def get_reference_points(img_cmesh, img_vbox):
 
     return ref_idx_1, near_points_2[0]
 
+
 @jit(
     nb_types.UniTuple(float64, 2)(float64[:, :], float64[:, :], nb_types.UniTuple(int64, 2)),
     nopython=True,

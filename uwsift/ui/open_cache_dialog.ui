@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Open Cached Layers</string>
+   <string>Open Cached Datasets</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
@@ -19,7 +19,7 @@
      <item>
       <widget class="QLabel" name="label">
        <property name="text">
-        <string>Pre-processed layers stored in cache will load quickly.</string>
+        <string>Pre-processed datasets stored in cache will load quickly.</string>
        </property>
       </widget>
      </item>
@@ -39,7 +39,7 @@
      <item>
       <widget class="QPushButton" name="removeFromCacheButton">
        <property name="text">
-        <string>Remove Selected Cached Layers</string>
+        <string>Remove Selected Cached Datasets</string>
        </property>
       </widget>
      </item>

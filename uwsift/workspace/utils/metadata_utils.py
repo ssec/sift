@@ -10,71 +10,70 @@ from uwsift.workspace.guidebook import Guidebook
 LOG = logging.getLogger(__name__)
 
 
-def get_default_colormap(layer_info: dict, guidebook: Guidebook) -> str:
+def get_default_colormap(info: dict, guidebook: Guidebook) -> str:
     """
     Return the name of a colormap configured in 'default_colormaps' for
-    the standard name taken from the given ``layer_info``.
+    the standard name taken from the given ``info``.
 
     If no according colormap is configured or the configuration yields an
     unknown colormap name (in that case a warning is logged), the colormap
     provided by the `guidebook` is returned.
     """
 
-    layer_standard_name = layer_info.get(Info.STANDARD_NAME)
+    layer_standard_name = info.get(Info.STANDARD_NAME)
     if layer_standard_name is None:
         LOG.debug(
-            "Cannot determine default colormap from configuration " "for layer which does not have a standard name."
+            "Cannot determine default colormap from configuration " "for info which does not have a standard name."
         )
     else:
         colormap_name = config.get(".".join(["default_colormaps", layer_standard_name]), None)
         if colormap_name in COLORMAP_MANAGER:
             LOG.debug(
-                f"Returning color map '{colormap_name}' as configured for"
-                f" layer standard name '{layer_standard_name}'."
+                f"Returning color map '{colormap_name}' as configured for" f" standard name '{layer_standard_name}'."
             )
             return colormap_name
 
         if colormap_name:
             LOG.warning(
                 f"Unknown color map '{colormap_name}' configured for"
-                f" layer standard name '{layer_standard_name}'. "
+                f" standard name '{layer_standard_name}'. "
                 f" Falling back to internal Guidebook mapping."
             )
 
-    return guidebook.default_colormap(layer_info)
+    return guidebook.default_colormap(info)
 
 
 # FIXME move this to a better location
 DEFAULT_POINT_STYLE_UNKNOWN = "unknown"
 
 
-def get_default_point_style_name(layer_info: dict) -> str:
-    # FIXME actually to have this consistent with IMAGE layer default colormap
-    #  selection the name chosen should be layer_info[Info.STANDARD_NAME] only
+def get_default_point_style_name(info: dict) -> str:
+    # FIXME actually to have this consistent with IMAGE dataset default colormap
+    #  selection the name chosen should be dataset_info[Info.STANDARD_NAME] only
     #  as done by the Guidebook, but the STANDARD_NAME is not set for points
     #  data (yet).
     #  It needs to be clarified which approach is the right one - either making
     #  sure the STANDARD_NAME is always set or implementing a common fallback
     #  strategy.
-    layer_identifying_name = layer_info.get(Info.STANDARD_NAME, None)
-    if not layer_identifying_name:
-        layer_identifying_name = layer_info.get(Info.SHORT_NAME, None)
-    if not layer_identifying_name:
-        layer_identifying_name = layer_info.get(Info.LONG_NAME, None)
-    if not layer_identifying_name:
-        layer_identifying_name = layer_info.get("name", None)
-    if not layer_identifying_name:
-        LOG.warning(f"Layer has no name." f" Cannot determine a default point style." f" Layer info: {layer_info}")
+    identifying_name = info.get(Info.STANDARD_NAME, None)
+    if not identifying_name:
+        identifying_name = info.get(Info.SHORT_NAME, None)
+    if not identifying_name:
+        identifying_name = info.get(Info.LONG_NAME, None)
+    if not identifying_name:
+        identifying_name = info.get("name", None)
+    if not identifying_name:
+        LOG.warning(f"There is no name." f" Cannot determine a default point style." f"info: {info}")
         return DEFAULT_POINT_STYLE_UNKNOWN
 
-    point_style_name = config.get(f"default_point_styles.{layer_identifying_name}", None)
+    point_style_name = config.get(f"default_point_styles.{identifying_name}", None)
     if not point_style_name:
-        LOG.warning(f"No default point style configured for layer" f" '{layer_identifying_name}'")
+        LOG.warning(f"No default point style configured for " f" '{identifying_name}'")
         return DEFAULT_POINT_STYLE_UNKNOWN
     # Check, whether there is a style defined for the given name
     point_style = get_point_style_by_name(point_style_name)
     if not point_style:
-        LOG.warning(f"Unknown point style '{point_style_name}' configured for" f" layer '{layer_identifying_name}'.")
+        LOG.warning(f"Unknown point style '{point_style_name}' configured for" f" '{identifying_name}'.")
         return DEFAULT_POINT_STYLE_UNKNOWN
     return point_style_name
 

@@ -123,23 +123,23 @@ class SimpleWorkspace(BaseWorkspace):
     def _all_product_uuids(self) -> list:
         return [self.products[p] for p in self.products]
 
-    def get_info(self, dsi_or_uuid, lod=None) -> Optional[frozendict]:
+    def get_info(self, info_or_uuid, lod=None) -> Optional[frozendict]:
         """
-        :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
+        :param info_or_uuid: existing datasetinfo dictionary, or its UUID
         :param lod: desired level of detail to focus
         :return: metadata access with mapping semantics, to be treated as read-only
         """
         # FUTURE deprecate this
-        if isinstance(dsi_or_uuid, str):
-            uuid = UUID(dsi_or_uuid)
-        elif not isinstance(dsi_or_uuid, UUID):
-            uuid = dsi_or_uuid[Info.UUID]
+        if isinstance(info_or_uuid, str):
+            uuid = UUID(info_or_uuid)
+        elif not isinstance(info_or_uuid, UUID):
+            uuid = info_or_uuid[Info.UUID]
         else:
-            uuid = dsi_or_uuid
+            uuid = info_or_uuid
 
         prod = self._product_with_uuid(None, uuid)
         if not prod:  # then it hasn't had its metadata scraped
-            LOG.error("no info available for UUID {}".format(dsi_or_uuid))
+            LOG.error("no info available for UUID {}".format(info_or_uuid))
             LOG.error("known products: {}".format(repr(self._all_product_uuids())))
             return None
         kind = prod.info[Info.KIND]
@@ -149,7 +149,7 @@ class SimpleWorkspace(BaseWorkspace):
             # query and/or deprecate .get_info
             # once upon a time...
             # our old model was that product == content and shares a UUID with
-            # the layer if content is available, we want to provide native
+            # the dataset if content is available, we want to provide native
             # content metadata along with the product metadata
             # specifically a lot of client code assumes that resource
             # == product == content and
@@ -207,32 +207,12 @@ class SimpleWorkspace(BaseWorkspace):
         """
         importers = []
         num_products = 0
-        remaining_paths = []
-        if "reader" in importer_kwargs:
-            # skip importer guessing and go straight to satpy importer
-            paths, remaining_paths = [], paths
+        if "reader" not in importer_kwargs:
+            # If there is no reader in the importer_kwargs then the SatPy Import can't be used
+            return None
 
-        for source_path in paths:
-            # LOG.info('collecting metadata for {}'.format(source_path))
-            # FIXME: Check if importer only accepts one path at a time
-            #        Maybe sort importers by single files versus multiple
-            #        files and doing single files first?
-            # FIXME: decide whether to update database if mtime of file
-            #  is newer than mtime in database
-            # Collect all the importers we are going to use and count
-            # how many products each expects to return
-            for imp in self._importers:
-                if imp.is_relevant(source_path=source_path):
-                    hauler = imp(source_path, database_session=None, workspace_cwd=self.cache_dir, **importer_kwargs)
-                    hauler.merge_resources()
-                    importers.append(hauler)
-                    num_products += hauler.num_products
-                    break
-            else:
-                remaining_paths.append(source_path)
-
-        # Pass remaining paths to SatPy importer and see what happens
-        if remaining_paths:
+        # Pass paths to SatPy importer and see what happens
+        if paths:
             if "reader" not in importer_kwargs:
                 raise NotImplementedError("Reader discovery is not " "currently implemented in " "the satpy importer.")
             if "scenes" in importer_kwargs:
@@ -240,7 +220,7 @@ class SimpleWorkspace(BaseWorkspace):
                 scenes = importer_kwargs.pop("scenes")
                 scenes = scenes.items()
             else:
-                scenes = [(remaining_paths, None)]
+                scenes = [(paths, None)]
             for paths, scene in scenes:
                 imp = SatpyImporter
                 these_kwargs = importer_kwargs.copy()
@@ -456,22 +436,22 @@ class SimpleWorkspace(BaseWorkspace):
         LOG.debug(f"Active Content after deletion: {list(self._available.keys())}")
         yield {TASK_DOING: "purging memory", TASK_PROGRESS: 1.0}
 
-    def get_content(self, dsi_or_uuid, lod=None, kind: Kind = Kind.IMAGE) -> Optional[np.memmap]:
+    def get_content(self, info_or_uuid, lod=None, kind: Kind = Kind.IMAGE) -> Optional[np.memmap]:
         """
         By default, get the best-available (closest to native)
         np.ndarray-compatible view of the full dataset
-        :param dsi_or_uuid: existing datasetinfo dictionary, or its UUID
+        :param info_or_uuid: existing datasetinfo dictionary, or its UUID
         :param lod: desired level of detail to focus  (0 for overview)
         :return:
         """
-        if dsi_or_uuid is None:
+        if info_or_uuid is None:
             return None
-        elif isinstance(dsi_or_uuid, UUID):
-            uuid = dsi_or_uuid
-        elif isinstance(dsi_or_uuid, str):
-            uuid = UUID(dsi_or_uuid)
+        elif isinstance(info_or_uuid, UUID):
+            uuid = info_or_uuid
+        elif isinstance(info_or_uuid, str):
+            uuid = UUID(info_or_uuid)
         else:
-            uuid = dsi_or_uuid[Info.UUID]
+            uuid = info_or_uuid[Info.UUID]
 
         # The current implementation, where self.contents is a dict, cannot
         # support multiple contents per Product/UUID which seems to be prepared

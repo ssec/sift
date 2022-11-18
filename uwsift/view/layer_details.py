@@ -222,38 +222,5 @@ class SingleLayerInfoPane(QWidget):
             self._display_shared_info(shared_info)
             return
 
-        # otherwise display information on the selected layer(s)
-        # figure out the info shared between all the layers currently selected
-        presentation_info = self.document.current_layer_set
-        for layer_uuid in selected_uuid_list:
-            layer_info = self.document.get_info(uuid=layer_uuid)
-
-            this_prez = None
-            for prez_tuple in presentation_info:
-                if prez_tuple.uuid == layer_uuid:
-                    this_prez = prez_tuple
-                    break
-
-            # compare our various values
-            self._update_if_different(shared_info, layer_info, Info.DISPLAY_NAME)
-            self._update_if_different(shared_info, layer_info, Info.DISPLAY_TIME)
-            self._update_if_different(shared_info, layer_info, Info.INSTRUMENT)
-            self._update_if_different(shared_info, this_prez, attr="colormap")
-            self._get_shared_color_limits(shared_info, layer_info, this_prez)
-            self._get_code_block(shared_info, layer_uuid)
-
-            # wavelength
-            wl = layer_info.get(Info.CENTRAL_WAVELENGTH)
-            fmt = "{:0.2f} µm"
-            if isinstance(wl, (tuple, list)):
-                wl = [fmt.format(x) if x is not None else "---" for x in wl]
-                wl = "(" + ", ".join(wl) + ")"
-            else:
-                wl = fmt.format(wl) if wl is not None else "---"
-            if Info.CENTRAL_WAVELENGTH not in shared_info:
-                shared_info[Info.CENTRAL_WAVELENGTH] = wl
-            else:
-                shared_info[Info.CENTRAL_WAVELENGTH] = "---" if shared_info[Info.CENTRAL_WAVELENGTH] != wl else wl
-
         # set the various text displays
         self._display_shared_info(shared_info)

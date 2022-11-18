@@ -12,39 +12,33 @@ from PyQt5.QtCore import Qt
 from uwsift.view import export_image
 
 
-def _get_mock_doc():
-    """Mock Document class for testing."""
+def _get_mock_model():
+    """Mock LayerModel class for testing."""
 
     class MockPrez:
         def __init__(self):
             self.colormap = "Rainbow (IR Default)"
             self.climits = (0, 1)
 
-    class MockDocBasicLayer:
+    class MockDataset:
         def __init__(self):
-            self.attrs = {}
-            self.attrs["unit_conversion"] = ("unit", lambda t: t, lambda t: t)
-            self.attrs["timeline"] = datetime.datetime(2000, 1, 1, 0, 0, 0, 0)
-            self.attrs["display_name"] = "name"
+            self.info = {}
+            self.info["unit_conversion"] = ("unit", lambda t: t, lambda t: t)
+            self.info["timeline"] = datetime.datetime(2000, 1, 1, 0, 0, 0, 0)
+            self.info["display_name"] = "name"
 
-        def __getitem__(self, item):
-            return self.attrs[item]
-
-    class MockDoc:
+    class MockModel:
         def __init__(self):
-            self.layer = MockDocBasicLayer()
-            self.prez = MockPrez()
+            self.moc_prez = MockPrez()
+            self.moc_dataset = MockDataset()
 
-        def __getitem__(self, item):
-            return self.layer
+        def get_dataset_presentation_by_uuid(self, u):
+            return self.moc_prez
 
-        def colormap_for_uuid(self, u):
-            return "Rainbow (IR Default)"
+        def get_dataset_by_uuid(self, u):
+            return self.moc_dataset
 
-        def prez_for_uuid(self, u):
-            return MockPrez()
-
-    return MockDoc()
+    return MockModel()
 
 
 def _get_mock_sd(fr, fn):
@@ -117,7 +111,7 @@ def _get_mock_writer():
 )
 def test_create_colorbar(size, mode, exp, monkeypatch, window):
     """Test colorbar is created correctly given dimensions and the colorbar append direction."""
-    monkeypatch.setattr(window.export_image, "doc", _get_mock_doc())
+    monkeypatch.setattr(window.export_image, "model", _get_mock_model())
     monkeypatch.setattr(window.export_image.sgm.main_canvas, "dpi", 100)
 
     res = window.export_image._create_colorbar(mode, None, size)
@@ -136,7 +130,7 @@ def test_create_colorbar(size, mode, exp, monkeypatch, window):
 )
 def test_append_colorbar(mode, cbar_size, exp, monkeypatch, window):
     """Test colorbar is appended to the appropriate location given the colorbar append direction."""
-    monkeypatch.setattr(window.export_image, "doc", _get_mock_doc())
+    monkeypatch.setattr(window.export_image, "model", _get_mock_model())
     monkeypatch.setattr(window.export_image.sgm.main_canvas, "dpi", 100)
     monkeypatch.setattr(window.export_image, "_create_colorbar", lambda x, y, z: plt.figure(figsize=cbar_size))
 
@@ -180,7 +174,7 @@ def test_convert_frame_range(range, exp, window):
 )
 def test_get_animation_parameters(info, isgif, exp, monkeypatch, window):
     """Test animation parameters are calculated correctly."""
-    monkeypatch.setattr(window.export_image, "doc", _get_mock_doc())
+    monkeypatch.setattr(window.export_image, "model", _get_mock_model())
     monkeypatch.setattr(export_image, "is_gif_filename", lambda x: isgif)
 
     im = Image.new("RGBA", (100, 100))
@@ -213,7 +207,7 @@ def test_is_video_filename(fn, exp):
 )
 def test_create_filenames(uuids, base, exp, monkeypatch, window):
     """Test file names are created correctly."""
-    monkeypatch.setattr(window.export_image, "doc", _get_mock_doc())
+    monkeypatch.setattr(window.export_image, "model", _get_mock_model())
     res = window.export_image._create_filenames(uuids, base)
     assert res == exp
 
@@ -236,7 +230,7 @@ def test_save_screenshot(fr, fn, overwrite, exp, monkeypatch, window):
     monkeypatch.setattr(window.export_image, "_convert_frame_range", lambda x: fr)
     monkeypatch.setattr(window.export_image, "sgm", _get_mock_sgm(fr))
     monkeypatch.setattr(window.export_image, "_create_filenames", lambda x, y: ([1], [fn]))
-    monkeypatch.setattr(window.export_image, "doc", _get_mock_doc())
+    monkeypatch.setattr(window.export_image, "model", _get_mock_model())
     monkeypatch.setattr(window.export_image, "_overwrite_dialog", lambda: overwrite)
     monkeypatch.setattr(window.export_image, "_append_colorbar", lambda x, y, z: y)
     monkeypatch.setattr(window.export_image, "_add_screenshot_footer", lambda x, y, font_size=10: x)

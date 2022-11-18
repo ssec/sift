@@ -89,16 +89,6 @@ EXIT_FORCED_SHUTDOWN = 101
 EXIT_CONFIRMED_SHUTDOWN = 102
 
 
-def test_layers_from_directory(doc, layer_tiff_glob):
-    return doc.open_file(glob(layer_tiff_glob))
-
-
-def test_layers(doc, glob_pattern=None):
-    if glob_pattern:
-        return test_layers_from_directory(doc, glob_pattern)
-    return []
-
-
 async def do_test_cycle(txt: QtWidgets.QWidget):
     from asyncio import sleep
 
@@ -246,13 +236,11 @@ def _common_path_prefix(paths):
 class UserControlsAnimation(QtCore.QObject):
     """Controller behavior focused around animation bar and next/last key bindings.
 
-    Connects between document, scene graph manager, layer list view of document; uses UI elements.
+    Connects between scene graph managers animation controller and the UI elements.
     Is composed into MainWindow.
-    - scrub left and right on slider
-    - next and last timestep (if time animation)
-    - next and last bandstep (if band animation)
-    - update time display above time slider
+    - next and last frame
     - update animation rate using popup widget
+    - start/stop animation
     """
 
     ui = None
@@ -260,17 +248,15 @@ class UserControlsAnimation(QtCore.QObject):
     scene_manager: SceneGraphManager = None
     _animation_speed_popup = None  # window we'll show temporarily with animation speed popup
 
-    def __init__(self, ui, scene_manager: SceneGraphManager, document: Document):
+    def __init__(self, ui, scene_manager: SceneGraphManager):
         """
         Args:
             ui: QtDesigner UI element tree for application
             scene_manager: Map display manager, needed for controller screen animation
-            document: document object, needed for sibling lookups
         """
         super(UserControlsAnimation, self).__init__()
         self.ui = ui
         self.scene_manager = scene_manager
-        self.document = document
 
         self.ui.animPlayPause.clicked.connect(self.toggle_animation)
         self.ui.animPlayPause.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -502,7 +488,7 @@ class Main(QtWidgets.QMainWindow):
     @staticmethod
     def run_gc_after_layer_deletion():
         """
-        Trigger a full garbage collection run after the deletion of a layer from the scene graph.
+        Trigger a full garbage collection run after the deletion of a layer and its datasets from the scene graph.
         The code uses cyclic and weak references, which can only be freed by the GC.
         """
         unreachable_object_count = gc.collect()
@@ -553,7 +539,7 @@ class Main(QtWidgets.QMainWindow):
 
     def _clear_last_dataset_creation_time(self, removed_uuids: typ.List[UUID]):
         """
-        Clear the LineEdit if the layer, from which the creation time was
+        Clear the LineEdit if the dataset, from which the creation time was
         extracted, is deleted from the scene graph.
         """
         if self._last_imported_dataset_uuid in removed_uuids:
@@ -652,7 +638,6 @@ class Main(QtWidgets.QMainWindow):
         config_dir=None,
         workspace_dir=None,
         cache_size=None,
-        glob_pattern=None,
         search_paths=None,
         border_shapefile=None,
         center=None,
@@ -688,12 +673,9 @@ class Main(QtWidgets.QMainWindow):
         else:
             self.workspace = SimpleWorkspace(workspace_dir)
         self.document = doc = Document(self.workspace, config_dir=config_dir, queue=self.queue)
-        self.document.didRemoveDatasets.connect(self.run_gc_after_layer_deletion)
         self.scene_manager = SceneGraphManager(
             doc, self.workspace, self.queue, borders_shapefiles=border_shapefile, center=center, parent=self
         )
-        self.export_image = ExportImageHelper(self, self.document, self.scene_manager)
-        self._wizard_dialog = None
 
         self._init_layer_model()
         self._init_layer_panes()
@@ -703,10 +685,13 @@ class Main(QtWidgets.QMainWindow):
         self._init_map_widget()
         self._init_qml_timeline()
 
+        self.export_image = ExportImageHelper(self, self.scene_manager, self.layer_model)
+        self._wizard_dialog = None
+
         if AUTO_UPDATE_MODE__ACTIVE:
             self._init_update_times_display()
 
-        self.animation = UserControlsAnimation(self.ui, self.scene_manager, self.document)
+        self.animation = UserControlsAnimation(self.ui, self.scene_manager)
 
         # disable close button on panes
         panes = [
@@ -718,8 +703,6 @@ class Main(QtWidgets.QMainWindow):
             pane.setFeatures(QtWidgets.QDockWidget.DockWidgetFloatable | QtWidgets.QDockWidget.DockWidgetMovable)
         # Make the panes on the right side 375px wide
         self.resizeDocks(panes, [375] * len(panes), QtCore.Qt.Horizontal)
-
-        test_layers(self.document, glob_pattern=glob_pattern)
 
         # Interaction Setup
         self._init_key_releases()
@@ -865,6 +848,7 @@ class Main(QtWidgets.QMainWindow):
         self.layer_model.didChangeLayerOpacity.connect(self.scene_manager.change_layer_opacity)
 
         self.layer_model.didChangeColormap.connect(self.scene_manager.change_dataset_nodes_colormap)
+        self.document.didUpdateUserColormap.connect(self.layer_model.update_user_colormap_for_layers)
         self.layer_model.didChangeGamma.connect(self.scene_manager.change_dataset_nodes_gamma)
         self.layer_model.didChangeColorLimits.connect(self.scene_manager.change_dataset_nodes_color_limits)
 
@@ -1334,9 +1318,6 @@ def main() -> int:
     )
     parser.add_argument("--border-shapefile", default=None, help="Specify alternative coastline/border shapefile")
     parser.add_argument(
-        "--glob-pattern", default=os.environ.get("TIFF_GLOB", None), help="Specify glob pattern for input images"
-    )
-    parser.add_argument(
         "-p", "--path", dest="paths", action="append", help="directory to search for data [MULTIPLE ALLOWED]"
     )
     parser.add_argument("-c", "--center", nargs=2, type=float, help="Specify center longitude and latitude for camera")
@@ -1386,7 +1367,6 @@ def main() -> int:
         workspace_dir=args.workspace_dir,
         config_dir=args.config_dir,
         cache_size=args.space,
-        glob_pattern=args.glob_pattern,
         search_paths=data_search_paths,
         border_shapefile=args.border_shapefile,
         center=args.center,

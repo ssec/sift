@@ -5,7 +5,7 @@ shapes.py
 ~~~~~~~~~
 
 PURPOSE
-Shape layers which can be represented in the workspace as data content masks
+Shape datasets which can be represented in the workspace as data content masks
 
 REFERENCES
 

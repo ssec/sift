@@ -5,11 +5,8 @@ visuals.py
 ~~~~~~~~~~~
 
 PURPOSE
-Layer representation - the "physical" realization of content to draw on the map.
-A layer representation can have multiple levels of detail
-
-A factory will convert URIs into LayerReps
-LayerReps are managed by document, and handed off to the MapWidget as part of a LayerDrawingPlan
+Dataset representation - the "physical" realization of content to draw on the map.
+A dataset representation can have multiple levels of detail.
 
 REFERENCES
 
@@ -883,7 +880,7 @@ class MultiChannelImageVisual(ImageVisual):
 MultiChannelImage = create_visual_node(MultiChannelImageVisual)
 
 
-class RGBCompositeLayerVisual(
+class RGBCompositeImageVisual(
     SIFTMultiChannelTiledGeolocatedMixin, TiledGeolocatedImageVisual, MultiChannelImageVisual
 ):
     def _init_texture(self, data_arrays, texture_format):
@@ -903,7 +900,7 @@ class RGBCompositeLayerVisual(
         return tex
 
 
-RGBCompositeLayer = create_visual_node(RGBCompositeLayerVisual)
+RGBCompositeImage = create_visual_node(RGBCompositeImageVisual)
 
 
 class ShapefileLinesVisual(LineVisual):
@@ -950,7 +947,7 @@ ShapefileLines = create_visual_node(ShapefileLinesVisual)
 
 
 class NEShapefileLinesVisual(ShapefileLinesVisual):
-    """Layer class for handling shapefiles from Natural Earth.
+    """Visual class for handling shapefiles from Natural Earth.
 
     http://www.naturalearthdata.com/
 

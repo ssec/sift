@@ -259,8 +259,8 @@ class Product(Base):
         "_key_values", "value", creator=lambda key, value: ProductKeyValue(key=key, value=value)
     )
 
-    # derived / algebraic layers have a symbol table and an expression
-    # typically Content objects for algebraic layers cache calculation output
+    # derived / algebraic datasets have a symbol table and an expression
+    # typically Content objects for algebraic datasets cache calculation output
     symbol = relationship("SymbolKeyValue", backref=backref("product"), cascade="all, delete-orphan")
     expression = Column(Unicode, nullable=True)
 
@@ -485,7 +485,7 @@ class ProductKeyValue(Base):
 
 class SymbolKeyValue(Base):
     """
-    derived layers have a symbol table which becomes namespace used by expression
+    datasets of derived layers have a symbol table which becomes namespace used by expression
     """
 
     __tablename__ = "algebraic_symbol_key_values_v1"
@@ -659,6 +659,7 @@ class Content(Base):
     def touch(self, when: Optional[datetime] = None) -> None:
         self.atime = when = when or datetime.utcnow()
         self.product.touch(when)
+
 
 class ContentImage(Content):
     __mapper_args__ = {"polymorphic_identity": "image"}

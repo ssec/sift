@@ -257,7 +257,7 @@ class LayerModel(QAbstractItemModel):
         Method to return the order of a specific layer within the model.
         Determined by its index in the model.
 
-        :param layer: Layer whose oorder is queried.
+        :param layer: Layer whose order is queried.
         :return: Integer representing the order of queried layer.
         """
         return self.layers.index(layer)
@@ -438,6 +438,18 @@ class LayerModel(QAbstractItemModel):
         layer.presentation.colormap = colormap
         change_dict = self._build_presentation_change_dict(layer, colormap)
         self.didChangeColormap.emit(change_dict)
+
+    def update_user_colormap_for_layers(self, colormap):
+        """Forward changes to a custom colormap to layers that use it
+
+        This slot must be called, when a user-created color map has been edited. The changes must be propagated to the
+        layers that use that color map so that they can update their scene graph nodes accordingly.
+
+        :param colormap: Name of the colormap which has an update
+        """
+        for layer in self.layers:
+            if layer.presentation.colormap == colormap:
+                self.change_colormap_for_layer(layer.uuid, colormap)
 
     def change_color_limits_for_layer(self, uuid: UUID, color_limits: object):
         layer = self.get_layer_by_uuid(uuid)
@@ -942,6 +954,29 @@ class LayerModel(QAbstractItemModel):
             if layer.uuid in recipe_layer.recipe.input_layer_ids:
                 derived_layers.append(recipe_layer.descriptor)
         return derived_layers
+
+    def _get_layer_by_dataset(self, dataset: ProductDataset):
+        for layer in self.layers:
+            for sched_time in layer.timeline:
+                if layer.timeline.get(sched_time) == dataset:
+                    return layer
+
+    def get_dataset_presentation_by_uuid(self, uuid):
+        """Get the presentation of the dataset with the given UUID. If the dataset has no presentation
+        then the presentation of the layer which own this dataset is returned.
+
+        :param uuid: UUID of the dataset which presentation should be returned
+        :return: either the presentation of the dataset or of the layer, if the dataset has no presentation
+        """
+        dataset = self.get_dataset_by_uuid(uuid)
+        if dataset:
+            if dataset.presentation:
+                return dataset.presentation
+
+            return self._get_layer_by_dataset(self.get_dataset_by_uuid(uuid)).presentation
+
+        else:
+            return None
 
 
 class ProductFamilyKeyMappingPolicy:
