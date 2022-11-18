@@ -4,8 +4,9 @@ from uuid import UUID
 from PyQt5.QtCore import QModelIndex, Qt, pyqtSignal
 from PyQt5.QtWidgets import QAbstractItemView, QHeaderView, QMenu, QTreeView
 
-from uwsift.common import Kind
+from uwsift.common import Info, Kind
 from uwsift.common import LayerModelColumns as LMC  # noqa
+from uwsift.common import Platform
 from uwsift.model.layer_item import LayerItem
 from uwsift.util.widgets.pie_dial import PieDialDelegate
 from uwsift.view.colormap_dialogs import ChangeColormapDialog
@@ -39,7 +40,7 @@ class LayerTreeView(QTreeView):
         self.setItemDelegateForColumn(LMC.VISIBILITY, self.visibility_delegate)
         self.setEditTriggers(QAbstractItemView.AllEditTriggers)
 
-        self.customContextMenuRequested.connect(self.open_layer_context_menu)
+        self.customContextMenuRequested.connect(self._open_layer_context_menu)
 
     def resizeColumnsToContents(self) -> None:  # noqa
         """Resize all columns to their current contents of the model."""
@@ -63,7 +64,7 @@ class LayerTreeView(QTreeView):
             if not self.isPersistentEditorOpen(model_idx):
                 self.openPersistentEditor(model_idx)
 
-    def open_layer_context_menu(self, position):
+    def _open_layer_context_menu(self, position):
 
         menu = QMenu()
         selection_model_idx = self.selectionModel().currentIndex()
@@ -74,8 +75,11 @@ class LayerTreeView(QTreeView):
 
         layer: LayerItem = self.model().layers[model_idx.row()]
         actions = {}
-        if layer is not None and layer.kind in [Kind.IMAGE, Kind.COMPOSITE]:
-            actions.update(self.change_layer_colormap_menu(menu, layer.uuid))
+        if layer is not None:
+            if layer.kind in [Kind.IMAGE, Kind.COMPOSITE]:
+                actions.update(self._change_layer_colormap_menu(menu, layer.uuid))
+            if layer.info.get(Info.PLATFORM) != Platform.SYSTEM:
+                actions.update(self._delete_layer_menu(menu, selection_model_idx))
 
         if not actions:
             action = menu.addAction("No actions available for this layer")
@@ -89,7 +93,7 @@ class LayerTreeView(QTreeView):
         else:
             LOG.debug("Unimplemented menu option '{}'".format(sel.text()))
 
-    def change_layer_colormap_menu(self, menu: QMenu, selected_uuid: UUID):
+    def _change_layer_colormap_menu(self, menu: QMenu, selected_uuid: UUID):
         model = self.model()
 
         def _show_change_colormap_dialog(action):  # noqa
@@ -100,6 +104,15 @@ class LayerTreeView(QTreeView):
 
         action = menu.addAction("Change Colormap...")
         return {action: _show_change_colormap_dialog}
+
+    def _delete_layer_menu(self, menu: QMenu, selection_model_idx: QModelIndex):
+        model = self.model()
+
+        def _remove_layer(action):
+            model.remove_layers([selection_model_idx])
+
+        action = menu.addAction("Remove Layer")
+        return {action: _remove_layer}
 
     def currentChanged(self, current: QModelIndex, previous: QModelIndex) -> None:
         # TODO: This is not Qt's default way of handling selections and the
