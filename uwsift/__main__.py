@@ -428,10 +428,11 @@ class Main(QtWidgets.QMainWindow):
 
     def update_point_probe_text(self, probe_name, state=None, xy_pos=None, uuid=None, animating=None):
         if uuid is None:
-            (
-                top_probeable_layer,
-                product_dataset,
-            ) = self.layer_model.get_top_probeable_layer_with_active_product_dataset()
+            current_row = self.ui.treeView.currentIndex().row()
+            product_dataset = None
+            if current_row >= 0:
+                selected_probeable_layer = self.layer_model.layers[current_row]
+                product_dataset = selected_probeable_layer.get_first_active_product_dataset()
             uuid = None if product_dataset is None else product_dataset.uuid
         if state is None or xy_pos is None:
             _state, _xy_pos = self.graphManager.current_point_probe_status(probe_name)
@@ -466,7 +467,7 @@ class Main(QtWidgets.QMainWindow):
                 data_str = "N/A"
                 layer_str = "N/A"
             else:
-                info = top_probeable_layer.info
+                info = selected_probeable_layer.info
                 unit_info = info[Info.UNIT_CONVERSION]
                 data_point = unit_info[1](data_point)
                 data_str = unit_info[2](data_point, numeric=False)
@@ -761,6 +762,8 @@ class Main(QtWidgets.QMainWindow):
         self.layer_model.didUpdateLayers.connect(self.graphManager.update_point_probe)
         self.layer_model.didUpdateLayers.connect(self.graphManager.handleActiveProductDatasetsChanged)
         self.layer_model.didChangeRecipeLayerNames.connect(self.graphManager.handleActiveProductDatasetsChanged)
+
+        self.ui.treeView.selectedLayerForProbeChanged.connect(self.update_point_probe_text)
 
         # Connect to an unnamed slot (lambda: ...) to strip off the argument
         # (of type dict) from the signal 'didMatchTimes'

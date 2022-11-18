@@ -10,12 +10,14 @@ from uwsift.common import Platform
 from uwsift.model.layer_item import LayerItem
 from uwsift.util.widgets.pie_dial import PieDialDelegate
 from uwsift.view.colormap_dialogs import ChangeColormapDialog
+from uwsift.view.probes import DEFAULT_POINT_PROBE
 
 LOG = logging.getLogger(__name__)
 
 
 class LayerTreeView(QTreeView):
     layerSelectionChanged = pyqtSignal(tuple)
+    selectedLayerForProbeChanged = pyqtSignal(str)
 
     def __init__(self, *args, **kwargs):
         super(LayerTreeView, self).__init__(*args, **kwargs)
@@ -124,6 +126,7 @@ class LayerTreeView(QTreeView):
         if len(self.model().layers) > 0:
             selected_layer: tuple = (self.model().layers[current.row()],)
             self.layerSelectionChanged.emit(selected_layer)
+            self.selectedLayerForProbeChanged.emit(DEFAULT_POINT_PROBE)
 
     def begin_layers_removal(self, *args, **kwargs):
         """
