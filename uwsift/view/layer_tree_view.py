@@ -1,11 +1,13 @@
 import logging
 from uuid import UUID
 
+from PyQt5 import QtGui, QtWidgets
 from PyQt5.QtCore import QModelIndex, Qt, pyqtSignal
 from PyQt5.QtWidgets import QAbstractItemView, QHeaderView, QMenu, QTreeView
 
 from uwsift.common import Info, Kind
 from uwsift.common import LayerModelColumns as LMC  # noqa
+from uwsift.common import LayerVisibility
 from uwsift.common import Platform
 from uwsift.model.layer_item import LayerItem
 from uwsift.util.widgets.pie_dial import PieDialDelegate
@@ -43,6 +45,23 @@ class LayerTreeView(QTreeView):
         self.setEditTriggers(QAbstractItemView.AllEditTriggers)
 
         self.customContextMenuRequested.connect(self._open_layer_context_menu)
+
+        # Set extra keyboard shortcuts
+        self._decrease_opacity_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Shift+Left"), self)
+        self._decrease_opacity_shortcut.setContext(Qt.WidgetShortcut)
+        self._decrease_opacity_shortcut.activated.connect(self._decrease_layer_opacity)
+
+        self._increase_opacity_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Shift+Right"), self)
+        self._increase_opacity_shortcut.setContext(Qt.WidgetShortcut)
+        self._increase_opacity_shortcut.activated.connect(self._increase_layer_opacity)
+
+        self._move_selected_layer_up_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Shift+Up"), self)
+        self._move_selected_layer_up_shortcut.setContext(Qt.WidgetShortcut)
+        self._move_selected_layer_up_shortcut.activated.connect(self._simulate_drag_and_drop_layer_up)
+
+        self._move_selected_layer_down_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence("Ctrl+Shift+Down"), self)
+        self._move_selected_layer_down_shortcut.setContext(Qt.WidgetShortcut)
+        self._move_selected_layer_down_shortcut.activated.connect(self._simulate_drag_and_drop_layer_down)
 
     def resizeColumnsToContents(self) -> None:  # noqa
         """Resize all columns to their current contents of the model."""
@@ -133,3 +152,41 @@ class LayerTreeView(QTreeView):
         Triggers the process that the model removes the current selected Rows out of itself.
         """
         self.model().remove_layers(self.selectionModel().selectedRows())
+
+    def _decrease_layer_opacity(self):
+        index = self.model().index(self.currentIndex().row(), LMC.VISIBILITY)
+        if index.row() >= 0:
+            layer: LayerItem = self.model().layers[index.row()]
+            opacity = layer.opacity - 0.05
+
+            if layer.opacity >= 0.0:
+                if opacity < 0.0:
+                    opacity = 0.0
+                new_layer_visibility = LayerVisibility(layer.visible, opacity)
+                self.model().setData(index, new_layer_visibility)
+
+    def _increase_layer_opacity(self):
+        index = self.model().index(self.currentIndex().row(), LMC.VISIBILITY)
+        if index.row() >= 0:
+            layer: LayerItem = self.model().layers[index.row()]
+            opacity = layer.opacity + 0.05
+
+            if layer.opacity <= 1.0:
+                if opacity > 1.0:
+                    opacity = 1.0
+                new_layer_visibility = LayerVisibility(layer.visible, opacity)
+                self.model().setData(index, new_layer_visibility)
+
+    def _simulate_drag_and_drop_layer_up(self):
+        index = self.currentIndex()
+        mime_data = self.model().mimeData([index])
+        parent_index = self.model().index(-1, -1)
+        row = index.row() - 1 if index.row() > 0 else 0
+        self.model().dropMimeData(mime_data, Qt.MoveAction, row, index.column(), parent_index)
+
+    def _simulate_drag_and_drop_layer_down(self):
+        index = self.currentIndex()
+        mime_data = self.model().mimeData([index])
+        parent_index = self.model().index(-1, -1)
+        row = index.row() + 2 if index.row() + 2 < len(self.model().layers) else -1
+        self.model().dropMimeData(mime_data, Qt.MoveAction, row, index.column(), parent_index)
