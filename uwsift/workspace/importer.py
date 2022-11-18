@@ -35,8 +35,9 @@ import satpy.readers.yaml_reader
 import satpy.resample
 import yaml
 from pyresample.geometry import AreaDefinition, StackedAreaDefinition
-from satpy import Scene, available_readers
+from satpy import DataQuery, Scene, available_readers
 from satpy.dataset import DatasetDict
+from satpy.writers import get_enhanced_image
 from sqlalchemy.orm import Session
 from xarray import DataArray
 
@@ -51,6 +52,7 @@ from uwsift.workspace.guidebook import ABI_AHI_Guidebook, Guidebook
 from .metadatabase import (
     Content,
     ContentImage,
+    ContentMultiChannelImage,
     ContentUnstructuredPoints,
     Product,
     Resource,
@@ -263,14 +265,34 @@ class aImporter(ABC):
         if "reader" in prod.info:
             kwargs.setdefault("reader", prod.info["reader"])
 
+        merge_target = kwargs.get("merge_target")
         if "scenes" in kwargs:
             scn = kwargs["scenes"].get(tuple(paths), None)
-            if scn and "_satpy_id" in prod.info:
+            if scn and "_satpy_id" in prod.info and config.get("data_reading.merge_with_existing", True):
                 # filter out files not required to load dataset for given product
                 # extraneous files interfere with the merging process
-                paths = _wanted_paths(scn, prod.info["_satpy_id"].get("name"))
 
-        merge_target = kwargs.get("merge_target")
+                if "prerequisites" in prod.info:
+                    # If the dataset has prerequisites for it to be loaded,
+                    # the files that are required by them must be included
+                    paths = []
+                    for prerequisite in prod.info.get("prerequisites"):
+                        name = prerequisite.get("name") if isinstance(prerequisite, DataQuery) else prerequisite
+                        if name not in scn.available_dataset_names():
+                            # In this case we have to interrupt the loading (which runs it is own thread) by raising
+                            # an exception
+                            raise RuntimeError(
+                                f"RGB Composite provided by satpy with the name"
+                                f" '{prod.info[Info.SHORT_NAME]}' does not work with activated merging of "
+                                f" new data segments into existing data. Consider switching it off by"
+                                f" configuring 'data_reading.merge_with_existing: False'"
+                            )
+                        paths += _wanted_paths(scn, name)
+                    # remove possible duplicates of files
+                    paths = list(dict.fromkeys(paths))
+                else:
+                    paths = _wanted_paths(scn, prod.info["_satpy_id"].get("name"))
+
         if merge_target:
             # filter out all segments which are already loaded in the target product
             new_filenames = []
@@ -391,6 +413,9 @@ class SatpyImporter(aImporter):
         self.use_inventory_db = USE_INVENTORY_DB
         self.requires = _get_requires(self.scn)
 
+        # NOTE: needed for an issue with resampling of NetCDF data.
+        self.scn_original = None  # noqa - Do not simply remove
+
     @classmethod
     def from_product(cls, prod: Product, workspace_cwd, database_session, **kwargs):
         # this overrides the base class because we assume that the product
@@ -500,14 +525,23 @@ class SatpyImporter(aImporter):
         :return: list of all the segment numbers of all segments loaded by the scene
         """
         segments = []
+        collected_segment_count = 0
         for reader in self.scn._readers.values():
             for file_handlers in reader.file_handlers.values():
+                collected_segment_count += 1
                 for file_handler in file_handlers:
                     if file_handler.filetype_info["file_type"] in self.requires:
+                        collected_segment_count -= 1
                         continue
                     seg = file_handler.filename_info["segment"]
                     segments.append(seg)
-        return segments
+
+        filtered_segments = []
+        for segment in set(segments):
+            if segments.count(segment) == collected_segment_count:
+                filtered_segments.append(segment)
+
+        return sorted(filtered_segments)
 
     def _extract_expected_segments(self) -> Optional[int]:
         """
@@ -571,6 +605,10 @@ class SatpyImporter(aImporter):
     def load_all_datasets(self) -> None:
         self.scn.load(self.dataset_ids, pad_data=False, upper_right_corner="NE", **self.product_filters)
         # copy satpy metadata keys to SIFT keys
+
+        if self.scn.missing_datasets:
+            self.scn = self.scn.resample(resampler="native")
+
         for ds in self.scn:
             self._set_name_metadata(ds.attrs)
             self._set_time_metadata(ds.attrs)
@@ -617,6 +655,9 @@ class SatpyImporter(aImporter):
         attrs[Info.OBS_DURATION] = duration
 
     def _set_kind_metadata(self, attrs: dict) -> None:
+        if "prerequisites" in attrs:
+            attrs[Info.KIND] = Kind.MC_IMAGE
+            return
         reader_kind = config.get(f"data_reading.{self.reader}.kind", None)
         if reader_kind:
             try:
@@ -629,10 +670,12 @@ class SatpyImporter(aImporter):
 
     def _set_wavelength_metadata(self, attrs: dict) -> None:
         self._get_platform_instrument(attrs)
-        if "wavelength" in attrs:
+        if "wavelength" in attrs and attrs.get("wavelength"):
             attrs.setdefault(Info.CENTRAL_WAVELENGTH, attrs["wavelength"][1])
 
     def _set_shape_metadata(self, attrs: dict, shape) -> None:
+        if len(shape) == 3 and "prerequisites" in attrs.keys():
+            shape = (shape[1], shape[2], shape[0])
         attrs[Info.SHAPE] = shape if not self.resampling_info else self.resampling_info["shape"]
         attrs[Info.UNITS] = attrs.get("units")
         if attrs[Info.UNITS] == "unknown":
@@ -1003,46 +1046,34 @@ class SatpyImporter(aImporter):
         dataset_ids = [prod.info["_satpy_id"] for prod in products]
         self.scn.load(dataset_ids, pad_data=not merge_with_existing, upper_right_corner="NE")
 
+        # If resampling is needed so that missing datasets can be generated then it is important
+        # to NOT override the SatpyImporter.scn variable. Because that cause problems with NetCDF files.
+        # The guess is here that with the overwritten scene the NetCDF files are closed in a way which
+        # leads later to problems for saving/computing the actual data of these files.
+        # Instead a local variable is used to prevent this.
+        if self.scn.missing_datasets:
+            # About the next strange line of code: keep a reference to the
+            # original scene to work around an issue in the resampling
+            # implementation for NetCDF data: otherwise the original data
+            # would be garbage collected too early.
+            self.scn_original = self.scn  # noqa - Do not simply remove
+            self.scn = self.scn.resample(resampler="native")
+
         if self.resampling_info:
-            resampler: str = self.resampling_info["resampler"]
-            max_area = self.scn.max_area()
-            if isinstance(max_area, AreaDefinition) and max_area.area_id == self.resampling_info["area_id"]:
-                LOG.info(
-                    f"Source and target area ID are identical:"
-                    f" '{self.resampling_info['area_id']}'."
-                    f" Skipping resampling."
-                )
-            else:
-                area_name = max_area.area_id if hasattr(max_area, "area_id") else max_area.name
-                LOG.info(
-                    f"Resampling from area ID/name '{area_name}'"
-                    f" to area ID '{self.resampling_info['area_id']}'"
-                    f" with method '{resampler}'"
-                )
-                # Use as many processes for resampling as the number of CPUs
-                # the application can use.
-                # See https://pyresample.readthedocs.io/en/latest/multi.html
-                #  and https://docs.python.org/3/library/os.html#os.cpu_count
-                nprocs = len(os.sched_getaffinity(0))
-
-                target_area_def = AreaDefinitionsManager.area_def_by_id(self.resampling_info["area_id"])
-
-                # About the next strange line of code: keep a reference to the
-                # original scene to work around an issue in the resampling
-                # implementation for NetCDF data: otherwise the original data
-                # would be garbage collected too early.
-                self.scn_original = self.scn  # noqa - Do not simply remove
-                self.scn = self.scn.resample(
-                    target_area_def,
-                    resampler=resampler,
-                    nprocs=nprocs,
-                    radius_of_influence=self.resampling_info["radius_of_influence"],
-                )
+            self._preprocess_products_with_resampling()
 
         num_stages = len(products)
         for idx, (prod, ds_id) in enumerate(zip(products, dataset_ids)):
-            dataset = self.scn[ds_id]
+
+            dataset = (
+                self.scn[ds_id] if prod.info[Info.KIND] != Kind.MC_IMAGE else get_enhanced_image(self.scn[ds_id]).data
+            )
             shape = dataset.shape
+            if prod.info[Info.KIND] == Kind.MC_IMAGE:
+                # The dimension of the dataset is ('bands', 'y', 'x')
+                # but for later the dimension ('y', 'x', 'bands') is needed
+                dataset = dataset.transpose("y", "x", "bands")
+                shape = dataset.shape
             # Since in the first SatpyImporter loading pass (see
             # load_all_datasets()) no padding is applied (pad_data=False), the
             # Info.SHAPE stored at that time may not be the same as it is now if
@@ -1058,26 +1089,14 @@ class SatpyImporter(aImporter):
 
             now = datetime.utcnow()
 
-            if prod.info[Info.KIND] in [Kind.LINES, Kind.POINTS]:
+            if kind in [Kind.LINES, Kind.POINTS]:
                 if len(shape) == 1:
                     LOG.error(f"one dimensional dataset can't be loaded: {ds_id['name']}")
                     continue
 
-                data_filename, data_memmap = self._create_data_memmap_file(dataset.data, dataset.dtype, prod)
-                content = ContentUnstructuredPoints(
-                    atime=now,
-                    mtime=now,
-                    # info about the data array memmap
-                    path=data_filename,
-                    n_points=shape[0],
-                    n_dimensions=shape[1],
-                    dtype=dataset.dtype,
+                completion, content, data_memmap = self._create_unstructured_points_dataset_content(
+                    dataset, kind, now, prod, shape
                 )
-                content.info[Info.KIND] = kind
-                prod.content.append(content)
-                self.add_content_to_cache(content)
-
-                completion = 2.0
                 yield import_progress(
                     uuid=prod.uuid,
                     stages=num_stages,
@@ -1102,49 +1121,19 @@ class SatpyImporter(aImporter):
                 self.merge_data_into_memmap(data, img_data, segments)
             else:
                 area_info = self._area_to_sift_attrs(dataset.attrs["area"])
-                cell_width = area_info[Info.CELL_WIDTH]
-                cell_height = area_info[Info.CELL_HEIGHT]
-                proj4 = area_info[Info.PROJ]
-                origin_x = area_info[Info.ORIGIN_X]
-                origin_y = area_info[Info.ORIGIN_Y]
-
                 grid_info = self._get_grid_info()
-                grid_origin = grid_info[Info.GRID_ORIGIN]
-                grid_first_index_x = grid_info[Info.GRID_FIRST_INDEX_X]
-                grid_first_index_y = grid_info[Info.GRID_FIRST_INDEX_Y]
 
-                # For kind IMAGE the dtype must be float32 seemingly, see class
-                # Column, comment for 'dtype' and the construction of c = Content
-                # just below.
-                # FIXME: It is dubious to enforce that type conversion to happen in
-                #  _create_data_memmap_file, but otherwise IMAGES of pixel counts
-                #  data (dtype = np.uint16) crash.
-                data_filename, img_data = self._create_data_memmap_file(data, np.float32, prod)
+                if kind == Kind.MC_IMAGE:
+                    c, img_data = self._create_mc_image_dataset_content(
+                        area_info, data, dataset, grid_info, now, prod, shape
+                    )
+                else:
+                    c, img_data = self._create_image_dataset_content(data, now, prod, shape, area_info, grid_info)
 
-                c = ContentImage(
-                    lod=0,
-                    resolution=int(min(abs(cell_width), abs(cell_height))),
-                    atime=now,
-                    mtime=now,
-                    # info about the data array memmap
-                    path=data_filename,
-                    rows=shape[0],
-                    cols=shape[1],
-                    proj4=proj4,
-                    dtype="float32",
-                    cell_width=cell_width,
-                    cell_height=cell_height,
-                    origin_x=origin_x,
-                    origin_y=origin_y,
-                    grid_origin=grid_origin,
-                    grid_first_index_x=grid_first_index_x,
-                    grid_first_index_y=grid_first_index_y,
-                )
-                c.info[Info.KIND] = Kind.IMAGE
+                c.info[Info.KIND] = prod.info[Info.KIND]
                 c.img_data = img_data
                 c.source_files = set()  # FIXME(AR) is this correct?
                 # c.info.update(prod.info) would just make everything leak together so let's not do it
-
                 prod.content.append(c)
                 self.add_content_to_cache(c)
 
@@ -1163,6 +1152,113 @@ class SatpyImporter(aImporter):
                 dataset_info=None,
                 data=img_data,
                 content=c,
+            )
+
+    def _create_mc_image_dataset_content(self, area_info, data, dataset, grid_info, now, prod, shape):
+        data_filename, img_data = self._create_data_memmap_file(data, data.dtype, prod)
+        c = ContentMultiChannelImage(
+            lod=0,
+            resolution=int(min(abs(area_info[Info.CELL_WIDTH]), abs(area_info[Info.CELL_HEIGHT]))),
+            atime=now,
+            mtime=now,
+            # info about the data array memmap
+            path=data_filename,
+            rows=shape[0],
+            cols=shape[1],
+            bands=shape[2],
+            proj4=area_info[Info.PROJ],
+            dtype=str(dataset.dtype),
+            cell_width=area_info[Info.CELL_WIDTH],
+            cell_height=area_info[Info.CELL_HEIGHT],
+            origin_x=area_info[Info.ORIGIN_X],
+            origin_y=area_info[Info.ORIGIN_Y],
+            grid_origin=grid_info[Info.GRID_ORIGIN],
+            grid_first_index_x=grid_info[Info.GRID_FIRST_INDEX_X],
+            grid_first_index_y=grid_info[Info.GRID_FIRST_INDEX_Y],
+        )
+        return c, img_data
+
+    def _create_image_dataset_content(self, data, now, prod, shape, area_info, grid_info):
+        # For kind IMAGE the dtype must be float32 seemingly, see class
+        # Column, comment for 'dtype' and the construction of c = Content
+        # just below.
+        # FIXME: It is dubious to enforce that type conversion to happen in
+        #  _create_data_memmap_file, but otherwise IMAGES of pixel counts
+        #  data (dtype = np.uint16) crash.
+        data_filename, img_data = self._create_data_memmap_file(data, np.float32, prod)
+        c = ContentImage(
+            lod=0,
+            resolution=int(min(abs(area_info[Info.CELL_WIDTH]), abs(area_info[Info.CELL_HEIGHT]))),
+            atime=now,
+            mtime=now,
+            # info about the data array memmap
+            path=data_filename,
+            rows=shape[0],
+            cols=shape[1],
+            proj4=area_info[Info.PROJ],
+            dtype="float32",
+            cell_width=area_info[Info.CELL_WIDTH],
+            cell_height=area_info[Info.CELL_HEIGHT],
+            origin_x=area_info[Info.ORIGIN_X],
+            origin_y=area_info[Info.ORIGIN_Y],
+            grid_origin=grid_info[Info.GRID_ORIGIN],
+            grid_first_index_x=grid_info[Info.GRID_FIRST_INDEX_X],
+            grid_first_index_y=grid_info[Info.GRID_FIRST_INDEX_Y],
+        )
+        return c, img_data
+
+    def _create_unstructured_points_dataset_content(self, dataset, kind, now, prod, shape):
+        data_filename, data_memmap = self._create_data_memmap_file(dataset.data, dataset.dtype, prod)
+        content = ContentUnstructuredPoints(
+            atime=now,
+            mtime=now,
+            # info about the data array memmap
+            path=data_filename,
+            n_points=shape[0],
+            n_dimensions=shape[1],
+            dtype=dataset.dtype,
+        )
+        content.info[Info.KIND] = kind
+        prod.content.append(content)
+        self.add_content_to_cache(content)
+        completion = 2.0
+        return completion, content, data_memmap
+
+    def _preprocess_products_with_resampling(self):
+        resampler: str = self.resampling_info["resampler"]
+        max_area = self.scn.finest_area()
+        if isinstance(max_area, AreaDefinition) and max_area.area_id == self.resampling_info["area_id"]:
+            LOG.info(
+                f"Source and target area ID are identical:"
+                f" '{self.resampling_info['area_id']}'."
+                f" Skipping resampling."
+            )
+        else:
+            area_name = max_area.area_id if hasattr(max_area, "area_id") else max_area.name
+            LOG.info(
+                f"Resampling from area ID/name '{area_name}'"
+                f" to area ID '{self.resampling_info['area_id']}'"
+                f" with method '{resampler}'"
+            )
+            # Use as many processes for resampling as the number of CPUs
+            # the application can use.
+            # See https://pyresample.readthedocs.io/en/latest/multi.html
+            #  and https://docs.python.org/3/library/os.html#os.cpu_count
+            nprocs = len(os.sched_getaffinity(0))
+
+            target_area_def = AreaDefinitionsManager.area_def_by_id(self.resampling_info["area_id"])
+
+            # About the next strange line of code: keep a reference to the
+            # original scene to work around an issue in the resampling
+            # implementation for NetCDF data: otherwise the original data
+            # would be garbage collected too early.
+            if not self.scn_original:
+                self.scn_original = self.scn  # noqa - Do not simply remove
+            self.scn = self.scn.resample(
+                target_area_def,
+                resampler=resampler,
+                nprocs=nprocs,
+                radius_of_influence=self.resampling_info["radius_of_influence"],
             )
 
     def get_fci_segment_height(self, segment_number: int, segment_width: int) -> int:

@@ -66,7 +66,7 @@ def create_scenes(scenes: dict, file_groups: dict) -> List[DataID]:
                 get_xritdecompress_cmd()
             # END OF WORKAROUND
 
-        all_available_products.update(scn.available_dataset_ids())
+        all_available_products.update(scn.available_dataset_ids(composites=True))
 
     # update the widgets
     return sorted(all_available_products)

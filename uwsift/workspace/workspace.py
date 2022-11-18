@@ -60,6 +60,7 @@ from .importer import SatpyImporter, generate_guidebook_metadata
 from .metadatabase import (
     Content,
     ContentImage,
+    ContentMultiChannelImage,
     ContentUnstructuredPoints,
     Metadatabase,
     Product,
@@ -172,7 +173,9 @@ class ActiveContent(QObject):
         :param c: Content entity from database
         :return: workspace_data_arrays instance
         """
-        if isinstance(c, ContentImage):
+        if isinstance(c, ContentMultiChannelImage):
+            rcl, shape = self._rcls(c.rows, c.cols, c.bands)
+        elif isinstance(c, ContentImage):
             rcl, shape = self._rcls(c.rows, c.cols, c.levels)
         elif isinstance(c, ContentUnstructuredPoints):
             rcl, shape = self._rcls(c.n_points, c.n_dimensions, None)

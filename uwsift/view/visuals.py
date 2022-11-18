@@ -460,8 +460,7 @@ class TiledGeolocatedImageVisual(SIFTTiledGeolocatedMixin, ImageVisual):
             self.texture_shape,
             tile_shape=self.tile_shape,
             interpolation=texture_interpolation,
-            format="LUMINANCE",
-            internalformat="R32F",
+            internalformat="auto",
         )
         return tex
 
