@@ -5,6 +5,7 @@ from typing import List, Optional, Tuple
 from uuid import UUID
 
 from PyQt5.QtCore import QAbstractItemModel, QMimeData, QModelIndex, Qt, pyqtSignal
+from PyQt5.QtWidgets import QMessageBox
 
 from uwsift.common import (
     BORDERS_DATASET_NAME,
@@ -50,13 +51,17 @@ class LayerModel(QAbstractItemModel):
     didFinishActivateProductDatasets = pyqtSignal()
 
     # ----------------------- Removing existing layers -------------------------
-    didDeleteProductDataset = pyqtSignal(UUID)
+    willRemoveLayer = pyqtSignal(UUID)
+    didRemoveLayer = pyqtSignal(UUID)
+    willDeleteProductDataset = pyqtSignal(UUID)
+    didDeleteProductDataset = pyqtSignal(list)
     # ---------------------- Request creation of Recipes -----------------------
     # object should be a List[Optional[UUID]]
-    didRequestCompositeRecipeCreation = pyqtSignal(object)
+    didRequestRGBCompositeRecipeCreation = pyqtSignal(object)
     # object should be a List[Optional[UUID]]
     didRequestAlgebraicRecipeCreation = pyqtSignal(object)
-
+    # ---------------------- Request change of Recipes -------------------------
+    removeLayerAsRecipeInput = pyqtSignal(UUID)
     # --------------------------------------------------------------------------
 
     didActivateProductDataset = pyqtSignal(UUID, bool)
@@ -100,6 +105,8 @@ class LayerModel(QAbstractItemModel):
         self.layers: List[LayerItem] = []
 
         self._supportedRoles = [Qt.DisplayRole, Qt.EditRole, Qt.TextAlignmentRole]
+
+        self.rowsAboutToBeRemoved.connect(self._rows_about_to_be_removed)
 
     def _init_system_layer(self, name):
         # The minimal 'dataset' information required by LayerItem
@@ -331,7 +338,7 @@ class LayerModel(QAbstractItemModel):
                 raise NotImplementedError(f"Managing datasets of kind {product_dataset.kind}" f" not (yet) supported.")
 
             self.didUpdateLayers.emit()
-        self._trigger_composite_layer_update(layer)
+        self._update_dependent_recipe_layers(layer)
 
     def mimeTypes(self):
         return ["text/plain", "text/xml"]
@@ -509,14 +516,40 @@ class LayerModel(QAbstractItemModel):
         return input_datasets_infos
 
     def _remove_datasets(self, datasets_to_remove: List[datetime], layer: LayerItem):
+        """
+        The caller of this function has to guarantee that the dataset with the given
+        dataset schedule times exist in the given layer.
+
+        MAINTENANCE: If the use case arises that this condition should not be met replace
+        the assertion statement with e.g. an if statement.
+
+        :param datasets_to_remove: List of schedule times of datasets which should be removed
+        :param layer: The specific layer which owns the datasets which should be removed
+        """
+
         for sched_time in datasets_to_remove:
             dataset: ProductDataset = layer.timeline.get(sched_time)
+            assert dataset
             self._remove_dataset(layer, sched_time, dataset.uuid)
 
     def _remove_dataset(self, layer: LayerItem, sched_time: datetime, dataset_uuid: UUID):
+        """When a specific dataset with the UUID should be removed then the corresponding distributed parts have to
+        be removed, too. These parts should be removed in the reverse order of their creation. So the order for the
+        deletion looks like:
+            - Deletion of scene graph node of the dataset
+            - Deletion of ProductDataset (+ its Presentation)
+            - Deletion of saved info of the dataset in the document
+            - Deletion of the corrsponding parts of the dataset which are handled by the workspace
+
+        :param layer: The Layer which the dataset belongs to
+        :param sched_time: The schedule time of the dataset which will be removed
+        :param dataset_uuid: The UUID of the dataset which will be removed
+        """
+        self.willDeleteProductDataset.emit(dataset_uuid)
         layer.remove_dataset(sched_time)
-        # TODO: Workspace has to remove Content/Product
-        self.didDeleteProductDataset.emit(dataset_uuid)
+        self._document.remove_dataset_info(dataset_uuid)
+        self._workspace.remove(dataset_uuid)
+        self.didDeleteProductDataset.emit([dataset_uuid])
 
     def _update_rgb_datasets(
         self, datasets_to_update: List[datetime], input_layers: List[LayerItem], rgb_layer: LayerItem
@@ -580,6 +613,29 @@ class LayerModel(QAbstractItemModel):
         return timelines_of_input_layers
 
     def update_recipe_layer_timeline(self, recipe: Recipe):
+        """Update the list of sched_times and associated data for which the recipe layer can present data.
+
+        A recipe layer aka derived layer has an entry for any given sched_time, if and only if all layers directly
+        or indirectly referenced by its recipe have data for that sched_time. The method updates the timeline for (the
+        layer of) the given recipe by calculating it as intersection of the timelines of all contributing layers.
+        By comparing this common timeline with the current timeline of the recipe layer it has to be determined, for
+        which sched_times derived datasets need to be removed, updated or added before the corresponding actions
+        are performed.
+
+        MAINTENANCE: For now the removal of recipe layer datasets is the same regardless of whether the recipe layer has
+        an algebraic or composite recipe. For the other two steps of the update process - updating and adding derived
+        datasets - there is a different handling depending on the type of recipe.
+
+        If the given recipe (layer) can be used as input for other recipe layers (currently only for algebraics),
+        then the dependent recipe layers must also be and is updated by calling this method with their recipes
+        recursively.
+
+        ATTENTION: There *must* be no cyclic dependency defined by recipes (e.g. an algebraic layer *n* which uses the
+        algebraic layer *m* as input layer, which in turn - directly or indirectly - again uses the layer *n* as input
+        layer), otherwise the depicted recursion will not terminate! This case is not caught!
+
+        :param recipe: Recipe of the layer whose timeline is to be updated
+        """
         recipe_layer: LayerItem = self._get_layer_of_recipe(recipe.id)
 
         if isinstance(recipe, CompositeRecipe):
@@ -610,7 +666,7 @@ class LayerModel(QAbstractItemModel):
             self._add_algebraic_datasets(sched_times_to_add, input_layers, recipe_layer)
             recipe_layer.recipe.modified = False
 
-            self._trigger_composite_layer_update(recipe_layer)
+            self._update_dependent_recipe_layers(recipe_layer)
 
         self.didUpdateLayers.emit()
 
@@ -646,15 +702,11 @@ class LayerModel(QAbstractItemModel):
             layers.append(self.get_layer_by_uuid(uuid))
         return layers
 
-    def _trigger_composite_layer_update(self, changed_layer):
+    def _update_dependent_recipe_layers(self, changed_layer):
         for layer in self.layers:
             if layer.recipe:
                 if changed_layer.uuid in layer.recipe.input_layer_ids:
-                    self._update_composite_layer_timeline(layer)
-
-    def _update_composite_layer_timeline(self, layer):
-        if isinstance(layer.recipe, CompositeRecipe):
-            self.update_recipe_layer_timeline(layer.recipe)
+                    self.update_recipe_layer_timeline(layer.recipe)
 
     @staticmethod
     def create_reasonable_rgb_composite_default():
@@ -681,7 +733,7 @@ class LayerModel(QAbstractItemModel):
         # TODO: case when layers list has less then 3 elements
         # layers = []
 
-        self.didRequestCompositeRecipeCreation.emit(layers)
+        self.didRequestRGBCompositeRecipeCreation.emit(layers)
 
     def update_recipe_layer_name(self, recipe: Recipe):
         recipe_layer: LayerItem = self._get_layer_of_recipe(recipe.id)
@@ -758,7 +810,11 @@ class LayerModel(QAbstractItemModel):
 
             operations = algebraic_layer.recipe.operation_formula
 
-            uuid, info, data = self._workspace.create_algebraic_composite(operations, assignment, info)
+            try:
+                uuid, info, data = self._workspace.create_algebraic_composite(operations, assignment, info)
+            except (NameError, ValueError, AttributeError) as e:
+                LOG.warning(f"Invalid formula of layer '{algebraic_layer.descriptor}': {e}")
+                return
 
             dataset = algebraic_layer.add_algebraic_dataset(None, info, sched_time, input_datasets_uuids)
 
@@ -796,6 +852,13 @@ class LayerModel(QAbstractItemModel):
         return None
 
     def remove_datasets_from_all_layers(self, dataset_uuids):
+        """
+        This method can be used if only the datasets and not the whole layer should be removed and if datasets from
+        different layers should be removed (or the caller does not know to which layer the datasets belong).
+        The dataset can be only removed if the UUID in the given list belongs to an existing dataset.
+
+        :param dataset_uuids: List of UUIDs from datasets which going to be removed
+        """
         did_remove_any_dataset = False
         for dataset_uuid in dataset_uuids:
             dataset = self.get_dataset_by_uuid(dataset_uuid)
@@ -804,12 +867,81 @@ class LayerModel(QAbstractItemModel):
                 layer = self.get_layer_by_uuid(dataset.layer_uuid)
                 self._remove_dataset(layer, dataset.info[Info.SCHED_TIME], dataset.info[Info.UUID])
                 LOG.debug(f"Removing {dataset}")
-                self._document.remove_layer_prez(dataset_uuid)
-                self._document.purge_layer_prez([dataset_uuid])
                 did_remove_any_dataset = True
 
         if did_remove_any_dataset:
             self.didUpdateLayers.emit()
+
+    def remove_layers(self, indices: List[QModelIndex]):
+        """Iterate the given indices, and if the layer is not a system layer at a given index, it can be deleted.
+
+        But before a layer can be finally deleted, it must be empty. To do this, the layer must no longer have
+        any ProductDatasets and other things associated with them, such as visual nodes.
+        The layer must be removed as an input layer for all derived layers that use the layer to be deleted.
+        Finally, the corresponding Scene Graph node of the layer must also be removed and the timeline must also
+        be updated.
+
+        :param indices: a list of QModelIndex indices which should be deleted and which should exist in the LayerModel
+        """
+        # TODO think about if this really works if more then one Layer should be deleted?
+        for idx in indices:
+            layer = self.layers[idx.row()]
+
+            if layer.info.get(Info.PLATFORM) == Platform.SYSTEM:
+                continue
+
+            derived_layers = self._get_derived_recipe_layers_of_layer(layer)
+            if derived_layers:
+                message = f"Layer '{layer.descriptor}' is used as input for the following derived layers: \n"
+                for layer_name in derived_layers:
+                    message += f"- '{layer_name}'\n"
+                message += "Are you sure you want to delete this layer?"
+                qm = QMessageBox()
+                answer = qm.question(
+                    None,
+                    "",
+                    message,
+                )
+                if answer != qm.Yes:
+                    return
+
+            self._clear_layer(layer)
+            self._remove_empty_layer(idx.row())
+
+            self.didRemoveLayer.emit(layer.uuid)
+        self.didUpdateLayers.emit()
+
+    def _clear_layer(self, layer: LayerItem):
+
+        self.removeLayerAsRecipeInput.emit(layer.uuid)
+
+        datasets_sched_times = list(layer.timeline.keys())
+
+        self._remove_datasets(datasets_sched_times, layer)
+
+    def _remove_empty_layer(self, row: int):
+        self.beginRemoveRows(QModelIndex(), row, row)
+        del self.layers[row]
+        self.endRemoveRows()
+
+        self._emit_didReorderLayers()
+
+    def _rows_about_to_be_removed(self, parent: QModelIndex, first: int, last: int):
+        for row in range(first, last + 1):
+            layer = self.layers[row]
+            self.willRemoveLayer.emit(layer.uuid)
+
+    def _get_recipe_layers(self):
+        return [layer for layer in self.layers if layer.recipe]
+
+    def _get_derived_recipe_layers_of_layer(self, layer: LayerItem):
+        recipe_layers = self._get_recipe_layers()
+        derived_layers = []
+        for recipe_layer in recipe_layers:
+            # check if the given layer is used as input layer of a recipe layer
+            if layer.uuid in recipe_layer.recipe.input_layer_ids:
+                derived_layers.append(recipe_layer.descriptor)
+        return derived_layers
 
 
 class ProductFamilyKeyMappingPolicy:
