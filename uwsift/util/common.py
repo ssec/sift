@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import List, Set
 
 import numpy as np
+import satpy.readers.hrit_base
 from satpy import DataID, Scene
 
 from uwsift import config as config
@@ -43,33 +44,42 @@ def create_scenes(scenes: dict, file_groups: dict) -> List[DataID]:
                 continue
             scenes[group_id] = scn
 
-            # WORKAROUND: to decompress compressed SEVIRI HRIT files, an environment variable
-            # needs to be set. Check if decompression might have introduced errors when using
-            # the specific reader and loading a file with compression flag set.
-            # NOTE: in case this workaround-check fails data cannot be loaded in SIFT although
-            # creating the scene might have succeeded!
-            compressed_seviri = False
-            from satpy.readers.hrit_base import get_xritdecompress_cmd
-
-            # TODO: Scene may not provide information about reader in the
-            # future - here the "protected" variable '_readers' is used as
-            # workaround already
-            for r in scn._readers.values():
-                # only perform check when using a relevant reader, so that this is not triggered
-                # mistakenly when another reader uses the same meta data key for another purpose
-                if r.name in ["seviri_l1b_hrit"]:
-                    for fh in r.file_handlers.values():
-                        for fh2 in fh:
-                            if fh2.mda.get("compression_flag_for_data"):
-                                compressed_seviri = True
-            if compressed_seviri:
-                get_xritdecompress_cmd()
-            # END OF WORKAROUND
+            if _scene_contains_compressed_seviri_hrit_files(scn):
+                # To decompress compressed SEVIRI HRIT files, an external
+                # decompression tool (xRITDecompress) must be executable by the
+                # Satpy HRIT reader (its file path is communicated via the
+                # XRIT_DECOMPRESS_PATH environment variable).
+                # Even though the creation of the scene was successful, even if
+                # the decompression tool is missing, in this case the loading
+                # of the scene would fail.
+                # To enable the caller of create_scenes() to fail early and
+                # inform the user about the problem we check beforehand if the
+                # decompression tool is available: if not, the following call
+                # will throw an exception which is intentionally not caught
+                # here.
+                satpy.readers.hrit_base.get_xritdecompress_cmd()
 
         all_available_products.update(scn.available_dataset_ids(composites=True))
 
     # update the widgets
     return sorted(all_available_products)
+
+
+def _scene_contains_compressed_seviri_hrit_files(scn):
+    # TODO: Scene may not provide information about reader in the
+    #  future - here the "protected" variable '_readers' is used as
+    #  workaround already
+    for r in scn._readers.values():
+        # only perform check when using a relevant reader, so that this is not
+        # triggered mistakenly when another reader uses the same meta data key
+        # 'compression_flag_for_data' but does not need xRITDecompress to
+        # uncompress
+        if r.name in ["seviri_l1b_hrit"]:
+            for fh in r.file_handlers.values():
+                for fh2 in fh:
+                    if fh2.mda.get("compression_flag_for_data"):
+                        return True
+    return False
 
 
 # TODO: use cf-units or cfunits or SIUnits or other package or: put all these
