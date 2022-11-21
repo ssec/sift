@@ -1,9 +1,10 @@
-if( DEFINED ENV{CONDA_EXE} )
+find_program( Conda_EXECUTABLE
+  NAMES mamba conda
+  PATHS ${CONDA_PREFIX}/bin ${CONDA_PREFIX}/Scripts ENV PATH
+  )
+
+if( NOT DEFINED ${Conda_EXECUTABLE} AND DEFINED ENV{CONDA_EXE} )
   set( Conda_EXECUTABLE $ENV{CONDA_EXE} CACHE PATH "Path to an executable" )
-else()
-  find_program( Conda_EXECUTABLE conda
-    PATHS ${CONDA_PREFIX}/bin ${CONDA_PREFIX}/Scripts ENV PATH
-    )
 endif()
 
 if( DEFINED ENV{CONDA_PREFIX} )
