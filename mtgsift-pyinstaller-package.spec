@@ -88,13 +88,13 @@ if is_win:
     hidden_imports += collect_submodules("PyQt5")
 
 
-def _include_if_exists(binaries, lib_dir, lib_pattern):
+def _include_if_exists(binaries, lib_dir, lib_pattern, target_dir = '.'):
     from glob import glob
     results = glob(os.path.join(lib_dir, lib_pattern))
     print(lib_dir, lib_pattern, results)
     if results:
         for result in results:
-            binaries.append((result, '.'))
+            binaries.append((result, target_dir))
 
 
 # Add missing shared libraries
@@ -106,11 +106,13 @@ if not is_win:
     binaries += [(os.path.join(bin_dir, 'ffmpeg'), '.')]
     if is_linux:
         binaries += [(os.path.join(lib_dir, 'libfontconfig*.so'), '.')]
+    _include_if_exists(binaries, bin_dir, 'xRITDecompress', os.path.join('resources', 'bin'))
 else:
     bin_dir   = os.path.join(sys.exec_prefix, "Library", "bin")
     lib_dir   = os.path.join(sys.exec_prefix, "Library", "lib")
     share_dir = os.path.join(sys.exec_prefix, "Library", "share")
     binaries += [(os.path.join(bin_dir, 'ffmpeg.exe'), '.')]
+    _include_if_exists(binaries, bin_dir, 'xRITDecompress.exe', os.path.join('resources', 'bin'))
 
 #-------------------------------------------------------------------------------
 # Add extra pygrib .def files
