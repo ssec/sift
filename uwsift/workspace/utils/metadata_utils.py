@@ -1,16 +1,16 @@
 import logging
 import re
-from typing import Dict
+from typing import Dict, Optional
 
 from uwsift import config
-from uwsift.common import Info
+from uwsift.common import Info, Kind
 from uwsift.view.colormap import COLORMAP_MANAGER
 from uwsift.workspace.guidebook import Guidebook
 
 LOG = logging.getLogger(__name__)
 
 
-def get_default_colormap(info: dict, guidebook: Guidebook) -> str:
+def get_default_colormap(info: dict, guidebook: Guidebook) -> Optional[str]:
     """
     Return the name of a colormap configured in 'default_colormaps' for
     the standard name taken from the given ``info``.
@@ -39,6 +39,10 @@ def get_default_colormap(info: dict, guidebook: Guidebook) -> str:
                 f" standard name '{layer_standard_name}'. "
                 f" Falling back to internal Guidebook mapping."
             )
+
+        if info.get(Info.KIND) == Kind.MC_IMAGE:
+            # RGB Composites provided by Satpy does not apply/have a colormap
+            return None
 
     return guidebook.default_colormap(info)
 
