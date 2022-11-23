@@ -190,8 +190,12 @@ def generate_guidebook_metadata(info) -> Mapping:
 
 def _get_types_of_required_aux_files(scn: Scene) -> Set[str]:
     """
-    Get the required file types for this scene. E.g. Seviri Prolog/Epilog.
-    :param scn: scene object to analyse
+    Get the file types of required auxiliary files in the given Scene.
+
+    For example, the types 'HRIT_PRO', 'HRIT_EPI' for the prolog/epilog files of
+    SEVIRI in HRIT format.
+
+    :param scn: Scene object to analyse
     :return: set of required file types
     """
     required_aux_file_types = set()
@@ -204,8 +208,10 @@ def _get_types_of_required_aux_files(scn: Scene) -> Set[str]:
 
 def _get_paths_of_required_aux_files(scn: Scene, required_aux_file_types) -> Set[str]:
     """
-    Get set of files additional required to load data. E.g. Seviri Prolog/Epilog files.
-    :param scn: scene object to analyse
+    Get set of paths of auxiliary files required to load data in Scene.
+    For example, prolog/epilog files for SEVIRI in HRIT format.
+
+    :param scn: Scene object to analyse
     :param required_aux_file_types: the file types which are required
     :return: set of required files
     """
@@ -221,7 +227,8 @@ def _get_paths_of_required_aux_files(scn: Scene, required_aux_file_types) -> Set
 
 def _get_paths_in_scene_contributing_to_ds(scn: Scene, ds_name: str) -> List[str]:
     """
-    Get list of paths in scene which are actually required to load given dataset name.
+    Get list of paths in scene which actually contain data for the dataset given
+    by its name `ds_name`.
     :param scn: scene object to analyse
     :param ds_name: dataset name
     :return: paths in scene which are required to load given dataset
@@ -268,18 +275,28 @@ class aImporter(ABC):
         if "scenes" in kwargs:
             scn = kwargs["scenes"].get(tuple(paths), None)
             if scn and "_satpy_id" in prod.info and kwargs["merge_with_existing"]:
-                # filter out files not required to load dataset for given product
-                # extraneous files interfere with the merging process
-
+                # For the merging process below it is crucial that it only has
+                # to deal with files which belong to the given Product `prod`,
+                # extraneous files would interfere with the merging process.
+                # Thus: Filter the files in `paths` and keep only those
+                # that contribute to the Satpy dataset for `prod`.
                 if "prerequisites" in prod.info:
-                    # If the dataset has prerequisites for it to be loaded,
-                    # the files that are required by them must be included
+                    # If the dataset has prerequisites - this is the case for
+                    # RGB composites provided by Satpy - the files that are
+                    # required by these must be collected.
                     paths = []
                     for prerequisite in prod.info.get("prerequisites"):
                         ds_name = prerequisite.get("name") if isinstance(prerequisite, DataQuery) else prerequisite
                         if ds_name not in scn.available_dataset_names():
-                            # In this case we have to interrupt the loading (which runs it is own thread) by raising
-                            # an exception
+                            # This is a not supported case: Merging should be
+                            # done for an RGB composite of which prequisite
+                            # datasets are missing in the scene. This can
+                            # happen, when the composite depends on other
+                            # composites - their datasets have not been created
+                            # in the Scene at this stage, thus the Scene can't
+                            # be queried for the files required by these datasets.
+                            # We have to interrupt this loading process (which
+                            # runs in its own thread) by raising an exception.
                             raise RuntimeError(
                                 f"RGB Composite provided by satpy with the name"
                                 f" '{prod.info[Info.SHORT_NAME]}' does not work with activated merging of "
