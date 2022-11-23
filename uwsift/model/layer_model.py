@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import QMessageBox
 
 from uwsift.common import (
     BORDERS_DATASET_NAME,
+    INVALID_COLOR_LIMITS,
     LATLON_GRID_DATASET_NAME,
     LAYER_TREE_VIEW_HEADER,
     Info,
@@ -646,6 +647,8 @@ class LayerModel(QAbstractItemModel):
         recursively.
 
         At the end of each update iteration, the information of the updated recipe layer is replaced.
+        The clims of the algebraic layer are also set correctly if they only have an invalid clims value.
+        If an algebraic layer is empty again then it will get an invalid clims value.
 
         ATTENTION: There *must* be no cyclic dependency defined by recipes (e.g. an algebraic layer *n* which uses the
         algebraic layer *m* as input layer, which in turn - directly or indirectly - again uses the layer *n* as input
@@ -692,6 +695,12 @@ class LayerModel(QAbstractItemModel):
         elif not all(input_layers):
             info = {Info.KIND: recipe_layer.kind}
             recipe_layer.replace_recipe_layer_info(info)
+
+        if isinstance(recipe, AlgebraicRecipe):
+            if recipe_layer.presentation.climits == INVALID_COLOR_LIMITS:
+                self.change_color_limits_for_layer(recipe_layer.uuid, recipe_layer.info.get(Info.VALID_RANGE))
+            elif not all(input_layers):
+                self.change_color_limits_for_layer(recipe_layer.uuid, INVALID_COLOR_LIMITS)
 
         self.didUpdateLayers.emit()
 
@@ -809,7 +818,7 @@ class LayerModel(QAbstractItemModel):
             Info.KIND: Kind.COMPOSITE,
         }
 
-        prez = Presentation(uuid=None, kind=Kind.COMPOSITE, colormap="grays", climits=(-100, 100))
+        prez = Presentation(uuid=None, kind=Kind.COMPOSITE, colormap="grays", climits=INVALID_COLOR_LIMITS)
 
         algebraic_layer = LayerItem(self, info, prez, recipe=recipe)
 
