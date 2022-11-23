@@ -265,10 +265,9 @@ class aImporter(ABC):
         if "reader" in prod.info:
             kwargs.setdefault("reader", prod.info["reader"])
 
-        merge_target = kwargs.get("merge_target")
         if "scenes" in kwargs:
             scn = kwargs["scenes"].get(tuple(paths), None)
-            if scn and "_satpy_id" in prod.info and config.get("data_reading.merge_with_existing", True):
+            if scn and "_satpy_id" in prod.info and kwargs["merge_with_existing"]:
                 # filter out files not required to load dataset for given product
                 # extraneous files interfere with the merging process
 
@@ -293,6 +292,7 @@ class aImporter(ABC):
                 else:
                     paths = _wanted_paths(scn, prod.info["_satpy_id"].get("name"))
 
+        merge_target = kwargs.get("merge_target")
         if merge_target:
             # filter out all segments which are already loaded in the target product
             new_filenames = []
