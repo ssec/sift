@@ -922,7 +922,11 @@ class Main(QtWidgets.QMainWindow):
         self.layer_model.willRemoveLayer.connect(self.recipe_manager.remove_layer_as_recipe_input)
 
     def _init_layer_panes(self):
-        pass
+        self.ui.treeView.layerSelectionChanged.connect(self.ui.layerDetailsPane.selection_did_change)
+        self.layer_model.didFinishActivateProductDatasets.connect(self.ui.layerDetailsPane.initiate_update)
+
+        self.layer_model.didChangeColorLimits.connect(self.ui.layerDetailsPane.update_displayed_clims)
+        self.layer_model.didChangeColormap.connect(self.ui.layerDetailsPane.update_displayed_colormap)
 
     def _init_map_widget(self):
         # connect canvas and projection pieces
@@ -961,6 +965,7 @@ class Main(QtWidgets.QMainWindow):
     def _init_arrange_panes(self):
         self.tabifyDockWidget(self.ui.areaProbePane, self.ui.datasetStatisticsPaneDockWidget)
         self.tabifyDockWidget(self.ui.rgbConfigPane, self.ui.algebraicConfigPane)
+        self.tabifyDockWidget(self.ui.rgbConfigPane, self.ui.layerDetailsPaneDockWidget)
 
         # refer to objectName'd entities as self.ui.objectName
         self.setAcceptDrops(True)
