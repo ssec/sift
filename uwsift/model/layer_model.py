@@ -645,6 +645,8 @@ class LayerModel(QAbstractItemModel):
         then the dependent recipe layers must also be and is updated by calling this method with their recipes
         recursively.
 
+        At the end of each update iteration, the information of the updated recipe layer is replaced.
+
         ATTENTION: There *must* be no cyclic dependency defined by recipes (e.g. an algebraic layer *n* which uses the
         algebraic layer *m* as input layer, which in turn - directly or indirectly - again uses the layer *n* as input
         layer), otherwise the depicted recursion will not terminate! This case is not caught!
@@ -682,6 +684,14 @@ class LayerModel(QAbstractItemModel):
             recipe_layer.recipe.modified = False
 
             self._update_dependent_recipe_layers(recipe_layer)
+
+        dataset_uuids = recipe_layer.get_datasets_uuids()
+        if dataset_uuids:
+            dataset = recipe_layer.get_dataset_by_uuid(dataset_uuids[0])
+            recipe_layer.replace_recipe_layer_info(dataset.info)
+        elif not all(input_layers):
+            info = {Info.KIND: recipe_layer.kind}
+            recipe_layer.replace_recipe_layer_info(info)
 
         self.didUpdateLayers.emit()
 
@@ -812,7 +822,6 @@ class LayerModel(QAbstractItemModel):
     ):
         assert isinstance(algebraic_layer.recipe, AlgebraicRecipe)
 
-        dataset_info = None
         for sched_time in sched_times:
             input_datasets_uuids = self._get_datasets_uuids_of_multichannel_dataset(sched_time, input_layers)
 
@@ -837,9 +846,6 @@ class LayerModel(QAbstractItemModel):
             dataset = algebraic_layer.add_algebraic_dataset(None, info, sched_time, input_datasets_uuids)
 
             self.didAddImageDataset.emit(algebraic_layer, dataset)
-            dataset_info = info
-        if dataset_info:
-            algebraic_layer.info = LayerItem.extract_layer_info(dataset_info)
 
     def _update_algebraic_datasets(
         self, sched_times: List[datetime], input_layers: List[LayerItem], algebraic_layer: LayerItem
