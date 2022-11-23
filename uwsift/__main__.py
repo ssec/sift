@@ -69,7 +69,6 @@ from uwsift.util.logger import configure_loggers
 from uwsift.view.algebraic_config import AlgebraicLayerConfigPane
 from uwsift.view.colormap_editor import ColormapEditor
 from uwsift.view.export_image import ExportImageHelper
-from uwsift.view.layer_details import SingleLayerInfoPane
 from uwsift.view.probes import DEFAULT_POINT_PROBE, ProbeGraphManager
 from uwsift.view.rgb_config import RGBLayerConfigPane
 from uwsift.view.scene_graph import SceneGraphManager
@@ -923,8 +922,7 @@ class Main(QtWidgets.QMainWindow):
         self.layer_model.willRemoveLayer.connect(self.recipe_manager.remove_layer_as_recipe_input)
 
     def _init_layer_panes(self):
-        # convey action between document and layer list view
-        self.layer_info_pane = SingleLayerInfoPane(self.document, parent=self.ui.layerDetailsContents)
+        pass
 
     def _init_map_widget(self):
         # connect canvas and projection pieces
@@ -962,11 +960,7 @@ class Main(QtWidgets.QMainWindow):
 
     def _init_arrange_panes(self):
         self.tabifyDockWidget(self.ui.areaProbePane, self.ui.datasetStatisticsPaneDockWidget)
-        self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.rgbConfigPane)
-        self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.algebraicConfigPane)
-        # Make the layer details shown
-        # FIXME hide layerDetailsPane for now, improve and show it later again
-        self.ui.layerDetailsPane.hide()
+        self.tabifyDockWidget(self.ui.rgbConfigPane, self.ui.algebraicConfigPane)
 
         # refer to objectName'd entities as self.ui.objectName
         self.setAcceptDrops(True)
