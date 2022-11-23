@@ -298,10 +298,11 @@ class aImporter(ABC):
                             # We have to interrupt this loading process (which
                             # runs in its own thread) by raising an exception.
                             raise RuntimeError(
-                                f"RGB Composite provided by satpy with the name"
-                                f" '{prod.info[Info.SHORT_NAME]}' does not work with activated merging of "
-                                f" new data segments into existing data. Consider switching it off by"
-                                f" configuring 'data_reading.merge_with_existing: False'"
+                                f"The Satpy RGB Composite type '{prod.info[Info.SHORT_NAME]}'"
+                                f" does not work when merging of new data chunks"
+                                f" into existing data is active."
+                                f" Consider switching it off by configuring"
+                                f" 'data_reading.merge_with_existing: False'"
                             )
                         paths += _get_paths_in_scene_contributing_to_ds(scn, ds_name)
                     # remove possible duplicates in paths
