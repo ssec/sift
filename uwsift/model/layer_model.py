@@ -999,6 +999,20 @@ class LayerModel(QAbstractItemModel):
         else:
             return None
 
+    def get_input_layers_info(self, recipe_layer: LayerItem) -> Optional[List[frozendict]]:
+        if recipe_layer.recipe:
+            input_layer_infos = []
+            for layer_uuid in recipe_layer.recipe.input_layer_ids:
+                input_layer: LayerItem = self.get_layer_by_uuid(layer_uuid)
+                if input_layer:
+                    input_layer_infos.append(input_layer.info)
+                else:
+                    input_layer_infos.append(None)
+            return input_layer_infos
+
+        LOG.debug(f"Layer with {recipe_layer.uuid} is no recipe layer. So this layer does not own input layers.")
+        return None
+
 
 class ProductFamilyKeyMappingPolicy:
     def __init__(self, model: LayerModel):
