@@ -797,3 +797,21 @@ class BaseWorkspace(QObject):
         else:
             stats = {}
         return stats
+
+    def get_min_max_value_for_dataset_by_uuid(self, uuid: UUID):
+        """Return the minimum and maximum value of a dataset.
+        Fallbacks to calculate these values if the minimum and maximum are not stored.
+        """
+        if uuid:
+            ac: ActiveContent = self._get_active_content_by_uuid(uuid)
+            stats = ac.statistics
+            min_ranges = stats.get("stats").get("min")
+            max_ranges = stats.get("stats").get("max")
+
+            if min_ranges is None and max_ranges is None:
+                dataarray = xarray.DataArray(ac.data)
+                stats = dataset_statistical_analysis(dataarray)
+                min_ranges = stats.get("stats").get("min")
+                max_ranges = stats.get("stats").get("max")
+
+            return min_ranges[0], max_ranges[0]
