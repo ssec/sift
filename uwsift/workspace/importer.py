@@ -281,32 +281,7 @@ class aImporter(ABC):
                 # Thus: Filter the files in `paths` and keep only those
                 # that contribute to the Satpy dataset for `prod`.
                 if "prerequisites" in prod.info:
-                    # If the dataset has prerequisites - this is the case for
-                    # RGB composites provided by Satpy - the files that are
-                    # required by these must be collected.
-                    paths = []
-                    for prerequisite in prod.info.get("prerequisites"):
-                        ds_name = prerequisite.get("name") if isinstance(prerequisite, DataQuery) else prerequisite
-                        if ds_name not in scn.available_dataset_names():
-                            # This is a not supported case: Merging should be
-                            # done for an RGB composite of which prequisite
-                            # datasets are missing in the scene. This can
-                            # happen, when the composite depends on other
-                            # composites - their datasets have not been created
-                            # in the Scene at this stage, thus the Scene can't
-                            # be queried for the files required by these datasets.
-                            # We have to interrupt this loading process (which
-                            # runs in its own thread) by raising an exception.
-                            raise RuntimeError(
-                                f"The Satpy RGB Composite type '{prod.info[Info.SHORT_NAME]}'"
-                                f" does not work when merging of new data chunks"
-                                f" into existing data is active."
-                                f" Consider switching it off by configuring"
-                                f" 'data_reading.merge_with_existing: False'"
-                            )
-                        paths += _get_paths_in_scene_contributing_to_ds(scn, ds_name)
-                    # remove possible duplicates in paths
-                    paths = list(dict.fromkeys(paths))
+                    paths = cls._collect_prerequisites_paths(prod, scn)
                 else:
                     paths = _get_paths_in_scene_contributing_to_ds(scn, prod.info["_satpy_id"].get("name"))
 
@@ -352,6 +327,36 @@ class aImporter(ABC):
                     break
 
         return cls(paths, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
+
+    @classmethod
+    def _collect_prerequisites_paths(cls, prod, scn):
+        # If the dataset has prerequisites - this is the case for
+        # RGB composites provided by Satpy - the files that are
+        # required by these must be collected.
+        paths = []
+        for prerequisite in prod.info.get("prerequisites"):
+            ds_name = prerequisite.get("name") if isinstance(prerequisite, DataQuery) else prerequisite
+            if ds_name not in scn.available_dataset_names():
+                # This is a not supported case: Merging should be
+                # done for an RGB composite of which prequisite
+                # datasets are missing in the scene. This can
+                # happen, when the composite depends on other
+                # composites - their datasets have not been created
+                # in the Scene at this stage, thus the Scene can't
+                # be queried for the files required by these datasets.
+                # We have to interrupt this loading process (which
+                # runs in its own thread) by raising an exception.
+                raise RuntimeError(
+                    f"The Satpy RGB Composite type '{prod.info[Info.SHORT_NAME]}'"
+                    f" does not work when merging of new data chunks"
+                    f" into existing data is active."
+                    f" Consider switching it off by configuring"
+                    f" 'data_reading.merge_with_existing: False'"
+                )
+            paths += _get_paths_in_scene_contributing_to_ds(scn, ds_name)
+        # remove possible duplicates in paths
+        paths = list(dict.fromkeys(paths))
+        return paths
 
     @classmethod
     @abstractmethod
