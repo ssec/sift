@@ -19,7 +19,7 @@ __docformat__ = "reStructuredText"
 import logging
 from typing import Dict, Tuple
 
-from uwsift.common import Info, Instrument, Platform
+from uwsift.common import INVALID_COLOR_LIMITS, Info, Instrument, Platform
 from uwsift.view.colormap import DEFAULT_IR, DEFAULT_UNKNOWN, DEFAULT_VIS
 
 LOG = logging.getLogger(__name__)
@@ -209,6 +209,8 @@ class ABI_AHI_Guidebook(Guidebook):
         return info.get(Info.STANDARD_NAME) in BT_STANDARD_NAMES
 
     def climits(self, info: Dict) -> Tuple:
+        from uwsift.workspace.utils.metadata_utils import get_default_climits
+
         # Valid min and max for colormap use for data values in file (unconverted)
         if self._is_refl(info):
             lims = (-0.012, 1.192)
@@ -228,16 +230,22 @@ class ABI_AHI_Guidebook(Guidebook):
         elif Info.VALID_RANGE in info:
             return tuple(info[Info.VALID_RANGE])
         else:
-            # some kind of default
-            return 0.0, 255.0
+            return get_default_climits(info)
 
     def valid_range(self, info):
+        climits = self.climits(info)
         if "valid_min" in info:
             valid_range = (info["valid_min"], info["valid_max"])
         elif "valid_range" in info:
             valid_range = info["valid_range"]
+        elif "flag_values" in info:
+            valid_range = (min(info["flag_values"]), max(info["flag_values"]))
+        elif climits != INVALID_COLOR_LIMITS:
+            valid_range = climits
+        elif "actual_range" in info:
+            valid_range = info["actual_range"]
         else:
-            valid_range = info[Info.CLIM]
+            raise ValueError(f"Can not determine valid range from {info}.")
         return info.setdefault(Info.VALID_RANGE, valid_range)
 
     def default_colormap(self, info):
