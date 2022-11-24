@@ -268,22 +268,24 @@ class aImporter(ABC):
             LOG.error("no resources in {} {}".format(repr(type(prod)), repr(prod)))
             raise
         paths = [r.path for r in prod.resource]
-        # HACK for Satpy importer
-        if "reader" in prod.info:
-            kwargs.setdefault("reader", prod.info["reader"])
 
-        if "scenes" in kwargs:
-            scn = kwargs["scenes"].get(tuple(paths), None)
-            if scn and "_satpy_id" in prod.info and kwargs["merge_with_existing"]:
-                # For the merging process below it is crucial that it only has
-                # to deal with files which belong to the given Product `prod`,
-                # extraneous files would interfere with the merging process.
-                # Thus: Filter the files in `paths` and keep only those
-                # that contribute to the Satpy dataset for `prod`.
-                if "prerequisites" in prod.info:
-                    paths = cls._collect_prerequisites_paths(prod, scn)
-                else:
-                    paths = _get_paths_in_scene_contributing_to_ds(scn, prod.info["_satpy_id"].get("name"))
+        # Get the Satpy Scene for this set of paths
+        scn = kwargs["scenes"].get(tuple(paths), None)
+
+        # Only Satpy readers / SatpyImporter still supported, thus:
+        # There must be such a Scene and the prod must be from Satpy, we can
+        assert scn and "_satpy_id" in prod.info
+
+        if kwargs["merge_with_existing"]:
+            # For the merging process below it is crucial that it only has
+            # to deal with files which belong to the given Product `prod`,
+            # extraneous files would interfere with the merging process.
+            # Thus: Filter the files in `paths` and keep only those
+            # that contribute to the Satpy dataset for `prod`.
+            if "prerequisites" in prod.info:
+                paths = cls._collect_prerequisites_paths(prod, scn)
+            else:
+                paths = _get_paths_in_scene_contributing_to_ds(scn, prod.info["_satpy_id"].get("name"))
 
         merge_target = kwargs.get("merge_target")
         if merge_target:
