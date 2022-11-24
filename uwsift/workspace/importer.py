@@ -289,22 +289,7 @@ class aImporter(ABC):
 
         merge_target = kwargs.get("merge_target")
         if merge_target:
-            # filter out all segments which are already loaded in the target product
-            new_paths = []
-            existing_content = merge_target.content[0]
-            for path in paths:
-                if path not in existing_content.source_files:
-                    new_paths.append(path)
-            if not new_paths:
-                paths = None
-            elif new_paths != paths:
-                required_aux_file_types = _get_types_of_required_aux_files(scn)
-                required_aux_file_paths = _get_paths_of_required_aux_files(scn, required_aux_file_types)
-                if set(new_paths) == required_aux_file_paths:
-                    paths = None
-                else:
-                    paths = new_paths + list(required_aux_file_paths)  # TODO
-
+            paths = cls._extract_paths_to_merge(merge_target, paths, scn)
             if not paths:
                 return None
 
@@ -325,6 +310,25 @@ class aImporter(ABC):
             kwargs["scene"] = scn
 
         return cls(paths, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
+
+    @classmethod
+    def _extract_paths_to_merge(cls, merge_target, paths, scn):
+        # filter out all segments which are already loaded in the target product
+        new_paths = []
+        existing_content = merge_target.content[0]
+        for path in paths:
+            if path not in existing_content.source_files:
+                new_paths.append(path)
+        if not new_paths:
+            paths = None
+        elif new_paths != paths:
+            required_aux_file_types = _get_types_of_required_aux_files(scn)
+            required_aux_file_paths = _get_paths_of_required_aux_files(scn, required_aux_file_types)
+            if set(new_paths) == required_aux_file_paths:
+                paths = None
+            else:
+                paths = new_paths + list(required_aux_file_paths)  # TODO
+        return paths
 
     @classmethod
     def _collect_prerequisites_paths(cls, prod, scn):
