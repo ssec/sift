@@ -321,12 +321,9 @@ class aImporter(ABC):
         # applied for these. For an unknown reason reusing the scene breaks for
         # FCI data, this Importer data reading magic is too confused.
         if prod.info[Info.KIND] in (Kind.POINTS, Kind.LINES, Kind.VECTORS):
-            for scene_files, scene in kwargs["scenes"].items():
-                if list(scene_files) == paths:
-                    del kwargs["scenes"]
-                    assert "scene" not in kwargs
-                    kwargs["scene"] = scene
-                    break
+            del kwargs["scenes"]
+            assert "scene" not in kwargs
+            kwargs["scene"] = scn
 
         return cls(paths, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
 
