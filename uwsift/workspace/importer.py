@@ -296,10 +296,8 @@ class aImporter(ABC):
                 if path not in existing_content.source_files:
                     new_paths.append(path)
             if new_paths != paths:
-                required_aux_file_paths = set()
-                if scn:
-                    required_aux_file_types = _get_types_of_required_aux_files(scn)
-                    required_aux_file_paths = _get_paths_of_required_aux_files(scn, required_aux_file_types)
+                required_aux_file_types = _get_types_of_required_aux_files(scn)
+                required_aux_file_paths = _get_paths_of_required_aux_files(scn, required_aux_file_types)
                 paths = new_paths
                 if not paths:
                     return None
