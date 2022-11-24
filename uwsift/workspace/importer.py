@@ -313,7 +313,13 @@ class aImporter(ABC):
 
     @classmethod
     def _extract_paths_to_merge(cls, merge_target, paths, scn):
-        # filter out all segments which are already loaded in the target product
+        """
+        Get a subset of 'paths', filtering out all files that are already loaded
+        into the target product.
+
+        I.e., collect only files from the given 'paths' list that are not yet
+        loaded and, if necessary, auxiliary files required to load these.
+        """
         new_paths = []
         existing_content = merge_target.content[0]
         for path in paths:
