@@ -295,15 +295,18 @@ class aImporter(ABC):
             for path in paths:
                 if path not in existing_content.source_files:
                     new_paths.append(path)
-            if new_paths != paths:
+            if not new_paths:
+                paths = None
+            elif new_paths != paths:
                 required_aux_file_types = _get_types_of_required_aux_files(scn)
                 required_aux_file_paths = _get_paths_of_required_aux_files(scn, required_aux_file_types)
-                paths = new_paths
-                if not paths:
-                    return None
-                if set(paths) == required_aux_file_paths:
-                    return None
-                paths.extend(list(required_aux_file_paths))  # TODO
+                if set(new_paths) == required_aux_file_paths:
+                    paths = None
+                else:
+                    paths = new_paths + list(required_aux_file_paths)  # TODO
+
+            if not paths:
+                return None
 
         # In order to "load" converted datasets, we have to reuse the existing
         # Scene 'scn' from the first instantiation of SatpyImporter instead of
