@@ -66,7 +66,6 @@ class LayerItem:
         layer_info[Info.UNIT_CONVERSION] = unit_conversion
 
         for key in [
-            Info.CLIM,
             Info.CENTRAL_WAVELENGTH,
             Info.INSTRUMENT,
             Info.KIND,

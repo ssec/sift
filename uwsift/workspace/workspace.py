@@ -523,7 +523,6 @@ class BaseWorkspace(QObject):
             info[k] = max_meta[k]
 
         info[Info.VALID_RANGE] = (np.nanmin(composite_array), np.nanmax(composite_array))
-        info[Info.CLIM] = (np.nanmin(composite_array), np.nanmax(composite_array))
         info[Info.OBS_TIME] = min([x[Info.OBS_TIME] for x in md_list])
         info[Info.SCHED_TIME] = min([x[Info.SCHED_TIME] for x in md_list])
         # get the overall observation time

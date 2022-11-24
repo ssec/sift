@@ -185,7 +185,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             visible=True,
             colormap=cmap,
             style=style,
-            climits=info[Info.CLIM],
+            climits=info[Info.VALID_RANGE],
             gamma=gamma,
             opacity=1.0,
         )
