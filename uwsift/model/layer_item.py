@@ -384,3 +384,30 @@ class LayerItem:
         for ds in self.timeline.values():
             output += f"{ds.info[Info.SCHED_TIME]} -> {ds.info[Info.UUID]}"
         return output
+
+    def _get_actual_range_from_dataset(self, uuid: UUID) -> Tuple:
+        """Returns the calculated actual range value of a dataset with the given uuid"""
+        return self.model._workspace.get_min_max_value_for_dataset_by_uuid(uuid)
+
+    def get_actual_range_from_first_active_dataset(self) -> Tuple:
+        """Returns the calculated actual range value of the first active dataset"""
+        first_active_dataset = self.get_first_active_product_dataset()
+        return self._get_actual_range_from_dataset(first_active_dataset.uuid)
+
+    def get_actual_range_from_layer(self) -> Tuple:
+        """Calculate on the fly the actual range of the layer.
+
+        The actual range of a layer is the union of all actual ranges of its owned datasets."""
+        if len(self._timeline) == 0:
+            return None, None
+
+        min_range = 0
+        max_range = 0
+        for dataset in self._timeline.values():
+            dataset_actual_range = self._get_actual_range_from_dataset(dataset.uuid)
+            if dataset_actual_range[0] < min_range:
+                min_range = dataset_actual_range[0]
+            if dataset_actual_range[1] > max_range:
+                max_range = dataset_actual_range[1]
+
+        return min_range, max_range
