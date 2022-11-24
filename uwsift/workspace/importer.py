@@ -276,8 +276,9 @@ class aImporter(ABC):
         # There must be such a Scene and the prod must be from Satpy, we can
         assert scn and "_satpy_id" in prod.info
 
-        if kwargs["merge_with_existing"]:
-            # For the merging process below it is crucial that it only has
+        merge_target = kwargs.get("merge_target")
+        if merge_target:
+            # For the merging process it is crucial that it only has
             # to deal with files which belong to the given Product `prod`,
             # extraneous files would interfere with the merging process.
             # Thus: Filter the files in `paths` and keep only those
@@ -287,8 +288,7 @@ class aImporter(ABC):
             else:
                 paths = _get_paths_in_scene_contributing_to_ds(scn, prod.info["_satpy_id"].get("name"))
 
-        merge_target = kwargs.get("merge_target")
-        if merge_target:
+            # Now we can analyse, which files must be loaded
             paths = cls._extract_paths_to_merge(merge_target, paths, scn)
             if not paths:
                 return None
