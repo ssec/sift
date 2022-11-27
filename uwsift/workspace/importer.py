@@ -838,108 +838,68 @@ class SatpyImporter(aImporter):
 
         return DataArray(combined_data, attrs=attrs)
 
-    def _parse_style_attr_config(self) -> Dict[str, List[str]]:
+    def _parse_style_attributes_config(self) -> Dict[str, List[str]]:
         """
         Extract the ``style_attributes`` section from the reader config.
         This function doesn't validate whether the style attributes or the
         product names exist.
 
-        :return: mapping of style attributes to products
+        The returned dictionary lists for each product, which dependent styles
+        it is configured for.
+
+        Maintenance: this swaps the mapping direction since the new one is more
+        useful for querying which features (style attributes) should be styled depending
+        on a given product
+
+        :return: mapping of products to style attributes
         """
-        style_config = config.get(f"data_reading.{self.reader}.style_attributes", None)
-        if not style_config:
+        style_attributes = config.get(f"data_reading.{self.reader}.style_attributes", None)
+        if not style_attributes:
             return {}
 
-        style_attrs = {}
-        for attr_name, product_names in style_config.items():
-            if attr_name in style_attrs:
-                LOG.warning(f"duplicate style attribute: {attr_name}")
-                continue
-
-            if not isinstance(product_names, list):
-                # a single product is allowed
-                product_names = [product_names]
-
-            distinct_products = []
+        style_attributes_by_product = {}
+        for style_attribute, product_names in style_attributes.items():
             for product_name in product_names:
-                if product_name in distinct_products:
-                    LOG.warning(f"duplicate product {product_name} for " f"style attribute: {attr_name}")
-                    continue
-                if product_name:
-                    distinct_products.append(product_name)
+                if product_name not in style_attributes_by_product:
+                    style_attributes_by_product[product_name] = {style_attribute}
+                else:
+                    style_attributes_by_product[product_name].add(style_attribute)
 
-            style_attrs[attr_name] = distinct_products
-        return style_attrs
+        return style_attributes_by_product
 
     def _combine_points(self, datasets: DatasetDict, converter) -> Dict[DataID, DataArray]:
-        """
-        Find convertible POINTS datasets in the ``DatasetDict``. The ``converter``
-        function is then used to generate new DataArrays.
-
-        The latitude and longitude for the points are extracted from the dataset
-        metadata. If configured in the reader config, the dataset itself will be
-        used for the ``fill`` style attribute.
-
-        :param datasets: all loaded datasets and previously converted datasets
-        :param converter: function to convert a list of DataArrays
-        :return: mapping of converted DataID to new DataArray
-        """
-        style_attrs = self._parse_style_attr_config()
-        allowed_style_attrs = ["fill"]
+        # Currently only the "fill" can be colored by a mapping from product values to colors (using a colormap) but in
+        # the future other features could be colored as well, e.g.  like "stroke".
+        supported_color_by_style_attrs = {"fill"}
+        style_attributes_by_product = self._parse_style_attributes_config()
 
         converted_datasets = {}
-        for style_attr, product_names in style_attrs.items():
-            if style_attr not in allowed_style_attrs:
-                LOG.error(f"unknown style attribute: {style_attr}")
-                continue
-
-            for product_name in product_names:
-                try:
-                    ds = datasets[product_name]
-                except KeyError:
-                    LOG.debug(f"product wasn't selected in ImportWizard: {product_name}")
-                    continue
-
-                kind = ds.attrs[Info.KIND]
-                if kind != Kind.POINTS:
-                    LOG.error(f"dataset {product_name} isn't of POINTS kind: {kind}")
-                    continue
-
-                try:
-                    convertable_ds = [ds.area.lons, ds.area.lats, ds]
-                except AttributeError:
-                    # Some products (e.g. `latitude` and `longitude`) may not
-                    # (for whatever reason) have an associated SwathDefinition.
-                    # Without it, there is no geo-location information per data
-                    # point, because it is taken from its fields 'lats', 'lons'.
-                    # This cannot be healed, point data loading fails.
-                    LOG.error(
-                        f"Dataset has no point coordinates (lats, lons):"
-                        f" {product_name} (Most likely due to missing"
-                        f" SwathDefinition)"
-                    )
-                    continue
-
-                ds_id = DataID.from_dataarray(ds)
-                converted_datasets[ds_id] = converter(convertable_ds, ds.attrs)
-
-        # All unused Datasets aren't defined in the style attributes config.
-        # If one of them has an area, use it to display uncolored points.
         for ds_id, ds in datasets.items():
-            if ds_id in converted_datasets:
+            if ds.attrs[Info.KIND] != Kind.POINTS:
                 continue
-            if ds.attrs[Info.KIND] == Kind.POINTS:
-                try:
-                    convertable_ds = [ds.area.lons, ds.area.lats]
-                except AttributeError:
-                    LOG.error(
-                        f"Dataset has no point coordinates (lats, lons):"
-                        f" {ds.attrs['name']} (Most likely due to missing"
-                        f" SwathDefinition)"
-                    )
-                    continue
-                converted_datasets[ds_id] = converter(convertable_ds, ds.attrs)
 
+            do_color_by_values = ds_id.name in style_attributes_by_product and bool(
+                style_attributes_by_product[ds_id.name] & supported_color_by_style_attrs
+            )
+            try:
+                # Only if we want to use the values of the data to color
+                # markers we need the dataset's array itself, otherwise the
+                # coordinates alone are sufficient.
+                convertible_ds = (
+                    [ds.area.lons, ds.area.lats, ds] if do_color_by_values else [ds.area.lons, ds.area.lats]
+                )
+            except AttributeError:
+                # Some products (e.g. `latitude` and `longitude`) may not
+                # (for whatever reason) have an associated SwathDefinition.
+                # Without it, there is no geo-location information per data
+                # point, because it is taken from its fields 'lats', 'lons'.
+                # This cannot be healed, point data loading fails.
+                LOG.error(
+                    f"Dataset '{ds.attrs['name']}' of kind POINTS has no point"
+                    f" coordinates (lats, lons) (Missing SwathDefinition)."
+                )
+                continue
+            converted_datasets[ds_id] = converter(convertible_ds, ds.attrs)
         return converted_datasets
 
     def _parse_coords_end_config(self) -> List[str]:
@@ -975,19 +935,19 @@ class SatpyImporter(aImporter):
             if ds.attrs[Info.KIND] != Kind.LINES:
                 continue
 
-            convertable_ds = []
+            convertible_ds = []
             try:
                 for coord in coords_end:
-                    convertable_ds.append(ds.coords[coord])  # base
+                    convertible_ds.append(ds.coords[coord])  # base
             except KeyError:
                 LOG.error(f"dataset has no coordinates: {ds.attrs['name']}")
                 continue
-            if len(convertable_ds) < 2:
+            if len(convertible_ds) < 2:
                 LOG.error(f"LINES dataset needs 4 coordinates: {ds.attrs['name']}")
                 continue
 
-            convertable_ds.extend([ds.area.lons, ds.area.lats])  # tip
-            converted_datasets[ds_id] = converter(convertable_ds, ds.attrs)
+            convertible_ds.extend([ds.area.lons, ds.area.lats])  # tip
+            converted_datasets[ds_id] = converter(convertible_ds, ds.attrs)
         return converted_datasets
 
     def _revise_all_datasets(self) -> DatasetDict:
