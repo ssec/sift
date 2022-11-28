@@ -1006,7 +1006,7 @@ class SatpyImporter(aImporter):
     def _get_grid_info(self):
         grid_origin = config.get(f"data_reading.{self.reader}.grid.origin", "NW")
         grid_first_index_x = config.get(f"data_reading.{self.reader}.grid.first_index_x", 0)
-        grid_first_index_y = config.get(f"data_reading.{self.reader}.grid.first_index_x", 0)
+        grid_first_index_y = config.get(f"data_reading.{self.reader}.grid.first_index_y", 0)
 
         return {
             Info.GRID_ORIGIN: grid_origin,
