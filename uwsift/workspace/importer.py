@@ -1078,9 +1078,7 @@ class SatpyImporter(aImporter):
                     LOG.error(f"one dimensional dataset can't be loaded: {ds_id['name']}")
                     continue
 
-                completion, content, data_memmap = self._create_unstructured_points_dataset_content(
-                    dataset, kind, now, prod
-                )
+                completion, content, data_memmap = self._create_unstructured_points_dataset_content(dataset, now, prod)
                 yield import_progress(
                     uuid=prod.uuid,
                     stages=num_stages,
@@ -1190,7 +1188,7 @@ class SatpyImporter(aImporter):
         )
         return c, img_data
 
-    def _create_unstructured_points_dataset_content(self, dataset, kind, now, prod):
+    def _create_unstructured_points_dataset_content(self, dataset, now, prod):
         data_filename, data_memmap = self._create_data_memmap_file(dataset.data, dataset.dtype, prod)
         shape = prod.info[Info.SHAPE]
         content = ContentUnstructuredPoints(
@@ -1202,7 +1200,7 @@ class SatpyImporter(aImporter):
             n_dimensions=shape[1],
             dtype=dataset.dtype,
         )
-        content.info[Info.KIND] = kind
+        content.info[Info.KIND] = prod.info[Info.KIND]
         prod.content.append(content)
         self.add_content_to_cache(content)
         completion = 2.0
