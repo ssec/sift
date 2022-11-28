@@ -1014,7 +1014,7 @@ class SatpyImporter(aImporter):
             Info.GRID_FIRST_INDEX_Y: grid_first_index_y,
         }
 
-    def begin_import_products(self, *product_ids) -> Generator[import_progress, None, None]:
+    def begin_import_products(self, *product_ids) -> Generator[import_progress, None, None]:  # noqa: C901
         if self.use_inventory_db:
             products = self._get_products_from_inventory_db(product_ids)
         else:
