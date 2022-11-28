@@ -1095,7 +1095,6 @@ class SatpyImporter(aImporter):
                 )
                 continue
 
-            data = dataset.data
             uuid = prod.uuid
 
             if merge_with_existing:
@@ -1104,17 +1103,15 @@ class SatpyImporter(aImporter):
                 uuid = existing_product.uuid
                 c = existing_product.content[0]
                 img_data = c.img_data
-                self.merge_data_into_memmap(data, img_data, segments)
+                self.merge_data_into_memmap(dataset.data, img_data, segments)
             else:
                 area_info = self._area_to_sift_attrs(dataset.attrs["area"])
                 grid_info = self._get_grid_info()
 
                 if kind == Kind.MC_IMAGE:
-                    c, img_data = self._create_mc_image_dataset_content(
-                        data, dataset, now, prod, shape, area_info, grid_info
-                    )
+                    c, img_data = self._create_mc_image_dataset_content(dataset, now, prod, shape, area_info, grid_info)
                 else:
-                    c, img_data = self._create_image_dataset_content(data, now, prod, shape, area_info, grid_info)
+                    c, img_data = self._create_image_dataset_content(dataset, now, prod, shape, area_info, grid_info)
 
                 c.info[Info.KIND] = prod.info[Info.KIND]
                 c.img_data = img_data
@@ -1140,8 +1137,8 @@ class SatpyImporter(aImporter):
                 content=c,
             )
 
-    def _create_mc_image_dataset_content(self, data, dataset, now, prod, shape, area_info, grid_info):
-        data_filename, img_data = self._create_data_memmap_file(data, data.dtype, prod)
+    def _create_mc_image_dataset_content(self, dataset, now, prod, shape, area_info, grid_info):
+        data_filename, img_data = self._create_data_memmap_file(dataset.data, dataset.data.dtype, prod)
         c = ContentMultiChannelImage(
             lod=0,
             resolution=int(min(abs(area_info[Info.CELL_WIDTH]), abs(area_info[Info.CELL_HEIGHT]))),
@@ -1164,14 +1161,14 @@ class SatpyImporter(aImporter):
         )
         return c, img_data
 
-    def _create_image_dataset_content(self, data, now, prod, shape, area_info, grid_info):
+    def _create_image_dataset_content(self, dataset, now, prod, shape, area_info, grid_info):
         # For kind IMAGE the dtype must be float32 seemingly, see class
         # Column, comment for 'dtype' and the construction of c = Content
         # just below.
         # FIXME: It is dubious to enforce that type conversion to happen in
         #  _create_data_memmap_file, but otherwise IMAGES of pixel counts
         #  data (dtype = np.uint16) crash.
-        data_filename, img_data = self._create_data_memmap_file(data, np.float32, prod)
+        data_filename, img_data = self._create_data_memmap_file(dataset.data, np.float32, prod)
         c = ContentImage(
             lod=0,
             resolution=int(min(abs(area_info[Info.CELL_WIDTH]), abs(area_info[Info.CELL_HEIGHT]))),
