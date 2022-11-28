@@ -14,7 +14,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_LayerDetailsPane(object):
     def setupUi(self, LayerDetailsPane):
         LayerDetailsPane.setObjectName("LayerDetailsPane")
-        LayerDetailsPane.resize(312, 228)
+        LayerDetailsPane.resize(312, 234)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -55,16 +55,22 @@ class Ui_LayerDetailsPane(object):
         self.formLayout.setWidget(3, QtWidgets.QFormLayout.FieldRole, self.layerWavelengthValue)
         self.layerColormapLabel = QtWidgets.QLabel(LayerDetailsPane)
         self.layerColormapLabel.setObjectName("layerColormapLabel")
-        self.formLayout.setWidget(4, QtWidgets.QFormLayout.LabelRole, self.layerColormapLabel)
+        self.formLayout.setWidget(5, QtWidgets.QFormLayout.LabelRole, self.layerColormapLabel)
         self.layerColormapValue = QtWidgets.QLabel(LayerDetailsPane)
         self.layerColormapValue.setObjectName("layerColormapValue")
-        self.formLayout.setWidget(4, QtWidgets.QFormLayout.FieldRole, self.layerColormapValue)
+        self.formLayout.setWidget(5, QtWidgets.QFormLayout.FieldRole, self.layerColormapValue)
         self.layerColorLimitsLabel = QtWidgets.QLabel(LayerDetailsPane)
         self.layerColorLimitsLabel.setObjectName("layerColorLimitsLabel")
-        self.formLayout.setWidget(5, QtWidgets.QFormLayout.LabelRole, self.layerColorLimitsLabel)
+        self.formLayout.setWidget(6, QtWidgets.QFormLayout.LabelRole, self.layerColorLimitsLabel)
         self.layerColorLimitsValue = QtWidgets.QLabel(LayerDetailsPane)
         self.layerColorLimitsValue.setObjectName("layerColorLimitsValue")
-        self.formLayout.setWidget(5, QtWidgets.QFormLayout.FieldRole, self.layerColorLimitsValue)
+        self.formLayout.setWidget(6, QtWidgets.QFormLayout.FieldRole, self.layerColorLimitsValue)
+        self.layerResolutionLabel = QtWidgets.QLabel(LayerDetailsPane)
+        self.layerResolutionLabel.setObjectName("layerResolutionLabel")
+        self.formLayout.setWidget(4, QtWidgets.QFormLayout.LabelRole, self.layerResolutionLabel)
+        self.layerResolutionValue = QtWidgets.QLabel(LayerDetailsPane)
+        self.layerResolutionValue.setObjectName("layerResolutionValue")
+        self.formLayout.setWidget(4, QtWidgets.QFormLayout.FieldRole, self.layerResolutionValue)
         self.verticalLayout.addLayout(self.formLayout)
         self.layerColormapVisual = QNoScrollWebView(LayerDetailsPane)
         self.layerColormapVisual.setMinimumSize(QtCore.QSize(300, 30))
@@ -92,16 +98,6 @@ class Ui_LayerDetailsPane(object):
         self.layerColormapValue.setText(_translate("LayerDetailsPane", "Rainbow (IR Default)"))
         self.layerColorLimitsLabel.setText(_translate("LayerDetailsPane", "Color Limits:"))
         self.layerColorLimitsValue.setText(_translate("LayerDetailsPane", "-109.00 ~ 55.00°C"))
-
-
+        self.layerResolutionLabel.setText(_translate("LayerDetailsPane", "Resolution:"))
+        self.layerResolutionValue.setText(_translate("LayerDetailsPane", "1 km"))
 from uwsift.ui.custom_widgets import QNoScrollWebView
-
-if __name__ == "__main__":
-    import sys
-
-    app = QtWidgets.QApplication(sys.argv)
-    LayerDetailsPane = QtWidgets.QWidget()
-    ui = Ui_LayerDetailsPane()
-    ui.setupUi(LayerDetailsPane)
-    LayerDetailsPane.show()
-    sys.exit(app.exec_())

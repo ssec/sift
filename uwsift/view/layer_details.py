@@ -19,6 +19,7 @@ __docformat__ = "reStructuredText"
 import logging
 from typing import Optional, Tuple
 
+from decimal import Decimal
 import numpy as np
 from PyQt5 import QtWidgets
 
@@ -103,6 +104,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         self._details_pane_ui.layerVisibleSchedTimeValue.setText("N/A")
         self._details_pane_ui.layerInstrumentValue.setText("N/A")
         self._details_pane_ui.layerWavelengthValue.setText("N/A")
+        self._details_pane_ui.layerResolutionValue.setText("N/A")
         self._details_pane_ui.layerColormapValue.setText("N/A")
         self._details_pane_ui.layerColorLimitsValue.setText("N/A")
         self._details_pane_ui.layerColormapVisual.setHtml("")
@@ -199,6 +201,8 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
         self._update_displayed_wavelength()
 
+        self._update_displayed_resolution()
+
         self.update_displayed_colormap()
 
         self.update_displayed_clims()
@@ -240,3 +244,22 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         else:
             wavelength_str = "N/A" if self._current_selected_layer.kind != Kind.RGB else "N/A, N/A, N/A"
             self._details_pane_ui.layerWavelengthValue.setText(wavelength_str)
+
+    def _update_displayed_resolution(self):
+        resolution_str = "N/A"
+
+        if self._current_selected_layer.info.get("resolution-x"):
+            resolution_str = self._format_resolution(self._current_selected_layer.info.get("resolution-x"))
+            resolution_str += ' / '
+            resolution_str += self._format_resolution(self._current_selected_layer.info.get("resolution-y"))
+
+        self._details_pane_ui.layerResolutionValue.setText(resolution_str)
+
+    @staticmethod
+    def _format_resolution(resolution):
+        resolution = Decimal(resolution)
+        if resolution < 1000:
+            return str(resolution.quantize(Decimal("1."))) + " m"
+        else:
+            resolution /= Decimal(1000)
+            return str(resolution.quantize(Decimal(".1"))) + " km"
