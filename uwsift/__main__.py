@@ -64,7 +64,7 @@ from uwsift.util import (
     check_imageio_deps,
     get_package_data_dir,
 )
-from uwsift.util.common import format_wavelength
+from uwsift.util.common import format_wavelength, normalize_longitude
 from uwsift.util.logger import configure_loggers
 from uwsift.view.algebraic_config import AlgebraicLayerConfigPane
 from uwsift.view.colormap_editor import ColormapEditor
@@ -439,8 +439,7 @@ class Main(QtWidgets.QMainWindow):
 
         if state and xy_pos is not None:
             lon, lat = xy_pos
-            lon = lon % 360 if lon > 0 else lon % -360 + 360
-            lon = lon - 360 if lon > 180 else lon
+            lon = normalize_longitude(lon)
             lon_str = "{:>6.02f} {}".format(abs(lon), "W" if lon < 0 else "E")
             lat_str = "{:>6.02f} {}".format(abs(lat), "S" if lat < 0 else "N")
             probe_loc = "{}, {}".format(lon_str, lat_str)

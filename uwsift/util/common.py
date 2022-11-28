@@ -242,3 +242,10 @@ def format_wavelength(wl):
     else:
         wl_str = f"{wl:0.01f} µm"
     return wl_str
+
+
+def normalize_longitude(lon: float) -> float:
+    """Return longitude centered around prime meridian, i.e. in the range ]-180.0, 180.0]"""
+    # Fiddling with '-' is required to include 180.0 and exclude -180.0 from the range,
+    # the code would be neater the other way around: (lon + 180.0) % 360.0 - 180.0
+    return -((-lon + 180.0) % 360.0 - 180.0)
