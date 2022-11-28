@@ -262,6 +262,10 @@ class Document(QObject):  # base class is rightmost, mixins left of that
         do_merge_with_existing = importer_kwargs.get("merge_with_existing", True) and not importer_kwargs.get(
             "resampling_info"
         )
+        # Ensure that the result of the test just performed is consistently
+        # passed on to further import steps via importer_kwargs:
+        importer_kwargs["merge_with_existing"] = do_merge_with_existing
+
         # Load all the metadata so we can sort the files
         # assume metadata collection is in the most user-friendly order
         infos = self._workspace.collect_product_metadata_for_paths(paths, **importer_kwargs)

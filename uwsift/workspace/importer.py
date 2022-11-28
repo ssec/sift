@@ -188,51 +188,58 @@ def generate_guidebook_metadata(info) -> Mapping:
     return info
 
 
-def _get_requires(scn: Scene) -> Set[str]:
+def _get_types_of_required_aux_files(scn: Scene) -> Set[str]:
     """
-    Get the required file types for this scene. E.g. Seviri Prolog/Epilog.
-    :param scn: scene object to analyse
+    Get the file types of required auxiliary files in the given Scene.
+
+    For example, the types 'HRIT_PRO', 'HRIT_EPI' for the prolog/epilog files of
+    SEVIRI in HRIT format.
+
+    :param scn: Scene object to analyse
     :return: set of required file types
     """
-    requires = set()
+    required_aux_file_types = set()
     for reader in scn._readers.values():
         for file_handlers in reader.file_handlers.values():
             for file_handler in file_handlers:
-                requires |= set(file_handler.filetype_info.get("requires", ()))
-    return requires
+                required_aux_file_types |= set(file_handler.filetype_info.get("requires", ()))
+    return required_aux_file_types
 
 
-def _required_files_set(scn: Scene, requires) -> Set[str]:
+def _get_paths_of_required_aux_files(scn: Scene, required_aux_file_types) -> Set[str]:
     """
-    Get set of files additional required to load data. E.g. Seviri Prolog/Epilog files.
-    :param scn: scene object to analyse
-    :param requires: the file types which are required
+    Get set of paths of auxiliary files required to load data in Scene.
+    For example, prolog/epilog files for SEVIRI in HRIT format.
+
+    :param scn: Scene object to analyse
+    :param required_aux_file_types: the file types which are required
     :return: set of required files
     """
-    required_files = set()
-    if requires:
+    required_aux_paths = set()
+    if required_aux_file_types:
         for reader in scn._readers.values():
             for file_handlers in reader.file_handlers.values():
                 for file_handler in file_handlers:
-                    if file_handler.filetype_info["file_type"] in requires:
-                        required_files.add(file_handler.filename)
-    return required_files
+                    if file_handler.filetype_info["file_type"] in required_aux_file_types:
+                        required_aux_paths.add(file_handler.filename)
+    return required_aux_paths
 
 
-def _wanted_paths(scn: Scene, ds_name: str) -> List[str]:
+def _get_paths_in_scene_contributing_to_ds(scn: Scene, ds_name: str) -> List[str]:
     """
-    Get list of paths in scene which are actually required to load given dataset name.
+    Get list of paths in scene which actually contain data for the dataset given
+    by its name `ds_name`.
     :param scn: scene object to analyse
     :param ds_name: dataset name
     :return: paths in scene which are required to load given dataset
     """
-    wanted_paths = []
+    contributing_paths = []
     for reader in scn._readers.values():
         for file_handlers in reader.file_handlers.values():
             for file_handler in file_handlers:
                 if not ds_name or not hasattr(file_handler, "channel_name") or file_handler.channel_name == ds_name:
-                    wanted_paths.append(file_handler.filename)
-    return wanted_paths
+                    contributing_paths.append(file_handler.filename)
+    return contributing_paths
 
 
 class aImporter(ABC):
@@ -265,52 +272,38 @@ class aImporter(ABC):
         if "reader" in prod.info:
             kwargs.setdefault("reader", prod.info["reader"])
 
-        merge_target = kwargs.get("merge_target")
         if "scenes" in kwargs:
             scn = kwargs["scenes"].get(tuple(paths), None)
-            if scn and "_satpy_id" in prod.info and config.get("data_reading.merge_with_existing", True):
-                # filter out files not required to load dataset for given product
-                # extraneous files interfere with the merging process
-
+            if scn and "_satpy_id" in prod.info and kwargs["merge_with_existing"]:
+                # For the merging process below it is crucial that it only has
+                # to deal with files which belong to the given Product `prod`,
+                # extraneous files would interfere with the merging process.
+                # Thus: Filter the files in `paths` and keep only those
+                # that contribute to the Satpy dataset for `prod`.
                 if "prerequisites" in prod.info:
-                    # If the dataset has prerequisites for it to be loaded,
-                    # the files that are required by them must be included
-                    paths = []
-                    for prerequisite in prod.info.get("prerequisites"):
-                        name = prerequisite.get("name") if isinstance(prerequisite, DataQuery) else prerequisite
-                        if name not in scn.available_dataset_names():
-                            # In this case we have to interrupt the loading (which runs it is own thread) by raising
-                            # an exception
-                            raise RuntimeError(
-                                f"RGB Composite provided by satpy with the name"
-                                f" '{prod.info[Info.SHORT_NAME]}' does not work with activated merging of "
-                                f" new data segments into existing data. Consider switching it off by"
-                                f" configuring 'data_reading.merge_with_existing: False'"
-                            )
-                        paths += _wanted_paths(scn, name)
-                    # remove possible duplicates of files
-                    paths = list(dict.fromkeys(paths))
+                    paths = cls._collect_prerequisites_paths(prod, scn)
                 else:
-                    paths = _wanted_paths(scn, prod.info["_satpy_id"].get("name"))
+                    paths = _get_paths_in_scene_contributing_to_ds(scn, prod.info["_satpy_id"].get("name"))
 
+        merge_target = kwargs.get("merge_target")
         if merge_target:
             # filter out all segments which are already loaded in the target product
-            new_filenames = []
+            new_paths = []
             existing_content = merge_target.content[0]
-            for fn in paths:
-                if fn not in existing_content.source_files:
-                    new_filenames.append(fn)
-            if new_filenames != paths:
-                required_files = set()
+            for path in paths:
+                if path not in existing_content.source_files:
+                    new_paths.append(path)
+            if new_paths != paths:
+                required_aux_file_paths = set()
                 if scn:
-                    requires = _get_requires(scn)
-                    required_files = _required_files_set(scn, requires)
-                paths = new_filenames
+                    required_aux_file_types = _get_types_of_required_aux_files(scn)
+                    required_aux_file_paths = _get_paths_of_required_aux_files(scn, required_aux_file_types)
+                paths = new_paths
                 if not paths:
                     return None
-                if set(paths) == required_files:
+                if set(paths) == required_aux_file_paths:
                     return None
-                paths.extend(list(required_files))  # TODO
+                paths.extend(list(required_aux_file_paths))  # TODO
 
         # In order to "load" converted datasets, we have to reuse the existing
         # scene from the first instantiation of SatpyImporter instead of loading
@@ -334,6 +327,36 @@ class aImporter(ABC):
                     break
 
         return cls(paths, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
+
+    @classmethod
+    def _collect_prerequisites_paths(cls, prod, scn):
+        # If the dataset has prerequisites - this is the case for
+        # RGB composites provided by Satpy - the files that are
+        # required by these must be collected.
+        paths = []
+        for prerequisite in prod.info.get("prerequisites"):
+            ds_name = prerequisite.get("name") if isinstance(prerequisite, DataQuery) else prerequisite
+            if ds_name not in scn.available_dataset_names():
+                # This is a not supported case: Merging should be
+                # done for an RGB composite of which prequisite
+                # datasets are missing in the scene. This can
+                # happen, when the composite depends on other
+                # composites - their datasets have not been created
+                # in the Scene at this stage, thus the Scene can't
+                # be queried for the files required by these datasets.
+                # We have to interrupt this loading process (which
+                # runs in its own thread) by raising an exception.
+                raise RuntimeError(
+                    f"The Satpy RGB Composite type '{prod.info[Info.SHORT_NAME]}'"
+                    f" does not work when merging of new data chunks"
+                    f" into existing data is active."
+                    f" Consider switching it off by configuring"
+                    f" 'data_reading.merge_with_existing: False'"
+                )
+            paths += _get_paths_in_scene_contributing_to_ds(scn, ds_name)
+        # remove possible duplicates in paths
+        paths = list(dict.fromkeys(paths))
+        return paths
 
     @classmethod
     @abstractmethod
@@ -411,7 +434,7 @@ class SatpyImporter(aImporter):
         self.dataset_ids = sorted(self.dataset_ids)
 
         self.use_inventory_db = USE_INVENTORY_DB
-        self.requires = _get_requires(self.scn)
+        self.required_aux_file_types = _get_types_of_required_aux_files(self.scn)
 
         # NOTE: needed for an issue with resampling of NetCDF data.
         self.scn_original = None  # noqa - Do not simply remove
@@ -530,7 +553,7 @@ class SatpyImporter(aImporter):
             for file_handlers in reader.file_handlers.values():
                 collected_segment_count += 1
                 for file_handler in file_handlers:
-                    if file_handler.filetype_info["file_type"] in self.requires:
+                    if file_handler.filetype_info["file_type"] in self.required_aux_file_types:
                         collected_segment_count -= 1
                         continue
                     seg = file_handler.filename_info["segment"]
@@ -553,7 +576,7 @@ class SatpyImporter(aImporter):
         for reader in self.scn._readers.values():
             for file_handlers in reader.file_handlers.values():
                 for file_handler in file_handlers:
-                    if file_handler.filetype_info["file_type"] in self.requires:
+                    if file_handler.filetype_info["file_type"] in self.required_aux_file_types:
                         continue
                     es = file_handler.filetype_info["expected_segments"]
                     if expected_segments is None:
@@ -1137,7 +1160,7 @@ class SatpyImporter(aImporter):
                 prod.content.append(c)
                 self.add_content_to_cache(c)
 
-            required_files = _required_files_set(self.scn, self.requires)
+            required_files = _get_paths_of_required_aux_files(self.scn, self.required_aux_file_types)
             # Note loaded source files but not required files. This is necessary
             # because the merger will try to not load already loaded files again
             # but might need to reload required files.
