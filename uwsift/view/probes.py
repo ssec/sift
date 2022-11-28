@@ -612,7 +612,9 @@ class ProbeGraphDisplay(object):
         # Assume that the task gets resolved otherwise we might try to draw multiple times
         self._stale = False
 
-    def _rebuild_plot_task(self, x_layer_uuid, y_layer_uuid, polygon, point_xy, plot_versus=False, plot_full_data=True):
+    def _rebuild_plot_task(  # noqa: C901
+        self, x_layer_uuid, y_layer_uuid, polygon, point_xy, plot_versus=False, plot_full_data=True
+    ):
 
         data_source_description = "full data" if plot_full_data else "polygon data"
 
