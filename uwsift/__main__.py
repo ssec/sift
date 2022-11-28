@@ -427,7 +427,7 @@ class Main(QtWidgets.QMainWindow):
         model_indexes = self.ui.treeView.selectedIndexes()
         self.layer_model.toggle_layers_visibility(model_indexes)
 
-    def update_point_probe_text(self, probe_name, state=None, xy_pos=None):
+    def update_point_probe_text(self, probe_name):
         current_row = self.ui.treeView.currentIndex().row()
         product_dataset = None
         if current_row >= 0:
@@ -435,12 +435,7 @@ class Main(QtWidgets.QMainWindow):
             product_dataset = selected_probeable_layer.get_first_active_product_dataset()
         uuid = None if product_dataset is None else product_dataset.uuid
 
-        if state is None or xy_pos is None:
-            _state, _xy_pos = self.graphManager.current_point_probe_status(probe_name)
-            if state is None:
-                state = _state
-            if xy_pos is None:
-                xy_pos = _xy_pos
+        state, xy_pos = self.graphManager.current_point_probe_status(probe_name)
 
         if xy_pos is not None and state:
             lon, lat = xy_pos
