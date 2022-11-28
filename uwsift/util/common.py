@@ -230,3 +230,15 @@ def units_conversion(info):
     # Format strings
     format_func = _unit_format_func(info, punits)
     return punits, conv_func, format_func
+
+
+def format_wavelength(wl):
+    """Return wavelength formatted as string with unit.
+
+    A wavelength below 4.1 micrometers is formatted with two, above with one decimal.
+    """
+    if wl < 4.1:
+        wl_str = f"{wl:0.02f} µm"
+    else:
+        wl_str = f"{wl:0.01f} µm"
+    return wl_str

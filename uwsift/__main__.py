@@ -64,6 +64,7 @@ from uwsift.util import (
     check_imageio_deps,
     get_package_data_dir,
 )
+from uwsift.util.common import format_wavelength
 from uwsift.util.logger import configure_loggers
 from uwsift.view.algebraic_config import AlgebraicLayerConfigPane
 from uwsift.view.colormap_editor import ColormapEditor
@@ -472,11 +473,7 @@ class Main(QtWidgets.QMainWindow):
                 data_point = unit_info[1](data_point)
                 data_str = unit_info[2](data_point, numeric=False)
                 if info.get(Info.CENTRAL_WAVELENGTH):
-                    wl = info[Info.CENTRAL_WAVELENGTH]
-                    if wl < 4.1:
-                        wl_str = "{:0.02f} µm".format(wl)
-                    else:
-                        wl_str = "{:0.01f} µm".format(wl)
+                    wl_str = format_wavelength(info[Info.CENTRAL_WAVELENGTH])
                     layer_str = "{}, {}".format(info[Info.SHORT_NAME], wl_str)
                 else:
                     layer_str = info[Info.SHORT_NAME]
