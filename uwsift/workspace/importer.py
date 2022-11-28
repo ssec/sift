@@ -1054,19 +1054,17 @@ class SatpyImporter(aImporter):
             dataset = (
                 self.scn[ds_id] if prod.info[Info.KIND] != Kind.MC_IMAGE else get_enhanced_image(self.scn[ds_id]).data
             )
-            shape = dataset.shape
             if prod.info[Info.KIND] == Kind.MC_IMAGE:
                 # The dimension of the dataset is ('bands', 'y', 'x')
                 # but for later the dimension ('y', 'x', 'bands') is needed
                 dataset = dataset.transpose("y", "x", "bands")
-                shape = dataset.shape
             # Since in the first SatpyImporter loading pass (see
             # load_all_datasets()) no padding is applied (pad_data=False), the
             # Info.SHAPE stored at that time may not be the same as it is now if
             # we load with padding now. In that case we must update the
             # prod.info[Info.SHAPE] with the actual shape, but let's do this in
             # any case, it doesn't hurt.
-            prod.info[Info.SHAPE] = shape
+            prod.info[Info.SHAPE] = dataset.shape
             kind = prod.info[Info.KIND]
 
             if prod.content:
@@ -1076,12 +1074,12 @@ class SatpyImporter(aImporter):
             now = datetime.utcnow()
 
             if kind in [Kind.LINES, Kind.POINTS]:
-                if len(shape) == 1:
+                if len(dataset.shape) == 1:
                     LOG.error(f"one dimensional dataset can't be loaded: {ds_id['name']}")
                     continue
 
                 completion, content, data_memmap = self._create_unstructured_points_dataset_content(
-                    dataset, kind, now, prod, shape
+                    dataset, kind, now, prod
                 )
                 yield import_progress(
                     uuid=prod.uuid,
@@ -1109,9 +1107,9 @@ class SatpyImporter(aImporter):
                 grid_info = self._get_grid_info()
 
                 if kind == Kind.MC_IMAGE:
-                    c, img_data = self._create_mc_image_dataset_content(dataset, now, prod, shape, area_info, grid_info)
+                    c, img_data = self._create_mc_image_dataset_content(dataset, now, prod, area_info, grid_info)
                 else:
-                    c, img_data = self._create_image_dataset_content(dataset, now, prod, shape, area_info, grid_info)
+                    c, img_data = self._create_image_dataset_content(dataset, now, prod, area_info, grid_info)
 
                 c.info[Info.KIND] = prod.info[Info.KIND]
                 c.img_data = img_data
@@ -1137,8 +1135,9 @@ class SatpyImporter(aImporter):
                 content=c,
             )
 
-    def _create_mc_image_dataset_content(self, dataset, now, prod, shape, area_info, grid_info):
+    def _create_mc_image_dataset_content(self, dataset, now, prod, area_info, grid_info):
         data_filename, img_data = self._create_data_memmap_file(dataset.data, dataset.data.dtype, prod)
+        shape = prod.info[Info.SHAPE]
         c = ContentMultiChannelImage(
             lod=0,
             resolution=int(min(abs(area_info[Info.CELL_WIDTH]), abs(area_info[Info.CELL_HEIGHT]))),
@@ -1161,7 +1160,7 @@ class SatpyImporter(aImporter):
         )
         return c, img_data
 
-    def _create_image_dataset_content(self, dataset, now, prod, shape, area_info, grid_info):
+    def _create_image_dataset_content(self, dataset, now, prod, area_info, grid_info):
         # For kind IMAGE the dtype must be float32 seemingly, see class
         # Column, comment for 'dtype' and the construction of c = Content
         # just below.
@@ -1169,6 +1168,7 @@ class SatpyImporter(aImporter):
         #  _create_data_memmap_file, but otherwise IMAGES of pixel counts
         #  data (dtype = np.uint16) crash.
         data_filename, img_data = self._create_data_memmap_file(dataset.data, np.float32, prod)
+        shape = prod.info[Info.SHAPE]
         c = ContentImage(
             lod=0,
             resolution=int(min(abs(area_info[Info.CELL_WIDTH]), abs(area_info[Info.CELL_HEIGHT]))),
@@ -1190,8 +1190,9 @@ class SatpyImporter(aImporter):
         )
         return c, img_data
 
-    def _create_unstructured_points_dataset_content(self, dataset, kind, now, prod, shape):
+    def _create_unstructured_points_dataset_content(self, dataset, kind, now, prod):
         data_filename, data_memmap = self._create_data_memmap_file(dataset.data, dataset.dtype, prod)
+        shape = prod.info[Info.SHAPE]
         content = ContentUnstructuredPoints(
             atime=now,
             mtime=now,
