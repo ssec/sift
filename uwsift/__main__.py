@@ -427,14 +427,14 @@ class Main(QtWidgets.QMainWindow):
         model_indexes = self.ui.treeView.selectedIndexes()
         self.layer_model.toggle_layers_visibility(model_indexes)
 
-    def update_point_probe_text(self, probe_name, state=None, xy_pos=None, uuid=None, animating=None):
-        if uuid is None:
-            current_row = self.ui.treeView.currentIndex().row()
-            product_dataset = None
-            if current_row >= 0:
-                selected_probeable_layer = self.layer_model.layers[current_row]
-                product_dataset = selected_probeable_layer.get_first_active_product_dataset()
-            uuid = None if product_dataset is None else product_dataset.uuid
+    def update_point_probe_text(self, probe_name, state=None, xy_pos=None):
+        current_row = self.ui.treeView.currentIndex().row()
+        product_dataset = None
+        if current_row >= 0:
+            selected_probeable_layer = self.layer_model.layers[current_row]
+            product_dataset = selected_probeable_layer.get_first_active_product_dataset()
+        uuid = None if product_dataset is None else product_dataset.uuid
+
         if state is None or xy_pos is None:
             _state, _xy_pos = self.graphManager.current_point_probe_status(probe_name)
             if state is None:
@@ -454,9 +454,7 @@ class Main(QtWidgets.QMainWindow):
 
         col, row = "N/A", "N/A"
 
-        if animating:
-            data_str = "<animating>"
-        elif state and uuid is not None:
+        if state and uuid is not None:
             try:
                 data_point = self.workspace.get_content_point(uuid, xy_pos)
                 col, row = self.workspace.position_to_grid_index(uuid, xy_pos)
