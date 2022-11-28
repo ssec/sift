@@ -437,7 +437,7 @@ class Main(QtWidgets.QMainWindow):
 
         state, xy_pos = self.graphManager.current_point_probe_status(probe_name)
 
-        if xy_pos is not None and state:
+        if state and xy_pos is not None:
             lon, lat = xy_pos
             lon = lon % 360 if lon > 0 else lon % -360 + 360
             lon = lon - 360 if lon > 180 else lon
@@ -448,6 +448,8 @@ class Main(QtWidgets.QMainWindow):
             probe_loc = "{:>6s}  , {:>6s}  ".format("N/A", "N/A")
 
         col, row = "N/A", "N/A"
+        data_str = "N/A"
+        layer_str = "N/A"
 
         if state and uuid is not None:
             try:
@@ -457,10 +459,7 @@ class Main(QtWidgets.QMainWindow):
                 LOG.debug("Could not get data value", exc_info=True)
                 data_point = None
 
-            if data_point is None:
-                data_str = "N/A"
-                layer_str = "N/A"
-            else:
+            if data_point is not None:
                 info = selected_probeable_layer.info
                 unit_info = info[Info.UNIT_CONVERSION]
                 data_point = unit_info[1](data_point)
@@ -470,9 +469,7 @@ class Main(QtWidgets.QMainWindow):
                     layer_str = "{}, {}".format(info[Info.SHORT_NAME], wl_str)
                 else:
                     layer_str = info[Info.SHORT_NAME]
-        else:
-            data_str = "N/A"
-            layer_str = "N/A"
+
         self.ui.cursorProbeLayer.setText(layer_str)
         self.ui.cursorProbeText.setText("{} ({}) [{}, {}]".format(data_str, probe_loc, col, row))
 
