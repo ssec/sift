@@ -1111,7 +1111,7 @@ class SatpyImporter(aImporter):
 
                 if kind == Kind.MC_IMAGE:
                     c, img_data = self._create_mc_image_dataset_content(
-                        area_info, data, dataset, grid_info, now, prod, shape
+                        data, dataset, now, prod, shape, area_info, grid_info
                     )
                 else:
                     c, img_data = self._create_image_dataset_content(data, now, prod, shape, area_info, grid_info)
@@ -1140,7 +1140,7 @@ class SatpyImporter(aImporter):
                 content=c,
             )
 
-    def _create_mc_image_dataset_content(self, area_info, data, dataset, grid_info, now, prod, shape):
+    def _create_mc_image_dataset_content(self, data, dataset, now, prod, shape, area_info, grid_info):
         data_filename, img_data = self._create_data_memmap_file(data, data.dtype, prod)
         c = ContentMultiChannelImage(
             lod=0,
