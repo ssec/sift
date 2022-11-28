@@ -1036,11 +1036,7 @@ class SatpyImporter(aImporter):
         dataset_ids = [prod.info["_satpy_id"] for prod in products]
         self.scn.load(dataset_ids, pad_data=not merge_with_existing, upper_right_corner="NE")
 
-        # If resampling is needed so that missing datasets can be generated then it is important
-        # to NOT override the SatpyImporter.scn variable. Because that cause problems with NetCDF files.
-        # The guess is here that with the overwritten scene the NetCDF files are closed in a way which
-        # leads later to problems for saving/computing the actual data of these files.
-        # Instead a local variable is used to prevent this.
+        # If there are datasets missing, resampling is needed to create them:
         if self.scn.missing_datasets:
             # About the next strange line of code: keep a reference to the
             # original scene to work around an issue in the resampling
@@ -1122,7 +1118,7 @@ class SatpyImporter(aImporter):
 
                 c.info[Info.KIND] = prod.info[Info.KIND]
                 c.img_data = img_data
-                c.source_files = set()  # FIXME(AR) is this correct?
+                c.source_files = set()  # TODO(AR): adds member to the ContentImage object 'c'
                 # c.info.update(prod.info) would just make everything leak together so let's not do it
                 prod.content.append(c)
                 self.add_content_to_cache(c)
@@ -1138,7 +1134,7 @@ class SatpyImporter(aImporter):
                 stages=num_stages,
                 current_stage=idx,
                 completion=1.0,
-                stage_desc="SatPy IMAGE data add to workspace",
+                stage_desc=f"SatPy {kind.name} data add to workspace",
                 dataset_info=None,
                 data=img_data,
                 content=c,
