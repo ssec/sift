@@ -64,15 +64,14 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
     def selection_did_change(self, layers: Tuple[LayerItem]):
         """Update the displayed values only when one layer is selected.
 
-        If no or multiple layer are selected then reset the display to its initial state.
+        Also reset the display to its initial state at the beginning.
 
         :param layers: Layers which are currently selected
         """
+        self._clear_details_pane()
         if layers is not None and len(layers) == 1:
             self._current_selected_layer = layers[0]
             self.initiate_update()
-        else:
-            self._clear_details_pane()
 
     def update_displayed_clims(self):
         """Update the corresponding viewed values for the color limits of the layer
@@ -83,8 +82,6 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
                 Info.KIND
             ) not in [Kind.MC_IMAGE]:
                 self._determine_display_value_for_clims()
-            else:
-                self._details_pane_ui.layerColorLimitsValue.setText("N/A")
 
     def update_displayed_colormap(self):
         """Update the currently viewed colormap values of the layer"""
@@ -98,15 +95,6 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
                     self._details_pane_ui.layerColormapVisual.setHtml(
                         f"""<html><head></head><body style="margin: 0px"><div>{cmap_html}</div></body></html>"""
                     )
-                else:
-                    self._details_pane_ui.layerColormapValue.setText("N/A")
-                    self._details_pane_ui.layerColormapVisual.page().runJavaScript(
-                        'document.body.style.overflow = "hidden";'
-                    )
-
-            else:
-                self._details_pane_ui.layerColormapValue.setText("N/A")
-                self._details_pane_ui.layerColormapVisual.setHtml("")
 
     # Utility functions
 
@@ -139,14 +127,12 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
                 f"Unable to set the value for clims."
                 f" Instead for {self._current_selected_layer.uuid} will the value 'N/A' be shown."
             )
-            self._details_pane_ui.layerColorLimitsValue.setText("N/A")
         except KeyError:
             LOG.warning(
                 f"Unable to convert clims of layer {self._current_selected_layer}."
                 f" Because there is no unit conversion in layer info: '{self._current_selected_layer.info}'."
                 f" Instead for {self._current_selected_layer.uuid} will the value 'N/A' be shown."
             )
-            self._details_pane_ui.layerColorLimitsValue.setText("N/A")
 
     def _get_multichannel_clim_str(self, clims):
 
@@ -233,8 +219,6 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         layer_descriptor = self._current_selected_layer.descriptor
         if layer_descriptor:
             self._details_pane_ui.layerNameValue.setText(self._current_selected_layer.descriptor)
-        else:
-            self._details_pane_ui.layerNameValue.setText("<no layer selected>")
 
     def _update_displayed_time(self):
         active_product_dataset: Optional[
@@ -244,8 +228,6 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
             self._details_pane_ui.layerVisibleSchedTimeValue.setText(
                 self._current_selected_layer.get_first_active_product_dataset().info.get(Info.DISPLAY_TIME)
             )
-        else:
-            self._details_pane_ui.layerVisibleSchedTimeValue.setText("N/A")
 
     def _update_displayed_wavelength(self):
         if self._current_selected_layer.info.get("wavelength"):
