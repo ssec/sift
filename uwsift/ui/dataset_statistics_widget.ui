@@ -31,19 +31,25 @@
      <item row="0" column="0">
       <widget class="QLabel" name="currDatasetLabel">
        <property name="text">
-        <string>Current dataset:</string>
+        <string>Current Dataset:</string>
        </property>
       </widget>
      </item>
      <item row="2" column="0">
       <widget class="QLabel" name="roundingPrecisionLabel">
        <property name="text">
-        <string>Rounding precision:</string>
+        <string>Decimal Places:</string>
        </property>
       </widget>
      </item>
      <item row="2" column="1">
       <widget class="QSpinBox" name="roundingPrecisionSpinBox">
+       <property name="wrapping">
+        <bool>true</bool>
+       </property>
+       <property name="specialValueText">
+        <string>unlimited</string>
+       </property>
        <property name="minimum">
         <number>-1</number>
        </property>
@@ -63,12 +69,19 @@
        <property name="text">
         <string>Dataset name</string>
        </property>
+       <property name="textInteractionFlags">
+        <set>Qt::TextSelectableByMouse</set>
+       </property>
       </widget>
      </item>
     </layout>
    </item>
    <item>
-    <widget class="QTableWidget" name="statisticsTableWidget"/>
+    <widget class="QTableWidget" name="statisticsTableWidget">
+     <property name="alternatingRowColors">
+      <bool>true</bool>
+     </property>
+    </widget>
    </item>
   </layout>
  </widget>

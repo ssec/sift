@@ -27,6 +27,7 @@ class Ui_datasetStatisticsPane(object):
         self.roundingPrecisionLabel.setObjectName("roundingPrecisionLabel")
         self.formLayout.setWidget(2, QtWidgets.QFormLayout.LabelRole, self.roundingPrecisionLabel)
         self.roundingPrecisionSpinBox = QtWidgets.QSpinBox(datasetStatisticsPane)
+        self.roundingPrecisionSpinBox.setWrapping(True)
         self.roundingPrecisionSpinBox.setMinimum(-1)
         self.roundingPrecisionSpinBox.setMaximum(25)
         self.roundingPrecisionSpinBox.setObjectName("roundingPrecisionSpinBox")
@@ -34,10 +35,12 @@ class Ui_datasetStatisticsPane(object):
         self.datasetNameLabel = QtWidgets.QLabel(datasetStatisticsPane)
         self.datasetNameLabel.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.datasetNameLabel.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.datasetNameLabel.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         self.datasetNameLabel.setObjectName("datasetNameLabel")
         self.formLayout.setWidget(1, QtWidgets.QFormLayout.SpanningRole, self.datasetNameLabel)
         self.verticalLayout.addLayout(self.formLayout)
         self.statisticsTableWidget = QtWidgets.QTableWidget(datasetStatisticsPane)
+        self.statisticsTableWidget.setAlternatingRowColors(True)
         self.statisticsTableWidget.setObjectName("statisticsTableWidget")
         self.statisticsTableWidget.setColumnCount(0)
         self.statisticsTableWidget.setRowCount(0)
@@ -49,8 +52,9 @@ class Ui_datasetStatisticsPane(object):
     def retranslateUi(self, datasetStatisticsPane):
         _translate = QtCore.QCoreApplication.translate
         datasetStatisticsPane.setWindowTitle(_translate("datasetStatisticsPane", "Form"))
-        self.currDatasetLabel.setText(_translate("datasetStatisticsPane", "Current dataset:"))
-        self.roundingPrecisionLabel.setText(_translate("datasetStatisticsPane", "Rounding precision:"))
+        self.currDatasetLabel.setText(_translate("datasetStatisticsPane", "Current Dataset:"))
+        self.roundingPrecisionLabel.setText(_translate("datasetStatisticsPane", "Decimal Places:"))
+        self.roundingPrecisionSpinBox.setSpecialValueText(_translate("datasetStatisticsPane", "unlimited"))
         self.datasetNameLabel.setText(_translate("datasetStatisticsPane", "Dataset name"))
 
 
