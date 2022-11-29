@@ -3,7 +3,8 @@
 
 if the file setting.update doesn't exist in ~user/config/SIFT/settings/config copy the default settings dir
 """
-# TODO: If setting.update exists and the contained date is older than the one contained in the default settings, overwrite it
+# TODO: If setting.update exists and the contained date is older than the one contained in the default settings,
+#  overwrite it
 
 
 import calendar
