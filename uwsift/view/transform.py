@@ -815,7 +815,7 @@ class PROJ4Transform(BaseTransform):
             return self.proj.crs.is_geographic
         return self.proj.is_latlong()
 
-    def create_proj_dict(self, proj_str):
+    def create_proj_dict(self, proj_str):  # noqa: C901
         d = tuple(x.replace("+", "").split("=") for x in proj_str.split(" "))
         d = dict((x[0], x[1] if len(x) > 1 else "true") for x in d)
 

@@ -439,9 +439,11 @@ class ExportImageHelper(QtCore.QObject):
             params = {}
             filenames = list(zip(filenames, [[x] for x in images]))
 
+        self._write_images(filenames, format_name, params)
+
+    def _write_images(self, filenames, format_name, params):
         for filename, file_images in filenames:
             writer = imageio.get_writer(filename, format_name, **params)
             for _, x in file_images:
                 writer.append_data(numpy.array(x))
-
         writer.close()

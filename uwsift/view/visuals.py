@@ -1029,7 +1029,7 @@ class _GLGradientLineVisual(_GLLineVisual):
         self._arrow_size = arrow_size
         super().__init__(*args, **kwargs)
 
-    def _prepare_draw(self, view):
+    def _prepare_draw(self, view):  # noqa: C901
         prof = Profiler()
 
         if self._parent._changed["pos"]:
@@ -1050,18 +1050,7 @@ class _GLGradientLineVisual(_GLLineVisual):
             self._pos_vbo.set_data(pos_re)
             # self._pos_vbo.set_data(pos)
             self._program.vert["position"] = self._pos_vbo
-            if hasattr(self, "_ensure_vec4_func"):
-                self._program.vert["to_vec4"] = self._ensure_vec4_func(pos.shape[-1])
-            else:
-                # old vispy
-                from vispy.visuals.line.line import vec2to4, vec3to4
-
-                if pos.shape[-1] == 2:
-                    self._program.vert["to_vec4"] = vec2to4
-                elif pos.shape[-1] == 3:
-                    self._program.vert["to_vec4"] = vec3to4
-                else:
-                    raise TypeError("Got bad position array shape: %r" % (pos.shape,))
+            self._program.vert["to_vec4"] = self._ensure_vec4_func(pos.shape[-1])
 
         if self._parent._changed["color"]:
             color, cmap = self._parent._interpret_color()

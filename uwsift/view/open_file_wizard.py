@@ -396,27 +396,7 @@ class OpenFileWizard(QtWidgets.QWizard):
             table_sorting_enabled = table.isSortingEnabled()
             table.setSortingEnabled(False)
             for file in os.listdir(folder):
-                try:
-                    if len(pattern_convert_dict) == 0:
-                        # if pattern is empty, show all files
-                        table.insertRow(table.rowCount())
-                        table.setItem(table.rowCount() - 1, 1, QtWidgets.QTableWidgetItem(file))
-                    elif pattern_convert_dict is None or fnparser.validate(filter_pattern, file):
-                        # if pattern matches, add more columns, and show error when pattern is invalid
-                        table.insertRow(table.rowCount())
-                        table.setItem(table.rowCount() - 1, 1, QtWidgets.QTableWidgetItem(file))
-                        p = fnparser.parse(filter_pattern, file)
-                        for col in range(2, len(column_names)):
-                            table.setItem(
-                                table.rowCount() - 1, col, QtWidgets.QTableWidgetItem(str(p.get(column_names[col], "")))
-                            )
-                except Exception:  # FIXME: Don't catch generic Exception
-                    # As the error thrown by trollsift's validate function in case of an
-                    # unparsable pattern has no class, a general 'Exception' is caught although
-                    # this is not PEP8-compliant.
-                    LOG.error(f"Invalid filter pattern: {filter_pattern}")
-                    self.ui.statusMessage.setText("Invalid filter pattern")
-                    self.ui.statusMessage.setStyleSheet("color: red")
+                self._add_row_to_file_table(column_names, file, filter_pattern, pattern_convert_dict, table)
             table.setSortingEnabled(table_sorting_enabled)
 
         # Initially (and if no sorting is applied), sort by filename (column: 1)
@@ -425,6 +405,29 @@ class OpenFileWizard(QtWidgets.QWizard):
 
         # resize columns to fit content (table's sizeAdjustPolicy is set to AdjustToContents)
         table.resizeColumnsToContents()
+
+    def _add_row_to_file_table(self, column_names, file, filter_pattern, pattern_convert_dict, table):
+        try:
+            if len(pattern_convert_dict) == 0:
+                # if pattern is empty, show all files
+                table.insertRow(table.rowCount())
+                table.setItem(table.rowCount() - 1, 1, QtWidgets.QTableWidgetItem(file))
+            elif pattern_convert_dict is None or fnparser.validate(filter_pattern, file):
+                # if pattern matches, add more columns, and show error when pattern is invalid
+                table.insertRow(table.rowCount())
+                table.setItem(table.rowCount() - 1, 1, QtWidgets.QTableWidgetItem(file))
+                p = fnparser.parse(filter_pattern, file)
+                for col in range(2, len(column_names)):
+                    table.setItem(
+                        table.rowCount() - 1, col, QtWidgets.QTableWidgetItem(str(p.get(column_names[col], "")))
+                    )
+        except Exception:  # FIXME: Don't catch generic Exception
+            # As the error thrown by trollsift's validate function in case of an
+            # unparsable pattern has no class, a general 'Exception' is caught although
+            # this is not PEP8-compliant.
+            LOG.error(f"Invalid filter pattern: {filter_pattern}")
+            self.ui.statusMessage.setText("Invalid filter pattern")
+            self.ui.statusMessage.setStyleSheet("color: red")
 
     def _file_sorting_changed(self, logical_index, order):
         """

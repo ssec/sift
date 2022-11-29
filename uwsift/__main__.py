@@ -64,6 +64,7 @@ from uwsift.util import (
     check_imageio_deps,
     get_package_data_dir,
 )
+from uwsift.util.common import format_wavelength, normalize_longitude
 from uwsift.util.logger import configure_loggers
 from uwsift.view.algebraic_config import AlgebraicLayerConfigPane
 from uwsift.view.colormap_editor import ColormapEditor
@@ -426,25 +427,19 @@ class Main(QtWidgets.QMainWindow):
         model_indexes = self.ui.treeView.selectedIndexes()
         self.layer_model.toggle_layers_visibility(model_indexes)
 
-    def update_point_probe_text(self, probe_name, state=None, xy_pos=None, uuid=None, animating=None):
-        if uuid is None:
-            current_row = self.ui.treeView.currentIndex().row()
-            product_dataset = None
-            if current_row >= 0:
-                selected_probeable_layer = self.layer_model.layers[current_row]
-                product_dataset = selected_probeable_layer.get_first_active_product_dataset()
-            uuid = None if product_dataset is None else product_dataset.uuid
-        if state is None or xy_pos is None:
-            _state, _xy_pos = self.graphManager.current_point_probe_status(probe_name)
-            if state is None:
-                state = _state
-            if xy_pos is None:
-                xy_pos = _xy_pos
+    def update_point_probe_text(self, probe_name):
+        current_row = self.ui.treeView.currentIndex().row()
+        product_dataset = None
+        if current_row >= 0:
+            selected_probeable_layer = self.layer_model.layers[current_row]
+            product_dataset = selected_probeable_layer.get_first_active_product_dataset()
+        uuid = None if product_dataset is None else product_dataset.uuid
 
-        if xy_pos is not None and state:
+        state, xy_pos = self.graphManager.current_point_probe_status(probe_name)
+
+        if state and xy_pos is not None:
             lon, lat = xy_pos
-            lon = lon % 360 if lon > 0 else lon % -360 + 360
-            lon = lon - 360 if lon > 180 else lon
+            lon = normalize_longitude(lon)
             lon_str = "{:>6.02f} {}".format(abs(lon), "W" if lon < 0 else "E")
             lat_str = "{:>6.02f} {}".format(abs(lat), "S" if lat < 0 else "N")
             probe_loc = "{}, {}".format(lon_str, lat_str)
@@ -452,10 +447,10 @@ class Main(QtWidgets.QMainWindow):
             probe_loc = "{:>6s}  , {:>6s}  ".format("N/A", "N/A")
 
         col, row = "N/A", "N/A"
+        data_str = "N/A"
+        layer_str = "N/A"
 
-        if animating:
-            data_str = "<animating>"
-        elif state and uuid is not None:
+        if state and uuid is not None:
             try:
                 data_point = self.workspace.get_content_point(uuid, xy_pos)
                 col, row = self.workspace.position_to_grid_index(uuid, xy_pos)
@@ -463,26 +458,17 @@ class Main(QtWidgets.QMainWindow):
                 LOG.debug("Could not get data value", exc_info=True)
                 data_point = None
 
-            if data_point is None:
-                data_str = "N/A"
-                layer_str = "N/A"
-            else:
+            if data_point is not None:
                 info = selected_probeable_layer.info
                 unit_info = info[Info.UNIT_CONVERSION]
                 data_point = unit_info[1](data_point)
                 data_str = unit_info[2](data_point, numeric=False)
                 if info.get(Info.CENTRAL_WAVELENGTH):
-                    wl = info[Info.CENTRAL_WAVELENGTH]
-                    if wl < 4.1:
-                        wl_str = "{:0.02f} µm".format(wl)
-                    else:
-                        wl_str = "{:0.01f} µm".format(wl)
+                    wl_str = format_wavelength(info[Info.CENTRAL_WAVELENGTH])
                     layer_str = "{}, {}".format(info[Info.SHORT_NAME], wl_str)
                 else:
                     layer_str = info[Info.SHORT_NAME]
-        else:
-            data_str = "N/A"
-            layer_str = "N/A"
+
         self.ui.cursorProbeLayer.setText(layer_str)
         self.ui.cursorProbeText.setText("{} ({}) [{}, {}]".format(data_str, probe_loc, col, row))
 

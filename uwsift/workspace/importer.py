@@ -268,65 +268,72 @@ class aImporter(ABC):
             LOG.error("no resources in {} {}".format(repr(type(prod)), repr(prod)))
             raise
         paths = [r.path for r in prod.resource]
-        # HACK for Satpy importer
-        if "reader" in prod.info:
-            kwargs.setdefault("reader", prod.info["reader"])
 
-        if "scenes" in kwargs:
-            scn = kwargs["scenes"].get(tuple(paths), None)
-            if scn and "_satpy_id" in prod.info and kwargs["merge_with_existing"]:
-                # For the merging process below it is crucial that it only has
-                # to deal with files which belong to the given Product `prod`,
-                # extraneous files would interfere with the merging process.
-                # Thus: Filter the files in `paths` and keep only those
-                # that contribute to the Satpy dataset for `prod`.
-                if "prerequisites" in prod.info:
-                    paths = cls._collect_prerequisites_paths(prod, scn)
-                else:
-                    paths = _get_paths_in_scene_contributing_to_ds(scn, prod.info["_satpy_id"].get("name"))
+        # Get the Satpy Scene for this set of paths
+        scn = kwargs["scenes"].get(tuple(paths), None)
+
+        # Only Satpy readers / SatpyImporter still supported, thus:
+        # There must be such a Scene and the prod must be from Satpy, we can
+        assert scn and "_satpy_id" in prod.info
 
         merge_target = kwargs.get("merge_target")
         if merge_target:
-            # filter out all segments which are already loaded in the target product
-            new_paths = []
-            existing_content = merge_target.content[0]
-            for path in paths:
-                if path not in existing_content.source_files:
-                    new_paths.append(path)
-            if new_paths != paths:
-                required_aux_file_paths = set()
-                if scn:
-                    required_aux_file_types = _get_types_of_required_aux_files(scn)
-                    required_aux_file_paths = _get_paths_of_required_aux_files(scn, required_aux_file_types)
-                paths = new_paths
-                if not paths:
-                    return None
-                if set(paths) == required_aux_file_paths:
-                    return None
-                paths.extend(list(required_aux_file_paths))  # TODO
+            # For the merging process it is crucial that it only has
+            # to deal with files which belong to the given Product `prod`,
+            # extraneous files would interfere with the merging process.
+            # Thus: Filter the files in `paths` and keep only those
+            # that contribute to the Satpy dataset for `prod`.
+            if "prerequisites" in prod.info:
+                paths = cls._collect_prerequisites_paths(prod, scn)
+            else:
+                paths = _get_paths_in_scene_contributing_to_ds(scn, prod.info["_satpy_id"].get("name"))
+
+            # Now we can analyse, which files must be loaded
+            paths = cls._extract_paths_to_merge(merge_target, paths, scn)
+            if not paths:
+                return None
 
         # In order to "load" converted datasets, we have to reuse the existing
-        # scene from the first instantiation of SatpyImporter instead of loading
-        # the data again, of course: we need to 'rescue across' the converted
-        # data from the first SatpyImporter instantiation to the second one
-        # (which will be created in the very last statement of this method).
-        # The correct scene can be identified based on the `paths` list, which
-        # contains the input files for a single scene. The keyword argument
-        # `scenes` is mapping of a tuple of input files to a Scene object.
-        # We reuse the Scene only if the `paths` list and the input files for
-        # the Scene are the same. Since only products of the kinds POINTS, LINES
-        # and VECTORS need conversion (at this time), the mechanism is only
-        # applied for these. For an unknown reason reusing the scene breaks for
-        # FCI data, this Importer data reading magic is too confused.
+        # Scene 'scn' from the first instantiation of SatpyImporter instead of
+        # loading the data again, of course: we need to 'rescue across' the
+        # converted data from the first SatpyImporter instantiation to the
+        # second one (which will be created in the very last statement of this
+        # method).
+        # Since only products of the kinds POINTS, LINES and VECTORS need
+        # conversion (at this time), the mechanism is only applied for these.
+        # For an unknown reason reusing the scene breaks for FCI data,
+        #
+        # this Importer data reading magic is too confused.
         if prod.info[Info.KIND] in (Kind.POINTS, Kind.LINES, Kind.VECTORS):
-            for scene_files, scene in kwargs["scenes"].items():
-                if list(scene_files) == paths:
-                    del kwargs["scenes"]
-                    assert "scene" not in kwargs
-                    kwargs["scene"] = scene
-                    break
+            del kwargs["scenes"]
+            assert "scene" not in kwargs
+            kwargs["scene"] = scn
 
         return cls(paths, workspace_cwd=workspace_cwd, database_session=database_session, **kwargs)
+
+    @classmethod
+    def _extract_paths_to_merge(cls, merge_target, paths, scn):
+        """
+        Get a subset of 'paths', filtering out all files that are already loaded
+        into the target product.
+
+        I.e., collect only files from the given 'paths' list that are not yet
+        loaded and, if necessary, auxiliary files required to load these.
+        """
+        new_paths = []
+        existing_content = merge_target.content[0]
+        for path in paths:
+            if path not in existing_content.source_files:
+                new_paths.append(path)
+        if not new_paths:
+            return None
+        if new_paths != paths:
+            required_aux_file_types = _get_types_of_required_aux_files(scn)
+            required_aux_file_paths = _get_paths_of_required_aux_files(scn, required_aux_file_types)
+            if set(new_paths) == required_aux_file_paths:
+                return None
+            return new_paths + list(required_aux_file_paths)  # TODO
+        return new_paths
 
     @classmethod
     def _collect_prerequisites_paths(cls, prod, scn):
@@ -831,108 +838,68 @@ class SatpyImporter(aImporter):
 
         return DataArray(combined_data, attrs=attrs)
 
-    def _parse_style_attr_config(self) -> Dict[str, List[str]]:
+    def _parse_style_attributes_config(self) -> Dict[str, List[str]]:
         """
         Extract the ``style_attributes`` section from the reader config.
         This function doesn't validate whether the style attributes or the
         product names exist.
 
-        :return: mapping of style attributes to products
+        The returned dictionary lists for each product, which dependent styles
+        it is configured for.
+
+        Maintenance: this swaps the mapping direction since the new one is more
+        useful for querying which features (style attributes) should be styled depending
+        on a given product
+
+        :return: mapping of products to style attributes
         """
-        style_config = config.get(f"data_reading.{self.reader}.style_attributes", None)
-        if not style_config:
+        style_attributes = config.get(f"data_reading.{self.reader}.style_attributes", None)
+        if not style_attributes:
             return {}
 
-        style_attrs = {}
-        for attr_name, product_names in style_config.items():
-            if attr_name in style_attrs:
-                LOG.warning(f"duplicate style attribute: {attr_name}")
-                continue
-
-            if not isinstance(product_names, list):
-                # a single product is allowed
-                product_names = [product_names]
-
-            distinct_products = []
+        style_attributes_by_product = {}
+        for style_attribute, product_names in style_attributes.items():
             for product_name in product_names:
-                if product_name in distinct_products:
-                    LOG.warning(f"duplicate product {product_name} for " f"style attribute: {attr_name}")
-                    continue
-                if product_name:
-                    distinct_products.append(product_name)
+                if product_name not in style_attributes_by_product:
+                    style_attributes_by_product[product_name] = {style_attribute}
+                else:
+                    style_attributes_by_product[product_name].add(style_attribute)
 
-            style_attrs[attr_name] = distinct_products
-        return style_attrs
+        return style_attributes_by_product
 
     def _combine_points(self, datasets: DatasetDict, converter) -> Dict[DataID, DataArray]:
-        """
-        Find convertible POINTS datasets in the ``DatasetDict``. The ``converter``
-        function is then used to generate new DataArrays.
-
-        The latitude and longitude for the points are extracted from the dataset
-        metadata. If configured in the reader config, the dataset itself will be
-        used for the ``fill`` style attribute.
-
-        :param datasets: all loaded datasets and previously converted datasets
-        :param converter: function to convert a list of DataArrays
-        :return: mapping of converted DataID to new DataArray
-        """
-        style_attrs = self._parse_style_attr_config()
-        allowed_style_attrs = ["fill"]
+        # Currently only the "fill" can be colored by a mapping from product values to colors (using a colormap) but in
+        # the future other features could be colored as well, e.g.  like "stroke".
+        supported_color_by_style_attrs = {"fill"}
+        style_attributes_by_product = self._parse_style_attributes_config()
 
         converted_datasets = {}
-        for style_attr, product_names in style_attrs.items():
-            if style_attr not in allowed_style_attrs:
-                LOG.error(f"unknown style attribute: {style_attr}")
-                continue
-
-            for product_name in product_names:
-                try:
-                    ds = datasets[product_name]
-                except KeyError:
-                    LOG.debug(f"product wasn't selected in ImportWizard: {product_name}")
-                    continue
-
-                kind = ds.attrs[Info.KIND]
-                if kind != Kind.POINTS:
-                    LOG.error(f"dataset {product_name} isn't of POINTS kind: {kind}")
-                    continue
-
-                try:
-                    convertable_ds = [ds.area.lons, ds.area.lats, ds]
-                except AttributeError:
-                    # Some products (e.g. `latitude` and `longitude`) may not
-                    # (for whatever reason) have an associated SwathDefinition.
-                    # Without it, there is no geo-location information per data
-                    # point, because it is taken from its fields 'lats', 'lons'.
-                    # This cannot be healed, point data loading fails.
-                    LOG.error(
-                        f"Dataset has no point coordinates (lats, lons):"
-                        f" {product_name} (Most likely due to missing"
-                        f" SwathDefinition)"
-                    )
-                    continue
-
-                ds_id = DataID.from_dataarray(ds)
-                converted_datasets[ds_id] = converter(convertable_ds, ds.attrs)
-
-        # All unused Datasets aren't defined in the style attributes config.
-        # If one of them has an area, use it to display uncolored points.
         for ds_id, ds in datasets.items():
-            if ds_id in converted_datasets:
+            if ds.attrs[Info.KIND] != Kind.POINTS:
                 continue
-            if ds.attrs[Info.KIND] == Kind.POINTS:
-                try:
-                    convertable_ds = [ds.area.lons, ds.area.lats]
-                except AttributeError:
-                    LOG.error(
-                        f"Dataset has no point coordinates (lats, lons):"
-                        f" {ds.attrs['name']} (Most likely due to missing"
-                        f" SwathDefinition)"
-                    )
-                    continue
-                converted_datasets[ds_id] = converter(convertable_ds, ds.attrs)
 
+            do_color_by_values = ds_id.name in style_attributes_by_product and bool(
+                style_attributes_by_product[ds_id.name] & supported_color_by_style_attrs
+            )
+            try:
+                # Only if we want to use the values of the data to color
+                # markers we need the dataset's array itself, otherwise the
+                # coordinates alone are sufficient.
+                convertible_ds = (
+                    [ds.area.lons, ds.area.lats, ds] if do_color_by_values else [ds.area.lons, ds.area.lats]
+                )
+            except AttributeError:
+                # Some products (e.g. `latitude` and `longitude`) may not
+                # (for whatever reason) have an associated SwathDefinition.
+                # Without it, there is no geo-location information per data
+                # point, because it is taken from its fields 'lats', 'lons'.
+                # This cannot be healed, point data loading fails.
+                LOG.error(
+                    f"Dataset '{ds.attrs['name']}' of kind POINTS has no point"
+                    f" coordinates (lats, lons) (Missing SwathDefinition)."
+                )
+                continue
+            converted_datasets[ds_id] = converter(convertible_ds, ds.attrs)
         return converted_datasets
 
     def _parse_coords_end_config(self) -> List[str]:
@@ -968,19 +935,19 @@ class SatpyImporter(aImporter):
             if ds.attrs[Info.KIND] != Kind.LINES:
                 continue
 
-            convertable_ds = []
+            convertible_ds = []
             try:
                 for coord in coords_end:
-                    convertable_ds.append(ds.coords[coord])  # base
+                    convertible_ds.append(ds.coords[coord])  # base
             except KeyError:
                 LOG.error(f"dataset has no coordinates: {ds.attrs['name']}")
                 continue
-            if len(convertable_ds) < 2:
+            if len(convertible_ds) < 2:
                 LOG.error(f"LINES dataset needs 4 coordinates: {ds.attrs['name']}")
                 continue
 
-            convertable_ds.extend([ds.area.lons, ds.area.lats])  # tip
-            converted_datasets[ds_id] = converter(convertable_ds, ds.attrs)
+            convertible_ds.extend([ds.area.lons, ds.area.lats])  # tip
+            converted_datasets[ds_id] = converter(convertible_ds, ds.attrs)
         return converted_datasets
 
     def _revise_all_datasets(self) -> DatasetDict:
@@ -1039,7 +1006,7 @@ class SatpyImporter(aImporter):
     def _get_grid_info(self):
         grid_origin = config.get(f"data_reading.{self.reader}.grid.origin", "NW")
         grid_first_index_x = config.get(f"data_reading.{self.reader}.grid.first_index_x", 0)
-        grid_first_index_y = config.get(f"data_reading.{self.reader}.grid.first_index_x", 0)
+        grid_first_index_y = config.get(f"data_reading.{self.reader}.grid.first_index_y", 0)
 
         return {
             Info.GRID_ORIGIN: grid_origin,
@@ -1047,19 +1014,9 @@ class SatpyImporter(aImporter):
             Info.GRID_FIRST_INDEX_Y: grid_first_index_y,
         }
 
-    def begin_import_products(self, *product_ids) -> Generator[import_progress, None, None]:
+    def begin_import_products(self, *product_ids) -> Generator[import_progress, None, None]:  # noqa: C901
         if self.use_inventory_db:
-            if product_ids:
-                products = [self._S.query(Product).filter_by(id=anid).one() for anid in product_ids]
-                assert products
-            else:
-                products = list(
-                    self._S.query(Resource, Product)
-                    .filter(Resource.path.in_(self.filenames))
-                    .filter(Product.resource_id == Resource.id)
-                    .all()
-                )
-                assert products
+            products = self._get_products_from_inventory_db(product_ids)
         else:
             products = product_ids
 
@@ -1069,11 +1026,7 @@ class SatpyImporter(aImporter):
         dataset_ids = [prod.info["_satpy_id"] for prod in products]
         self.scn.load(dataset_ids, pad_data=not merge_with_existing, upper_right_corner="NE")
 
-        # If resampling is needed so that missing datasets can be generated then it is important
-        # to NOT override the SatpyImporter.scn variable. Because that cause problems with NetCDF files.
-        # The guess is here that with the overwritten scene the NetCDF files are closed in a way which
-        # leads later to problems for saving/computing the actual data of these files.
-        # Instead a local variable is used to prevent this.
+        # If there are datasets missing, resampling is needed to create them:
         if self.scn.missing_datasets:
             # About the next strange line of code: keep a reference to the
             # original scene to work around an issue in the resampling
@@ -1091,19 +1044,17 @@ class SatpyImporter(aImporter):
             dataset = (
                 self.scn[ds_id] if prod.info[Info.KIND] != Kind.MC_IMAGE else get_enhanced_image(self.scn[ds_id]).data
             )
-            shape = dataset.shape
             if prod.info[Info.KIND] == Kind.MC_IMAGE:
                 # The dimension of the dataset is ('bands', 'y', 'x')
                 # but for later the dimension ('y', 'x', 'bands') is needed
                 dataset = dataset.transpose("y", "x", "bands")
-                shape = dataset.shape
             # Since in the first SatpyImporter loading pass (see
             # load_all_datasets()) no padding is applied (pad_data=False), the
             # Info.SHAPE stored at that time may not be the same as it is now if
             # we load with padding now. In that case we must update the
             # prod.info[Info.SHAPE] with the actual shape, but let's do this in
             # any case, it doesn't hurt.
-            prod.info[Info.SHAPE] = shape
+            prod.info[Info.SHAPE] = dataset.shape
             kind = prod.info[Info.KIND]
 
             if prod.content:
@@ -1113,13 +1064,11 @@ class SatpyImporter(aImporter):
             now = datetime.utcnow()
 
             if kind in [Kind.LINES, Kind.POINTS]:
-                if len(shape) == 1:
+                if len(dataset.shape) == 1:
                     LOG.error(f"one dimensional dataset can't be loaded: {ds_id['name']}")
                     continue
 
-                completion, content, data_memmap = self._create_unstructured_points_dataset_content(
-                    dataset, kind, now, prod, shape
-                )
+                completion, content, data_memmap = self._create_unstructured_points_dataset_content(dataset, now, prod)
                 yield import_progress(
                     uuid=prod.uuid,
                     stages=num_stages,
@@ -1132,7 +1081,6 @@ class SatpyImporter(aImporter):
                 )
                 continue
 
-            data = dataset.data
             uuid = prod.uuid
 
             if merge_with_existing:
@@ -1141,21 +1089,19 @@ class SatpyImporter(aImporter):
                 uuid = existing_product.uuid
                 c = existing_product.content[0]
                 img_data = c.img_data
-                self.merge_data_into_memmap(data, img_data, segments)
+                self.merge_data_into_memmap(dataset.data, img_data, segments)
             else:
                 area_info = self._area_to_sift_attrs(dataset.attrs["area"])
                 grid_info = self._get_grid_info()
 
                 if kind == Kind.MC_IMAGE:
-                    c, img_data = self._create_mc_image_dataset_content(
-                        area_info, data, dataset, grid_info, now, prod, shape
-                    )
+                    c, img_data = self._create_mc_image_dataset_content(dataset, now, prod, area_info, grid_info)
                 else:
-                    c, img_data = self._create_image_dataset_content(data, now, prod, shape, area_info, grid_info)
+                    c, img_data = self._create_image_dataset_content(dataset, now, prod, area_info, grid_info)
 
                 c.info[Info.KIND] = prod.info[Info.KIND]
                 c.img_data = img_data
-                c.source_files = set()  # FIXME(AR) is this correct?
+                c.source_files = set()  # TODO(AR): adds member to the ContentImage object 'c'
                 # c.info.update(prod.info) would just make everything leak together so let's not do it
                 prod.content.append(c)
                 self.add_content_to_cache(c)
@@ -1171,14 +1117,29 @@ class SatpyImporter(aImporter):
                 stages=num_stages,
                 current_stage=idx,
                 completion=1.0,
-                stage_desc="SatPy IMAGE data add to workspace",
+                stage_desc=f"SatPy {kind.name} data add to workspace",
                 dataset_info=None,
                 data=img_data,
                 content=c,
             )
 
-    def _create_mc_image_dataset_content(self, area_info, data, dataset, grid_info, now, prod, shape):
-        data_filename, img_data = self._create_data_memmap_file(data, data.dtype, prod)
+    def _get_products_from_inventory_db(self, product_ids):
+        if product_ids:
+            products = [self._S.query(Product).filter_by(id=anid).one() for anid in product_ids]
+            assert products
+        else:
+            products = list(
+                self._S.query(Resource, Product)
+                .filter(Resource.path.in_(self.filenames))
+                .filter(Product.resource_id == Resource.id)
+                .all()
+            )
+            assert products
+        return products
+
+    def _create_mc_image_dataset_content(self, dataset, now, prod, area_info, grid_info):
+        data_filename, img_data = self._create_data_memmap_file(dataset.data, dataset.data.dtype, prod)
+        shape = prod.info[Info.SHAPE]
         c = ContentMultiChannelImage(
             lod=0,
             resolution=int(min(abs(area_info[Info.CELL_WIDTH]), abs(area_info[Info.CELL_HEIGHT]))),
@@ -1201,14 +1162,15 @@ class SatpyImporter(aImporter):
         )
         return c, img_data
 
-    def _create_image_dataset_content(self, data, now, prod, shape, area_info, grid_info):
+    def _create_image_dataset_content(self, dataset, now, prod, area_info, grid_info):
         # For kind IMAGE the dtype must be float32 seemingly, see class
         # Column, comment for 'dtype' and the construction of c = Content
         # just below.
         # FIXME: It is dubious to enforce that type conversion to happen in
         #  _create_data_memmap_file, but otherwise IMAGES of pixel counts
         #  data (dtype = np.uint16) crash.
-        data_filename, img_data = self._create_data_memmap_file(data, np.float32, prod)
+        data_filename, img_data = self._create_data_memmap_file(dataset.data, np.float32, prod)
+        shape = prod.info[Info.SHAPE]
         c = ContentImage(
             lod=0,
             resolution=int(min(abs(area_info[Info.CELL_WIDTH]), abs(area_info[Info.CELL_HEIGHT]))),
@@ -1230,8 +1192,9 @@ class SatpyImporter(aImporter):
         )
         return c, img_data
 
-    def _create_unstructured_points_dataset_content(self, dataset, kind, now, prod, shape):
+    def _create_unstructured_points_dataset_content(self, dataset, now, prod):
         data_filename, data_memmap = self._create_data_memmap_file(dataset.data, dataset.dtype, prod)
+        shape = prod.info[Info.SHAPE]
         content = ContentUnstructuredPoints(
             atime=now,
             mtime=now,
@@ -1241,7 +1204,7 @@ class SatpyImporter(aImporter):
             n_dimensions=shape[1],
             dtype=dataset.dtype,
         )
-        content.info[Info.KIND] = kind
+        content.info[Info.KIND] = prod.info[Info.KIND]
         prod.content.append(content)
         self.add_content_to_cache(content)
         completion = 2.0

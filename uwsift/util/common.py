@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import List, Set
 
 import numpy as np
+import satpy.readers.hrit_base
 from satpy import DataID, Scene
 
 from uwsift import config as config
@@ -43,33 +44,42 @@ def create_scenes(scenes: dict, file_groups: dict) -> List[DataID]:
                 continue
             scenes[group_id] = scn
 
-            # WORKAROUND: to decompress compressed SEVIRI HRIT files, an environment variable
-            # needs to be set. Check if decompression might have introduced errors when using
-            # the specific reader and loading a file with compression flag set.
-            # NOTE: in case this workaround-check fails data cannot be loaded in SIFT although
-            # creating the scene might have succeeded!
-            compressed_seviri = False
-            from satpy.readers.hrit_base import get_xritdecompress_cmd
-
-            # TODO: Scene may not provide information about reader in the
-            # future - here the "protected" variable '_readers' is used as
-            # workaround already
-            for r in scn._readers.values():
-                # only perform check when using a relevant reader, so that this is not triggered
-                # mistakenly when another reader uses the same meta data key for another purpose
-                if r.name in ["seviri_l1b_hrit"]:
-                    for fh in r.file_handlers.values():
-                        for fh2 in fh:
-                            if fh2.mda.get("compression_flag_for_data"):
-                                compressed_seviri = True
-            if compressed_seviri:
-                get_xritdecompress_cmd()
-            # END OF WORKAROUND
+            if _scene_contains_compressed_seviri_hrit_files(scn):
+                # To decompress compressed SEVIRI HRIT files, an external
+                # decompression tool (xRITDecompress) must be executable by the
+                # Satpy HRIT reader (its file path is communicated via the
+                # XRIT_DECOMPRESS_PATH environment variable).
+                # Even though the creation of the scene was successful, even if
+                # the decompression tool is missing, in this case the loading
+                # of the scene would fail.
+                # To enable the caller of create_scenes() to fail early and
+                # inform the user about the problem we check beforehand if the
+                # decompression tool is available: if not, the following call
+                # will throw an exception which is intentionally not caught
+                # here.
+                satpy.readers.hrit_base.get_xritdecompress_cmd()
 
         all_available_products.update(scn.available_dataset_ids(composites=True))
 
     # update the widgets
     return sorted(all_available_products)
+
+
+def _scene_contains_compressed_seviri_hrit_files(scn):
+    # TODO: Scene may not provide information about reader in the
+    #  future - here the "protected" variable '_readers' is used as
+    #  workaround already
+    for r in scn._readers.values():
+        # only perform check when using a relevant reader, so that this is not
+        # triggered mistakenly when another reader uses the same meta data key
+        # 'compression_flag_for_data' but does not need xRITDecompress to
+        # uncompress
+        if r.name in ["seviri_l1b_hrit"]:
+            for fh in r.file_handlers.values():
+                for fh2 in fh:
+                    if fh2.mda.get("compression_flag_for_data"):
+                        return True
+    return False
 
 
 # TODO: use cf-units or cfunits or SIUnits or other package or: put all these
@@ -104,9 +114,6 @@ def _unit_format_func(info, units):
     units = unit_symbol(units)
     standard_name = info.get(Info.STANDARD_NAME)
 
-    def check_for_nan(val):
-        return N_A if np.isnan(val) else str(val)
-
     if (standard_name is not None) and (standard_name in Temperature_Quantities):
         # BT data limits, Kelvin to degC
         def _format_unit(val, numeric=True, include_units=True):
@@ -117,29 +124,7 @@ def _unit_format_func(info, units):
                 return "{:.02f}{units}".format(val, units=unit_str)
 
     elif "flag_values" in info:
-        # flag values don't have units
-        if "flag_meanings" in info:
-            flag_masks = info["flag_masks"] if "flag_masks" in info else [-1] * len(info["flag_values"])
-            flag_info = tuple(zip(info["flag_meanings"], info["flag_values"], flag_masks))
-
-            def _format_unit(val, numeric=True, include_units=True, flag_info=flag_info):
-                val = int(val)
-                if numeric:
-                    return "{:s}".format(check_for_nan(val))
-
-                meanings = []
-                for fmean, fval, fmask in flag_info:
-                    if (val & fmask) == fval:
-                        meanings.append(fmean)
-                return "{:s} ({:s})".format(check_for_nan(val), ", ".join(meanings))
-
-        else:
-
-            def _format_unit(val, numeric=True, include_units=True):
-                if np.isnan(val):
-                    return N_A
-                else:
-                    return "{:d}".format(int(val))
+        _format_unit = _unit_format_func_for_flags(info)
 
     else:
         # default formatting string
@@ -148,6 +133,37 @@ def _unit_format_func(info, units):
                 return "{:s} {units:s}".format(N_A, units=units if include_units else "")
             else:
                 return "{:.03f} {units:s}".format(val, units=units if include_units else "")
+
+    return _format_unit
+
+
+def _unit_format_func_for_flags(info):
+    def check_for_nan(val):
+        return N_A if np.isnan(val) else str(val)
+
+    # flag values don't have units
+    if "flag_meanings" in info:
+        flag_masks = info["flag_masks"] if "flag_masks" in info else [-1] * len(info["flag_values"])
+        flag_info = tuple(zip(info["flag_meanings"], info["flag_values"], flag_masks))
+
+        def _format_unit(val, numeric=True, include_units=True, flag_info=flag_info):
+            val = int(val)
+            if numeric:
+                return "{:s}".format(check_for_nan(val))
+
+            meanings = []
+            for fmean, fval, fmask in flag_info:
+                if (val & fmask) == fval:
+                    meanings.append(fmean)
+            return "{:s} ({:s})".format(check_for_nan(val), ", ".join(meanings))
+
+    else:
+
+        def _format_unit(val, numeric=True, include_units=True):
+            if np.isnan(val):
+                return N_A
+            else:
+                return "{:d}".format(int(val))
 
     return _format_unit
 
@@ -214,3 +230,22 @@ def units_conversion(info):
     # Format strings
     format_func = _unit_format_func(info, punits)
     return punits, conv_func, format_func
+
+
+def format_wavelength(wl):
+    """Return wavelength formatted as string with unit.
+
+    A wavelength below 4.1 micrometers is formatted with two, above with one decimal.
+    """
+    if wl < 4.1:
+        wl_str = f"{wl:0.02f} µm"
+    else:
+        wl_str = f"{wl:0.01f} µm"
+    return wl_str
+
+
+def normalize_longitude(lon: float) -> float:
+    """Return longitude centered around prime meridian, i.e. in the range ]-180.0, 180.0]"""
+    # Fiddling with '-' is required to include 180.0 and exclude -180.0 from the range,
+    # the code would be neater the other way around: (lon + 180.0) % 360.0 - 180.0
+    return -((-lon + 180.0) % 360.0 - 180.0)

@@ -318,77 +318,84 @@ class GlobbingCreator:
         For details see the documentation for the catalogue constraints
         specification.
 
-        TODO consider splitting this into separate methods for "datetime" and
-          "recent_datetime"
-
         :return: List of "scalar" constraints dictionaries representing all
         combinations which result from the interpretation of the given
         *dt_constraints*
         """
-        expanded_dt_constraints: List[dict] = []
         supported_codes = ["Y", "m", "d", "H", "M", "S"]  # Devel hint: Don't change this to a string.
 
-        if dt_constraints.get("type") == "datetime":
-            year = dt_constraints.get("Y", 2000)
-            month = dt_constraints.get("m", 1)
-            day = dt_constraints.get("d", 1)
-            hours = dt_constraints.get("H", 0)
-            minutes = dt_constraints.get("M", 0)
-            seconds = dt_constraints.get("S", 0)
+        dt_constraints_type = dt_constraints.get("type")
+        if dt_constraints_type == "datetime":
+            return GlobbingCreator._expand_dt_constraints_datetime(dt_constraints, field_name, supported_codes)
 
-            # FIXME: catch here for wrong parameters and generate helpful exception to re-raise
+        if dt_constraints_type == "recent_datetime":
+            return GlobbingCreator._expand_dt_constraints_recent_datetime(dt_constraints, field_name, supported_codes)
+
+        raise ValueError("Invalid datetime constraint type '{dt_constraints_type}'.")
+
+    @staticmethod
+    def _expand_dt_constraints_datetime(dt_constraints, field_name, supported_codes) -> List[dict]:
+        year = dt_constraints.get("Y", 2000)
+        month = dt_constraints.get("m", 1)
+        day = dt_constraints.get("d", 1)
+        hours = dt_constraints.get("H", 0)
+        minutes = dt_constraints.get("M", 0)
+        seconds = dt_constraints.get("S", 0)
+
+        # FIXME: catch here for wrong parameters and generate helpful exception to re-raise
+        try:
+            dt = datetime(year, month, day, hours, minutes, seconds, tzinfo=timezone.utc)
+        except TypeError as exc:
+            msg = (
+                f"Got data incompatible to datetime initialisation"
+                f" for constraint '{field_name}'."
+                f" Original message: {exc}"
+            )
+            raise TypeError(msg) from exc
+
+        expanded_dt_constraint = {}
+        for code in supported_codes:
+            if dt_constraints.get(code):
+                expanded_dt_constraint[f"{field_name}_{code}"] = dt
+        return [expanded_dt_constraint]
+
+    @staticmethod
+    def _expand_dt_constraints_recent_datetime(dt_constraints, field_name, supported_codes) -> List[dict]:
+        expanded_dt_constraints: List[dict] = []
+        codes_to_set = []
+        given_code = None
+        sequence_of_given_code = []
+        for code in supported_codes:
+            codes_to_set.append(code)
+            sequence_of_given_code = dt_constraints.get(code)
+            if sequence_of_given_code:
+                given_code = code
+                break
+
+        if not given_code:
+            msg = f"No valid time code specification for constraint" f" '{field_name}' given."
+            raise ValueError(msg)
+
+        if not isinstance(sequence_of_given_code, collections.abc.Sequence):
+            sequence_of_given_code = [sequence_of_given_code]
+
+        for value in sequence_of_given_code:
             try:
-                dt = datetime(year, month, day, hours, minutes, seconds, tzinfo=timezone.utc)
+                delta_dt = GlobbingCreator._convert_to_relativedelta(value, given_code)
             except TypeError as exc:
                 msg = (
-                    f"Got data incompatible to datetime initialisation"
-                    f" for constraint '{field_name}'."
+                    f"Got incompatible data for constraint"
+                    f" '{field_name} / {given_code}'."
                     f" Original message: {exc}"
                 )
                 raise TypeError(msg) from exc
 
+            dt = GlobbingCreator.now_utc + delta_dt
             expanded_dt_constraint = {}
-            for code in supported_codes:
-                if dt_constraints.get(code):
-                    expanded_dt_constraint[f"{field_name}_{code}"] = dt
+            for code in codes_to_set:
+                expanded_dt_constraint[f"{field_name}_{code}"] = dt
 
             expanded_dt_constraints.append(expanded_dt_constraint)
-
-        else:  # dt_constraints.get("type") == "recent_datetime":
-            codes_to_set = []
-            given_code = None
-            sequence_of_given_code = None
-            for code in supported_codes:
-                codes_to_set.append(code)
-                sequence_of_given_code = dt_constraints.get(code)
-                if sequence_of_given_code:
-                    given_code = code
-                    break
-
-            if not given_code:
-                msg = f"No valid time code specification for constraint" f" '{field_name}' given."
-                raise ValueError(msg)
-
-            if not isinstance(sequence_of_given_code, collections.abc.Sequence):
-                sequence_of_given_code = [sequence_of_given_code]
-
-            for value in sequence_of_given_code:
-                try:
-                    delta_dt = GlobbingCreator._convert_to_relativedelta(value, given_code)
-                except TypeError as exc:
-                    msg = (
-                        f"Got incompatible data for constraint"
-                        f" '{field_name} / {given_code}'."
-                        f" Original message: {exc}"
-                    )
-                    raise TypeError(msg) from exc
-
-                dt = GlobbingCreator.now_utc + delta_dt
-                expanded_dt_constraint = {}
-                for code in codes_to_set:
-                    expanded_dt_constraint[f"{field_name}_{code}"] = dt
-
-                expanded_dt_constraints.append(expanded_dt_constraint)
 
         return expanded_dt_constraints
 

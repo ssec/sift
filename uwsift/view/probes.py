@@ -432,10 +432,10 @@ class ProbeGraphDisplay(object):
 
         # if possible, set the selections back to the way they were
         need_rebuild = False
-        xIndex = self.xDropDown.findData(str(self.xSelectedUUID))
-        if xIndex >= 0:
+        x_index = self.xDropDown.findData(str(self.xSelectedUUID))
+        if x_index >= 0:
             # Selection didn't change
-            self.xDropDown.setCurrentIndex(xIndex)
+            self.xDropDown.setCurrentIndex(x_index)
         elif self.xDropDown.count() > 0:
             # Setting to a new layer
             need_rebuild = True
@@ -445,10 +445,10 @@ class ProbeGraphDisplay(object):
             # we had something selected but now there is nothing new to select
             need_rebuild = need_rebuild or self.xSelectedUUID is not None
             self.xSelectedUUID = None
-        yIndex = self.yDropDown.findData(str(self.ySelectedUUID))
-        if yIndex >= 0:
+        y_index = self.yDropDown.findData(str(self.ySelectedUUID))
+        if y_index >= 0:
             # Selection didn't change
-            self.yDropDown.setCurrentIndex(yIndex)
+            self.yDropDown.setCurrentIndex(y_index)
         elif self.yDropDown.count() > 0:
             # Setting to a new layer
             need_rebuild = need_rebuild or self.yCheckBox.isChecked()
@@ -459,7 +459,19 @@ class ProbeGraphDisplay(object):
             need_rebuild = need_rebuild or self.ySelectedUUID is not None
             self.ySelectedUUID = None
 
-        # check whether active datasets have changed
+        need_rebuild |= self._check_active_datasets_changed()
+
+        # refresh the plot
+        self._stale = need_rebuild
+        if do_rebuild_plot:
+            # Rebuild the plot (stale is used to determine if actual rebuild
+            # is needed)
+            self.rebuildPlot()
+
+    def _check_active_datasets_changed(self):
+        # check whether active datasets have changed. If so, update stored
+        # dataset uuids and indicate that the graph needs to be rebuilt.
+        need_rebuild = False
         x_layer = self.layer_model.get_layer_by_uuid(self.xSelectedUUID)
         x_active_product_dataset = None if not x_layer else x_layer.get_first_active_product_dataset()
         if not x_active_product_dataset:
@@ -469,7 +481,6 @@ class ProbeGraphDisplay(object):
         elif x_active_product_dataset.uuid != self.xCurrentDatasetUUID:
             need_rebuild = True
             self.xCurrentDatasetUUID = x_active_product_dataset.uuid
-
         y_layer = self.layer_model.get_layer_by_uuid(self.ySelectedUUID)
         y_active_product_dataset = None if not y_layer else y_layer.get_first_active_product_dataset()
         if not y_active_product_dataset:
@@ -479,13 +490,7 @@ class ProbeGraphDisplay(object):
         elif y_active_product_dataset.uuid != self.yCurrentDatasetUUID:
             need_rebuild |= self.yCheckBox.isChecked()
             self.yCurrentDatasetUUID = y_active_product_dataset.uuid
-
-        # refresh the plot
-        self._stale = need_rebuild
-        if do_rebuild_plot:
-            # Rebuild the plot (stale is used to determine if actual rebuild
-            # is needed)
-            self.rebuildPlot()
+        return need_rebuild
 
     def set_default_layer_selections(self, layer_uuids):
         # only set the defaults if we don't have a polygon yet
@@ -612,7 +617,9 @@ class ProbeGraphDisplay(object):
         # Assume that the task gets resolved otherwise we might try to draw multiple times
         self._stale = False
 
-    def _rebuild_plot_task(self, x_layer_uuid, y_layer_uuid, polygon, point_xy, plot_versus=False, plot_full_data=True):
+    def _rebuild_plot_task(  # noqa: C901
+        self, x_layer_uuid, y_layer_uuid, polygon, point_xy, plot_versus=False, plot_full_data=True
+    ):
 
         data_source_description = "full data" if plot_full_data else "polygon data"
 
