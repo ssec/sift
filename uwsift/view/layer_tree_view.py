@@ -7,8 +7,7 @@ from PyQt5.QtWidgets import QAbstractItemView, QHeaderView, QMenu, QTreeView
 
 from uwsift.common import Info, Kind
 from uwsift.common import LayerModelColumns as LMC  # noqa
-from uwsift.common import LayerVisibility
-from uwsift.common import Platform
+from uwsift.common import LayerVisibility, Platform
 from uwsift.model.layer_item import LayerItem
 from uwsift.util.widgets.pie_dial import PieDialDelegate
 from uwsift.view.colormap_dialogs import ChangeColormapDialog
