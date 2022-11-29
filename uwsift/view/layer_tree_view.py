@@ -1,16 +1,14 @@
 import logging
-from uuid import UUID
 
 from PyQt5 import QtGui, QtWidgets
 from PyQt5.QtCore import QModelIndex, Qt, pyqtSignal
 from PyQt5.QtWidgets import QAbstractItemView, QHeaderView, QMenu, QTreeView
 
-from uwsift.common import Info, Kind
+from uwsift.common import Info
 from uwsift.common import LayerModelColumns as LMC  # noqa
 from uwsift.common import LayerVisibility, Platform
 from uwsift.model.layer_item import LayerItem
 from uwsift.util.widgets.pie_dial import PieDialDelegate
-from uwsift.view.colormap_dialogs import ChangeColormapDialog
 from uwsift.view.probes import DEFAULT_POINT_PROBE
 
 LOG = logging.getLogger(__name__)
@@ -96,8 +94,6 @@ class LayerTreeView(QTreeView):
         layer: LayerItem = self.model().layers[model_idx.row()]
         actions = {}
         if layer is not None:
-            if layer.kind in [Kind.IMAGE, Kind.COMPOSITE]:
-                actions.update(self._change_layer_colormap_menu(menu, layer.uuid))
             if layer.info.get(Info.PLATFORM) != Platform.SYSTEM:
                 actions.update(self._delete_layer_menu(menu, selection_model_idx))
 
@@ -112,18 +108,6 @@ class LayerTreeView(QTreeView):
             return actions[sel](sel)
         else:
             LOG.debug("Unimplemented menu option '{}'".format(sel.text()))
-
-    def _change_layer_colormap_menu(self, menu: QMenu, selected_uuid: UUID):
-        model = self.model()
-
-        def _show_change_colormap_dialog(action):  # noqa
-            d = ChangeColormapDialog(model, selected_uuid, parent=self)
-            d.show()
-            d.raise_()
-            d.activateWindow()
-
-        action = menu.addAction("Change Colormap...")
-        return {action: _show_change_colormap_dialog}
 
     def _delete_layer_menu(self, menu: QMenu, selection_model_idx: QModelIndex):
         model = self.model()
