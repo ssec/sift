@@ -73,6 +73,7 @@ class LayerItem:
             Info.SHORT_NAME,
             Info.UNITS,
             Info.VALID_RANGE,
+            Info.COLORMAP,
             # for _get_dataset_info_labels()
             "name",
             "standard_name",
