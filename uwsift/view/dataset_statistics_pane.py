@@ -32,9 +32,9 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
         layout.addWidget(self._pane_widget)
         self.setLayout(layout)
         self._pane_ui.datasetNameLabel.setText("")
-        self._pane_ui.roundingPrecisionSpinBox.setValue(2)
+        self._pane_ui.decimalPlacesSpinBox.setValue(2)
 
-        self._pane_ui.roundingPrecisionSpinBox.valueChanged.connect(self._rounding_precision_changed)
+        self._pane_ui.decimalPlacesSpinBox.valueChanged.connect(self._decimal_places_changed)
 
         self._current_selected_layer = None
 
@@ -55,7 +55,7 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
 
             self._carry_out_update(first_active_dataset)
 
-    def _rounding_precision_changed(self):
+    def _decimal_places_changed(self):
         if self._current_selected_layer:
             first_active_dataset = self._current_selected_layer.get_first_active_product_dataset()
             if first_active_dataset:
@@ -99,14 +99,14 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
         self._pane_ui.statisticsTableWidget.horizontalHeader().show()
 
     @staticmethod
-    def _determine_rounded_value(rounding: int, value: Decimal):
-        if rounding > 1:
-            rounding_precision_str = f"{0:.{rounding - 1}f}1"
-        elif rounding == 1:
-            rounding_precision_str = ".1"
+    def _determine_rounded_value(decimal_places: int, value: Decimal):
+        if decimal_places > 1:
+            decimal_places_str = f"{0:.{decimal_places - 1}f}1"
+        elif decimal_places == 1:
+            decimal_places_str = ".1"
         else:
-            rounding_precision_str = "1."
-        value = value.quantize(Decimal(rounding_precision_str))
+            decimal_places_str = "1."
+        value = value.quantize(Decimal(decimal_places_str))
         return value
 
     def _determine_table_content_by_stats_dict(self, stats: dict, header: list):
@@ -157,7 +157,7 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
                 self._pane_ui.statisticsTableWidget.setItem(row, col, item)
 
     def _determine_value_for_table_item(self, value: numbers.Number):
-        rounding_precision = self._pane_ui.roundingPrecisionSpinBox.value()
+        decimal_places = self._pane_ui.decimalPlacesSpinBox.value()
 
         if isinstance(value, np.number):
             # if the given value is a numeric numpy value then it needs to be converted
@@ -166,11 +166,11 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
             value = value.item()
 
         if isinstance(value, numbers.Number):
-            if isinstance(value, int) and rounding_precision > 0:
-                expand = " " * (rounding_precision + 1)
+            if isinstance(value, int) and decimal_places > 0:
+                expand = " " * (decimal_places + 1)
                 value = str(value) + expand
-            elif rounding_precision > -1:
-                value = self._determine_rounded_value(rounding_precision, Decimal(value))
+            elif decimal_places > -1:
+                value = self._determine_rounded_value(decimal_places, Decimal(value))
         return str(value)
 
     @staticmethod
