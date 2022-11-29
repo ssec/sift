@@ -38,9 +38,7 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
 
         self._current_selected_layer = None
 
-        self._pane_ui.statisticsTableWidget.setEditTriggers(QtWidgets.QTableWidget.NoEditTriggers)
-        self._pane_ui.statisticsTableWidget.setFocusPolicy(Qt.NoFocus)
-        self._pane_ui.statisticsTableWidget.setSelectionMode(QtWidgets.QTableWidget.NoSelection)
+        self._pane_ui.statisticsTableWidget.setSelectionMode(QtWidgets.QTableWidget.SingleSelection)
         self._pane_ui.statisticsTableWidget.resizeColumnsToContents()
         self._pane_ui.statisticsTableWidget.horizontalHeader().setStretchLastSection(True)
 
@@ -131,8 +129,7 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
             curr_stat = stats.get(keys[row])
             for col in range(len(curr_stat)):
                 value = self._determine_value_for_table_item(curr_stat[col])
-                item = QtWidgets.QTableWidgetItem(value)
-                self._set_text_styling_of_item(item)
+                item = self._get_tailored_item(value)
                 self._pane_ui.statisticsTableWidget.setItem(row, col, item)
 
     def _determine_table_content_by_stats_list(self, stats: list, header: list):
@@ -156,8 +153,7 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
             for col in range(len(row_content)):
                 col_content = row_content[col]
                 value = self._determine_value_for_table_item(col_content)
-                item = QtWidgets.QTableWidgetItem(value)
-                self._set_text_styling_of_item(item)
+                item = self._get_tailored_item(value)
                 self._pane_ui.statisticsTableWidget.setItem(row, col, item)
 
     def _determine_value_for_table_item(self, value: numbers.Number):
@@ -178,11 +174,14 @@ class DatasetStatisticsPane(QtWidgets.QWidget):
         return str(value)
 
     @staticmethod
-    def _set_text_styling_of_item(item: QtWidgets.QTableWidgetItem):
+    def _get_tailored_item(value: str) -> QtWidgets.QTableWidgetItem:
+        item = QtWidgets.QTableWidgetItem(value)
         item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
         font = QFont("Monospace")
         font.setStyleHint(QFont.TypeWriter)
         item.setFont(font)
+        item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+        return item
 
     def _update_table_content(self, data: dict):
         stats = data.get("stats")
