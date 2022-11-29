@@ -43,7 +43,7 @@ from PyQt5.QtCore import QObject, pyqtSignal
 from uwsift.common import Info, Kind, Presentation
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.queue import TASK_DOING, TASK_PROGRESS, TaskQueue
-from uwsift.util.common import units_conversion
+from uwsift.util.common import get_initial_gamma, units_conversion
 from uwsift.util.default_paths import DOCUMENT_SETTINGS_DIR
 from uwsift.view.colormap import (
     COLORMAP_MANAGER,
@@ -174,11 +174,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             cmap = info.get(Info.COLORMAP)
         if style is None:
             style = info.get(Info.STYLE)
-        gamma = 1.0
-        if info.get(Info.KIND) == Kind.RGB:
-            gamma = (1.0,) * 3
-        elif hasattr(info, "layers"):
-            gamma = (1.0,) * len(info.layers)
+        gamma = get_initial_gamma(info)
 
         p = Presentation(
             uuid=info[Info.UUID],
