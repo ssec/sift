@@ -91,6 +91,11 @@ class Watchdog:
         else:
             LOG.warning("Memory consumption won't be checked")
 
+        # Variable runtime state
+        self.old_pid = None
+        self.application_start_time = None
+        self.sent_restart_request = False
+
     @staticmethod
     def _parse_byte_count(byte_count: str) -> int:
         """
@@ -224,9 +229,6 @@ class Watchdog:
         the application is restarted from time to time and that the
         memory consumption isn't too high.
         """
-        old_pid = None
-        application_start_time = None
-        sent_restart_request = False
 
         while True:
             if self.restart_interval is None:
@@ -245,13 +247,14 @@ class Watchdog:
                 self._notify(logging.INFO, f"Heartbeat file doesn't exist:" f" {self.heartbeat_file}")
                 continue
 
+            now_utc = datetime.now(tz=timezone.utc)
+
             # The last update time is implicitly stored as the file modification
             # time. It is possible to approximate this time by checking whether
             # the file content changes, but if the user loads the same dataset
             # again, then this update won't be detected.
             modification_time = datetime.fromtimestamp(os.path.getmtime(self.heartbeat_file), tz=timezone.utc)
 
-            now_utc = datetime.now(tz=timezone.utc)
             idle_time = now_utc - modification_time
             if idle_time.total_seconds() > self.max_tolerable_idle_time:
                 self._notify(logging.WARNING, f"Dataset was not updated" f" since {modification_time}")
@@ -277,15 +280,15 @@ class Watchdog:
                     f"Current dataset scheduled time for observation" f" ('start_time'): {latest_dataset_time} - OK",
                 )
 
-            if application_start_time is None:
-                application_start_time = now_utc
+            if self.application_start_time is None:
+                self.application_start_time = now_utc
 
-            if old_pid is None:
-                old_pid = pid
-            elif old_pid != pid:
+            if self.old_pid is None:
+                self.old_pid = pid
+            elif self.old_pid != pid:
                 self._notify(logging.INFO, f"Application was restarted: {pid}")
-                application_start_time = now_utc
-                old_pid = pid
+                self.application_start_time = now_utc
+                self.old_pid = pid
 
             if self.allowed_mem_usage:
                 mem_usage = self._get_memory_consumption(pid)
@@ -293,15 +296,15 @@ class Watchdog:
                     LOG.warning(f"program uses too much memory: {mem_usage}")
                     self._restart_application(pid)
 
-            if self.restart_interval is not None and not sent_restart_request:
-                runtime = now_utc - application_start_time
+            if self.restart_interval is not None and not self.sent_restart_request:
+                runtime = now_utc - self.application_start_time
                 if runtime > self.restart_interval:
                     self._restart_application(pid)
                     if self.ask_again_interval is None:
                         # send the restart request only once
-                        sent_restart_request = True
+                        self.sent_restart_request = True
                     else:
-                        application_start_time += self.ask_again_interval
+                        self.application_start_time += self.ask_again_interval
 
 
 if __name__ == "__main__":
