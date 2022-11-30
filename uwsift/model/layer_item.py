@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 from uuid import UUID, uuid1
 
 from uwsift import config
-from uwsift.common import N_A, Info
+from uwsift.common import INVALID_COLOR_LIMITS, N_A, Info
 from uwsift.common import LayerModelColumns as LMC
 from uwsift.common import LayerVisibility, Presentation
 from uwsift.model.composite_recipes import Recipe
@@ -394,13 +394,18 @@ class LayerItem:
         if len(self._timeline) == 0:
             return None, None
 
-        min_range = 0
-        max_range = 0
+        actual_range = INVALID_COLOR_LIMITS
+        min = 0
+        max = 1
         for dataset in self._timeline.values():
             dataset_actual_range = self._get_actual_range_from_dataset(dataset.uuid)
-            if dataset_actual_range[0] < min_range:
-                min_range = dataset_actual_range[0]
-            if dataset_actual_range[1] > max_range:
-                max_range = dataset_actual_range[1]
 
-        return min_range, max_range
+            if actual_range == INVALID_COLOR_LIMITS:
+                actual_range = dataset_actual_range
+
+            if dataset_actual_range[min] < actual_range[min]:
+                actual_range[min] = dataset_actual_range[min]
+            if dataset_actual_range[max] > actual_range[max]:
+                actual_range[max] = dataset_actual_range[max]
+
+        return actual_range
