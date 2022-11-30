@@ -445,36 +445,6 @@ class Ui_MainWindow(object):
         self.verticalLayout_12.addLayout(self.horizontalLayout_11)
         self.areaProbePane.setWidget(self.probeWidget)
         MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.areaProbePane)
-        self.layerDetailsPane = QtWidgets.QDockWidget(MainWindow)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.layerDetailsPane.sizePolicy().hasHeightForWidth())
-        self.layerDetailsPane.setSizePolicy(sizePolicy)
-        self.layerDetailsPane.setFeatures(
-            QtWidgets.QDockWidget.DockWidgetFloatable | QtWidgets.QDockWidget.DockWidgetMovable
-        )
-        self.layerDetailsPane.setObjectName("layerDetailsPane")
-        self.layerInfoContents = QtWidgets.QWidget()
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.layerInfoContents.sizePolicy().hasHeightForWidth())
-        self.layerInfoContents.setSizePolicy(sizePolicy)
-        self.layerInfoContents.setObjectName("layerInfoContents")
-        self.gridLayout = QtWidgets.QGridLayout(self.layerInfoContents)
-        self.gridLayout.setContentsMargins(0, 0, 0, 0)
-        self.gridLayout.setObjectName("gridLayout")
-        self.layerDetailsScrollArea = QtWidgets.QScrollArea(self.layerInfoContents)
-        self.layerDetailsScrollArea.setWidgetResizable(True)
-        self.layerDetailsScrollArea.setObjectName("layerDetailsScrollArea")
-        self.layerDetailsContents = QtWidgets.QWidget()
-        self.layerDetailsContents.setGeometry(QtCore.QRect(0, 0, 292, 68))
-        self.layerDetailsContents.setObjectName("layerDetailsContents")
-        self.layerDetailsScrollArea.setWidget(self.layerDetailsContents)
-        self.gridLayout.addWidget(self.layerDetailsScrollArea, 0, 0, 1, 1)
-        self.layerDetailsPane.setWidget(self.layerInfoContents)
-        MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.layerDetailsPane)
         self.rgbConfigPane = QtWidgets.QDockWidget(MainWindow)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         sizePolicy.setHorizontalStretch(0)
@@ -836,6 +806,20 @@ class Ui_MainWindow(object):
         self.verticalLayout_9.addWidget(self.datasetStatisticsPane)
         self.datasetStatisticsPaneDockWidget.setWidget(self.datasetStatisticsPaneDockWidgetContents)
         MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.datasetStatisticsPaneDockWidget)
+        self.layerDetailsPaneDockWidget = QtWidgets.QDockWidget(MainWindow)
+        self.layerDetailsPaneDockWidget.setFeatures(
+            QtWidgets.QDockWidget.DockWidgetFloatable | QtWidgets.QDockWidget.DockWidgetMovable
+        )
+        self.layerDetailsPaneDockWidget.setObjectName("layerDetailsPaneDockWidget")
+        self.layerDetailsPaneDockWidgetContents = QtWidgets.QWidget()
+        self.layerDetailsPaneDockWidgetContents.setObjectName("layerDetailsPaneDockWidgetContents")
+        self.verticalLayout_16 = QtWidgets.QVBoxLayout(self.layerDetailsPaneDockWidgetContents)
+        self.verticalLayout_16.setObjectName("verticalLayout_16")
+        self.layerDetailsPane = SingleLayerInfoPane(self.layerDetailsPaneDockWidgetContents)
+        self.layerDetailsPane.setObjectName("layerDetailsPane")
+        self.verticalLayout_16.addWidget(self.layerDetailsPane)
+        self.layerDetailsPaneDockWidget.setWidget(self.layerDetailsPaneDockWidgetContents)
+        MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.layerDetailsPaneDockWidget)
 
         self.retranslateUi(MainWindow)
         self.probeTabWidget.setCurrentIndex(0)
@@ -888,8 +872,6 @@ class Ui_MainWindow(object):
             _translate("MainWindow", "Manually update plots to display currently active Datasets.")
         )
         self.updateButton.setText(_translate("MainWindow", "Update"))
-        self.layerDetailsPane.setStatusTip(_translate("MainWindow", "Selected layer information"))
-        self.layerDetailsPane.setWindowTitle(_translate("MainWindow", "Layer Details"))
         self.rgbConfigPane.setWindowTitle(_translate("MainWindow", "RGB Bounds"))
         self.nameGroupBox.setTitle(_translate("MainWindow", "Name"))
         self.redGroupBox.setTitle(_translate("MainWindow", "Red"))
@@ -921,6 +903,7 @@ class Ui_MainWindow(object):
         self.operations_text.setPlainText(_translate("MainWindow", "result = x - y"))
         self.algebraicUpdateButton.setText(_translate("MainWindow", "Update"))
         self.datasetStatisticsPaneDockWidget.setWindowTitle(_translate("MainWindow", "Statistics"))
+        self.layerDetailsPaneDockWidget.setWindowTitle(_translate("MainWindow", "Layer Details"))
 
 
 from PyQt5 import QtQuickWidgets
@@ -931,4 +914,5 @@ from uwsift.ui.custom_widgets import (
     QNoScrollSlider,
 )
 from uwsift.view.dataset_statistics_pane import DatasetStatisticsPane
+from uwsift.view.layer_details import SingleLayerInfoPane
 from uwsift.view.layer_tree_view import LayerTreeView

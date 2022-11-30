@@ -65,7 +65,15 @@ class ProductDataset:
 
     @staticmethod
     def _update_info_with_input_infos(dataset_info, input_datasets_infos) -> dict:
-        keys_to_compare = [Info.ORIGIN_X, Info.ORIGIN_Y, Info.CELL_WIDTH, Info.CELL_HEIGHT, Info.PROJ]
+        keys_to_compare = [
+            Info.ORIGIN_X,
+            Info.ORIGIN_Y,
+            Info.CELL_WIDTH,
+            Info.CELL_HEIGHT,
+            Info.PROJ,
+            Info.SCHED_TIME,
+            Info.DISPLAY_TIME,
+        ]
         infos_to_compare = [info for info in input_datasets_infos if info]
         if len(infos_to_compare) == 0:
             LOG.debug("Could not create a multichannel ProductDataset, without any given datasets infos")
@@ -83,6 +91,11 @@ class ProductDataset:
                     )
                     return None
         color_limits = tuple([info.get(Info.CLIM) if info else (None, None) for info in input_datasets_infos])
+        central_wavelength = tuple(
+            [info.get(Info.CENTRAL_WAVELENGTH) if info else None for info in input_datasets_infos]
+        )
+        wavelength = tuple([info.get("wavelength") if info else None for info in input_datasets_infos])
+        instrument = tuple([info.get(Info.INSTRUMENT) if info else None for info in input_datasets_infos])
         dataset_info.update(
             {
                 Info.ORIGIN_X: infos_to_compare[-1].get(Info.ORIGIN_X),
@@ -91,6 +104,11 @@ class ProductDataset:
                 Info.CELL_HEIGHT: infos_to_compare[-1].get(Info.CELL_HEIGHT),
                 Info.PROJ: infos_to_compare[-1].get(Info.PROJ),
                 Info.CLIM: color_limits,
+                Info.SCHED_TIME: infos_to_compare[-1].get(Info.SCHED_TIME),
+                Info.DISPLAY_TIME: infos_to_compare[-1].get(Info.DISPLAY_TIME),
+                Info.CENTRAL_WAVELENGTH: central_wavelength,
+                "wavelength": wavelength,
+                Info.INSTRUMENT: instrument,
             }
         )
 

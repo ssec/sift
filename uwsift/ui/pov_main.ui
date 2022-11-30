@@ -1119,65 +1119,6 @@ Checking this deactivates the Update button.</string>
     </layout>
    </widget>
   </widget>
-  <widget class="QDockWidget" name="layerDetailsPane">
-   <property name="sizePolicy">
-    <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-     <horstretch>0</horstretch>
-     <verstretch>0</verstretch>
-    </sizepolicy>
-   </property>
-   <property name="statusTip">
-    <string>Selected layer information</string>
-   </property>
-   <property name="features">
-    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
-   </property>
-   <property name="windowTitle">
-    <string>Layer Details</string>
-   </property>
-   <attribute name="dockWidgetArea">
-    <number>2</number>
-   </attribute>
-   <widget class="QWidget" name="layerInfoContents">
-    <property name="sizePolicy">
-     <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-      <horstretch>0</horstretch>
-      <verstretch>0</verstretch>
-     </sizepolicy>
-    </property>
-    <layout class="QGridLayout" name="gridLayout">
-     <property name="leftMargin">
-      <number>0</number>
-     </property>
-     <property name="topMargin">
-      <number>0</number>
-     </property>
-     <property name="rightMargin">
-      <number>0</number>
-     </property>
-     <property name="bottomMargin">
-      <number>0</number>
-     </property>
-     <item row="0" column="0">
-      <widget class="QScrollArea" name="layerDetailsScrollArea">
-       <property name="widgetResizable">
-        <bool>true</bool>
-       </property>
-       <widget class="QWidget" name="layerDetailsContents">
-        <property name="geometry">
-         <rect>
-          <x>0</x>
-          <y>0</y>
-          <width>292</width>
-          <height>68</height>
-         </rect>
-        </property>
-       </widget>
-      </widget>
-     </item>
-    </layout>
-   </widget>
-  </widget>
   <widget class="QDockWidget" name="rgbConfigPane">
    <property name="sizePolicy">
     <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
@@ -1860,6 +1801,24 @@ Checking this deactivates the Update button.</string>
     </layout>
    </widget>
   </widget>
+  <widget class="QDockWidget" name="layerDetailsPaneDockWidget">
+   <property name="features">
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
+   </property>
+   <property name="windowTitle">
+    <string>Layer Details</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>2</number>
+   </attribute>
+   <widget class="QWidget" name="layerDetailsPaneDockWidgetContents">
+    <layout class="QVBoxLayout" name="verticalLayout_16">
+     <item>
+      <widget class="SingleLayerInfoPane" name="layerDetailsPane" native="true"/>
+     </item>
+    </layout>
+   </widget>
+  </widget>
  </widget>
  <customwidgets>
   <customwidget>
@@ -1891,6 +1850,12 @@ Checking this deactivates the Update button.</string>
    <class>DatasetStatisticsPane</class>
    <extends>QWidget</extends>
    <header>uwsift.view.dataset_statistics_pane</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>SingleLayerInfoPane</class>
+   <extends>QWidget</extends>
+   <header>uwsift.view.layer_details</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

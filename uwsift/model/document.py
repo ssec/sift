@@ -344,9 +344,6 @@ class Document(QObject):  # base class is rightmost, mixins left of that
     def get_uuids(self):
         return list(self._info_by_uuid.keys())
 
-    def get_algebraic_namespace(self, uuid):
-        return self._workspace.get_algebraic_namespace(uuid)
-
     def __getitem__(self, dataset_uuid):
         """
         return dataset info with the given UUID

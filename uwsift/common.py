@@ -84,6 +84,8 @@ PROBE_UNIT = "Unit"
 
 LAYER_TREE_VIEW_HEADER = [VISIBILITY, SOURCE, NAME, WAVELENGTH, PROBE_VALUE, PROBE_UNIT]
 
+INVALID_COLOR_LIMITS = (None, None)
+
 
 # Calculate and provide LayerModel column indices from LAYER_TREE_VIEW_HEADER
 class LayerModelColumns:

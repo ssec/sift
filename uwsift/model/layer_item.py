@@ -84,6 +84,14 @@ class LayerItem:
 
         return frozendict(layer_info)
 
+    def replace_recipe_layer_info(self, info: frozendict):
+        """Replace the info of a recipe layer with the given one.
+
+        This will raise a ValueError if this layer is not a recipe layer."""
+        if not self.recipe:
+            raise ValueError("Updating info of a non recipe layer is not allowed.")
+        self.info = self.extract_layer_info(info)
+
     @property
     def kind(self):
         return self.info[Info.KIND]

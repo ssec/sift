@@ -394,10 +394,6 @@ class BaseWorkspace(QObject):
         """
         pass
 
-    @abstractmethod
-    def get_algebraic_namespace(self, uuid: UUID):
-        pass
-
     @property
     @abstractmethod
     def product_names_available_in_cache(self) -> dict:

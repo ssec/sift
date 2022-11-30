@@ -368,18 +368,6 @@ class CachingWorkspace(BaseWorkspace):
             # flatten to one namespace and read-only
             return frozendict(prod.info)
 
-    def get_algebraic_namespace(self, uuid: UUID):
-        if uuid is None:
-            return {}, ""
-
-        with self._inventory as s:
-            prod = self._product_with_uuid(s, uuid)
-            if prod is None:
-                return {}, ""
-            symbols = {x.key: x.value for x in prod.symbol}
-            code = prod.expression
-        return symbols, code
-
     @property
     def product_names_available_in_cache(self) -> dict:
         """
