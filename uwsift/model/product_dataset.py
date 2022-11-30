@@ -90,7 +90,6 @@ class ProductDataset:
                         f" have different values for {key}"
                     )
                     return None
-        color_limits = tuple([info.get(Info.CLIM) if info else (None, None) for info in input_datasets_infos])
         central_wavelength = tuple(
             [info.get(Info.CENTRAL_WAVELENGTH) if info else None for info in input_datasets_infos]
         )
@@ -103,7 +102,6 @@ class ProductDataset:
                 Info.CELL_WIDTH: infos_to_compare[-1].get(Info.CELL_WIDTH),
                 Info.CELL_HEIGHT: infos_to_compare[-1].get(Info.CELL_HEIGHT),
                 Info.PROJ: infos_to_compare[-1].get(Info.PROJ),
-                Info.CLIM: color_limits,
                 Info.SCHED_TIME: infos_to_compare[-1].get(Info.SCHED_TIME),
                 Info.DISPLAY_TIME: infos_to_compare[-1].get(Info.DISPLAY_TIME),
                 Info.CENTRAL_WAVELENGTH: central_wavelength,

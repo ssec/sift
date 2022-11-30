@@ -1,9 +1,9 @@
 import logging
 import re
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 from uwsift import config
-from uwsift.common import Info, Kind
+from uwsift.common import INVALID_COLOR_LIMITS, Info, Kind
 from uwsift.view.colormap import COLORMAP_MANAGER
 from uwsift.workspace.guidebook import Guidebook
 
@@ -20,23 +20,23 @@ def get_default_colormap(info: dict, guidebook: Guidebook) -> Optional[str]:
     provided by the `guidebook` is returned.
     """
 
-    layer_standard_name = info.get(Info.STANDARD_NAME)
-    if layer_standard_name is None:
+    info_standard_name = info.get(Info.STANDARD_NAME)
+    if info_standard_name is None:
         LOG.debug(
             "Cannot determine default colormap from configuration " "for info which does not have a standard name."
         )
     else:
-        colormap_name = config.get(".".join(["default_colormaps", layer_standard_name]), None)
+        colormap_name = config.get(".".join(["default_colormaps", info_standard_name, "colormap_name"]), None)
         if colormap_name in COLORMAP_MANAGER:
             LOG.debug(
-                f"Returning color map '{colormap_name}' as configured for" f" standard name '{layer_standard_name}'."
+                f"Returning color map '{colormap_name}' as configured for" f" standard name '{info_standard_name}'."
             )
             return colormap_name
 
         if colormap_name:
             LOG.warning(
                 f"Unknown color map '{colormap_name}' configured for"
-                f" standard name '{layer_standard_name}'. "
+                f" standard name '{info_standard_name}'. "
                 f" Falling back to internal Guidebook mapping."
             )
 
@@ -45,6 +45,25 @@ def get_default_colormap(info: dict, guidebook: Guidebook) -> Optional[str]:
             return None
 
     return guidebook.default_colormap(info)
+
+
+def get_default_climits(info: dict) -> Optional[Tuple]:
+    """Return the value of clims configured in 'default_colormaps' for the standard name taken from the given ''info''
+
+    If no according clims are configured, the clims invalid default value is returned.
+    """
+    info_standard_name = info.get(Info.STANDARD_NAME)
+    if not info_standard_name:
+        LOG.debug(
+            "Can not determine default color limits from configuration for info which does not have a standard name"
+        )
+    else:
+        climits = config.get(".".join(["default_colormaps", info_standard_name, "climits"]), None)
+
+        if climits:
+            return climits
+
+    return INVALID_COLOR_LIMITS
 
 
 # FIXME move this to a better location

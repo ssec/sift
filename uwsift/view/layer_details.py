@@ -17,6 +17,7 @@ __author__ = "evas"
 __docformat__ = "reStructuredText"
 
 import logging
+from functools import partial
 from typing import Optional, Tuple
 
 import numpy as np
@@ -27,7 +28,7 @@ from uwsift.model.layer_item import LayerItem
 from uwsift.model.layer_model import LayerModel
 from uwsift.model.product_dataset import ProductDataset
 from uwsift.ui.layer_details_widget_ui import Ui_LayerDetailsPane
-from uwsift.util.common import format_resolution
+from uwsift.util.common import format_resolution, get_initial_gamma
 from uwsift.view.colormap import COLORMAP_MANAGER
 
 LOG = logging.getLogger(__name__)
@@ -35,6 +36,10 @@ LOG = logging.getLogger(__name__)
 
 class SingleLayerInfoPane(QtWidgets.QWidget):
     """Shows details about one layer that is currently selected."""
+
+    _valid_min = None
+    _valid_max = None
+    _slider_steps = 100
 
     def __init__(self, *args, **kwargs):
         """Initialise subwidgets and layout.
@@ -55,6 +60,21 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
         self._current_selected_layer: Optional[LayerItem] = None
 
+        self._init_cmap_combo()
+
+        self._details_pane_ui.cmap_combobox.currentIndexChanged.connect(self._cmap_changed)
+        self._details_pane_ui.vmin_slider.valueChanged.connect(partial(self._slider_changed, is_max=False))
+        self._details_pane_ui.vmax_slider.valueChanged.connect(partial(self._slider_changed, is_max=True))
+        self._details_pane_ui.vmin_spinbox.valueChanged.connect(partial(self._spin_box_changed, is_max=False))
+        self._details_pane_ui.vmax_spinbox.valueChanged.connect(partial(self._spin_box_changed, is_max=True))
+
+        self._details_pane_ui.gammaSpinBox.valueChanged.connect(self._gamma_changed)
+
+        self._details_pane_ui.climitsCurrentTime.clicked.connect(self._fit_clims_to_current_time)
+        self._details_pane_ui.climitsAllTimes.clicked.connect(self._fit_clims_to_all_times)
+
+        self._details_pane_ui.colormap_reset_button.clicked.connect(self._reset_to_intial_state)
+
     # Slot functions
 
     def initiate_update(self):
@@ -72,6 +92,13 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         self._clear_details_pane()
         if layers is not None and len(layers) == 1:
             self._current_selected_layer = layers[0]
+            if self._current_selected_layer.valid_range:
+                valid_range = self._current_selected_layer.valid_range
+                clims = self._current_selected_layer.presentation.climits
+                self._set_valid_min_max(clims, valid_range)
+            else:
+                self._valid_min = None
+                self._valid_max = None
             self.initiate_update()
 
     def update_displayed_clims(self):
@@ -89,6 +116,10 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         if self._current_selected_layer:
             if self._current_selected_layer.presentation.colormap:
                 self._details_pane_ui.layerColormapValue.setText(self._current_selected_layer.presentation.colormap)
+
+                idx = self._details_pane_ui.cmap_combobox.findData(self._current_selected_layer.presentation.colormap)
+                self._details_pane_ui.cmap_combobox.setCurrentIndex(idx)
+
                 cmap = COLORMAP_MANAGER.get(self._current_selected_layer.presentation.colormap)
                 if cmap:
                     cmap_html = cmap._repr_html_()
@@ -108,6 +139,16 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         self._details_pane_ui.layerColormapValue.setText("N/A")
         self._details_pane_ui.layerColorLimitsValue.setText("N/A")
         self._details_pane_ui.layerColormapVisual.setHtml("")
+        self._details_pane_ui.kindDetailsStackedWidget.setCurrentWidget(self._details_pane_ui.page_others)
+
+    def _cmap_changed(self, index):
+        model = self._current_selected_layer.model
+        cmap_str = self._details_pane_ui.cmap_combobox.itemData(index)
+        self._current_cmap = str(cmap_str)
+        model.change_colormap_for_layer(self._current_selected_layer.uuid, self._current_cmap)
+
+    def _create_slider_value(self, channel_val):
+        return int((channel_val - self._valid_min) / (self._valid_max - self._valid_min) * self._slider_steps)
 
     def _determine_clim_str_for_channel(self, curr_clim, curr_layer_info, multichannel_clim_strs):
         curr_unit_conv = curr_layer_info.get(Info.UNIT_CONVERSION) if curr_layer_info else None
@@ -135,6 +176,35 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
                 f" Because there is no unit conversion in layer info: '{self._current_selected_layer.info}'."
                 f" Instead for {self._current_selected_layer.uuid} will the value 'N/A' be shown."
             )
+
+    def _fit_clims_to_all_times(self):
+        model = self._current_selected_layer.model
+        actual_range = self._current_selected_layer.get_actual_range_from_layer()
+        model.change_color_limits_for_layer(self._current_selected_layer.uuid, actual_range)
+        valid_range = self._current_selected_layer.valid_range
+
+        self._set_valid_min_max(actual_range, valid_range)
+
+        self._update_vmin()
+        self._update_vmax()
+
+    def _fit_clims_to_current_time(self):
+        first_active_dataset = self._current_selected_layer.get_first_active_product_dataset()
+        if first_active_dataset:
+            model = self._current_selected_layer.model
+            actual_range = self._current_selected_layer.get_actual_range_from_first_active_dataset()
+            model.change_color_limits_for_layer(self._current_selected_layer.uuid, actual_range)
+
+            valid_range = self._current_selected_layer.valid_range
+
+            self._set_valid_min_max(actual_range, valid_range)
+
+            self._update_vmin()
+            self._update_vmax()
+
+    def _gamma_changed(self, val):
+        model = self._current_selected_layer.model
+        model.change_gamma_for_layer(self._current_selected_layer.uuid, val)
 
     def _get_multichannel_clim_str(self, clims):
 
@@ -192,6 +262,70 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         clim_str = f"{min_clim} ~ {max_clim}"
         return clim_str
 
+    def _get_slider_value(self, slider_val):
+        return (slider_val / self._slider_steps) * (self._valid_max - self._valid_min) + self._valid_min
+
+    def _init_cmap_combo(self):
+        # FIXME: We should do this by colormap category
+        for colormap in COLORMAP_MANAGER.keys():
+            self._details_pane_ui.cmap_combobox.addItem(colormap, colormap)
+
+    def _reset_to_intial_state(self):
+        model = self._current_selected_layer.model
+        # rejecting (Cancel button) means reset previous settings
+        model.change_colormap_for_layer(
+            self._current_selected_layer.uuid, self._current_selected_layer.info[Info.COLORMAP]
+        )
+        model.change_color_limits_for_layer(
+            self._current_selected_layer.uuid, self._current_selected_layer.info[Info.VALID_RANGE]
+        )
+        model.change_gamma_for_layer(
+            self._current_selected_layer.uuid, get_initial_gamma(self._current_selected_layer.info)
+        )
+        self._valid_min, self._valid_max = self._current_selected_layer.valid_range
+        self._update_vmin()
+        self._update_vmax()
+        self._update_gamma()
+
+    def _set_new_clims(self, val, is_max):
+        if is_max:
+            new_clims = (self._current_selected_layer.presentation.climits[0], val)
+        else:
+            new_clims = (val, self._current_selected_layer.presentation.climits[1])
+        model = self._current_selected_layer.model
+        model.change_color_limits_for_layer(self._current_selected_layer.uuid, new_clims)
+
+    def _set_valid_min_max(self, clims, valid_range):
+        self._valid_min = min(clims[0], valid_range[0])
+        self._valid_max = max(clims[1], valid_range[1])
+
+    def _slider_changed(self, value=None, is_max=True):
+        spin_box = self._details_pane_ui.vmax_spinbox if is_max else self._details_pane_ui.vmin_spinbox
+        if value is None:
+            slider = self._details_pane_ui.vmax_slider if is_max else self._details_pane_ui.vmin_slider
+            value = slider.value()
+        value = self._get_slider_value(value)
+        LOG.debug("slider %s %s => %f" % (self._current_selected_layer.uuid, "max" if is_max else "min", value))
+        display_val = self._current_selected_layer.info[Info.UNIT_CONVERSION][1](value)
+        spin_box.blockSignals(True)
+        spin_box.setValue(display_val)
+        spin_box.blockSignals(False)
+        return self._set_new_clims(value, is_max)
+
+    def _spin_box_changed(self, is_max=True):
+        slider = self._details_pane_ui.vmax_slider if is_max else self._details_pane_ui.vmin_slider
+        spin_box = self._details_pane_ui.vmax_spinbox if is_max else self._details_pane_ui.vmin_spinbox
+        dis_val = spin_box.value()
+        val = self._current_selected_layer.info[Info.UNIT_CONVERSION][1](dis_val, inverse=True)
+        LOG.debug(
+            "spin box %s %s => %f => %f" % (self._current_selected_layer.uuid, "max" if is_max else "min", dis_val, val)
+        )
+        sv = self._create_slider_value(val)
+        slider.blockSignals(True)
+        slider.setValue(sv)
+        slider.blockSignals(False)
+        return self._set_new_clims(val, is_max)
+
     def _update_displayed_info(self):
         self._update_displayed_layer_name()
 
@@ -203,9 +337,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
         self._update_displayed_resolution()
 
-        self.update_displayed_colormap()
-
-        self.update_displayed_clims()
+        self._update_displayed_kind_details()
 
     def _update_displayed_instrument(self):
         if self._current_selected_layer.info.get(Info.INSTRUMENT):
@@ -216,8 +348,17 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
                 instrument_str = self._current_selected_layer.info[Info.INSTRUMENT].value
 
             self._details_pane_ui.layerInstrumentValue.setText(instrument_str)
-        else:
-            self._details_pane_ui.layerInstrumentValue.setText("N/A")
+
+    def _update_displayed_kind_details(self):
+        if self._current_selected_layer.kind == Kind.IMAGE:
+            self._details_pane_ui.kindDetailsStackedWidget.setCurrentWidget(self._details_pane_ui.page_IMAGE)
+
+            self.update_displayed_colormap()
+
+            self.update_displayed_clims()
+            self._update_gamma()
+            self._update_vmin()
+            self._update_vmax()
 
     def _update_displayed_layer_name(self):
         layer_descriptor = self._current_selected_layer.descriptor
@@ -254,3 +395,27 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         else:
             wavelength_str = "N/A" if self._current_selected_layer.kind != Kind.RGB else "N/A, N/A, N/A"
             self._details_pane_ui.layerWavelengthValue.setText(wavelength_str)
+
+    def _update_gamma(self):
+        self._details_pane_ui.gammaSpinBox.setValue(self._current_selected_layer.presentation.gamma)
+
+    def _update_vmin(self):
+        current_vmin = self._current_selected_layer.presentation.climits[0]
+        self._details_pane_ui.vmin_slider.setRange(0, self._slider_steps)
+        slider_val = self._create_slider_value(current_vmin)
+        self._details_pane_ui.vmin_slider.setSliderPosition(max(slider_val, 0))
+
+        conv = self._current_selected_layer.info[Info.UNIT_CONVERSION]
+        self._details_pane_ui.vmin_spinbox.setRange(conv[1](self._valid_min), conv[1](self._valid_max))
+        self._details_pane_ui.vmin_spinbox.setValue(conv[1](current_vmin))
+
+    def _update_vmax(self):
+        current_vmax = self._current_selected_layer.presentation.climits[1]
+        self._details_pane_ui.vmax_slider.setMaximum(32767)
+        self._details_pane_ui.vmax_slider.setRange(0, self._slider_steps)
+        slider_val = self._create_slider_value(current_vmax)
+        self._details_pane_ui.vmax_slider.setSliderPosition(min(slider_val, 32767))
+
+        conv = self._current_selected_layer.info[Info.UNIT_CONVERSION]
+        self._details_pane_ui.vmax_spinbox.setRange(conv[1](self._valid_min), conv[1](self._valid_max))
+        self._details_pane_ui.vmax_spinbox.setValue(conv[1](current_vmax))

@@ -180,9 +180,10 @@ class RGBLayerConfigPane(QObject):
         LOG.debug("RGB: user selected %s for %s" % (repr(layer_uuid), color))
         # reset slider position to min and max for layer
         self._set_minmax_slider(color, layer_uuid)
-        layer_info = self.model.get_layer_by_uuid(layer_uuid).info if layer_uuid else None
 
-        clim = layer_info.get(Info.CLIM) if layer_info else (None, None)
+        layer_valid_range = self.model.get_layer_by_uuid(layer_uuid).valid_range if layer_uuid else None
+
+        clim = layer_valid_range if layer_valid_range else (None, None)
 
         self.didChangeRGBInputLayers.emit(self.recipe, color, layer_uuid, clim, DEFAULT_GAMMA_VALUE)
 

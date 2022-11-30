@@ -178,8 +178,6 @@ def generate_guidebook_metadata(info) -> Mapping:
     info[Info.COLORMAP] = metadata_utils.get_default_colormap(info, guidebook)
     if info[Info.KIND] == Kind.POINTS:
         info[Info.STYLE] = metadata_utils.get_default_point_style_name(info)
-    info[Info.CLIM] = guidebook.climits(info)
-    info[Info.VALID_RANGE] = guidebook.valid_range(info)
     if Info.DISPLAY_TIME not in info:
         info[Info.DISPLAY_TIME] = guidebook._default_display_time(info)
     if Info.DISPLAY_NAME not in info:
@@ -542,7 +540,6 @@ class SatpyImporter(aImporter):
             assert Info.OBS_DURATION in meta
             prod.update(meta)  # sets fields like obs_duration and obs_time transparently
             assert prod.info[Info.OBS_TIME] is not None and prod.obs_time is not None
-            assert prod.info[Info.VALID_RANGE] is not None
             LOG.debug("new product: {}".format(repr(prod)))
             if self.use_inventory_db:
                 self._S.add(prod)

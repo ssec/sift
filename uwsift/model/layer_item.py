@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 from uuid import UUID, uuid1
 
 from uwsift import config
-from uwsift.common import N_A, Info
+from uwsift.common import INVALID_COLOR_LIMITS, N_A, Info
 from uwsift.common import LayerModelColumns as LMC
 from uwsift.common import LayerVisibility, Presentation
 from uwsift.model.composite_recipes import Recipe
@@ -66,7 +66,6 @@ class LayerItem:
         layer_info[Info.UNIT_CONVERSION] = unit_conversion
 
         for key in [
-            Info.CLIM,
             Info.CENTRAL_WAVELENGTH,
             Info.INSTRUMENT,
             Info.KIND,
@@ -74,6 +73,7 @@ class LayerItem:
             Info.SHORT_NAME,
             Info.UNITS,
             Info.VALID_RANGE,
+            Info.COLORMAP,
             # for _get_dataset_info_labels()
             "name",
             "standard_name",
@@ -191,14 +191,7 @@ class LayerItem:
 
     @property
     def valid_range(self):
-        # TODO: this method mimicks the behaviour of
-        #  Document.valid_range_for_uuid() and returns not the VALID_RANGE,
-        #  but CLIM info for now, but that may as the following comment cited
-        #  from the mentioned function states, this may (and should?) change
-        #  in the future:
-        #    "Limit ourselves to what information
-        #     in the future valid range may be different than the default CLIMs"
-        return self.info[Info.CLIM]
+        return self.info.get(Info.VALID_RANGE)
 
     @staticmethod
     def _get_dataset_info_labels(info: frozendict) -> Tuple[str, str, str]:
@@ -384,3 +377,35 @@ class LayerItem:
         for ds in self.timeline.values():
             output += f"{ds.info[Info.SCHED_TIME]} -> {ds.info[Info.UUID]}"
         return output
+
+    def _get_actual_range_from_dataset(self, uuid: UUID) -> Tuple:
+        """Returns the calculated actual range value of a dataset with the given uuid"""
+        return self.model._workspace.get_min_max_value_for_dataset_by_uuid(uuid)
+
+    def get_actual_range_from_first_active_dataset(self) -> Tuple:
+        """Returns the calculated actual range value of the first active dataset"""
+        first_active_dataset = self.get_first_active_product_dataset()
+        return self._get_actual_range_from_dataset(first_active_dataset.uuid)
+
+    def get_actual_range_from_layer(self) -> Tuple:
+        """Calculate on the fly the actual range of the layer.
+
+        The actual range of a layer is the union of all actual ranges of its owned datasets."""
+        if len(self._timeline) == 0:
+            return None, None
+
+        actual_range = INVALID_COLOR_LIMITS
+        min = 0
+        max = 1
+        for dataset in self._timeline.values():
+            dataset_actual_range = self._get_actual_range_from_dataset(dataset.uuid)
+
+            if actual_range == INVALID_COLOR_LIMITS:
+                actual_range = dataset_actual_range
+
+            if dataset_actual_range[min] < actual_range[min]:
+                actual_range[min] = dataset_actual_range[min]
+            if dataset_actual_range[max] > actual_range[max]:
+                actual_range[max] = dataset_actual_range[max]
+
+        return actual_range

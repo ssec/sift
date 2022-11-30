@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from datetime import datetime
 from decimal import Decimal
@@ -8,7 +10,7 @@ import satpy.readers.hrit_base
 from satpy import DataID, Scene
 
 from uwsift import config as config
-from uwsift.common import N_A, Info
+from uwsift.common import N_A, Info, Kind
 
 LOG = logging.getLogger(__name__)
 
@@ -262,3 +264,13 @@ def normalize_longitude(lon: float) -> float:
     # Fiddling with '-' is required to include 180.0 and exclude -180.0 from the range,
     # the code would be neater the other way around: (lon + 180.0) % 360.0 - 180.0
     return -((-lon + 180.0) % 360.0 - 180.0)
+
+
+def get_initial_gamma(info):
+    """Determine initial gamma value based on 'info'"""
+    gamma = 1.0
+    if info.get(Info.KIND) == Kind.RGB:
+        gamma = (1.0,) * 3
+    elif hasattr(info, "layers"):
+        gamma = (1.0,) * len(info.layers)
+    return gamma

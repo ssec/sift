@@ -43,7 +43,7 @@ from PyQt5.QtCore import QObject, pyqtSignal
 from uwsift.common import Info, Kind, Presentation
 from uwsift.model.area_definitions_manager import AreaDefinitionsManager
 from uwsift.queue import TASK_DOING, TASK_PROGRESS, TaskQueue
-from uwsift.util.common import units_conversion
+from uwsift.util.common import get_initial_gamma, units_conversion
 from uwsift.util.default_paths import DOCUMENT_SETTINGS_DIR
 from uwsift.view.colormap import (
     COLORMAP_MANAGER,
@@ -52,6 +52,7 @@ from uwsift.view.colormap import (
     PyQtGraphColormap,
 )
 from uwsift.workspace import BaseWorkspace, CachingWorkspace, SimpleWorkspace
+from uwsift.workspace.importer import get_guidebook_class
 from uwsift.workspace.metadatabase import Product
 
 LOG = logging.getLogger(__name__)
@@ -173,11 +174,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             cmap = info.get(Info.COLORMAP)
         if style is None:
             style = info.get(Info.STYLE)
-        gamma = 1.0
-        if info.get(Info.KIND) == Kind.RGB:
-            gamma = (1.0,) * 3
-        elif hasattr(info, "layers"):
-            gamma = (1.0,) * len(info.layers)
+        gamma = get_initial_gamma(info)
 
         p = Presentation(
             uuid=info[Info.UUID],
@@ -185,7 +182,7 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             visible=True,
             colormap=cmap,
             style=style,
-            climits=info[Info.CLIM],
+            climits=info[Info.VALID_RANGE],
             gamma=gamma,
             opacity=1.0,
         )
@@ -213,6 +210,15 @@ class Document(QObject):  # base class is rightmost, mixins left of that
             info[Info.UNIT_CONVERSION] = units_conversion(info)
         if Info.FAMILY not in info:
             info[Info.FAMILY] = self.family_for_product_or_info(info)
+        if "actual_range" not in info:
+            info["actual_range"] = self._workspace.get_min_max_value_for_dataset_by_uuid(uuid)
+
+        if Info.VALID_RANGE not in info:
+            guidebook = get_guidebook_class(info)
+            info[Info.VALID_RANGE] = guidebook.valid_range(info)
+
+        assert info[Info.VALID_RANGE] is not None
+
         presentation = self._insert_dataset_with_info(info, insert_before=insert_before)
 
         # signal updates from the document
