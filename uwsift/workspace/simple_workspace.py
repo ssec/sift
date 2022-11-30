@@ -280,7 +280,7 @@ class SimpleWorkspace(BaseWorkspace):
             if update.content is not None:
                 self.contents[update.uuid] = update.content
         LOG.debug("received {} updates during import".format(nupd))
-        self.clear_product_state_flag(prod.uuid, State.ARRIVING)
+        self._clear_product_state_flag(prod.uuid, State.ARRIVING)
 
         # make an ActiveContent object from the Content, now that we've imported it
         ac = self._overview_content_for_uuid(

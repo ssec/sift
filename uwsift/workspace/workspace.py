@@ -250,7 +250,7 @@ class BaseWorkspace(QObject):
         state.add(flag)
         self.didChangeProductState.emit(uuid, state)
 
-    def clear_product_state_flag(self, uuid: UUID, flag):
+    def _clear_product_state_flag(self, uuid: UUID, flag):
         state = self._state[uuid]
         state.remove(flag)
         self.didChangeProductState.emit(uuid, state)
