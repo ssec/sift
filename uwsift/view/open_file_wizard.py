@@ -327,10 +327,10 @@ class OpenFileWizard(QtWidgets.QWizard):
     # ==============================================================================================
 
     def _open_select_folder_dialog(self):
-        """Show folder chooser and update table with files"""
+        """Show folder chooser and update table with files matching the filter pattern."""
         file_dialog = QtWidgets.QFileDialog(self, "Select folder to open")
-        file_dialog.setOption(QtWidgets.QFileDialog.ShowDirsOnly, True)
         file_dialog.setFileMode(QtWidgets.QFileDialog.Directory)
+        file_dialog.setOption(QtWidgets.QFileDialog.ShowDirsOnly, True)  # Must come after setFileMode()
 
         if self._initial_directory:
             file_dialog.setDirectory(self._initial_directory)
