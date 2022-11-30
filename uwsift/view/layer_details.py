@@ -27,6 +27,7 @@ from uwsift.model.layer_item import LayerItem
 from uwsift.model.layer_model import LayerModel
 from uwsift.model.product_dataset import ProductDataset
 from uwsift.ui.layer_details_widget_ui import Ui_LayerDetailsPane
+from uwsift.util.common import format_resolution
 from uwsift.view.colormap import COLORMAP_MANAGER
 
 LOG = logging.getLogger(__name__)
@@ -103,6 +104,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         self._details_pane_ui.layerVisibleSchedTimeValue.setText("N/A")
         self._details_pane_ui.layerInstrumentValue.setText("N/A")
         self._details_pane_ui.layerWavelengthValue.setText("N/A")
+        self._details_pane_ui.layerResolutionValue.setText("N/A")
         self._details_pane_ui.layerColormapValue.setText("N/A")
         self._details_pane_ui.layerColorLimitsValue.setText("N/A")
         self._details_pane_ui.layerColormapVisual.setHtml("")
@@ -199,6 +201,8 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
         self._update_displayed_wavelength()
 
+        self._update_displayed_resolution()
+
         self.update_displayed_colormap()
 
         self.update_displayed_clims()
@@ -219,6 +223,16 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         layer_descriptor = self._current_selected_layer.descriptor
         if layer_descriptor:
             self._details_pane_ui.layerNameValue.setText(self._current_selected_layer.descriptor)
+
+    def _update_displayed_resolution(self):
+        resolution_str = "N/A"
+
+        if self._current_selected_layer.info.get("resolution-x"):
+            resolution_str = format_resolution(self._current_selected_layer.info.get("resolution-x"))
+            resolution_str += " / "
+            resolution_str += format_resolution(self._current_selected_layer.info.get("resolution-y"))
+
+        self._details_pane_ui.layerResolutionValue.setText(resolution_str)
 
     def _update_displayed_time(self):
         active_product_dataset: Optional[

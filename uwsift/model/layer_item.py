@@ -82,6 +82,13 @@ class LayerItem:
             if key in info:
                 layer_info[key] = info[key]
 
+        if 'area' in info:
+            layer_info["resolution-x"] = info['area'].pixel_size_x
+            layer_info["resolution-y"] = info['area'].pixel_size_y
+        elif 'resolution' in info:
+            layer_info["resolution-x"] = info["resolution"]
+            layer_info["resolution-y"] = info["resolution"]
+
         return frozendict(layer_info)
 
     def replace_recipe_layer_info(self, info: frozendict):

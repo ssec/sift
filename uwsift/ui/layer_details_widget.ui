@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>312</width>
-    <height>228</height>
+    <height>234</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -105,31 +105,45 @@
        </property>
       </widget>
      </item>
-     <item row="4" column="0">
+     <item row="5" column="0">
       <widget class="QLabel" name="layerColormapLabel">
        <property name="text">
         <string>Colormap:</string>
        </property>
       </widget>
      </item>
-     <item row="4" column="1">
+     <item row="5" column="1">
       <widget class="QLabel" name="layerColormapValue">
        <property name="text">
         <string>Rainbow (IR Default)</string>
        </property>
       </widget>
      </item>
-     <item row="5" column="0">
+     <item row="6" column="0">
       <widget class="QLabel" name="layerColorLimitsLabel">
        <property name="text">
         <string>Color Limits:</string>
        </property>
       </widget>
      </item>
-     <item row="5" column="1">
+     <item row="6" column="1">
       <widget class="QLabel" name="layerColorLimitsValue">
        <property name="text">
         <string>-109.00 ~ 55.00°C</string>
+       </property>
+      </widget>
+     </item>
+     <item row="4" column="0">
+      <widget class="QLabel" name="layerResolutionLabel">
+       <property name="text">
+        <string>Resolution:</string>
+       </property>
+      </widget>
+     </item>
+     <item row="4" column="1">
+      <widget class="QLabel" name="layerResolutionValue">
+       <property name="text">
+        <string>1 km</string>
        </property>
       </widget>
      </item>
