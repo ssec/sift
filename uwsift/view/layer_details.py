@@ -70,6 +70,9 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
         self._details_pane_ui.gammaSpinBox.valueChanged.connect(self._gamma_changed)
 
+        self._details_pane_ui.climitsCurrentTime.clicked.connect(self._fit_clims_to_current_time)
+        self._details_pane_ui.climitsAllTimes.clicked.connect(self._fit_clims_to_all_times)
+
         self._details_pane_ui.colormap_reset_button.clicked.connect(self._reset_to_intial_state)
 
     # Slot functions
@@ -90,7 +93,9 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         if layers is not None and len(layers) == 1:
             self._current_selected_layer = layers[0]
             if self._current_selected_layer.valid_range:
-                self._valid_min, self._valid_max = self._current_selected_layer.valid_range
+                valid_range = self._current_selected_layer.valid_range
+                clims = self._current_selected_layer.presentation.climits
+                self._set_valid_min_max(clims, valid_range)
             else:
                 self._valid_min = None
                 self._valid_max = None
@@ -172,6 +177,31 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
                 f" Instead for {self._current_selected_layer.uuid} will the value 'N/A' be shown."
             )
 
+    def _fit_clims_to_all_times(self):
+        model = self._current_selected_layer.model
+        actual_range = self._current_selected_layer.get_actual_range_from_layer()
+        model.change_color_limits_for_layer(self._current_selected_layer.uuid, actual_range)
+        valid_range = self._current_selected_layer.valid_range
+
+        self._set_valid_min_max(actual_range, valid_range)
+
+        self._update_vmin()
+        self._update_vmax()
+
+    def _fit_clims_to_current_time(self):
+        first_active_dataset = self._current_selected_layer.get_first_active_product_dataset()
+        if first_active_dataset:
+            model = self._current_selected_layer.model
+            actual_range = self._current_selected_layer.get_actual_range_from_first_active_dataset()
+            model.change_color_limits_for_layer(self._current_selected_layer.uuid, actual_range)
+
+            valid_range = self._current_selected_layer.valid_range
+
+            self._set_valid_min_max(actual_range, valid_range)
+
+            self._update_vmin()
+            self._update_vmax()
+
     def _gamma_changed(self, val):
         model = self._current_selected_layer.model
         model.change_gamma_for_layer(self._current_selected_layer.uuid, val)
@@ -252,6 +282,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         model.change_gamma_for_layer(
             self._current_selected_layer.uuid, get_initial_gamma(self._current_selected_layer.info)
         )
+        self._valid_min, self._valid_max = self._current_selected_layer.valid_range
         self._update_vmin()
         self._update_vmax()
         self._update_gamma()
@@ -263,6 +294,10 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
             new_clims = (val, self._current_selected_layer.presentation.climits[1])
         model = self._current_selected_layer.model
         model.change_color_limits_for_layer(self._current_selected_layer.uuid, new_clims)
+
+    def _set_valid_min_max(self, clims, valid_range):
+        self._valid_min = min(clims[0], valid_range[0])
+        self._valid_max = max(clims[1], valid_range[1])
 
     def _slider_changed(self, value=None, is_max=True):
         spin_box = self._details_pane_ui.vmax_spinbox if is_max else self._details_pane_ui.vmin_spinbox
