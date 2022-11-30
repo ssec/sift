@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'pov_main.ui'
+# Form implementation generated from reading ui file 'uwsift/ui/pov_main.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.7
 #
@@ -822,6 +822,20 @@ class Ui_MainWindow(object):
         self.verticalLayout_15.addWidget(self.algebraicScrollAreaWidget)
         self.algebraicConfigPane.setWidget(self.dockWidgetContents_4)
         MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.algebraicConfigPane)
+        self.datasetStatisticsPaneDockWidget = QtWidgets.QDockWidget(MainWindow)
+        self.datasetStatisticsPaneDockWidget.setFeatures(
+            QtWidgets.QDockWidget.DockWidgetFloatable | QtWidgets.QDockWidget.DockWidgetMovable
+        )
+        self.datasetStatisticsPaneDockWidget.setObjectName("datasetStatisticsPaneDockWidget")
+        self.datasetStatisticsPaneDockWidgetContents = QtWidgets.QWidget()
+        self.datasetStatisticsPaneDockWidgetContents.setObjectName("datasetStatisticsPaneDockWidgetContents")
+        self.verticalLayout_9 = QtWidgets.QVBoxLayout(self.datasetStatisticsPaneDockWidgetContents)
+        self.verticalLayout_9.setObjectName("verticalLayout_9")
+        self.datasetStatisticsPane = DatasetStatisticsPane(self.datasetStatisticsPaneDockWidgetContents)
+        self.datasetStatisticsPane.setObjectName("datasetStatisticsPane")
+        self.verticalLayout_9.addWidget(self.datasetStatisticsPane)
+        self.datasetStatisticsPaneDockWidget.setWidget(self.datasetStatisticsPaneDockWidgetContents)
+        MainWindow.addDockWidget(QtCore.Qt.DockWidgetArea(2), self.datasetStatisticsPaneDockWidget)
 
         self.retranslateUi(MainWindow)
         self.probeTabWidget.setCurrentIndex(0)
@@ -906,6 +920,7 @@ class Ui_MainWindow(object):
         self.operations_label.setText(_translate("MainWindow", "Operations"))
         self.operations_text.setPlainText(_translate("MainWindow", "result = x - y"))
         self.algebraicUpdateButton.setText(_translate("MainWindow", "Update"))
+        self.datasetStatisticsPaneDockWidget.setWindowTitle(_translate("MainWindow", "Statistics"))
 
 
 from PyQt5 import QtQuickWidgets
@@ -915,4 +930,5 @@ from uwsift.ui.custom_widgets import (
     QNoScrollDoubleSpinBox,
     QNoScrollSlider,
 )
+from uwsift.view.dataset_statistics_pane import DatasetStatisticsPane
 from uwsift.view.layer_tree_view import LayerTreeView

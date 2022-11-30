@@ -668,6 +668,7 @@ class Main(QtWidgets.QMainWindow):
         self._init_layer_panes()
         self._init_algebraic_pane()
         self._init_rgb_pane()
+        self._init_statistics_pane()
         self._init_recipe_manager()
         self._init_map_widget()
         self._init_qml_timeline()
@@ -876,6 +877,10 @@ class Main(QtWidgets.QMainWindow):
         self.layer_model.didChangeRecipeLayerNames.connect(self.rgb_config_pane.set_combos_to_layer_names)
         self.layer_model.didRemoveLayer.connect(self.rgb_config_pane.layer_removed)
 
+    def _init_statistics_pane(self):
+        self.ui.treeView.layerSelectionChanged.connect(self.ui.datasetStatisticsPane.selection_did_change)
+        self.layer_model.didFinishActivateProductDatasets.connect(self.ui.datasetStatisticsPane.initiate_update)
+
     def _init_recipe_manager(self):
         self.recipe_manager = RecipeManager()
 
@@ -956,6 +961,7 @@ class Main(QtWidgets.QMainWindow):
         return engine.rootContext()
 
     def _init_arrange_panes(self):
+        self.tabifyDockWidget(self.ui.areaProbePane, self.ui.datasetStatisticsPaneDockWidget)
         self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.rgbConfigPane)
         self.tabifyDockWidget(self.ui.layerDetailsPane, self.ui.algebraicConfigPane)
         # Make the layer details shown

@@ -59,7 +59,7 @@ class SimpleWorkspace(BaseWorkspace):
     #
 
     def _activate_content(self, c: Content) -> ActiveContent:
-        self._available[c.uuid] = zult = ActiveContent(self.cache_dir, c)
+        self._available[c.uuid] = zult = ActiveContent(self.cache_dir, c, self.get_info(c.uuid))
         c.touch()
         c.product.touch()
         self._remove_content_data_from_cache_dir_checked(c)
@@ -476,3 +476,6 @@ class SimpleWorkspace(BaseWorkspace):
             return
         for c in p.content:
             self._available.pop(c.uuid, None)
+
+    def _get_active_content_by_uuid(self, uuid: UUID):
+        return self._available.get(uuid)
