@@ -19,7 +19,6 @@ __docformat__ = "reStructuredText"
 import logging
 from typing import Optional, Tuple
 
-from decimal import Decimal
 import numpy as np
 from PyQt5 import QtWidgets
 
@@ -28,6 +27,7 @@ from uwsift.model.layer_item import LayerItem
 from uwsift.model.layer_model import LayerModel
 from uwsift.model.product_dataset import ProductDataset
 from uwsift.ui.layer_details_widget_ui import Ui_LayerDetailsPane
+from uwsift.util.common import format_resolution
 from uwsift.view.colormap import COLORMAP_MANAGER
 
 LOG = logging.getLogger(__name__)
@@ -224,6 +224,16 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         if layer_descriptor:
             self._details_pane_ui.layerNameValue.setText(self._current_selected_layer.descriptor)
 
+    def _update_displayed_resolution(self):
+        resolution_str = "N/A"
+
+        if self._current_selected_layer.info.get("resolution-x"):
+            resolution_str = format_resolution(self._current_selected_layer.info.get("resolution-x"))
+            resolution_str += " / "
+            resolution_str += format_resolution(self._current_selected_layer.info.get("resolution-y"))
+
+        self._details_pane_ui.layerResolutionValue.setText(resolution_str)
+
     def _update_displayed_time(self):
         active_product_dataset: Optional[
             ProductDataset
@@ -244,22 +254,3 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         else:
             wavelength_str = "N/A" if self._current_selected_layer.kind != Kind.RGB else "N/A, N/A, N/A"
             self._details_pane_ui.layerWavelengthValue.setText(wavelength_str)
-
-    def _update_displayed_resolution(self):
-        resolution_str = "N/A"
-
-        if self._current_selected_layer.info.get("resolution-x"):
-            resolution_str = self._format_resolution(self._current_selected_layer.info.get("resolution-x"))
-            resolution_str += ' / '
-            resolution_str += self._format_resolution(self._current_selected_layer.info.get("resolution-y"))
-
-        self._details_pane_ui.layerResolutionValue.setText(resolution_str)
-
-    @staticmethod
-    def _format_resolution(resolution):
-        resolution = Decimal(resolution)
-        if resolution < 1000:
-            return str(resolution.quantize(Decimal("1."))) + " m"
-        else:
-            resolution /= Decimal(1000)
-            return str(resolution.quantize(Decimal(".1"))) + " km"

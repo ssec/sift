@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+from decimal import Decimal
 from typing import List, Set
 
 import numpy as np
@@ -242,6 +243,18 @@ def format_wavelength(wl):
     else:
         wl_str = f"{wl:0.01f} µm"
     return wl_str
+
+
+def format_resolution(resolution: float) -> str:
+    """Return string representing the given resolution (interpreted in meters)
+    in the unit km for values greater than 1 km, otherwise in m, including the
+    unit symbol."""
+    resolution = Decimal(resolution)
+    if resolution < 1000:
+        return str(resolution.quantize(Decimal("1."))) + " m"
+    else:
+        resolution /= Decimal(1000)
+        return str(resolution.quantize(Decimal(".1"))) + " km"
 
 
 def normalize_longitude(lon: float) -> float:
