@@ -80,6 +80,13 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
     def initiate_update(self):
         """Start the update process if a layer is currently selected."""
         if self._current_selected_layer:
+            if self._current_selected_layer.valid_range:
+                valid_range = self._current_selected_layer.valid_range
+                clims = self._current_selected_layer.presentation.climits
+                self._set_valid_min_max(clims, valid_range)
+            else:
+                self._valid_min = None
+                self._valid_max = None
             self._update_displayed_info()
 
     def selection_did_change(self, layers: Tuple[LayerItem]):
@@ -92,13 +99,6 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         self._clear_details_pane()
         if layers is not None and len(layers) == 1:
             self._current_selected_layer = layers[0]
-            if self._current_selected_layer.valid_range:
-                valid_range = self._current_selected_layer.valid_range
-                clims = self._current_selected_layer.presentation.climits
-                self._set_valid_min_max(clims, valid_range)
-            else:
-                self._valid_min = None
-                self._valid_max = None
             self.initiate_update()
 
     def update_displayed_clims(self):
