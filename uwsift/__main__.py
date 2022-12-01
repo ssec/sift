@@ -314,7 +314,7 @@ class Main(QtWidgets.QMainWindow):
 
     didFinishLoading = QtCore.pyqtSignal(list)
 
-    def interactive_open_files(self, *args, files=None, **kwargs):
+    def _interactive_open_files(self, *args, files=None, **kwargs):
         self.scene_manager.animation_controller.animating = False
         # http://pyqt.sourceforge.net/Docs/PyQt4/qfiledialog.html#getOpenFileNames
         filename_filters = [
@@ -369,9 +369,9 @@ class Main(QtWidgets.QMainWindow):
         # don't use <algebraic layer ...> type paths
         self._last_open_dir = _common_path_prefix([x for x in paths if x[0] != "<"]) or self._last_open_dir
         if USE_INVENTORY_DB:
-            self.update_recent_file_menu()
+            self._update_recent_file_menu()
 
-    def activate_products_by_uuid(self, uuids):
+    def _activate_products_by_uuid(self, uuids):
         uuids = list(uuids)
         if not uuids:
             return
@@ -389,12 +389,12 @@ class Main(QtWidgets.QMainWindow):
         else:
             event.ignore()
 
-    def change_tool(self, checked, name=Tool.PAN_ZOOM):
+    def _change_tool(self, checked, name=Tool.PAN_ZOOM):
         if checked is not True:
             return
         self.scene_manager.change_tool(name)
 
-    def update_recent_file_menu(self, *args, **kwargs):
+    def _update_recent_file_menu(self, *args, **kwargs):
         assert isinstance(self.workspace, CachingWorkspace)  # nosec B101
         uuid_to_name = self.workspace.recently_used_products()
         LOG.debug("recent uuids: {}".format(repr(uuid_to_name.keys())))
@@ -404,13 +404,13 @@ class Main(QtWidgets.QMainWindow):
             def openit(checked=False, uuid=uuid):
                 LOG.debug("open recent product {}".format(uuid))
                 self.scene_manager.animation_controller.animating = False
-                self.activate_products_by_uuid([uuid])
+                self._activate_products_by_uuid([uuid])
 
             open_action = QtWidgets.QAction(p_name, self)
             open_action.triggered.connect(openit)
             self._recent_files_menu.addAction(open_action)
 
-    def update_progress_bar(self, status_info, *args, **kwargs):
+    def _update_progress_bar(self, status_info, *args, **kwargs):
         active = status_info[0] if len(status_info) > 0 else None
         val = active[TASK_PROGRESS] if active else 0.0
         txt = active[TASK_DOING] if active else ""
@@ -418,11 +418,11 @@ class Main(QtWidgets.QMainWindow):
         self.ui.progressBar.setValue(int(val * PROGRESS_BAR_MAX))
         self.ui.progressText.setText(txt)
 
-    def toggle_visibility_on_selected_layers(self, *args, **kwargs):
+    def _toggle_visibility_on_selected_layers(self, *args, **kwargs):
         model_indexes = self.ui.treeView.selectedIndexes()
         self.layer_model.toggle_layers_visibility(model_indexes)
 
-    def update_point_probe_text(self, probe_name):
+    def _update_point_probe_text(self, probe_name):
         current_row = self.ui.treeView.currentIndex().row()
         product_dataset = None
         if current_row >= 0:
@@ -584,7 +584,7 @@ class Main(QtWidgets.QMainWindow):
 
         self.queue = TaskQueue()
         self.ui.progressBar.setRange(0, PROGRESS_BAR_MAX)
-        self.queue.didMakeProgress.connect(self.update_progress_bar)
+        self.queue.didMakeProgress.connect(self._update_progress_bar)
 
         # create manager and helper classes
         if USE_INVENTORY_DB:
@@ -695,7 +695,7 @@ class Main(QtWidgets.QMainWindow):
         self.graphManager.didClonePolygon.connect(self.scene_manager.copy_polygon)
         self.graphManager.pointProbeChanged.connect(self.scene_manager.on_point_probe_set)
         self.graphManager.pointProbeChanged.connect(self.layer_model.on_point_probe_set)
-        self.graphManager.pointProbeChanged.connect(self.update_point_probe_text)
+        self.graphManager.pointProbeChanged.connect(self._update_point_probe_text)
 
         self.scene_manager.newPointProbe.connect(self.graphManager.update_point_probe)
 
@@ -703,8 +703,8 @@ class Main(QtWidgets.QMainWindow):
         self.layer_model.didUpdateLayers.connect(self.graphManager.handleActiveProductDatasetsChanged)
         self.layer_model.didChangeRecipeLayerNames.connect(self.graphManager.handleActiveProductDatasetsChanged)
 
-        self.ui.treeView.selectedLayerForProbeChanged.connect(self.update_point_probe_text)
-        self.layer_model.didChangeRecipeLayerNames.connect(self.update_point_probe_text)
+        self.ui.treeView.selectedLayerForProbeChanged.connect(self._update_point_probe_text)
+        self.layer_model.didChangeRecipeLayerNames.connect(self._update_point_probe_text)
 
         # Connect to an unnamed slot (lambda: ...) to strip off the argument
         # (of type dict) from the signal 'didMatchTimes'
@@ -735,11 +735,11 @@ class Main(QtWidgets.QMainWindow):
         self.scene_manager.newProbePolygon.connect(update_probe_polygon)
 
     def _init_tool_controls(self):
-        self.ui.panZoomToolButton.toggled.connect(partial(self.change_tool, name=Tool.PAN_ZOOM))
-        self.ui.pointSelectButton.toggled.connect(partial(self.change_tool, name=Tool.POINT_PROBE))
-        self.ui.regionSelectButton.toggled.connect(partial(self.change_tool, name=Tool.REGION_PROBE))
+        self.ui.panZoomToolButton.toggled.connect(partial(self._change_tool, name=Tool.PAN_ZOOM))
+        self.ui.pointSelectButton.toggled.connect(partial(self._change_tool, name=Tool.POINT_PROBE))
+        self.ui.regionSelectButton.toggled.connect(partial(self._change_tool, name=Tool.REGION_PROBE))
         self.ui.regionSelectButton.toggled.connect(self.ui.areaProbePane.raise_)
-        self.change_tool(True)
+        self._change_tool(True)
 
         def update_full_data_selection():
             # TODO: this slot implementation should be revised, parts of it
@@ -1054,18 +1054,18 @@ class Main(QtWidgets.QMainWindow):
         LOG.debug("main window closing")
         self.workspace.close()
 
-    def open_from_cache(self, *args, **kwargs):
+    def _open_from_cache(self, *args, **kwargs):
         assert isinstance(self.workspace, CachingWorkspace)  # nosec B101
 
         def _activate_products_for_names(uuids):
             LOG.info("activating cached products with uuids: {}".format(repr(uuids)))
-            self.activate_products_by_uuid(uuids)
+            self._activate_products_by_uuid(uuids)
 
         def _purge_content_for_names(uuids):
             LOG.info("removing cached products with uuids: {}".format(repr(uuids)))
             self.workspace.purge_content_for_product_uuids(uuids, also_products=False)
             if USE_INVENTORY_DB:
-                self.update_recent_file_menu()
+                self._update_recent_file_menu()
 
         if not self._open_cache_dialog:
             self._open_cache_dialog = OpenCacheDialog(self, _activate_products_for_names, _purge_content_for_names)
@@ -1075,7 +1075,7 @@ class Main(QtWidgets.QMainWindow):
         ordered_uuid_to_name = OrderedDict([(u, uuid_to_name[u]) for u in ordered_uuids])
         self._open_cache_dialog.activate(ordered_uuid_to_name)
 
-    def open_wizard(self, *args, **kwargs):
+    def _open_wizard(self, *args, **kwargs):
 
         if not self._wizard_dialog:
             self._wizard_dialog = OpenFileWizard(
@@ -1126,10 +1126,10 @@ class Main(QtWidgets.QMainWindow):
         else:
             LOG.debug("Wizard closed, nothing to load")
 
-    def reload_config(self):
+    def _reload_config(self):
         config.refresh()
 
-    def remove_region_polygon(self, action: QtWidgets.QAction = None, *args):
+    def _remove_region_polygon(self, action: QtWidgets.QAction = None, *args):
         if self.scene_manager._current_tool == Tool.REGION_PROBE:
             self.ui.panZoomToolButton.click()
 
@@ -1148,7 +1148,7 @@ class Main(QtWidgets.QMainWindow):
     def _init_menu(self):
         open_action = QtWidgets.QAction("&Open...", self)
         open_action.setShortcut("Ctrl+Shift+O")
-        open_action.triggered.connect(self.interactive_open_files)
+        open_action.triggered.connect(self._interactive_open_files)
 
         exit_action = QtWidgets.QAction("&Exit", self)
         exit_action.setShortcut("Ctrl+Q")
@@ -1157,15 +1157,15 @@ class Main(QtWidgets.QMainWindow):
         if USE_INVENTORY_DB:
             open_cache_action = QtWidgets.QAction("Open from Cache...", self)
             open_cache_action.setShortcut("Ctrl+A")
-            open_cache_action.triggered.connect(self.open_from_cache)
+            open_cache_action.triggered.connect(self._open_from_cache)
 
         open_wizard_action = QtWidgets.QAction("Open File Wizard...", self)
         open_wizard_action.setShortcuts(["Ctrl+O", "Ctrl+Alt+O"])
-        open_wizard_action.triggered.connect(self.open_wizard)
+        open_wizard_action.triggered.connect(self._open_wizard)
 
         reload_config_action = QtWidgets.QAction("Reload Configuration", self)
         reload_config_action.setShortcuts(["Ctrl+K", "Ctrl+Alt+K"])
-        reload_config_action.triggered.connect(self.reload_config)
+        reload_config_action.triggered.connect(self._reload_config)
 
         menubar = self.ui.menubar
         file_menu = menubar.addMenu("&File")
@@ -1197,7 +1197,7 @@ class Main(QtWidgets.QMainWindow):
 
         toggle_vis = QtWidgets.QAction("Toggle &Visibility", self)
         toggle_vis.setShortcut("V")
-        toggle_vis.triggered.connect(self.toggle_visibility_on_selected_layers)
+        toggle_vis.triggered.connect(self._toggle_visibility_on_selected_layers)
 
         animate = QtWidgets.QAction("Animate", self)
         animate.setShortcut("A")
@@ -1217,7 +1217,7 @@ class Main(QtWidgets.QMainWindow):
 
         clear = QtWidgets.QAction("Clear Region Selection", self)
         clear.setShortcut(QtCore.Qt.Key_Escape)
-        clear.triggered.connect(self.remove_region_polygon)
+        clear.triggered.connect(self._remove_region_polygon)
 
         composite = QtWidgets.QAction("Create Composite", self)
         composite.setShortcut("C")
@@ -1234,7 +1234,7 @@ class Main(QtWidgets.QMainWindow):
 
         open_gradient = QtWidgets.QAction("Toggle Colormap Editor", self)
         open_gradient.setShortcut("Ctrl+E")
-        open_gradient.triggered.connect(self.open_colormap_editor)
+        open_gradient.triggered.connect(self._open_colormap_editor)
 
         focus_layer_manager = QtWidgets.QAction("Set Focus to LayerManager", self)
         focus_layer_manager.setShortcut("Shift+L")
@@ -1260,7 +1260,7 @@ class Main(QtWidgets.QMainWindow):
         view_menu.addAction(focus_layer_manager)
 
         if USE_INVENTORY_DB:
-            self.update_recent_file_menu()
+            self._update_recent_file_menu()
         menubar.setEnabled(True)
 
     def _init_key_releases(self):
@@ -1273,7 +1273,7 @@ class Main(QtWidgets.QMainWindow):
 
         self.scene_manager.main_canvas.events.key_release.connect(cb_factory("t", self.scene_manager.next_tool))
 
-    def open_colormap_editor(self):
+    def _open_colormap_editor(self):
         if self._cmap_editor is None:
             self._cmap_editor = ColormapEditor(doc=self.document)
         self._cmap_editor.show()
