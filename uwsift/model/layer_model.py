@@ -698,7 +698,9 @@ class LayerModel(QAbstractItemModel):
 
         if isinstance(recipe, AlgebraicRecipe):
             if recipe_layer.presentation.climits == INVALID_COLOR_LIMITS:
-                self.change_color_limits_for_layer(recipe_layer.uuid, recipe_layer.info.get(Info.VALID_RANGE))
+                climits = recipe_layer.determine_initial_clims()
+
+                self.change_color_limits_for_layer(recipe_layer.uuid, climits)
             elif not all(input_layers):
                 self.change_color_limits_for_layer(recipe_layer.uuid, INVALID_COLOR_LIMITS)
 

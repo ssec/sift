@@ -82,10 +82,10 @@ class LayerItem:
             if key in info:
                 layer_info[key] = info[key]
 
-        if 'area' in info:
-            layer_info["resolution-x"] = info['area'].pixel_size_x
-            layer_info["resolution-y"] = info['area'].pixel_size_y
-        elif 'resolution' in info:
+        if "area" in info:
+            layer_info["resolution-x"] = info["area"].pixel_size_x
+            layer_info["resolution-y"] = info["area"].pixel_size_y
+        elif "resolution" in info:
             layer_info["resolution-x"] = info["resolution"]
             layer_info["resolution-y"] = info["resolution"]
 
@@ -409,3 +409,12 @@ class LayerItem:
                 actual_range[max] = dataset_actual_range[max]
 
         return actual_range
+
+    def determine_initial_clims(self):
+        """Returns a range based on available metadata either of the layer self or its owned first dataset"""
+        if self.valid_range:
+            return self.valid_range
+        elif self.get_first_active_product_dataset():
+            return self.model._workspace.get_range_for_dataset_no_fail(self.get_first_active_product_dataset().info)
+        else:
+            return INVALID_COLOR_LIMITS

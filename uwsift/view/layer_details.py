@@ -80,10 +80,13 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
     def initiate_update(self):
         """Start the update process if a layer is currently selected."""
         if self._current_selected_layer:
+            clims = self._current_selected_layer.presentation.climits
             if self._current_selected_layer.valid_range:
                 valid_range = self._current_selected_layer.valid_range
-                clims = self._current_selected_layer.presentation.climits
                 self._set_valid_min_max(clims, valid_range)
+            elif clims:
+                self._valid_min = clims[0]
+                self._valid_max = clims[1]
             else:
                 self._valid_min = None
                 self._valid_max = None
@@ -276,9 +279,9 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         model.change_colormap_for_layer(
             self._current_selected_layer.uuid, self._current_selected_layer.info[Info.COLORMAP]
         )
-        model.change_color_limits_for_layer(
-            self._current_selected_layer.uuid, self._current_selected_layer.info[Info.VALID_RANGE]
-        )
+
+        clims = self._current_selected_layer.determine_initial_clims()
+        model.change_color_limits_for_layer(self._current_selected_layer.uuid, clims)
         model.change_gamma_for_layer(
             self._current_selected_layer.uuid, get_initial_gamma(self._current_selected_layer.info)
         )

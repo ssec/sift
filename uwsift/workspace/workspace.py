@@ -54,7 +54,7 @@ from PyQt5.QtCore import QObject, pyqtSignal
 from rasterio import Affine
 from shapely.geometry.polygon import LinearRing
 
-from uwsift.common import Flags, Info, Kind
+from uwsift.common import FALLBACK_RANGE, Flags, Info, Kind
 from uwsift.model.shapes import content_within_shape
 
 from .importer import SatpyImporter, generate_guidebook_metadata
@@ -558,9 +558,9 @@ class BaseWorkspace(QObject):
         # See: https://stackoverflow.com/a/35608701/433202
         names = list(dep_metadata.keys())
         try:
-            valid_combos = np.array(np.meshgrid(*tuple(dep_metadata[n][Info.VALID_RANGE] for n in names))).reshape(
-                len(names), -1
-            )
+            valid_combos = np.array(
+                np.meshgrid(*tuple(self.get_range_for_dataset_no_fail(dep_metadata[n]) for n in names))
+            ).reshape(len(names), -1)
         except KeyError:
             badboys = [n for n in names if Info.VALID_RANGE not in dep_metadata[n]]
             LOG.error("missing VALID_RANGE for: {}".format(repr([dep_metadata[n][Info.DISPLAY_NAME] for n in badboys])))
@@ -598,6 +598,20 @@ class BaseWorkspace(QObject):
             info, content[result_name], namespace=namespace, codeblock=operations
         )
         return uuid, info, data
+
+    def get_range_for_dataset_no_fail(self, info: dict) -> tuple:
+        """Return always a range.
+        If possible, it is the valid range from the metadata, otherwise the actual range of the data given by the
+        minimum and maximum data values, and if that doesn't work either, the FALLBACK_RANGE"""
+        if Info.VALID_RANGE in info:
+            return info[Info.VALID_RANGE]
+
+        actual_range = self.get_min_max_value_for_dataset_by_uuid(info[Info.UUID])
+
+        if actual_range:
+            return actual_range
+
+        return FALLBACK_RANGE
 
     @abstractmethod
     def _create_product_from_array(

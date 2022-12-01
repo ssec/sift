@@ -227,8 +227,6 @@ class ABI_AHI_Guidebook(Guidebook):
             valid_range = info["valid_range"]
         elif "flag_values" in info:
             valid_range = (min(info["flag_values"]), max(info["flag_values"]))
-        elif "actual_range" in info:
-            valid_range = info["actual_range"]
         else:
             valid_range = None
         return valid_range
