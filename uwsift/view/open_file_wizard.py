@@ -41,12 +41,12 @@ DATA_READING_CONFIG_KEY = "data_reading"
 
 CHECKMARK = "✔️"
 
-FILE_PAGE = 0
-PRODUCT_PAGE = 1
+PAGE_ID_FILE_SELECTION = 0
+PAGE_ID_PRODUCT_SELECTION = 1
 
 
 class Conf(Enum):
-    # Just to have a well defined constant to express "skip this resampler"
+    # Just to have a well-defined constant to express "skip this resampler"
     SKIP = 1
 
 
@@ -184,10 +184,10 @@ class OpenFileWizard(QtWidgets.QWizard):
     # ==============================================================================================
 
     def initializePage(self, page_id: int):
-        if page_id == FILE_PAGE:
-            self._init_file_page()
-        elif page_id == PRODUCT_PAGE:
-            self._init_product_select_page()
+        if page_id == PAGE_ID_FILE_SELECTION:
+            self._initialize_page_file_selection()
+        elif page_id == PAGE_ID_PRODUCT_SELECTION:
+            self._initialize_page_product_selection()
 
     def validateCurrentPage(self) -> bool:
         """Check that the current page will generate the necessary data."""
@@ -199,7 +199,7 @@ class OpenFileWizard(QtWidgets.QWizard):
             return valid
 
         page_id: int = self.currentId()
-        if page_id == FILE_PAGE:
+        if page_id == PAGE_ID_FILE_SELECTION:
             # Check for completeness when pressing NEXT, and not a lot of times when selection
             # changes. In case the check fails 'page_complete' is set to False.
             self._check_selected_files_for_compatibility_with_reader()
@@ -234,7 +234,7 @@ class OpenFileWizard(QtWidgets.QWizard):
     # PRIVATE GENERAL WIZARD INTERFACE
     # ----------------------------------------------------------------------------------------------
 
-    def _init_file_page(self):
+    def _initialize_page_file_selection(self):
         if self.file_page_initialized:
             return
 
@@ -261,7 +261,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         readers = sorted(readers, key=lambda x: x.get("long_name", x["name"]))
         OpenFileWizard.configured_readers = OrderedDict((ri.get("long_name", ri["name"]), ri["name"]) for ri in readers)
 
-    def _init_product_select_page(self):
+    def _initialize_page_product_selection(self):
         # name and level
         id_components = self.config["id_components"]
         self.ui.selectIDTable.setColumnCount(len(id_components))
