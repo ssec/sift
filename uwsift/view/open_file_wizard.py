@@ -715,7 +715,7 @@ class OpenFileWizard(QtWidgets.QWizard):
 
     def _update_grouping_mode_combobox(self):
         reader = self.get_reader()
-        geometry_definition: str = config.get(f"data_reading.{reader}" f".geometry_definition", "AreaDefinition")
+        geometry_definition: str = config.get(f"data_reading.{reader}.geometry_definition", "AreaDefinition")
 
         self.ui.groupingModeComboBox.blockSignals(True)
 

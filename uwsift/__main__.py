@@ -69,6 +69,7 @@ from uwsift.util.logger import configure_loggers
 from uwsift.view.algebraic_config import AlgebraicLayerConfigPane
 from uwsift.view.colormap_editor import ColormapEditor
 from uwsift.view.export_image import ExportImageHelper
+from uwsift.view.open_file_wizard import OpenFileWizard
 from uwsift.view.probes import DEFAULT_POINT_PROBE, ProbeGraphManager
 from uwsift.view.rgb_config import RGBLayerConfigPane
 from uwsift.view.scene_graph import SceneGraphManager
@@ -1073,7 +1074,6 @@ class Main(QtWidgets.QMainWindow):
         self._open_cache_dialog.activate(ordered_uuid_to_name)
 
     def open_wizard(self, *args, **kwargs):
-        from uwsift.view.open_file_wizard import OpenFileWizard
 
         if not self._wizard_dialog:
             self._wizard_dialog = OpenFileWizard(
