@@ -83,7 +83,7 @@ class GroupingMode(Enum):
 
 
 class OpenFileWizard(QtWidgets.QWizard):
-    AVAILABLE_READERS = OrderedDict()
+    configured_readers = None
     inputParametersChanged = QtCore.pyqtSignal()
     directoryChanged = QtCore.pyqtSignal(str)
 
@@ -232,15 +232,9 @@ class OpenFileWizard(QtWidgets.QWizard):
     # ----------------------------------------------------------------------------------------------
 
     def _init_file_page(self):
-        if self.AVAILABLE_READERS:
-            readers = self.AVAILABLE_READERS
-        else:
-            satpy_readers = config.get("data_reading.readers")
-            readers = available_satpy_readers(as_dict=True)
-            readers = (r for r in readers if not satpy_readers or r["name"] in satpy_readers)
-            readers = sorted(readers, key=lambda x: x.get("long_name", x["name"]))
-            readers = OrderedDict((ri.get("long_name", ri["name"]), ri["name"]) for ri in readers)
-            OpenFileWizard.AVAILABLE_READERS = readers
+        if not OpenFileWizard.configured_readers:
+            self._update_configured_readers()
+        readers = OpenFileWizard.configured_readers
 
         reader_to_preselect = self._initial_reader or self.config["default_reader"]
         for idx, (reader_short_name, reader_name) in enumerate(readers.items()):
@@ -250,6 +244,15 @@ class OpenFileWizard(QtWidgets.QWizard):
 
         self.ui.folderTextBox.setText(self._initial_directory)
         self._update_grouping_mode_combobox()
+
+    @classmethod
+    def _update_configured_readers(cls):
+        """Update the list of readers that are both configured and a reader is available from Satpy."""
+        configured_readers = config.get("data_reading.readers", None)
+        readers = available_satpy_readers(as_dict=True)
+        readers = (r for r in readers if not configured_readers or r["name"] in configured_readers)
+        readers = sorted(readers, key=lambda x: x.get("long_name", x["name"]))
+        OpenFileWizard.configured_readers = OrderedDict((ri.get("long_name", ri["name"]), ri["name"]) for ri in readers)
 
     def _init_product_select_page(self):
         # name and level
