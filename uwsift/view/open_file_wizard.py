@@ -641,6 +641,8 @@ class OpenFileWizard(QtWidgets.QWizard):
         reader = self.get_reader()
         geometry_definition: str = config.get(f"data_reading.{reader}" f".geometry_definition", "AreaDefinition")
 
+        previous_resampling_method = self.ui.resamplingMethodComboBox.currentData()
+
         self.ui.resamplingMethodComboBox.blockSignals(True)
         self.ui.resamplingMethodComboBox.clear()
 
@@ -662,14 +664,18 @@ class OpenFileWizard(QtWidgets.QWizard):
 
             # Check, whether current item is approved for detected geometry
             # (area or swath). Disable if not and make sure the first enabled
-            # item is preselected
+            # item is preselected or - if an attempt is to be made to do so,
+            # preselect the previously selected item, if it is enabled.
             item_index = self.ui.resamplingMethodComboBox.count() - 1
             if not configuration or geometry_definition not in configuration:
                 item = cb_model.item(item_index)
                 item.setEnabled(False)
-            elif first_enabled_item_index < 0:
-                first_enabled_item_index = item_index
-                self.ui.resamplingMethodComboBox.setCurrentIndex(first_enabled_item_index)
+            else:
+                if first_enabled_item_index < 0:
+                    first_enabled_item_index = item_index
+                    self.ui.resamplingMethodComboBox.setCurrentIndex(first_enabled_item_index)
+                if resampling_method == previous_resampling_method:
+                    self.ui.resamplingMethodComboBox.setCurrentIndex(item_index)
 
         self.update_resampling_info()
         self._set_opts_disabled(self.ui.resamplingMethodComboBox.currentData() == "none")
