@@ -176,6 +176,9 @@ class OpenFileWizard(QtWidgets.QWizard):
         # on cell change: check if page is complete
         self.ui.selectIDTable.cellChanged.connect(self._check_product_page_completeness)
 
+        # wizard state
+        self.file_page_initialized = False
+
     # ==============================================================================================
     # PUBLIC GENERAL WIZARD INTERFACE
     # ==============================================================================================
@@ -232,6 +235,9 @@ class OpenFileWizard(QtWidgets.QWizard):
     # ----------------------------------------------------------------------------------------------
 
     def _init_file_page(self):
+        if self.file_page_initialized:
+            return
+
         if not OpenFileWizard.configured_readers:
             self._update_configured_readers()
         readers = OpenFileWizard.configured_readers
@@ -244,6 +250,7 @@ class OpenFileWizard(QtWidgets.QWizard):
 
         self.ui.folderTextBox.setText(self._initial_directory)
         self._update_grouping_mode_combobox()
+        self.file_page_initialized = True
 
     @classmethod
     def _update_configured_readers(cls):

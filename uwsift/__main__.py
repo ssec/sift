@@ -1079,6 +1079,8 @@ class Main(QtWidgets.QMainWindow):
             self._wizard_dialog = OpenFileWizard(
                 base_dir=self._last_open_dir, base_reader=self._last_reader, parent=self
             )
+        else:
+            self._wizard_dialog.restart()
 
         if self._wizard_dialog.exec_():
             LOG.info("Loading products from open wizard...")
