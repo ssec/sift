@@ -266,6 +266,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         id_components = self.config["id_components"]
         self.ui.selectIDTable.setColumnCount(len(id_components))
         self.ui.selectIDTable.setHorizontalHeaderLabels([x.title() for x in id_components])
+        self.ui.selectIDTable.cellChanged.disconnect(self._check_product_page_completeness)
         for idx, ds_id in enumerate(filter_dataset_ids(self.all_available_products)):
             col_idx = 0
             for id_key, id_val, pretty_val in self._pretty_identifiers(ds_id):
@@ -280,6 +281,7 @@ class OpenFileWizard(QtWidgets.QWizard):
                     item.setCheckState(_to_Qt_CheckState(self._all_selected))
                 self.ui.selectIDTable.setItem(idx, col_idx, item)
                 col_idx += 1
+        self.ui.selectIDTable.cellChanged.connect(self._check_product_page_completeness)
 
         self.update_resampling_method_combobox()
 
