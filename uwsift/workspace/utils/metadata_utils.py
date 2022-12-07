@@ -5,12 +5,12 @@ from typing import Dict, Optional, Tuple
 from uwsift import config
 from uwsift.common import INVALID_COLOR_LIMITS, Info, Kind
 from uwsift.view.colormap import COLORMAP_MANAGER
-from uwsift.workspace.guidebook import Guidebook
+from uwsift.workspace.guidebook import ABI_AHI_Guidebook
 
 LOG = logging.getLogger(__name__)
 
 
-def get_default_colormap(info: dict, guidebook: Guidebook) -> Optional[str]:
+def get_default_colormap(info: dict, guidebook: ABI_AHI_Guidebook) -> Optional[str]:
     """
     Return the name of a colormap configured in 'default_colormaps' for
     the standard name taken from the given ``info``.
