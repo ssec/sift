@@ -41,12 +41,12 @@ DATA_READING_CONFIG_KEY = "data_reading"
 
 CHECKMARK = "✔️"
 
-FILE_PAGE = 0
-PRODUCT_PAGE = 1
+PAGE_ID_FILE_SELECTION = 0
+PAGE_ID_PRODUCT_SELECTION = 1
 
 
 class Conf(Enum):
-    # Just to have a well defined constant to express "skip this resampler"
+    # Just to have a well-defined constant to express "skip this resampler"
     SKIP = 1
 
 
@@ -83,10 +83,12 @@ class GroupingMode(Enum):
 
 
 class OpenFileWizard(QtWidgets.QWizard):
-    AVAILABLE_READERS = OrderedDict()
+    configured_readers = None
     inputParametersChanged = QtCore.pyqtSignal()
+    directoryChanged = QtCore.pyqtSignal(str)
 
     def __init__(self, base_dir=None, base_reader=None, parent=None):
+        super(OpenFileWizard, self).__init__(parent)
         super(OpenFileWizard, self).__init__(parent)
 
         self._initial_directory = base_dir
@@ -138,6 +140,8 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.folderTextBox.textChanged.connect(self.inputParametersChanged.emit)
         # on input parameter change (e.g.: filter pattern, folder): update file table
         self.inputParametersChanged.connect(self._update_file_table)
+        # directory was entered or selected with the QFileDialog
+        self.directoryChanged.connect(self._update_input_directory)
         # on change of selection: group files and check if selection is valid
         self.ui.fileTable.itemSelectionChanged.connect(self._synchronize_checkmarks_and_check_file_page_completeness)
         # on change of sorting: temporarily pause sorting while sorted by checked state
@@ -172,15 +176,18 @@ class OpenFileWizard(QtWidgets.QWizard):
         # on cell change: check if page is complete
         self.ui.selectIDTable.cellChanged.connect(self._check_product_page_completeness)
 
+        # wizard state
+        self.file_page_initialized = False
+
     # ==============================================================================================
     # PUBLIC GENERAL WIZARD INTERFACE
     # ==============================================================================================
 
     def initializePage(self, page_id: int):
-        if page_id == FILE_PAGE:
-            self._init_file_page()
-        elif page_id == PRODUCT_PAGE:
-            self._init_product_select_page()
+        if page_id == PAGE_ID_FILE_SELECTION:
+            self._initialize_page_file_selection()
+        elif page_id == PAGE_ID_PRODUCT_SELECTION:
+            self._initialize_page_product_selection()
 
     def validateCurrentPage(self) -> bool:
         """Check that the current page will generate the necessary data."""
@@ -192,7 +199,7 @@ class OpenFileWizard(QtWidgets.QWizard):
             return valid
 
         page_id: int = self.currentId()
-        if page_id == FILE_PAGE:
+        if page_id == PAGE_ID_FILE_SELECTION:
             # Check for completeness when pressing NEXT, and not a lot of times when selection
             # changes. In case the check fails 'page_complete' is set to False.
             self._check_selected_files_for_compatibility_with_reader()
@@ -227,16 +234,13 @@ class OpenFileWizard(QtWidgets.QWizard):
     # PRIVATE GENERAL WIZARD INTERFACE
     # ----------------------------------------------------------------------------------------------
 
-    def _init_file_page(self):
-        if self.AVAILABLE_READERS:
-            readers = self.AVAILABLE_READERS
-        else:
-            satpy_readers = config.get("data_reading.readers")
-            readers = available_satpy_readers(as_dict=True)
-            readers = (r for r in readers if not satpy_readers or r["name"] in satpy_readers)
-            readers = sorted(readers, key=lambda x: x.get("long_name", x["name"]))
-            readers = OrderedDict((ri.get("long_name", ri["name"]), ri["name"]) for ri in readers)
-            OpenFileWizard.AVAILABLE_READERS = readers
+    def _initialize_page_file_selection(self):
+        if self.file_page_initialized:
+            return
+
+        if not OpenFileWizard.configured_readers:
+            self._update_configured_readers()
+        readers = OpenFileWizard.configured_readers
 
         reader_to_preselect = self._initial_reader or self.config["default_reader"]
         for idx, (reader_short_name, reader_name) in enumerate(readers.items()):
@@ -246,8 +250,18 @@ class OpenFileWizard(QtWidgets.QWizard):
 
         self.ui.folderTextBox.setText(self._initial_directory)
         self._update_grouping_mode_combobox()
+        self.file_page_initialized = True
 
-    def _init_product_select_page(self):
+    @classmethod
+    def _update_configured_readers(cls):
+        """Update the list of readers that are both configured and a reader is available from Satpy."""
+        configured_readers = config.get("data_reading.readers", None)
+        readers = available_satpy_readers(as_dict=True)
+        readers = (r for r in readers if not configured_readers or r["name"] in configured_readers)
+        readers = sorted(readers, key=lambda x: x.get("long_name", x["name"]))
+        OpenFileWizard.configured_readers = OrderedDict((ri.get("long_name", ri["name"]), ri["name"]) for ri in readers)
+
+    def _initialize_page_product_selection(self):
         # name and level
         id_components = self.config["id_components"]
         self.ui.selectIDTable.setColumnCount(len(id_components))
@@ -323,16 +337,40 @@ class OpenFileWizard(QtWidgets.QWizard):
     # ==============================================================================================
 
     def _open_select_folder_dialog(self):
-        """Show folder chooser and update table with files"""
+        """Show folder chooser and update table with files matching the filter pattern."""
+        file_dialog = QtWidgets.QFileDialog(self, "Select Data Directory")
+        file_dialog.setFileMode(QtWidgets.QFileDialog.Directory)
+        file_dialog.setOption(QtWidgets.QFileDialog.ShowDirsOnly, True)  # Must come after setFileMode()
+        tree = file_dialog.findChild(QtWidgets.QTreeView)
+        tree.setRootIsDecorated(True)
+        tree.setItemsExpandable(True)
 
-        folder = QtWidgets.QFileDialog.getExistingDirectory(
-            self, "Select folder to open", self.ui.folderTextBox.text() or os.getenv("HOME")
-        )
-        if not folder:
+        if self._initial_directory:
+            file_dialog.setDirectory(self._initial_directory)
+        else:
+            home_dir = os.getenv("HOME")
+            if home_dir:
+                file_dialog.setDirectory(home_dir)
+
+        file_dialog.currentChanged.connect(self.directoryChanged)
+        file_dialog.directoryEntered.connect(self.directoryChanged)
+        file_dialog.open()
+
+    def _update_input_directory(self, path: str):
+        # The DirectoryOnly FileMode is obsolete and the Directory FileMode
+        # doesn't work with the ShowDirsOnly option. Thus the user is able to
+        # select regular files. Filter these paths from the currentChanged
+        # event.
+        if not os.path.isdir(path):
             return
 
-        if os.path.exists(folder):
-            self.ui.folderTextBox.setText(folder)
+        # Don't update the table twice in the following case: The user may
+        # select the directory with a single click (currentChanged) and then
+        # enter the directory with a double click (directoryEntered).
+        if path != self._initial_directory:
+            self._initial_directory = path
+            self.ui.folderTextBox.setText(path)
+            self.inputParametersChanged.emit()
 
     def _update_filter_patterns(self):
         """Updates available file filter patterns by reading the config. Selects first entry."""
@@ -606,6 +644,8 @@ class OpenFileWizard(QtWidgets.QWizard):
         reader = self.get_reader()
         geometry_definition: str = config.get(f"data_reading.{reader}" f".geometry_definition", "AreaDefinition")
 
+        previous_resampling_method = self.ui.resamplingMethodComboBox.currentData()
+
         self.ui.resamplingMethodComboBox.blockSignals(True)
         self.ui.resamplingMethodComboBox.clear()
 
@@ -627,14 +667,18 @@ class OpenFileWizard(QtWidgets.QWizard):
 
             # Check, whether current item is approved for detected geometry
             # (area or swath). Disable if not and make sure the first enabled
-            # item is preselected
+            # item is preselected or - if an attempt is to be made to do so,
+            # preselect the previously selected item, if it is enabled.
             item_index = self.ui.resamplingMethodComboBox.count() - 1
             if not configuration or geometry_definition not in configuration:
                 item = cb_model.item(item_index)
                 item.setEnabled(False)
-            elif first_enabled_item_index < 0:
-                first_enabled_item_index = item_index
-                self.ui.resamplingMethodComboBox.setCurrentIndex(first_enabled_item_index)
+            else:
+                if first_enabled_item_index < 0:
+                    first_enabled_item_index = item_index
+                    self.ui.resamplingMethodComboBox.setCurrentIndex(first_enabled_item_index)
+                if resampling_method == previous_resampling_method:
+                    self.ui.resamplingMethodComboBox.setCurrentIndex(item_index)
 
         self.update_resampling_info()
         self._set_opts_disabled(self.ui.resamplingMethodComboBox.currentData() == "none")
@@ -687,7 +731,7 @@ class OpenFileWizard(QtWidgets.QWizard):
 
     def _update_grouping_mode_combobox(self):
         reader = self.get_reader()
-        geometry_definition: str = config.get(f"data_reading.{reader}" f".geometry_definition", "AreaDefinition")
+        geometry_definition: str = config.get(f"data_reading.{reader}.geometry_definition", "AreaDefinition")
 
         self.ui.groupingModeComboBox.blockSignals(True)
 
