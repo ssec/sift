@@ -379,11 +379,17 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
     def _update_displayed_resolution(self):
         resolution_str = "N/A"
+        if self._current_selected_layer.info.get("resolution"):
+            resolution_str = format_resolution(self._current_selected_layer.info["resolution"])
+        elif self._current_selected_layer.info.get("resolution-x") or self._current_selected_layer.info.get(
+            "resolution-y"
+        ):
+            resolution_x = self._current_selected_layer.info.get("resolution-x")
+            resolution_y = self._current_selected_layer.info.get("resolution-y")
 
-        if self._current_selected_layer.info.get("resolution-x"):
-            resolution_str = format_resolution(self._current_selected_layer.info.get("resolution-x"))
+            resolution_str = format_resolution(resolution_x) if resolution_x else "N/A"
             resolution_str += " / "
-            resolution_str += format_resolution(self._current_selected_layer.info.get("resolution-y"))
+            resolution_str += format_resolution(resolution_y) if resolution_y else "N/A"
 
         self._details_pane_ui.layerResolutionValue.setText(resolution_str)
 

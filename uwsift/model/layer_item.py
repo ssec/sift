@@ -4,6 +4,8 @@ from types import MappingProxyType
 from typing import List, Optional, Tuple
 from uuid import UUID, uuid1
 
+from pyresample import AreaDefinition
+
 from uwsift import config
 from uwsift.common import INVALID_COLOR_LIMITS, N_A, Info
 from uwsift.common import LayerModelColumns as LMC
@@ -82,12 +84,11 @@ class LayerItem:
             if key in info:
                 layer_info[key] = info[key]
 
-        if "area" in info:
+        if "area" in info and isinstance(info["area"], AreaDefinition):
             layer_info["resolution-x"] = info["area"].pixel_size_x
             layer_info["resolution-y"] = info["area"].pixel_size_y
         elif "resolution" in info:
-            layer_info["resolution-x"] = info["resolution"]
-            layer_info["resolution-y"] = info["resolution"]
+            layer_info["resolution"] = info["resolution"]
 
         return frozendict(layer_info)
 
