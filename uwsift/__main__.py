@@ -963,9 +963,15 @@ class Main(QtWidgets.QMainWindow):
         return engine.rootContext()
 
     def _init_arrange_panes(self):
-        self.tabifyDockWidget(self.ui.areaProbePane, self.ui.datasetStatisticsPaneDockWidget)
-        self.tabifyDockWidget(self.ui.rgbConfigPane, self.ui.algebraicConfigPane)
-        self.tabifyDockWidget(self.ui.rgbConfigPane, self.ui.layerDetailsPaneDockWidget)
+        self.tabifyDockWidget(self.ui.datasetStatisticsPaneDockWidget, self.ui.areaProbePane)
+        self.tabifyDockWidget(self.ui.layerDetailsPaneDockWidget, self.ui.rgbConfigPane)
+        self.tabifyDockWidget(self.ui.layerDetailsPaneDockWidget, self.ui.algebraicConfigPane)
+
+        self.ui.layerDetailsPaneDockWidget.show()
+        self.ui.layerDetailsPaneDockWidget.raise_()
+
+        self.ui.datasetStatisticsPaneDockWidget.show()
+        self.ui.datasetStatisticsPaneDockWidget.raise_()
 
         # refer to objectName'd entities as self.ui.objectName
         self.setAcceptDrops(True)
