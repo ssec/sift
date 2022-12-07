@@ -759,6 +759,10 @@ class Main(QtWidgets.QMainWindow):
         )
 
         def update_probe_polygon(points: list):
+            # Show the area probe pane if a region is created
+            self.ui.areaProbePane.show()
+            self.ui.areaProbePane.raise_()
+
             probeable_layers = self.layer_model.get_probeable_layers()
             probeable_layers_uuids = [layer.uuid for layer in probeable_layers]
 
