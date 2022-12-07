@@ -139,13 +139,14 @@ class PieDial:
 
 
 class PieDialEditor(QtWidgets.QWidget):
-    pie_dial = None
     editingFinished = QtCore.pyqtSignal()
 
-    def __init__(self, parent: QtWidgets.QWidget):
+    def __init__(self, parent: QtWidgets.QWidget, pie_dial: PieDial):
         super(PieDialEditor, self).__init__(parent=parent)
 
         self.setAutoFillBackground(True)
+
+        self.pie_dial = pie_dial
 
         self._layer_opacity_popup = SliderPopup(parent=self)
         self._layer_opacity_popup.get_slider().valueChanged.connect(self._set_opacity_in_percent)
@@ -235,7 +236,7 @@ class PieDialDelegate(QtWidgets.QStyledItemDelegate):
         :param index:
         :return:
         """
-        editor = PieDialEditor(parent)
+        editor = PieDialEditor(parent, PieDial())
         editor.editingFinished.connect(self.commit_and_close_editor)
 
         return editor
@@ -299,8 +300,6 @@ class SliderPopup(QtWidgets.QWidget):
     is displayed in a pop-up window. When the widget is displayed, the value to
     be changed must be converted if the value is not a percentage value.
     """
-
-    _slider = None
 
     def __init__(self, *args, **kwargs):
         super(SliderPopup, self).__init__(*args, **kwargs)
