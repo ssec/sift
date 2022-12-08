@@ -75,7 +75,7 @@ RESAMPLING_METHODS = {
 
 
 class GroupingMode(Enum):
-    # Keep in sync with uwsift/ui/open_file_wizard_2.ui
+    # Keep in sync with uwsift/ui/open_file_wizard.ui
     # TODO initialize groupingModeComboBox programmatically
     BY_GROUP_KEYS = 0
     KEEP_SEPARATE = 1
@@ -146,6 +146,8 @@ class OpenFileWizard(QtWidgets.QWizard):
         self.ui.fileTable.itemSelectionChanged.connect(self._synchronize_checkmarks_and_check_file_page_completeness)
         # on change of sorting: temporarily pause sorting while sorted by checked state
         self.ui.fileTable.horizontalHeader().sortIndicatorChanged.connect(self._file_sorting_changed)
+        # the dialog for selecting a data directory, lazily initialized but to be reused
+        self.file_dialog = None
 
         # Page 2 - Product selection
 
@@ -266,6 +268,7 @@ class OpenFileWizard(QtWidgets.QWizard):
         id_components = self.config["id_components"]
         self.ui.selectIDTable.setColumnCount(len(id_components))
         self.ui.selectIDTable.setHorizontalHeaderLabels([x.title() for x in id_components])
+        self.ui.selectIDTable.cellChanged.disconnect(self._check_product_page_completeness)
         for idx, ds_id in enumerate(filter_dataset_ids(self.all_available_products)):
             col_idx = 0
             for id_key, id_val, pretty_val in self._pretty_identifiers(ds_id):
@@ -280,6 +283,7 @@ class OpenFileWizard(QtWidgets.QWizard):
                     item.setCheckState(_to_Qt_CheckState(self._all_selected))
                 self.ui.selectIDTable.setItem(idx, col_idx, item)
                 col_idx += 1
+        self.ui.selectIDTable.cellChanged.connect(self._check_product_page_completeness)
 
         self.update_resampling_method_combobox()
 
@@ -338,23 +342,25 @@ class OpenFileWizard(QtWidgets.QWizard):
 
     def _open_select_folder_dialog(self):
         """Show folder chooser and update table with files matching the filter pattern."""
-        file_dialog = QtWidgets.QFileDialog(self, "Select Data Directory")
-        file_dialog.setFileMode(QtWidgets.QFileDialog.Directory)
-        file_dialog.setOption(QtWidgets.QFileDialog.ShowDirsOnly, True)  # Must come after setFileMode()
-        tree = file_dialog.findChild(QtWidgets.QTreeView)
-        tree.setRootIsDecorated(True)
-        tree.setItemsExpandable(True)
+        if not self.file_dialog:
+            self.file_dialog = QtWidgets.QFileDialog(self, "Select Data Directory")
+            self.file_dialog.setFileMode(QtWidgets.QFileDialog.Directory)
+            self.file_dialog.setOption(QtWidgets.QFileDialog.ShowDirsOnly, True)  # Must come after setFileMode()
+            tree = self.file_dialog.findChild(QtWidgets.QTreeView)
+            tree.setRootIsDecorated(True)
+            tree.setItemsExpandable(True)
 
-        if self._initial_directory:
-            file_dialog.setDirectory(self._initial_directory)
-        else:
-            home_dir = os.getenv("HOME")
-            if home_dir:
-                file_dialog.setDirectory(home_dir)
+            if self._initial_directory:
+                self.file_dialog.setDirectory(self._initial_directory)
+            else:
+                home_dir = os.getenv("HOME")
+                if home_dir:
+                    self.file_dialog.setDirectory(home_dir)
 
-        file_dialog.currentChanged.connect(self.directoryChanged)
-        file_dialog.directoryEntered.connect(self.directoryChanged)
-        file_dialog.open()
+            self.file_dialog.currentChanged.connect(self.directoryChanged)
+            self.file_dialog.directoryEntered.connect(self.directoryChanged)
+
+        self.file_dialog.open()
 
     def _update_input_directory(self, path: str):
         # The DirectoryOnly FileMode is obsolete and the Directory FileMode
