@@ -165,7 +165,8 @@ class ColormapEditor(QtWidgets.QDialog):
                 # numpy data types
                 controls = controls.tolist()
             for control, color in zip(controls, colors):
-                newWidget.addTick(control, QtGui.QColor(*(color * 255.0)), movable=editable)
+                color_int = (color * 255.0).astype(int)
+                newWidget.addTick(control, QtGui.QColor(*color_int), movable=editable)
 
             if editable:
                 self.user_colormap_states[name] = newWidget.saveState()
