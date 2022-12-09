@@ -84,6 +84,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
     def initiate_update(self):
         """Start the update process if a layer is currently selected."""
+        self._clear_details_pane()
         if not self._current_selected_layer:
             return
 
@@ -105,10 +106,11 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
         :param layers: Layers which are currently selected
         """
-        self._clear_details_pane()
         if layers is not None and len(layers) == 1:
             self._current_selected_layer = layers[0]
             self.initiate_update()
+        else:
+            self._clear_details_pane()
 
     def update_displayed_clims(self):
         """Update the corresponding viewed values for the color limits of the layer
