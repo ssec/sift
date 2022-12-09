@@ -28,7 +28,7 @@ from uwsift.model.layer_item import LayerItem
 from uwsift.model.layer_model import LayerModel
 from uwsift.model.product_dataset import ProductDataset
 from uwsift.ui.layer_details_widget_ui import Ui_LayerDetailsPane
-from uwsift.util.common import format_resolution, get_initial_gamma
+from uwsift.util.common import format_resolution, get_initial_gamma, range_hull
 from uwsift.view.colormap import COLORMAP_MANAGER
 
 LOG = logging.getLogger(__name__)
@@ -79,18 +79,20 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
     def initiate_update(self):
         """Start the update process if a layer is currently selected."""
-        if self._current_selected_layer:
-            clims = self._current_selected_layer.presentation.climits
-            if self._current_selected_layer.valid_range:
-                valid_range = self._current_selected_layer.valid_range
-                self._set_valid_min_max(clims, valid_range)
-            elif clims:
-                self._valid_min = clims[0]
-                self._valid_max = clims[1]
-            else:
-                self._valid_min = None
-                self._valid_max = None
-            self._update_displayed_info()
+        if not self._current_selected_layer:
+            return
+
+        clims = self._current_selected_layer.presentation.climits
+        valid_range = self._current_selected_layer.valid_range
+        if valid_range:
+            self._valid_min, self._valid_max = range_hull(clims, valid_range)
+        elif clims:
+            self._valid_min, self._valid_max = clims
+        else:
+            self._valid_min = None
+            self._valid_max = None
+
+        self._update_displayed_info()
 
     def selection_did_change(self, layers: Tuple[LayerItem]):
         """Update the displayed values only when one layer is selected.
@@ -186,7 +188,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         model.change_color_limits_for_layer(self._current_selected_layer.uuid, actual_range)
         valid_range = self._current_selected_layer.valid_range
 
-        self._set_valid_min_max(actual_range, valid_range)
+        self._valid_min, self._valid_max = range_hull(actual_range, valid_range)
 
         self._update_vmin()
         self._update_vmax()
@@ -200,7 +202,7 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
             valid_range = self._current_selected_layer.valid_range
 
-            self._set_valid_min_max(actual_range, valid_range)
+            self._valid_min, self._valid_max = range_hull(actual_range, valid_range)
 
             self._update_vmin()
             self._update_vmax()
@@ -297,10 +299,6 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
             new_clims = (val, self._current_selected_layer.presentation.climits[1])
         model = self._current_selected_layer.model
         model.change_color_limits_for_layer(self._current_selected_layer.uuid, new_clims)
-
-    def _set_valid_min_max(self, clims, valid_range):
-        self._valid_min = min(clims[0], valid_range[0])
-        self._valid_max = max(clims[1], valid_range[1])
 
     def _slider_changed(self, value=None, is_max=True):
         spin_box = self._details_pane_ui.vmax_spinbox if is_max else self._details_pane_ui.vmin_spinbox

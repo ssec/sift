@@ -274,3 +274,13 @@ def get_initial_gamma(info):
     elif hasattr(info, "layers"):
         gamma = (1.0,) * len(info.layers)
     return gamma
+
+
+def range_hull(range_1: tuple, range_2: tuple) -> tuple:
+    """Get a range which contains the given ranges.
+
+    If the given ranges don't overlap the resulting range also contains the range between them. Thus, the result
+    can be more than the union of the given ranges.
+
+    Here a 'range' is defined by a pair of numbers a, b. The range is considered empty, if a > b."""
+    return min(range_1[0], range_2[0]), max(range_1[1], range_2[1])
