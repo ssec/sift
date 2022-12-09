@@ -33,7 +33,6 @@ from uwsift.queue import TASK_DOING, TASK_PROGRESS
 # Stuff for custom toolbars
 try:
     import matplotlib.backends.qt_editor.figureoptions as figureoptions
-    import six
 except ImportError:
     figureoptions = None
 
@@ -73,7 +72,7 @@ class NavigationToolbar(NavigationToolbar):
             else:
                 item, ok = QtWidgets.QInputDialog.getItem(self.parent, "Customize", "Select axes:", titles, 0, False)
                 if ok:
-                    axes = allaxes[titles.index(six.text_type(item))]
+                    axes = allaxes[titles.index(str(item))]
                 else:
                     return
 
