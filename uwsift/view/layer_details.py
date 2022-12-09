@@ -23,7 +23,7 @@ from typing import Optional, Tuple
 import numpy as np
 from PyQt5 import QtWidgets
 
-from uwsift.common import INVALID_COLOR_LIMITS, Info, Kind
+from uwsift.common import FALLBACK_RANGE, INVALID_COLOR_LIMITS, Info, Kind
 from uwsift.model.layer_item import LayerItem
 from uwsift.model.layer_model import LayerModel
 from uwsift.model.product_dataset import ProductDataset
@@ -37,8 +37,6 @@ LOG = logging.getLogger(__name__)
 class SingleLayerInfoPane(QtWidgets.QWidget):
     """Shows details about one layer that is currently selected."""
 
-    _valid_min = None
-    _valid_max = None
     _slider_steps = 100
 
     def __init__(self, *args, **kwargs):
@@ -46,6 +44,8 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
         Hide the subwidgets at the beginning because no layer is selected."""
         super(SingleLayerInfoPane, self).__init__(*args, **kwargs)
+
+        self._valid_min, self._valid_max = FALLBACK_RANGE
 
         layout = QtWidgets.QVBoxLayout(self)
         self.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
@@ -86,11 +86,10 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         valid_range = self._current_selected_layer.valid_range
         if valid_range:
             self._valid_min, self._valid_max = range_hull(clims, valid_range)
-        elif clims:
+        elif clims and clims != INVALID_COLOR_LIMITS:
             self._valid_min, self._valid_max = clims
         else:
-            self._valid_min = None
-            self._valid_max = None
+            self._valid_min, self._valid_max = FALLBACK_RANGE
 
         self._update_displayed_info()
 
