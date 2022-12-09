@@ -293,7 +293,10 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         model.change_gamma_for_layer(
             self._current_selected_layer.uuid, get_initial_gamma(self._current_selected_layer.info)
         )
-        self._valid_min, self._valid_max = self._current_selected_layer.valid_range
+        actual_range = self._current_selected_layer.get_actual_range_from_first_active_dataset()
+        valid_range = self._current_selected_layer.valid_range
+
+        self._valid_min, self._valid_max = valid_range if valid_range else actual_range
         self._update_vmin()
         self._update_vmax()
         self._update_gamma()
