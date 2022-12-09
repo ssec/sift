@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Set
+from typing import List, Optional, Set
 
 import numpy as np
 import satpy.readers.hrit_base
@@ -284,3 +284,19 @@ def range_hull(range_1: tuple, range_2: tuple) -> tuple:
 
     Here a 'range' is defined by a pair of numbers a, b. The range is considered empty, if a > b."""
     return min(range_1[0], range_2[0]), max(range_1[1], range_2[1])
+
+
+def range_hull_no_fail(range_1: Optional[tuple], range_2: Optional[tuple], fallback: tuple) -> tuple:
+    """Get a range which contains the given ranges.
+
+    It is the same as 'range_hull()' but if the range can not be computed from 'range_1' and 'range_2'
+    then the given 'fallback' is returned.
+    """
+
+    try:
+        lower = min(range_1[0], range_2[0])
+        upper = max(range_1[1], range_2[1])
+    except TypeError:
+        return fallback
+
+    return lower, upper

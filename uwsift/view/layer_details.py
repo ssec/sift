@@ -28,7 +28,12 @@ from uwsift.model.layer_item import LayerItem
 from uwsift.model.layer_model import LayerModel
 from uwsift.model.product_dataset import ProductDataset
 from uwsift.ui.layer_details_widget_ui import Ui_LayerDetailsPane
-from uwsift.util.common import format_resolution, get_initial_gamma, range_hull
+from uwsift.util.common import (
+    format_resolution,
+    get_initial_gamma,
+    range_hull,
+    range_hull_no_fail,
+)
 from uwsift.view.colormap import COLORMAP_MANAGER
 
 LOG = logging.getLogger(__name__)
@@ -187,7 +192,8 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         model.change_color_limits_for_layer(self._current_selected_layer.uuid, actual_range)
         valid_range = self._current_selected_layer.valid_range
 
-        self._valid_min, self._valid_max = range_hull(actual_range, valid_range)
+        assert actual_range != (None, None)
+        self._valid_min, self._valid_max = range_hull_no_fail(actual_range, valid_range, actual_range)
 
         self._update_vmin()
         self._update_vmax()
@@ -201,7 +207,8 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
 
             valid_range = self._current_selected_layer.valid_range
 
-            self._valid_min, self._valid_max = range_hull(actual_range, valid_range)
+            assert actual_range != (None, None)
+            self._valid_min, self._valid_max = range_hull_no_fail(actual_range, valid_range, actual_range)
 
             self._update_vmin()
             self._update_vmax()
