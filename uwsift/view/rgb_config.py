@@ -4,7 +4,7 @@
 import logging
 import uuid
 from functools import partial
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 from PyQt5.QtCore import QObject, pyqtSignal
 from PyQt5.QtGui import QDoubleValidator
@@ -35,15 +35,14 @@ class RGBLayerConfigPane(QObject):
     _rgb = None  # combo boxes in r,g,b order; cache
     _sliders = None  # sliders in r,g,b order; cache
     _edits = None
-    _valid_ranges: List[Tuple[float, float]] = None  # tuples of each component's c-limits
     _gamma_boxes = None  # tuple of each component's gamma spin boxes
 
     def __init__(self, ui, parent, model: LayerModel):
         super(RGBLayerConfigPane, self).__init__(parent)
         self.ui = ui
-        self._valid_ranges = [(None, None), (None, None), (None, None)]
-        self._layer_uuids = []
-        self.recipe = None
+        self._valid_ranges = [(None, None), (None, None), (None, None)]  # tuples of each component's c-limits
+        self._layer_uuids: list = []
+        self.recipe: Optional[CompositeRecipe] = None
         self.model = model
 
         self._slider_steps = 100
@@ -171,7 +170,7 @@ class RGBLayerConfigPane(QObject):
 
         self.didChangeRGBGamma.emit(self.recipe, changed_channel, value)
 
-    def _combo_changed(self, index, combo: QComboBox = None, color=None):
+    def _combo_changed(self, index, combo: QComboBox, color):
         layer_uuid = combo.itemData(index)
         if not layer_uuid:
             # we use None as no-selection value, not empty string
@@ -207,7 +206,9 @@ class RGBLayerConfigPane(QObject):
         layer_uuid = self.recipe.input_layer_ids[RGBA2IDX[color]]
         if layer_uuid is None:
             return values
-        layer_info = self.model.get_layer_by_uuid(layer_uuid).info
+        layer = self.model.get_layer_by_uuid(layer_uuid)
+        assert layer is not None  # nosec B101 # suppress mypy [union-attr]
+        layer_info = layer.info
 
         return (
             layer_info[Info.UNIT_CONVERSION][1](values, inverse=True)
@@ -217,10 +218,15 @@ class RGBLayerConfigPane(QObject):
 
     def _data_to_display(self, color: str, values):
         "convert data value to display value"
+        if self.recipe is None:
+            # No recipe has been set yet
+            return values
         layer_uuid = self.recipe.input_layer_ids[RGBA2IDX[color]]
         if layer_uuid is None:
             return values
-        layer_info = self.model.get_layer_by_uuid(layer_uuid).info
+        layer = self.model.get_layer_by_uuid(layer_uuid)
+        assert layer is not None  # nosec B101 # suppress mypy [union-attr]
+        layer_info = layer.info
 
         return layer_info[Info.UNIT_CONVERSION][1](values) if layer_info.get(Info.UNIT_CONVERSION) else values
 
@@ -230,7 +236,7 @@ class RGBLayerConfigPane(QObject):
     def _create_slider_value(self, valid_min, valid_max, channel_val):
         return int((channel_val - valid_min) / (valid_max - valid_min)) * self._slider_steps
 
-    def _update_line_edits(self, color: str, n: float = None, x: float = None):
+    def _update_line_edits(self, color: str, n: Optional[float] = None, x: Optional[float] = None):
         """
         update edit controls to match non-None values provided
         if called with just color, returns current min and max
@@ -264,7 +270,7 @@ class RGBLayerConfigPane(QObject):
         new_limits = (n, x)
         self.didChangeRGBColorLimits.emit(self.recipe, color, new_limits)
 
-    def _slider_changed(self, value=None, slider=None, color: str = None, is_max: bool = False):
+    def _slider_changed(self, value, slider, color: str, is_max: bool):
         """
         handle slider update event from user
         :param slider: control
@@ -305,7 +311,7 @@ class RGBLayerConfigPane(QObject):
         """Change UI elements to reflect the provided recipe."""
         if layers is not None and len(layers) == 1:
             layer = layers[0]
-            self.recipe = layer.recipe if layer.recipe else None
+            self.recipe = layer.recipe if isinstance(layer.recipe, CompositeRecipe) else None
             self._show_settings_for_layer(self.recipe)
 
     def _show_settings_for_layer(self, recipe=None):
@@ -365,6 +371,7 @@ class RGBLayerConfigPane(QObject):
             editx.setDisabled(False)
 
             layer = self.model.get_layer_by_uuid(layer_uuid)
+            assert layer is not None  # nosec B101 # suppress mypy [union-attr]
             valid_range = layer.valid_range
             # TODO: is the actual range really used correctly here?
             actual_range = layer.get_actual_range_from_layer()
