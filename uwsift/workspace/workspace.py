@@ -130,8 +130,12 @@ class ActiveContent(QObject):
         attrs = dict(info)
         attrs = attrs.update({"algebraic": info.get(Info.ALGEBRAIC)}) if info.get(Info.ALGEBRAIC) else attrs
 
-        data_array = xarray.DataArray(self._data, attrs=attrs)
-        self.statistics = dataset_statistical_analysis(data_array)
+        # exclude mulit channel images out of statistics calculation
+        if info.get(Info.KIND) != Kind.MC_IMAGE:
+            data_array = xarray.DataArray(self._data, attrs=attrs)
+            self.statistics = dataset_statistical_analysis(data_array)
+        else:
+            self.statistics = {}
 
     def _test_init(self):
         data = np.ones((4, 12), dtype=np.float32)

@@ -26,7 +26,7 @@ def get_default_colormap(info: dict, guidebook: Guidebook) -> Optional[str]:
             "Cannot determine default colormap from configuration " "for info which does not have a standard name."
         )
     else:
-        colormap_name = config.get(".".join(["default_colormaps", info_standard_name, "colormap_name"]), None)
+        colormap_name = config.get(".".join(["default_colormaps", info_standard_name, "colormap"]), None)
         if colormap_name in COLORMAP_MANAGER:
             LOG.debug(
                 f"Returning color map '{colormap_name}' as configured for" f" standard name '{info_standard_name}'."
@@ -58,10 +58,10 @@ def get_default_climits(info: dict) -> Optional[Tuple]:
             "Can not determine default color limits from configuration for info which does not have a standard name"
         )
     else:
-        climits = config.get(".".join(["default_colormaps", info_standard_name, "climits"]), None)
+        range = config.get(".".join(["default_colormaps", info_standard_name, "range"]), None)
 
-        if climits:
-            return climits
+        if range:
+            return tuple(range)
 
     return INVALID_COLOR_LIMITS
 

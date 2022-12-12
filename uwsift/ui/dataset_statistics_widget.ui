@@ -14,47 +14,12 @@
    <string>Form</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
-   <property name="leftMargin">
-    <number>2</number>
-   </property>
-   <property name="topMargin">
-    <number>2</number>
-   </property>
-   <property name="rightMargin">
-    <number>2</number>
-   </property>
-   <property name="bottomMargin">
-    <number>2</number>
-   </property>
    <item>
     <layout class="QFormLayout" name="formLayout">
      <item row="0" column="0">
       <widget class="QLabel" name="currDatasetLabel">
        <property name="text">
         <string>Current Dataset:</string>
-       </property>
-      </widget>
-     </item>
-     <item row="2" column="0">
-      <widget class="QLabel" name="decimalPlacesLabel">
-       <property name="text">
-        <string>Decimal Places:</string>
-       </property>
-      </widget>
-     </item>
-     <item row="2" column="1">
-      <widget class="QSpinBox" name="decimalPlacesSpinBox">
-       <property name="wrapping">
-        <bool>true</bool>
-       </property>
-       <property name="specialValueText">
-        <string>unlimited</string>
-       </property>
-       <property name="minimum">
-        <number>-1</number>
-       </property>
-       <property name="maximum">
-        <number>25</number>
        </property>
       </widget>
      </item>
@@ -82,6 +47,33 @@
       <bool>true</bool>
      </property>
     </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout">
+     <item>
+      <widget class="QLabel" name="decimalPlacesLabel">
+       <property name="text">
+        <string>Decimal Places:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QSpinBox" name="decimalPlacesSpinBox">
+       <property name="wrapping">
+        <bool>true</bool>
+       </property>
+       <property name="specialValueText">
+        <string>unlimited</string>
+       </property>
+       <property name="minimum">
+        <number>-1</number>
+       </property>
+       <property name="maximum">
+        <number>25</number>
+       </property>
+      </widget>
+     </item>
+    </layout>
    </item>
   </layout>
  </widget>

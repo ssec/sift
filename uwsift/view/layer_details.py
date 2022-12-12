@@ -362,7 +362,10 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
             self._details_pane_ui.layerInstrumentValue.setText(instrument_str)
 
     def _update_displayed_kind_details(self):
-        if self._current_selected_layer.kind == Kind.IMAGE:
+        if (
+            self._current_selected_layer.kind == Kind.IMAGE
+            and self._current_selected_layer.get_first_active_product_dataset()
+        ):
             self._details_pane_ui.kindDetailsStackedWidget.setCurrentWidget(self._details_pane_ui.page_IMAGE)
 
             self.update_displayed_colormap()
