@@ -224,7 +224,7 @@ class ABI_AHI_Guidebook(Guidebook):
         elif "valid_min" in info:
             valid_range = (info["valid_min"], info["valid_max"])
         elif "valid_range" in info:
-            valid_range = info["valid_range"]
+            valid_range = tuple(info["valid_range"])
         elif "flag_values" in info:
             valid_range = (min(info["flag_values"]), max(info["flag_values"]))
         else:
