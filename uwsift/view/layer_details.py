@@ -92,7 +92,9 @@ class SingleLayerInfoPane(QtWidgets.QWidget):
         valid_range = self._current_selected_layer.valid_range
         if valid_range:
             self._valid_min, self._valid_max = range_hull(clims, valid_range)
-        elif clims and clims != INVALID_COLOR_LIMITS:
+        elif (
+            clims and clims != INVALID_COLOR_LIMITS and isinstance(clims, tuple)
+        ):  # Internal RGB Composites s have a list of clim tuples
             self._valid_min, self._valid_max = clims
         else:
             self._valid_min, self._valid_max = FALLBACK_RANGE
